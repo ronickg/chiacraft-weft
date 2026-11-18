@@ -1,5 +1,6 @@
 //! Blocks and their local simulation, for terrain regions and moving bodies alike.
 
+use crate::world::placement::{CellLayout, Part};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, VecDeque};
 use std::sync::{Arc, OnceLock};
@@ -36,9 +37,11 @@ pub struct Space {
     /// Block changes this tick, sent as deltas.
     pub changes: Vec<(IVec3, u32)>,
     /// The part of a cell whose callback is running, what the mod's `get` and `set` mean there.
-    pub(super) acting: Option<(IVec3, u32)>,
+    pub(super) acting: Option<(IVec3, crate::world::placement::Part)>,
     /// Cells whose other blocks changed this tick, with what they have now.
-    pub extra_changes: Vec<(IVec3, Vec<u32>)>,
+    pub extra_changes: Vec<(IVec3, CellLayout)>,
+    /// Coverage from generated or older saved owners at a cube boundary, until its neighbor loads.
+    pub(super) pending_covers: FxHashMap<IVec3, Vec<(IVec3, Part)>>,
     /// Cubes whose light changed this tick, sent whole.
     pub resend: Vec<(IVec3, Arc<Cube>)>,
     pub(super) light_dirty: FxHashSet<IVec3>,
@@ -58,7 +61,7 @@ pub struct Space {
     /// Where the cells that transferred out of this display-only body were committed.
     pub(super) transfer: Option<Box<super::structure::Transfer>>,
     /// Cells of those landings, what clients are left seeing there until then, and whose they are.
-    pub(super) not_shown: FxHashMap<IVec3, (u32, Vec<u32>, u64)>,
+    pub(super) not_shown: FxHashMap<IVec3, (u32, CellLayout, u64)>,
     /// Light from bodies going through here: the cells they light from, each body's and in all.
     pub(super) body_lights: FxHashMap<u64, Vec<(IVec3, [u8; 3])>>,
     pub(super) body_light: FxHashMap<IVec3, [u8; 3]>,
@@ -114,8 +117,8 @@ impl crate::physics::Blocks for Space {
     fn bounds(&self) -> Option<(IVec3, IVec3)> {
         self.bounds
     }
-    fn extras(&self, p: IVec3) -> &[u32] {
-        self.extras(p)
+    fn layout(&self, p: IVec3) -> &CellLayout {
+        self.layout(p)
     }
 }
 
@@ -127,7 +130,7 @@ impl CubeCells<'_> {
     pub(super) fn may_collide(&self, c: &Content, area: crate::physics::Aabb) -> bool {
         let lo = cube_of(area.min.floor().as_ivec3() - IVec3::Y);
         let hi = cube_of(area.max.floor().as_ivec3());
-        let solid = |s: u32| !c.states[s as usize].collision.is_empty() || c.covered_step(s).is_some();
+        let solid = |s: u32| !c.states[s as usize].collision.is_empty();
         for z in lo.z..=hi.z {
             for y in lo.y..=hi.y {
                 for x in lo.x..=hi.x {
@@ -135,6 +138,9 @@ impl CubeCells<'_> {
                     if cube.uniform_state().map_or_else(
                         || {
                             cube.palette().iter().copied().any(solid)
+                                || cube
+                                    .layouts()
+                                    .any(|(_, l)| l.covers.iter().any(|p| solid(p.state)))
                                 || cube
                                     .all_extras()
                                     .flat_map(|(_, s)| s.iter().copied())
@@ -155,15 +161,15 @@ impl crate::physics::Cells for CubeCells<'_> {
     fn main(&self, p: IVec3) -> Option<u32> {
         self.0.get(&cube_of(p)).map(|cube| cube.get(local_index(p)))
     }
-    fn extras(&self, p: IVec3) -> &[u32] {
+    fn layout(&self, p: IVec3) -> &CellLayout {
         self.0
             .get(&cube_of(p))
-            .map_or(&[], |cube| cube.extras(local_index(p)))
+            .map_or(&crate::world::placement::EMPTY_LAYOUT, |cube| cube.layout(local_index(p)))
     }
     #[inline]
-    fn cell(&self, p: IVec3) -> Option<(u32, &[u32])> {
+    fn cell(&self, p: IVec3) -> Option<(u32, &CellLayout)> {
         let (cube, i) = (self.0.get(&cube_of(p))?, local_index(p));
-        Some((cube.get(i), cube.extras(i)))
+        Some((cube.get(i), cube.layout(i)))
     }
 }
 
@@ -171,13 +177,17 @@ impl crate::physics::Cells for Space {
     fn main(&self, p: IVec3) -> Option<u32> {
         self.get(p)
     }
-    fn extras(&self, p: IVec3) -> &[u32] {
-        Space::extras(self, p)
+    fn layout(&self, p: IVec3) -> &CellLayout {
+        Space::layout(self, p)
     }
-    fn cell(&self, p: IVec3) -> Option<(u32, &[u32])> {
-        let Some(cube) = self.cubes.get(&cube_of(p)) else { return self.finite.then_some((AIR, &[])) };
+    fn cell(&self, p: IVec3) -> Option<(u32, &CellLayout)> {
+        let Some(cube) = self.cubes.get(&cube_of(p)) else {
+            return self
+                .finite
+                .then_some((AIR, &crate::world::placement::EMPTY_LAYOUT));
+        };
         let index = local_index(p);
-        Some((cube.get(index), cube.extras(index)))
+        Some((cube.get(index), cube.layout(index)))
     }
 }
 
@@ -193,38 +203,37 @@ impl Space {
     /// The blocks of a moving structure.
     pub fn with_blocks(c: &Content, blocks: &[(IVec3, u32)]) -> Space {
         let mut s = Self::finite();
-        s.build(c, blocks, []);
+        s.build(c, blocks.iter().map(|&(p, state)| (p, Part::aligned(state))));
         s
     }
 
-    pub fn from_saved(c: &Content, blocks: Vec<(IVec3, u32)>) -> Space {
+    pub fn from_saved(c: &Content, blocks: Vec<(IVec3, Part)>) -> Space {
         let mut body = Self::finite();
-        let mut main = Vec::new();
-        let mut extras: FxHashMap<IVec3, Vec<u32>> = FxHashMap::default();
-        for (at, state) in blocks {
-            if main.last().is_some_and(|&(p, _)| p == at) {
-                extras.entry(at).or_default().push(state);
-            } else {
-                main.push((at, state));
-            }
-        }
-        body.build(c, &main, extras);
+        body.build(c, blocks);
         body
     }
 
-    /// Its blocks to begin with, with what comes with them there already.
-    pub fn build(&mut self, c: &Content, blocks: &[(IVec3, u32)], extras: impl IntoIterator<Item = (IVec3, Vec<u32>)>) {
-        for &(pos, state) in blocks {
-            let cube = self
-                .cubes
-                .entry(cube_of(pos))
-                .or_insert_with(|| Arc::new(Cube::uniform(AIR, 0)));
-            Arc::make_mut(cube).set(local_index(pos), state);
-            self.grow_bounds(pos, state);
-        }
-        for (pos, parts) in extras {
-            if let Some(cube) = self.cubes.get_mut(&cube_of(pos)) {
-                Arc::make_mut(cube).set_extras(local_index(pos), parts);
+    /// Build the same resident and coverage index as a world edit, before starting lighting and circuits.
+    pub fn build(&mut self, c: &Content, blocks: impl IntoIterator<Item = (IVec3, Part)>) {
+        for (p, part) in blocks.into_iter().filter(|(_, part)| part.state != AIR) {
+            for cell in std::iter::once(IVec3::ZERO).chain(part.footprint(c).iter().copied()) {
+                let pos = p + cell;
+                let cube = self
+                    .cubes
+                    .entry(cube_of(pos))
+                    .or_insert_with(|| Arc::new(Cube::uniform(AIR, 0)));
+                let cube = Arc::make_mut(cube);
+                let i = local_index(pos);
+                let mut layout = cube.layout(i).clone();
+                if cell == IVec3::ZERO {
+                    let mut residents: Vec<_> = layout.residents(cube.get(i)).collect();
+                    residents.push(part);
+                    cube.set(i, layout.set_residents(&residents));
+                } else {
+                    layout.covers.push(part.in_cell(cell));
+                }
+                cube.set_layout(i, layout);
+                self.grow_bounds(pos, part.state);
             }
         }
         self.light_structure(c);
@@ -249,12 +258,12 @@ impl Space {
             let mut groups = std::collections::BTreeMap::new();
             let mut grip_radius = 0.0_f64;
             for &(p, state) in self.block_snapshot().iter() {
-                for part in std::iter::once(state).chain(self.extras(p).iter().copied()) {
-                    let info = &c.states[part as usize];
-                    if info.liquid.is_some() || c.covered_step(part).is_some() {
+                for part in self.layout(p).residents(state) {
+                    let info = &c.states[part.state as usize];
+                    if info.liquid.is_some() {
                         continue;
                     }
-                    for shape in block_solids(p, info) {
+                    for shape in block_solids(p.as_dvec3() + part.shift(), info) {
                         if let Solid::Cylinder(wheel) = shape
                             && wheel.grip > 0.0
                         {
@@ -313,9 +322,13 @@ impl Space {
 
     /// What else is in the cell at `p`.
     pub fn extras(&self, p: IVec3) -> &[u32] {
+        &self.layout(p).extras
+    }
+
+    pub fn layout(&self, p: IVec3) -> &CellLayout {
         self.cubes
             .get(&cube_of(p))
-            .map_or(&[], |cube| cube.extras(local_index(p)))
+            .map_or(&crate::world::placement::EMPTY_LAYOUT, |cube| cube.layout(local_index(p)))
     }
 
     /// Allocates the air cube addressed by a write in a finite space.
@@ -352,7 +365,11 @@ impl Space {
                 Err(_) => {}
             }
         }
-        if state == AIR {
+        self.cover_bounds(p, state != AIR || !self.layout(p).covers.is_empty());
+    }
+
+    pub(super) fn cover_bounds(&mut self, p: IVec3, occupied: bool) {
+        if !occupied {
             // Shrinking needs a look over everything (only when the edge itself went).
             if self
                 .bounds
@@ -415,24 +432,19 @@ impl Space {
         Self::mask_cube(&self.not_shown, pos, cube)
     }
 
-    fn mask_cube(hidden: &FxHashMap<IVec3, (u32, Vec<u32>, u64)>, cp: IVec3, mut cube: Arc<Cube>) -> Arc<Cube> {
+    fn mask_cube(hidden: &FxHashMap<IVec3, (u32, CellLayout, u64)>, cp: IVec3, mut cube: Arc<Cube>) -> Arc<Cube> {
         for (&pos, (state, parts, _)) in hidden.iter().filter(|(pos, _)| cube_of(**pos) == cp) {
             let cube = Arc::make_mut(&mut cube);
             cube.set(local_index(pos), *state);
-            cube.set_extras(local_index(pos), parts.clone());
+            cube.set_layout(local_index(pos), parts.clone());
         }
         cube
     }
 
-    /// The blocks of a structure for saving: (position, state name), air left out.
-    pub fn structure_blocks(&self, c: &Content) -> Vec<(IVec3, String)> {
-        self.all_blocks()
-            .into_iter()
-            .flat_map(|(p, s)| {
-                std::iter::once(s)
-                    .chain(self.extras(p).iter().copied())
-                    .map(move |s| (p, c.state_name(s)))
-            })
+    pub fn placed_blocks(&self) -> Vec<(IVec3, Part)> {
+        self.block_snapshot()
+            .iter()
+            .flat_map(|&(p, state)| self.layout(p).residents(state).map(move |part| (p, part)))
             .collect()
     }
 }

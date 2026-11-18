@@ -12,6 +12,7 @@ struct VOut {
     @location(4) dist: f32,
     @location(5) @interpolate(flat) layer2: u32,
     @location(6) @interpolate(flat) blend: f32,
+    @location(7) clip_cube: vec3<f32>,
     // The face's tint, also in `color`; alone it colors emission.
     @location(8) tint: vec3<f32>,
     // Glow mask texture (LabPBR emission), all ones: none.
@@ -204,6 +205,17 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.lod_fade = 0.0;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
+    let light0 = records[base + 6u];
+    var light1 = records[base + 7u];
+    if ((uvw >> QUAD_TINT_SHIFT) & QUAD_CLIP) != 0u {
+        let planes = vec3<u32>(light1) >> vec3<u32>(0u, 2u, 4u);
+        let min_pos = -f32(QUAD_POS_OFFSET) / 16.0;
+        let max_pos = f32(QUAD_POS_MASK - QUAD_POS_OFFSET) / 16.0;
+        let lo = select(vec3(min_pos), vec3(0.0), (planes & vec3(1u)) != vec3(0u));
+        let hi = select(vec3(max_pos), vec3(16.0), (planes & vec3(2u)) != vec3(0u));
+        out.clip_cube = (local - lo) / (hi - lo) - 0.5;
+        light1 = light0;
+    }
     out.world_liquid = select(0u, 1u, origins[ii].w == 0 && ((uvw >> QUAD_TINT_SHIFT) & QUAD_LIQUID) != 0u);
     out.uv = uvs[c];
     let tex_id = w4 & FACE_TEX_MASK;
@@ -213,7 +225,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.layer2 = fr.b;
     out.blend = fr.blend;
     out.glow = glow_of(fr.a);
-    out.light = on_body(corner_light(records[base + 6u], records[base + 7u], c), origins[ii].w);
+    out.light = on_body(corner_light(light0, light1, c), origins[ii].w);
     let o = origins[ii] + g.cam_cube;
     out.slot = shader_of(tex_id);
     out.pos = pos.xyz + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
@@ -228,6 +240,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 }
 
 fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
+    if any(abs(in.clip_cube) > vec3(0.5)) { discard; }
     var light = in.color * lightmap(in.light, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
     // Glowing texels are lifted towards full brightness by their mask: lit = albedo * max(light,
     // emission), so they stay their own (tinted, unshaded) color in the dark.

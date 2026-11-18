@@ -187,7 +187,7 @@ fn send_space_changes(conn: &mut crate::net::ServerConn, dim: u32, frame: u64, s
         .signals
         .level_changes
         .iter()
-        .filter(|(pos, ..)| sent(cube_of(*pos)))
+        .filter(|(pos, ..)| sent(cube_of(pos.cell)))
         .copied()
         .collect();
     if !changes.is_empty() {
@@ -389,9 +389,14 @@ fn send_entities(
             };
             let destination = transfer.destination;
             let mut cubes: Vec<_> = transfer
-                .cells
+                .parts
                 .values()
-                .map(|&(pos, _)| cube_of(pos))
+                .flat_map(|&(pos, part)| {
+                    let footprint = part.footprint(c);
+                    std::iter::once(cube_of(pos))
+                        .chain(footprint.iter().map(|&d| cube_of(pos + d)))
+                        .collect::<Vec<_>>()
+                })
                 .filter(|pos| if destination == 0 { p.sent.contains(pos) } else { visible.contains(&destination) })
                 .collect();
             cubes.sort_unstable_by_key(|pos| pos.to_array());

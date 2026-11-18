@@ -237,20 +237,34 @@ impl GroupDef {
             size: if g.size > 0.0 { g.size } else { 18.0 },
             background: text(g.background),
             tooltip: text(g.tooltip),
-            priorities: g.priorities.iter().map(|p| (p.priority, filter(&p.items))).collect(),
+            priorities: g
+                .priorities
+                .iter()
+                .map(|p| (p.priority, filter(&p.items)))
+                .collect(),
         }
     }
 
     pub fn priority(&self, item: Option<u32>) -> i32 {
-        self.priorities.iter()
-            .filter(|(_, items)| items.as_ref().is_none_or(|bits| item.is_some_and(|i| crate::refs::has(bits, i))))
+        self.priorities
+            .iter()
+            .filter(|(_, items)| {
+                items
+                    .as_ref()
+                    .is_none_or(|bits| item.is_some_and(|i| crate::refs::has(bits, i)))
+            })
             .map(|(priority, _)| *priority)
-            .max().unwrap_or(0)
+            .max()
+            .unwrap_or(0)
     }
 
     pub fn accepts(&self, item: u32, liquid: bool) -> bool {
-        item == 0 || ((self.flags & abi::slot_flags::LIQUID != 0) == liquid
-            && self.accepted.as_ref().is_none_or(|bits| crate::refs::has(bits, item)))
+        item == 0
+            || ((self.flags & abi::slot_flags::LIQUID != 0) == liquid
+                && self
+                    .accepted
+                    .as_ref()
+                    .is_none_or(|bits| crate::refs::has(bits, item)))
     }
 
     pub fn capacity(&self, max_stack: u32) -> u32 {
@@ -927,7 +941,10 @@ pub const EQUIPMENT_GROUP: &str = "core:equipment";
 
 impl Default for PlayerLayout {
     fn default() -> Self {
-        let storage = default_player_groups().into_iter().map(|g| GroupDef::bake(g, |_| None)).collect();
+        let storage = default_player_groups()
+            .into_iter()
+            .map(|g| GroupDef::bake(g, |_| None))
+            .collect();
         Self::new(storage, Vec::new())
     }
 }
@@ -935,14 +952,18 @@ impl Default for PlayerLayout {
 impl PlayerLayout {
     /// The hotbar group first, then the other groups in order, then the equipment slots.
     fn new(mut storage: Vec<GroupDef>, mut equipment: Vec<EquipmentSlot>) -> PlayerLayout {
-        let off = equipment.last().is_some_and(|e| e.group.flags & abi::slot_flags::OFF_HAND != 0) as u32;
+        let off = equipment
+            .last()
+            .is_some_and(|e| e.group.flags & abi::slot_flags::OFF_HAND != 0) as u32;
         storage.sort_by_key(|g| g.flags & abi::slot_flags::HOTBAR == 0);
         let mut hotbar = 0;
         let mut at = 0;
         storage.retain_mut(|g| {
             g.start = at;
             g.owner = if g.flags & abi::slot_flags::HOTBAR != 0 {
-                if hotbar != 0 { return false; }
+                if hotbar != 0 {
+                    return false;
+                }
                 hotbar = g.cols * g.rows;
                 abi::slot_owner::PLAYER_HOTBAR
             } else {
@@ -970,7 +991,9 @@ impl PlayerLayout {
     }
 
     pub fn storage_at(&self, index: u32) -> Option<&GroupDef> {
-        if index >= self.worn.start { return None; }
+        if index >= self.worn.start {
+            return None;
+        }
         let next = self.storage.partition_point(|g| g.start <= index);
         next.checked_sub(1).map(|i| &self.storage[i])
     }
@@ -1791,7 +1814,9 @@ fn bake_menu(e: &Entry, mut bake: impl FnMut(abi::SlotGroupDef) -> GroupDef) -> 
         .into_iter()
         .map(|mut g| {
             let o = (g.owner as usize).min(4);
-            if g.start == u32::MAX { g.start = next[o]; }
+            if g.start == u32::MAX {
+                g.start = next[o];
+            }
             next[o] = next[o].max(g.start + g.cols * g.rows);
             bake(g)
         })
@@ -1817,7 +1842,11 @@ fn bake_menu(e: &Entry, mut bake: impl FnMut(abi::SlotGroupDef) -> GroupDef) -> 
 
 fn default_player_groups() -> Vec<abi::SlotGroupDef> {
     let group = |name: &str, rows, flags| abi::SlotGroupDef {
-        name: name.into(), cols: 9, rows, flags: flags | abi::slot_flags::ALLOW_SORTING, ..Default::default()
+        name: name.into(),
+        cols: 9,
+        rows,
+        flags: flags | abi::slot_flags::ALLOW_SORTING,
+        ..Default::default()
     };
     vec![group("hotbar", 1, abi::slot_flags::HOTBAR), group("main", 3, 0)]
 }
@@ -2275,7 +2304,9 @@ pub fn freeze(
     g.recipe_kind_defs = recipe_kinds.into_iter().collect();
     let bake_group = |group: abi::SlotGroupDef, owner: &str, errors: &mut Vec<String>| {
         GroupDef::bake(group, |text| {
-            if text.is_empty() { return None; }
+            if text.is_empty() {
+                return None;
+            }
             match crate::refs::bits(text, comps::ITEM, item_names, items.len() as u32, c, "item") {
                 Ok(bits) => Some(bits.into()),
                 Err(e) => {
@@ -2291,14 +2322,20 @@ pub fn freeze(
         let bones: Vec<String> = e.or(abi::comp::equipment_slot::COVERS, Vec::new());
         let off = off_last(e);
         let group = abi::SlotGroupDef {
-            name: e.name.clone(), owner: abi::slot_owner::WORN, cols: 1, rows: 1,
+            name: e.name.clone(),
+            owner: abi::slot_owner::WORN,
+            cols: 1,
+            rows: 1,
             flags: if off { abi::slot_flags::OFF_HAND } else { 0 },
             accepts: if off { String::new() } else { format!("#worn/{}", e.name) },
             limit: if off { 0 } else { 1 },
-            background: e.text(abi::comp::equipment_slot::BACKGROUND).unwrap_or_default().into(),
-            priorities: e.get(abi::comp::equipment_slot::PRIORITIES).unwrap_or_else(|| {
-                if off { Vec::new() } else { vec![abi::SlotPriority { priority: 1, items: String::new() }] }
-            }),
+            background: e
+                .text(abi::comp::equipment_slot::BACKGROUND)
+                .unwrap_or_default()
+                .into(),
+            priorities: e
+                .get(abi::comp::equipment_slot::PRIORITIES)
+                .unwrap_or_else(|| if off { Vec::new() } else { vec![abi::SlotPriority { priority: 1, items: String::new() }] }),
             ..Default::default()
         };
         EquipmentSlot { group: bake_group(group, &e.name, errors), roles: crate::model::roles_of(&bones), bones }
@@ -2404,10 +2441,19 @@ pub fn freeze(
     world_ticks.sort_by_key(|h: &(ModId, Callback)| order(h.0));
     g.world_ticks = world_ticks;
 
-    (g.menus, _) = tables.bake_by(kind(ek::MENU), ek::MENU, mod_name, errors, |e| e.name.clone(), |e, errors| {
-        bake_menu(e, |group| bake_group(group, &e.name, errors))
-    });
-    let storage = entities.player_groups.into_iter().map(|group| bake_group(group, PLAYER, errors)).collect();
+    (g.menus, _) = tables.bake_by(
+        kind(ek::MENU),
+        ek::MENU,
+        mod_name,
+        errors,
+        |e| e.name.clone(),
+        |e, errors| bake_menu(e, |group| bake_group(group, &e.name, errors)),
+    );
+    let storage = entities
+        .player_groups
+        .into_iter()
+        .map(|group| bake_group(group, PLAYER, errors))
+        .collect();
     lay_out_slots(&mut g, storage, equipment, c, errors);
     g.player_menu = entities.player_menu.and_then(|n| {
         let m = tables.1.ids(ek::MENU).get(&n).copied();
@@ -2604,13 +2650,7 @@ fn freeze_entity_storage(
 
 /// The player's inventory layout, the slots each kind carries and wears, and a group per
 /// equipment slot in the menus that show equipment.
-fn lay_out_slots(
-    g: &mut Game,
-    storage: Vec<GroupDef>,
-    equipment: Vec<EquipmentSlot>,
-    c: &Components,
-    errors: &mut Vec<String>,
-) {
+fn lay_out_slots(g: &mut Game, storage: Vec<GroupDef>, equipment: Vec<EquipmentSlot>, c: &Components, errors: &mut Vec<String>) {
     g.player_layout = PlayerLayout::new(storage, equipment);
     if g.player_layout.hotbar == 0 {
         errors.push("player inventory: no group is the hotbar (`.hotbar()`)".into());

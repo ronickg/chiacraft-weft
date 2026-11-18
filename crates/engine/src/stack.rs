@@ -492,7 +492,9 @@ pub fn insert_by_priority(
 ) -> ItemStack {
     for tier in targets.chunk_by(|a, b| a.priority == b.priority) {
         stack = insert_into(stack, 0..tier.len(), |i, value| access(tier[i].slot, value), |i, _| tier[i].limit);
-        if stack.is_empty() { break; }
+        if stack.is_empty() {
+            break;
+        }
     }
     stack
 }

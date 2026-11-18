@@ -39,7 +39,9 @@ impl Dim {
                     face: h.face as u32,
                     part: 0,
                     point: point.to_array().into(),
-                    local: (on - h.origin.as_dvec3()).to_array().into(),
+                    local: (on - h.origin.as_dvec3() - h.part().shift())
+                        .to_array()
+                        .into(),
                     distance: h.dist,
                 });
             }

@@ -68,56 +68,62 @@ mod android {
                 // SAFETY: The borrowed global reference is valid while app is alive.
                 let activity = unsafe { env.as_cast_raw::<Global<JObject>>(&raw)? };
                 let service = JString::new(env, "clipboard")?;
-                let clipboard = env.call_method(
-                    &*activity,
-                    jni_str!("getSystemService"),
-                    jni_sig!("(Ljava/lang/String;)Ljava/lang/Object;"),
-                    &[JValue::Object(service.as_ref())],
-                )?.l()?;
+                let clipboard = env
+                    .call_method(
+                        &*activity,
+                        jni_str!("getSystemService"),
+                        jni_sig!("(Ljava/lang/String;)Ljava/lang/Object;"),
+                        &[JValue::Object(service.as_ref())],
+                    )?
+                    .l()?;
                 action(env, &clipboard)
             })
         });
-        result.map_err(|error| log::warn!("Android clipboard: {error}")).ok()
+        result
+            .map_err(|error| log::warn!("Android clipboard: {error}"))
+            .ok()
     }
 
     pub fn get() -> Option<String> {
         with_clipboard(|env, clipboard| {
-            let clip = env.call_method(clipboard, jni_str!("getPrimaryClip"), jni_sig!("()Landroid/content/ClipData;"), &[])?.l()?;
+            let clip = env
+                .call_method(clipboard, jni_str!("getPrimaryClip"), jni_sig!("()Landroid/content/ClipData;"), &[])?
+                .l()?;
             if clip.is_null() {
                 return Ok(None);
             }
-            let item = env.call_method(
-                &clip,
-                jni_str!("getItemAt"),
-                jni_sig!("(I)Landroid/content/ClipData$Item;"),
-                &[JValue::Int(0)],
-            )?.l()?;
-            let text = env.call_method(&item, jni_str!("getText"), jni_sig!("()Ljava/lang/CharSequence;"), &[])?.l()?;
+            let item = env
+                .call_method(&clip, jni_str!("getItemAt"), jni_sig!("(I)Landroid/content/ClipData$Item;"), &[JValue::Int(0)])?
+                .l()?;
+            let text = env
+                .call_method(&item, jni_str!("getText"), jni_sig!("()Ljava/lang/CharSequence;"), &[])?
+                .l()?;
             if text.is_null() {
                 return Ok(None);
             }
-            let text = env.call_method(&text, jni_str!("toString"), jni_sig!("()Ljava/lang/String;"), &[])?.l()?;
+            let text = env
+                .call_method(&text, jni_str!("toString"), jni_sig!("()Ljava/lang/String;"), &[])?
+                .l()?;
             Ok(Some(env.cast_local::<JString>(text)?.try_to_string(env)?))
-        }).flatten()
+        })
+        .flatten()
     }
 
     pub fn set(text: &str) -> bool {
         with_clipboard(|env, clipboard| {
             let label = JString::new(env, "Weft")?;
             let text = JString::new(env, text)?;
-            let clip = env.call_static_method(
-                jni_str!("android/content/ClipData"),
-                jni_str!("newPlainText"),
-                jni_sig!("(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Landroid/content/ClipData;"),
-                &[JValue::Object(label.as_ref()), JValue::Object(text.as_ref())],
-            )?.l()?;
-            env.call_method(
-                clipboard,
-                jni_str!("setPrimaryClip"),
-                jni_sig!("(Landroid/content/ClipData;)V"),
-                &[JValue::Object(&clip)],
-            )?;
+            let clip = env
+                .call_static_method(
+                    jni_str!("android/content/ClipData"),
+                    jni_str!("newPlainText"),
+                    jni_sig!("(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Landroid/content/ClipData;"),
+                    &[JValue::Object(label.as_ref()), JValue::Object(text.as_ref())],
+                )?
+                .l()?;
+            env.call_method(clipboard, jni_str!("setPrimaryClip"), jni_sig!("(Landroid/content/ClipData;)V"), &[JValue::Object(&clip)])?;
             Ok(())
-        }).is_some()
+        })
+        .is_some()
     }
 }

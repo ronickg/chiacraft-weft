@@ -2,9 +2,7 @@
 
 use super::*;
 
-fn landed_part(c: &Content, state: u32, turn: abi::Turn) -> u32 {
-    if turn == abi::Turn::NONE || state as usize >= c.states.len() { state } else { c.turned_state(state, turn) }
-}
+use crate::world::placement::Part;
 
 fn landed_hit(turn: abi::Turn, face: u8, hit: [f32; 3]) -> (u8, [f32; 3]) {
     if turn == abi::Turn::NONE || face >= 6 { (face, hit) } else { (turn.face(face as usize) as u8, turn.point(hit, 1.0)) }
@@ -41,6 +39,7 @@ impl Server {
         slot: u32,
         frame: u64,
         pos: IVec3,
+        surface: Part,
         face: u8,
         look: [f32; 3],
         hit: [f32; 3],
@@ -65,9 +64,9 @@ impl Server {
                 .vector_to_local(glam::Vec3::from_array(look).as_dvec3())
                 .as_vec3()
                 .to_array();
-            let target = d.place_clicked(space_id, c, pos, face, state, look, hit, entity, held.item)?;
+            let (target, part) = d.place_clicked(space_id, c, pos, surface, face, state, look, hit, entity, held.item)?;
             // What the stack carries goes onto the block entity it becomes (a renamed chest).
-            if let Some(id) = d.anchored_part(space_id, c, target, state) {
+            if let Some(id) = d.as_placed(space_id, target, part, |d| d.anchored_part(space_id, c, target, part.state)) {
                 for &comp in &c.game.carried {
                     if let Some(v) = crate::stack::value(held.data, comp) {
                         d.entities.comps.insert((id, comp), v.into());
@@ -146,12 +145,10 @@ impl Server {
             ToServer::StartBreak { pos, part, frame } => {
                 let Some((r, entity)) = self.region(pi) else { return };
                 let request = ToClient::BreakRefused { frame, pos };
-                let Some((frame, pos, turn)) = r.landed_as(c, frame, pos) else {
+                let Some((frame, pos, part, _)) = r.landed_as(c, frame, pos, part) else {
                     self.players[pi].conn.send(request);
                     return;
                 };
-                let part = landed_part(c, part, turn);
-                // Said now, or it would mine all that time for nothing.
                 if !r.start_mining(c, entity, frame, pos, part) {
                     self.players[pi].conn.send(request);
                 }
@@ -280,10 +277,10 @@ impl Server {
                     return;
                 }
                 e.pose = pose;
-                let height = e.height(c);
+                let dims = e.dims(c);
                 let dry = r.dry_volumes();
                 let seen = crate::physics::ObservedCells { cells: super::space::CubeCells(&r.space.cubes), dry: &dry };
-                let here = crate::physics::around(c, &seen, pos, height);
+                let here = crate::physics::around(c, &seen, pos, dims.height, dims.half_width);
                 let Some(e) = r.entities.get_mut(entity) else { return };
                 let splash = entity::splashes(e.in_liquid, here.in_liquid, -walked.y);
                 let fell = entity::track_fall(&mut e.fall, walked.y, on_ground, here.in_liquid || here.climbing);
@@ -335,11 +332,11 @@ impl Server {
             ToServer::Break { pos, part, face, hit, frame } => {
                 let Some((r, entity)) = self.region(pi) else { return };
                 let request = ToClient::BreakRefused { frame, pos };
-                let Some((frame, pos, turn)) = r.landed_as(c, frame, pos) else {
+                let hit = (glam::Vec3::from_array(hit) - part.shift().as_vec3()).to_array();
+                let Some((frame, pos, part, turn)) = r.landed_as(c, frame, pos, part) else {
                     self.players[pi].conn.send(request);
                     return;
                 };
-                let part = landed_part(c, part, turn);
                 let (face, hit) = landed_hit(turn, face, hit);
                 let mining = r.entities.get_mut(entity).and_then(|e| e.mining.take());
                 let rate = r.mining_rate_of(c, entity, frame, pos, part);
@@ -360,9 +357,21 @@ impl Server {
                 if let Some(p) = placed.filter(|_| r.has_space(frame)) {
                     r.resend_cell(frame, p);
                 }
-                let Some((frame, pos, turn)) = r.landed_as(c, frame, pos) else { return };
-                let part = landed_part(c, part, turn);
-                let (face, hit) = landed_hit(turn, face, hit);
+                let Some(normal) = crate::world::DIRS.get(face as usize) else { return };
+                if !hit
+                    .iter()
+                    .all(|v| v.is_finite() && (-0.01..=1.01).contains(v))
+                {
+                    return;
+                }
+                let local = (glam::Vec3::from_array(hit) - part.shift().as_vec3()).to_array();
+                let Some((frame, owner, part, turn)) = r.landed_as(c, frame, pos, part) else { return };
+                let (face, local) = landed_hit(turn, face, local);
+                let point = DVec3::from_array(local.map(f64::from)) + part.shift();
+                let normal = IVec3::from(turn.vector(normal.to_array()));
+                let delta = (point - normal.as_dvec3() * 1e-5).floor().as_ivec3();
+                let (pos, part) = (owner + delta, part.in_cell(delta));
+                let hit = (point - delta.as_dvec3()).as_vec3().to_array();
                 let Some(e) = r.entities.get(entity) else { return };
                 let eye = e.pos + DVec3::Y * e.eye(c);
                 let reach = r.block_reach(0, c, entity);
@@ -371,7 +380,11 @@ impl Server {
                     if !within(o.to_local(eye), pos, reach) {
                         return None;
                     }
-                    Some(d.player_use(space_id, c, pos, part, face, entity, sneak))
+                    if !d.has_placed(space_id, pos, part) {
+                        return None;
+                    }
+                    let (owner, part) = part.owner(pos);
+                    Some(d.as_placed(space_id, owner, part, |d| d.player_use(space_id, c, owner, part.state, face, entity, sneak)))
                 });
                 match used {
                     Some(Some(true)) => {
@@ -383,7 +396,7 @@ impl Server {
                     }
                     Some(Some(false)) => {
                         for slot in self.hands(c, pi) {
-                            if self.place_or_use(c, pi, slot, frame, pos, face, look, hit) {
+                            if self.place_or_use(c, pi, slot, frame, pos, part, face, look, hit) {
                                 break;
                             }
                         }
@@ -1003,7 +1016,7 @@ impl Dim {
     /// `entity` starts breaking `part` of the cell at `pos` in `frame` (`u32::MAX`: what it
     /// stands for), a player holding the button or a mob (`World::start_mining`). False when
     /// it may not (`actions::BREAK_BLOCK`), said now so it doesn't mine all that time for nothing.
-    pub fn start_mining(&mut self, c: &'static Content, entity: u64, frame: u64, pos: IVec3, part: u32) -> bool {
+    pub fn start_mining(&mut self, c: &'static Content, entity: u64, frame: u64, pos: IVec3, part: Part) -> bool {
         let held = self.entities.held(entity).item;
         if c.items
             .get(held as usize)
@@ -1013,16 +1026,11 @@ impl Dim {
             return false;
         }
         let aimed = self.with_space(c, frame, |d, space_id, _| {
-            let state = d.aimed_part(space_id, c, pos, part);
-            (d.get(space_id, pos).is_none() || d.may_break(space_id, c, pos, state, held, entity)).then_some(state)
+            d.has_placed(space_id, pos, part)
+                && d.as_placed(space_id, pos, part, |d| d.may_break(space_id, c, pos, part.state, held, entity))
         });
         let Some(e) = self.entities.get_mut(entity) else { return false };
-        e.mining = match aimed {
-            Some(None) => None,
-            // What it stands for, as cracks are drawn by.
-            Some(Some(state)) if part == u32::MAX => Some(super::entity::Mining { frame, pos, part: state, progress: 0.0 }),
-            _ => Some(super::entity::Mining { frame, pos, part, progress: 0.0 }),
-        };
+        e.mining = (aimed == Some(true)).then_some(super::entity::Mining { frame, pos, part, progress: 0.0 });
         e.mining.is_some()
     }
 
@@ -1071,7 +1079,7 @@ impl Dim {
         entity: u64,
         frame: u64,
         pos: IVec3,
-        part: u32,
+        part: Part,
         face: u8,
         hit: [f32; 3],
         too_soon: bool,
@@ -1082,7 +1090,8 @@ impl Dim {
         let (reach, held) = (self.block_reach(0, c, entity), self.entities.held(entity));
         let mut refused = false;
         let worn = self.with_space(c, frame, |d, space_id, o| {
-            let part = d.aimed_part(space_id, c, pos, part);
+            let valid =
+                d.has_placed(space_id, pos, part) && c.states[part.state as usize].flags & weft_abi::block_flags::NOT_TARGETABLE == 0;
             let keeps = (creative && c.no_creative_break(held.item))
                 || no_break
                 || c.items
@@ -1090,12 +1099,16 @@ impl Dim {
                     .is_some_and(|item| item.on_attack.is_some());
             let free = c
                 .states
-                .get(part as usize)
+                .get(part.state as usize)
                 .is_some_and(|s| s.hardness <= 0.0);
-            let done = within(o.to_local(eye), pos, reach)
+            let local_eye = o.to_local(eye) - pos.as_dvec3();
+            let done = valid
+                && part
+                    .bounds(c)
+                    .any(|b| local_eye.distance_squared(local_eye.clamp(b.min, b.max)) <= (reach + 0.5).powi(2))
                 && !too_soon
                 && !keeps
-                && d.break_piece(space_id, c, pos, part, face, hit, held, entity, !creative);
+                && d.as_placed(space_id, pos, part, |d| d.break_piece(space_id, c, pos, part.state, face, hit, held, entity, !creative));
             if !done && d.get(space_id, pos).is_some() {
                 d.resend_cell(space_id, pos);
                 refused = true;

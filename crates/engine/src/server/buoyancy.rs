@@ -361,20 +361,21 @@ impl Hull {
         let mut masses = Vec::new();
         let mut seals = FxHashSet::default();
         for &(p, state) in space.block_snapshot().iter() {
-            for st in std::iter::once(state).chain(space.extras(p).iter().copied()) {
+            for part in space.layout(p).residents(state) {
+                let st = part.state;
                 let info = &c.states[st as usize];
-                if info.liquid.is_some() || c.covered_step(st).is_some() {
+                if info.liquid.is_some() {
                     continue;
                 }
                 let d = c
                     .block_value::<f32>(st, density)
                     .filter(|n| n.is_finite() && *n > 0.0)
                     .map_or(1.45, f64::from);
-                let min = p.as_dvec3();
+                let min = p.as_dvec3() + part.shift();
                 if info.collision.is_empty() {
                     masses.push((min + DVec3::splat(0.5), d * 0.04));
                 }
-                for solid in crate::physics::block_solids(p, info) {
+                for solid in crate::physics::block_solids(min, info) {
                     let shape = solid.bounds();
                     let volume = solid.volume();
                     let (lo, hi) = ((shape.min - 1e-8).ceil().as_ivec3(), (shape.max + 1e-8).floor().as_ivec3());
@@ -925,7 +926,7 @@ impl Dim {
         let rotation = DQuat::from_rotation_y(yaw);
         let pos = Transform::of(e.pos).cell(None).as_dvec3() + Transform::FEET;
         let place = Transform::rotated(pos, rotation);
-        if !self.mount_fits(0, c, place, &space.block_snapshot()) {
+        if !self.mount_fits(0, c, place, space) {
             return false;
         }
         if let Some((lo, hi)) = space.bounds {

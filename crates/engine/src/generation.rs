@@ -231,6 +231,11 @@ impl Cells for Point {
     fn get(&self, p: IVec3) -> Option<u32> {
         (p == self.pos).then_some(self.state)
     }
+    fn add_part(&mut self, p: IVec3, part: crate::world::placement::Part) {
+        if self.state == crate::content::AIR {
+            self.set(p, part.state);
+        }
+    }
     fn set(&mut self, p: IVec3, state: u32) {
         if p == self.pos {
             self.state = state;

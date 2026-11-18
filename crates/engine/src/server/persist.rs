@@ -15,7 +15,7 @@ pub type Saved = (Entity, Option<Vec<ItemStack>>, Vec<(u32, Box<[u8]>)>, Option<
 pub type ToSave<'a> = (&'a Entity, Option<&'a Vec<ItemStack>>, Vec<(u32, &'a [u8])>, Option<&'a Space>);
 
 pub struct SavedSpace {
-    pub blocks: Vec<(IVec3, u32)>,
+    pub blocks: Vec<(IVec3, crate::world::placement::Part)>,
     pub timers: Vec<BlockTimer>,
 }
 
@@ -32,6 +32,7 @@ const ROTATED_BODY: u16 = 0x100;
 const LAND_ON_SUPPORT: u16 = 0x200;
 const DOCK_BODY: u16 = 0x400;
 const STUCK: u16 = 0x800;
+const SHIFTED_ANCHOR: u16 = 0x1000;
 
 struct W<'a>(&'a mut Vec<u8>);
 
@@ -108,11 +109,15 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
         Completion::Dock => DOCK_BODY,
         _ => 0,
     };
-    let format = if list.iter().any(|(e, ..)| e.stuck.is_some()) {
+    let format = if list
+        .iter()
+        .any(|(e, ..)| e.stuck.is_some() || e.anchor_offset != IVec3::ZERO)
+    {
         ENTITY_FORMAT
     } else if list
         .iter()
-        .any(|(e, _, _, space)| orientation(e, space.is_some()).is_some() || completion(e) != 0) {
+        .any(|(e, _, _, space)| orientation(e, space.is_some()).is_some() || completion(e) != 0)
+    {
         ENTITY_FORMAT_V3
     } else {
         ENTITY_FORMAT_V2
@@ -146,7 +151,8 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
             | if e.mount.as_ref().is_some_and(|m| m.slide.is_some()) { MOUNT_SLIDE } else { 0 }
             | if rotation.is_some() { ROTATED_BODY } else { 0 }
             | completion(e)
-            | if e.stuck.is_some() { STUCK } else { 0 };
+            | if e.stuck.is_some() { STUCK } else { 0 }
+            | if e.anchor_offset != IVec3::ZERO { SHIFTED_ANCHOR } else { 0 };
         let frame = e.block_frame();
         let attachment = attachment | e.anchor.map_or(0, |_| if frame != 0 { 2 } else { 1 });
         if format != ENTITY_FORMAT_V2 {
@@ -157,6 +163,11 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
         if let Some(a) = e.anchor {
             for v in a.to_array() {
                 w.u32(v as u32);
+            }
+            if attachment & SHIFTED_ANCHOR != 0 {
+                for v in e.anchor_offset.to_array() {
+                    w.u32(v as u32);
+                }
             }
             if frame != 0 {
                 w.u64(frame);
@@ -203,14 +214,18 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
                 StuckIn::Block { body, block } => {
                     w.u8(0);
                     w.u64(body);
-                    for v in block.to_array() { w.u32(v as u32); }
+                    for v in block.to_array() {
+                        w.u32(v as u32);
+                    }
                 }
                 StuckIn::Entity(id) => {
                     w.u8(1);
                     w.u64(id);
                 }
             }
-            for v in stuck.at.to_array() { w.f64(v); }
+            for v in stuck.at.to_array() {
+                w.f64(v);
+            }
             w.f32(stuck.yaw);
             w.u32(stuck.ticks);
         }
@@ -247,13 +262,19 @@ pub fn write(c: &Content, out: &mut Vec<u8>, list: &[ToSave<'_>], now: u64) {
         }
         match blocks {
             Some(space) => {
-                let list = space.structure_blocks(c);
-                w.u32(list.len() as u32);
-                for (p, name) in list {
+                let list = space.placed_blocks();
+                let shifted = list.iter().any(|(_, part)| part.offset != IVec3::ZERO);
+                w.u32(list.len() as u32 | ((shifted as u32) << 31));
+                for (p, part) in list {
                     for v in p.to_array() {
                         w.u32(v as u32);
                     }
-                    w.str(&name);
+                    if shifted {
+                        for v in part.offset.to_array() {
+                            w.u32(v as u32);
+                        }
+                    }
+                    w.str(&c.state_name(part.state));
                 }
             }
             None => w.u32(u32::MAX),
@@ -385,6 +406,8 @@ fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<S
     let attachment = if extended { r.u16()? } else { u16::from(r.u8()?) };
     let anchor_kind = attachment & 0x03;
     let anchor = if anchor_kind != 0 { Some(IVec3::new(r.u32()? as i32, r.u32()? as i32, r.u32()? as i32)) } else { None };
+    let anchor_offset =
+        if attachment & SHIFTED_ANCHOR != 0 { IVec3::new(r.u32()? as i32, r.u32()? as i32, r.u32()? as i32) } else { IVec3::ZERO };
     let frame = if anchor_kind == 2 || attachment & NESTED_MOUNT != 0 { Some(r.u64()?) } else { None };
     let mount = if attachment & MOUNTED_BODY != 0 {
         let block = IVec3::new(r.u32()? as i32, r.u32()? as i32, r.u32()? as i32);
@@ -433,7 +456,9 @@ fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<S
             _ => return None,
         };
         Some(Stuck { into, at: DVec3::get(r)?, yaw: r.f32()?, ticks: r.u32()? })
-    } else { None };
+    } else {
+        None
+    };
     let inv_len = r.u16()?;
     let inv = if inv_len == u16::MAX {
         None
@@ -466,12 +491,18 @@ fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<S
     let blocks = if nb == u32::MAX {
         None
     } else {
+        let shifted = nb & (1 << 31) != 0;
+        let nb = nb & 0x7fff_ffff;
+        if nb as usize > r.0.len() / 12 {
+            return None;
+        }
         let mut v = Vec::with_capacity(nb as usize);
         for _ in 0..nb {
             let p = IVec3::new(r.u32()? as i32, r.u32()? as i32, r.u32()? as i32);
+            let offset = if shifted { IVec3::new(r.u32()? as i32, r.u32()? as i32, r.u32()? as i32) } else { IVec3::ZERO };
             // Blocks of removed mods are left out.
             if let Some(s) = c.state_by_name(&r.str()?) {
-                v.push((p, s));
+                v.push((p, crate::world::placement::Part { state: s, offset }));
             }
         }
         Some(SavedSpace { blocks: v, timers: Vec::new() })
@@ -480,10 +511,9 @@ fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<S
     if kind == c.game.ship_kind
         && !comps.iter().any(|(id, _)| *id == c.game.fields.helm)
         && blocks.as_ref().is_some_and(|space| {
-            space
-                .blocks
-                .iter()
-                .any(|&(pos, state)| pos == IVec3::ZERO && c.states[state as usize].signal.flags as u32 & weft_abi::signal_flags::HELM != 0)
+            space.blocks.iter().any(|&(pos, state)| {
+                pos == IVec3::ZERO && c.states[state.state as usize].signal.flags as u32 & weft_abi::signal_flags::HELM != 0
+            })
         })
     {
         comps.push((c.game.fields.helm, IVec3::ZERO.to_bytes().into_boxed_slice()));
@@ -500,6 +530,7 @@ fn read_one(c: &Content, r: &mut R, now: u64, extended: bool) -> Option<Option<S
     e.age = age;
     e.item = item;
     e.anchor = anchor;
+    e.anchor_offset = anchor_offset;
     e.frame = frame;
     e.mount = mount;
     e.completion = match attachment {

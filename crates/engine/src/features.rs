@@ -209,6 +209,7 @@ pub struct Extra {
     pub at: DVec3,
     /// A block entity's block: `data` goes into it, `loot` fills it.
     pub anchor: Option<IVec3>,
+    pub transform: Transform,
     /// `u32::MAX`: from `data`.
     pub kind: u32,
     pub data: Option<Arc<[u8]>>,
@@ -219,6 +220,7 @@ pub struct Extra {
 /// world.
 #[derive(Clone, Default)]
 pub struct Generated {
+    pub layouts: rustc_hash::FxHashMap<usize, crate::world::placement::CellLayout>,
     pub extras: Vec<Extra>,
     /// Starts whose cube this is: (feature, start, transform).
     pub placed: Vec<(u32, IVec3, u8)>,
@@ -444,15 +446,21 @@ pub fn make_piece(view: &crate::generation::ReadCtx<'_>, at: IVec3, variant: Arc
 pub fn add_piece(start: &mut Start, piece: Piece) {
     let (at, variant) = (piece.at, &piece.variant);
     for (p, kind, data) in &variant.entities {
-        start
-            .extras
-            .push(Extra { at: at.as_dvec3() + *p, anchor: None, kind: *kind, data: data.clone(), loot: None });
+        start.extras.push(Extra {
+            at: at.as_dvec3() + *p,
+            anchor: None,
+            transform: Transform::default(),
+            kind: *kind,
+            data: data.clone(),
+            loot: None,
+        });
     }
     for (p, data) in &variant.data {
         let b = at + *p;
         start.extras.push(Extra {
             at: b.as_dvec3() + DVec3::splat(0.5),
             anchor: Some(b),
+            transform: variant.transform,
             kind: u32::MAX,
             data: Some(data.clone()),
             loot: None,
@@ -463,10 +471,14 @@ pub fn add_piece(start: &mut Start, piece: Piece) {
         start.extras.push(Extra {
             at: b.as_dvec3() + DVec3::splat(0.5),
             anchor: Some(b),
+            transform: Transform::default(),
             kind: u32::MAX,
             data: None,
             loot: Some(table.clone()),
         });
+    }
+    for &(p, _) in &variant.positioned {
+        start.grow(at + p, at + p);
     }
     // What it stands on and what it cuts away count as its own.
     if piece.foundation != 0 || piece.clear_above {
@@ -578,6 +590,7 @@ impl PlanCtx<'_> {
                 self.start.extras.push(Extra {
                     at: pos.as_dvec3() + DVec3::new(0.5, 0.0, 0.5),
                     anchor: None,
+                    transform: Transform::default(),
                     kind,
                     data: None,
                     loot: None,
@@ -588,9 +601,14 @@ impl PlanCtx<'_> {
                     return false;
                 }
                 let at = pos.as_dvec3() + DVec3::splat(0.5);
-                self.start
-                    .extras
-                    .push(Extra { at, anchor: Some(pos), kind: u32::MAX, data: None, loot: Some(Arc::from(name)) });
+                self.start.extras.push(Extra {
+                    at,
+                    anchor: Some(pos),
+                    transform: Transform::default(),
+                    kind: u32::MAX,
+                    data: None,
+                    loot: Some(Arc::from(name)),
+                });
             }
             _ => return false,
         }
@@ -717,6 +735,7 @@ pub trait Cells {
     /// What is at `p`, `None` past the bounds.
     fn get(&self, p: IVec3) -> Option<u32>;
     fn set(&mut self, p: IVec3, state: u32);
+    fn add_part(&mut self, p: IVec3, part: crate::world::placement::Part);
 }
 
 /// Writes what `start` puts into `to`, as far as its bounds go.
@@ -790,6 +809,9 @@ fn write_piece(piece: &Piece, to: &mut impl Cells) {
         };
         to.set(at, state);
     }
+    for &(p, part) in &v.positioned {
+        to.add_part(piece.at + p, part);
+    }
     let inside = |x: i32, z: i32| x >= lo.x && x <= hi.x && z >= lo.z && z <= hi.z;
     if piece.foundation != 0 {
         for &(x, z) in &v.bottom {
@@ -850,6 +872,7 @@ impl Cells for CubeGen<'_> {
     }
     fn set(&mut self, p: IVec3, state: u32) {
         let Some(i) = self.local(p) else { return };
+        self.generated.layouts.remove(&i);
         if self.blocks[i] != state {
             self.blocks[i] = state;
             self.changed = true;
@@ -859,6 +882,16 @@ impl Cells for CubeGen<'_> {
                 p.push(state);
             }
         }
+    }
+    fn add_part(&mut self, p: IVec3, part: crate::world::placement::Part) {
+        let Some(i) = self.local(p) else { return };
+        let layout = self.generated.layouts.entry(i).or_default();
+        let mut parts: Vec<_> = layout.residents(self.blocks[i]).collect();
+        if !parts.contains(&part) {
+            parts.push(part);
+        }
+        self.blocks[i] = layout.set_residents(&parts);
+        self.changed = true;
     }
 }
 

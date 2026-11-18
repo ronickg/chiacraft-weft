@@ -54,6 +54,7 @@ pub struct Entity {
     /// The block it is breaking.
     pub mining: Option<Mining>,
     pub anchor: Option<IVec3>,
+    pub anchor_offset: IVec3,
     pub sent: Option<crate::net::Move>,
     /// The solid body it rides (stands on, or flies above within its carry height).
     /// The body it is on: what it rides, or whose blocks hold it if it has an `anchor`.
@@ -137,7 +138,7 @@ pub enum StuckIn {
 pub struct Mining {
     pub frame: u64,
     pub pos: IVec3,
-    pub part: u32,
+    pub part: crate::world::placement::Part,
     pub progress: f32,
 }
 
@@ -323,6 +324,7 @@ impl Entity {
             use_done: None,
             mining: None,
             anchor: None,
+            anchor_offset: IVec3::ZERO,
             sent: None,
             frame: None,
             motion: Motion::Free,
@@ -663,12 +665,11 @@ impl Entities {
     }
 
     /// The block entity of kind `kind` in the cell at `at` in `frame`.
-    pub fn anchored_kind(&self, frame: u64, at: IVec3, kind: u32) -> Option<u64> {
-        self.anchors
-            .get(&(frame, at))?
-            .iter()
-            .copied()
-            .find(|&id| self.get(id).is_some_and(|e| e.kind == kind))
+    pub fn anchored_kind(&self, frame: u64, at: IVec3, kind: u32, offset: IVec3) -> Option<u64> {
+        self.anchors.get(&(frame, at))?.iter().copied().find(|&id| {
+            self.get(id)
+                .is_some_and(|e| e.kind == kind && e.anchor_offset == offset)
+        })
     }
 
     pub fn unanchor(&mut self, at: (u64, IVec3), id: u64) {
@@ -767,9 +768,7 @@ impl Entities {
             .into_iter()
             .flatten()
             .enumerate()
-            .map(move |(i, &s)| {
-                crate::stack::room_in(s, stack, limit.as_ref().map_or(0, |f| f(i, s)))
-            })
+            .map(move |(i, &s)| crate::stack::room_in(s, stack, limit.as_ref().map_or(0, |f| f(i, s))))
     }
 
     pub fn item_room(&self, c: &Content, id: u64, stack: ItemStack) -> u64 {
@@ -788,7 +787,9 @@ impl Entities {
         let liquid = c.item_fluid.contains_key(&stack.item);
         Some(move |i: usize, current: ItemStack| {
             let slot = i as u32;
-            if k.worn.contains(&slot) || (k.off == Some(slot) && current.is_empty()) { return 0; }
+            if k.worn.contains(&slot) || (k.off == Some(slot) && current.is_empty()) {
+                return 0;
+            }
             let Some(g) = layout.and_then(|layout| layout.storage_at(slot)) else { return max };
             if g.flags & (sf::OUTPUT | sf::LOCKED | sf::TRASH) != 0 || !g.accepts(stack.item, liquid) {
                 return 0;
@@ -868,17 +869,30 @@ impl Entities {
         let Some(inv) = self.inventories.get_mut(&owner) else { return stack };
         let layout = &c.game.player_layout;
         let count = inv.len();
-        let targets = (quick && layout.storage.iter().any(|g| g.priority(Some(stack.item)) != 0)).then(|| {
-            let mut targets: Vec<_> = inv.iter().enumerate().map(|(i, &s)| {
-                let slot = i as u32;
-                let priority = layout.storage_at(slot).map_or(0, |g| g.priority(Some(stack.item)));
-                crate::stack::TransferTarget { slot, priority, limit: limit(i, s) }
-            }).collect();
+        let targets = (quick
+            && layout
+                .storage
+                .iter()
+                .any(|g| g.priority(Some(stack.item)) != 0))
+        .then(|| {
+            let mut targets: Vec<_> = inv
+                .iter()
+                .enumerate()
+                .map(|(i, &s)| {
+                    let slot = i as u32;
+                    let priority = layout
+                        .storage_at(slot)
+                        .map_or(0, |g| g.priority(Some(stack.item)));
+                    crate::stack::TransferTarget { slot, priority, limit: limit(i, s) }
+                })
+                .collect();
             targets.sort_by_key(|t| std::cmp::Reverse(t.priority));
             targets
         });
         let mut access = |i: usize, value| {
-            if let Some(s) = value { inv[i] = s; }
+            if let Some(s) = value {
+                inv[i] = s;
+            }
             inv[i]
         };
         let rest = match targets {
@@ -1019,7 +1033,7 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl physics::Cel
         e.vel = v / DT;
         e.moved = (e.pos - start).with_y(0.0).length() as f32;
         e.blocked = false;
-        e.in_liquid = physics::around(c, block, e.pos, h).in_liquid;
+        e.in_liquid = physics::around(c, block, e.pos, h, hw).in_liquid;
         e.fall = 0.0;
         return out;
     }
@@ -1068,8 +1082,7 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl physics::Cel
     }
     let dy = e.pos.y - start.y;
     e.moved = ((e.pos.x - start.x).powi(2) + (e.pos.z - start.z).powi(2)).sqrt() as f32;
-    let here =
-        if !block.masks_liquid() && physics::same_around(start, e.pos, h) { r.started_in } else { physics::around(c, block, e.pos, h) };
+    let here = if !block.masks_liquid() && start == e.pos { r.started_in } else { physics::around(c, block, e.pos, h, hw) };
     e.in_liquid = here.in_liquid;
     if let Some(land) = track_fall(&mut e.fall, dy, e.on_ground, here.in_liquid || here.climbing) {
         out.land = Some(land);

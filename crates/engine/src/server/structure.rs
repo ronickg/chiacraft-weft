@@ -6,6 +6,7 @@
 use glam::{DVec3, IVec3};
 use std::f64::consts::{FRAC_PI_2, TAU};
 
+use crate::world::placement::Part;
 use weft_abi as abi;
 
 use super::dim::Dim;
@@ -144,6 +145,7 @@ pub struct Lifted {
     pub local: IVec3,
     pub to: IVec3,
     pub part: Option<u32>,
+    pub only: Option<Part>,
 }
 
 /// How a body's circuits go. They always go; only that a piston on a piston's blocks can't act.
@@ -165,7 +167,7 @@ pub struct Landing {
 pub(super) struct Transfer {
     pub(super) destination: u64,
     turn: abi::Turn,
-    pub(super) cells: FxHashMap<IVec3, (IVec3, u32)>,
+    pub(super) parts: FxHashMap<(IVec3, Part), (IVec3, Part)>,
     pub(super) shown_at: Option<u64>,
 }
 
@@ -208,59 +210,63 @@ impl Dim {
         kind: u32,
         at: DVec3,
         cells: impl IntoIterator<Item = Lifted>,
-        also: &[(IVec3, u32)],
+        also: &[(IVec3, Part)],
         live: Liveness,
     ) -> (u64, Vec<Carried>) {
         if !c.dims[self.id as usize].editable {
             return (0, Vec::new());
         }
         let mut carried = Vec::new();
-        let mut blocks: Vec<(IVec3, u32)> = also.to_vec();
+        let mut blocks = also.to_vec();
         let mut arriving = FxHashMap::default();
-        let mut extras = Vec::new();
         let mut anchors = Vec::new();
         let mut moved = FxHashMap::default();
-        // Read first: taking a big block's own cell takes its other cells along.
-        let cells: Vec<Lifted> = cells.into_iter().collect();
-        let wholes: Vec<Option<u32>> = cells.iter().map(|l| self.get(space_id, l.from)).collect();
-        for (l, whole) in cells.into_iter().zip(wholes) {
-            let Some(whole) = whole.filter(|&state| state != AIR) else { continue };
-            // A big block's other cells come as they were read.
-            if c.covered_step(whole).is_some() {
-                blocks.push((l.local, whole));
-                carried.push(Carried { local: l.local, to: l.to, state: whole });
+        for l in cells {
+            let Some(whole) = self.get(space_id, l.from).filter(|&s| s != AIR) else { continue };
+            let original = self.space(space_id).layout(l.from).clone();
+            let (mut wet, mut moving): (Vec<_>, Vec<_>) = self
+                .space(space_id)
+                .layout(l.from)
+                .residents(whole)
+                .partition(|part| {
+                    l.only.is_some_and(|v| v != *part) || (live == Liveness::Assembly && c.states[part.state as usize].liquid.is_some())
+                });
+            let Some(main) = moving.first_mut() else { continue };
+            let state = l.part.unwrap_or(main.state);
+            if state != main.state {
+                let first = c.block_of(main.state).first_state;
+                wet.push(Part { state: first + ((main.state - first) & !(state - first)), ..*main });
+                main.state = state;
+            }
+            if self
+                .write_residents(space_id, c, l.from, &mut wet, true)
+                .is_none()
+            {
                 continue;
             }
-            let (mut wet, on_body): (Vec<_>, Vec<_>) = self
-                .space(space_id)
-                .extras(l.from)
-                .iter()
-                .copied()
-                .partition(|&state| live == Liveness::Assembly && c.states[state as usize].liquid.is_some());
-            if !on_body.is_empty() {
-                extras.push((l.local, on_body));
+            for part in moving {
+                if let Some(id) = c
+                    .game
+                    .block_entities
+                    .get(&c.states[part.state as usize].block)
+                    .and_then(|&kind| {
+                        self.entities
+                            .anchored_kind(space_id, l.from, kind, part.offset)
+                    })
+                {
+                    self.entities.unanchor((space_id, l.from), id);
+                    anchors.push((l.local, id));
+                }
+                let site = crate::wire::Site::of(c, l.from, part, whole, &original);
+                let signal = self.space(space_id).signals.carry_out(site);
+                if !signal.is_empty() {
+                    arriving.insert(crate::wire::Site { cell: l.local, ..site }, signal);
+                }
+                blocks.push((l.local, part));
             }
-            if let Some(id) = self.entities.anchored(space_id, l.from) {
-                self.entities.unanchor((space_id, l.from), id);
-                anchors.push((l.local, id));
+            if moved.insert(l.from, l.local).is_none() {
+                carried.push(Carried { local: l.local, to: l.to, state });
             }
-            let signal = self.space_mut(space_id).signals.carry_out(l.from);
-            self.carry_block(space_id, c, l.from, AIR);
-            if !wet.is_empty() {
-                self.write_cell(space_id, c, l.from, wet.remove(0), Some(wet), false);
-            }
-            let state = l.part.unwrap_or(whole);
-            // Pieces of wire on what stays, stay.
-            if state != whole {
-                let first = c.block_of(whole).first_state;
-                self.carry_block(space_id, c, l.from, first + ((whole - first) & !(state - first)));
-            }
-            blocks.push((l.local, state));
-            if !signal.is_empty() {
-                arriving.insert(l.local, signal);
-            }
-            carried.push(Carried { local: l.local, to: l.to, state });
-            moved.insert(l.from, l.local);
         }
         let body = self.spawn(space_id, c, kind, at);
         let mut space = Space::finite();
@@ -271,7 +277,7 @@ impl Dim {
         // either cell.
         let cell = Transform::of(self.space_pose(space_id).to_world(at)).cell(None);
         space.cell = Some(cell);
-        space.build(c, &blocks, extras);
+        space.build(c, blocks);
         self.bodies.insert(body, Box::new(space));
         // What it lit with doesn't go off for a moment. Its light is in the world's, from there on
         // a body too; that gets to it when it looks.
@@ -288,8 +294,13 @@ impl Dim {
         }
         self.reparent_mounts(space_id, body, abi::Turn::NONE, |at| moved.get(&at).copied());
         for (local, id) in anchors {
+            let offset = self
+                .entities
+                .get(id)
+                .map_or(IVec3::ZERO, |e| e.anchor_offset);
+            let shift = offset.as_dvec3() / f64::from(crate::world::placement::UNIT);
             self.entities
-                .attach(id, body, local, place.to_world(local.as_dvec3() + DVec3::splat(0.5)));
+                .attach(id, body, local, place.to_world(local.as_dvec3() + shift + DVec3::splat(0.5)));
         }
         (body, carried)
     }
@@ -383,7 +394,7 @@ impl Dim {
             plan.lifted
                 .sort_unstable_by_key(|l| (l.from.to_array(), l.part));
             plan.lifted.dedup_by(|duplicate, first| {
-                if duplicate.from != first.from {
+                if duplicate.from != first.from || duplicate.only != first.only {
                     return false;
                 }
                 if let (Some(a), Some(b)) = (first.part, duplicate.part) {
@@ -418,7 +429,12 @@ impl Dim {
                         .map(|l| l.from)
                         .collect();
                     broken.retain(|b| !riders.contains(b));
-                    broken.extend(ways(steps.0).flat_map(|step| self.who_rides(space_id, c, &list, None, step).1));
+                    broken.extend(ways(steps.0).flat_map(|step| {
+                        self.who_rides(space_id, c, &list, None, step)
+                            .1
+                            .into_iter()
+                            .map(|v| v.0)
+                    }));
                     broken.sort_unstable_by_key(|b| b.to_array());
                     broken.dedup();
                     plan.lifted
@@ -681,7 +697,7 @@ impl Dim {
         let valid = info.kind == abi::signal_kind::BODY_MOUNT && info.front == mount.face;
         if mount.slide.is_some() {
             let valid = valid && info.flags as u32 & abi::signal_flags::SLIDES != 0;
-            return self.step_slide(c, id, parent, nested, pose, mount, children, valid);
+            return self.step_slide(c, id, parent, pose, mount, children, valid);
         }
         let power = if valid {
             let Some(power) = parent.signals.level_into(mount.block) else { return false };
@@ -743,11 +759,10 @@ impl Dim {
         if drive.is_some() && mount.angle == goal {
             return false;
         }
-        let blocks = body.block_snapshot();
         let initial = *mount;
         let Some(current) = self.entities.get(id).map(|e| e.body_place()) else { return false };
         let parts = self.mounted_parts(id, current, children);
-        let fits = |turn: f64| Self::mount_fits_in(c, parent, nested, initial.place_at(turn), &blocks);
+        let fits = |turn: f64| Self::mount_fits_in(c, parent, initial.place_at(turn), body);
         let axis = crate::world::DIRS[mount.face as usize].as_dvec3().abs();
         let coaxial = drive.is_some() && parts.len() == 1 && body.coaxial_tire(c, axis);
         let radius = parts
@@ -854,7 +869,6 @@ impl Dim {
         c: &Content,
         id: u64,
         parent: &Space,
-        nested: bool,
         pose: Transform,
         mount: &mut BodyMount,
         children: &FxHashMap<u64, Vec<u64>>,
@@ -877,7 +891,7 @@ impl Dim {
             let goal = if rail_end > 0 { f64::from(rail_end) } else { slide.length.round() };
             if current == goal {
                 let local = mount.slide_place(goal);
-                return Self::mount_fits_in(c, parent, nested, local, &space.block_snapshot()) && self.mount_clear(c, place, &parts);
+                return Self::mount_fits_in(c, parent, local, space) && self.mount_clear(c, place, &parts);
             }
             (goal - current).clamp(-0.1, 0.1)
         } else {
@@ -979,33 +993,29 @@ impl Dim {
         structure_pose_clear(c, &world, parts, &other_bodies, place)
     }
 
-    pub(super) fn mount_fits(&self, space_id: u64, c: &Content, place: Transform, blocks: &[(IVec3, u32)]) -> bool {
-        Self::mount_fits_in(c, &self.space(space_id), space_id != 0, place, blocks)
+    pub(super) fn mount_fits(&self, space_id: u64, c: &Content, place: Transform, body: &Space) -> bool {
+        Self::mount_fits_in(c, self.space(space_id), place, body)
     }
 
-    fn mount_fits_in(c: &Content, space: &Space, nested: bool, place: Transform, blocks: &[(IVec3, u32)]) -> bool {
+    fn mount_fits_in(c: &Content, space: &Space, place: Transform, body: &Space) -> bool {
         let turn = place.turn();
-        let free = |p| {
-            !space.signals.reserved(p)
-                && space.get(p).or(nested.then_some(AIR)).is_some_and(|s| {
-                    (s == AIR || c.states[s as usize].flags & abi::block_flags::REPLACEABLE != 0)
-                        && space
-                            .extras(p)
-                            .iter()
-                            .all(|s| c.states[*s as usize].flags & abi::block_flags::REPLACEABLE != 0)
-                })
-        };
-        blocks.iter().all(|&(p, state)| {
-            let to = place.cell_at(p);
-            let turned = c.turned_state(state, turn);
-            let was = &c.states[state as usize].cells;
-            let now = &c.states[turned as usize].cells;
-            free(to)
-                && was.len() == now.len()
-                && was.iter().all(|&(offset, _)| {
-                    let at = place.cell_at(p + offset);
-                    free(at) && now.iter().any(|&(offset, _)| to + offset == at)
-                })
+        body.block_snapshot().iter().all(|&(p, state)| {
+            body.layout(p).residents(state).all(|part| {
+                let (owner, part) = part.turned(c, turn).owner(place.cell_at(p));
+                std::iter::once(IVec3::ZERO)
+                    .chain(part.footprint(c).iter().copied())
+                    .all(|delta| {
+                        let cell = owner + delta;
+                        !space.signals.reserved(cell)
+                            && space.get(cell).is_some_and(|main| {
+                                space.layout(cell).parts(main).all(|other| {
+                                    c.states[other.state as usize].flags & abi::block_flags::REPLACEABLE != 0
+                                        || c.may_share(part.state, other.state)
+                                        || !part.in_cell(delta).overlaps(other, c)
+                                })
+                            })
+                    })
+            })
         })
     }
 
@@ -1018,9 +1028,7 @@ impl Dim {
         let local = m.place_at(m.angle);
         let parent_space = self.bodies.get(&parent).map_or(&self.space, |s| s);
         let parts = [MountedPart { id, space, relative: Transform::default() }];
-        if !Self::mount_fits_in(c, parent_space, parent != 0, local, &space.block_snapshot())
-            || !self.mount_clear(c, e.body_place(), &parts)
-        {
+        if !Self::mount_fits_in(c, parent_space, local, space) || !self.mount_clear(c, e.body_place(), &parts) {
             if let Some(m) = self
                 .entities
                 .get_mut(id)
@@ -1319,61 +1327,86 @@ impl Dim {
                 })
             })
             .map_or(abi::Turn::NONE, Transform::turn);
+        let landing_offset = self
+            .entities
+            .get(body)
+            .filter(|e| e.completion == super::entity::Completion::LandOnSupport)
+            .map_or(IVec3::ZERO, |e| {
+                let pose = Transform::of(self.space_pose(space_id).to_local(e.pos));
+                ((pose.origin() - pose.cell(None).as_dvec3()) * f64::from(crate::world::placement::UNIT))
+                    .round()
+                    .as_ivec3()
+            });
         if let Some(e) = self.entities.get_mut(body) {
             e.motion = Motion::Parked;
             e.vel = DVec3::ZERO;
         }
         let mut cells: FxHashMap<_, _> = also
             .into_iter()
-            .map(|(pos, state)| (pos, (state, self.space(space_id).extras(pos).to_vec())))
+            .map(|(p, state)| (p, (state, self.space(space_id).layout(p).clone())))
             .collect();
-        let before: Vec<_> = blocks
-            .iter()
-            .map(|block| (self.get(space_id, block.to), self.space(space_id).extras(block.to).to_vec()))
-            .collect();
+        let mut transferred = FxHashMap::default();
         let mut landed = FxHashMap::default();
-        for (mut b, (was, parts)) in blocks.into_iter().zip(before) {
-            let there = self.space(body).get(b.local);
-            // Broken off on its way.
-            if there == Some(AIR) {
-                continue;
-            }
-            // As it is now, having gone on on the way; a head is what it turns into.
-            if let Some(now) = there.filter(|_| c.states[b.state as usize].signal.kind != abi::signal_kind::PISTON_HEAD) {
-                b.state = now;
-            }
-            if turn != abi::Turn::NONE {
-                if c.covered_step(b.state).is_some() {
+        for b in blocks {
+            let source = self.space(body);
+            let Some(main) = source.get(b.local).filter(|&s| s != AIR) else { continue };
+            let residents: Vec<_> = source.layout(b.local).residents(main).collect();
+            for (i, part) in residents.into_iter().enumerate() {
+                let entity = c
+                    .game
+                    .block_entities
+                    .get(&c.states[part.state as usize].block)
+                    .and_then(|&kind| {
+                        self.entities
+                            .anchored_kind(body, b.local, kind, part.offset)
+                    });
+                let signal = self
+                    .space(body)
+                    .signals
+                    .carry_out(crate::wire::Site::of(c, b.local, part, main, self.space(body).layout(b.local)))
+                    .turned(turn);
+                let original = part;
+                let mut part = part;
+                if i == 0 && c.states[b.state as usize].signal.kind == abi::signal_kind::PISTON_HEAD {
+                    part.state = b.state;
+                }
+                let mut part = part.turned(c, turn);
+                part.offset += landing_offset;
+                let (to, part) = part.owner(b.to);
+                if self
+                    .entities
+                    .get(body)
+                    .is_some_and(|e| e.completion == super::entity::Completion::LandOnSupport)
+                    && !self.held_at(space_id, c, to, part)
+                {
+                    self.broke_landing(space_id, c, to, part.state, entity);
                     continue;
                 }
-                b.state = c.turned_state(b.state, turn);
-            }
-            let entity = self.entities.anchored(body, b.local);
-            let source = self.space(body);
-            let signal = source.signals.carry_out(b.local);
-            let extras = source
-                .extras(b.local)
-                .iter()
-                .map(|&state| c.turned_state(state, turn))
-                .collect();
-            let signal = if turn == abi::Turn::NONE { signal } else { signal.turned(turn) };
-            if self.land_block(space_id, c, b.to, b.state, extras, entity, signal) {
-                if let Some(entity) = entity {
-                    self.turn_assembly_offsets(c, entity, turn);
+                for delta in std::iter::once(IVec3::ZERO).chain(part.footprint(c).iter().copied()) {
+                    let p = to + delta;
+                    if let Some(state) = self.get(space_id, p) {
+                        cells
+                            .entry(p)
+                            .or_insert_with(|| (state, self.space(space_id).layout(p).clone()));
+                    }
                 }
-                if let Some(state) = self.get(space_id, b.to) {
-                    landed.insert(b.local, (b.to, state));
+                if self.land_block(space_id, c, to, part, entity, signal) {
+                    if let Some(entity) = entity {
+                        self.turn_assembly_offsets(c, entity, turn);
+                    }
+                    transferred.insert((b.local, original), (to, part));
+                    if i == 0 {
+                        landed.insert(b.local, (to, part.state));
+                    }
                 }
-            }
-            if let Some(was) = was.filter(|was| self.get(space_id, b.to) != Some(*was) || self.space(space_id).extras(b.to) != parts) {
-                cells.insert(b.to, (was, parts));
             }
         }
+        cells.retain(|&p, (s, layout)| self.get(space_id, p) != Some(*s) || self.space(space_id).layout(p) != layout);
         self.reparent_mounts(body, space_id, turn, |pos| landed.get(&pos).map(|&(at, _)| at));
         {
             let source = self.space_mut(body);
             source.signals = Default::default();
-            source.transfer = Some(Box::new(Transfer { destination: space_id, turn, cells: landed, shown_at: None }));
+            source.transfer = Some(Box::new(Transfer { destination: space_id, turn, parts: transferred, shown_at: None }));
         }
         // Its circuits and light are the world's again: at once here, in a moment from on a body.
         self.space_mut(space_id)
@@ -1397,50 +1430,60 @@ impl Dim {
     }
 
     /// Goes where it was going, if that is free: otherwise it breaks there, what it holds with it.
-    fn land_block(
-        &mut self,
-        space_id: u64,
-        c: &'static Content,
-        at: IVec3,
-        state: u32,
-        extras: Vec<u32>,
-        entity: Option<u64>,
-        signal: Moved,
-    ) -> bool {
-        match self.get(space_id, at) {
-            // Sides join the sides there, each holding on by itself.
-            Some(there) if c.states[there as usize].block == c.states[state as usize].block && c.states[state as usize].sides != 0 => {
-                let sides = c.states[there as usize].sides | c.states[state as usize].sides;
-                let joined = c.block_of(state).with_sides(state, sides);
-                return self
-                    .write_cell(space_id, c, at, joined, (joined == state).then_some(extras), true)
-                    .is_some();
-            }
-            Some(there) if there == AIR || c.states[there as usize].flags & abi::block_flags::REPLACEABLE != 0 => {
-                if c.states[state as usize].signal.kind == abi::signal_kind::OBSERVER {
-                    self.space_mut(space_id).signals.moved_observers.insert(at);
-                }
-                if !signal.is_empty() {
-                    self.space_mut(space_id).signals.arriving.insert(at, signal);
-                }
-                if self
-                    .write_cell(space_id, c, at, state, Some(extras), true)
-                    .is_some()
+    fn land_block(&mut self, space_id: u64, c: &'static Content, at: IVec3, part: Part, entity: Option<u64>, signal: Moved) -> bool {
+        let state = part.state;
+        if let Some(main) = self.get(space_id, at) {
+            let info = &c.states[state as usize];
+            let mut parts: Vec<_> = self.space(space_id).layout(at).residents(main).collect();
+            if let Some(other) = parts
+                .iter_mut()
+                .find(|v| v.offset == part.offset && info.sides != 0 && c.states[v.state as usize].block == info.block)
+            {
+                other.state = c
+                    .block_of(state)
+                    .with_sides(state, info.sides | c.states[other.state as usize].sides);
+            } else {
+                parts.retain(|v| c.states[v.state as usize].flags & abi::block_flags::REPLACEABLE == 0 || !v.overlaps(part, c));
+                if parts
+                    .iter()
+                    .any(|&v| v == part || (!c.may_share(state, v.state) && v.overlaps(part, c)))
                 {
-                    if let Some(id) = entity {
-                        self.entities.attach(
-                            id,
-                            space_id,
-                            at,
-                            self.space_pose(space_id)
-                                .to_world(at.as_dvec3() + DVec3::splat(0.5)),
-                        );
-                    }
-                    return true;
+                    self.broke_landing(space_id, c, at, state, entity);
+                    return false;
                 }
-                self.space_mut(space_id).signals.arriving.remove(&at);
+                parts.push(part);
             }
-            _ => {}
+            let mut layout = self.space(space_id).layout(at).clone();
+            let main = layout.set_residents(&parts);
+            let site = crate::wire::Site::of(c, at, part, main, &layout);
+            if info.signal.kind == abi::signal_kind::OBSERVER {
+                self.space_mut(space_id)
+                    .signals
+                    .moved_observers
+                    .insert(site);
+            }
+            if !signal.is_empty() {
+                self.space_mut(space_id)
+                    .signals
+                    .arriving
+                    .insert(site, signal);
+            }
+            if self
+                .write_residents(space_id, c, at, &mut parts, true)
+                .is_some()
+            {
+                if let Some(id) = entity {
+                    if let Some(e) = self.entities.get_mut(id) {
+                        e.anchor_offset = part.offset;
+                    }
+                    let pos = self
+                        .space_pose(space_id)
+                        .to_world(at.as_dvec3() + part.shift() + DVec3::splat(0.5));
+                    self.entities.attach(id, space_id, at, pos);
+                }
+                return true;
+            }
+            self.space_mut(space_id).signals.arriving.remove(&site);
         }
         self.broke_landing(space_id, c, at, state, entity);
         false
@@ -1849,20 +1892,26 @@ impl Dim {
         if let Some(source) = self.bodies.get(&frame)
             && let Some(transfer) = &source.transfer
         {
-            let gone: Vec<_> = source
+            let edited: Vec<_> = source
                 .block_snapshot()
                 .iter()
-                .filter_map(|&(pos, state)| {
-                    (c.covered_step(state).is_none()
-                        && transfer
-                            .cells
-                            .get(&pos)
-                            .is_none_or(|&(at, state)| self.get(space_id, at) != Some(state)))
-                    .then_some(pos)
+                .filter_map(|&(p, main)| {
+                    let before: Vec<_> = source.layout(p).residents(main).collect();
+                    let kept: Vec<_> = before
+                        .iter()
+                        .copied()
+                        .filter(|part| {
+                            transfer
+                                .parts
+                                .get(&(p, *part))
+                                .is_some_and(|&(at, placed)| self.has_placed(space_id, at, placed))
+                        })
+                        .collect();
+                    (before.len() != kept.len()).then_some((p, kept))
                 })
                 .collect();
-            for pos in gone {
-                self.carry_block(frame, c, pos, AIR);
+            for (p, mut kept) in edited {
+                self.write_residents(frame, c, p, &mut kept, true);
             }
         }
         if let Some(transfer) = self
@@ -1887,6 +1936,11 @@ impl Dim {
 
     /// A replacement at the destination ends the old cell's route from its source.
     pub(super) fn invalidate_arrival(&mut self, space_id: u64, pos: IVec3) {
+        let keep: Vec<_> = self
+            .space(space_id)
+            .layout(pos)
+            .residents(self.get(space_id, pos).unwrap_or(AIR))
+            .collect();
         let frames: Vec<_> = self
             .space(space_id)
             .landings
@@ -1900,34 +1954,25 @@ impl Dim {
                 .and_then(|space| space.transfer.as_mut())
             {
                 transfer
-                    .cells
-                    .retain(|_, (destination, _)| *destination != pos);
+                    .parts
+                    .retain(|_, (destination, part)| *destination != pos || keep.contains(part));
             }
         }
     }
 
     /// Resolves a late click through cells that were committed to another space.
-    pub fn landed_as(&self, c: &Content, frame: u64, pos: IVec3) -> Option<(u64, IVec3, abi::Turn)> {
-        let (mut frame, mut pos, mut turn) = (frame, pos, abi::Turn::NONE);
-        let mut block = None;
+    pub fn landed_as(&self, c: &Content, mut frame: u64, pos: IVec3, part: Part) -> Option<(u64, IVec3, Part, abi::Turn)> {
+        c.states.get(part.state as usize)?;
+        let (mut owner, mut part) = part.owner(pos);
+        let mut turn = abi::Turn::NONE;
         while !self.active_space(frame) {
             let transfer = self.bodies.get(&frame)?.transfer.as_ref()?;
-            let &(at, state) = transfer.cells.get(&pos)?;
-            let kind = c.states[state as usize].block;
-            if block.is_some_and(|previous| previous != kind) {
-                return None;
-            }
-            block = Some(kind);
-            (frame, pos, turn) = (transfer.destination, at, turn.then(transfer.turn));
+            (owner, part) = *transfer.parts.get(&(owner, part))?;
+            frame = transfer.destination;
+            turn = turn.then(transfer.turn);
         }
-        if let Some(block) = block
-            && self
-                .get(frame, pos)
-                .is_none_or(|state| c.states[state as usize].block != block)
-        {
-            return None;
-        }
-        Some((frame, pos, turn))
+        self.has_placed(frame, owner, part)
+            .then_some((frame, owner, part, turn))
     }
 
     /// Runs `f` on the space blocks at `frame` are in: this region (0) or the blocks of body

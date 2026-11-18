@@ -15,8 +15,8 @@ use winit::keyboard::{KeyCode, NamedKey, PhysicalKey};
 use winit::window::{CursorGrabMode, Window, WindowId};
 
 use crate::assets::Assets;
-use crate::client::{Client, DragPreview};
 use crate::client::textures::GameTextures;
+use crate::client::{Client, DragPreview};
 use crate::content::content;
 use crate::hud::Hud;
 use crate::input::{Input, Key};
@@ -2532,7 +2532,9 @@ fn refresh_hud(r: &mut Running) {
         ) {
             h = crate::world::mix(h ^ ((s.item as u64) << 32 | s.count as u64) ^ (s.data as u64) << 48);
         }
-        if g.client.drag.is_some() && let Some(menu) = &g.client.menu {
+        if g.client.drag.is_some()
+            && let Some(menu) = &g.client.menu
+        {
             for target in &menu.drag_targets {
                 h = crate::world::mix(h ^ ((u64::from(target.slot) << 32) | u64::from(target.room)));
             }

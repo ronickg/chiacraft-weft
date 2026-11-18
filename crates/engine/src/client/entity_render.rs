@@ -33,7 +33,7 @@ pub struct Crack {
     pub pos: IVec3,
     pub progress: f32,
     pub place: Transform,
-    pub state: u32,
+    pub part: crate::world::placement::Part,
 }
 
 pub struct Hand {
@@ -1525,7 +1525,10 @@ impl EntityRenderer {
             .draw(gpu, list, frame, super::models::Batch::World, self.model_pipe, vb);
 
         if let Some((hit, place)) = target {
-            let root = Mat4::from_rotation_translation(place.rotation().as_quat(), rel(place.to_world(hit.origin.as_dvec3())));
+            let root = Mat4::from_rotation_translation(
+                place.rotation().as_quat(),
+                rel(place.to_world(hit.origin.as_dvec3() + hit.offset.as_dvec3() / f64::from(crate::world::placement::UNIT))),
+            );
             outline_boxes(&mut boxes, c.states[hit.state as usize].outlined(), root);
         }
         gizmo_line_boxes(&mut boxes, gizmo_lines, cam.pos);
@@ -2106,17 +2109,18 @@ fn gizmo_fill_boxes(out: &mut Vec<GpuBox>, fills: &[super::gizmo::Fill], cam: DV
 /// textured like the block's own faces there.
 fn crack_boxes(out: &mut Vec<GpuBox>, breaking: &[Crack], textures: &GameTextures, cam: DVec3, light: &impl Fn(IVec3) -> u32) {
     let c = content();
-    for &Crack { pos: p, progress, place, state } in breaking {
+    for &Crack { pos: p, progress, place, part } in breaking {
         if progress <= 0.0 {
             continue;
         }
         let stage = ((progress * 10.0) as usize).min(9);
         let l = textures.texture(c.crack_textures[stage]);
         let lit = light(place.cell_at(p));
-        let root = Mat4::from_rotation_translation(place.rotation().as_quat(), (place.to_world(p.as_dvec3()) - cam).as_vec3());
+        let root =
+            Mat4::from_rotation_translation(place.rotation().as_quat(), (place.to_world(p.as_dvec3() + part.shift()) - cam).as_vec3());
         let shape = c
             .states
-            .get(state as usize)
+            .get(part.state as usize)
             .map_or(&[][..], |s| s.outlined());
         for b in shape {
             let (mn, mx) = (Vec3::new(b[0], b[1], b[2]), Vec3::new(b[3], b[4], b[5]));

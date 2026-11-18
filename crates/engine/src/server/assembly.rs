@@ -172,19 +172,18 @@ impl Dim {
             if controller.is_some_and(|ctrl| ctrl.slide.is_some() && super::structure::is_guide_rail(c, state)) {
                 continue;
             }
+            for cover in &self.space(space_id).layout(at).covers {
+                let root = cover.owner(at).0;
+                if !allowed(root) {
+                    return Err(result::UNAVAILABLE);
+                }
+                pending.push(root);
+            }
             if state == AIR || info.liquid.is_some() {
                 continue;
             }
             if self.space(space_id).signals.reserved(at) {
                 return Err(result::UNAVAILABLE);
-            }
-            if let Some(step) = c.covered_step(state) {
-                let root = at + step;
-                if !allowed(root) {
-                    return Err(result::UNAVAILABLE);
-                }
-                pending.push(root);
-                continue;
             }
             if connected && Some(at) != grip && !info.solid() {
                 continue;
@@ -197,13 +196,16 @@ impl Dim {
                 continue;
             }
             cells.push(at);
-            for &(offset, _) in &info.cells {
+            let layout = self.space(space_id).layout(at);
+            for offset in layout
+                .residents(state)
+                .flat_map(|part| part.footprint(c).into_owned())
+            {
                 let extra = at + offset;
                 if !allowed(extra) || self.space(space_id).signals.reserved(extra) || self.get(space_id, extra).is_none() {
                     return Err(result::UNAVAILABLE);
                 }
-                cells.push(extra);
-                seen.insert(extra);
+                pending.push(extra);
                 if connected {
                     pending.extend(DIRS.map(|d| extra + d));
                 }
@@ -238,15 +240,13 @@ impl Dim {
         let (riders, _) = self.who_rides(space_id, c, cells, fixed, IVec3::ZERO);
         let mut out: Vec<_> = cells
             .iter()
-            .copied()
-            .map(|p| (p, None))
+            .map(|&p| Lifted { from: p, local: p - center, to: p, part: None, only: None })
             .chain(
                 riders
                     .into_iter()
-                    .filter(|(p, _)| bounds.is_none_or(|b| b.contains(*p)))
-                    .map(|(p, state)| (p, Some(state))),
+                    .filter(|((p, _), _)| bounds.is_none_or(|b| b.contains(*p)))
+                    .map(|((p, source), state)| Lifted { from: p, local: p - center, to: p, part: Some(state), only: Some(source) }),
             )
-            .map(|(p, part)| Lifted { from: p, local: p - center, to: p, part })
             .collect();
         out.sort_unstable_by_key(|l| (l.from.to_array(), l.part));
         out

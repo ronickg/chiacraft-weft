@@ -250,8 +250,8 @@ impl World {
     }
 
     /// Puts another block in a cell with what is there, whatever its shape; `set_block` would replace
-    /// all of it. Only one thing in a cell can have a block entity, a circuit, light of its own or
-    /// growth: false if there would be two, or the cell isn't loaded.
+    /// all of it. Returns false for a duplicate, an unavailable cell or an occupied neighboring
+    /// cell intersected by the new hitbox.
     pub fn part_add(&self, pos: impl Into<BlockPos>, state: u32) -> bool {
         let pos = pos.into();
         unsafe { (host().part_add)(self.raw(), &pos, state) != 0 }

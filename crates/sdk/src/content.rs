@@ -1705,7 +1705,6 @@ macro_rules! state_setters {
         pub fn tall_plant(self, lower: &str, upper: &str) -> Self {
             let mut b = self
                 .plant()
-                .cells(&[[0, 1, 0]])
                 .hitbox([2.0, 0.0, 2.0], [14.0, 30.0, 14.0])
                 .texture(lower)
                 .top(upper);
@@ -1828,13 +1827,6 @@ macro_rules! state_setters {
         /// "type=top", "type=bottom")`. Without pieces a hit breaks all of it.
         pub fn piece(self, min: [f32; 3], max: [f32; 3], left: &str, alone: &str) -> Self {
             self.push(&bc::PIECES, abi::Piece { min, max, left: left.into(), alone: alone.into() })
-        }
-        /// More cells than its own, as its model is written (facing north, its top up): a door
-        /// `&[[0, 1, 0]]`, a 3x3x3 machine every cell around. It is one block in all of them: what
-        /// is done to any is done to it, and it is placed and gone whole. Its model and boxes span
-        /// them from its own cell. The cells touch each other by faces.
-        pub fn cells(self, cells: &[[i32; 3]]) -> Self {
-            self.set(&bc::CELLS, cells.to_vec())
         }
         /// The sides a liquid in its cell can't pass (`.shares_cell_with("#water")`): without
         /// this, the ones its hitbox covers whole (a stair's back holds water, a hollow log's open
@@ -2489,7 +2481,7 @@ impl<'a> BlockBuilder<'a> {
     }
     /// Pushes blocks at its `facing` with power from any other side (after `facing`). Its `power`
     /// property: `off` in, `moving` while its head is on the way, `on` out, the head being the
-    /// state's own cell in front (`.cells`). `head`: what the head looks like on the way, a block
+    /// extended state's hitbox in front. `head`: what the head looks like on the way, a block
     /// with a `facing` property that is never in the world. `sticky` brings a block back.
     pub fn signal_piston(mut self, head: &'static str, sticky: bool) -> Self {
         let flags = if sticky { abi::signal_flags::STICKY } else { 0 };

@@ -5,9 +5,9 @@ use weft_abi::ItemStack;
 use weft_abi::entry_kind as ek;
 
 use crate::app::Ctx;
-use crate::client::{Client, DragPreview};
 use crate::client::modui::{self, TAG_ENTITY, TAG_SLOT};
 use crate::client::textures::GameTextures;
+use crate::client::{Client, DragPreview};
 use crate::content::content;
 use crate::ui::lang::Lang;
 use crate::ui::look::Look;

@@ -34,7 +34,7 @@ pub enum In {
         cube: Arc<Cube>,
         edit: bool,
     },
-    Blocks(Vec<(IVec3, u32)>, Vec<(IVec3, Vec<u32>)>),
+    Blocks(Vec<(IVec3, u32)>, Vec<(IVec3, crate::world::placement::CellLayout)>),
     SpaceLanded(u64),
     Unload(IVec3),
     Saved(Vec<IVec3>),
@@ -67,7 +67,7 @@ pub enum Out {
         cube: Arc<Cube>,
         around: Around,
     },
-    Blocks(Vec<(IVec3, u32)>, Vec<(IVec3, Vec<u32>)>),
+    Blocks(Vec<(IVec3, u32)>, Vec<(IVec3, crate::world::placement::CellLayout)>),
     Unload(IVec3),
     /// The view now spans cubes `lo..=hi` up and down.
     Range {
@@ -506,7 +506,7 @@ impl Terrain {
                 }
                 for (p, parts) in &extras {
                     if let Some(cube) = self.cubes.get_mut(&crate::world::cube_of(*p)) {
-                        Arc::make_mut(cube).set_extras(crate::world::local_index(*p), parts.clone());
+                        Arc::make_mut(cube).set_layout(crate::world::local_index(*p), parts.clone());
                     }
                 }
                 self.out.push(Out::Blocks(changes, extras));

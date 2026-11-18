@@ -1,3 +1,4 @@
+use crate::world::placement::CellLayout;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -151,8 +152,8 @@ impl crate::physics::Blocks for ClientWorld {
     fn bounds(&self) -> Option<(IVec3, IVec3)> {
         self.bounds
     }
-    fn extras(&self, p: IVec3) -> &[u32] {
-        ClientWorld::extras(self, p)
+    fn layout(&self, p: IVec3) -> &CellLayout {
+        ClientWorld::layout(self, p)
     }
 }
 
@@ -170,8 +171,8 @@ impl crate::physics::Cells for SeenCells<'_> {
             .block_or_air(p)
             .or(self.air_if_missing.then_some(AIR))
     }
-    fn extras(&self, p: IVec3) -> &[u32] {
-        self.world.extras(p)
+    fn layout(&self, p: IVec3) -> &CellLayout {
+        self.world.layout(p)
     }
 }
 
@@ -247,7 +248,7 @@ impl ClientWorld {
                     self.set_block(pos, state);
                 }
                 for (pos, parts) in extras {
-                    self.set_extras(pos, parts);
+                    self.set_layout(pos, parts);
                 }
             }
             Out::Unload(pos) => self.remove(pos),
@@ -693,23 +694,42 @@ impl ClientWorld {
 
     /// What else is in the cell at `p`.
     pub fn extras(&self, p: IVec3) -> &[u32] {
+        &self.layout(p).extras
+    }
+
+    pub fn layout(&self, p: IVec3) -> &CellLayout {
         self.cubes
             .get(&cube_of(p))
-            .map_or(&[], |slot| slot.cube.extras(local_index(p)))
+            .map_or(&crate::world::placement::EMPTY_LAYOUT, |slot| slot.cube.layout(local_index(p)))
     }
 
     /// What else is in the cell at `p` is now `extras`.
-    pub fn set_extras(&mut self, p: IVec3, extras: Vec<u32>) {
+    pub fn set_layout(&mut self, p: IVec3, layout: CellLayout) {
         let cp = cube_of(p);
         self.glow.changed(cp);
         let Some(slot) = self.cubes.get_mut(&cp) else { return };
-        if slot.cube.extras(local_index(p)) == extras {
+        if slot.cube.layout(local_index(p)) == &layout {
             return;
         }
         let c = content();
-        let glows = |parts: &[u32]| parts.iter().any(|&s| c.states[s as usize].light != [0; 3]);
-        let relight = glows(slot.cube.extras(local_index(p))) || glows(&extras);
-        Arc::make_mut(&mut slot.cube).set_extras(local_index(p), extras);
+        let i = local_index(p);
+        let relight = !slot
+            .cube
+            .light_material(c, i)
+            .same_light(&layout.light(c, slot.cube.get(i)));
+        let wire = |s: u32| c.states[s as usize].signal.kind == weft_abi::signal_kind::WIRE;
+        let main = slot.cube.get(local_index(p));
+        let wires = slot
+            .cube
+            .layout(local_index(p))
+            .residents(main)
+            .chain(layout.residents(main))
+            .any(|v| wire(v.state));
+        self.wire_seen |= wires;
+        if self.wire_seen {
+            self.wire_dirty.insert(cp);
+        }
+        Arc::make_mut(&mut slot.cube).set_layout(local_index(p), layout);
         self.next_rev += 1;
         (slot.rev, slot.stamp) = (self.next_rev, self.next_rev);
         let l = p & 15;
@@ -737,7 +757,7 @@ impl ClientWorld {
         if main != was {
             self.set_block(p, main);
         }
-        self.set_extras(p, extras);
+        self.set_layout(p, CellLayout { extras, ..CellLayout::EMPTY });
     }
 
     /// Remeshes every cube, e.g. after textures were reloaded.
@@ -845,6 +865,11 @@ impl ClientWorld {
 
     /// The block, `None` while its cube has not arrived; outside the dimension's height there are
     /// no cubes, only air.
+    pub fn seen(&self, p: IVec3) -> u32 {
+        let main = self.block(p);
+        if main == AIR { self.layout(p).covers.first().map_or(AIR, |v| v.state) } else { main }
+    }
+
     pub fn block_or_air(&self, p: IVec3) -> Option<u32> {
         let s = self.block(p);
         if s != u32::MAX {
@@ -1087,11 +1112,11 @@ fn neighborhood(around: &[Option<Arc<Cube>>; 27], hidden: u32, filler: u32, pos:
             biomes[z * 16 + x] = center.biome(x, z);
         }
     }
-    let mut extras: FxHashMap<usize, Vec<u32>> = center
-        .all_extras()
+    let mut extras: FxHashMap<usize, CellLayout> = center
+        .layouts()
         .map(|(i, parts)| {
             let at = crate::world::cube::offset(i);
-            (pidx(at.x, at.y, at.z), parts.to_vec())
+            (pidx(at.x, at.y, at.z), parts.clone())
         })
         .collect();
     // The cube itself whole, a row at a time; the border from its neighbors block by block.
@@ -1146,8 +1171,8 @@ fn neighborhood(around: &[Option<Arc<Cube>>; 27], hidden: u32, filler: u32, pos:
                 let pi = pidx(x, y, z);
                 states[pi] = cube.get(li);
                 light[pi] = cube.light(li);
-                if !cube.extras(li).is_empty() {
-                    extras.insert(pi, cube.extras(li).to_vec());
+                if cube.layout(li) != &crate::world::placement::EMPTY_LAYOUT {
+                    extras.insert(pi, cube.layout(li).clone());
                 }
             }
         }

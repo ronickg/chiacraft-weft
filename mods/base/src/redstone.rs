@@ -231,8 +231,7 @@ pub fn register(r: &mut Registry) {
                 let plate = [strip, strip, ("piston_top", UV_FROM_BOX), (top, UV_FROM_BOX), strip, strip];
                 let none = ("piston_side", UV_NO_FACE);
                 let rod = [strip, strip, none, none, strip, strip];
-                s.cells(&[[0, 1, 0]])
-                    .model_box_faces([0.0, 28.0, 0.0], [16.0, 32.0, 16.0], plate)
+                s.model_box_faces([0.0, 28.0, 0.0], [16.0, 32.0, 16.0], plate)
                     .model_box_faces([6.0, 12.0, 6.0], [10.0, 28.0, 10.0], rod)
                     .turned([1, 1, 0, 0, 1, 1])
                     .hitbox([0.0, 0.0, 0.0], [16.0, 12.0, 16.0])

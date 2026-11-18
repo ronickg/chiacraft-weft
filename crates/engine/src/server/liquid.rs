@@ -50,28 +50,36 @@ impl Dim {
     /// Whether what shares the cell at `p` with a liquid closes its side towards `d`: what its
     /// shape covers whole there (a stair's back), or what its block says (`liquid_walls`).
     fn sealed(&self, space_id: u64, c: &Content, p: IVec3, d: IVec3) -> bool {
-        if self.space(space_id).extras(p).is_empty() {
-            return false;
+        let space = self.space(space_id);
+        let Some(main) = space.get(p) else { return false };
+        let layout = space.layout(p);
+        let Some(dir) = crate::world::DIRS.iter().position(|&v| v == d) else { return false };
+        if layout.offsets.is_empty() && layout.covers.is_empty() && layout.extras.len() <= 1 {
+            return std::iter::once(main)
+                .chain(layout.extras.iter().copied())
+                .any(|s| c.liquid_walls[s as usize] & (1 << dir) != 0);
         }
-        let Some(dir) = weft_abi::FACE_DIRS
-            .iter()
-            .position(|f| IVec3::from_array(*f) == d)
-        else {
-            return false;
-        };
-        self.parts(space_id, p)
-            .into_iter()
-            .any(|s| c.liquid_walls[s as usize] & 1 << dir != 0)
+        layout.covered_faces(c, main, true) & (1 << dir) != 0
     }
 
     /// Room for liquid: neither solid nor a ladder (unloaded counts as solid).
     fn has_room(&self, space_id: u64, c: &Content, p: IVec3) -> bool {
         let room = |s: u32| c.states[s as usize].flags & (bf::SOLID | bf::CLIMBABLE) == 0;
-        self.get(space_id, p).is_some_and(room) && self.space(space_id).extras(p).iter().all(|&s| room(s))
+        self.get(space_id, p).is_some_and(|main| {
+            self.space(space_id)
+                .layout(p)
+                .parts(main)
+                .all(|part| room(part.state))
+        })
     }
 
     fn solid(&self, space_id: u64, c: &Content, p: IVec3) -> bool {
-        self.get(space_id, p).is_none_or(|s| c.solid(s)) || self.space(space_id).extras(p).iter().any(|&s| c.solid(s))
+        self.get(space_id, p).is_none_or(|main| {
+            self.space(space_id)
+                .layout(p)
+                .parts(main)
+                .any(|part| c.solid(part.state))
+        })
     }
 
     /// What liquid `l` would make of `p` from its neighbors: a state, or `None` for nothing.

@@ -12,7 +12,6 @@ static GLASS: Block = Block::named("glass");
 static IRON: Block = Block::named("iron_block");
 static HELM: Block = Block::named("helm");
 static AIR: Block = Block::named("core:air");
-const TIRE_CELLS: [[i32; 3]; 8] = [[-1, -1, 0], [0, -1, 0], [1, -1, 0], [-1, 0, 0], [1, 0, 0], [-1, 1, 0], [0, 1, 0], [1, 1, 0]];
 
 pub fn register(r: &mut Registry) {
     for (block, radius, half_length, recipe) in [
@@ -29,8 +28,7 @@ pub fn register(r: &mut Registry) {
             .sound_group("cloth")
             .tab(&crate::tabs::REDSTONE)
             .states(move |_, s| {
-                let s = s.cylinder(radius / 16.0, half_length / 16.0, 1.15);
-                let mut s = if radius > 8.0 { s.cells(&TIRE_CELLS) } else { s };
+                let mut s = s.cylinder(radius / 16.0, half_length / 16.0, 1.15);
                 let tread = "wheel_tread";
                 let side = "wheel_side";
                 let faces = [tread, tread, tread, tread, side, side].map(|texture| (texture, UV_FROM_BOX));

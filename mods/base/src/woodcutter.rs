@@ -12,6 +12,8 @@ static MENU: Menu = Menu::named("woodcutter");
 pub fn register(r: &mut Registry) {
     r.block(&WOODCUTTER)
         .sound_group("wood")
+        .facing(Facings::HORIZONTAL, Toward::Player)
+        .default_facing(Dir::North)
         .states(|_, s| {
             let mut m = s;
             for (x, z) in [(1.0, 1.0), (28.0, 1.0), (1.0, 12.0), (28.0, 12.0)] {
@@ -53,7 +55,6 @@ pub fn register(r: &mut Registry) {
                 ],
             )
         })
-        .cells(&[[1, 0, 0]])
         .hitbox([0.0; 3], [32.0, 16.0, 16.0])
         .hardness(2.5)
         .mined_by("axe", tool_tier::HAND)

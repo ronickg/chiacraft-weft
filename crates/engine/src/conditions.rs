@@ -58,6 +58,7 @@ pub struct Ask<'a> {
     pub daylight: Option<f32>,
     /// Sides named (`side(down)`) are of `state`'s own frame, turned as it is (a block's rules).
     pub own_frame: bool,
+    pub placement: Option<(glam::IVec3, crate::world::placement::Part)>,
     /// Whether it may hold some time, not whether it does now: what changes by itself (light,
     /// time, chance, a mod's answer) is not known then.
     pub could: bool,
@@ -466,6 +467,14 @@ impl Context<'_> {
         }
     }
 
+    fn placed_at(&self, p: glam::IVec3) -> Option<(u32, &crate::world::placement::CellLayout)> {
+        let layout = match self {
+            Self::Server(d, id) => d.space(*id).layout(p),
+            Self::Client(cl) => cl.as_ref()?.world.layout(p),
+        };
+        Some((self.cell(p)?, layout))
+    }
+
     fn parts(&self, p: glam::IVec3) -> Vec<u32> {
         match self {
             Self::Server(d, space_id) => d.parts(*space_id, p),
@@ -564,6 +573,28 @@ impl Context<'_> {
                     }
                 },
                 (k::SIDE, Arg::Side(f, m)) => {
+                    if let Some((cell, part)) = a.placement
+                        && *f < 6
+                    {
+                        let face = c.states[a.state as usize].turn.face(*f as usize);
+                        let context = &*self;
+                        let accepts = |s| {
+                            m.as_ref()
+                                .map_or_else(|| c.solid(s), |m| crate::refs::has(m, s))
+                        };
+                        let held = crate::world::placement::supported(c, cell, part, face, |at| context.placed_at(at), accepts);
+                        // A tagged neighbor is also an authored grid relationship. Existing crops
+                        // can sit in the cell above farmland or another plant with a shorter model.
+                        if held == Some(true) || m.is_none() || part.offset != glam::IVec3::ZERO {
+                            return held;
+                        }
+                        let (main, layout) = context.placed_at(cell + crate::world::DIRS[face])?;
+                        return Some(
+                            layout
+                                .residents(main)
+                                .any(|v| v.offset == glam::IVec3::ZERO && accepts(v.state)),
+                        );
+                    }
                     let at = toward(*f);
                     self.cell(at)?;
                     self.parts(at)
@@ -571,6 +602,21 @@ impl Context<'_> {
                         .any(|s| m.as_ref().map_or(c.solid(s), |m| crate::refs::has(m, s)))
                 }
                 (k::OPEN, Arg::Side(f, _)) => {
+                    if let Some((cell, part)) = a.placement
+                        && *f < 6
+                    {
+                        let face = c.states[a.state as usize].turn.face(*f as usize);
+                        let context = &*self;
+                        return crate::world::placement::supported(
+                            c,
+                            cell,
+                            part,
+                            face,
+                            |at| context.placed_at(at),
+                            |s| c.states[s as usize].flags & abi::block_flags::REPLACEABLE == 0,
+                        )
+                        .map(|held| !held);
+                    }
                     let s = self.cell(toward(*f))?;
                     s == crate::content::AIR || c.states[s as usize].flags & abi::block_flags::REPLACEABLE != 0
                 }

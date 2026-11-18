@@ -546,14 +546,20 @@ impl ClientMenu {
     pub fn drag_preview(&self, button: u8, slots: &[u32]) -> DragPreview {
         let room = |slot: u32| {
             let i = slot as usize;
-            self.drag_targets.get(i).zip(self.slots.get(i)).map_or(0, |(target, _)| target.room)
+            self.drag_targets
+                .get(i)
+                .zip(self.slots.get(i))
+                .map_or(0, |(target, _)| target.room)
         };
         let (valid, share) = crate::stack::drag_slots(slots, self.cursor.count, button, room);
         let mut preview = DragPreview { cursor: self.cursor, slots: FxHashMap::default() };
         for slot in valid {
             let original = self.slots[slot as usize].count;
             let target = &self.drag_targets[slot as usize];
-            let stack = preview.slots.entry(target.slot).or_insert(ItemStack { count: original, ..self.cursor });
+            let stack = preview
+                .slots
+                .entry(target.slot)
+                .or_insert(ItemStack { count: original, ..self.cursor });
             let limit = original.saturating_add(target.room);
             let take = share.min(limit.saturating_sub(stack.count));
             stack.count += take;
@@ -752,7 +758,7 @@ pub struct Client {
     /// Who else is mining what, and how far along.
     others_mining: Vec<crate::net::Crack>,
     /// What the server was last told this player mines.
-    told_mining: Option<(u64, IVec3, u32)>,
+    told_mining: Option<(u64, IVec3, crate::world::placement::Part)>,
     /// What the server says this player may do (`abi::permission`).
     pub permission: u32,
     /// Seconds since it died, while it is.
@@ -781,7 +787,7 @@ pub struct Client {
     /// The block being broken (frame, block as in `Hit`) and how far.
     pub breaking: Option<(u64, IVec3, f32)>,
     /// Which of what is in that cell.
-    breaking_part: u32,
+    breaking_part: crate::world::placement::Part,
     /// Hotbar contents last frame, so the HUD knows when to redraw.
     pub hotbar: Vec<u32>,
 }
@@ -1091,7 +1097,7 @@ impl Client {
             gizmo_fills: Vec::new(),
             gizmo_labels: Vec::new(),
             breaking: None,
-            breaking_part: 0,
+            breaking_part: Default::default(),
             hotbar: vec![0; 9],
         })
     }
@@ -1799,20 +1805,24 @@ impl Client {
                     * if self.player.on_ground { 1.0 } else { self.attribute(a::AIRBORNE_MINING_SPEED) };
                 let rate = c.mining_rate(hit.state, &self.held(), speed, self.mode.has(crate::tag_bits::game_mode::INSTANT_BREAK));
                 let done = match self.breaking {
-                    Some((f, p, v)) if (f, p) == (hit.frame, hit.origin) && self.breaking_part == hit.state => v,
+                    Some((f, p, v)) if (f, p) == (hit.frame, hit.origin) && self.breaking_part == hit.part() => v,
                     _ => 0.0,
                 };
-                self.breaking_part = hit.state;
+                self.breaking_part = hit.part();
                 let progress = if rate >= 1.0 { 1.0 } else { done + dt as f32 * self.tick_rate as f32 * rate };
                 if progress >= 1.0 && (self.pressed_without_helm(input, "core:attack") || self.break_delay <= 0.0) {
                     send_look.send(&mut self.conn);
                     let at = self.hit_point(&hit, hit.origin);
                     self.conn
-                        .send(ToServer::Break { pos: hit.origin, part: hit.state, face: hit.face, hit: at, frame: hit.frame });
+                        .send(ToServer::Break { pos: hit.origin, part: hit.part(), face: hit.face, hit: at, frame: hit.frame });
                     let after = c.states[hit.state as usize]
-                        .piece_hit(at, hit.face)
+                        .piece_hit((glam::Vec3::from_array(at) - hit.part().shift().as_vec3()).to_array(), hit.face)
                         .map_or(crate::content::AIR, |p| p.left);
-                    if let Some(space) = self.space_mut(hit.frame) {
+                    if let Some(space) = self.space_mut(hit.frame)
+                        && space.layout(hit.origin).offsets.is_empty()
+                        && space.layout(hit.origin).covers.is_empty()
+                        && c.states[hit.state as usize].cells.is_empty()
+                    {
                         space.replace_part(hit.origin, hit.state, after);
                     }
                     self.breaking = None;
@@ -1889,17 +1899,21 @@ impl Client {
         let replaceable = |s: u32| c.states[s as usize].flags & bf::REPLACEABLE != 0;
         let space = self.space(hit.frame)?;
         let main = space.block_or_air(hit.block)?;
-        let mut choices = physics::placement_cells(c, hit.block, hit.face, at, main, space.extras(hit.block));
-        let (p, local) = choices.next()?;
-        if choices.next().is_some() {
-            return None;
-        }
+        let replacing = space
+            .layout(hit.block)
+            .parts(main)
+            .all(|v| replaceable(v.state));
         let transform = self.frame_place(hit.frame);
         let look = transform
             .vector_to_local(glam::Vec3::from_array(look).as_dvec3())
             .as_vec3()
             .to_array();
-        let chosen = physics::placement_state(c.block_of(state), p, hit.face, look, local).ok()?;
+        let (p, part, _) =
+            physics::placement(c, state, hit.block, hit.part().in_cell(hit.block - hit.origin), hit.face, at, look, replacing)?;
+        if part.offset != IVec3::ZERO || !space.layout(p).covers.is_empty() || !space.layout(p).offsets.is_empty() {
+            return None;
+        }
+        let chosen = part.state;
         let st = &c.states[chosen as usize];
         let held_up = st
             .rules
@@ -1929,7 +1943,7 @@ impl Client {
         }
         let space = self.space_mut(hit.frame)?;
         space.set_block(p, chosen);
-        space.set_extras(p, Vec::new());
+        space.set_layout(p, Default::default());
         Some(p)
     }
 
@@ -1951,7 +1965,7 @@ impl Client {
                 let placed = self.predict_place(&hit, at, look, sneak);
                 self.conn.send(ToServer::Use {
                     pos: hit.block,
-                    part: hit.state,
+                    part: hit.part().in_cell(hit.block - hit.origin),
                     face: hit.face,
                     look,
                     hit: at,
@@ -3172,11 +3186,11 @@ impl Client {
         let mut cracks: Vec<entity_render::Crack> = self
             .others_mining
             .iter()
-            .map(|&(_, pos, state, progress)| entity_render::Crack { pos, progress, place: physics::Transform::default(), state })
+            .map(|&(_, pos, part, progress)| entity_render::Crack { pos, progress, place: physics::Transform::default(), part })
             .collect();
         cracks.extend(
             self.breaking
-                .map(|(f, pos, progress)| entity_render::Crack { pos, progress, place: self.frame_place(f), state: self.breaking_part }),
+                .map(|(f, pos, progress)| entity_render::Crack { pos, progress, place: self.frame_place(f), part: self.breaking_part }),
         );
         self.entity_render.draw(
             gpu,
@@ -3336,7 +3350,7 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
             p.flying = false;
         }
         p.landed |= p.on_ground;
-        let here = physics::around(c, block, p.pos, height);
+        let here = physics::around(c, block, p.pos, height, hw);
         (p.in_liquid, p.climbing) = (here.in_liquid, here.climbing);
         return;
     }
@@ -3367,7 +3381,7 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         p.jump_cooldown = 10;
         p.jumped = true;
     }
-    let here = physics::around(c, block, p.pos, height);
+    let here = physics::around(c, block, p.pos, height, hw);
     (p.in_liquid, p.climbing) = (here.in_liquid, here.climbing);
     if w.on_ground {
         p.support = physics::standing_on(c, p.pos, hw, bodies, 0);

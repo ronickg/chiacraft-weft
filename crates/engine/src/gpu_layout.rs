@@ -57,6 +57,8 @@ shared! {
         /// Tint flag: no directional shading (plants).
         FLAT = 16,
         LIQUID = 32,
+        /// A clipped model face has uniform light in word 6 and its six clipping planes in word 7.
+        CLIP = 64,
     }
     /// Distant terrain record (`client::lod`), four words in the faces' pages: x, z in the tile
     /// (10 bits each), direction, tint kind, sky light; texture and biome like a face's; y
@@ -807,6 +809,7 @@ gpu_struct! {
         pub pos: [i32; 4],
         /// x texture index, y light (as `GpuParticle`), z its piece's number among the levels.
         pub data: [u32; 4],
+        pub offset: [f32; 4],
     }
 }
 

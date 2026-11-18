@@ -47,8 +47,16 @@ impl Screen for Multiplayer {
                     if cfg!(target_os = "android") || crate::settings::touch_controls() {
                         let paste = button(ui, cx, "multiplayer.paste_ticket", &[], 70.0, |c| {
                             let clip = crate::clipboard::get().unwrap_or_default();
-                            let text: String = clip.trim().lines().next().unwrap_or_default().trim()
-                                .chars().filter(|ch| !ch.is_control()).take(TICKET_MAX_LEN).collect();
+                            let text: String = clip
+                                .trim()
+                                .lines()
+                                .next()
+                                .unwrap_or_default()
+                                .trim()
+                                .chars()
+                                .filter(|ch| !ch.is_control())
+                                .take(TICKET_MAX_LEN)
+                                .collect();
                             if text.is_empty() {
                                 Self::show_clipboard_status(c, Some("multiplayer.clipboard_empty"));
                             } else {

@@ -10,7 +10,6 @@ pub fn register(r: &mut Registry) {
         .facing(Facings::HORIZONTAL, Toward::Player)
         .prop("open", ["false", "true"])
         .prop("hinge", ["right", "left"])
-        .cells(&[[0, 1, 0]])
         .placement(|place, props| {
             // The front points toward the player, so its clockwise side is the player's left.
             let left = props.facing().clockwise().offset();

@@ -1393,14 +1393,7 @@ pub struct Slots(abi::SlotGroupDef);
 impl Slots {
     /// A sortable rectangular storage group.
     pub fn grid(cols: u32, rows: u32) -> Slots {
-        Slots(abi::SlotGroupDef {
-            owner: u32::MAX,
-            start: u32::MAX,
-            cols,
-            rows,
-            flags: slot_flags::ALLOW_SORTING,
-            ..Default::default()
-        })
+        Slots(abi::SlotGroupDef { owner: u32::MAX, start: u32::MAX, cols, rows, flags: slot_flags::ALLOW_SORTING, ..Default::default() })
     }
     pub fn row(n: u32) -> Slots {
         Slots::grid(n, 1)
@@ -1506,7 +1499,9 @@ impl Slots {
     /// Fills this group earlier for matching items on a quick transfer, e.g. `.priority(1, "#food")`.
     /// The highest matching priority wins, zero by default. An empty reference matches every item.
     pub fn priority(mut self, priority: i32, items: &str) -> Self {
-        self.0.priorities.push(abi::SlotPriority { priority, items: items.into() });
+        self.0
+            .priorities
+            .push(abi::SlotPriority { priority, items: items.into() });
         self
     }
 

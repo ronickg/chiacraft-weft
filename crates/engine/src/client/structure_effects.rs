@@ -42,8 +42,7 @@ impl Client {
         let world_frame = Transform::default();
         self.wake_render.advance(tick);
         emit_exhaust(c, cells, &self.world, world_frame, world_frame, eye, &dry, &kinds, &mut self.particles, &mut exhaust);
-        let mine = (!self.dead && !self.mode.has(crate::tag_bits::game_mode::HIDDEN))
-            .then_some((&self.player_id, &self.me));
+        let mine = (!self.dead && !self.mode.has(crate::tag_bits::game_mode::HIDDEN)).then_some((&self.player_id, &self.me));
         for (&id, e) in mine.into_iter().chain(self.entities.iter()) {
             let pos = e.surface_pos;
             let body = e.structure.as_deref();
@@ -51,7 +50,9 @@ impl Client {
                 let Some((min, max)) = body.bounds else { continue };
                 (
                     Aabb { min: min.as_dvec3(), max: max.as_dvec3() + DVec3::ONE },
-                    e.place_at(tick), e.place_at(tick - MOTION_TICKS), MOTION_TICKS * TICK,
+                    e.place_at(tick),
+                    e.place_at(tick - MOTION_TICKS),
+                    MOTION_TICKS * TICK,
                 )
             } else {
                 if samples == 0 || e.pulled.is_some() || pos.y - e.pos.y <= 0.8 * elapsed {
@@ -60,7 +61,9 @@ impl Client {
                 let size = e.dims();
                 (
                     Aabb::around(DVec3::ZERO, size.half_width, size.height),
-                    Transform::rotated(e.pos, glam::DQuat::IDENTITY), Transform::rotated(pos, glam::DQuat::IDENTITY), elapsed,
+                    Transform::rotated(e.pos, glam::DQuat::IDENTITY),
+                    Transform::rotated(pos, glam::DQuat::IDENTITY),
+                    elapsed,
                 )
             };
             let world = place.box_to_world(bounds);
@@ -79,7 +82,9 @@ impl Client {
                 self.wake_render.waterline(id, line, tick, |at, liquid| {
                     exposed_surface(c, &cells, at.floor().as_ivec3())
                         .is_some_and(|(kind, height)| kind == liquid && (height + FOAM_HEIGHT - at.y).abs() < 0.27)
-                        && !dry.iter().any(|&volume| physics::inside_dry_volume(volume, at))
+                        && !dry
+                            .iter()
+                            .any(|&volume| physics::inside_dry_volume(volume, at))
                 });
             }
         }
@@ -348,9 +353,7 @@ impl Wake<'_> {
             let from = ray_origin + (pos - self.place.position()).with_y(0.0);
             Some((from - outward * cast(sample, from)?, sample))
         };
-        let (rim, sample) = entry().or_else(|| {
-            Some((ray_origin - outward * cast(self.place, ray_origin)?, self.place))
-        })?;
+        let (rim, sample) = entry().or_else(|| Some((ray_origin - outward * cast(self.place, ray_origin)?, self.place)))?;
         let open = rim + outward * (0.38 * size.min(1.0));
         let (here, y) = exposed_surface(self.c, &self.cells, open.floor().as_ivec3())?;
         if here != liquid || (y - rim.y).abs() > 0.25 || open.distance_squared(self.eye) > EFFECT_RANGE * EFFECT_RANGE {

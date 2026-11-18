@@ -11,6 +11,7 @@ use weft_abi::ItemStack;
 
 use crate::server::lod_tops::LodColumn;
 use crate::world::Cube;
+use crate::world::placement::Part;
 use codec::Wire;
 
 pub mod codec;
@@ -332,7 +333,7 @@ impl GizmoShape {
 }
 
 /// Someone's mining as others see it: who, the cell, which of what is in it, how far along (0..1).
-pub type Crack = (u64, IVec3, u32, f32);
+pub type Crack = (u64, IVec3, Part, f32);
 
 wire_struct! {
     #[derive(Clone, Copy, Debug)]
@@ -374,7 +375,7 @@ messages! {
         LodColumns { dim: u32, all: bool, cols: Vec<LodColumn> },
         /// Of the world, or of body `frame`.
         /// `extras`: what else is in cells, after `changes` (which take it away).
-        Blocks { dim: u32, frame: u64, changes: Vec<(IVec3, u32)>, extras: Vec<(IVec3, Vec<u32>)> },
+        Blocks { dim: u32, frame: u64, changes: Vec<(IVec3, u32)>, extras: Vec<(IVec3, crate::world::placement::CellLayout)> },
         /// What moving bodies' lights give cells of the world besides what is there, for a client
         /// to work out light as the server would: (cell, its light), none taking it away.
         BodyGlow { dim: u32, cells: Vec<(IVec3, [u8; 3])> },
@@ -383,7 +384,7 @@ messages! {
         /// Dry sections of a body's hull, as local half-open box bounds.
         BodyAir { frame: u64, boxes: Vec<(IVec3, IVec3)> },
         /// Power of pieces of wire: (cell, face, level), of the world or of body `frame`.
-        Signals { dim: u32, frame: u64, changes: Vec<(IVec3, u8, u8)> },
+        Signals { dim: u32, frame: u64, changes: Vec<(crate::wire::Site, u8, u8)> },
         /// The dimension's time of day, the ticks it ran (what entity effects end by, unlike the time
         /// `/time set` moves), its weather (`registry::WeatherDef` by id) and the ticks a second the
         /// server runs at.
@@ -489,7 +490,7 @@ messages! {
         /// May it turn on camera mode `mode` (`camera_flags::ASK`)? Answered with `Camera`.
         Camera(u32),
         /// Started mining this block (`frame` and `part` like `Break`'s).
-        StartBreak { pos: IVec3, part: u32, frame: u64 },
+        StartBreak { pos: IVec3, part: Part, frame: u64 },
         /// Stopped mining without finishing.
         StopBreak,
         /// Actions (key ids) that went down and up since the last.
@@ -501,12 +502,12 @@ messages! {
         /// `frame`: the structure (entity) the block is part of, its position in the structure's
         /// coordinates; 0 for the world. `face`: of its selection that was hit.
         /// `part`: which of what is in the cell; `hit`: where on it, from its corner (`Use`'s).
-        Break { pos: IVec3, part: u32, face: u8, hit: [f32; 3], frame: u64 },
+        Break { pos: IVec3, part: Part, face: u8, hit: [f32; 3], frame: u64 },
         /// Right click on a block: the block reacts first (chests), otherwise the held item is used or
         /// placed against the clicked face. `frame` like `Break`'s; `look` in world space.
         /// `hit`: where on the block, from its corner. `placed`: the cell the client already
         /// shows the held block in, sent back as it really is whatever happens.
-        Use { pos: IVec3, part: u32, face: u8, look: [f32; 3], hit: [f32; 3], sneak: bool, frame: u64, placed: Option<IVec3> },
+        Use { pos: IVec3, part: Part, face: u8, look: [f32; 3], hit: [f32; 3], sneak: bool, frame: u64, placed: Option<IVec3> },
         UseItem,
         Select(u32),
         Attack(u64),

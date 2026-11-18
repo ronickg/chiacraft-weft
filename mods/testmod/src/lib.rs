@@ -171,11 +171,9 @@ fn init(r: &mut Registry) {
         );
     // One block in 2x2x2 cells, its model and boxes spanning them from its own.
     static BIG: Block = Block::named("big");
-    let others = [[1, 0, 0], [0, 1, 0], [1, 1, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]];
     r.block(&BIG)
         .texture("base:mossy_cobblestone")
-        .model_box([0.0; 3], [32.0; 3])
-        .cells(&others);
+        .model_box([0.0; 3], [32.0; 3]);
     // Edited by testkit (`max_stack` 8 there): an edit wins whichever mod loads first.
     static EDITED: Item = Item::named("edited");
     r.item(&EDITED).max_stack(16).attack_damage(3.0);
@@ -387,7 +385,14 @@ fn init(r: &mut Registry) {
         });
     r.menu(&SHELVES)
         .group("stock", Slots::row(3).holder())
-        .group("fuel", Slots::row(2).holder().accepts("#fuel").limit(4).priority(1, "#stick"))
+        .group(
+            "fuel",
+            Slots::row(2)
+                .holder()
+                .accepts("#fuel")
+                .limit(4)
+                .priority(1, "#stick"),
+        )
         .group("display", Slots::row(2).holder().allow_sorting(false))
         .default_screen();
 

@@ -537,7 +537,13 @@ unsafe extern "C" fn block_get(w: *mut abi::WorldCtx, pos: *const abi::BlockPos)
 
 unsafe extern "C" fn part_list(w: *mut abi::WorldCtx, pos: *const abi::BlockPos, out: *mut u32, cap: u32) -> u32 {
     unsafe {
-        let parts = dim(w).parts(space_id(w), ip(pos));
+        let space = dim(w).space(space_id(w));
+        let at = ip(pos);
+        let parts: Vec<_> = space
+            .layout(at)
+            .parts(space.get(at).unwrap_or(0))
+            .map(|v| v.state)
+            .collect();
         std::ptr::copy_nonoverlapping(parts.as_ptr(), out, parts.len().min(cap as usize));
         parts.len() as u32
     }
@@ -1035,7 +1041,9 @@ unsafe extern "C" fn entity_mine(w: *mut abi::WorldCtx, id: u64, pos: *const abi
             d.stop_mining(id);
             return 1;
         }
-        d.start_mining(content(), id, 0, ip(pos), u32::MAX) as u32
+        d.block_at(0, content(), ip(pos))
+            .and_then(|(p, state)| d.resident(0, p, state).map(|part| (p, part)))
+            .is_some_and(|(p, part)| d.start_mining(content(), id, 0, p, part)) as u32
     }
 }
 
@@ -2358,9 +2366,9 @@ unsafe extern "C" fn particle_burst(w: *mut abi::WorldCtx, who: abi::Who, b: *co
 unsafe extern "C" fn signal_at(w: *mut abi::WorldCtx, pos: *const abi::BlockPos) -> u32 {
     unsafe {
         let d = dim(w);
-        d.space
-            .signals
-            .power_at(content(), d.signal_view(space_id(w)), crate::world::ivec(*pos)) as u32
+        let id = space_id(w);
+        let at = crate::world::ivec(*pos);
+        d.power_at(content(), id, at) as u32
     }
 }
 

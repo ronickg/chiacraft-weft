@@ -214,11 +214,8 @@ fn slots(dim: &Dim, c: &'static Content, kind: u32, on: Option<Inv>, player: u64
         for index in first..first + g.cols * g.rows {
             // The stack the menu is open on can't be moved while it is.
             let locked = owner == Owner::Player && on.is_some_and(|inv| inv.at == At::Stack { entity: player, slot: index });
-            let flags = if locked || index >= len || g.flags & sf::LOCKED != 0 {
-                (g.flags | sf::LOCKED) & !sf::ALLOW_SORTING
-            } else {
-                g.flags
-            };
+            let flags =
+                if locked || index >= len || g.flags & sf::LOCKED != 0 { (g.flags | sf::LOCKED) & !sf::ALLOW_SORTING } else { g.flags };
             out.push(SlotRef { owner, index, flags, group: g });
         }
     };
@@ -333,8 +330,7 @@ fn takeable(s: &SlotRef) -> bool {
 }
 
 fn can_replace(c: &Content, s: &SlotRef, old: ItemStack, new: ItemStack) -> bool {
-    (old.is_empty() || takeable(s)) && (new.is_empty() || s.flags & sf::OUTPUT == 0)
-        && fits(c, s, new.item) && new.count <= cap(c, s, &new)
+    (old.is_empty() || takeable(s)) && (new.is_empty() || s.flags & sf::OUTPUT == 0) && fits(c, s, new.item) && new.count <= cap(c, s, &new)
 }
 
 /// What a bucket holds.
@@ -413,7 +409,10 @@ pub const WHEEL_DOWN: u8 = 20;
 /// Sorts each selected storage group independently, skipping locked slots inside it.
 fn sort(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, slot: u32) {
     let sortable = |s: &SlotRef| s.flags & sf::ALLOW_SORTING != 0;
-    let on = m.slots.iter().any(|s| matches!(s.owner, Owner::On(_)) && sortable(s));
+    let on = m
+        .slots
+        .iter()
+        .any(|s| matches!(s.owner, Owner::On(_)) && sortable(s));
     if slot != u32::MAX && !m.slots.get(slot as usize).is_some_and(sortable) {
         return;
     }
@@ -429,7 +428,9 @@ fn sort(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, slot:
             r.owner == Owner::Player && r.group.owner == abi::slot_owner::PLAYER_MAIN
         };
         if selected && r.group.flags & sf::ALLOW_SORTING != 0 {
-            let picked = (first..end).filter(|&i| sortable(&m.slots[i as usize])).collect();
+            let picked = (first..end)
+                .filter(|&i| sortable(&m.slots[i as usize]))
+                .collect();
             sort_group(m, dim, c, player, picked);
         }
         first = end;
@@ -438,7 +439,11 @@ fn sort(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, slot:
 
 fn sort_group(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, mut slots: Vec<u32>) {
     let Some(&first) = slots.first() else { return };
-    let mut stacks: Vec<_> = slots.iter().map(|&i| get(m, dim, player, i)).filter(|s| !s.is_empty()).collect();
+    let mut stacks: Vec<_> = slots
+        .iter()
+        .map(|&i| get(m, dim, player, i))
+        .filter(|s| !s.is_empty())
+        .collect();
     stacks.sort_by_key(|s| (s.item, s.data));
     let mut packed = Vec::with_capacity(stacks.len());
     for same in stacks.chunk_by(|a, b| (a.item, a.data) == (b.item, b.data)) {
@@ -458,7 +463,9 @@ fn sort_group(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64,
     let mut packed = packed.into_iter();
     slots.retain(|&i| {
         let stack = packed.next().unwrap_or(ItemStack::EMPTY);
-        if get(m, dim, player, i) == stack { return false; }
+        if get(m, dim, player, i) == stack {
+            return false;
+        }
         set(m, dim, player, i, stack);
         true
     });
@@ -484,7 +491,9 @@ pub fn creative_to_hotbar(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, 
     };
     let r = &m.slots[h as usize];
     let stack = ItemStack::new(item, cap(c, r, &ItemStack::new(item, 1)));
-    if !can_replace(c, r, get(m, dim, player, h), stack) { return; }
+    if !can_replace(c, r, get(m, dim, player, h), stack) {
+        return;
+    }
     set(m, dim, player, h, stack);
     changed(m, dim, c, player, h);
 }
@@ -723,7 +732,9 @@ pub fn click(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, 
                 if now.is_empty() || now.item != cur.item || now.data != cur.data {
                     break;
                 }
-                if dim.entities.item_room(c, player, now) < u64::from(now.count) { break; }
+                if dim.entities.item_room(c, player, now) < u64::from(now.count) {
+                    break;
+                }
                 dim.entities.insert_result(c, player, now);
                 dim.entities.dirty_inv.insert(player);
                 set(m, dim, player, slot, ItemStack::EMPTY);
@@ -812,7 +823,8 @@ fn other_side(m: &OpenMenu, c: &Content, player: u64, slot: u32, stack: Option<I
     let mut inventory = Vec::new();
     let max_stack = stack.map_or(0, |s| c.max_stack(&s));
     for (i, s) in m.slots.iter().enumerate() {
-        if s.flags & (sf::OUTPUT | sf::LOCKED) != 0 || s.owner == Owner::Trash
+        if s.flags & (sf::OUTPUT | sf::LOCKED) != 0
+            || s.owner == Owner::Trash
             || (s.owner.backing(player) == from.owner.backing(player) && (s.index == from.index || std::ptr::eq(s.group, from.group)))
             || stack.is_some_and(|stack| !fits(c, s, stack.item))
         {
@@ -837,7 +849,11 @@ fn other_side(m: &OpenMenu, c: &Content, player: u64, slot: u32, stack: Option<I
     let mut targets = if container.is_empty() {
         inventory
     } else {
-        container.extend(inventory.into_iter().filter(|t| stack.is_some() && t.priority > 0));
+        container.extend(
+            inventory
+                .into_iter()
+                .filter(|t| stack.is_some() && t.priority > 0),
+        );
         container
     };
     targets.sort_by_key(|t| (std::cmp::Reverse(t.priority), m.slots[t.slot as usize].flags & sf::HOTBAR != 0));
@@ -850,7 +866,9 @@ fn move_out(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, s
     let going = n.min(cur.count);
     let targets = other_side(m, c, player, slot, Some(cur));
     let rest = crate::stack::insert_by_priority(ItemStack { count: going, ..cur }, &targets, |i, value| {
-        if let Some(s) = value { set(m, dim, player, i, s); }
+        if let Some(s) = value {
+            set(m, dim, player, i, s);
+        }
         get(m, dim, player, i)
     });
     let moved = going - rest.count;
@@ -1069,7 +1087,9 @@ pub fn drag(m: &mut OpenMenu, dim: &mut Dim, c: &'static Content, player: u64, s
         return;
     }
     let (valid, share) = crate::stack::drag_slots(slots, cur.count, button, |slot| {
-        m.slots.get(slot as usize).map_or(0, |r| drag_room(c, r, get(m, dim, player, slot), cur))
+        m.slots
+            .get(slot as usize)
+            .map_or(0, |r| drag_room(c, r, get(m, dim, player, slot), cur))
     });
     let mut left = cur.count;
     for &s in &valid {
@@ -1110,9 +1130,16 @@ pub fn changes(m: &mut OpenMenu, dim: &Dim, c: &Content, player: u64) -> (Vec<(u
         m.sent_cursor = m.cursor;
         // Two menu slots can show the same inventory index.
         let mut backing = rustc_hash::FxHashMap::default();
-        let targets = m.slots.iter().zip(&m.sent_slots).enumerate().take(if m.cursor.is_empty() { 0 } else { n })
+        let targets = m
+            .slots
+            .iter()
+            .zip(&m.sent_slots)
+            .enumerate()
+            .take(if m.cursor.is_empty() { 0 } else { n })
             .map(|(i, (r, &s))| {
-                let slot = *backing.entry((r.owner.backing(player), r.index)).or_insert(i as u32);
+                let slot = *backing
+                    .entry((r.owner.backing(player), r.index))
+                    .or_insert(i as u32);
                 crate::net::DragSlot { slot, room: drag_room(c, r, s, m.cursor) }
             })
             .collect();

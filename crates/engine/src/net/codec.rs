@@ -197,6 +197,43 @@ impl Wire for LodColumn {
     }
 }
 
+use crate::world::placement::{CellLayout, Part};
+
+impl Wire for crate::wire::Site {
+    fn put(&self, w: &mut W) {
+        self.cell.put(w);
+        self.offset.put(w);
+        self.port.put(w);
+    }
+    fn get(r: &mut R) -> Option<Self> {
+        Some(Self { cell: Wire::get(r)?, offset: Wire::get(r)?, port: Wire::get(r)? })
+    }
+}
+
+impl Wire for Part {
+    fn put(&self, w: &mut W) {
+        self.state.put(w);
+        self.offset.put(w);
+    }
+    fn get(r: &mut R) -> Option<Self> {
+        Some(Self { state: Wire::get(r)?, offset: Wire::get(r)? })
+    }
+}
+
+impl Item for Part {}
+
+impl Wire for CellLayout {
+    fn put(&self, w: &mut W) {
+        self.extras.put(w);
+        self.offsets.put(w);
+        self.covers.put(w);
+    }
+    fn get(r: &mut R) -> Option<Self> {
+        let layout = Self { extras: Wire::get(r)?, offsets: Wire::get(r)?, covers: Wire::get(r)? };
+        (layout.offsets.len() <= layout.extras.len() + 1).then_some(layout)
+    }
+}
+
 impl Wire for IVec3 {
     fn put(&self, w: &mut W) {
         self.to_array().put(w);
@@ -361,7 +398,7 @@ mod tests {
             ToServer::Join { name: "Ann".into(), key: "k".into() },
             ToServer::Use {
                 pos: IVec3::new(-5, 70, 3),
-                part: 7,
+                part: Part { state: 7, offset: IVec3::new(0, 32768, 0) },
                 face: 3,
                 hit: [0.5, 1.0, 0.25],
                 look: [0.1, -0.5, 0.8],

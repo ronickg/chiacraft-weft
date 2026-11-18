@@ -113,7 +113,7 @@ fn crit(d: &mut Dim, _space_id: u64, c: &'static Content, q: &abi::Query, s: &mu
 /// sprinting.
 fn vanilla_crit(d: &mut Dim, _space_id: u64, c: &'static Content, q: &abi::Query, s: &mut Calc) {
     let Some(e) = d.entities.get(q.entity) else { return };
-    let here = crate::physics::around(c, &*d.space, e.pos, e.height(c));
+    let here = crate::physics::around(c, &*d.space, e.pos, e.height(c), e.dims(c).half_width);
     if q.charge > 0.9 && e.fall > 0.0 && !e.on_ground && !here.in_liquid && !here.climbing && !e.sprinting {
         s.value = 1.0;
     }
