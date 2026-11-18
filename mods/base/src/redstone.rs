@@ -128,7 +128,6 @@ pub fn register(r: &mut Registry) {
         .not_solid()
         .hardness(0.0)
         .sound_group("stone")
-        .item_texture("repeater")
         .tab(&crate::tabs::REDSTONE);
 
     r.block(&COMPARATOR)
@@ -153,7 +152,6 @@ pub fn register(r: &mut Registry) {
         .not_solid()
         .hardness(0.0)
         .sound_group("stone")
-        .item_texture("comparator")
         .tab(&crate::tabs::REDSTONE);
 
     r.block(&LEVER)
@@ -179,7 +177,6 @@ pub fn register(r: &mut Registry) {
         .not_solid()
         .hardness(0.5)
         .sound_group("wood")
-        .item_texture("lever")
         .tab(&crate::tabs::REDSTONE);
 
     r.block(&BUTTON)
