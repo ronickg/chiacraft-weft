@@ -372,7 +372,7 @@ pub fn register(r: &mut Registry) {
                 let (front, back) = match (rotates, hold) {
                     (true, true) => ("rotor_hold_front", "rotor_hold_back"),
                     (true, false) => ("rotor_front", "rotor_back"),
-                    (false, _) => ("assembler_front", "assembler_back"),
+                    (false, _) => ("assembler_front", "iron_block"),
                 };
                 let faces = [
                     (side, UV_FROM_BOX),
