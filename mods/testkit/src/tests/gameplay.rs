@@ -2338,6 +2338,26 @@ pub async fn attack_charge(t: T) -> R {
     let full = before - health(t.clone(), id.clone()).await?;
     t.note(format!("charged: {full:.2}"));
     t.check((5.5..6.5).contains(&full), format!("a charged iron sword does 6: {full:.2}"));
+
+    t.op(&format!("remove {id}")).await?;
+    let target: u64 = t
+        .op(&format!("spawn core:player {} {} {}", spot[0], spot[1], spot[2]))
+        .await?
+        .parse()
+        .map_err(|_| "target id")?;
+    t.secs(0.8).await?;
+    t.hold("core:jump", 0.12);
+    t.until("descending", Duration::from_secs(2), |t| t.state().vel.y < -0.14 && t.state().pos.y > f[1] as f64 + 0.3)
+        .await?;
+    let mob = t.c().entity(target).ok_or("missing melee target")?;
+    aim(&t, [mob.pos.x, mob.pos.y + mob.size.height as f64 * 0.65, mob.pos.z]);
+    t.until("mob under crosshair", Duration::from_millis(100), |t| t.c().target().is_some_and(|hit| hit.entity == target))
+        .await?;
+    let particles = t.state().particles;
+    t.press("core:attack");
+    t.until("critical hit burst", Duration::from_millis(300), |t| t.state().particles >= particles + 16)
+        .await?;
+    t.shot("critical").await?;
     Ok(())
 }
 

@@ -3059,7 +3059,7 @@ fn engine_particles() -> Vec<RawEntry> {
     vec![
         kind(k::BLOCK, Vec::new(), [[0.2, 1.0], [0.05, 0.1]], [16.0, 0.98], [0x999999FF; 2], pf::COLLIDE),
         kind(k::POOF, generic.clone(), [[0.4, 1.1], [0.15, 0.3]], [-2.0, 0.9], [0xD0D0D0FF, 0x909090FF], 0),
-        kind(k::CRIT, generic.clone(), [[0.3, 0.7], [0.1, 0.2]], [8.0, 0.8], [0xFFE9A0FF, 0xC08030FF], pf::FULLBRIGHT),
+        kind(k::CRIT, one("glint_3"), [[0.3, 0.48], [0.16, 0.25]], [8.0, 0.91], [0xFFF0B2FF, 0xE1A259FF], pf::FULLBRIGHT | pf::SHRINK),
         kind(k::FLAME, one("flame"), [[0.3, 0.8], [0.08, 0.14]], [0.0, 0.96], white, pf::FULLBRIGHT | pf::SHRINK),
         kind(k::SMOKE, generic.clone(), [[0.6, 1.4], [0.08, 0.16]], [-1.5, 0.96], [0x505050FF, 0x303030FF], 0),
         kind(

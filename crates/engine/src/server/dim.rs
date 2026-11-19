@@ -1670,27 +1670,6 @@ impl Dim {
         if !hit {
             return false;
         }
-        if q.crit != 0 {
-            if let Some(t) = self.entities.get(target) {
-                let (pos, id) = (t.pos + DVec3::Y * (t.dims(c).height * 0.5), self.id);
-                self.events.push(DimEvent::Particles {
-                    dim: id,
-                    who: abi::Who::Around,
-                    burst: abi::ParticleBurst {
-                        kind: c
-                            .game
-                            .catalog
-                            .find(ek::PARTICLE, abi::particle::CRIT)
-                            .unwrap_or(0),
-                        pos: pos.to_array().into(),
-                        count: 16,
-                        spread: [0.3, 0.5, 0.3].into(),
-                        speed: 3.0,
-                        ..abi::ParticleBurst::DEFAULT
-                    },
-                });
-            }
-        }
         // Asked before the knock below ends a sprint.
         let sweeps = self.ask_or(space_id, c, abi::question::SWEEP, &q, false);
         let extra = self.attribute_for(space_id, c, crate::registry::attr::ATTACK_KNOCKBACK, &q, false);
@@ -2008,6 +1987,27 @@ impl Dim {
             e.hurt_cooldown = cooldown;
         }
         let (health, player, pos, kind, on_fire, height) = (e.health, e.player, e.pos, e.kind, e.fire > 0, e.height(c));
+        if d.crit != 0 {
+            let half = e.dims(c).half_width;
+            let toward_hit = from.map_or(DVec3::ZERO, |at| (at - pos).with_y(0.0).normalize_or_zero());
+            if let Some(kind) = c.game.catalog.find(ek::PARTICLE, abi::particle::CRIT) {
+                self.events.push(DimEvent::Particles {
+                    dim: self.id,
+                    who: abi::Who::Around,
+                    burst: abi::ParticleBurst {
+                        kind,
+                        pos: (pos + DVec3::Y * (height * 0.55) + toward_hit * half)
+                            .to_array()
+                            .into(),
+                        count: 16,
+                        spread: [half, height * 0.5, half].into(),
+                        speed: 3.0,
+                        outward: 1,
+                        ..abi::ParticleBurst::DEFAULT
+                    },
+                });
+            }
+        }
         let effects = k.effects;
         use crate::registry::entity_event;
         if health <= 0.0 || !def.has(df::SILENT) {
