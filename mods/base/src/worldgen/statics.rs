@@ -16,11 +16,6 @@ pub static CLOVER_COVER: Component<f32> = Component::named("clover");
 pub static COARSE_DIRT_COVER: Component<f32> = Component::named("coarse_dirt");
 /// Flowers a biome grows, picked evenly (`"base:dandelion base:rose"` where unset).
 pub static FLOWERS: Component<BlockList> = Component::named("flowers");
-/// On a log, the tree it grows into: `round <leaves>` (like oaks, 4-6 high) or `cone <leaves>`
-/// (like spruces, 6-9 high).
-pub static TREE_LEAVES: Component<BlockRef> = Component::named("tree_leaves");
-/// Logs with this tag grow into cones (spruces), the others round (oaks, birches).
-pub static CONE_TREE: Tag = Tag::named("cone_tree");
 pub static FROZEN: Tag = Tag::named("frozen");
 pub static DRY: Tag = Tag::named("dry");
 
