@@ -13,6 +13,7 @@ pub static FERN_COVER: Component<f32> = Component::named("fern");
 pub static BLUEGRASS_COVER: Component<f32> = Component::named("bluegrass");
 pub static SHORT_GRASS_COVER: Component<f32> = Component::named("short_grass");
 pub static CLOVER_COVER: Component<f32> = Component::named("clover");
+pub static COARSE_DIRT_COVER: Component<f32> = Component::named("coarse_dirt");
 /// Flowers a biome grows, picked evenly (`"base:dandelion base:rose"` where unset).
 pub static FLOWERS: Component<BlockList> = Component::named("flowers");
 /// On a log, the tree it grows into: `round <leaves>` (like oaks, 4-6 high) or `cone <leaves>`

@@ -121,7 +121,7 @@ pub fn register(r: &mut Registry) {
         .set(&BOULDER_COVER, 0.03)
         .set(&FLOWER_COVER, 0.0);
     r.biome(&FOREST)
-        .humidity(0.25..)
+        .humidity(0.125..)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x79c05a)
         .tint(foliage, 0x59ae30)
@@ -133,6 +133,7 @@ pub fn register(r: &mut Registry) {
         .set(&BUSH_COVER, 0.06)
         .set(&RASPBERRY_COVER, 0.002)
         .set(&FUNGI_COVER, 0.001)
+        .set(&COARSE_DIRT_COVER, 0.4)
         // .set_text(&FLOWERS, "base:rose base:dandelion base:fern base:fern")
         // .set(&FLOWER_COVER, 0.02)
         .set(&TREE_KINDS, TreeKinds::from([("base:oak", 4), ("base:birch", 1)]));
@@ -323,6 +324,7 @@ pub fn register(r: &mut Registry) {
         .density(&TREES)
         .ground("#plant_soil")
         .plan(|s| {
+            if COARSE_DIRT.is(s.read(s.pos().below())) { return }
             let kinds = TREE_KINDS.on_biome(s.biome());
             let mut rng = Rng(s.random());
             // Biomes that ask for trees without naming kinds grow oaks, as they always did.
@@ -332,7 +334,6 @@ pub fn register(r: &mut Registry) {
             };
             let Some(name) = name else { return };
             let Some(place_tree) = tree_place(name) else { return };
-
             place_tree(&mut TreePlaceData::new(s));
         });
     r.scatter(&BOULDER_SITES)

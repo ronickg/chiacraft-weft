@@ -61,6 +61,21 @@ pub fn decorate(g: &mut Gen) {
                 continue;
             }
             let below = g.read([wx, oy + y as i32 - 1, wz]);
+            let coarse_cover = COARSE_DIRT_COVER.on_biome(b).unwrap_or(0.0) as f64;
+            if coarse_cover > 0.0 && y > 0 && GRASS.is(below)
+            {
+                let patch = fixed::fbm(
+                    fixed::seed32(seed, 0xC0A5E),
+                    wx * 16,
+                    wz * 16,
+                    20 * 16,
+                    3,
+                );
+                let value = (patch as f64 / fixed::ONE as f64 + 1.0) * 0.5;
+                if value < coarse_cover {
+                    g.set(x, y - 1, z, COARSE_DIRT.id());
+                }
+            }
             if PLANT_SOIL.on_block(below) {
                 // roll ∈ [0; flower_chance)
                 if roll < flower_chance {

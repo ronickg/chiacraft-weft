@@ -7,6 +7,7 @@ pub static STONE: Block = Block::named("stone");
 pub static COBBLESTONE: Block = Block::named("cobblestone");
 pub static MOSSY_COBBLESTONE: Block = Block::named("mossy_cobblestone");
 pub static DIRT: Block = Block::named("dirt");
+pub static COARSE_DIRT: Block = Block::named("coarse_dirt");
 pub static GRASS: Block = Block::named("grass");
 pub static SNOWY_GRASS: Block = Block::named("snowy_grass");
 pub static SAND: Block = Block::named("sand");
@@ -256,6 +257,13 @@ pub fn register(r: &mut Registry) {
         .tag("dirt")
         .tag("tillable")
         .tab(&crate::tabs::NATURAL);
+    r.block(&COARSE_DIRT)
+        .sound_group("gravel")
+        .hardness(0.6)
+        .mined_by("shovel", tool_tier::HAND)
+        .tag("dirt")
+        .tag("tillable")
+        .tab(&crate::tabs::NATURAL);
     r.block(&GRASS)
         .sound_group("grass")
         .texture("dirt")
@@ -485,7 +493,7 @@ pub fn register(r: &mut Registry) {
         .replaceable()
         // .two_part("half", ["lower", "upper"], |_| Dir::Up)
         // .state_where("half=upper", |s| s.texture("tall_tallgrass_top"))
-        // .state_where("half=lower", |s| s.needs_below("#plant_soil"))
+        // .state_where("half=lower", |s| s.needs_below("#plant_6oil"))
         .tint_kind(&tints::GRASS)
         .tab(&crate::tabs::NATURAL);
     r.loot(&TALL_TALL_GRASS)
