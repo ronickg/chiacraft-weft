@@ -86,8 +86,13 @@ shared! {
         /// edges go: red and green at the top of word 2, blue under word 3's AO.
         LIGHT_RG_SHIFT = 26,
         LIGHT_B_SHIFT = 20,
-        /// Word 3 flag: the upper half of word 1 holds a baked RGB565 albedo.
+        /// Word 3 flag: the upper half of word 1 holds an RGB565 texture gain.
         COVER_SHIFT = 23,
+        COVER_GAIN = 2,
+        /// On a covered wall, the pattern texture uses the AO byte and block light bits.
+        PATTERN_LOW_SHIFT = 24,
+        PATTERN_MID_MASK = 63,
+        PATTERN_HIGH_MASK = 3,
     }
     /// A forest atlas has one row per elevation and one column per azimuth.
     forest {
@@ -376,6 +381,28 @@ pub fn lod_record(dir: u32, pos: [i32; 3], size: [i32; 3], tex: u32, tint: u32, 
 pub fn lod_draw_data(level: u32, fade: f32) -> i32 {
     let fade = (((fade.clamp(-1.0, 2.0) + 1.0) / 3.0) * lod_draw::FADE_MASK as f32).round() as u32;
     ((level.saturating_sub(lod_draw::PACKED_LEVEL) << lod_draw::SCALE_SHIFT) | fade) as i32
+}
+
+pub fn lod_set_cover_pattern(r: &mut [u32; 4], tex: u16) {
+    use lod_face as l;
+    let tex = u32::from(tex);
+    r[2] = (r[2] & !(l::PATTERN_MID_MASK << l::LIGHT_RG_SHIFT)) | (((tex >> 8) & l::PATTERN_MID_MASK) << l::LIGHT_RG_SHIFT);
+    r[3] = (r[3] & !((0xff << l::PATTERN_LOW_SHIFT) | (7 << l::LIGHT_B_SHIFT)))
+        | ((tex & 255) << l::PATTERN_LOW_SHIFT)
+        | ((tex >> 14) << l::LIGHT_B_SHIFT);
+}
+
+pub fn lod_cover_pattern(r: &[u32; 4]) -> Option<u32> {
+    use lod_face as l;
+    (r[3] & (1 << l::COVER_SHIFT) != 0 && face_dir_lod(r[0]) != 3).then(|| {
+        (r[3] >> l::PATTERN_LOW_SHIFT)
+            | (((r[2] >> l::LIGHT_RG_SHIFT) & l::PATTERN_MID_MASK) << 8)
+            | (((r[3] >> l::LIGHT_B_SHIFT) & l::PATTERN_HIGH_MASK) << 14)
+    })
+}
+
+fn face_dir_lod(word: u32) -> u32 {
+    (word >> lod_face::DIR_SHIFT) & face::DIR_MASK
 }
 
 /// `r` (a one-block record) as the part of its block from `min` to `max` in 1/16; `extrude`: up
@@ -1175,6 +1202,12 @@ mod tests {
         let q = quad_pos([-2.0, 0.5, 61.9375]);
         assert_eq!([q & quad::POS_MASK, (q >> quad::POS_BITS) & quad::POS_MASK, q >> (2 * quad::POS_BITS)], [0, 40, 1023]);
         let l = lod_record(4, [1023, -300, 5], [1024, 7, 1], 9, 3, 2, 9, [15, 4, 13]);
+        assert_eq!(lod_cover_pattern(&l), None);
+        let mut cover = l;
+        cover[3] |= 1 << lod_face::COVER_SHIFT;
+        lod_set_cover_pattern(&mut cover, 0xb5e1);
+        assert_eq!(lod_cover_pattern(&cover), Some(0xb5e1));
+        assert_eq!(cover[2] & ((1 << lod_face::LIGHT_RG_SHIFT) - 1), l[2] & ((1 << lod_face::LIGHT_RG_SHIFT) - 1));
         assert_eq!(l[0] & lod_face::POS_MASK, 1023);
         assert_eq!((l[0] >> lod_face::Z_SHIFT) & lod_face::POS_MASK, 5);
         assert_eq!((l[0] >> lod_face::DIR_SHIFT) & face::DIR_MASK, 4);

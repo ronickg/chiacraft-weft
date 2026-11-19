@@ -2,7 +2,8 @@
 var<private> TRI_FLIP: array<u32, 6> = array<u32, 6>(1u, 2u, 3u, 1u, 3u, 0u);
 var<private> AO: array<f32, 4> = array<f32, 4>(0.42, 0.62, 0.8, 1.0);
 const WORLD_LIQUID: u32 = 1u;
-const BAKED_COVER: u32 = 2u;
+const COVER_WALL: u32 = 2u;
+const COVER_SIZE_SHIFT: u32 = 2u;
 
 struct VOut {
     @builtin(position) clip: vec4<f32>,
@@ -246,7 +247,7 @@ fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     var light = in.color * lightmap(in.light, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
     // Glowing texels are lifted towards full brightness by their mask: lit = albedo * max(light,
     // emission), so they stay their own (tinted, unshaded) color in the dark.
-    if in.glow != 0xffffffffu {
+    if in.glow != 0xffffffffu && (in.flags & COVER_WALL) == 0u {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
         light = max(light, in.tint * e);
     }
@@ -397,7 +398,9 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let w2 = records[f * 4u + 2u];
     let w3 = records[f * 4u + 3u];
     let dir = lod_dir(w0);
-    let a = lod_ao(w3);
+    let covered = ((w3 >> LOD_FACE_COVER_SHIFT) & 1u) != 0u;
+    let grass_wall = covered && dir != 3u;
+    let a = select(lod_ao(w3), vec4(3u), grass_wall);
     var c = vi % 4u;
     if a.x + a.z < a.y + a.w {
         c = (c + 1u) % 4u;
@@ -429,15 +432,26 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.light = lod_light(w0, w2, w3);
     let kind = lod_tint(w0);
     var tint = vec3(1.0);
-    if ((w3 >> LOD_FACE_COVER_SHIFT) & 1u) != 0u {
+    var shade = SHADE[dir] * AO[a[c]];
+    if covered {
         let rgb = w1 >> FACE_BIOME_SHIFT;
-        tint = vec3(f32(rgb >> 11u) / 31.0, f32((rgb >> 5u) & 63u) / 63.0, f32(rgb & 31u) / 31.0);
-        out.flags = BAKED_COVER;
+        tint = f32(LOD_FACE_COVER_GAIN) * vec3(f32(rgb >> 11u) / 31.0, f32((rgb >> 5u) & 63u) / 63.0, f32(rgb & 31u) / 31.0);
+        if grass_wall {
+            // The texture represents the grass emerging from the lower step.
+            shade = mix(SHADE[dir], 1.0, 0.65);
+            let pattern_id = (w3 >> LOD_FACE_PATTERN_LOW_SHIFT)
+                | (((w2 >> LOD_FACE_LIGHT_RG_SHIFT) & LOD_FACE_PATTERN_MID_MASK) << 8u)
+                | (((w3 >> LOD_FACE_LIGHT_B_SHIFT) & LOD_FACE_PATTERN_HIGH_MASK) << 14u);
+            let pattern = texture_frame(pattern_id);
+            out.flags = COVER_WALL | (u32(pattern.size) << COVER_SIZE_SHIFT);
+            out.glow = pattern.a;
+            out.light = vec4(out.light.x, 0.0, 0.0, 0.0);
+        }
     } else if kind != 0u {
         tint = unpack_rgb(biomes[(w1 >> FACE_BIOME_SHIFT) * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
-    out.color = tint * SHADE[dir] * AO[a[c]];
+    out.color = tint * shade;
     return out;
 }
 
@@ -576,9 +590,11 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     let cover = smoothstep(0.1, 0.6, albedo.a);
     let tinted = any(in.tint != vec3(1.0));
     albedo = vec4(mix(select(albedo.rgb, vec3(1.0), tinted), albedo.rgb, cover), 1.0);
-    if (in.flags & BAKED_COVER) != 0u {
-        // The tint already carries the averaged albedo. Retain a little ground texture grain.
-        albedo = vec4(vec3(0.88 + 0.12 * dot(albedo.rgb, vec3(0.2126, 0.7152, 0.0722))), 1.0);
+    if (in.flags & COVER_WALL) != 0u {
+        let leaf_uv = nearest_uv(f32(in.flags >> COVER_SIZE_SHIFT), uv, du, dv);
+        let plant = textureSampleGrad(textures[in.glow], linear_mipped, leaf_uv, du, dv);
+        let leaf = dot(plant.rgb, vec3(0.2126, 0.7152, 0.0722));
+        albedo = vec4(albedo.rgb * mix(0.75, 1.25 + 0.35 * leaf, plant.a), 1.0);
     }
     return vec4(shade(in, albedo).rgb, 1.0);
 }

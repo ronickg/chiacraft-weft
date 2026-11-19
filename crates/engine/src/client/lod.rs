@@ -383,6 +383,11 @@ fn mesh(
         .cover
         .as_ref()
         .map(|cover| cover.colors(c, seed, key, words, columns));
+    let plants = |i: i32, j: i32| {
+        cover
+            .as_ref()
+            .and_then(|cells| cells[(i + 1) as usize][(j + 1) as usize])
+    };
     let mut forest = terrain.forest.instances(c, key, words, &h, columns);
     let ground_light = |i: i32, j: i32, y, light| shade_sky(light_of(i, j, y, light), forest.shadow[(i + 1) as usize][(j + 1) as usize]);
     let mut faces = Vec::new();
@@ -404,9 +409,7 @@ fn mesh(
                 ao: ao_bits(&h, i, j, 3, y),
                 light: lit,
                 part: ALWAYS,
-                cover: cover
-                    .as_ref()
-                    .and_then(|color| color[i as usize + 1][j as usize + 1]),
+                cover: plants(i, j).map(|cell| cover::Appearance { gain: cell.gain, pattern: None }),
             });
             (lo, hi) = (lo.min(y), hi.max(y + 1));
             if let Some((floor, roof)) = cave_gap(words, i, j) {
@@ -535,40 +538,94 @@ fn mesh(
                 // Beside one as high inside the tile it is only ever seen where that one's
                 // pixels give way to cubes.
                 let part = if ny == y && (0..CELLS).contains(&ni) && (0..CELLS).contains(&nj) { BESIDE_CUBES } else { ALWAYS };
-                let dir = dir as u32;
-                if ny < y {
-                    let (tex, tint) = face_of(top, dir as usize);
-                    let ao = ao_bits(&h, i, j, dir as usize, y);
-                    faces.push(Face { dir, at: [i * s, y, j * s], size: [s, 1, s], tex, tint, biome, ao, light, part, cover: None });
-                }
-                let (tex, tint) = face_of(under, dir as usize);
                 let top_y = if ny < y { y - 1 } else { y };
                 skirt = skirt
                     .max(top_y - lod_face::HEIGHT_MASK as i32)
                     .max(i16::MIN as i32);
-                lo = lo.min(skirt + 1);
-                let ao = ao_span(&h, i, j, dir as usize, top_y, (ny + 1).min(top_y));
-                faces.push(Face {
-                    dir,
-                    at: [i * s, skirt + 1, j * s],
-                    size: [s, y - 1 - skirt, s],
-                    tex,
-                    tint,
-                    biome,
-                    ao,
-                    light,
-                    part,
-                    cover: None,
-                });
+                let mut bottom = skirt + 1;
+                lo = lo.min(bottom);
+                let (under_tex, under_tint) = face_of(under, dir);
+                if ny < y
+                    && over(i, j).1 == 0
+                    && light & 0xFF_FFFF == 0
+                    && let Some(cell) = plants(ni, nj)
+                {
+                    // A taller grass canopy hides the foot of the next riser. A coarse
+                    // cell stands for several steps, so scale the band with the cell.
+                    let start = (ny + 1).max(bottom);
+                    let end = (start + (cell.height * s as f32).round() as i32).min(y + 1);
+                    if end > start {
+                        if start > bottom {
+                            let edge = !((0..CELLS).contains(&ni) && (0..CELLS).contains(&nj));
+                            faces.push(Face {
+                                dir: dir as u32,
+                                at: [i * s, bottom, j * s],
+                                size: [s, start - bottom, s],
+                                tex: under_tex,
+                                tint: under_tint,
+                                biome,
+                                ao: 0xFF,
+                                light,
+                                part: if edge { ALWAYS } else { BESIDE_CUBES },
+                                cover: None,
+                            });
+                        }
+                        faces.push(Face {
+                            dir: dir as u32,
+                            at: [i * s, start, j * s],
+                            size: [s, end - start, s],
+                            tex: cell.texture,
+                            tint: 0,
+                            biome,
+                            ao: 0xFF,
+                            light,
+                            part,
+                            cover: Some(cover::Appearance { gain: cell.gain, pattern: Some(cell.pattern) }),
+                        });
+                        bottom = end;
+                    }
+                }
+                if ny < y && bottom <= y {
+                    let (tex, tint) = face_of(top, dir);
+                    faces.push(Face {
+                        dir: dir as u32,
+                        at: [i * s, y, j * s],
+                        size: [s, 1, s],
+                        tex,
+                        tint,
+                        biome,
+                        ao: ao_bits(&h, i, j, dir, y),
+                        light,
+                        part,
+                        cover: None,
+                    });
+                }
+                if bottom < y {
+                    faces.push(Face {
+                        dir: dir as u32,
+                        at: [i * s, bottom, j * s],
+                        size: [s, y - bottom, s],
+                        tex: under_tex,
+                        tint: under_tint,
+                        biome,
+                        ao: ao_span(&h, i, j, dir, top_y, (ny + 1).max(bottom).min(top_y)),
+                        light,
+                        part,
+                        cover: None,
+                    });
+                }
             }
         }
     }
     let record = |f: &Face| {
         let mut q = quad(f.dir, f.at[0], f.at[1], f.at[2], (f.size[0], f.size[1], f.size[2]), f.tex, f.tint, f.biome, f.ao, f.light, scale);
-        if let Some(color) = f.cover {
+        if let Some(cover) = f.cover {
             q[0] &= !(crate::gpu_layout::tint::MASK << lod_face::TINT_SHIFT);
-            q[1] = f.tex | (u32::from(color) << face::BIOME_SHIFT);
+            q[1] = f.tex | (u32::from(cover.gain) << face::BIOME_SHIFT);
             q[3] |= 1 << lod_face::COVER_SHIFT;
+            if let Some(tex) = cover.pattern {
+                crate::gpu_layout::lod_set_cover_pattern(&mut q, tex);
+            }
         }
         q
     };
@@ -609,7 +666,7 @@ struct Face {
     biome: u32,
     ao: u32,
     light: u32,
-    cover: Option<u16>,
+    cover: Option<cover::Appearance>,
     /// Which of `Counts`' parts.
     part: usize,
 }

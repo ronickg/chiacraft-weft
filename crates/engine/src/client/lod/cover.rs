@@ -9,14 +9,31 @@ use super::{CELLS, Columns, GRID, TileKey, corner_y, sample_offset};
 use crate::client::textures::GameTextures;
 use crate::client::{looks, mesher};
 use crate::content::Content;
+use crate::gpu_layout::lod_face;
 
-pub(super) type Colors = [[Option<u16>; GRID]; GRID];
+pub(super) type Colors = [[Option<Cell>; GRID]; GRID];
+
+#[derive(Clone, Copy)]
+pub(super) struct Cell {
+    pub texture: u32,
+    pub gain: u16,
+    pub height: f32,
+    pub pattern: u16,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Appearance {
+    pub gain: u16,
+    pub pattern: Option<u16>,
+}
 
 #[derive(Clone, Copy)]
 struct Material {
+    texture: u32,
     rgb: Vec3,
     opacity: f32,
     tint: u8,
+    height: f32,
 }
 
 impl Material {
@@ -70,7 +87,7 @@ impl Cover {
                 }
                 (rgb / (255.0 * alpha.max(1.0)), alpha / (16.0 * 255.0))
             });
-            Material { rgb, opacity, tint: tint as u8 }
+            Material { texture: tex, rgb, opacity, tint: tint as u8, height: 0.0 }
         };
         let mut ground = FxHashMap::default();
         for state in std::iter::once(terrain.stone).chain(
@@ -94,7 +111,7 @@ impl Cover {
                 }
                 // For a tall plant use the canopy, whose texture can differ from its stem.
                 let model = looks.drawn(id as u32, state);
-                let (tex, dir) = model
+                let (height, tex, dir) = model
                     .boxes
                     .iter()
                     .flat_map(|b| {
@@ -103,10 +120,9 @@ impl Cover {
                             Some((b.max[1], b.textures[dir], dir))
                         })
                     })
-                    .max_by(|a, b| a.0.total_cmp(&b.0))
-                    .map(|(_, tex, dir)| (tex, dir))?;
+                    .max_by(|a, b| a.0.total_cmp(&b.0))?;
                 let first = mesher::face_layers(c, state, tex & crate::gpu_layout::face::TEX_MASK, dir)[0];
-                Some(material((first.tex, first.tint as u32)))
+                Some(Material { height: height.clamp(0.0, 3.0), ..material((first.tex, first.tint as u32)) })
             })
             .collect();
         Some(Self { hooks, ground, plants })
@@ -120,8 +136,8 @@ impl Cover {
         let origin = key.origin();
         let mut samples = Vec::new();
         let mut cells = Vec::new();
-        for j in 0..CELLS {
-            for i in 0..CELLS {
+        for j in -1..=CELLS {
+            for i in -1..=CELLS {
                 let k = sample_offset(i, j);
                 let state = words[k] >> 16;
                 let Some(&ground) = self.ground.get(&state) else { continue };
@@ -131,7 +147,7 @@ impl Cover {
                 }
                 let y = corner_y(words, i, j);
                 let biome = words[k + 1] as u16;
-                cells.push((i, j, ground.color(c, biome)));
+                cells.push((i, j, ground, ground.color(c, biome)));
                 let stride = s / side;
                 for dz in 0..side {
                     for dx in 0..side {
@@ -156,19 +172,36 @@ impl Cover {
         for &(owner, cb) in &self.hooks {
             crate::host::invoke(owner, cb, &mut args);
         }
-        for ((i, j, ground), samples) in cells.into_iter().zip(samples.chunks_exact(n)) {
+        for ((i, j, material, ground), samples) in cells.into_iter().zip(samples.chunks_exact(n)) {
             let mut delta = Vec3::ZERO;
+            let mut height = 0.0;
+            let mut pattern = 0;
+            let mut thickest = 0.0;
             for sample in samples {
                 if let Some(plant) = self.plants.get(sample.plant as usize).copied().flatten() {
                     // A crossed plant shows more than one face from an oblique view.
                     let cover = (plant.opacity * 1.6).min(0.8);
                     delta += (plant.color(c, sample.biome as u16) - ground) * cover;
+                    let reach = plant.height * cover;
+                    height += reach;
+                    if reach > thickest {
+                        thickest = reach;
+                        pattern = plant.texture as u16;
+                    }
                 }
             }
-            if delta != Vec3::ZERO {
-                let rgb = (ground + delta / n as f32) * Vec3::new(31.0, 63.0, 31.0);
+            if height > 0.0 {
+                // Apply color relative to the original texture so its full contrast survives.
+                let color = ground + delta / n as f32;
+                let gain = color / material.rgb.max(Vec3::splat(1.0 / 255.0));
+                let rgb = (gain / lod_face::COVER_GAIN as f32).clamp(Vec3::ZERO, Vec3::ONE) * Vec3::new(31.0, 63.0, 31.0);
                 let rgb = rgb.round().as_uvec3();
-                colors[i as usize + 1][j as usize + 1] = Some(((rgb.x << 11) | (rgb.y << 5) | rgb.z) as u16);
+                colors[i as usize + 1][j as usize + 1] = Some(Cell {
+                    texture: material.texture,
+                    gain: ((rgb.x << 11) | (rgb.y << 5) | rgb.z) as u16,
+                    height: height * 2.0 / n as f32,
+                    pattern,
+                });
             }
         }
         colors

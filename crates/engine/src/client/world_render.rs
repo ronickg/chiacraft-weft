@@ -800,7 +800,7 @@ impl WorldRenderer {
         textures.ensure_blocks(
             gpu,
             land.iter()
-                .map(|q| q[1] & crate::gpu_layout::face::TEX_MASK),
+                .flat_map(|q| std::iter::once(q[1] & crate::gpu_layout::face::TEX_MASK).chain(crate::gpu_layout::lod_cover_pattern(q))),
         );
         let a = self.faces.alloc(gpu, quads.len() as u32);
         let buf = self.faces.pages[a.page as usize].0;
