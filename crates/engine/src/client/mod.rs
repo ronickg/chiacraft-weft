@@ -3099,6 +3099,7 @@ impl Client {
                 self.seed,
                 &cam,
                 (frame.width, frame.height),
+                self.player.zoom < 0.99,
                 self.view_radius,
                 self.budget.min(remaining),
             );
