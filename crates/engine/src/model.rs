@@ -279,11 +279,13 @@ pub struct BoneMotion {
     pub spring: f32,
     /// How fast the swing dies down.
     pub drag: f32,
+    /// Cone half-angle around the animated direction, in degrees.
+    pub max_angle: f32,
 }
 
 impl BoneMotion {
     /// What a bone called `hanging` does: hangs and swings.
-    pub const HANGING: BoneMotion = BoneMotion { gravity: 40.0, spring: 0.0, drag: 2.5 };
+    pub const HANGING: BoneMotion = BoneMotion { gravity: 40.0, spring: 0.0, drag: 2.5, max_angle: 180.0 };
 }
 
 /// What a bone named so does without being told: `hanging` and `hanging_<anything>`.
@@ -292,17 +294,22 @@ pub fn motion_by_name(name: &str) -> Option<BoneMotion> {
     n.starts_with("hanging").then_some(BoneMotion::HANGING)
 }
 
-/// A sidecar `models/<name>.bones`, lines `bone = gravity spring drag`, for what a file alone
+/// A sidecar `models/<name>.bones`, lines `bone = gravity spring drag [max_angle]`, for what a file alone
 /// has to say (an avatar has no code to say it with).
 pub fn load_bones(src: &str) -> Vec<(String, BoneMotion)> {
     crate::kv::pairs(src)
         .filter_map(|(line, bone, v)| {
             let n: Vec<f32> = v.split_whitespace().map_while(|x| x.parse().ok()).collect();
-            if v.split_whitespace().count() != 3 || n.len() != 3 {
-                log::warn!("bones file, line {}: {bone} wants gravity, spring and drag, has `{v}`", line + 1);
+            if !(3..=4).contains(&n.len()) || n.len() != v.split_whitespace().count() || !n.iter().all(|x| x.is_finite()) {
+                log::warn!("bones file, line {}: {bone} wants gravity, spring, drag and an optional angle in degrees, has `{v}`", line + 1);
                 return None;
             }
-            Some((bone.to_string(), BoneMotion { gravity: n[0], spring: n[1], drag: n[2] }))
+            let max_angle = n
+                .get(3)
+                .copied()
+                .unwrap_or_else(|| weft_abi::comp::bone_motion::default_max_angle(n[1]))
+                .clamp(0.0, 180.0);
+            Some((bone.to_string(), BoneMotion { gravity: n[0], spring: n[1], drag: n[2], max_angle }))
         })
         .collect()
 }
@@ -1201,6 +1208,12 @@ pub fn pose(parts: &[Part], root: Mat4, m: &Motion, out: &mut Vec<Mat4>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bones_accept_per_joint_limits_and_legacy_presets() {
+        let joints = load_bones("a = 5 30 5\nb = 40 0 2.5\nc = 6 30 5 65\nd = 4 0 1 0\ne = 6 30 5 NaN\nf = 4 0 1 bad");
+        assert_eq!(joints.iter().map(|(_, m)| m.max_angle).collect::<Vec<_>>(), [30.0, 180.0, 65.0, 0.0]);
+    }
 
     #[test]
     fn roles_from_names() {

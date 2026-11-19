@@ -1330,10 +1330,20 @@ impl Registry {
 
     /// `bone` of `model` moves by itself. A bone called `hanging` or `hanging_<anything>` does without this.
     pub fn bone_motion(&mut self, model: &str, bone: &str, motion: BoneMotion) {
+        self.bone_motion_with_limit(model, bone, motion, abi::comp::bone_motion::default_max_angle(motion.spring));
+    }
+
+    /// Limits the swing from this bone's animated direction, in degrees (0 locks it, 180 leaves it free).
+    pub fn bone_motion_with_limit(&mut self, model: &str, bone: &str, motion: BoneMotion, max_angle: f32) {
         use crate::comps::bone_motion as m;
         let name = format!("{}/{bone}", crate::asset("", model));
         let mut e = crate::entry::Entry::new(abi::entry_kind::BONE_MOTION, name);
-        e.ops = vec![m::GRAVITY.raw_value(&motion.gravity), m::SPRING.raw_value(&motion.spring), m::DRAG.raw_value(&motion.drag)];
+        e.ops = vec![
+            m::GRAVITY.raw_value(&motion.gravity),
+            m::SPRING.raw_value(&motion.spring),
+            m::DRAG.raw_value(&motion.drag),
+            m::MAX_ANGLE.raw_value(&max_angle),
+        ];
         e.send(self);
     }
 }

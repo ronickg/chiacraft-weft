@@ -625,6 +625,7 @@ pub mod bone_motion {
     pub static GRAVITY: Component<f32, BoneMotion> = Component::named(b::GRAVITY);
     pub static SPRING: Component<f32, BoneMotion> = Component::named(b::SPRING);
     pub static DRAG: Component<f32, BoneMotion> = Component::named(b::DRAG);
+    pub static MAX_ANGLE: Component<f32, BoneMotion> = Component::named(b::MAX_ANGLE);
 }
 
 /// What a menu is made of: tags for how its screen behaves (`abi::comp::menu::FLAGS`) and these.

@@ -70,17 +70,26 @@ struct LiveBone {
     motion: BoneMotion,
 }
 
-/// Camera-relative tip and its world-space velocity in blocks per second.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 struct Swing {
-    tip: Vec3,
+    pivot: Vec3,
+    offset: Vec3,
+    /// Tip velocity in the simulation frame, in blocks per second.
     velocity: Vec3,
 }
 
 impl Swing {
+    fn new(pivot: Vec3, rest: Vec3) -> Self {
+        Self { pivot, offset: rest, velocity: Vec3::ZERO }
+    }
+
     /// `dt` further on, with its bone's pivot at `pivot` and where its clips have the end at `pivot +
     /// rest`: what pulls it moves it, what it hangs from drags it along at its length.
     fn step(&mut self, pivot: Vec3, rest: Vec3, motion: BoneMotion, dt: f32) {
+        if motion.max_angle == 0.0 {
+            *self = Self::new(pivot, rest);
+            return;
+        }
         let length = rest.length();
         if length < 1e-5 || dt <= 0.0 {
             return;
@@ -89,17 +98,26 @@ impl Swing {
         let steps = ((dt * 120.0).ceil() as u32).clamp(1, 8);
         let h = dt.min(0.1) / steps as f32;
         let keep = (-motion.drag * h).exp();
+        let pivot_velocity = (pivot - self.pivot) / (steps as f32 * h);
+        self.pivot = pivot;
+        // A free pendulum keeps its world momentum. Flex in a sprung bone is relative to its
+        // moving joint, so a parent's correction doesn't become an impulse in each child.
+        let pivot_in_frame = if motion.spring > 0.0 { Vec3::ZERO } else { pivot_velocity };
+        let air_drag = pivot_velocity * (1.0 - keep);
+        let limit = motion.max_angle.to_radians();
+        let cos_limit = limit.cos();
         for _ in 0..steps {
-            let pull = Vec3::NEG_Y * motion.gravity * length + (pivot + rest - self.tip) * motion.spring;
-            let next = self.tip + (self.velocity * keep + pull * h) * h;
-            let mut dir = (next - pivot).normalize_or(axis);
-            // Sprung joints bend around their animated pose. Free pendulums can hang straight down.
-            if motion.spring > 0.0 && dir.dot(axis) < 30.0_f32.to_radians().cos() {
-                dir = axis.rotate_towards(dir, 30.0_f32.to_radians());
+            let pull = Vec3::NEG_Y * motion.gravity * length + (rest - self.offset) * motion.spring;
+            let mut relative = (self.velocity - pivot_in_frame) * keep + pull * h - air_drag;
+            let mut dir = (self.offset + relative * h).normalize_or(axis);
+            if dir.dot(axis) < cos_limit {
+                dir = axis.rotate_towards(dir, limit);
+                let outward = (dir * dir.dot(axis) - axis).normalize_or_zero();
+                relative -= outward * relative.dot(outward).max(0.0);
             }
-            let tip = pivot + dir * length;
-            self.velocity = (tip - self.tip) / h;
-            self.tip = tip;
+            // The pivot carries the tip along the rod. Only tangent velocity can swing it.
+            self.velocity = pivot_in_frame + relative - dir * relative.dot(dir);
+            self.offset = dir * length;
         }
     }
 }
@@ -574,17 +592,18 @@ fn middle_of(parts: &[Part], under: &[usize]) -> Option<Vec3> {
     (n > 0.0).then(|| sum / n)
 }
 
-/// What a model's bones do by what is said of it: its sidecar, then mods.
+/// The model file can override a mod's defaults for individual bones.
 fn motions_of(assets: &Assets, model: &str) -> Vec<(String, BoneMotion)> {
-    let mut out = read(assets, model, "models", "bones").map_or_else(Vec::new, |s| model::load_bones(&s));
-    out.extend(
-        content()
-            .game
-            .bone_motions
-            .iter()
-            .filter(|m| m.0 == model)
-            .map(|m| (m.1.clone(), m.2)),
-    );
+    let mut out: Vec<_> = content()
+        .game
+        .bone_motions
+        .iter()
+        .filter(|m| m.0 == model)
+        .map(|m| (m.1.clone(), m.2))
+        .collect();
+    if let Some(file) = read(assets, model, "models", "bones") {
+        out.extend(model::load_bones(&file));
+    }
     out
 }
 
@@ -611,7 +630,7 @@ fn bounds_of(parts: &[Part]) -> (Vec3, Vec3) {
     if lo.x > hi.x { (Vec3::ZERO, Vec3::ZERO) } else { (lo, hi) }
 }
 
-/// Its bones that move by themselves: by name, by a sidecar, by a mod, the later over the earlier.
+/// Explicit entries override the name-based preset. The last entry for a bone wins.
 fn live_bones(model_name: &str, parts: &[Part], said: &[(String, BoneMotion)]) -> Vec<LiveBone> {
     for (bone, _) in said {
         if model::bone_named(parts, bone).is_none() {
@@ -884,40 +903,71 @@ mod tests {
     #[test]
     fn a_lantern_hangs_lags_and_settles() {
         let rest = Vec3::new(0.0, 0.0, -0.5);
-        let mut s = Swing { tip: rest, velocity: Vec3::ZERO };
+        let mut s = Swing::new(Vec3::ZERO, rest);
         settle(&mut s, Vec3::ZERO, rest, BoneMotion::HANGING, 8.0);
-        assert!((s.tip - Vec3::new(0.0, -0.5, 0.0)).length() < 0.02, "it hangs whichever way its bone was: {}", s.tip);
+        assert!((s.offset - Vec3::new(0.0, -0.5, 0.0)).length() < 0.02, "it hangs whichever way its bone was: {}", s.offset);
         // The hand jumps aside: the lamp stays behind, stays on its chain, swings back to rest.
         let pivot = Vec3::new(0.4, 0.0, 0.0);
         s.step(pivot, rest, BoneMotion::HANGING, 1.0 / 60.0);
-        assert!(s.tip.x < pivot.x - 0.05, "it lags: {}", s.tip);
-        assert!(((s.tip - pivot).length() - 0.5).abs() < 1e-3, "its chain doesn't stretch");
+        assert!(s.offset.x < -0.05, "it lags: {}", s.offset);
+        assert!((s.offset.length() - 0.5).abs() < 1e-3, "its chain doesn't stretch");
         settle(&mut s, pivot, rest, BoneMotion::HANGING, 8.0);
-        assert!((s.tip - (pivot + Vec3::NEG_Y * 0.5)).length() < 0.02, "and hangs again: {}", s.tip);
+        assert!((s.offset - Vec3::NEG_Y * 0.5).length() < 0.02, "and hangs again: {}", s.offset);
     }
 
     #[test]
     fn sprung_joint_stays_within_its_animated_cone() {
         let rest = Vec3::Z * 0.14;
-        let mut swing = Swing { tip: rest, velocity: Vec3::ZERO };
+        let mut swing = Swing::new(Vec3::ZERO, rest);
         let mut pivot = Vec3::ZERO;
-        let motion = BoneMotion { gravity: 6.0, spring: 30.0, drag: 5.0 };
+        let motion = BoneMotion { gravity: 6.0, spring: 30.0, drag: 5.0, max_angle: 45.0 };
         for dt in [0.006, 0.016, 0.05, 0.008].into_iter().cycle().take(300) {
             pivot += Vec3::Z * 4.3 * dt;
             swing.step(pivot, rest, motion, dt);
-            let offset = swing.tip - pivot;
+            let offset = swing.offset;
             assert!((offset.length() - rest.length()).abs() < 0.0001);
-            assert!(offset.normalize().dot(Vec3::Z) >= 30.0_f32.to_radians().cos() - 0.0001);
+            assert!(offset.normalize().dot(Vec3::Z) >= motion.max_angle.to_radians().cos() - 0.0001);
+        }
+        swing.step(pivot, Vec3::X, BoneMotion { max_angle: 0.0, ..motion }, 0.016);
+        assert_eq!(swing.offset, Vec3::X);
+    }
+
+    #[test]
+    fn a_walking_chain_keeps_a_smooth_swing_at_different_frame_rates() {
+        let motion = BoneMotion { gravity: 6.0, spring: 30.0, drag: 5.0, max_angle: 45.0 };
+        for frames in [[1.0 / 60.0; 3], [0.007, 0.016, 0.035]] {
+            let mut middle = Swing::new(Vec3::Z * 0.31, Vec3::Z * 0.30);
+            let mut end = Swing::new(Vec3::Z * 0.62, Vec3::Z * 0.125);
+            let mut time = 0.0_f32;
+            let mut yaw_range = (0.0_f32, 0.0_f32);
+            for dt in frames.into_iter().cycle().take(360) {
+                time += dt;
+                let phase = (time / 0.55).fract();
+                let yaw = 18.0_f32.to_radians() * (1.0 - 4.0 * (phase - 0.5).abs());
+                let axis = Quat::from_rotation_y(yaw) * Vec3::Z;
+                let pivot = Vec3::NEG_Z * (4.3 * time) + axis * 0.31;
+                middle.step(pivot, axis * 0.30, motion, dt);
+                let parent = middle.offset.normalize();
+                let prev = end.offset;
+                end.step(pivot + parent * 0.31, parent * 0.125, motion, dt);
+                if time > 1.0 {
+                    let turn = prev.angle_between(end.offset).to_degrees();
+                    assert!(turn < 360.0 * dt, "tip turned {turn} degrees in {dt}s");
+                    let yaw = end.offset.x.atan2(end.offset.z).to_degrees();
+                    yaw_range = (yaw_range.0.min(yaw), yaw_range.1.max(yaw));
+                }
+            }
+            assert!(yaw_range.0 < -2.0 && yaw_range.1 > 2.0, "tip should sway both ways: {yaw_range:?}");
         }
     }
 
     #[test]
     fn a_long_frame_does_not_throw_it() {
         let rest = Vec3::NEG_Y * 0.5;
-        let mut s = Swing { tip: rest, velocity: Vec3::ZERO };
+        let mut s = Swing::new(Vec3::ZERO, rest);
         for dt in [0.5, 0.0, 2.0, 1e-5] {
             s.step(Vec3::X, rest, BoneMotion::HANGING, dt);
-            assert!(s.tip.is_finite() && ((s.tip - Vec3::X).length() - 0.5).abs() < 1e-3, "{}", s.tip);
+            assert!(s.offset.is_finite() && (s.offset.length() - 0.5).abs() < 1e-3, "{}", s.offset);
         }
     }
 
@@ -1290,8 +1340,9 @@ impl Models {
                 .unwrap_or_else(|| Swings { list: Vec::new(), seen: 0 });
             let fresh = state.list.len() != live_len;
             if fresh {
-                state.list = vec![Swing { tip: Vec3::ZERO, velocity: Vec3::ZERO }; live_len];
+                state.list = vec![Swing::default(); live_len];
             }
+            let resumed = state.seen.wrapping_add(1) != self.frame;
             state.seen = self.frame;
             for k in 0..live_len {
                 let m = &self.kinds[kind as usize];
@@ -1305,13 +1356,16 @@ impl Models {
                     continue;
                 }
                 let s = &mut state.list[k];
-                if fresh || (s.tip - moved - pivot).length() > length * 4.0 + 4.0 {
-                    *s = Swing { tip: pivot + rest, velocity: Vec3::ZERO };
-                } else {
-                    s.tip -= moved;
+                s.pivot -= moved;
+                if fresh || resumed || (s.pivot - pivot).length() > length * 4.0 + 4.0 {
+                    *s = Swing::new(pivot, rest);
                 }
                 s.step(pivot, rest, motion, dt);
-                let turn = Quat::from_rotation_arc(rest / length, (s.tip - pivot) / length);
+                if crate::log::on(crate::log::Channel::Bones, log::Level::Trace) {
+                    log::trace!(target: "bones", "frame={} entity={id} model={kind} slot={slot} bone={} dt={dt:.6} pivot={pivot:.6} tip={:.6} rest={rest:.6} camera_delta={moved:.6}",
+                        self.frame, m.parts[bone].name, pivot + s.offset);
+                }
+                let turn = Quat::from_rotation_arc(rest / length, s.offset / length);
                 let by = Mat4::from_translation(pivot) * Mat4::from_quat(turn) * Mat4::from_translation(-pivot);
                 for n in 0..self.kinds[kind as usize].live[k].under.len() {
                     let i = first + self.kinds[kind as usize].live[k].under[n];

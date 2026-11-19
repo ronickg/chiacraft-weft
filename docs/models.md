@@ -201,10 +201,14 @@ Draw it in the pixels of the model it goes on, with the same origin (`player_tem
 ## Bones that move by themselves
 On top of clips. A bone whose name starts with `hanging` hangs down whichever way what holds it turns, and swings when that moves: a lantern on a chain is a hook and two `hanging_` links, with no code. For something other than hanging:
 ```rust
-r.bone_motion("tailmod:tail", "tail2", BoneMotion::SPRINGY);                                   // keeps its shape, lags behind
+r.bone_motion_with_limit("tailmod:tail", "tail2", BoneMotion::SPRINGY, 45.0);
 r.bone_motion("mymod:banner", "cloth", BoneMotion { gravity: 20.0, spring: 5.0, drag: 1.5 });
 ```
-A file can say the same, for those without code: `models/<model>.bones` with lines like `tail2 = 5 30 5` (gravity, spring, drag).
+In `models/<model>.bones` or an avatar's `avatar.bones`, write `tail2 = 5 30 5 45` (gravity, spring, drag, maximum angle in degrees).
+An entry in the file overrides the mod's settings for that bone, so a resource pack can change the swing.
+Each bone measures its angle from its animated direction after its parent moves. Zero locks it to that direction and 180 allows a full swing.
+Omitting the angle, or calling `r.bone_motion`, uses 30 degrees for a positive spring and 180 otherwise.
+To record the pivot, tip and animated direction of each simulated bone every frame, run with `--log bones=trace`. Positions are relative to the camera in blocks.
 
 Each frame on the client, from `r.client_entity_frame(&KIND, |c, e| ..)` (any number of mods on one kind, the local player too) or `r.client_frame`:
 ```rust

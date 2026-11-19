@@ -319,8 +319,6 @@ pub fn register(r: &mut Registry) {
     r.item(&FOX_TAIL)
         .max_stack(1)
         .wearable_model(&EquipmentSlot::named("base:legs"), "fox_tail", "body");
-    r.bone_motion("fox_tail", "tail2", BoneMotion::SPRINGY);
-    r.bone_motion("fox_tail", "tail3", BoneMotion::SPRINGY);
     // Both hands, or one if the other is busy.
     static MAP_SHEET: Item = Item::named("map_sheet");
     r.item(&MAP_SHEET)

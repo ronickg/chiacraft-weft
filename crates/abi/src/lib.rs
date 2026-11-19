@@ -1476,11 +1476,16 @@ pub mod comp {
 
     /// A bone motion's (`entry_kind::BONE_MOTION`): `GRAVITY`, the pull toward hanging straight
     /// down, `SPRING`, the pull back to where the clips have it, `DRAG`, how fast a swing dies down
-    /// (`f32` each, 0).
+    /// (`f32` each, 0). `MAX_ANGLE` is the cone half-angle in degrees.
     pub mod bone_motion {
         pub const GRAVITY: &str = "bone_motion.gravity";
         pub const SPRING: &str = "bone_motion.spring";
         pub const DRAG: &str = "bone_motion.drag";
+        pub const MAX_ANGLE: &str = "bone_motion.max_angle";
+
+        pub fn default_max_angle(spring: f32) -> f32 {
+            if spring > 0.0 { 30.0 } else { 180.0 }
+        }
     }
 
     /// A weather's (`entry_kind::WEATHER`). How it looks, each `f32` 0..1 (rain's unless set):

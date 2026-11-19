@@ -2151,7 +2151,11 @@ pub fn freeze(
     (g.bone_motions, _) = tables.bake(kind(ek::BONE_MOTION), ek::BONE_MOTION, mod_name, errors, |e, _| {
         use abi::comp::bone_motion as b;
         let (model, bone) = e.name.rsplit_once('/').unwrap_or((&e.name, ""));
-        let motion = crate::model::BoneMotion { gravity: e.or(b::GRAVITY, 0.0), spring: e.or(b::SPRING, 0.0), drag: e.or(b::DRAG, 0.0) };
+        let spring = e.or(b::SPRING, 0.0);
+        let default_angle = b::default_max_angle(spring);
+        let angle = e.or(b::MAX_ANGLE, default_angle);
+        let max_angle = if angle.is_finite() { angle.clamp(0.0, 180.0) } else { default_angle };
+        let motion = crate::model::BoneMotion { gravity: e.or(b::GRAVITY, 0.0), spring, drag: e.or(b::DRAG, 0.0), max_angle };
         (model.to_string(), bone.to_string(), motion)
     });
     (g.screen_parts, _) = tables.bake(kind(ek::SCREEN_PART), ek::SCREEN_PART, mod_name, errors, |e, _| {
