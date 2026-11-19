@@ -396,6 +396,7 @@ key.base.zoom = Приближение
 key.base.zoom_in = Приблизить
 key.base.zoom_out = Отдалить
 
+block.base.bush_leaves = Листва куста
 block.base.short_grass = Низкая трава
 block.base.bluegrass = Синетрава
 block.base.tulip_orange = Оранжевый тюльпан
