@@ -464,11 +464,11 @@ fn mesh(
                 // the sky shows through the crack.
                 let (ni, nj) = (i + di, j + dj);
                 let ny = column(&h, ni, nj);
+                let edge = !((0..CELLS).contains(&ni) && (0..CELLS).contains(&nj));
                 let other_gap = cave_gap(words, ni, nj);
                 let mouth = cave_mouth(ni, nj).or_else(|| cave_mouth(i, j));
                 if gap.is_some() || other_gap.is_some() || mouth.is_some() {
                     let (floor, roof) = gap.unwrap_or((y + 1, y + 1));
-                    let edge = ni < 0 || ni == CELLS || nj < 0 || nj == CELLS;
                     let bottom = if edge && other_gap.is_none() {
                         ny.min(y)
                             .saturating_sub(s + 2)
@@ -525,7 +525,7 @@ fn mesh(
                 // Past a neighbor as high, real cubes may stand in for it lower than its sample
                 // says (it is interpolated): a skirt down below that, or the sky shows through
                 // between them.
-                if ny > y {
+                if ny > y && !edge {
                     continue;
                 }
                 let mut skirt = ny.min(y - 1) - s - 2;
@@ -537,8 +537,9 @@ fn mesh(
                 }
                 // Beside one as high inside the tile it is only ever seen where that one's
                 // pixels give way to cubes.
-                let part = if ny == y && (0..CELLS).contains(&ni) && (0..CELLS).contains(&nj) { BESIDE_CUBES } else { ALWAYS };
-                let top_y = if ny < y { y - 1 } else { y };
+                let part = if ny == y && !edge { BESIDE_CUBES } else { ALWAYS };
+                let has_top = ny < y || edge;
+                let top_y = if has_top { y - 1 } else { y };
                 skirt = skirt
                     .max(top_y - lod_face::HEIGHT_MASK as i32)
                     .max(i16::MIN as i32);
@@ -556,7 +557,6 @@ fn mesh(
                     let end = (start + (cell.height * s as f32).round() as i32).min(y + 1);
                     if end > start {
                         if start > bottom {
-                            let edge = !((0..CELLS).contains(&ni) && (0..CELLS).contains(&nj));
                             faces.push(Face {
                                 dir: dir as u32,
                                 at: [i * s, bottom, j * s],
@@ -585,7 +585,7 @@ fn mesh(
                         bottom = end;
                     }
                 }
-                if ny < y && bottom <= y {
+                if has_top && bottom <= y {
                     let (tex, tint) = face_of(top, dir);
                     faces.push(Face {
                         dir: dir as u32,

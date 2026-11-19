@@ -3,7 +3,8 @@ var<private> TRI_FLIP: array<u32, 6> = array<u32, 6>(1u, 2u, 3u, 1u, 3u, 0u);
 var<private> AO: array<f32, 4> = array<f32, 4>(0.42, 0.62, 0.8, 1.0);
 const WORLD_LIQUID: u32 = 1u;
 const COVER_WALL: u32 = 2u;
-const COVER_SIZE_SHIFT: u32 = 2u;
+const LOD_DIR_SHIFT: u32 = 2u;
+const COVER_SIZE_SHIFT: u32 = 5u;
 
 struct VOut {
     @builtin(position) clip: vec4<f32>,
@@ -414,7 +415,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.lod_fade = f32(data & LOD_DRAW_FADE_MASK) / f32(LOD_DRAW_FADE_MASK) * 3.0 - 1.0;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
-    out.flags = 0u;
+    out.flags = dir << LOD_DIR_SHIFT;
     let o = origins[ii] + g.cam_cube;
     let world = vec3<f32>(o.xyz * 16) + local + vec3(0.0, 0.125, 0.0);
     out.uv = lod_uv(dir, world);
@@ -443,7 +444,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
                 | (((w2 >> LOD_FACE_LIGHT_RG_SHIFT) & LOD_FACE_PATTERN_MID_MASK) << 8u)
                 | (((w3 >> LOD_FACE_LIGHT_B_SHIFT) & LOD_FACE_PATTERN_HIGH_MASK) << 14u);
             let pattern = texture_frame(pattern_id);
-            out.flags = COVER_WALL | (u32(pattern.size) << COVER_SIZE_SHIFT);
+            out.flags |= COVER_WALL | (u32(pattern.size) << COVER_SIZE_SHIFT);
             out.glow = pattern.a;
             out.light = vec4(out.light.x, 0.0, 0.0, 0.0);
         }
@@ -582,7 +583,12 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     if shown_by_cubes(in.pos, 0u) {
-        discard;
+        let dir = (in.flags >> LOD_DIR_SHIFT) & FACE_DIR_MASK;
+        // A near column may omit a side against its neighbor. Keep the wall
+        // across the boundary until that neighboring column also draws cubes.
+        if dir == 2u || dir == 3u || shown_by_cubes(in.pos + FACE_DIRS[dir] * 0.5, 0u) {
+            discard;
+        }
     }
     let uv = fract(in.uv);
     let nuv = nearest_uv(in.size, uv, du, dv);
