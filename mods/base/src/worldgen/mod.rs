@@ -423,7 +423,7 @@ pub fn register(r: &mut Registry) {
             let mut rng = Rng(s.random());
             s.put(s.pos(), fungi[rng.next() as usize % fungi.len()].id());
         });
-    r.decoration(decorate);
+    r.decoration(decorate).surface_cover(plant_at);
 }
 
 static FUNGI_SITES: Feature = Feature::named("fungis");

@@ -1,6 +1,8 @@
 
 var<private> TRI_FLIP: array<u32, 6> = array<u32, 6>(1u, 2u, 3u, 1u, 3u, 0u);
 var<private> AO: array<f32, 4> = array<f32, 4>(0.42, 0.62, 0.8, 1.0);
+const WORLD_LIQUID: u32 = 1u;
+const BAKED_COVER: u32 = 2u;
 
 struct VOut {
     @builtin(position) clip: vec4<f32>,
@@ -23,7 +25,7 @@ struct VOut {
     @location(12) @interpolate(flat) size: f32,
     @location(13) @interpolate(flat) lod_fade: f32,
     @location(14) rel: vec3<f32>,
-    @location(15) @interpolate(flat) world_liquid: u32,
+    @location(15) @interpolate(flat) flags: u32,
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -150,7 +152,7 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.lod_fade = 0.0;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
-    out.world_liquid = 0u;
+    out.flags = 0u;
     out.uv = UVS[(c + 4u - ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
@@ -216,7 +218,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         out.clip_cube = (local - lo) / (hi - lo) - 0.5;
         light1 = light0;
     }
-    out.world_liquid = select(0u, 1u, origins[ii].w == 0 && ((uvw >> QUAD_TINT_SHIFT) & QUAD_LIQUID) != 0u);
+    out.flags = select(0u, WORLD_LIQUID, origins[ii].w == 0 && ((uvw >> QUAD_TINT_SHIFT) & QUAD_LIQUID) != 0u);
     out.uv = uvs[c];
     let tex_id = w4 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
@@ -349,7 +351,7 @@ fn in_dry_hull(rel: vec3<f32>) -> bool {
 }
 
 fn clip_dry_liquid(in: VOut) {
-    if in.world_liquid != 0u && in_dry_hull(in.rel) {
+    if (in.flags & WORLD_LIQUID) != 0u && in_dry_hull(in.rel) {
         discard;
     }
 }
@@ -409,7 +411,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.lod_fade = f32(data & LOD_DRAW_FADE_MASK) / f32(LOD_DRAW_FADE_MASK) * 3.0 - 1.0;
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
-    out.world_liquid = 0u;
+    out.flags = 0u;
     let o = origins[ii] + g.cam_cube;
     let world = vec3<f32>(o.xyz * 16) + local + vec3(0.0, 0.125, 0.0);
     out.uv = lod_uv(dir, world);
@@ -427,7 +429,11 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.light = lod_light(w0, w2, w3);
     let kind = lod_tint(w0);
     var tint = vec3(1.0);
-    if kind != 0u {
+    if ((w3 >> LOD_FACE_COVER_SHIFT) & 1u) != 0u {
+        let rgb = w1 >> FACE_BIOME_SHIFT;
+        tint = vec3(f32(rgb >> 11u) / 31.0, f32((rgb >> 5u) & 63u) / 63.0, f32(rgb & 31u) / 31.0);
+        out.flags = BAKED_COVER;
+    } else if kind != 0u {
         tint = unpack_rgb(biomes[(w1 >> FACE_BIOME_SHIFT) * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
@@ -570,6 +576,10 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     let cover = smoothstep(0.1, 0.6, albedo.a);
     let tinted = any(in.tint != vec3(1.0));
     albedo = vec4(mix(select(albedo.rgb, vec3(1.0), tinted), albedo.rgb, cover), 1.0);
+    if (in.flags & BAKED_COVER) != 0u {
+        // The tint already carries the averaged albedo. Retain a little ground texture grain.
+        albedo = vec4(vec3(0.88 + 0.12 * dot(albedo.rgb, vec3(0.2126, 0.7152, 0.0722))), 1.0);
+    }
     return vec4(shade(in, albedo).rgb, 1.0);
 }
 

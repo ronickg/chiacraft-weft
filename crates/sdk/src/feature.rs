@@ -269,6 +269,22 @@ impl FeatureBuilder<'_> {
             .set(&f::GENERATE, callback(move |a: &mut abi::GenArgs| f(Gen::wrap(a))))
     }
 
+    /// Low vegetation used to color distant ground. Given seed, surface position, biome id
+    /// and ground state, return the plant state (0 for bare ground). Share this pure function
+    /// with the decoration that places the plant.
+    pub fn surface_cover(self, f: impl Fn(u64, BlockPos, u32, u32) -> u32 + Send + Sync + 'static) -> Self {
+        self.set(
+            &f::SURFACE_COVER,
+            callback(move |a: &mut abi::SurfaceCoverArgs| {
+                for s in unsafe { std::slice::from_raw_parts_mut(a.samples, a.len) } {
+                    if s.ground != 0 && s.plant == 0 {
+                        s.plant = f(a.seed, s.surface, s.biome, s.ground);
+                    }
+                }
+            }),
+        )
+    }
+
     // Shape.
 
     /// What a vein looks like (a random walk of 8 blocks unless said).

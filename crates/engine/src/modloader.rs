@@ -1,5 +1,6 @@
 //! Finds mod libraries, loads them and runs registration in parallel.
 
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Instant;
@@ -13,6 +14,7 @@ pub struct LoadedMod {
     pub id: String,
     pub assets: PathBuf,
     source: PathBuf,
+    revision: u64,
     _lib: libloading::Library,
     decl: &'static abi::ModDecl,
 }
@@ -453,6 +455,7 @@ pub fn load(
             log::warn!("mod {name} is off: {reason}");
             errors.insert(name.clone(), reason);
             off.push(ModMeta {
+                revision: 0,
                 id: name.clone(),
                 version: String::new(),
                 deps: Vec::new(),
@@ -497,7 +500,12 @@ pub fn load(
             rejected(format!("the library declares mod {id}; its folder or zip must use that name"), &mut off, &mut errors);
             continue;
         }
-        mods.push(LoadedMod { id, assets: dir.join("assets"), source, _lib: lib, decl });
+        let mut revision = DefaultHasher::new();
+        let versioned = if source.is_file() { &source } else { &lib_path };
+        if let Ok(file) = std::fs::metadata(versioned) {
+            (file.len(), file.modified().ok()).hash(&mut revision);
+        }
+        mods.push(LoadedMod { id, assets: dir.join("assets"), source, revision: revision.finish(), _lib: lib, decl });
     }
     mods.sort_by(|a, b| a.id.cmp(&b.id));
     // Out go the ones turned off, then what needs them, and what needs that.
@@ -532,6 +540,7 @@ pub fn load(
             log::warn!("mod {} is off, as it needs one that is", m.id);
         }
         off.push(ModMeta {
+            revision: 0,
             id: m.id.clone(),
             version: unsafe { m.decl.version.as_str() }.to_string(),
             deps: deps_of(&m),
@@ -568,6 +577,7 @@ pub fn load(
                     .collect()
             };
             ModMeta {
+                revision: m.revision,
                 id: m.id.clone(),
                 version: m.decl.version.as_str().to_string(),
                 deps: names(&m.decl.deps),
@@ -664,6 +674,7 @@ mod tests {
         ]
         .into_iter()
         .map(|(id, deps)| ModMeta {
+            revision: 0,
             id: id.to_string(),
             version: String::new(),
             deps: off(&deps),

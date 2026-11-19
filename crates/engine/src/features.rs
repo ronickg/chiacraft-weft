@@ -26,6 +26,7 @@ pub struct FeatureDef {
     /// Index in `Content::features`.
     pub id: u32,
     pub owner: ModId,
+    pub surface_cover: Option<(ModId, abi::Callback)>,
     pub stage: u32,
     /// From the name, so adding one moves none of the others.
     pub salt: u64,

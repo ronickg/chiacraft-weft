@@ -86,6 +86,8 @@ shared! {
         /// edges go: red and green at the top of word 2, blue under word 3's AO.
         LIGHT_RG_SHIFT = 26,
         LIGHT_B_SHIFT = 20,
+        /// Word 3 flag: the upper half of word 1 holds a baked RGB565 albedo.
+        COVER_SHIFT = 23,
     }
     /// A forest atlas has one row per elevation and one column per azimuth.
     forest {

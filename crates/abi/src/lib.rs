@@ -1071,6 +1071,7 @@ pub mod comp {
         pub const PRIORITY: &str = "feature.priority";
         pub const SEPARATION: &str = "feature.separation";
         pub const GENERATE: &str = "feature.generate";
+        pub const SURFACE_COVER: &str = "feature.surface_cover";
         pub const SHAPE: &str = "feature.shape";
         pub const VEIN: &str = "feature.vein";
         pub const SIZE: &str = "feature.size";
@@ -5946,6 +5947,23 @@ pub struct TerrainColumn {
     /// The top solid block of the terrain itself (water, caves and decorations aside).
     pub height: i32,
     pub biome: u32,
+}
+
+/// A visual sample of the low vegetation on one terrain column before structures.
+#[repr(C)]
+pub struct SurfaceCoverArgs {
+    pub seed: u64,
+    pub samples: *mut SurfaceCoverSample,
+    pub len: usize,
+}
+
+#[repr(C)]
+pub struct SurfaceCoverSample {
+    pub surface: BlockPos,
+    pub biome: u32,
+    pub ground: u32,
+    /// Plant state, or 0 for bare ground.
+    pub plant: u32,
 }
 
 crate::data! {

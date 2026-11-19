@@ -389,6 +389,7 @@ pub mod feature {
     pub static PRIORITY: Component<i32, Feature> = Component::named(f::PRIORITY);
     pub static SEPARATION: Component<i32, Feature> = Component::named(f::SEPARATION);
     pub static GENERATE: Component<abi::Callback, Feature> = Component::named(f::GENERATE);
+    pub static SURFACE_COVER: Component<abi::Callback, Feature> = Component::named(f::SURFACE_COVER);
     pub static SHAPE: Component<u32, Feature> = Component::named(f::SHAPE);
     pub static VEIN: Component<abi::VeinShape, Feature> = Component::named(f::VEIN);
     pub static SIZE: Component<u32, Feature> = Component::named(f::SIZE);

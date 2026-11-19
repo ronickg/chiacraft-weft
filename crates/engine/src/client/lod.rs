@@ -29,6 +29,7 @@ use crate::gpu_layout::{CORNERS, face, lod_box, lod_face, lod_record};
 use crate::server::lod_tops::{LodColumn, Span, shows};
 
 mod cache;
+mod cover;
 mod forest;
 
 /// Columns that differ from the terrain, as the server said.
@@ -125,6 +126,7 @@ impl LodJob {
 
 struct TileTerrain {
     forest: forest::Forest,
+    cover: Option<cover::Cover>,
     description: Vec<i32>,
     faces: Vec<[(u32, u32); 6]>,
     ctm: Arc<super::ctm::Ctm>,
@@ -169,7 +171,8 @@ impl TileTerrain {
             }
         }
         let (forest, atlases) = forest::Forest::new(c, dim, seed, &faces, textures, &mut hash);
-        Some((Self { forest, description, faces, ctm, signature: hash.finish() }, atlases))
+        let cover = cover::Cover::new(c, dim, &faces, textures, &mut hash);
+        Some((Self { forest, cover, description, faces, ctm, signature: hash.finish() }, atlases))
     }
 }
 
@@ -213,7 +216,7 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
                 }
             }
         }
-        let (quads, counts, y) = mesh(content(), job.key, &words, &job.columns, &job.terrain);
+        let (quads, counts, y) = mesh(content(), job.seed, job.key, &words, &job.columns, &job.terrain);
         let mesh = Arc::new(LodMesh { key: job.key, quads, counts, y });
         let _ = job.done.send(Ok(mesh.clone()));
         job.cache.store(&mesh);
@@ -281,7 +284,14 @@ fn sample_y(words: &[u32], gx: f32, gz: f32) -> i32 {
 /// The tile's top faces and the walls down to lower neighbors: the top block for its own
 /// height, then the block under it for the rest, lit as the column the cell is sampled at; then
 /// what stands on the ground (`add_structures`). Sorted by part and direction (`Counts`).
-fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &TileTerrain) -> (Vec<[u32; 4]>, Counts, (i32, i32)) {
+fn mesh(
+    c: &Content,
+    seed: u64,
+    key: TileKey,
+    words: &[u32],
+    columns: &Columns,
+    terrain: &TileTerrain,
+) -> (Vec<[u32; 4]>, Counts, (i32, i32)) {
     let s = 1 << key.level;
     let scale = key.scale();
     let origin = key.origin();
@@ -334,6 +344,10 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
     }
     // Far off a face is its first layer.
     let face_of = |state: u32, dir| terrain.faces[state as usize][dir];
+    let cover = terrain
+        .cover
+        .as_ref()
+        .map(|cover| cover.colors(c, seed, key, words, columns));
     let mut faces = Vec::new();
     let (mut lo, mut hi) = (i32::MAX, i32::MIN);
     for j in 0..CELLS {
@@ -353,6 +367,9 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
                 ao: ao_bits(&h, i, j, 3, y),
                 light: lit,
                 part: ALWAYS,
+                cover: cover
+                    .as_ref()
+                    .and_then(|color| color[i as usize + 1][j as usize + 1]),
             });
             (lo, hi) = (lo.min(y), hi.max(y + 1));
             // A sea's surface, unshaded as a liquid's.
@@ -360,7 +377,18 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
             if surface != 0 && top_y > y {
                 let (tex, tint) = face_of(surface, 3);
                 let part = if c.states[surface as usize].layer == weft_abi::RenderLayer::Translucent { SURFACE } else { ALWAYS };
-                faces.push(Face { dir: 3, at: [i * s, top_y, j * s], size: [s, 1, s], tex, tint, biome, ao: 0xFF, light, part });
+                faces.push(Face {
+                    dir: 3,
+                    at: [i * s, top_y, j * s],
+                    size: [s, 1, s],
+                    tex,
+                    tint,
+                    biome,
+                    ao: 0xFF,
+                    light,
+                    part,
+                    cover: None,
+                });
                 hi = hi.max(top_y + 1);
             }
         }
@@ -399,7 +427,18 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
                 if ny < y {
                     let (tex, tint) = face_of(top, dir as usize);
                     let ao = ao_bits(&h, i, j, dir as usize, y);
-                    faces.push(Face { dir, at: [i * s, y, j * s], size: [s, 1, s], tex, tint, biome, ao, light: wall_light(y), part });
+                    faces.push(Face {
+                        dir,
+                        at: [i * s, y, j * s],
+                        size: [s, 1, s],
+                        tex,
+                        tint,
+                        biome,
+                        ao,
+                        light: wall_light(y),
+                        part,
+                        cover: None,
+                    });
                 }
                 let (tex, tint) = face_of(under, dir as usize);
                 let top_y = if ny < y { y - 1 } else { y };
@@ -409,7 +448,18 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
                 lo = lo.min(skirt + 1);
                 if mouth.is_none() {
                     let ao = ao_span(&h, i, j, dir as usize, top_y, (ny + 1).min(top_y));
-                    faces.push(Face { dir, at: [i * s, skirt + 1, j * s], size: [s, y - 1 - skirt, s], tex, tint, biome, ao, light, part });
+                    faces.push(Face {
+                        dir,
+                        at: [i * s, skirt + 1, j * s],
+                        size: [s, y - 1 - skirt, s],
+                        tex,
+                        tint,
+                        biome,
+                        ao,
+                        light,
+                        part,
+                        cover: None,
+                    });
                     continue;
                 }
                 let mut bottom = skirt + 1;
@@ -425,6 +475,7 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
                         ao,
                         light: wall_light(bottom + (end - bottom - 1) / 2),
                         part,
+                        cover: None,
                     });
                     bottom = end;
                 };
@@ -446,8 +497,15 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
             }
         }
     }
-    let record =
-        |f: &Face| quad(f.dir, f.at[0], f.at[1], f.at[2], (f.size[0], f.size[1], f.size[2]), f.tex, f.tint, f.biome, f.ao, f.light, scale);
+    let record = |f: &Face| {
+        let mut q = quad(f.dir, f.at[0], f.at[1], f.at[2], (f.size[0], f.size[1], f.size[2]), f.tex, f.tint, f.biome, f.ao, f.light, scale);
+        if let Some(color) = f.cover {
+            q[0] &= !(crate::gpu_layout::tint::MASK << lod_face::TINT_SHIFT);
+            q[1] = f.tex | (u32::from(color) << face::BIOME_SHIFT);
+            q[3] |= 1 << lod_face::COVER_SHIFT;
+        }
+        q
+    };
     let faces = merged(faces);
     let mut parts: [Vec<[u32; 4]>; PARTS] = std::array::from_fn(|p| faces.iter().filter(|f| f.part == p).map(record).collect());
     add_structures(&mut parts[ALWAYS], &mut lo, &mut hi, c, key, words, columns, &h, &face_of, &terrain.ctm);
@@ -483,6 +541,7 @@ struct Face {
     biome: u32,
     ao: u32,
     light: u32,
+    cover: Option<u16>,
     /// Which of `Counts`' parts.
     part: usize,
 }
@@ -507,7 +566,7 @@ fn merged_along(mut faces: Vec<Face>, along: impl Fn(&Face) -> Option<usize>) ->
         if let Some(a) = a {
             pos[a] = 0;
         }
-        (f.dir, f.part, pos, f.size, f.tex, f.tint, f.biome, f.ao, f.light, a.map_or(0, |a| f.at[a]))
+        (f.dir, f.part, pos, f.size, f.tex, f.tint, f.biome, f.ao, f.light, f.cover, a.map_or(0, |a| f.at[a]))
     };
     faces.sort_unstable_by_key(key);
     let mut out: Vec<Face> = Vec::with_capacity(faces.len());

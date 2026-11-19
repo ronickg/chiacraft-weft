@@ -884,6 +884,7 @@ pub struct PaletteDef {
 }
 
 pub struct ModMeta {
+    pub revision: u64,
     pub id: String,
     pub version: String,
     pub deps: Vec<String>,
@@ -3098,6 +3099,7 @@ fn freeze_features(
             return None;
         }
         let mut def = FeatureDef {
+            surface_cover: e.callback(abi::comp::feature::SURFACE_COVER),
             name: e.name.clone(),
             id,
             owner: e.owner,
@@ -4062,6 +4064,7 @@ mod tests {
 
     fn meta(id: &str, deps: &[&str]) -> ModMeta {
         ModMeta {
+            revision: 0,
             id: id.into(),
             version: "1".into(),
             deps: deps.iter().map(|d| d.to_string()).collect(),
