@@ -206,7 +206,7 @@ fn decorate_trunk(skeleton: &TreeSkeleton, d: &mut TreePlaceData) {
             }
             continue;
         }
-        if d.rng.float() >= 0.25 {
+        if d.rng.float() >= 0.1 {
             continue;
         }
         let (dx, dz, facing) = random_direction(&mut d.rng);

@@ -132,7 +132,7 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, 0.4)
         .set(&BUSH_COVER, 0.06)
         .set(&RASPBERRY_COVER, 0.002)
-        .set(&FUNGI_COVER, 0.01)
+        .set(&FUNGI_COVER, 0.001)
         // .set_text(&FLOWERS, "base:rose base:dandelion base:fern base:fern")
         // .set(&FLOWER_COVER, 0.02)
         .set(&TREE_KINDS, TreeKinds::from([("base:oak", 4), ("base:birch", 1)]));
@@ -149,7 +149,7 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, 0.4)
         .set(&BUSH_COVER, 0.06)
         .set(&RASPBERRY_COVER, 0.002)
-        .set(&FUNGI_COVER, 0.01)
+        .set(&FUNGI_COVER, 0.001)
         // .set_text(&FLOWERS, "base:rose base:dandelion base:fern base:fern")
         // .set(&FLOWER_COVER, 0.02)
         .set(&TREE_KINDS, TreeKinds::from([("base:birch", 1)]));
@@ -236,7 +236,14 @@ pub fn register(r: &mut Registry) {
         .sea(SEA, "water")
         .field("temperature", Expr::fbm(0x22, 2200.0, 3) * Expr::value(1.4))
         .field("humidity", Expr::fbm(0x33, 1600.0, 3) * Expr::value(1.4))
-        .field("base:weirdness", Expr::fbm(0x4A7, 700.0, 3).ramp(-0.2, 0.2))
+        .field("base:weirdness",
+            Expr::fbm(0x4A7, 1000.0, 3)
+                .at(
+                    Expr::x() + Expr::fbm(0x111, 600.0, 2) * Expr::blocks(80.0) + Expr::noise(40.0) * Expr::value(0.5),
+                    Expr::z() + Expr::fbm(0x222, 600.0, 2) * Expr::blocks(80.0) + Expr::noise(40.0) * Expr::value(0.5),
+                )
+                .ramp(-0.2, 0.2),
+        )
         .field("base:randomness", Expr::fbm(0x4A7, 700.0, 3).ramp(-0.2, 0.2))
         .landform(preset::continents(18.0))
         // Biomes shape the land through their climate, not their borders, so nothing seams:
@@ -296,11 +303,15 @@ pub fn register(r: &mut Registry) {
         .rule(
             BiomeRule::new("hills")
                 .field("base:randomness", 0.5..)
-                .height(SEA + 30..),
+                .field("base:mountains", 0.3..)
         )
-        .rule(BiomeRule::new("lavender_fields").field("base:weirdness", 1.0..))
-        .rule(BiomeRule::new("tallgrass_meadow").field("base:weirdness", ..0.3))
-        .rule(BiomeRule::new("clover_meadow").field("base:weirdness", 0.6..0.9))
+        .rule(BiomeRule::new("lavender_fields")
+            .field("base:weirdness", 1.0..)
+        ).rule(BiomeRule::new("tallgrass_meadow")
+            .field("base:weirdness", 0.1..0.3)
+        ).rule(BiomeRule::new("clover_meadow")
+            .field("base:weirdness", 0.6..0.9)
+        )
         .rule(BiomeRule::new("plains"))
         .cave_biome("deep_caves", 24, 96.0, 0.25)
         .caves(Caves::new("lava", i32::MIN, 11));
