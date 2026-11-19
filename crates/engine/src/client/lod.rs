@@ -348,14 +348,16 @@ fn mesh(
         .cover
         .as_ref()
         .map(|cover| cover.colors(c, seed, key, words, columns));
+    let mut forest = terrain.forest.instances(c, key, words, &h, columns);
+    let ground_light = |i: i32, j: i32, y, light| shade_sky(light_of(i, j, y, light), forest.shadow[(i + 1) as usize][(j + 1) as usize]);
     let mut faces = Vec::new();
     let (mut lo, mut hi) = (i32::MAX, i32::MIN);
     for j in 0..CELLS {
         for i in 0..CELLS {
             let y = column(&h, i, j);
             let (top, biome, _, light) = at(i, j);
-            let lit = light_of(i, j, y, light);
-            let lit = cave_mouth(i, j).map_or(lit, |mouth| cave_light(lit, mouth - y));
+            let lit = ground_light(i, j, y, light);
+            let lit = cave_mouth(i, j).map_or(lit, |mouth| shade_sky(lit, mouth - y));
             let (tex, tint) = face_of(top, 3);
             faces.push(Face {
                 dir: 3,
@@ -397,7 +399,7 @@ fn mesh(
         for i in 0..CELLS {
             let (top, biome, under, light) = at(i, j);
             let y = column(&h, i, j);
-            let light = light_of(i, j, y, light);
+            let light = ground_light(i, j, y, light);
             for (dir, (di, dj)) in [(0usize, (-1, 0)), (1, (1, 0)), (4, (0, -1)), (5, (0, 1))] {
                 // At the tile's edge the tile beside may be of another level, its ground not
                 // where this one's sample says: the wall goes on down below it (a skirt), or
@@ -423,7 +425,7 @@ fn mesh(
                 let dir = dir as u32;
                 // A wall facing the cut sees the sky through the neighboring mouth.
                 let mouth = cave_mouth(ni, nj).or_else(|| cave_mouth(i, j));
-                let wall_light = |by| mouth.map_or(light, |mouth| cave_light(light, mouth - by));
+                let wall_light = |by| mouth.map_or(light, |mouth| shade_sky(light, mouth - by));
                 if ny < y {
                     let (tex, tint) = face_of(top, dir as usize);
                     let ao = ao_bits(&h, i, j, dir as usize, y);
@@ -518,15 +520,17 @@ fn mesh(
         }
     }
     let space = MAX_QUADS.saturating_sub(parts.iter().map(Vec::len).sum());
-    terrain
-        .forest
-        .instances(c, key, words, &h, columns, space, &mut parts[FOREST], &mut lo, &mut hi);
+    forest.instances.truncate(space);
+    if !forest.instances.is_empty() {
+        (lo, hi) = (lo.min(forest.y.0), hi.max(forest.y.1));
+        parts[FOREST] = forest.instances;
+    }
     counts[FOREST][0] = parts[FOREST].len() as u32;
     (parts.concat(), counts, (lo, hi))
 }
 
-fn cave_light(light: u32, depth: i32) -> u32 {
-    let lost = (depth.clamp(0, CAVE_LIGHT_REACH) as u32).max(light >> 24);
+fn shade_sky(light: u32, loss: i32) -> u32 {
+    let lost = (loss.clamp(0, 15) as u32).max(light >> 24);
     light & 0xFF_FFFF | (lost << 24)
 }
 
@@ -1048,9 +1052,9 @@ impl Lod {
                 continue;
             }
             for level in 0..=MAX_LEVEL {
-                let step = 1i64 << level;
-                let side = CELLS as i64 * step;
-                let range = |p: i32| (p as i64 - step).div_euclid(side) as i32..=(p as i64 + step).div_euclid(side) as i32;
+                let side = (CELLS as i64) << level;
+                let border = i64::from(forest::shadow_margin(1 << level));
+                let range = |p: i32| (p as i64 - border).div_euclid(side) as i32..=(p as i64 + border).div_euclid(side) as i32;
                 for z in range(z) {
                     for x in range(x) {
                         let key = TileKey { level, x, z };
@@ -1755,8 +1759,8 @@ fn tile_columns(key: TileKey, saved: Option<&SavedColumns>) -> (Columns, u64) {
     let mut hash = DefaultHasher::new();
     if let Some(saved) = saved.filter(|s| !s.is_empty()) {
         let o = key.origin();
-        let step = 1 << key.level;
-        let bounds = |v: i32| v.saturating_sub(step)..=v.saturating_add(key.size()).saturating_add(step - 1);
+        let border = forest::shadow_margin(1 << key.level);
+        let bounds = |v: i32| v.saturating_sub(border)..=v.saturating_add(key.size()).saturating_add(border - 1);
         let (x_range, z_range) = (bounds(o.x), bounds(o.y));
         for (&(z, x), col) in saved.range((*z_range.start(), i32::MIN)..=(*z_range.end(), i32::MAX)) {
             if x_range.contains(&x) {
@@ -1966,17 +1970,17 @@ mod tests {
     fn saved_tile_inputs_follow_the_sampling_border() {
         let key = TileKey { level: 2, x: -1, z: 1 };
         let mut saved = SavedColumns::new();
-        for (x, z) in [(-133, 127), (-132, 124), (-4, 258), (3, 259), (4, 259), (-2, 260)] {
+        for (x, z) in [(-141, 127), (-140, 116), (-4, 258), (11, 267), (12, 267), (-2, 268)] {
             saved.insert((z, x), Arc::new(LodColumn { x, z, y: 40, top: 1, under: 2, light: 0, spans: Vec::new() }));
         }
         let (cols, id) = tile_columns(key, Some(&saved));
         assert_eq!(cols.len(), 3);
-        for p in [(-132, 124), (-4, 258), (3, 259)] {
+        for p in [(-140, 116), (-4, 258), (11, 267)] {
             assert!(cols.contains_key(&IVec2::new(p.0, p.1)));
         }
-        saved.remove(&(259, 4));
+        saved.remove(&(267, 12));
         assert_eq!(id, tile_columns(key, Some(&saved)).1);
-        Arc::make_mut(saved.get_mut(&(259, 3)).unwrap()).light = 10;
+        Arc::make_mut(saved.get_mut(&(267, 11)).unwrap()).light = 10;
         assert_ne!(id, tile_columns(key, Some(&saved)).1);
     }
 

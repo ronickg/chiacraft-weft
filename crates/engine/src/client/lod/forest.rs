@@ -2,7 +2,7 @@
 //! scatter shapes from several directions once. A tile only owns their roots and records.
 use std::hash::{DefaultHasher, Hash};
 
-use glam::{IVec2, IVec3, Vec3};
+use glam::{IVec2, IVec3, Vec2, Vec3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use weft_noise::{hash, mix, unit};
@@ -16,6 +16,11 @@ use crate::gpu_layout::forest::{ELEVATIONS, FRAME, VIEWS};
 const VARIANTS: usize = 4;
 const GROVE: i32 = 4; // Scatter cells per side of a baked group.
 const EXTENT: f32 = 1.7320508; // Radius of the normalized [-1, 1] object box.
+const MIN_SHADOW_MARGIN: i32 = 12;
+
+pub(super) fn shadow_margin(step: i32) -> i32 {
+    MIN_SHADOW_MARGIN.max(2 * step)
+}
 type Voxels = Vec<(IVec3, u32)>;
 type Colors = FxHashMap<u32, [[[u8; 4]; 16]; 6]>;
 pub(super) type Atlases = Vec<Vec<Vec<u8>>>;
@@ -25,6 +30,8 @@ struct Model {
     atlas: u32,
     radius: i32,
     height: i32,
+    canopy_center: IVec2,
+    canopy_radius: i32,
 }
 
 struct Biome {
@@ -43,6 +50,12 @@ struct Scatter {
 pub(super) struct Forest {
     dim: u32,
     scatter: Vec<Scatter>,
+}
+
+pub(super) struct TileForest {
+    pub(super) instances: Vec<[u32; 4]>,
+    pub(super) shadow: [[i32; super::GRID]; super::GRID],
+    pub(super) y: (i32, i32),
 }
 
 impl Forest {
@@ -156,7 +169,20 @@ impl Forest {
                         .map(|(p, _)| (-p.x).max(p.x + 1).max(-p.z).max(p.z + 1))
                         .max()?;
                     let height = blocks.iter().map(|(p, _)| p.y + 1).max()?;
-                    let model = Model { radius, height, atlas: models.len() as u32 };
+                    let canopy: FxHashSet<_> = blocks
+                        .iter()
+                        .filter(|(p, _)| p.y >= height / 2)
+                        .map(|(p, _)| IVec2::new(p.x, p.z))
+                        .collect();
+                    let area = canopy.len() as f32;
+                    let center = canopy.iter().map(|p| p.as_vec2() + 0.5).sum::<Vec2>() / area;
+                    let model = Model {
+                        radius,
+                        height,
+                        atlas: models.len() as u32,
+                        canopy_center: center.round().as_ivec2(),
+                        canopy_radius: (area / std::f32::consts::PI).sqrt().ceil() as i32,
+                    };
                     model.hash(signature);
                     models.push((model, blocks, palette.clone()));
                     Some(model)
@@ -211,13 +237,11 @@ impl Forest {
         words: &[u32],
         heights: &[[i32; super::GRID]; super::GRID],
         columns: &Columns,
-        limit: usize,
-        out: &mut Vec<[u32; 4]>,
-        lo: &mut i32,
-        hi: &mut i32,
-    ) {
+    ) -> TileForest {
+        let mut result = TileForest { instances: Vec::new(), shadow: [[0; super::GRID]; super::GRID], y: (i32::MAX, i32::MIN) };
         let origin = key.origin();
         let step = 1 << key.level;
+        let margin = shadow_margin(step);
         for rule in &self.scatter {
             if !words.chunks_exact(WORDS).any(|w| {
                 rule.biomes
@@ -245,8 +269,10 @@ impl Forest {
                 }
             }
             let mut patches = Vec::new();
-            for z in origin.y.div_euclid(stride)..=end.y.div_euclid(stride) {
-                for x in origin.x.div_euclid(stride)..=end.x.div_euclid(stride) {
+            // Include the crowns just across the tile edge. The sampled terrain border
+            // supplies their height and biome even if the adjacent mesh isn't ready.
+            for z in origin.y.saturating_sub(margin).div_euclid(stride)..=end.y.saturating_add(margin).div_euclid(stride) {
+                for x in origin.x.saturating_sub(margin).div_euclid(stride)..=end.x.saturating_add(margin).div_euclid(stride) {
                     patches.push((groups, x, z));
                 }
             }
@@ -261,18 +287,17 @@ impl Forest {
                     continue;
                 }
                 let stride = groups * rule.spacing;
-                if out.len() >= limit {
-                    return;
-                }
                 let h = hash(rule.seed, x as i64, 0, z as i64);
                 let (wx, wz) =
                     if groups == 1 { grid_position((x, z), stride, stride, h) } else { (x * stride + stride / 2, z * stride + stride / 2) };
                 let site = IVec2::new(wx, wz);
                 let local = site - origin;
-                if local.min_element() < 0 || local.max_element() >= key.size() {
+                if local.min_element() < -margin || local.max_element() >= key.size() + margin {
                     continue;
                 }
-                let cell = local / step;
+                let cell = local
+                    .div_euclid(IVec2::splat(step))
+                    .clamp(IVec2::splat(-1), IVec2::splat(super::CELLS));
                 let k = ((cell.y + 1) * SIDE + cell.x + 1) as usize * WORDS;
                 let biome = (words[k + 1] & 0xffff) as usize;
                 let Some(b) = rule.biomes.get(biome).and_then(Option::as_ref) else { continue };
@@ -289,7 +314,9 @@ impl Forest {
                 let ground = words[k] >> 16;
                 // The terrain here is a set of flat cells, so use the height actually drawn.
                 let base = super::column(heights, cell.x, cell.y) + 1;
-                if (!f.fit.over_water && words[k + 2] != 0)
+                let surface = words[k + 2];
+                let blocked = if surface >> 16 != 0 { !f.fit.over_water } else { surface != 0 && !f.fit.over_caves };
+                if blocked
                     || !(f.y[0]..=f.y[1]).contains(&base)
                     || f.fit.ground.is_some_and(|m| !c.matchers.has(m, ground))
                     || columns.contains_key(&site)
@@ -297,16 +324,51 @@ impl Forest {
                     continue;
                 }
                 let base = base - f.fit.buried;
-                let radius = model.radius as f32 * if groups == 1 { 1.0 } else { groups as f32 / GROVE as f32 };
+                let magnification = if groups == 1 { 1.0 } else { groups as f32 / GROVE as f32 };
+                let radius = model.radius as f32 * magnification;
+                let offset = model.canopy_center.as_vec2() * magnification;
+                let canopy = (model.canopy_radius as f32 * magnification).min(margin as f32 - offset.abs().max_element());
+                if canopy > 0.0 {
+                    result.shade(local.as_vec2() + offset, step, canopy, base + model.height, heights);
+                }
+                if local.min_element() < 0 || local.max_element() >= key.size() || result.instances.len() >= super::MAX_QUADS {
+                    continue;
+                }
                 let p = local / key.scale();
-                out.push([
+                result.instances.push([
                     p.x as u32 | (p.y as u32) << 16,
                     base as u16 as u32 | (model.height as u32) << 16,
                     radius.to_bits(),
                     model.atlas,
                 ]);
-                *lo = (*lo).min(base);
-                *hi = (*hi).max(base + model.height);
+                result.y.0 = result.y.0.min(base);
+                result.y.1 = result.y.1.max(base + model.height);
+            }
+        }
+        result
+    }
+}
+
+impl TileForest {
+    fn shade(&mut self, local: Vec2, step: i32, radius: f32, top: i32, heights: &[[i32; super::GRID]; super::GRID]) {
+        let p = local / step as f32;
+        let r = radius / step as f32;
+        let extent = (r + 0.35).max(0.75);
+        let min = (p - extent).floor().as_ivec2().max(IVec2::splat(-1));
+        let max = (p + extent)
+            .floor()
+            .as_ivec2()
+            .min(IVec2::splat(super::CELLS));
+        let strength = 8.0 * (r / extent).min(1.0);
+        for j in min.y..=max.y {
+            for i in min.x..=max.x {
+                if super::column(heights, i, j) >= top {
+                    continue;
+                }
+                let dist = (IVec2::new(i, j).as_vec2() + 0.5 - p).length() / extent;
+                let light = ((1.0 - dist).clamp(0.0, 1.0) * strength).round() as i32;
+                let cell = &mut self.shadow[(i + 1) as usize][(j + 1) as usize];
+                *cell = (*cell).max(light);
             }
         }
     }
@@ -441,7 +503,7 @@ mod tests {
 
     #[test]
     fn atlas_keeps_directional_silhouettes_and_transparent_faces() {
-        let model = Model { radius: 4, height: 5, atlas: 0 };
+        let model = Model { radius: 4, height: 5, atlas: 0, canopy_center: IVec2::ZERO, canopy_radius: 4 };
         let fence: Vec<_> = (-4..4)
             .flat_map(|x| (0..5).map(move |y| (IVec3::new(x, y, 0), 1)))
             .collect();
