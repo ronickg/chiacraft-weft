@@ -33,6 +33,8 @@ mod forest;
 
 /// Columns that differ from the terrain, as the server said.
 type Columns = FxHashMap<IVec2, Arc<LodColumn>>;
+// A failed warm-cache probe goes back through normal coarse-first generation.
+type TileResult = Result<Arc<LodMesh>, TileKey>;
 type SavedColumns = BTreeMap<(i32, i32), Arc<LodColumn>>;
 
 /// Cells a tile side.
@@ -106,7 +108,7 @@ pub struct LodJob {
     pub dim: u32,
     pub seed: u64,
     pub key: TileKey,
-    done: Sender<Arc<LodMesh>>,
+    done: Sender<TileResult>,
     terrain: Arc<TileTerrain>,
     cache: cache::Entry,
     /// What the server said of columns, taken over the terrain's where the tile samples them.
@@ -208,7 +210,7 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
         }
         let (quads, counts, y) = mesh(content(), job.key, &words, &job.columns, &job.terrain);
         let mesh = Arc::new(LodMesh { key: job.key, quads, counts, y });
-        let _ = job.done.send(mesh.clone());
+        let _ = job.done.send(Ok(mesh.clone()));
         job.cache.store(&mesh);
     });
 }
@@ -814,7 +816,7 @@ pub struct Lod {
     /// The land's height at the camera's column, kept while it stays in it.
     ground: Option<((u32, IVec2), i32)>,
     jobs: Sender<LodJob>,
-    done: (Sender<Arc<LodMesh>>, Receiver<Arc<LodMesh>>),
+    done: (Sender<TileResult>, Receiver<TileResult>),
     dim: u32,
     seed: u64,
     shader: Option<u64>,
@@ -823,6 +825,8 @@ pub struct Lod {
     baking: Option<Receiver<forest::Atlases>>,
     /// Drawn height bounds guide priorities, never conservative visibility bounds.
     ready: FxHashMap<TileKey, ReadyTile>,
+    cached_heights: cache::Heights,
+    cache_misses: FxHashSet<TileKey>,
     generation: u64,
     pending: FxHashSet<TileKey>,
     /// Tiles wanted, coarse first then nearest, and the view that selected them.
@@ -883,6 +887,8 @@ impl Lod {
             terrain: None,
             baking: None,
             ready: FxHashMap::default(),
+            cached_heights: cache::Heights::default(),
+            cache_misses: FxHashSet::default(),
             generation: 0,
             pending: FxHashSet::default(),
             wanted: Vec::new(),
@@ -950,7 +956,31 @@ impl Lod {
     }
 
     pub fn reload(&mut self) {
+        self.save_view();
         self.dim = u32::MAX;
+    }
+
+    pub(super) fn save_view(&self) {
+        let (Some(terrain), Some(view)) = (&self.terrain, self.wanted_at) else { return };
+        if self.dim == u32::MAX {
+            return;
+        }
+        let mut ordinary: Vec<_> = self
+            .remembered
+            .keys()
+            .filter_map(|&key| Some((key, self.ready.get(&key)?.y)))
+            .collect();
+        if ordinary.is_empty() {
+            return;
+        }
+        let pos = glam::DVec2::new(view.pos.x, view.pos.z);
+        ordinary.sort_unstable_by_key(|(key, _)| (key.distance(pos).0.to_bits(), std::cmp::Reverse(key.level), *key));
+        let previous = self
+            .cached_heights
+            .iter()
+            .filter(|(key, _)| !self.remembered.contains_key(key) || !self.ready.contains_key(key))
+            .map(|(&key, &y)| (key, y));
+        cache::write_heights(&self.cache_dir, self.dim, self.seed, terrain.signature, ordinary.into_iter().chain(previous));
     }
 
     pub fn columns_len(&self) -> usize {
@@ -994,6 +1024,9 @@ impl Lod {
         let reach = Self::distance();
         let world_changed = (dim, seed) != (self.dim, self.seed);
         if (reach != 0 && world_changed) || (reach == 0 && self.terrain.is_some()) {
+            self.save_view();
+            self.cached_heights.clear();
+            self.cache_misses.clear();
             for (key, _) in self.ready.drain() {
                 render.remove_lod(key);
             }
@@ -1027,6 +1060,9 @@ impl Lod {
                 .and_then(|s| TileTerrain::new(c, dim, seed, s, textures))
                 .map(|(terrain, rx)| (Arc::new(terrain), rx))
                 .unzip();
+            if let Some(terrain) = &self.terrain {
+                self.cached_heights = cache::read_heights(&self.cache_dir, dim, seed, terrain.signature);
+            }
         }
         if let Some(images) = self.baking.as_ref().and_then(|rx| rx.try_recv().ok()) {
             render.set_forest(gpu, images);
@@ -1048,19 +1084,28 @@ impl Lod {
         let released = self.zooming && !zooming;
         self.zooming = zooming;
         while self.baking.is_none()
-            && let Ok(m) = self.done.1.try_recv()
+            && let Ok(result) = self.done.1.try_recv()
         {
-            self.pending.remove(&m.key);
+            let key = match &result {
+                Ok(m) => m.key,
+                Err(key) => *key,
+            };
+            self.pending.remove(&key);
             self.dirty = true;
-            if !zooming && self.zoom_only.contains(&m.key) {
-                if !self.ready.contains_key(&m.key) {
-                    self.zoom_only.remove(&m.key);
+            if !zooming && self.zoom_only.contains(&key) {
+                if !self.ready.contains_key(&key) {
+                    self.zoom_only.remove(&key);
                 }
                 continue;
             }
-            if self.stale.contains(&m.key) {
+            if self.stale.contains(&key) {
                 continue;
             }
+            let Ok(m) = result else {
+                self.cache_misses.insert(key);
+                continue;
+            };
+            self.cache_misses.remove(&key);
             render.upload_lod(gpu, textures, m.key, &m.quads, m.counts, m.y);
             self.ready
                 .insert(m.key, ReadyTile { y: m.y, quads: m.quads.len(), last_used: self.generation });
@@ -1115,15 +1160,15 @@ impl Lod {
             if released {
                 self.release_zoom(|key| render.remove_lod(key));
             }
-            let mut next = FxHashSet::default();
-            for &root in self.wanted.iter().take_while(|k| k.level == self.max_level) {
+            let mut next = Vec::new();
+            for &root in needed.iter().filter(|k| k.level == self.max_level) {
                 self.cover(root, &needed, &mut next);
             }
             if cut {
                 self.frontier.clear();
                 self.transitions.clear();
             }
-            self.change_frontier(next, now);
+            self.change_frontier(next.into_iter().collect(), now);
             needed.extend(&self.frontier);
             for (&parent, fade) in &self.transitions {
                 needed.insert(parent);
@@ -1131,8 +1176,9 @@ impl Lod {
             }
             self.trim(&needed, render);
             self.request();
-            log::debug!(target: "load", "lod fov {:.2}, range {}, tiles {}, levels {}..{}", camera.fov, reach, self.wanted.len(),
-                self.wanted.iter().map(|k| k.level).min().unwrap_or(0), self.max_level);
+            log::debug!(target: "load", "lod fov {:.2}, range {}, tiles {}, levels {}..{}, shown {} (finest {:?}), zoom-only resident {}",
+                camera.fov, reach, self.wanted.len(), self.wanted.iter().map(|k| k.level).min().unwrap_or(0), self.max_level,
+                self.frontier.len(), self.frontier.iter().map(|k| k.level).min(), self.zoom_only.iter().filter(|k| self.ready.contains_key(k)).count());
         }
         if changed || !self.transitions.is_empty() || self.hidden != hidden {
             self.hidden = hidden;
@@ -1389,7 +1435,11 @@ impl Lod {
             if key.level == 0 {
                 return None;
             }
-            let (low, high) = self.ready.get(&key)?.y;
+            let (low, high) = self
+                .ready
+                .get(&key)
+                .map(|t| t.y)
+                .or_else(|| self.cached_heights.get(&key).copied())?;
             let origin = key.origin();
             let bounds = |height: (f64, f64)| {
                 let min = (DVec3::new(origin.x as f64, height.0, origin.y as f64) - view.pos).as_vec3();
@@ -1485,34 +1535,63 @@ impl Lod {
         if let Some(wide) = wide {
             self.wanted.extend(wide.difference(&needed).copied());
         }
-        self.wanted
-            .sort_by_cached_key(|key| (std::cmp::Reverse(key.level), key.distance(p).0.to_bits()));
+        let mut fallback = FxHashSet::default();
+        for mut key in self
+            .cache_misses
+            .iter()
+            .copied()
+            .filter(|k| needed.contains(k))
+        {
+            loop {
+                if !fallback.insert(key) || key.level == self.max_level {
+                    break;
+                }
+                key = key.parent();
+            }
+        }
+        self.wanted.sort_by_cached_key(|key| {
+            let distance = key.distance(p).0.to_bits();
+            let cached_leaf = self.cached_heights.contains_key(key)
+                && needed.contains(key)
+                && (key.level == 0 || !key.children().iter().any(|k| needed.contains(k)));
+            let coarse = self.max_level - key.level;
+            if fallback.contains(key) {
+                (0, coarse, distance)
+            } else if cached_leaf {
+                (1, key.level, distance)
+            } else {
+                (2, coarse, distance)
+            }
+        });
         needed
     }
 
-    fn cover(&self, key: TileKey, needed: &FxHashSet<TileKey>, shown: &mut FxHashSet<TileKey>) {
-        if key.level == 0 {
-            if self.ready.contains_key(&key) {
-                shown.insert(key);
-            }
-            return;
-        }
-        let children = key.children();
-        let required = children.iter().any(|k| needed.contains(k));
-        let refine = required
-            && children
-                .iter()
-                .filter(|k| needed.contains(k))
-                .all(|k| self.ready.contains_key(k));
-        if self.ready.contains_key(&key) && !refine {
-            shown.insert(key);
-        } else if required {
+    fn cover(&self, key: TileKey, needed: &FxHashSet<TileKey>, shown: &mut Vec<TileKey>) -> bool {
+        let start = shown.len();
+        if key.level > 0 {
+            let children = key.children();
+            let mut required = false;
+            let mut complete = true;
             for child in children.into_iter().filter(|k| needed.contains(k)) {
-                self.cover(child, needed, shown);
+                required = true;
+                complete &= self.cover(child, needed, shown);
             }
-        } else if key.level > 0 && children.iter().all(|k| self.ready.contains_key(k)) {
-            shown.extend(children);
+            if required && complete {
+                return true;
+            }
+            if !required && !self.ready.contains_key(&key) && children.iter().all(|k| self.ready.contains_key(k)) {
+                shown.extend(children);
+                return true;
+            }
         }
+        if self.ready.contains_key(&key) {
+            // A complete cached leaf cover needs no intermediate meshes. Only replace partial
+            // coverage with a parent when a branch really is missing.
+            shown.truncate(start);
+            shown.push(key);
+            return true;
+        }
+        false
     }
 
     /// Asks for the nearest wanted tiles not made yet, or made before columns changed.
@@ -1541,11 +1620,14 @@ impl Lod {
             let (done, terrain, columns) = (self.done.0.clone(), terrain.clone(), columns.cloned());
             let dir = self.cache_dir.clone();
             let jobs = self.jobs.clone();
+            let probe = key.level < self.max_level && self.cached_heights.contains_key(&key) && !self.cache_misses.contains(&key);
             background().spawn(move || {
                 let (columns, edits) = tile_columns(key, columns.as_deref());
                 let mut cache = cache::Entry::new(&dir, dim, seed, key, terrain.signature, edits);
                 if let Some(mesh) = cache.load(key) {
-                    let _ = done.send(Arc::new(mesh));
+                    let _ = done.send(Ok(Arc::new(mesh)));
+                } else if probe {
+                    let _ = done.send(Err(key));
                 } else {
                     let _ = jobs.send(LodJob { dim, seed, key, done, terrain, cache, columns });
                 }
@@ -1701,6 +1783,25 @@ mod tests {
     }
 
     #[test]
+    fn cached_view_selects_leaves_before_meshes_arrive() {
+        let view = selection(70.0, 1080, 4096);
+        let heights = (0.0, 256.0);
+        let mut lod = Lod::new(unbounded().0, PathBuf::new(), None);
+        settle(&mut lod, view, heights);
+        let expected = lod.select(view, heights);
+        lod.cached_heights
+            .extend(lod.ready.drain().map(|(key, tile)| (key, tile.y)));
+        let wanted = lod.pick(view, heights, None);
+        assert_eq!(wanted, expected);
+        let leaf = lod.wanted[0];
+        assert!(leaf.level < lod.max_level);
+        assert!(leaf.level == 0 || !leaf.children().iter().any(|k| wanted.contains(k)));
+        lod.cache_misses.insert(leaf);
+        assert_eq!(lod.pick(view, heights, None), expected);
+        assert_eq!(lod.wanted[0].level, lod.max_level);
+    }
+
+    #[test]
     fn coverage_waits_for_complete_children() {
         let mut lod = Lod::new(unbounded().0, PathBuf::new(), None);
         let parent = TileKey { level: 3, x: -1, z: 0 };
@@ -1711,20 +1812,27 @@ mod tests {
                 .into_iter()
                 .map(|k| (k, ReadyTile::default())),
         );
-        let mut shown = FxHashSet::default();
+        let mut shown = Vec::new();
         lod.cover(parent, &needed, &mut shown);
-        assert_eq!(shown, [parent].into_iter().collect());
+        assert_eq!(shown, [parent]);
         lod.ready
             .extend(children.into_iter().map(|k| (k, ReadyTile::default())));
         shown.clear();
         lod.cover(parent, &needed, &mut shown);
-        assert_eq!(shown, children.into_iter().collect());
+        assert_eq!(shown, children);
         lod.ready.remove(&parent);
         shown.clear();
         lod.cover(parent, &[parent].into_iter().collect(), &mut shown);
-        assert_eq!(shown, children.into_iter().collect());
+        assert_eq!(shown, children);
 
         let fine: FxHashSet<_> = children.into_iter().flat_map(TileKey::children).collect();
+        lod.ready.clear();
+        lod.ready.insert(parent, ReadyTile::default());
+        lod.ready
+            .extend(fine.iter().map(|&key| (key, ReadyTile::default())));
+        shown.clear();
+        lod.cover(parent, &needed.union(&fine).copied().collect(), &mut shown);
+        assert_eq!(shown.into_iter().collect::<FxHashSet<_>>(), fine);
         let coarse: FxHashSet<_> = [parent].into_iter().collect();
         lod.frontier = coarse.clone();
         let start = Instant::now();

@@ -2982,6 +2982,7 @@ impl Client {
     }
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
+        self.lod.save_view();
         for b in self.scene_bufs.drain(..) {
             gpu.destroy_buffer(b);
         }

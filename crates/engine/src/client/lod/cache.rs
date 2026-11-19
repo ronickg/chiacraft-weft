@@ -6,10 +6,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::{Counts, LodMesh, MAX_QUADS, TileKey};
+use rustc_hash::FxHashMap;
 
 // Bump when the mesher or packed face format changes.
 const VERSION: u32 = 2;
-const SLOTS: u64 = 4096;
+pub(super) const SLOTS: u64 = 4096;
 const MAX_FILE: usize = 128 << 10;
 const HEADER: usize = size_of::<Counts>() + 8;
 
@@ -99,28 +100,85 @@ impl Entry {
         if data.len() + 16 > MAX_FILE {
             return;
         }
-        // A second client can use the same cache, or an edit can catch a job in flight.
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let tmp = self
-            .path
-            .with_extension(format!("{}.{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
-        let open = || File::create(&tmp);
-        let file = open().or_else(|e| {
-            if e.kind() != std::io::ErrorKind::NotFound {
-                return Err(e);
-            }
-            fs::create_dir_all(self.path.parent().unwrap())?;
-            open()
+        replace(&self.path, |file| {
+            file.write_all(&self.signature.to_le_bytes())?;
+            file.write_all(&checksum(&data).to_le_bytes())?;
+            file.write_all(&data)
         });
-        let Ok(mut file) = file else { return };
-        let written = file
-            .write_all(&self.signature.to_le_bytes())
-            .and_then(|_| file.write_all(&checksum(&data).to_le_bytes()))
-            .and_then(|_| file.write_all(&data));
-        drop(file);
-        if written.and_then(|_| fs::rename(&tmp, &self.path)).is_err() {
-            let _ = fs::remove_file(tmp);
+    }
+}
+
+/// The small height index lets selection descend directly to cached detail on a new visit.
+/// Geometry still goes through Entry::load with the current terrain and saved-column signatures.
+pub(super) type Heights = FxHashMap<TileKey, (i32, i32)>;
+
+fn view_file(dir: &Path, dim: u32, seed: u64, terrain: u64) -> (PathBuf, [u8; 8]) {
+    let mut hash = DefaultHasher::new();
+    (dim, seed).hash(&mut hash);
+    // At most 64 world/dimension indices, about 5 MiB across all worlds.
+    let path = dir.join(format!("view-{:02x}", hash.finish() % 64));
+    (VERSION, terrain).hash(&mut hash);
+    (path, hash.finish().to_le_bytes())
+}
+
+pub(super) fn read_heights(dir: &Path, dim: u32, seed: u64, terrain: u64) -> Heights {
+    let read = || -> Option<Heights> {
+        let mut data = Vec::new();
+        let (path, signature) = view_file(dir, dim, seed, terrain);
+        File::open(path)
+            .ok()?
+            .take(17 + SLOTS * 20)
+            .read_to_end(&mut data)
+            .ok()?;
+        let rows = data.get(16..)?;
+        if rows.len() % 20 != 0 || rows.len() / 20 > SLOTS as usize || data[..8] != signature || data[8..16] != checksum(rows).to_le_bytes()
+        {
+            return None;
         }
+        let mut heights = Heights::default();
+        for row in rows.chunks_exact(20) {
+            let [level, x, z, lo, hi] = std::array::from_fn(|i| i32::from_le_bytes(row[i * 4..i * 4 + 4].try_into().unwrap()));
+            if (0..=super::MAX_LEVEL as i32).contains(&level) && lo <= hi {
+                heights.insert(TileKey { level: level as u32, x, z }, (lo, hi));
+            }
+        }
+        Some(heights)
+    };
+    read().unwrap_or_default()
+}
+
+pub(super) fn write_heights(dir: &Path, dim: u32, seed: u64, terrain: u64, tiles: impl Iterator<Item = (TileKey, (i32, i32))>) {
+    let mut rows = Vec::new();
+    for (key, (lo, hi)) in tiles.take(SLOTS as usize) {
+        for value in [key.level as i32, key.x, key.z, lo, hi] {
+            rows.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+    let (path, signature) = view_file(dir, dim, seed, terrain);
+    replace(&path, |file| {
+        file.write_all(&signature)?;
+        file.write_all(&checksum(&rows).to_le_bytes())?;
+        file.write_all(&rows)
+    });
+}
+
+// A second client can use the same cache, or an edit can catch a job in flight.
+fn replace(path: &Path, write: impl FnOnce(&mut File) -> std::io::Result<()>) {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let tmp = path.with_extension(format!("{}.{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+    let open = || File::create(&tmp);
+    let file = open().or_else(|e| {
+        if e.kind() != std::io::ErrorKind::NotFound {
+            return Err(e);
+        }
+        fs::create_dir_all(path.parent().unwrap())?;
+        open()
+    });
+    let Ok(mut file) = file else { return };
+    let written = write(&mut file);
+    drop(file);
+    if written.and_then(|_| fs::rename(&tmp, path)).is_err() {
+        let _ = fs::remove_file(tmp);
     }
 }
 
@@ -161,6 +219,13 @@ mod tests {
         let mut corrupt = bytes;
         *corrupt.last_mut().unwrap() ^= 1;
         assert!(entry.decode(key, &corrupt).is_none());
+        let other = TileKey { level: 0, x: -19, z: 32 };
+        let heights = Heights::from_iter([(key, mesh.y), (other, (-5, 17))]);
+        write_heights(&dir, 3, 42, 17, heights.iter().map(|(&k, &y)| (k, y)));
+        assert_eq!(read_heights(&dir, 3, 42, 17), heights);
+        assert!(read_heights(&dir, 3, 42, 18).is_empty());
+        assert!(read_heights(&dir, 3, 43, 17).is_empty());
+        fs::remove_file(view_file(&dir, 3, 42, 17).0).unwrap();
         fs::remove_file(entry.path).unwrap();
         fs::remove_dir(dir).unwrap();
     }
