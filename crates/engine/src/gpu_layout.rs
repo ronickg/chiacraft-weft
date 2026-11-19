@@ -196,14 +196,20 @@ pub mod terrain {
             HEIGHTS = 2176,
             COLUMN_BIOMES = 2432,
         }
-        /// Distant terrain tiles (`client::lod`): samples per side (a tile's 32 cells and one
-        /// around it), all of them, and words per sample: ground height and top block; biome
+        /// Distant terrain tiles (`client::lod`): 32 cells and their sampling border.
+        /// Words per sample: ground height and top block; biome
         /// and the block under the top; what stands over the ground up to a height (a sea: its
-        /// surface and block), or the depth of a cave cut if there is no surface block.
+        /// surface and block), or the depth of a cave cut if there is no surface block; and
+        /// the floor and roof depths of an opening (bytes), then the surface soil depth.
         lod {
-            SIDE = 34,
-            SAMPLES = 34 * 34,
-            WORDS = 3,
+            BORDER = 2,
+            SIDE = 32 + 2 * 2,
+            SAMPLES = 36 * 36,
+            WORDS = 4,
+            CAVE_REACH = 48,
+            CAVE_DEPTH_MASK = 255,
+            CAVE_ROOF_SHIFT = 8,
+            SOIL_DEPTH_SHIFT = 16,
         }
         /// Expression step kinds.
         expr {

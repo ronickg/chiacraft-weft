@@ -352,19 +352,41 @@ fn lerp2(a: vec2<i32>, b: vec2<i32>, t: i32) -> vec2<i32> {
     return vec2<i32>(lerp(a.x, b.x, t), lerp(a.y, b.y, t));
 }
 
-// Whether caves take block (x, y, z) of a column standing alone, `ground` its smoothed height
-// (Q4): as `block` does with a cube's nodes, as `Terrain::surface_carved` does on the CPU.
-fn carved_at(x: i32, y: i32, z: i32, ground: i32) -> bool {
-    let gx = div_floor(x, 4).x * 4;
-    let gy = div_floor(y, 4).x * 4;
-    let gz = div_floor(z, 4).x * 4;
-    let fx = (x - gx) * 1024;
-    let fy = (y - gy) * 1024;
-    let fz = (z - gz) * 1024;
-    let a = lerp2(lerp2(cave_node(gx, gy, gz), cave_node(gx + 4, gy, gz), fx), lerp2(cave_node(gx, gy, gz + 4), cave_node(gx + 4, gy, gz + 4), fx), fz);
-    let b = lerp2(lerp2(cave_node(gx, gy + 4, gz), cave_node(gx + 4, gy + 4, gz), fx), lerp2(cave_node(gx, gy + 4, gz + 4), cave_node(gx + 4, gy + 4, gz + 4), fx), fz);
-    let n = lerp2(a, b, fy);
-    return carves(n.x > 0, n.y, cavern_roof(x, z), ground - y * 16);
+fn cave_plane(grid: vec2<i32>, y: i32, weight: vec2<i32>) -> vec2<i32> {
+    let x = grid.x;
+    let z = grid.y;
+    let a = lerp2(cave_node(x, y, z), cave_node(x + 4, y, z), weight.x);
+    let b = lerp2(cave_node(x, y, z + 4), cave_node(x + 4, y, z + 4), weight.x);
+    return lerp2(a, b, weight.y);
+}
+
+// Keep the lattice planes while walking down a column. Return the solid floor and roof.
+// For an open cut the search stops at the first solid block.
+fn lod_cave(x: i32, z: i32, ground: i32, hi: i32, lo: i32, cut: bool) -> vec2<i32> {
+    let grid = vec2(div_floor(x, 4).x, div_floor(z, 4).x) * 4;
+    let weight = (vec2(x, z) - grid) * 1024;
+    let closed = cavern_roof(x, z);
+    let first = div_floor(hi, 4).x * 4 + 4;
+    let last = div_floor(lo + 1, 4).x * 4;
+    var upper = vec2(0);
+    var roof = hi + 1;
+    for (var plane = first; plane >= last; plane -= 4) {
+        let lower = cave_plane(grid, plane, weight);
+        if plane != first {
+            for (var y = min(hi, plane + 3); y >= plane && y > lo; y -= 1) {
+                let n = lerp2(lower, upper, (y - plane) * 1024);
+                let carved = carves(n.x > 0, n.y, closed, ground - y * 16);
+                if !carved || (y >= desc[D_LAVA_FROM] && y < desc[D_LAVA_TO] && lake(y) != 0) {
+                    if cut || roof - y >= 4 {
+                        return vec2(y, roof);
+                    }
+                    roof = y;
+                }
+            }
+        }
+        upper = lower;
+    }
+    return select(vec2(0), vec2(lo, roof), cut || roof - lo >= 4);
 }
 
 // The block at local (x, y, z) of column `i`, as `Terrain::generate`.
@@ -513,10 +535,14 @@ fn generate(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_inde
     }
 }
 
+var<workgroup> lod_floor: array<i32, LOD_SAMPLES>;
+var<workgroup> lod_ground: array<i32, LOD_SAMPLES>;
+var<workgroup> lod_passes: u32;
+
 @compute @workgroup_size(256)
 fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t: u32) {
     let tile = wg.x;
-    if (tile >= params.cubes) {
+    if tile >= params.cubes {
         return;
     }
     let job = tile * 4u;
@@ -525,66 +551,110 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
     let s = 1 << u32(jobs[job + 2u]);
     let nr = u32(desc[D_RULES]);
     let stone = desc[D_STONE];
-    for (var k = t; k < LOD_SAMPLES; k += 256u) {
-        let bx = ox + (i32(k % LOD_SIDE) - 1) * s + s / 2;
-        let bz = oz + (i32(k / LOD_SIDE) - 1) * s + s / 2;
-        let c = column(bx, bz);
-        var top = stone;
-        var under = stone;
-        var ice = -1;
-        let ri = u32(c.rule);
-        if (ri < nr) {
-            let r = u32(desc[D_RULE_OFF]) + ri * WORDS_RULE;
-            let bare = desc[r + 13u] != 0 && c.height > desc[r + 14u];
-            if (!bare) {
-                if (desc[r + 5u] >= 0) {
-                    top = desc[r + 5u];
+    let caves = desc[D_HAS_CAVES] != 0;
+    if t == 0u {
+        lod_passes = select(1u, 2u, caves && s <= i32(LOD_CAVE_REACH));
+    }
+    let passes = workgroupUniformLoad(&lod_passes);
+    // First the heightfield, then the caves exposed by a neighboring lower surface.
+    // Both passes share the lattice walk so the driver only compiles it once.
+    for (var phase = 0u; phase < passes; phase += 1u) {
+        let heightfield = phase == 0u;
+        for (var k = t; k < LOD_SAMPLES; k += 256u) {
+            let i = k % LOD_SIDE;
+            let j = k / LOD_SIDE;
+            let bx = ox + (i32(i) - i32(LOD_BORDER)) * s + s / 2;
+            let bz = oz + (i32(j) - i32(LOD_BORDER)) * s + s / 2;
+            let o = (tile * LOD_SAMPLES + k) * LOD_WORDS;
+            var top = stone;
+            var under = stone;
+            var soil = 0u;
+            var biome = 0;
+            var y = 0;
+            var over = 0u;
+            var ground = 0;
+            var lo = 0;
+            var scan = false;
+            if heightfield {
+                let c = column(bx, bz);
+                y = c.height;
+                biome = c.biome;
+                var ice = -1;
+                let ri = u32(c.rule);
+                if ri < nr {
+                    let r = u32(desc[D_RULE_OFF]) + ri * WORDS_RULE;
+                    let bare = desc[r + 13u] != 0 && c.height > desc[r + 14u];
+                    if !bare {
+                        if desc[r + 5u] >= 0 {
+                            top = desc[r + 5u];
+                        }
+                        if desc[r + 10u] >= 0 && c.height < desc[r + 11u] {
+                            top = desc[r + 10u];
+                        }
+                        if desc[r + 6u] >= 0 && desc[r + 7u] > 0 {
+                            under = desc[r + 6u];
+                            soil = u32(min(desc[r + 7u], 65535));
+                        }
+                    }
+                    ice = desc[r + 12u];
                 }
-                if (desc[r + 10u] >= 0 && c.height < desc[r + 11u]) {
-                    top = desc[r + 10u];
+                if desc[D_HAS_SEA] != 0 && y < desc[D_SEA] {
+                    var surface = desc[D_WATER];
+                    if ice >= 0 {
+                        surface = ice;
+                    }
+                    over = (u32(desc[D_SEA]) & 65535u) | (u32(surface) << 16u);
                 }
-                if (desc[r + 6u] >= 0 && desc[r + 7u] > 0) {
-                    under = desc[r + 6u];
+                scan = caves && (desc[D_HAS_SEA] == 0 || y > desc[D_SEA]);
+                if scan {
+                    let gx = div_floor(bx, 4).x * 4;
+                    let gz = div_floor(bz, 4).x * 4;
+                    let fx = bx - gx;
+                    let fz = bz - gz;
+                    let c00 = column(gx, gz).height;
+                    let c10 = column(gx + 4, gz).height;
+                    let c01 = column(gx, gz + 4).height;
+                    let c11 = column(gx + 4, gz + 4).height;
+                    ground = (c00 * (4 - fx) + c10 * fx) * (4 - fz) + (c01 * (4 - fx) + c11 * fx) * fz;
+                    lo = y - i32(LOD_CAVE_REACH);
+                }
+            } else {
+                y = lod_floor[k];
+                if outp[o + 2u] != 0u || (desc[D_HAS_SEA] != 0 && y <= desc[D_SEA])
+                    || i == 0u || i + 1u == LOD_SIDE || j == 0u || j + 1u == LOD_SIDE {
+                    continue;
+                }
+                let low_x = min(lod_floor[k - 1u], lod_floor[k + 1u]);
+                let low_z = min(lod_floor[k - LOD_SIDE], lod_floor[k + LOD_SIDE]);
+                lo = max(y - i32(LOD_CAVE_REACH), min(low_x, low_z));
+                scan = y - lo >= 4;
+                ground = lod_ground[k];
+            }
+            if scan {
+                let gap = lod_cave(bx, bz, ground, y - select(1, 0, heightfield), lo, heightfield);
+                if heightfield && gap.x < y {
+                    over = u32(y - gap.x);
+                    y = gap.x;
+                    top = stone;
+                    under = stone;
+                    soil = 0u;
+                } else if !heightfield && gap.x < gap.y {
+                    outp[o + 3u] |= u32(y - gap.x) | (u32(y - gap.y) << LOD_CAVE_ROOF_SHIFT);
                 }
             }
-            ice = desc[r + 12u];
-        }
-        var y = c.height;
-        // The sea over the ground.
-        var over = 0u;
-        if (desc[D_HAS_SEA] != 0 && c.height < desc[D_SEA]) {
-            var surface = desc[D_WATER];
-            if (ice >= 0) {
-                surface = ice;
-            }
-            over = (u32(desc[D_SEA]) & 65535u) | (u32(surface) << 16u);
-        }
-        // Where caves open the ground, the floor they leave, as far down as distance shows.
-        if (desc[D_HAS_CAVES] != 0 && (desc[D_HAS_SEA] == 0 || c.height > desc[D_SEA])) {
-            let gx = div_floor(bx, 4).x * 4;
-            let gz = div_floor(bz, 4).x * 4;
-            let fx = bx - gx;
-            let fz = bz - gz;
-            let c00 = column(gx, gz).height;
-            let c10 = column(gx + 4, gz).height;
-            let c01 = column(gx, gz + 4).height;
-            let c11 = column(gx + 4, gz + 4).height;
-            let ground = (c00 * (4 - fx) + c10 * fx) * (4 - fz) + (c01 * (4 - fx) + c11 * fx) * fz;
-            var wy = c.height;
-            while (wy > c.height - 48 && carved_at(bx, wy, bz, ground)) {
-                wy -= 1;
-            }
-            if (wy < c.height) {
-                y = wy;
-                top = stone;
-                under = stone;
-                // If there is no surface block, its low word is the cut's depth.
-                over = u32(c.height - wy);
+            if heightfield {
+                outp[o] = (u32(y) & 65535u) | (u32(top) << 16u);
+                outp[o + 1u] = (u32(biome) & 65535u) | (u32(under) << 16u);
+                outp[o + 2u] = over;
+                outp[o + 3u] = soil << LOD_SOIL_DEPTH_SHIFT;
+                if passes > 1u {
+                    lod_floor[k] = y;
+                    lod_ground[k] = ground;
+                }
             }
         }
-        let o = (tile * LOD_SAMPLES + k) * LOD_WORDS;
-        outp[o] = (u32(y) & 65535u) | (u32(top) << 16u);
-        outp[o + 1u] = (u32(c.biome) & 65535u) | (u32(under) << 16u);
-        outp[o + 2u] = over;
+        if phase + 1u < passes {
+            workgroupBarrier();
+        }
     }
 }

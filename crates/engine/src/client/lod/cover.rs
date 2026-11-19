@@ -5,7 +5,7 @@ use glam::{IVec2, Vec3};
 use rustc_hash::FxHashMap;
 use weft_abi::{Callback, ModId, RenderLayer, SurfaceCoverArgs, SurfaceCoverSample};
 
-use super::{CELLS, Columns, GRID, SIDE, TileKey, WORDS, corner_y};
+use super::{CELLS, Columns, GRID, TileKey, corner_y, sample_offset};
 use crate::client::textures::GameTextures;
 use crate::client::{looks, mesher};
 use crate::content::Content;
@@ -122,7 +122,7 @@ impl Cover {
         let mut cells = Vec::new();
         for j in 0..CELLS {
             for i in 0..CELLS {
-                let k = (((j + 1) * SIDE + i + 1) as usize) * WORDS;
+                let k = sample_offset(i, j);
                 let state = words[k] >> 16;
                 let Some(&ground) = self.ground.get(&state) else { continue };
                 let p = origin + IVec2::new(i * s, j * s);

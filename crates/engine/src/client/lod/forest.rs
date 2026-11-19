@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use weft_noise::{hash, mix, unit};
 
-use super::{Columns, SIDE, TileKey, WORDS};
+use super::{Columns, TileKey, WORDS, sample_offset};
 use crate::client::textures::GameTextures;
 use crate::content::Content;
 use crate::features::grid_position;
@@ -298,7 +298,7 @@ impl Forest {
                 let cell = local
                     .div_euclid(IVec2::splat(step))
                     .clamp(IVec2::splat(-1), IVec2::splat(super::CELLS));
-                let k = ((cell.y + 1) * SIDE + cell.x + 1) as usize * WORDS;
+                let k = sample_offset(cell.x, cell.y);
                 let biome = (words[k + 1] & 0xffff) as usize;
                 let Some(b) = rule.biomes.get(biome).and_then(Option::as_ref) else { continue };
                 let v = (hash(h, 1, 2, 3) % VARIANTS as u64) as usize;

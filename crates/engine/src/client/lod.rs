@@ -43,6 +43,7 @@ pub const CELLS: i32 = 32;
 /// Columns a tile is made from: its cells and one around them (for the walls at its edges).
 pub const SAMPLES: usize = lod_gpu::SAMPLES as usize;
 const SIDE: i32 = lod_gpu::SIDE as i32;
+const BORDER: i32 = lod_gpu::BORDER as i32;
 const GRID: usize = (CELLS + 2) as usize;
 /// Words per sample and per tile coming back from the GPU.
 const WORDS: usize = lod_gpu::WORDS as usize;
@@ -131,6 +132,7 @@ struct TileTerrain {
     faces: Vec<[(u32, u32); 6]>,
     ctm: Arc<super::ctm::Ctm>,
     signature: u64,
+    stone: u32,
 }
 
 impl TileTerrain {
@@ -172,7 +174,8 @@ impl TileTerrain {
         }
         let (forest, atlases) = forest::Forest::new(c, dim, seed, &faces, textures, &mut hash);
         let cover = cover::Cover::new(c, dim, &faces, textures, &mut hash);
-        Some((Self { forest, cover, description, faces, ctm, signature: hash.finish() }, atlases))
+        let stone = c.dims[dim as usize].terrain.as_ref()?.stone;
+        Some((Self { forest, cover, description, faces, ctm, signature: hash.finish(), stone }, atlases))
     }
 }
 
@@ -203,16 +206,28 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
         if !job.columns.is_empty() {
             let (s, o) = (1 << job.key.level, job.key.origin());
             for k in 0..SAMPLES {
-                let (i, j) = ((k as i32 % SIDE) - 1, (k as i32 / SIDE) - 1);
+                let (i, j) = ((k as i32 % SIDE) - BORDER, (k as i32 / SIDE) - BORDER);
                 let at = o + IVec2::new(i * s + s / 2, j * s + s / 2);
                 let w = k * WORDS;
                 if let Some(col) = job.columns.get(&at).filter(|col| s <= 2 && col.top != 0) {
                     let (y, top, under) = (col.y, col.top, col.under);
+                    let natural_y = (words[w] as u16) as i16 as i32;
+                    if y != natural_y {
+                        if words[w + 2] >> 16 == 0 {
+                            words[w + 2] = 0;
+                        }
+                        let gap = words[w + 3];
+                        let depth_mask = lod_gpu::CAVE_DEPTH_MASK;
+                        let floor = (gap & depth_mask) as i32;
+                        let roof = ((gap >> lod_gpu::CAVE_ROOF_SHIFT) & depth_mask) as i32;
+                        let shift = y.saturating_sub(natural_y);
+                        words[w + 3] &= !0xFFFF;
+                        if floor > roof + 1 && shift >= -roof && shift <= depth_mask as i32 - floor {
+                            words[w + 3] |= (floor + shift) as u32 | ((roof + shift) as u32) << lod_gpu::CAVE_ROOF_SHIFT;
+                        }
+                    }
                     words[w] = (y as u32 & 0xFFFF) | (top << 16);
                     words[w + 1] = (words[w + 1] & 0xFFFF) | (under << 16);
-                    if words[w + 2] >> 16 == 0 {
-                        words[w + 2] = 0;
-                    }
                 }
             }
         }
@@ -264,11 +279,31 @@ fn scaled_edges(x: i32, z: i32, scale: i32, mut min: [u32; 3], mut max: [u32; 3]
     (min, max)
 }
 
+fn sample_offset(i: i32, j: i32) -> usize {
+    ((j + BORDER) * SIDE + i + BORDER) as usize * WORDS
+}
+
 fn corner_y(words: &[u32], gi: i32, gj: i32) -> i32 {
     let gi = gi.clamp(-1, CELLS);
     let gj = gj.clamp(-1, CELLS);
-    let k = ((gj + 1) * SIDE + gi + 1) as usize * WORDS;
+    let k = sample_offset(gi, gj);
     (words[k] & 0xFFFF) as u16 as i16 as i32
+}
+
+/// Empty blocks between the first solid floor and roof, as a half-open interval.
+fn cave_gap(words: &[u32], i: i32, j: i32) -> Option<(i32, i32)> {
+    let w = words[sample_offset(i, j) + 3];
+    let floor = (w & lod_gpu::CAVE_DEPTH_MASK) as i32;
+    let roof = ((w >> lod_gpu::CAVE_ROOF_SHIFT) & lod_gpu::CAVE_DEPTH_MASK) as i32;
+    (floor > roof + 1).then(|| {
+        let y = corner_y(words, i, j);
+        (y - floor + 1, y - roof)
+    })
+}
+
+fn cave_cut(words: &[u32], i: i32, j: i32) -> bool {
+    let w = words[sample_offset(i, j) + 2];
+    w != 0 && w >> 16 == 0
 }
 
 fn sample_y(words: &[u32], gx: f32, gz: f32) -> i32 {
@@ -296,14 +331,14 @@ fn mesh(
     let scale = key.scale();
     let origin = key.origin();
     let at = |i: i32, j: i32| {
-        let k = ((j + 1) * SIDE + i + 1) as usize * WORDS;
+        let k = sample_offset(i, j);
         let (a, b) = (words[k], words[k + 1]);
         let col = IVec2::new(origin.x + i * s + s / 2, origin.y + j * s + s / 2);
         (a >> 16, b & 0xFFFF, b >> 16, columns.get(&col).map_or(0, |c| c.light))
     };
     // What stands over a cell's ground: its top and block.
     let over = |i: i32, j: i32| {
-        let w = words[((j + 1) * SIDE + i + 1) as usize * WORDS + 2];
+        let w = words[sample_offset(i, j) + 2];
         ((w & 0xFFFF) as u16 as i16 as i32, w >> 16)
     };
     let cave_mouth = |i: i32, j: i32| {
@@ -374,6 +409,24 @@ fn mesh(
                     .and_then(|color| color[i as usize + 1][j as usize + 1]),
             });
             (lo, hi) = (lo.min(y), hi.max(y + 1));
+            if let Some((floor, roof)) = cave_gap(words, i, j) {
+                for (dir, by) in [(3, floor - 1), (2, roof)] {
+                    let (tex, tint) = face_of(terrain.stone, dir as usize);
+                    faces.push(Face {
+                        dir,
+                        at: [i * s, by, j * s],
+                        size: [s, 1, s],
+                        tex,
+                        tint,
+                        biome,
+                        ao: 0xFF,
+                        light: shade_sky(light, CAVE_LIGHT_REACH),
+                        part: ALWAYS,
+                        cover: None,
+                    });
+                    lo = lo.min(by);
+                }
+            }
             // A sea's surface, unshaded as a liquid's.
             let (top_y, surface) = over(i, j);
             if surface != 0 && top_y > y {
@@ -399,13 +452,73 @@ fn mesh(
         for i in 0..CELLS {
             let (top, biome, under, light) = at(i, j);
             let y = column(&h, i, j);
+            let gap = cave_gap(words, i, j);
+            let soil = (words[sample_offset(i, j) + 3] >> lod_gpu::SOIL_DEPTH_SHIFT) as i32;
             let light = ground_light(i, j, y, light);
             for (dir, (di, dj)) in [(0usize, (-1, 0)), (1, (1, 0)), (4, (0, -1)), (5, (0, 1))] {
                 // At the tile's edge the tile beside may be of another level, its ground not
                 // where this one's sample says: the wall goes on down below it (a skirt), or
                 // the sky shows through the crack.
                 let (ni, nj) = (i + di, j + dj);
-                let ny = if (-1..=CELLS).contains(&ni) && (-1..=CELLS).contains(&nj) { column(&h, ni, nj) } else { y.min(y - 1) - 2 * s };
+                let ny = column(&h, ni, nj);
+                let other_gap = cave_gap(words, ni, nj);
+                let mouth = cave_mouth(ni, nj).or_else(|| cave_mouth(i, j));
+                if gap.is_some() || other_gap.is_some() || mouth.is_some() {
+                    let (floor, roof) = gap.unwrap_or((y + 1, y + 1));
+                    let edge = ni < 0 || ni == CELLS || nj < 0 || nj == CELLS;
+                    let bottom = if edge && other_gap.is_none() {
+                        ny.min(y)
+                            .saturating_sub(s + 2)
+                            .max(y - lod_face::HEIGHT_MASK as i32)
+                    } else {
+                        ny + 1
+                    };
+                    let sky = (bottom, y + 1, mouth);
+                    let below_roof = other_gap.map(|(a, b)| (a, b, Some(b + CAVE_LIGHT_REACH / 2)));
+                    let mut emit = |from: i32, to: i32, state: u32, mouth: Option<i32>| {
+                        if from >= to {
+                            return;
+                        }
+                        let (tex, tint) = face_of(state, dir);
+                        let mut start = from;
+                        while start < to {
+                            let end = mouth.map_or(to, |h| {
+                                if start < h - CAVE_LIGHT_REACH {
+                                    to.min(h - CAVE_LIGHT_REACH)
+                                } else if start < h {
+                                    to.min(start + 3)
+                                } else {
+                                    to
+                                }
+                            });
+                            let lit = mouth.map_or(light, |h| shade_sky(light, h - (start + (end - start) / 2)));
+                            let ao = ao_span(&h, i, j, dir, end - 1, start);
+                            faces.push(Face {
+                                dir: dir as u32,
+                                at: [i * s, start, j * s],
+                                size: [s, end - start, s],
+                                tex,
+                                tint,
+                                biome,
+                                ao,
+                                light: lit,
+                                part: ALWAYS,
+                                cover: None,
+                            });
+                            lo = lo.min(start);
+                            start = end;
+                        }
+                    };
+                    for (a, b, shadow) in std::iter::once(sky).chain(below_roof) {
+                        for (solid_lo, solid_hi) in [(i16::MIN as i32, floor), (roof, y + 1)] {
+                            let (lo, hi) = (a.max(solid_lo), b.min(solid_hi));
+                            emit(lo, hi.min(y - soil), terrain.stone, shadow);
+                            emit(lo.max(y - soil), hi.min(y), under, shadow);
+                            emit(lo.max(y), hi, top, shadow);
+                        }
+                    }
+                    continue;
+                }
                 // Past a neighbor as high, real cubes may stand in for it lower than its sample
                 // says (it is interpolated): a skirt down below that, or the sky shows through
                 // between them.
@@ -423,24 +536,10 @@ fn mesh(
                 // pixels give way to cubes.
                 let part = if ny == y && (0..CELLS).contains(&ni) && (0..CELLS).contains(&nj) { BESIDE_CUBES } else { ALWAYS };
                 let dir = dir as u32;
-                // A wall facing the cut sees the sky through the neighboring mouth.
-                let mouth = cave_mouth(ni, nj).or_else(|| cave_mouth(i, j));
-                let wall_light = |by| mouth.map_or(light, |mouth| shade_sky(light, mouth - by));
                 if ny < y {
                     let (tex, tint) = face_of(top, dir as usize);
                     let ao = ao_bits(&h, i, j, dir as usize, y);
-                    faces.push(Face {
-                        dir,
-                        at: [i * s, y, j * s],
-                        size: [s, 1, s],
-                        tex,
-                        tint,
-                        biome,
-                        ao,
-                        light: wall_light(y),
-                        part,
-                        cover: None,
-                    });
+                    faces.push(Face { dir, at: [i * s, y, j * s], size: [s, 1, s], tex, tint, biome, ao, light, part, cover: None });
                 }
                 let (tex, tint) = face_of(under, dir as usize);
                 let top_y = if ny < y { y - 1 } else { y };
@@ -448,54 +547,19 @@ fn mesh(
                     .max(top_y - lod_face::HEIGHT_MASK as i32)
                     .max(i16::MIN as i32);
                 lo = lo.min(skirt + 1);
-                if mouth.is_none() {
-                    let ao = ao_span(&h, i, j, dir as usize, top_y, (ny + 1).min(top_y));
-                    faces.push(Face {
-                        dir,
-                        at: [i * s, skirt + 1, j * s],
-                        size: [s, y - 1 - skirt, s],
-                        tex,
-                        tint,
-                        biome,
-                        ao,
-                        light,
-                        part,
-                        cover: None,
-                    });
-                    continue;
-                }
-                let mut bottom = skirt + 1;
-                let mut strip = |end| {
-                    let ao = ao_span(&h, i, j, dir as usize, end - 1, (ny + 1).clamp(bottom, end - 1));
-                    faces.push(Face {
-                        dir,
-                        at: [i * s, bottom, j * s],
-                        size: [s, end - bottom, s],
-                        tex,
-                        tint,
-                        biome,
-                        ao,
-                        light: wall_light(bottom + (end - bottom - 1) / 2),
-                        part,
-                        cover: None,
-                    });
-                    bottom = end;
-                };
-                // The same bands on every wall keep adjacent strips mergeable.
-                let end = y;
-                if let Some(mouth) = mouth {
-                    let mut edge = skirt + 1;
-                    for depth in (0..=CAVE_LIGHT_REACH).rev().step_by(3) {
-                        let next = mouth - depth;
-                        if next > edge && next < end {
-                            strip(next);
-                            edge = next;
-                        }
-                    }
-                }
-                if end > skirt + 1 {
-                    strip(end);
-                }
+                let ao = ao_span(&h, i, j, dir as usize, top_y, (ny + 1).min(top_y));
+                faces.push(Face {
+                    dir,
+                    at: [i * s, skirt + 1, j * s],
+                    size: [s, y - 1 - skirt, s],
+                    tex,
+                    tint,
+                    biome,
+                    ao,
+                    light,
+                    part,
+                    cover: None,
+                });
             }
         }
     }
@@ -608,7 +672,12 @@ fn height_grid(words: &[u32]) -> [[i32; GRID]; GRID] {
     let mut h = [[0i32; GRID]; GRID];
     for j in -1..=CELLS {
         for i in -1..=CELLS {
-            let y = if i < CELLS && j < CELLS {
+            // Interpolating across an open cut lowers intact roof columns into pillars.
+            let cave = (j..=(j + 1).min(CELLS))
+                .any(|z| (i..=(i + 1).min(CELLS)).any(|x| cave_cut(words, x, z) || cave_gap(words, x, z).is_some()));
+            let y = if cave {
+                corner_y(words, i, j)
+            } else if i < CELLS && j < CELLS {
                 sample_y(words, i as f32 + 0.5, j as f32 + 0.5)
             } else {
                 let (i0, fx) = if i < CELLS { (i, 0.5) } else { (CELLS, 0.0) };
@@ -751,7 +820,7 @@ fn add_structures(
         }
         let Some(col) = columns.get(&p) else { continue };
         let (i, j) = ((p.x - x0) / s, (p.y - z0) / s);
-        let k = ((j + 1) * SIDE + i + 1) as usize * WORDS;
+        let k = sample_offset(i, j);
         let biome = words[k + 1] & 0xFFFF;
         let ground = column(h, i, j);
         // How high the ground beside covers this column's sides.
