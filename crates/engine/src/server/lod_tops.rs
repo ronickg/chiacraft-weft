@@ -168,6 +168,12 @@ impl DimTops {
         let def = &c.dims[dim as usize];
         let Some(list) = self.cubes.get(&col) else { return };
         let sea = def.sea_level();
+        let scatter: Vec<_> = def
+            .features
+            .iter()
+            .enumerate()
+            .filter_map(|(i, f)| f.density_plan().map(|(spacing, _)| (i, f, spacing)))
+            .collect();
         for i in 0..256 {
             let (x, z) = (col.x * 16 + (i % 16) as i32, col.y * 16 + (i / 16) as i32);
             let Some(t) = def.column(seed, x, z) else { continue };
@@ -238,14 +244,32 @@ impl DimTops {
                 y == fy && (top == ftop || ftop == u32::MAX && c.states[top as usize].liquid.is_some())
             };
             let light = here.map_or(0, |h| h.3);
-            let now = match here {
-                // The terrain's own ground, as it was: kept only for what stands on it or shines.
-                Some(h) if terrain(&h) && spans.is_empty() && light == 0 => None,
-                Some(h) if terrain(&h) => Some(LodColumn { x, z, y: fy, top: 0, under: 0, light, spans }),
+            // A saved empty tree site is authoritative even when its ground is in an unsaved
+            // cube below. Otherwise a felled tree reappears outside the real cube view.
+            let saved_root = || {
+                scatter.iter().any(|&(i, f, spacing)| {
+                    let cell = (x.div_euclid(spacing), z.div_euclid(spacing));
+                    let hash = weft_noise::hash(seed ^ f.salt, cell.0 as i64, 0, cell.1 as i64);
+                    if crate::features::grid_position(cell, spacing, spacing, hash) != (x, z)
+                        || !list.contains_key(&(t.height + 1 - f.fit.buried).div_euclid(16))
+                    {
+                        return false;
+                    }
+                    // Empty scatter slots and small ground plants need no network record.
+                    crate::features::start_at(c, def, dim, seed, i, cell).is_some_and(|start| {
+                        start.hi.y >= t.height + 3
+                            && start.puts.iter().any(|put| {
+                                matches!(put,
+                            crate::features::Put::Block { at,state,.. } if at.x == x && at.z == z
+                                && at.y > fy && list.contains_key(&at.y.div_euclid(16)) && drawn(c,*state))
+                            })
+                    })
+                })
+            };
+            let now = match here.filter(|h| !terrain(h)) {
                 Some((y, top, under, light)) => Some(LodColumn { x, z, y, top, under, light, spans }),
-                // Its ground cube isn't saved: the terrain's ground stands.
-                None if spans.is_empty() => None,
-                None => Some(LodColumn { x, z, y: fy, top: 0, under: 0, light: 0, spans }),
+                None if !spans.is_empty() || light != 0 || saved_root() => Some(LodColumn { x, z, y: fy, top: 0, under: 0, light, spans }),
+                None => None,
             };
             let p = IVec2::new(x, z);
             match now {

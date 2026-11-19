@@ -1,7 +1,7 @@
 //! Distant terrain beyond the view: made on the GPU straight from the dimension's terrain at a
 //! coarser step (`shaders/terrain.wgsl`'s `lod`), so it reaches as far as wanted for a few
 //! kilobytes a tile. A tile is 32x32 cells of 2^level blocks; each cell is the column at its
-//! middle: its top block, the one under it, its biome, and tree canopies over it. Where saved
+//! middle: its top block, the one under it, its biome, and any water over it. Where saved
 //! cubes made a column's top other than the terrain's (a town, a crater), the server says so
 //! (`server::lod_tops`) and that column is taken instead. What stands above the ground is drawn
 //! as its own spans, so a building keeps its roof and its walls.
@@ -29,6 +29,7 @@ use crate::gpu_layout::{CORNERS, face, lod_box, lod_face, lod_record};
 use crate::server::lod_tops::{LodColumn, Span, shows};
 
 mod cache;
+mod forest;
 
 /// Columns that differ from the terrain, as the server said.
 type Columns = FxHashMap<IVec2, Arc<LodColumn>>;
@@ -119,6 +120,7 @@ impl LodJob {
 }
 
 struct TileTerrain {
+    forest: forest::Forest,
     description: Vec<i32>,
     faces: Vec<[(u32, u32); 6]>,
     ctm: Arc<super::ctm::Ctm>,
@@ -126,8 +128,14 @@ struct TileTerrain {
 }
 
 impl TileTerrain {
-    fn new(c: &Content, dim: u32, seed: u64, shader: u64) -> Option<Self> {
-        let description = super::terrain_gpu::describe_lod(c, dim, seed)?;
+    fn new(
+        c: &Content,
+        dim: u32,
+        seed: u64,
+        shader: u64,
+        textures: &super::textures::GameTextures,
+    ) -> Option<(Self, Receiver<forest::Atlases>)> {
+        let description = super::terrain_gpu::describe(c, dim, seed)?;
         let looks = super::looks::current();
         let ctm = super::ctm::current();
         let mut hash = DefaultHasher::new();
@@ -156,7 +164,8 @@ impl TileTerrain {
                 model_boxes(state).hash(&mut hash);
             }
         }
-        Some(Self { description, faces, ctm, signature: hash.finish() })
+        let (forest, atlases) = forest::Forest::new(c, dim, seed, &faces, textures, &mut hash);
+        Some((Self { forest, description, faces, ctm, signature: hash.finish() }, atlases))
     }
 }
 
@@ -168,7 +177,7 @@ pub struct LodMesh {
     pub y: (i32, i32),
 }
 
-/// How many quads a tile has, per part (`ALWAYS`, `BESIDE_CUBES`, `SURFACE`) and per direction
+/// How many quads a tile has, per part (`ALWAYS`, `BESIDE_CUBES`, `SURFACE`, `FOREST`) and per direction
 /// rank (`mesher::DIR_RANK`), in that order.
 pub type Counts = [[u32; 6]; PARTS];
 /// All a tile shows that is opaque.
@@ -177,40 +186,21 @@ pub const ALWAYS: usize = 0;
 pub const BESIDE_CUBES: usize = 1;
 /// A see-through surface over the ground (a sea), drawn after everything opaque.
 pub const SURFACE: usize = 2;
-const PARTS: usize = 3;
+/// View-facing scatter instances, all in direction bucket zero.
+pub const FOREST: usize = 3;
+const PARTS: usize = 4;
 
 /// What came back for `job`, meshed on a worker.
 pub fn made(job: LodJob, mut words: Vec<u32>) {
     background().spawn(move || {
         if !job.columns.is_empty() {
-            let c = content();
-            let def = &c.dims[job.dim as usize];
             let (s, o) = (1 << job.key.level, job.key.origin());
-            // Cells something stands in: the tree cover the terrain puts there is gone.
-            let built: FxHashSet<(i32, i32)> = job
-                .columns
-                .iter()
-                .filter(|(_, col)| !col.spans.is_empty())
-                .map(|(p, _)| ((p.x - o.x).div_euclid(s), (p.y - o.y).div_euclid(s)))
-                .collect();
             for k in 0..SAMPLES {
                 let (i, j) = ((k as i32 % SIDE) - 1, (k as i32 / SIDE) - 1);
                 let at = o + IVec2::new(i * s + s / 2, j * s + s / 2);
                 let w = k * WORDS;
-                let (y, top, under) = ((words[w] & 0xFFFF) as u16 as i16 as i32, words[w] >> 16, words[w + 1] >> 16);
-                let ground = match job.columns.get(&at) {
-                    // One saved column must not repaint a coarse cell: a patch of dirt the width
-                    // of the cell. Up close a cell is a dug column's width.
-                    Some(col) if s <= 2 && col.top != 0 => Some((col.y, col.top, col.under)),
-                    _ if built.contains(&(i, j)) && top == under && !shows(c, top) => def
-                        .column(job.seed, at.x, at.y)
-                        .filter(|t| t.height < y && def.sea_level().is_none_or(|sea| t.height >= sea))
-                        .map(|t| (t.height, def.surface_block(job.seed, at.x, at.y)))
-                        .filter(|g| g.1 != 0)
-                        .map(|(y, top)| (y, top, top)),
-                    _ => None,
-                };
-                if let Some((y, top, under)) = ground {
+                if let Some(col) = job.columns.get(&at).filter(|col| s <= 2 && col.top != 0) {
+                    let (y, top, under) = (col.y, col.top, col.under);
                     words[w] = (y as u32 & 0xFFFF) | (top << 16);
                     words[w + 1] = (words[w + 1] & 0xFFFF) | (under << 16);
                 }
@@ -420,6 +410,11 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
             n[rank(q)] += 1;
         }
     }
+    let space = MAX_QUADS.saturating_sub(parts.iter().map(Vec::len).sum());
+    terrain
+        .forest
+        .instances(c, key, words, &h, columns, space, &mut parts[FOREST], &mut lo, &mut hi);
+    counts[FOREST][0] = parts[FOREST].len() as u32;
     (parts.concat(), counts, (lo, hi))
 }
 
@@ -825,6 +820,7 @@ pub struct Lod {
     shader: Option<u64>,
     cache_dir: PathBuf,
     terrain: Option<Arc<TileTerrain>>,
+    baking: Option<Receiver<forest::Atlases>>,
     /// Drawn height bounds guide priorities, never conservative visibility bounds.
     ready: FxHashMap<TileKey, ReadyTile>,
     generation: u64,
@@ -882,6 +878,7 @@ impl Lod {
             shader,
             cache_dir,
             terrain: None,
+            baking: None,
             ready: FxHashMap::default(),
             generation: 0,
             pending: FxHashSet::default(),
@@ -991,7 +988,7 @@ impl Lod {
         let dim = world.dim;
         let reach = Self::distance();
         let world_changed = (dim, seed) != (self.dim, self.seed);
-        if (reach != 0 && world_changed) || (reach == 0 && !self.wanted.is_empty()) {
+        if (reach != 0 && world_changed) || (reach == 0 && self.terrain.is_some()) {
             for (key, _) in self.ready.drain() {
                 render.remove_lod(key);
             }
@@ -1007,19 +1004,26 @@ impl Lod {
             self.ground = None;
             self.mask.clear();
             render.lod_draw.clear();
+            render.set_forest(gpu, Vec::new());
         }
         if reach == 0 {
             self.dim = u32::MAX;
             self.terrain = None;
+            self.baking = None;
             world.take_changed_columns();
             return;
         }
         if world_changed {
             (self.dim, self.seed) = (dim, seed);
-            self.terrain = self
+            (self.terrain, self.baking) = self
                 .shader
-                .and_then(|s| TileTerrain::new(c, dim, seed, s))
-                .map(Arc::new);
+                .and_then(|s| TileTerrain::new(c, dim, seed, s, textures))
+                .map(|(terrain, rx)| (Arc::new(terrain), rx))
+                .unzip();
+        }
+        if let Some(images) = self.baking.as_ref().and_then(|rx| rx.try_recv().ok()) {
+            render.set_forest(gpu, images);
+            self.baking = None;
         }
         if self.terrain.is_none() {
             world.take_changed_columns();
@@ -1032,7 +1036,9 @@ impl Lod {
         // Above the loaded cubes the tiles also fill the middle of the view.
         let hide = if land.is_some_and(|h| cam.y > (h + view * 8) as f64) { 0 } else { (view / 2 * 16).max(0) };
         let upload_start = Instant::now();
-        while let Ok(m) = self.done.1.try_recv() {
+        while self.baking.is_none()
+            && let Ok(m) = self.done.1.try_recv()
+        {
             self.pending.remove(&m.key);
             self.dirty = true;
             if self.stale.contains(&m.key) {

@@ -473,6 +473,87 @@ fn lod_fade_visible(fade: f32, pixel: vec2<f32>) -> bool {
     return threshold < fade;
 }
 
+@vertex
+fn vs_forest(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
+    let f = (vi / 4u) * 4u;
+    let xz = records[f];
+    let y = records[f + 1u];
+    let radius = bitcast<f32>(records[f + 2u]);
+    let data = u32(origins[ii].w);
+    let scale = exp2(f32((data >> LOD_DRAW_SCALE_SHIFT) & LOD_DRAW_SCALE_MASK));
+    // Records keep tile-local x/z, signed ground height, model height, horizontal radius and atlas.
+    let half = vec3(radius, f32(y >> 16u) * 0.5, radius);
+    let center = vec3(f32(xz & 65535u) * scale, f32(i32(y << 16u) >> 16u) + half.y - 0.125, f32(xz >> 16u) * scale);
+    let rel = finish(center, vec4<i32>(origins[ii].xyz, 0)).xyz;
+    // Select the view in object space. Coarse groves are wider but keep their physical height.
+    let normal = normalize(-rel / half);
+    let yaw = atan2(normal.x, select(1.0, normal.z, dot(normal.xz, normal.xz) > 1e-12));
+    let right = vec3(cos(yaw), 0.0, -sin(yaw));
+    let up = cross(normal, right);
+    let corner = array<vec2<f32>, 4>(vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(1.0, 1.0), vec2(-1.0, 1.0))[vi % 4u];
+    let offset = (right * corner.x + up * corner.y) * sqrt(3.0) * half;
+    var out: VOut;
+    out.rel = rel + offset;
+    out.clip = scene.view_proj * vec4(out.rel, 1.0);
+    out.uv = corner * vec2(0.5, -0.5) + 0.5;
+    out.layer = records[f + 3u];
+    out.pos = vec3<f32>((origins[ii].xyz + g.cam_cube.xyz) * 16) + center + offset;
+    out.dist = length(out.rel);
+    out.lod_fade = f32(data & LOD_DRAW_FADE_MASK) / f32(LOD_DRAW_FADE_MASK) * 3.0 - 1.0;
+    out.light = vec4(1.0, 0.0, 0.0, 0.0);
+    out.color = vec3(1.0);
+    out.glow = 0xffffffffu;
+    let pi = 3.14159265;
+    // Both coordinates are constant across the primitive. Interpolate the four enclosing views.
+    out.blend = fract(yaw / (2.0 * pi) + 1.0) * f32(FOREST_VIEWS);
+    out.size = (asin(clamp(normal.y, -1.0, 1.0)) / pi + 0.5) * f32(FOREST_ELEVATIONS - 1u);
+    return out;
+}
+
+fn forest_view(layer: u32, local: vec2<f32>, frame: vec2<u32>, level: f32) -> vec4<f32> {
+    let edge = 0.5 * exp2(ceil(level)) / f32(FOREST_FRAME);
+    let uv = (vec2<f32>(frame) + clamp(local, vec2(edge), vec2(1.0 - edge))) / vec2(f32(FOREST_VIEWS), f32(FOREST_ELEVATIONS));
+    let p = textureSampleLevel(textures[layer], linear_mipped, uv, level);
+    return vec4(p.rgb * p.a, p.a);
+}
+
+// Only views near an angular boundary need blending. This preserves small branches at
+// magnification and skips the other texture reads when a single view describes the tree.
+fn forest_row(layer: u32, uv: vec2<f32>, frame: vec2<u32>, weight: f32, level: f32) -> vec4<f32> {
+    let first = forest_view(layer, uv, frame, level);
+    if weight <= 0.0 {
+        return first;
+    }
+    let next = vec2((frame.x + 1u) % FOREST_VIEWS, frame.y);
+    return mix(first, forest_view(layer, uv, next, level), weight);
+}
+
+@fragment
+fn fs_forest(in: VOut) -> @location(0) vec4<f32> {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let footprint = max(length(du), length(dv)) * f32(FOREST_FRAME);
+    let level = clamp(log2(max(1.0, footprint)), 0.0, log2(f32(FOREST_FRAME)));
+    let uv = nearest_uv(f32(FOREST_FRAME), in.uv, du, dv);
+    if !lod_fade_visible(in.lod_fade, in.clip.xy) || shown_by_cubes(in.pos, 0u) {
+        discard;
+    }
+    let angles = vec2(in.blend, in.size);
+    var weight = smoothstep(vec2(0.25), vec2(0.75), fract(angles));
+    let base = vec2<u32>(angles) + select(vec2(0u), vec2(1u), weight == vec2(1.0));
+    weight = select(weight, vec2(0.0), weight == vec2(1.0));
+    let frame = vec2(base.x % FOREST_VIEWS, min(base.y, FOREST_ELEVATIONS - 1u));
+    var p = forest_row(in.layer, uv, frame, weight.x, level);
+    if weight.y > 0.0 {
+        let next = vec2(frame.x, min(frame.y + 1u, FOREST_ELEVATIONS - 1u));
+        p = mix(p, forest_row(in.layer, uv, next, weight.x, level), weight.y);
+    }
+    if p.a < 0.32 {
+        discard;
+    }
+    return vec4(shade(in, vec4(p.rgb / p.a, 1.0)).rgb, 1.0);
+}
+
 @fragment
 fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     let du = dpdx(in.uv);

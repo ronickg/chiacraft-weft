@@ -304,11 +304,12 @@ pub struct WorldRenderer {
     face_pipes: [PipelineId; 4],
     quad_pipes: [PipelineId; 4],
     /// Distant terrain: what is opaque, then see-through surfaces (seas).
-    lod_pipes: [PipelineId; 2],
+    lod_pipes: [PipelineId; 3],
+    forest_textures: Vec<(TextureId, u32)>,
     /// Distant terrain tiles (`lod`): their quads (in `faces`, four words like a face), count
     /// and the heights they span; the ones to draw this frame; and the columns whose cubes show
     /// their ground (`Lod::mask`, half its width), where their pixels are left to the cubes.
-    lod: FxHashMap<super::lod::TileKey, (Alloc, super::lod::Counts, (i32, i32))>,
+    lod: FxHashMap<super::lod::TileKey, (Alloc, super::lod::Counts, (i32, i32), i32)>,
     lod_quads: usize,
     pub lod_draw: Vec<(super::lod::TileKey, f32)>,
     pub lod_half: u32,
@@ -422,7 +423,7 @@ impl WorldRenderer {
         assets: &crate::assets::Assets,
     ) -> Result<WorldRenderer, String> {
         let (shader, slots) = world_shader(assets).map_err(|e| e.0)?;
-        let (face_pipes, quad_pipes, lod_pipes) = Self::pipelines(gpu, &shader)?;
+        let (face_pipes, quad_pipes, lod_pipes) = Self::pipelines(gpu, &shader, assets)?;
         let tex_shader = shader_table(gpu, c, textures, &slots);
 
         let (tex_info, anim) = Self::texture_info(gpu, textures);
@@ -453,6 +454,7 @@ impl WorldRenderer {
             face_pipes,
             quad_pipes,
             lod_pipes,
+            forest_textures: Vec::new(),
             lod: FxHashMap::default(),
             lod_quads: 0,
             lod_draw: Vec::new(),
@@ -517,7 +519,11 @@ impl WorldRenderer {
         self.tex_generation = textures.generation();
     }
 
-    fn pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Result<([PipelineId; 4], [PipelineId; 4], [PipelineId; 2]), String> {
+    fn pipelines(
+        gpu: &mut dyn Backend,
+        shader: &Shader,
+        assets: &crate::assets::Assets,
+    ) -> Result<([PipelineId; 4], [PipelineId; 4], [PipelineId; 3]), String> {
         let depth_write = Some(DepthState { write: true, compare: Compare::GreaterEqual });
         let depth_read = Some(DepthState { write: false, compare: Compare::GreaterEqual });
         let layers = if shader
@@ -530,10 +536,22 @@ impl WorldRenderer {
         } else {
             "fs_translucent"
         };
+        let fallback = if ["vs_forest", "fs_forest"]
+            .iter()
+            .all(|&name| shader.module.entry_points.iter().any(|e| e.name == name))
+        {
+            None
+        } else {
+            Some(
+                crate::packs::compose_engine(assets, "world.wgsl", &[(&HOOK, &[])])
+                    .map_err(|e| e.0)?
+                    .0,
+            )
+        };
         let mut make = |label: &str, vs: &str, fs: &str, depth, blend, cull| {
             gpu.create_pipeline(&PipelineDesc {
                 label,
-                shader,
+                shader: if vs == "vs_forest" { fallback.as_ref().unwrap_or(shader) } else { shader },
                 vertex: vs,
                 fragment: Some(fs),
                 color: Some(Format::Surface),
@@ -559,6 +577,7 @@ impl WorldRenderer {
         ];
         let lod = [
             make("distant terrain", "vs_lod", "fs_lod", depth_write, Blend::None, true)?,
+            make("distant forest", "vs_forest", "fs_forest", depth_write, Blend::None, false)?,
             make("distant surfaces", "vs_lod", "fs_lod_surface", depth_read, Blend::Alpha, true)?,
         ];
         Ok((faces, quads, lod))
@@ -569,7 +588,7 @@ impl WorldRenderer {
         self.occlusion.reload(gpu, assets);
         match world_shader(assets)
             .map_err(|e| e.0)
-            .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, slots)))
+            .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s, assets)?, slots)))
         {
             Ok(((f, q, l), slots)) => {
                 for p in self
@@ -645,6 +664,7 @@ impl WorldRenderer {
         self.meshes.clear();
         self.regions.clear();
         self.table_only.clear();
+        self.set_forest(gpu, Vec::new());
         self.table.destroy(gpu);
         self.lod.clear();
         self.lod_quads = 0;
@@ -738,6 +758,29 @@ impl WorldRenderer {
         }
     }
 
+    pub(super) fn set_forest(&mut self, gpu: &mut dyn Backend, atlases: Vec<Vec<Vec<u8>>>) {
+        for (tex, _) in self.forest_textures.drain(..) {
+            gpu.destroy_texture(tex);
+        }
+        for mips in atlases {
+            let size = crate::gpu_layout::forest::VIEWS * crate::gpu_layout::forest::FRAME;
+            let tex = gpu.create_texture(
+                &TextureDesc {
+                    width: size,
+                    height: crate::gpu_layout::forest::ELEVATIONS * crate::gpu_layout::forest::FRAME,
+                    mips: mips.len() as u32,
+                    format: Format::Rgba8Srgb,
+                    render_target: false,
+                },
+                "distant forest",
+            );
+            for (level, pixels) in mips.iter().enumerate() {
+                gpu.write_texture(tex, level as u32, pixels);
+            }
+            self.forest_textures.push((tex, gpu.texture_index(tex)));
+        }
+    }
+
     /// A distant terrain tile's quads (`lod::mesh`), spanning heights `y`.
     pub fn upload_lod(
         &mut self,
@@ -752,15 +795,32 @@ impl WorldRenderer {
         if quads.is_empty() {
             return;
         }
+        let n = quads.len() - counts[super::lod::FOREST][0] as usize;
+        let (land, forest) = quads.split_at(n);
         textures.ensure_blocks(
             gpu,
-            quads
-                .iter()
+            land.iter()
                 .map(|q| q[1] & crate::gpu_layout::face::TEX_MASK),
         );
         let a = self.faces.alloc(gpu, quads.len() as u32);
-        gpu.write_buffer(self.faces.pages[a.page as usize].0, a.offset as u64 * 16, bytemuck::cast_slice(quads));
-        self.lod.insert(key, (a, counts, y));
+        let buf = self.faces.pages[a.page as usize].0;
+        if !land.is_empty() {
+            gpu.write_buffer(buf, a.offset as u64 * 16, bytemuck::cast_slice(land));
+        }
+        if !forest.is_empty() {
+            // Disk tiles store stable prototype numbers. Bindless handles belong to this device.
+            let records: Vec<_> = forest
+                .iter()
+                .map(|&[xz, y, radius, id]| [xz, y, radius, self.forest_textures[id as usize].1])
+                .collect();
+            gpu.write_buffer(buf, (a.offset as u64 + n as u64) * 16, bytemuck::cast_slice(&records));
+        }
+        let spill = forest
+            .iter()
+            .map(|r| (2.0 * f32::from_bits(r[2])).ceil() as i32)
+            .max()
+            .unwrap_or(0);
+        self.lod.insert(key, (a, counts, y, spill));
         self.lod_quads += quads.len();
     }
 
@@ -779,7 +839,7 @@ impl WorldRenderer {
     }
 
     pub fn remove_lod(&mut self, key: super::lod::TileKey) {
-        if let Some((a, _, _)) = self.lod.remove(&key) {
+        if let Some((a, _, _, _)) = self.lod.remove(&key) {
             self.lod_quads -= a.len as usize;
             self.faces.free(a);
         }
@@ -1066,26 +1126,26 @@ impl WorldRenderer {
         self.lod_drawn = 0;
         let masked = [-(self.lod_half as i32) * 16, (self.lod_half as i32 + 1) * 16];
         for &(key, fade) in &self.lod_draw {
-            let Some(&(a, counts, (y0, y1))) = self.lod.get(&key) else { continue };
+            let Some(&(a, counts, (y0, y1), spill)) = self.lod.get(&key) else { continue };
             let o = key.origin();
             let half = Vec3::new(key.size() as f32, (y1 - y0) as f32, key.size() as f32) / 2.0;
             let center = (glam::DVec3::new(o.x as f64, y0 as f64, o.y as f64) - cam.pos).as_vec3() + half;
             if !planes
                 .iter()
-                .all(|pl| pl.dot(center.extend(1.0)) > -half.length())
+                .all(|pl| pl.dot(center.extend(1.0)) > -(half + Vec3::new(spill as f32, 0.0, spill as f32)).length())
             {
                 continue;
             }
             let lo = [o.x - cam_cube.x * 16, y0 - cam_cube.y * 16, o.y - cam_cube.z * 16];
             let size = key.size() as i32;
-            let bounds = [lo[0], lo[1], lo[2], lo[0] + size, lo[1] + (y1 - y0), lo[2] + size];
+            let bounds = [lo[0] - spill, lo[1], lo[2] - spill, lo[0] + size + spill, lo[1] + (y1 - y0), lo[2] + size + spill];
             let near_cubes = [0, 2]
                 .iter()
                 .all(|&k| bounds[k] < masked[1] && bounds[k + 3] > masked[0]);
             // A block of margin: the tiles are drawn a little lower than their records say.
             let seen = seen_sides(center - half - Vec3::ONE, center + half + Vec3::ONE);
             let origin = [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, crate::gpu_layout::lod_draw_data(key.level, fade)];
-            use super::lod::{ALWAYS, BESIDE_CUBES, SURFACE};
+            use super::lod::{ALWAYS, BESIDE_CUBES, FOREST, SURFACE};
             let mut draw = |layer: u8, s: u32, len: u32| {
                 self.lod_drawn += len as u64;
                 let args =
@@ -1104,6 +1164,9 @@ impl WorldRenderer {
                     .chain(&counts[BESIDE_CUBES])
                     .sum::<u32>();
             runs(surface_at, counts[SURFACE].iter().zip(seen), |s, len| draw(2, s, len));
+            if counts[FOREST][0] > 0 {
+                draw(1, surface_at + counts[SURFACE].iter().sum::<u32>(), counts[FOREST][0]);
+            }
         }
         // What is opaque first; see-through surfaces after all of it, in `draw_translucent`.
         lod.sort_by_key(|d| (d.0.1, d.0.2, d.0.5.length_squared().to_bits()));
@@ -1286,7 +1349,7 @@ impl WorldRenderer {
         if kind == 0 {
             (self.face_pipes[layer as usize], self.faces.pages[page as usize].0)
         } else if kind == 3 {
-            (self.lod_pipes[(layer == 2) as usize], self.faces.pages[page as usize].0)
+            (self.lod_pipes[layer as usize], self.faces.pages[page as usize].0)
         } else {
             (self.quad_pipes[layer as usize], self.quads.pages[page as usize].0)
         }

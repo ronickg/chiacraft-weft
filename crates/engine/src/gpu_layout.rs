@@ -87,6 +87,12 @@ shared! {
         LIGHT_RG_SHIFT = 26,
         LIGHT_B_SHIFT = 20,
     }
+    /// A forest atlas has one row per elevation and one column per azimuth.
+    forest {
+        VIEWS = 8,
+        ELEVATIONS = 5,
+        FRAME = 32,
+    }
     /// Per-draw distant terrain metadata, sharing the origin's fourth word.
     lod_draw {
         SCALE_SHIFT = 16,
@@ -154,10 +160,8 @@ pub mod terrain {
             /// The noise seeds, in `SEEDS` order.
             SEEDS = 13,
             FIELD_OFF = 18, FEAT_OFF = 19, RULE_OFF = 20, CAVE_OFF = 21,
-            /// Distant terrain's scattered things (`describe_lod`).
-            SCATTER_OFF = 22,
             /// The header's length.
-            LEN = 23,
+            LEN = 22,
         }
         /// Words per record of the description and per cube made. A rule is: biome, lowest and
         /// highest surface height, the word where its conditions start and how many there
@@ -175,8 +179,6 @@ pub mod terrain {
             /// A condition of a rule: the field, from, to.
             COND = 3,
             CAVE = 5,
-            /// Per scatter and biome: threshold (two words), canopy radius, top, block.
-            SCATTER_BIOME = 5,
             OUT = 2560,
         }
         /// Sizes of the shader's own arrays: the values of the fields at one column, and what an
@@ -200,8 +202,6 @@ pub mod terrain {
             SIDE = 34,
             SAMPLES = 34 * 34,
             WORDS = 3,
-            SCATTER_STEP = 32,
-            COVER_SCALE = 65536,
         }
         /// Expression step kinds.
         expr {
@@ -1201,7 +1201,7 @@ mod tests {
     fn terrain_prelude() {
         use terrain::*;
         assert_eq!(d::SEEDS as usize + SEEDS.len(), d::FIELD_OFF as usize);
-        assert!(d::SCATTER_OFF < d::LEN);
+        assert!(d::CAVE_OFF < d::LEN);
         let src = prelude() + include_str!("../assets/shaders/terrain.wgsl");
         let module = naga::front::wgsl::parse_str(&src).expect("terrain shader parses");
         naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all())

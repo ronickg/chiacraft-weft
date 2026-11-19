@@ -116,6 +116,14 @@ impl Write {
 }
 
 impl FeatureDef {
+    /// Biome-density plans whose silhouettes can be sampled outside the loaded world.
+    pub(crate) fn density_plan(&self) -> Option<(i32, u32)> {
+        match (&self.spread, &self.shape) {
+            (Spread::Grid { spacing, chance: Chance::Density(Some(d)) }, Shape::Plan(..)) => Some((*spacing, *d)),
+            _ => None,
+        }
+    }
+
     /// How far from its start a vein may put blocks.
     pub fn vein_reach(&self) -> i32 {
         match self.shape {
@@ -272,10 +280,12 @@ impl Start {
     }
 }
 
-/// Where a feature on a grid starts in a cell, if it does: the start (above the ground, sunk by
-/// its burying), the biome, its random bits and the transform its template takes. From the seed
-/// and the columns alone; distant terrain repeats the test for trees exactly
-/// (`terrain_gpu::describe_lod`).
+/// The same site offset is used when placing a feature and drawing it beyond loaded cubes.
+pub(crate) fn grid_position(cell: (i32, i32), spacing: i32, room: i32, h: u64) -> (i32, i32) {
+    (cell.0 * spacing + (h % room as u64) as i32, cell.1 * spacing + ((h >> 8) % room as u64) as i32)
+}
+
+/// A grid feature's fitted start, biome, shape seed and transform.
 pub fn grid_site(
     c: &Content,
     def: &DimensionDef,
@@ -293,7 +303,7 @@ pub fn grid_site(
         _ => IVec3::ZERO,
     };
     let room = (spacing - foot.x.max(foot.z)).max(1);
-    let (x, z) = (cell.0 * spacing + (h % room as u64) as i32, cell.1 * spacing + ((h >> 8) % room as u64) as i32);
+    let (x, z) = grid_position(cell, spacing, room, h);
     let mid = (x + foot.x / 2, z + foot.z / 2);
     let col = def.column(seed, mid.0, mid.1)?;
     let fit = &f.fit;

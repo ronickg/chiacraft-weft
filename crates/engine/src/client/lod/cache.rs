@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use super::{Counts, LodMesh, MAX_QUADS, TileKey};
 
 // Bump when the mesher or packed face format changes.
-const VERSION: u32 = 1;
+const VERSION: u32 = 2;
 const SLOTS: u64 = 4096;
 const MAX_FILE: usize = 128 << 10;
 const HEADER: usize = size_of::<Counts>() + 8;

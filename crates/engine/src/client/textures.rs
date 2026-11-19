@@ -242,6 +242,20 @@ impl GameTextures {
         self.inner.borrow().generation
     }
 
+    /// A small face image for distant silhouettes, from the same resolved asset as the mesh.
+    pub(super) fn impostor_texels(&self, id: u32) -> [[u8; 4]; 16] {
+        let i = self.inner.borrow();
+        let Some(&entry) = i.ids.get(id as usize) else { return [[255, 0, 255, 255]; 16] };
+        let (image, _) = load_one(&i.entries, &i.assets, entry);
+        let level = image.size.ilog2().saturating_sub(2);
+        let width = (image.size >> level) as usize;
+        let mip = &image.frames[0][level as usize];
+        std::array::from_fn(|k| {
+            let at = ((k / 4 * width / 4) * width + (k % 4 * width / 4)) * 4;
+            mip[at..at + 4].try_into().unwrap()
+        })
+    }
+
     /// Block textures `ids` loaded now: a mesh about to be drawn uses them.
     pub fn ensure_blocks(&self, gpu: &mut dyn Backend, ids: impl IntoIterator<Item = u32>) {
         {
