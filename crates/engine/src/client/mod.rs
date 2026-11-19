@@ -633,6 +633,7 @@ pub struct Client {
     pub disconnected: Option<String>,
     /// Seconds until holding a button repeats its action. A new press never waits.
     break_delay: f32,
+    melee_recovery: f32,
     use_delay: f32,
     /// Each action as the server last heard of it (`send_keys`).
     keys_down: Vec<bool>,
@@ -1005,6 +1006,7 @@ impl Client {
             selected: 0,
             disconnected: None,
             break_delay: 0.0,
+            melee_recovery: 0.0,
             use_delay: 0.0,
             keys_down: Vec::new(),
             helm_pilot: None,
@@ -1736,6 +1738,7 @@ impl Client {
 
     fn act(&mut self, input: &Input, dt: f64, look: DVec3) {
         self.break_delay -= dt as f32;
+        self.melee_recovery -= dt as f32 * self.tick_rate as f32;
         self.use_delay -= dt as f32;
         // The server judges actions by where the player looks, which it only hears 20 times a
         // second: a turn made just before a click must arrive first.
@@ -1791,12 +1794,15 @@ impl Client {
                 // does depends on how charged the swing was.
                 if self.pressed_without_helm(input, "core:attack") {
                     send_look.send(&mut self.conn);
+                    self.melee_recovery =
+                        crate::content::melee_recovery(c, self.me.kind, &self.held(), self.attribute(crate::registry::attr::ATTACK_SPEED))
+                            as f32;
                     self.conn.send(ToServer::Attack(id));
                     self.conn.send(ToServer::Swing);
                     self.swing_since = 0.0;
                 }
                 self.breaking = None;
-            } else if refused {
+            } else if refused || self.melee_recovery > 0.0 {
                 self.breaking = None;
             } else if let Some(hit) = self.target {
                 use crate::registry::attr as a;

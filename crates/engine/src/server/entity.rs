@@ -91,6 +91,7 @@ pub struct Entity {
     pub jumped: bool,
     /// Ticks since it last swung or changed items (players): what a hit's strength is judged by.
     pub swing_ticks: u32,
+    pub melee_recovery: u32,
     /// What it held when that was last looked at (`notice_hand`).
     pub in_hand: ItemStack,
     /// What its last hit did while `hurt_cooldown` runs: a stronger one only adds the difference.
@@ -344,6 +345,7 @@ impl Entity {
             flying: false,
             jumped: false,
             swing_ticks: u32::MAX / 2,
+            melee_recovery: 0,
             in_hand: ItemStack::EMPTY,
             last_hurt: 0.0,
             nav: None,

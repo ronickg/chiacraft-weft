@@ -1048,7 +1048,7 @@ impl Dim {
             .entities
             .list
             .iter()
-            .filter(|e| !e.removed && (e.player || !players_only))
+            .filter(|e| !e.removed && e.melee_recovery == 0 && (e.player || !players_only))
             .filter_map(|e| e.mining.map(|m| (e.id, m, e.player)))
             .collect();
         for (id, m, player) in mining {
@@ -1086,6 +1086,7 @@ impl Dim {
     ) -> bool {
         let Some(e) = self.entities.get(entity) else { return false };
         let (eye, sel, creative) = (e.pos + DVec3::Y * e.eye(c), e.selected, e.mode.has(crate::tag_bits::game_mode::INSTANT_BREAK));
+        let recovering = e.melee_recovery > 0;
         let no_break = e.mode.has(crate::tag_bits::game_mode::NO_BREAK);
         let (reach, held) = (self.block_reach(0, c, entity), self.entities.held(entity));
         let mut refused = false;
@@ -1107,11 +1108,13 @@ impl Dim {
                     .bounds(c)
                     .any(|b| local_eye.distance_squared(local_eye.clamp(b.min, b.max)) <= (reach + 0.5).powi(2))
                 && !too_soon
+                && !recovering
                 && !keeps
                 && d.as_placed(space_id, pos, part, |d| d.break_piece(space_id, c, pos, part.state, face, hit, held, entity, !creative));
             if !done && d.get(space_id, pos).is_some() {
                 d.resend_cell(space_id, pos);
-                refused = true;
+                // A held click can retry once the server's swing has recovered.
+                refused = !recovering;
             }
             done && !free
         });

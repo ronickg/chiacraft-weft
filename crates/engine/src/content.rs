@@ -593,6 +593,12 @@ pub fn swings_per_second(c: &Content, kind: u32, held: &weft_abi::ItemStack) -> 
         .unwrap_or(1.0)
 }
 
+/// Mining can start again after the swing with the weapon that struck the target.
+pub fn melee_recovery(c: &Content, kind: u32, held: &weft_abi::ItemStack, speed: f32) -> u32 {
+    let rate = swings_per_second(c, kind, held) * speed;
+    if rate > 0.0 { (crate::world::TPS as f32 / rate).ceil().max(1.0) as u32 } else { 1 }
+}
+
 /// How charged a swing is after that many ticks, 0..1. Client and server have to agree, with
 /// `speed` the `core:attack_speed` attribute.
 pub fn swing_charge(c: &Content, kind: u32, held: &weft_abi::ItemStack, ticks: f32, speed: f32) -> f32 {

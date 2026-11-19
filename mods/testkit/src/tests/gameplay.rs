@@ -2345,6 +2345,10 @@ pub async fn attack_charge(t: T) -> R {
         .await?
         .parse()
         .map_err(|_| "target id")?;
+    let torch = add(f, [1, 1, 0]);
+    t.set(torch, "base:torch[facing=up]").await?;
+    t.until("torch ready", Duration::from_secs(2), |t| t.c().block(torch).is_some_and(|s| s != 0))
+        .await?;
     t.secs(0.8).await?;
     t.hold("core:jump", 0.12);
     t.until("descending", Duration::from_secs(2), |t| t.state().vel.y < -0.14 && t.state().pos.y > f[1] as f64 + 0.3)
@@ -2354,10 +2358,17 @@ pub async fn attack_charge(t: T) -> R {
     t.until("mob under crosshair", Duration::from_millis(100), |t| t.c().target().is_some_and(|hit| hit.entity == target))
         .await?;
     let particles = t.state().particles;
-    t.press("core:attack");
+    t.hold("core:attack", 1.6);
     t.until("critical hit burst", Duration::from_millis(300), |t| t.state().particles >= particles + 16)
         .await?;
     t.shot("critical").await?;
+    t.look_at(torch);
+    t.secs(0.1).await?;
+    t.check(t.c().block(torch).is_some_and(|s| s != 0), "a held melee swing cannot mine during recovery");
+    t.secs(0.2).await?;
+    t.look_at(torch);
+    t.until("same held click mines after recovery", Duration::from_secs(2), |t| t.c().block(torch) == Some(0))
+        .await?;
     Ok(())
 }
 

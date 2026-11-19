@@ -1650,7 +1650,10 @@ impl Dim {
         let dmg = (self.compute(space_id, c, abi::chain::MELEE, base, &q, false) as f32).max(0.0);
         self.events
             .push(DimEvent::EntitySwing { id: attacker, off: false });
+        let speed = self.attribute(space_id, c, attacker, crate::registry::attr::ATTACK_SPEED, false);
         let Some(me) = self.entities.get_mut(attacker) else { return false };
+        me.melee_recovery = crate::content::melee_recovery(c, me.kind, &held, speed as f32);
+        me.mining = None;
         me.swing_ticks = 0;
         let pos = me.pos;
         let hit = self.damage(
@@ -2762,6 +2765,7 @@ impl Dim {
                 e.age += 1;
                 e.hurt_cooldown = e.hurt_cooldown.saturating_sub(1);
                 e.swing_ticks = e.swing_ticks.saturating_add(1);
+                e.melee_recovery = e.melee_recovery.saturating_sub(1);
                 if let Some(inv) = inventories
                     .get(&e.id)
                     .filter(|_| c.game.entities[e.kind as usize].hand_slots > 0)
