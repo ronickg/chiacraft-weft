@@ -326,19 +326,22 @@ fn place_stump(d: &mut TreePlaceData, log_block: &Block, hollow_log_block: &Bloc
     let log = if d.rng.float() > 0.5 { log_block } else { hollow_log_block };
     place_log(d, log, log_length);
 }
-fn place_oak(data: &mut TreePlaceData) {
+fn place_oak_impl(data: &mut TreePlaceData, allow_stump: bool) {
     static LOG: &Block = &OAK_LOG;
     static HOLLOW_LOG: Block = Block::named("oak_log_hollow");
     static WOOD: &Block = &OAK_WOOD;
     static ALLOW_ROOTS: bool = true;
     let height = 6u16 + (data.rng.next() as u16) % 3u16;
-    if check_stump(data, height) {
+    if allow_stump && check_stump(data, height) {
         place_stump(data, LOG, &HOLLOW_LOG, WOOD, height, ALLOW_ROOTS);
         return;
     }
     let skeleton = place_trunk(data, height, LOG, WOOD, true, ALLOW_ROOTS);
     place_foliage(&skeleton, data, height, OAK_LEAVES.id());
     decorate_trunk(&skeleton, data);
+}
+fn place_oak(data: &mut TreePlaceData) {
+    place_oak_impl(data, true)
 }
 fn place_birch(data: &mut TreePlaceData) {
     static LOG: &Block = &BIRCH_LOG;
@@ -363,4 +366,39 @@ pub fn register() {
     register_tree("base:oak", place_oak);
     register_tree("base:birch", place_birch);
     register_tree("base:spruce", place_spruce);
+}
+/// Places a tree into a live world (saplings). Checks for room first.
+pub fn grow_tree(w: World, p: [i32; 3]) {
+    // A tree needs a clear trunk column before we start replacing the sapling.
+    for y in p[1] + 1..p[1] + 12 {
+        match w.block_loaded([p[0], y, p[2]]) {
+            Some(s) if s == 0 || TALL_GRASS.is(s) || TALL_TALL_GRASS.is(s) => {}
+            _ => return,
+        }
+    }
+
+    let mut data = TreePlaceData {
+        pos: (p[0], p[1], p[2]),
+        rng: Rng(w.random()),
+        place: Box::new(move |x, y, z, state, force| {
+            let Some(cur) = w.block_loaded([x, y, z]) else { return };
+            if force || cur == 0 || TALL_GRASS.is(cur) || TALL_TALL_GRASS.is(cur) {
+                w.set_block([x, y, z], state);
+            }
+        }),
+        read: Box::new(move |x, y, z| w.block([x, y, z])),
+        ground: Box::new(move |x, z| {
+            // The live world has no column-height query, so find the top solid block near the
+            // sapling. Stop at the loaded edge rather than pretending air is ground.
+            for y in (p[1].saturating_sub(64)..=p[1] + 32).rev() {
+                let Some(state) = w.block_loaded([x, y, z]) else { continue };
+                if block_info(state).is_some_and(|i| i.solid()) {
+                    return y;
+                }
+            }
+            p[1] - 1
+        }),
+    };
+
+    place_oak_impl(&mut data, false)
 }

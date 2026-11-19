@@ -10,6 +10,7 @@ mod util;
 use consts::*;
 use decor::*;
 use statics::*;
+pub use tree_algorythms::grow_tree;
 use tree_algorythms::register as register_trees;
 use tree_kinds::*;
 use util::gentle;
@@ -237,7 +238,8 @@ pub fn register(r: &mut Registry) {
         .sea(SEA, "water")
         .field("temperature", Expr::fbm(0x22, 2200.0, 3) * Expr::value(1.4))
         .field("humidity", Expr::fbm(0x33, 1600.0, 3) * Expr::value(1.4))
-        .field("base:weirdness",
+        .field(
+            "base:weirdness",
             Expr::fbm(0x4A7, 1000.0, 3)
                 .at(
                     Expr::x() + Expr::fbm(0x111, 600.0, 2) * Expr::blocks(80.0) + Expr::noise(40.0) * Expr::value(0.5),
@@ -304,15 +306,11 @@ pub fn register(r: &mut Registry) {
         .rule(
             BiomeRule::new("hills")
                 .field("base:randomness", 0.5..)
-                .field("base:mountains", 0.3..)
+                .field("base:mountains", 0.3..),
         )
-        .rule(BiomeRule::new("lavender_fields")
-            .field("base:weirdness", 1.0..)
-        ).rule(BiomeRule::new("tallgrass_meadow")
-            .field("base:weirdness", 0.1..0.3)
-        ).rule(BiomeRule::new("clover_meadow")
-            .field("base:weirdness", 0.6..0.9)
-        )
+        .rule(BiomeRule::new("lavender_fields").field("base:weirdness", 1.0..))
+        .rule(BiomeRule::new("tallgrass_meadow").field("base:weirdness", 0.1..0.3))
+        .rule(BiomeRule::new("clover_meadow").field("base:weirdness", 0.6..0.9))
         .rule(BiomeRule::new("plains"))
         .cave_biome("deep_caves", 24, 96.0, 0.25)
         .caves(Caves::new("lava", i32::MIN, 11));
@@ -324,7 +322,9 @@ pub fn register(r: &mut Registry) {
         .density(&TREES)
         .ground("#plant_soil")
         .plan(|s| {
-            if COARSE_DIRT.is(s.read(s.pos().below())) { return }
+            if COARSE_DIRT.is(s.read(s.pos().below())) {
+                return;
+            }
             let kinds = TREE_KINDS.on_biome(s.biome());
             let mut rng = Rng(s.random());
             // Biomes that ask for trees without naming kinds grow oaks, as they always did.
@@ -432,110 +432,6 @@ static SNOWBERRY_SITES: Feature = Feature::named("snowberries");
 static RASPBERRY_SITES: Feature = Feature::named("raspberries");
 static BOULDER_SITES: Feature = Feature::named("boulders");
 static TREE_SITES: Feature = Feature::named("trees");
-
-struct TreeAt {
-    x: i32,
-    y: i32,
-    z: i32,
-    log: u32,
-    leaves: u32,
-    cone: bool,
-    height: i32,
-}
-
-/// A tree growing from `log` (its `tree` component), `h` deciding the height.
-fn tree_at(log: u32, x: i32, y: i32, z: i32, h: u64) -> Option<TreeAt> {
-    let leaves = TREE_LEAVES.on_block(log)?.0;
-    let cone = CONE_TREE.on_block(log);
-    let height = if cone { 6 + (h % 4) as i32 } else { 6 + (h % 3) as i32 };
-    Some(TreeAt { x, y, z, log, leaves, cone, height })
-}
-
-/// Calls `put(x, y, z, state, force)` for every block of the tree.
-fn tree_blocks(t: &TreeAt, rng: &mut Rng, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
-    let (log, leaves) = (t.log, t.leaves);
-    let top = t.y + t.height;
-    match t.cone {
-        true => {
-            for dy in 2..=t.height + 1 {
-                let y = t.y + dy;
-                let r = if dy == t.height + 1 { 0 } else { 1 + ((t.height + 1 - dy) % 3).min(2) };
-                for dz in -r..=r {
-                    for dx in -r..=r {
-                        if dx * dx + dz * dz <= r * r + 1 {
-                            put(t.x + dx, y, t.z + dz, leaves, false);
-                        }
-                    }
-                }
-            }
-        }
-        false => {
-            for y in top - 3..=top {
-                let r: i32 = if y >= top - 1 { 1 } else { 2 };
-                for dz in -r..=r {
-                    for dx in -r..=r {
-                        let corner = dx.abs() == r && dz.abs() == r;
-                        if corner && (y == top || hash(0, (t.x + dx) as i64, y as i64, (t.z + dz) as i64) & 1 == 0) {
-                            continue;
-                        }
-                        put(t.x + dx, y, t.z + dz, leaves, false);
-                    }
-                }
-            }
-        }
-    }
-    for y in t.y..top {
-        put(t.x, y, t.z, log, true);
-        let left = top - y;
-        if rng.next() % (left as u64) <= 2 {
-            if rng.float() < 0.5 {
-                put(t.x, y, t.z, log, true);
-            } else {
-                put(t.x, y, t.z, log, true);
-            }
-        }
-    }
-    let mut grow_root = |dx: i32, dz: i32, tall: bool| {
-        let x = t.x + dx;
-        let z = t.z + dz;
-        if tall {
-            put(x, t.y + 1, z, log, true);
-        }
-        put(x, t.y, z, log, true);
-        put(x, t.y - 1, z, log, true);
-    };
-    let root_positions = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-    let mut root_count = 0;
-    for dpos in root_positions {
-        if rng.float() < 0.666 {
-            grow_root(dpos.0, dpos.1, rng.float() < 0.5);
-            root_count += 1;
-        }
-    }
-    if root_count == 0 {
-        let root_pos = root_positions[rng.next() as usize % root_positions.len()];
-        grow_root(root_pos.0, root_pos.1, rng.float() < 0.5);
-    }
-    put(t.x, t.y - 1, t.z, log, true);
-    put(t.x, t.y - 2, t.z, DIRT.id(), true);
-}
-
-/// Places a tree into a live world (saplings). Checks for room first.
-pub fn grow_tree(w: World, p: [i32; 3]) {
-    let Some(t) = tree_at(OAK_LOG.id(), p[0], p[1], p[2], w.random()) else { return };
-    for y in t.y + 1..t.y + t.height {
-        if w.block([t.x, y, t.z]) != 0 {
-            return;
-        }
-    }
-    let mut rng = Rng((p[0] ^ p[1] ^ p[2]) as u64);
-    tree_blocks(&t, &mut rng, |x, y, z, s, overwrite| {
-        let cur = w.block([x, y, z]);
-        if overwrite || cur == 0 || TALL_GRASS.is(cur) || TALL_TALL_GRASS.is(cur) {
-            w.set_block([x, y, z], s);
-        }
-    });
-}
 
 /// The test dimension: flat, bounded in height, nothing else.
 pub fn flat(g: &mut Gen) {
