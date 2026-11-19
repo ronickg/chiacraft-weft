@@ -832,7 +832,7 @@ pub struct Lod {
     /// Tiles wanted, coarse first then nearest, and the view that selected them.
     wanted: Vec<TileKey>,
     wanted_at: Option<LodView>,
-    // Parent tiles split at ordinary zoom, and where that detail was last requested.
+    // Ordinary-view tiles protected from eviction, and where they were last seen.
     remembered: FxHashMap<TileKey, DVec3>,
     dirty: bool,
     max_level: u32,
@@ -982,7 +982,7 @@ impl Lod {
         seed: u64,
         camera: &super::world_render::Camera,
         viewport: (u32, u32),
-        zoomed: bool,
+        normal_fov: f32,
         view: i32,
         upload_budget: Duration,
     ) {
@@ -1079,7 +1079,11 @@ impl Lod {
             self.wanted_at = Some(selection);
             let d = &c.dims[dim as usize];
             let heights = ((d.min_cube_y as f64 * 16.0).max(i16::MIN as f64), (d.max_cube_y as f64 * 16.0 + 16.0).min(i16::MAX as f64));
-            let mut needed = self.pick(selection, heights, !zoomed);
+            let normal = (camera.fov < normal_fov).then(|| {
+                let wide = super::world_render::Camera { fov: (normal_fov * 1.1).min(175.0), ..guard };
+                LodView { projection: wide.proj(aspect) * wide.view(), ..selection }
+            });
+            let mut needed = self.pick(selection, heights, normal);
             let mut next = FxHashSet::default();
             for &root in self.wanted.iter().take_while(|k| k.level == self.max_level) {
                 self.cover(root, &needed, &mut next);
@@ -1218,7 +1222,7 @@ impl Lod {
         let mut spare = Vec::new();
         let mut quads = 0;
         for (&key, tile) in &mut self.ready {
-            if needed.contains(&key) {
+            if needed.contains(&key) || self.remembered.contains_key(&key) {
                 tile.last_used = self.generation;
             } else {
                 quads += tile.quads;
@@ -1323,12 +1327,7 @@ impl Lod {
         }
     }
 
-    fn pick(&mut self, view: LodView, heights: (f64, f64), remember: bool) -> FxHashSet<TileKey> {
-        self.max_level = (view.reach as u32)
-            .next_power_of_two()
-            .ilog2()
-            .saturating_sub(CELLS.ilog2())
-            .clamp(1, MAX_LEVEL);
+    fn select(&self, view: LodView, heights: (f64, f64)) -> FxHashSet<TileKey> {
         let top = CELLS << self.max_level;
         let p = glam::DVec2::new(view.pos.x, view.pos.z);
         let reach = view.reach as f64;
@@ -1336,7 +1335,7 @@ impl Lod {
         let planes = super::world_render::projection_planes(view.projection);
         // Allow overlap from slopes, walls and conservative height envelopes.
         let budget = (view.tiles_per_screen * 8.0).ceil().max(16.0) as usize;
-        let mut leaves = FxHashSet::default();
+        let mut tree = FxHashSet::default();
         let mut queue = BinaryHeap::new();
         let in_range = |key: TileKey| {
             let (near, far) = key.distance(p);
@@ -1369,54 +1368,53 @@ impl Lod {
             for x in lo.x..=hi.x {
                 let key = TileKey { level: self.max_level, x, z };
                 if in_range(key) {
-                    leaves.insert(key);
+                    tree.insert(key);
                     if let Some(candidate) = priority(key) {
                         queue.push(candidate);
                     }
                 }
             }
         }
+        let mut leaves = tree.len();
         while let Some((_, _, key)) = queue.pop() {
             let children = key.children().map(|child| in_range(child).then_some(child));
             let count = children.iter().flatten().count();
-            if leaves.len() + count - 1 > budget {
+            if leaves + count - 1 > budget {
                 continue;
             }
-            if remember {
-                self.remembered.insert(key, view.pos);
-            }
-            leaves.remove(&key);
+            leaves = leaves + count - 1;
             for child in children.into_iter().flatten() {
-                leaves.insert(child);
+                tree.insert(child);
                 if let Some(candidate) = priority(child) {
                     queue.push(candidate);
                 }
             }
         }
-        // Keep the same coverage through a camera turn. Fine tiles expire after short trips,
-        // distant tiles after longer ones, according to their size in world space.
+        tree
+    }
+
+    fn pick(&mut self, view: LodView, heights: (f64, f64), normal: Option<LodView>) -> FxHashSet<TileKey> {
+        self.max_level = (view.reach as u32)
+            .next_power_of_two()
+            .ilog2()
+            .saturating_sub(CELLS.ilog2())
+            .clamp(1, MAX_LEVEL);
+        let (mut needed, wide) = match normal {
+            Some(wide) if !view.similar(wide) => (self.select(view, heights), Some(self.select(wide, heights))),
+            _ => (self.select(normal.unwrap_or(view), heights), None),
+        };
+        let p = glam::DVec2::new(view.pos.x, view.pos.z);
+        let reach = view.reach as f64;
         self.remembered.retain(|&key, at| {
-            in_range(key) && key.level <= self.max_level && view.pos.distance_squared(*at) <= (key.size() as f64).powi(2)
+            let (near, far) = key.distance(p);
+            near <= reach && far >= view.hide as f64 && view.pos.distance_squared(*at) <= (2.0 * key.size() as f64).powi(2)
         });
-        for parent in self.remembered.keys() {
-            leaves.extend(
-                parent
-                    .children()
-                    .into_iter()
-                    .filter(|&child| in_range(child)),
-            );
-        }
-        let mut needed = FxHashSet::default();
-        for key in leaves {
-            let mut ancestor = key;
-            loop {
-                needed.insert(ancestor);
-                if ancestor.level == self.max_level {
-                    break;
-                }
-                ancestor = ancestor.parent();
-            }
-        }
+        self.remembered.extend(
+            wide.as_ref()
+                .unwrap_or(&needed)
+                .iter()
+                .map(|&key| (key, view.pos)),
+        );
         if needed
             .iter()
             .any(|k| k.level == self.max_level && !self.ready.contains_key(k))
@@ -1546,7 +1544,7 @@ mod tests {
 
     fn settle(lod: &mut Lod, view: LodView, heights: (f64, f64)) {
         for _ in 0..=MAX_LEVEL {
-            lod.pick(view, heights, false);
+            lod.pick(view, heights, None);
             if lod.wanted.iter().all(|k| lod.ready.contains_key(k)) {
                 return;
             }
@@ -1604,19 +1602,41 @@ mod tests {
         let view = selection(70.0, 1080, 4096);
         let heights = (0.0, 256.0);
         settle(&mut lod, view, heights);
-        let original = lod.pick(view, heights, true);
+        let original = lod.pick(view, heights, None);
         let back = LodView { projection: view.projection * Mat4::from_rotation_y(std::f32::consts::PI), ..view };
-        let away = lod.pick(back, heights, true);
-        assert!(original.is_subset(&away));
-        let returned = lod.pick(view, heights, true);
-        assert!(original.is_subset(&returned));
-        for root in original.iter().filter(|k| k.level == lod.max_level) {
-            let mut before = FxHashSet::default();
-            let mut after = FxHashSet::default();
-            lod.cover(*root, &original, &mut before);
-            lod.cover(*root, &returned, &mut after);
-            assert!(before.is_subset(&after));
+        let away = lod.pick(back, heights, None);
+        assert!(!original.is_subset(&away));
+        assert!(original.iter().all(|key| lod.remembered.contains_key(key)));
+        assert_eq!(lod.pick(view, heights, None), original);
+    }
+
+    #[test]
+    fn zoom_sweep_only_retains_ordinary_detail() {
+        let mut lod = Lod::new(unbounded().0, PathBuf::new(), None);
+        let normal = selection(70.0, 1080, 4096);
+        let zoom = selection(14.0, 1080, 4096);
+        let heights = (0.0, 256.0);
+        let mut expected = FxHashSet::default();
+        for yaw in [0.0, 1.0, 2.0, 3.0, 4.0, 5.0] {
+            let turn = Mat4::from_rotation_y(yaw);
+            let wide = LodView { projection: normal.projection * turn, ..normal };
+            let narrow = LodView { projection: zoom.projection * turn, ..zoom };
+            for _ in 0..=MAX_LEVEL {
+                let tiles = lod.pick(narrow, heights, Some(wide));
+                expected.extend(lod.select(wide, heights));
+                if tiles.iter().all(|k| lod.ready.contains_key(k)) {
+                    assert!(!tiles.is_subset(&lod.select(wide, heights)));
+                    break;
+                }
+                lod.ready.extend(
+                    tiles
+                        .into_iter()
+                        .map(|k| (k, ReadyTile { y: (0, 256), ..ReadyTile::default() })),
+                );
+            }
         }
+        assert_eq!(lod.remembered.keys().copied().collect::<FxHashSet<_>>(), expected);
+        assert_eq!(lod.pick(normal, heights, None), lod.select(normal, heights));
     }
 
     #[test]

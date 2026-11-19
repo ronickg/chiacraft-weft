@@ -327,7 +327,7 @@ impl Client {
             pos,
             yaw: pose.yaw,
             pitch: pose.pitch,
-            fov: if effects { eye.fov } else { eye.fov / self.player.fov_mul / self.inside_fov() } * pose.fov,
+            fov: self.base_camera_fov() * self.player.zoom * pose.fov,
             bob: (glam::Vec3::ZERO, pose.roll, 0.0),
         };
         if effects || m.has(cf::BOB) {
@@ -352,5 +352,9 @@ impl Client {
             }
         }
         cams.shown = cam;
+    }
+
+    pub(super) fn base_camera_fov(&self) -> f32 {
+        if self.camera_has(cf::EFFECTS) { self.fov * self.player.fov_mul * self.inside_fov() } else { self.fov }
     }
 }
