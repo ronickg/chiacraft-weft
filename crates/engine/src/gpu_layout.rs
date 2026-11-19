@@ -197,7 +197,7 @@ pub mod terrain {
         /// Distant terrain tiles (`client::lod`): samples per side (a tile's 32 cells and one
         /// around it), all of them, and words per sample: ground height and top block; biome
         /// and the block under the top; what stands over the ground up to a height (a sea: its
-        /// surface and block), none for 0.
+        /// surface and block), or the depth of a cave cut if there is no surface block.
         lod {
             SIDE = 34,
             SAMPLES = 34 * 34,

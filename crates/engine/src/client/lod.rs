@@ -59,6 +59,8 @@ const MAX_MODEL_BOXES: usize = 6;
 const LOD_FADE: Duration = Duration::from_millis(250);
 /// Extra face records kept on the GPU when a tile leaves the selected tree (32 MiB).
 const SPARE_QUADS: usize = (32 << 20) / 16;
+/// After this far below the cave mouth the diffuse sky is gone.
+const CAVE_LIGHT_REACH: i32 = 15;
 
 /// A tile: its level and place in the grid of its level's tiles.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -205,6 +207,9 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
                     let (y, top, under) = (col.y, col.top, col.under);
                     words[w] = (y as u32 & 0xFFFF) | (top << 16);
                     words[w + 1] = (words[w + 1] & 0xFFFF) | (under << 16);
+                    if words[w + 2] >> 16 == 0 {
+                        words[w + 2] = 0;
+                    }
                 }
             }
         }
@@ -291,6 +296,10 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
         let w = words[((j + 1) * SIDE + i + 1) as usize * WORDS + 2];
         ((w & 0xFFFF) as u16 as i16 as i32, w >> 16)
     };
+    let cave_mouth = |i: i32, j: i32| {
+        let (depth, surface) = over(i, j);
+        (surface == 0 && depth > 0).then(|| corner_y(words, i, j) + depth)
+    };
     // Under a surface (a sea) the sky's light on the ground after `depth` blocks of it, as in the
     // cubes.
     static SKY: std::sync::LazyLock<[([u8; 17], Option<i32>); 16]> = std::sync::LazyLock::new(|| {
@@ -332,6 +341,7 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
             let y = column(&h, i, j);
             let (top, biome, _, light) = at(i, j);
             let lit = light_of(i, j, y, light);
+            let lit = cave_mouth(i, j).map_or(lit, |mouth| cave_light(lit, mouth - y));
             let (tex, tint) = face_of(top, 3);
             faces.push(Face {
                 dir: 3,
@@ -383,19 +393,56 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
                 // pixels give way to cubes.
                 let part = if ny == y && (0..CELLS).contains(&ni) && (0..CELLS).contains(&nj) { BESIDE_CUBES } else { ALWAYS };
                 let dir = dir as u32;
+                // A wall facing the cut sees the sky through the neighboring mouth.
+                let mouth = cave_mouth(ni, nj).or_else(|| cave_mouth(i, j));
+                let wall_light = |by| mouth.map_or(light, |mouth| cave_light(light, mouth - by));
                 if ny < y {
                     let (tex, tint) = face_of(top, dir as usize);
                     let ao = ao_bits(&h, i, j, dir as usize, y);
-                    faces.push(Face { dir, at: [i * s, y, j * s], size: [s, 1, s], tex, tint, biome, ao, light, part });
+                    faces.push(Face { dir, at: [i * s, y, j * s], size: [s, 1, s], tex, tint, biome, ao, light: wall_light(y), part });
                 }
                 let (tex, tint) = face_of(under, dir as usize);
                 let top_y = if ny < y { y - 1 } else { y };
                 skirt = skirt
                     .max(top_y - lod_face::HEIGHT_MASK as i32)
                     .max(i16::MIN as i32);
-                let ao = ao_span(&h, i, j, dir as usize, top_y, (ny + 1).min(top_y));
-                faces.push(Face { dir, at: [i * s, skirt + 1, j * s], size: [s, y - 1 - skirt, s], tex, tint, biome, ao, light, part });
                 lo = lo.min(skirt + 1);
+                if mouth.is_none() {
+                    let ao = ao_span(&h, i, j, dir as usize, top_y, (ny + 1).min(top_y));
+                    faces.push(Face { dir, at: [i * s, skirt + 1, j * s], size: [s, y - 1 - skirt, s], tex, tint, biome, ao, light, part });
+                    continue;
+                }
+                let mut bottom = skirt + 1;
+                let mut strip = |end| {
+                    let ao = ao_span(&h, i, j, dir as usize, end - 1, (ny + 1).clamp(bottom, end - 1));
+                    faces.push(Face {
+                        dir,
+                        at: [i * s, bottom, j * s],
+                        size: [s, end - bottom, s],
+                        tex,
+                        tint,
+                        biome,
+                        ao,
+                        light: wall_light(bottom + (end - bottom - 1) / 2),
+                        part,
+                    });
+                    bottom = end;
+                };
+                // The same bands on every wall keep adjacent strips mergeable.
+                let end = y;
+                if let Some(mouth) = mouth {
+                    let mut edge = skirt + 1;
+                    for depth in (0..=CAVE_LIGHT_REACH).rev().step_by(3) {
+                        let next = mouth - depth;
+                        if next > edge && next < end {
+                            strip(next);
+                            edge = next;
+                        }
+                    }
+                }
+                if end > skirt + 1 {
+                    strip(end);
+                }
             }
         }
     }
@@ -418,6 +465,11 @@ fn mesh(c: &Content, key: TileKey, words: &[u32], columns: &Columns, terrain: &T
         .instances(c, key, words, &h, columns, space, &mut parts[FOREST], &mut lo, &mut hi);
     counts[FOREST][0] = parts[FOREST].len() as u32;
     (parts.concat(), counts, (lo, hi))
+}
+
+fn cave_light(light: u32, depth: i32) -> u32 {
+    let lost = (depth.clamp(0, CAVE_LIGHT_REACH) as u32).max(light >> 24);
+    light & 0xFF_FFFF | (lost << 24)
 }
 
 /// A face of a tile before it is packed.

@@ -578,6 +578,8 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
                 y = wy;
                 top = stone;
                 under = stone;
+                // If there is no surface block, its low word is the cut's depth.
+                over = u32(c.height - wy);
             }
         }
         let o = (tile * LOD_SAMPLES + k) * LOD_WORDS;
