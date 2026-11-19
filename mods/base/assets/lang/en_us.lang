@@ -433,3 +433,17 @@ item.base.shield = Shield
 key.base.zoom = Zoom
 key.base.zoom_in = Zoom in
 key.base.zoom_out = Zoom out
+
+block.base.short_grass = Short Grass
+block.base.bluegrass = Bluegrass
+block.base.tulip_orange = Orange Tulip
+block.base.tulip_pink = Pink Tulip
+block.base.tulip_purple = Purple Tulip
+block.base.tulip_red = Red Tulip
+block.base.tulip_white = White Tulip
+block.base.tulip_yellow = Yellow Tulip
+block.base.inula = Inula
+block.base.verbascum = Verbascum
+block.base.lavender = Lavender
+block.base.clover = Clover
+block.base.fern = Fern

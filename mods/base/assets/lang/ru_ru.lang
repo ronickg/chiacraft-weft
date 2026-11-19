@@ -395,3 +395,17 @@ item.base.shield = Щит
 key.base.zoom = Приближение
 key.base.zoom_in = Приблизить
 key.base.zoom_out = Отдалить
+
+block.base.short_grass = Низкая трава
+block.base.bluegrass = Синетрава
+block.base.tulip_orange = Оранжевый тюльпан
+block.base.tulip_pink = Розовый тюльпан
+block.base.tulip_purple = Фиолетовый тюльпан
+block.base.tulip_red = Красный тюльпан
+block.base.tulip_white = Белый тюльпан
+block.base.tulip_yellow = Жёлтый тюльпан
+block.base.inula = Девясил
+block.base.verbascum = Коровяк
+block.base.lavender = Лаванда
+block.base.clover = Клевер
+block.base.fern = Папоротник

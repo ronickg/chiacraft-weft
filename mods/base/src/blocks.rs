@@ -382,6 +382,18 @@ pub fn register(r: &mut Registry) {
     log(r, &OAK_WOOD, "oak", true);
     log(r, &BIRCH_WOOD, "birch", true);
     log(r, &SPRUCE_WOOD, "spruce", true);
+    r.shapes_of("hollow_log", "#logs", "_hollow")
+        .sound_group("wood")
+        .model_file("hollow_log")
+        .model_texture("inside", "{source.mod}:block/{source.name}_inner")
+        .axis()
+        .signal_blocker()
+        .shares_cell_with("#water")
+        .liquid_walls(&[Dir::North, Dir::South, Dir::East, Dir::West])
+        .outline([0.0; 3], [16.0; 3])
+        .outline([2.0, 0.0, 2.0], [14.0, 16.0, 14.0])
+        .tag("hollow_log")
+        .tab(&crate::tabs::NATURAL);
     r.block(&BUSH_STEM)
         .sound_group("grass")
         .hardness(0.2)
@@ -496,6 +508,7 @@ pub fn register(r: &mut Registry) {
         .tall_plant("inula_bottom", "inula_top")
         .replaceable()
         .needs_below("#plant_soil")
+        .item_texture("inula")
         .tab(&crate::tabs::NATURAL);
     r.loot(&INULA)
         .pool(
@@ -508,6 +521,7 @@ pub fn register(r: &mut Registry) {
         .tall_plant("verbascum_bottom", "verbascum_top")
         .replaceable()
         .needs_below("#plant_soil")
+        .item_texture("verbascum")
         .tab(&crate::tabs::NATURAL);
     r.loot(&VERBASCUM)
         .pool(
@@ -520,6 +534,7 @@ pub fn register(r: &mut Registry) {
         .tall_plant("lavender_bottom", "lavender_top")
         .replaceable()
         .needs_below("#plant_soil")
+        .item_texture("lavender")
         .tab(&crate::tabs::NATURAL);
     r.loot(&LAVENDER)
         .pool(
@@ -831,18 +846,6 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL)
         .not_solid()
         .hitbox([2.0, 0.0, 2.0], [14.0, 16.0, 14.0]);
-    r.shapes_of("hollow_log", "#logs", "_hollow")
-        .sound_group("wood")
-        .model_file("hollow_log")
-        .model_texture("inside", "{source.mod}:block/{source.name}_inner")
-        .axis()
-        .signal_blocker()
-        .shares_cell_with("#water")
-        .liquid_walls(&[Dir::North, Dir::South, Dir::East, Dir::West])
-        .outline([0.0; 3], [16.0; 3])
-        .outline([2.0, 0.0, 2.0], [14.0, 16.0, 14.0])
-        .tag("hollow_log")
-        .tab(&crate::tabs::NATURAL);
     r.loot(&FERN).pool(
         Pool::new()
             .when(Cond::tool("#tools/shears"))
