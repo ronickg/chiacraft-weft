@@ -830,6 +830,9 @@ pub struct Lod {
     wanted_at: Option<LodView>,
     // Ordinary-view tiles protected from eviction, and where they were last seen.
     remembered: FxHashMap<TileKey, DVec3>,
+    /// Ready or pending tiles requested exclusively for a magnified view.
+    zoom_only: FxHashSet<TileKey>,
+    zooming: bool,
     dirty: bool,
     max_level: u32,
     /// A bit per cube column around the camera's (`MASK_MARGIN` past the view, addressed
@@ -885,6 +888,8 @@ impl Lod {
             wanted: Vec::new(),
             wanted_at: None,
             remembered: FxHashMap::default(),
+            zoom_only: FxHashSet::default(),
+            zooming: false,
             dirty: false,
             max_level: 1,
             mask: Vec::new(),
@@ -1001,6 +1006,8 @@ impl Lod {
             self.solid.clear();
             self.wanted_at = None;
             self.remembered.clear();
+            self.zoom_only.clear();
+            self.zooming = false;
             self.ground = None;
             self.mask.clear();
             render.lod_draw.clear();
@@ -1036,11 +1043,21 @@ impl Lod {
         // Above the loaded cubes the tiles also fill the middle of the view.
         let hide = if land.is_some_and(|h| cam.y > (h + view * 8) as f64) { 0 } else { (view / 2 * 16).max(0) };
         let upload_start = Instant::now();
+        // An eased FOV can settle a few float steps below its target at high frame rates.
+        let zooming = camera.fov < normal_fov - 0.01;
+        let released = self.zooming && !zooming;
+        self.zooming = zooming;
         while self.baking.is_none()
             && let Ok(m) = self.done.1.try_recv()
         {
             self.pending.remove(&m.key);
             self.dirty = true;
+            if !zooming && self.zoom_only.contains(&m.key) {
+                if !self.ready.contains_key(&m.key) {
+                    self.zoom_only.remove(&m.key);
+                }
+                continue;
+            }
             if self.stale.contains(&m.key) {
                 continue;
             }
@@ -1062,6 +1079,7 @@ impl Lod {
             reach,
         };
         let changed = self.dirty
+            || released
             || self
                 .wanted_at
                 .is_none_or(|previous| !selection.similar(previous));
@@ -1085,11 +1103,18 @@ impl Lod {
             self.wanted_at = Some(selection);
             let d = &c.dims[dim as usize];
             let heights = ((d.min_cube_y as f64 * 16.0).max(i16::MIN as f64), (d.max_cube_y as f64 * 16.0 + 16.0).min(i16::MAX as f64));
-            let normal = (camera.fov < normal_fov).then(|| {
+            let normal = zooming.then(|| {
                 let wide = super::world_render::Camera { fov: (normal_fov * 1.1).min(175.0), ..guard };
                 LodView { projection: wide.proj(aspect) * wide.view(), ..selection }
             });
+            if released {
+                self.frontier.clear();
+                self.transitions.clear();
+            }
             let mut needed = self.pick(selection, heights, normal);
+            if released {
+                self.release_zoom(|key| render.remove_lod(key));
+            }
             let mut next = FxHashSet::default();
             for &root in self.wanted.iter().take_while(|k| k.level == self.max_level) {
                 self.cover(root, &needed, &mut next);
@@ -1244,6 +1269,9 @@ impl Lod {
         spare.sort_unstable();
         for (_, key, size) in spare {
             self.ready.remove(&key);
+            if !self.pending.contains(&key) {
+                self.zoom_only.remove(&key);
+            }
             render.remove_lod(key);
             quads -= size;
             count -= 1;
@@ -1251,6 +1279,16 @@ impl Lod {
                 break;
             }
         }
+    }
+
+    fn release_zoom(&mut self, mut remove: impl FnMut(TileKey)) {
+        self.zoom_only.retain(|key| {
+            if self.ready.remove(key).is_some() {
+                remove(*key);
+            }
+            // Ignore a late completion unless a subsequent ordinary view needs it.
+            self.pending.contains(key)
+        });
     }
 
     /// How high the land is at the camera's column.
@@ -1421,6 +1459,8 @@ impl Lod {
                 .iter()
                 .map(|&key| (key, view.pos)),
         );
+        self.zoom_only
+            .retain(|key| !self.remembered.contains_key(key));
         if needed
             .iter()
             .any(|k| k.level == self.max_level && !self.ready.contains_key(k))
@@ -1442,6 +1482,9 @@ impl Lod {
         }
         self.wanted.clear();
         self.wanted.extend(needed.iter().copied());
+        if let Some(wide) = wide {
+            self.wanted.extend(wide.difference(&needed).copied());
+        }
         self.wanted
             .sort_by_cached_key(|key| (std::cmp::Reverse(key.level), key.distance(p).0.to_bits()));
         needed
@@ -1476,8 +1519,10 @@ impl Lod {
     fn request(&mut self) {
         let Some(terrain) = &self.terrain else { return };
         let columns = (self.columns_dim == self.dim).then_some(&self.columns);
+        // Released zoom jobs may finish, but no longer occupy ordinary request slots.
+        let retired = if self.zooming { 0 } else { self.zoom_only.len() };
         for &key in &self.wanted {
-            if self.pending.len() >= IN_FLIGHT {
+            if self.pending.len() >= IN_FLIGHT + retired {
                 break;
             }
             // Leave the mark: the one in flight still has the old columns.
@@ -1489,6 +1534,9 @@ impl Lod {
                 continue;
             }
             self.pending.insert(key);
+            if self.zooming && !self.remembered.contains_key(&key) && !self.ready.contains_key(&key) {
+                self.zoom_only.insert(key);
+            }
             let (dim, seed) = (self.dim, self.seed);
             let (done, terrain, columns) = (self.done.0.clone(), terrain.clone(), columns.cloned());
             let dir = self.cache_dir.clone();
@@ -1630,19 +1678,26 @@ mod tests {
             for _ in 0..=MAX_LEVEL {
                 let tiles = lod.pick(narrow, heights, Some(wide));
                 expected.extend(lod.select(wide, heights));
-                if tiles.iter().all(|k| lod.ready.contains_key(k)) {
+                if lod.wanted.iter().all(|k| lod.ready.contains_key(k)) {
                     assert!(!tiles.is_subset(&lod.select(wide, heights)));
                     break;
                 }
-                lod.ready.extend(
-                    tiles
-                        .into_iter()
-                        .map(|k| (k, ReadyTile { y: (0, 256), ..ReadyTile::default() })),
-                );
+                for &key in &lod.wanted {
+                    if !lod.remembered.contains_key(&key) {
+                        lod.zoom_only.insert(key);
+                    }
+                    lod.ready
+                        .insert(key, ReadyTile { y: (0, 256), ..ReadyTile::default() });
+                }
             }
         }
         assert_eq!(lod.remembered.keys().copied().collect::<FxHashSet<_>>(), expected);
         assert_eq!(lod.pick(normal, heights, None), lod.select(normal, heights));
+        let late = *lod.zoom_only.iter().next().unwrap();
+        lod.pending.insert(late);
+        lod.release_zoom(|_| {});
+        assert_eq!(lod.ready.keys().copied().collect::<FxHashSet<_>>(), expected);
+        assert_eq!(lod.zoom_only, FxHashSet::from_iter([late]));
     }
 
     #[test]

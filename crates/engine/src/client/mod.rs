@@ -3098,13 +3098,14 @@ impl Client {
         if self.joined {
             let remaining = (self.budget * 2).saturating_sub(std::time::Duration::from_secs_f64(self.spent));
             let normal_fov = self.base_camera_fov() * self.player.zoom.max(1.0);
+            let lod_cam = Camera { fov: self.cameras.lod_fov, ..cam };
             self.lod.update(
                 gpu,
                 &mut self.render,
                 &mut self.world,
                 textures,
                 self.seed,
-                &cam,
+                &lod_cam,
                 (frame.width, frame.height),
                 normal_fov,
                 self.view_radius,

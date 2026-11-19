@@ -3004,6 +3004,9 @@ pub struct CameraArgs {
     pub anchor: Vec3,
     /// Previous mode pose for a shot, current computed pose for a global modifier.
     pub out: CameraPose,
+    /// Multiply the displayed FOV by this for terrain detail selection. Starts at 1 each frame.
+    /// A scope can undo its visual easing here once the player releases it.
+    pub lod_fov_scale: f32,
 }
 
 /// Eye height as a share of an entity's height unless it says otherwise (vanilla's default).
