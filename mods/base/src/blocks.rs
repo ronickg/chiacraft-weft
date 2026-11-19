@@ -184,6 +184,12 @@ fn plant(r: &mut Registry, handle: &'static Block, tex: &str) {
         .hitbox([5.0, 0.0, 5.0], [11.0, 10.0, 11.0])
         .needs_below("#plant_soil")
         .tab(&crate::tabs::NATURAL);
+    r.loot(handle)
+        .pool(
+            Pool::new()
+                .when(Cond::tool("#tools/shears"))
+                .item(handle.name())
+        );
 }
 
 fn pick_berries(u: &mut Use, berry: &'static Item) -> bool {
@@ -491,21 +497,40 @@ pub fn register(r: &mut Registry) {
         .replaceable()
         .needs_below("#plant_soil")
         .tab(&crate::tabs::NATURAL);
+    r.loot(&INULA)
+        .pool(
+            Pool::new()
+                .when(Cond::tool("#tools/shears"))
+                .item(INULA.name())
+        );
     r.block(&VERBASCUM)
         .sound_group("grass")
         .tall_plant("verbascum_bottom", "verbascum_top")
         .replaceable()
         .needs_below("#plant_soil")
         .tab(&crate::tabs::NATURAL);
+    r.loot(&VERBASCUM)
+        .pool(
+            Pool::new()
+                .when(Cond::tool("#tools/shears"))
+                .item(VERBASCUM.name())
+        );
     r.block(&LAVENDER)
         .sound_group("grass")
         .tall_plant("lavender_bottom", "lavender_top")
         .replaceable()
         .needs_below("#plant_soil")
         .tab(&crate::tabs::NATURAL);
+    r.loot(&LAVENDER)
+        .pool(
+            Pool::new()
+                .when(Cond::tool("#tools/shears"))
+                .item(LAVENDER.name())
+        );
     r.block(&CLOVER)
         .sound_group("grass")
         .needs_below("#plant_soil")
+        .hardness(0.0)
         .model_box_faces(
             [0.0, 0.0, 0.0],
             [16.0, 2.0, 16.0],
@@ -537,6 +562,12 @@ pub fn register(r: &mut Registry) {
         .tint_kind(&tints::GRASS)
         .not_solid()
         .tab(&crate::tabs::NATURAL);
+    r.loot(&CLOVER)
+        .pool(
+            Pool::new()
+                .when(Cond::tool("#tools/shears"))
+                .item(CLOVER.name())
+        );
 
     r.block(&SAPLING)
         .sound_group("grass")
