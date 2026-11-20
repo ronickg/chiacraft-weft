@@ -829,7 +829,7 @@ fn tick_furnaces(b: &mut SystemBatch<Work>) {
 }
 
 /// Another mod's blocks, found by name the first time they are used.
-static STONE: Block = Block::named("base:stone");
+use base_api::blocks::STONE;
 static GRASS: Block = Block::named("base:grass");
 static DIRT: Block = Block::named("base:dirt");
 static CHEST: Block = Block::named("base:chest");

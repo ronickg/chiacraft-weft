@@ -1,9 +1,8 @@
-//! What other mods use of the base game, as types: its events with their values, components,
-//! value chains, recipe kinds, equipment slots, creative tabs and dimensions. A mod adds
-//! `base_api` to its `Cargo.toml` and gets these checked when it compiles, without depending on
-//! the game's code; the engine still compares the value layouts when the mods load.
+//! Typed handles and shared value types for the base game. Add `base_api` to your mod's
+//! `Cargo.toml` to use them. The engine checks shared value layouts when mods load.
 //!
-//! Names here are full (`base:..`): the statics compile into whichever mod uses them.
+//! Content handles use explicit `base:` names so they resolve to the base game's entries
+//! in every mod. Shared vocabulary such as the `fuel` component keeps its unqualified name.
 
 /// Shared components, their value types, and food-item helpers.
 pub mod components;
@@ -23,6 +22,7 @@ pub mod chains;
 /// HUD elements exposed by the base game.
 pub mod hud;
 
+/// Dimensions registered by the base game.
 pub mod dimensions;
 
 /// Vanilla's entity kinds.

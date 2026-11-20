@@ -12,8 +12,7 @@ static COUNTS: [AtomicU32; 8] = [const { AtomicU32::new(0) }; 8];
 const EVENT_NAMES: [&str; 8] =
     ["block_broken", "block_placed", "item_picked_up", "entity_died", "entity_hurt", "player_joined", "item_used", "smelted"];
 
-use base_api::events::SMELTED;
-static GOLD: Block = Block::named("base:gold_block");
+use base_api::{blocks::GOLD_BLOCK, entities::PIG, events::SMELTED};
 static GOLD_HELMET: Item = Item::named("base:gold_helmet");
 static RED_LAMP: Item = Item::named("base:red_lamp");
 static BLUE_LAMP: Item = Item::named("base:blue_lamp");
@@ -31,7 +30,6 @@ static DISPLAY_PHASE: Component<u32> = Component::named("testmod:display_phase")
 static DISPLAY_PARTS: Storage = Storage::named("testmod:display_parts");
 /// A stash every player carries, for menus on an inventory that is no block's or entity's own.
 static STASH: Storage = Storage::named("testkit:stash");
-static PIG: EntityKind = EntityKind::named("base:pig");
 /// Green light and nothing drawn, for the dynamic light test.
 static LIT: EntityEffect = EntityEffect::named("lit");
 /// Shows what is in its one slot.
@@ -285,7 +283,10 @@ pub fn register(r: &mut Registry) {
             .extend(b.iter().map(|v| (v.feature, v.pos)));
     });
     r.config(&HALF_DAMAGE).bool(false).world();
-    r.before_event(&actions::BREAK_BLOCK, |q| if GOLD.is(q.state()) && PROTECT_GOLD.get() { Verdict::Deny } else { Verdict::Abstain });
+    r.before_event(
+        &actions::BREAK_BLOCK,
+        |q| if GOLD_BLOCK.is(q.state()) && PROTECT_GOLD.get() { Verdict::Deny } else { Verdict::Abstain },
+    );
     r.modify(&chain::DAMAGE, &phase::FINAL, |m| {
         if HALF_DAMAGE.get() {
             m.value *= 0.5;
