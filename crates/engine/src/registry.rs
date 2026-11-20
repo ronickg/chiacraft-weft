@@ -1898,7 +1898,7 @@ fn engine_entities() -> Vec<RawEntry> {
             .set(k::CARRY_HEIGHT, 3.0f32)
             .set(
                 k::SEATS,
-                vec![abi::Seat { pos: [0.0, 1.0, 0.0].into(), steers: false, exit: abi::seat_exit::STAY, exit_at: abi::Vec3::default() }],
+                vec![abi::Seat { pos: [0.0, 0.0, 0.0].into(), steers: false, exit: abi::seat_exit::STAY, exit_at: abi::Vec3::default() }],
             ),
     ]
 }

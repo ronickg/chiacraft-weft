@@ -396,6 +396,7 @@ pub(crate) fn engine_assets(dev: bool) -> PathBuf {
 #[derive(Default, PartialEq)]
 struct Applied {
     vsync: bool,
+    frame_interval: Option<Duration>,
     view: i32,
     language: String,
     gui_scale: u32,
@@ -1656,8 +1657,10 @@ impl Running {
     /// command or a test.
     fn apply_settings(&mut self) {
         use crate::settings as s;
+        let fps_limit = s::fps_limit();
         let mut now = Applied {
             vsync: s::vsync(),
+            frame_interval: (fps_limit > 0).then(|| Duration::from_secs_f64(1.0 / f64::from(fps_limit))),
             view: s::view_distance(),
             language: s::language(),
             gui_scale: s::gui_scale(),
@@ -2050,9 +2053,17 @@ impl ApplicationHandler for App {
                 r.input.cursor = Vec2::new(position.x as f32, position.y as f32);
             }
             WindowEvent::RedrawRequested => {
+                let now = Instant::now();
+                if r.applied
+                    .frame_interval
+                    .is_some_and(|interval| now < r.last + interval)
+                    && !r.quit
+                {
+                    return;
+                }
                 let aim = r.aim();
                 r.touches.tick(&mut r.input, aim);
-                if frame(r, &self.opts) || r.quit {
+                if frame(r, &self.opts, now) || r.quit {
                     r.leave_world_silent();
                     el.exit();
                 }
@@ -2061,8 +2072,16 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn about_to_wait(&mut self, _el: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, el: &ActiveEventLoop) {
         if let Some(r) = &self.run {
+            if let Some(interval) = r.applied.frame_interval {
+                let next = r.last + interval;
+                if next > Instant::now() && !r.quit {
+                    el.set_control_flow(ControlFlow::WaitUntil(next));
+                    return;
+                }
+            }
+            el.set_control_flow(ControlFlow::Poll);
             r.window.request_redraw();
         }
     }
@@ -2085,9 +2104,8 @@ struct UiCallbacks {
 }
 
 /// One frame. Returns true when the app should quit.
-fn frame(r: &mut Running, opts: &Options) -> bool {
+fn frame(r: &mut Running, opts: &Options, now: Instant) -> bool {
     r.retired = None;
-    let now = Instant::now();
     let dt = (now - r.last).as_secs_f64();
     r.last = now;
     let scale = r.gui_scale();

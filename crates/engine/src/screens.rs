@@ -646,6 +646,12 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                     .into_iter()
                     .flatten(),
             )
+            .chain(
+                (d.kind == ck::INT && !small)
+                    .then(|| [d.show(d.min), d.show(d.max)])
+                    .into_iter()
+                    .flatten(),
+            )
             .filter(|n| cx.lang.has(&format!("{key}.{n}")))
             .collect(),
     );
