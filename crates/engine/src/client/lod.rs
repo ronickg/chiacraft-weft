@@ -369,6 +369,15 @@ fn mesh(
     for j in -1..=CELLS {
         for i in -1..=CELLS {
             let (top_y, surface) = over(i, j);
+            if s <= 2 {
+                let p = origin + IVec2::new(i * s + s / 2, j * s + s / 2);
+                if columns
+                    .get(&p)
+                    .is_some_and(|col| col.top != 0 || !col.spans.is_empty())
+                {
+                    h[(i + 1) as usize][(j + 1) as usize] = corner_y(words, i, j);
+                }
+            }
             if surface != 0
                 && let Some(dark) = sky_under(surface).1
             {
@@ -620,9 +629,7 @@ fn mesh(
     let record = |f: &Face| {
         let mut q = quad(f.dir, f.at[0], f.at[1], f.at[2], (f.size[0], f.size[1], f.size[2]), f.tex, f.tint, f.biome, f.ao, f.light, scale);
         if let Some(cover) = f.cover {
-            q[0] &= !(crate::gpu_layout::tint::MASK << lod_face::TINT_SHIFT);
-            q[1] = f.tex | (u32::from(cover.gain) << face::BIOME_SHIFT);
-            q[3] |= 1 << lod_face::COVER_SHIFT;
+            crate::gpu_layout::lod_set_gain(&mut q, cover.gain);
             if let Some(tex) = cover.pattern {
                 crate::gpu_layout::lod_set_cover_pattern(&mut q, tex);
             }
@@ -893,7 +900,10 @@ fn add_structures(
         };
         let (lx, lz) = (p.x - x0, p.y - z0);
         for span in &col.spans {
-            let (bottom, span_hi, block, light) = (span.bottom, span.top, span.block, span.light);
+            let (bottom, span_hi, block, light) = (span.bottom.max(ground + 1), span.top, span.block, span.light);
+            if bottom > span_hi {
+                continue;
+            }
             if c.states[block as usize].model == BlockModel::Boxes {
                 for (mn, mx, textures) in model_boxes(&c.states[block as usize]) {
                     let height = span_hi - bottom + 1;
@@ -950,7 +960,13 @@ fn add_structures(
                                 scale,
                             );
                             let (mn, mx) = scaled_edges(lx, lz, scale, mn, mx);
-                            out.push(lod_box(r, mn, mx, extrude));
+                            let mut r = lod_box(r, mn, mx, extrude);
+                            if c.states[block as usize].layer == weft_abi::RenderLayer::Cutout {
+                                let rgb = c.kind_color(tint as u8, Some(biome as u16));
+                                let gain = crate::gpu_layout::lod_color_gain([16, 8, 0].map(|s| ((rgb >> s) & 255) as f32 / 255.0));
+                                crate::gpu_layout::lod_set_gain(&mut r, gain);
+                            }
+                            out.push(r);
                         }
                         if extrude {
                             break;

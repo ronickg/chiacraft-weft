@@ -9,7 +9,7 @@ use super::{CELLS, Columns, GRID, TileKey, corner_y, sample_offset};
 use crate::client::textures::GameTextures;
 use crate::client::{looks, mesher};
 use crate::content::Content;
-use crate::gpu_layout::lod_face;
+use crate::gpu_layout::lod_color_gain;
 
 pub(super) type Colors = [[Option<Cell>; GRID]; GRID];
 
@@ -203,11 +203,9 @@ impl Cover {
                 // Apply color relative to the original texture so its full contrast survives.
                 let color = ground + delta / n as f32;
                 let gain = color / material.rgb.max(Vec3::splat(1.0 / 255.0));
-                let rgb = (gain / lod_face::COVER_GAIN as f32).clamp(Vec3::ZERO, Vec3::ONE) * Vec3::new(31.0, 63.0, 31.0);
-                let rgb = rgb.round().as_uvec3();
                 colors[i as usize + 1][j as usize + 1] = Some(Cell {
                     texture: material.texture,
-                    gain: ((rgb.x << 11) | (rgb.y << 5) | rgb.z) as u16,
+                    gain: lod_color_gain(gain.to_array()),
                     height: height * 2.0 / n as f32,
                     pattern,
                 });

@@ -86,7 +86,8 @@ shared! {
         /// edges go: red and green at the top of word 2, blue under word 3's AO.
         LIGHT_RG_SHIFT = 26,
         LIGHT_B_SHIFT = 20,
-        /// Word 3 flag: the upper half of word 1 holds an RGB565 texture gain.
+        /// Word 3 flag: word 1 holds an RGB565 texture gain. For a partial box it
+        /// also selects alpha testing. For a plain terrain wall there is a pattern.
         COVER_SHIFT = 23,
         COVER_GAIN = 2,
         /// On a covered wall, the pattern texture uses the AO byte and block light bits.
@@ -394,11 +395,22 @@ pub fn lod_set_cover_pattern(r: &mut [u32; 4], tex: u16) {
 
 pub fn lod_cover_pattern(r: &[u32; 4]) -> Option<u32> {
     use lod_face as l;
-    (r[3] & (1 << l::COVER_SHIFT) != 0 && face_dir_lod(r[0]) != 3).then(|| {
+    (r[3] & (1 << l::COVER_SHIFT) != 0 && r[0] & (1 << l::PARTIAL_SHIFT) == 0 && face_dir_lod(r[0]) != 3).then(|| {
         (r[3] >> l::PATTERN_LOW_SHIFT)
             | (((r[2] >> l::LIGHT_RG_SHIFT) & l::PATTERN_MID_MASK) << 8)
             | (((r[3] >> l::LIGHT_B_SHIFT) & l::PATTERN_HIGH_MASK) << 14)
     })
+}
+
+pub fn lod_color_gain(gain: [f32; 3]) -> u16 {
+    let pack = |x: f32, max: f32| ((x / lod_face::COVER_GAIN as f32).clamp(0.0, 1.0) * max).round() as u16;
+    pack(gain[0], 31.0) << 11 | pack(gain[1], 63.0) << 5 | pack(gain[2], 31.0)
+}
+
+pub fn lod_set_gain(r: &mut [u32; 4], gain: u16) {
+    r[0] &= !(tint::MASK << lod_face::TINT_SHIFT);
+    r[1] = (r[1] & face::TEX_MASK) | (u32::from(gain) << face::BIOME_SHIFT);
+    r[3] |= 1 << lod_face::COVER_SHIFT;
 }
 
 fn face_dir_lod(word: u32) -> u32 {
