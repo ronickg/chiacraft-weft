@@ -3398,8 +3398,8 @@ impl Client {
                 .filter(|_| !self.hide_gui)
                 .map(|h| (h, self.frame_place(h.frame))),
             self.placement_preview
-                .filter(|_| !self.hide_gui)
-                .map(|(frame, p, part)| (p, part, self.frame_place(frame))),
+                .filter(|(frame, _, _)| self.target.is_some_and(|hit| hit.frame == *frame))
+                .map(|(_, p, part)| (p, part)),
             &cracks,
             &self.gizmo_lines,
             &self.gizmo_fills,

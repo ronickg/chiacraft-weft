@@ -614,7 +614,7 @@ impl Hud {
             }
             Part::Crosshair => drop(ui.add(Kind::Custom { tag: TAG_CROSSHAIR, data: 0 }, Style::default().size(9.0, 9.0))),
             Part::PlacementMode if by_face || editing => {
-                ui.text(text::plain(lang.get("hud.placement.active")), "label");
+                ui.text(text::plain(lang.get("hud.placement.gridless")), "label");
             }
             Part::PlacementMode => {}
             Part::Effects => {
@@ -679,9 +679,10 @@ impl Hud {
             Part::Touch(i) => {
                 let b = &touch_buttons[i];
                 ui.panel("touch_button", Style::default().size(b.size, b.size).center(), |ui| {
-                    let label = if b.action == crate::input::PLACEMENT_MODE {
+                    let placement = b.action == crate::input::PLACEMENT_MODE;
+                    let label = if placement {
                         crate::touch::Label::Text(
-                            lang.get(if by_face { "hud.placement.face" } else { "hud.placement.grid" })
+                            lang.get(if by_face { "hud.placement.gridless" } else { "hud.placement.grid" })
                                 .into(),
                         )
                     } else {
@@ -701,7 +702,7 @@ impl Hud {
                             let fit = (b.size * 0.8 / (6.0 * name.chars().count().max(1) as f32)).min(b.size * 0.5 / 8.0);
                             if let Some(t) = ui.text_mut(t) {
                                 t.wrap = false;
-                                t.scale = fit.floor().max(1.0);
+                                t.scale = if placement { fit.min(fit.floor().max(1.0)) } else { fit.floor().max(1.0) };
                             }
                         }
                     }
