@@ -213,7 +213,8 @@ pub mod terrain {
             SAMPLES = 36 * 36,
             WORDS = 4,
             CAVE_REACH = 48,
-            CAVE_DEPTH_MASK = 255,
+            CAVE_DEPTH_MASK = 127,
+            CAVE_OPEN_FLOOR = 128,
             CAVE_ROOF_SHIFT = 8,
             SOIL_DEPTH_SHIFT = 16,
         }
@@ -986,8 +987,8 @@ bindings! {
         // Block shader slot (`shaders/block/<name>.wgsl`) per texture id, 0 none.
         TEX_SHADER "tex_shader": "array<u32>",
         SCENE "scene": "Scene",
-        // A bit per cube column around the camera's, addressed modulo 2 * g.extra.w + 1:
-        // its cubes show its ground, distant terrain is not drawn there (`client::lod`).
+        // Ground and surface bitmaps, followed by the bottom covered cube per column.
+        // Columns are addressed modulo 2 * g.extra.w + 1 (`client::lod`).
         LOD_MASK "lod_mask": "array<u32>",
         // Which blocks around the camera cast shadows, for shader packs that call `solid_at`
         // (`client::world_render::Solid`); a single word otherwise.

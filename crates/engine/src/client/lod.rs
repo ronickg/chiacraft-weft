@@ -223,7 +223,9 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
                         let shift = y.saturating_sub(natural_y);
                         words[w + 3] &= !0xFFFF;
                         if floor > roof + 1 && shift >= -roof && shift <= depth_mask as i32 - floor {
-                            words[w + 3] |= (floor + shift) as u32 | ((roof + shift) as u32) << lod_gpu::CAVE_ROOF_SHIFT;
+                            words[w + 3] |= (floor + shift) as u32
+                                | ((roof + shift) as u32) << lod_gpu::CAVE_ROOF_SHIFT
+                                | gap & lod_gpu::CAVE_OPEN_FLOOR;
                         }
                     }
                     words[w] = (y as u32 & 0xFFFF) | (top << 16);
@@ -299,6 +301,10 @@ fn cave_gap(words: &[u32], i: i32, j: i32) -> Option<(i32, i32)> {
         let y = corner_y(words, i, j);
         (y - floor + 1, y - roof)
     })
+}
+
+fn cave_has_floor(words: &[u32], i: i32, j: i32) -> bool {
+    words[sample_offset(i, j) + 3] & lod_gpu::CAVE_OPEN_FLOOR == 0
 }
 
 fn cave_cut(words: &[u32], i: i32, j: i32) -> bool {
@@ -406,23 +412,31 @@ fn mesh(
             let y = column(&h, i, j);
             let (top, biome, _, light) = at(i, j);
             let lit = ground_light(i, j, y, light);
-            let lit = cave_mouth(i, j).map_or(lit, |mouth| shade_sky(lit, mouth - y));
-            let (tex, tint) = face_of(top, 3);
-            faces.push(Face {
-                dir: 3,
-                at: [i * s, y, j * s],
-                size: [s, 1, s],
-                tex,
-                tint,
-                biome,
-                ao: ao_bits(&h, i, j, 3, y),
-                light: lit,
-                part: ALWAYS,
-                cover: plants(i, j).map(|cell| cover::Appearance { gain: cell.gain, pattern: None }),
+            let lit = cave_mouth(i, j).map_or(lit, |mouth| {
+                let loss = if key.level == 0 && cave_has_floor(words, i, j) { 0 } else { mouth - y };
+                shade_sky(lit, loss)
             });
+            let (tex, tint) = face_of(top, 3);
+            if cave_mouth(i, j).is_none() || cave_has_floor(words, i, j) {
+                faces.push(Face {
+                    dir: 3,
+                    at: [i * s, y, j * s],
+                    size: [s, 1, s],
+                    tex,
+                    tint,
+                    biome,
+                    ao: ao_bits(&h, i, j, 3, y),
+                    light: lit,
+                    part: ALWAYS,
+                    cover: plants(i, j).map(|cell| cover::Appearance { gain: cell.gain, pattern: None }),
+                });
+            }
             (lo, hi) = (lo.min(y), hi.max(y + 1));
             if let Some((floor, roof)) = cave_gap(words, i, j) {
                 for (dir, by) in [(3, floor - 1), (2, roof)] {
+                    if dir == 3 && !cave_has_floor(words, i, j) {
+                        continue;
+                    }
                     let (tex, tint) = face_of(terrain.stone, dir as usize);
                     faces.push(Face {
                         dir,
@@ -485,7 +499,8 @@ fn mesh(
                     } else {
                         ny + 1
                     };
-                    let sky = (bottom, y + 1, mouth);
+                    let open_sky = key.level == 0 && cave_cut(words, ni, nj) && cave_has_floor(words, ni, nj);
+                    let sky = (bottom, y + 1, if open_sky { None } else { mouth });
                     let below_roof = other_gap.map(|(a, b)| (a, b, Some(b + CAVE_LIGHT_REACH / 2)));
                     let mut emit = |from: i32, to: i32, state: u32, mouth: Option<i32>| {
                         if from >= to {
@@ -521,8 +536,9 @@ fn mesh(
                             start = end;
                         }
                     };
+                    let under_floor = if cave_has_floor(words, i, j) { i16::MIN as i32 } else { floor };
                     for (a, b, shadow) in std::iter::once(sky).chain(below_roof) {
-                        for (solid_lo, solid_hi) in [(i16::MIN as i32, floor), (roof, y + 1)] {
+                        for (solid_lo, solid_hi) in [(under_floor, floor), (roof, y + 1)] {
                             let (lo, hi) = (a.max(solid_lo), b.min(solid_hi));
                             emit(lo, hi.min(y - soil), terrain.stone, shadow);
                             emit(lo.max(y - soil), hi.min(y), under, shadow);
@@ -1634,11 +1650,15 @@ impl Lod {
         let set = |mask: &mut Vec<u32>, col: IVec2| {
             let i = slot(col);
             let bit = 1u32 << (i % 32);
-            let mut changed = false;
-            for (part, through) in [(0, true), (1, false)] {
+            let bottom = world.column_coverage(col, seed, true);
+            let depth = &mut mask[2 * words + i];
+            let old_depth = *depth;
+            *depth = bottom.unwrap_or(i32::MAX) as u32;
+            let mut changed = *depth != old_depth;
+            for (part, shown) in [(0, bottom.is_some()), (1, world.column_shown(col, seed, false))] {
                 let word = part * words + i / 32;
                 let old = mask[word];
-                mask[word] = if world.column_shown(col, seed, through) { old | bit } else { old & !bit };
+                mask[word] = if shown { old | bit } else { old & !bit };
                 changed |= old != mask[word];
             }
             changed
@@ -1646,7 +1666,7 @@ impl Lod {
         let inside = |col: IVec2, at: IVec2| (col - at).abs().max_element() <= half;
         if half != self.half || self.mask.is_empty() {
             self.half = half;
-            self.mask = vec![0; 2 * words];
+            self.mask = vec![0; 2 * words + (w * w) as usize];
             self.center = center;
             for z in -half..=half {
                 for x in -half..=half {

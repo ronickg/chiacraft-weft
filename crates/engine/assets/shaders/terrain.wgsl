@@ -362,23 +362,27 @@ fn cave_plane(grid: vec2<i32>, y: i32, weight: vec2<i32>) -> vec2<i32> {
 
 // Keep the lattice planes while walking down a column. Return the solid floor and roof.
 // For an open cut the search stops at the first solid block.
-fn lod_cave(x: i32, z: i32, ground: i32, hi: i32, lo: i32, cut: bool) -> vec2<i32> {
+fn lod_cave(x: i32, z: i32, ground: i32, hi: i32, exposed: i32, lo: i32, cut: bool) -> vec3<i32> {
     let grid = vec2(div_floor(x, 4).x, div_floor(z, 4).x) * 4;
     let weight = (vec2(x, z) - grid) * 1024;
     let closed = cavern_roof(x, z);
     let first = div_floor(hi, 4).x * 4 + 4;
-    let last = div_floor(lo + 1, 4).x * 4;
+    let last = div_floor(lo, 4).x * 4;
     var upper = vec2(0);
     var roof = hi + 1;
     for (var plane = first; plane >= last; plane -= 4) {
         let lower = cave_plane(grid, plane, weight);
         if plane != first {
-            for (var y = min(hi, plane + 3); y >= plane && y > lo; y -= 1) {
+            for (var y = min(hi, plane + 3); y >= plane && y >= lo; y -= 1) {
+                // Once past the lip, only continue tracing a gap that opens above it.
+                if y < exposed && roof <= exposed {
+                    return vec3(0);
+                }
                 let n = lerp2(lower, upper, (y - plane) * 1024);
                 let carved = carves(n.x > 0, n.y, closed, ground - y * 16);
                 if !carved || (y >= desc[D_LAVA_FROM] && y < desc[D_LAVA_TO] && lake(y) != 0) {
                     if cut || roof - y >= 4 {
-                        return vec2(y, roof);
+                        return vec3(y, roof, 1);
                     }
                     roof = y;
                 }
@@ -386,7 +390,7 @@ fn lod_cave(x: i32, z: i32, ground: i32, hi: i32, lo: i32, cut: bool) -> vec2<i3
         }
         upper = lower;
     }
-    return select(vec2(0), vec2(lo, roof), cut || roof - lo >= 4);
+    return select(vec3(0), vec3(lo, roof, 0), cut || roof - lo >= 4);
 }
 
 // The block at local (x, y, z) of column `i`, as `Terrain::generate`.
@@ -575,6 +579,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             var ground = 0;
             var lo = 0;
             var scan = false;
+            var open_floor = 0u;
             if heightfield {
                 let c = column(bx, bz);
                 y = c.height;
@@ -616,7 +621,8 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
                     let c01 = column(gx, gz + 4).height;
                     let c11 = column(gx + 4, gz + 4).height;
                     ground = (c00 * (4 - fx) + c10 * fx) * (4 - fz) + (c01 * (4 - fx) + c11 * fx) * fz;
-                    lo = y - i32(LOD_CAVE_REACH);
+                    // Follow an open shaft below the usual shell depth at block resolution.
+                    lo = y - i32(LOD_CAVE_REACH) * select(1, 2, s == 1);
                 }
             } else {
                 y = lod_floor[k];
@@ -626,27 +632,43 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
                 }
                 let low_x = min(lod_floor[k - 1u], lod_floor[k + 1u]);
                 let low_z = min(lod_floor[k - LOD_SIDE], lod_floor[k + LOD_SIDE]);
-                lo = max(y - i32(LOD_CAVE_REACH), min(low_x, low_z));
+                var lip = min(low_x, low_z);
+                if s == 1 {
+                    // Follow the opening into adjacent roofed columns, where the nearest
+                    // surface is the roof rather than the floor visible through the mouth.
+                    let at = vec2<i32>(i32(i), i32(j));
+                    let limit = vec2<i32>(i32(LOD_SIDE) - 1);
+                    let lip_reach = 6;
+                    for (var d = -lip_reach; d <= lip_reach; d += 1) {
+                        let x = clamp(at.x + d, 0, limit.x);
+                        let z = clamp(at.y + d, 0, limit.y);
+                        lip = min(lip, min(lod_floor[j * LOD_SIDE + u32(x)], lod_floor[u32(z) * LOD_SIDE + i]));
+                    }
+                }
+                lo = max(y - i32(LOD_CAVE_REACH), lip);
                 scan = y - lo >= 4;
                 ground = lod_ground[k];
             }
             if scan {
-                let gap = lod_cave(bx, bz, ground, y - select(1, 0, heightfield), lo, heightfield);
+                let depth = select(lo, y - 2 * i32(LOD_CAVE_REACH), s == 1);
+                let gap = lod_cave(bx, bz, ground, y - select(1, 0, heightfield), lo, depth, heightfield);
                 if heightfield && gap.x < y {
+                    open_floor = select(LOD_CAVE_OPEN_FLOOR, 0u, gap.z != 0);
                     over = u32(y - gap.x);
                     y = gap.x;
                     top = stone;
                     under = stone;
                     soil = 0u;
                 } else if !heightfield && gap.x < gap.y {
-                    outp[o + 3u] |= u32(y - gap.x) | (u32(y - gap.y) << LOD_CAVE_ROOF_SHIFT);
+                    outp[o + 3u] |= u32(y - gap.x) | (u32(y - gap.y) << LOD_CAVE_ROOF_SHIFT)
+                        | select(LOD_CAVE_OPEN_FLOOR, 0u, gap.z != 0);
                 }
             }
             if heightfield {
                 outp[o] = (u32(y) & 65535u) | (u32(top) << 16u);
                 outp[o + 1u] = (u32(biome) & 65535u) | (u32(under) << 16u);
                 outp[o + 2u] = over;
-                outp[o + 3u] = soil << LOD_SOIL_DEPTH_SHIFT;
+                outp[o + 3u] = (soil << LOD_SOIL_DEPTH_SHIFT) | open_floor;
                 if passes > 1u {
                     lod_floor[k] = y;
                     lod_ground[k] = ground;
