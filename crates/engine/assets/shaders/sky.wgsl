@@ -110,8 +110,8 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     if hit.color.a <= 0.0 {
         discard;
     }
-    let clip = scene.view_proj * vec4(dir * hit.distance, 1.0);
-    return CloudPixel(vec4(hit.color.rgb * hit.color.a, hit.color.a), clip.z / clip.w);
+    let clip = scene.view_proj * vec4(dir * max(hit.distance, 0.001), 1.0);
+    return CloudPixel(vec4(hit.color.rgb * hit.color.a, hit.color.a), clamp(clip.z / clip.w, 0.0, 1.0));
 }
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.

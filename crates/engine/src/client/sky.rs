@@ -407,7 +407,7 @@ impl Sky {
                 continue;
             }
             if s.kind == sky_kind::CLOUDS {
-                use crate::weather::{CLOUD_CELL, CLOUD_PERIOD};
+                use crate::weather::{CLOUD_CELL, CLOUD_HEIGHT};
                 let setting = |name: &str| {
                     c.game
                         .catalog
@@ -417,7 +417,8 @@ impl Sky {
                 };
                 let lifted = s.height as f64 + setting("core:cloud_height");
                 let low = (lifted - cam.pos.y) as f32;
-                if low >= environment.cloud_fog_end || low + 4.0 <= -environment.cloud_fog_end {
+                let height = if weather.clouds.is_some() { CLOUD_HEIGHT } else { 4.0 };
+                if low >= environment.cloud_fog_end || low + height <= -environment.cloud_fog_end {
                     continue;
                 }
                 let ambient = environment.ambient.max(0.0);
@@ -433,39 +434,35 @@ impl Sky {
                 };
                 let automatic = weather.clouds.is_some() && weather.forced.is_none();
                 let color = if automatic { shade(0.0, 0.0) } else { shade(environment.cloud_gray, environment.cloud_dark) };
-                let (ids, period, pos, colors, shift) = if let Some(field) = weather.clouds {
+                let (ids, size, pos, colors) = if let Some(field) = weather.clouds {
                     let color_for = |id: u16| {
                         let look = c.game.weathers[id as usize].look;
-                        shade(look.cloud_gray, look.cloud_dark)
+                        shade(look.cloud_gray, look.cloud_dark * 0.74)
                             .extend(0.0)
                             .to_array()
                     };
                     (
                         [u32::MAX, kind::CLOUDS, field.seed, automatic as u32],
-                        CLOUD_PERIOD as f64,
+                        CLOUD_CELL,
                         field.coords(glam::DVec2::new(cam.pos.x, cam.pos.z)),
                         [color_for(field.rain), color_for(field.thunder), [0.0; 4]],
-                        field.rain_shift,
                     )
                 } else {
                     let Some((index, [w, h])) = self.picture(gpu, &s.texture) else { continue };
-                    let pos = glam::DVec2::new(cam.pos.x + time * s.drift as f64, cam.pos.z) / CLOUD_CELL;
-                    ([index, kind::CLOUDS, w, h], 4096.0, pos, [[0.0; 4]; 3], 0.0)
+                    const TEXTURE_CELL: f64 = 12.0;
+                    let pos = glam::DVec2::new(cam.pos.x + time * s.drift as f64, cam.pos.z) / TEXTURE_CELL;
+                    ([index, kind::CLOUDS, w, h], TEXTURE_CELL, pos, [[0.0; 4]; 3])
                 };
+                let origin = if weather.clouds.is_some() { pos.floor() } else { pos.floor().rem_euclid(glam::DVec2::splat(4096.0)) };
                 clouds = Some(self.list.len() as u32);
                 self.list.push(GpuSky {
                     axes: colors,
-                    uv: [
-                        pos.x.rem_euclid(1.0) as f32,
-                        pos.y.rem_euclid(1.0) as f32,
-                        pos.x.floor().rem_euclid(period) as f32,
-                        pos.y.floor().rem_euclid(period) as f32,
-                    ],
+                    uv: [pos.x.rem_euclid(1.0) as f32, pos.y.rem_euclid(1.0) as f32, origin.x as f32, origin.y as f32],
                     color: color
-                        .extend(0.8 * environment.cloud_opacity * opacity)
+                        .extend(if weather.clouds.is_some() { 0.93 } else { 0.8 } * environment.cloud_opacity * opacity)
                         .to_array(),
                     ids,
-                    extra: [CLOUD_CELL as f32, 4.0, low, shift],
+                    extra: [size as f32, height, low, 0.0],
                 });
                 continue;
             }
