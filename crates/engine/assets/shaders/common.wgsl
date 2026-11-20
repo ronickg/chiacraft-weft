@@ -118,7 +118,7 @@ fn cloud_volume(s: Sky, dir: vec3<f32>, near: f32, far: f32, view: Scene) -> Clo
     let first_band = i32(clamp(floor(height_at_camera + height_rate * near), 0.0, 4.0));
     let last_band = i32(clamp(floor(height_at_camera + height_rate * far), 0.0, 4.0));
     let has_sun = s.cloud_sun.w > 0.0;
-    var scattered_sun = vec3(0.0);
+    var directed_sun = vec3(0.0);
     var sun_from_above = 1.0;
     if has_sun {
         // Two polynomial forward lobes approximate the broad glow and bright rim.
@@ -130,8 +130,8 @@ fn cloud_volume(s: Sky, dir: vec3<f32>, near: f32, far: f32, view: Scene) -> Clo
         let eighth = fourth * fourth;
         let narrow = eighth * eighth;
         let back = max(-cosine, 0.0);
-        scattered_sun = s.cloud_sun.rgb * (0.14 + 0.52 * eighth + 1.02 * narrow * narrow + 0.10 * back * back);
-        sun_from_above = smoothstep(-0.06, 0.22, s.axes[2].y);
+        directed_sun = s.cloud_sun.rgb * (0.16 + 0.48 * eighth + 0.95 * narrow * narrow + 0.10 * back * back);
+        sun_from_above = smoothstep(0.02, 0.36, s.axes[2].y);
     }
     var light = vec3(0.0);
     var alpha = 0.0;
@@ -169,8 +169,13 @@ fn cloud_volume(s: Sky, dir: vec3<f32>, near: f32, far: f32, view: Scene) -> Clo
                         // Approximate how far the light travels through the cloud from
                         // the local density, band height and solar elevation. Reuse the
                         // view sample instead of marching a second ray into the sun.
-                        let depth = density * sun_path * (1.0 + 0.30 * kind);
-                        radiance += scattered_sun * (1.0 - 0.97 * smoothstep(0.0, 1.0, depth));
+                        let depth = clamp(density * sun_path * (1.0 + 0.30 * kind), 0.0, 1.0);
+                        let direct = 1.0 - smoothstep(0.0, 1.0, depth);
+                        // A broad multiple-scattering approximation also lights the far side
+                        // and interior. Leave headroom for sunlit white clouds at noon.
+                        let diffuse = 0.34 - 0.15 * depth;
+                        let headroom = 1.0 - 0.65 * min(dot(radiance, vec3(0.30, 0.59, 0.11)), 1.0);
+                        radiance += (s.cloud_sun.rgb * diffuse + directed_sun * direct) * headroom;
                     }
                     first = min(first, t);
                     optical_distance += (t + end) * 0.5 * absorption;
@@ -265,6 +270,39 @@ fn trace_cloud(s: Sky, dir: vec3<f32>, limit: f32, view: Scene) -> CloudHit {
     return CloudHit(vec4(color, alpha), t, t);
 }
 
+// The primary bow is centered opposite the sun, with red at the outer edge.
+// Work in cosines of 39.4 and 42.4 degrees to avoid acos per fragment.
+fn rainbow_radiance(s: Sky, dir: vec3<f32>) -> vec3<f32> {
+    let sun = s.axes[2].xyz;
+    if s.cloud_sun.w <= 0.0 || sun.y <= 0.0 {
+        return vec3(0.0);
+    }
+    let cosine = -dot(dir, sun);
+    let inner = 0.772734;
+    let outer = 0.738455;
+    if cosine <= outer || cosine >= inner {
+        return vec3(0.0);
+    }
+    let band = (inner - cosine) / (inner - outer);
+    let edge = smoothstep(0.0, 0.14, band) * (1.0 - smoothstep(0.84, 1.0, band));
+    let red = smoothstep(0.54, 0.83, band) + 0.36 * (1.0 - smoothstep(0.14, 0.37, band));
+    let green = smoothstep(0.17, 0.45, band) * (1.0 - smoothstep(0.65, 0.94, band));
+    let blue = 1.0 - smoothstep(0.34, 0.69, band);
+    return vec3(red, green, blue) * s.cloud_sun.rgb * (0.55 * edge * smoothstep(0.0, 0.06, sun.y));
+}
+
+// One cloud-footprint sample along the light ray approximates the shadow on a rain bin.
+fn rain_sunlight(s: Sky, origin: vec2<i32>, at: vec2<f32>, height: f32) -> f32 {
+    let rise = s.extra.z + s.extra.y * 0.5 - height;
+    if rise <= 0.0 {
+        return 1.0;
+    }
+    let sun = s.axes[2].xyz;
+    let above = at + sun.xz * (rise / (max(sun.y, 0.002) * s.extra.x));
+    let shadow = cloud_field(s.ids.z, origin, above).x;
+    return 1.0 - smoothstep(0.06, 0.67, shadow);
+}
+
 // A soft mass beneath the cloud. Only the weather field moves it, with the cloud's drift.
 fn composite_rain_veil(s: Sky, dir: vec3<f32>, limit: f32, cloud: CloudHit, view: Scene) -> vec4<f32> {
     if s.ids.w == 0u || max(s.axes[0].w, s.axes[1].w) <= 0.0 {
@@ -287,6 +325,8 @@ fn composite_rain_veil(s: Sky, dir: vec3<f32>, limit: f32, cloud: CloudHit, view
     }
     let origin = vec2<i32>(s.uv.zw);
     let ray = dir.xz / s.extra.x;
+    let rainbow = rainbow_radiance(s, dir);
+    let in_bow = max(max(rainbow.r, rainbow.g), rainbow.b) > 0.002;
     var light = vec3(0.0);
     var alpha = 0.0;
     var front_alpha = 0.0;
@@ -326,7 +366,10 @@ fn composite_rain_veil(s: Sky, dir: vec3<f32>, limit: f32, cloud: CloudHit, view
             front_absorption = (1.0 - alpha) * (1.0 - exp(-extinction * (cloud.optical_distance - start)));
         }
         let luma = vec3(0.30, 0.59, 0.11);
-        let color = mix(vec3(dot(preset.rgb, luma) * 0.55), mix(vec3(dot(view.fog_color.rgb, luma)), view.fog_color.rgb, 0.28), 0.58);
+        var color = mix(vec3(dot(preset.rgb, luma) * 0.55), mix(vec3(dot(view.fog_color.rgb, luma)), view.fog_color.rgb, 0.28), 0.58);
+        if in_bow && absorption > 0.0 {
+            color += rainbow * rain_sunlight(s, origin, at, dir.y * t);
+        }
         light += mix(color, view.fog_color.rgb, rain_mist_amount(t, view)) * mix(absorption, front_absorption, cloud.color.a);
         alpha += absorption;
         front_alpha += front_absorption;
