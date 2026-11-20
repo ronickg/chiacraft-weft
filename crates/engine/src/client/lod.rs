@@ -2097,7 +2097,10 @@ mod tests {
         let key = TileKey { level: 2, x: -1, z: 1 };
         let mut saved = SavedColumns::new();
         for (x, z) in [(-141, 127), (-140, 116), (-4, 258), (11, 267), (12, 267), (-2, 268)] {
-            saved.insert((z, x), Arc::new(LodColumn { x, z, y: 40, top: 1, under: 2, light: 0, spans: Vec::new() }));
+            saved.insert(
+                (z, x),
+                Arc::new(LodColumn { x, z, y: 40, top: 1, under: 2, light: 0, spans: Vec::new(), removed_scatter: Vec::new() }),
+            );
         }
         let (cols, id) = tile_columns(key, Some(&saved));
         assert_eq!(cols.len(), 3);

@@ -41,6 +41,8 @@ pub struct LodColumn {
     pub under: u32,
     pub light: u32,
     pub spans: Vec<Span>,
+    /// Grid features whose original root is absent from this saved column.
+    pub removed_scatter: Vec<u32>,
 }
 
 /// The cubes beside one, -x, +x, -z, +z, as far as they are loaded: the light at its sides.
@@ -91,6 +93,10 @@ fn drawn(c: &Content, s: u32) -> bool {
             && st.flags & bf::REPLACEABLE == 0
             && st.model == BlockModel::Boxes
             && st.boxes.iter().any(|b| (0..3).all(|i| b.max[i] > b.min[i])))
+}
+
+pub(crate) fn impostor_block(c: &Content, s: u32) -> bool {
+    drawn(c, s) && c.states[s as usize].liquid.is_none()
 }
 
 /// Each channel the brighter of the two.
@@ -168,12 +174,38 @@ impl DimTops {
         let def = &c.dims[dim as usize];
         let Some(list) = self.cubes.get(&col) else { return };
         let sea = def.sea_level();
-        let scatter: Vec<_> = def
-            .features
-            .iter()
-            .enumerate()
-            .filter_map(|(i, f)| f.density_plan().map(|(spacing, _)| (i, f, spacing)))
-            .collect();
+        let mut natural: [_; 256] = std::array::from_fn(|_| Vec::new());
+        let mut roots: [_; 256] = std::array::from_fn(|_| Vec::new());
+        if def.features.iter().any(|f| f.density_plan().is_some()) {
+            for start in crate::features::column_starts(c, def, dim, seed, col.x, col.y).iter() {
+                let f = &def.features[start.feature];
+                if f.density_plan().is_none() {
+                    continue;
+                }
+                let mut root = None;
+                for put in &start.puts {
+                    let crate::features::Put::Block { at, state, .. } = *put else { continue };
+                    if IVec2::new(at.x.div_euclid(16), at.z.div_euclid(16)) != col || !impostor_block(c, state) {
+                        continue;
+                    }
+                    let index = ((at.z & 15) * 16 + (at.x & 15)) as usize;
+                    natural[index].push((at.y, state));
+                    if at.x == start.pos.x
+                        && at.z == start.pos.z
+                        && at.y >= start.pos.y + f.fit.buried
+                        && root.is_none_or(|(_, y, _)| at.y <= y)
+                    {
+                        root = Some((index, at.y, state));
+                    }
+                }
+                if let Some((i, y, block)) = root {
+                    roots[i].push((f.id, y, block));
+                }
+            }
+            for blocks in &mut natural {
+                blocks.sort_unstable();
+            }
+        }
         for i in 0..256 {
             let (x, z) = (col.x * 16 + (i % 16) as i32, col.y * 16 + (i / 16) as i32);
             let Some(t) = def.column(seed, x, z) else { continue };
@@ -194,23 +226,32 @@ impl DimTops {
             let mut spans: Vec<Span> = Vec::new();
             for (&cy, tops) in list.range(lowest..=highest) {
                 for r in tops.column(i) {
-                    let (bottom, top) = (cy * 16 + r.bottom, cy * 16 + r.top);
-                    match spans.last_mut() {
-                        Some(prev) if prev.top + 1 == bottom && prev.block == r.block => {
-                            (prev.top, prev.light) = (top, brighter(prev.light, r.light));
+                    let top = cy * 16 + r.top;
+                    let mut bottom = (cy * 16 + r.bottom).max(fy + 1);
+                    let mut push = |bottom, top| {
+                        if bottom > top {
+                            return;
                         }
-                        _ => spans.push(Span { bottom, top, ..*r }),
+                        match spans.last_mut() {
+                            Some(prev) if prev.top + 1 == bottom && prev.block == r.block => {
+                                (prev.top, prev.light) = (top, brighter(prev.light, r.light));
+                            }
+                            _ => spans.push(Span { bottom, top, ..*r }),
+                        }
+                    };
+                    for &(y, block) in &natural[i] {
+                        if block == r.block && y >= bottom && y <= top {
+                            push(bottom, y - 1);
+                            bottom = y + 1;
+                        }
                     }
+                    push(bottom, top);
                 }
-            }
-            spans.retain(|s| s.top > fy);
-            for s in &mut spans {
-                s.bottom = s.bottom.max(fy);
             }
             spans.drain(..spans.len().saturating_sub(MAX_SPANS));
             // The ground under them: from the highest saved cube down, what shows in it; where
             // one isn't saved above the terrain's ground, air; at or under it, the terrain.
-            let limit = spans.first().map_or(i32::MAX, |s| s.bottom - 1);
+            let limit = fy;
             let mut here = None;
             for cy in (lowest.min(ground) - 1..=highest).rev() {
                 match list.get(&cy) {
@@ -244,31 +285,23 @@ impl DimTops {
                 y == fy && (top == ftop || ftop == u32::MAX && c.states[top as usize].liquid.is_some())
             };
             let light = here.map_or(0, |h| h.3);
-            // A saved empty tree site is authoritative even when its ground is in an unsaved
-            // cube below. Otherwise a felled tree reappears outside the real cube view.
-            let saved_root = || {
-                scatter.iter().any(|&(i, f, spacing)| {
-                    let cell = (x.div_euclid(spacing), z.div_euclid(spacing));
-                    let hash = weft_noise::hash(seed ^ f.salt, cell.0 as i64, 0, cell.1 as i64);
-                    if crate::features::grid_position(cell, spacing, spacing, hash) != (x, z)
-                        || !list.contains_key(&(t.height + 1 - f.fit.buried).div_euclid(16))
-                    {
-                        return false;
-                    }
-                    // Empty scatter slots and small ground plants need no network record.
-                    crate::features::start_at(c, def, dim, seed, i, cell).is_some_and(|start| {
-                        start.hi.y >= t.height + 3
-                            && start.puts.iter().any(|put| {
-                                matches!(put,
-                            crate::features::Put::Block { at,state,.. } if at.x == x && at.z == z
-                                && at.y > fy && list.contains_key(&at.y.div_euclid(16)) && drawn(c,*state))
-                            })
-                    })
+            let removed_scatter: Vec<_> = roots[i]
+                .iter()
+                .filter_map(|&(feature, y, block)| {
+                    let cube = list.get(&y.div_euclid(16))?;
+                    let y = y.rem_euclid(16);
+                    (!cube
+                        .column(i)
+                        .iter()
+                        .any(|s| s.bottom <= y && y <= s.top && s.block == block))
+                    .then_some(feature)
                 })
-            };
+                .collect();
             let now = match here.filter(|h| !terrain(h)) {
-                Some((y, top, under, light)) => Some(LodColumn { x, z, y, top, under, light, spans }),
-                None if !spans.is_empty() || light != 0 || saved_root() => Some(LodColumn { x, z, y: fy, top: 0, under: 0, light, spans }),
+                Some((y, top, under, light)) => Some(LodColumn { x, z, y, top, under, light, spans, removed_scatter }),
+                None if !spans.is_empty() || light != 0 || !removed_scatter.is_empty() => {
+                    Some(LodColumn { x, z, y: fy, top: 0, under: 0, light, spans, removed_scatter })
+                }
                 None => None,
             };
             let p = IVec2::new(x, z);
@@ -302,6 +335,7 @@ impl DimTops {
                     under: 0,
                     light: 0,
                     spans: Vec::new(),
+                    removed_scatter: Vec::new(),
                 })
             })
             .collect()

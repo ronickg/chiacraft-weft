@@ -190,10 +190,11 @@ impl Wire for LodColumn {
     fn put(&self, w: &mut W) {
         (self.x, self.z, self.y, self.top, self.under, self.light).put(w);
         self.spans.put(w);
+        self.removed_scatter.put(w);
     }
     fn get(r: &mut R) -> Option<Self> {
         let (x, z, y, top, under, light) = Wire::get(r)?;
-        Some(LodColumn { x, z, y, top, under, light, spans: Wire::get(r)? })
+        Some(LodColumn { x, z, y, top, under, light, spans: Wire::get(r)?, removed_scatter: Wire::get(r)? })
     }
 }
 

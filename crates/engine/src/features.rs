@@ -722,7 +722,7 @@ fn grid_starts(c: &Content, def: &DimensionDef, dim: u32, seed: u64, fi: usize, 
 
 /// Every start on a grid whose box reaches into cube column (`x`, `z`), in feature order: the
 /// same for every cube of the column, so worked out once for it.
-fn column_starts(c: &Content, def: &DimensionDef, dim: u32, seed: u64, x: i32, z: i32) -> Arc<Vec<Arc<Start>>> {
+pub(crate) fn column_starts(c: &Content, def: &DimensionDef, dim: u32, seed: u64, x: i32, z: i32) -> Arc<Vec<Arc<Start>>> {
     def.sites.get(seed, x, z, || {
         (0..def.features.len())
             .flat_map(|fi| grid_starts(c, def, dim, seed, fi, x, z))

@@ -12,6 +12,7 @@ use crate::client::textures::GameTextures;
 use crate::content::Content;
 use crate::features::grid_position;
 use crate::gpu_layout::forest::{ELEVATIONS, FRAME, VIEWS};
+use crate::server::lod_tops::impostor_block;
 
 const VARIANTS: usize = 4;
 const GROVE: i32 = 4; // Scatter cells per side of a baked group.
@@ -111,19 +112,19 @@ impl Forest {
                     .filter(|&&(biome, p, g)| biome == b && fits(p, g))
                     .map(|s| s.1)
                     .collect();
-                if roots.is_empty() {
-                    roots.extend(sites.iter().filter(|s| fits(s.1, s.2)).map(|s| s.1));
-                }
-                if roots.is_empty() {
-                    biomes.push(None);
-                    continue;
-                }
-                let samples: [Voxels; VARIANTS] = std::array::from_fn(|v| {
+                roots.extend(
+                    sites
+                        .iter()
+                        .filter(|s| s.0 != b && fits(s.1, s.2))
+                        .map(|s| s.1),
+                );
+                let mut samples = Vec::new();
+                for (attempt, root) in roots.into_iter().take(48).enumerate() {
                     let mut blocks = FxHashMap::default();
                     for (p, state, force) in
-                        crate::features::sample(c, dim, seed, feature, roots[v % roots.len()] - IVec3::Y * f.fit.buried, b, mix(v as u64))
+                        crate::features::sample(c, dim, seed, feature, root - IVec3::Y * f.fit.buried, b, mix(attempt as u64))
                     {
-                        if p.y >= 0 && state != 0 {
+                        if p.y >= 0 && impostor_block(c, state) {
                             if force {
                                 blocks.insert(p, state);
                             } else {
@@ -131,15 +132,17 @@ impl Forest {
                             }
                         }
                     }
-                    // Ground clutter smaller than a few blocks contributes no distant silhouette.
-                    if blocks.keys().all(|p| p.y < 2) {
-                        return Vec::new();
+                    if blocks.is_empty() {
+                        continue;
                     }
                     let mut blocks: Voxels = blocks.into_iter().collect();
                     blocks.sort_unstable_by_key(|(p, _)| (p.y, p.z, p.x));
-                    blocks
-                });
-                if samples.iter().all(Vec::is_empty) {
+                    samples.push(blocks);
+                    if samples.len() == VARIANTS {
+                        break;
+                    }
+                }
+                if samples.is_empty() {
                     biomes.push(None);
                     continue;
                 }
@@ -187,7 +190,7 @@ impl Forest {
                     models.push((model, blocks, palette.clone()));
                     Some(model)
                 };
-                let trees = std::array::from_fn(|v| register(samples[v].clone()));
+                let trees = std::array::from_fn(|v| register(samples[v % samples.len()].clone()));
                 let groves = std::array::from_fn(|v| {
                     if spacing > (1 << super::MAX_LEVEL) / 2 {
                         return None;
@@ -202,7 +205,7 @@ impl Forest {
                             let (dx, dz) = grid_position((x, z), spacing, spacing, h);
                             let offset = IVec3::new(dx - GROVE * spacing / 2, 0, dz - GROVE * spacing / 2);
                             blocks.extend(
-                                samples[(hash(h, 1, 2, 3) % VARIANTS as u64) as usize]
+                                samples[(hash(h, 1, 2, 3) % samples.len() as u64) as usize]
                                     .iter()
                                     .map(|&(p, s)| (p + offset, s)),
                             );
@@ -259,7 +262,10 @@ impl Forest {
             // individual sites beside the edits while the rest keeps its ordinary draw cost.
             let mut edited = FxHashSet::default();
             if groups > 1 {
-                for site in columns.keys() {
+                for (site, _) in columns
+                    .iter()
+                    .filter(|(_, col)| col.top != 0 || col.removed_scatter.contains(&f.id))
+                {
                     let mut n = groups;
                     while n >= GROVE {
                         let width = n * rule.spacing;
@@ -319,9 +325,23 @@ impl Forest {
                 if blocked
                     || !(f.y[0]..=f.y[1]).contains(&base)
                     || f.fit.ground.is_some_and(|m| !c.matchers.has(m, ground))
-                    || columns.contains_key(&site)
+                    || columns
+                        .get(&site)
+                        .is_some_and(|col| col.removed_scatter.contains(&f.id))
                 {
                     continue;
+                }
+                if groups == 1 && key.level == 0 {
+                    let def = &c.dims[self.dim as usize];
+                    let found = crate::features::start_at(c, def, self.dim, rule.seed ^ f.salt, rule.feature, (x, z));
+                    if found.is_none_or(|start| {
+                        !start.puts.iter().any(|p| {
+                            matches!(*p, crate::features::Put::Block { state, at, .. }
+                            if at.y >= start.pos.y && impostor_block(c, state))
+                        })
+                    }) {
+                        continue;
+                    }
                 }
                 let base = base - f.fit.buried;
                 let magnification = if groups == 1 { 1.0 } else { groups as f32 / GROVE as f32 };
