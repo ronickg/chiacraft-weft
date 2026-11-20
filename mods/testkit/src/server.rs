@@ -12,7 +12,7 @@ static COUNTS: [AtomicU32; 8] = [const { AtomicU32::new(0) }; 8];
 const EVENT_NAMES: [&str; 8] =
     ["block_broken", "block_placed", "item_picked_up", "entity_died", "entity_hurt", "player_joined", "item_used", "smelted"];
 
-use base_api::SMELTED;
+use base_api::events::SMELTED;
 static GOLD: Block = Block::named("base:gold_block");
 static GOLD_HELMET: Item = Item::named("base:gold_helmet");
 static RED_LAMP: Item = Item::named("base:red_lamp");
@@ -195,7 +195,7 @@ pub fn register(r: &mut Registry) {
     r.edit(&OAK_STAIRS).light(7);
     r.set("#testkit:lamp*", &WARMTH, 1.5);
     r.tag("testkit:lit", &["lamp[lit=true]"]);
-    r.shapeless(&base_api::SMELTING, "base:stick", 1, &["testmod:edited"], 200)
+    r.shapeless(&base_api::recipes::SMELTING, "base:stick", 1, &["testmod:edited"], 200)
         .named("smelt_edited");
     r.remove(&Recipe::named("smelt_edited"));
     r.loot(&EDITED_LOOT)
@@ -665,7 +665,7 @@ const OPS: &[(&str, &str, Run)] = &[
             .split_whitespace()
             .map(|n| if n == "air" { ItemStack::EMPTY } else { ItemStack::new(Item::lookup(n).unwrap_or(0), 1) })
             .collect();
-        let made = recipe_grid_output(&base_api::CRAFTING, &grid, width, height);
+        let made = recipe_grid_output(&base_api::recipes::CRAFTING, &grid, width, height);
         Ok(format!("{} {}", name_of(abi::entry_kind::ITEM, made.item), made.count))
     }),
     ("seed", "<pos:pos>", |w, cmd, _, _| {
@@ -929,7 +929,7 @@ const OPS: &[(&str, &str, Run)] = &[
         let mut n = [0u32; 4];
         for z in me[2] - r..=me[2] + r {
             for x in me[0] - r..=me[0] + r {
-                let h = base_api::OVERWORLD.column(5, x, z).height;
+                let h = base_api::dimensions::OVERWORLD.column(5, x, z).height;
                 if h < 63 {
                     continue;
                 }
@@ -1015,7 +1015,7 @@ const OPS: &[(&str, &str, Run)] = &[
                 comps::weather::UNSHELTERED.on_id(STORM.id())
             ),
             w.attribute(player, &GRIT),
-            recipe_process(&base_api::SMELTING, i).is_none(),
+            recipe_process(&base_api::recipes::SMELTING, i).is_none(),
             drops.join(","),
             liquid_of(OIL.id()) == Some(OIL.liquid().id()),
             oil.on_block(OIL.id()) && oil.on_item(Item::generated(OIL.name().to_string()).id()),
