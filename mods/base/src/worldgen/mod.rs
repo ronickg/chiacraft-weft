@@ -237,14 +237,18 @@ pub fn register(r: &mut Registry) {
         .sea(SEA, "water")
         .field("temperature", Expr::fbm(0x22, 2200.0, 3) * Expr::value(1.4))
         .field("humidity", Expr::fbm(0x33, 1600.0, 3) * Expr::value(1.4))
+        // Broad patches with smaller offshoots. Shifting the surface thresholds
+        // with coherent noise mixes materials where two regions are close.
+        .field("base:surface_patch", Expr::fbm(0x89, 24.0, 1) * Expr::value(0.76) + Expr::fbm(0x8A, 7.0, 1) * Expr::value(0.24))
+        .field("base:surface_temperature", Expr::temperature() + Expr::field("base:surface_patch") * Expr::value(0.24))
+        .field("base:surface_humidity", Expr::humidity() - Expr::field("base:surface_patch") * Expr::value(0.22))
         .field(
             "base:weirdness",
-            Expr::fbm(0x4A7, 1000.0, 3)
-                .at(
-                    Expr::x() + Expr::fbm(0x111, 600.0, 2) * Expr::blocks(80.0) + Expr::noise(40.0) * Expr::value(0.5),
-                    Expr::z() + Expr::fbm(0x222, 600.0, 2) * Expr::blocks(80.0) + Expr::noise(40.0) * Expr::value(0.5),
-                )
-                .ramp(-0.2, 0.2),
+            (Expr::fbm(0x4A7, 1000.0, 3).at(
+                Expr::x() + Expr::fbm(0x111, 600.0, 2) * Expr::blocks(80.0) + Expr::noise(40.0) * Expr::value(0.5),
+                Expr::z() + Expr::fbm(0x222, 600.0, 2) * Expr::blocks(80.0) + Expr::noise(40.0) * Expr::value(0.5),
+            ) + Expr::field("base:surface_patch") * Expr::value(0.08))
+            .ramp(-0.2, 0.2),
         )
         .field("base:randomness", Expr::fbm(0x4A7, 700.0, 3).ramp(-0.2, 0.2))
         .field(
@@ -263,9 +267,17 @@ pub fn register(r: &mut Registry) {
         .field(
             "base:shore",
             Expr::fbm(0x81, 210.0, 3) * Expr::value(0.78) + Expr::fbm(0x82, 39.0, 2) * Expr::value(0.22)
-                - Expr::humidity() * Expr::value(0.18),
+                - Expr::humidity() * Expr::value(0.18)
+                + Expr::field("base:surface_patch") * Expr::value(0.18),
         )
-        .field("base:rock_line", Expr::fbm(0x85, 175.0, 3) * Expr::value(0.66) + Expr::fbm(0x86, 37.0, 2) * Expr::value(0.34))
+        .field(
+            "base:rock_line",
+            Expr::fbm(0x85, 175.0, 3) * Expr::value(0.66)
+                + Expr::fbm(0x86, 37.0, 2) * Expr::value(0.34)
+                + Expr::field("base:surface_patch") * Expr::value(0.66),
+        )
+        .field("base:surface_mountains", Expr::field("base:mountains") + Expr::field("base:surface_patch") * Expr::value(0.18))
+        .field("base:surface_plains", Expr::field("base:plains") + Expr::field("base:surface_patch") * Expr::value(0.18))
         .landform(preset::continents(18.0))
         // Plains have long, shallow rises and small swales. Ease out the
         // shorter hills as the plains take over.
@@ -293,15 +305,21 @@ pub fn register(r: &mut Registry) {
         // Slight jittering so snow doesn't fall on visible contours
         .field(
             "base:alpine",
-            Expr::temperature() + Expr::noise(400.0) * Expr::value(0.2) + Expr::noise(70.0) * Expr::value(0.1)
+            Expr::field("base:surface_temperature") + Expr::noise(400.0) * Expr::value(0.2) + Expr::noise(70.0) * Expr::value(0.1)
                 - Expr::humidity() * Expr::value(0.1),
         )
         // Biomes bring their climate and surface; rules only add where else they must hold.
-        .rule(BiomeRule::new("ocean").height(..=SEA - 8).surface("gravel", "gravel", 3))
+        .rule(
+            BiomeRule::new("ocean")
+                .height(..=SEA - 8)
+                .surface("gravel", "gravel", 3),
+        )
         .rule(
             BiomeRule::new("snowy_plains")
                 .named("snowy_coast")
                 .height(SEA - 1..=SEA + 1)
+                .temperature(..)
+                .field("base:surface_temperature", ..-0.25)
                 .continent(..0.1),
         )
         .rule(
@@ -342,43 +360,88 @@ pub fn register(r: &mut Registry) {
         );
     let mut terrain = terrain;
     for (i, (cold, warm, line)) in snow_bands().into_iter().enumerate() {
-        terrain = terrain.rule(
-            BiomeRule::new("snowy_peaks")
-                .named(&format!("snow_line_{i}"))
-                .field("base:mountains", 0.45..)
-                .field("base:alpine", cold..warm)
-                .height(line..),
-        );
+        let alpine = BiomeRule::new("snowy_peaks")
+            .field("base:surface_mountains", 0.45..)
+            .field("base:alpine", cold..warm);
+        terrain = terrain
+            .rule(
+                alpine
+                    .clone()
+                    .named(&format!("snow_line_{i}"))
+                    .height(line..),
+            )
+            .rule(
+                alpine
+                    .height(line - 8..line)
+                    .field("base:surface_patch", ..-0.08)
+                    .surface("snowy_grass", "dirt", 2)
+                    .named(&format!("snow_patches_{i}")),
+            );
     }
     for i in 0..9 {
         let lo = if i == 0 { f64::NEG_INFINITY } else { (i - 5) as f64 * 0.13 };
         let hi = if i == 8 { f64::INFINITY } else { (i - 4) as f64 * 0.13 };
-        terrain = terrain.rule(
-            BiomeRule::new("mountains")
-                .named(&format!("exposed_rock_{i}"))
-                .field("base:mountains", 0.45..)
-                .field("base:rock_line", lo..hi)
-                .height(106 + i * 6..)
-                .surface("stone", "stone", 0),
-        );
+        let line = 106 + i * 6;
+        let mountains = BiomeRule::new("mountains")
+            .field("base:surface_mountains", 0.45..)
+            .field("base:rock_line", lo..hi);
+        terrain = terrain
+            .rule(
+                mountains
+                    .clone()
+                    .named(&format!("exposed_rock_{i}"))
+                    .height(line..)
+                    .surface("stone", "stone", 0),
+            )
+            .rule(
+                mountains
+                    .named(&format!("thin_soil_{i}"))
+                    .height(line - 7..line)
+                    .field("base:surface_patch", 0.02..)
+                    .surface("coarse_dirt", "dirt", 1),
+            );
     }
     terrain
-        .rule(BiomeRule::new("mountains").field("base:mountains", 0.45..))
-        .rule(BiomeRule::new("snowy_plains"))
-        .rule(BiomeRule::new("taiga"))
-        .rule(BiomeRule::new("desert"))
+        .rule(BiomeRule::new("mountains").field("base:surface_mountains", 0.45..))
+        .rule(
+            BiomeRule::new("snowy_plains")
+                .temperature(..)
+                .field("base:surface_temperature", ..-0.25),
+        )
+        .rule(
+            BiomeRule::new("taiga")
+                .temperature(..)
+                .field("base:surface_temperature", ..-0.15),
+        )
+        .rule(
+            BiomeRule::new("desert")
+                .temperature(..)
+                .humidity(..)
+                .field("base:surface_temperature", 0.25..)
+                .field("base:surface_humidity", ..0.1),
+        )
         .rule(
             BiomeRule::new("plains")
                 .named("open_plains")
-                .field("base:plains", 0.57..)
-                .humidity(..0.22),
+                .field("base:surface_plains", 0.57..)
+                .field("base:surface_humidity", ..0.22),
         )
-        .rule(BiomeRule::new("forest"))
-        .rule(BiomeRule::new("birch_forest"))
+        .rule(
+            BiomeRule::new("forest")
+                .humidity(..)
+                .field("base:surface_humidity", 0.125..),
+        )
+        .rule(
+            BiomeRule::new("birch_forest")
+                .temperature(..)
+                .humidity(..)
+                .field("base:surface_temperature", ..0.1)
+                .field("base:surface_humidity", 0.05..),
+        )
         .rule(
             BiomeRule::new("hills")
                 .field("base:randomness", 0.5..)
-                .field("base:mountains", 0.3..),
+                .field("base:surface_mountains", 0.3..),
         )
         .rule(BiomeRule::new("lavender_fields").field("base:weirdness", 1.0..))
         .rule(BiomeRule::new("tallgrass_meadow").field("base:weirdness", 0.1..0.3))
