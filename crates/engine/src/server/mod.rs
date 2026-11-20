@@ -45,7 +45,7 @@ use crossbeam_channel::{Receiver, Sender, unbounded};
 use glam::{DVec3, IVec3};
 use parking_lot::Mutex;
 use rayon::prelude::*;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use weft_abi::{self as abi, ItemStack, component_flags as cf, entry_kind as ek};
 
 pub use dim::{Dim, DimEvent};
@@ -993,27 +993,33 @@ impl Server {
                 // spawn in untouched cubes too).
                 let mut cubes: Vec<IVec3> = std::mem::take(&mut r.space.modified).into_iter().collect();
                 cubes.extend(r.on_disk.iter().copied());
-                cubes.extend(
-                    r.entities
-                        .list
-                        .iter()
-                        .filter(|e| e.saved_with_cube())
-                        .map(|e| cube_of(e.pos.floor().as_ivec3())),
-                );
+                let mut roots: FxHashMap<IVec3, Vec<u64>> = FxHashMap::default();
+                for e in r.entities.list.iter().filter(|e| e.saved_with_cube()) {
+                    roots
+                        .entry(cube_of(e.pos.floor().as_ivec3()))
+                        .or_default()
+                        .push(e.id);
+                }
+                cubes.extend(roots.keys().copied());
                 cubes.sort_unstable_by_key(|p| (p.x, p.y, p.z));
                 cubes.dedup();
+                let children = r.entities.structure_children();
+                let mut components: FxHashMap<u64, Vec<_>> = FxHashMap::default();
+                for (&(id, kind), bytes) in &r.entities.comps {
+                    components
+                        .entry(id)
+                        .or_default()
+                        .push((kind, bytes.as_ref()));
+                }
                 for pos in cubes {
                     if let Some(cube) = r.space.cubes.get(&pos) {
-                        let mut bytes = entities_in(c, r, pos);
+                        let ids = roots.get(&pos).map_or(&[][..], Vec::as_slice);
+                        let tree = entity::Entities::indexed_structure_tree(ids, &children);
+                        let mut bytes = serialize_indexed(c, r, &tree, |id| components.get(&id).cloned().unwrap_or_default());
                         let ticks = r.timers_in(pos);
-                        let holds = r
-                            .entities
-                            .list
-                            .iter()
-                            .any(|e| e.saved_with_cube() && cube_of(e.pos.floor().as_ivec3()) == pos);
                         persist::append_timers(&mut bytes, c, &ticks);
                         s.save(c, r.id, pos, cube, &r.around(pos, |_| None), &bytes);
-                        if holds || !ticks.is_empty() {
+                        if !ids.is_empty() || !ticks.is_empty() {
                             r.on_disk.insert(pos);
                         } else {
                             r.on_disk.remove(&pos);
@@ -1458,34 +1464,27 @@ pub(super) fn serialize(c: &Content, d: &Dim, ids: &[u64]) -> Vec<u8> {
 }
 
 pub(super) fn serialize_tree(c: &Content, d: &Dim, ids: &[u64]) -> Vec<u8> {
+    serialize_indexed(c, d, ids, |id| {
+        d.entities
+            .comps
+            .iter()
+            .filter(|((eid, _), _)| *eid == id)
+            .map(|((_, k), v)| (*k, &v[..]))
+            .collect()
+    })
+}
+
+fn serialize_indexed<'a>(c: &Content, d: &'a Dim, ids: &[u64], mut components: impl FnMut(u64) -> Vec<(u32, &'a [u8])>) -> Vec<u8> {
     let list: Vec<persist::ToSave> = ids
         .iter()
         .filter_map(|&id| {
             let e = d.entities.get(id)?;
-            let comps = d
-                .entities
-                .comps
-                .iter()
-                .filter(|((eid, _), _)| *eid == id)
-                .map(|((_, k), v)| (*k, &v[..]))
-                .collect();
-            Some((e, d.entities.inventories.get(&id), comps, d.bodies.get(&id).map(Box::as_ref)))
+            Some((e, d.entities.inventories.get(&id), components(id), d.bodies.get(&id).map(Box::as_ref)))
         })
         .collect();
     let mut out = Vec::new();
     persist::write(c, &mut out, &list, d.time);
     out
-}
-
-fn entities_in(c: &Content, d: &Dim, cube: IVec3) -> Vec<u8> {
-    let ids: Vec<u64> = d
-        .entities
-        .list
-        .iter()
-        .filter(|e| e.saved_with_cube() && cube_of(e.pos.floor().as_ivec3()) == cube)
-        .map(|e| e.id)
-        .collect();
-    serialize(c, d, &ids)
 }
 
 /// Said to a player arriving in the engine's void.
