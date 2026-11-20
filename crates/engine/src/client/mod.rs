@@ -3118,7 +3118,7 @@ impl Client {
         early: &mut CommandList,
         frame: &FrameInfo,
         textures: &GameTextures,
-    ) {
+    ) -> bool {
         self.entity_render.local = self.player_id;
         for (entity, skin) in std::mem::take(&mut self.entity_render.skin_pending) {
             self.entity_render.set_skin(gpu, entity, &skin);
@@ -3195,12 +3195,24 @@ impl Client {
         let ticks = self.smooth_time();
         let weather_ticks = ticks - self.world.time as f64 + self.world.ticks as f64;
         let weather = self.weather_field(weather_ticks);
+        let environment = &self.environment.values;
+        let world_depth = (self.sky.has_atmosphere()
+            && weather.clouds.is_some()
+            && environment.cloud_opacity > 0.0
+            && environment.sky_opacity > 0.0
+            && environment.cloud_fog_end > 0.0)
+            .then(|| {
+                self.render
+                    .occlusion
+                    .capture_buffer(gpu, [frame.width, frame.height])
+            });
         scene.cloud = self.sky.draw(
             gpu,
             &mut late,
             frame,
             &cam,
             scene_buf,
+            world_depth,
             self.world.dim as usize,
             ticks,
             weather,
@@ -3265,6 +3277,7 @@ impl Client {
         after.append(&mut hand_late);
         (self.late, self.hand_late) = (late, hand_late);
         after.push(weft_render::Cmd::Mark);
+        world_depth.is_some()
     }
 
     pub fn fog_color(&self) -> [f32; 4] {

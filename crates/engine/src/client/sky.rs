@@ -114,6 +114,7 @@ struct Picture {
 pub struct Sky {
     pipe: Option<PipelineId>,
     clouds_pipe: Option<PipelineId>,
+    atmosphere_pipe: Option<PipelineId>,
     /// Shader slot of each object, per dimension.
     slots: Vec<Vec<u32>>,
     buffers: Vec<(BufferId, u32)>,
@@ -169,6 +170,7 @@ impl Sky {
         let mut s = Sky {
             pipe: None,
             clouds_pipe: None,
+            atmosphere_pipe: None,
             slots: Vec::new(),
             buffers: Vec::new(),
             pictures: FxHashMap::default(),
@@ -219,20 +221,41 @@ impl Sky {
                         topology: Topology::Triangles,
                     })
                     .map_err(|e| e.0)?;
-                Ok((pipe, clouds, slots.pop().unwrap_or_default()))
+                let atmosphere = gpu.create_pipeline(&PipelineDesc {
+                    label: "atmosphere",
+                    shader: &shader,
+                    vertex: "vs_clouds",
+                    fragment: Some("fs_atmosphere"),
+                    color: Some(Format::Surface),
+                    depth: Some(DepthState { write: false, compare: Compare::Always }),
+                    blend: Blend::Premultiplied,
+                    cull_back: false,
+                    topology: Topology::Triangles,
+                });
+                let atmosphere = atmosphere
+                    .map_err(|e| log::warn!("atmosphere shader: {e}"))
+                    .ok();
+                Ok((pipe, clouds, atmosphere, slots.pop().unwrap_or_default()))
             });
         match made {
-            Ok((pipe, clouds, slots)) => {
+            Ok((pipe, clouds, atmosphere, slots)) => {
                 if let Some(old) = self.pipe.replace(pipe) {
                     gpu.destroy_pipeline(old);
                 }
                 if let Some(old) = self.clouds_pipe.replace(clouds) {
                     gpu.destroy_pipeline(old);
                 }
+                if let Some(old) = std::mem::replace(&mut self.atmosphere_pipe, atmosphere) {
+                    gpu.destroy_pipeline(old);
+                }
                 self.set_slots(&slots);
             }
             Err(e) => log::error!("sky shader: {e}"),
         }
+    }
+
+    pub(super) fn has_atmosphere(&self) -> bool {
+        self.atmosphere_pipe.is_some()
     }
 
     pub fn block_color(&self, state: u32) -> Vec3 {
@@ -298,7 +321,7 @@ impl Sky {
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
         self.drop_pictures(gpu);
-        for p in [self.pipe.take(), self.clouds_pipe.take()]
+        for p in [self.pipe.take(), self.clouds_pipe.take(), self.atmosphere_pipe.take()]
             .into_iter()
             .flatten()
         {
@@ -344,6 +367,7 @@ impl Sky {
         frame: &FrameInfo,
         cam: &Camera,
         scene: BufferId,
+        world_depth: Option<BufferId>,
         dim: usize,
         time: f64,
         weather: crate::weather::WeatherField,
@@ -391,7 +415,7 @@ impl Sky {
                 .extend(environment.sky_opacity)
                 .to_array(),
             ids: [u32::MAX, kind::GRADIENT, 0, 0],
-            extra: [0.0; 4],
+            extra: [frame.width as f32, 0.0, 0.0, 0.0],
         });
         let mut draws: Vec<(u32, u32)> = vec![(3, 0)];
 
@@ -436,9 +460,10 @@ impl Sky {
                 let color = if automatic { shade(0.0, 0.0) } else { shade(environment.cloud_gray, environment.cloud_dark) };
                 let (ids, size, pos, colors) = if let Some(field) = weather.clouds {
                     let color_for = |id: u16| {
-                        let look = c.game.weathers[id as usize].look;
+                        let preset = &c.game.weathers[id as usize];
+                        let look = preset.look;
                         shade(look.cloud_gray, look.cloud_dark * 0.74)
-                            .extend(0.0)
+                            .extend(if world_depth.is_some() && preset.falls() { look.falls } else { 0.0 })
                             .to_array()
                     };
                     (
@@ -544,8 +569,13 @@ impl Sky {
         for (vertices, first_instance) in draws {
             list.push(Cmd::Draw { vertices, instances: 1, first_vertex: 0, first_instance });
         }
-        if let (Some(first_instance), Some(pipe)) = (clouds, self.clouds_pipe) {
-            list.pipeline(pipe);
+        if let (Some(first_instance), Some(cloud_pipe)) = (clouds, self.clouds_pipe) {
+            if let (Some(depth), Some(pipe)) = (world_depth, self.atmosphere_pipe) {
+                list.pipeline(pipe);
+                list.bind(bind::sky::WORLD_DEPTH, depth);
+            } else {
+                list.pipeline(cloud_pipe);
+            }
             list.bind(bind::sky::OBJECTS, buf);
             list.bind(bind::sky::SCENE, scene);
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance });

@@ -1056,6 +1056,7 @@ bindings! {
     sky "sky.wgsl" {
         OBJECTS "sky": "array<Sky>",
         SCENE "scene": "Scene",
+        WORLD_DEPTH "world_depth": "array<f32>",
     }
     ui "ui.wgsl" {
         QUADS "quads": "array<Quad>",

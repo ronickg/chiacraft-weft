@@ -2860,10 +2860,12 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
     let (mut world_list, mut after) = (std::mem::take(&mut r.world_list), std::mem::take(&mut r.after_list));
     world_list.clear();
     after.clear();
-    if let Some(g) = &mut r.game {
+    let atmosphere = if let Some(g) = &mut r.game {
         g.client
-            .render(&mut *r.gpu, &mut world_list, &mut after, &mut r.list, &world, &r.textures);
-    }
+            .render(&mut *r.gpu, &mut world_list, &mut after, &mut r.list, &world, &r.textures)
+    } else {
+        false
+    };
     r.list
         .push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
     r.list.append(&mut world_list);
@@ -2876,7 +2878,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
         g.client
             .render
             .occlusion
-            .take_depth(&mut *r.gpu, &mut r.list, r.depth.0, [r.depth.1, r.depth.2]);
+            .take_depth(&mut *r.gpu, &mut r.list, r.depth.0, [r.depth.1, r.depth.2], atmosphere);
     }
     if !after.cmds.is_empty() {
         r.list

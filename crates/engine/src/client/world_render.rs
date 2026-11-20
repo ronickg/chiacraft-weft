@@ -1785,12 +1785,11 @@ impl Occlusion {
         list.push(Cmd::Barrier);
     }
 
-    /// Takes this frame's depth for the next frame to go by. After the world's pass.
-    pub fn take_depth(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, depth: TextureId, size: [u32; 2]) {
-        let Some([down, ..]) = self.pipes.filter(|_| self.on) else {
-            self.last = None;
-            return;
-        };
+    /// Prepare the shared depth copy before recording the atmosphere's draw.
+    pub fn capture_buffer(&mut self, gpu: &mut dyn Backend, size: [u32; 2]) -> BufferId {
+        if let Some((buffer, _, _)) = self.depths.filter(|d| d.1 == size) {
+            return buffer;
+        }
         let (texels, levels) = {
             let (mut s, mut texels, mut levels) = (size, 0u64, 0);
             loop {
@@ -1802,19 +1801,30 @@ impl Occlusion {
                 s = s.map(|v| v.div_ceil(2));
             }
         };
-        let buffer = match self.depths.filter(|d| d.1 == size) {
-            Some(d) => d.0,
-            None => {
-                if let Some((old, ..)) = self.depths.take() {
-                    gpu.destroy_buffer(old);
-                }
-                let b = gpu.create_buffer(texels * 4, usage::STORAGE, "depth levels");
-                self.depths = Some((b, size, levels));
-                b
-            }
-        };
+        if let Some((old, ..)) = self.depths.take() {
+            gpu.destroy_buffer(old);
+        }
+        let buffer = gpu.create_buffer(texels * 4, usage::STORAGE, "depth levels");
+        self.depths = Some((buffer, size, levels));
+        buffer
+    }
+
+    /// Copy the solid world's depth. The atmosphere uses the first level in this frame and
+    /// occlusion culling uses the pyramid in the next frame.
+    pub fn take_depth(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, depth: TextureId, size: [u32; 2], atmosphere: bool) {
+        let down = self.pipes.filter(|_| self.on).map(|p| p[0]);
+        if down.is_none() && !atmosphere {
+            self.last = None;
+            return;
+        }
+        let buffer = self.capture_buffer(gpu, size);
         list.push(Cmd::CopyDepthToBuffer { depth, buffer });
         list.push(Cmd::Barrier);
+        let Some(down) = down else {
+            self.last = None;
+            return;
+        };
+        let (_, levels) = self.depth_size();
         list.pipeline(down);
         list.bind(crate::gpu_layout::bind::occlusion::DEPTHS, buffer);
         let (mut s, mut src) = (size, 0u32);

@@ -114,6 +114,19 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     return CloudPixel(vec4(hit.color.rgb * hit.color.a, hit.color.a), clamp(clip.z / clip.w, 0.0, 1.0));
 }
 
+@fragment
+fn fs_atmosphere(in: CloudOut) -> @location(0) vec4<f32> {
+    let dir = normalize(mat(sky[0]) * in.at);
+    let pixel = vec2<u32>(in.clip.xy);
+    let depth = world_depth[pixel.y * u32(sky[0].extra.x) + pixel.x];
+    let slope = (scene.view_proj * vec4(dir, 0.0)).w;
+    // Infinite reverse Z, with the optional translation from camera bobbing.
+    let at_origin = scene.view_proj[3];
+    let limit = (at_origin.z - depth * at_origin.w) / max(depth * slope, 1e-8);
+    let c = trace_atmosphere(sky[in.index], dir, limit, scene);
+    return vec4(c.rgb * c.a, c.a);
+}
+
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.
 fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
     if dir.y <= 0.0 {

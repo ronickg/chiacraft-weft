@@ -3,7 +3,7 @@ use glam::{DVec2, DVec3, IVec2, Vec2};
 use crate::content::Content;
 
 pub(crate) const CLOUD_CELL: f64 = 320.0;
-pub(crate) const CLOUD_HEIGHT: f32 = 25.0;
+pub(crate) const CLOUD_HEIGHT: f32 = 75.0;
 // Rectangular cloud columns per noise cell. Keep in sync with common.wgsl.
 const CLOUD_COLUMNS: DVec2 = DVec2::new(16.0, 32.0);
 pub(crate) const AUTOMATIC: u32 = u32::MAX;
@@ -163,10 +163,15 @@ fn cloud_sample(seed: u32, origin: IVec2, at: Vec2) -> CloudColumn {
     // Climate has twice the wavelength of the coarse cloud noise. With the
     // margins below, even diagonally adjacent columns cannot jump a band.
     let parity = origin & IVec2::ONE;
-    let weather = cloud_noise(seed ^ 0xb73102ad, (origin - parity) / 2, (at + parity.as_vec2()) * 0.5, IVec2::ONE);
-    let gap = ((weather - 0.56).abs().min((weather - 0.75).abs()) - 0.036) * 16.0;
-    let kind = usize::from(weather >= 0.56) + usize::from(weather >= 0.75);
-    CloudColumn { cover: cover.min(gap).max(0.0), kind, detail: detail * 0.65 + edge * 0.35 }
+    let climate_origin = (origin - parity) / 2;
+    let climate_at = (at + parity.as_vec2()) * 0.5;
+    let bend = cloud_noise(seed ^ 0xab5399d3, climate_origin, climate_at, IVec2::ONE) - 0.5;
+    let weather = cloud_noise(seed ^ 0xb73102ad, climate_origin, climate_at + Vec2::new(0.18, -0.10) * bend, IVec2::ONE);
+    let margin = 0.051 + (0.03 * detail + 0.07 * edge - 0.025).max(0.0);
+    let gap = (weather - 0.51).abs().min((weather - 0.77).abs()) - margin;
+    let blend = (gap / 0.045).clamp(0.0, 1.0);
+    let kind = usize::from(weather >= 0.51) + usize::from(weather >= 0.77);
+    CloudColumn { cover: cover * blend * blend * (3.0 - 2.0 * blend), kind, detail: detail * 0.65 + edge * 0.35 }
 }
 
 #[cfg(test)]

@@ -17,7 +17,7 @@ use crate::settings::Settings;
 
 const ALPN: &[u8] = b"weft/1";
 // Peers must agree on the deterministic weather field as well as the wire format.
-const PROTOCOL: u32 = 16;
+const PROTOCOL: u32 = 17;
 
 fn runtime() -> &'static tokio::runtime::Runtime {
     static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
