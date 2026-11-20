@@ -3135,6 +3135,10 @@ impl Client {
             cloud: Default::default(),
             atmosphere_grid: [0; 4],
             cloud_lod: [cloud_lod, cloud_lod * 1.35, 0.0, 0.0],
+            cloud_cache: [0; 4],
+            atmosphere_cache: [0; 4],
+            atmosphere_previous: [[0.0; 4]; 4],
+            atmosphere_shift: [0.0; 4],
         }
     }
 
@@ -3272,10 +3276,14 @@ impl Client {
         scene.cloud = cloud;
         if let Some(ref atmosphere) = atmosphere {
             scene.atmosphere_grid = atmosphere.grid;
+            scene.atmosphere_cache = atmosphere.cache;
+            scene.cloud_cache = atmosphere.cloud_origin;
+            scene.atmosphere_previous = atmosphere.previous;
+            scene.atmosphere_shift = atmosphere.shift;
         }
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render
-            .draw_translucent(&mut late, &cam, atmosphere.map(|a| a.buffer));
+            .draw_translucent(&mut late, &cam, atmosphere.as_ref());
         let tick = self.anim_tick();
         self.wake_render
             .draw(gpu, &mut late, frame.slot, &cam, scene_buf, tick);

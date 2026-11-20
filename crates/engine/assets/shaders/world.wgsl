@@ -374,6 +374,13 @@ fn through_sampled_atmosphere(color: vec4<f32>, rel: vec3<f32>, pixel: vec4<f32>
         if a.a >= 0.0 {
             return vec4(a.rgb + color.rgb * (1.0 - a.a), color.a);
         }
+        let dist = length(rel);
+        let dir = rel / max(dist, 0.000001);
+        let limit = select(dist, min(dist, scene.params.y), scene.environment.w >= 1.0);
+        let s = scene.cloud;
+        let exact_cloud = trace_cloud(s, dir, limit, scene);
+        let resolved = resolve_rain(s, dir, limit, exact_cloud, scene, pixel.xy);
+        return vec4(resolved.rgb + color.rgb * (1.0 - resolved.a), color.a);
     }
     return through_cloud(color, rel, scene);
 }

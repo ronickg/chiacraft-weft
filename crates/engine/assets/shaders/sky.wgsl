@@ -114,24 +114,126 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     return CloudPixel(vec4(hit.color.rgb * hit.color.a, hit.color.a), clamp(clip.z / clip.w, 0.0, 1.0));
 }
 
-fn atmosphere_at(s: Sky, dir: vec3<f32>, depth: f32) -> vec4<f32> {
+fn atmosphere_limit(dir: vec3<f32>, depth: f32) -> f32 {
     let slope = (scene.view_proj * vec4(dir, 0.0)).w;
     // Infinite reverse Z, with the optional translation from camera bobbing.
     let at_origin = scene.view_proj[3];
     let limit = (at_origin.z - depth * at_origin.w) / max(depth * slope, 1e-8);
-    let c = trace_atmosphere(s, dir, limit, scene);
-    return vec4(c.rgb * c.a, c.a);
+    return select(limit, min(limit, scene.params.y), scene.environment.w >= 1.0);
+}
+
+fn atmosphere_at(s: Sky, dir: vec3<f32>, depth: f32, pixel: vec2<f32>) -> vec4<f32> {
+    let limit = atmosphere_limit(dir, depth);
+    return resolve_rain(s, dir, limit, trace_cloud(s, dir, limit, scene), scene, pixel);
 }
 
 @fragment
 fn fs_atmosphere(in: CloudOut) -> @location(0) vec4<f32> {
     let pixel = vec2<u32>(in.clip.xy);
     let depth = world_depth[pixel.y * u32(sky[0].extra.x) + pixel.x];
-    return atmosphere_at(sky[in.index], normalize(mat(sky[0]) * in.at), depth);
+    return atmosphere_at(sky[in.index], normalize(mat(sky[0]) * in.at), depth, in.clip.xy);
 }
 
 fn atmosphere_sample_pixel(cell: vec2<u32>, size: vec2<u32>, stride: u32) -> vec2<u32> {
     return min(cell * stride + vec2(stride / 2u), size - vec2(1u));
+}
+
+var<workgroup> occupied_cloud_brick: atomic<u32>;
+var<workgroup> keep_cloud_brick: u32;
+
+@compute @workgroup_size(8, 8)
+fn cache_cloud_density(
+    @builtin(workgroup_id) brick: vec3<u32>,
+    @builtin(local_invocation_id) lane: vec3<u32>,
+    @builtin(local_invocation_index) index: u32,
+) {
+    let side = i32(scene.atmosphere_cache.x);
+    let start = scene.cloud_cache.xy + vec2<i32>(brick.xy) * CLOUD_BRICK;
+    let previous = scene.cloud_cache.zw;
+    // The toroidal buffer leaves overlapping world bricks at the same addresses.
+    if index == 0u {
+        keep_cloud_brick = u32(previous.x != -2147483647 && all(start >= previous) && all(start < previous + vec2(side)));
+        atomicStore(&occupied_cloud_brick, 0u);
+    }
+    if workgroupUniformLoad(&keep_cloud_brick) != 0u {
+        return;
+    }
+    let cell = start + vec2<i32>(lane.xy);
+    // Floor division is required on the negative side of the weather origin.
+    let origin = (cell - (cell % 24 + 24) % 24) / 24;
+    let local_cell = vec2<f32>(cell - origin * 24);
+    let band = i32(brick.z);
+    let packed = pack2x16float(cloud_cell_density(scene.cloud.ids.z, origin, local_cell, band));
+    cloud_cells_out[cloud_cache_index(cell, band, side)] = packed;
+    if (packed & 0xffffu) != 0u {
+        atomicOr(&occupied_cloud_brick, 1u);
+    }
+    workgroupBarrier();
+    if index == 0u {
+        cloud_cells_out[cloud_brick_index(start, band, side)] = atomicLoad(&occupied_cloud_brick);
+    }
+}
+
+fn atmosphere_ray(pixel: vec2<f32>, size: vec2<u32>) -> vec3<f32> {
+    let ndc = (pixel / vec2<f32>(size)) * vec2(2.0, -2.0) + vec2(-1.0, 1.0);
+    return normalize(mat(sky[0]) * vec3(ndc, 1.0));
+}
+
+@compute @workgroup_size(8, 8)
+fn cache_rain_depth(@builtin(global_invocation_id) id: vec3<u32>) {
+    let size = scene.atmosphere_grid.xy;
+    let grid = (size + (RAIN_STRIDE - 1u)) / RAIN_STRIDE;
+    if any(id.xy >= grid) {
+        return;
+    }
+    let pixel = vec2<f32>(atmosphere_sample_pixel(id.xy, size, RAIN_STRIDE)) + 0.5;
+    let dir = atmosphere_ray(pixel, size);
+    let s = scene.cloud;
+    let reach = min(1536.0, scene.environment.z);
+    let ceiling = s.extra.z + s.extra.y * 0.27 + 18.0;
+    var enter = 36.0;
+    var leave = select(reach, min(reach, scene.params.y), scene.environment.w >= 1.0);
+    if dir.y > 0.0 {
+        leave = min(leave, ceiling / dir.y);
+    } else if dir.y < 0.0 {
+        enter = max(enter, ceiling / dir.y);
+    } else if ceiling < 0.0 {
+        leave = 0.0;
+    }
+    let rainbow = rainbow_radiance(s, dir);
+    let offset = (id.y * grid.x + id.x) * (RAIN_SLICES + 1u);
+    var rain = vec4(0.0);
+    rain_depth_out[offset] = vec2(0u);
+    for (var layer = 1u; layer <= RAIN_SLICES; layer += 1u) {
+        let start = f32(layer - 1u) * RAIN_SLICE;
+        let end = min(start + RAIN_SLICE, leave);
+        for (var t = start; t < end && rain.a < 0.88; t += 32.0) {
+            let a = max(t, enter);
+            let b = min(t + 32.0, end);
+            if b > a {
+                let medium = rain_medium(s, dir, (a + b) * 0.5, reach, rainbow, scene);
+                let absorption = (1.0 - rain.a) * (1.0 - exp(-medium.a * (b - a)));
+                rain += vec4(medium.rgb, 1.0) * absorption;
+            }
+        }
+        rain_depth_out[offset + layer] = vec2(pack2x16float(rain.rg), pack2x16float(rain.ba));
+    }
+}
+
+fn distant_cloud_history(dir: vec3<f32>, plane: f32, grid: vec2<u32>, stride: u32, size: vec2<u32>) -> CloudHistory {
+    let position = dir * plane + scene.atmosphere_shift.xyz;
+    let clip = scene.atmosphere_previous * vec4(position, 1.0);
+    let pixel = (clip.xy / max(clip.w, 0.001) * vec2(0.5, -0.5) + 0.5) * vec2<f32>(size);
+    if clip.w <= 0.0 || any(pixel < vec2(0.0)) || any(pixel >= vec2<f32>(size)) {
+        return CloudHistory(0u, 0u, 0u);
+    }
+    let cell = min(vec2<u32>(pixel) / stride, grid - 1u);
+    let center = vec2<f32>(atmosphere_sample_pixel(cell, size, stride)) + 0.5;
+    // Avoid dragging the previous silhouette across the current sample footprint.
+    if any(abs(pixel - center) > vec2(f32(stride) * 0.38)) {
+        return CloudHistory(0u, 0u, 0u);
+    }
+    return atmosphere_history[cell.y * grid.x + cell.x];
 }
 
 // Trace a sparse grid of rays. The two packed halves hold premultiplied RGB and opacity.
@@ -143,12 +245,41 @@ fn sample_atmosphere(@builtin(global_invocation_id) id: vec3<u32>) {
     if any(id.xy >= cells) {
         return;
     }
-    let pixel = atmosphere_sample_pixel(id.xy, size, stride);
-    let ndc = ((vec2<f32>(pixel) + 0.5) / vec2<f32>(size)) * vec2(2.0, -2.0) + vec2(-1.0, 1.0);
-    let dir = normalize(mat(sky[0]) * vec3(ndc, 1.0));
-    let depth = world_depth[pixel.y * size.x + pixel.x];
-    let c = atmosphere_at(scene.cloud, dir, depth);
-    atmosphere_out[id.y * cells.x + id.x] = AtmosphereSample(pack2x16float(c.rg), pack2x16float(c.ba), depth);
+    let p = atmosphere_sample_pixel(id.xy, size, stride);
+    let pixel = vec2<f32>(p) + 0.5;
+    let dir = atmosphere_ray(pixel, size);
+    let depth = world_depth[p.y * size.x + p.x];
+    let limit = atmosphere_limit(dir, depth);
+    let s = scene.cloud;
+    let a = s.extra.z / select(dir.y, 1e-8, dir.y == 0.0);
+    let b = (s.extra.z + s.extra.y) / select(dir.y, 1e-8, dir.y == 0.0);
+    let distant = stride == 4u && dir.y != 0.0 && min(a, b) > max(1536.0, scene.cloud_lod.y) && max(a, b) < min(limit, scene.environment.z);
+    let phase = scene.atmosphere_cache.w;
+    var age = 0u;
+    var cloud: CloudHit;
+    if distant && phase != 0u && (id.x + id.y + phase) % 3u != 0u {
+        let history = distant_cloud_history(dir, (a + b) * 0.5, cells, stride, size);
+        if history.history_age > 0u && history.history_age < 3u {
+            let color = vec4(unpack2x16float(history.cloud_rg), unpack2x16float(history.cloud_ba));
+            // The whole distant slab sits beyond the rain reach.
+            cloud = CloudHit(color, 0.0, min(a, b));
+            age = history.history_age + 1u;
+        }
+    }
+    if age == 0u {
+        cloud = trace_cloud(s, dir, limit, scene);
+        age = select(0u, 1u, distant);
+    }
+    let c = resolve_rain(s, dir, limit, cloud, scene, pixel);
+    let index = id.y * cells.x + id.x;
+    atmosphere_out[index] = AtmosphereSample(pack2x16float(c.rg), pack2x16float(c.ba), depth);
+    if stride == 4u {
+        var remembered = CloudHistory(0u, 0u, 0u);
+        if age != 0u {
+            remembered = CloudHistory(pack2x16float(cloud.color.rg), pack2x16float(cloud.color.ba), age);
+        }
+        atmosphere_history_out[index] = remembered;
+    }
 }
 
 @fragment
@@ -162,7 +293,7 @@ fn fs_resolve_atmosphere(in: CloudOut) -> @location(0) vec4<f32> {
     if result.a >= 0.0 {
         return result;
     }
-    return atmosphere_at(sky[in.index], normalize(mat(sky[0]) * in.at), depth);
+    return atmosphere_at(sky[in.index], normalize(mat(sky[0]) * in.at), depth, in.clip.xy);
 }
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.

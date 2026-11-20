@@ -633,6 +633,13 @@ gpu_struct! {
         pub atmosphere_grid: [u32; 4],
         /// Start and end of the fade from voxel clouds to their projected footprint.
         pub cloud_lod: [f32; 4],
+        /// Current and previous origins of the world-space cloud cache, in voxel columns.
+        pub cloud_cache: [i32; 4],
+        /// x cache side, y rain grid stride, z rain row width, w history phase (zero if invalid).
+        pub atmosphere_cache: [u32; 4],
+        pub atmosphere_previous: [[f32; 4]; 4],
+        /// Shift from this frame's cloud coordinates to the previous camera's coordinates.
+        pub atmosphere_shift: [f32; 4],
     }
 }
 
@@ -641,6 +648,14 @@ gpu_struct! {
         pub rg: u32,
         pub ba: u32,
         pub depth: f32,
+    }
+}
+
+gpu_struct! {
+    pub struct GpuCloudHistory as "CloudHistory" {
+        pub cloud_rg: u32,
+        pub cloud_ba: u32,
+        pub history_age: u32,
     }
 }
 
@@ -1031,6 +1046,8 @@ bindings! {
         BODY_ROTATIONS "body_rotations": "array<vec4<f32>>",
         DRY_VOLUMES "dry_volumes": "array<DryVolume>",
         ATMOSPHERE "atmosphere": "array<AtmosphereSample>",
+        CLOUD_CELLS "cloud_cells": "array<u32>",
+        RAIN_DEPTH "rain_depth": "array<vec2<u32>>",
     }
     // `item_boxes`: item models in their own space, kept between frames
     // (`EntityRenderer::item_model`); an item instance is a box in `boxes` whose rows place
@@ -1090,6 +1107,12 @@ bindings! {
         WORLD_DEPTH "world_depth": "array<f32>",
         ATMOSPHERE "atmosphere": "array<AtmosphereSample>",
         ATMOSPHERE_OUT "atmosphere_out": "array<AtmosphereSample>",
+        CLOUD_CELLS "cloud_cells": "array<u32>",
+        CLOUD_CELLS_OUT "cloud_cells_out": "array<u32>",
+        RAIN_DEPTH "rain_depth": "array<vec2<u32>>",
+        RAIN_DEPTH_OUT "rain_depth_out": "array<vec2<u32>>",
+        ATMOSPHERE_HISTORY "atmosphere_history": "array<CloudHistory>",
+        ATMOSPHERE_HISTORY_OUT "atmosphere_history_out": "array<CloudHistory>",
     }
     ui "ui.wgsl" {
         QUADS "quads": "array<Quad>",
@@ -1139,6 +1162,7 @@ fn structs() -> String {
         GpuWeather::wgsl(),
         GpuSky::wgsl(),
         GpuAtmosphereSample::wgsl(),
+        GpuCloudHistory::wgsl(),
         Quad::wgsl(),
         Screen::wgsl(),
         Pass::wgsl(),
@@ -1154,7 +1178,11 @@ pub fn prelude(shader: &str, common: &str) -> String {
     s.push_str(&records());
     s.push_str(&structs());
     for (i, (name, ty)) in bindings(shader).iter().enumerate() {
-        let access = if *name == "atmosphere_out" { "read_write" } else { "read" };
+        let access = if matches!(*name, "atmosphere_out" | "cloud_cells_out" | "rain_depth_out" | "atmosphere_history_out") {
+            "read_write"
+        } else {
+            "read"
+        };
         s.push_str(&format!("@group(1) @binding({i}) var<storage, {access}> {name}: {ty};\n"));
     }
     if shader == "world.wgsl" {
@@ -1162,6 +1190,11 @@ pub fn prelude(shader: &str, common: &str) -> String {
     }
     s.push_str(common);
     s.push('\n');
+    if matches!(shader, "sky.wgsl" | "world.wgsl") {
+        s.push_str(include_str!("../assets/shaders/atmosphere-cache.wgsl"));
+    } else {
+        s.push_str("fn cloud_cache_value(view: Scene, cell: vec2<i32>, band: i32) -> u32 { return 0xffffffffu; }\n");
+    }
     s
 }
 
