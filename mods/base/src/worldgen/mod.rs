@@ -240,14 +240,15 @@ pub fn register(r: &mut Registry) {
         // Broad patches with smaller offshoots. Shifting the surface thresholds
         // with coherent noise mixes materials where two regions are close.
         .field("base:surface_patch", Expr::fbm(0x89, 24.0, 1) * Expr::value(0.76) + Expr::fbm(0x8A, 7.0, 1) * Expr::value(0.24))
-        .field("base:surface_temperature", Expr::temperature() + Expr::field("base:surface_patch") * Expr::value(0.24))
-        .field("base:surface_humidity", Expr::humidity() - Expr::field("base:surface_patch") * Expr::value(0.22))
+        .field("base:biome_edge", Expr::field("base:surface_patch") * Expr::value(0.25))
+        .field("base:surface_temperature", Expr::temperature() + Expr::field("base:biome_edge") * Expr::value(0.24))
+        .field("base:surface_humidity", Expr::humidity() - Expr::field("base:biome_edge") * Expr::value(0.22))
         .field(
             "base:weirdness",
             (Expr::fbm(0x4A7, 1000.0, 3).at(
                 Expr::x() + Expr::fbm(0x111, 600.0, 2) * Expr::blocks(80.0) + Expr::noise(40.0) * Expr::value(0.5),
                 Expr::z() + Expr::fbm(0x222, 600.0, 2) * Expr::blocks(80.0) + Expr::noise(40.0) * Expr::value(0.5),
-            ) + Expr::field("base:surface_patch") * Expr::value(0.08))
+            ) + Expr::field("base:biome_edge") * Expr::value(0.08))
             .ramp(-0.2, 0.2),
         )
         .field("base:randomness", Expr::fbm(0x4A7, 700.0, 3).ramp(-0.2, 0.2))
@@ -276,8 +277,8 @@ pub fn register(r: &mut Registry) {
                 + Expr::fbm(0x86, 37.0, 2) * Expr::value(0.34)
                 + Expr::field("base:surface_patch") * Expr::value(0.66),
         )
-        .field("base:surface_mountains", Expr::field("base:mountains") + Expr::field("base:surface_patch") * Expr::value(0.18))
-        .field("base:surface_plains", Expr::field("base:plains") + Expr::field("base:surface_patch") * Expr::value(0.18))
+        .field("base:surface_mountains", Expr::field("base:mountains") + Expr::field("base:biome_edge") * Expr::value(0.18))
+        .field("base:surface_plains", Expr::field("base:plains") + Expr::field("base:biome_edge") * Expr::value(0.18))
         .landform(preset::continents(18.0))
         // Plains have long, shallow rises and small swales. Ease out the
         // shorter hills as the plains take over.
@@ -372,7 +373,7 @@ pub fn register(r: &mut Registry) {
             )
             .rule(
                 alpine
-                    .height(line - 8..line)
+                    .height(line - 2..line)
                     .field("base:surface_patch", ..-0.08)
                     .surface("snowy_grass", "dirt", 2)
                     .named(&format!("snow_patches_{i}")),
