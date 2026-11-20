@@ -18,6 +18,7 @@ pub struct BuildCx<'a> {
     pub settings: &'a Settings,
     pub languages: &'a [(String, String)],
     pub in_game: bool,
+    pub debug: bool,
     /// Joined someone else's world (their synced settings apply).
     pub remote: bool,
     pub mods: usize,
@@ -615,15 +616,13 @@ fn settings_links(cx: &BuildCx) -> Vec<(&'static str, &'static str)> {
         ("settings.resource_packs", "core:resource_packs"),
         ("settings.shader_packs", "core:shader_packs"),
         ("settings.mods", "core:mod_settings"),
+        ("settings.hud", "core:hud_editor"),
     ];
-    if cx.in_game {
-        v.push(("settings.hud", "core:hud_editor"));
-        if cx
-            .client
-            .is_some_and(|cl| cl.permission >= weft_abi::permission::ADMIN)
-        {
-            v.push(("world.rules", "core:world_rules"));
-        }
+    if cx
+        .client
+        .is_some_and(|cl| cl.permission >= weft_abi::permission::ADMIN)
+    {
+        v.push(("world.rules", "core:world_rules"));
     }
     v
 }
@@ -1104,12 +1103,6 @@ impl Screen for Controls {
             ui.set_id(list, "controls");
             ui.container(Style::row().gap(6.0), |ui| {
                 button(ui, cx, "controls.reset", &[], 120.0, |c| c.requests.push(Request::ResetBinds));
-                if crate::settings::touch_controls() {
-                    button(ui, cx, "touch.title", &[], 120.0, |c| {
-                        c.requests
-                            .push(Request::Screen("core:touch_buttons".into()))
-                    });
-                }
                 back_button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
             });
         });

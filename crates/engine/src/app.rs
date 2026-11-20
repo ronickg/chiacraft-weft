@@ -80,6 +80,8 @@ pub enum Request {
     Sound(crate::audio::Play),
     Rebind(String, crate::input::Slots),
     ResetBinds,
+    ResetHudLayout,
+    SetDebug(bool),
     StartWorld(WorldMeta),
     /// Into a world from its picture in the list, `picture` (a GUI texture) growing from `from`
     /// (GUI pixels) to the whole window first.
@@ -657,6 +659,7 @@ impl Running {
             settings: &self.settings,
             languages: &self.languages,
             in_game: self.game.is_some(),
+            debug: self.debug,
             remote: self.game.as_ref().is_some_and(|g| g.server.is_none()),
             mods: self.mods.len(),
             client: self.game.as_ref().map(|g| &g.client),
@@ -693,6 +696,14 @@ impl Running {
     fn rebuild_all(&mut self) {
         self.rebuild_screens(|_| true);
         self.hud.invalidate();
+    }
+
+    fn set_debug(&mut self, on: bool) {
+        if self.debug != on {
+            self.debug = on;
+            self.hud.invalidate();
+            self.rebuild_screens(|ui| ui.find("hud_tools").is_some());
+        }
     }
 
     fn rebuild_music_screens(&mut self) {
@@ -1019,6 +1030,11 @@ impl Running {
                     }
                 }
                 Request::Rebuild => self.rebuild_all(),
+                Request::ResetHudLayout => {
+                    self.hud.reset_all();
+                    crate::touch::reset_sizes();
+                }
+                Request::SetDebug(on) => self.set_debug(on),
                 Request::Sound(play) => self.ui_sounds.push(play),
                 Request::ModCall(owner, cb, data) => {
                     let mut v = self.frame_view();
@@ -2260,8 +2276,7 @@ fn debug_keys(r: &mut Running) {
         crate::settings::set("advanced_tooltips", (!crate::settings::advanced_tooltips()) as u8 as f64);
     }
     if r.input.pressed("core:debug") {
-        r.debug = !r.debug;
-        r.hud.invalidate();
+        r.set_debug(!r.debug);
     }
     // Through the command, so permissions still apply.
     if r.input.pressed("core:cycle_game_mode")
@@ -2287,8 +2302,7 @@ fn debug_keys(r: &mut Running) {
     for i in 0..groups.min(9) {
         if r.input.pressed(&format!("core:debug_group{}", i + 1)) {
             crate::settings::set("debug_groups", (crate::settings::debug_groups() ^ (1 << i)) as f64);
-            r.debug = true;
-            r.hud.invalidate();
+            r.set_debug(true);
         }
     }
 }
@@ -2546,22 +2560,20 @@ fn end_input(r: &mut Running) {
 }
 
 fn refresh_hud(r: &mut Running) {
-    if let Some(g) = &r.game {
-        let chat_open = r.screens.last().is_some_and(|(s, _)| s.shows_chat());
-        if r.hud.editing()
-            && !r
-                .screens
-                .last()
-                .is_some_and(|(s, _)| s.name() == "core:hud_editor")
-        {
-            r.hud.set_edit(None);
-        }
+    let top = r.screens.last().map(|(s, _)| s.as_ref());
+    if !top.is_some_and(|s| s.name() == "core:hud_editor") {
+        r.hud.set_edit(None);
+    }
+    if r.game.is_some() || r.hud.editing() {
+        let chat_open = top.is_some_and(Screen::shows_chat);
         r.hud.knob = r.touches.knob();
         if r.hud
-            .update(&g.client, r.debug, crate::settings::debug_groups(), chat_open, &r.lang, &r.input)
+            .update(r.game.as_ref().map(|g| &g.client), r.debug, crate::settings::debug_groups(), chat_open, &r.lang, &r.input)
         {
             r.quads_dirty = true;
         }
+    }
+    if let Some(g) = &r.game {
         let mut h = g.client.selected as u64;
         for s in g.client.inventory.iter().chain(
             g.client
@@ -2600,7 +2612,7 @@ fn layout_uis(r: &mut Running, scale: f32) -> f32 {
     let screen_size = Vec2::new(gui_size.x, visible_height(r).map_or(gui_size.y, |h| (h / scale).min(gui_size.y)));
     {
         let mut uis: Vec<(&mut Ui, Vec2)> = Vec::new();
-        if r.game.is_some() {
+        if r.game.is_some() || r.hud.editing() {
             uis.push((&mut r.hud.ui, gui_size));
         }
         uis.extend(r.screens.iter_mut().map(|(_, u)| (u, screen_size)));
@@ -2645,7 +2657,7 @@ fn build_ui_quads(r: &mut Running, scale: f32, drag: Option<&DragPreview>) {
         .as_ref()
         .is_some_and(|g| g.client.camera_has(crate::tag_bits::camera::HUD))
         || !r.screens.is_empty();
-    let with_hud = r.game.is_some() && hud && !hud_hidden() && !(r.hud_off && r.screens.is_empty());
+    let with_hud = r.hud.editing() || (r.game.is_some() && hud && !hud_hidden() && !(r.hud_off && r.screens.is_empty()));
     if with_hud {
         layers.push(&r.hud.ui);
     }
@@ -2706,7 +2718,7 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
     let shown = r
         .seen_since
         .map_or(0.0, |t| (t.elapsed().as_secs_f32() / HUD_FADE).min(1.0));
-    if shown < 1.0 {
+    if shown < 1.0 && !r.hud.editing() {
         for q in
             r.ui.quads
                 .get_mut(r.hud_quads.clone())
@@ -2762,9 +2774,17 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
         let game = crate::content::try_content().map(|c| (c, &r.textures));
         r.ui.append(&mut *r.gpu, &r.assets, &o, &r.look, scale, game, &mut |_, _, _, _, _, _| {});
     }
-    if let Some((_, ui)) = r.screens.last() {
+    if let Some((screen, ui)) = r.screens.last() {
         let game = crate::content::try_content().map(|c| (c, &r.textures));
-        r.ui.tooltip(&mut *r.gpu, &r.assets, ui, &r.look, scale, r.input.cursor, game);
+        let cursor = r.input.cursor / scale;
+        let (source, hovered) = match (screen.as_ref() as &dyn std::any::Any).downcast_ref::<crate::hud_editor::HudEditor>() {
+            Some(editor) => match editor.element_tooltip(cursor, ui, &r.hud) {
+                Some(node) => (&r.hud.ui, Some(node)),
+                None => (ui, ui.hit(cursor)),
+            },
+            None => (ui, ui.hovered),
+        };
+        r.ui.tooltip(&mut *r.gpu, &r.assets, source, hovered, &r.look, scale, r.input.cursor, game);
     }
     if let Some(cursor) = r
         .game

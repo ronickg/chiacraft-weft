@@ -499,7 +499,7 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
                 "renderer",
             ],
         ),
-        ("core:controls", &["sensitivity", "invert_y", "touch_controls", "auto_jump"]),
+        ("core:controls", &["sensitivity", "invert_y", "auto_jump"]),
         ("core:accessibility", &["fov_effects", "camera_bob"]),
         ("core:profile", &["skin_model", "first_person_model", "show_avatars"]),
         ("core:chat_settings", &["chat_width", "chat_height", "chat_height_closed", "chat_opacity", "chat_visibility"]),

@@ -113,6 +113,16 @@ pub fn set_buttons(buttons: Vec<Button>) {
     save();
 }
 
+pub fn reset_sizes() {
+    edit(|l| {
+        l.stick = STICK_SIZE;
+        for button in &mut l.buttons {
+            button.size = BUTTON_SIZE;
+        }
+    });
+    save();
+}
+
 /// Each touch element with its side: the joystick and the buttons.
 pub fn sizes() -> Vec<(String, f32)> {
     std::iter::once((STICK.to_string(), stick_size()))
