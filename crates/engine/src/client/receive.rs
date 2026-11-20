@@ -94,7 +94,15 @@ impl Client {
                 }
             }
             ToClient::Saved { dim, cubes } if dim == self.world.dim => fwd.push(terrain::In::Saved(cubes)),
-            ToClient::Edits { dim, specs, all } if dim == self.world.dim => fwd.push(terrain::In::Edits { specs, all }),
+            ToClient::Edits { dim, specs, all } if dim == self.world.dim => {
+                let c = content();
+                let edits = specs
+                    .iter()
+                    .filter_map(|s| crate::server::area::AreaFill::parse(c, s))
+                    .collect::<Vec<_>>();
+                self.lod.set_edits(dim, all, &edits);
+                fwd.push(terrain::In::Edits { edits, all });
+            }
             ToClient::Signals { dim, frame, changes } if dim == self.world.dim => self.wires.power_changed(frame, &changes),
             ToClient::BodyGlow { dim, cells } if dim == self.world.dim => self.world.body_glow_changed(cells),
             ToClient::Clock { dim, time, ticks, weather, rate } => {

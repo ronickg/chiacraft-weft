@@ -118,6 +118,7 @@ pub struct LodJob {
     cache: cache::Entry,
     /// What the server said of columns, taken over the terrain's where the tile samples them.
     columns: Columns,
+    edits: Vec<crate::server::area::AreaFill>,
 }
 
 impl LodJob {
@@ -217,8 +218,11 @@ const PARTS: usize = 5;
 /// What came back for `job`, meshed on a worker.
 pub fn made(job: LodJob, mut words: Vec<u32>) {
     background().spawn(move || {
-        if !job.columns.is_empty() {
+        if !job.columns.is_empty() || !job.edits.is_empty() {
             let (s, o) = (1 << job.key.level, job.key.origin());
+            let c = content();
+            let min_y = (c.dims[job.dim as usize].min_cube_y * 16).max(i16::MIN as i32);
+            let max_y = (c.dims[job.dim as usize].max_cube_y * 16 + 15).min(i16::MAX as i32);
             for k in 0..SAMPLES {
                 let (i, j) = ((k as i32 % SIDE) - BORDER, (k as i32 / SIDE) - BORDER);
                 let at = o + IVec2::new(i * s + s / 2, j * s + s / 2);
@@ -244,6 +248,8 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
                     }
                     words[w] = (y as u32 & 0xFFFF) | (top << 16);
                     words[w + 1] = (words[w + 1] & 0xFFFF) | (under << 16);
+                } else if !job.edits.is_empty() {
+                    apply_surface_edits(c, &job.edits, at, min_y, max_y, &mut words[w..w + WORDS]);
                 }
             }
         }
@@ -253,6 +259,73 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
         let _ = job.done.send(Ok(mesh.clone()));
         job.cache.store(&mesh);
     });
+}
+
+/// Apply a fill to the same column that the distant mesh samples, including columns that were
+/// never loaded. The tile already approximates undisplayed layers with its under-surface block.
+fn apply_surface_edits(c: &Content, edits: &[crate::server::area::AreaFill], at: IVec2, min_y: i32, max_y: i32, words: &mut [u32]) {
+    let y = (words[0] as u16) as i16 as i32;
+    let top = words[0] >> 16;
+    let under = words[1] >> 16;
+    let liquid = words[2] >> 16;
+    let liquid_y = words[2] as u16 as i16 as i32;
+    let at_y = |y| DVec3::new(at.x as f64 + 0.5, y as f64 + 0.5, at.y as f64 + 0.5);
+    let mut lo = max_y;
+    let mut hi = min_y;
+    let mut touched = false;
+    for edit in edits {
+        let (min, max) = edit.shape.bounds();
+        let start = ((min.y - 0.5).ceil() as i32).max(min_y);
+        let end = ((max.y - 0.5).floor() as i32).min(max_y);
+        if start > end || !edit.shape.test_box(at_y(start), at_y(end)).1 {
+            continue;
+        }
+        touched = true;
+        lo = lo.min(start);
+        if shows(c, edit.state) {
+            hi = hi.max(end);
+        }
+    }
+    if !touched {
+        return;
+    }
+    let read = |height: i32| {
+        let original = match height.cmp(&y) {
+            std::cmp::Ordering::Less => under,
+            std::cmp::Ordering::Equal => top,
+            std::cmp::Ordering::Greater if liquid != 0 && height <= liquid_y => liquid,
+            std::cmp::Ordering::Greater => 0,
+        };
+        let p = IVec3::new(at.x, height, at.y);
+        edits
+            .iter()
+            .fold(original, |state, edit| edit.state_at(p, state))
+    };
+    let low = (lo - 1).min(y).max(min_y);
+    let high = hi.max(y).max(if liquid == 0 { y } else { liquid_y });
+    let mut water = None;
+    let mut ground = (low, 0);
+    for height in (low..=high).rev() {
+        let state = read(height);
+        if !shows(c, state) {
+            continue;
+        }
+        if c.states[state as usize].liquid.is_some() {
+            water.get_or_insert((height, state));
+        } else {
+            ground = (height, state);
+            break;
+        }
+    }
+    let (new_y, new_top) = ground;
+    if ground != (y, top) {
+        words[0] = (new_y as u16 as u32) | (new_top << 16);
+        words[1] = (words[1] & 0xFFFF) | (read(new_y - 1) << 16);
+        words[3] &= !0xFFFF;
+    }
+    if liquid != 0 || water.is_some() || ground != (y, top) {
+        words[2] = water.map_or(0, |(height, state)| (height as u16 as u32) | (state << 16));
+    }
 }
 
 /// A record of `world.wgsl`'s `vs_lod`: the `dir` face of a box at (x, y, z) in the tile, size
@@ -1198,6 +1271,8 @@ pub struct Lod {
     /// What the server said of columns of `columns_dim`.
     columns: Arc<SavedColumns>,
     columns_dim: u32,
+    edits: Arc<Vec<crate::server::area::AreaFill>>,
+    edits_dim: u32,
     /// Made tiles to make again for columns that changed, shown as they are till then.
     stale: FxHashSet<TileKey>,
     /// A coarse tile and the complete finer cover sharing its dither.
@@ -1253,6 +1328,8 @@ impl Lod {
             mask_changed: false,
             columns: Arc::default(),
             columns_dim: u32::MAX,
+            edits: Arc::default(),
+            edits_dim: u32::MAX,
             stale: FxHashSet::default(),
             transitions: FxHashMap::default(),
             solid: Vec::new(),
@@ -1302,6 +1379,29 @@ impl Lod {
         if !self.stale.is_empty() {
             self.dirty = true;
         }
+    }
+
+    pub(super) fn set_edits(&mut self, dim: u32, all: bool, edits: &[crate::server::area::AreaFill]) {
+        let reset = all || dim != self.edits_dim;
+        let detail_margin = self.terrain.as_deref().map_or(1, |t| t.detail_margin);
+        let affected = self
+            .ready
+            .keys()
+            .chain(&self.pending)
+            .copied()
+            .filter(|&key| {
+                reset
+                    || edits
+                        .iter()
+                        .any(|edit| tile_meets_edit(key, edit, detail_margin))
+            });
+        self.stale.extend(affected);
+        self.dirty |= !self.stale.is_empty();
+        if reset {
+            self.edits = Arc::default();
+            self.edits_dim = dim;
+        }
+        Arc::make_mut(&mut self.edits).extend_from_slice(edits);
     }
 
     pub fn reload(&mut self) {
@@ -1972,6 +2072,7 @@ impl Lod {
     fn request(&mut self) {
         let Some(terrain) = &self.terrain else { return };
         let columns = (self.columns_dim == self.dim).then_some(&self.columns);
+        let edits = (self.edits_dim == self.dim).then_some(&self.edits);
         // Released zoom jobs may finish, but no longer occupy ordinary request slots.
         let retired = if self.zooming { 0 } else { self.zoom_only.len() };
         for &key in &self.wanted {
@@ -1992,18 +2093,31 @@ impl Lod {
             }
             let (dim, seed) = (self.dim, self.seed);
             let (done, terrain, columns) = (self.done.0.clone(), terrain.clone(), columns.cloned());
+            let edits = edits.cloned();
             let dir = self.cache_dir.clone();
             let jobs = self.jobs.clone();
-            let probe = key.level < self.max_level && self.cached_heights.contains_key(&key) && !self.cache_misses.contains(&key);
+            let probe = !again && key.level < self.max_level && self.cached_heights.contains_key(&key) && !self.cache_misses.contains(&key);
             background().spawn(move || {
-                let (columns, edits) = tile_columns(key, columns.as_deref(), terrain.detail_margin);
-                let mut cache = cache::Entry::new(&dir, dim, seed, key, terrain.signature, edits);
+                let (columns, column_hash) = tile_columns(key, columns.as_deref(), terrain.detail_margin);
+                let edits: Vec<_> = edits
+                    .iter()
+                    .flat_map(|edits| edits.iter())
+                    .filter(|edit| tile_meets_edit(key, edit, terrain.detail_margin))
+                    .cloned()
+                    .collect();
+                let mut hash = DefaultHasher::new();
+                column_hash.hash(&mut hash);
+                for edit in &edits {
+                    edit.spec(content()).hash(&mut hash);
+                }
+                let edits_hash = if edits.is_empty() { column_hash } else { hash.finish() };
+                let mut cache = cache::Entry::new(&dir, dim, seed, key, terrain.signature, edits_hash);
                 if let Some(mesh) = cache.load(key) {
                     let _ = done.send(Ok(Arc::new(mesh)));
                 } else if probe {
                     let _ = done.send(Err(key));
                 } else {
-                    let _ = jobs.send(LodJob { dim, seed, key, done, terrain, cache, columns });
+                    let _ = jobs.send(LodJob { dim, seed, key, done, terrain, cache, columns, edits });
                 }
             });
         }
@@ -2014,6 +2128,15 @@ impl Lod {
 
 fn sample_margin(level: u32, detail_margin: i32) -> i32 {
     forest::shadow_margin(1 << level).max(if level == 0 { detail_margin } else { 0 })
+}
+
+fn tile_meets_edit(key: TileKey, edit: &crate::server::area::AreaFill, detail_margin: i32) -> bool {
+    let (lo, hi) = edit.shape.bounds();
+    let at = key.origin().as_dvec2();
+    let margin = sample_margin(key.level, detail_margin).max((BORDER + 1) << key.level) as f64;
+    let lower = at - margin;
+    let upper = at + (key.size() as f64 + margin);
+    hi.x >= lower.x && hi.z >= lower.y && lo.x <= upper.x && lo.z <= upper.y
 }
 
 /// Snapshot only columns in the tile and its sampling border, in a stable order for the disk key.
