@@ -171,13 +171,12 @@ impl Forest {
                             let rgba = face
                                 .iter()
                                 .map(|&[r, g, b, a]| {
-                                    let shade = if foliage { shade * a as f32 / 255.0 } else { shade };
                                     let rgb = [r, g, b];
                                     let rgb: [u8; 3] = std::array::from_fn(|i| {
                                         let tint = ((tint >> (16 - 8 * i)) & 255) as f32 / 255.0;
                                         (rgb[i] as f32 * tint * shade) as u8
                                     });
-                                    [rgb[0], rgb[1], rgb[2], if foliage { 255 } else { a }]
+                                    [rgb[0], rgb[1], rgb[2], a]
                                 })
                                 .collect();
                             FacePixels { side, rgba }
