@@ -249,7 +249,7 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
                     words[w] = (y as u32 & 0xFFFF) | (top << 16);
                     words[w + 1] = (words[w + 1] & 0xFFFF) | (under << 16);
                 } else if !job.edits.is_empty() {
-                    apply_surface_edits(c, &job.edits, at, min_y, max_y, &mut words[w..w + WORDS]);
+                    apply_surface_edits(c, &job.edits, at, min_y..=max_y, job.terrain.stone, &mut words[w..w + WORDS]);
                 }
             }
         }
@@ -263,10 +263,19 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
 
 /// Apply a fill to the same column that the distant mesh samples, including columns that were
 /// never loaded. The tile already approximates undisplayed layers with its under-surface block.
-fn apply_surface_edits(c: &Content, edits: &[crate::server::area::AreaFill], at: IVec2, min_y: i32, max_y: i32, words: &mut [u32]) {
+fn apply_surface_edits(
+    c: &Content,
+    edits: &[crate::server::area::AreaFill],
+    at: IVec2,
+    limits: std::ops::RangeInclusive<i32>,
+    stone: u32,
+    words: &mut [u32],
+) {
+    let (min_y, max_y) = limits.into_inner();
     let y = (words[0] as u16) as i16 as i32;
     let top = words[0] >> 16;
     let under = words[1] >> 16;
+    let soil = (words[3] >> lod_gpu::SOIL_DEPTH_SHIFT) as i32;
     let liquid = words[2] >> 16;
     let liquid_y = words[2] as u16 as i16 as i32;
     let at_y = |y| DVec3::new(at.x as f64 + 0.5, y as f64 + 0.5, at.y as f64 + 0.5);
@@ -291,7 +300,8 @@ fn apply_surface_edits(c: &Content, edits: &[crate::server::area::AreaFill], at:
     }
     let read = |height: i32| {
         let original = match height.cmp(&y) {
-            std::cmp::Ordering::Less => under,
+            std::cmp::Ordering::Less if y - height <= soil => under,
+            std::cmp::Ordering::Less => stone,
             std::cmp::Ordering::Equal => top,
             std::cmp::Ordering::Greater if liquid != 0 && height <= liquid_y => liquid,
             std::cmp::Ordering::Greater => 0,
@@ -321,7 +331,8 @@ fn apply_surface_edits(c: &Content, edits: &[crate::server::area::AreaFill], at:
     if ground != (y, top) {
         words[0] = (new_y as u16 as u32) | (new_top << 16);
         words[1] = (words[1] & 0xFFFF) | (read(new_y - 1) << 16);
-        words[3] &= !0xFFFF;
+        let depth = (soil + new_y - y).clamp(0, u16::MAX as i32);
+        words[3] = (depth as u32) << lod_gpu::SOIL_DEPTH_SHIFT;
     }
     if liquid != 0 || water.is_some() || ground != (y, top) {
         words[2] = water.map_or(0, |(height, state)| (height as u16 as u32) | (state << 16));
