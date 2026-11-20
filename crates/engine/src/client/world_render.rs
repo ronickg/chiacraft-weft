@@ -14,6 +14,8 @@ use super::textures::GameTextures;
 use crate::content::Content;
 pub use crate::gpu_layout::Globals;
 
+pub(super) mod far_lod;
+
 const FACE_WORDS: u32 = 4;
 const QUAD_WORDS: u32 = 8;
 const PAGE_BYTES: u64 = 64 << 20;
@@ -305,6 +307,7 @@ pub struct WorldRenderer {
     quad_pipes: [PipelineId; 4],
     /// Distant terrain: what is opaque, then see-through surfaces (seas).
     lod_pipes: [PipelineId; 3],
+    pub(super) far_lod: far_lod::FarLod,
     forest_textures: Vec<(TextureId, u32)>,
     /// Distant terrain tiles (`lod`): their quads (in `faces`, four words like a face), count
     /// and the heights they span; the ones to draw this frame; and the columns whose cubes show
@@ -424,6 +427,8 @@ impl WorldRenderer {
     ) -> Result<WorldRenderer, String> {
         let (shader, slots) = world_shader(assets).map_err(|e| e.0)?;
         let (face_pipes, quad_pipes, lod_pipes) = Self::pipelines(gpu, &shader, assets)?;
+        let mut far_lod = far_lod::FarLod::default();
+        far_lod.reload(gpu, &shader);
         let tex_shader = shader_table(gpu, c, textures, &slots);
 
         let (tex_info, anim) = Self::texture_info(gpu, textures);
@@ -454,6 +459,7 @@ impl WorldRenderer {
             face_pipes,
             quad_pipes,
             lod_pipes,
+            far_lod,
             forest_textures: Vec::new(),
             lod: FxHashMap::default(),
             lod_quads: 0,
@@ -588,9 +594,9 @@ impl WorldRenderer {
         self.occlusion.reload(gpu, assets);
         match world_shader(assets)
             .map_err(|e| e.0)
-            .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s, assets)?, slots)))
+            .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s, assets)?, slots, s)))
         {
-            Ok(((f, q, l), slots)) => {
+            Ok(((f, q, l), slots, shader)) => {
                 for p in self
                     .face_pipes
                     .into_iter()
@@ -602,6 +608,7 @@ impl WorldRenderer {
                 self.face_pipes = f;
                 self.quad_pipes = q;
                 self.lod_pipes = l;
+                self.far_lod.reload(gpu, &shader);
                 gpu.destroy_buffer(self.tex_shader);
                 self.tex_shader = shader_table(gpu, crate::content::content(), textures, &slots);
                 self.solid
@@ -667,6 +674,7 @@ impl WorldRenderer {
         self.set_forest(gpu, Vec::new());
         self.table.destroy(gpu);
         self.lod.clear();
+        self.far_lod.destroy(gpu);
         self.lod_quads = 0;
         for (b, _) in self.faces.pages.drain(..).chain(self.quads.pages.drain(..)) {
             gpu.destroy_buffer(b);
@@ -847,10 +855,11 @@ impl WorldRenderer {
 
     /// Distant terrain tiles held and their quads.
     pub fn lod_counts(&self) -> (usize, usize) {
-        (self.lod.len(), self.lod_quads)
+        (self.lod.len() + self.far_lod.len(), self.lod_quads)
     }
 
     pub fn remove_lod(&mut self, key: super::lod::TileKey) {
+        self.far_lod.remove(key);
         if let Some((a, _, _, _)) = self.lod.remove(&key) {
             self.lod_quads -= a.len as usize;
             self.faces.free(a);
@@ -1343,10 +1352,17 @@ impl WorldRenderer {
             });
         }
         self.emit(list, 0..self.translucent);
+        self.far_lod
+            .draw(list, &self.lod_draw, cam_cube, false, |list, pipe, records| self.bind_run(list, pipe, records, obuf));
     }
 
     /// The translucent part of the last `draw`, after everything that may stand behind it.
-    pub fn draw_translucent(&self, list: &mut CommandList) {
+    pub fn draw_translucent(&self, list: &mut CommandList, camera: &Camera) {
+        if let Some((_, origins, _, _, _, _, _)) = self.buffers {
+            let cam_cube = crate::world::cube_of(camera.pos.floor().as_ivec3());
+            self.far_lod
+                .draw(list, &self.lod_draw, cam_cube, true, |list, pipe, records| self.bind_run(list, pipe, records, origins));
+        }
         let n = self.runs.len();
         if self.buffers.is_some() && self.translucent < n {
             self.emit(list, self.translucent..n);

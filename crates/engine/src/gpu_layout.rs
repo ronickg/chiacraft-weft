@@ -223,6 +223,18 @@ pub mod terrain {
             CAVE_ROOF_SHIFT = 8,
             SOIL_DEPTH_SHIFT = 16,
         }
+        /// GPU-only distant terrain: one shared corner grid, and two indirect draws
+        /// followed by compact ground/wall and water records.
+        far_lod {
+            CELLS = 32,
+            SIDE = 35,
+            SAMPLES = 35 * 35,
+            HEADER = 8,
+            SOLID_MAX = 32 * 32 * 3 + 64,
+            WATER_MAX = 32 * 32,
+            WORDS = 3,
+            SCRATCH = HEADER + (SOLID_MAX + WATER_MAX) * WORDS,
+        }
         /// Expression step kinds.
         expr {
             CONST = weft_abi::expr::CONST,

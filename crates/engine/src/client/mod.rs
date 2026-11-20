@@ -3135,7 +3135,9 @@ impl Client {
                 textures,
                 self.seed,
                 &lod_cam,
-                (frame.width, frame.height),
+                frame,
+                early,
+                self.gpu_terrain.far_lod_pipeline,
                 normal_fov,
                 self.view_radius,
                 self.budget.min(remaining),
@@ -3222,7 +3224,7 @@ impl Client {
             &overlays,
         );
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
-        self.render.draw_translucent(&mut late);
+        self.render.draw_translucent(&mut late, &cam);
         let tick = self.anim_tick();
         self.wake_render
             .draw(gpu, &mut late, frame.slot, &cam, scene_buf, tick);
