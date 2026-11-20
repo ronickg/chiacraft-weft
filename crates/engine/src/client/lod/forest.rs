@@ -10,7 +10,8 @@ use weft_noise::{hash, mix, unit};
 use super::{Columns, TileKey, WORDS, sample_offset};
 use crate::client::textures::GameTextures;
 use crate::content::Content;
-use crate::features::grid_layout;
+use crate::features::{Shape, grid_layout};
+use crate::generation::Snapshot;
 use crate::gpu_layout::forest::{ELEVATIONS, FRAME, VIEWS};
 use crate::server::lod_tops::impostor_block;
 
@@ -42,7 +43,7 @@ struct Model {
 
 struct Biome {
     chance: f32,
-    trees: [Option<Model>; VARIANTS],
+    trees: Vec<Option<Model>>,
     groves: [Option<Model>; VARIANTS],
 }
 
@@ -50,6 +51,7 @@ struct Scatter {
     feature: usize,
     seed: u64,
     spacing: i32,
+    template: bool,
     biomes: Vec<Option<Biome>>,
 }
 
@@ -94,6 +96,9 @@ impl Forest {
             .collect();
         for (feature, f) in def.features.iter().enumerate() {
             let Some((spacing, chance)) = f.impostor_grid() else { continue };
+            let template = matches!(f.shape, Shape::Template(_));
+            let variants = if template { f.transforms.len() } else { VARIANTS };
+            let snapshot = Snapshot::new(c, dim, seed, f.stage);
             let mut biomes = Vec::new();
             for b in 0..c.biomes.len() as u32 {
                 let chance = chance.in_biome(c, b);
@@ -121,22 +126,34 @@ impl Forest {
                         .filter(|s| s.0 != b && fits(s.1, s.2))
                         .map(|s| s.1),
                 );
-                let mut samples = Vec::new();
-                for (attempt, root) in roots.into_iter().take(48).enumerate() {
-                    let mut blocks = crate::features::sample(c, dim, seed, feature, root - IVec3::Y * f.fit.buried, b, mix(attempt as u64));
-                    // A coating such as moss should not expand the silhouette by a full block.
-                    blocks.retain(|&(_, state)| impostor_block(c, state) && c.states[state as usize].sides == 0);
-                    if blocks.is_empty() {
-                        continue;
-                    }
-                    samples.push(blocks);
-                    if samples.len() == VARIANTS {
-                        break;
-                    }
-                }
-                if samples.is_empty() {
+                let mut samples: Vec<_> = (0..variants)
+                    .map(|variant| {
+                        let transform = f.transforms[variant % f.transforms.len()];
+                        roots
+                            .iter()
+                            .cycle()
+                            .skip(variant)
+                            .take(48.min(roots.len()))
+                            .enumerate()
+                            .find_map(|(attempt, &root)| {
+                                let random = mix((variant * 48 + attempt) as u64);
+                                let mut blocks =
+                                    crate::features::sample(snapshot, feature, root - IVec3::Y * f.fit.buried, b, random, transform);
+                                // A coating such as moss should not expand the silhouette by a full block.
+                                blocks.retain(|&(_, state)| impostor_block(c, state));
+                                (!blocks.is_empty()).then_some(blocks)
+                            })
+                            .unwrap_or_default()
+                    })
+                    .collect();
+                let Some(example) = samples.iter().find(|shape| !shape.is_empty()).cloned() else {
                     biomes.push(None);
                     continue;
+                };
+                if !template {
+                    for shape in samples.iter_mut().filter(|shape| shape.is_empty()) {
+                        *shape = example.clone();
+                    }
                 }
                 let mut colors = Colors::default();
                 for &(_, state) in samples.iter().flatten() {
@@ -192,7 +209,7 @@ impl Forest {
                     models.push((model, blocks, palette.clone()));
                     Some(model)
                 };
-                let trees = std::array::from_fn(|v| register(samples[v % samples.len()].clone()));
+                let trees: Vec<_> = samples.iter().cloned().map(&mut register).collect();
                 let groves = std::array::from_fn(|v| {
                     if spacing > (1 << super::MAX_LEVEL) / 2 {
                         return None;
@@ -204,24 +221,21 @@ impl Forest {
                             if unit(h.rotate_left(17)) >= chance as f64 {
                                 continue;
                             }
-                            let ((dx, dz), ..) = grid_layout(c, f, (x, z), spacing, h);
+                            let ((dx, dz), _, random, _) = grid_layout(c, f, (x, z), spacing, h);
+                            let v = variant(random, template, samples.len());
                             let offset = IVec3::new(dx - GROVE * spacing / 2, 0, dz - GROVE * spacing / 2);
-                            blocks.extend(
-                                samples[(hash(h, 1, 2, 3) % samples.len() as u64) as usize]
-                                    .iter()
-                                    .map(|&(p, s)| (p + offset, s)),
-                            );
+                            blocks.extend(samples[v].iter().map(|&(p, s)| (p + offset, s)));
                         }
                     }
                     register(blocks)
                 });
-                (b, chance.to_bits(), trees, groves).hash(signature);
+                (b, chance.to_bits(), &trees, groves).hash(signature);
                 biomes.push(Some(Biome { chance, trees, groves }));
             }
             if biomes.iter().any(Option::is_some) {
                 let ground = f.fit.ground.map(|m| c.matchers.set(m));
                 (feature, f.salt, spacing, f.y, f.fit.buried, f.fit.over_water, ground).hash(signature);
-                scatter.push(Scatter { feature, seed: seed ^ f.salt, spacing, biomes });
+                scatter.push(Scatter { feature, seed: seed ^ f.salt, spacing, template, biomes });
             }
         }
         let (tx, rx) = crossbeam_channel::bounded(1);
@@ -247,15 +261,18 @@ impl Forest {
         let origin = key.origin();
         let step = 1 << key.level;
         let margin = shadow_margin(step);
+        let def = &c.dims[self.dim as usize];
         for rule in &self.scatter {
-            if !words.chunks_exact(WORDS).any(|w| {
-                rule.biomes
-                    .get((w[1] & 0xffff) as usize)
-                    .is_some_and(Option::is_some)
-            }) {
+            if !rule.template
+                && !words.chunks_exact(WORDS).any(|w| {
+                    rule.biomes
+                        .get((w[1] & 0xffff) as usize)
+                        .is_some_and(Option::is_some)
+                })
+            {
                 continue;
             }
-            let f = &c.dims[self.dim as usize].features[rule.feature];
+            let f = &def.features[rule.feature];
             // A coarse tile samples at most one grove per terrain cell, even at the horizon.
             let groups = if step / 2 < rule.spacing { 1 } else { GROVE << (step / (GROVE * rule.spacing)).max(1).ilog2() };
             let stride = groups * rule.spacing;
@@ -296,9 +313,12 @@ impl Forest {
                 }
                 let stride = groups * rule.spacing;
                 let h = hash(rule.seed, x as i64, 0, z as i64);
-                let (wx, wz) =
-                    if groups == 1 { grid_layout(c, f, (x, z), stride, h).0 } else { (x * stride + stride / 2, z * stride + stride / 2) };
-                let site = IVec2::new(wx, wz);
+                let (site, foot, random) = if groups == 1 {
+                    let ((wx, wz), foot, random, _) = grid_layout(c, f, (x, z), stride, h);
+                    (IVec2::new(wx, wz), foot, random)
+                } else {
+                    (IVec2::new(x * stride + stride / 2, z * stride + stride / 2), IVec3::ZERO, hash(h, 1, 2, 3))
+                };
                 let local = site - origin;
                 if local.min_element() < -margin || local.max_element() >= key.size() + margin {
                     continue;
@@ -307,46 +327,51 @@ impl Forest {
                     .div_euclid(IVec2::splat(step))
                     .clamp(IVec2::splat(-1), IVec2::splat(super::CELLS));
                 let k = sample_offset(cell.x, cell.y);
-                let biome = (words[k + 1] & 0xffff) as usize;
-                let Some(b) = rule.biomes.get(biome).and_then(Option::as_ref) else { continue };
-                let v = (hash(h, 1, 2, 3) % VARIANTS as u64) as usize;
-                let model = if groups == 1 {
-                    if unit(h.rotate_left(17)) >= b.chance as f64 {
-                        continue;
-                    }
-                    b.trees[v]
-                } else {
-                    b.groves[v]
-                };
-                let Some(model) = model else { continue };
-                let ground = words[k] >> 16;
-                // The terrain here is a set of flat cells, so use the height actually drawn.
-                let base = super::column(heights, cell.x, cell.y) + 1;
-                let surface = words[k + 2];
-                let blocked = if surface >> 16 != 0 { !f.fit.over_water } else { surface != 0 && !f.fit.over_caves };
-                if blocked
-                    || !(f.y[0]..=f.y[1]).contains(&base)
-                    || f.fit.ground.is_some_and(|m| !c.matchers.has(m, ground))
-                    || columns
-                        .get(&site)
-                        .is_some_and(|col| col.removed_scatter.contains(&f.id))
+                if columns
+                    .get(&site)
+                    .is_some_and(|col| col.removed_scatter.contains(&f.id))
                 {
                     continue;
                 }
-                if groups == 1 && key.level == 0 {
-                    let def = &c.dims[self.dim as usize];
-                    let seed = rule.seed ^ f.salt;
-                    let found = crate::features::start_at(c, def, self.dim, seed, rule.feature, (x, z));
-                    if found.is_none_or(|start| {
-                        !start
-                            .lod_blocks(crate::generation::Snapshot::new(c, self.dim, seed, f.stage))
-                            .iter()
-                            .any(|&(_, state)| impostor_block(c, state) && c.states[state as usize].sides == 0)
-                    }) {
+                let seed = rule.seed ^ f.salt;
+                let (model, base) = if groups == 1 && (rule.template || key.level == 0) {
+                    let Some(start) = crate::features::start_at(c, def, self.dim, seed, rule.feature, (x, z)) else { continue };
+                    if !start
+                        .lod_blocks(Snapshot::new(c, self.dim, seed, f.stage))
+                        .iter()
+                        .any(|&(_, state)| impostor_block(c, state))
+                    {
                         continue;
                     }
-                }
-                let base = base - f.fit.buried;
+                    let mid = start.pos + foot / 2;
+                    let Some(col) = def.column(seed, mid.x, mid.z) else { continue };
+                    let Some(b) = rule.biomes.get(col.biome as usize).and_then(Option::as_ref) else { continue };
+                    (b.trees[variant(random, rule.template, b.trees.len())], start.pos.y)
+                } else {
+                    let biome = words[k + 1] & 0xffff;
+                    let Some(b) = rule.biomes.get(biome as usize).and_then(Option::as_ref) else { continue };
+                    let base = super::column(heights, cell.x, cell.y) + 1;
+                    let surface = words[k + 2];
+                    let blocked = if surface >> 16 != 0 { !f.fit.over_water } else { surface != 0 && !f.fit.over_caves };
+                    if blocked
+                        || !(f.y[0]..=f.y[1]).contains(&base)
+                        || f.fit
+                            .ground
+                            .is_some_and(|m| !c.matchers.has(m, words[k] >> 16))
+                    {
+                        continue;
+                    }
+                    let model = if groups == 1 {
+                        if unit(h.rotate_left(17)) >= b.chance as f64 {
+                            continue;
+                        }
+                        b.trees[variant(random, false, b.trees.len())]
+                    } else {
+                        b.groves[variant(random, false, VARIANTS)]
+                    };
+                    (model, base - f.fit.buried)
+                };
+                let Some(model) = model else { continue };
                 let magnification = if groups == 1 { 1.0 } else { groups as f32 / GROVE as f32 };
                 let radius = model.radius as f32 * magnification;
                 let offset = model.canopy_center.as_vec2() * magnification;
@@ -370,6 +395,11 @@ impl Forest {
         }
         result
     }
+}
+
+fn variant(random: u64, template: bool, count: usize) -> usize {
+    let choice = if template { random >> 40 } else { random };
+    (choice % count as u64) as usize
 }
 
 impl TileForest {

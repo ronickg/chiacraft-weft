@@ -296,7 +296,7 @@ r.scatter(&TREE_SITES).spacing(5).reach(3).density(&TREES).plan(|p| {
 
 `r.edit(&TREE_SITES)` changes another mod's scatter by its handle.
 
-`.impostor()` adds the `feature.impostor` tag to a grid feature. Distant terrain draws a view-dependent image of its shape. Loaded cubes show the placed blocks. Both grid odds and biome density work with the tag, including templates and plans.
+`.impostor()` adds the `feature.impostor` tag to a grid feature. Distant terrain draws a view-dependent image of its occupied voxels. Loaded cubes show the placed blocks. Both grid odds and biome density work with the tag, including templates and plans.
 
 `.surface_cover(sample)` adds the `surface_projection` tag and supplies the callback for a terrain projection. Share the sampler with the decoration's placement rules. It returns the block state to use for the projection at a position, or air for no cover. A solid block can supply a projection texture by carrying the same tag.
 

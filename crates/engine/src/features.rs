@@ -299,7 +299,7 @@ impl Start {
             let consult_terrain = self
                 .puts
                 .iter()
-                .any(|p| matches!(p, Put::Cells(_) | Put::Fill { only: Some(_), .. }));
+                .any(|p| matches!(p, Put::Cells(_) | Put::Fill { only: Some(_), .. } | Put::Block { force: false, .. }));
             let mut space = PreviewCells { lo, hi: self.hi, base: consult_terrain.then_some(snapshot), blocks: Default::default() };
             write_start(snapshot.c, snapshot.def(), snapshot.seed, self, &mut space);
             let mut blocks: Vec<_> = space
@@ -803,8 +803,14 @@ impl Cells for PreviewCells<'_> {
     }
 
     fn add_part(&mut self, p: IVec3, part: crate::world::placement::Part) {
-        if part.offset == IVec3::ZERO && self.get(p).is_some() {
-            self.set(p, part.state);
+        let (cell, part) = part.owner(p);
+        if self.get(cell).is_some() {
+            // The impostor samples one material per voxel.
+            if part.offset == IVec3::ZERO {
+                self.set(cell, part.state);
+            } else {
+                self.blocks.entry(cell).or_insert(part.state);
+            }
         }
     }
 }
@@ -1219,12 +1225,18 @@ pub fn nearest(c: &Content, dim: u32, seed: u64, name: &str, pos: IVec3, radius:
 }
 
 /// Sample the shape a distant grid feature places relative to its start.
-pub(crate) fn sample(c: &Content, dim: u32, seed: u64, fi: usize, pos: IVec3, biome: u32, random: u64) -> Vec<(IVec3, u32)> {
-    let def = &c.dims[dim as usize];
-    let f = &def.features[fi];
-    let transform = f.transforms[(random >> 40) as usize % f.transforms.len()];
-    let Some(s) = make_start(c, def, dim, seed, fi, pos, biome, random, transform) else { return Vec::new() };
-    s.lod_blocks(crate::generation::Snapshot::new(c, dim, seed, f.stage))
+pub(crate) fn sample(
+    snapshot: crate::generation::Snapshot<'_>,
+    fi: usize,
+    pos: IVec3,
+    biome: u32,
+    random: u64,
+    transform: Transform,
+) -> Vec<(IVec3, u32)> {
+    let Some(s) = make_start(snapshot.c, snapshot.def(), snapshot.dim, snapshot.seed, fi, pos, biome, random, transform) else {
+        return Vec::new();
+    };
+    s.lod_blocks(snapshot)
         .iter()
         .map(|&(at, state)| (at - pos, state))
         .collect()
