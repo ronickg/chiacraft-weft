@@ -225,8 +225,7 @@ fn trace_cloud(s: Sky, dir: vec3<f32>, limit: f32, view: Scene) -> CloudHit {
     return CloudHit(vec4(color, alpha), t);
 }
 
-// Distant precipitation fades in after the local particles. Sample the continuous core of
-// the same weather footprint so the veils have soft edges even beside stepped clouds.
+// A soft mass beneath the cloud. Only the weather field moves it, with the cloud's drift.
 fn rain_veil(s: Sky, dir: vec3<f32>, limit: f32, view: Scene) -> vec4<f32> {
     if s.ids.w == 0u || max(s.axes[0].w, s.axes[1].w) <= 0.0 {
         return vec4(0.0);
@@ -266,15 +265,12 @@ fn rain_veil(s: Sky, dir: vec3<f32>, limit: f32, view: Scene) -> vec4<f32> {
         let top = s.extra.z + max(0.0, middle - thickness + 0.65) * (s.extra.y / 5.0);
         let below = top - dir.y * t;
         let attach = smoothstep(-10.0, 22.0, below);
-        // Wind bends the finer streaks below the cloud. The large footprint stays vertical.
-        let streak_at = at - vec2(0.00065, -0.00023) * below;
-        let streak = cloud_noise(s.ids.z ^ 0x8fa24bb1u, origin, streak_at, vec2(19, 22));
         let range = smoothstep(36.0, 105.0, t) * (1.0 - smoothstep(reach * 0.55, reach, t));
         let density = smoothstep(0.12, 0.72, field.x) * attach * range * preset.w * s.color.a;
-        let extinction = density * mix(0.006, 0.018, streak) * select(0.62, 1.0, field.y == 2.0);
+        let extinction = density * select(0.0075, 0.012, field.y == 2.0);
         let absorption = (1.0 - alpha) * (1.0 - exp(-extinction * (end - start)));
-        let fog = smoothstep(0.0, 1.0, fog_amount(t, view.environment.y, view.environment.z));
-        let color = mix(preset.rgb * 0.62, view.fog_color.rgb, 0.35 + fog * 0.65);
+        let luma = vec3(0.30, 0.59, 0.11);
+        let color = mix(vec3(dot(preset.rgb, luma) * 0.55), mix(vec3(dot(view.fog_color.rgb, luma)), view.fog_color.rgb, 0.28), 0.58);
         light += color * absorption;
         alpha += absorption;
     }

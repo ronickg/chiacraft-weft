@@ -886,6 +886,8 @@ gpu_struct! {
         pub place: [f32; 4],
         /// x its left in the picture, y its top, z how much of the picture high, w alpha.
         pub uv: [f32; 4],
+        /// Wind slope in x/z, its time-dependent sideways offset along that wind, and rain flag.
+        pub wind: [f32; 4],
         /// x texture index, y light of the column (as `GpuParticle`), z a number of its own, w how
         /// much of the picture shows (0..255).
         pub data: [u32; 4],
