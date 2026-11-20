@@ -105,8 +105,16 @@ struct Entering {
     /// Where it was, GUI pixels.
     from: crate::ui::Rect,
     started: Instant,
+    expanded: bool,
     /// When the picture filled the window and the world took over.
     shown: Option<Instant>,
+}
+
+struct OpenedWorld {
+    storage: saves::Storage,
+    skin: Option<net::Skin>,
+    avatar: Option<net::AvatarData>,
+    chat_history: Vec<String>,
 }
 
 /// Cubes about the player whose ground has to be drawn for the world to be there to see.
@@ -282,8 +290,8 @@ pub(crate) struct Running {
     preview_shot: Option<(PathBuf, bool)>,
     /// Going into a world from its picture in the list (`Request::EnterWorld`).
     entering: Option<Entering>,
-    /// The world opened while shaders were compiling ahead, opening once they are done.
-    waiting_world: Option<WorldMeta>,
+    /// The save and player files being opened off the render thread.
+    opening_world: Option<crossbeam_channel::Receiver<OpenedWorld>>,
     /// When the world around the player was first loaded, the HUD coming in from then.
     seen_since: Option<Instant>,
     /// The HUD's quads among the cached ones.
@@ -562,7 +570,7 @@ impl App {
             world_dir: None,
             preview_shot: None,
             entering: None,
-            waiting_world: None,
+            opening_world: None,
             seen_since: None,
             hud_quads: 0..0,
             reload_requested: false,
@@ -805,15 +813,13 @@ impl Running {
     }
 
     fn start_world(&mut self, meta: WorldMeta) {
-        self.start_world_under(meta, false);
-    }
-
-    /// `start_world`, with `under` the screens staying over it for now (going into a world from
-    /// its picture: it loads while the picture grows).
-    fn start_world_under(&mut self, meta: WorldMeta, under: bool) {
+        if self.opening_world.is_some() {
+            return;
+        }
         log::info!("opening world '{}' (seed {})", meta.name, meta.seed);
         if meta.format != saves::SAVE_FORMAT {
             log::error!("world '{}' was saved in format {}, this build reads {}", meta.name, meta.format, saves::SAVE_FORMAT);
+            self.entering = None;
             self.screens.clear();
             self.open(Box::new(screens::Message { title: "world.open_failed".into(), args: vec![Arg::Key("world.old_format".into())] }));
             return;
@@ -821,16 +827,49 @@ impl Running {
         for m in meta.missing_mods(content()) {
             log::warn!("the world was played with mod {m}, which is not loaded");
         }
-        if self.gpu.compiling() {
+        if self.gpu.compiling() && self.entering.is_none() {
             log::info!("waiting for shaders to compile");
-            self.waiting_world = Some(meta);
             self.screens.clear();
             self.open(Box::new(screens::Compiling));
+        }
+        let run_dir = self.settings.run_dir.clone();
+        let (send, opened) = crossbeam_channel::bounded(1);
+        crate::background().spawn(move || {
+            let storage = saves::Storage::open(meta, content());
+            let world = OpenedWorld {
+                storage,
+                skin: read_skin(&run_dir),
+                avatar: read_avatar(&run_dir),
+                chat_history: load_chat_history(&run_dir),
+            };
+            let _ = send.send(world);
+        });
+        self.opening_world = Some(opened);
+    }
+
+    fn finish_world_open(&mut self) {
+        let Some(opened) = &self.opening_world else { return };
+        // Client GPU resources belong to the render thread. Let the picture grow on
+        // its own frames before creating them behind the full-screen preview.
+        if self.entering.as_ref().is_some_and(|e| !e.expanded) || self.gpu.compiling() {
             return;
         }
-        let storage = saves::Storage::open(meta.clone(), content());
+        let world = opened.try_recv();
+        if matches!(world, Err(crossbeam_channel::TryRecvError::Empty)) {
+            return;
+        }
+        self.opening_world = None;
+        let OpenedWorld { storage, skin, avatar, chat_history } = match world {
+            Ok(world) => world,
+            Err(_) => {
+                self.world_open_failed("world loader stopped".into());
+                return;
+            }
+        };
+        let seed = storage.meta.seed;
+        let dir = storage.meta.dir.clone();
         let server = server::spawn(
-            ServerConfig { seed: meta.seed, view_radius: crate::settings::view_distance(), dedicated: false, whitelist: None },
+            ServerConfig { seed, view_radius: crate::settings::view_distance(), dedicated: false, whitelist: None },
             Some(storage),
         );
         let (client_conn, server_conn) = net::local_pair();
@@ -845,27 +884,29 @@ impl Running {
             &crate::settings::name(),
             &key,
             crate::settings::view_distance(),
-            read_skin(&self.settings.run_dir),
-            read_avatar(&self.settings.run_dir),
+            skin,
+            avatar,
         ) {
             Ok(mut client) => {
-                client.sent = load_chat_history(&self.settings.run_dir);
-                self.world_dir = Some(meta.dir.clone());
+                client.sent = chat_history;
+                self.world_dir = Some(dir);
                 self.game = Some(Game { client, server: Some(server) });
                 self.hud.invalidate();
                 self.quads_dirty = true;
-                if !under {
+                if self.entering.is_none() {
                     self.screens.clear();
                     self.set_capture(true);
                 }
             }
-            Err(e) => {
-                log::error!("{e}");
-                // Something to look at instead of an empty window; the server stops with `server`.
-                self.screens.clear();
-                self.open(Box::new(screens::Message { title: "world.open_failed".into(), args: vec![Arg::Text(e.to_string())] }));
-            }
+            Err(e) => self.world_open_failed(e),
         }
+    }
+
+    fn world_open_failed(&mut self, reason: String) {
+        log::error!("{reason}");
+        self.entering = None;
+        self.screens.clear();
+        self.open(Box::new(screens::Message { title: "world.open_failed".into(), args: vec![Arg::Text(reason)] }));
     }
 
     /// Opens the pause screen over play. In a world of this machine the frame first goes without
@@ -891,6 +932,8 @@ impl Running {
     }
 
     fn leave_world_silent(&mut self) {
+        self.opening_world = None;
+        self.entering = None;
         self.world_dir = None;
         if let Some(mut g) = self.game.take() {
             if g.server.is_none() {
@@ -1022,13 +1065,10 @@ impl Running {
                 }
                 Request::EnterWorld { world, picture, from } => {
                     let missing = world.missing_mods(content());
-                    if self.entering.is_some() || self.game.is_some() {
+                    if self.entering.is_some() || self.game.is_some() || self.opening_world.is_some() {
                     } else if missing.is_empty() {
-                        self.entering = Some(Entering { picture, from, started: Instant::now(), shown: None });
-                        self.start_world_under(world, true);
-                        if self.game.is_none() {
-                            self.entering = None;
-                        }
+                        self.entering = Some(Entering { picture, from, started: Instant::now(), expanded: false, shown: None });
+                        self.start_world(world);
                     } else {
                         self.open(Box::new(saves::MissingMods { world, missing }));
                     }
@@ -2040,7 +2080,8 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     let scale = r.gui_scale();
     start_frame(r, opts, dt);
     let mut requests = Vec::new();
-    if !screen_keys_first(r, &mut requests) && r.input.pressed_key(Key::Code(KeyCode::Escape)) {
+    let opening = r.opening_world.is_some() || r.entering.as_ref().is_some_and(|e| e.shown.is_none());
+    if !opening && !screen_keys_first(r, &mut requests) && r.input.pressed_key(Key::Code(KeyCode::Escape)) {
         escape(r, &mut requests);
     }
     debug_keys(r);
@@ -2061,19 +2102,17 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     // those frames left the GPU on work it never finished (NVIDIA: Xid 109; Apple: a hang the
     // whole machine went down with). It waits for the join.
     let joining = r.game.as_ref().is_some_and(|g| !g.client.joined);
-    if r.reload_requested && !joining {
+    if r.reload_requested && !opening && !joining {
         r.reload_requested = false;
         reload_assets(r, opts);
     }
     window_keys(r);
-    r.screen_input(scale, &mut requests);
+    if !opening {
+        r.screen_input(scale, &mut requests);
+    }
     r.handle(requests);
     soft_keyboard(r);
-    if !r.gpu.compiling()
-        && let Some(meta) = r.waiting_world.take()
-    {
-        r.start_world(meta);
-    }
+    r.finish_world_open();
     update_game(r, dt, now);
     r.entity_ticks(dt as f32);
     r.client_packets();
@@ -3000,8 +3039,7 @@ fn save_screenshot(r: &mut Running) {
     }
 }
 
-/// Going into a world from its picture (`Entering`): the world starts once the picture fills the
-/// window, which goes when the world is loaded around the player.
+/// Fade out the full-screen picture once the server has welcomed the client.
 fn enter_world(r: &mut Running) {
     if r.game.is_none() {
         r.seen_since = None;
@@ -3009,13 +3047,7 @@ fn enter_world(r: &mut Running) {
         r.seen_since = Some(Instant::now());
     }
     let Some(e) = &mut r.entering else { return };
-    if r.game.is_none() {
-        r.entering = None;
-        return;
-    }
-    // The picture fills the window: the list goes and the world is played, loaded as far as
-    // it got; the rest comes in as it does anyway.
-    if e.shown.is_none() && e.started.elapsed().as_secs_f32() >= ENTER_GROW {
+    if e.shown.is_none() && e.expanded && r.game.as_ref().is_some_and(|g| g.client.joined) {
         e.shown = Some(Instant::now());
         r.screens.clear();
         r.quads_dirty = true;
@@ -3032,8 +3064,9 @@ fn enter_world(r: &mut Running) {
 /// The picture of `Entering` over everything: from its place in the list to the window, eased
 /// out, then fading.
 fn draw_entering(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
-    let Some(e) = &r.entering else { return };
+    let Some(e) = &mut r.entering else { return };
     let grow = (e.started.elapsed().as_secs_f32() / ENTER_GROW).min(1.0);
+    e.expanded = grow >= 1.0;
     let k = 1.0 - (1.0 - grow).powi(3);
     let alpha = 1.0
         - e.shown
