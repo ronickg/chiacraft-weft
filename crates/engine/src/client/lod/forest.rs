@@ -23,7 +23,12 @@ pub(super) fn shadow_margin(step: i32) -> i32 {
     MIN_SHADOW_MARGIN.max(2 * step)
 }
 type Voxels = Vec<(IVec3, u32)>;
-type Colors = FxHashMap<u32, [[[u8; 4]; 16]; 6]>;
+type Colors = FxHashMap<u32, [FacePixels; 6]>;
+
+struct FacePixels {
+    side: usize,
+    rgba: Box<[[u8; 4]]>,
+}
 pub(super) type Atlases = Vec<Vec<Vec<u8>>>;
 
 #[derive(Clone, Copy, Hash)]
@@ -72,6 +77,7 @@ impl Forest {
         let mut models = Vec::new();
         let mut texels = FxHashMap::default();
         let def = &c.dims[dim as usize];
+        let leaves = c.components.id("leaves");
         // Mod callbacks can inspect their actual substrate. Take representative surface sites
         // from this seed, preferring the requested biome and a ground accepted by the feature.
         let sites: Vec<_> = (0..512)
@@ -149,19 +155,29 @@ impl Forest {
                 let mut colors = Colors::default();
                 for &(_, state) in samples.iter().flatten() {
                     colors.entry(state).or_insert_with(|| {
+                        let foliage = leaves.is_some_and(|tag| c.components.has(crate::components::BLOCK, state, tag));
                         std::array::from_fn(|dir| {
                             let (tex, tint) = faces[state as usize][dir];
+                            // Keep individual leaf holes in the bake instead of averaging the whole face.
+                            let side = if foliage { 16 } else { 4 };
                             let face = texels
-                                .entry(tex)
-                                .or_insert_with(|| textures.impostor_texels(tex));
+                                .entry((tex, side))
+                                .or_insert_with(|| textures.impostor_texels(tex, side));
                             let tint = c.kind_color(tint as u8, Some(b as u16));
                             let shade = [0.6, 0.6, 0.5, 1.0, 0.8, 0.8][dir];
-                            face.map(|rgba| {
-                                let rgb: [u8; 3] = std::array::from_fn(|i| {
-                                    (rgba[i] as f32 * (((tint >> (16 - 8 * i)) & 255) as f32 / 255.0) * shade) as u8
-                                });
-                                [rgb[0], rgb[1], rgb[2], rgba[3]]
-                            })
+                            let rgba = face
+                                .iter()
+                                .map(|&[r, g, b, a]| {
+                                    let shade = if foliage { shade * a as f32 / 255.0 } else { shade };
+                                    let rgb = [r, g, b];
+                                    let rgb: [u8; 3] = std::array::from_fn(|i| {
+                                        let tint = ((tint >> (16 - 8 * i)) & 255) as f32 / 255.0;
+                                        (rgb[i] as f32 * tint * shade) as u8
+                                    });
+                                    [rgb[0], rgb[1], rgb[2], if foliage { 255 } else { a }]
+                                })
+                                .collect();
+                            FacePixels { side, rgba }
                         })
                     });
                 }
@@ -470,8 +486,9 @@ fn bake(model: Model, blocks: &[(IVec3, u32)], colors: &Colors) -> Vec<Vec<u8>> 
                                 1 => [at.x, at.z],
                                 _ => [at.x, -at.y],
                             };
-                            let [u, v] = uv.map(|v| ((v.rem_euclid(1.0) * 4.0) as usize).min(3));
-                            let [r, g, b, a] = colors[&state][dir][v * 4 + u];
+                            let face = &colors[&state][dir];
+                            let [u, v] = uv.map(|v| ((v.rem_euclid(1.0) * face.side as f32) as usize).min(face.side - 1));
+                            let [r, g, b, a] = face.rgba[v * face.side + u];
                             let mut outside = p;
                             outside[axis] -= step[axis];
                             let shade = if outside.cmpge(IVec3::ZERO).all()

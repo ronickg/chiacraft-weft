@@ -77,7 +77,7 @@ impl Cover {
         let mut cache = FxHashMap::default();
         let mut material = |(tex, tint)| {
             let (rgb, opacity) = *cache.entry(tex).or_insert_with(|| {
-                let pixels = textures.impostor_texels(tex);
+                let pixels = textures.impostor_texels(tex, 4);
                 pixels.hash(signature);
                 let mut rgb = Vec3::ZERO;
                 let mut alpha = 0.0;
