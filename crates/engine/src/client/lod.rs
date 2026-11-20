@@ -221,8 +221,8 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
         if !job.columns.is_empty() || !job.edits.is_empty() {
             let (s, o) = (1 << job.key.level, job.key.origin());
             let c = content();
-            let min_y = (c.dims[job.dim as usize].min_cube_y * 16).max(i16::MIN as i32);
-            let max_y = (c.dims[job.dim as usize].max_cube_y * 16 + 15).min(i16::MAX as i32);
+            let dim = &c.dims[job.dim as usize];
+            let heights = lod_edit_heights(dim.min_cube_y, dim.max_cube_y);
             for k in 0..SAMPLES {
                 let (i, j) = ((k as i32 % SIDE) - BORDER, (k as i32 / SIDE) - BORDER);
                 let at = o + IVec2::new(i * s + s / 2, j * s + s / 2);
@@ -249,7 +249,7 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
                     words[w] = (y as u32 & 0xFFFF) | (top << 16);
                     words[w + 1] = (words[w + 1] & 0xFFFF) | (under << 16);
                 } else if !job.edits.is_empty() {
-                    apply_surface_edits(c, &job.edits, at, min_y..=max_y, job.terrain.stone, &mut words[w..w + WORDS]);
+                    apply_surface_edits(c, &job.edits, at, heights.clone(), job.terrain.stone, &mut words[w..w + WORDS]);
                 }
             }
         }
@@ -259,6 +259,16 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
         let _ = job.done.send(Ok(mesh.clone()));
         job.cache.store(&mesh);
     });
+}
+
+fn lod_edit_heights(min_cube_y: i32, max_cube_y: i32) -> std::ops::RangeInclusive<i32> {
+    // Open-ended dimensions use i32 extrema. LOD samples only store i16 heights.
+    let min_y = min_cube_y.saturating_mul(16).max(i16::MIN as i32);
+    let max_y = max_cube_y
+        .saturating_mul(16)
+        .saturating_add(15)
+        .min(i16::MAX as i32);
+    min_y..=max_y
 }
 
 /// Apply a fill to the same column that the distant mesh samples, including columns that were
@@ -2203,6 +2213,18 @@ mod tests {
             );
         }
         panic!("selection did not settle");
+    }
+
+    #[test]
+    fn edit_heights_fit_lod_samples_in_open_ended_dimensions() {
+        let min = i16::MIN as i32;
+        let max = i16::MAX as i32;
+        assert_eq!(lod_edit_heights(i32::MIN, i32::MAX), min..=max);
+        assert_eq!(lod_edit_heights(i32::MIN, 4), min..=79);
+        assert_eq!(lod_edit_heights(-4, i32::MAX), -64..=max);
+        assert_eq!(lod_edit_heights(-4, 4), -64..=79);
+        assert!(lod_edit_heights(2048, i32::MAX).is_empty());
+        assert!(lod_edit_heights(i32::MIN, -2049).is_empty());
     }
 
     #[test]
