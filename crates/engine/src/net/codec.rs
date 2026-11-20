@@ -405,6 +405,7 @@ mod tests {
                 hit: [0.5, 1.0, 0.25],
                 look: [0.1, -0.5, 0.8],
                 sneak: true,
+                by_face: true,
                 frame: 0,
                 placed: Some(IVec3::new(-5, 71, 3)),
             },

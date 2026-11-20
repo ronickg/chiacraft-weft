@@ -536,6 +536,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     r.damage_cause(&PRICKED).death_message("death.base.cactus");
     r.block(&CACTUS)
+        .grid_placement()
         .sound_group("cloth")
         .texture("cactus_side")
         .ends("cactus_top")
@@ -702,6 +703,7 @@ pub fn register(r: &mut Registry) {
         .set(&FLAMMABLE, 30)
         .tab(&crate::tabs::COLORED);
     r.block(&MOSS)
+        .grid_placement()
         .on_sides(Facings::ALL)
         .sound_group("grass")
         .shares_cell_with("#water")
@@ -746,6 +748,7 @@ pub fn register(r: &mut Registry) {
         [none, none, (tex, bottom), (tex, top), none, none]
     }
     r.block(&DRYADS_SADDLE_MUSHROOM)
+        .grid_placement()
         .sound_group("wood")
         .shares_cell_with("#water")
         .hardness(0.1)
@@ -769,6 +772,7 @@ pub fn register(r: &mut Registry) {
         .drops("dryads_saddle", 1)
         .tab(&crate::tabs::NATURAL);
     r.block(&FERN)
+        .grid_placement()
         .sound_group("grass")
         .shares_cell_with("#water")
         .hardness(0.1)

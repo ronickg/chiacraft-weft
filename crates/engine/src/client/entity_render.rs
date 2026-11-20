@@ -1288,6 +1288,7 @@ impl EntityRenderer {
         scene: &Scene,
         scene_buf: BufferId,
         target: Option<(Hit, Transform)>,
+        placement: Option<(IVec3, crate::world::placement::Part, Transform)>,
         breaking: &[Crack],
         gizmo_lines: &[super::gizmo::Line],
         gizmo_fills: &[super::gizmo::Fill],
@@ -1531,7 +1532,11 @@ impl EntityRenderer {
                 place.rotation().as_quat(),
                 rel(place.to_world(hit.origin.as_dvec3() + hit.offset.as_dvec3() / f64::from(crate::world::placement::UNIT))),
             );
-            outline_boxes(&mut boxes, c.states[hit.state as usize].outlined(), root);
+            outline_boxes(&mut boxes, c.states[hit.state as usize].outlined(), root, [0.02, 0.02, 0.02, 0.0]);
+        }
+        if let Some((pos, part, place)) = placement {
+            let root = Mat4::from_rotation_translation(place.rotation().as_quat(), rel(place.to_world(pos.as_dvec3() + part.shift())));
+            outline_boxes(&mut boxes, c.states[part.state as usize].outlined(), root, [0.18, 0.64, 0.91, 0.0]);
         }
         gizmo_line_boxes(&mut boxes, gizmo_lines, cam.pos);
         let overlay_start = boxes.len();
@@ -2052,7 +2057,7 @@ fn embedded_root(projectile: &weft_abi::EmbeddedProjectile, attached: Mat4) -> O
 }
 
 /// The selection outline at `o`: twelve thin dark boxes along the edges of each selection box.
-fn outline_boxes(out: &mut Vec<GpuBox>, selection: &[[f32; 6]], root: Mat4) {
+fn outline_boxes(out: &mut Vec<GpuBox>, selection: &[[f32; 6]], root: Mat4, color: [f32; 4]) {
     for sel in selection {
         let (mn, mx) = (Vec3::new(sel[0], sel[1], sel[2]), Vec3::new(sel[3], sel[4], sel[5]));
         let t = 0.006;
@@ -2066,7 +2071,7 @@ fn outline_boxes(out: &mut Vec<GpuBox>, selection: &[[f32; 6]], root: Mat4) {
                 lo[u] = if corner & 1 == 0 { a[u] } else { b[u] - t * 2.0 };
                 lo[v] = if corner & 2 == 0 { a[v] } else { b[v] - t * 2.0 };
                 let m = root * Mat4::from_translation(lo) * Mat4::from_scale(size);
-                out.push(GpuBox { rows: rows(m), color: [0.02, 0.02, 0.02, 0.0], ids: [0, box_mode::SOLID, 0, 0], ..Default::default() });
+                out.push(GpuBox { rows: rows(m), color, ids: [0, box_mode::SOLID, 0, 0], ..Default::default() });
             }
         }
     }

@@ -43,6 +43,7 @@ impl Server {
         face: u8,
         look: [f32; 3],
         hit: [f32; 3],
+        by_face: bool,
     ) -> bool {
         let Some((r, entity)) = self.region(pi) else { return false };
         let Some(e) = r.entities.get(entity) else { return false };
@@ -59,12 +60,11 @@ impl Server {
             return self.use_in_hand(c, pi, slot, frame, Some((pos, face)));
         };
         let placed = r.with_space(c, frame, |d, space_id, o| {
-            let hit = hit.map(|v| v.clamp(0.0, 1.0));
             let look = o
                 .vector_to_local(glam::Vec3::from_array(look).as_dvec3())
                 .as_vec3()
                 .to_array();
-            let (target, part) = d.place_clicked(space_id, c, pos, surface, face, state, look, hit, entity, held.item)?;
+            let (target, part) = d.place_clicked(space_id, c, pos, surface, face, state, look, hit, entity, held.item, by_face)?;
             // What the stack carries goes onto the block entity it becomes (a renamed chest).
             if let Some(id) = d.as_placed(space_id, target, part, |d| d.anchored_part(space_id, c, target, part.state)) {
                 for &comp in &c.game.carried {
@@ -368,7 +368,7 @@ impl Server {
                 }
             }
 
-            ToServer::Use { pos, part, face, look, hit, sneak, frame, placed } => {
+            ToServer::Use { pos, part, face, look, hit, sneak, by_face, frame, placed } => {
                 let Some((r, entity)) = self.region(pi) else { return };
                 // What the client shows there is set right at the end of the tick, placed or not.
                 if let Some(p) = placed.filter(|_| r.has_space(frame)) {
@@ -413,7 +413,7 @@ impl Server {
                     }
                     Some(Some(false)) => {
                         for slot in self.hands(c, pi) {
-                            if self.place_or_use(c, pi, slot, frame, pos, part, face, look, hit) {
+                            if self.place_or_use(c, pi, slot, frame, pos, part, face, look, hit, by_face) {
                                 break;
                             }
                         }

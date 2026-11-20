@@ -2328,6 +2328,11 @@ impl<'a> BlockBuilder<'a> {
         self.set(&bc::SNEAK_USE, rule)
     }
 
+    /// Always places this block on the local grid, including in the player's by-face mode.
+    pub fn grid_placement(self) -> Self {
+        self.tag(abi::comp::block::GRID_PLACEMENT)
+    }
+
     /// A `facing` property with the directions in `allowed` (`p.facing()` in `.states`), set by
     /// `toward` when placed: three allowed directions are three values. Its model, written facing
     /// north, turns to it (`Orientation::front`) unless a state says otherwise.

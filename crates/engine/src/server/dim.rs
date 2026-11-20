@@ -3654,13 +3654,14 @@ impl Dim {
         hit: [f32; 3],
         player: u64,
         item: u32,
+        by_face: bool,
     ) -> Option<(IVec3, Part)> {
         let space = self.space(space_id);
         let replacing = space
             .layout(clicked)
             .parts(space.get(clicked)?)
             .all(|part| c.states[part.state as usize].flags & bf::REPLACEABLE != 0);
-        let (p, placed, hit) = crate::physics::placement(c, state, clicked, surface, face, hit, look, replacing)?;
+        let (p, placed, hit) = crate::physics::placement(c, state, clicked, surface, face, hit, look, replacing, by_face)?;
         self.place(space_id, c, p, face, placed, look, hit, player, item)
             .then_some((p, placed))
     }

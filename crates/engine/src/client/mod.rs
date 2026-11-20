@@ -686,6 +686,8 @@ pub struct Client {
     pub cameras: camera::Cameras,
     /// F1: no hand and no block outline.
     pub hide_gui: bool,
+    pub(crate) by_face_placement: bool,
+    placement_preview: Option<(u64, IVec3, crate::world::placement::Part)>,
     /// Show your own body in first person instead of just the hand.
     pub first_person_model: bool,
     /// Arm swing progress 0..1 while swinging.
@@ -1069,6 +1071,8 @@ impl Client {
             mode: GameMode::SURVIVAL,
             cameras: camera::Cameras::default(),
             hide_gui: false,
+            by_face_placement: false,
+            placement_preview: None,
             first_person_model: true,
             hand_swing: None,
             hand_swing_off: false,
@@ -1771,6 +1775,7 @@ impl Client {
     }
 
     fn act(&mut self, input: &Input, dt: f64, look: DVec3) {
+        self.placement_preview = None;
         self.break_delay -= dt as f32;
         self.melee_recovery -= dt as f32 * self.tick_rate as f32;
         self.use_delay -= dt as f32;
@@ -1791,6 +1796,9 @@ impl Client {
             self.breaking = None;
             return;
         }
+        if self.pressed_without_helm(input, crate::input::PLACEMENT_MODE) {
+            self.by_face_placement = !self.by_face_placement;
+        }
         if grab_tool {
             self.breaking = None;
             if self.pressed_without_helm(input, "core:attack") {
@@ -1798,6 +1806,14 @@ impl Client {
                 self.conn.send(ToServer::GrabBody);
             }
             return;
+        }
+        if !self.hide_gui {
+            self.placement_preview = self.target.and_then(|hit| {
+                let at = self.hit_point(&hit, hit.block);
+                let (p, part) = self.placement_target(&hit, at, look.as_vec3().to_array(), input.held("core:sneak"))?;
+                self.can_preview_placement(hit.frame, p, part)
+                    .then_some((hit.frame, p, part))
+            });
         }
         self.attack(input, dt, &mut send_look);
         self.use_held(input, dt, look, &mut send_look);
@@ -1921,13 +1937,7 @@ impl Client {
         self.lod.ready_for_entry(self.world.dim, self.seed)
     }
 
-    /// The held block used on `hit`, shown placed at once where the server will put it
-    /// (`Dim::place_clicked`, `Dim::place`), as vanilla's client does: placing doesn't wait for the
-    /// server, nor does the player fall into the cell meanwhile. Only what is sure here: a block
-    /// alone in its cell, in one cell, held up by nothing, into air or what it replaces, not into
-    /// the player. The server sends the cell back as it is either way. Where it went.
-    fn predict_place(&mut self, hit: &Hit, at: [f32; 3], look: [f32; 3], sneak: bool) -> Option<IVec3> {
-        use crate::content::{AIR, Then, When};
+    fn placement_target(&self, hit: &Hit, at: [f32; 3], look: [f32; 3], sneak: bool) -> Option<(IVec3, crate::world::placement::Part)> {
         let c = content();
         let held = self.held();
         let state = c
@@ -1952,8 +1962,69 @@ impl Client {
             .vector_to_local(glam::Vec3::from_array(look).as_dvec3())
             .as_vec3()
             .to_array();
-        let (p, part, _) =
-            physics::placement(c, state, hit.block, hit.part().in_cell(hit.block - hit.origin), hit.face, at, look, replacing)?;
+        let (p, part, _) = physics::placement(
+            c,
+            state,
+            hit.block,
+            hit.part().in_cell(hit.block - hit.origin),
+            hit.face,
+            at,
+            look,
+            replacing,
+            self.by_face_placement,
+        )?;
+        Some((p, part))
+    }
+
+    fn can_preview_placement(&self, frame: u64, p: IVec3, part: crate::world::placement::Part) -> bool {
+        use crate::content::{Then, When};
+        let c = content();
+        let Some(space) = self.space(frame) else { return false };
+        let st = &c.states[part.state as usize];
+        let def = c.block_of(part.state);
+        if !std::iter::once(IVec3::ZERO)
+            .chain(part.footprint(c).iter().copied())
+            .all(|d| {
+                space.block_or_air(p + d).is_some_and(|main| {
+                    space.layout(p + d).parts(main).all(|other| {
+                        c.may_share(part.state, other.state)
+                            || !part.in_cell(d).overlaps(other, c)
+                            || (def.cb.merge.is_some()
+                                && other.owner(p + d).0 == p
+                                && other.offset == part.in_cell(d).offset
+                                && c.states[other.state as usize].block == st.block)
+                            || (c.states[other.state as usize].flags & bf::REPLACEABLE != 0
+                                && c.states[other.state as usize].block != st.block)
+                    })
+                })
+            })
+        {
+            return false;
+        }
+        let ask = crate::conditions::Ask {
+            pos: p.as_dvec3() + DVec3::splat(0.5),
+            state: part.state,
+            placement: Some((p, part)),
+            own_frame: true,
+            ..Default::default()
+        };
+        frame != 0
+            || !st.rules.iter().any(|r| {
+                matches!(r.when, When::Neighbor(_))
+                    && matches!(r.then, Then::Break | Then::Shed(_))
+                    && r.cond
+                        .is_none_or(|id| crate::conditions::on_client(Some(self), id, &ask))
+            })
+    }
+
+    /// Predict only a simple replacement. The server always sends back the real cell.
+    fn predict_place(&mut self, hit: &Hit, at: [f32; 3], look: [f32; 3], sneak: bool) -> Option<IVec3> {
+        use crate::content::{AIR, Then, When};
+        let c = content();
+        let (p, part) = self.placement_target(hit, at, look, sneak)?;
+        let space = self.space(hit.frame)?;
+        let replaceable = |s: u32| c.states[s as usize].flags & bf::REPLACEABLE != 0;
+        let transform = self.frame_place(hit.frame);
         if part.offset != IVec3::ZERO || !space.layout(p).covers.is_empty() || !space.layout(p).offsets.is_empty() {
             return None;
         }
@@ -2014,6 +2085,7 @@ impl Client {
                     look,
                     hit: at,
                     sneak,
+                    by_face: self.by_face_placement,
                     frame: hit.frame,
                     placed,
                 });
@@ -3325,6 +3397,9 @@ impl Client {
             self.target
                 .filter(|_| !self.hide_gui)
                 .map(|h| (h, self.frame_place(h.frame))),
+            self.placement_preview
+                .filter(|_| !self.hide_gui)
+                .map(|(frame, p, part)| (p, part, self.frame_place(frame))),
             &cracks,
             &self.gizmo_lines,
             &self.gizmo_fills,

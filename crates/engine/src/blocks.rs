@@ -89,6 +89,7 @@ pub(crate) fn freeze(
     let mut out = Blocks {
         states: vec![air()],
         block_defs: vec![BlockDef {
+            grid_placement: false,
             name: "core:air".into(),
             owner: crate::registry::ENGINE,
             first_state: 0,
@@ -252,7 +253,19 @@ pub(crate) fn freeze(
             signal_gate: e.callback(b::SIGNAL_GATE),
         };
         let sneak_use = e.or(b::SNEAK_USE, abi::sneak_use::EMPTY_HANDS);
-        let def = BlockDef { name: e.name, owner: e.owner, first_state: first, states: count, props, cb, opens: None, sneak_use, sides };
+        let grid_placement = e.has(b::GRID_PLACEMENT) || e.has("plantable");
+        let def = BlockDef {
+            name: e.name,
+            owner: e.owner,
+            first_state: first,
+            states: count,
+            props,
+            cb,
+            opens: None,
+            sneak_use,
+            sides,
+            grid_placement,
+        };
         // A piece's properties are of the state it is in.
         for (state, raw) in pieces {
             let to = |text: &str| def.changed_text(state as u32, text);
@@ -397,7 +410,7 @@ fn full_key(props: &[Prop], s: u32) -> String {
 }
 
 /// What only a block as a whole has: its states leave it out.
-const BLOCK_ONLY: [&str; 16] = [
+const BLOCK_ONLY: [&str; 17] = [
     b::PROPS,
     b::ON_USE,
     b::ON_NEIGHBOR,
@@ -405,6 +418,7 @@ const BLOCK_ONLY: [&str; 16] = [
     b::ON_CARRIED,
     b::ON_GROW,
     b::PLACEMENT,
+    b::GRID_PLACEMENT,
     b::MERGE,
     b::ON_SIGNAL,
     b::SIGNAL_GATE,

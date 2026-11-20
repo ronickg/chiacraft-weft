@@ -1254,6 +1254,8 @@ pub mod comp {
         pub const ON_CARRIED: &str = "block.on_carried";
         pub const ON_GROW: &str = "block.on_grow";
         pub const PLACEMENT: &str = "block.placement";
+        /// The block's origin always snaps to its space's grid when placed by a player.
+        pub const GRID_PLACEMENT: &str = "block.grid_placement";
         pub const MERGE: &str = "block.merge";
         pub const ON_SIGNAL: &str = "block.on_signal";
         pub const SIGNAL_GATE: &str = "block.signal_gate";

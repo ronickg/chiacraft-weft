@@ -26,6 +26,7 @@ enum Part {
     HeldName,
     HelmKeys,
     Crosshair,
+    PlacementMode,
     PlayerList,
     Chat,
     /// Text in `PLACES[i]`.
@@ -261,6 +262,7 @@ pub struct Hud {
     revisions: Vec<u64>,
     key: Option<(bool, usize, [u32; 3], bool, bool, u32, u8, (i32, i32), (u32, u32, u8, bool), u64, (bool, [i32; 2], u64))>,
     helm_held: u64,
+    by_face_placement: bool,
     /// Player overrides from `config/hud.txt` by element name.
     layout: rustc_hash::FxHashMap<String, Placement>,
     file: std::path::PathBuf,
@@ -455,11 +457,13 @@ impl Hud {
         );
         let pilot = client.and_then(Client::active_helm_pilot);
         let helm_held = pilot.map_or(0, |p| p.held);
-        if self.key == Some(key) && self.helm_held == helm_held {
+        let by_face = client.is_some_and(|cl| cl.by_face_placement);
+        if self.key == Some(key) && self.helm_held == helm_held && self.by_face_placement == by_face {
             return false;
         }
         self.key = Some(key);
         self.helm_held = helm_held;
+        self.by_face_placement = by_face;
         let c = content();
         use weft_abi::hud_anchor as a;
         let mods_debug = mod_debug_groups();
@@ -488,6 +492,7 @@ impl Hud {
             ("core:helm_keys".into(), a::TOP_RIGHT.into(), 1, Part::HelmKeys),
             ("core:held_name".into(), a::ABOVE_HOTBAR.into(), 0, Part::HeldName),
             ("core:crosshair".into(), CENTER.into(), 0, Part::Crosshair),
+            ("core:placement_mode".into(), a::UNDER_CROSSHAIR.into(), 0, Part::PlacementMode),
             ("core:player_list".into(), CENTER.into(), 2, Part::PlayerList),
             ("core:chat".into(), CHAT.into(), 0, Part::Chat),
             ("core:debug.help".into(), a::DEBUG_LEFT.into(), i32::MAX, Part::DebugHelp),
@@ -608,6 +613,10 @@ impl Hud {
                 });
             }
             Part::Crosshair => drop(ui.add(Kind::Custom { tag: TAG_CROSSHAIR, data: 0 }, Style::default().size(9.0, 9.0))),
+            Part::PlacementMode if by_face || editing => {
+                ui.text(text::plain(lang.get("hud.placement.active")), "label");
+            }
+            Part::PlacementMode => {}
             Part::Effects => {
                 // Beneficial ones in a row, harmful ones in the row under it, as vanilla's.
                 ui.container(Style::default().gap(1.0).align(align), |ui| {
@@ -670,7 +679,15 @@ impl Hud {
             Part::Touch(i) => {
                 let b = &touch_buttons[i];
                 ui.panel("touch_button", Style::default().size(b.size, b.size).center(), |ui| {
-                    match crate::touch::label(input, &b.action) {
+                    let label = if b.action == crate::input::PLACEMENT_MODE {
+                        crate::touch::Label::Text(
+                            lang.get(if by_face { "hud.placement.face" } else { "hud.placement.grid" })
+                                .into(),
+                        )
+                    } else {
+                        crate::touch::label(input, &b.action)
+                    };
+                    match label {
                         crate::touch::Label::Icon(icon) => {
                             let side = (b.size * 0.6).round();
                             ui.add(

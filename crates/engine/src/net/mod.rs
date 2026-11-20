@@ -511,7 +511,7 @@ messages! {
         /// placed against the clicked face. `frame` like `Break`'s; `look` in world space.
         /// `hit`: where on the block, from its corner. `placed`: the cell the client already
         /// shows the held block in, sent back as it really is whatever happens.
-        Use { pos: IVec3, part: Part, face: u8, look: [f32; 3], hit: [f32; 3], sneak: bool, frame: u64, placed: Option<IVec3> },
+        Use { pos: IVec3, part: Part, face: u8, look: [f32; 3], hit: [f32; 3], sneak: bool, by_face: bool, frame: u64, placed: Option<IVec3> },
         UseItem,
         Select(u32),
         Attack(u64),

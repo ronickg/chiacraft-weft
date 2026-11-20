@@ -301,6 +301,7 @@ pub struct BlockCallbacks {
 }
 
 pub struct BlockDef {
+    pub grid_placement: bool,
     pub name: String,
     pub owner: ModId,
     pub first_state: u32,

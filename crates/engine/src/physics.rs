@@ -30,8 +30,8 @@ pub(crate) fn seat_at(
     })
 }
 
-/// Position and orient the placed shape against the clicked surface. Looking within the face
-/// still chooses the authored slab half, hinge or orientation.
+/// Position and orient the placed shape on the space's grid or against the clicked surface.
+/// Looking within the face still chooses the authored slab half, hinge or orientation.
 pub(crate) fn placement(
     c: &Content,
     state: u32,
@@ -41,15 +41,19 @@ pub(crate) fn placement(
     hit: [f32; 3],
     look: [f32; 3],
     replacing: bool,
+    by_face: bool,
 ) -> Option<(IVec3, Part, [f32; 3])> {
     let normal = *crate::world::DIRS.get(face as usize)?;
     if !hit.iter().all(|v| v.is_finite()) {
         return None;
     }
+    let hit = hit.map(|v| v.clamp(0.0, 1.0));
     let axis = face as usize / 2;
     let positive = face % 2 == 1;
+    let def = c.block_of(state);
+    let by_face = by_face && !def.grid_placement;
     // Find the clicked unit of the supporting instance's grid, even in a covered cell.
-    let shift = if replacing { DVec3::ZERO } else { surface.shift().rem_euclid(DVec3::ONE) };
+    let shift = if by_face && !replacing { surface.shift().rem_euclid(DVec3::ONE) } else { DVec3::ZERO };
     let local = DVec3::from_array(hit.map(f64::from)) - shift;
     let delta = (local - normal.as_dvec3() * 1e-5).floor().as_ivec3();
     let local = if replacing { DVec3::from_array(hit.map(f64::from)) } else { local - delta.as_dvec3() };
@@ -70,7 +74,19 @@ pub(crate) fn placement(
     } else {
         0.999
     };
-    let state = placement_state(c.block_of(state), cell, face, look, hit).ok()?;
+    let state = placement_state(def, cell, face, look, hit).ok()?;
+    if !by_face {
+        let aligned = Part::aligned(state);
+        // A slab or another small part can accept a complementary shape in the same cell.
+        // If they intersect, try the next whole cell along the clicked face.
+        if inner && !c.may_share(state, surface.state) && aligned.overlaps(surface.in_cell(delta), c) {
+            let cell = cell + normal;
+            hit[axis] = if positive { 0.001 } else { 0.999 };
+            let state = placement_state(def, cell, face, look, hit).ok()?;
+            return Some((cell, Part::aligned(state), hit));
+        }
+        return Some((cell, aligned, hit));
+    }
     let mut offset = shift;
     if inner {
         let mount = Part::aligned(state)
