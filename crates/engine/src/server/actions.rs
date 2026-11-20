@@ -112,8 +112,20 @@ impl Server {
     pub(super) fn allowed(&self, pi: usize, msg: &ToServer) -> bool {
         use ToServer as M;
         let p = &self.players[pi];
-        if matches!(msg, M::Join { .. } | M::Leave) {
+        if p.conn.is_closed() {
+            return false;
+        }
+        if matches!(msg, M::Leave) {
             return true;
+        }
+        if matches!(msg, M::Join { .. }) {
+            return !p.streams_world();
+        }
+        if p.arrival.is_some() {
+            return matches!(msg, M::Ready | M::View(_) | M::Skin(_) | M::Avatar(_));
+        }
+        if matches!(msg, M::Ready) {
+            return false;
         }
         let Some(e) = self.dims[p.dim as usize]
             .entity(p.entity)
@@ -141,7 +153,12 @@ impl Server {
             return;
         }
         match msg {
-            ToServer::Join { name, key } => self.join(c, pi, name, key),
+            ToServer::Join { name, key } => self.prepare_join(c, pi, name, key),
+            ToServer::Ready => {
+                if let Some(arrival) = &mut self.players[pi].arrival {
+                    arrival.ready = true;
+                }
+            }
             ToServer::StartBreak { pos, part, frame } => {
                 let Some((r, entity)) = self.region(pi) else { return };
                 let request = ToClient::BreakRefused { frame, pos };
@@ -659,6 +676,9 @@ impl Server {
                 let skin = Arc::new(skin);
                 let entity = self.players[pi].entity;
                 self.players[pi].skin = Some(skin.clone());
+                if !self.players[pi].joined {
+                    return;
+                }
                 for p in self.players.iter_mut().filter(|p| p.joined) {
                     p.conn
                         .send(ToClient::Skin { entity, skin: (*skin).clone() });
@@ -673,6 +693,9 @@ impl Server {
                 let avatar = Arc::new(avatar);
                 let entity = self.players[pi].entity;
                 self.players[pi].avatar = Some(avatar.clone());
+                if !self.players[pi].joined {
+                    return;
+                }
                 for p in self.players.iter_mut().filter(|p| p.joined) {
                     p.conn
                         .send(ToClient::Avatar { entity, avatar: (*avatar).clone() });
@@ -690,6 +713,11 @@ impl Server {
             }
             ToServer::Leave => {
                 if !self.players[pi].joined {
+                    let p = &mut self.players[pi];
+                    if p.arrival.take().is_some() {
+                        p.conn.send(ToClient::Disconnect("bye".into()));
+                        p.conn.close();
+                    }
                     return;
                 }
                 log::info!("{} left", self.players[pi].identity.name);

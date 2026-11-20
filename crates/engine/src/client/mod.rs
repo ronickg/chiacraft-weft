@@ -597,6 +597,10 @@ pub struct Client {
     pub entity_render: EntityRenderer,
     pub player: LocalPlayer,
     pub joined: bool,
+    /// The world is available before the player can act. Kept through the welcome
+    /// so the app can hand off the loading screen on that frame.
+    pub(crate) preparing_since: Option<Instant>,
+    ready_sent: bool,
     pub player_id: u64,
     /// The local player as an entity: what the server says of it (health, actions, look) and
     /// what its own animation works out, brought up to date each frame (`sync_me`).
@@ -994,6 +998,8 @@ impl Client {
                 moves: physics::Moves::default(),
             },
             joined: false,
+            preparing_since: None,
+            ready_sent: false,
             player_id: 0,
             sprint_stopped: false,
             me: ClientEntity::new(content().game.player_kind, DVec3::ZERO, 0.0, 0.0),
@@ -1124,6 +1130,18 @@ impl Client {
         self.conn.send(ToServer::Leave);
     }
 
+    fn has_world(&self) -> bool {
+        self.joined || self.preparing_since.is_some()
+    }
+
+    pub(crate) fn ready_to_join(&mut self) {
+        if !self.ready_sent {
+            self.conn.send(ToServer::Ready);
+            self.ready_sent = true;
+            log::debug!(target: "load", "client ready to enter the prepared world");
+        }
+    }
+
     /// The player's health, full until the server has said.
     pub fn health(&self) -> f32 {
         if self.me.health.is_nan() { self.max_health } else { self.me.health }
@@ -1240,7 +1258,10 @@ impl Client {
         input.muted = if m.has(crate::tag_bits::camera::DETACHED) { k::MOVEMENT | k::RIDING } else { 0 }
             | if m.has(crate::tag_bits::camera::NO_INTERACT) { k::HANDS } else { 0 };
         let input = &*input;
+        let was_joined = self.joined;
         self.take_messages(dt);
+        // The frame that receives the welcome may include time spent loading.
+        let dt = if !was_joined && self.joined { 0.0 } else { dt };
         self.read_look(input);
         self.read_controls(input);
         self.fly_speed(input);
@@ -1887,7 +1908,7 @@ impl Client {
     /// anyway).
     pub fn near_shown(&self, reach: i32) -> bool {
         let at = crate::world::cube_of(self.player.pos.floor().as_ivec3());
-        self.joined
+        self.has_world()
             && (-reach..=reach).all(|x| {
                 (-reach..=reach).all(|z| {
                     self.world
@@ -2263,7 +2284,7 @@ impl Client {
         {
             self.render.upload_tints(gpu, col, &tints);
         }
-        if self.joined && self.terrain_view != (center, self.view_radius) {
+        if self.has_world() && self.terrain_view != (center, self.view_radius) {
             self.terrain_view = (center, self.view_radius);
             let _ = self
                 .terrain
@@ -3136,7 +3157,7 @@ impl Client {
             self.entity_render.set_skin(gpu, entity, &skin);
         }
         let cam = self.render_camera();
-        if self.joined {
+        if self.has_world() {
             let remaining = (self.budget * 2).saturating_sub(std::time::Duration::from_secs_f64(self.spent));
             let normal_fov = self.base_camera_fov() * self.player.zoom.max(1.0);
             let lod_cam = Camera { fov: self.cameras.lod_fov, ..cam };
@@ -3241,7 +3262,7 @@ impl Client {
         let tick = self.anim_tick();
         self.wake_render
             .draw(gpu, &mut late, frame.slot, &cam, scene_buf, tick);
-        let alive = !self.dead && !self.mode.has(crate::tag_bits::game_mode::NO_INTERACT);
+        let alive = self.joined && !self.dead && !self.mode.has(crate::tag_bits::game_mode::NO_INTERACT);
         let hand = (alive && self.camera_has(crate::tag_bits::camera::HAND) && !self.hide_gui).then(|| entity_render::Hand {
             lowered: 1.0 - self.hand_height,
             lag: (self.player.pitch - self.hand_view.0, angle_diff(self.player.yaw, self.hand_view.1)),

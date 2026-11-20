@@ -106,8 +106,7 @@ struct Entering {
     from: crate::ui::Rect,
     started: Instant,
     expanded: bool,
-    joined: Option<Instant>,
-    /// When the picture filled the window and the world took over.
+    /// When the prepared view started to replace the picture.
     shown: Option<Instant>,
 }
 
@@ -838,7 +837,7 @@ impl Running {
         if self.gpu.compiling() && self.entering.is_none() {
             log::info!("waiting for shaders to compile");
             self.screens.clear();
-            self.open(Box::new(screens::Compiling));
+            self.open(Box::new(screens::LoadingWorld::Compiling));
         }
         let run_dir = self.settings.run_dir.clone();
         let (send, opened) = crossbeam_channel::bounded(1);
@@ -897,7 +896,7 @@ impl Running {
                 self.quads_dirty = true;
                 if self.entering.is_none() {
                     self.screens.clear();
-                    self.set_capture(true);
+                    self.open(Box::new(screens::LoadingWorld::Streaming));
                 }
             }
             Err(e) => self.world_open_failed(e),
@@ -1069,8 +1068,7 @@ impl Running {
                     let missing = world.missing_mods(content());
                     if self.entering.is_some() || self.game.is_some() || self.opening_world.is_some() {
                     } else if missing.is_empty() {
-                        self.entering =
-                            Some(Entering { picture, from, started: Instant::now(), expanded: false, joined: None, shown: None });
+                        self.entering = Some(Entering { picture, from, started: Instant::now(), expanded: false, shown: None });
                         self.start_world(world);
                     } else {
                         self.open(Box::new(saves::MissingMods { world, missing }));
@@ -1112,7 +1110,7 @@ impl Running {
                                 self.game = Some(Game { client, server: None });
                                 self.screens.clear();
                                 self.hud.invalidate();
-                                self.set_capture(true);
+                                self.open(Box::new(screens::LoadingWorld::Streaming));
                             }
                             Err(e) => log::error!("{e}"),
                         }
@@ -1609,6 +1607,9 @@ impl Running {
     /// `client_entity_frame`, the local player's too; finished deaths go after their last call.
     fn entity_ticks(&mut self, dt: f32) {
         let Some(g) = &self.game else { return };
+        if !g.client.joined {
+            return;
+        }
         let c = content();
         let mine = g.client.me.args(g.client.player_id, dt);
         let all: Vec<abi::ClientEntityArgs> = g
@@ -2076,7 +2077,7 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     let scale = r.gui_scale();
     start_frame(r, opts, dt);
     let mut requests = Vec::new();
-    let opening = r.opening_world.is_some() || r.entering.as_ref().is_some_and(|e| e.shown.is_none());
+    let opening = r.opening_world.is_some() || r.entering.is_some();
     if !opening && !screen_keys_first(r, &mut requests) && r.input.pressed_key(Key::Code(KeyCode::Escape)) {
         escape(r, &mut requests);
     }
@@ -2116,10 +2117,12 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
         g.client.update_environment(&r.textures, dt as f32);
     }
     play_sounds(r);
-    client_events(r);
-    world_keys(r);
     handle_disconnect(r);
     enter_world(r);
+    client_events(r);
+    if r.game.as_ref().is_some_and(|g| g.client.joined) {
+        world_keys(r);
+    }
     end_input(r);
     refresh_hud(r);
     r.poll_bindings();
@@ -2379,7 +2382,7 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
             .set_show_avatars(crate::settings::show_avatars());
         g.client.render.occlusion.on = crate::settings::occlusion_culling();
         let t = Instant::now();
-        if world_input {
+        if world_input && g.client.joined {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
         } else {
             g.client
@@ -3035,32 +3038,49 @@ fn save_screenshot(r: &mut Running) {
     }
 }
 
-/// Reveal the world after the first view is ready, with a deadline for slow or unusual spawns.
+/// Reveal the prepared scene, then ask the server to spawn the player once the
+/// animation has finished. Controls wait for the server's welcome.
 fn enter_world(r: &mut Running) {
-    if r.game.is_none() {
+    let Some(g) = &mut r.game else {
         r.seen_since = None;
-    } else if r.seen_since.is_none() && r.game.as_ref().is_some_and(|g| g.client.near_shown(NEAR)) {
-        r.seen_since = Some(Instant::now());
+        return;
+    };
+    let now = Instant::now();
+    if r.seen_since.is_none() && g.client.near_shown(NEAR) {
+        r.seen_since = Some(now);
     }
-    let Some(e) = &mut r.entering else { return };
-    if let Some(shown) = e.shown {
-        if shown.elapsed().as_secs_f32() >= ENTER_FADE {
+    if g.client.joined {
+        if g.client.preparing_since.take().is_some() {
             r.entering = None;
-        }
-    } else if e.expanded
-        && let Some(g) = r.game.as_ref().filter(|g| g.client.joined)
-    {
-        let now = Instant::now();
-        let joined = *e.joined.get_or_insert(now);
-        let near = r.seen_since.is_some();
-        let lod = g.client.lod_ready_for_entry();
-        if (near && lod) || now - joined >= ENTER_LOAD_LIMIT {
-            log::debug!(target: "load", "revealing world after {:.3} s (near ready: {near}, LOD ready: {lod})", e.started.elapsed().as_secs_f64());
-            e.shown = Some(now);
             r.screens.clear();
             r.quads_dirty = true;
             r.set_capture(true);
         }
+        return;
+    }
+    let Some(preparing) = g.client.preparing_since else { return };
+    let near = r.seen_since.is_some();
+    let lod = g.client.lod_ready_for_entry();
+    let scene_ready = near && lod || now - preparing >= ENTER_LOAD_LIMIT;
+    match &mut r.entering {
+        Some(e) => {
+            if let Some(shown) = e.shown {
+                if (now - shown).as_secs_f32() >= ENTER_FADE {
+                    g.client.ready_to_join();
+                }
+            } else if e.expanded && scene_ready {
+                log::debug!(
+                    target: "load",
+                    "revealing world after {:.3} s (near ready: {near}, LOD ready: {lod})",
+                    (now - e.started).as_secs_f64()
+                );
+                e.shown = Some(now);
+                r.screens.clear();
+                r.quads_dirty = true;
+            }
+        }
+        None if scene_ready => g.client.ready_to_join(),
+        None => {}
     }
 }
 

@@ -54,16 +54,21 @@ impl Client {
                     _ => None,
                 };
             }
-            ToClient::Welcome { player, dim, pos, seed, look, selected, flying } => {
-                self.player.flying = flying;
-                self.player_id = player;
+            ToClient::PrepareJoin { dim, pos, seed, look } => {
+                self.preparing_since = Some(Instant::now());
                 (self.player.yaw, self.player.pitch) = (look[0], look[1]);
-                self.selected = selected as usize;
-                self.joined = true;
                 self.player.pos = pos;
                 self.player.prev = pos;
                 self.seed = seed;
                 self.reset_terrain(dim, fwd);
+            }
+            ToClient::Welcome { player, vel, selected, flying } => {
+                self.player_id = player;
+                self.player.vel = vel;
+                self.player.flying = flying;
+                self.selected = selected as usize;
+                self.tick_accum = 0.0;
+                self.joined = true;
             }
             ToClient::Cube { dim, frame, pos, cube, edit } if dim == self.world.dim => {
                 if frame == 0 {

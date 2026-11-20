@@ -397,6 +397,7 @@ mod tests {
     fn server_messages_roundtrip() {
         let msgs = [
             ToServer::Join { name: "Ann".into(), key: "k".into() },
+            ToServer::Ready,
             ToServer::Use {
                 pos: IVec3::new(-5, 70, 3),
                 part: Part { state: 7, offset: IVec3::new(0, 32768, 0) },
@@ -437,6 +438,8 @@ mod tests {
     #[test]
     fn tags_follow_the_message_table() {
         for m in [
+            ToClient::PrepareJoin { dim: 2, pos: DVec3::new(-5.5, 70.0, 3.0), seed: 7, look: [1.0, -0.5] },
+            ToClient::Welcome { player: 8, vel: DVec3::new(0.0, -12.0, 1.0), selected: 3, flying: false },
             ToClient::Died,
             ToClient::Skin { entity: 7, skin: crate::net::Skin { png: vec![4, 5, 6], slim: false } },
             ToClient::Show(crate::net::Shown::chat(Msg::new(

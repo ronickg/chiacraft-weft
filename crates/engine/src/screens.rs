@@ -1154,20 +1154,30 @@ pub struct Message {
     pub args: Vec<Arg>,
 }
 
-/// While shaders compile ahead (`Backend::precompile`) and a world waits for them: once, on a
-/// phone's first start, which it says so nobody takes it for every time.
-pub struct Compiling;
+/// Loading without a saved preview, including a cold shader compilation.
+pub enum LoadingWorld {
+    Compiling,
+    Streaming,
+}
 
-impl Screen for Compiling {
+impl Screen for LoadingWorld {
     fn name(&self) -> &str {
-        "core:compiling"
+        match self {
+            Self::Compiling => "core:compiling",
+            Self::Streaming => "core:loading_world",
+        }
     }
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         ui.root_style(Style::default().stretch());
-        ui.panel("background", Style::default().grow().center().pad(12.0).gap(10.0), |ui| {
-            label(ui, cx, "world.compiling", &[], "title");
-            label(ui, cx, "world.compiling.once", &[], "label");
+        ui.panel("background", Style::default().grow().center().pad(12.0).gap(10.0), |ui| match self {
+            Self::Compiling => {
+                label(ui, cx, "world.compiling", &[], "title");
+                label(ui, cx, "world.compiling.once", &[], "label");
+            }
+            Self::Streaming => {
+                label(ui, cx, "world.loading", &[], "title");
+            }
         });
     }
 
