@@ -270,20 +270,30 @@ fn trace_cloud(s: Sky, dir: vec3<f32>, limit: f32, view: Scene) -> CloudHit {
     return CloudHit(vec4(color, alpha), t, t);
 }
 
-// The primary bow is centered opposite the sun, with red at the outer edge.
-// Work in cosines of 39.4 and 42.4 degrees to avoid acos per fragment.
+// A square ring on a grid perpendicular to the direction opposite the sun.
+// The grid follows the sun in world space, so camera rotation doesn't move the pixels.
 fn rainbow_radiance(s: Sky, dir: vec3<f32>) -> vec3<f32> {
     let sun = s.axes[2].xyz;
     if s.cloud_sun.w <= 0.0 || sun.y <= 0.0 {
         return vec3(0.0);
     }
     let cosine = -dot(dir, sun);
-    let inner = 0.772734;
-    let outer = 0.738455;
-    if cosine <= outer || cosine >= inner {
+    // Reject directions beyond the far corners or inside the nearest edges.
+    if cosine <= 0.58 || cosine >= 0.82 {
         return vec3(0.0);
     }
-    let band = (inner - cosine) / (inner - outer);
+    let vertical = select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), sun.y > 0.999);
+    let right = normalize(cross(vertical, sun));
+    let up = cross(sun, right);
+    let projected = vec2(dot(dir, right), dot(dir, up)) * (28.0 / cosine);
+    let pixel = abs(floor(projected) + vec2(0.5));
+    // Trim each corner on the same grid to get short, blocky steps.
+    let corner = floor((pixel.x + pixel.y + 5.0) * 0.5) + 0.5;
+    let radius = max(max(pixel.x, pixel.y), corner);
+    if radius < 21.0 || radius > 27.0 {
+        return vec3(0.0);
+    }
+    let band = (radius - 21.0) / 6.0;
     let edge = smoothstep(0.0, 0.14, band) * (1.0 - smoothstep(0.84, 1.0, band));
     let red = smoothstep(0.54, 0.83, band) + 0.36 * (1.0 - smoothstep(0.14, 0.37, band));
     let green = smoothstep(0.17, 0.45, band) * (1.0 - smoothstep(0.65, 0.94, band));
