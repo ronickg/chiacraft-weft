@@ -103,7 +103,7 @@ impl<'a> Snapshot<'a> {
             .filter(|c| c.height != i32::MIN)
             .map_or(0, |c| self.read(IVec3::new(x, c.height, z)))
     }
-    fn cube(&self, pos: IVec3) -> Arc<Vec<u32>> {
+    pub(crate) fn cube(&self, pos: IVec3) -> Arc<Vec<u32>> {
         let key = (self.seed, self.before, self.terrain_only, pos);
         let cache = &self.def().snapshots.0;
         if let Some(v) = cache.lock().unwrap().get(&key).cloned() {

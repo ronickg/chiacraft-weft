@@ -404,6 +404,8 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let dir = lod_dir(w0);
     let covered = ((w3 >> LOD_FACE_COVER_SHIFT) & 1u) != 0u;
     let partial = ((w0 >> LOD_FACE_PARTIAL_SHIFT) & 1u) != 0u;
+    let kind = lod_tint(w0);
+    let plant = partial && covered && kind == LOD_FACE_PLANT;
     let grass_wall = covered && !partial && dir != 3u;
     let a = select(lod_ao(w3), vec4(3u), grass_wall);
     var c = vi % 4u;
@@ -412,7 +414,15 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     }
     let data = u32(origins[ii].w);
     let scale = exp2(f32((data >> LOD_DRAW_SCALE_SHIFT) & LOD_DRAW_SCALE_MASK));
-    let local = (lod_pos(w0, w2) + lod_corner(w0, w2, w3, CORNERS[dir * 4u + c])) * vec3(scale, 1.0, scale) - vec3(0.0, 0.125, 0.0);
+    let corner = CORNERS[dir * 4u + c];
+    var shape = lod_corner(w0, w2, w3, corner);
+    let u = select(corner.x, corner.z, dir < 2u);
+    if plant {
+        // The packed X/Z edge pairs are the endpoints of the plane.
+        let edge = vec4<f32>(vec4<u32>(w3, w3 >> 5u, w3 >> 10u, w3 >> 15u) & vec4(LOD_FACE_EDGE_MASK)) / 16.0;
+        shape = vec3(mix(edge.x, edge.y, u), shape.y, mix(edge.z, edge.w, u));
+    }
+    let local = (lod_pos(w0, w2) + shape) * vec3(scale, 1.0, scale) - vec3(0.0, 0.125, 0.0);
     let pos = finish(local, vec4<i32>(origins[ii].xyz, 0));
     var out: VOut;
     out.clip = scene.view_proj * pos;
@@ -428,6 +438,11 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     // A wall lies on the line between two columns: it is of the one its box stands in, a little
     // behind it, or the mask's pick between them flickers along it.
     out.pos = world - vec3(0.0, 0.125, 0.0) - FACE_DIRS[dir] * 0.25;
+    if plant {
+        out.uv = vec2(select(1.0 - u, u, dir == 0u || dir == 5u), 1.0 - corner.y);
+        let owner = vec3<f32>(o.xyz * 16) + lod_pos(w0, w2) + vec3(0.5, 0.0, 0.5);
+        out.pos = vec3(owner.x, world.y, owner.z);
+    }
     let tex_id = w1 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
     out.size = fr.size;
@@ -437,12 +452,11 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.glow = 0xffffffffu;
     out.slot = 0u;
     out.light = lod_light(w0, w2, w3);
-    let kind = lod_tint(w0);
-    if partial && covered && kind != 0u {
+    if partial && covered && kind == LOD_FACE_FILLED_LEAVES {
         out.flags |= LOD_LEAVES;
     }
     var tint = vec3(1.0);
-    var shade = SHADE[dir] * AO[a[c]];
+    var shade = select(SHADE[dir] * AO[a[c]], 1.0, plant);
     if covered {
         let rgb = w1 >> FACE_BIOME_SHIFT;
         tint = f32(LOD_FACE_COVER_GAIN) * vec3(f32(rgb >> 11u) / 31.0, f32((rgb >> 5u) & 63u) / 63.0, f32(rgb & 31u) / 31.0);

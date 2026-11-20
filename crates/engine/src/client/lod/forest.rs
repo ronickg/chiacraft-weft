@@ -257,6 +257,9 @@ impl Forest {
         columns: &Columns,
     ) -> TileForest {
         let mut result = TileForest { instances: Vec::new(), shadow: [[0; super::GRID]; super::GRID], y: (i32::MAX, i32::MIN) };
+        if key.level == 0 {
+            return result;
+        }
         let origin = key.origin();
         let step = 1 << key.level;
         let margin = shadow_margin(step);
@@ -333,7 +336,7 @@ impl Forest {
                     continue;
                 }
                 let seed = rule.seed ^ f.salt;
-                let (model, base) = if groups == 1 && (rule.template || key.level == 0) {
+                let (model, base) = if groups == 1 && rule.template {
                     let Some(start) = crate::features::start_at(c, def, self.dim, seed, rule.feature, (x, z)) else { continue };
                     if !start
                         .lod_blocks(Snapshot::new(c, self.dim, seed, f.stage))
@@ -402,7 +405,7 @@ fn variant(random: u64, template: bool, count: usize) -> usize {
 }
 
 impl TileForest {
-    fn shade(&mut self, local: Vec2, step: i32, radius: f32, top: i32, heights: &[[i32; super::GRID]; super::GRID]) {
+    pub(super) fn shade(&mut self, local: Vec2, step: i32, radius: f32, top: i32, heights: &[[i32; super::GRID]; super::GRID]) {
         let p = local / step as f32;
         let r = radius / step as f32;
         let extent = (r + 0.35).max(0.75);

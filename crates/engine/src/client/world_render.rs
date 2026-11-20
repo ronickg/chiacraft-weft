@@ -815,11 +815,23 @@ impl WorldRenderer {
                 .collect();
             gpu.write_buffer(buf, (a.offset as u64 + n as u64) * 16, bytemuck::cast_slice(&records));
         }
+        use crate::gpu_layout::lod_face as l;
+        let fine_spill = if key.level == 0 {
+            land.iter()
+                .flat_map(|q| [q[0], q[0] >> l::Z_SHIFT])
+                .map(|v| (v & l::POS_MASK) as i32 - l::DETAIL_PAD as i32)
+                .map(|v| (-v).max(v + 1 - key.size()))
+                .max()
+                .unwrap_or(0)
+        } else {
+            0
+        };
         let spill = forest
             .iter()
             .map(|r| (2.0 * f32::from_bits(r[2])).ceil() as i32)
             .max()
-            .unwrap_or(0);
+            .unwrap_or(0)
+            .max(fine_spill);
         self.lod.insert(key, (a, counts, y, spill));
         self.lod_quads += quads.len();
     }
@@ -1143,9 +1155,12 @@ impl WorldRenderer {
                 .iter()
                 .all(|&k| bounds[k] < masked[1] && bounds[k + 3] > masked[0]);
             // A block of margin: the tiles are drawn a little lower than their records say.
-            let seen = seen_sides(center - half - Vec3::ONE, center + half + Vec3::ONE);
-            let origin = [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, crate::gpu_layout::lod_draw_data(key.level, fade)];
-            use super::lod::{ALWAYS, BESIDE_CUBES, FOREST, SURFACE};
+            let extent = half + Vec3::ONE + Vec3::new(spill as f32, 0.0, spill as f32);
+            let seen = seen_sides(center - extent, center + extent);
+            let pad = if key.level == 0 { crate::gpu_layout::lod_face::DETAIL_PAD as i32 / 16 } else { 0 };
+            let origin =
+                [o.x / 16 - cam_cube.x - pad, -cam_cube.y, o.y / 16 - cam_cube.z - pad, crate::gpu_layout::lod_draw_data(key.level, fade)];
+            use super::lod::{ALWAYS, BESIDE_CUBES, FOREST, PLANTS, SURFACE};
             let mut draw = |layer: u8, s: u32, len: u32| {
                 self.lod_drawn += len as u64;
                 let args =
@@ -1164,8 +1179,12 @@ impl WorldRenderer {
                     .chain(&counts[BESIDE_CUBES])
                     .sum::<u32>();
             runs(surface_at, counts[SURFACE].iter().zip(seen), |s, len| draw(2, s, len));
+            let plants_at = surface_at + counts[SURFACE].iter().sum::<u32>();
+            if counts[PLANTS][0] > 0 {
+                draw(0, plants_at, counts[PLANTS][0]);
+            }
             if counts[FOREST][0] > 0 {
-                draw(1, surface_at + counts[SURFACE].iter().sum::<u32>(), counts[FOREST][0]);
+                draw(1, plants_at + counts[PLANTS][0], counts[FOREST][0]);
             }
         }
         // What is opaque first; see-through surfaces after all of it, in `draw_translucent`.

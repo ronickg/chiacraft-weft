@@ -66,6 +66,8 @@ shared! {
     /// each), corner AO in the top byte.
     lod_face {
         POS_MASK = 1023,
+        /// Extra space on each side of a fine tile for structures spanning its border.
+        DETAIL_PAD = 480,
         Z_SHIFT = 10,
         DIR_SHIFT = 20,
         TINT_SHIFT = 23,
@@ -90,6 +92,9 @@ shared! {
         /// also selects alpha testing. For a plain terrain wall there is a pattern.
         COVER_SHIFT = 23,
         COVER_GAIN = 2,
+        /// Cutout box modes, stored in the unused tint kind when COVER is set.
+        FILLED_LEAVES = 1,
+        PLANT = 2,
         /// On a covered wall, the pattern texture uses the AO byte and block light bits.
         PATTERN_LOW_SHIFT = 24,
         PATTERN_MID_MASK = 63,
@@ -368,8 +373,8 @@ pub fn lod_record(dir: u32, pos: [i32; 3], size: [i32; 3], tex: u32, tint: u32, 
     let [r, g, b] = light.map(|c| c.min(15) as u32 / 2);
     let across = |v: i32| (v.max(1) as u32 - 1).min(wide);
     [
-        pos[0] as u32
-            | (pos[2] as u32) << l::Z_SHIFT
+        (pos[0] as u32 & lod_face::POS_MASK)
+            | (pos[2] as u32 & lod_face::POS_MASK) << l::Z_SHIFT
             | dir << l::DIR_SHIFT
             | tint << l::TINT_SHIFT
             | (sky.min(15) as u32 / 2) << l::SKY_SHIFT,

@@ -67,10 +67,6 @@ impl Cover {
             return None;
         }
         let terrain = def.terrain.as_ref()?;
-        // A callback and its data can change even if the terrain description is identical.
-        for m in &c.mods {
-            (&m.id, &m.version, m.revision).hash(signature);
-        }
         for biome in &c.biomes {
             biome.tints.hash(signature);
         }

@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
-use glam::{DVec3, IVec2, Mat4};
+use glam::{DVec3, IVec2, IVec3, Mat4};
 use rustc_hash::{FxHashMap, FxHashSet};
 use weft_abi::{BlockModel, FACE_DIRS, entry_kind as ek};
 
@@ -30,6 +30,7 @@ use crate::server::lod_tops::{LodColumn, Span, shows};
 
 mod cache;
 mod cover;
+mod detail;
 mod forest;
 
 /// Columns that differ from the terrain, as the server said.
@@ -133,6 +134,7 @@ struct TileTerrain {
     ctm: Arc<super::ctm::Ctm>,
     signature: u64,
     stone: u32,
+    detail_margin: i32,
 }
 
 impl TileTerrain {
@@ -148,6 +150,9 @@ impl TileTerrain {
         let ctm = super::ctm::current();
         let mut hash = DefaultHasher::new();
         (shader, &description).hash(&mut hash);
+        for m in &c.mods {
+            (&m.id, &m.version, m.revision).hash(&mut hash);
+        }
         let mut faces = Vec::with_capacity(c.states.len());
         for (id, state) in c.states.iter().enumerate() {
             let id = id as u32;
@@ -175,7 +180,14 @@ impl TileTerrain {
         let (forest, atlases) = forest::Forest::new(c, dim, seed, &faces, textures, &mut hash);
         let cover = cover::Cover::new(c, dim, &faces, textures, &mut hash);
         let stone = c.dims[dim as usize].terrain.as_ref()?.stone;
-        Some((Self { forest, cover, description, faces, ctm, signature: hash.finish(), stone }, atlases))
+        let detail_margin = c.dims[dim as usize]
+            .features
+            .iter()
+            .filter(|f| f.impostor)
+            .map(|f| f.reach[0] + 1)
+            .max()
+            .unwrap_or(1);
+        Some((Self { forest, cover, description, faces, ctm, signature: hash.finish(), stone, detail_margin }, atlases))
     }
 }
 
@@ -196,9 +208,11 @@ pub const ALWAYS: usize = 0;
 pub const BESIDE_CUBES: usize = 1;
 /// A see-through surface over the ground (a sea), drawn after everything opaque.
 pub const SURFACE: usize = 2;
+/// Diagonal cutout faces that the GPU culls by their actual orientation.
+pub const PLANTS: usize = 3;
 /// View-facing scatter instances, all in direction bucket zero.
-pub const FOREST: usize = 3;
-const PARTS: usize = 4;
+pub const FOREST: usize = 4;
+const PARTS: usize = 5;
 
 /// What came back for `job`, meshed on a worker.
 pub fn made(job: LodJob, mut words: Vec<u32>) {
@@ -233,7 +247,8 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
                 }
             }
         }
-        let (quads, counts, y) = mesh(content(), job.seed, job.key, &words, &job.columns, &job.terrain);
+        let snapshot = crate::generation::Snapshot::new(content(), job.dim, job.seed, u32::MAX);
+        let (quads, counts, y) = mesh(snapshot, job.key, &words, &job.columns, &job.terrain);
         let mesh = Arc::new(LodMesh { key: job.key, quads, counts, y });
         let _ = job.done.send(Ok(mesh.clone()));
         job.cache.store(&mesh);
@@ -326,13 +341,13 @@ fn sample_y(words: &[u32], gx: f32, gz: f32) -> i32 {
 /// height, then the block under it for the rest, lit as the column the cell is sampled at; then
 /// what stands on the ground (`add_structures`). Sorted by part and direction (`Counts`).
 fn mesh(
-    c: &Content,
-    seed: u64,
+    snapshot: crate::generation::Snapshot<'_>,
     key: TileKey,
     words: &[u32],
     columns: &Columns,
     terrain: &TileTerrain,
 ) -> (Vec<[u32; 4]>, Counts, (i32, i32)) {
+    let c = snapshot.c;
     let s = 1 << key.level;
     let scale = key.scale();
     let origin = key.origin();
@@ -368,7 +383,7 @@ fn mesh(
         (top_y, surface) if surface != 0 => light | ((15 - sky_under(surface).0[(top_y - y).clamp(0, 16) as usize]) as u32) << 24,
         _ => light,
     };
-    let mut h = height_grid(words);
+    let mut h = height_grid(words, key.level == 0);
     // Ground deeper than the sky's light reaches is as dark at any depth: it is laid as high as
     // that, a flat floor of few quads and no walls.
     let deepest = h.iter().flatten().copied().min().unwrap_or(0);
@@ -397,16 +412,45 @@ fn mesh(
     let cover = terrain
         .cover
         .as_ref()
-        .map(|cover| cover.colors(c, seed, key, words, columns));
+        .map(|cover| cover.colors(c, snapshot.seed, key, words, columns));
+    let mut forest = terrain.forest.instances(c, key, words, &h, columns);
+    let mut detail = (key.level == 0).then(|| detail::Detail::new(snapshot));
+    let generated = detail
+        .as_mut()
+        .map(|detail| detail.structures(key, columns, &h, &mut forest));
+    let ground_light = |i: i32, j: i32, y, light| shade_sky(light_of(i, j, y, light), forest.shadow[(i + 1) as usize][(j + 1) as usize]);
+    let mut faces = Vec::new();
+    let (mut lo, mut hi) = (i32::MAX, i32::MIN);
+    let mut plant_mesh = Vec::new();
+    let mut cover = cover;
+    if let (Some(detail), Some(cells)) = (&mut detail, &mut cover) {
+        for j in 0..CELLS {
+            for i in 0..CELLS {
+                let cell = &mut cells[(i + 1) as usize][(j + 1) as usize];
+                let y = column(&h, i, j) + 1;
+                let at_pos = origin + IVec2::new(i, j);
+                if over(i, j) != (0, 0)
+                    || columns
+                        .get(&at_pos)
+                        .is_some_and(|col| col.spans.iter().any(|s| s.bottom <= y && s.top >= y))
+                {
+                    continue;
+                }
+                let (_, biome, _, light) = at(i, j);
+                let p = IVec3::new(at_pos.x, y, at_pos.y);
+                let top = detail.plant(key, p, biome, ground_light(i, j, y, light), &mut plant_mesh);
+                if top > y {
+                    hi = hi.max(top);
+                    *cell = None;
+                }
+            }
+        }
+    }
     let plants = |i: i32, j: i32| {
         cover
             .as_ref()
             .and_then(|cells| cells[(i + 1) as usize][(j + 1) as usize])
     };
-    let mut forest = terrain.forest.instances(c, key, words, &h, columns);
-    let ground_light = |i: i32, j: i32, y, light| shade_sky(light_of(i, j, y, light), forest.shadow[(i + 1) as usize][(j + 1) as usize]);
-    let mut faces = Vec::new();
-    let (mut lo, mut hi) = (i32::MAX, i32::MIN);
     for j in 0..CELLS {
         for i in 0..CELLS {
             let y = column(&h, i, j);
@@ -654,13 +698,25 @@ fn mesh(
     };
     let faces = merged(faces);
     let mut parts: [Vec<[u32; 4]>; PARTS] = std::array::from_fn(|p| faces.iter().filter(|f| f.part == p).map(record).collect());
-    add_structures(&mut parts[ALWAYS], &mut lo, &mut hi, c, key, words, columns, &h, &face_of, &terrain.ctm);
+    add_structures(&mut parts[ALWAYS], &mut lo, &mut hi, c, key, words, columns, generated.as_ref(), &h, &face_of, &terrain.ctm);
+    let room = MAX_QUADS.saturating_sub(parts.iter().map(Vec::len).sum());
+    plant_mesh.truncate(room);
     let rank = |q: &[u32; 4]| super::mesher::DIR_RANK[((q[0] >> lod_face::DIR_SHIFT) & face::DIR_MASK) as usize] as usize;
     let mut counts = [[0; 6]; PARTS];
     for (part, n) in parts.iter_mut().zip(&mut counts) {
         part.sort_by_key(rank);
         for q in part.iter() {
             n[rank(q)] += 1;
+        }
+    }
+    counts[PLANTS][0] = plant_mesh.len() as u32;
+    parts[PLANTS] = plant_mesh;
+    if key.level == 0 {
+        let mask = lod_face::POS_MASK;
+        for q in parts.iter_mut().flatten() {
+            let x = ((q[0] & mask) + lod_face::DETAIL_PAD) & mask;
+            let z = ((q[0] >> lod_face::Z_SHIFT) + lod_face::DETAIL_PAD) & mask;
+            q[0] = (q[0] & !(mask | (mask << lod_face::Z_SHIFT))) | x | (z << lod_face::Z_SHIFT);
         }
     }
     let space = MAX_QUADS.saturating_sub(parts.iter().map(Vec::len).sum());
@@ -748,14 +804,14 @@ fn stretches(dir: u32, ao: u32, along: usize) -> bool {
     })
 }
 
-fn height_grid(words: &[u32]) -> [[i32; GRID]; GRID] {
+fn height_grid(words: &[u32], exact: bool) -> [[i32; GRID]; GRID] {
     let mut h = [[0i32; GRID]; GRID];
     for j in -1..=CELLS {
         for i in -1..=CELLS {
             // Interpolating across an open cut lowers intact roof columns into pillars.
             let cave = (j..=(j + 1).min(CELLS))
                 .any(|z| (i..=(i + 1).min(CELLS)).any(|x| cave_cut(words, x, z) || cave_gap(words, x, z).is_some()));
-            let y = if cave {
+            let y = if exact || cave {
                 corner_y(words, i, j)
             } else if i < CELLS && j < CELLS {
                 sample_y(words, i as f32 + 0.5, j as f32 + 0.5)
@@ -877,6 +933,7 @@ fn add_structures(
     key: TileKey,
     words: &[u32],
     columns: &Columns,
+    generated: Option<&detail::Structures>,
     h: &[[i32; GRID]; GRID],
     face_of: &impl Fn(u32, usize) -> (u32, u32),
     ctm: &super::ctm::Ctm,
@@ -886,11 +943,16 @@ fn add_structures(
     let origin = key.origin();
     let (x0, z0) = (origin.x, origin.y);
     let (x1, z1) = (x0 + CELLS * s, z0 + CELLS * s);
+    let inside = |p: IVec2| (x0..x1).contains(&p.x) && (z0..z1).contains(&p.y);
+    let columns = generated.map_or(columns, |g| &g.columns);
     let mut here: Vec<IVec2> = columns
         .iter()
-        .filter(|(p, col)| !col.spans.is_empty() && p.x >= x0 && p.x < x1 && p.y >= z0 && p.y < z1)
+        .filter(|(p, col)| !col.spans.is_empty() && inside(**p))
         .map(|(p, _)| *p)
         .collect();
+    if let Some(g) = generated {
+        here.extend(g.outside.keys().copied());
+    }
     let (cx, cz) = (x0 + CELLS * s / 2, z0 + CELLS * s / 2);
     here.sort_by_key(|p| (p.x - cx).abs() + (p.y - cz).abs());
     let hides = |block: u32, by: &Span| super::mesher::face_hidden(c, ctm, block, by.block);
@@ -901,11 +963,17 @@ fn add_structures(
         }
         let Some(col) = columns.get(&p) else { continue };
         let (i, j) = ((p.x - x0) / s, (p.y - z0) / s);
-        let k = sample_offset(i, j);
-        let biome = words[k + 1] & 0xFFFF;
-        let ground = column(h, i, j);
+        let outside = generated.and_then(|g| g.outside.get(&p));
+        let (biome, ground, spans) = if let Some((biome, spans)) = outside {
+            (*biome, i16::MIN as i32, spans.as_slice())
+        } else {
+            (words[sample_offset(i, j) + 1] & 0xFFFF, column(h, i, j), col.spans.as_slice())
+        };
         // How high the ground beside covers this column's sides.
         let skirt_hi = |ni: i32, nj: i32| {
+            if outside.is_some() {
+                return i32::MIN;
+            }
             let n = column(h, ni, nj);
             if ni == i && nj == j || n < ground {
                 i32::MIN
@@ -916,7 +984,7 @@ fn add_structures(
             }
         };
         let (lx, lz) = (p.x - x0, p.y - z0);
-        for span in &col.spans {
+        for span in spans {
             let (bottom, span_hi, block, light) = (span.bottom.max(ground + 1), span.top, span.block, span.light);
             if bottom > span_hi {
                 continue;
@@ -979,12 +1047,13 @@ fn add_structures(
                             let (mn, mx) = scaled_edges(lx, lz, scale, mn, mx);
                             let mut r = lod_box(r, mn, mx, extrude);
                             if c.states[block as usize].layer == weft_abi::RenderLayer::Cutout {
-                                let foliage = leaves.is_some_and(|tag| c.components.has(crate::components::BLOCK, block, tag));
+                                let foliage =
+                                    key.level > 0 && leaves.is_some_and(|tag| c.components.has(crate::components::BLOCK, block, tag));
                                 let rgb = c.kind_color(tint as u8, Some(biome as u16));
                                 let gain = crate::gpu_layout::lod_color_gain([16, 8, 0].map(|s| ((rgb >> s) & 255) as f32 / 255.0));
                                 crate::gpu_layout::lod_set_gain(&mut r, gain);
                                 if foliage {
-                                    r[0] |= 1 << crate::gpu_layout::lod_face::TINT_SHIFT;
+                                    r[0] |= lod_face::FILLED_LEAVES << lod_face::TINT_SHIFT;
                                 }
                             }
                             out.push(r);
@@ -1216,7 +1285,7 @@ impl Lod {
             }
             for level in 0..=MAX_LEVEL {
                 let side = (CELLS as i64) << level;
-                let border = i64::from(forest::shadow_margin(1 << level));
+                let border = i64::from(sample_margin(level, self.terrain.as_deref().map_or(1, |t| t.detail_margin)));
                 let range = |p: i32| (p as i64 - border).div_euclid(side) as i32..=(p as i64 + border).div_euclid(side) as i32;
                 for z in range(z) {
                     for x in range(x) {
@@ -1904,7 +1973,7 @@ impl Lod {
             let jobs = self.jobs.clone();
             let probe = key.level < self.max_level && self.cached_heights.contains_key(&key) && !self.cache_misses.contains(&key);
             background().spawn(move || {
-                let (columns, edits) = tile_columns(key, columns.as_deref());
+                let (columns, edits) = tile_columns(key, columns.as_deref(), terrain.detail_margin);
                 let mut cache = cache::Entry::new(&dir, dim, seed, key, terrain.signature, edits);
                 if let Some(mesh) = cache.load(key) {
                     let _ = done.send(Ok(Arc::new(mesh)));
@@ -1920,13 +1989,17 @@ impl Lod {
     }
 }
 
+fn sample_margin(level: u32, detail_margin: i32) -> i32 {
+    forest::shadow_margin(1 << level).max(if level == 0 { detail_margin } else { 0 })
+}
+
 /// Snapshot only columns in the tile and its sampling border, in a stable order for the disk key.
-fn tile_columns(key: TileKey, saved: Option<&SavedColumns>) -> (Columns, u64) {
+fn tile_columns(key: TileKey, saved: Option<&SavedColumns>, detail_margin: i32) -> (Columns, u64) {
     let mut columns = Columns::default();
     let mut hash = DefaultHasher::new();
     if let Some(saved) = saved.filter(|s| !s.is_empty()) {
         let o = key.origin();
-        let border = forest::shadow_margin(1 << key.level);
+        let border = sample_margin(key.level, detail_margin);
         let bounds = |v: i32| v.saturating_sub(border)..=v.saturating_add(key.size()).saturating_add(border - 1);
         let (x_range, z_range) = (bounds(o.x), bounds(o.y));
         for (&(z, x), col) in saved.range((*z_range.start(), i32::MIN)..=(*z_range.end(), i32::MAX)) {
@@ -2143,15 +2216,15 @@ mod tests {
                 Arc::new(LodColumn { x, z, y: 40, top: 1, under: 2, light: 0, spans: Vec::new(), removed_scatter: Vec::new() }),
             );
         }
-        let (cols, id) = tile_columns(key, Some(&saved));
+        let (cols, id) = tile_columns(key, Some(&saved), 1);
         assert_eq!(cols.len(), 3);
         for p in [(-140, 116), (-4, 258), (11, 267)] {
             assert!(cols.contains_key(&IVec2::new(p.0, p.1)));
         }
         saved.remove(&(267, 12));
-        assert_eq!(id, tile_columns(key, Some(&saved)).1);
+        assert_eq!(id, tile_columns(key, Some(&saved), 1).1);
         Arc::make_mut(saved.get_mut(&(267, 11)).unwrap()).light = 10;
-        assert_ne!(id, tile_columns(key, Some(&saved)).1);
+        assert_ne!(id, tile_columns(key, Some(&saved), 1).1);
     }
 
     #[test]
