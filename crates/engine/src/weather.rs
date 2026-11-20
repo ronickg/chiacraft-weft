@@ -4,8 +4,8 @@ use crate::content::Content;
 
 pub(crate) const CLOUD_CELL: f64 = 320.0;
 pub(crate) const CLOUD_HEIGHT: f32 = 75.0;
-// Rectangular cloud columns per noise cell. Keep in sync with common.wgsl.
-const CLOUD_COLUMNS: DVec2 = DVec2::new(16.0, 32.0);
+// Square cloud columns per noise cell along each axis. Keep in sync with common.wgsl.
+const CLOUD_COLUMNS: f64 = 24.0;
 pub(crate) const AUTOMATIC: u32 = u32::MAX;
 
 /// A sampleable layer shared by simulation and rendering. Its drift follows elapsed world ticks,
