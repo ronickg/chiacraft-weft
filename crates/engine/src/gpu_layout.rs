@@ -633,8 +633,11 @@ gpu_struct! {
         /// x bindless picture (`u32::MAX` none), y `sky` kind, z shader slot, w 1 if additive.
         pub ids: [u32; 4],
         /// x half size across (a body's tangent). Overlay: x tiles across, y 1 for the screen's
-        /// lower part only, z where its frame starts in the picture.
+        /// lower part only, z where its frame starts in the picture. Weather clouds: tile size,
+        /// height, base relative to the eye, and forced weather class (clear/rain/thunder).
         pub extra: [f32; 4],
+        /// Direct solar light for procedural clouds, linear RGB with a precomputed path scale in w.
+        pub cloud_sun: [f32; 4],
     }
 }
 

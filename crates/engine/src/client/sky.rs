@@ -289,6 +289,7 @@ impl Sky {
                 color: o.color,
                 ids: [index, kind::OVERLAY, 0, 0],
                 extra: [o.tiles, o.lower as u32 as f32, (o.frame as f32 * frame_h).fract(), 0.0],
+                cloud_sun: [0.0; 4],
             });
             n += 1;
         }
@@ -416,10 +417,45 @@ impl Sky {
                 .to_array(),
             ids: [u32::MAX, kind::GRADIENT, 0, 0],
             extra: [frame.width as f32, 0.0, 0.0, 0.0],
+            cloud_sun: [0.0; 4],
         });
         let mut draws: Vec<(u32, u32)> = vec![(3, 0)];
 
         let objects = c.game.sky.get(dim).map_or(&[][..], |l| &l[..]);
+        // Use the visible sun's orbit, including its heading and tilt. A small
+        // color curve models the longer path through the air near the horizon.
+        let (cloud_sun_dir, cloud_sun) = if d.sky_light && weather.clouds.is_some() && environment.sunlight > 0.0 {
+            objects
+                .iter()
+                .filter(|s| s.glow != 0 && s.kind == sky_kind::BODY)
+                .find_map(|s| {
+                    let toward = frame_of(s, turn_of(s, d, time)).x_axis;
+                    let opacity = (s.opacity[0] + (s.opacity[1] - s.opacity[0]) * night) * weights.get(&s.name).copied().unwrap_or(1.0);
+                    let fade = ((toward.y + 0.09) * 9.0).clamp(0.0, 1.0);
+                    if opacity <= 0.0 || fade <= 0.0 {
+                        return None;
+                    }
+                    let warmth = (1.0 - toward.y.max(0.0) / 0.46).clamp(0.0, 1.0);
+                    let color = Vec3::ONE.lerp(Vec3::new(1.0, 0.36, 0.10), warmth)
+                        * rgb(s.color).powf(2.2)
+                        * (opacity * fade * environment.sunlight);
+                    let path = 0.21 / toward.y.max(0.24);
+                    Some((toward.extend(0.0).to_array(), color.extend(path).to_array()))
+                })
+                .unwrap_or_default()
+        } else {
+            Default::default()
+        };
+        let forced_kind = weather.forced.map_or(0.0, |id| {
+            let preset = &c.game.weathers[id as usize];
+            if preset.lightning() {
+                2.0
+            } else if preset.falls() {
+                1.0
+            } else {
+                0.0
+            }
+        });
         let mut clouds = None;
         for (i, s) in objects.iter().enumerate() {
             // Cloud cover hides celestial objects, not the clouds or sky behind them.
@@ -470,7 +506,7 @@ impl Sky {
                         [u32::MAX, kind::CLOUDS, field.seed, automatic as u32],
                         CLOUD_CELL,
                         field.coords(glam::DVec2::new(cam.pos.x, cam.pos.z)),
-                        [color_for(field.rain), color_for(field.thunder), [0.0; 4]],
+                        [color_for(field.rain), color_for(field.thunder), cloud_sun_dir],
                     )
                 } else {
                     let Some((index, [w, h])) = self.picture(gpu, &s.texture) else { continue };
@@ -484,10 +520,11 @@ impl Sky {
                     axes: colors,
                     uv: [pos.x.rem_euclid(1.0) as f32, pos.y.rem_euclid(1.0) as f32, origin.x as f32, origin.y as f32],
                     color: color
-                        .extend(if weather.clouds.is_some() { 0.93 } else { 0.8 } * environment.cloud_opacity * opacity)
+                        .extend(if weather.clouds.is_some() { 1.0 } else { 0.8 } * environment.cloud_opacity * opacity)
                         .to_array(),
                     ids,
-                    extra: [size as f32, height, low, 0.0],
+                    extra: [size as f32, height, low, forced_kind],
+                    cloud_sun,
                 });
                 continue;
             }
@@ -531,6 +568,7 @@ impl Sky {
                 color: rgb(s.color).powf(2.2).extend(opacity).to_array(),
                 ids: [picture.map_or(u32::MAX, |p| p.0), kind_id, slot, s.additive as u32],
                 extra: [half, 0.0, 0.0, 0.0],
+                cloud_sun: [0.0; 4],
             });
             draws.push((vertices, at));
         }
@@ -552,6 +590,7 @@ impl Sky {
                     .to_array(),
                 ids: [u32::MAX, kind::GLOW, 0, 0],
                 extra: [0.0; 4],
+                cloud_sun: [0.0; 4],
             });
             draws.insert(first_body + n, (3, at));
         }

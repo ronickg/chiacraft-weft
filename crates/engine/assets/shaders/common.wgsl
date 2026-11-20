@@ -116,11 +116,27 @@ fn cloud_volume(s: Sky, dir: vec3<f32>, near: f32, far: f32, view: Scene) -> Clo
     let direction = select(1, -1, dir.y < 0.0);
     let first_band = i32(clamp(floor(height_at_camera + height_rate * near), 0.0, 4.0));
     let last_band = i32(clamp(floor(height_at_camera + height_rate * far), 0.0, 4.0));
+    let has_sun = s.cloud_sun.w > 0.0;
+    var scattered_sun = vec3(0.0);
+    var sun_from_above = 1.0;
+    if has_sun {
+        // Two polynomial forward lobes approximate the broad glow and bright rim.
+        // The view and light directions are constant along this ray.
+        let cosine = dot(dir, s.axes[2].xyz);
+        let forward = max(cosine, 0.0);
+        let square = forward * forward;
+        let fourth = square * square;
+        let eighth = fourth * fourth;
+        let narrow = eighth * eighth;
+        let back = max(-cosine, 0.0);
+        scattered_sun = s.cloud_sun.rgb * (0.14 + 0.52 * eighth + 1.02 * narrow * narrow + 0.10 * back * back);
+        sun_from_above = smoothstep(-0.06, 0.22, s.axes[2].y);
+    }
     var light = vec3(0.0);
     var alpha = 0.0;
     var first = far;
     var optical_distance = 0.0;
-    for (var band = first_band; band != last_band + direction && alpha < 0.97; band += direction) {
+    for (var band = first_band; band != last_band + direction && alpha < 0.99; band += direction) {
         let boundary = f32(band) + select(0.0, 1.0, dir.y < 0.0);
         let enter = (boundary - height_at_camera) * band_time * f32(direction);
         let band_start = select(max(enter, near), near, band == first_band);
@@ -130,25 +146,34 @@ fn cloud_volume(s: Sky, dir: vec3<f32>, near: f32, far: f32, view: Scene) -> Clo
         var cell = floor(start);
         let offset = select(start - cell, cell + vec2(1.0) - start, ray > vec2(0.0));
         var next = select(band_start + offset * delta, vec2(1e12), ray == vec2(0.0));
+        let shade = 0.82 + 0.050 * f32(band);
+        let sun_path = mix(f32(band) + 0.5, 4.5 - f32(band), sun_from_above) * s.cloud_sun.w;
         var t = band_start;
-        while t < band_end && alpha < 0.97 {
+        while t < band_end && alpha < 0.99 {
             let end = min(band_end, min(next.x, next.y));
             let field = cloud_field(s.ids.z, origin, (cell + shift + vec2(0.5)) / CLOUD_COLUMNS);
             if field.x > 0.0 && end > t {
                 let fill = cloud_band_fill(field, band);
                 if fill > 0.0 {
                     let density = smoothstep(0.0, 0.8, fill) * (0.6 + 0.4 * smoothstep(0.0, 0.65, field.x));
-                    let absorption = (1.0 - alpha) * (1.0 - exp(-density * (end - t) * 0.069));
-                    // Light the volume uniformly within a band. A DDA step into another
-                    // cell does not cross a lit face if both cells contain cloud.
-                    let shade = 0.82 + 0.050 * f32(band);
+                    let kind = select(s.extra.w, field.y, s.ids.w != 0u);
+                    let extinction = select(0.085, select(0.145, 0.22, kind == 2.0), kind > 0.0);
+                    let absorption = (1.0 - alpha) * (1.0 - exp(-density * (end - t) * extinction));
                     var base = s.color.rgb;
                     if s.ids.w != 0u && field.y > 0.0 {
                         base = select(s.axes[0].xyz, s.axes[1].xyz, field.y == 2.0);
                     }
+                    var radiance = base * shade;
+                    if has_sun {
+                        // Approximate how far the light travels through the cloud from
+                        // the local density, band height and solar elevation. Reuse the
+                        // view sample instead of marching a second ray into the sun.
+                        let depth = density * sun_path * (1.0 + 0.30 * kind);
+                        radiance += scattered_sun * (1.0 - 0.97 * smoothstep(0.0, 1.0, depth));
+                    }
                     first = min(first, t);
                     optical_distance += (t + end) * 0.5 * absorption;
-                    light += base * shade * absorption;
+                    light += radiance * absorption;
                     alpha += absorption;
                 }
             }
