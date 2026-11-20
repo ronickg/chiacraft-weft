@@ -156,10 +156,17 @@ impl Cover {
                         let h = weft_noise::hash(seed, x as i64, 0, z as i64);
                         let bx = x + (h as i32 & (stride - 1));
                         let bz = z + ((h >> 32) as i32 & (stride - 1));
-                        let edited = columns
-                            .get(&IVec2::new(bx, bz))
-                            .is_some_and(|col| col.top != 0 || !col.spans.is_empty());
-                        let ground = if edited { 0 } else { state };
+                        let saved = columns.get(&IVec2::new(bx, bz));
+                        let (y, ground) = saved
+                            .filter(|col| col.top != 0)
+                            .map_or((y, state), |col| (col.y, col.top));
+                        let plant_y = y + 1;
+                        let occupied = saved.is_some_and(|col| {
+                            col.spans
+                                .iter()
+                                .any(|span| span.bottom <= plant_y && plant_y <= span.top)
+                        });
+                        let ground = if occupied { 0 } else { ground };
                         samples.push(SurfaceCoverSample { surface: [bx, y, bz].into(), biome: biome as u32, ground, plant: 0 });
                     }
                 }
