@@ -1132,26 +1132,28 @@ impl LodView {
         {
             return 0.0;
         }
-        let (mut low, mut high) = (glam::Vec2::splat(1.0), glam::Vec2::splat(-1.0));
-        let mut behind = false;
-        let mut ahead = false;
-        for corner in 0..8 {
+        const NEAR: f32 = 0.05;
+        let corners: [_; 8] = std::array::from_fn(|corner| {
             let at = glam::Vec3::new([min.x, max.x][corner & 1], [min.y, max.y][(corner >> 1) & 1], [min.z, max.z][corner >> 2]);
-            let clip = self.projection * at.extend(1.0);
-            if clip.w <= 0.05 {
-                behind = true;
-                continue;
-            }
-            ahead = true;
-            let point = glam::Vec2::new(clip.x, clip.y) / clip.w;
+            self.projection * at.extend(1.0)
+        });
+        let (mut low, mut high) = (glam::Vec2::splat(1.0), glam::Vec2::splat(-1.0));
+        let mut include = |point: glam::Vec2| {
             low = low.min(point);
             high = high.max(point);
+        };
+        for clip in corners.iter().filter(|clip| clip.w >= NEAR) {
+            include(glam::Vec2::new(clip.x, clip.y) / clip.w);
         }
-        if !ahead {
-            return 0.0;
-        }
-        if behind {
-            return self.tiles_per_screen;
+        // A box spanning the near plane can still cover only a sliver of the screen.
+        for (i, behind) in corners.iter().enumerate().filter(|(_, clip)| clip.w < NEAR) {
+            for axis in [1, 2, 4] {
+                let ahead = corners[i ^ axis];
+                if ahead.w >= NEAR {
+                    let at = behind.lerp(ahead, (NEAR - behind.w) / (ahead.w - behind.w));
+                    include(glam::Vec2::new(at.x, at.y) / NEAR);
+                }
+            }
         }
         let span = (high.min(glam::Vec2::ONE) - low.max(-glam::Vec2::ONE)).max(glam::Vec2::ZERO);
         span.x as f64 * span.y as f64 * self.tiles_per_screen * 0.25
@@ -2067,6 +2069,16 @@ mod tests {
             );
         }
         panic!("selection did not settle");
+    }
+
+    #[test]
+    fn tile_crossing_near_plane_can_cover_only_the_bottom_of_the_view() {
+        let view = selection(70.0, 1080, 4096);
+        let planes = super::super::world_render::projection_planes(view.projection);
+        let min = glam::Vec3::new(-32.0, -800.0, -1024.0);
+        let max = glam::Vec3::new(32.0, -650.0, 8.0);
+        let area = view.area(min, max, &planes);
+        assert!(area > 0.0 && area < view.tiles_per_screen * 0.1, "projected area: {area}");
     }
 
     #[test]
