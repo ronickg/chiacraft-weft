@@ -564,7 +564,8 @@ mod tests {
             .flat_map(|x| (0..5).map(move |y| (IVec3::new(x, y, 0), 1)))
             .collect();
         let mut colors = Colors::default();
-        colors.insert(1, [[[180, 100, 50, 255]; 16]; 6]);
+        let pixels = |alpha| std::array::from_fn(|_| FacePixels { side: 4, rgba: Box::new([[180, 100, 50, alpha]; 16]) });
+        colors.insert(1, pixels(255));
         let mips = bake(model, &fence, &colors);
         let solid = |view: u32| {
             (0..FRAME)
@@ -577,7 +578,7 @@ mod tests {
         for (level, data) in mips.iter().enumerate() {
             assert_eq!(data.len(), (VIEWS * ELEVATIONS * (FRAME >> level).pow(2) * 4) as usize);
         }
-        colors.insert(1, [[[180, 100, 50, 0]; 16]; 6]);
+        colors.insert(1, pixels(0));
         assert!(
             bake(model, &fence, &colors)[0]
                 .chunks_exact(4)
