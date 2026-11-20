@@ -189,12 +189,15 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         dir = mat(sky[0]) * in.at;
     }
     dir = normalize(dir);
+    let mist = scene.environment.w;
     if s.ids.y == SKY_GRADIENT {
-        return gradient(dir, s);
+        let c = gradient(dir, s);
+        return vec4(mix(c.rgb, scene.fog_color.rgb * c.a, mist), c.a);
     }
     if s.ids.y == SKY_GLOW {
         let c = glow(dir, s);
-        return vec4(c.rgb * c.a, c.a);
+        let a = c.a * (1.0 - mist);
+        return vec4(c.rgb * a, a);
     }
     let local = dir * mat(s);
     var uv = in.uv;
@@ -208,6 +211,6 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         albedo = textureSampleLevel(textures[s.ids.x], nearest_clamp, uv, 0.0);
     }
     let c = sky_shade(s.ids.z, SkyPixel(dir, local, uv, albedo, vec4(s.color.rgb, 1.0), scene.params.z, scene.params.w));
-    let a = c.a * s.color.a;
+    let a = c.a * s.color.a * (1.0 - mist);
     return vec4(c.rgb * a, select(a, 0.0, s.ids.w != 0u));
 }

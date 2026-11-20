@@ -14,6 +14,8 @@ use weft_abi::{
     environment::{EnvironmentLayer as Layer, EnvironmentOverlay as Overlay, EnvironmentValues as Values},
 };
 
+const RAIN_MIST: &str = "core:rain_mist";
+
 #[derive(Default)]
 pub struct Environment {
     pub local: FxHashMap<String, Layer>,
@@ -26,6 +28,7 @@ pub struct Environment {
     pub overlays: Vec<sky::Overlay>,
     pub post: Vec<(String, f32)>,
     pub sky: FxHashMap<String, f32>,
+    pub(super) rain_mist: f32,
 }
 
 struct Active {
@@ -226,7 +229,7 @@ impl Client {
                 .light_loaded(eye)
                 .is_some_and(|light| abi::light::sky(light) == 15);
             if outside && c.game.precipitations[precipitation as usize].name == "core:rain" {
-                let mut mist = Layer::new("core:rain_mist".into());
+                let mut mist = Layer::new(RAIN_MIST.into());
                 mist.priority = -890;
                 mist.fade_in = 1.5;
                 mist.fade_out = 2.5;
@@ -235,7 +238,7 @@ impl Client {
                 mist.values.fog_start = mist.values.fog_end * 0.12;
                 let gray = fog.dot(Vec3::new(0.30, 0.59, 0.11));
                 mist.values.fog_color = fog.lerp(Vec3::splat(gray), 0.8).powf(2.2).to_array();
-                env.contribute("rain-mist".into(), mist, 1.0);
+                env.contribute(RAIN_MIST.into(), mist, 1.0);
             }
         }
         let weather_layers = env.layers(c, abi::entry_kind::WEATHER as usize, self.weather_id as u32);
@@ -437,6 +440,7 @@ impl Client {
         post.retain(|(_, weight)| weight.is_finite() && *weight > 0.0);
         env.post = post;
         env.sky = sky_weights;
+        env.rain_mist = env.active.get(RAIN_MIST).map_or(0.0, |mist| mist.weight);
         self.environment = env;
     }
 }

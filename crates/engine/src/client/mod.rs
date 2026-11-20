@@ -3088,7 +3088,7 @@ impl Client {
             fog_color: self.fog_color(),
             params: [fog_start, fog_end, environment.daylight, crate::shaders::time()],
             light: [environment.ambient, self.brightness, ticks, environment.night_vision],
-            environment: [environment.sunlight, environment.cloud_fog_start, environment.cloud_fog_end, 0.0],
+            environment: [environment.sunlight, environment.cloud_fog_start, environment.cloud_fog_end, self.environment.rain_mist],
             sun: self.sun(),
             cloud: Default::default(),
         }
