@@ -107,20 +107,31 @@ impl DimSet {
 
     /// Folds regions into the largest of them; returns its index afterwards.
     fn merge(&mut self, c: &Content, list: &[usize]) -> usize {
-        let target = *list
+        let original = *list
             .iter()
             .max_by_key(|&&i| self.regions[i].space.cubes.len())
             .unwrap();
+        let mut target = original;
         for &i in list.iter().rev() {
-            if i != target {
+            if i != original {
                 let parcel = self.regions[i].take_sections(|_| true);
                 self.regions[target].absorb(c, parcel);
                 self.regions.remove(i);
+                if i < target {
+                    target -= 1;
+                }
             }
         }
+        // Area edits can reserve a section before it has any cubes to rebuild ownership from.
+        for region in self.owner.values_mut() {
+            *region = if list.binary_search(region).is_ok() {
+                target
+            } else {
+                *region - (list.partition_point(|&i| i < *region) - usize::from(original < *region))
+            };
+        }
         log::debug!("dimension {}: {} regions merged", self.id, list.len());
-        self.rebuild_owner();
-        target - list.iter().filter(|&&i| i < target).count()
+        target
     }
 
     pub fn region_index(&self, pos: IVec3) -> Option<usize> {
