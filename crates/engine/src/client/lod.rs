@@ -1714,28 +1714,45 @@ impl Lod {
         let center = IVec2::new((cam.x / 16.0).floor() as i32, (cam.z / 16.0).floor() as i32);
         let slot = |col: IVec2| (col.y.rem_euclid(w) * w + col.x.rem_euclid(w)) as usize;
         let words = ((w * w) as usize).div_ceil(32);
+        let (low, high) = world.lod_range();
+        let layers = (high.saturating_sub(low).saturating_add(1).max(0) as usize).div_ceil(32);
+        let header = 2 * words;
+        let info = [low as u32, layers as u32];
         let changed = world.take_changed_columns();
         let world = &*world;
         let set = |mask: &mut Vec<u32>, col: IVec2| {
             let i = slot(col);
             let bit = 1u32 << (i % 32);
-            let bottom = world.column_coverage(col, seed, true);
-            let depth = &mut mask[2 * words + i];
-            let old_depth = *depth;
-            *depth = bottom.unwrap_or(i32::MAX) as u32;
-            let mut changed = *depth != old_depth;
-            for (part, shown) in [(0, bottom.is_some()), (1, world.column_shown(col, seed, false))] {
+            let ground = world.column_shown(col, seed, true);
+            let surface = world.column_shown(col, seed, false);
+            let mut changed = false;
+            for (part, shown) in [(0, ground), (1, surface)] {
                 let word = part * words + i / 32;
                 let old = mask[word];
                 mask[word] = if shown { old | bit } else { old & !bit };
                 changed |= old != mask[word];
             }
+            let offset = header + info.len() + i * layers;
+            for (word, stored) in mask[offset..offset + layers].iter_mut().enumerate() {
+                let mut shown = 0u32;
+                if ground || surface {
+                    let first = low + word as i32 * 32;
+                    for y in first..=high.min(first + 31) {
+                        if world.cube_shown(IVec3::new(col.x, y, col.y)) {
+                            shown |= 1 << (y - first);
+                        }
+                    }
+                }
+                changed |= *stored != shown;
+                *stored = shown;
+            }
             changed
         };
         let inside = |col: IVec2, at: IVec2| (col - at).abs().max_element() <= half;
-        if half != self.half || self.mask.is_empty() {
+        if half != self.half || self.mask.get(header..header + info.len()) != Some(&info) {
             self.half = half;
-            self.mask = vec![0; 2 * words + (w * w) as usize];
+            self.mask = vec![0; header + info.len() + (w * w) as usize * layers];
+            self.mask[header..header + info.len()].copy_from_slice(&info);
             self.center = center;
             for z in -half..=half {
                 for x in -half..=half {

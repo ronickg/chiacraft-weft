@@ -992,7 +992,7 @@ bindings! {
         // Block shader slot (`shaders/block/<name>.wgsl`) per texture id, 0 none.
         TEX_SHADER "tex_shader": "array<u32>",
         SCENE "scene": "Scene",
-        // Ground and surface bitmaps, followed by the bottom covered cube per column.
+        // Ground and surface bitmaps, then the origin, stride and shown cubes per column.
         // Columns are addressed modulo 2 * g.extra.w + 1 (`client::lod`).
         LOD_MASK "lod_mask": "array<u32>",
         // Which blocks around the camera cast shadows, for shader packs that call `solid_at`

@@ -492,10 +492,17 @@ fn shown_by_cubes(pos: vec3<f32>, part: u32) -> bool {
     let i = u32(((col.y % w) + w) % w * w + ((col.x % w) + w) % w);
     let words = (u32(w * w) + 31u) / 32u;
     let shown = ((lod_mask[i / 32u + part * words] >> (i % 32u)) & 1u) != 0u;
-    if shown && part == 0u {
-        return i32(floor(pos.y / 16.0)) >= bitcast<i32>(lod_mask[2u * words + i]);
+    if !shown {
+        return false;
     }
-    return shown;
+    let mask_header = 2u * words;
+    let layer = i32(floor(pos.y / 16.0)) - bitcast<i32>(lod_mask[mask_header]);
+    let stride = lod_mask[mask_header + 1u];
+    if layer < 0 || u32(layer) / 32u >= stride {
+        return false;
+    }
+    let bit = u32(layer);
+    return ((lod_mask[mask_header + 2u + i * stride + bit / 32u] >> (bit % 32u)) & 1u) != 0u;
 }
 
 fn lod_fade_visible(fade: f32, pixel: vec2<f32>) -> bool {
