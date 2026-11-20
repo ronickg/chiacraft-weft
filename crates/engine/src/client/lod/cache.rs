@@ -9,7 +9,7 @@ use super::{Counts, LodMesh, MAX_QUADS, TileKey};
 use rustc_hash::FxHashMap;
 
 // Bump when the mesher or packed face format changes.
-const VERSION: u32 = 9;
+const VERSION: u32 = 10;
 pub(super) const SLOTS: u64 = 4096;
 const MAX_FILE: usize = 128 << 10;
 const HEADER: usize = size_of::<Counts>() + 8;

@@ -1424,7 +1424,11 @@ impl Lod {
         let land = self.land_height(c, cam);
         let hidden = land.is_some_and(|h| cam.y < (h - UNDERGROUND) as f64);
         // Above the loaded cubes the tiles also fill the middle of the view.
-        let hide = if land.is_some_and(|h| cam.y > (h + view * 8) as f64) { 0 } else { (view / 2 * 16).max(0) };
+        let spill = self
+            .terrain
+            .as_deref()
+            .map_or(0, |t| t.detail_margin.min(lod_face::DETAIL_PAD as i32));
+        let hide = if land.is_some_and(|h| cam.y > (h + view * 8) as f64) { 0 } else { (view / 2 * 16 - spill).max(0) };
         let upload_start = Instant::now();
         // An eased FOV can settle a few float steps below its target at high frame rates.
         let zooming = camera.fov < normal_fov - 0.01;

@@ -55,8 +55,10 @@ impl<'a> Detail<'a> {
         for (fi, feature) in def.features.iter().enumerate() {
             let Some((spacing, _)) = feature.impostor_grid() else { continue };
             let s = IVec2::splat(spacing);
-            let lo = (origin - margin).div_euclid(s);
-            let hi = (end + margin).div_euclid(s);
+            let split = feature.reach[0] >= lod_face::DETAIL_PAD as i32;
+            let search = if split { feature.reach[0].max(margin) } else { margin };
+            let lo = (origin - search).div_euclid(s);
+            let hi = (end + search).div_euclid(s);
             for z in lo.y..=hi.y {
                 for x in lo.x..=hi.x {
                     let hash = weft_noise::hash(snap.seed ^ feature.salt, x as i64, 0, z as i64);
@@ -81,8 +83,9 @@ impl<'a> Detail<'a> {
                         if p.y >= middle {
                             canopy.insert(at);
                         }
+                        let here = if split { at.cmpge(origin).all() && at.cmple(end).all() } else { own };
                         let local = at - origin;
-                        if own
+                        if here
                             && local.min_element() >= -(lod_face::DETAIL_PAD as i32)
                             && local.max_element() <= (lod_face::POS_MASK - lod_face::DETAIL_PAD) as i32
                             && self.block(p) == state
