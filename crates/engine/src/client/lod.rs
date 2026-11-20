@@ -1518,6 +1518,14 @@ impl Lod {
         self.pending.len()
     }
 
+    pub(super) fn ready_for_entry(&self, dim: u32, seed: u64) -> bool {
+        Self::distance() == 0
+            || (self.dim, self.seed) == (dim, seed)
+                && (self.terrain.is_none()
+                    || self.hidden
+                    || self.wanted_at.is_some() && self.wanted.iter().all(|key| self.ready.contains_key(key)))
+    }
+
     /// Distance in blocks it reaches (`core:lod_distance` cubes), 0 when off.
     pub fn distance() -> i32 {
         let c = content();
@@ -1545,6 +1553,7 @@ impl Lod {
         normal_fov: f32,
         view: i32,
         upload_budget: Duration,
+        animate: bool,
     ) {
         let cam = camera.pos;
         let c = content();
@@ -1719,7 +1728,13 @@ impl Lod {
                 self.frontier.clear();
                 self.transitions.clear();
             }
-            self.change_frontier(next.into_iter().collect(), now);
+            if animate {
+                self.change_frontier(next.into_iter().collect(), now);
+            } else {
+                // The world preview already provides the transition into this view.
+                self.transitions.clear();
+                self.frontier = next.into_iter().collect();
+            }
             needed.extend(&self.frontier);
             for (&parent, fade) in &self.transitions {
                 needed.insert(parent);

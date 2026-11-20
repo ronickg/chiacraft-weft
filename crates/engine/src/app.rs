@@ -2,7 +2,7 @@ pub mod api;
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use weft_abi::entry_kind as ek;
 
 use glam::Vec2;
@@ -106,6 +106,7 @@ struct Entering {
     from: crate::ui::Rect,
     started: Instant,
     expanded: bool,
+    joined: Option<Instant>,
     /// When the picture filled the window and the world took over.
     shown: Option<Instant>,
 }
@@ -117,6 +118,11 @@ struct OpenedWorld {
     chat_history: Vec<String>,
 }
 
+enum OpeningWorld {
+    Reading(crossbeam_channel::Receiver<OpenedWorld>),
+    Streaming { conn: net::ClientConn, server: ServerHandle, dir: PathBuf, view: i32, skin: Option<net::Skin>, chat_history: Vec<String> },
+}
+
 /// Cubes about the player whose ground has to be drawn for the world to be there to see.
 const NEAR: i32 = 2;
 
@@ -126,6 +132,8 @@ const HUD_FADE: f32 = 0.5;
 /// Seconds the picture takes to fill the window, and to fade into the world.
 const ENTER_GROW: f32 = 0.35;
 const ENTER_FADE: f32 = 0.3;
+/// A slow or unusual spawn can finish streaming once play has started.
+const ENTER_LOAD_LIMIT: Duration = Duration::from_millis(1500);
 
 #[derive(Clone, Copy)]
 enum PreviewKind {
@@ -290,8 +298,8 @@ pub(crate) struct Running {
     preview_shot: Option<(PathBuf, bool)>,
     /// Going into a world from its picture in the list (`Request::EnterWorld`).
     entering: Option<Entering>,
-    /// The save and player files being opened off the render thread.
-    opening_world: Option<crossbeam_channel::Receiver<OpenedWorld>>,
+    /// The save being opened, then its server streaming the spawn while the preview grows.
+    opening_world: Option<OpeningWorld>,
     /// When the world around the player was first loaded, the HUD coming in from then.
     seen_since: Option<Instant>,
     /// The HUD's quads among the cached ones.
@@ -844,49 +852,43 @@ impl Running {
             };
             let _ = send.send(world);
         });
-        self.opening_world = Some(opened);
+        self.opening_world = Some(OpeningWorld::Reading(opened));
+    }
+
+    fn stream_world(&mut self, world: OpenedWorld) {
+        let OpenedWorld { storage, skin, avatar, chat_history } = world;
+        let seed = storage.meta.seed;
+        let dir = storage.meta.dir.clone();
+        let view = crate::settings::view_distance();
+        let preload_view = if self.entering.is_some() || self.gpu.compiling() { view.min(NEAR + 2) } else { view };
+        let server = server::spawn(ServerConfig { seed, view_radius: preload_view, dedicated: false, whitelist: None }, Some(storage));
+        let (mut conn, server_conn) = net::local_pair();
+        let _ = server.connect.send(server_conn);
+        let key = net::p2p::player_key(&self.settings.run_dir);
+        Client::send_join(&mut conn, crate::settings::name(), key, preload_view, skin.as_ref(), avatar);
+        self.opening_world = Some(OpeningWorld::Streaming { conn, server, dir, view, skin, chat_history });
     }
 
     fn finish_world_open(&mut self) {
-        let Some(opened) = &self.opening_world else { return };
-        // Client GPU resources belong to the render thread. Let the picture grow on
-        // its own frames before creating them behind the full-screen preview.
+        if let Some(OpeningWorld::Reading(opened)) = &self.opening_world {
+            match opened.try_recv() {
+                Ok(world) => self.stream_world(world),
+                Err(crossbeam_channel::TryRecvError::Empty) => return,
+                Err(crossbeam_channel::TryRecvError::Disconnected) => {
+                    self.opening_world = None;
+                    self.world_open_failed("world loader stopped".into());
+                    return;
+                }
+            }
+        }
+        // The server can stream ahead while the preview grows. GPU resources
+        // still belong to the render thread, behind the full-screen preview.
         if self.entering.as_ref().is_some_and(|e| !e.expanded) || self.gpu.compiling() {
             return;
         }
-        let world = opened.try_recv();
-        if matches!(world, Err(crossbeam_channel::TryRecvError::Empty)) {
-            return;
-        }
-        self.opening_world = None;
-        let OpenedWorld { storage, skin, avatar, chat_history } = match world {
-            Ok(world) => world,
-            Err(_) => {
-                self.world_open_failed("world loader stopped".into());
-                return;
-            }
-        };
-        let seed = storage.meta.seed;
-        let dir = storage.meta.dir.clone();
-        let server = server::spawn(
-            ServerConfig { seed, view_radius: crate::settings::view_distance(), dedicated: false, whitelist: None },
-            Some(storage),
-        );
-        let (client_conn, server_conn) = net::local_pair();
-        let _ = server.connect.send(server_conn);
-        let key = net::p2p::player_key(&self.settings.run_dir);
-        match Client::new(
-            &mut *self.gpu,
-            &self.assets,
-            &self.textures,
-            &self.cache_dir,
-            client_conn,
-            &crate::settings::name(),
-            &key,
-            crate::settings::view_distance(),
-            skin,
-            avatar,
-        ) {
+        let Some(OpeningWorld::Streaming { mut conn, server, dir, view, skin, chat_history }) = self.opening_world.take() else { return };
+        conn.send(net::ToServer::View(view as u32));
+        match Client::new(&mut *self.gpu, &self.assets, &self.textures, &self.cache_dir, conn, view, skin) {
             Ok(mut client) => {
                 client.sent = chat_history;
                 self.world_dir = Some(dir);
@@ -1067,7 +1069,8 @@ impl Running {
                     let missing = world.missing_mods(content());
                     if self.entering.is_some() || self.game.is_some() || self.opening_world.is_some() {
                     } else if missing.is_empty() {
-                        self.entering = Some(Entering { picture, from, started: Instant::now(), expanded: false, shown: None });
+                        self.entering =
+                            Some(Entering { picture, from, started: Instant::now(), expanded: false, joined: None, shown: None });
                         self.start_world(world);
                     } else {
                         self.open(Box::new(saves::MissingMods { world, missing }));
@@ -1096,21 +1099,14 @@ impl Running {
                     }
                 }
                 Request::Join(ticket) => match net::p2p::join(&ticket, &self.settings) {
-                    Ok(conn) => {
+                    Ok(mut conn) => {
                         self.leave_world_silent();
                         let key = net::p2p::player_key(&self.settings.run_dir);
-                        match Client::new(
-                            &mut *self.gpu,
-                            &self.assets,
-                            &self.textures,
-                            &self.cache_dir,
-                            conn,
-                            &crate::settings::name(),
-                            &key,
-                            crate::settings::view_distance(),
-                            read_skin(&self.settings.run_dir),
-                            read_avatar(&self.settings.run_dir),
-                        ) {
+                        let view = crate::settings::view_distance();
+                        let skin = read_skin(&self.settings.run_dir);
+                        let avatar = read_avatar(&self.settings.run_dir);
+                        Client::send_join(&mut conn, crate::settings::name(), key, view, skin.as_ref(), avatar);
+                        match Client::new(&mut *self.gpu, &self.assets, &self.textures, &self.cache_dir, conn, view, skin) {
                             Ok(mut client) => {
                                 client.sent = load_chat_history(&self.settings.run_dir);
                                 self.game = Some(Game { client, server: None });
@@ -2901,7 +2897,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
     after.clear();
     let atmosphere = if let Some(g) = &mut r.game {
         g.client
-            .render(&mut *r.gpu, &mut world_list, &mut after, &mut r.list, &world, &r.textures)
+            .render(&mut *r.gpu, &mut world_list, &mut after, &mut r.list, &world, &r.textures, r.entering.is_none())
     } else {
         false
     };
@@ -3039,7 +3035,7 @@ fn save_screenshot(r: &mut Running) {
     }
 }
 
-/// Fade out the full-screen picture once the server has welcomed the client.
+/// Reveal the world after the first view is ready, with a deadline for slow or unusual spawns.
 fn enter_world(r: &mut Running) {
     if r.game.is_none() {
         r.seen_since = None;
@@ -3047,17 +3043,24 @@ fn enter_world(r: &mut Running) {
         r.seen_since = Some(Instant::now());
     }
     let Some(e) = &mut r.entering else { return };
-    if e.shown.is_none() && e.expanded && r.game.as_ref().is_some_and(|g| g.client.joined) {
-        e.shown = Some(Instant::now());
-        r.screens.clear();
-        r.quads_dirty = true;
-        r.set_capture(true);
-        return;
-    }
-    if e.shown
-        .is_some_and(|t| t.elapsed().as_secs_f32() >= ENTER_FADE)
+    if let Some(shown) = e.shown {
+        if shown.elapsed().as_secs_f32() >= ENTER_FADE {
+            r.entering = None;
+        }
+    } else if e.expanded
+        && let Some(g) = r.game.as_ref().filter(|g| g.client.joined)
     {
-        r.entering = None;
+        let now = Instant::now();
+        let joined = *e.joined.get_or_insert(now);
+        let near = r.seen_since.is_some();
+        let lod = g.client.lod_ready_for_entry();
+        if (near && lod) || now - joined >= ENTER_LOAD_LIMIT {
+            log::debug!(target: "load", "revealing world after {:.3} s (near ready: {near}, LOD ready: {lod})", e.started.elapsed().as_secs_f64());
+            e.shown = Some(now);
+            r.screens.clear();
+            r.quads_dirty = true;
+            r.set_capture(true);
+        }
     }
 }
 

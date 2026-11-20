@@ -32,7 +32,7 @@ use weft_render::{Backend, BufferId, CommandList, FrameInfo};
 
 use crate::content::content;
 use crate::input::Input;
-use crate::net::{ClientConn, ToClient, ToServer};
+use crate::net::{self, ClientConn, ToClient, ToServer};
 use crate::physics::{self, Hit};
 use crate::ui::text::{Arg, Msg};
 use crate::world::{GameMode, Pose};
@@ -914,18 +914,33 @@ impl Client {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    /// The local server can start sending the spawn before its renderer is ready.
+    pub(super) fn send_join(
+        conn: &mut ClientConn,
+        name: String,
+        key: String,
+        view: i32,
+        skin: Option<&net::Skin>,
+        avatar: Option<net::AvatarData>,
+    ) {
+        conn.send(ToServer::Join { name, key });
+        conn.send(ToServer::View(view as u32));
+        if let Some(skin) = skin {
+            conn.send(ToServer::Skin(skin.clone()));
+        }
+        if let Some(avatar) = avatar {
+            conn.send(ToServer::Avatar(avatar));
+        }
+    }
+
     pub fn new(
         gpu: &mut dyn Backend,
         assets: &crate::assets::Assets,
         textures: &GameTextures,
         cache_dir: &std::path::Path,
-        mut conn: ClientConn,
-        name: &str,
-        key: &str,
+        conn: ClientConn,
         view_radius: i32,
         skin: Option<crate::net::Skin>,
-        avatar: Option<crate::net::AvatarData>,
     ) -> Result<Client, String> {
         let c = content();
         let render = WorldRenderer::new(gpu, c, textures, assets)?;
@@ -934,14 +949,6 @@ impl Client {
         let wires = wires::Wires::new(gpu, assets);
         let weather_render = weather::Weather::new(gpu, assets);
         let sky = sky::Sky::new(gpu, assets);
-        conn.send(ToServer::Join { name: name.to_string(), key: key.to_string() });
-        conn.send(ToServer::View(view_radius as u32));
-        if let Some(skin) = &skin {
-            conn.send(ToServer::Skin(skin.clone()));
-        }
-        if let Some(a) = avatar {
-            conn.send(ToServer::Avatar(a));
-        }
         let (gpu_tx, gpu_rx) = crossbeam_channel::unbounded();
         let gpu_on = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let gpu_terrain = terrain_gpu::GpuTerrain::new(gpu, assets, gpu_rx, gpu_on.clone());
@@ -1887,6 +1894,10 @@ impl Client {
                         .column_shown(glam::IVec2::new(at.x + x, at.z + z), self.seed, false)
                 })
             })
+    }
+
+    pub(crate) fn lod_ready_for_entry(&self) -> bool {
+        self.lod.ready_for_entry(self.world.dim, self.seed)
     }
 
     /// The held block used on `hit`, shown placed at once where the server will put it
@@ -3118,6 +3129,7 @@ impl Client {
         early: &mut CommandList,
         frame: &FrameInfo,
         textures: &GameTextures,
+        animate_lod: bool,
     ) -> bool {
         self.entity_render.local = self.player_id;
         for (entity, skin) in std::mem::take(&mut self.entity_render.skin_pending) {
@@ -3141,6 +3153,7 @@ impl Client {
                 normal_fov,
                 self.view_radius,
                 self.budget.min(remaining),
+                animate_lod,
             );
         }
         let mut scene = self.scene(&cam, frame);
