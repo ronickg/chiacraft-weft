@@ -6,7 +6,8 @@ const COVER_WALL: u32 = 2u;
 const LOD_DIR_SHIFT: u32 = 2u;
 const LOD_BOX: u32 = 32u;
 const LOD_CUTOUT: u32 = 64u;
-const COVER_SIZE_SHIFT: u32 = 7u;
+const LOD_LEAVES: u32 = 128u;
+const COVER_SIZE_SHIFT: u32 = 8u;
 
 struct VOut {
     @builtin(position) clip: vec4<f32>,
@@ -437,6 +438,9 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.slot = 0u;
     out.light = lod_light(w0, w2, w3);
     let kind = lod_tint(w0);
+    if partial && covered && kind != 0u {
+        out.flags |= LOD_LEAVES;
+    }
     var tint = vec3(1.0);
     var shade = SHADE[dir] * AO[a[c]];
     if covered {
@@ -523,7 +527,7 @@ fn vs_forest(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -
     out.clip = scene.view_proj * vec4(out.rel, 1.0);
     out.uv = corner * vec2(0.5, -0.5) + 0.5;
     out.layer = records[f + 3u];
-    out.pos = vec3<f32>((origins[ii].xyz + g.cam_cube.xyz) * 16) + center;
+    out.pos = vec3<f32>((origins[ii].xyz + g.cam_cube.xyz) * 16) + center + offset;
     out.dist = length(out.rel);
     out.lod_fade = f32(data & LOD_DRAW_FADE_MASK) / f32(LOD_DRAW_FADE_MASK) * 3.0 - 1.0;
     out.light = vec4(1.0, 0.0, 0.0, 0.0);
@@ -599,7 +603,9 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     let nuv = nearest_uv(in.size, uv, du, dv);
     var albedo = sample(in, nuv, du, dv);
     if (in.flags & LOD_CUTOUT) != 0u {
-        if albedo.a < 0.5 {
+        if (in.flags & LOD_LEAVES) != 0u {
+            albedo = vec4(albedo.rgb * albedo.a, 1.0);
+        } else if albedo.a <= 0.1 {
             discard;
         }
         return vec4(shade(in, albedo).rgb, 1.0);

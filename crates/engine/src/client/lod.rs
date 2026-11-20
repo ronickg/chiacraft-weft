@@ -878,6 +878,7 @@ fn add_structures(
     let (cx, cz) = (x0 + CELLS * s / 2, z0 + CELLS * s / 2);
     here.sort_by_key(|p| (p.x - cx).abs() + (p.y - cz).abs());
     let hides = |block: u32, by: &Span| super::mesher::face_hidden(c, ctm, block, by.block);
+    let leaves = c.components.id("leaves");
     for p in here {
         if out.len() >= MAX_QUADS {
             return;
@@ -962,9 +963,13 @@ fn add_structures(
                             let (mn, mx) = scaled_edges(lx, lz, scale, mn, mx);
                             let mut r = lod_box(r, mn, mx, extrude);
                             if c.states[block as usize].layer == weft_abi::RenderLayer::Cutout {
+                                let foliage = leaves.is_some_and(|tag| c.components.has(crate::components::BLOCK, block, tag));
                                 let rgb = c.kind_color(tint as u8, Some(biome as u16));
                                 let gain = crate::gpu_layout::lod_color_gain([16, 8, 0].map(|s| ((rgb >> s) & 255) as f32 / 255.0));
                                 crate::gpu_layout::lod_set_gain(&mut r, gain);
+                                if foliage {
+                                    r[0] |= 1 << crate::gpu_layout::lod_face::TINT_SHIFT;
+                                }
                             }
                             out.push(r);
                         }
