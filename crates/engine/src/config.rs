@@ -419,7 +419,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:lod_detail", ck::FLOAT, if phone { 2.0 } else { 4.0 }, 1.0, 4.0, 0.5),
         // Blocks clouds float above where their dimension puts them.
         number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 16.0),
-        number("core:cloud_distance", ck::INT, if phone { 2048.0 } else { 6144.0 }, 0.0, 8192.0, 16.0),
+        number("core:cloud_distance", ck::INT, if phone { 2048.0 } else { 6144.0 }, 0.0, 32768.0, 16.0).tag("config.logarithmic"),
+        number("core:cloud_impostor_distance", ck::INT, if phone { 1024.0 } else { 2048.0 }, 256.0, 16384.0, 16.0)
+            .tag("config.logarithmic"),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
         number("core:chat_width", ck::INT, 320.0, 40.0, 1000.0, 1.0),
         number("core:chat_height", ck::INT, 180.0, 20.0, 1000.0, 1.0),
@@ -494,6 +496,7 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
                 "lod_detail",
                 "cloud_height",
                 "cloud_distance",
+                "cloud_impostor_distance",
                 "vsync",
                 "fullscreen",
                 "renderer",

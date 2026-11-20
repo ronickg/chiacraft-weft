@@ -631,6 +631,8 @@ gpu_struct! {
         /// World pixel width, height, and sample stride, followed by the number of sample columns.
         /// A zero stride means the renderer has no shared atmosphere samples.
         pub atmosphere_grid: [u32; 4],
+        /// Start and end of the fade from voxel clouds to their projected footprint.
+        pub cloud_lod: [f32; 4],
     }
 }
 

@@ -153,16 +153,16 @@ fn sample_atmosphere(@builtin(global_invocation_id) id: vec3<u32>) {
 
 @fragment
 fn fs_resolve_atmosphere(in: CloudOut) -> @location(0) vec4<f32> {
-    let size = scene.atmosphere_grid.xy;
+    let grid = scene.atmosphere_grid;
     let pixel = vec2<u32>(in.clip.xy);
-    let sampled = atmosphere[atmosphere_index(pixel, scene.atmosphere_grid)];
-    let depth = world_depth[pixel.y * size.x + pixel.x];
-    // Similar depths put the atmosphere in front of the same surface. Re-evaluate across
-    // silhouettes to keep clouds and rain behind hills, buildings and trees.
-    if !same_atmosphere_depth(scene, depth, sampled.depth, 0.035) {
-        return atmosphere_at(sky[in.index], normalize(mat(sky[0]) * in.at), depth);
+    let depth = world_depth[pixel.y * grid.x + pixel.x];
+    let taps = atmosphere_filter(in.clip.xy, grid);
+    let i = taps.index;
+    let result = filter_atmosphere(scene, depth, taps, false, atmosphere[i.x], atmosphere[i.y], atmosphere[i.z], atmosphere[i.w]);
+    if result.a >= 0.0 {
+        return result;
     }
-    return atmosphere_color(sampled);
+    return atmosphere_at(sky[in.index], normalize(mat(sky[0]) * in.at), depth);
 }
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.

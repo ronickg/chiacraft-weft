@@ -3113,8 +3113,18 @@ impl Client {
         // Animated textures follow the game's ticks: between two from the server the client
         // counts on for a second at most, so they stop with the game.
         let ticks = (self.smooth_time() % (1 << 20) as f64) as f32;
+        let cloud_detail = content()
+            .game
+            .catalog
+            .ids(ek::CONFIG)
+            .get("core:cloud_impostor_distance")
+            .map_or(2048.0, |&id| crate::config::get(id) as f32);
+        let projection = cam.proj(aspect);
+        // Keep voxel detail when a higher resolution or a zoom makes it visible farther away.
+        let relative_pixel_scale = (frame.height as f32 / 900.0).clamp(0.5, 2.0) * projection.y_axis.y.abs() * 35.0_f32.to_radians().tan();
+        let cloud_lod = (cloud_detail * relative_pixel_scale).max(256.0);
         Scene {
-            view_proj: (cam.proj(aspect) * view).to_cols_array_2d(),
+            view_proj: (projection * view).to_cols_array_2d(),
             right: inv.transform_vector3(Vec3::X).extend(0.0).to_array(),
             up: inv.transform_vector3(Vec3::Y).extend(0.0).to_array(),
             fog_color: self.fog_color(),
@@ -3124,6 +3134,7 @@ impl Client {
             sun: self.sun(),
             cloud: Default::default(),
             atmosphere_grid: [0; 4],
+            cloud_lod: [cloud_lod, cloud_lod * 1.35, 0.0, 0.0],
         }
     }
 

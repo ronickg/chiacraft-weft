@@ -364,14 +364,14 @@ fn clip_dry_liquid(in: VOut) {
 fn through_sampled_atmosphere(color: vec4<f32>, rel: vec3<f32>, pixel: vec4<f32>, liquid: bool) -> vec4<f32> {
     let grid = scene.atmosphere_grid;
     if grid.z != 0u {
-        let sampled = atmosphere[atmosphere_index(vec2<u32>(pixel.xy), grid)];
-        // Water usually lies only a little in front of the bottom that already cut the ray.
-        // Only broaden the tolerance away from the cloud shelves, where rain changes slowly.
+        let taps = atmosphere_filter(pixel.xy, grid);
+        let i = taps.index;
         let cloud = scene.cloud.extra;
         let outside = rel.y < cloud.z - 12.0 || rel.y > cloud.z + cloud.y + 12.0;
-        let tolerance = select(0.035, 0.085, liquid && outside && pixel.z >= sampled.depth);
-        if same_atmosphere_depth(scene, pixel.z, sampled.depth, tolerance) {
-            let a = atmosphere_color(sampled);
+        let a = filter_atmosphere(
+            scene, pixel.z, taps, liquid && outside, atmosphere[i.x], atmosphere[i.y], atmosphere[i.z], atmosphere[i.w],
+        );
+        if a.a >= 0.0 {
             return vec4(a.rgb + color.rgb * (1.0 - a.a), color.a);
         }
     }
