@@ -190,7 +190,6 @@ pub fn register(r: &mut Registry) {
         .tag("hot");
     r.biome(&MOUNTAINS)
         .surface("grass", "dirt", 3)
-        .bare_above(130)
         .tint(grass, 0x8ab689)
         .tint(foliage, 0x6da36b)
         .tag("mountain")
@@ -248,23 +247,43 @@ pub fn register(r: &mut Registry) {
                 .ramp(-0.2, 0.2),
         )
         .field("base:randomness", Expr::fbm(0x4A7, 700.0, 3).ramp(-0.2, 0.2))
+        .field(
+            "base:mountains",
+            Expr::fbm(0x44, 700.0, 3)
+                .ramp(-0.1, 0.3)
+                .and(Expr::continent().ramp(0.0, 0.2)),
+        )
+        .field(
+            "base:plains",
+            Expr::fbm(0x53, 670.0, 3)
+                .ramp(-0.19, 0.22)
+                .and(Expr::continent().ramp(0.04, 0.19))
+                .and(Expr::field("base:mountains").ramp(0.16, 0.42).not()),
+        )
+        .field(
+            "base:shore",
+            Expr::fbm(0x81, 210.0, 3) * Expr::value(0.78) + Expr::fbm(0x82, 39.0, 2) * Expr::value(0.22)
+                - Expr::humidity() * Expr::value(0.18),
+        )
+        .field("base:rock_line", Expr::fbm(0x85, 175.0, 3) * Expr::value(0.66) + Expr::fbm(0x86, 37.0, 2) * Expr::value(0.34))
         .landform(preset::continents(18.0))
-        // Biomes shape the land through their climate, not their borders, so nothing seams:
-        // the cold flattens hills into tundra, deserts get dunes.
-        .landform(preset::hills(16.0, 110.0).mask(Expr::temperature().ramp(-0.35, -0.6).not()))
+        // Plains have long, shallow rises and small swales. Ease out the
+        // shorter hills as the plains take over.
+        .landform(
+            Landform::new(Expr::fbm(0x54, 310.0, 2) * Expr::blocks(9.0) + Expr::fbm(0x55, 105.0, 2) * Expr::blocks(3.0))
+                .mask(Expr::field("base:plains"))
+                .named("plains"),
+        )
+        .landform(
+            preset::hills(16.0, 110.0)
+                .mask(Expr::temperature().ramp(-0.35, -0.6).not() * (Expr::value(1.0) - Expr::field("base:plains") * Expr::value(0.86))),
+        )
         .landform(
             preset::dunes(4.0, 26.0).mask(
                 Expr::temperature()
                     .ramp(0.25, 0.45)
                     .and(Expr::humidity().ramp(0.1, -0.05)),
             ),
-        )
-        // How mountainous a place is: the mountains' strength, and where the mountains biome goes.
-        .field(
-            "base:mountains",
-            Expr::fbm(0x44, 700.0, 3)
-                .ramp(-0.1, 0.3)
-                .and(Expr::continent().ramp(0.0, 0.2)),
         )
         .landform(
             preset::mountains(150.0, 260.0)
@@ -278,14 +297,49 @@ pub fn register(r: &mut Registry) {
                 - Expr::humidity() * Expr::value(0.1),
         )
         // Biomes bring their climate and surface; rules only add where else they must hold.
-        .rule(BiomeRule::new("ocean").height(..=SEA - 2))
+        .rule(BiomeRule::new("ocean").height(..=SEA - 8).surface("gravel", "gravel", 3))
         .rule(
             BiomeRule::new("snowy_plains")
                 .named("snowy_coast")
-                .height(..=SEA + 1)
+                .height(SEA - 1..=SEA + 1)
                 .continent(..0.1),
         )
-        .rule(BiomeRule::new("beach").height(..=SEA + 1).continent(..0.3));
+        .rule(
+            BiomeRule::new("beach")
+                .named("rocky_shore")
+                .surface("stone", "stone", 0)
+                .height(SEA - 4..=SEA + 3)
+                .continent(..0.28)
+                .field("base:mountains", 0.24..)
+                .field("base:shore", ..-0.08),
+        )
+        .rule(
+            BiomeRule::new("beach")
+                .named("gravel_shore")
+                .surface("gravel", "gravel", 2)
+                .height(SEA - 4..=SEA + 1)
+                .continent(..0.28)
+                .field("base:shore", ..-0.23),
+        )
+        .rule(
+            BiomeRule::new("beach")
+                .height(SEA - 4..=SEA + 3)
+                .continent(..0.28)
+                .field("base:shore", 0.23..),
+        )
+        .rule(
+            BiomeRule::new("beach")
+                .named("narrow_beach")
+                .height(SEA - 3..=SEA)
+                .continent(..0.28)
+                .field("base:shore", 0.10..),
+        )
+        .rule(
+            BiomeRule::new("ocean")
+                .named("shallow_water")
+                .surface("dirt", "dirt", 2)
+                .height(..SEA),
+        );
     let mut terrain = terrain;
     for (i, (cold, warm, line)) in snow_bands().into_iter().enumerate() {
         terrain = terrain.rule(
@@ -296,11 +350,29 @@ pub fn register(r: &mut Registry) {
                 .height(line..),
         );
     }
+    for i in 0..9 {
+        let lo = if i == 0 { f64::NEG_INFINITY } else { (i - 5) as f64 * 0.13 };
+        let hi = if i == 8 { f64::INFINITY } else { (i - 4) as f64 * 0.13 };
+        terrain = terrain.rule(
+            BiomeRule::new("mountains")
+                .named(&format!("exposed_rock_{i}"))
+                .field("base:mountains", 0.45..)
+                .field("base:rock_line", lo..hi)
+                .height(106 + i * 6..)
+                .surface("stone", "stone", 0),
+        );
+    }
     terrain
         .rule(BiomeRule::new("mountains").field("base:mountains", 0.45..))
         .rule(BiomeRule::new("snowy_plains"))
         .rule(BiomeRule::new("taiga"))
         .rule(BiomeRule::new("desert"))
+        .rule(
+            BiomeRule::new("plains")
+                .named("open_plains")
+                .field("base:plains", 0.57..)
+                .humidity(..0.22),
+        )
         .rule(BiomeRule::new("forest"))
         .rule(BiomeRule::new("birch_forest"))
         .rule(
@@ -313,6 +385,7 @@ pub fn register(r: &mut Registry) {
         .rule(BiomeRule::new("clover_meadow").field("base:weirdness", 0.6..0.9))
         .rule(BiomeRule::new("plains"))
         .cave_biome("deep_caves", 24, 96.0, 0.25)
+        .cave_biome("deep_caves", 48, 96.0, -1.0)
         .caves(Caves::new("lava", i32::MIN, 11));
 
     // Trees wherever a biome asks for them, in any dimension.
