@@ -128,6 +128,7 @@ pub fn register(r: &mut Registry) {
     }
     drop(obelisk.key('s', "base:sandstone").key('g', "glow_crystal"));
     r.structure(&OBELISK)
+        .impostor()
         .dimension(&crate::MARS)
         .spacing(128)
         .chance(0.5)

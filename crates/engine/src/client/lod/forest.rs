@@ -10,7 +10,7 @@ use weft_noise::{hash, mix, unit};
 use super::{Columns, TileKey, WORDS, sample_offset};
 use crate::client::textures::GameTextures;
 use crate::content::Content;
-use crate::features::grid_position;
+use crate::features::grid_layout;
 use crate::gpu_layout::forest::{ELEVATIONS, FRAME, VIEWS};
 use crate::server::lod_tops::impostor_block;
 
@@ -93,13 +93,10 @@ impl Forest {
             })
             .collect();
         for (feature, f) in def.features.iter().enumerate() {
-            let Some((spacing, d)) = f.density_plan() else { continue };
+            let Some((spacing, chance)) = f.impostor_grid() else { continue };
             let mut biomes = Vec::new();
             for b in 0..c.biomes.len() as u32 {
-                let chance = c
-                    .components
-                    .get::<f32>(crate::components::BIOME, b, d)
-                    .unwrap_or_default();
+                let chance = chance.in_biome(c, b);
                 if chance <= 0.0
                     || f.biome
                         .as_ref()
@@ -126,23 +123,12 @@ impl Forest {
                 );
                 let mut samples = Vec::new();
                 for (attempt, root) in roots.into_iter().take(48).enumerate() {
-                    let mut blocks = FxHashMap::default();
-                    for (p, state, force) in
-                        crate::features::sample(c, dim, seed, feature, root - IVec3::Y * f.fit.buried, b, mix(attempt as u64))
-                    {
-                        if p.y >= 0 && impostor_block(c, state) {
-                            if force {
-                                blocks.insert(p, state);
-                            } else {
-                                blocks.entry(p).or_insert(state);
-                            }
-                        }
-                    }
+                    let mut blocks = crate::features::sample(c, dim, seed, feature, root - IVec3::Y * f.fit.buried, b, mix(attempt as u64));
+                    // A coating such as moss should not expand the silhouette by a full block.
+                    blocks.retain(|&(_, state)| impostor_block(c, state) && c.states[state as usize].sides == 0);
                     if blocks.is_empty() {
                         continue;
                     }
-                    let mut blocks: Voxels = blocks.into_iter().collect();
-                    blocks.sort_unstable_by_key(|(p, _)| (p.y, p.z, p.x));
                     samples.push(blocks);
                     if samples.len() == VARIANTS {
                         break;
@@ -218,7 +204,7 @@ impl Forest {
                             if unit(h.rotate_left(17)) >= chance as f64 {
                                 continue;
                             }
-                            let (dx, dz) = grid_position((x, z), spacing, spacing, h);
+                            let ((dx, dz), ..) = grid_layout(c, f, (x, z), spacing, h);
                             let offset = IVec3::new(dx - GROVE * spacing / 2, 0, dz - GROVE * spacing / 2);
                             blocks.extend(
                                 samples[(hash(h, 1, 2, 3) % samples.len() as u64) as usize]
@@ -311,7 +297,7 @@ impl Forest {
                 let stride = groups * rule.spacing;
                 let h = hash(rule.seed, x as i64, 0, z as i64);
                 let (wx, wz) =
-                    if groups == 1 { grid_position((x, z), stride, stride, h) } else { (x * stride + stride / 2, z * stride + stride / 2) };
+                    if groups == 1 { grid_layout(c, f, (x, z), stride, h).0 } else { (x * stride + stride / 2, z * stride + stride / 2) };
                 let site = IVec2::new(wx, wz);
                 let local = site - origin;
                 if local.min_element() < -margin || local.max_element() >= key.size() + margin {
@@ -349,12 +335,13 @@ impl Forest {
                 }
                 if groups == 1 && key.level == 0 {
                     let def = &c.dims[self.dim as usize];
-                    let found = crate::features::start_at(c, def, self.dim, rule.seed ^ f.salt, rule.feature, (x, z));
+                    let seed = rule.seed ^ f.salt;
+                    let found = crate::features::start_at(c, def, self.dim, seed, rule.feature, (x, z));
                     if found.is_none_or(|start| {
-                        !start.puts.iter().any(|p| {
-                            matches!(*p, crate::features::Put::Block { state, at, .. }
-                            if at.y >= start.pos.y && impostor_block(c, state))
-                        })
+                        !start
+                            .lod_blocks(crate::generation::Snapshot::new(c, self.dim, seed, f.stage))
+                            .iter()
+                            .any(|&(_, state)| impostor_block(c, state) && c.states[state as usize].sides == 0)
                     }) {
                         continue;
                     }

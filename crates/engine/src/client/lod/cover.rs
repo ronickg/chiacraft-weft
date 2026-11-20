@@ -101,12 +101,14 @@ impl Cover {
                 .or_insert_with(|| material(faces[state as usize][3]));
         }
         let looks = looks::current();
+        let projection = c.components.id(weft_abi::comp::feature::SURFACE_PROJECTION);
         let plants = c
             .states
             .iter()
             .enumerate()
             .map(|(id, state)| {
-                if state.layer != RenderLayer::Cutout || state.solid() {
+                let opted_in = projection.is_some_and(|tag| c.components.has(crate::components::BLOCK, id as u32, tag));
+                if !opted_in && (state.layer != RenderLayer::Cutout || state.solid()) {
                     return None;
                 }
                 // For a tall plant use the canopy, whose texture can differ from its stem.

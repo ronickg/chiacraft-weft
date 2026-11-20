@@ -3099,7 +3099,11 @@ fn freeze_features(
             return None;
         }
         let mut def = FeatureDef {
-            surface_cover: e.callback(abi::comp::feature::SURFACE_COVER),
+            impostor: e.has(f::IMPOSTOR),
+            surface_cover: e
+                .has(f::SURFACE_PROJECTION)
+                .then(|| e.callback(f::SURFACE_COVER))
+                .flatten(),
             name: e.name.clone(),
             id,
             owner: e.owner,

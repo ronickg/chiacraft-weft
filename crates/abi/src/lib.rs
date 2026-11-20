@@ -1071,6 +1071,11 @@ pub mod comp {
         pub const PRIORITY: &str = "feature.priority";
         pub const SEPARATION: &str = "feature.separation";
         pub const GENERATE: &str = "feature.generate";
+        /// Draw the completed grid feature as a view-dependent impostor in distant terrain.
+        pub const IMPOSTOR: &str = "feature.impostor";
+        /// Project the feature's sampled surface cover. On a block this also allows an opaque
+        /// or solid model to supply a projection texture when the sampler returns it.
+        pub const SURFACE_PROJECTION: &str = "surface_projection";
         pub const SURFACE_COVER: &str = "feature.surface_cover";
         pub const SHAPE: &str = "feature.shape";
         pub const VEIN: &str = "feature.vein";

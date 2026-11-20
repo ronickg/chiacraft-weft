@@ -176,15 +176,15 @@ impl DimTops {
         let sea = def.sea_level();
         let mut natural: [_; 256] = std::array::from_fn(|_| Vec::new());
         let mut roots: [_; 256] = std::array::from_fn(|_| Vec::new());
-        if def.features.iter().any(|f| f.density_plan().is_some()) {
+        if def.features.iter().any(|f| f.impostor_grid().is_some()) {
             for start in crate::features::column_starts(c, def, dim, seed, col.x, col.y).iter() {
                 let f = &def.features[start.feature];
-                if f.density_plan().is_none() {
+                if f.impostor_grid().is_none() {
                     continue;
                 }
                 let mut root = None;
-                for put in &start.puts {
-                    let crate::features::Put::Block { at, state, .. } = *put else { continue };
+                let snapshot = crate::generation::Snapshot::new(c, dim, seed, f.stage);
+                for &(at, state) in start.lod_blocks(snapshot) {
                     if IVec2::new(at.x.div_euclid(16), at.z.div_euclid(16)) != col || !impostor_block(c, state) {
                         continue;
                     }
