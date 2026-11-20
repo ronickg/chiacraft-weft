@@ -628,6 +628,17 @@ gpu_struct! {
         pub environment: [f32; 4],
         /// The cloud layer visible this frame, with zero opacity when absent.
         pub cloud: GpuSky,
+        /// World pixel width, height, and sample stride, followed by the number of sample columns.
+        /// A zero stride means the renderer has no shared atmosphere samples.
+        pub atmosphere_grid: [u32; 4],
+    }
+}
+
+gpu_struct! {
+    pub struct GpuAtmosphereSample as "AtmosphereSample" {
+        pub rg: u32,
+        pub ba: u32,
+        pub depth: f32,
     }
 }
 
@@ -1017,6 +1028,7 @@ bindings! {
         SOLID "solid": "array<u32>",
         BODY_ROTATIONS "body_rotations": "array<vec4<f32>>",
         DRY_VOLUMES "dry_volumes": "array<DryVolume>",
+        ATMOSPHERE "atmosphere": "array<AtmosphereSample>",
     }
     // `item_boxes`: item models in their own space, kept between frames
     // (`EntityRenderer::item_model`); an item instance is a box in `boxes` whose rows place
@@ -1074,6 +1086,8 @@ bindings! {
         OBJECTS "sky": "array<Sky>",
         SCENE "scene": "Scene",
         WORLD_DEPTH "world_depth": "array<f32>",
+        ATMOSPHERE "atmosphere": "array<AtmosphereSample>",
+        ATMOSPHERE_OUT "atmosphere_out": "array<AtmosphereSample>",
     }
     ui "ui.wgsl" {
         QUADS "quads": "array<Quad>",
@@ -1122,6 +1136,7 @@ fn structs() -> String {
         GpuWake::wgsl(),
         GpuWeather::wgsl(),
         GpuSky::wgsl(),
+        GpuAtmosphereSample::wgsl(),
         Quad::wgsl(),
         Screen::wgsl(),
         Pass::wgsl(),
@@ -1137,7 +1152,8 @@ pub fn prelude(shader: &str, common: &str) -> String {
     s.push_str(&records());
     s.push_str(&structs());
     for (i, (name, ty)) in bindings(shader).iter().enumerate() {
-        s.push_str(&format!("@group(1) @binding({i}) var<storage, read> {name}: {ty};\n"));
+        let access = if *name == "atmosphere_out" { "read_write" } else { "read" };
+        s.push_str(&format!("@group(1) @binding({i}) var<storage, {access}> {name}: {ty};\n"));
     }
     if shader == "world.wgsl" {
         s.push_str(SOLID_AT);

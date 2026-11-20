@@ -2937,6 +2937,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             .render
             .occlusion
             .take_depth(&mut *r.gpu, &mut r.list, r.depth.0, [r.depth.1, r.depth.2], atmosphere);
+        g.client.sample_atmosphere(&mut r.list);
     }
     if !after.cmds.is_empty() {
         r.list

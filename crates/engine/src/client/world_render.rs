@@ -1357,8 +1357,10 @@ impl WorldRenderer {
     }
 
     /// The translucent part of the last `draw`, after everything that may stand behind it.
-    pub fn draw_translucent(&self, list: &mut CommandList, camera: &Camera) {
-        if let Some((_, origins, _, _, _, _, _)) = self.buffers {
+    pub fn draw_translucent(&self, list: &mut CommandList, camera: &Camera, atmosphere: Option<BufferId>) {
+        if let Some((_, origins, _, _, _, _, dry)) = self.buffers {
+            // The shader needs a valid descriptor even when the grid stride is zero.
+            list.bind(crate::gpu_layout::bind::world::ATMOSPHERE, atmosphere.unwrap_or(dry));
             let cam_cube = crate::world::cube_of(camera.pos.floor().as_ivec3());
             self.far_lod
                 .draw(list, &self.lod_draw, cam_cube, true, |list, pipe, records| self.bind_run(list, pipe, records, origins));

@@ -114,17 +114,55 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     return CloudPixel(vec4(hit.color.rgb * hit.color.a, hit.color.a), clamp(clip.z / clip.w, 0.0, 1.0));
 }
 
-@fragment
-fn fs_atmosphere(in: CloudOut) -> @location(0) vec4<f32> {
-    let dir = normalize(mat(sky[0]) * in.at);
-    let pixel = vec2<u32>(in.clip.xy);
-    let depth = world_depth[pixel.y * u32(sky[0].extra.x) + pixel.x];
+fn atmosphere_at(s: Sky, dir: vec3<f32>, depth: f32) -> vec4<f32> {
     let slope = (scene.view_proj * vec4(dir, 0.0)).w;
     // Infinite reverse Z, with the optional translation from camera bobbing.
     let at_origin = scene.view_proj[3];
     let limit = (at_origin.z - depth * at_origin.w) / max(depth * slope, 1e-8);
-    let c = trace_atmosphere(sky[in.index], dir, limit, scene);
+    let c = trace_atmosphere(s, dir, limit, scene);
     return vec4(c.rgb * c.a, c.a);
+}
+
+@fragment
+fn fs_atmosphere(in: CloudOut) -> @location(0) vec4<f32> {
+    let pixel = vec2<u32>(in.clip.xy);
+    let depth = world_depth[pixel.y * u32(sky[0].extra.x) + pixel.x];
+    return atmosphere_at(sky[in.index], normalize(mat(sky[0]) * in.at), depth);
+}
+
+fn atmosphere_sample_pixel(cell: vec2<u32>, size: vec2<u32>, stride: u32) -> vec2<u32> {
+    return min(cell * stride + vec2(stride / 2u), size - vec2(1u));
+}
+
+// Trace a sparse grid of rays. The two packed halves hold premultiplied RGB and opacity.
+@compute @workgroup_size(8, 8)
+fn sample_atmosphere(@builtin(global_invocation_id) id: vec3<u32>) {
+    let size = scene.atmosphere_grid.xy;
+    let stride = scene.atmosphere_grid.z;
+    let cells = (size + vec2(stride - 1u)) >> vec2(firstTrailingBit(stride));
+    if any(id.xy >= cells) {
+        return;
+    }
+    let pixel = atmosphere_sample_pixel(id.xy, size, stride);
+    let ndc = ((vec2<f32>(pixel) + 0.5) / vec2<f32>(size)) * vec2(2.0, -2.0) + vec2(-1.0, 1.0);
+    let dir = normalize(mat(sky[0]) * vec3(ndc, 1.0));
+    let depth = world_depth[pixel.y * size.x + pixel.x];
+    let c = atmosphere_at(scene.cloud, dir, depth);
+    atmosphere_out[id.y * cells.x + id.x] = AtmosphereSample(pack2x16float(c.rg), pack2x16float(c.ba), depth);
+}
+
+@fragment
+fn fs_resolve_atmosphere(in: CloudOut) -> @location(0) vec4<f32> {
+    let size = scene.atmosphere_grid.xy;
+    let pixel = vec2<u32>(in.clip.xy);
+    let sampled = atmosphere[atmosphere_index(pixel, scene.atmosphere_grid)];
+    let depth = world_depth[pixel.y * size.x + pixel.x];
+    // Similar depths put the atmosphere in front of the same surface. Re-evaluate across
+    // silhouettes to keep clouds and rain behind hills, buildings and trees.
+    if !same_atmosphere_depth(scene, depth, sampled.depth, 0.035) {
+        return atmosphere_at(sky[in.index], normalize(mat(sky[0]) * in.at), depth);
+    }
+    return atmosphere_color(sampled);
 }
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.

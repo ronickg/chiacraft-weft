@@ -12,7 +12,7 @@ use weft_render::*;
 use super::world_render::Camera;
 use crate::assets::{Assets, decode_png};
 use crate::content::{DimensionDef, content};
-use crate::gpu_layout::{GpuSky, bind, sky as kind};
+use crate::gpu_layout::{GpuAtmosphereSample, GpuSky, bind, sky as kind};
 use crate::registry::SkyDef;
 use crate::shaders::{Hook, Slots};
 
@@ -111,10 +111,46 @@ struct Picture {
     size: [u32; 2],
 }
 
+struct AtmosphereSamples {
+    trace: PipelineId,
+    resolve: PipelineId,
+    buffer: Option<(BufferId, u64)>,
+}
+
+pub(super) struct AtmosphereFrame {
+    pub buffer: BufferId,
+    pub grid: [u32; 4],
+}
+
+impl AtmosphereSamples {
+    fn buffer(&mut self, gpu: &mut dyn Backend, size: [u32; 2]) -> BufferId {
+        let bytes = u64::from(size[0]) * u64::from(size[1]) * size_of::<GpuAtmosphereSample>() as u64;
+        if let Some((buffer, _)) = self.buffer.filter(|&(_, capacity)| capacity >= bytes) {
+            return buffer;
+        }
+        if let Some((buffer, _)) = self.buffer.take() {
+            gpu.destroy_buffer(buffer);
+        }
+        let buffer = gpu.create_buffer(bytes, usage::STORAGE, "atmosphere samples");
+        self.buffer = Some((buffer, bytes));
+        buffer
+    }
+
+    fn destroy(self, gpu: &mut dyn Backend) {
+        gpu.destroy_pipeline(self.trace);
+        gpu.destroy_pipeline(self.resolve);
+        if let Some((buffer, _)) = self.buffer {
+            gpu.destroy_buffer(buffer);
+        }
+    }
+}
+
 pub struct Sky {
     pipe: Option<PipelineId>,
     clouds_pipe: Option<PipelineId>,
     atmosphere_pipe: Option<PipelineId>,
+    atmosphere_samples: Option<AtmosphereSamples>,
+    atmosphere_compute: CommandList,
     /// Shader slot of each object, per dimension.
     slots: Vec<Vec<u32>>,
     buffers: Vec<(BufferId, u32)>,
@@ -171,6 +207,8 @@ impl Sky {
             pipe: None,
             clouds_pipe: None,
             atmosphere_pipe: None,
+            atmosphere_samples: None,
+            atmosphere_compute: CommandList::default(),
             slots: Vec::new(),
             buffers: Vec::new(),
             pictures: FxHashMap::default(),
@@ -221,24 +259,50 @@ impl Sky {
                         topology: Topology::Triangles,
                     })
                     .map_err(|e| e.0)?;
-                let atmosphere = gpu.create_pipeline(&PipelineDesc {
-                    label: "atmosphere",
-                    shader: &shader,
-                    vertex: "vs_clouds",
-                    fragment: Some("fs_atmosphere"),
-                    color: Some(Format::Surface),
-                    depth: Some(DepthState { write: false, compare: Compare::Always }),
-                    blend: Blend::Premultiplied,
-                    cull_back: false,
-                    topology: Topology::Triangles,
-                });
-                let atmosphere = atmosphere
-                    .map_err(|e| log::warn!("atmosphere shader: {e}"))
-                    .ok();
-                Ok((pipe, clouds, atmosphere, slots.pop().unwrap_or_default()))
+                let atmosphere_pipeline = |gpu: &mut dyn Backend, label, fragment| {
+                    gpu.create_pipeline(&PipelineDesc {
+                        label,
+                        shader: &shader,
+                        vertex: "vs_clouds",
+                        fragment: Some(fragment),
+                        color: Some(Format::Surface),
+                        depth: Some(DepthState { write: false, compare: Compare::Always }),
+                        blend: Blend::Premultiplied,
+                        cull_back: false,
+                        topology: Topology::Triangles,
+                    })
+                };
+                let samples = shader
+                    .module
+                    .entry_points
+                    .iter()
+                    .any(|entry| entry.name == "sample_atmosphere")
+                    .then(|| {
+                        let trace =
+                            gpu.create_compute(&ComputeDesc { label: "sample atmosphere", shader: &shader, entry: "sample_atmosphere" })?;
+                        match atmosphere_pipeline(gpu, "resolve atmosphere", "fs_resolve_atmosphere") {
+                            Ok(resolve) => Ok(AtmosphereSamples { trace, resolve, buffer: None }),
+                            Err(e) => {
+                                gpu.destroy_pipeline(trace);
+                                Err(e)
+                            }
+                        }
+                    })
+                    .transpose()
+                    .map_err(|e| log::warn!("atmosphere samples shader: {e}"))
+                    .ok()
+                    .flatten();
+                let atmosphere = if samples.is_none() {
+                    atmosphere_pipeline(gpu, "atmosphere", "fs_atmosphere")
+                        .map_err(|e| log::warn!("atmosphere shader: {e}"))
+                        .ok()
+                } else {
+                    None
+                };
+                Ok((pipe, clouds, atmosphere, samples, slots.pop().unwrap_or_default()))
             });
         match made {
-            Ok((pipe, clouds, atmosphere, slots)) => {
+            Ok((pipe, clouds, atmosphere, samples, slots)) => {
                 if let Some(old) = self.pipe.replace(pipe) {
                     gpu.destroy_pipeline(old);
                 }
@@ -248,6 +312,9 @@ impl Sky {
                 if let Some(old) = std::mem::replace(&mut self.atmosphere_pipe, atmosphere) {
                     gpu.destroy_pipeline(old);
                 }
+                if let Some(old) = std::mem::replace(&mut self.atmosphere_samples, samples) {
+                    old.destroy(gpu);
+                }
                 self.set_slots(&slots);
             }
             Err(e) => log::error!("sky shader: {e}"),
@@ -255,7 +322,11 @@ impl Sky {
     }
 
     pub(super) fn has_atmosphere(&self) -> bool {
-        self.atmosphere_pipe.is_some()
+        self.atmosphere_samples.is_some() || self.atmosphere_pipe.is_some()
+    }
+
+    pub(super) fn sample_atmosphere(&mut self, list: &mut CommandList) {
+        list.append(&mut self.atmosphere_compute);
     }
 
     pub fn block_color(&self, state: u32) -> Vec3 {
@@ -328,6 +399,9 @@ impl Sky {
         {
             gpu.destroy_pipeline(p);
         }
+        if let Some(samples) = self.atmosphere_samples.take() {
+            samples.destroy(gpu);
+        }
         for (b, _) in self.buffers.drain(..) {
             gpu.destroy_buffer(b);
         }
@@ -376,9 +450,10 @@ impl Sky {
         environment: &weft_abi::environment::EnvironmentValues,
         weights: &FxHashMap<String, f32>,
         overlays: &[Overlay],
-    ) -> GpuSky {
+    ) -> (GpuSky, Option<AtmosphereFrame>) {
         self.overlay = None;
-        let Some(pipe) = self.pipe else { return GpuSky::default() };
+        self.atmosphere_compute.clear();
+        let Some(pipe) = self.pipe else { return (GpuSky::default(), None) };
         let c = content();
         let d = &c.dims[dim];
         if environment.sky_opacity <= 0.0 {
@@ -397,7 +472,7 @@ impl Sky {
                 gpu.mapped(buf)[..self.list.len() * size_of::<GpuSky>()].copy_from_slice(bytemuck::cast_slice(&self.list));
                 self.overlay = Some((buf, 0, n));
             }
-            return GpuSky::default();
+            return (GpuSky::default(), None);
         }
         let turn = d.day_turn(time);
         let height = (turn * std::f64::consts::TAU).sin() as f32;
@@ -609,7 +684,27 @@ impl Sky {
             list.push(Cmd::Draw { vertices, instances: 1, first_vertex: 0, first_instance });
         }
         if let (Some(first_instance), Some(cloud_pipe)) = (clouds, self.clouds_pipe) {
-            if let (Some(depth), Some(pipe)) = (world_depth, self.atmosphere_pipe) {
+            let s = self.list[first_instance as usize];
+            let mut shared = None;
+            if let (Some(depth), Some(samples)) = (world_depth, &mut self.atmosphere_samples) {
+                let [_, height, low, _] = s.extra;
+                // Coarser from outside the layer, finer where the individual shelves are close.
+                let stride = if low > 32.0 || low + height < -32.0 { 4 } else { 2 };
+                let grid = [frame.width.div_ceil(stride), frame.height.div_ceil(stride)];
+                let buffer = samples.buffer(gpu, grid);
+                shared = Some(AtmosphereFrame { buffer, grid: [frame.width, frame.height, stride, grid[0]] });
+                let compute = &mut self.atmosphere_compute;
+                compute.pipeline(samples.trace);
+                compute.bind(bind::sky::OBJECTS, buf);
+                compute.bind(bind::sky::SCENE, scene);
+                compute.bind(bind::sky::WORLD_DEPTH, depth);
+                compute.bind(bind::sky::ATMOSPHERE_OUT, buffer);
+                compute.push(Cmd::Dispatch { x: grid[0].div_ceil(8), y: grid[1].div_ceil(8), z: 1 });
+                compute.push(Cmd::Barrier);
+                list.pipeline(samples.resolve);
+                list.bind(bind::sky::WORLD_DEPTH, depth);
+                list.bind(bind::sky::ATMOSPHERE, buffer);
+            } else if let (Some(depth), Some(pipe)) = (world_depth, self.atmosphere_pipe) {
                 list.pipeline(pipe);
                 list.bind(bind::sky::WORLD_DEPTH, depth);
             } else {
@@ -618,8 +713,8 @@ impl Sky {
             list.bind(bind::sky::OBJECTS, buf);
             list.bind(bind::sky::SCENE, scene);
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance });
-            return self.list[first_instance as usize];
+            return (s, shared);
         }
-        GpuSky::default()
+        (GpuSky::default(), None)
     }
 }

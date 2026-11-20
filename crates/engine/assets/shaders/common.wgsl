@@ -400,6 +400,22 @@ fn trace_atmosphere(s: Sky, dir: vec3<f32>, limit: f32, view: Scene) -> vec4<f32
     return composite_rain_veil(s, dir, visible_limit, cloud, view);
 }
 
+fn atmosphere_index(pixel: vec2<u32>, grid: vec4<u32>) -> u32 {
+    let cell = pixel >> vec2(firstTrailingBit(grid.z));
+    return cell.y * grid.w + cell.x;
+}
+
+fn atmosphere_color(sampled: AtmosphereSample) -> vec4<f32> {
+    return vec4(unpack2x16float(sampled.rg), unpack2x16float(sampled.ba));
+}
+
+fn same_atmosphere_depth(view: Scene, a: f32, b: f32, tolerance: f32) -> bool {
+    let depth = max(a, b);
+    let at_origin = view.view_proj[3];
+    let beyond_clouds = at_origin.z / max(view.environment.z + abs(at_origin.w), 1.0);
+    return depth <= beyond_clouds || abs(a - b) <= depth * tolerance;
+}
+
 // Tint translucent fragments by the part of the atmosphere between them and the camera.
 fn through_cloud(c: vec4<f32>, rel: vec3<f32>, view: Scene) -> vec4<f32> {
     let s = view.cloud;

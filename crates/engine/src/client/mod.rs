@@ -3123,6 +3123,7 @@ impl Client {
             environment: [environment.sunlight, environment.cloud_fog_start, environment.cloud_fog_end, self.environment.rain_mist],
             sun: self.sun(),
             cloud: Default::default(),
+            atmosphere_grid: [0; 4],
         }
     }
 
@@ -3242,7 +3243,7 @@ impl Client {
                     .occlusion
                     .capture_buffer(gpu, [frame.width, frame.height])
             });
-        scene.cloud = self.sky.draw(
+        let (cloud, atmosphere) = self.sky.draw(
             gpu,
             &mut late,
             frame,
@@ -3257,8 +3258,13 @@ impl Client {
             &self.environment.sky,
             &overlays,
         );
+        scene.cloud = cloud;
+        if let Some(ref atmosphere) = atmosphere {
+            scene.atmosphere_grid = atmosphere.grid;
+        }
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
-        self.render.draw_translucent(&mut late, &cam);
+        self.render
+            .draw_translucent(&mut late, &cam, atmosphere.map(|a| a.buffer));
         let tick = self.anim_tick();
         self.wake_render
             .draw(gpu, &mut late, frame.slot, &cam, scene_buf, tick);
@@ -3314,6 +3320,10 @@ impl Client {
         (self.late, self.hand_late) = (late, hand_late);
         after.push(weft_render::Cmd::Mark);
         world_depth.is_some()
+    }
+
+    pub(crate) fn sample_atmosphere(&mut self, list: &mut CommandList) {
+        self.sky.sample_atmosphere(list);
     }
 
     pub fn fog_color(&self) -> [f32; 4] {

@@ -361,11 +361,28 @@ fn clip_dry_liquid(in: VOut) {
     }
 }
 
+fn through_sampled_atmosphere(color: vec4<f32>, rel: vec3<f32>, pixel: vec4<f32>, liquid: bool) -> vec4<f32> {
+    let grid = scene.atmosphere_grid;
+    if grid.z != 0u {
+        let sampled = atmosphere[atmosphere_index(vec2<u32>(pixel.xy), grid)];
+        // Water usually lies only a little in front of the bottom that already cut the ray.
+        // Only broaden the tolerance away from the cloud shelves, where rain changes slowly.
+        let cloud = scene.cloud.extra;
+        let outside = rel.y < cloud.z - 12.0 || rel.y > cloud.z + cloud.y + 12.0;
+        let tolerance = select(0.035, 0.085, liquid && outside && pixel.z >= sampled.depth);
+        if same_atmosphere_depth(scene, pixel.z, sampled.depth, tolerance) {
+            let a = atmosphere_color(sampled);
+            return vec4(a.rgb + color.rgb * (1.0 - a.a), color.a);
+        }
+    }
+    return through_cloud(color, rel, scene);
+}
+
 @fragment
 fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     let color = translucent(in);
     clip_dry_liquid(in);
-    return through_cloud(color, in.rel, scene);
+    return through_sampled_atmosphere(color, in.rel, in.clip, (in.flags & WORLD_LIQUID) != 0u);
 }
 
 @fragment
@@ -661,7 +678,7 @@ fn fs_lod_surface(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     let nuv = nearest_uv(in.size, fract(in.uv), du, dv);
-    return through_cloud(shade(in, sample(in, nuv, du, dv)), in.rel, scene);
+    return through_sampled_atmosphere(shade(in, sample(in, nuv, du, dv)), in.rel, in.clip, true);
 }
 
 struct FarDraw {
@@ -727,5 +744,5 @@ fn fs_lod_far_water(in: FarOut) -> @location(0) vec4<f32> {
     if !lod_fade_visible(far_draw.fade, in.clip.xy) || shown_by_cubes(p, 1u) {
         discard;
     }
-    return through_cloud(far_lit(in), in.rel, scene);
+    return through_sampled_atmosphere(far_lit(in), in.rel, in.clip, true);
 }
