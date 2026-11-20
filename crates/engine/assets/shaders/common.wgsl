@@ -22,14 +22,48 @@ fn fog_amount(dist: f32, start: f32, end: f32) -> f32 {
     return (dist - start) / (end - start);
 }
 
-fn cloud_mix(bits: u32) -> u32 {
-    let a = (bits ^ (bits >> 16u)) * 0x7feb352du;
+fn cloud_hash(seed: u32, cell: vec2<i32>) -> f32 {
+    let v = seed ^ (bitcast<u32>(cell.x) * 0x9e3779b1u) ^ (bitcast<u32>(cell.y) * 0x85ebca77u);
+    let a = (v ^ (v >> 16u)) * 0x7feb352du;
     let b = (a ^ (a >> 15u)) * 0x846ca68bu;
-    return b ^ (b >> 16u);
+    return f32((b ^ (b >> 16u)) >> 8u) / 16777216.0;
 }
 
-fn cloud_byte(n: u32) -> f32 {
-    return f32(n & 255u) / 255.0;
+fn cloud_noise(seed: u32, origin: vec2<i32>, at: vec2<f32>, frequency: vec2<i32>) -> f32 {
+    let scaled = at * vec2<f32>(frequency);
+    let cell = floor(scaled);
+    let grid = origin * frequency + vec2<i32>(cell);
+    let frac = scaled - cell;
+    let f = frac * frac * (3.0 - 2.0 * frac);
+    let a = cloud_hash(seed, grid);
+    let b = cloud_hash(seed, grid + vec2(1, 0));
+    let c = cloud_hash(seed, grid + vec2(0, 1));
+    let d = cloud_hash(seed, grid + vec2(1, 1));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+// Match weather.rs. Each rectangular column has one footprint and weather type.
+const CLOUD_COLUMNS: vec2<f32> = vec2(16.0, 32.0);
+
+fn cloud_field(seed: u32, origin: vec2<i32>, at: vec2<f32>) -> vec3<f32> {
+    let warp = cloud_noise(seed ^ 0xa341316cu, origin, at, vec2(1)) - 0.5;
+    let warped = at + vec2(0.78, 0.54) * warp;
+    let coarse = cloud_noise(seed, origin, warped, vec2(1, 2));
+    let detail = cloud_noise(seed ^ 0x3ca1ef53u, origin, warped, vec2(3, 6));
+    let partial = coarse * 0.64 + detail * 0.23;
+    if partial + 0.13 <= 0.47 {
+        return vec3(0.0);
+    }
+    let edge = cloud_noise(seed ^ 0x5a528247u, origin, warped, vec2(9, 16));
+    let cover = (partial + edge * 0.13 - 0.47) * 4.7;
+    if cover <= 0.0 {
+        return vec3(0.0);
+    }
+    let parity = origin & vec2(1);
+    let weather = cloud_noise(seed ^ 0xb73102adu, (origin - parity) / 2, (at + vec2<f32>(parity)) * 0.5, vec2(1));
+    let gap = (min(abs(weather - 0.56), abs(weather - 0.75)) - 0.036) * 16.0;
+    let kind = select(0.0, 1.0, weather >= 0.56) + select(0.0, 1.0, weather >= 0.75);
+    return vec3(max(0.0, min(cover, gap)), kind, detail * 0.65 + edge * 0.35);
 }
 
 fn texture_cloud_at(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> bool {
@@ -42,82 +76,78 @@ struct CloudHit {
     distance: f32,
 }
 
-fn cloud_lobe(at: vec2<f32>, center: vec2<f32>, radius: f32) -> f32 {
-    let offset = (at - center) / radius;
-    return dot(offset, offset);
+// The lattice shifts between bands so the rectangular shelves overhang each other.
+fn cloud_band_offset(band: i32) -> vec2<f32> {
+    return fract(vec2(0.375, 0.625) * f32(band - 2));
 }
 
-// Match the cell layout in weather.rs. Intersect the low envelope before sampling density.
-fn cloud_volume(s: Sky, dir: vec3<f32>, cell: vec2<f32>, start: f32, end: f32, view: Scene) -> CloudHit {
-    let grid = vec2<i32>(cell) + vec2<i32>(s.uv.zw);
-    let h = s.ids.z ^ (bitcast<u32>(grid.x) * 0x9e3779b1u) ^ (bitcast<u32>(grid.y) * 0x85ebca77u);
-    let details = cloud_mix(h ^ 0xa341316cu);
-    if details >> 24u < 48u {
-        return CloudHit(vec4(0.0), 0.0);
-    }
-    let shape = cloud_mix(h);
-    let center = vec2(cloud_byte(shape >> 8u), cloud_byte(shape >> 16u)) * 0.44 + 0.28;
-    let edge = abs(center - 0.5);
-    let major = min(0.475 - max(edge.x, edge.y), 0.34 + 0.07 * cloud_byte(details));
-    let radii = vec2(major, major * (0.64 + 0.30 * cloud_byte(details >> 8u)));
-    let diagonal = 0.7071067812;
-    let axes = array(vec2(1.0, 0.0), vec2(diagonal), vec2(0.0, 1.0), vec2(-diagonal, diagonal));
-    let axis = axes[shape >> 30u];
-    let across = vec2(-axis.y, axis.x);
-    let roll = shape & 255u;
-    let half_height = select(5.0, select(6.0, 8.0, roll >= 218u), roll >= 155u);
-    let offset = s.uv.xy - cell - center + dir.xz * (start / s.extra.x);
-    let p = vec3(vec2(dot(offset, axis), dot(offset, across)) / radii, (dir.y * start - s.extra.z) / half_height - 1.0);
-    let ray = vec3(vec2(dot(dir.xz, axis), dot(dir.xz, across)) / (radii * s.extra.x), dir.y / half_height);
-    // The envelope is looser vertically so the shoulders keep their rounded tops.
-    let bound = vec3(1.0, 1.0, 0.67);
-    let origin = p * bound;
-    let direction = ray * bound;
-    let inv_ray2 = 1.0 / dot(direction, direction);
-    let mid = -dot(origin, direction) * inv_ray2;
-    let closest = origin + direction * mid;
-    let depth = (1.0 - dot(closest, closest)) * inv_ray2;
-    if depth <= 0.0 {
-        return CloudHit(vec4(0.0), 0.0);
-    }
-    let radius = sqrt(depth);
-    let entry = max(0.0, mid - radius);
-    let exit = min(end - start, mid + radius);
-    if entry >= exit {
-        return CloudHit(vec4(0.0), 0.0);
-    }
-    var base = s.color.rgb;
-    if s.ids.w != 0u && roll >= 155u {
-        base = select(s.axes[0].xyz, s.axes[1].xyz, roll >= 218u);
-    }
-    let count = select(8u, 4u, start + entry > 900.0);
-    let stride = (exit - entry) / f32(count);
-    let phase = cloud_byte(details >> 16u) * 6.2831853;
-    let left = vec2(-0.47, 0.13 + 0.14 * cloud_byte(details >> 16u));
-    let right = vec2(0.43, -0.07 - 0.17 * cloud_byte(shape >> 16u));
-    var light = 0.0;
-    var opacity = 0.0;
-    var front = entry;
-    for (var i = 0u; i < count; i++) {
-        let q = p + ray * (entry + (f32(i) + 0.5) * stride);
-        let core = cloud_lobe(q.xy, vec2(0.0, 0.08), 0.70);
-        let body = min(core, min(cloud_lobe(q.xy, left, 0.42), cloud_lobe(q.xy, right, 0.49)));
-        let interior = 1.0 - body - q.z * q.z;
-        let folds = sin(12.0 * q.x + 7.0 * q.y + phase) * 0.65 + sin(9.0 * q.y - 4.0 * q.x - phase) * 0.35;
-        let density = smoothstep(0.0, 0.49, interior * (1.0 + folds * 0.24));
-        let absorbed = (1.0 - opacity) * (1.0 - exp(-density * stride * 0.29));
-        if opacity == 0.0 && absorbed > 0.0 {
-            front = entry + f32(i) * stride;
+fn cloud_band_fill(field: vec3<f32>, band: i32) -> f32 {
+    let middle = 2.0 + 3.2 * (field.z - 0.5);
+    let thickness = 0.68 + min(field.x, 1.0) * (1.30 + field.y * 0.19);
+    return thickness - abs(f32(band) - middle);
+}
+
+// Walk each intersected band front to back, stepping exactly at voxel boundaries.
+fn cloud_volume(s: Sky, dir: vec3<f32>, near: f32, far: f32, view: Scene) -> CloudHit {
+    let origin = vec2<i32>(s.uv.zw);
+    let ray = dir.xz * CLOUD_COLUMNS / s.extra.x;
+    let step = sign(ray);
+    let delta = 1.0 / max(abs(ray), vec2(1e-12));
+    let band_height = s.extra.y / 5.0;
+    let height_at_camera = -s.extra.z / band_height;
+    let height_rate = dir.y / band_height;
+    let band_time = 1.0 / max(abs(height_rate), 1e-12);
+    let direction = select(1, -1, dir.y < 0.0);
+    let first_band = i32(clamp(floor(height_at_camera + height_rate * near), 0.0, 4.0));
+    let last_band = i32(clamp(floor(height_at_camera + height_rate * far), 0.0, 4.0));
+    var light = vec3(0.0);
+    var alpha = 0.0;
+    var first = far;
+    for (var band = first_band; band != last_band + direction && alpha < 0.97; band += direction) {
+        let boundary = f32(band) + select(0.0, 1.0, dir.y < 0.0);
+        let enter = (boundary - height_at_camera) * band_time * f32(direction);
+        let band_start = select(max(enter, near), near, band == first_band);
+        let band_end = select(min(enter + band_time, far), far, band == last_band);
+        let shift = cloud_band_offset(band);
+        let start = s.uv.xy * CLOUD_COLUMNS + ray * band_start - shift;
+        var cell = floor(start);
+        let offset = select(start - cell, cell + vec2(1.0) - start, ray > vec2(0.0));
+        var next = select(band_start + offset * delta, vec2(1e12), ray == vec2(0.0));
+        var t = band_start;
+        var face = select(1.0, 0.90, dir.y > 0.0);
+        while t < band_end && alpha < 0.97 {
+            let end = min(band_end, min(next.x, next.y));
+            let field = cloud_field(s.ids.z, origin, (cell + shift + vec2(0.5)) / CLOUD_COLUMNS);
+            if field.x > 0.0 && end > t {
+                let fill = cloud_band_fill(field, band);
+                if fill > 0.0 {
+                    let density = min(fill, 1.0) * (0.22 + 0.78 * min(field.x, 1.0));
+                    let absorption = (1.0 - alpha) * (1.0 - exp(-density * (end - t) * 0.23));
+                    let shade = (0.78 + 0.052 * f32(band) + 0.10 * field.z) * face;
+                    var base = s.color.rgb;
+                    if s.ids.w != 0u && field.y > 0.0 {
+                        base = select(s.axes[0].xyz, s.axes[1].xyz, field.y == 2.0);
+                    }
+                    first = min(first, t);
+                    light += base * shade * absorption;
+                    alpha += absorption;
+                }
+            }
+            t = end;
+            if next.x < next.y {
+                next.x += delta.x;
+                cell.x += step.x;
+                face = 0.84;
+            } else {
+                next.y += delta.y;
+                cell.y += step.y;
+                face = 0.92;
+            }
         }
-        let shade = clamp(0.88 + q.z * 0.26 + folds * 0.07 + q.x * 0.08, 0.50, 1.12);
-        light += absorbed * shade;
-        opacity += absorbed;
     }
-    let distance = start + front;
-    let fog = fog_amount(distance, view.environment.y, view.environment.z);
-    let alpha = opacity * s.color.a * (1.0 - smoothstep(0.6, 1.0, fog));
-    let color = mix(base * (light / max(opacity, 0.00001)), view.fog_color.rgb, smoothstep(0.0, 1.0, fog));
-    return CloudHit(vec4(color, alpha), distance);
+    let fog = fog_amount(first, view.environment.y, view.environment.z);
+    let color = mix(light / max(alpha, 0.00001), view.fog_color.rgb, smoothstep(0.0, 1.0, fog));
+    return CloudHit(vec4(color, alpha * s.color.a * (1.0 - smoothstep(0.6, 1.0, fog))), first);
 }
 
 // Trace up to the first cloud surface, stopping at the fragment when testing world geometry.
@@ -128,7 +158,7 @@ fn trace_cloud(s: Sky, dir: vec3<f32>, limit: f32, view: Scene) -> CloudHit {
     let high = low + s.extra.y;
     var near = 0.0;
     var far = min(reach, limit);
-    if abs(dir.y) > 0.00001 {
+    if dir.y != 0.0 {
         near = max(near, min(low / dir.y, high / dir.y));
         far = min(far, max(low / dir.y, high / dir.y));
     } else if low > 0.0 || high < 0.0 {
@@ -136,6 +166,9 @@ fn trace_cloud(s: Sky, dir: vec3<f32>, limit: f32, view: Scene) -> CloudHit {
     }
     if near >= far {
         return CloudHit(vec4(0.0), 0.0);
+    }
+    if s.ids.x == 0xffffffffu {
+        return cloud_volume(s, dir, near, far, view);
     }
     let dims = vec2<f32>(f32(s.ids.z), f32(s.ids.w));
     let start = s.uv.xy + dir.xz * near / size;
@@ -147,24 +180,16 @@ fn trace_cloud(s: Sky, dir: vec3<f32>, limit: f32, view: Scene) -> CloudHit {
     // 0: came in through a plane, 1 and 2: through a side along x or z.
     var side = 0u;
     // From inside a cloud, it isn't what is seen.
-    let procedural = s.ids.x == 0xffffffffu;
-    var within = !procedural && near == 0.0 && texture_cloud_at(s, cell, dims);
+    var within = near == 0.0 && texture_cloud_at(s, cell, dims);
     var hit = false;
     let steps = u32(ceil((far - near) / size * (abs(dir.x) + abs(dir.z)))) + 2u;
     for (var i = 0u; i < steps; i++) {
-        if procedural {
-            let volume = cloud_volume(s, dir, cell, t, min(far, min(next.x, next.y)), view);
-            if volume.color.a > 0.003 {
-                return volume;
-            }
-        } else {
-            let filled = texture_cloud_at(s, cell, dims);
-            if filled && !within {
-                hit = true;
-                break;
-            }
-            within = within && filled;
+        let filled = texture_cloud_at(s, cell, dims);
+        if filled && !within {
+            hit = true;
+            break;
         }
+        within = within && filled;
         if next.x < next.y {
             t = next.x;
             next.x += delta.x;

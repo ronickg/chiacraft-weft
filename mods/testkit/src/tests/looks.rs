@@ -427,7 +427,7 @@ pub async fn clouds(t: T) -> R {
     t.check(wall < 0.005, format!("clouds through a wall: {wall:.3}"));
     // Weather supplies cloud appearance to the same environment as external sources.
     // Seed 5 has a cloud in this cell. Frame its interior so sky gaps don't dominate the tint probes.
-    t.c().teleport([188.0, 195.0, 176.0]);
+    t.c().teleport([540.0, 195.0, 620.0]);
     t.c().set_look(0.0, 89.0);
     t.secs(0.4).await?;
     let sky_lum = |shot: &crate::runner::Shot| crate::runner::lum(shot.avg(0.1, 0.05, 0.9, 0.8));
