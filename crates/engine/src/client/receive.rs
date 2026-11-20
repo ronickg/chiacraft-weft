@@ -110,8 +110,10 @@ impl Client {
                     self.world.time = time;
                     self.world.ticks = ticks;
                     self.since_time = 0.0;
+                    self.weather_override = u16::try_from(weather)
+                        .ok()
+                        .filter(|&id| (id as usize) < content().game.weathers.len());
                 }
-                self.weather_id = (weather as usize).min(content().game.weathers.len() - 1) as u16;
                 self.tick_rate = rate.max(1) as f64;
             }
             ToClient::Teleport { dim, pos, frame } => self.teleported(dim, pos, frame, fwd),

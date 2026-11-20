@@ -429,7 +429,7 @@ impl Server {
             for (name, weather, until) in &s.meta.weather {
                 if let (Some(&i), Some(&w)) = (c.game.catalog.ids(ek::DIMENSION).get(name), c.game.catalog.ids(ek::WEATHER).get(weather)) {
                     let d = &mut dims[i as usize];
-                    d.set_weather(w as u16, 0);
+                    d.set_weather(Some(w as u16), 0);
                     d.weather_until = *until;
                 }
             }
@@ -608,9 +608,7 @@ impl Server {
             }
             d.time += 1;
             d.tick_timers(c);
-            if c.dims[d.id as usize].has_weather() {
-                d.tick_weather(c);
-            }
+            d.tick_weather(c, t);
         }
         if runs {
             self.dims
@@ -806,7 +804,7 @@ impl Server {
                         self.set_permission(pi, level);
                     }
                 }
-                DimEvent::SetWeather { dim, weather, ticks } => self.dims[dim as usize].set_weather(weather, ticks as u64),
+                DimEvent::SetWeather { dim, weather, ticks } => self.dims[dim as usize].set_weather(Some(weather), ticks as u64),
 
                 // What the entity's own client hears of its uses: everyone else sees the swing.
                 DimEvent::Using { entity, using } => {
@@ -1043,8 +1041,10 @@ impl Server {
         s.meta.weather = self
             .dims
             .iter()
-            .filter(|d| d.weather_until != 0)
-            .map(|d| (c.dims[d.id as usize].name.clone(), c.game.weathers[d.weather as usize].name.clone(), d.weather_until))
+            .filter_map(|d| {
+                let id = d.weather?;
+                Some((c.dims[d.id as usize].name.clone(), c.game.weathers[id as usize].name.clone(), d.weather_until))
+            })
             .collect();
         s.meta.timers = self
             .dims
@@ -1180,7 +1180,7 @@ impl Server {
             .send(ToClient::Edits { dim: to, specs: dims[to as usize].edits.iter().map(|e| e.spec(c)).collect(), all: true });
         let d = &dims[to as usize];
         p.conn
-            .send(ToClient::Clock { dim: to, time: d.day_time(), ticks: d.time, weather: d.weather as u32, rate: p.sent_rate });
+            .send(ToClient::Clock { dim: to, time: d.day_time(), ticks: d.time, weather: d.weather_wire(), rate: p.sent_rate });
         if to == c.void_dim && from != to as usize {
             p.conn
                 .send(ToClient::Show(crate::net::Shown::chat(void_note(c))));
