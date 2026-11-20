@@ -240,7 +240,7 @@ pub fn register(r: &mut Registry) {
         // Broad patches with smaller offshoots. Shifting the surface thresholds
         // with coherent noise mixes materials where two regions are close.
         .field("base:surface_patch", Expr::fbm(0x89, 24.0, 1) * Expr::value(0.76) + Expr::fbm(0x8A, 7.0, 1) * Expr::value(0.24))
-        .field("base:biome_edge", Expr::field("base:surface_patch") * Expr::value(0.25))
+        .field("base:biome_edge", Expr::field("base:surface_patch") * Expr::value(0.125))
         .field("base:surface_temperature", Expr::temperature() + Expr::field("base:biome_edge") * Expr::value(0.24))
         .field("base:surface_humidity", Expr::humidity() - Expr::field("base:biome_edge") * Expr::value(0.22))
         .field(
@@ -373,7 +373,7 @@ pub fn register(r: &mut Registry) {
             )
             .rule(
                 alpine
-                    .height(line - 2..line)
+                    .height(line - 1..line)
                     .field("base:surface_patch", ..-0.08)
                     .surface("snowy_grass", "dirt", 2)
                     .named(&format!("snow_patches_{i}")),
