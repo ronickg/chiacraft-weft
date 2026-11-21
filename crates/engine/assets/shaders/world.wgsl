@@ -248,7 +248,8 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 
 fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     if any(abs(in.clip_cube) > vec3(0.5)) { discard; }
-    var light = in.color * lightmap(in.light, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
+    let lit_color = lightmap(in.light, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
+    var light = in.color * min(vec3(1.0), lit_color + lightning_ground(scene, in.rel, in.light.x));
     // Glowing texels are lifted towards full brightness by their mask: lit = albedo * max(light,
     // emission), so they stay their own (tinted, unshaded) color in the dark.
     if in.glow != 0xffffffffu && (in.flags & COVER_WALL) == 0u {
@@ -716,7 +717,8 @@ fn vs_lod_far(@builtin(vertex_index) vi: u32) -> FarOut {
 }
 
 fn far_lit(in: FarOut) -> vec4<f32> {
-    let light = lightmap(vec4(1.0, 0.0, 0.0, 0.0), scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
+    let sky_light = lightmap(vec4(1.0, 0.0, 0.0, 0.0), scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
+    let light = min(vec3(1.0), sky_light + lightning_ground(scene, in.rel, 1.0));
     let lit = in.color.rgb * pow(light * SHADE[in.dir], vec3(2.2));
     let fog = fog_amount(length(in.rel), scene.params.x, scene.params.y);
     return vec4(mix(lit, scene.fog_color.rgb, fog), in.color.a);

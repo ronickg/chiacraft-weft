@@ -4,6 +4,7 @@ pub mod entity_render;
 pub mod environment;
 pub mod gizmo;
 pub mod glow;
+mod lightning;
 pub mod lod;
 pub mod looks;
 pub mod mesher;
@@ -762,8 +763,7 @@ pub struct Client {
     look: weft_abi::WeatherLook,
     pub environment: environment::Environment,
     frame_dt: f32,
-    /// Seconds left of a lightning's flash.
-    lightning: f32,
+    lightning: lightning::LightningEffects,
     /// Holding the use button on an item that takes time: ticks held, ticks in all.
     using: Option<(f32, f32)>,
     /// Who else is mining what, and how far along.
@@ -1103,7 +1103,7 @@ impl Client {
             weather_id: 0,
             look: Default::default(),
             environment: Default::default(),
-            lightning: 0.0,
+            lightning: lightning::LightningEffects::default(),
             using: None,
             others_mining: Vec::new(),
             told_mining: None,
@@ -1211,6 +1211,7 @@ impl Client {
         self.meshes.clear();
         self.landings.clear();
         self.weather_override = None;
+        self.lightning.clear();
         self.world.dim = dim;
         self.terrain_resets += 1;
         self.terrain_view = (IVec3::MAX, 0);
@@ -1276,6 +1277,10 @@ impl Client {
         let moved = self.animate_player(input, dt);
         self.frame_dt = dt as f32;
         self.weather_effects(dt as f32);
+        if self.lightning.is_active() {
+            let listener = self.render_camera().pos;
+            self.lightning.advance(listener, &mut self.sounds);
+        }
         // Night vision comes and goes over about half a second, not at once.
         let night = self
             .attribute(crate::registry::attr::NIGHT_VISION)
@@ -3137,12 +3142,10 @@ impl Client {
 
     /// Simulation daylight used by conditions and prediction, independent of perception overrides.
     pub fn daylight(&self) -> f32 {
-        let day = content().dims[self.world.dim as usize].daylight(self.world.time) * (1.0 - self.look.darkness);
-        if self.lightning > 0.0 { (day + 0.5).min(1.0) } else { day }
+        content().dims[self.world.dim as usize].daylight(self.world.time) * (1.0 - self.look.darkness)
     }
 
-    /// The weather's look going over to the current one's, its sound now and then, and a
-    /// lightning's flash (`weather` draws the precipitation).
+    /// Blend the weather at the camera and play its ambient sound.
     fn weather_effects(&mut self, dt: f32) {
         self.weather_id = self.weather_at(self.camera().pos);
         let weather = &content().game.weathers[self.weather_id as usize];
@@ -3156,10 +3159,6 @@ impl Client {
         go(&mut l.cloud_gray, to.cloud_gray);
         go(&mut l.cloud_dark, to.cloud_dark);
         go(&mut l.darkness, to.darkness);
-        self.lightning = (self.lightning - dt).max(0.0);
-        if weather.lightning() && self.chance() < dt / 12.0 {
-            self.lightning = 0.15;
-        }
         if let Some(sound) = weather
             .sound
             .filter(|_| self.look.falls > 0.5 && !self.enclosed())
@@ -3195,6 +3194,7 @@ impl Client {
     fn scene(&self, cam: &Camera, frame: &FrameInfo) -> Scene {
         let environment = &self.environment.values;
         let (fog_start, fog_end) = (environment.fog_start, environment.fog_end);
+        let (lightning_start, lightning_end) = self.lightning.lights(cam.pos);
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
         let view = cam.view();
         let inv = view.inverse();
@@ -3226,6 +3226,8 @@ impl Client {
             cloud_cache: [0; 4],
             atmosphere_cache: [0; 4],
             rain_cover: [0.0; 4],
+            lightning_start,
+            lightning_end,
         }
     }
 
@@ -3359,6 +3361,7 @@ impl Client {
             scene.cloud_lod[1].min(environment.cloud_fog_end),
             self.camera().pos.y,
             &self.environment.values,
+            &self.lightning,
             &self.environment.sky,
             &overlays,
         );

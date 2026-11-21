@@ -3013,6 +3013,15 @@ fn engine_sounds() -> Vec<RawEntry> {
     vec![
         one("core:ui.click", "core:ui/click", "core:ui", 0.6, [1.0, 1.0]),
         one("core:item.pickup", "core:item/pickup", "core:players", 0.4, [1.4, 2.2]),
+        one("core:weather.thunder_crack", "core:weather/thunder_crack", "core:ambient", 0.95, [1.0, 1.0])
+            .set(s::RANGE, crate::weather::THUNDER_RANGE as f32)
+            .set(s::FULL_WITHIN, 48.0f32),
+        one("core:weather.thunder_roll", "core:weather/thunder_roll", "core:ambient", 0.92, [1.0, 1.0])
+            .set(s::RANGE, crate::weather::THUNDER_RANGE as f32)
+            .set(s::FULL_WITHIN, 48.0f32),
+        one("core:weather.thunder_rumble", "core:weather/thunder_rumble", "core:ambient", 0.92, [1.0, 1.0])
+            .set(s::RANGE, crate::weather::THUNDER_RANGE as f32)
+            .set(s::FULL_WITHIN, 48.0f32),
     ]
 }
 

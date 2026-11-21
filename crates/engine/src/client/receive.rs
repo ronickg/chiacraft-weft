@@ -336,6 +336,10 @@ impl Client {
                         .map(|(sound, pos, volume, pitch)| crate::audio::Play { sound, pos, volume, pitch }),
                 );
             }
+            ToClient::Lightning(strike) if strike.dim == self.world.dim => {
+                let late = (self.world.ticks.saturating_sub(strike.tick) as f64 / self.tick_rate) as f32;
+                self.lightning.receive(strike, late);
+            }
             ToClient::Particles(list) => {
                 for b in &list {
                     self.particles.spawn(b, &self.world);

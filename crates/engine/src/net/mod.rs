@@ -337,6 +337,19 @@ pub type Crack = (u64, IVec3, Part, f32);
 
 wire_struct! {
     #[derive(Clone, Copy, Debug)]
+    pub struct Lightning {
+        pub dim: u32,
+        pub tick: u64,
+        pub origin: DVec3,
+        pub end: DVec3,
+        pub ground: bool,
+        pub seed: u64,
+        pub strength: f32,
+    }
+}
+
+wire_struct! {
+    #[derive(Clone, Copy, Debug)]
     pub struct Move {
         pub id: u64,
         pub pos: DVec3,
@@ -473,6 +486,7 @@ messages! {
         ControllerEdit { controller: u64, face: u8, data: Vec<u8> },
         HelmProfile { mount: u64, controller: u64, data: Vec<u8> },
         BodyGrab(Option<u64>),
+        Lightning(Lightning),
     }
 }
 

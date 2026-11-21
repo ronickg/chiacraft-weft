@@ -67,6 +67,18 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
         out.clip = far_point(dir);
         out.at = dir;
         out.uv = CORNER[vi % 6u];
+    } else if s.ids.y == SKY_LIGHTNING {
+        let c = CORNER[vi % 6u];
+        let start = s.axes[0].xyz;
+        let end = s.axes[1].xyz;
+        let middle = (start + end) * 0.5;
+        let side = cross(end - start, middle);
+        let normal = select(scene.right.xyz, side / max(length(side), 0.0001), dot(side, side) > 0.0001);
+        let width = max(s.extra.x * 2.5, s.extra.y * length(middle));
+        let pos = mix(start, end, c.y) + normal * ((c.x * 2.0 - 1.0) * width);
+        out.clip = scene.view_proj * vec4(pos, 1.0);
+        out.at = pos;
+        out.uv = c;
     } else {
         let p = vec2<f32>(f32((vi << 1u) & 2u), f32(vi & 2u)) * 2.0 - 1.0;
         // The overlay of a liquid goes over everything, the hand too; depth 1 is the near plane.
@@ -364,6 +376,28 @@ fn dome_uv(l: vec3<f32>, s: Sky) -> vec2<f32> {
         cell = select(vec2(0.0, 1.0), vec2(2.0, 1.0), l.x > 0.0);
     }
     return (cell + face * 0.5 + 0.5) / vec2(3.0, 2.0);
+}
+
+@fragment
+fn fs_lightning(in: VOut) -> @location(0) vec4<f32> {
+    let s = sky[in.index];
+    let edge = abs(in.uv.x * 2.0 - 1.0);
+    let core = 1.0 - smoothstep(0.15, 0.39, edge);
+    let halo = (1.0 - smoothstep(0.12, 1.0, edge)) * 0.32;
+    let alpha = min(s.color.a * (core * 1.9 + halo), 1.0);
+    if alpha < 0.002 {
+        return vec4(0.0);
+    }
+    var color = mix(s.color.rgb, vec3(0.96, 0.98, 1.0), core);
+    if scene.atmosphere_extent.x != 0u {
+        // The channel is already over the composited sky. Sample only the air in front of it.
+        let range = length(in.at);
+        let dir = in.at / max(range, 0.001);
+        let cloud = trace_cloud(scene.cloud, dir, range, scene);
+        let front = resolve_rain(scene.cloud, dir, range, cloud, scene, in.clip.xy);
+        color = front.rgb + color * (1.0 - front.a);
+    }
+    return vec4(color * alpha, alpha);
 }
 
 @fragment

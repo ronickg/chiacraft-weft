@@ -206,8 +206,7 @@ impl Client {
 
         let mut weather = Layer::new("core:weather".into());
         weather.priority = -900;
-        weather.values.daylight =
-            if self.lightning > 0.0 { (day * (1.0 - self.look.darkness) + 0.5).min(1.0) } else { day * (1.0 - self.look.darkness) };
+        weather.values.daylight = day * (1.0 - self.look.darkness);
         weather.values.sky_gray = self.look.sky_gray;
         weather.values.fog_gray = self.look.fog_gray;
         weather.values.sky_cover = self.look.sky_cover;

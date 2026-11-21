@@ -314,6 +314,7 @@ pub struct Sky {
     pipe: Option<PipelineId>,
     clouds_pipe: Option<PipelineId>,
     atmosphere_pipe: Option<PipelineId>,
+    bolt_pipe: Option<PipelineId>,
     atmosphere: AtmosphereCache,
     atmosphere_compute: CommandList,
     /// Shader slot of each object, per dimension.
@@ -372,6 +373,7 @@ impl Sky {
             pipe: None,
             clouds_pipe: None,
             atmosphere_pipe: None,
+            bolt_pipe: None,
             atmosphere: AtmosphereCache::default(),
             atmosphere_compute: CommandList::default(),
             slots: Vec::new(),
@@ -438,6 +440,27 @@ impl Sky {
                     })
                     .map_err(|e| log::warn!("atmosphere shader: {e}"))
                     .ok();
+                let bolt = shader
+                    .module
+                    .entry_points
+                    .iter()
+                    .any(|entry| entry.name == "fs_lightning")
+                    .then(|| {
+                        gpu.create_pipeline(&PipelineDesc {
+                            label: "lightning",
+                            shader: &shader,
+                            vertex: "vs",
+                            fragment: Some("fs_lightning"),
+                            color: Some(Format::Surface),
+                            depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
+                            blend: Blend::Premultiplied,
+                            cull_back: false,
+                            topology: Topology::Triangles,
+                        })
+                        .map_err(|e| log::warn!("lightning shader: {e}"))
+                        .ok()
+                    })
+                    .flatten();
                 let mut optional = |entry, label| {
                     shader
                         .module
@@ -460,10 +483,10 @@ impl Sky {
                 } else {
                     AtmosphereCache::default()
                 };
-                Ok((pipe, clouds, atmosphere, cache, slots.pop().unwrap_or_default()))
+                Ok((pipe, clouds, atmosphere, bolt, cache, slots.pop().unwrap_or_default()))
             });
         match made {
-            Ok((pipe, clouds, atmosphere, cache, slots)) => {
+            Ok((pipe, clouds, atmosphere, bolt, cache, slots)) => {
                 if let Some(old) = self.pipe.replace(pipe) {
                     gpu.destroy_pipeline(old);
                 }
@@ -471,6 +494,9 @@ impl Sky {
                     gpu.destroy_pipeline(old);
                 }
                 if let Some(old) = std::mem::replace(&mut self.atmosphere_pipe, atmosphere) {
+                    gpu.destroy_pipeline(old);
+                }
+                if let Some(old) = std::mem::replace(&mut self.bolt_pipe, bolt) {
                     gpu.destroy_pipeline(old);
                 }
                 std::mem::replace(&mut self.atmosphere, cache).destroy(gpu);
@@ -552,7 +578,7 @@ impl Sky {
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
         self.drop_pictures(gpu);
-        for p in [self.pipe.take(), self.clouds_pipe.take(), self.atmosphere_pipe.take()]
+        for p in [self.pipe.take(), self.clouds_pipe.take(), self.atmosphere_pipe.take(), self.bolt_pipe.take()]
             .into_iter()
             .flatten()
         {
@@ -607,6 +633,7 @@ impl Sky {
         detailed_range: f32,
         eye_y: f64,
         environment: &weft_abi::environment::EnvironmentValues,
+        lightning: &super::lightning::LightningEffects,
         weights: &FxHashMap<String, f32>,
         overlays: &[Overlay],
     ) -> (GpuSky, Option<AtmosphereFrame>) {
@@ -834,6 +861,9 @@ impl Sky {
             draws.insert(first_body + n, (3, at));
         }
 
+        let bolt_from = self.list.len() as u32;
+        lightning.append_bolts(&mut self.list, cam, frame.height, environment.sky_opacity);
+        let bolts = self.list.len() as u32 - bolt_from;
         let over_from = self.list.len() as u32;
         let over = self.overlay_entries(gpu, overlays);
         let n = self.list.len() as u32;
@@ -847,7 +877,7 @@ impl Sky {
         for (vertices, first_instance) in draws {
             list.push(Cmd::Draw { vertices, instances: 1, first_vertex: 0, first_instance });
         }
-        if let (Some(first_instance), Some(cloud_pipe)) = (clouds, self.clouds_pipe) {
+        let (cloud, shared) = if let (Some(first_instance), Some(cloud_pipe)) = (clouds, self.clouds_pipe) {
             let s = self.list[first_instance as usize];
             let shared = if let (Some(depth), Some(pipe)) = (world_depth, self.atmosphere_pipe) {
                 let prepared = self.atmosphere.prepare(
@@ -876,8 +906,21 @@ impl Sky {
             list.bind(bind::sky::RAIN_DEPTH, shared.as_ref().and_then(|a| a.rain).unwrap_or(scene));
             list.bind(bind::sky::RAIN_COVER, shared.as_ref().and_then(|a| a.cover).unwrap_or(scene));
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance });
-            return (s, shared);
+            (s, shared)
+        } else {
+            (GpuSky::default(), None)
+        };
+        if bolts != 0
+            && let Some(bolt) = self.bolt_pipe
+        {
+            list.pipeline(bolt);
+            list.bind(bind::sky::OBJECTS, buf);
+            list.bind(bind::sky::SCENE, scene);
+            list.bind(bind::sky::CLOUD_CELLS, shared.as_ref().and_then(|a| a.density).unwrap_or(scene));
+            list.bind(bind::sky::RAIN_DEPTH, shared.as_ref().and_then(|a| a.rain).unwrap_or(scene));
+            list.bind(bind::sky::RAIN_COVER, shared.as_ref().and_then(|a| a.cover).unwrap_or(scene));
+            list.push(Cmd::Draw { vertices: 6, instances: bolts, first_vertex: 0, first_instance: bolt_from });
         }
-        (GpuSky::default(), None)
+        (cloud, shared)
     }
 }

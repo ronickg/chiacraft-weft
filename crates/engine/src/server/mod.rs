@@ -14,6 +14,7 @@ pub(crate) mod extend;
 pub mod forced;
 mod guard;
 pub mod holder;
+mod lightning;
 mod liquid;
 mod load;
 pub mod lod_tops;
@@ -625,6 +626,7 @@ impl Server {
                 .par_iter_mut()
                 .flat_map(|d| d.regions.par_iter_mut())
                 .for_each(|r| r.tick(c));
+            self.tick_lightning(c);
         }
         lap(2, &self.shared);
         if let Some((left, all, start)) = &mut self.sprint {

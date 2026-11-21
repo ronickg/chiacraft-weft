@@ -161,6 +161,7 @@ shared! {
         GLOW = 4,
         OVERLAY = 5,
         CLOUDS = 6,
+        LIGHTNING = 7,
     }
 }
 
@@ -642,6 +643,10 @@ gpu_struct! {
         pub atmosphere_cache: [u32; 4],
         /// Camera position relative to the cover map's horizontal origin, then an enabled flag.
         pub rain_cover: [f32; 4],
+        /// Lightning origins relative to the camera, with flash strength in w.
+        pub lightning_start: [[f32; 4]; 3],
+        /// Channel ends relative to the camera, with w set for ground strikes.
+        pub lightning_end: [[f32; 4]; 3],
     }
 }
 

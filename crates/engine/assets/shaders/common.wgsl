@@ -135,6 +135,7 @@ const CLOUD_OPAQUE: f32 = 0.95;
 struct CloudLighting {
     directed: vec3<f32>,
     from_above: f32,
+    flashes: u32,
 }
 
 struct CloudAccumulation {
@@ -144,7 +145,7 @@ struct CloudAccumulation {
     optical_distance: f32,
 }
 
-fn cloud_lighting(s: Sky, dir: vec3<f32>) -> CloudLighting {
+fn cloud_lighting(s: Sky, dir: vec3<f32>, flashes: u32) -> CloudLighting {
     var directed_sun = vec3(0.0);
     var sun_from_above = 1.0;
     if s.cloud_sun.w > 0.0 {
@@ -160,7 +161,7 @@ fn cloud_lighting(s: Sky, dir: vec3<f32>) -> CloudLighting {
         directed_sun = s.cloud_sun.rgb * (0.16 + 0.48 * eighth + 0.95 * narrow * narrow + 0.10 * back * back);
         sun_from_above = smoothstep(0.02, 0.36, s.axes[2].y);
     }
-    return CloudLighting(directed_sun, sun_from_above);
+    return CloudLighting(directed_sun, sun_from_above, flashes);
 }
 
 fn cloud_radiance(s: Sky, weather: f32, kind: f32, optical_depth: f32, sun: CloudLighting) -> vec3<f32> {
@@ -181,8 +182,59 @@ fn cloud_radiance(s: Sky, weather: f32, kind: f32, optical_depth: f32, sun: Clou
     return radiance * min(1.0, shoulder / max(peak, 0.001));
 }
 
+const CLOUD_FLASH_RADIUS: f32 = 210.0;
+
+fn cloud_flash_end(start: vec3<f32>, end: vec4<f32>) -> vec3<f32> {
+    return mix(start, end.xyz, select(1.0, 0.25, end.w > 0.0));
+}
+
+fn cloud_flashes_on_ray(view: Scene, dir: vec3<f32>, near: f32, far: f32) -> u32 {
+    var mask = 0u;
+    for (var i = 0u; i < 3u && view.lightning_start[i].w > 0.0; i++) {
+        let start = view.lightning_start[i].xyz;
+        let end = cloud_flash_end(start, view.lightning_end[i]);
+        let center = (start + end) * 0.5;
+        let radius = CLOUD_FLASH_RADIUS + length(end - start) * 0.5;
+        let to_ray = center - dir * clamp(dot(center, dir), near, far);
+        if dot(to_ray, to_ray) < radius * radius {
+            mask |= 1u << i;
+        }
+    }
+    return mask;
+}
+
+fn lightning_cloud(view: Scene, pos: vec3<f32>, radiance: vec3<f32>, flashes: u32) -> vec3<f32> {
+    var brightness = 0.0;
+    for (var mask = flashes; mask != 0u; mask &= mask - 1u) {
+        let i = firstTrailingBit(mask);
+        let start = view.lightning_start[i];
+        let span = cloud_flash_end(start.xyz, view.lightning_end[i]) - start.xyz;
+        let rel = pos - start.xyz;
+        let along = clamp(dot(rel, span) / max(dot(span, span), 1.0), 0.0, 1.0);
+        let distance = length(rel - span * along);
+        let glow = max(1.0 - distance / CLOUD_FLASH_RADIUS, 0.0);
+        brightness += start.w * glow * glow * 2.4;
+    }
+    return mix(radiance, vec3(0.87, 0.92, 1.0), 1.0 - exp(-brightness));
+}
+
+fn lightning_ground(view: Scene, pos: vec3<f32>, sky_light: f32) -> vec3<f32> {
+    if view.lightning_start[0].w <= 0.0 || sky_light < 0.38 {
+        return vec3(0.0);
+    }
+    var brightness = 0.0;
+    for (var i = 0u; i < 3u && view.lightning_start[i].w > 0.0; i++) {
+        let end = view.lightning_end[i];
+        if end.w > 0.0 {
+            let glow = max(1.0 - distance(end.xyz, pos) / 116.0, 0.0);
+            brightness += view.lightning_start[i].w * glow * glow;
+        }
+    }
+    return vec3(0.61, 0.70, 0.86) * brightness * smoothstep(0.38, 0.94, sky_light);
+}
+
 fn accumulate_cloud(
-    a: ptr<function, CloudAccumulation>, s: Sky, weather: f32, overhead: f32, density: f32,
+    a: ptr<function, CloudAccumulation>, s: Sky, view: Scene, dir: vec3<f32>, weather: f32, overhead: f32, density: f32,
     near: f32, far: f32, weight: f32, sun: CloudLighting,
 ) {
     let kind = select(s.extra.w, weather, s.ids.w != 0u);
@@ -190,7 +242,11 @@ fn accumulate_cloud(
     let absorption = (1.0 - (*a).alpha) * (1.0 - exp(-density * weight * (far - near) * extinction));
     (*a).first = min((*a).first, near);
     (*a).optical_distance += (near + far) * 0.5 * absorption;
-    (*a).light += cloud_radiance(s, weather, kind, overhead + density * 0.35, sun) * absorption;
+    var radiance = cloud_radiance(s, weather, kind, overhead + density * 0.35, sun);
+    if sun.flashes != 0u {
+        radiance = lightning_cloud(view, dir * ((near + far) * 0.5), radiance, sun.flashes);
+    }
+    (*a).light += radiance * absorption;
     (*a).alpha += absorption;
 }
 
@@ -250,7 +306,7 @@ fn trace_cloud_bands(
                 if transition {
                     weight = 1.0 - smoothstep(lod.x, lod.y, (t + end) * 0.5);
                 }
-                accumulate_cloud(a, s, floor(sample_density.y), fract(sample_density.y) * 8.0, sample_density.x, t, end, weight, sun);
+                accumulate_cloud(a, s, view, dir, floor(sample_density.y), fract(sample_density.y) * 8.0, sample_density.x, t, end, weight, sun);
             }
             t = end;
             if next.x < next.y {
@@ -268,8 +324,9 @@ fn trace_cloud_bands(
 // mean density through the slab with one lookup when possible, and bound the cost of
 // grazing rays that see long stretches of the footprint.
 fn trace_cloud_impostor(
-    a: ptr<function, CloudAccumulation>, s: Sky, dir: vec3<f32>, near: f32, far: f32, lod: vec2<f32>, sun: CloudLighting,
+    a: ptr<function, CloudAccumulation>, s: Sky, dir: vec3<f32>, near: f32, far: f32, view: Scene, sun: CloudLighting,
 ) {
+    let lod = view.cloud_lod.xy;
     let origin = vec2<i32>(s.uv.zw);
     let ray = dir.xz / s.extra.x;
     let stride = max(96.0, (far - near) / 16.0);
@@ -281,21 +338,21 @@ fn trace_cloud_impostor(
         if field.x > 0.0 {
             let density = smoothstep(0.0, 0.72, field.x) * 0.58;
             let weight = smoothstep(lod.x, lod.y, middle);
-            accumulate_cloud(a, s, field.y, overhead * density, density, t, end, weight, sun);
+            accumulate_cloud(a, s, view, dir, field.y, overhead * density, density, t, end, weight, sun);
         }
     }
 }
 
 fn cloud_volume(s: Sky, dir: vec3<f32>, near: f32, far: f32, view: Scene) -> CloudHit {
     let lod = view.cloud_lod.xy;
-    let sun = cloud_lighting(s, dir);
+    let sun = cloud_lighting(s, dir, cloud_flashes_on_ray(view, dir, near, far));
     var result = CloudAccumulation(vec3(0.0), 0.0, far, 0.0);
     let detailed_end = min(far, lod.y);
     if near < detailed_end {
         trace_cloud_bands(&result, s, dir, near, detailed_end, view, sun);
     }
     if far > lod.x && result.alpha < CLOUD_OPAQUE {
-        trace_cloud_impostor(&result, s, dir, max(near, lod.x), far, lod, sun);
+        trace_cloud_impostor(&result, s, dir, max(near, lod.x), far, view, sun);
     }
     let distance = result.optical_distance / max(result.alpha, 0.00001);
     let fog = fog_amount(distance, view.environment.y, view.environment.z);
