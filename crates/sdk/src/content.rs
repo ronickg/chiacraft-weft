@@ -1717,6 +1717,14 @@ macro_rules! state_setters {
         pub fn random_height_scale(self, min: f32, max: f32) -> Self {
             self.set(&bc::RANDOM_HEIGHT_SCALE, [min, max])
         }
+        /// Draws it scaled in width (X and Z) between `min` and `max` relative size.
+        pub fn random_width_scale(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_WIDTH_SCALE, [min, max])
+        }
+        /// Draws it scaled in both width and height between `min` and `max` relative size.
+        pub fn random_scale(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_SCALE, [min, max])
+        }
         /// Draws it turned between `min` and `max` degrees about Y.
         pub fn random_yaw(self, min: f32, max: f32) -> Self {
             self.set(&bc::RANDOM_YAW, [min, max])

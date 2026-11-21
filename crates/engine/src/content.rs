@@ -14,14 +14,17 @@ use crate::registry::entries_of;
 pub const AIR: u32 = 0;
 
 #[derive(Clone, Copy, PartialEq)]
-pub struct Foliage {
+pub struct RandomTransform {
     pub offset: f32,
     pub height_scale: [f32; 2],
+    pub width_scale: [f32; 2],
+    pub scale: [f32; 2],
     pub yaw: [f32; 2],
 }
 
-impl Foliage {
-    pub const NONE: Foliage = Foliage { offset: 0.0, height_scale: [1.0; 2], yaw: [0.0; 2] };
+impl RandomTransform {
+    pub const NONE: RandomTransform =
+        RandomTransform { offset: 0.0, height_scale: [1.0; 2], width_scale: [1.0; 2], scale: [1.0; 2], yaw: [0.0; 2] };
 }
 
 #[derive(Clone)]
@@ -145,7 +148,7 @@ pub struct StateInfo {
     pub level: u8,
     pub model: BlockModel,
     pub item_face: Option<u8>,
-    pub foliage: Foliage,
+    pub random_transform: RandomTransform,
     /// Texture ids (`Content::textures`) per face.
     pub textures: [u32; 6],
     pub boxes: Vec<ModelBox>,

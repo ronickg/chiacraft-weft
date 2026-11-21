@@ -868,9 +868,11 @@ fn bake_state(
         level: 0,
         model,
         item_face,
-        foliage: crate::content::Foliage {
+        random_transform: crate::content::RandomTransform {
             offset: s.or(b::RANDOM_OFFSET, 0.0),
             height_scale: s.or(b::RANDOM_HEIGHT_SCALE, [1.0; 2]),
+            width_scale: s.or(b::RANDOM_WIDTH_SCALE, [1.0; 2]),
+            scale: s.or(b::RANDOM_SCALE, [1.0; 2]),
             yaw: s.or(b::RANDOM_YAW, [0.0f32; 2]),
         },
         signal: Signal {
@@ -955,7 +957,7 @@ fn air() -> StateInfo {
         level: 0,
         model: BlockModel::None,
         item_face: None,
-        foliage: crate::content::Foliage::NONE,
+        random_transform: crate::content::RandomTransform::NONE,
         textures: [0; 6],
         boxes: Vec::new(),
         collision: Vec::new(),

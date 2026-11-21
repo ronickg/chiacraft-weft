@@ -1273,11 +1273,10 @@ pub mod comp {
         pub const MODEL: &str = "block.model";
         /// Item sprite from this face (u8, FACE_DIRS); 255 draws the model.
         pub const ITEM_FACE: &str = "block.item_face";
-        /// Most a model sits off its cell's center along X and Z, in blocks.
         pub const RANDOM_OFFSET: &str = "block.random_offset";
-        /// Range of the height scale a model is drawn with.
         pub const RANDOM_HEIGHT_SCALE: &str = "block.random_height_scale";
-        /// Range of degrees a model is turned about Y.
+        pub const RANDOM_WIDTH_SCALE: &str = "block.random_width_scale";
+        pub const RANDOM_SCALE: &str = "block.random_scale";
         pub const RANDOM_YAW: &str = "block.random_yaw";
         pub const TEXTURES: &str = "block.textures";
         pub const TURNS: &str = "block.turns";
