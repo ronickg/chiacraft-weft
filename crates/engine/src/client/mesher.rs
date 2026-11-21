@@ -244,7 +244,7 @@ fn draw_block(
         let dark_inside = info.flags & bf::OPAQUE != 0;
         let l = if dark_inside { light16(brightest_around(n, x, y, z)) } else { l };
         let foliage_transformation =
-            if part.offset == glam::IVec3::ZERO { foliage_look(boxes, n.origin[0] + x, n.origin[2] + z) } else { None };
+            if part.offset == glam::IVec3::ZERO { foliage_look(&info.foliage, n.origin[0] + x, n.origin[2] + z) } else { None };
         for bx in boxes {
             let center = std::array::from_fn(|a| (bx.min[a] + bx.max[a]) * 0.5);
             let center = if bx.tilt.degrees == 0.0 { center } else { tilted(center, &bx.tilt) };
@@ -294,21 +294,15 @@ fn draw_block(
     }
 }
 
-fn foliage_look(boxes: &[crate::content::ModelBox], x: i32, z: i32) -> Option<glam::Affine3A> {
-    /// Range a foliage can sit far from center of a block, in block units
-    const JITTER_RANGE: f32 = 0.25;
-    /// A foliages size is [HEIGHT_MIN, HEIGHT_MIN + HEIGHT_RANGE]
-    const HEIGHT_MIN: f32 = 0.85;
-    const HEIGHT_RANGE: f32 = 0.3;
-
-    if boxes.is_empty() || boxes.iter().any(|b| !b.flat || b.tilt.degrees == 0.0) {
+fn foliage_look(f: &crate::content::Foliage, x: i32, z: i32) -> Option<glam::Affine3A> {
+    if *f == crate::content::Foliage::NONE {
         return None;
     }
     let h = weft_noise::hash(1, x as i64, 0, z as i64);
     let r = |i: u32| f32::from((h >> (16 * i)) as u16) / f32::from(u16::MAX);
-    let (mid, turn) = (Vec3::new(0.5, 0.0, 0.5), Quat::from_rotation_y(r(0) * std::f32::consts::FRAC_PI_2));
-    let lean = Vec3::new(r(2) - 0.5, 0.0, r(3) - 0.5) * (2.0 * JITTER_RANGE);
-    let height = Vec3::new(1.0, HEIGHT_MIN + HEIGHT_RANGE * r(1), 1.0);
+    let (mid, turn) = (Vec3::new(0.5, 0.0, 0.5), Quat::from_rotation_y((f.yaw[0] + (f.yaw[1] - f.yaw[0]) * r(0)).to_radians()));
+    let lean = Vec3::new(r(2) * 2.0 - 1.0, 0.0, r(3) * 2.0 - 1.0) * f.offset;
+    let height = Vec3::new(1.0, f.height_scale[0] + (f.height_scale[1] - f.height_scale[0]) * r(1), 1.0);
     let to = Affine3A::from_scale_rotation_translation(height, turn, mid + lean - turn * mid);
     Some(to)
 }

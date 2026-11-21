@@ -1709,6 +1709,18 @@ macro_rules! state_setters {
                 .hardness(0.0)
                 .tag("plantable")
         }
+        /// Draws it up to `blocks` off center along X and Z.
+        pub fn random_offset(self, blocks: f32) -> Self {
+            self.set(&bc::RANDOM_OFFSET, blocks)
+        }
+        /// Draws it scaled in height between `min` and `max` relative size.
+        pub fn random_height_scale(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_HEIGHT_SCALE, [min, max])
+        }
+        /// Draws it turned between `min` and `max` degrees about Y.
+        pub fn random_yaw(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_YAW, [min, max])
+        }
         /// `plant` two blocks tall (vanilla's tall grass, a sunflower): a cross showing `lower`
         /// in its cell and `upper` in the one above (relative names under `block/`), taking room
         /// in both. Every face is picked after, so `.tint_kind(..)` goes on both.

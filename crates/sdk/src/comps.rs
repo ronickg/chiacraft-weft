@@ -569,6 +569,9 @@ pub mod block {
     pub static LAYER: Component<u32, Block> = Component::named(b::LAYER);
     pub static MODEL: Component<u32, Block> = Component::named(b::MODEL);
     pub static ITEM_FACE: Component<u8, Block> = Component::named(b::ITEM_FACE);
+    pub static RANDOM_OFFSET: Component<f32, Block> = Component::named(b::RANDOM_OFFSET);
+    pub static RANDOM_HEIGHT_SCALE: Component<[f32; 2], Block> = Component::named(b::RANDOM_HEIGHT_SCALE);
+    pub static RANDOM_YAW: Component<[f32; 2], Block> = Component::named(b::RANDOM_YAW);
     pub static TEXTURES: Component<[String; 6], Block> = Component::named(b::TEXTURES);
     pub static TURNS: Component<[u8; 6], Block> = Component::named(b::TURNS);
     pub static TURN: Component<u8, Block> = Component::named(b::TURN);
