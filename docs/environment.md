@@ -32,6 +32,8 @@ r.entity(&SPIRIT).environment(
 Liquid `.fog(rgb, start, end)`, `.overlay(texture, opacity)` and `.no_overlay()` are presets
 of this same mechanism. Start and end are explicit block distances. Water's low-pass filter is
 an independent environment contribution; heat never selects an audio filter.
+Below the surface, a camera in a dry moving hull can still pick up the surrounding liquid's
+fog and screen overlay. The hull's air still determines immersion and acoustics.
 `EntityEffectBuilder::screen(&SHADER)` is likewise a post-shader preset. Native dimension,
 weather, cave reverb, inside-block and fire appearances all contribute to the same result.
 Acoustics apply to every sound category, including music and UI sounds. Leaving the world

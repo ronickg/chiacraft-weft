@@ -3021,6 +3021,11 @@ impl Client {
     }
 
     fn visible_liquid(&self, point: DVec3) -> Option<u16> {
+        let (liquid, dry) = self.liquid_observation(point)?;
+        (!dry).then_some(liquid)
+    }
+
+    fn liquid_observation(&self, point: DVec3) -> Option<(u16, bool)> {
         let c = content();
         let cells = world::SeenCells { world: &self.world, air_if_missing: false };
         let liquid = physics::liquid_at(c, &cells, point)?;
@@ -3030,7 +3035,7 @@ impl Client {
             .values()
             .filter(|e| !e.dry_boxes.is_empty())
             .any(|e| physics::inside_dry_volume((e.place_at(tick), &e.dry_boxes), point));
-        (!dry).then_some(liquid)
+        Some((liquid, dry))
     }
 
     /// With the view not bobbing walking (`core:camera_bob` off) where it would, the bob the hand

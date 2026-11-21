@@ -266,13 +266,28 @@ impl Client {
             for layer in block_layers.iter().filter(|l| l.observer == observer) {
                 self.environment_source(&mut env, format!("block/{observer}/{block}/{}", layer.name), layer.clone(), 0, point);
             }
-            if let Some(liquid) = self.visible_liquid(point) {
+            if let Some((liquid, dry)) = self.liquid_observation(point) {
+                if dry && observer != abi::environment::observer::CAMERA {
+                    continue;
+                }
                 for layer in c.liquids[liquid as usize]
                     .environment
                     .iter()
                     .filter(|l| l.observer == observer)
                 {
-                    let layer = self.environment_material(layer.clone(), point, Some(c.liquids[liquid as usize].first_state));
+                    let mut layer = self.environment_material(layer.clone(), point, Some(c.liquids[liquid as usize].first_state));
+                    if dry {
+                        // The camera can see the liquid outside a dry hull.
+                        layer.values = Values {
+                            fog_color: layer.values.fog_color,
+                            fog_start: layer.values.fog_start,
+                            fog_end: layer.values.fog_end,
+                            ..Values::unset()
+                        };
+                        layer.sky.clear();
+                        layer.post.clear();
+                        layer.replace_post = false;
+                    }
                     self.environment_source(&mut env, format!("liquid/{observer}/{liquid}/{}", layer.name), layer, 0, point);
                 }
             }
