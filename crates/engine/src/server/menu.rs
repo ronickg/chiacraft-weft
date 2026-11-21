@@ -129,7 +129,9 @@ fn set_trash(dim: &mut Dim, c: &Content, player: u64, stack: ItemStack) {
         .into_iter()
         .flat_map(u32::to_le_bytes)
         .collect();
-    dim.entities.comps.insert((player, c.game.fields.trash), bytes);
+    dim.entities
+        .comps
+        .insert((player, c.game.fields.trash), bytes);
 }
 
 /// What `player` last put in its trash.

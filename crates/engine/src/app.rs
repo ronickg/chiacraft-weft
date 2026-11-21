@@ -1222,9 +1222,11 @@ impl Running {
                 CLONE, GATHER, HOTBAR_SWAP, OFF_HAND_SWAP, PICK_SAME, THROW, THROW_ALL, TO_TRASH, WHEEL_DOWN, WHEEL_UP,
             };
             // A release and a new press can both land between two frames.
-            if g.client.drag.as_ref().is_some_and(|(button, _)| {
-                !self.input.held_button(*button) || self.input.pressed_button(*button)
-            }) {
+            if g.client
+                .drag
+                .as_ref()
+                .is_some_and(|(button, _)| !self.input.held_button(*button) || self.input.pressed_button(*button))
+            {
                 let (button, slots) = g.client.drag.take().unwrap();
                 if slots.len() == 1 {
                     g.client

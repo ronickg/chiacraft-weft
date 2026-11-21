@@ -630,6 +630,7 @@ impl Sky {
         dim: usize,
         time: f64,
         weather: crate::weather::WeatherField,
+        rain_veil: bool,
         eye_y: f64,
         environment: &weft_abi::environment::EnvironmentValues,
         weights: &FxHashMap<String, f32>,
@@ -763,7 +764,7 @@ impl Sky {
                         let preset = &c.game.weathers[id as usize];
                         let look = preset.look;
                         shade(look.cloud_gray, look.cloud_dark * 0.74)
-                            .extend(if world_depth.is_some() && preset.falls() { look.falls } else { 0.0 })
+                            .extend(if rain_veil && world_depth.is_some() && preset.falls() { look.falls } else { 0.0 })
                             .to_array()
                     };
                     (

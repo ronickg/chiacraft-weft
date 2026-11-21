@@ -268,7 +268,7 @@ pub async fn inventory_crafting(t: T) -> R {
         let stack = t.c().cursor_stack();
         stack.item == planks && stack.count == 8
     })
-        .await?;
+    .await?;
     t.click_ui("slot:37", 0);
     t.until("planks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(1).item == planks)
         .await?;

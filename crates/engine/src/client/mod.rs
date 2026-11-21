@@ -637,6 +637,7 @@ pub struct Client {
     pub disconnected: Option<String>,
     /// Seconds until holding a button repeats its action. A new press never waits.
     break_delay: f32,
+    last_break: Option<(u64, IVec3, crate::world::placement::Part)>,
     melee_recovery: f32,
     use_delay: f32,
     /// Each action as the server last heard of it (`send_keys`).
@@ -1024,6 +1025,7 @@ impl Client {
             selected: 0,
             disconnected: None,
             break_delay: 0.0,
+            last_break: None,
             melee_recovery: 0.0,
             use_delay: 0.0,
             keys_down: Vec::new(),
@@ -1859,14 +1861,18 @@ impl Client {
                 let speed = self.attribute(a::MINING_SPEED)
                     * if self.eye_liquid().is_some() { self.attribute(a::SUBMERGED_MINING_SPEED) } else { 1.0 }
                     * if self.player.on_ground { 1.0 } else { self.attribute(a::AIRBORNE_MINING_SPEED) };
-                let rate = c.mining_rate(hit.state, &self.held(), speed, self.mode.has(crate::tag_bits::game_mode::INSTANT_BREAK));
+                let creative = self.mode.has(crate::tag_bits::game_mode::INSTANT_BREAK);
+                let rate = c.mining_rate(hit.state, &self.held(), speed, creative);
+                let target = (hit.frame, hit.origin, hit.part());
                 let done = match self.breaking {
                     Some((f, p, v)) if (f, p) == (hit.frame, hit.origin) && self.breaking_part == hit.part() => v,
                     _ => 0.0,
                 };
                 self.breaking_part = hit.part();
                 let progress = if rate >= 1.0 { 1.0 } else { done + dt as f32 * self.tick_rate as f32 * rate };
-                if progress >= 1.0 && (self.pressed_without_helm(input, "core:attack") || self.break_delay <= 0.0) {
+                let waiting = self.break_delay > 0.0
+                    && (self.last_break == Some(target) || (creative && !self.pressed_without_helm(input, "core:attack")));
+                if progress >= 1.0 && !waiting {
                     send_look.send(&mut self.conn);
                     let at = self.hit_point(&hit, hit.origin);
                     self.conn
@@ -1882,7 +1888,9 @@ impl Client {
                         space.replace_part(hit.origin, hit.state, after);
                     }
                     self.breaking = None;
+                    self.last_break = Some(target);
                     self.break_delay = 0.25;
+                    self.swing_arm();
                 } else if rate < 1.0 {
                     self.breaking = Some((hit.frame, hit.origin, progress.min(1.0)));
                 } else {
@@ -1904,6 +1912,9 @@ impl Client {
         let mining = self.breaking.map(|(f, p, _)| (f, p, self.breaking_part));
         if mining != self.told_mining {
             self.told_mining = mining;
+            if mining.is_some() {
+                send_look.send(&mut self.conn);
+            }
             self.conn.send(match mining {
                 Some((frame, pos, part)) => ToServer::StartBreak { pos, part, frame },
                 None => ToServer::StopBreak,
@@ -3324,6 +3335,8 @@ impl Client {
         let ticks = self.smooth_time();
         let weather_ticks = ticks - self.world.time as f64 + self.world.ticks as f64;
         let weather = self.weather_field(weather_ticks);
+        let rain_veil =
+            !crate::world::light::enclosed(&content().dims[self.world.dim as usize], self.world.light(cam.pos.floor().as_ivec3()));
         let environment = &self.environment.values;
         let world_depth = (self.sky.has_atmosphere()
             && weather.clouds.is_some()
@@ -3345,6 +3358,7 @@ impl Client {
             self.world.dim as usize,
             ticks,
             weather,
+            rain_veil,
             self.camera().pos.y,
             &self.environment.values,
             &self.environment.sky,

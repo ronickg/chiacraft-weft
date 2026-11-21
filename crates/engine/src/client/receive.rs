@@ -244,7 +244,12 @@ impl Client {
             }
             ToClient::BreakRefused { frame, pos } => {
                 self.refused_break = Some((frame, pos));
-                self.breaking = None;
+                if self
+                    .breaking
+                    .is_some_and(|(f, p, _)| (f, p) == (frame, pos))
+                {
+                    self.breaking = None;
+                }
             }
             ToClient::Using(ticks) => {
                 self.using = ticks.map(|(t, _)| (0.0, t as f32));
