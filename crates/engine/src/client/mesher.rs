@@ -6,6 +6,7 @@
 
 use crate::gpu_layout::{face, quad};
 use weft_abi::{BlockModel, RenderLayer, block_flags as bf};
+use glam::{Affine3A, Quat, Vec3};
 
 use crate::content::Content;
 use crate::world::placement::{CellLayout, Part};
@@ -242,6 +243,7 @@ fn draw_block(
         // nor in others like it next to it: the brightest around goes for all.
         let dark_inside = info.flags & bf::OPAQUE != 0;
         let l = if dark_inside { light16(brightest_around(n, x, y, z)) } else { l };
+        let foliage_transformation = if part.offset == glam::IVec3::ZERO { foliage_look(boxes, n.origin[0] + x, n.origin[2] + z) } else { None };
         for bx in boxes {
             let center = std::array::from_fn(|a| (bx.min[a] + bx.max[a]) * 0.5);
             let center = if bx.tilt.degrees == 0.0 { center } else { tilted(center, &bx.tilt) };
@@ -264,6 +266,7 @@ fn draw_block(
                 }
                 let fl = if at_edge && !dark_inside { light16(nl) } else { l };
                 let Some((corners, uv)) = box_face(bx, dir) else { continue };
+                let corners = corners.map(|p| foliage_transformation.map_or(p, |m| m.transform_point3(p.into()).to_array()));
                 let corners = corners.map(|p| [p[0] + at[0], p[1] + at[1], p[2] + at[2]]);
                 for (k, l) in face_layers(c, info, bx.textures[dir] & face::TEX_MASK, dir)
                     .iter()
@@ -290,10 +293,28 @@ fn draw_block(
     }
 }
 
+fn foliage_look(boxes: &[crate::content::ModelBox], x: i32, z: i32) -> Option<glam::Affine3A> {
+    /// Range a foliage can sit far from center of a block, in block units
+    const JITTER_RANGE: f32 = 0.25;
+    /// A foliages size is [HEIGHT_MIN, HEIGHT_MIN + HEIGHT_RANGE]
+    const HEIGHT_MIN: f32 = 0.85;
+    const HEIGHT_RANGE: f32 = 0.3;
+
+    if boxes.is_empty() || !boxes.iter().all(|b| b.flat && b.tilt.degrees != 0.0) {
+        return None;
+    }
+    let h = weft_noise::hash(1, x as i64, 0, z as i64);
+    let r = |i: u32| f32::from((h >> (16 * i)) as u16) / f32::from(u16::MAX);
+    let (mid, turn) = (Vec3::new(0.5, 0.0, 0.5), Quat::from_rotation_y(r(0) * std::f32::consts::FRAC_PI_2));
+    let lean = Vec3::new(r(2) - 0.5, 0.0, r(3) - 0.5) * (2.0 * JITTER_RANGE);
+    let height = Vec3::new(1.0, HEIGHT_MIN + HEIGHT_RANGE * r(1), 1.0);
+    let to = Affine3A::from_scale_rotation_translation(height, turn, mid + lean - turn * mid);
+    Some(to)
+}
+
 /// Each cube owns only the portion of a spanning model inside it. Crop along the
 /// face's texture axes; tilted faces use the same bounds again at the fragment.
 fn clipped_face(corners: [[f32; 3]; 4], uv: [f32; 4], clip: u8, draw: &mut impl FnMut([[f32; 3]; 4], [f32; 4], bool)) {
-    use glam::Vec3;
     let [p, b, _, d] = corners.map(Vec3::from_array);
     let (u, v) = (b - p, d - p);
     let normal = u.cross(v).normalize_or_zero();
