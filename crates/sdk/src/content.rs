@@ -1709,6 +1709,27 @@ macro_rules! state_setters {
                 .hardness(0.0)
                 .tag("plantable")
         }
+        pub fn random_offset(self, blocks: f32) -> Self {
+            self.set(&bc::RANDOM_OFFSET, blocks)
+        }
+        pub fn random_height_scale(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_HEIGHT_SCALE, [min, max])
+        }
+        pub fn random_width_scale(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_WIDTH_SCALE, [min, max])
+        }
+        pub fn random_scale(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_SCALE, [min, max])
+        }
+        pub fn random_yaw(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_YAW, [min, max])
+        }
+        pub fn random_pitch(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_PITCH, [min, max])
+        }
+        pub fn random_roll(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_ROLL, [min, max])
+        }
         /// `plant` two blocks tall (vanilla's tall grass, a sunflower): a cross showing `lower`
         /// in its cell and `upper` in the one above (relative names under `block/`), taking room
         /// in both. Every face is picked after, so `.tint_kind(..)` goes on both.
