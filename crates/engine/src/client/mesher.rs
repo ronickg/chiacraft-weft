@@ -5,8 +5,8 @@
 //! corners.
 
 use crate::gpu_layout::{face, quad};
-use weft_abi::{BlockModel, RenderLayer, block_flags as bf};
 use glam::{Affine3A, Quat, Vec3};
+use weft_abi::{BlockModel, RenderLayer, block_flags as bf};
 
 use crate::content::Content;
 use crate::world::placement::{CellLayout, Part};
@@ -243,7 +243,8 @@ fn draw_block(
         // nor in others like it next to it: the brightest around goes for all.
         let dark_inside = info.flags & bf::OPAQUE != 0;
         let l = if dark_inside { light16(brightest_around(n, x, y, z)) } else { l };
-        let foliage_transformation = if part.offset == glam::IVec3::ZERO { foliage_look(boxes, n.origin[0] + x, n.origin[2] + z) } else { None };
+        let foliage_transformation =
+            if part.offset == glam::IVec3::ZERO { foliage_look(boxes, n.origin[0] + x, n.origin[2] + z) } else { None };
         for bx in boxes {
             let center = std::array::from_fn(|a| (bx.min[a] + bx.max[a]) * 0.5);
             let center = if bx.tilt.degrees == 0.0 { center } else { tilted(center, &bx.tilt) };
