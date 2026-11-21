@@ -118,7 +118,13 @@ fn cloud_cell_density(seed: u32, origin: vec2<i32>, cell: vec2<f32>, band: i32) 
         return vec2(0.0);
     }
     let fill = cloud_band_fill(field, band);
-    return vec2(smoothstep(0.0, 0.8, fill) * (0.6 + 0.4 * smoothstep(0.0, 0.65, field.x)), field.y);
+    let density = smoothstep(0.0, 0.8, fill) * (0.6 + 0.4 * smoothstep(0.0, 0.65, field.x));
+    var overhead = 0.0;
+    for (var above = band + 1; above < 5; above++) {
+        overhead += smoothstep(0.0, 0.8, cloud_band_fill(field, above));
+    }
+    // Keep the weather type and approximate overhead optical thickness in one half.
+    return vec2(density, field.y + overhead * 0.125);
 }
 
 const CLOUD_BRICK: i32 = 8;
@@ -157,34 +163,34 @@ fn cloud_lighting(s: Sky, dir: vec3<f32>) -> CloudLighting {
     return CloudLighting(directed_sun, sun_from_above);
 }
 
-fn cloud_radiance(s: Sky, field: vec3<f32>, kind: f32, density: f32, band: f32, sun: CloudLighting) -> vec3<f32> {
+fn cloud_radiance(s: Sky, weather: f32, kind: f32, optical_depth: f32, sun: CloudLighting) -> vec3<f32> {
     var base = s.color.rgb;
-    if s.ids.w != 0u && field.y > 0.0 {
-        base = select(s.axes[0].xyz, s.axes[1].xyz, field.y == 2.0);
+    if s.ids.w != 0u && weather > 0.0 {
+        base = select(s.axes[0].xyz, s.axes[1].xyz, weather == 2.0);
     }
-    var radiance = base * (0.82 + 0.05 * band);
-    if s.cloud_sun.w > 0.0 {
-        // Local density and band height approximate sun attenuation without a second ray.
-        let sun_path = mix(band + 0.5, 4.5 - band, sun.from_above) * s.cloud_sun.w;
-        let depth = clamp(density * sun_path * (1.0 + 0.30 * kind), 0.0, 1.0);
-        let direct = 1.0 - smoothstep(0.0, 1.0, depth);
-        let diffuse = 0.34 - 0.15 * depth;
-        let headroom = 1.0 - 0.65 * min(dot(radiance, vec3(0.30, 0.59, 0.11)), 1.0);
-        radiance += (s.cloud_sun.rgb * diffuse + sun.directed * direct) * headroom;
-    }
-    return radiance;
+    let scattered_tint = base / max(max(max(base.r, base.g), base.b), 0.001);
+    let ambient = 0.77 + 0.13 * exp2(-0.75 * optical_depth);
+    let sun_path = s.cloud_sun.w * optical_depth * (1.0 + 0.30 * kind);
+    let transmittance = exp2(-1.6 * sun_path);
+    let scatter = s.cloud_sun.rgb * 0.12 + transmittance * (s.cloud_sun.rgb * 0.19 + sun.directed * 0.30) * sun.from_above;
+    let radiance = base * ambient + scattered_tint * scatter;
+    // Keep distinctions in sunlit cloud tops when the surface has no HDR headroom.
+    let peak = max(max(radiance.r, radiance.g), radiance.b);
+    let highlight = max(peak - 0.75, 0.0);
+    let shoulder = 0.75 + highlight / (1.0 + 4.0 * highlight);
+    return radiance * min(1.0, shoulder / max(peak, 0.001));
 }
 
 fn accumulate_cloud(
-    a: ptr<function, CloudAccumulation>, s: Sky, field: vec3<f32>, band: f32, density: f32,
+    a: ptr<function, CloudAccumulation>, s: Sky, weather: f32, overhead: f32, density: f32,
     near: f32, far: f32, weight: f32, sun: CloudLighting,
 ) {
-    let kind = select(s.extra.w, field.y, s.ids.w != 0u);
+    let kind = select(s.extra.w, weather, s.ids.w != 0u);
     let extinction = select(0.085, select(0.145, 0.22, kind == 2.0), kind > 0.0);
     let absorption = (1.0 - (*a).alpha) * (1.0 - exp(-density * weight * (far - near) * extinction));
     (*a).first = min((*a).first, near);
     (*a).optical_distance += (near + far) * 0.5 * absorption;
-    (*a).light += cloud_radiance(s, field, kind, density, band, sun) * absorption;
+    (*a).light += cloud_radiance(s, weather, kind, overhead + density * 0.35, sun) * absorption;
     (*a).alpha += absorption;
 }
 
@@ -244,7 +250,7 @@ fn trace_cloud_bands(
                 if transition {
                     weight = 1.0 - smoothstep(lod.x, lod.y, (t + end) * 0.5);
                 }
-                accumulate_cloud(a, s, vec3(0.0, sample_density.y, 0.0), f32(band), sample_density.x, t, end, weight, sun);
+                accumulate_cloud(a, s, floor(sample_density.y), fract(sample_density.y) * 8.0, sample_density.x, t, end, weight, sun);
             }
             t = end;
             if next.x < next.y {
@@ -267,7 +273,7 @@ fn trace_cloud_impostor(
     let origin = vec2<i32>(s.uv.zw);
     let ray = dir.xz / s.extra.x;
     let stride = max(96.0, (far - near) / 16.0);
-    let band = mix(3.65, 0.95, smoothstep(-0.035, 0.035, dir.y));
+    let overhead = mix(0.15, 2.4, smoothstep(-0.035, 0.035, dir.y));
     for (var t = near; t < far && (*a).alpha < CLOUD_OPAQUE; t += stride) {
         let end = min(t + stride, far);
         let middle = (t + end) * 0.5;
@@ -275,7 +281,7 @@ fn trace_cloud_impostor(
         if field.x > 0.0 {
             let density = smoothstep(0.0, 0.72, field.x) * 0.58;
             let weight = smoothstep(lod.x, lod.y, middle);
-            accumulate_cloud(a, s, field, band, density, t, end, weight, sun);
+            accumulate_cloud(a, s, field.y, overhead * density, density, t, end, weight, sun);
         }
     }
 }
@@ -412,26 +418,35 @@ fn rain_sunlight(s: Sky, origin: vec2<i32>, at: vec2<f32>, height: f32) -> f32 {
 }
 
 fn rain_medium(s: Sky, dir: vec3<f32>, t: f32, reach: f32, rainbow: vec3<f32>, view: Scene) -> vec4<f32> {
-    let top = s.extra.z + s.extra.y * 0.27;
-    let origin = vec2<i32>(s.uv.zw);
-    let at = s.uv.xy + dir.xz * (t / s.extra.x);
-    // Only the coarse footprint feeds the rain shafts.
-    let coarse = cloud_noise(s.ids.z, origin, cloud_warp(s.ids.z, origin, at), vec2(1, 2));
-    if coarse <= 0.48 {
+    let rel = dir * t;
+    if !rain_exposed(view, rel) {
         return vec4(0.0);
     }
-    let climate = cloud_climate(s.ids.z, origin, at);
-    let storm = climate >= 0.77;
-    let rain_band = smoothstep(0.57, 0.63, climate) * (1.0 - smoothstep(0.66, 0.72, climate));
-    let storm_band = smoothstep(0.83, 0.90, climate);
-    let wetness = select(rain_band, storm_band, storm);
+    let top = s.extra.z + s.extra.y * 0.27;
+    let origin = vec2<i32>(s.uv.zw);
+    let at = s.uv.xy + rel.xz / s.extra.x;
+    var coverage = 1.0;
+    var storm = s.extra.w >= 2.0;
+    var wetness = 1.0;
+    if s.ids.w != 0u {
+        // Only the coarse footprint feeds the rain shafts.
+        let coarse = cloud_noise(s.ids.z, origin, cloud_warp(s.ids.z, origin, at), vec2(1, 2));
+        if coarse <= 0.48 {
+            return vec4(0.0);
+        }
+        coverage = smoothstep(0.48, 0.74, coarse);
+        let climate = cloud_climate(s.ids.z, origin, at);
+        storm = climate >= 0.77;
+        let rain_band = smoothstep(0.57, 0.63, climate) * (1.0 - smoothstep(0.66, 0.72, climate));
+        wetness = select(rain_band, smoothstep(0.83, 0.90, climate), storm);
+    }
     let preset = select(s.axes[0], s.axes[1], storm);
     if wetness <= 0.0 || preset.w <= 0.0 {
         return vec4(0.0);
     }
     let attach = smoothstep(-18.0, 28.0, top - dir.y * t);
     let range = smoothstep(36.0, 105.0, t) * (1.0 - smoothstep(reach * 0.55, reach, t));
-    let density = smoothstep(0.48, 0.74, coarse) * wetness * attach * range * preset.w * s.color.a;
+    let density = coverage * wetness * attach * range * preset.w * s.color.a;
     let extinction = density * select(0.0075, 0.012, storm);
     let luma = vec3(0.30, 0.59, 0.11);
     let fog = view.fog_color.rgb;
@@ -442,13 +457,16 @@ fn rain_medium(s: Sky, dir: vec3<f32>, t: f32, reach: f32, rainbow: vec3<f32>, v
     return vec4(mix(color, fog, rain_mist_amount(t, view)), extinction);
 }
 
+fn rain_ceiling(s: Sky) -> f32 {
+    return s.extra.z + s.extra.y * 0.27 + 18.0;
+}
+
 // A soft mass beneath the cloud. Only the weather field moves it, with the cloud's drift.
 fn composite_rain_veil(s: Sky, dir: vec3<f32>, limit: f32, cloud: CloudHit, view: Scene) -> vec4<f32> {
-    if s.ids.w == 0u || max(s.axes[0].w, s.axes[1].w) <= 0.0 {
+    if max(s.axes[0].w, s.axes[1].w) <= 0.0 {
         return cloud.color;
     }
-    let top = s.extra.z + s.extra.y * 0.27;
-    let ceiling = top + 18.0;
+    let ceiling = rain_ceiling(s);
     let reach = min(1536.0, view.environment.z);
     var near = 36.0;
     // Once the cloud is nearly opaque, rain behind it contributes at most five percent.
@@ -525,29 +543,6 @@ fn atmosphere_filter(pixel: vec2<f32>, grid: vec4<u32>) -> AtmosphereFilter {
     let g = 1.0 - f;
     let rows = vec4(low.y, low.y, high.y, high.y) * grid.w;
     return AtmosphereFilter(rows + vec4(low.x, high.x, low.x, high.x), vec4(g.x * g.y, f.x * g.y, g.x * f.y, f.x * f.y));
-}
-
-fn atmosphere_color(sampled: AtmosphereSample) -> vec4<f32> {
-    return vec4(unpack2x16float(sampled.rg), unpack2x16float(sampled.ba));
-}
-
-fn filter_atmosphere(
-    view: Scene, depth: f32, taps: AtmosphereFilter, liquid: bool,
-    a: AtmosphereSample, b: AtmosphereSample, c: AtmosphereSample, d: AtmosphereSample,
-) -> vec4<f32> {
-    let depths = vec4(a.depth, b.depth, c.depth, d.depth);
-    let nearer = max(vec4(depth), depths);
-    let at_origin = view.view_proj[3];
-    let beyond_clouds = at_origin.z / max(view.environment.z + abs(at_origin.w), 1.0);
-    // A liquid surface can sit slightly above the bottom sampled by the pass.
-    let tolerance = select(vec4(0.035), vec4(0.085), vec4(liquid) & (vec4(depth) >= depths));
-    let weights = select(vec4(0.0), taps.weight, (nearer <= vec4(beyond_clouds)) | (abs(depths - depth) <= nearer * tolerance));
-    let total = dot(weights, vec4(1.0));
-    // Trace the actual ray when too little of the footprint belongs to this surface.
-    if total < 0.25 {
-        return vec4(0.0, 0.0, 0.0, -1.0);
-    }
-    return mat4x4(atmosphere_color(a), atmosphere_color(b), atmosphere_color(c), atmosphere_color(d)) * (weights / total);
 }
 
 // Tint translucent fragments by the part of the atmosphere between them and the camera.

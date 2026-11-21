@@ -93,14 +93,18 @@ struct CloudPixel {
     @builtin(frag_depth) depth: f32,
 }
 
-@vertex
-fn vs_clouds(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> CloudOut {
+fn cloud_triangle(vi: u32, ii: u32) -> CloudOut {
     let p = vec2<f32>(f32((vi << 1u) & 2u), f32(vi & 2u)) * 2.0 - 1.0;
     var out: CloudOut;
     out.clip = vec4(p, 0.0, 1.0);
     out.at = vec3(p, 1.0);
     out.index = ii;
     return out;
+}
+
+@vertex
+fn vs_clouds(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> CloudOut {
+    return cloud_triangle(vi, ii);
 }
 
 @fragment
@@ -127,10 +131,28 @@ fn atmosphere_at(s: Sky, dir: vec3<f32>, depth: f32, pixel: vec2<f32>) -> vec4<f
     return resolve_rain(s, dir, limit, trace_cloud(s, dir, limit, scene), scene, pixel);
 }
 
+@vertex
+fn vs_atmosphere(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> CloudOut {
+    var out = cloud_triangle(vi, ii);
+    let s = sky[ii];
+    let slab = max(0.0, max(s.extra.z, -s.extra.z - s.extra.y));
+    let wet = max(s.axes[0].w, s.axes[1].w) > 0.0;
+    let closest = select(slab, min(36.0, slab), wet);
+    // Use the smallest forward component over the viewport, so the depth test can
+    // reject opaque geometry only when it is in front of every possible effect.
+    let m = mat(sky[0]);
+    let center = m * vec3(0.0, 0.0, 1.0);
+    let longest = sqrt(dot(center, center) + dot(m[0], m[0]) + dot(m[1], m[1]));
+    let forward = (scene.view_proj * vec4(center, 0.0)).w * closest / max(longest, 0.000001);
+    let origin = scene.view_proj[3];
+    out.clip.z = clamp(origin.z / max(forward + origin.w, 0.000001), 0.0, 1.0);
+    return out;
+}
+
 @fragment
 fn fs_atmosphere(in: CloudOut) -> @location(0) vec4<f32> {
     let pixel = vec2<u32>(in.clip.xy);
-    let depth = world_depth[pixel.y * u32(sky[0].extra.x) + pixel.x];
+    let depth = world_depth[pixel.y * scene.atmosphere_extent.x + pixel.x];
     return atmosphere_at(sky[in.index], normalize(mat(sky[0]) * in.at), depth, in.clip.xy);
 }
 
@@ -174,25 +196,83 @@ fn cache_cloud_density(
     }
 }
 
-fn atmosphere_ray(pixel: vec2<f32>, size: vec2<u32>) -> vec3<f32> {
+fn unnormalized_atmosphere_ray(pixel: vec2<f32>, size: vec2<u32>) -> vec3<f32> {
     let ndc = (pixel / vec2<f32>(size)) * vec2(2.0, -2.0) + vec2(-1.0, 1.0);
-    return normalize(mat(sky[0]) * vec3(ndc, 1.0));
+    return mat(sky[0]) * vec3(ndc, 1.0);
+}
+
+fn atmosphere_ray(pixel: vec2<f32>, size: vec2<u32>) -> vec3<f32> {
+    return normalize(unnormalized_atmosphere_ray(pixel, size));
+}
+
+fn rain_visible_range(p: vec2<u32>, size: vec2<u32>, reach: f32) -> f32 {
+    if scene.atmosphere_cache.z == 0u || min(size.x, size.y) < 16u {
+        return reach;
+    }
+    // Cover the whole support of bilinear rain interpolation with 16-pixel depth tiles.
+    let lo = vec2<u32>(max(vec2<i32>(p) - i32(RAIN_STRIDE), vec2(0)));
+    let hi = min(p + RAIN_STRIDE, size - 1u);
+    var dims = size;
+    var offset = 0u;
+    for (var level = 0u; level < 4u; level++) {
+        offset += dims.x * dims.y;
+        dims = (dims + 1u) / 2u;
+    }
+    let first = lo / 16u;
+    let last = hi / 16u;
+    var depth = 1.0;
+    for (var y = first.y; y <= last.y; y++) {
+        for (var x = first.x; x <= last.x; x++) {
+            depth = min(depth, world_depth[offset + y * dims.x + x]);
+        }
+    }
+    if depth <= 0.0 {
+        return reach;
+    }
+    let at_origin = scene.view_proj[3];
+    let forward = (at_origin.z - depth * at_origin.w) / depth;
+    var min_slope = 1e6;
+    var max_length = 0.0;
+    for (var corner = 0u; corner < 4u; corner++) {
+        let pixel = select(lo, hi, vec2((corner & 1u) != 0u, (corner & 2u) != 0u));
+        let ray = unnormalized_atmosphere_ray(vec2<f32>(pixel) + 0.5, size);
+        min_slope = min(min_slope, (scene.view_proj * vec4(ray, 0.0)).w);
+        max_length = max(max_length, length(ray));
+    }
+    return min(reach, forward * max_length / max(min_slope, 1e-8));
+}
+
+fn rain_cover_boundary(dir: vec3<f32>, a: f32, b: f32, exposed_end: bool) -> f32 {
+    var low = a;
+    var high = b;
+    for (var i = 0u; i < 5u; i++) {
+        let middle = (low + high) * 0.5;
+        if rain_exposed(scene, dir * middle) == exposed_end {
+            high = middle;
+        } else {
+            low = middle;
+        }
+    }
+    // Keep the side known to contain rain.
+    return select(low, high, exposed_end);
 }
 
 @compute @workgroup_size(8, 8)
 fn cache_rain_depth(@builtin(global_invocation_id) id: vec3<u32>) {
-    let size = scene.atmosphere_grid.xy;
+    let size = scene.atmosphere_extent.xy;
     let grid = (size + (RAIN_STRIDE - 1u)) / RAIN_STRIDE;
     if any(id.xy >= grid) {
         return;
     }
-    let pixel = vec2<f32>(atmosphere_sample_pixel(id.xy, size, RAIN_STRIDE)) + 0.5;
+    let p = atmosphere_sample_pixel(id.xy, size, RAIN_STRIDE);
+    let pixel = vec2<f32>(p) + 0.5;
     let dir = atmosphere_ray(pixel, size);
     let s = scene.cloud;
     let reach = min(1536.0, scene.environment.z);
-    let ceiling = s.extra.z + s.extra.y * 0.27 + 18.0;
+    let ceiling = rain_ceiling(s);
     var enter = 36.0;
     var leave = select(reach, min(reach, scene.params.y), scene.environment.w >= 1.0);
+    leave = rain_visible_range(p, size, leave);
     if dir.y > 0.0 {
         leave = min(leave, ceiling / dir.y);
     } else if dir.y < 0.0 {
@@ -203,97 +283,43 @@ fn cache_rain_depth(@builtin(global_invocation_id) id: vec3<u32>) {
     let rainbow = rainbow_radiance(s, dir);
     let offset = (id.y * grid.x + id.x) * (RAIN_SLICES + 1u);
     var rain = vec4(0.0);
-    rain_depth_out[offset] = vec2(0u);
+    var first_wet = leave;
     for (var layer = 1u; layer <= RAIN_SLICES; layer += 1u) {
         let start = f32(layer - 1u) * RAIN_SLICE;
         let end = min(start + RAIN_SLICE, leave);
         for (var t = start; t < end && rain.a < 0.88; t += 32.0) {
-            let a = max(t, enter);
-            let b = min(t + 32.0, end);
+            var a = max(t, enter);
+            var b = min(t + 32.0, end);
             if b > a {
+                let middle = (a + b) * 0.5;
+                if !rain_exposed(scene, dir * middle) {
+                    if rain_exposed(scene, dir * a) {
+                        b = rain_cover_boundary(dir, a, middle, false);
+                    } else if rain_exposed(scene, dir * b) {
+                        a = rain_cover_boundary(dir, middle, b, true);
+                    } else {
+                        continue;
+                    }
+                } else {
+                    if !rain_exposed(scene, dir * a) {
+                        a = rain_cover_boundary(dir, a, middle, true);
+                    }
+                    if !rain_exposed(scene, dir * b) {
+                        b = rain_cover_boundary(dir, middle, b, false);
+                    }
+                }
                 let medium = rain_medium(s, dir, (a + b) * 0.5, reach, rainbow, scene);
+                if medium.a <= 0.0 || b <= a {
+                    continue;
+                }
+                first_wet = min(first_wet, a);
                 let absorption = (1.0 - rain.a) * (1.0 - exp(-medium.a * (b - a)));
                 rain += vec4(medium.rgb, 1.0) * absorption;
             }
         }
         rain_depth_out[offset + layer] = vec2(pack2x16float(rain.rg), pack2x16float(rain.ba));
     }
-}
-
-fn distant_cloud_history(dir: vec3<f32>, plane: f32, grid: vec2<u32>, stride: u32, size: vec2<u32>) -> CloudHistory {
-    let position = dir * plane + scene.atmosphere_shift.xyz;
-    let clip = scene.atmosphere_previous * vec4(position, 1.0);
-    let pixel = (clip.xy / max(clip.w, 0.001) * vec2(0.5, -0.5) + 0.5) * vec2<f32>(size);
-    if clip.w <= 0.0 || any(pixel < vec2(0.0)) || any(pixel >= vec2<f32>(size)) {
-        return CloudHistory(0u, 0u, 0u);
-    }
-    let cell = min(vec2<u32>(pixel) / stride, grid - 1u);
-    let center = vec2<f32>(atmosphere_sample_pixel(cell, size, stride)) + 0.5;
-    // Avoid dragging the previous silhouette across the current sample footprint.
-    if any(abs(pixel - center) > vec2(f32(stride) * 0.38)) {
-        return CloudHistory(0u, 0u, 0u);
-    }
-    return atmosphere_history[cell.y * grid.x + cell.x];
-}
-
-// Trace a sparse grid of rays. The two packed halves hold premultiplied RGB and opacity.
-@compute @workgroup_size(8, 8)
-fn sample_atmosphere(@builtin(global_invocation_id) id: vec3<u32>) {
-    let size = scene.atmosphere_grid.xy;
-    let stride = scene.atmosphere_grid.z;
-    let cells = (size + vec2(stride - 1u)) >> vec2(firstTrailingBit(stride));
-    if any(id.xy >= cells) {
-        return;
-    }
-    let p = atmosphere_sample_pixel(id.xy, size, stride);
-    let pixel = vec2<f32>(p) + 0.5;
-    let dir = atmosphere_ray(pixel, size);
-    let depth = world_depth[p.y * size.x + p.x];
-    let limit = atmosphere_limit(dir, depth);
-    let s = scene.cloud;
-    let a = s.extra.z / select(dir.y, 1e-8, dir.y == 0.0);
-    let b = (s.extra.z + s.extra.y) / select(dir.y, 1e-8, dir.y == 0.0);
-    let distant = stride == 4u && dir.y != 0.0 && min(a, b) > max(1536.0, scene.cloud_lod.y) && max(a, b) < min(limit, scene.environment.z);
-    let phase = scene.atmosphere_cache.w;
-    var age = 0u;
-    var cloud: CloudHit;
-    if distant && phase != 0u && (id.x + id.y + phase) % 3u != 0u {
-        let history = distant_cloud_history(dir, (a + b) * 0.5, cells, stride, size);
-        if history.history_age > 0u && history.history_age < 3u {
-            let color = vec4(unpack2x16float(history.cloud_rg), unpack2x16float(history.cloud_ba));
-            // The whole distant slab sits beyond the rain reach.
-            cloud = CloudHit(color, 0.0, min(a, b));
-            age = history.history_age + 1u;
-        }
-    }
-    if age == 0u {
-        cloud = trace_cloud(s, dir, limit, scene);
-        age = select(0u, 1u, distant);
-    }
-    let c = resolve_rain(s, dir, limit, cloud, scene, pixel);
-    let index = id.y * cells.x + id.x;
-    atmosphere_out[index] = AtmosphereSample(pack2x16float(c.rg), pack2x16float(c.ba), depth);
-    if stride == 4u {
-        var remembered = CloudHistory(0u, 0u, 0u);
-        if age != 0u {
-            remembered = CloudHistory(pack2x16float(cloud.color.rg), pack2x16float(cloud.color.ba), age);
-        }
-        atmosphere_history_out[index] = remembered;
-    }
-}
-
-@fragment
-fn fs_resolve_atmosphere(in: CloudOut) -> @location(0) vec4<f32> {
-    let grid = scene.atmosphere_grid;
-    let pixel = vec2<u32>(in.clip.xy);
-    let depth = world_depth[pixel.y * grid.x + pixel.x];
-    let taps = atmosphere_filter(in.clip.xy, grid);
-    let i = taps.index;
-    let result = filter_atmosphere(scene, depth, taps, false, atmosphere[i.x], atmosphere[i.y], atmosphere[i.z], atmosphere[i.w]);
-    if result.a >= 0.0 {
-        return result;
-    }
-    return atmosphere_at(sky[in.index], normalize(mat(sky[0]) * in.at), depth, in.clip.xy);
+    rain_depth_out[offset] = bitcast<vec2<u32>>(vec2(first_wet, leave));
 }
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.

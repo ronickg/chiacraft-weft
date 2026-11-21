@@ -3,16 +3,17 @@
 //! only the pixels no block covers pay for it; stars are made in the vertex shader from their
 //! number and need no buffer at all.
 
-use glam::{DVec3, Mat3, Mat4, Vec3};
+use glam::{IVec3, Mat3, Vec3};
 use rustc_hash::FxHashMap;
 use weft_abi::entry_kind as ek;
 use weft_abi::sky_kind;
 use weft_render::*;
 
+use super::world::ClientWorld;
 use super::world_render::Camera;
 use crate::assets::{Assets, decode_png};
 use crate::content::{DimensionDef, content};
-use crate::gpu_layout::{GpuAtmosphereSample, GpuCloudHistory, GpuSky, bind, sky as kind};
+use crate::gpu_layout::{GpuSky, bind, sky as kind};
 use crate::registry::SkyDef;
 use crate::shaders::{Hook, Slots};
 
@@ -111,43 +112,98 @@ struct Picture {
     size: [u32; 2],
 }
 
-struct AtmosphereSamples {
-    trace: PipelineId,
-    resolve: PipelineId,
+#[derive(Default)]
+struct AtmosphereCache {
     fill_clouds: Option<PipelineId>,
     fill_rain: Option<PipelineId>,
-    samples: Option<(BufferId, u64)>,
-    history: [Option<(BufferId, u64)>; 2],
     density: Option<(BufferId, u64)>,
     rain: Option<(BufferId, u64)>,
-    cache_key: Option<(usize, u32, [i32; 2])>,
-    previous: Option<AtmosphereHistory>,
-    phase: u32,
-}
-
-struct AtmosphereHistory {
-    grid: [u32; 4],
-    position: DVec3,
-    projection: Mat4,
-    sky: GpuSky,
-    dimension: usize,
+    cover: RainCover,
+    cache_key: Option<(usize, u32, u32, [i32; 2])>,
 }
 
 pub(super) struct AtmosphereFrame {
-    pub buffer: BufferId,
-    pub grid: [u32; 4],
     pub density: Option<BufferId>,
     pub rain: Option<BufferId>,
+    pub cover: Option<BufferId>,
     pub cache: [u32; 4],
     pub cloud_origin: [i32; 4],
-    pub previous: [[f32; 4]; 4],
-    pub shift: [f32; 4],
+    pub cover_origin: [f32; 4],
 }
 
-const CLOUD_CACHE_SIDE: u32 = 256;
+const CLOUD_CACHE_LIMIT: u32 = if cfg!(target_os = "android") { 256 } else { 512 };
 const CLOUD_BRICK: u32 = 8;
 const RAIN_STRIDE: u32 = 8;
 const RAIN_SLICES: u64 = 16;
+
+#[derive(Default)]
+struct RainCover {
+    built: Option<(u32, IVec3, std::time::Instant)>,
+    roofs: Vec<i32>,
+    buffers: Vec<(BufferId, u32)>,
+}
+
+impl RainCover {
+    fn prepare(&mut self, gpu: &mut dyn Backend, frame: &FrameInfo, cam: &Camera, world: &ClientWorld) -> (BufferId, [f32; 4]) {
+        use crate::gpu_layout::rain_cover::{CELL, CUBES};
+        const ACROSS: usize = (16 / CELL) as usize;
+        const SIDE: usize = CUBES as usize * ACROSS;
+        let edge = (cam.pos.floor().as_ivec3() >> 4) - IVec3::splat(CUBES as i32 / 2);
+        let now = std::time::Instant::now();
+        if self
+            .built
+            .is_none_or(|(dim, old, since)| dim != world.dim || old != edge || (now - since).as_secs_f32() >= 0.25)
+        {
+            self.built = Some((world.dim, edge, now));
+            self.roofs.resize(SIDE * SIDE, i32::MIN);
+            self.roofs.fill(i32::MIN);
+            let content = content();
+            let blocks_rain =
+                |state: u32| content.states[state as usize].flags & (weft_abi::block_flags::SOLID | weft_abi::block_flags::LIQUID) != 0;
+            for cz in 0..CUBES as usize {
+                for cx in 0..CUBES as usize {
+                    let mut found = 0;
+                    for y in (edge.y..edge.y + CUBES as i32).rev() {
+                        let Some(cube) = world.cube(IVec3::new(edge.x + cx as i32, y, edge.z + cz as i32)) else { continue };
+                        let uniform = cube.uniform_state();
+                        let light = cube.uniform_light();
+                        if uniform.is_some_and(|s| !blocks_rain(s)) && light.is_some_and(|l| weft_abi::light::sky(l) == 15) {
+                            continue;
+                        }
+                        for z in 0..ACROSS {
+                            for x in 0..ACROSS {
+                                let roof = &mut self.roofs[(cz * ACROSS + z) * SIDE + cx * ACROSS + x];
+                                if *roof != i32::MIN {
+                                    continue;
+                                }
+                                let x = x * CELL as usize + CELL as usize / 2;
+                                let z = z * CELL as usize + CELL as usize / 2;
+                                let floor = (0..16).rev().find(|&y| {
+                                    let i = crate::world::cube::index(x, y, z);
+                                    blocks_rain(cube.get(i)) || weft_abi::light::sky(cube.light(i)) < 15
+                                });
+                                if let Some(floor) = floor {
+                                    *roof = y * 16 + floor as i32 + 1;
+                                    found += 1;
+                                }
+                            }
+                        }
+                        if found == ACROSS * ACROSS {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        let buffer =
+            crate::gpu_layout::frame_buffer(gpu, &mut self.buffers, frame.slot, (SIDE * SIDE) as u32, 4, usage::STORAGE, "rain cover");
+        let bytes = bytemuck::cast_slice(&self.roofs);
+        gpu.mapped(buffer)[..bytes.len()].copy_from_slice(bytes);
+        let origin = edge.as_dvec3() * 16.0;
+        let relative = cam.pos - origin;
+        (buffer, [relative.x as f32, cam.pos.y as f32, relative.z as f32, 1.0])
+    }
+}
 
 fn atmosphere_buffer(slot: &mut Option<(BufferId, u64)>, gpu: &mut dyn Backend, bytes: u64, label: &str) -> BufferId {
     if let Some((buffer, _)) = slot.filter(|&(_, capacity)| capacity >= bytes) {
@@ -161,20 +217,15 @@ fn atmosphere_buffer(slot: &mut Option<(BufferId, u64)>, gpu: &mut dyn Backend, 
     buffer
 }
 
-impl AtmosphereSamples {
+impl AtmosphereCache {
     fn destroy(self, gpu: &mut dyn Backend) {
-        for pipe in [Some(self.trace), Some(self.resolve), self.fill_clouds, self.fill_rain]
-            .into_iter()
-            .flatten()
-        {
+        for pipe in [self.fill_clouds, self.fill_rain].into_iter().flatten() {
             gpu.destroy_pipeline(pipe);
         }
-        for (buffer, _) in self
-            .history
-            .into_iter()
-            .chain([self.samples, self.density, self.rain])
-            .flatten()
-        {
+        for (buffer, _) in [self.density, self.rain].into_iter().flatten() {
+            gpu.destroy_buffer(buffer);
+        }
+        for (buffer, _) in self.cover.buffers {
             gpu.destroy_buffer(buffer);
         }
     }
@@ -185,48 +236,43 @@ impl AtmosphereSamples {
         commands: &mut CommandList,
         frame: &FrameInfo,
         cam: &Camera,
-        dim: usize,
+        world: &ClientWorld,
         s: GpuSky,
         objects: BufferId,
         scene: BufferId,
         depth: BufferId,
+        depth_pyramid: bool,
+        detailed_range: f32,
     ) -> AtmosphereFrame {
-        let [_, height, low, _] = s.extra;
-        let stride = if low > 32.0 || low + height < -32.0 { 4 } else { 2 };
-        let grid = [frame.width.div_ceil(stride), frame.height.div_ceil(stride)];
-        let records = u64::from(grid[0]) * u64::from(grid[1]);
-        self.phase = self.phase.wrapping_add(1);
-        let slot = self.phase as usize & 1;
-        let buffer = atmosphere_buffer(&mut self.samples, gpu, records * size_of::<GpuAtmosphereSample>() as u64, "atmosphere samples");
-        // A ray starting inside the layer cannot use the distant impostor history.
-        let history_records = if stride == 4 { records } else { 1 };
-        let history_bytes = history_records * size_of::<GpuCloudHistory>() as u64;
-        let history = atmosphere_buffer(&mut self.history[1 - slot], gpu, history_bytes, "old distant clouds");
-        let current = atmosphere_buffer(&mut self.history[slot], gpu, history_bytes, "new distant clouds");
+        let dim = world.dim as usize;
         let mut out = AtmosphereFrame {
-            buffer,
-            grid: [frame.width, frame.height, stride, grid[0]],
             density: None,
             rain: None,
-            cache: [0; 4],
+            cover: None,
+            cache: [0, 0, u32::from(depth_pyramid), 0],
             cloud_origin: [0; 4],
-            previous: [[0.0; 4]; 4],
-            shift: [0.0; 4],
+            cover_origin: [0.0; 4],
         };
 
         if let Some(fill) = self.fill_clouds.filter(|_| s.ids[0] == u32::MAX) {
-            let brick_count = CLOUD_CACHE_SIDE / CLOUD_BRICK;
-            let size = 5 * (CLOUD_CACHE_SIDE * CLOUD_CACHE_SIDE + brick_count * brick_count);
+            // Include the furthest detailed cells when possible, plus one tile for alignment.
+            let cell_width = s.extra[0] / crate::weather::CLOUD_COLUMNS as f32;
+            let radius = (detailed_range / cell_width).ceil() as u32 + CLOUD_BRICK;
+            let side = (2 * radius)
+                .next_power_of_two()
+                .clamp(128, CLOUD_CACHE_LIMIT);
+            let brick_count = side / CLOUD_BRICK;
+            let size = 5 * (side * side + brick_count * brick_count);
             let density = atmosphere_buffer(&mut self.density, gpu, u64::from(size) * 4, "cloud density");
             let origin = [0, 1].map(|axis| {
                 let cells = (s.uv[axis + 2] as i32).wrapping_mul(24) + (s.uv[axis] * 24.0) as i32;
-                (cells - CLOUD_CACHE_SIDE as i32 / 2).div_euclid(CLOUD_BRICK as i32) * CLOUD_BRICK as i32
+                (cells - side as i32 / 2).div_euclid(CLOUD_BRICK as i32) * CLOUD_BRICK as i32
             });
             let previous = self
                 .cache_key
-                .filter(|&(dimension, seed, _)| dimension == dim && seed == s.ids[2])
-                .map_or([i32::MIN + 1; 2], |(_, _, last)| last);
-            out.cache[0] = CLOUD_CACHE_SIDE;
+                .filter(|&(dimension, seed, old_side, _)| dimension == dim && seed == s.ids[2] && old_side == side)
+                .map_or([i32::MIN + 1; 2], |(_, _, _, last)| last);
+            out.cache[0] = side;
             out.cloud_origin = [origin[0], origin[1], previous[0], previous[1]];
             out.density = Some(density);
             if previous != origin {
@@ -236,68 +282,30 @@ impl AtmosphereSamples {
                 commands.push(Cmd::Dispatch { x: brick_count, y: brick_count, z: 5 });
                 commands.push(Cmd::Barrier);
             }
-            self.cache_key = Some((dim, s.ids[2], origin));
+            self.cache_key = Some((dim, s.ids[2], side, origin));
         }
-        if let Some(fill) = self
-            .fill_rain
-            .filter(|_| s.ids[0] == u32::MAX && s.ids[3] != 0 && s.axes[0][3].max(s.axes[1][3]) > 0.0)
-        {
+        let wet = s.ids[0] == u32::MAX && s.axes[0][3].max(s.axes[1][3]) > 0.0;
+        if wet && content().dims[dim].sky_light {
+            let (cover, origin) = self.cover.prepare(gpu, frame, cam, world);
+            out.cover = Some(cover);
+            out.cover_origin = origin;
+        }
+        if let Some(fill) = self.fill_rain.filter(|_| wet) {
             let rain_grid = [frame.width.div_ceil(RAIN_STRIDE), frame.height.div_ceil(RAIN_STRIDE)];
             let bytes = u64::from(rain_grid[0]) * u64::from(rain_grid[1]) * (RAIN_SLICES + 1) * 8;
             let rain = atmosphere_buffer(&mut self.rain, gpu, bytes, "rain depth samples");
-            out.cache[1] = RAIN_STRIDE;
-            out.cache[2] = rain_grid[0];
+            out.cache[1] = rain_grid[0];
             out.rain = Some(rain);
             commands.pipeline(fill);
             commands.bind(bind::sky::OBJECTS, objects);
             commands.bind(bind::sky::SCENE, scene);
+            commands.bind(bind::sky::WORLD_DEPTH, depth);
+            commands.bind(bind::sky::RAIN_COVER, out.cover.unwrap_or(scene));
             commands.bind(bind::sky::RAIN_DEPTH_OUT, rain);
             commands.push(Cmd::Dispatch { x: rain_grid[0].div_ceil(8), y: rain_grid[1].div_ceil(8), z: 1 });
             commands.push(Cmd::Barrier);
         }
 
-        let aspect = frame.width as f32 / frame.height.max(1) as f32;
-        let projection = cam.proj(aspect) * cam.view();
-        let position = DVec3::new(
-            (f64::from(s.uv[2]) + f64::from(s.uv[0])) * f64::from(s.extra[0]),
-            cam.pos.y,
-            (f64::from(s.uv[3]) + f64::from(s.uv[1])) * f64::from(s.extra[0]),
-        );
-        if let Some(last) = &self.previous {
-            let delta = position - last.position;
-            if stride == 4
-                && last.grid == out.grid
-                && last.dimension == dim
-                && last.sky.ids == s.ids
-                && last.sky.extra[3] == s.extra[3]
-                && delta.length_squared() < 24.0 * 24.0
-                && (last.sky.color[3] - s.color[3]).abs() < 0.03
-                && last
-                    .sky
-                    .cloud_sun
-                    .iter()
-                    .zip(s.cloud_sun)
-                    .all(|(a, b)| (a - b).abs() < 0.05)
-                && s.ids[0] == u32::MAX
-            {
-                out.cache[3] = self.phase % 3 + 1;
-                out.previous = last.projection.to_cols_array_2d();
-                out.shift = delta.as_vec3().extend(0.0).to_array();
-            }
-        }
-        self.previous = Some(AtmosphereHistory { grid: out.grid, position, projection, sky: s, dimension: dim });
-
-        commands.pipeline(self.trace);
-        commands.bind(bind::sky::OBJECTS, objects);
-        commands.bind(bind::sky::SCENE, scene);
-        commands.bind(bind::sky::WORLD_DEPTH, depth);
-        commands.bind(bind::sky::CLOUD_CELLS, out.density.unwrap_or(scene));
-        commands.bind(bind::sky::RAIN_DEPTH, out.rain.unwrap_or(scene));
-        commands.bind(bind::sky::ATMOSPHERE_HISTORY, history);
-        commands.bind(bind::sky::ATMOSPHERE_HISTORY_OUT, current);
-        commands.bind(bind::sky::ATMOSPHERE_OUT, buffer);
-        commands.push(Cmd::Dispatch { x: grid[0].div_ceil(8), y: grid[1].div_ceil(8), z: 1 });
-        commands.push(Cmd::Barrier);
         out
     }
 }
@@ -306,7 +314,7 @@ pub struct Sky {
     pipe: Option<PipelineId>,
     clouds_pipe: Option<PipelineId>,
     atmosphere_pipe: Option<PipelineId>,
-    atmosphere_samples: Option<AtmosphereSamples>,
+    atmosphere: AtmosphereCache,
     atmosphere_compute: CommandList,
     /// Shader slot of each object, per dimension.
     slots: Vec<Vec<u32>>,
@@ -364,7 +372,7 @@ impl Sky {
             pipe: None,
             clouds_pipe: None,
             atmosphere_pipe: None,
-            atmosphere_samples: None,
+            atmosphere: AtmosphereCache::default(),
             atmosphere_compute: CommandList::default(),
             slots: Vec::new(),
             buffers: Vec::new(),
@@ -416,77 +424,46 @@ impl Sky {
                         topology: Topology::Triangles,
                     })
                     .map_err(|e| e.0)?;
-                let atmosphere_pipeline = |gpu: &mut dyn Backend, label, fragment| {
-                    gpu.create_pipeline(&PipelineDesc {
-                        label,
+                let atmosphere = gpu
+                    .create_pipeline(&PipelineDesc {
+                        label: "atmosphere",
                         shader: &shader,
-                        vertex: "vs_clouds",
-                        fragment: Some(fragment),
+                        vertex: "vs_atmosphere",
+                        fragment: Some("fs_atmosphere"),
                         color: Some(Format::Surface),
-                        depth: Some(DepthState { write: false, compare: Compare::Always }),
+                        depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
                         blend: Blend::Premultiplied,
                         cull_back: false,
                         topology: Topology::Triangles,
                     })
+                    .map_err(|e| log::warn!("atmosphere shader: {e}"))
+                    .ok();
+                let mut optional = |entry, label| {
+                    shader
+                        .module
+                        .entry_points
+                        .iter()
+                        .any(|p| p.name == entry)
+                        .then(|| {
+                            gpu.create_compute(&ComputeDesc { label, shader: &shader, entry })
+                                .map_err(|e| log::warn!("{label}: {e}"))
+                                .ok()
+                        })
+                        .flatten()
                 };
-                let samples = shader
-                    .module
-                    .entry_points
-                    .iter()
-                    .any(|entry| entry.name == "sample_atmosphere")
-                    .then(|| {
-                        let trace =
-                            gpu.create_compute(&ComputeDesc { label: "sample atmosphere", shader: &shader, entry: "sample_atmosphere" })?;
-                        match atmosphere_pipeline(gpu, "resolve atmosphere", "fs_resolve_atmosphere") {
-                            Ok(resolve) => {
-                                let mut optional = |entry, label| {
-                                    shader
-                                        .module
-                                        .entry_points
-                                        .iter()
-                                        .any(|p| p.name == entry)
-                                        .then(|| {
-                                            gpu.create_compute(&ComputeDesc { label, shader: &shader, entry })
-                                                .map_err(|e| log::warn!("{label}: {e}"))
-                                                .ok()
-                                        })
-                                        .flatten()
-                                };
-                                Ok(AtmosphereSamples {
-                                    trace,
-                                    resolve,
-                                    fill_clouds: optional("cache_cloud_density", "cloud density cache"),
-                                    fill_rain: optional("cache_rain_depth", "rain depth cache"),
-                                    samples: None,
-                                    history: [None, None],
-                                    density: None,
-                                    rain: None,
-                                    cache_key: None,
-                                    previous: None,
-                                    phase: 0,
-                                })
-                            }
-                            Err(e) => {
-                                gpu.destroy_pipeline(trace);
-                                Err(e)
-                            }
-                        }
-                    })
-                    .transpose()
-                    .map_err(|e| log::warn!("atmosphere samples shader: {e}"))
-                    .ok()
-                    .flatten();
-                let atmosphere = if samples.is_none() {
-                    atmosphere_pipeline(gpu, "atmosphere", "fs_atmosphere")
-                        .map_err(|e| log::warn!("atmosphere shader: {e}"))
-                        .ok()
+                let cache = if atmosphere.is_some() {
+                    AtmosphereCache {
+                        fill_clouds: optional("cache_cloud_density", "cloud density cache"),
+                        fill_rain: optional("cache_rain_depth", "rain depth cache"),
+                        ..Default::default()
+                    }
                 } else {
-                    None
+                    AtmosphereCache::default()
                 };
-                Ok((pipe, clouds, atmosphere, samples, slots.pop().unwrap_or_default()))
+                Ok((pipe, clouds, atmosphere, cache, slots.pop().unwrap_or_default()))
             });
         match made {
-            Ok((pipe, clouds, atmosphere, samples, slots)) => {
+            Ok((pipe, clouds, atmosphere, cache, slots)) => {
                 if let Some(old) = self.pipe.replace(pipe) {
                     gpu.destroy_pipeline(old);
                 }
@@ -496,9 +473,7 @@ impl Sky {
                 if let Some(old) = std::mem::replace(&mut self.atmosphere_pipe, atmosphere) {
                     gpu.destroy_pipeline(old);
                 }
-                if let Some(old) = std::mem::replace(&mut self.atmosphere_samples, samples) {
-                    old.destroy(gpu);
-                }
+                std::mem::replace(&mut self.atmosphere, cache).destroy(gpu);
                 self.set_slots(&slots);
             }
             Err(e) => log::error!("sky shader: {e}"),
@@ -506,7 +481,7 @@ impl Sky {
     }
 
     pub(super) fn has_atmosphere(&self) -> bool {
-        self.atmosphere_samples.is_some() || self.atmosphere_pipe.is_some()
+        self.atmosphere_pipe.is_some()
     }
 
     pub(super) fn sample_atmosphere(&mut self, list: &mut CommandList) {
@@ -583,9 +558,7 @@ impl Sky {
         {
             gpu.destroy_pipeline(p);
         }
-        if let Some(samples) = self.atmosphere_samples.take() {
-            samples.destroy(gpu);
-        }
+        std::mem::take(&mut self.atmosphere).destroy(gpu);
         for (b, _) in self.buffers.drain(..) {
             gpu.destroy_buffer(b);
         }
@@ -627,22 +600,19 @@ impl Sky {
         cam: &Camera,
         scene: BufferId,
         world_depth: Option<BufferId>,
-        dim: usize,
+        world: &ClientWorld,
         time: f64,
         weather: crate::weather::WeatherField,
-        rain_veil: bool,
+        depth_pyramid: bool,
+        detailed_range: f32,
         eye_y: f64,
         environment: &weft_abi::environment::EnvironmentValues,
         weights: &FxHashMap<String, f32>,
         overlays: &[Overlay],
     ) -> (GpuSky, Option<AtmosphereFrame>) {
+        let dim = world.dim as usize;
         self.overlay = None;
         self.atmosphere_compute.clear();
-        if world_depth.is_none() {
-            if let Some(samples) = &mut self.atmosphere_samples {
-                samples.previous = None;
-            }
-        }
         let Some(pipe) = self.pipe else { return (GpuSky::default(), None) };
         let c = content();
         let d = &c.dims[dim];
@@ -764,14 +734,18 @@ impl Sky {
                         let preset = &c.game.weathers[id as usize];
                         let look = preset.look;
                         shade(look.cloud_gray, look.cloud_dark * 0.74)
-                            .extend(if rain_veil && world_depth.is_some() && preset.falls() { look.falls } else { 0.0 })
+                            .extend(if world_depth.is_some() && preset.falls() { look.falls } else { 0.0 })
                             .to_array()
                     };
                     (
                         [u32::MAX, kind::CLOUDS, field.seed, automatic as u32],
                         CLOUD_CELL,
                         field.coords(glam::DVec2::new(cam.pos.x, cam.pos.z)),
-                        [color_for(field.rain), color_for(field.thunder), cloud_sun_dir],
+                        [
+                            color_for(weather.forced.unwrap_or(field.rain)),
+                            color_for(weather.forced.unwrap_or(field.thunder)),
+                            cloud_sun_dir,
+                        ],
                     )
                 } else {
                     let Some((index, [w, h])) = self.picture(gpu, &s.texture) else { continue };
@@ -875,23 +849,32 @@ impl Sky {
         }
         if let (Some(first_instance), Some(cloud_pipe)) = (clouds, self.clouds_pipe) {
             let s = self.list[first_instance as usize];
-            let mut shared = None;
-            if let (Some(depth), Some(samples)) = (world_depth, &mut self.atmosphere_samples) {
-                let prepared = samples.prepare(gpu, &mut self.atmosphere_compute, frame, cam, dim, s, buf, scene, depth);
-                list.pipeline(samples.resolve);
-                list.bind(bind::sky::WORLD_DEPTH, depth);
-                list.bind(bind::sky::ATMOSPHERE, prepared.buffer);
-                shared = Some(prepared);
-            } else if let (Some(depth), Some(pipe)) = (world_depth, self.atmosphere_pipe) {
+            let shared = if let (Some(depth), Some(pipe)) = (world_depth, self.atmosphere_pipe) {
+                let prepared = self.atmosphere.prepare(
+                    gpu,
+                    &mut self.atmosphere_compute,
+                    frame,
+                    cam,
+                    world,
+                    s,
+                    buf,
+                    scene,
+                    depth,
+                    depth_pyramid,
+                    detailed_range,
+                );
                 list.pipeline(pipe);
                 list.bind(bind::sky::WORLD_DEPTH, depth);
+                Some(prepared)
             } else {
                 list.pipeline(cloud_pipe);
-            }
+                None
+            };
             list.bind(bind::sky::OBJECTS, buf);
             list.bind(bind::sky::SCENE, scene);
             list.bind(bind::sky::CLOUD_CELLS, shared.as_ref().and_then(|a| a.density).unwrap_or(scene));
             list.bind(bind::sky::RAIN_DEPTH, shared.as_ref().and_then(|a| a.rain).unwrap_or(scene));
+            list.bind(bind::sky::RAIN_COVER, shared.as_ref().and_then(|a| a.cover).unwrap_or(scene));
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance });
             return (s, shared);
         }
