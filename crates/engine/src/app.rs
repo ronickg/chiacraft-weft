@@ -2151,7 +2151,8 @@ fn frame(r: &mut Running, opts: &Options, now: Instant) -> bool {
     r.entity_ticks(dt as f32);
     r.client_packets();
     if let Some(g) = &mut r.game {
-        g.client.update_environment(&r.textures, dt as f32);
+        g.client
+            .update_environment(&r.textures, dt as f32, r.audio.is_some());
     }
     play_sounds(r);
     handle_disconnect(r);
@@ -2431,27 +2432,37 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
 fn play_sounds(r: &mut Running) {
     let mut music_ended = false;
     if let Some(a) = &mut r.audio {
-        if let Some(g) = &mut r.game {
+        let listener = r.game.as_ref().map(|g| g.client.listener());
+        if let Some(g) = &mut r.game
+            && let Some(listener) = &listener
+        {
             let cl = &mut g.client;
-            let pos = cl
+            let source = cl
                 .local_music
                 .source()
-                .and_then(|source| cl.music_source_position(source));
-            music_ended = cl.local_music.update(pos);
+                .and_then(|source| cl.music_source_position(source))
+                .map(|pos| (pos, cl.source_filter(pos, listener.pos)));
+            music_ended = cl.local_music.update(source);
         }
-        let listener = r.game.as_ref().map(|g| g.client.listener());
         let local_playing = r
             .game
             .as_ref()
             .is_some_and(|g| g.client.local_music.source().is_some());
         a.update(&r.assets, listener.as_ref(), local_playing);
-        if let Some(g) = &mut r.game {
-            for p in g.client.sounds.drain(..) {
+        if let Some(g) = &mut r.game
+            && let Some(listener) = listener
+        {
+            g.client
+                .play_audio(a, &r.assets, listener.pos, r.ui_sounds.drain(..));
+        } else {
+            for p in r.ui_sounds.drain(..) {
                 a.play(&r.assets, p);
             }
         }
-        for p in r.ui_sounds.drain(..) {
-            a.play(&r.assets, p);
+    } else {
+        r.ui_sounds.clear();
+        if let Some(g) = &mut r.game {
+            g.client.discard_audio();
         }
     }
     if music_ended {

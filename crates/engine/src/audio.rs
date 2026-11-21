@@ -11,7 +11,7 @@ use std::{
 
 use glam::{DVec3, Quat};
 use kira::effect::filter::{FilterBuilder, FilterHandle};
-use kira::effect::reverb::ReverbBuilder;
+use kira::effect::reverb::{ReverbBuilder, ReverbHandle};
 use kira::sound::static_sound::StaticSoundData;
 use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
 use kira::track::{SendTrackBuilder, SendTrackHandle, SpatialTrackBuilder, SpatialTrackHandle, TrackBuilder, TrackHandle};
@@ -32,16 +32,51 @@ pub struct Play {
     pub pitch: f32,
 }
 
+pub(crate) fn travel_time(distance: f64) -> f64 {
+    distance / 343.0
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct Arrival {
+    pub pos: DVec3,
+    pub distance: f64,
+    pub gain: f32,
+    pub cutoff: f32,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) struct SourceFilter {
+    pub cutoff: f32,
+    pub gain: f32,
+}
+
+impl Default for SourceFilter {
+    fn default() -> Self {
+        Self { cutoff: 20_000.0, gain: 1.0 }
+    }
+}
+
+impl SourceFilter {
+    pub fn from_liquid(source: u16, listener: Option<u16>) -> Self {
+        if Some(source) == listener {
+            return Self::default();
+        }
+        content().liquids[source as usize].source_filter
+    }
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub struct Acoustics {
     pub cutoff: f32,
     pub reverb: f32,
     pub volume: f32,
+    pub feedback: f32,
+    pub damping: f32,
 }
 
 impl Default for Acoustics {
     fn default() -> Self {
-        Self { cutoff: 20_000.0, reverb: 0.0, volume: 1.0 }
+        Self { cutoff: 20_000.0, reverb: 0.0, volume: 1.0, feedback: 0.85, damping: 0.60 }
     }
 }
 
@@ -60,6 +95,7 @@ pub struct Audio {
     mgr: AudioManager<DefaultBackend>,
     listener: kira::listener::ListenerHandle,
     reverb: SendTrackHandle,
+    reverb_shape: ReverbHandle,
     environment: TrackHandle,
     lowpass: FilterHandle,
     /// Per category (`sound_category`): its track.
@@ -103,6 +139,8 @@ struct LocalPlayback {
     paused: bool,
     sound: StreamingSoundHandle<kira::sound::FromFileError>,
     track: SpatialTrackHandle,
+    filter: FilterHandle,
+    source_filter: SourceFilter,
 }
 
 impl Default for LocalMusic {
@@ -191,15 +229,21 @@ impl LocalMusic {
         self.failed = Some(source);
     }
 
-    pub fn update(&mut self, position: Option<DVec3>) -> bool {
+    pub fn update(&mut self, source: Option<(DVec3, SourceFilter)>) -> bool {
         let Some(playback) = &mut self.playing else { return false };
         if let Some(error) = playback.sound.pop_error() {
             log::warn!("local music {}: {error}", playback.name);
             self.failed = Some(playback.source);
-        } else if let Some(position) = position.filter(|_| playback.sound.state() != kira::sound::PlaybackState::Stopped) {
+        } else if let Some((position, filter)) = source.filter(|_| playback.sound.state() != kira::sound::PlaybackState::Stopped) {
             playback
                 .track
                 .set_position(position.as_vec3(), Tween::default());
+            if filter != playback.source_filter {
+                playback.filter.set_cutoff(f64::from(filter.cutoff), QUICK);
+                playback.track.set_volume(db(f64::from(filter.gain)), QUICK);
+                playback.source_filter = filter;
+                log::trace!(target: "acoustics::paths", "local music at {position}: source cutoff {:.0}, gain {:.3}", filter.cutoff, filter.gain);
+            }
             return false;
         }
         self.playing = None;
@@ -269,18 +313,18 @@ impl Audio {
         };
         let made = (|| -> Result<Audio, kira::ResourceLimitReached> {
             let listener = mgr.add_listener(glam::Vec3::ZERO, Quat::IDENTITY)?;
-            let reverb = mgr.add_send_track(
-                SendTrackBuilder::new().with_effect(
-                    ReverbBuilder::new()
-                        .mix(Mix::WET)
-                        .damping(0.6)
-                        .feedback(0.85),
-                ),
-            )?;
+            let acoustics = Acoustics::default();
+            let mut wet = SendTrackBuilder::new();
+            let reverb_shape = wet.add_effect(
+                ReverbBuilder::new()
+                    .mix(Mix::WET)
+                    .damping(f64::from(acoustics.damping))
+                    .feedback(f64::from(acoustics.feedback)),
+            );
+            let reverb = mgr.add_send_track(wet)?;
             let mut track = TrackBuilder::new()
                 .sub_track_capacity(content().game.sound_categories.len())
                 .with_send(&reverb, Decibels::SILENCE);
-            let acoustics = Acoustics::default();
             let lowpass = track.add_effect(FilterBuilder::new().cutoff(acoustics.cutoff as f64));
             let mut environment = mgr.add_sub_track(track)?;
             let mut groups = Vec::new();
@@ -294,6 +338,7 @@ impl Audio {
                 mgr,
                 listener,
                 reverb,
+                reverb_shape,
                 environment,
                 lowpass,
                 groups,
@@ -398,6 +443,14 @@ impl Audio {
         }
         let acoustics = l.map_or_else(Acoustics::default, |l| l.acoustics);
         if acoustics != self.state {
+            if acoustics.feedback != self.state.feedback {
+                self.reverb_shape
+                    .set_feedback(acoustics.feedback as f64, QUICK);
+            }
+            if acoustics.damping != self.state.damping {
+                self.reverb_shape
+                    .set_damping(acoustics.damping as f64, QUICK);
+            }
             self.state = acoustics;
             self.lowpass.set_cutoff(acoustics.cutoff as f64, QUICK);
             self.environment
@@ -425,7 +478,15 @@ impl Audio {
         }
     }
 
-    pub(crate) fn start_local(&mut self, local: &mut LocalMusic, folder: &Path, source: MusicSource, pos: DVec3, name: &str) -> bool {
+    pub(crate) fn start_local(
+        &mut self,
+        local: &mut LocalMusic,
+        folder: &Path,
+        source: MusicSource,
+        pos: DVec3,
+        source_filter: SourceFilter,
+        name: &str,
+    ) -> bool {
         if local
             .tracks
             .binary_search_by(|track| track.name.as_str().cmp(name))
@@ -437,19 +498,18 @@ impl Audio {
         let result = (|| -> Result<LocalPlayback, String> {
             let data = StreamingSoundData::from_file(folder.join(name)).map_err(|err| err.to_string())?;
             let duration = data.duration().as_secs_f64();
+            let mut builder = SpatialTrackBuilder::new()
+                .distances((4.0, 48.0))
+                .volume(db(f64::from(source_filter.gain)))
+                .sound_capacity(1);
+            let filter = builder.add_effect(FilterBuilder::new().cutoff(f64::from(source_filter.cutoff)));
             let mut track = self.groups[crate::registry::MUSIC_CATEGORY as usize]
-                .add_spatial_sub_track(
-                    &self.listener,
-                    pos.as_vec3(),
-                    SpatialTrackBuilder::new()
-                        .distances((4.0, 48.0))
-                        .sound_capacity(1),
-                )
+                .add_spatial_sub_track(&self.listener, pos.as_vec3(), builder)
                 .map_err(|err| format!("{err:?}"))?;
             let sound = track
                 .play(data.volume(db(f64::from(local.volume))))
                 .map_err(|err| err.to_string())?;
-            Ok(LocalPlayback { source, name: name.to_owned(), duration, paused: false, sound, track })
+            Ok(LocalPlayback { source, name: name.to_owned(), duration, paused: false, sound, track, filter, source_filter })
         })();
         match result {
             Ok(playback) => {
@@ -461,6 +521,7 @@ impl Audio {
                 local.failed = None;
                 local.playing = Some(playback);
                 log::debug!("local music: {name}");
+                log::trace!(target: "acoustics::paths", "local music at {pos}: source cutoff {:.0}, gain {:.3}", source_filter.cutoff, source_filter.gain);
                 true
             }
             Err(err) => {
@@ -528,9 +589,14 @@ impl Audio {
     }
 
     pub fn play(&mut self, assets: &Assets, p: Play) {
+        self.play_paths(assets, p, 0.0, &[]);
+    }
+
+    pub(crate) fn play_paths(&mut self, assets: &Assets, p: Play, age: f64, paths: &[Arrival]) {
         if !self.active {
             return;
         }
+        let started = Instant::now();
         let c = content();
         let Some(def) = c.game.sounds.get(p.sound as usize) else { return };
         if def.files.is_empty() {
@@ -563,29 +629,56 @@ impl Audio {
         let Some(data) = self.file(assets, &file) else { return };
         let pitch = if p.pitch > 0.0 { p.pitch } else { def.pitch[0] + (def.pitch[1] - def.pitch[0]) * self.random() };
         let volume = (p.volume * def.volume).max(0.0);
-        let data = data.volume(db(volume as f64)).playback_rate(pitch as f64);
+        let data = data.playback_rate(pitch as f64);
         let g = (def.category as usize).min(self.groups.len().saturating_sub(1));
         let group = &mut self.groups[g];
         let played = match p.pos {
             Some(pos) => {
                 // Heard up to `range` blocks (further for loud ones).
-                let reach = def.range * volume.max(1.0);
-                let near = def.full_within.min(reach - 0.5);
+                let reach = def.reach(volume);
+                let near = f64::from(def.full_within).min(reach - 0.5);
                 let curve = match def.falloff {
                     0 => kira::Easing::Linear,
                     n if n > 0 => kira::Easing::InPowi(n),
                     n => kira::Easing::OutPowi(-n),
                 };
-                let b = SpatialTrackBuilder::new()
-                    .distances((near.max(0.0), reach.max(1.5)))
-                    .attenuation_function(curve)
-                    .persist_until_sounds_finish(true);
-                group
-                    .add_spatial_sub_track(&self.listener, pos.as_vec3(), b)
-                    .map_err(|e| format!("{e:?}"))
-                    .and_then(|mut t| t.play(data).map(|_| ()).map_err(|e| e.to_string()))
+                let mut voice = |arrival: Arrival, delay: f64| {
+                    let mut b = SpatialTrackBuilder::new()
+                        .distances((near.max(0.0) as f32, reach.max(1.5) as f32))
+                        .attenuation_function(curve)
+                        .sub_track_capacity(0)
+                        .sound_capacity(1)
+                        .persist_until_sounds_finish(true);
+                    if arrival.cutoff < 20_000.0 {
+                        b = b.with_effect(FilterBuilder::new().cutoff(f64::from(arrival.cutoff)));
+                    }
+                    group
+                        .add_spatial_sub_track(&self.listener, arrival.pos.as_vec3(), b)
+                        .map_err(|e| format!("{e:?}"))
+                        .and_then(|mut t| {
+                            let delay = Duration::from_secs_f64(delay).saturating_sub(started.elapsed());
+                            let data = data
+                                .volume(db(f64::from(volume * arrival.gain)))
+                                .start_time(delay);
+                            t.play(data).map(|_| ()).map_err(|e| e.to_string())
+                        })
+                };
+                if let Some((&direct, echoes)) = paths.split_first() {
+                    let played = voice(direct, (travel_time(direct.distance) - age).max(0.0));
+                    for &echo in echoes {
+                        if let Err(e) = voice(echo, (travel_time(echo.distance) - age).max(0.0)) {
+                            log::trace!(target: "acoustics", "reflection of {}: {e}", def.name);
+                        }
+                    }
+                    played
+                } else {
+                    voice(Arrival { pos, distance: 0.0, gain: 1.0, cutoff: 20_000.0 }, 0.0)
+                }
             }
-            None => group.play(data).map(|_| ()).map_err(|e| e.to_string()),
+            None => group
+                .play(data.volume(db(volume as f64)))
+                .map(|_| ())
+                .map_err(|e| e.to_string()),
         };
         match played {
             Ok(()) => self.played += 1,

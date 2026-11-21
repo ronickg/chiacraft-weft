@@ -1,3 +1,4 @@
+mod acoustics;
 pub mod camera;
 pub mod ctm;
 pub mod entity_render;
@@ -753,6 +754,7 @@ pub struct Client {
     hit_dust: f32,
     /// Sounds to play this frame (from the server and from here).
     pub sounds: Vec<crate::audio::Play>,
+    soundscape: acoustics::Soundscape,
     rng: weft_noise::Rng,
     pub dead: bool,
     /// A server override and the weather at the camera.
@@ -1062,6 +1064,7 @@ impl Client {
             hand_late: CommandList::default(),
             hit_dust: 0.0,
             sounds: Vec::new(),
+            soundscape: acoustics::Soundscape::default(),
             rng: weft_noise::Rng(0x9E37_79B9_7F4A_7C15),
             drag: None,
             sweep: Vec::new(),
@@ -1212,6 +1215,8 @@ impl Client {
         self.landings.clear();
         self.weather_override = None;
         self.lightning.clear();
+        self.sounds.clear();
+        self.soundscape = acoustics::Soundscape::default();
         self.world.dim = dim;
         self.terrain_resets += 1;
         self.terrain_view = (IVec3::MAX, 0);
@@ -1277,10 +1282,7 @@ impl Client {
         let moved = self.animate_player(input, dt);
         self.frame_dt = dt as f32;
         self.weather_effects(dt as f32);
-        if self.lightning.is_active() {
-            let listener = self.render_camera().pos;
-            self.lightning.advance(listener, &mut self.sounds);
-        }
+        self.lightning.advance();
         // Night vision comes and goes over about half a second, not at once.
         let night = self
             .attribute(crate::registry::attr::NIGHT_VISION)
@@ -2706,6 +2708,8 @@ impl Client {
                 cutoff: self.environment.values.lowpass,
                 reverb: self.environment.values.reverb,
                 volume: self.environment.values.volume,
+                feedback: if self.soundscape.reverb > 0.005 { self.soundscape.feedback } else { 0.85 },
+                damping: if self.soundscape.reverb > 0.005 { self.soundscape.damping } else { 0.60 },
             },
             dim: self.world.dim,
             holds: c
@@ -2718,6 +2722,30 @@ impl Client {
                 })
                 .collect(),
         }
+    }
+
+    pub(crate) fn play_audio(
+        &mut self,
+        audio: &mut crate::audio::Audio,
+        assets: &crate::assets::Assets,
+        listener: DVec3,
+        other: impl IntoIterator<Item = crate::audio::Play>,
+    ) {
+        let liquids = world::LiquidSampler { world: &self.world, entities: &self.entities, tick: self.anim_tick() };
+        self.soundscape
+            .play(liquids, listener, audio, assets, self.sounds.drain(..).chain(other));
+    }
+
+    pub(crate) fn source_filter(&self, source: DVec3, listener: DVec3) -> crate::audio::SourceFilter {
+        let liquids = self.liquid_sampler();
+        liquids
+            .at_source(source, listener)
+            .map_or_else(Default::default, |liquid| crate::audio::SourceFilter::from_liquid(liquid, liquids.at(listener)))
+    }
+
+    pub(crate) fn discard_audio(&mut self) {
+        self.sounds.clear();
+        self.soundscape.discard_pending();
     }
 
     /// No sky light at the camera: a cave, or under a roof.
@@ -3037,21 +3065,11 @@ impl Client {
     }
 
     fn visible_liquid(&self, point: DVec3) -> Option<u16> {
-        let (liquid, dry) = self.liquid_observation(point)?;
-        (!dry).then_some(liquid)
+        self.liquid_sampler().at(point)
     }
 
-    fn liquid_observation(&self, point: DVec3) -> Option<(u16, bool)> {
-        let c = content();
-        let cells = world::SeenCells { world: &self.world, air_if_missing: false };
-        let liquid = physics::liquid_at(c, &cells, point)?;
-        let tick = self.anim_tick();
-        let dry = self
-            .entities
-            .values()
-            .filter(|e| !e.dry_boxes.is_empty())
-            .any(|e| physics::inside_dry_volume((e.place_at(tick), &e.dry_boxes), point));
-        Some((liquid, dry))
+    fn liquid_sampler(&self) -> world::LiquidSampler<'_> {
+        world::LiquidSampler { world: &self.world, entities: &self.entities, tick: self.anim_tick() }
     }
 
     /// With the view not bobbing walking (`core:camera_bob` off) where it would, the bob the hand

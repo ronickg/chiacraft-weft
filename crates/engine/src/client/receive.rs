@@ -338,7 +338,9 @@ impl Client {
             }
             ToClient::Lightning(strike) if strike.dim == self.world.dim => {
                 let late = (self.world.ticks.saturating_sub(strike.tick) as f64 / self.tick_rate) as f32;
-                self.lightning.receive(strike, late);
+                let listener = self.render_camera().pos;
+                self.lightning
+                    .receive(strike, late, listener, &mut self.soundscape);
             }
             ToClient::Particles(list) => {
                 for b in &list {

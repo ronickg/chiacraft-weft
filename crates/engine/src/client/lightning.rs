@@ -4,14 +4,13 @@ use glam::{DVec3, Vec3};
 use weft_abi::entry_kind;
 use weft_noise::Rng;
 
-use super::world_render::Camera;
+use super::{acoustics::Soundscape, world_render::Camera};
 use crate::audio::Play;
 use crate::content::content;
 use crate::gpu_layout::{GpuSky, sky};
 use crate::net::Lightning;
-use crate::weather::{LIGHTNING_RANGE, THUNDER_RANGE};
+use crate::weather::LIGHTNING_RANGE;
 
-const SOUND_SPEED: f64 = 343.0;
 const FLASH_TIME: f32 = 0.30;
 pub(super) const FLASH_LIGHTS: usize = 3;
 
@@ -35,12 +34,10 @@ struct Discharge {
     received: Instant,
     late_by: f32,
     segments: Vec<Segment>,
-    tail: [DVec3; 2],
-    heard: u8,
 }
 
 impl Discharge {
-    fn new(strike: Lightning, late_by: f32) -> Self {
+    fn new(strike: Lightning, late_by: f32, listener: DVec3, sounds: &mut Soundscape) -> Self {
         let mut rng = Rng(strike.seed);
         let mut segments = Vec::with_capacity(if strike.ground { 32 } else { 16 });
         let trunk = bolt_path::<17>(strike.origin, strike.end, &mut rng);
@@ -64,7 +61,9 @@ impl Discharge {
                 }));
             }
         }
-        Self { strike, received: Instant::now(), late_by, segments, tail: [trunk[4], trunk[12]], heard: 0 }
+        let discharge = Self { strike, received: Instant::now(), late_by, segments };
+        discharge.emit_thunder(listener, [trunk[4], trunk[12]], sounds);
+        discharge
     }
 
     fn age(&self) -> f32 {
@@ -80,8 +79,7 @@ impl Discharge {
         pulse * self.strike.strength * (1.0 - smooth(0.22, FLASH_TIME, age))
     }
 
-    fn thunder(&mut self, listener: DVec3, sounds: &mut Vec<Play>) {
-        let age = self.age();
+    fn emit_thunder(&self, listener: DVec3, tail: [DVec3; 2], sounds: &mut Soundscape) {
         let nearest = self
             .segments
             .iter()
@@ -91,34 +89,18 @@ impl Discharge {
                     .total_cmp(&b.distance_squared(listener))
             })
             .unwrap_or(self.strike.origin);
-        for (i, pos) in [nearest, self.tail[0], self.tail[1]]
-            .into_iter()
-            .enumerate()
-        {
-            let bit = 1 << i;
-            if self.heard & bit != 0 {
-                continue;
-            }
-            let distance = listener.distance(pos);
-            if distance >= THUNDER_RANGE || age < (distance / SOUND_SPEED) as f32 {
-                continue;
-            }
-            self.heard |= bit;
-            if age > (distance / SOUND_SPEED) as f32 + 1.0 {
-                continue;
-            }
-            let distance = distance as f32;
+        for (i, pos) in [nearest, tail[0], tail[1]].into_iter().enumerate() {
+            let distance = listener.distance(pos) as f32;
             let power = self.strike.strength.min(1.0);
             let pitch = 0.91 + 0.17 * weft_noise::unit(weft_noise::mix(self.strike.seed ^ i as u64)) as f32;
             if i == 0 {
                 let crack = (1.0 - smooth(45.0, 420.0, distance)) * power;
-                play(sounds, "core:weather.thunder_crack", pos, crack, pitch);
+                emit(sounds, "core:weather.thunder_crack", pos, crack, pitch, self.late_by);
             }
             let spread = if i == 0 { 0.79 } else { 0.24 * smooth(14.0, 95.0, nearest.distance(pos) as f32) };
             let low = smooth(180.0, 970.0, distance);
-            play(sounds, "core:weather.thunder_roll", pos, spread * (1.0 - low) * power, pitch);
-            play(sounds, "core:weather.thunder_rumble", pos, spread * low * power, pitch);
-            log::debug!("thunder {} part {} at {:.0} blocks after {:.3}s", self.strike.seed, i, distance, age);
+            emit(sounds, "core:weather.thunder_roll", pos, spread * (1.0 - low) * power, pitch, self.late_by);
+            emit(sounds, "core:weather.thunder_rumble", pos, spread * low * power, pitch, self.late_by);
         }
     }
 }
@@ -132,11 +114,11 @@ fn cloud_lift() -> f64 {
     crate::config::by_name("core:cloud_height").map_or(0.0, crate::config::get)
 }
 
-fn play(out: &mut Vec<Play>, name: &str, pos: DVec3, volume: f32, pitch: f32) {
+fn emit(out: &mut Soundscape, name: &str, pos: DVec3, volume: f32, pitch: f32, age: f32) {
     if volume >= 0.003
         && let Some(&sound) = content().game.catalog.ids(entry_kind::SOUND).get(name)
     {
-        out.push(Play { sound, pos: Some(pos), volume, pitch });
+        out.emit(Play { sound, pos: Some(pos), volume, pitch }, age);
     }
 }
 
@@ -167,32 +149,24 @@ impl LightningEffects {
         self.discharges.clear();
     }
 
-    pub fn is_active(&self) -> bool {
-        !self.discharges.is_empty()
-    }
-
-    pub fn receive(&mut self, strike: Lightning, late: f32) {
+    pub fn receive(&mut self, strike: Lightning, late: f32, listener: DVec3, sounds: &mut Soundscape) {
         let late = late.max(0.0);
-        if late > (THUNDER_RANGE / SOUND_SPEED) as f32
-            || self
-                .discharges
-                .iter()
-                .any(|d| d.strike.seed == strike.seed && d.strike.tick == strike.tick)
+        if self
+            .discharges
+            .iter()
+            .any(|d| d.strike.seed == strike.seed && d.strike.tick == strike.tick)
         {
             return;
         }
         log::debug!("flash {} from {} to {} (ground: {}, late: {:.3}s)", strike.seed, strike.origin, strike.end, strike.ground, late);
-        self.discharges.push(Discharge::new(strike, late));
+        let discharge = Discharge::new(strike, late, listener, sounds);
+        if late < FLASH_TIME {
+            self.discharges.push(discharge);
+        }
     }
 
-    pub fn advance(&mut self, listener: DVec3, sounds: &mut Vec<Play>) {
-        self.discharges.retain_mut(|d| {
-            if d.heard == 0b111 || d.age() > (THUNDER_RANGE / SOUND_SPEED) as f32 + 0.1 {
-                return d.age() < FLASH_TIME;
-            }
-            d.thunder(listener, sounds);
-            true
-        });
+    pub fn advance(&mut self) {
+        self.discharges.retain(|d| d.age() < FLASH_TIME);
     }
 
     pub fn lights(&self, camera: DVec3) -> ([[f32; 4]; FLASH_LIGHTS], [[f32; 4]; FLASH_LIGHTS]) {
@@ -276,7 +250,7 @@ mod tests {
         let listener = DVec3::new(343.0, 170.0, 0.0);
         let nearest = segment.closest(listener);
         assert!(nearest.distance(DVec3::Y * 170.0) < 1e-8);
-        assert!((listener.distance(nearest) / SOUND_SPEED - 1.0).abs() < 1e-8);
-        assert!(listener.distance(segment.to) / SOUND_SPEED > 1.1);
+        assert!((crate::audio::travel_time(listener.distance(nearest)) - 1.0).abs() < 1e-8);
+        assert!(crate::audio::travel_time(listener.distance(segment.to)) > 1.1);
     }
 }

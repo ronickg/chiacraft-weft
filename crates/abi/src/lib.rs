@@ -720,6 +720,8 @@ pub mod comp {
         pub const RANGE: &str = "sound.range";
         pub const FULL_WITHIN: &str = "sound.full_within";
         pub const FALLOFF: &str = "sound.falloff";
+        /// Minimum gain through cover, still subject to the obstruction's low-pass filter (`f32`, 0).
+        pub const THROUGH_WALLS: &str = "sound.through_walls";
         pub const CATEGORY: &str = "sound.category";
     }
 
@@ -1243,6 +1245,8 @@ pub mod comp {
     pub mod block {
         /// Mass per full block relative to a block of water (`f32`).
         pub const DENSITY: &str = "density";
+        /// Fraction of a sound's amplitude lost at a reflection (`f32`, 0..1).
+        pub const SOUND_ABSORPTION: &str = "sound_absorption";
         /// The force a block puts on its body when fully powered.
         pub const THRUST: &str = "thrust";
         pub const GUIDE_RAIL: &str = "guide_rail";

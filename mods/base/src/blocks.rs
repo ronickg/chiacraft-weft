@@ -357,6 +357,9 @@ pub fn register(r: &mut Registry) {
             .set(&FUEL, 300)
             .tab(&crate::tabs::BUILDING);
     }
+    for tag in ["#materials/wood", "#planks", "#wood", "#logs"] {
+        r.set(tag, &SOUND_ABSORPTION, 0.90);
+    }
     leaves(r, &OAK_LEAVES, "leaves_oak", true);
     leaves(r, &BIRCH_LEAVES, "leaves_birch", true);
     leaves(r, &SPRUCE_LEAVES, "leaves_spruce", true);

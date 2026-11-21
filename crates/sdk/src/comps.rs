@@ -131,6 +131,7 @@ pub mod sound {
     pub static RANGE: Component<f32, Sound> = Component::named(s::RANGE);
     pub static FULL_WITHIN: Component<f32, Sound> = Component::named(s::FULL_WITHIN);
     pub static FALLOFF: Component<i32, Sound> = Component::named(s::FALLOFF);
+    pub static THROUGH_WALLS: Component<f32, Sound> = Component::named(s::THROUGH_WALLS);
     pub static CATEGORY: Component<Text, Sound> = Component::named(s::CATEGORY);
 }
 
