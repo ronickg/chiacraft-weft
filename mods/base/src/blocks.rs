@@ -416,8 +416,6 @@ pub fn register(r: &mut Registry) {
         .needs_below("#plant_soil")
         .tint_kind(&tints::GRASS)
         .tab(&crate::tabs::NATURAL);
-    r.loot(&TALL_GRASS)
-        .pool(Pool::new().when(Cond::chance(0.125)).item("wheat_seeds"));
     r.block(&SHORT_GRASS)
         .sound_group("grass")
         .texture("short_grass")
@@ -439,8 +437,6 @@ pub fn register(r: &mut Registry) {
         // .state_where("half=lower", |s| s.needs_below("#plant_6oil"))
         .tint_kind(&tints::GRASS)
         .tab(&crate::tabs::NATURAL);
-    r.loot(&TALL_TALL_GRASS)
-        .pool(Pool::new().when(Cond::chance(0.25)).item("wheat_seeds"));
     r.block(&BLUEGRASS)
         .sound_group("grass")
         .plant()
@@ -525,12 +521,6 @@ pub fn register(r: &mut Registry) {
         .tint_kind(&tints::GRASS)
         .not_solid()
         .tab(&crate::tabs::NATURAL);
-    r.loot(&CLOVER).pool(
-        Pool::new()
-            .when(Cond::tool("#tools/shears"))
-            .item(CLOVER.name()),
-    );
-
     r.block(&SAPLING)
         .sound_group("grass")
         .texture("sapling_oak")
@@ -796,11 +786,19 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL)
         .not_solid()
         .hitbox([2.0, 0.0, 2.0], [14.0, 16.0, 14.0]);
-    r.loot(&FERN).pool(
-        Pool::new()
-            .when(Cond::tool("#tools/shears"))
-            .item(FERN.name()),
-    );
+    let shears = Cond::tool("#tools/shears");
+    for (grass, chance) in
+        [(&TALL_GRASS, 0.125), (&SHORT_GRASS, 0.125), (&BLUEGRASS, 0.125), (&CLOVER, 0.125), (&FERN, 0.125), (&TALL_TALL_GRASS, 0.25)]
+    {
+        r.loot(grass)
+            .pool(Pool::new().when(shears.clone()).item(grass.name()))
+            .pool(
+                Pool::new()
+                    .when(!shears.clone())
+                    .when(Cond::chance(chance))
+                    .item(crate::items::WHEAT_SEEDS.name()),
+            );
+    }
 
     // What may grow or stand where, from the common `dirt` and `sand` tags like modern vanilla:
     // a mod's sand tagged `sand` gets cactus and sugar cane, in the world and from players.
