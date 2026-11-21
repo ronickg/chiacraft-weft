@@ -187,7 +187,7 @@ impl Dim {
                 let place = m.body_place();
                 let dims = m.dims(c);
                 let body = crate::physics::Body::of(mount, k, place, (dims.half_width, dims.height), place, Some(&**built));
-                body.and_then(|b| b.deck_height(c, sat, r.dims(c).half_width))
+                body.and_then(|b| b.deck_height(c, sat, r.dims(c).half_width, s.exit_at.y))
                     .map_or(sat, |y| sat.with_y(y))
             }
             abi::seat_exit::CALL => {

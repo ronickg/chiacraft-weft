@@ -2767,7 +2767,8 @@ crate::data! {
         pub steers: bool,
         /// `seat_exit`: where a rider of this seat gets off.
         pub exit: u32,
-        /// `seat_exit::OFFSET`: from the mount, turned with it. `NEAREST`: x is how far to look.
+        /// `OFFSET`: offset from the mount in its frame. `NEAREST`: search radius in x.
+        /// `STAY`: maximum rise to the deck in y.
         pub exit_at: Vec3,
     }
 }
@@ -2778,8 +2779,11 @@ pub mod seat_exit {
     pub const NEAREST: u32 = 0;
     /// At `exit_at` from the mount, turned with it (a gondola's door).
     pub const OFFSET: u32 = 1;
-    /// Right where it sat, in the air if that is where it was.
+    /// On the deck at the seat, at most `exit_at.y` blocks up. Without a deck in reach,
+    /// the rider gets off where it sat.
     pub const STAY: u32 = 2;
+    /// Upward deck search distance for the default stay exit, in blocks.
+    pub const DEFAULT_STAY_RISE: f64 = 0.5;
     /// The kind's `comp::entity::DISMOUNT` decides.
     pub const CALL: u32 = 3;
 }

@@ -4,7 +4,7 @@ Every public method of every builder in the SDK, with its summary and a link to 
 
 - [Blocks](blocks.md): The block builder and everything a block's rules, hazards and states are made with. (94 methods)
 - [Items](items.md): The item builder. (32 methods)
-- [Entities](entities.md): Entity kinds, their AI, riding, status effects, poses, game modes and damage causes. (188 methods)
+- [Entities](entities.md): Entity kinds, their AI, riding, status effects, poses, game modes and damage causes. (190 methods)
 - [World generation](worldgen.md): Dimensions, biomes, terrain, features, structures and the sky. (222 methods)
 - [World](world.md): What a `World` can do, shapes, directions, conditions. (209 methods)
 - [Registration](registration.md): The registry, components, tags, settings, slots and menus. (219 methods)

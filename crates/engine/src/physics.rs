@@ -11,6 +11,7 @@ mod character;
 use character::{Collider, Sweep, Travel};
 
 const WALKABLE_Y: f64 = std::f64::consts::FRAC_1_SQRT_2;
+const DECK_REACH: f64 = 0.45;
 pub(crate) const LIQUID_SOURCES: u32 = 1 << 31;
 
 pub(crate) fn seat_at(
@@ -783,9 +784,10 @@ impl<'a> Body<'a> {
         area
     }
 
-    pub fn deck_height(&self, c: &Content, pos: DVec3, half_width: f64) -> Option<f64> {
+    pub fn deck_height(&self, c: &Content, pos: DVec3, half_width: f64, above: f64) -> Option<f64> {
+        let above = above.max(0.0).min((self.aabb.max.y - pos.y).max(0.0));
         let mut top = None::<f64>;
-        self.under(c, pos, half_width, 0.45, 0.45, false, |b, _| {
+        self.under(c, pos, half_width, DECK_REACH, above, false, |b, _| {
             top = Some(top.map_or(b.max.y, |y| y.max(b.max.y)));
         });
         top
@@ -900,7 +902,7 @@ pub fn ride(c: &Content, pos: DVec3, half_width: f64, on_ground: bool, support: 
             .is_some_and(|(_, place)| place.rotation() != b.before.rotation())
     {
         let at = pos + carry;
-        if let Some(y) = b.deck_height(c, at, half_width) {
+        if let Some(y) = b.deck_height(c, at, half_width, DECK_REACH) {
             carry.y = y - pos.y;
         }
     }
