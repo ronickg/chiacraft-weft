@@ -300,7 +300,7 @@ fn foliage_look(boxes: &[crate::content::ModelBox], x: i32, z: i32) -> Option<gl
     const HEIGHT_MIN: f32 = 0.85;
     const HEIGHT_RANGE: f32 = 0.3;
 
-    if boxes.is_empty() || !boxes.iter().all(|b| b.flat && b.tilt.degrees != 0.0) {
+    if boxes.is_empty() || boxes.iter().any(|b| !b.flat && b.tilt.degrees == 0.0) {
         return None;
     }
     let h = weft_noise::hash(1, x as i64, 0, z as i64);
