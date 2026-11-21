@@ -245,6 +245,19 @@ pub async fn slot_limit(t: T) -> R {
     t.frames(4).await?;
     t.check_eq(t.c().menu_slot(0).count, 16, "the input slot holds 16");
     t.check_eq(t.c().menu_slot(29).count, 16, "the rest stays in the hotbar");
+
+    t.secs(0.35).await?;
+    t.op(&format!("put {} {} {} 1 iron_ingot 5", p[0], p[1], p[2]))
+        .await?;
+    t.until("ingots in the output", Duration::from_secs(5), |t| t.c().menu_slot(1).count == 5)
+        .await?;
+    for (button, count) in [(1, 3), (1, 4), (0, 5)] {
+        t.click_ui("slot:1", button);
+        t.until("ingots on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().count == count)
+            .await
+            .map_err(|e| format!("{e}, expected {count}, cursor: {}, output: {}", t.c().cursor_stack().count, t.c().menu_slot(1).count))?;
+        t.check_eq(t.c().menu_slot(1).count, 5 - count, "remaining ingots in the output");
+    }
     t.c().menu_close();
     t.no_screen().await
 }

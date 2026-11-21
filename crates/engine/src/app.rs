@@ -1221,6 +1221,19 @@ impl Running {
             use crate::server::menu::{
                 CLONE, GATHER, HOTBAR_SWAP, OFF_HAND_SWAP, PICK_SAME, THROW, THROW_ALL, TO_TRASH, WHEEL_DOWN, WHEEL_UP,
             };
+            // A release and a new press can both land between two frames.
+            if g.client.drag.as_ref().is_some_and(|(button, _)| {
+                !self.input.held_button(*button) || self.input.pressed_button(*button)
+            }) {
+                let (button, slots) = g.client.drag.take().unwrap();
+                if slots.len() == 1 {
+                    g.client
+                        .send(net::ToServer::Click { slot: slots[0], button, shift: false });
+                } else {
+                    g.client.send(net::ToServer::Drag { slots, button });
+                }
+                self.quads_dirty = true;
+            }
             let typing = ui
                 .focused
                 .is_some_and(|f| matches!(ui.nodes[f].kind, Kind::Input { .. }));
@@ -1250,14 +1263,13 @@ impl Running {
                         g.client.sweep.extend(slot);
                     }
                     match slot {
-                        // Double click: the rest of the stack just picked up joins it (the
-                        // server knows what is on the cursor even before we do).
+                        // The server tries to gather or applies a normal click with its cursor state.
                         Some(s) if double && !shift => {
                             g.client
                                 .send(net::ToServer::Click { slot: s, button: GATHER, shift: false });
                             g.client.last_click = None;
                         }
-                        Some(s) if holding && !shift && g.client.drag.is_none() => {
+                        Some(s) if holding && !shift && self.input.held_button(button) && g.client.drag.is_none() => {
                             g.client.drag = Some((button, vec![s]));
                             self.quads_dirty = true;
                         }
@@ -1323,21 +1335,10 @@ impl Running {
                 }
             }
             if let Some((button, slots)) = &mut g.client.drag {
-                if self.input.held_button(*button) {
-                    // A right-button drag leaves one more each time it comes back onto a slot.
-                    let again = |s: &u32| if *button == 1 { slots.last() != Some(s) } else { !slots.contains(s) };
-                    if let Some(s) = slot.filter(again) {
-                        slots.push(s);
-                        self.quads_dirty = true;
-                    }
-                } else {
-                    let (button, slots) = g.client.drag.take().unwrap();
-                    if slots.len() == 1 {
-                        g.client
-                            .send(net::ToServer::Click { slot: slots[0], button, shift: false });
-                    } else {
-                        g.client.send(net::ToServer::Drag { slots, button });
-                    }
+                // A right-button drag leaves one more each time it comes back onto a slot.
+                let again = |s: &u32| if *button == 1 { slots.last() != Some(s) } else { !slots.contains(s) };
+                if let Some(s) = slot.filter(again) {
+                    slots.push(s);
                     self.quads_dirty = true;
                 }
             }
