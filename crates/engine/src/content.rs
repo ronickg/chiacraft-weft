@@ -20,11 +20,20 @@ pub struct RandomTransform {
     pub width_scale: [f32; 2],
     pub scale: [f32; 2],
     pub yaw: [f32; 2],
+    pub pitch: [f32; 2],
+    pub roll: [f32; 2],
 }
 
 impl RandomTransform {
-    pub const NONE: RandomTransform =
-        RandomTransform { offset: 0.0, height_scale: [1.0; 2], width_scale: [1.0; 2], scale: [1.0; 2], yaw: [0.0; 2] };
+    pub const NONE: RandomTransform = RandomTransform {
+        offset: 0.0,
+        height_scale: [1.0; 2],
+        width_scale: [1.0; 2],
+        scale: [1.0; 2],
+        yaw: [0.0; 2],
+        pitch: [0.0; 2],
+        roll: [0.0; 2],
+    };
 }
 
 #[derive(Clone)]

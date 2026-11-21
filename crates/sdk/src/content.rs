@@ -1709,25 +1709,26 @@ macro_rules! state_setters {
                 .hardness(0.0)
                 .tag("plantable")
         }
-        /// Draws it up to `blocks` off center along X and Z.
         pub fn random_offset(self, blocks: f32) -> Self {
             self.set(&bc::RANDOM_OFFSET, blocks)
         }
-        /// Draws it scaled in height between `min` and `max` relative size.
         pub fn random_height_scale(self, min: f32, max: f32) -> Self {
             self.set(&bc::RANDOM_HEIGHT_SCALE, [min, max])
         }
-        /// Draws it scaled in width (X and Z) between `min` and `max` relative size.
         pub fn random_width_scale(self, min: f32, max: f32) -> Self {
             self.set(&bc::RANDOM_WIDTH_SCALE, [min, max])
         }
-        /// Draws it scaled in both width and height between `min` and `max` relative size.
         pub fn random_scale(self, min: f32, max: f32) -> Self {
             self.set(&bc::RANDOM_SCALE, [min, max])
         }
-        /// Draws it turned between `min` and `max` degrees about Y.
         pub fn random_yaw(self, min: f32, max: f32) -> Self {
             self.set(&bc::RANDOM_YAW, [min, max])
+        }
+        pub fn random_pitch(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_PITCH, [min, max])
+        }
+        pub fn random_roll(self, min: f32, max: f32) -> Self {
+            self.set(&bc::RANDOM_ROLL, [min, max])
         }
         /// `plant` two blocks tall (vanilla's tall grass, a sunflower): a cross showing `lower`
         /// in its cell and `upper` in the one above (relative names under `block/`), taking room

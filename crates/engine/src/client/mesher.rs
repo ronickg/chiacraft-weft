@@ -5,7 +5,7 @@
 //! corners.
 
 use crate::gpu_layout::{face, quad};
-use glam::{Affine3A, Quat, Vec3};
+use glam::{Affine3A, EulerRot, Quat, Vec3};
 use weft_abi::{BlockModel, RenderLayer, block_flags as bf};
 
 use crate::content::Content;
@@ -304,7 +304,8 @@ fn random_transform_at(f: &crate::content::RandomTransform, x: i32, z: i32) -> O
     let h = [weft_noise::hash(1, x as i64, 0, z as i64), weft_noise::hash(1, x as i64, 1, z as i64)];
     let r = |i: usize| f32::from((h[i / 4] >> (16 * (i % 4))) as u16) / f32::from(u16::MAX);
     let range = |[min, max]: [f32; 2], i| min + (max - min) * r(i);
-    let (mid, turn) = (Vec3::new(0.5, 0.0, 0.5), Quat::from_rotation_y(range(f.yaw, 0).to_radians()));
+    let (yaw, pitch, roll) = (range(f.yaw, 0), range(f.pitch, 6), range(f.roll, 7));
+    let (mid, turn) = (Vec3::new(0.5, 0.0, 0.5), Quat::from_euler(EulerRot::YXZ, yaw.to_radians(), pitch.to_radians(), roll.to_radians()));
     let lean = Vec3::new(r(2) * 2.0 - 1.0, 0.0, r(3) * 2.0 - 1.0) * f.offset;
     let width = range(f.width_scale, 4);
     let size = Vec3::new(width, range(f.height_scale, 1), width) * range(f.scale, 5);

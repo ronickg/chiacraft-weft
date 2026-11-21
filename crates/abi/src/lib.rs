@@ -1278,6 +1278,8 @@ pub mod comp {
         pub const RANDOM_WIDTH_SCALE: &str = "block.random_width_scale";
         pub const RANDOM_SCALE: &str = "block.random_scale";
         pub const RANDOM_YAW: &str = "block.random_yaw";
+        pub const RANDOM_PITCH: &str = "block.random_pitch";
+        pub const RANDOM_ROLL: &str = "block.random_roll";
         pub const TEXTURES: &str = "block.textures";
         pub const TURNS: &str = "block.turns";
         pub const TURN: &str = "block.turn";

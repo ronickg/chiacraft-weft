@@ -874,6 +874,8 @@ fn bake_state(
             width_scale: s.or(b::RANDOM_WIDTH_SCALE, [1.0; 2]),
             scale: s.or(b::RANDOM_SCALE, [1.0; 2]),
             yaw: s.or(b::RANDOM_YAW, [0.0f32; 2]),
+            pitch: s.or(b::RANDOM_PITCH, [0.0f32; 2]),
+            roll: s.or(b::RANDOM_ROLL, [0.0f32; 2]),
         },
         signal: Signal {
             kind: signal.kind,
