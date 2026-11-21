@@ -1273,6 +1273,13 @@ pub mod comp {
         pub const MODEL: &str = "block.model";
         /// Item sprite from this face (u8, FACE_DIRS); 255 draws the model.
         pub const ITEM_FACE: &str = "block.item_face";
+        pub const RANDOM_OFFSET: &str = "block.random_offset";
+        pub const RANDOM_HEIGHT_SCALE: &str = "block.random_height_scale";
+        pub const RANDOM_WIDTH_SCALE: &str = "block.random_width_scale";
+        pub const RANDOM_SCALE: &str = "block.random_scale";
+        pub const RANDOM_YAW: &str = "block.random_yaw";
+        pub const RANDOM_PITCH: &str = "block.random_pitch";
+        pub const RANDOM_ROLL: &str = "block.random_roll";
         pub const TEXTURES: &str = "block.textures";
         pub const TURNS: &str = "block.turns";
         pub const TURN: &str = "block.turn";
