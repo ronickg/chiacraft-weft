@@ -697,3 +697,18 @@ def egg_looks(root):
     t = strip_comments(open(p, encoding="utf-8").read())
     m = re.search(r"pub const EGGS[^=]*=\s*&\[(.*?)\];", t, re.S)
     return dict(re.findall(r'\(\s*"(\w+)"\s*,\s*"(\w+)"', m.group(1))) if m else {}
+
+
+def drawn_parts(root):
+    """`crafting::looks`' drawn parts (art redo v3): SHELLS_DRAWN (shells drawn per material) and
+    `drawn_shape`'s mapping (a shape drawn as another's picture)."""
+    t = strip_comments(open(f"{root}/mods/base/crafting/src/looks.rs").read())
+    m = re.search(r"SHELLS_DRAWN: \[&str; \d+\] = \[(.*?)\]", t)
+    shells = strings(m.group(1)) if m else []
+    f = re.search(r"pub fn drawn_shape\(.*?\n\}", t, re.S)
+    mapping = {}
+    if f:
+        for pats, to in re.findall(r'((?:"\w+"\s*\|?\s*)+)=>\s*"(\w+)"', f.group(0)):
+            for p in strings(pats):
+                mapping[p] = to
+    return shells, mapping
