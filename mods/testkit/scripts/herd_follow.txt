@@ -11,6 +11,7 @@
 #   across it (before this, each wandered its own way: compare the spread in 1 and 4).
 # Each row also shows its walk (nav 1: walking somewhere, moved: blocks last tick, ground,
 # pose, using): in ai1122_herd2 every deer said "doing wander" without moving at all.
+# "stuck walking at ..." lines: a wander that got nowhere for 3 s, stopped by the guard; send them.
 # FAIL: no "lead" field (old build), or the herd spread over 30+ blocks by shot 4.
 loaded
 idle

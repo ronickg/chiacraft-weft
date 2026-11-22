@@ -174,6 +174,7 @@ fn init(r: &mut Registry) {
     senses::init(r);
     memory::init(r);
     choose::init(r);
+    group::init(r);
     screen::init(r);
     taming::init(r);
     commands::init(r);
