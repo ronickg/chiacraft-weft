@@ -1339,10 +1339,10 @@ fn slot_icon(ren: &mut UiRenderer, look: &Look, class: &str, r: Rect, stack: Ite
 /// it when selected.
 pub fn slot_background(ren: &mut UiRenderer, look: &Look, class: &str, r: Rect, selected: bool, scale: f32) {
     loaded(ren, look, class, r, scale);
+    // chiacraft: under the item, as before upstream's overlay: our `hotbar_selected` is a filled
+    // frame, which over the item hid it.
     if selected {
-        ren.defer_overlay(|ren| {
-            loaded(ren, look, "hotbar_selected", Rect { x: r.x - scale, y: r.y - scale, w: r.w + 2.0 * scale, h: r.h + 2.0 * scale }, scale)
-        });
+        loaded(ren, look, "hotbar_selected", Rect { x: r.x - scale, y: r.y - scale, w: r.w + 2.0 * scale, h: r.h + 2.0 * scale }, scale);
     }
 }
 

@@ -238,7 +238,7 @@ fn grove(r: &mut Registry) {
     // The dogwood is white with its bracts in spring and plain green the rest of the year
     // (`vitals::wild::BLOOMS`), both drawn in their own colours.
     let b = tree_leaves(r.block(&DOGWOOD_LEAVES).sound_group("grass"));
-    bloom(b, DOGWOOD_LEAVES.name(), "leaves_dogwood", "leaves_dogwood_green")
+    bloom(b, DOGWOOD_LEAVES.name(), "leaves_dogwood", "leaves_dogwood_green", None)
         .hardness(0.2)
         .cutout()
         .cull_same()
@@ -300,19 +300,19 @@ fn planks(r: &mut Registry, h: &'static Block, wood: &str) {
 /// Leaves that drop `sapling` (a time in 20) and, for our trees, `fruit` (a time in 20).
 fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fruit: Option<&str>) {
     let b = tree_leaves(r.block(handle).sound_group("grass").texture(tex));
-    let b = bloom(b, handle.name(), leak(format!("{tex}_bloom")), leak(tex.to_string()))
+    // Its tint by how it turns in autumn (`vitals::wild::LEAVES`), but for leaves drawn in their
+    // own colours (the tropical canopy's, `vitals::wild::OWN_COLOURS`).
+    let kind = (!vitals::wild::OWN_COLOURS.contains(&handle.name())).then(|| base_api::trees::leaf_tint(vitals::wild::turn(handle.name())));
+    let b = bloom(b, handle.name(), leak(format!("{tex}_bloom")), leak(tex.to_string()), kind)
         .hardness(0.2)
         .cutout()
         // Faces between two leaves of one tree kind aren't drawn (each was drawn twice): a crown
         // keeps its outer shell and its holes (Researcher's performance report, item 9).
         .cull_same()
         .light_opacity(1);
-    // Its tint by how it turns in autumn (`vitals::wild::LEAVES`), but for leaves drawn in their
-    // own colours (the tropical canopy's, `vitals::wild::OWN_COLOURS`).
-    let b = if vitals::wild::OWN_COLOURS.contains(&handle.name()) {
-        b
-    } else {
-        b.tint_kind(base_api::trees::leaf_tint(vitals::wild::turn(handle.name())))
+    let b = match kind {
+        Some(kind) => b.tint_kind(kind),
+        None => b,
     };
     b.tag("leaves")
         .signal_blocker()
@@ -340,10 +340,18 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fr
 /// Leaves that flower (`vitals::wild::BLOOMS`): `bloom` 1 in their seasons, drawn as `open`, and
 /// `shut` the rest of the year, a growth step every few minutes looking at the season as the wild
 /// flowers do (`wild.rs`). Leaves that don't bloom are left as they are.
-fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'static str) -> BlockBuilder<'a> {
+/// `tint`: the leaves' tint kind, put on each state's texture (upstream's `tint_kind` colours only
+/// the faces set so far, and a state's texture replaces the block's).
+fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'static str, tint: Option<&'static TintKind>) -> BlockBuilder<'a> {
     let Some(seasons) = vitals::wild::blooms(leaves) else { return b };
     b.prop("bloom", 0..=1)
-        .states(move |p, s| s.texture(if p.get("bloom") == "1" { open } else { shut }))
+        .states(move |p, s| {
+            let s = s.texture(if p.get("bloom") == "1" { open } else { shut });
+            match tint {
+                Some(kind) => s.tint_kind(kind),
+                None => s,
+            }
+        })
         .grows(BLOOM_SECS, 0)
         .on_grow(move |e| {
             let open = vitals::wild::in_bloom(seasons, base_api::ground_at(&e.world(), e.pos().to_array()).season);
@@ -1089,7 +1097,7 @@ pub fn register(r: &mut Registry) {
     // The shrubs' leaves (`vitals::layers`), drawn in their own colours: not tinted.
     for (b, tex) in [(&WILLOW_LEAVES, "leaves_willow"), (&JUNIPER_LEAVES, "leaves_juniper"), (&CREOSOTE_LEAVES, "leaves_creosote")] {
         let builder = r.block(b).sound_group("grass").texture(tex);
-        bloom(builder, b.name(), leak(format!("{tex}_bloom")), tex)
+        bloom(builder, b.name(), leak(format!("{tex}_bloom")), tex, None)
             .hardness(0.2)
             .cutout()
             .cull_same()
@@ -1108,9 +1116,13 @@ pub fn register(r: &mut Registry) {
         .sound_group("grass")
         .plant()
         .needs_below("#tall_grass_soil")
-        .tint_kind(&tints::GRASS)
         .prop("half", ["lower", "upper"])
-        .states(|p, s| s.texture(if p.get("half") == "upper" { "tall_grass_upper" } else { "tall_grass_lower" }))
+        // The tint goes on the state's own texture: upstream's `tint_kind` colours only the faces
+        // set so far, and a state's texture replaces the block's.
+        .states(|p, s| {
+            s.texture(if p.get("half") == "upper" { "tall_grass_upper" } else { "tall_grass_lower" })
+                .tint_kind(&tints::GRASS)
+        })
         .no_item();
     // Big-leaved plants two blocks tall, in their own colours: the upper half on the lower, which
     // takes it when broken.

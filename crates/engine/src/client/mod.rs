@@ -4312,7 +4312,13 @@ impl Client {
         self.sky.froxels_possible = self.fog >= 0.005 && self.eye_liquid().is_none();
         let ticks = self.smooth_time();
         let weather_ticks = ticks - self.world.time as f64 + self.world.ticks as f64;
-        let weather = self.weather_field(weather_ticks);
+        // chiacraft: the sky draws the dimension's cloud picture (our soft clouds and the pack's
+        // boxes read it) unless `--weather-clouds` asks for upstream's volumetric weather clouds
+        // (the clouds A/B, notes/ENGINE_CHANGES.md 10b). Weather itself still uses the field.
+        let mut weather = self.weather_field(weather_ticks);
+        if !crate::app::api::launch_options().contains_key("weather-clouds") {
+            weather.clouds = None;
+        }
         let environment = &self.environment.values;
         let world_depth = (self.sky.has_atmosphere()
             && weather.clouds.is_some()

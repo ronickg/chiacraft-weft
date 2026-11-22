@@ -737,7 +737,8 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:inactive_entity_interval", ck::INT, 20.0, 1.0, 200.0, 1.0).set(c::SCOPE, scope::WORLD),
         // Most cubes mods' tickets keep loaded with no player near (`Host::force_load`).
         number("core:max_forced_cubes", ck::INT, 4096.0, 0.0, 1048576.0, 1.0).set(c::SCOPE, scope::WORLD),
-        number("core:first_person_model", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // chiacraft: off by default, as before upstream 86aad52d0: the hand and held item in view.
+        number("core:first_person_model", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         number("core:show_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         number("core:skin_model", ck::CHOICE, 0.0, 0.0, 1.0, 0.0).set(c::CHOICES, ["classic", "slim"].map(String::from).to_vec()),
         number("core:occlusion_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
