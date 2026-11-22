@@ -141,6 +141,14 @@ const OPT_WATER_MIRROR: u32 = 44u;
 // its light (Bliss's bliss_tw, 11-22: land 5 23 78 at 19:00, 0 10 75 at 19:30, dark at 20:00, where
 // ours was grey-black, 10 13 21, at 19:00).
 const OPT_TWILIGHT: u32 = 45u;
+// How bright the water's own body is, near and far (`base:look_water_body`): 1 as made, less darker.
+// Looking down at a lake the mirror is a few percent; the rest is the body's light, which kept our
+// open water a light blue (lsL, 11-22: 102 123 133 against Bliss's dark navy 68 93 125).
+const OPT_WATER_BODY: u32 = 46u;
+fn water_body() -> f32 {
+    let b = fantasy_opt(OPT_WATER_BODY);
+    return select(1.0, b, b >= 0.0);
+}
 
 // How much of the mist lies as the evening's (`OPT_EVENING_MIST`): none with the sun 25° up in the
 // west (17:00), a little at 12° (18:00), all with it on the horizon, into the dusk. (It began at 32°

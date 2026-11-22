@@ -1121,7 +1121,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     let scatter_raw = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
     // The water's own colour 40 % toward grey: at a slant ours read 0.31 saturation against Bliss's
     // 0.10-0.19 (Terrain's water sheet; Water 12).
-    let scatter = mix(vec3(luma(scatter_raw)), scatter_raw, 0.6);
+    let scatter = mix(vec3(luma(scatter_raw)), scatter_raw, 0.6) * water_body();
     // How much of the bottom shows: the way through the water to it, longer at a slant; never all
     // of it, so even the shallowest water tints what lies under it.
     let through = exp(-0.28 * depth / max(v.y, 0.2)) * 0.82;
@@ -1622,7 +1622,7 @@ fn far_water_lit(in: VOut) -> vec3<f32> {
     // The clouds' shadow here once (it was asked twice, for the light and the glint).
     let clouds = cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, clouds, 1.0, in.pos, in.rel);
-    let deep = WATER_DEEP * lit;
+    let deep = WATER_DEEP * lit * water_body();
     let r = reflect(-v, n);
     let refl = sky_color(normalize(vec3(r.x, max(r.y * water_sky_lift(), 0.02), r.z)));
     let l = light_dir();
