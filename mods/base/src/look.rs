@@ -46,12 +46,51 @@ pub static LOOK_LEAF_HOLES: Config<f32> = Config::named("look_leaf_holes");
 /// and the sun through it (Bliss's leaf subsurface scattering, its SSS types 1-2), 0 none. Off by
 /// default and in the Bliss comparisons: Ronald's Bliss (SSS type 3, no LabPBR pack) has none.
 pub static LOOK_LEAF_LIGHT: Config<f32> = Config::named("look_leaf_light");
+/// A debug view for matching the light against Bliss's (its debug_DIRECT / debug_INDIRECT): 0 the
+/// picture, 1 the sun's light alone, 2 the sky's alone, on white.
+pub static LOOK_DEBUG: Config<f32> = Config::named("look_debug");
+/// The HDR world's sky light by day in the upper sky's own hue, as Bliss's: 0 the palette's fill as
+/// made, 1 all the way.
+pub static LOOK_SKY_HUE: Config<f32> = Config::named("look_sky_hue");
+/// The HDR world's exposure by day in Bliss's own units (its curve's gentle slope, no near-land dim):
+/// 0 as made, 1 all the way.
+pub static LOOK_EXPOSURE_ABS: Config<f32> = Config::named("look_exposure_abs");
+/// The HDR world's warmth on sunlit foliage toward a leaf-top yellow: 0.7 as made, 0 none.
+pub static LOOK_SPLIT_WARM: Config<f32> = Config::named("look_split_warm");
+/// The HDR world's evening mist, Bliss's evening fog (the 18:00 warm veil): with the sun low in the
+/// west the mist lies densest at the low land, thinning with height. 0 as made, 1 all the way.
+pub static LOOK_EVENING_MIST: Config<f32> = Config::named("look_evening_mist");
+/// The HDR world's bloom by day added on top, as Bliss's (+35% at the centre, +12% in the corners at
+/// noon): 0 mixed in as made, 1 all the way.
+pub static LOOK_BLOOM_ADD: Config<f32> = Config::named("look_bloom_add");
+/// A test switch for like-for-like compares: 1 takes the high cirrus out of the sky (with soft
+/// clouds and cloud shadows off and a blank clouds texture, no cloud at all). 0 as made.
+pub static LOOK_CIRRUS_OFF: Config<f32> = Config::named("look_cirrus_off");
+/// The HDR world's veiling glare (a little of the sky's light over the whole picture, lifting the
+/// shade): 1 as made, 0 none (Bliss has none).
+pub static LOOK_GLARE: Config<f32> = Config::named("look_glare");
+/// The far shade from the sky (`fx_far_ao`) as strong as Bliss's: what a point keeps of the sky's
+/// light is its open share to this power (Bliss's 6). 0 as made.
+pub static LOOK_AO_POWER: Config<f32> = Config::named("look_ao_power");
+/// Water's absorption by depth as Bliss's (per colour, water and dirt, floored dark): 0 as made, 1
+/// Bliss's, more stronger.
+pub static LOOK_WATER_ABSORB: Config<f32> = Config::named("look_water_absorb");
+/// The foam at the shore and over the shallows: 1 as made, 0 none (Bliss has none).
+pub static LOOK_WATER_FOAM: Config<f32> = Config::named("look_water_foam");
+/// Water's mirror as Bliss's (Fresnel's fifth power from 0.02, the sky where the ripples point):
+/// 0 as made, 1 Bliss's.
+pub static LOOK_WATER_MIRROR: Config<f32> = Config::named("look_water_mirror");
+/// The evening's blue hour as Bliss's: 0 as made; above 0 the sky a deep blue from sunset to about
+/// 10 degrees under, the land lit by it at this many times its light.
+pub static LOOK_TWILIGHT: Config<f32> = Config::named("look_twilight");
+/// How bright the water's own body is, near and far: 1 as made, less darker.
+pub static LOOK_WATER_BODY: Config<f32> = Config::named("look_water_body");
 
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -91,4 +130,18 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_LEAF_SUN).float(1.0, 0.5, 4.0);
     r.config(&LOOK_LEAF_HOLES).float(1.0, 0.0, 1.0);
     r.config(&LOOK_LEAF_LIGHT).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_DEBUG).float(0.0, 0.0, 2.0);
+    r.config(&LOOK_SKY_HUE).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_EXPOSURE_ABS).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_SPLIT_WARM).float(0.7, 0.0, 1.0);
+    r.config(&LOOK_EVENING_MIST).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_BLOOM_ADD).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_CIRRUS_OFF).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_GLARE).float(1.0, 0.0, 2.0);
+    r.config(&LOOK_AO_POWER).float(0.0, 0.0, 8.0);
+    r.config(&LOOK_WATER_ABSORB).float(0.0, 0.0, 4.0);
+    r.config(&LOOK_WATER_FOAM).float(1.0, 0.0, 1.0);
+    r.config(&LOOK_WATER_MIRROR).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_TWILIGHT).float(0.0, 0.0, 8.0);
+    r.config(&LOOK_WATER_BODY).float(1.0, 0.0, 2.0);
 }

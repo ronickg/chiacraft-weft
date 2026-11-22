@@ -8,3 +8,4 @@ testkit.drawn = нарисовано testkit
 testkit.screen_text = текст на экране из покадрового хука
 testkit.ok = ok {0}
 testkit.err = err {0}
+command.testkit.compare = {0}

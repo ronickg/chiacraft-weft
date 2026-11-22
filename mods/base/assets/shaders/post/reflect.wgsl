@@ -77,8 +77,13 @@ fn reflect_swell(p: vec2<f32>, t: f32, dist: f32, glance: f32) -> vec3<f32> {
 // How much of what it shows water mirrors at the angle it is seen at (the pack's `water_fresnel`,
 // the same): a fourth power from 0.04, muted navy water as Bliss's in its own world (Far view,
 // 11-06; it was a near mirror at an ordinary look, ^2 from 0.08).
+// With base's `look_water_mirror` (option 44, read raw: 0 as made) Bliss's, a fifth power from 0.02.
 fn reflect_fresnel(ndv: f32) -> f32 {
-    return 0.04 + 0.96 * pow(1.0 - clamp(ndv, 0.0, 1.0), 4.0);
+    let c = 1.0 - clamp(ndv, 0.0, 1.0);
+    return mix(0.04 + 0.96 * pow(c, 4.0), 0.02 + 0.98 * pow(c, 5.0), reflect_bliss());
+}
+fn reflect_bliss() -> f32 {
+    return clamp(scene.options[11][0], 0.0, 1.0);
 }
 
 // Where `rel` (camera relative) lands on the screen, and its depth there.
@@ -242,7 +247,7 @@ fn reflect_result(p: PostPixel) -> vec4<f32> {
     // than the Fresnel share: the water's own body under it is dark, so what it mirrors carries.
     // That extra fades looking steeply down, where the water shows its body more than what it mirrors.
     let steep = smoothstep(0.5, 0.9, dot(-v, n));
-    let amount = clamp(fresnel + select(0.15 * (1.0 - steep), 0.0, solid), 0.0, 0.97) * mask * edge * near;
+    let amount = clamp(fresnel + select(0.15 * (1.0 - steep) * (1.0 - reflect_bliss()), 0.0, solid), 0.0, 0.97) * mask * edge * near;
     return vec4(mirrored * amount, amount);
 }
 
