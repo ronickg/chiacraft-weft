@@ -450,7 +450,8 @@ async fn run_lines(t: T, src: String) -> R {
             // a second, `/tick freeze`, 8 s): the hour-shot recipe in one step.
             "hour" => {
                 t.c().say("/tick unfreeze");
-                t.c().say(&format!("/time set {}", crate::compare::hour_ticks(num(0, 12.0))));
+                t.c()
+                    .say(&format!("/time set {}", crate::compare::hour_ticks(num(0, 12.0))));
                 t.secs(1.0).await?;
                 t.c().say("/tick freeze");
                 t.secs(8.0).await?;
