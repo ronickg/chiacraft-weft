@@ -169,7 +169,9 @@ pub async fn edits(t: T) -> R {
     let gear = Menu::lookup("testkit:gear").unwrap_or(u32::MAX);
     t.until("the edited menu open", Duration::from_secs(5), |t| t.c().menu().is_some_and(|m| m.kind == gear))
         .await?;
-    t.check_eq(t.c().menu().map(|m| m.slots), Some(43), "the slots of a menu an edit added a group to");
+    // (Weft's four pieces make 43; a game's own equipment slots, chiacraft's clothing, count too.)
+    let worn = t.c().displayed(t.c().player(), DisplaySource::Equipment).len() as u32;
+    t.check_eq(t.c().menu().map(|m| m.slots), Some(36 + 2 + worn + 1), "the slots of a menu an edit added a group to");
     t.c().menu_close();
     t.no_screen().await
 }

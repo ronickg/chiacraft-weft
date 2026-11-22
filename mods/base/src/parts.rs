@@ -173,6 +173,8 @@ pub fn register(r: &mut Registry) {
         };
         // Vanilla: weapons wear by one per hit, tools (made for blocks) by two.
         let b = b.set(&WEAR_PER_HIT, if matches!(k.id, "sword" | "spear" | "knife") { 1 } else { 2 });
+        // An axe's hit takes a raised shield down for a while (on the item: every axe has it).
+        let b = if k.use_ == Use::Chop { b.set(&comps::DISABLE_BLOCKING, crafting::kinds::CHOP_DISABLES_BLOCKING) } else { b };
         if k.id == "sword" {
             b.sweeps().no_creative_break();
         } else if k.id == "hoe" {

@@ -50,7 +50,10 @@ pub async fn shields(t: T) -> R {
         );
     }
     t.secs(0.15).await?;
-    t.check_eq(t.state().health, health, "blocked hits preserve health");
+    // Our survival drains a little health over time (cold, hunger); a hit that got through
+    // would take at least one point.
+    let now = t.state().health;
+    t.check(health - now < 0.5, &format!("blocked hits preserve health: {health} -> {now}"));
     t.check_eq(t.c().inventory_slot(0).wear(), 13, "only hits above threshold wear the shield");
     t.check_eq(t.op(&format!("hit_from {back} 2 base:stick")).await?, "1".into(), "rear hit lands");
     t.secs(0.6).await?;
@@ -93,7 +96,7 @@ pub async fn shields(t: T) -> R {
         .await?;
     t.hold("core:use", 30.0);
     t.secs(0.15).await?;
-    t.check_eq(t.op(&format!("hit_from {front} 4 base:iron_axe")).await?, "0".into(), "axe hit is blocked");
+    t.check_eq(t.op(&format!("hit_from {front} 4 base:axe")).await?, "0".into(), "axe hit is blocked");
     t.secs(0.2).await?;
     t.hold("core:use", 30.0);
     t.secs(0.2).await?;

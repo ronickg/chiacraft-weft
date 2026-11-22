@@ -2174,7 +2174,8 @@ pub async fn hoe_tills(t: T) -> R {
     let soil = add(t.feet(), [2, -1, 0]);
     let stone = add(t.feet(), [-2, -1, 0]);
     t.set(stone, "stone").await?;
-    t.op("put me 0 wood_hoe 1").await?;
+    // Ours are assembled from parts (`/gear`); any hoe tills.
+    t.op("put me 0 hoe 1").await?;
     t.c().select_slot(0);
     for p in [soil, stone] {
         t.look_at(p);

@@ -249,7 +249,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 
 These are the biggest changes. They live mostly in our crates, but each needed hooks in the engine.
 
-- **Account (phase 1):** the network key follows the account's 24 words; joining proves the account (170fff57, 308a0544).
+- **Account (phase 1):** the network key follows the account's 24 words; joining proves the account (170fff57, 308a0544). *11-22 CI fix* (claude/ci-after-weft-sync-1122; `screens.rs`, `assets/lang/{en_us,ru_ru,fr_fr}.lang`): the profile's key line and Copy Key button put back on upstream's overhauled profile screen, which had dropped them (testkit `account`).
 - **Data packages (phase 2):** local packages, package identity, switching content between worlds without a restart, downloading a world's packages on join, signing and trust (d2b75419 to 91f907c3).
 - **Linked worlds (phase 3):** your world runs while you visit others, every world has its own address, link requests, portal blocks, travel, invites, friends (94a0f394 to b15162ec).
 - **Linking at the portal (phase 3, 2026-11-22):** all of it is in our own folder
