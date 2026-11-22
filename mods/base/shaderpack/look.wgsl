@@ -320,7 +320,10 @@ fn palette_now() -> Palette {
         p.zenith = mix(p.zenith, deep * (luma(p.zenith) / luma(deep)), tw * 0.7);
         p.horizon = mix(p.horizon, mix(p.horizon, deep * (luma(p.horizon) / luma(deep)), 0.5), tw);
         let sky = p.zenith * 0.65 + p.horizon * 0.35;
-        p.ambient = mix(p.ambient, sky * blue_k, tw);
+        // The land lit by it only once the sun is down: from 4° up it turned the 18:30 land a
+        // bright green (lsO_tw2: 125 136 88 at 4, where Bliss's is already dim, 35 36 69).
+        let down = 1.0 - smoothstep(-0.04, 0.0, scene.sun.y);
+        p.ambient = mix(p.ambient, sky * blue_k, tw * down);
     }
     return p;
 }
@@ -2048,6 +2051,21 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             let grey = 1.0 - exp(-2.5e-4 * min(dist, 250.0));
             add += gold * luma(p.horizon) * phase * grey * low * 0.6;
             out += add * day_air * fade;
+        }
+        // The blue hour's air (`OPT_TWILIGHT`): after sunset Bliss's land is a deep blue to the
+        // near ground (19:00 land 5 23 78, far 47 72 164; bliss_tw, 11-22), its own light near
+        // gone and the air between lit by the blue sky. Ours lit the land by that sky and it went
+        // grey-green, 22 36 40 (lsO_tw2), not blue. So the air adds the twilight sky's colour,
+        // blue first, filled in over the first few hundred blocks, at the setting's strength.
+        let blue_k = max(fantasy_opt(OPT_TWILIGHT), 0.0);
+        if blue_k > 0.0 {
+            let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
+            let tw = smoothstep(-0.3, -0.17, scene.sun.y) * (1.0 - smoothstep(-0.02, 0.1, scene.sun.y)) * evening * (1.0 - rain_amount());
+            if tw > 0.0 {
+                let fill = vec3(1.0) - exp(-vec3(1.5e-3, 3.0e-3, 6.0e-3) * min(dist, 600.0));
+                let sky_up = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
+                out += sky_up * fill * tw * blue_k;
+            }
         }
     }
     var extra = vec3(0.0);
