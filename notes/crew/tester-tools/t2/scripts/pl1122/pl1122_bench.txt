@@ -1,0 +1,53 @@
+# Look: reach Bliss bench (11-05): four views as Lighting's Mac plan (ground, toward a low sun, sea, mist),
+# seed 1, --shader-pack chiacraft, spectator, vsync and fps cap off, 6 s benches. Run once per setting
+# (core:hdr_world is read at start). Check each BENCH line shows the pack's shadows and effects > 0.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+set_config core:vsync 0
+set_config core:fps_cap 0
+# --- ground, noon
+chat /time set 6000
+chat /tp -689 120 -122
+loaded
+idle
+wait 15
+look 45 -4
+wait 3
+shot lb_ground.png
+wait 1
+bench 6 ground
+# --- toward a low sun
+chat /time set 1000
+look 270 8
+wait 4
+shot lb_sun.png
+wait 1
+bench 6 sun
+# --- sea
+chat /time set 6000
+chat /tp -1032 90 -345
+loaded
+idle
+wait 15
+look 180 -10
+wait 3
+shot lb_sea.png
+wait 1
+bench 6 sea
+# --- mist toward the morning sun
+chat /time set 1500
+chat /air 0.6 0
+chat /tp 148.5 93 523.5
+loaded
+idle
+wait 15
+look 270 10
+wait 3
+shot lb_mist.png
+wait 1
+bench 6 mist
+chat /air 0 0
+quit

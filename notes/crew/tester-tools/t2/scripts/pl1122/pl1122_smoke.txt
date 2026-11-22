@@ -1,0 +1,27 @@
+# pl1122 smoke: a survival run on dev (Tester 2, 11-22). Load, survival, walk, look around, open the inventory, wait through some game time. Check run.log for `died`.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /time set 6000
+chat /tk mode survival
+wait 5
+where smoke_start
+shot smoke_01_start.png
+look 0 0
+hold core:forward 6
+wait 1
+look 90 0
+hold core:forward 6
+wait 1
+shot smoke_02_walked.png
+press core:inventory
+wait 2
+shot smoke_03_inventory.png
+key Escape
+wait 1
+chat /time set 12000
+wait 6
+shot smoke_04_dusk.png
+where smoke_end
+quit
