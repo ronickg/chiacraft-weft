@@ -450,7 +450,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         }
     }
     let p = palette();
-    col += (p.zenith * 0.4 + p.horizon * 0.6) * GLARE_HDR * lens * smoothstep(-0.05, 0.2, scene.sun.y) * (1.0 - rain_amount());
+    col += (p.zenith * 0.4 + p.horizon * 0.6) * GLARE_HDR * max(fantasy_opt(OPT_GLARE), 0.0) * lens * smoothstep(-0.05, 0.2, scene.sun.y) * (1.0 - rain_amount());
     if pass_.exposure != 0u {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {

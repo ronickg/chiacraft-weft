@@ -119,6 +119,11 @@ const OPT_BLOOM_ADD: u32 = 38u;
 // the sky then has no cloud at all, as Bliss's with VOLUMETRIC_CLOUDS off (Ronald, 11-22: "removing
 // clouds could help with bliss vs ours").
 const OPT_CIRRUS_OFF: u32 = 39u;
+// The HDR world's veiling glare, a share of the sky's light over the whole picture
+// (`base:look_glare`, read raw: 1 as made, 0 none). Bliss has none: its shade's lift is its added
+// bloom (controlled frames, 11-22: with bloom and auto exposure off its noon shade is 0 19 65,
+// ours 24 46 79).
+const OPT_GLARE: u32 = 40u;
 
 // How much of the mist lies as the evening's (`OPT_EVENING_MIST`): half with the sun about 25° up
 // in the west (17:00), all from about 12° (18:00), into the dusk.
