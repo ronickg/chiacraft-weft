@@ -142,6 +142,7 @@ class Builder:
         metals = {m for m, r in self.mats.items() if r.get("Works as") in ("Metal",)} | {"gold"}
         self.kinds, self.shapes = kinds, shapes
         self.looks = I.Looks(looks, kinds, shapes, maps, metals)
+        self.looks.shells_drawn, self.looks.drawn_shapes = S.drawn_parts(root)
         self.overrides = S.texture_overrides(root)
         self.src_blocks = S.block_defs(root)
         self.eggs = S.egg_looks(root)
@@ -532,10 +533,8 @@ class Builder:
         for m, row in self.mats.items():
             if not self.fits(m, kind, slot, role):
                 continue
-            look = None
-            if shape in self.looks.part_maps:
-                look = self.looks.part_look(shape, m)
-            elif l:
+            look = self.looks.part_look(shape, m)
+            if not look and l:
                 for layer in l["layers"]:
                     if slot in layer["regions"]:
                         r0 = layer["regions"][0]
@@ -555,21 +554,20 @@ class Builder:
         return out
 
     def worn_entries(self):
-        """Worn armour skins (`textures/entity/armor/<look>_<layer>`), flat at 4x."""
+        """Worn armour skins, one set per shell material (`looks::worn_look`:
+        `textures/entity/armor/worn/<material>_<layer>`), flat at 4x."""
         self.tex.used = set()
-        for p in sorted(glob.glob(f"{self.root}/mods/base/assets/textures/entity/armor/*.png")):
+        for p in sorted(glob.glob(f"{self.root}/mods/base/assets/textures/entity/armor/worn/*.png")):
             stem = os.path.basename(p)[:-4]
-            look, _, layer = stem.rpartition("_")
-            a = self.tex.get(f"base:entity/armor/{stem}")
+            mat, _, layer = stem.rpartition("_")
+            a = self.tex.get(f"base:entity/armor/worn/{stem}")
             if a is None:
                 continue
             big = np.array(Image.fromarray(a).resize((a.shape[1] * 4, a.shape[0] * 4), Image.NEAREST))
-            sets = {"leather": "leather look (leather, rawhide, bone shells)", "iron": "mail (iron or steel shells)",
-                    "gold": "scale (bronze or copper shells)", "diamond": "gem scale (diamond shells)"}
-            self.add({"id": f"base:armor/{stem}", "mod": "base", "name": f"Worn armour: {look} {'outer' if layer == '1' else 'leggings'} layer",
+            self.add({"id": f"base:armor/worn/{stem}", "mod": "base", "name": f"Worn armour: {self.mat_name(mat)} {'outer' if layer == '1' else 'leggings'} layer",
                       "is": "skin", "group": "armour", "kind": "worn skin", "tier": None, "age": "", "path": "tech", "tab": "",
                       "img": self.img(big, f"worn/{stem}.png"), "pix": True, "wide": True,
-                      "note": f"the {sets.get(look, look)} set as it's worn: layer {layer} ({'helmet, chestplate, boots' if layer == '1' else 'leggings'})",
+                      "note": f"{self.mat_name(mat)} shells as they're worn: layer {layer} ({'helmet, chestplate, boots' if layer == '1' else 'leggings'})",
                       "made": [], "uses": [], "facts": []})
 
     # ------------------------------------------------------------ recipes as screens
