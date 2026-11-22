@@ -331,7 +331,7 @@ Looked at and not ported, with why (from the same list):
 - **fc5a58266, d4a206bb8, 11c4cbb6e, 0876ecbc7, 1889d7c9e** (LOD speed-ups, water LODs, overflow and overlap fixes): all in upstream's own far-terrain code (their tile mesher's direction counts and water surfaces, `lod/cache.rs`, `lod/cover.rs`, surface edits), which our far terrain (section 3: smooth tiles, crowns, wall bands, our draw kinds) replaced. None of the overflowing code exists in ours. They come with the "distant land" A/B against our own.
 - **d818f6ce3** (worlds open without waiting for saved LOD): built on upstream's later `server/lod_tops.rs` (runs, scatter impostors, edited structures); ours is still the 11-05 version. Its idea (rebuild the saved columns in the background, only when someone enters the dimension) would fit ours as our own change if world opening is slow on big saves.
 
-## 11. Ours put back on upstream's code (Weft sync 11-22)
+## 10b. Ours put back on upstream's code (Weft sync 11-22)
 
 Upstream replaced scatters with features (`features.rs`, SDK `feature.rs`). What of ours hung on scatters is re-hooked on their feature data, as a thin layer.
 
