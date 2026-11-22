@@ -104,9 +104,20 @@ pub fn species() -> Vec<String> {
             same_age(size, d.role, d.area_level(level), them, s.name, &mut out);
         }
     }
-    // Base's hostile mobs, on the same curve (`vitals::mobs`).
+    // Base's hostile mobs, on the same curve (`vitals::mobs`); armour pays off against them.
     for m in vitals::mobs::MOBS {
         same_age(m.size(), m.role, m.level(), m.stats(), m.name, &mut out);
+        let hits = vitals::mobs::armoured_hits(m);
+        // Only for mobs priced against a fresh player: priced against the reference (option B)
+        // they take the band's hits from it by design.
+        if vitals::mobs::MEETS == vitals::mobs::Meets::Fresh && hits < vitals::mobs::ARMOURED_HITS {
+            out.push(format!(
+                "{}: the {} reference in its armour goes down in {hits:.1} of its hits, under {}",
+                m.name,
+                m.home.name(),
+                vitals::mobs::ARMOURED_HITS
+            ));
+        }
     }
     out
 }

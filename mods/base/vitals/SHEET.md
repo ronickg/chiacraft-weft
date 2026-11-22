@@ -613,11 +613,11 @@ Dung pats: a grazer drops one every 100 mouthfuls where it stands on the ground,
 
 ## Hostile mobs
 
-Base's night mobs on the one curve (`vitals::mobs`), like the animals: a size class from a real body's mass, a role, and the start of their home age, tweaked within x0.75-x1.25 with a reason. Health and hit in engine points; armour cuts a hit by armour / (armour + 5 x hit).
+Base's night mobs on the one curve (`vitals::mobs`), like the animals: a size class from a real body's mass, a role, and the start of their home age, tweaked within x0.75-x1.25 with a reason. Health and hit in engine points; armour cuts a hit by armour / (armour + 5 x hit). Their hits are priced against a fresh player (base health, no armour) (`vitals::mobs::MEETS`): their size's hits to down that player, times their role's hit. The last column is the hits that down the home age's reference in its armour (at least 12).
 
-| mob | kg | size | role | level | health | armour | hit | every | tweaks |
-|---|---|---|---|---|---|---|---|---|---|
-| zombie | 70 | medium | hunter | 0 | 24.3 | 3.3 | 6.00 | 1.2 s |  |
-| spider | 40 | medium | hunter | 0 | 19.4 | 3.3 | 6.00 | 1.2 s | Health x0.8 (light and fast: a leg-span of 1.3 m on a small body) |
-| skeleton | 30 | medium | hunter | 0 | 19.4 | 3.3 | 4.80 | 1.2 s | Health x0.8 (bones only, it breaks easily); Hit x0.8 (it shoots from range, never in reach) |
-| creeper | 50 | medium | prey | 0 | 18.9 | 3.3 | 2.50 | 1.2 s |  |
+| mob | kg | size | role | level | health | armour | hit | every | armoured hits | tweaks |
+|---|---|---|---|---|---|---|---|---|---|---|
+| zombie | 70 | medium | hunter | 0 | 24.3 | 3.3 | 3.00 | 1.2 s | 26.2 |  |
+| spider | 40 | medium | hunter | 0 | 19.4 | 3.3 | 3.00 | 1.2 s | 26.2 | Health x0.8 (light and fast: a leg-span of 1.3 m on a small body) |
+| skeleton | 30 | medium | hunter | 0 | 19.4 | 3.3 | 2.40 | 1.2 s | 38.3 | Health x0.8 (bones only, it breaks easily); Hit x0.8 (it shoots from range, never in reach) |
+| creeper | 50 | medium | prey | 0 | 18.9 | 3.3 | 1.25 | 1.2 s | 101.2 |  |

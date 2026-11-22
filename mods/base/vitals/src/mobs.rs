@@ -6,6 +6,25 @@
 use crate::combat::{self, Role, Size, Stats};
 use crate::curve::{Age, Tweak};
 
+/// Whom a mob's hit is priced against: its size's hits to down (`combat::Band::hits`) for
+/// that player. Night one's mobs meet a fresh player, not the reference.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Meets {
+    /// A fresh player: base health (`combat::REF_HEALTH`), no armour. Planner, 11-22 (option A
+    /// after the first night run: a zombie's 6 killed a fresh player in 3 hits).
+    Fresh,
+    /// The age's reference player, as the animals are priced (option B: armour is needed
+    /// from night one).
+    Reference,
+}
+
+/// What every mob's hit is priced against (switch to `Meets::Reference` for option B).
+pub const MEETS: Meets = Meets::Fresh;
+
+/// The reference player of its age in that age's armour takes at least this many of a mob's hits
+/// to go down, while they meet a fresh player (the check: armour pays off against them).
+pub const ARMOURED_HITS: f32 = 12.0;
+
 /// Which of a mob's numbers a tweak shapes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Stat {
@@ -77,9 +96,20 @@ impl Mob {
     /// Its numbers (engine points): derived, then tweaked.
     pub fn stats(&self) -> Stats {
         let mut st = combat::derive(self.size(), self.role, self.level());
+        if MEETS == Meets::Fresh {
+            // The same hits to down, against base health and no armour, times its role's hit.
+            st.hit = combat::hit_to_down(self.size().band().hits, combat::REF_HEALTH, 0.0) * self.role.times().1;
+        }
         st.health *= self.tweak(Stat::Health);
         st.hit *= self.tweak(Stat::Hit);
         st.armour *= self.tweak(Stat::Armour);
         st
     }
+}
+
+/// Hits of `m`'s that down the reference player of its home age, in that age's armour.
+pub fn armoured_hits(m: &Mob) -> f32 {
+    let p = combat::Player::of(m.home);
+    let hit = m.stats().hit;
+    p.health() / (hit * (1.0 - combat::armour_cut(p.armour(), hit))).max(1e-6)
 }
