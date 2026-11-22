@@ -4,6 +4,7 @@
 open pe-bob-home
 wait 3
 chat /tk fill 0 150 0 8 150 8 base:stone
+chat /tk fill 0 151 0 8 156 8 core:air   # clear the terrain above the platform (suffocation)
 chat /tk set 5 151 4 portals:portal
 leave
 join pe-ticket.txt

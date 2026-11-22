@@ -1,9 +1,10 @@
 # Linking at the portal, run B, the visitor's side: bob has two worlds, hosts one, befriends
 # alice, links his world at her pad with one touch, then places his own portal at home.
-open pe2-bob-other
+loaded                             # the launcher opens pe2-bob-other (--world) for the first copy
 wait 3
 open pe2-bob-home
 chat /tk fill 0 150 0 8 150 8 base:stone
+chat /tk fill 0 151 0 8 156 8 core:air   # clear the terrain above the platform (suffocation)
 chat /tk set 5 151 4 portals:portal
 host pe2-bob-ticket.txt
 join pe2-alice-ticket.txt          # waits for alice's world; bob's own keeps running
@@ -12,7 +13,7 @@ wait 12
 screen core:multiplayer
 tap core:multiplayer id:befriend:pe2-alice-1
 wait 2
-close
+key Escape                         # close the screen
 mark pe2-mark-bob-in
 await_file pe2-mark-ready 300      # alice moved bob in front of her pad at 4 151 2
 wait 2
