@@ -334,7 +334,14 @@ impl GameTextures {
             let todo: Vec<u32> = (0..i.entries.len() as u32)
                 .filter(|&e| {
                     let en = &i.entries[e as usize];
-                    en.frames.is_empty() && !en.requested
+                    // A face of several layers or one tinted by a kind is only a name: drawn as
+                    // its layers (`ids` points at its first), never loaded as a picture of its own.
+                    let only_a_name = en.source == Source::File && {
+                        let mut layers = weft_abi::layers(&en.name);
+                        let first = layers.next();
+                        layers.next().is_some() || first.is_some_and(|l| l.kind.is_some())
+                    };
+                    en.frames.is_empty() && !en.requested && !only_a_name
                 })
                 .collect();
             for &e in &todo {
