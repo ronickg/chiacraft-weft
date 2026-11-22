@@ -1,0 +1,96 @@
+<p align="center"><img src="docs/img/banner.png" alt="Weft"></p>
+
+<p align="center">
+  <a href="https://discord.gg/zTEekbrc7U"><img src="https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Rust-1.95%2B-B7410E?logo=rust&logoColor=white" alt="Rust 1.95+">
+  <img src="https://img.shields.io/badge/graphics-Vulkan-A41E22?logo=vulkan&logoColor=white" alt="Vulkan">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-2A6CB0" alt="Windows, Linux, macOS and Android">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-3B2F7E" alt="MPL-2.0"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Weft-Rust/Weft/releases"><b>Download</b></a> ·
+  <a href="docs/modding.md"><b>Modding</b></a> ·
+  <a href="docs"><b>Documentation</b></a> ·
+  <a href="#project-status"><b>Project status</b></a> ·
+  <a href="#contributing"><b>Contributing</b></a>
+</p>
+
+Weft is a voxel sandbox engine written in Rust. The game itself is a mod, `mods/base`, built only on the public SDK: it has no private hooks into the engine, so anything it does, another mod can do or change. Weft is not a Minecraft clone and does not read Minecraft worlds; it plays like one and borrows its numbers where that makes sense.
+
+> Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft. Weft contains no Minecraft code or assets.
+
+## Features
+
+- The world is made of cubic 16x16x16 chunks, so there is no limit on height or depth, and the terrain is generated on the GPU, which allows distant terrain to be drawn far past the view distance. World generation is deterministic and includes caves, several dimensions, and biomes whose colors blend into each other on the borders.
+
+- Instead of random ticks, the world is split into regions that are ticked in parallel, and plants, furnaces and other timed blocks catch up on the time nobody was there for, so crops keep growing and furnaces keep smelting even while their chunks are not loaded.
+
+- Blocks can emit colored RGB light and use connected or randomized texture variants, textures can be animated or glowing, and models are made in Blockbench with keyframe animations. The look of the game can be changed with resource packs and shader packs.
+
+- As for gameplay, there are survival and creative modes, crafting and smelting, mobs with pathfinding, liquids that can be picked up with a bucket regardless of which liquid it is, machines powered by energy, and moving structures that you can stand and build on.
+
+- Multiplayer works peer to peer: Open to Friends in the pause menu gives you a ticket, and a friend can join with it without any server or port forwarding.
+
+- Mods are native libraries behind a C ABI, packed as zip files and loaded in parallel. Content is registered through builders, behavior hooks into the game through events, interceptors and value chains, and recipes, loot and world generation are driven by tags, which is described in more detail in [Modding](#modding).
+
+- For development, textures, translations, shaders and UI can be reloaded in game, and there are debug overlays, a recipe viewer, and crash reports that name the mod which was running at the moment of the crash.
+
+## Download
+
+Get the latest build for your system from [Releases](https://github.com/Weft-Rust/Weft/releases), unpack it and run `weft`. You need a GPU with Vulkan; on macOS it comes with the game (Apple Silicon, macOS 12 or newer). Windows is the main tested platform; Linux and macOS are reported to work well too. On an Android phone install the APK: touch controls, and settings scaled for a phone's GPU. The release notes have the steps for each system.
+
+Weft ships with its own textures. If Minecraft is installed through the official launcher or Prism, Weft builds a resource pack from that copy when it starts. The pack stays on your computer, off until you turn it on in Settings > Resource Packs. If you have a custom installation path, you can set it with `MINECRAFT_DIR_LOOKUP` like that:
+
+```bash
+MINECRAFT_DIR_LOOKUP=path-to-prism-dir:path-to-dot-minecraft-dir cargo run --release
+```
+
+## Build from source
+
+Requires Rust 1.95 or newer.
+
+```sh
+git clone https://github.com/Weft-Rust/Weft.git
+cd Weft
+cargo run --release
+```
+
+Run it from the repository root. Release builds pack each mod in `mods/` into `run/mods/` on start; settings, saves and logs go to `run/`. `cargo run --release -- dist <dir>` makes a standalone build to share, and `help` lists the other commands and options.
+
+A game from a release writes nothing next to itself, so it can live in a read-only folder and be replaced by an update:
+
+| | Saves, mods, packs, logs | Settings | Cache |
+|---|---|---|---|
+| Linux | `$XDG_DATA_HOME/weft` (`~/.local/share/weft`) | `$XDG_CONFIG_HOME/weft` (`~/.config/weft`) | `$XDG_CACHE_HOME/weft` (`~/.cache/weft`) |
+| Windows | `%APPDATA%\Weft` | `%APPDATA%\Weft\config` | `%LOCALAPPDATA%\Weft` |
+| macOS | `~/Library/Application Support/Weft` | `.../Weft/config` | `~/Library/Caches/Weft` |
+| Android | `Android/data/org.weft.game/files` | `.../files/config` | the app's private cache |
+
+A game that already has a `run/config` folder next to it keeps everything in `run/`, as older versions did; make that folder to keep a copy portable. `--run-dir <dir>` puts everything in one folder of your choice.
+
+
+## Modding
+
+Copy [`examples/examplemod`](examples/examplemod): every kind of registration is there as a commented example. Then read the [modding cheat sheet](docs/modding.md); the guides for worldgen, machines, models, UI, tooltips, textures, CTM, resource packs and shaders are in [`docs/`](docs). [`mods/base`](mods/base) is the game itself and [`mods/testmod`](mods/testmod) shows a mod extending and replacing it without engine changes.
+
+## Project status
+
+Early. The mod interface and the save format can still change between versions. A mod built against another engine version refuses to load and asks to be rebuilt rather than crashing.
+
+## Running a server
+
+`weft server --world myworld --port 27182` runs a world with no window and no GPU. Forward the port, TCP and UDP, and players join with `host:port` in the Multiplayer screen, or with the ticket it logs. It keeps what a game keeps in the same folders as above, or in `--run-dir`.
+
+Type `stop` to save and leave, `list`, `say <text>`, `op <player> [level]` or `deop <player>`. Nobody can use commands until you `op` them. To limit who may join, list their keys one a line in `config/whitelist.txt`: anyone refused is logged with the line to add.
+
+## Contributing
+
+Issues and pull requests are welcome, for the engine, mods, textures or docs. Read the [AI policy](AI_POLICY.md) before opening a pull request, it applies to everyone and the template asks for it.
+
+## License - [MPL-2.0](LICENSE)
+
+Made by [VortexSo4](https://github.com/VortexSo4).
