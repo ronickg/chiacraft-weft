@@ -49,12 +49,15 @@ pub static LOOK_LEAF_LIGHT: Config<f32> = Config::named("look_leaf_light");
 /// A debug view for matching the light against Bliss's (its debug_DIRECT / debug_INDIRECT): 0 the
 /// picture, 1 the sun's light alone, 2 the sky's alone, on white.
 pub static LOOK_DEBUG: Config<f32> = Config::named("look_debug");
+/// The HDR world's sky light by day in the upper sky's own hue, as Bliss's: 0 the palette's fill as
+/// made, 1 all the way.
+pub static LOOK_SKY_HUE: Config<f32> = Config::named("look_sky_hue");
 
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -95,4 +98,5 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_LEAF_HOLES).float(1.0, 0.0, 1.0);
     r.config(&LOOK_LEAF_LIGHT).float(0.0, 0.0, 1.0);
     r.config(&LOOK_DEBUG).float(0.0, 0.0, 2.0);
+    r.config(&LOOK_SKY_HUE).float(0.0, 0.0, 1.0);
 }

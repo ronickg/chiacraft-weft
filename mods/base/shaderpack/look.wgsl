@@ -94,6 +94,10 @@ const OPT_LEAF_LIGHT: u32 = 32u;
 // alone, both on white (no texture or tint), haze and curve as usual: Bliss's DEBUG_VIEW
 // debug_DIRECT / debug_INDIRECT (composite1.fsh:1347-1354), to compare the light pixel by pixel.
 const OPT_DEBUG: u32 = 33u;
+// The HDR world's sky light by day in the upper sky's own hue, as Bliss's ambient (its sky averaged
+// between the horizon and the zenith, normalised: `deferred.vsh:121-151`), `base:look_sky_hue` read
+// raw: 0 the palette's fill as made, 1 all the way to the sky's hue.
+const OPT_SKY_HUE: u32 = 34u;
 
 // The surface's light from the sun and in all, before its tint (`light_on`, `surface_light`), for
 // the debug view.
@@ -221,6 +225,17 @@ fn palette_now() -> Palette {
         let hue = sun_kelvin_linear() * sky_transmittance(scene.sun.y);
         let day = smoothstep(-0.05, 0.05, scene.sun.y);
         p.sun = mix(p.sun, hue * (luma(p.sun) / max(luma(hue), 1e-4)), day);
+    }
+    // The sky's light in the upper sky's hue (`base:look_sky_hue`): our fill, a pale near-white blue
+    // (white tops lit by the sky alone 192 195 204 where Bliss's are 163 186 210), diluted the
+    // 4300 K sun on leaf tops and kept them green (the debug view, lsA_d2 against Bliss's
+    // debug_INDIRECT, 11-22). By day only; its brightness kept.
+    let sky_hue = clamp(fantasy_opt(OPT_SKY_HUE), 0.0, 1.0);
+    if scene.frame.x > 0.5 && sky_hue > 0.0 {
+        let day_h = smoothstep(0.0, 0.12, scene.sun.y);
+        let upper = p.zenith * 0.65 + p.horizon * 0.35;
+        let hue = upper * (luma(p.ambient) / max(luma(upper), 1e-4));
+        p.ambient = mix(p.ambient, hue, day_h * sky_hue);
     }
     // In the HDR world the twilight's light grows as the sun nears the horizon, as real twilight's
     // does (about tenfold over its last few degrees): the dusk key held one level from 8 degrees
