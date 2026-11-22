@@ -517,3 +517,183 @@ def recipe_raw(root):
         except IndexError:
             pass
     return out
+
+
+# ------------------------------------------------------------------ blocks from the sources
+
+
+def stmt_end(t, i):
+    """Where the statement from `i` ends: the first `;` outside brackets and strings."""
+    depth, q = 0, False
+    while i < len(t):
+        c = t[i]
+        if q:
+            if c == "\\":
+                i += 1
+            elif c == '"':
+                q = False
+        elif c == '"':
+            q = True
+        elif c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+            if depth < 0:
+                return i
+        elif c == ";" and depth == 0:
+            return i
+        i += 1
+    return i
+
+
+def _num_expr(x):
+    """A box corner's number: `16.0`, `2.0 * n` (each unknown name taken as 1)."""
+    class One(dict):
+        def __missing__(self, k):
+            return 1.0
+    try:
+        return float(eval(x.replace("f32", ""), {"__builtins__": {}}, One()))
+    except Exception:
+        return None
+
+
+def _tex_name(ns, name):
+    tns = ns
+    if ":" in name:
+        tns, name = name.split(":", 1)
+    if "/" not in name:
+        name = "block/" + name
+    return f"{tns}:{name}"
+
+
+def _boxes(s):
+    out = []
+    for a, b in re.findall(r"\[([^\[\]]+)\]\s*,\s*\[([^\[\]]+)\]", s):
+        lo, hi = [_num_expr(x) for x in a.split(",")], [_num_expr(x) for x in b.split(",")]
+        if len(lo) == 3 and len(hi) == 3 and None not in lo + hi:
+            out.append(tuple(v / 16.0 for v in lo + hi))
+    return out
+
+
+def block_defs(root):
+    """Each block's look as its `r.block(...)` chain says (`.texture`, `.textures` top/side/bottom,
+    `.faces` -X +X -Y +Y -Z +Z, `.model_box`, `.plant`, `.tint`), in the shape of a `/tk dump`
+    block: {id or 're:'regex: {textures [6], model, boxes, comps, fill}}; a `format!` name's
+    `{var}` is `{0}` in its textures, filled from the regex's group. Blocks put down by a helper
+    (`loose(r, &LOOSE_ROCK, .., "cobblestone", &[boxes])`) take its last texture and its boxes.
+    The game's own registry (`/tk dump`) wins where there is one; this needs no game."""
+    out = {}
+    for ns in MODS:
+        files = glob.glob(f"{root}/mods/{ns}/src/**/*.rs", recursive=True)
+        texdir = f"{root}/mods/{ns}/assets/textures/block"
+        is_tex = lambda n: os.path.exists(f"{root}/mods/{_tex_name(ns, n).split(':')[0]}/assets/textures/{_tex_name(ns, n).split(':')[1]}.png")
+        for f in files:
+            t = strip_comments(open(f, encoding="utf-8").read())
+            statics = dict(re.findall(r'static (\w+): Block = Block::named\("([\w:]+)"\)', t))
+            heads = [(m, "block") for m in re.finditer(r"\br\s*\.\s*(?:block|machine)\(\s*", t)]
+            heads += [(m, "helper") for m in re.finditer(r"\b(?!block\b|machine\b|item\b)(\w+)\(\s*r\s*,\s*", t)]
+            for m, how in heads:
+                end = stmt_end(t, m.start())
+                stmt = t[m.start():end]
+                arg = t[m.end():end]
+                key, var = None, None
+                a = re.match(r"&?(\w+)\s*[,)]", arg)
+                s = re.match(r'&?Block::(?:named|generated)\(\s*"([\w:]+)"', arg)
+                g = re.match(r'&?Block::generated\(\s*format!\(\s*"([^"]+)"', arg)
+                if s:
+                    key = s.group(1)
+                elif g:
+                    var = re.findall(r"\{(\w*)\}", g.group(1))
+                    if len(var) != 1:
+                        continue
+                    var = var[0]
+                    key = "re:" + re.escape(g.group(1)).replace(re.escape("{" + var + "}"), "(.+)")
+                elif a and a.group(1) in statics:
+                    key = statics[a.group(1)]
+                if not key:
+                    continue
+                if ":" in key and not key.startswith("re:"):
+                    key = key.split(":", 1)[1]
+                fill = lambda x: x.replace("{" + var + "}", "{0}") if var else x
+                d = {"model": "Cube", "boxes": [], "comps": [], "textures": [None] * 6}
+                if how == "helper":
+                    if a is None or a.group(1) not in statics:
+                        continue
+                    texs = [x for x in strings(arg) if is_tex(x)]
+                    bx = _boxes(arg)
+                    if not texs or not bx:
+                        continue
+                    d["textures"] = [_tex_name(ns, texs[-1])] * 6
+                    d["model"], d["boxes"] = "Boxes", bx
+                    out.setdefault(f"{ns}:{key}" if not key.startswith("re:") else key, d)
+                    continue
+                for c in re.finditer(r"\.(texture|textures|faces)\(", stmt):
+                    body = stmt[c.end():stmt_end(stmt, c.end())]
+                    names = [fill(x) for x in re.findall(r'"([\w/:{}]+)"', body) if "{" in x or is_tex(x)]
+                    if not names:
+                        continue
+                    if c.group(1) == "texture":
+                        # A state's choice (`if lit { "x_lit" } else { "x" }`): the resting one, as the item shows.
+                        rest = [x for x in names if not re.search(r"_(lit|on|powered|active)$", x)] or names
+                        d["textures"] = [_tex_name(ns, rest[0])] * 6
+                    elif c.group(1) == "textures" and len(names) >= 3:
+                        tp, sd, bt = (_tex_name(ns, x) for x in names[:3])
+                        d["textures"] = [sd, sd, bt, tp, sd, sd]
+                    elif c.group(1) == "faces":
+                        rep = re.search(r'\[\s*"([\w/:]+)"\s*;\s*6\s*\]', body)
+                        fs = [rep.group(1)] * 6 if rep else names[:6]
+                        if len(fs) == 6:
+                            d["textures"] = [_tex_name(ns, x) for x in fs]
+                    break
+                for c in re.finditer(r"\.model_box(?:_faces)?\(", stmt):
+                    body = stmt[c.end():stmt_end(stmt, c.end())]
+                    d["boxes"] += _boxes(body)[:1]
+                    if "model_box_faces" in stmt[c.start():c.end()]:
+                        n = [x for x in re.findall(r'"([\w/:]+)"', body) if is_tex(x)]
+                        if n:
+                            d["textures"] = [_tex_name(ns, n[0])] * 6
+                if d["boxes"]:
+                    d["model"] = "Boxes"
+                if re.search(r"\.plant\(\)", stmt):
+                    d["model"] = "Plant"
+                if re.search(r"\.tint(_kind)?\(", stmt):
+                    d["comps"].append("tint")
+                if re.search(r"\.tint_top\(", stmt):
+                    d["comps"] += ["tint", "tint_faces"]
+                if d["textures"][0] is None:
+                    continue
+                out.setdefault(f"{ns}:{key}" if not key.startswith("re:") else f"re:{ns}:{key[3:]}", d)
+    # Crops (`crops.rs`): their stages' textures by the look's name, `<look>_stage_<n>`.
+    p = f"{root}/mods/base/src/crops.rs"
+    if os.path.exists(p):
+        t = open(p, encoding="utf-8").read()
+        fn = re.search(r"fn texture\(.*?\n\}", t, re.S)
+        if fn:
+            for b, look in re.findall(r'"(\w+)"\s*=>\s*"(\w+)"', fn.group(0)):
+                out.setdefault(f"base:{b}", {"crop": look})
+    return out
+
+
+def block_def(defs, i):
+    """Block `i`'s look from `block_defs` (exact, then a `format!` name), as a dump block, or None."""
+    d = defs.get(i)
+    if d is None:
+        for k, v in defs.items():
+            m = re.fullmatch(k[3:], i) if k.startswith("re:") else None
+            if m:
+                d = dict(v, textures=[x.replace("{0}", m.group(1)) if x else x for x in v["textures"]])
+                break
+    if d is None or "crop" in d:
+        return d
+    return dict(d, id=i)
+
+
+def egg_looks(root):
+    """{species: egg look} (`animals_core::eggs::EGGS`): the item `<species>_egg` is drawn as
+    `item/egg_<look>`."""
+    p = f"{root}/mods/animals/core/src/eggs.rs"
+    if not os.path.exists(p):
+        return {}
+    t = strip_comments(open(p, encoding="utf-8").read())
+    m = re.search(r"pub const EGGS[^=]*=\s*&\[(.*?)\];", t, re.S)
+    return dict(re.findall(r'\(\s*"(\w+)"\s*,\s*"(\w+)"', m.group(1))) if m else {}

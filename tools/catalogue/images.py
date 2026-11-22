@@ -267,6 +267,10 @@ def block_icon(block, tex):
     imgs = [tex.get(x) if x else None for x in t]
     tint, top_only = tint_of(block)
     end, boxes = shape_of(block["id"])
+    if block.get("boxes") and imgs[3] is not None:
+        # Boxes the sources give (a snow layer, a button, loose stones): drawn where they sit.
+        side = lambda k: imgs[k] if imgs[k] is not None else imgs[3]
+        return iso_boxes(block["boxes"], imgs[3], side(5), side(1), tint_top=tint, tint_sides=None if top_only else tint), "cube"
     if boxes and imgs[3] is not None:
         return iso_boxes(boxes, imgs[3], imgs[5] if imgs[5] is not None else imgs[3], imgs[1] if imgs[1] is not None else imgs[3]), "cube"
     if block["model"] == "Boxes" and imgs[3] is not None and imgs[5] is not None and t[3] != t[5]:
