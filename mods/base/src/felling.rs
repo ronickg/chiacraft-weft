@@ -28,6 +28,8 @@ use weft_sdk::*;
 
 static AXES: Tag = Tag::named("tools/axe");
 static LOGS: Tag = Tag::named("logs");
+/// Thin branch blocks (`blocks::branch`), a quarter of a log to felling.
+static BRANCHES: Tag = Tag::named("branches");
 static LEAVES: Tag = Tag::named("leaves");
 
 /// The most logs one felling brings down; a bigger tree is taken by the block.
@@ -52,6 +54,17 @@ static SLOWED: Mutex<Option<HashSet<u64>>> = Mutex::new(None);
 
 /// What chopping a tree of `logs` at its foot with `tool` is like: an axe by its tier, anything
 /// else slow and fruitless.
+/// A tree's wood as felling counts it: a log one, a thin branch block (`blocks::branch`) a
+/// quarter (it drops a stick or none: Dynamic Trees counts its thin wood by volume), so branch
+/// blocks don't make a broadleaf tree slower or past its axe's tier.
+fn wood(w: &World, logs: &[[i32; 3]]) -> usize {
+    let branches = logs
+        .iter()
+        .filter(|&&p| BRANCHES.on_block(w.block(p)))
+        .count();
+    (logs.len() - branches) + branches.div_ceil(4)
+}
+
 fn chop(logs: usize, tool: &ItemStack) -> vitals::felling::Felling {
     if AXES.on_item(tool.item) {
         vitals::felling::felling(logs as u32, TOOL_LEVEL.on_stack(tool).unwrap_or(0))
@@ -61,8 +74,8 @@ fn chop(logs: usize, tool: &ItemStack) -> vitals::felling::Felling {
 }
 
 pub fn register(r: &mut Registry) {
-    // Mining starts (and ends): a tree's foot is slow, a felled piece with an axe too, anything
-    // else as it is.
+    // Mining starts (and ends): a tree's foot is slow, a cut in its trunk with an axe as slow for
+    // what stands on it, a felled piece with an axe too, anything else as it is.
     r.intercept(&actions::BREAK_BLOCK, |q| {
         let player = q.entity();
         let pos = q.pos().to_array();
@@ -73,7 +86,7 @@ pub fn register(r: &mut Registry) {
         let tool = held(&w, player);
         let cut = crate::felled::piece_logs(&w, pos, q.state(), q.item())
             .map(|n| vitals::felling::piece(n as u32))
-            .or_else(|| tree_on(&w, pos, q.state()).map(|logs| chop(logs.len(), &tool)));
+            .or_else(|| cut_on(&w, pos, q.state(), AXES.on_item(tool.item)).map(|logs| chop(wood(&w, &logs), &tool)));
         if let Some(f) = cut {
             let hardness = HARDNESS.on_block(q.state()).unwrap_or(2.0);
             let speed = if AXES.on_item(tool.item) { MINING_SPEED.on_stack(&tool).unwrap_or(1.0) } else { 1.0 };
@@ -161,8 +174,8 @@ pub fn register(r: &mut Registry) {
                     w.break_block(p, tool, e.player, survival);
                 }
                 if let (true, Some(h)) = (survival, &hotbar) {
-                    let by = vitals::felling::wear(piece.len() as u32 + 1);
-                    h.set(slot, worn(tool, by, DURABILITY.on_item(tool.item).unwrap_or(0)));
+                    let by = vitals::felling::PIECE_WEAR;
+                    h.set(slot, worn(tool, by, DURABILITY.on_stack(&tool).unwrap_or(0)));
                 }
                 continue;
             }
@@ -174,7 +187,13 @@ pub fn register(r: &mut Registry) {
             // log of its trunk.
             let Some(logs) = loose(&w, pos, e.state) else { continue };
             let foot = !LOGS.on_block(w.block([pos[0], pos[1] - 1, pos[2]]));
-            let felling = if by_player && foot { chop(logs.len(), &tool) } else { vitals::felling::fruitless(logs.len() as u32) };
+            // A cut with an axe above the foot fells what stands on it, as one at the foot does
+            // (Ronald, 11-04: "Fells what's above"; the logs under it stay, a stump to chop): a
+            // player aims at the trunk at eye height, and it shattered fruitlessly before.
+            let axe = AXES.on_item(e.item);
+            // Felling counts a branch block a quarter of a log (`wood`).
+            let n = wood(&w, &logs);
+            let felling = if by_player && (foot || axe) { chop(n, &tool) } else { vitals::felling::fruitless(n as u32) };
             // It falls (`fall`): lifted out with its crown, it leans over away from the player
             // (any way for no one) and, felled for its wood in survival, lies down to be cut in
             // pieces (`felled`); otherwise it shatters. If it can't be lifted it is taken down
@@ -186,6 +205,12 @@ pub fn register(r: &mut Registry) {
                 None => [[1, 0], [-1, 0], [0, 1], [0, -1]][w.random_below(4) as usize],
             };
             let leaves = crown(&w, &logs);
+            weft_sdk::info!(
+                "felling: {} logs from {pos:?} (foot {foot}), fruitful {}, lays {lays}, falls {d:?}, {} leaves",
+                logs.len(),
+                felling.fruitful,
+                leaves.len()
+            );
             if crate::fall::start(&w, pos, logs.clone(), states.clone(), leaves, d, lays) {
                 crate::leaf_decay::logs_gone(&w, logs.iter().copied());
             } else {
@@ -197,14 +222,18 @@ pub fn register(r: &mut Registry) {
                 for &p in &logs {
                     w.break_block(p, tool, e.player, false);
                 }
+                // What stood in its way is hit as by a fall (`felled::crush`).
+                let hit = crate::felled::crush(&w, pos, &logs, d);
+                weft_sdk::info!("felling: {} logs at {pos:?} not lifted, taken down in place, {hit} hit in its line", logs.len());
                 if lays {
-                    crate::felled::lay(&w, pos, &logs, &states, d);
+                    let laid = crate::felled::lay(&w, pos, &logs, &states, d);
+                    weft_sdk::info!("felling: not lifted, {laid} of {} logs laid", logs.len());
                 }
             }
             // An axe wears by the felling's chops (not past them).
-            if let (true, true, Some(h)) = (survival, AXES.on_item(e.item) && foot, &hotbar) {
-                let by = vitals::felling::wear(logs.len() as u32);
-                h.set(slot, worn(tool, by, DURABILITY.on_item(tool.item).unwrap_or(0)));
+            if let (true, true, Some(h)) = (survival, axe, &hotbar) {
+                let by = vitals::felling::wear(n as u32);
+                h.set(slot, worn(tool, by, DURABILITY.on_stack(&tool).unwrap_or(0)));
             }
         }
     });
@@ -239,6 +268,12 @@ pub fn tree_on(w: &World, pos: [i32; 3], state: u32) -> Option<Vec<[i32; 3]>> {
         return None;
     }
     loose(w, pos, state)
+}
+
+/// What a cut at `pos` brings down: from a tree's foot the tree (`tree_on`), and with an axe
+/// (`axe`) from a log of its trunk what stands on it (`loose`).
+pub fn cut_on(w: &World, pos: [i32; 3], state: u32, axe: bool) -> Option<Vec<[i32; 3]>> {
+    if axe { loose(w, pos, state) } else { tree_on(w, pos, state) }
 }
 
 /// What a log at `pos` (`state` it, there or just gone) holds up of a tree: the logs at its

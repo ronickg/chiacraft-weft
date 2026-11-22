@@ -25,8 +25,9 @@ A manual run shows up in the Actions tab only once the workflow file is on the d
 (`main`). From then on it can run from any branch that has it.
 
 **Cost.** The repository is private, so runs use the account's Actions minutes, and Mac minutes
-count 10 times, Windows twice. A full release build takes about 20-40 minutes per platform, so
-one run with both Macs can use several hundred of the included minutes. Build only the platforms
+count 10 times, Windows twice. A build with the `dist` profile takes several times as long as
+`release` (the first run, with `release`: Linux 20, Windows 41, macOS arm64 5 minutes), so one
+run with both Macs can use several hundred of the included minutes. Build only the platforms
 you need (`-f platforms=...`); the cargo cache makes later runs of the same branch faster.
 
 ## What comes out
@@ -46,9 +47,28 @@ The game itself makes this folder (`weft --dist`); `tools/release/package.sh` ru
 the result and archives it. The same script runs anywhere the game builds:
 
 ```
-cargo build --release
+CARGO_PROFILE_DIST_DEBUG=0 CARGO_PROFILE_DIST_STRIP=debuginfo cargo build --profile dist
 tools/release/package.sh linux-x64      # dist/chiacraft-<commit>-linux-x64.tar.gz
 ```
+
+**The `dist` profile.** Players get the `dist` profile from `Cargo.toml`: `release` plus thin
+LTO and one codegen unit. On the PC it made far tiles' heights 17 % faster and meshing 10 %
+faster, and the far fill went from 5.2 to 4.4 s. Frames stayed the same, since they are
+GPU-bound (`reports/Perf review.md`, row 11). It builds about 6 times slower (0:54 to 5:39 on
+the PC), so the crew keeps `release` for its own runs. Its output goes to `target/dist`, and
+`package.sh` packs from there; `PROFILE=release tools/release/package.sh …` packs a crew build.
+The build job's timeout is 300 minutes, because a cold Windows build took 41 minutes even with
+`release`.
+
+**No debug info.** The workflow builds with those two settings, so the archives carry no debug
+info. Our own `cargo build --release` keeps line tables (`debug = "line-tables-only"` in
+`Cargo.toml`), so the crew's backtraces name file and line. Only the workflow drops them. The
+first run without stripping (11-05) gave Linux 129 MB, Windows 43 MB and macOS 48 MB. Most of
+the Linux size was debug info inside the `.so` files, about 80 MB of it in the packages mod.
+Windows keeps its debug info in `.pdb` files, which the game folder never contained, and macOS
+leaves it in the object files. Those two only lose a small debug map. `strip = "debuginfo"`
+keeps the symbol names, so a player's crash backtrace still names the functions, without line
+numbers.
 
 What each runner needs to build: Linux `libasound2-dev pkg-config` (ALSA for sound); Windows
 NASM (for the wallet's TLS library, aws-lc-sys) and MSVC, which the runner has; macOS nothing
@@ -60,6 +80,34 @@ Windows 10 or newer (x64), macOS 12 or newer.
 
 Saves, settings and logs go to the player's own folders (`%APPDATA%\Weft`,
 `~/.local/share/weft`, `~/Library/Application Support/Weft`), not into the unpacked folder.
+
+## Windows from a Mac, without GitHub
+
+`tools/release/cross-windows.sh [label]` builds the Windows x64 archive on a Mac (or on Linux).
+It costs no Actions minutes. It uses Rust's GNU target, `x86_64-pc-windows-gnu`, with
+mingw-w64, so it needs neither Microsoft's SDK nor accepting Microsoft's licence:
+
+```
+rustup target add x86_64-pc-windows-gnu
+brew install mingw-w64 nasm
+tools/release/cross-windows.sh          # dist/chiacraft-<commit>-windows-x64.zip
+```
+
+It builds as CI does (`--profile dist`, no debug info), niced with 4 jobs, then runs
+`package.sh` with `TARGET=x86_64-pc-windows-gnu`. A Windows `weft.exe` can't run on the Mac, so
+it can't make its own folder with `--dist`. `package.sh` then calls `tools/release/cross-pack.py`
+instead, which makes the same folder: the executable, `assets/core`, and each mod zipped with
+its `.dll` at the top and its `assets/`. The script also gives bindgen (run by aws-lc-sys)
+mingw's C headers. Without them the build stops with `'stdlib.h' file not found`. On the Mac
+(11-05), the first build of dev took 4.5 minutes and gave a 43 MB zip.
+
+How it differs from CI's MSVC build:
+- `weft.exe` and the mods import only Windows' own DLLs and the Universal C Runtime, which
+  Windows 10 and newer have. They need no mingw DLLs (`x86_64-w64-mingw32-objdump -p weft.exe`).
+- A mod that players build themselves with MSVC should still load, because mods talk to the
+  game over the C ABI (`crates/abi`). Nobody has tried one yet.
+- Crash backtraces may name fewer functions than MSVC's: the GNU build reads its own symbols,
+  not a `.pdb`. Nobody has checked this yet.
 
 ## macOS: unsigned, and signing
 

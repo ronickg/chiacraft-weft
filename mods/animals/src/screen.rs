@@ -59,7 +59,7 @@ pub fn init(r: &mut Registry) {
         }
     });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,room,away,habitats,hungry,thirsty)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,level,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,room,away,habitats,hungry,thirsty)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -71,6 +71,8 @@ pub fn open(w: &World, player: u64, id: u64) -> bool {
     }
     let full = crate::commands::can_command(w, id, player) || w.outside_survival(player);
     let spyglass = w.inventory(player).get(w.selected_slot(player)).item == SPYGLASS.id();
+    // Looked at closely, through the spyglass or at hand: seen.
+    crate::journal::note_animal(w, player, id, animals_core::journal::SEEN);
     w.open_menu(
         player,
         if full {
@@ -1187,11 +1189,12 @@ fn command(cmd: &mut ServerCommand) {
                 .int("count")
                 .map_or(s.bio.social.group().1, |n| n.max(1) as u32);
             let near = crate::forage::kind_near(&w, s, at);
-            let comes = animals_core::life::room_for(near, coming, s.crowd());
+            let crowd = crate::species::crowd_at(&w, s, at);
+            let comes = animals_core::life::room_for(near, coming, crowd);
             let line = format!(
                 "room: {} at {at:?}: {near:.1} near, room for {}: a group of {coming} {}",
                 s.name,
-                s.crowd(),
+                crowd,
                 if comes { "would come" } else { "is turned away" }
             );
             weft_sdk::info!("{line}");
@@ -1286,6 +1289,11 @@ fn command(cmd: &mut ServerCommand) {
             if let Some(a) = w.component_mut(id, &ANIMAL) {
                 a.thirst = 1.0 - share;
             }
+        }
+        "level" => {
+            let level = cmd.int("count").unwrap_or(0).clamp(0, 200) as u32;
+            animal::set_level(&w, id, level);
+            cmd.reply("command.animals.line", &[Arg::Text(&format!("level {level}"))]);
         }
         "age" => {
             let days = cmd.int("count").unwrap_or(10).clamp(0, 100_000) as u64;

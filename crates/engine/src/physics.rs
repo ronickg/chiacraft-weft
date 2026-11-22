@@ -477,6 +477,59 @@ pub fn collides(c: &Content, block: &impl Cells, area: Aabb) -> bool {
     each_solid(c, block, area, |s| s.intersects(&area))
 }
 
+/// Feet moved out of solid blocks: a box with feet at `pos` that overlaps something solid goes the
+/// shortest way along one axis to where it overlaps nothing (up when about as short), at most
+/// `PUSH_REACH` blocks. `None` when it is clear, or no way out is that near. Movement clips a box
+/// against what it moves into, not what it already overlaps, so one left inside (a teleport onto
+/// a block's edge, a block placed or grown into it, a correction) walked or flew on through, and
+/// the eyes inside a block saw the world from inside, black (Ronald, 11-06).
+pub fn push_out(c: &Content, block: &impl Cells, pos: DVec3, half_width: f64, height: f64) -> Option<DVec3> {
+    let me = Aabb::around(pos, half_width, height);
+    let mut inside = Vec::new();
+    each_solid(c, block, me, |s| {
+        if s.intersects(&me) {
+            inside.push(s);
+        }
+        false
+    });
+    if inside.is_empty() {
+        return None;
+    }
+    let free = |b: Aabb| !collides(c, block, b);
+    out_of(me, &inside, free).map(|by| pos + by)
+}
+
+/// The farthest a player is pushed out of blocks in one go.
+pub const PUSH_REACH: f64 = 1.5;
+
+/// `push_out`'s choice: of the six ways along an axis that clear all of `inside` from `me`, the
+/// shortest that `free` allows and `PUSH_REACH` reaches, up first on a near tie.
+fn out_of(me: Aabb, inside: &[Aabb], free: impl Fn(Aabb) -> bool) -> Option<DVec3> {
+    const EPS: f64 = 1e-4;
+    let mut best: Option<(f64, DVec3)> = None;
+    for axis in [1usize, 0, 2] {
+        for up in [true, false] {
+            let d = inside
+                .iter()
+                .map(|s| if up { s.max[axis] - me.min[axis] } else { me.max[axis] - s.min[axis] })
+                .fold(0.0f64, f64::max)
+                + EPS;
+            if d > PUSH_REACH {
+                continue;
+            }
+            let mut by = DVec3::ZERO;
+            by[axis] = if up { d } else { -d };
+            // Up wins a tie it is within a hundredth of.
+            let cost = d - if axis == 1 && up { 0.01 } else { 0.0 };
+            if best.is_some_and(|b| b.0 <= cost) || !free(me.shifted(by)) {
+                continue;
+            }
+            best = Some((cost, by));
+        }
+    }
+    best.map(|b| b.1)
+}
+
 thread_local! {
     /// `move_box_with`'s obstacles, kept between calls.
     static SOLIDS: std::cell::RefCell<Vec<Aabb>> = const { std::cell::RefCell::new(Vec::new()) };
@@ -796,6 +849,9 @@ pub struct Control {
     pub swim_look: Option<f64>,
     /// Never steps off an edge, and holds on to a ladder (sneaking).
     pub careful: bool,
+    /// Blocks per tick it climbs up any wall it pushes into in the air, times the wall's grip
+    /// (`attribute::CLIMB_SPEED`); 0 climbs only ladders.
+    pub climb: f64,
 }
 
 /// The walker's box and the world's pull.
@@ -813,6 +869,8 @@ pub struct Walked {
     pub hit: [bool; 3],
     pub on_ground: bool,
     pub jumped: bool,
+    /// Held on to a wall it climbs (`Control::climb`), not a ladder.
+    pub on_wall: bool,
     /// `around` where it started.
     pub started_in: Around,
 }
@@ -851,6 +909,22 @@ pub fn walk(
         }
     };
     let mut jumped = false;
+    // A wall it climbs: the one it pushes into in the air, or any it touches while holding on.
+    let wall = if ctl.climb > 0.0 && !liquid && !on_ground {
+        if ctl.wish.length_squared() > 1e-4 {
+            wall_grip(c, block, *pos, f.half_width, f.height, ctl.wish).map(|g| (g, ctl.wish))
+        } else if ctl.careful {
+            [DVec3::X, DVec3::NEG_X, DVec3::Z, DVec3::NEG_Z]
+                .into_iter()
+                .filter_map(|d| wall_grip(c, block, *pos, f.half_width, f.height, d).map(|g| (g, d)))
+                .max_by(|a, b| a.0.total_cmp(&b.0))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let on_wall = wall.is_some();
     if liquid {
         accelerate(vel, 0.02 * drag);
         if ctl.swim {
@@ -874,10 +948,25 @@ pub fn walk(
             jumped = true;
         }
         accelerate(vel, accel * drag);
-        if climbing {
+        if climbing || on_wall {
             vel.x = vel.x.clamp(-0.15, 0.15);
             vel.z = vel.z.clamp(-0.15, 0.15);
             vel.y = vel.y.max(if ctl.careful { 0.0 } else { -0.15 });
+        }
+        if let Some((grip, dir)) = wall {
+            if ctl.careful {
+                // Sneaking it holds still, or climbs down pushing into the wall.
+                vel.y = if ctl.wish.length_squared() > 1e-4 { -ctl.climb * grip } else { 0.0 };
+            } else {
+                vel.y = ctl.climb * grip;
+                // Over the top: where the wall ends under its knees, a pull up onto it.
+                let dir = DVec3::new(dir.x, 0.0, dir.z).normalize_or_zero();
+                let over = Aabb::around(*pos + DVec3::Y * MANTLE, f.half_width - 1e-3, f.height).shifted(dir * 0.3);
+                if !collides(c, block, over) {
+                    vel.y = vel.y.max(MANTLE_POP);
+                    *vel += dir * 0.1;
+                }
+            }
         }
     }
     // Careful at an edge (vanilla's sneaking): each horizontal component is cut back in 0.05
@@ -910,7 +999,7 @@ pub fn walk(
             vel[i] = 0.0;
         }
     }
-    if (r.hit[0] || r.hit[2] || ctl.jump > 0.0) && climbing {
+    if (r.hit[0] || r.hit[2] || ctl.jump > 0.0) && climbing && !on_wall {
         vel.y = 0.2;
     }
     if liquid {
@@ -934,7 +1023,123 @@ pub fn walk(
         vel.x *= slip * 0.91;
         vel.z *= slip * 0.91;
     }
-    Walked { hit: r.hit, on_ground: r.on_ground, jumped, started_in }
+    Walked { hit: r.hit, on_ground: r.on_ground, jumped, on_wall, started_in }
+}
+
+/// How far out a climber feels for a wall, in blocks.
+const WALL_REACH: f64 = 0.06;
+/// A wall that ends this far over a climber's feet is climbed over (`MANTLE_POP` up, like a jump).
+pub const MANTLE: f64 = 0.6;
+pub const MANTLE_POP: f64 = 0.42;
+
+/// The best grip (`abi::comp::GRIP`) of the solid sides a box at `pos` touches toward `dir`
+/// (horizontal; each of x and z it has), its feet and head kept clear of floor and ceiling:
+/// `None` with nothing there to hold on to.
+pub fn wall_grip(c: &Content, block: &impl Cells, pos: DVec3, half_width: f64, height: f64, dir: DVec3) -> Option<f64> {
+    let me = Aabb::around(pos, half_width, height);
+    let mut best: Option<f64> = None;
+    for axis in [0usize, 2] {
+        if dir[axis].abs() < 0.2 {
+            continue;
+        }
+        let mut by = DVec3::ZERO;
+        by[axis] = WALL_REACH * dir[axis].signum();
+        let mut feel = me.shifted(by);
+        feel.min.y += 0.1;
+        feel.max.y = (feel.max.y - 0.1).max(feel.min.y + 0.1);
+        let lo = feel.min.floor().as_ivec3();
+        let hi = feel.max.floor().as_ivec3();
+        for y in lo.y..=hi.y {
+            for z in lo.z..=hi.z {
+                for x in lo.x..=hi.x {
+                    let p = IVec3::new(x, y, z);
+                    let Some((main, extras)) = block.cell(p) else { continue };
+                    let b = p.as_dvec3();
+                    for s in std::iter::once(main).chain(extras.iter().copied()) {
+                        let st = &c.states[s as usize];
+                        let touches = st.collision.iter().any(|bx| {
+                            let bx = bx.map(|v| v as f64);
+                            Aabb { min: b + DVec3::new(bx[0], bx[1], bx[2]), max: b + DVec3::new(bx[3], bx[4], bx[5]) }.intersects(&feel)
+                        });
+                        if touches && st.grip > 0.0 {
+                            best = Some(best.map_or(st.grip as f64, |g: f64| g.max(st.grip as f64)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    best
+}
+
+/// A glider's air, all in blocks per tick (`attribute::GLIDE_SPEED` and the rest).
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
+pub struct Glide {
+    /// Airspeed where it heads.
+    pub speed: f64,
+    /// Sinking through the air at that speed.
+    pub sink: f64,
+    /// The air's own movement (x and z) and its rising (y).
+    pub wind: DVec3,
+}
+
+/// One tick of gliding toward `forward` (horizontal, length 1): through the air it turns and
+/// comes to its airspeed over about a second and sinks at its rate less the air's rising, and
+/// the air carries it, so it goes further downwind. `brake` 0..1 slows and flares (holding
+/// back), `dive` 0..1 trades height for speed (sneaking).
+pub fn glide(vel: &mut DVec3, forward: DVec3, g: &Glide, brake: f64, dive: f64) {
+    let speed = g.speed * (1.0 - 0.45 * brake) * (1.0 + 0.5 * dive);
+    let sink = g.sink * (1.0 + 0.25 * brake) * (1.0 + 1.5 * dive);
+    let wind = DVec3::new(g.wind.x, 0.0, g.wind.z);
+    let air = DVec3::new(vel.x, 0.0, vel.z) - wind;
+    let air = air + (forward * speed - air) * 0.08;
+    let fall = vel.y + ((g.wind.y - sink) - vel.y) * 0.15;
+    *vel = DVec3::new(air.x + wind.x, fall, air.z + wind.z);
+}
+
+/// A rope it hangs on (`attribute::ROPE_LENGTH` and the rest): where it is made fast, how long
+/// it may be let out (blocks) and how fast it is pulled in or let out (blocks a tick).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Rope {
+    pub anchor: DVec3,
+    pub length: f64,
+    pub reel: f64,
+}
+
+/// The shortest a rope is pulled in to, blocks.
+pub const ROPE_MIN: f64 = 1.2;
+
+/// Keeps a body's `hold` point (its hands, `hold` above its feet) within `length` of the rope's
+/// anchor after a tick's move: moved back along the rope as far as blocks allow, and what took it
+/// outward taken off its velocity. Gravity on the rope is the swing. True if the rope is taut.
+#[allow(clippy::too_many_arguments)]
+pub fn rope_hold(
+    c: &Content,
+    block: &impl Cells,
+    bodies: &[Body<'_>],
+    pos: &mut DVec3,
+    vel: &mut DVec3,
+    half_width: f64,
+    height: f64,
+    hold: f64,
+    anchor: DVec3,
+    length: f64,
+) -> bool {
+    let hands = *pos + DVec3::Y * hold;
+    let d = hands - anchor;
+    let dist = d.length();
+    if dist <= length || dist < 1e-6 {
+        return false;
+    }
+    let n = d / dist;
+    let back = anchor + n * length - hands;
+    let r = move_box_with(c, block, bodies, 0, *pos, half_width, height, back, 0.0);
+    *pos = r.pos;
+    let out = vel.dot(n);
+    if out > 0.0 {
+        *vel -= n * out;
+    }
+    true
 }
 
 /// The push two overlapping soft bodies give each other per tick (vanilla's
@@ -957,6 +1162,42 @@ pub fn collision_top(c: &Content, state: u32) -> Option<f64> {
 #[cfg(test)]
 mod knock_tests {
     use super::*;
+
+    fn cell(x: i32, y: i32, z: i32) -> Aabb {
+        Aabb { min: DVec3::new(x as f64, y as f64, z as f64), max: DVec3::new(x as f64 + 1.0, y as f64 + 1.0, z as f64 + 1.0) }
+    }
+
+    /// Ronald's black view: a player teleported to x 146.0 overlapped the wall at x 145; pushed
+    /// out the 0.3 its half width reached in, not up or through.
+    #[test]
+    fn pushed_out_of_a_wall_the_short_way() {
+        let walls = [cell(145, 64, 10), cell(145, 65, 10)];
+        let me = Aabb::around(DVec3::new(146.0, 64.0, 10.5), 0.3, 1.8);
+        let free = |b: Aabb| !walls.iter().any(|w| w.intersects(&b));
+        let by = out_of(me, &walls, free).expect("a way out");
+        assert!((by.x - 0.3).abs() < 1e-3 && by.y == 0.0 && by.z == 0.0, "{by}");
+    }
+
+    #[test]
+    fn up_out_of_the_ground_and_never_into_another_block() {
+        // Sunk 0.2 into the ground: up. With a block above too, sideways instead.
+        let ground = [cell(0, 9, 0)];
+        let me = Aabb::around(DVec3::new(0.5, 9.8, 0.5), 0.3, 1.8);
+        let free = |b: Aabb| !ground.iter().any(|w| w.intersects(&b));
+        let by = out_of(me, &ground, free).unwrap();
+        assert!((by.y - 0.2).abs() < 1e-3, "{by}");
+        let shut = [cell(0, 9, 0), cell(0, 11, 0)];
+        let free = |b: Aabb| !shut.iter().any(|w| w.intersects(&b));
+        let by = out_of(me, &ground, free).unwrap();
+        assert!(by.y == 0.0 && (by.x.abs() > 0.7 || by.z.abs() > 0.7), "{by}");
+        // Buried deep: no push past the reach.
+        let deep: Vec<Aabb> = (0..4)
+            .flat_map(|y| (-2..3).flat_map(move |x| (-2..3).map(move |z| cell(x, 8 + y, z))))
+            .collect();
+        let me = Aabb::around(DVec3::new(0.5, 9.0, 0.5), 0.3, 1.8);
+        let free = |b: Aabb| !deep.iter().any(|w| w.intersects(&b));
+        assert!(out_of(me, &deep, free).is_none());
+    }
 
     #[test]
     fn knock_is_vanillas() {

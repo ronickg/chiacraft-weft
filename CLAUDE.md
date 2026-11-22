@@ -18,8 +18,12 @@ game), `animals`, `portals`, `packages`, `testkit`.
   plants, grazers, hunters, rot, soil), with its numbers from real places: `notes/ECOLOGY.md`. The numbers: `mods/base/vitals/SHEET.md`,
   `mods/animals/SPECIES.md` (both generated).
 - **The look**: `notes/STYLE.md`, the `game-art` skill (all generated art: items, blocks, animal
-  looks, UI, from the style guides in its `guides/`), `block-textures` (the 32 px block set and
+  looks, UI, from the style guides in its `guides/`), `game-art`'s `guides/2 Blocks/Full set.md` (the 32 px block set and
   its batches) and `blocky-model` (box models).
+- **Names and invented words**: `mods/base/lore/lexicon.toml` is the one source (the ancients' Old
+  Eskenai, its drifts, Elvish, Dwarvish), `notes/NAMES.md` its generated sheet. Never make a name
+  up freehand: `python3 tools/names/names.py gen --people <p>` offers roots, `derive <word> --steps`
+  shows each tongue's form, `check` must pass. Why: `reports/Naming and invented words.md`.
 
 ## The engine's docs (Weft)
 
@@ -40,7 +44,11 @@ in our crates and mods.
   touches gameplay, and a check that ties it to what it touches.
 - After changing numbers, regenerate the sheets (tests fail while they're stale):
   - `cargo run -p vitals --bin sheet > mods/base/vitals/SHEET.md`
-  - `mods/animals/web/build.sh && node mods/animals/web/sheet.mjs`
+  - `mods/animals/web/build.sh && node mods/animals/web/sheet.mjs` (or, with no WASM build,
+    `cargo run -p animals_core --bin sheet > mods/animals/SPECIES.md`: the same page)
+  - `cargo run -p progression --bin sheet > mods/base/progression/PROGRESSION_SHEET.md` (ages,
+    curves, the combat matrix, every item's age and path; also after adding an item, block,
+    recipe or species: the checks fail until it's tagged in `mods/base/progression`)
   - `cargo run -p crafting --bin sheet > mods/base/crafting/SHEET.md`
 
 ## Trying it in the game
@@ -51,6 +59,7 @@ in our crates and mods.
 `run/saves/<name>`, and a reused name keeps its inventory: use a fresh name per check.
 Two traps that broke several scripts: `hold` waits until it releases unless given `nowait` (with `nowait`, follow it with a `wait` of its length),
 and in `look <yaw> <pitch>` a positive pitch looks up (look down to aim at the ground).
+A third, for noise and dither in shots: under `/tick freeze` the shader clock (`params.w`) stops, so an effect jittered by it shows a standing pattern in a frozen shot that TAA cannot average; `scene.frame.w` (the frame count) keeps moving. Check which clock your jitter uses, and judge noise or grain also in a shot with ticks running.
 Never launch the game yourself: the testers ("Tester", "Tester 2") run every script
 (`.claude/skills/session-crew/SKILL.md`).
 

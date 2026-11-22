@@ -12,56 +12,110 @@ use crate::worldgen::SEA;
 
 /// The overworld's terrain.
 pub fn terrain(r: &mut Registry) {
-    let mut t = r
-        .terrain(&crate::OVERWORLD)
+    let t = land(r.terrain(&crate::OVERWORLD), l::features());
+    let t = coasts(t);
+    let mut t = heights(t);
+    // Giant sequoia groves, on the mountains' front slopes (`base_api::land::SEQUOIA_AREA`).
+    t = t.biome(
+        BiomeRule::new("sequoia_grove")
+            .height(SEA + l::SEQUOIA_RISE.0..=SEA + l::SEQUOIA_RISE.1)
+            .field(l::SEQUOIA_FIELD, l::SEQUOIA_GROVE..),
+    );
+    for (biome, bed) in l::RIVER_BEDS {
+        let mut rule = BiomeRule::new(biome).deep_top(bed, SEA);
+        // Swamps only on low land, where water stands.
+        if biome == "swamp" {
+            rule = rule.height(..=SEA + 12).continent(0.1..);
+        }
+        // Old growth in its patches of the temperate wet land, up to its height
+        // (`base_api::land::OLD_GROWTH_AREA`).
+        if biome == "old_growth_forest" {
+            rule = rule
+                .height(..=SEA + l::OLD_GROWTH_TOP)
+                .field(l::OLD_GROWTH_FIELD, l::OLD_GROWTH_FROM..);
+        }
+        t = t.biome(rule);
+    }
+    finish(t);
+
+    r.decoration(rock_faces).dimension(&crate::OVERWORLD);
+    r.decoration(rock_faces).dimension(&crate::MC_FOREST);
+    r.decoration(cave_mouths).dimension(&crate::OVERWORLD);
+    r.decoration(cave_mouths).dimension(&crate::MC_FOREST);
+    r.decoration(glaciers).dimension(&crate::OVERWORLD);
+    r.decoration(glaciers).dimension(&crate::MC_FOREST);
+    r.decoration(tarn_water).dimension(&crate::OVERWORLD);
+    r.decoration(tarn_water).dimension(&crate::MC_FOREST);
+    // Not in the test world: its biomes are the mix's, not the overworld's climate, and the fray
+    // put the overworld's taiga and snowy plains ground (snowy grass, podzol) in its old growth.
+    r.decoration(fray_borders).dimension(&crate::OVERWORLD);
+    r.decoration(sea_sand).dimension(&crate::OVERWORLD);
+    r.decoration(sea_sand).dimension(&crate::MC_FOREST);
+    r.decoration(coral).dimension(&crate::OVERWORLD);
+    r.decoration(landmarks).dimension(&crate::OVERWORLD);
+    r.decoration(tropical_water).dimension(&crate::OVERWORLD);
+}
+
+/// The overworld's land, for it and for the test world on the same seed (`MC_FOREST`): its stone,
+/// sea and continents, the fields the rules ask for (the mountains, the sequoia groves, the snow's
+/// drifts), then the features. Biomes shape the land through their climate, not their borders, so
+/// nothing seams: the cold flattens hills into tundra, deserts get dunes and mesas, rivers run
+/// where it's wet enough.
+fn land(t: TerrainBuilder<'_>, features: Vec<Feature>) -> TerrainBuilder<'_> {
+    let mut t = t
         .stone("stone")
         .base_height(SEA as f64)
         .continent_scale(l::CONTINENT_SCALE)
         .sea(SEA, "water");
-    // Biomes shape the land through their climate, not their borders, so nothing seams: the cold
-    // flattens hills into tundra, deserts get dunes and mesas, rivers run where it's wet enough.
-    // The fields the rules ask for (the mountains, the sequoia groves, the snow's drifts), then
-    // the features.
     for (name, field) in l::rule_fields() {
         t = t.field(name, field);
     }
-    for f in l::features() {
+    for f in features {
         t = t.feature(f);
     }
+    t
+}
+
+/// The coasts' rules: the warm seas' reefs and lagoons, the ocean, the cold coast's snow and the
+/// beach.
+fn coasts(t: TerrainBuilder<'_>) -> TerrainBuilder<'_> {
     // Biomes bring their climate and surface; rules only add where else they must hold. The sea
     // is the ocean's out to the coast; water inland (rivers, lakes) belongs to the land around it
     // and lies on its own bed (`RIVER_BEDS`).
     // Warm shallow seas first (`base_api::land::reef_part`): the reef's top 2 under the surface,
     // the lagoon's floor 3-5 under, in warm water near the coasts.
-    t = t
-        .biome(
-            BiomeRule::new("coral_reef")
-                .height(SEA - 2..=SEA - 2)
-                .temperature(l::REEF_WARM_RULE..)
-                .continent(..l::REEF_COAST),
-        )
-        .biome(
-            BiomeRule::new("lagoon")
-                .height(SEA - l::REEF_LAGOON.1..=SEA - l::REEF_LAGOON.0)
-                .temperature(l::REEF_WARM_RULE..)
-                .continent(..l::REEF_COAST),
-        )
-        .biome(
-            BiomeRule::new("ocean")
-                .height(..=SEA - 2)
-                .continent(..l::OCEAN_CONTINENT),
-        )
-        .biome(
-            BiomeRule::new("snowy_plains")
-                .named("snowy_coast")
-                .height(..=SEA + 1)
-                .continent(..l::BEACH_CONTINENT),
-        )
-        .biome(
-            BiomeRule::new("beach")
-                .height(..=SEA + 1)
-                .continent(..l::BEACH_CONTINENT),
-        );
+    t.biome(
+        BiomeRule::new("coral_reef")
+            .height(SEA - 2..=SEA - 2)
+            .temperature(l::REEF_WARM_RULE..)
+            .continent(..l::REEF_COAST),
+    )
+    .biome(
+        BiomeRule::new("lagoon")
+            .height(SEA - l::REEF_LAGOON.1..=SEA - l::REEF_LAGOON.0)
+            .temperature(l::REEF_WARM_RULE..)
+            .continent(..l::REEF_COAST),
+    )
+    .biome(
+        BiomeRule::new("ocean")
+            .height(..=SEA - 2)
+            .continent(..l::OCEAN_CONTINENT),
+    )
+    .biome(
+        BiomeRule::new("snowy_plains")
+            .named("snowy_coast")
+            .height(..=SEA + 1)
+            .continent(..l::BEACH_CONTINENT),
+    )
+    .biome(
+        BiomeRule::new("beach")
+            .height(..=SEA + 1)
+            .continent(..l::BEACH_CONTINENT),
+    )
+}
+
+/// The heights' rules: snow over its line, the mountains' own ground.
+fn heights(mut t: TerrainBuilder<'_>) -> TerrainBuilder<'_> {
     // Snow on the heights, the line lower in the cold and in drifts (`base_api::land::snowy`); the
     // ground is the mountains' (their climate), only its surface is snow.
     let mut low = f64::NEG_INFINITY;
@@ -81,45 +135,68 @@ pub fn terrain(r: &mut Registry) {
         low = below;
     }
     // A creek in the mountains lies on gravel.
-    t = t.biome(
+    t.biome(
         BiomeRule::new("mountains")
             .field(l::MOUNTAINS_FIELD, l::MOUNTAIN_BIOME..)
             .deep_top("gravel", SEA),
-    );
-    // Giant sequoia groves, on the mountains' front slopes (`base_api::land::SEQUOIA_AREA`).
-    t = t.biome(
-        BiomeRule::new("sequoia_grove")
-            .height(SEA + l::SEQUOIA_RISE.0..=SEA + l::SEQUOIA_RISE.1)
-            .field(l::SEQUOIA_FIELD, l::SEQUOIA_GROVE..),
-    );
-    for (biome, bed) in l::RIVER_BEDS {
-        let mut rule = BiomeRule::new(biome).deep_top(bed, SEA);
-        // Swamps only on low land, where water stands.
-        if biome == "swamp" {
-            rule = rule.height(..=SEA + 12).continent(0.1..);
-        }
-        t = t.biome(rule);
-    }
+    )
+}
+
+/// What every terrain on the overworld's land ends with: the deep caves, lava, the far crowns'
+/// leaves and the steep faces' bare rock.
+fn finish(t: TerrainBuilder<'_>) {
     t.cave_biome("deep_caves", 24, 96.0, 0.25)
         .caves(Caves::new("lava", i32::MIN, 11))
         // Distant terrain runs no decorations: it asks this what its steep faces show.
+        // Far crowns' leaves by the season (a bloom over out of its months).
+        .far_leaves(crate::blocks::far_leaves)
         .faces(l::SNOW_FALL, |f| {
             let [x, _, z] = f.pos();
-            let rocks = l::rock_set(&l::fields(f.seed()), x * 16, z * 16, f.height(), SAND.is(f.surface_block()));
+            // A steep cell is asked once for its top and once per wall band down, the same column
+            // each time: its rocks (the climate, the areas, the surface) are worked out once.
+            let key = (f.seed(), x, z, f.height());
+            let rocks = FACE_ROCKS.with(|c| match c.get() {
+                Some((k, rocks)) if k == key => rocks,
+                _ => {
+                    let rocks = l::rock_set(&l::fields(f.seed()), x * 16, z * 16, f.height(), SAND.is(f.surface_block()));
+                    c.set(Some((key, rocks)));
+                    rocks
+                }
+            });
             if let Some(rock) = bare(f.seed(), f.pos(), f.block(), f.fall(), f.biome(), rocks) {
                 f.set(rock);
             }
         });
+}
 
-    r.decoration(rock_faces).dimension(&crate::OVERWORLD);
-    r.decoration(cave_mouths).dimension(&crate::OVERWORLD);
-    r.decoration(glaciers).dimension(&crate::OVERWORLD);
-    r.decoration(tarn_water).dimension(&crate::OVERWORLD);
-    r.decoration(fray_borders).dimension(&crate::OVERWORLD);
-    r.decoration(sea_sand).dimension(&crate::OVERWORLD);
-    r.decoration(coral).dimension(&crate::OVERWORLD);
-    r.decoration(landmarks).dimension(&crate::OVERWORLD);
-    r.decoration(tropical_water).dimension(&crate::OVERWORLD);
+/// The Minecraft forest test world's terrain (`base_api::land::MC_MIX`): the overworld's land, its
+/// coasts and heights, and the rest shared out among Minecraft's temperate forest biomes by the mix
+/// field, each with its river bed (`RIVER_BEDS`).
+pub fn mc_forest_terrain(r: &mut Registry) {
+    let t = land(r.terrain(&crate::MC_FOREST), l::features()).field(l::MC_MIX_FIELD, l::mc_mix_field());
+    let mut t = heights(coasts(t));
+    let cuts = l::mc_mix_cuts();
+    let mut low = f64::NEG_INFINITY;
+    for (i, &(biome, _)) in l::MC_MIX.iter().enumerate() {
+        let bed = l::RIVER_BEDS
+            .iter()
+            .find(|e| e.0 == biome)
+            .map_or("sand", |e| e.1);
+        let rule = BiomeRule::new(biome)
+            .named(&format!("mc_{biome}"))
+            .deep_top(bed, SEA);
+        t = t.biome(if i + 1 < l::MC_MIX.len() { rule.field(l::MC_MIX_FIELD, low..cuts[i]) } else { rule });
+        low = cuts[i];
+    }
+    finish(t);
+}
+
+/// A steep column (seed, x, z, height) and its rocks.
+type FaceRocks = Option<((u64, i32, i32, i32), l::RockSet)>;
+
+thread_local! {
+    /// The last steep column's rocks (`faces`).
+    static FACE_ROCKS: std::cell::Cell<FaceRocks> = const { std::cell::Cell::new(None) };
 }
 
 static WET: Tag = Tag::named("wet");
@@ -131,17 +208,30 @@ pub fn rock_face(fall: i32) -> bool {
     fall >= l::ROCK_FALL
 }
 
+/// Whether a dimension stands on the overworld's land (the overworld, and the test world on its
+/// seed, `MC_FOREST`): its columns' heights are the overworld's (`OVERWORLD.column`).
+pub fn overworld_land(dimension: u32) -> bool {
+    dimension == crate::OVERWORLD.id() || dimension == crate::MC_FOREST.id()
+}
+
+/// The dimension whose columns a site in `dimension` stands on (its own: the test world's land is
+/// the overworld's, its biomes are not).
+fn land_of(dimension: u32) -> &'static Dimension {
+    if dimension == crate::MC_FOREST.id() { &crate::MC_FOREST } else { &crate::OVERWORLD }
+}
+
 /// Whether a scatter's site (`Site::pos`, the block above the ground) in the overworld stands on a
 /// bare rock face, for trees and boulders to skip: a site can't see the cube, so this asks the
 /// terrain for the neighbouring columns.
 pub fn site_on_rock(seed: u64, dimension: u32, [x, _, z]: [i32; 3]) -> bool {
-    if dimension != crate::OVERWORLD.id() {
+    if !overworld_land(dimension) {
         return false;
     }
-    let h = crate::OVERWORLD.column(seed, x, z).height;
+    let dim = land_of(dimension);
+    let h = dim.column(seed, x, z).height;
     let fall = [(1, 0), (-1, 0), (0, 1), (0, -1)]
         .iter()
-        .map(|&(dx, dz)| h - crate::OVERWORLD.column(seed, x + dx, z + dz).height)
+        .map(|&(dx, dz)| h - dim.column(seed, x + dx, z + dz).height)
         .max()
         .unwrap_or(0);
     rock_face(fall)
@@ -153,11 +243,12 @@ pub fn site_on_rock(seed: u64, dimension: u32, [x, _, z]: [i32; 3]) -> bool {
 /// It looks along the eight directions at 2 and 4 blocks, and beside the site: a crown reaches
 /// three to five blocks (the first rule, 2 blocks, left the towers' crowns as they were).
 pub fn site_under_wall(seed: u64, dimension: u32, [x, _, z]: [i32; 3]) -> bool {
-    if dimension != crate::OVERWORLD.id() {
+    if !overworld_land(dimension) {
         return false;
     }
-    let h = crate::OVERWORLD.column(seed, x, z).height;
-    let high = |dx: i32, dz: i32| crate::OVERWORLD.column(seed, x + dx, z + dz).height - h >= WALL_RISE;
+    let dim = land_of(dimension);
+    let h = dim.column(seed, x, z).height;
+    let high = |dx: i32, dz: i32| dim.column(seed, x + dx, z + dz).height - h >= WALL_RISE;
     const DIRS: [(i32, i32); 8] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
     DIRS[..4].iter().any(|&(dx, dz)| high(dx, dz))
         || [WALL_REACH / 2, WALL_REACH]
@@ -230,7 +321,7 @@ fn rocks(g: &Gen, wx: i32, wz: i32, height: i32, top: u32) -> l::RockSet {
 /// cube above reads instead of the terrain's (`Gen::surface_block`).
 pub fn surface_block(g: &Gen, wx: i32, wz: i32) -> u32 {
     let top = g.surface_block(wx, wz);
-    if g.dimension() != crate::OVERWORLD.id() {
+    if !overworld_land(g.dimension()) {
         return top;
     }
     let c = g.column(wx, wz);
@@ -240,8 +331,9 @@ pub fn surface_block(g: &Gen, wx: i32, wz: i32) -> u32 {
     {
         return face;
     }
-    // Then the border's fray (`fray_borders`), on soil.
-    if SOIL.contains(&top)
+    // Then the border's fray (`fray_borders`), on soil (the overworld's: the test world has none).
+    if g.dimension() == crate::OVERWORLD.id()
+        && SOIL.contains(&top)
         && let Some((frayed, _)) = l::fray(&l::fields(g.seed()), wx * 16, wz * 16, c.height)
     {
         return rock(frayed);
@@ -456,6 +548,15 @@ fn landmarks(g: &mut Gen) {
                     }
                 }
             }
+        }
+    }
+    // The meteorites buried under old craters (`base_api::land::crater_meteorites`): First
+    // hours' block (with the sky events), none until it is there.
+    static METEORITE: Block = Block::named("meteorite");
+    let meteorite = METEORITE.id();
+    for [mx, my, mz] in l::crater_meteorites(&f, ox + 8, oz + 8, 8 + (l::CRATER_RADIUS.1 as f64 * l::CRATER_METEORITE_SPREAD) as i32 + 1) {
+        if meteorite != u32::MAX && inside(mx, my, mz) {
+            g.set((mx - ox) as usize, (my - oy) as usize, (mz - oz) as usize, meteorite);
         }
     }
     let water = WATER.id();

@@ -3,6 +3,7 @@
 //! (`World::set_look`), as the chihuahua's, so every player sees it. The model, its animations
 //! and texture are built from `source/cat` (see `docs/creatures.md`).
 
+use crate::choose::{Band, Need, Stops, WithBand};
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
@@ -25,9 +26,9 @@ pub fn init(r: &mut Registry) {
     );
     r.entity(&CAT)
         .size(animals_core::bodies::of("cat").0, animals_core::bodies::of("cat").1)
-        .max_health(6.0)
+        .max_health(crate::animal::health(index))
         .walk_speed(3.0)
-        .attack_damage(1.0)
+        .attack_damage(crate::animal::hit(index))
         .passive()
         .model_file("cat")
         .animations("cat")
@@ -47,15 +48,21 @@ pub fn init(r: &mut Registry) {
                 .then(crate::hunt::hunt)
                 .then(crate::signatures::gifts)
                 .then(crate::commands::act(index))
-                .then(crate::breeding::behave(index))
-                .then(crate::rest::settle)
-                .then(crate::commands::hold)
-                .then(crate::comfort::seek)
-                .then(crate::forage::forage)
-                .then(ai::wander(0.5, 7.0)),
+                // What it does when nothing is after it or ordered, the most pressing first (`choose.rs`).
+                .band(
+                    "needs",
+                    Band::new()
+                        .with(Need::Love, crate::breeding::behave(index))
+                        .with(Need::Rest, Stops { goal: crate::rest::settle, stop: crate::rest::stop })
+                        .with(Need::Hold, crate::commands::hold)
+                        .with(Need::Comfort, crate::comfort::seek)
+                        .with(Need::Drink, crate::drink::drink)
+                        .with(Need::Eat, crate::forage::eat)
+                        .with(Need::Wander, ai::wander(0.5, 7.0)),
+                ),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity);
+            crate::taming::hurt(w, h.entity, h.source);
             crate::rest::stop(w, h.entity);
         });
 }

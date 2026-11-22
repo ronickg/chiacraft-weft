@@ -226,6 +226,7 @@ impl Server {
                 self.players[pi].identity = identity;
                 // A DID claimed (chiacraft): checked on chain in the background. When the
                 // world's rules ask for a DID, the join waits for the answer (a few seconds).
+                self.players[pi].did_proof = did.clone();
                 let did_pending = self.check_did(pi, &key, &did) && self.gate.rules.needs_did();
                 // An achievement the rules ask for: the joining game shows its credentials for it.
                 let ask = self
@@ -359,7 +360,10 @@ impl Server {
                 e.pose = pose;
                 let here = crate::physics::around(c, &*r.space, pos, e.height(c));
                 let splash = entity::splashes(e.in_liquid, here.in_liquid, -walked.y);
-                let fell = entity::track_fall(&mut e.fall, walked.y, on_ground, here.in_liquid || here.climbing);
+                // Held on to a wall or gliding, as its client moved it: no fall builds up.
+                let held =
+                    pose.def().when & (weft_abi::pose_when::CLIMBING | weft_abi::pose_when::GLIDING | weft_abi::pose_when::ROPE) != 0;
+                let fell = entity::track_fall(&mut e.fall, walked.y, on_ground, here.in_liquid || here.climbing || held);
                 let land = fell.and_then(|f| entity::fall_damage(&c.game.entities[e.kind as usize], f));
                 e.sprinting = sprint;
                 e.flying = flying;

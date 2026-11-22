@@ -6,16 +6,21 @@ impl Client {
     pub(super) fn receive(&mut self) {
         // World messages go to the terrain thread, all of a frame together.
         let mut fwd = Vec::new();
+        let p = crate::diag::part("messages");
         while let Some(msg) = self.conn.recv() {
             self.receive_message(msg, &mut fwd);
         }
+        drop(p);
         if !fwd.is_empty() {
             let _ = self.terrain.tx.send(terrain::In::Many(fwd));
         }
+        let p = crate::diag::part("take terrain");
         self.take_terrain();
+        drop(p);
         if self.conn.is_closed() && self.disconnected.is_none() {
             self.disconnected = Some("connection lost".into());
         }
+        let _p = crate::diag::part("removed cubes");
         for pos in std::mem::take(&mut self.world.removed) {
             self.render.remove((0, pos));
         }
@@ -191,6 +196,20 @@ impl Client {
                 self.player.speed_mul = self.attributes[a::MOVEMENT_SPEED as usize] as f64;
                 self.player.jump_mul = self.attributes[a::JUMP_STRENGTH as usize] as f64;
                 self.player.can_sprint = self.attributes[a::CAN_SPRINT as usize] >= 1.0;
+                // Blocks a second to blocks a tick.
+                let at = |i: u32| self.attributes[i as usize] as f64 / crate::world::TPS as f64;
+                self.player.climb = at(a::CLIMB_SPEED);
+                self.player.glide = crate::physics::Glide {
+                    speed: at(a::GLIDE_SPEED),
+                    sink: at(a::GLIDE_SINK),
+                    wind: glam::DVec3::new(at(a::WIND_X), at(a::LIFT), at(a::WIND_Z)),
+                };
+                let raw = |i: u32| self.attributes[i as usize] as f64;
+                self.player.rope = (raw(a::ROPE_LENGTH) > 0.0).then(|| crate::physics::Rope {
+                    anchor: glam::DVec3::new(raw(a::ROPE_X), raw(a::ROPE_Y), raw(a::ROPE_Z)),
+                    length: raw(a::ROPE_LENGTH),
+                    reel: at(a::ROPE_REEL),
+                });
             }
             ToClient::BreakRefused { frame, pos } => {
                 self.refused_break = Some((frame, pos));
@@ -202,6 +221,11 @@ impl Client {
                 self.using_off = ticks.is_some_and(|(_, off)| off);
             }
             ToClient::Air { air, heading } => self.world.air = (air, heading),
+            ToClient::SkyEvent { kind, strength } => {
+                let began = if kind == self.sky_event.0 { self.sky_event.2 } else { crate::shaders::clock() };
+                self.sky_event = (kind, strength, began);
+            }
+            ToClient::SkyLanding { pos, seconds } => self.sky_landing = Some((pos, crate::shaders::clock() + seconds)),
             ToClient::Tints { tints } => self.world.set_tints(tints),
             ToClient::Weather { id, only } => {
                 self.weather_id = (id as usize).min(content().game.weathers.len() - 1) as u16;
@@ -217,6 +241,7 @@ impl Client {
             ToClient::Cracks(list) => self.others_mining = list,
             ToClient::StopSprint => self.sprint_stopped = true,
             ToClient::LodColumns { dim, all, cols } => self.lod.set_columns(dim, all, &cols),
+            ToClient::LodFar { dim, grid } => self.lod.set_far(dim, &grid),
             ToClient::Camera { mode, locked, transition, easing } => self.camera_from_server(mode, locked, transition, easing),
             ToClient::Knock { away } => {
                 let away = Vec3::from_array(away).as_dvec3();
@@ -434,6 +459,7 @@ impl Client {
                     break;
                 }
             }
+            let _p = crate::diag::part("end batch (no budget)");
             self.world.end_batch();
         }
     }

@@ -78,7 +78,9 @@ pub fn register(r: &mut Registry) {
     // Sea water boiled dry; the bucket comes back (`consume_one` in the furnace).
     r.shapeless(&SMELTING, "salt", 1, &["water_bucket"], preserve::SALT_TICKS);
     r.shapeless(&CRAFTING, "salted_meat", 1, &["#raw_meat", "#salt"], 0);
-    r.shaped(&CRAFTING, "cooking_pot", 1, &["i i", "i i", "iii"], &[('i', "#ingots/iron")]);
+    // A clay pot (the Stone Age's, Ronald, 11-07: "move them to fit"; it hardens on its first
+    // fire), not iron.
+    r.shaped(&CRAFTING, "cooking_pot", 1, &["c c", "c c", "ccc"], &[('c', "#clay")]);
     r.shaped(&CRAFTING, "drying_rack", 1, &["sss", "s s"], &[('s', "#stick")]);
     // In the inventory's own grid: a fire comes before a crafting table (Research round 4).
     // Laid unlit, and lit with a drill like a fire bed (`firebed.rs`; Planner, 11-05, from Ronald's
@@ -283,6 +285,9 @@ fn roast_step(w: &World, id: u64, s: &mut Roasting) -> bool {
     if s.cook >= s.cook_max {
         s.cook = 0;
         input.set(0, st.shrink(1));
+        // Its cook learns, and their web may make it two (`skills::cooked`), as room allows.
+        let room = max_stack(made.item).saturating_sub(out_now.count);
+        let made = ItemStack { count: crate::skills::cooked(w, id, &made, 1).clamp(1, room.max(1)), ..made };
         output.set(0, if out_now.is_empty() { made } else { out_now.grow(made.count) });
     }
     true
@@ -340,7 +345,10 @@ fn pot_step(w: &World, id: u64, s: &mut Cooking) -> bool {
                 }
             }
             bowl.set(0, consume_one(bowl.get(0)));
-            output.set(0, stew(w, &foods, used));
+            let stew = stew(w, &foods, used);
+            // Its cook learns (a stew teaches by what went in); a pot makes one stew a bowl.
+            crate::skills::cooked(w, id, &stew, foods.len() as u32);
+            output.set(0, stew);
         }
         true
     } else {

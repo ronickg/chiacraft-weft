@@ -23,7 +23,9 @@ pub struct Report {
 
 pub fn report(s: &Species) -> Report {
     let day = |t: u32| t as f64 / DAY as f64;
-    let generation = day(life::carrying(s)) + day(s.incubation()) + day(s.growth());
+    // Eggs (a fish's roe too) hatch after their incubation; live young have none.
+    let hatching = if s.gestation() > 0 { 0 } else { s.incubation() };
+    let generation = day(life::carrying(s)) + day(hatching) + day(s.growth());
     let cycle = day(life::carrying(s) + s.recovery()).max(0.01);
     let litter = (s.litter().0 + s.litter().1) as f64 / 2.0;
     let breeding = (day(s.lifespan()) * life::ELDERLY - day(s.growth())).max(0.0);

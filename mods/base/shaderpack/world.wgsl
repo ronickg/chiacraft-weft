@@ -12,7 +12,9 @@ const TINT_FOLIAGE: u32 = 2u;
 const TINT_WATER: u32 = 3u;
 
 struct VOut {
-    @builtin(position) clip: vec4<f32>,
+    // Invariant: cutout blocks' shading (`fs_cutout_shade`) draws where the depth equals what their
+    // depth pass laid with the same vertex shader, which needs bit-identical positions.
+    @builtin(position) @invariant clip: vec4<f32>,
     @location(0) uv: vec2<f32>,
     // Textures (bindless indices) of this frame and the next.
     @location(1) @interpolate(flat) layer: u32,
@@ -37,6 +39,26 @@ struct VOut {
     @location(15) ao: f32,
     // x tint kind, y 1 for a moving structure's blocks (not traced), z 1 for plants lit from above.
     @location(16) @interpolate(flat) kind: vec4<u32>,
+    // Temporal anti-aliasing (`core:aa`): xy how far this vertex moved on the screen since last
+    // frame (`screen_motion`), z 1 where that is its own (swaying), 0 for the camera's.
+    @location(17) motion: vec3<f32>,
+}
+
+// The world's opaque and cutout surfaces: their color and their motion (`motion_texel`), which the
+// engine keeps where the world's pass has a motion image and drops elsewhere.
+struct WorldOut {
+    @location(0) color: vec4<f32>,
+    @location(1) motion: vec4<f32>,
+}
+
+fn world_out(in: VOut, c: vec4<f32>) -> WorldOut {
+    return WorldOut(c, motion_texel(in.motion, in.clip.z));
+}
+
+// Whether this frame writes motion: temporal anti-aliasing on with the motion image (`core:aa` 1),
+// with a last frame to come from.
+fn taa_moving() -> bool {
+    return scene.taa.z > 0.5 && scene.taa_frame.y > 0.5;
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -154,6 +176,21 @@ fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
     return vec4(pos, 1.0);
 }
 
+// Where `finish` put this vertex last frame, camera relative as now (temporal anti-aliasing's
+// motion): a moving structure's place and turn then, after the table's three vec4 a structure
+// (`offsets[2].w` structures, then two vec4 each: offset, rotation). The world's own cubes stay.
+fn finish_prev(local: vec3<f32>, origin: vec4<i32>) -> vec3<f32> {
+    let k = origin.w;
+    var at = vec3<f32>(origin.xyz) * 16.0 + local;
+    if k == 0 {
+        return at - g.cam_frac.xyz;
+    }
+    let base = (i32(offsets[2].w) + 1) * 3;
+    let pivot = offsets[k * 3 + 2].xyz;
+    at = quat_turn(offsets[base + k * 2 + 1], at - pivot) + pivot;
+    return at - g.cam_frac.xyz + offsets[base + k * 2].xyz;
+}
+
 fn body_normal(n: vec3<f32>, k: i32) -> vec3<f32> {
     if k == 0 {
         return n;
@@ -168,16 +205,20 @@ fn body_normal(n: vec3<f32>, k: i32) -> vec3<f32> {
 // How far the wind moves what sways at `p`: a lean the way it blows, stronger in its gusts, and a
 // flutter that quickens with it. Calm air keeps a little life in the leaves.
 fn wind(p_world: vec3<f32>) -> vec3<f32> {
+    return wind_at(p_world, scene.params.w);
+}
+
+// `wind` at the shaders' clock `t` (`scene.taa.w`: last frame's, for the motion image).
+fn wind_at(p_world: vec3<f32>, t: f32) -> vec3<f32> {
     // Far from spawn the sines would get huge arguments and lose their place (foliage jumps on
     // fast-math backends): positions are taken within 4096 blocks, a seam once every 4096.
     let p = vec3(p_world.x - floor(p_world.x / 4096.0) * 4096.0, p_world.y, p_world.z - floor(p_world.z / 4096.0) * 4096.0);
-    let t = scene.params.w;
     let w = wind_now();
     let speed = length(w);
     let dir = select(vec2(1.0, 0.0), w / max(speed, 1e-4), speed > 0.01);
     // A fresh breeze (9 m/s) bends things as far as they go, a gale a little further.
     let s = clamp(speed / 9.0, 0.0, 1.6);
-    let g = gust(p);
+    let g = gust_at(p, t);
     let q = t * (1.0 + 0.8 * s);
     let a = sin(q * 1.7 + p.x * 0.63 + p.z * 0.41 + p.y * 0.2) * 0.6 + sin(q * 2.9 + p.x * 1.21 - p.z * 0.83) * 0.25;
     let b = sin(q * 1.3 + p.z * 0.71 - p.x * 0.37) * 0.5 + sin(q * 3.4 + p.z * 1.4 + p.x * 0.6) * 0.2;
@@ -187,6 +228,22 @@ fn wind(p_world: vec3<f32>) -> vec3<f32> {
     let flutter = vec3(a, 0.0, b) * (0.35 + 0.65 * s) * g * beaten;
     let lean = vec3(dir.x, 0.0, dir.y) * s * g * 1.3;
     return flutter + lean;
+}
+
+// How far a plant's top at camera-relative `rel` (world `world`) is pushed aside by the player
+// walking through it (the Recrafted study, item 7): away from the feet (the eye less 1.6) within
+// about a block, flattened within half of one, out and down; only plants about the feet, so flying
+// over a field parts nothing. (They spring back at once: a slow return needs a trail of where the
+// player was, which the engine doesn't send.)
+fn parted(rel: vec3<f32>, world: vec3<f32>) -> vec3<f32> {
+    let base = rel + floor(world) + vec3(0.5, 0.0, 0.5) - world + vec3(0.0, 1.6, 0.0);
+    let d = length(base.xz);
+    let near = (1.0 - smoothstep(0.45, 1.1, d)) * (1.0 - smoothstep(1.2, 2.0, abs(base.y)));
+    if near <= 0.0 {
+        return vec3(0.0);
+    }
+    let away = select(vec2(1.0, 0.0), base.xz / max(d, 1e-4), d > 0.05);
+    return vec3(away.x * 0.42, -0.3, away.y * 0.42) * near;
 }
 
 @vertex
@@ -209,11 +266,21 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     let world = vec3<f32>(o.xyz * 16) + local;
     let tint_kind = (w0 >> FACE_TINT_SHIFT) & TINT_MASK;
     // Leaves sway a little.
-    if tint_kind == TINT_FOLIAGE && origins[ii].w == 0 {
-        pos = vec4(pos.xyz + wind(world) * 0.035, 1.0);
-    }
     var out: VOut;
+    if tint_kind == TINT_FOLIAGE && origins[ii].w == 0 {
+        let rest = pos.xyz;
+        pos = vec4(rest + wind(world) * 0.035, 1.0);
+        out.clip = scene.view_proj * pos;
+        if taa_moving() {
+            let was = rest + wind_at(world, scene.taa.w) * 0.035;
+            out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(was, 1.0), scene.taa.xy), 1.0);
+        }
+    }
     out.clip = scene.view_proj * pos;
+    // A moving structure's blocks (a boat, a falling tree): where they were last frame.
+    if origins[ii].w != 0 && taa_moving() {
+        out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(finish_prev(local, origins[ii]), 1.0), scene.taa.xy), 1.0);
+    }
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
     // A face's texture turned in quarters (Weft 26.11.2's block faces with a rotation).
@@ -234,7 +301,9 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     }
     out.normal = body_normal(NORMAL[dir], origins[ii].w);
     out.ao = AO[a[c]];
-    out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), 0u, 0u);
+    // w: 2 on a see-through face with the same block behind it (`FACE_BACKED`), its holes filled
+    // (distant terrain's crown flag is 1).
+    out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), 0u, select(0u, 2u, (w0 & FACE_BACKED) != 0u));
     var tint = vec3(1.0);
     if tint_kind != 0u {
         tint = tint_color(tint_kind, w1 >> FACE_BIOME_SHIFT, o.x * 16 + i32(local.x), o.z * 16 + i32(local.z));
@@ -247,7 +316,7 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     } else {
         out.overlay = 0u;
         // The tint is a gamma-space color; the pack lights in linear light.
-        out.color = pow(tint, vec3(2.2));
+        out.color = pow(tint, vec3(2.2)) * select(vec3(1.0), foliage_test(), tint_kind == TINT_GRASS || tint_kind == TINT_FOLIAGE);
     }
     return out;
 }
@@ -273,15 +342,26 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     var pos = finish(local, origins[ii]);
     let o = origins[ii] + g.cam_cube;
     let world = vec3<f32>(o.xyz * 16) + local;
+    var out: VOut;
     // Grass and flowers bend at the top and stay rooted.
     if (tint_kind == TINT_GRASS || tint_kind == TINT_FOLIAGE || flat_) && tint_kind != TINT_WATER && origins[ii].w == 0 {
         let lo = min(min(p0.y, p1.y), min(p2.y, p3.y));
         let hi = max(max(p0.y, p1.y), max(p2.y, p3.y));
         let up = clamp((local.y - lo) / max(hi - lo, 0.001), 0.0, 1.0) * step(0.2, hi - lo);
-        pos = vec4(pos.xyz + wind(floor(world) + vec3(0.5)) * 0.11 * up, 1.0);
+        let rest = pos.xyz;
+        let part = parted(rest, world) * up;
+        pos = vec4(rest + wind(floor(world) + vec3(0.5)) * 0.11 * up + part, 1.0);
+        out.clip = scene.view_proj * pos;
+        // (The parting follows the player, who moved too; taken as it is now.)
+        if taa_moving() && up > 0.0 {
+            let was = rest + wind_at(floor(world) + vec3(0.5), scene.taa.w) * 0.11 * up + part;
+            out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(was, 1.0), scene.taa.xy), 1.0);
+        }
     }
-    var out: VOut;
     out.clip = scene.view_proj * pos;
+    if origins[ii].w != 0 && taa_moving() {
+        out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(finish_prev(local, origins[ii]), 1.0), scene.taa.xy), 1.0);
+    }
     out.dist = length(pos.xyz);
     out.rel = pos.xyz;
     out.uv = uvs[c];
@@ -315,7 +395,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     } else {
         out.overlay = 0u;
         // The tint is a gamma-space color; the pack lights in linear light.
-        out.color = pow(tint, vec3(2.2));
+        out.color = pow(tint, vec3(2.2)) * select(vec3(1.0), foliage_test(), tint_kind == TINT_GRASS || tint_kind == TINT_FOLIAGE);
     }
     return out;
 }
@@ -326,9 +406,53 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 // shadows that move with the sun), the sky light alone beyond it, and never deep under cover. This
 // file must not name the engine's block lookup: its name anywhere in it makes the engine upload
 // the blocks around the camera every frame.
+const PLANT_SHADOW_LIFT: f32 = 0.7;
+// Traced shadows: the radius of the sun's (and moon's) disc the rays aim into (radians), with
+// temporal anti-aliasing on (`rt_sun_soft`): soft edges that widen with the distance to what casts
+// them. The real sun's is 0.0047; a little more, as shader packs' suns, reads as softer light.
+const SUN_CONE: f32 = 0.012;
+
+// Traced shadows reach this far from the eye (blocks); the far shadow map (the terrain alone while
+// tracing) takes over past it, over the last fifth. At view 32 the far land is most of the frame,
+// and its long rays through thousands of distant tiles cost the most (Planner's sweep, 11-06: +4 ms
+// On, +11 ms Ultra at 1080p).
+const RT_REACH: f32 = 256.0;
+
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
+    // Traced (`core:rt_shadows`, a GPU with ray queries): one ray toward the light through the
+    // cubes and the distant terrain, by the leaves' holes, so no texels and no acne; still never
+    // deep under cover. Its colour through stained glass is kept for later (`rt_sun`'s rgb); here
+    // its brightness.
+    if scene.rt.x < 0.5 || in.dist >= RT_REACH {
+        return sun_shadow_mapped(in, n);
+    }
+    // A solid face turned from the light is in its own shade (leaves and plants let it through).
+    if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
+        return 0.0;
+    }
+    let c = min(canopy(), 1.0);
+    let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
+    // Deep under cover (a cave, a room): no sun to trace.
+    if cover <= 0.0 {
+        return 0.0;
+    }
+    let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, scene.rt.z > 0.5);
+    let traced = min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
+    let fade = smoothstep(RT_REACH * 0.8, RT_REACH, in.dist);
+    if fade <= 0.0 {
+        return traced;
+    }
+    return mix(traced, sun_shadow_mapped(in, n), fade);
+}
+
+fn sun_shadow_mapped(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
-    let mapped = shadow_at(in.rel, n);
+    // A plant's blade asks the map from most of a block toward the sun: the blades round it, as
+    // thin as a few of the map's texels, shaded each other in fine crossing stripes, pale and
+    // banded tall grass up close at 3456 px (Ronald's Mac, 11-06; gone with shadows off). Trees,
+    // walls and the player still shade it; the ground under it keeps the grass's shade.
+    let lift = select(0.0, PLANT_SHADOW_LIFT, in.kind.z != 0u);
+    let mapped = shadow_at(in.rel + light_dir() * lift, n);
     // Under a forest's canopy the map's gaps let the sun through where the leaves cut the sky light
     // (`light_on`'s sunflecks).
     let c = min(canopy(), 1.0);
@@ -350,20 +474,135 @@ fn fs_shadow(in: VOut) {
 
 // ---- shading ----
 
+// A leaf cube being shaded (the cutout passes set it: a cutout cube, `kind.z` 0, is leaves) and the
+// sun's reach on it (`surface_light`), for its light through the leaves (`leaf_sss`).
+var<private> LEAF_CUBE: bool = false;
+var<private> LEAF_SHADOW: f32 = 1.0;
+
+// How strong the light through leaves is (HDR, `base:look_leaf_light`), 0 none.
+fn leaf_light() -> f32 {
+    return fantasy_opt(OPT_LEAF_LIGHT);
+}
+
+// The sun's light through a leaf of colour `col` (albedo times tint) in the HDR world, after Bliss's
+// subsurface scattering for leaves (composite1.fsh, its SSS type 1; crew notes bliss-techniques.md
+// 6.4): the colours under the leaf's own brightness are absorbed on the way through, so the light
+// comes out a deep yellow-green, the more so the thicker the leaves it went through; a lobe toward
+// the sun makes a crown seen against it glow up to about ten times. Bliss takes the brighter of the
+// sun on the face and this; so does `shade_soft_lit`. Its canopy seen from below reads a saturated
+// green mass with sparkles, where ours read grey (Trees, Bliss's own world, 11-06).
+// The method after X0nk's Bliss (a Chocapic13' Shaders edit), written anew here; no code taken.
+// A setting of its own, off by default: Ronald's Bliss (SSS type 3 and no LabPBR pack) has none,
+// so the Bliss comparisons run without it (crew notes bliss-leaves.md).
+// Seen from below, its light has gone through the whole leaf block: a quarter of the thin skin's
+// at most, by the sun's reach (as thin, the canopy glowed yellow-lime, luma 160-180 against Bliss's
+// 66-69; a floor of 0.15 for leaves in the crown's shade lit it all, Trees' sss1-sss3). The lobe
+// toward the sun at half Bliss's (x3): at Bliss's x6 the crown over the camera glowed neon at 08:00.
+// At noon its lit leaves 73 against Bliss's 66, hue 100 against 107 (trb_s3_lk4a, with Look's glare
+// meter).
+fn leaf_sss(in: VOut, col: vec3<f32>) -> vec3<f32> {
+    let mu = dot(normalize(in.rel), light_dir());
+    let phase = 1.0 + 3.0 * (exp2(-25.0 * sqrt(max(1.0 - mu, 0.0))) + 0.5 * exp(-10.0 * (1.0 - mu)));
+    let depth = max(LEAF_SHADOW * 0.25, 0.01);
+    let absorb = exp(-max(vec3(luma(col)) - col * vec3(1.0, 1.1, 1.2), vec3(0.0)) * (20.0 - 19.0 * depth));
+    let open = smoothstep(0.4, 0.9, in.light.x);
+    return palette().sun * light_strength() * depth * absorb * phase * open * leaf_light();
+}
+
 // `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
-fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>) -> vec3<f32> {
+fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
-    var light = paint * light_on(n, in.light, shadow, in.ao, in.pos, in.rel);
+    var light = paint * light_on(n, in.light, shadow, ao, in.pos, in.rel);
     // Leaves and plants let some sun through when it is behind them.
+    // In the HDR world the light through leaves (`leaf_through`), the curve rolling its brights off
+    // (the screen's hold-back below was for today's look).
+    // Far crowns too, whatever their tint (distant terrain's crown flag, `in.kind.w`: spruce, birch
+    // and tropical leaves keep their own colours), so near and far tops light alike (Far view).
+    let crown = in.kind.y == 1u && in.kind.w == 1u;
+    if (in.kind.x == TINT_FOLIAGE || in.kind.z != 0u || crown) && scene.frame.x > 0.5 {
+        // More sun on the leaves' lit faces (`base:look_leaf_sun`, 2): our crowns' tops sat dull
+        // beside Bliss's (light-range sweep lr1, 11-06: x2 took the canopy's roughness at 150
+        // blocks 7.6/11.7 to 8.9/13.8; x3 no further, the curve rolls it off; darker shaded faces
+        // took it down, not up).
+        // Leaves only, not plants (`in.kind.z`): on tall grass it bleached the sunlit blades pale
+        // yellow-white beside black gaps (Tester 2's calm noon, -470 520, HDR on against off).
+        let k_sun = look_opt(OPT_LEAF_SUN, 1.0);
+        if k_sun != 1.0 && in.kind.z == 0u {
+            let c_open = min(canopy(), 1.0);
+            let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
+            light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
+        }
+        // A leaf cube's light through it is `leaf_sss`'s (`shade_soft_lit`), from its colour, and
+        // only with the leaf light on; off, none, as Ronald's Bliss (no SSS). With `leaf_through`'s
+        // glow on every face, a crown's shaded sides took green sun light and the canopy from above
+        // read an even green carpet: its shade 48 63 46 at noon against Bliss's 30 53 78; without it
+        // 42 49 44, roughness 8.7 -> 10.2 (Bliss's world vista, trb_s7_lk10_v).
+        if LEAF_CUBE {
+            LEAF_SHADOW = shadow;
+            return light;
+        }
+        // Plants half of it: with all of it tall grass in the sun went pale yellow-white beside black
+        // gaps (Tester 2's calm noon, HDR on against off).
+        return light + paint * palette().sun * leaf_through(in.rel, shadow, in.light.x) * select(1.0, 0.5, in.kind.z != 0u);
+    }
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
+        // A low morning or evening sun full on a crown's side: light about as strong as on the tops
+        // at noon, but on the light birch green seen from below it went through the curve as a
+        // lime flash at 06:00-07:00 and 17:00-18:00 (Tester 2's forest hours, 11-05). Its brightest
+        // part is held back while the sun is under about 45° (none at noon or at golden hour's
+        // dim light), so leaves stay vivid at other hours.
         let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
         light += paint * palette().sun * light_strength() * pow(back, 3.0) * 0.35 * shadow * smoothstep(0.5, 0.95, in.light.x);
+        let low = 1.0 - smoothstep(0.5, 0.72, scene.sun.y);
+        let lum = luma(light / max(paint, vec3(0.05)));
+        light *= 1.0 / (1.0 + 0.9 * max(lum - 1.0, 0.0) * low);
+        // And some colour out of the sunlit part: held back alone it kept a near-pure yellow-green
+        // (sRGB 135 170 7, a gold morning sun has little blue), 3 % of the frame at 06:00 where it
+        // was 6 % (PC run sh3); from a lower light up, a leaf by the eye at 18:00 stayed lime (sh3b).
+        let hot = smoothstep(0.6, 1.3, lum) * low;
+        light = mix(light, vec3(luma(light)) * vec3(0.9, 1.06, 0.86), hot * 0.2);
     }
     return light;
 }
 
+// The far ground's look (`core:far_look`, all on by default; Ronald, 11-06, after Voxy and Distant
+// Horizons): 1 small plants thin out, 2 the cubes' block-scale shading softens, 4 textures give way
+// to their average colour, all with distance.
+fn far_look() -> u32 {
+    return g.extra.w >> 24u;
+}
+
+// How far a cube's shading has softened (far look 2): from 48 to 160 blocks its corner shade goes
+// and its faces' normals lean halfway up, so one-block steps don't each draw a dark line.
+fn far_soft(in: VOut) -> f32 {
+    // Not leaves (`LEAF_CUBE`): see `far_flat`.
+    if (far_look() & 2u) == 0u || LEAF_CUBE {
+        return 0.0;
+    }
+    return smoothstep(48.0, 160.0, in.dist);
+}
+
 fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
-    let n = normalize(in.normal);
+    return shade_soft(in, albedo_in, far_soft(in));
+}
+
+// `shade` with the cubes' shading softened by `soft` (distant terrain's boxes too, `fs_lod`).
+fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
+    let lit = shade_soft_lit(in, albedo_in, soft);
+    return vec4(display(haze_lit(lit.rgb, in.rel, in.light.x)), lit.a);
+}
+
+// `shade_soft` before the haze: the light on the surface and the placed lights' glow in the air
+// before it (distant terrain hazes it once for land and water alike, `lod_color`).
+fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
+    let n0 = normalize(mix(normalize(in.normal), vec3(0.0, 1.0, 0.0), soft * 0.5));
+    // A texture's material maps (LabPBR `_s`/`_n`, the showcase blocks': polished stone, glazed
+    // tiles, metals, glass; `mat_at` in the prelude): its normal tilts the face's, and below a
+    // metal loses its own diffuse light to the sun's highlight and the sky's reflection. Textures
+    // without maps are as before.
+    let mat = shade_mat(in, albedo_in.rgb);
+    let n = mat_normal(mat, n0, in.rel, fract(in.uv));
+    let ao = mix(in.ao, 1.0, soft) * mat.ao;
     var albedo = albedo_in;
     // Snow lying on the tops of blocks and leaves (not on plants, which it buries). The biome's
     // tint goes onto the light (`in.color`), so the snow takes it off there too: tinted with the
@@ -374,7 +613,7 @@ fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
         snow = snow_on(n, in.pos, in.light.x);
         albedo = vec4(mix(albedo.rgb, vec3(0.86, 0.9, 0.95), snow), albedo.a);
     }
-    var light = surface_light(in, n, mix(in.color, vec3(1.0), snow));
+    var light = surface_light(in, n, mix(in.color, vec3(1.0), snow), ao);
     if in.glow != 0xffffffffu {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
         light = max(light, select(pow(in.tint, vec3(2.2)), vec3(1.0), in.overlay != 0u) * e * 1.7);
@@ -382,19 +621,215 @@ fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
     var lit: vec4<f32>;
     if in.slot == 0u {
         lit = vec4(albedo.rgb * light, albedo.a);
+        if mat.has {
+            lit = vec4(lit.rgb * (1.0 - 0.5 * mat.metal) + mat_shine(in, mat, n, albedo.rgb, light), lit.a);
+            lit = vec4(lit.rgb + mat_through(in, mat, albedo.rgb), lit.a);
+        }
+        // A low sun full on a bright, saturated yellow-green (the birch's untinted leaves, whose
+        // own picture is that green, so `surface_light` never sees them as leaves): some of its
+        // colour and brightness held back while the sun is under about 45°. A leaf by the eye at
+        // 18:00 stayed lime, 3.5 % of the frame (PC sh3c). By colour, as no flag marks them.
+        let low = 1.0 - smoothstep(0.5, 0.72, scene.sun.y);
+        let c = lit.rgb;
+        if low > 0.0 && c.g > c.r && c.r > c.b {
+            let sat = (c.g - c.b) / max(c.g, 1e-4);
+            // (In linear light: the lime's sRGB 120 167 3 is red/green 0.72 on the screen, about 0.5
+            // here, which a window of 0.5-0.72 missed: PC sh6.)
+            // (Not only the bright: the 18:00 leaf is mid-bright, luma about 0.3 before the curve, and
+            // lime by its colour alone; from 0.25 it hardly counted, 3 % of the frame left, PC sh6b.)
+            let k = smoothstep(0.06, 0.22, luma(c)) * smoothstep(0.55, 0.85, sat) * smoothstep(0.25, 0.45, c.r / c.g) * low;
+            lit = vec4(mix(c, vec3(luma(c)) * vec3(0.92, 1.05, 0.88), k * 0.175) * (1.0 - 0.18 * k), lit.a);
+            // And its red pulled down, so it turns green rather than grey (Ronald: "a bit greener"):
+            // the crown by the eye still read yellow-lime at 17:00-18:00, sRGB 88 125 3, hue 82
+            // where noon's lit leaves are about 100 (Tester 2's f0d78419 hours, 11-06). At 0.55 of
+            // its red, linear red/green 0.47 goes to about 0.26, hue about 95.
+            lit = vec4(lit.r * mix(1.0, 0.55, k), lit.g, lit.b, lit.a);
+        }
+        // Leaves: the brighter of the sun on the face and the sun through the leaf (`leaf_sss`).
+        if LEAF_CUBE && leaf_light() > 0.0 && scene.frame.x > 0.5 {
+            let col = albedo.rgb * mix(in.color, vec3(1.0), snow);
+            let direct = palette().sun * light_strength() * sun_facing(n) * LEAF_SHADOW;
+            lit = vec4(lit.rgb + col * max(leaf_sss(in, col) - direct, vec3(0.0)), lit.a);
+        }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
     }
-    // Out in the rain, the ground goes dark and wet, with a little of the sky on it (not plants).
-    let wet = rain_amount() * smoothstep(0.85, 1.0, in.light.x) * smoothstep(0.3, 0.9, n.y) * select(1.0, 0.0, in.kind.z != 0u || in.kind.x == TINT_FOLIAGE);
+    // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
+    // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
+    // after it stopped, Tester 2's after-rain shots, 11-05). Leaves and plants wet too, less: a
+    // little darker, a faint sheen.
+    let open_top = smoothstep(0.85, 1.0, in.light.x);
+    let leafy = in.kind.z != 0u || in.kind.x == TINT_FOLIAGE;
+    let wet = ground_wet() * open_top * select(smoothstep(0.3, 0.9, n.y), 0.45, leafy);
     if wet > 0.0 {
         let v = -normalize(in.rel);
-        let sheen = pow(1.0 - max(dot(n, v), 0.0), 5.0) * 0.12;
-        lit = vec4(lit.rgb * mix(1.0, 0.7, wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
+        // (Darker and glossier than in the rain alone: after it, in the sun, 0.7 and a 0.12 sheen
+        // read only 2-4 % darker than dry ground, PC shw_wet.)
+        let sheen = (0.04 + pow(1.0 - max(dot(n, v), 0.0), 4.0) * 0.3) * select(1.0, 0.35, leafy);
+        lit = vec4(lit.rgb * mix(1.0, select(0.58, 0.8, leafy), wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
+    }
+    // Puddles on flat open ground (the Recrafted study, item 4): they grow over minutes of rain
+    // (`scene.canopy.z`, the engine's) and dry slower than the ground after: a shower leaves a few
+    // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
+    // mirrored by Fresnel, and rings where the rain still falls on it.
+    let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
+    // (None in the calm-and-dry pipelines, `DRY`.)
+    if !DRY && puddles > 0.01 && !leafy && n.y > 0.95 {
+        // In cells three blocks across, some hold a puddle (one hash each against a share that grows
+        // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
+        // that widens as it fills, edged in the blocks' own pixels.
+        // (A threshold on two octaves of value noise left none: in the shader the noise stayed
+        // near its middle, PC debug runs shpdd-shpdd3; with `hash3` picking the cells, one or two
+        // in the whole field where a fifth were due, shpd6. `puddle_hash` is a sine hash.)
+        let q = floor(in.pos.xz * 16.0) / 16.0;
+        let cell = vec2<i32>(floor(q / 3.0));
+        let pick = puddle_hash(cell, 1.0);
+        let middle = (vec2<f32>(cell) + 0.3 + 0.4 * vec2(puddle_hash(cell, 2.0), puddle_hash(cell, 3.0))) * 3.0;
+        let reach = mix(0.6, 1.5, puddles) * mix(0.7, 1.0, puddle_hash(cell, 4.0));
+        let wobble = (noise3(vec3(q * 0.9, 5.3)) - 0.5) * 0.5;
+        let pool = select(0.0, 1.0, pick < mix(0.12, 0.6, puddles)) * smoothstep(reach, reach - 0.12, length(q - middle) + wobble);
+        if pool > 0.0 {
+            let v = -normalize(in.rel);
+            let slope = rain_rings(in.pos.xz) * rain_amount();
+            let pn = normalize(vec3(-slope.x, 1.0, -slope.y));
+            let cos_v = max(dot(pn, v), 0.0);
+            let fresnel = 0.02 + 0.98 * pow(1.0 - cos_v, 5.0);
+            // A still mirror over darker ground: at Fresnel's few percent from eye height the film
+            // read as the wet ground round it (PC shpd4: puddles over a quarter of the field and
+            // none seen); a puddle shows by the sky in it.
+            let film = lit.rgb * 0.3 + sky_color(reflect(-v, pn)) * mix(0.3, 1.0, fresnel);
+            lit = vec4(mix(lit.rgb, film, pool), lit.a);
+        }
     }
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
-    let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, fog_here(in.light.x));
-    return vec4(display(haze_lit(lit.rgb + glow, in.rel, in.light.x)), lit.a);
+    let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
+    return vec4(lit.rgb + glow, lit.a);
+}
+
+// The material at this pixel: none for distant terrain, plants, models and far off (from 96 blocks).
+fn shade_mat(in: VOut, albedo: vec3<f32>) -> Mat {
+    if in.dist > 96.0 || in.kind.y != 0u || in.kind.z != 0u || in.slot != 0u {
+        return mat_none();
+    }
+    return mat_at(in.layer, fract(in.uv), albedo);
+}
+
+// What a mirror at `rel` (camera relative) shows along `r` (unit) with traced reflections
+// (`core:rt_reflections`, `scene.rt.w`): the first surface the ray meets (`rt_hit`), in its texel and
+// tint, lit as the world lights it (its sky and block light, its sun through one more ray where
+// shadows are traced, the sky light standing in otherwise), veiled by the air over the whole way
+// from the eye; else the sky that way.
+// `cone`: the ray spread over a cone this wide (radians), a different way each frame for temporal
+// anti-aliasing to average (`rt_cone`, at pixel `px`): a rippled or rough mirror's blur, where one
+// sharp ray drew a skylight's grid as a hard zigzag across the pool (rtr3_rt).
+fn traced_view(rel: vec3<f32>, r_in: vec3<f32>, blur: f32, cone: f32, px: vec2<f32>) -> vec3<f32> {
+    var r = rt_cone(r_in, cone, px);
+    if r.y < 0.0 && r_in.y >= 0.0 {
+        r = r_in;
+    }
+    let h = rt_hit(rel, r, 384.0, blur);
+    if !h.hit {
+        return sky_color(r);
+    }
+    var albedo = h.albedo.rgb;
+    if h.tint != 0u {
+        albedo *= pow(tint_color(h.tint, h.biome, i32(floor(h.world.x)), i32(floor(h.world.z))), vec3(2.2));
+    }
+    var sun = smoothstep(0.75, 1.0, h.light.x);
+    if scene.rt.x > 0.5 && dot(h.n, light_dir()) > 0.0 {
+        sun = min(sun, dot(rt_sun(h.rel, h.n, light_dir(), false), vec3(1.0 / 3.0)));
+    }
+    let lit = albedo * light_on(h.n, h.light, sun, 1.0, h.world, h.rel);
+    return haze_lit(lit, normalize(rel) * (length(rel) + h.t), h.light.x);
+}
+
+// Schlick's Fresnel for reflectance `f0` at `cos_v`.
+fn mat_fresnel(f0: vec3<f32>, cos_v: f32) -> vec3<f32> {
+    return f0 + (vec3(1.0) - f0) * pow(1.0 - clamp(cos_v, 0.0, 1.0), 5.0);
+}
+
+// What a material adds on its own (`mat_at`): the sun's highlight (GGX, Smith's visibility),
+// through the same shadow as the rest of the light, and what's round it mirrored by Fresnel: the
+// sky, blurred toward the zenith's colour the rougher it is, where the sky is open above it; under a
+// roof the room's own light (`light`, what falls on the surface) instead. The screen's reflections
+// (`post/reflect.wgsl`) mirror what's nearby on top (`mirror_alpha`). A metal reflects in its own
+// colour (its albedo as F0, as NVIDIA's RTX mod does): with LabPBR's copper F0 and a bright sky,
+// the hall's copper columns came out pale lavender like glass (PC rsb_hall_rt0, 11-06).
+fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f32>) -> vec3<f32> {
+    var m = m_in;
+    if m.metal > 0.5 {
+        m.f0 = albedo;
+    }
+    let v = -normalize(in.rel);
+    let l = light_dir();
+    let h = normalize(v + l);
+    let ndl = max(dot(n, l), 0.0);
+    let ndv = max(dot(n, v), 1e-4);
+    let ndh = max(dot(n, h), 0.0);
+    let a = max(m.rough, 0.03);
+    let a2 = a * a;
+    let dd = ndh * ndh * (a2 - 1.0) + 1.0;
+    let d = a2 / (3.14159265 * dd * dd);
+    let vis = 0.5 / max(ndl * sqrt(ndv * ndv * (1.0 - a2) + a2) + ndv * sqrt(ndl * ndl * (1.0 - a2) + a2), 1e-4);
+    let f = mat_fresnel(m.f0, max(dot(v, h), 0.0));
+    var out = vec3(0.0);
+    if ndl > 0.0 && scene.sun.w > 0.0 {
+        let sun = palette().sun * light_strength() * sun_shadow(in, n);
+        out = min(d * vis, 60.0) * f * ndl * sun;
+    }
+    let r = reflect(-v, n);
+    let sky_seen = mix(sky_color(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(m.rough * 2.0, 0.0, 1.0));
+    let open = smoothstep(0.8, 1.0, in.light.x);
+    var sky = mix(light * 0.5, sky_seen, open * open);
+    // Traced (`scene.rt.w`): what really lies that way, the room or the hills, off the screen too;
+    // the rougher, the more it gives way to the blurred guess above.
+    if scene.rt.w > 0.5 && m.rough < 0.5 {
+        sky = mix(traced_view(in.rel + n * 0.01, r, m.rough * 6.0, 0.01 + m.rough * 0.5, in.clip.xy), sky, smoothstep(0.1, 0.5, m.rough));
+    }
+    // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
+    let gloss = 1.0 - clamp(m.rough * 1.6, 0.0, 0.85);
+    // Only what the face itself looks out at: a normal map's tilt (a mortar joint's groove) turned the
+    // mirrored ray toward the open sky behind the face, and stone bricks in the shade showed a bright
+    // blue line at every vertical joint (rt-sun-shadows' crop of NVIDIA's cathedral, 11-06; its path
+    // tracer has the same term).
+    let horizon = smoothstep(-0.05, 0.3, dot(r, normalize(in.normal)));
+    out += mat_fresnel(m.f0, ndv) * sky * gloss * horizon;
+    return out;
+}
+
+// Light that comes through a subsurface material (LabPBR `_s` blue over 64: blue ice, wax, the
+// leaves of packs that set it): the day's sky and sun, scattered on its way through, in the
+// material's own colour squared (deep blue for blue ice), the more the less sky reaches the face
+// directly, so a tunnel through ice glows and its outside barely changes. A guess at thickness, not a
+// trace: NVIDIA's showcase ice tunnel glowed deep blue where ours was grey (`notes/RTX_SHOWCASE.md`).
+fn mat_through(in: VOut, m: Mat, albedo: vec3<f32>) -> vec3<f32> {
+    if m.sss <= 0.0 {
+        return vec3(0.0);
+    }
+    let day = smoothstep(-0.05, 0.25, scene.sun.w);
+    let outside = sky_color(vec3(0.0, 1.0, 0.0)) * 0.6 + palette().sun * light_strength() * 0.25 * day;
+    let hidden = 1.0 - 0.75 * smoothstep(0.3, 1.0, in.light.x);
+    return albedo * albedo * m.sss * outside * hidden;
+}
+
+// The world image's alpha for an opaque pixel: SOLID_ALPHA, or for a smooth material (a polished
+// floor, a metal, a glazed tile) minus how much it mirrors, which the screen's reflections then
+// trace (`post/reflect.wgsl`; water writes its own positive share). Only with the HDR world, whose
+// image keeps a negative alpha.
+fn mirror_alpha(in: VOut, albedo: vec3<f32>) -> f32 {
+    let m = shade_mat(in, albedo);
+    if !m.has || scene.frame.x < 0.5 {
+        return SOLID_ALPHA;
+    }
+    let ndv = max(dot(normalize(in.normal), -normalize(in.rel)), 0.0);
+    let f = mat_fresnel(select(m.f0, albedo, m.metal > 0.5), ndv);
+    return -luma(f) * smoothstep(0.55, 0.9, m.smoothness);
+}
+
+// 0..1 for puddle cell `c` and key `k`: a sine hash (the pack's `hash3` picked far too few cells,
+// PC shpd6).
+fn puddle_hash(c: vec2<i32>, k: f32) -> f32 {
+    return fract(sin(dot(vec2<f32>(c), vec2(12.9898, 78.233)) + k * 37.719) * 43758.5453);
 }
 
 // ---- water ----
@@ -423,7 +858,11 @@ fn wave_height(p: vec2<f32>, t: f32, detail: f32) -> f32 {
     var h = wave_layer(q, t, 0.0, vec2(6.0, 1.6), 0.10);
     h += wave_layer(q, t, 1.0, vec2(1.6, 6.0), 0.08);
     h += wave_layer(q, t, 2.0, vec2(3.2, 3.2), 0.07);
-    h += wave_layer(q, t * 1.3, 3.0, vec2(0.8, 0.8), 0.022) * detail;
+    // The finest ripples only where they show: past 56 blocks `detail` is 0 and their noise was
+    // worked out for nothing, three times a pixel over all far water (Android port, 11-06).
+    if detail > 0.0 {
+        h += wave_layer(q, t * 1.3, 3.0, vec2(0.8, 0.8), 0.022) * detail;
+    }
     return h * (0.7 + 0.3 * smoothstep(1.0, 8.0, speed));
 }
 
@@ -578,7 +1017,15 @@ fn water_under(in: VOut, n: vec3<f32>, v: vec3<f32>, scatter: vec3<f32>, shadow:
 // shallows (lighter and greener there), blue and opaque where deep, a mirror of the sky toward the
 // horizon (Fresnel), a path of sun glitter toward a low sun and a soft line of foam at the shore.
 // The screen's reflections (`post/reflect.wgsl`) then mirror the hills into it.
-fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
+// Water before the haze, for `translucent` to haze once: `pre` goes through the haze, `below` (the
+// bottom seen through the surface, already veiled) is added after it.
+struct WaterLit {
+    pre: vec3<f32>,
+    below: vec3<f32>,
+    a: f32,
+}
+
+fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     let v = -normalize(in.rel);
     let top = in.normal.y > 0.5;
     // The surface from below, the eye in the water: not the texture's navy but the water's own
@@ -589,16 +1036,18 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // A water face seen from inside the water that is not its surface: one the mesher draws where
     // the water meets a cube not loaded yet (at a chunk edge). Water inside water is not there; it
     // showed as flat dark-cyan boxes standing in the sea (Plants' reef, coral_under_w).
-    if in_water() && abs(in.normal.y) <= 0.5 {
+    // (Never with the eye out of liquid: a calm scene's shader has neither, `CALM`.)
+    if !CALM && in_water() && abs(in.normal.y) <= 0.5 {
         discard;
     }
-    if in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
+    if !CALM && in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
         let window = smoothstep(0.55, 0.85, -v.y);
         let sky = mix(0.6, 2.4, window) * mix(0.15, 1.0, brightness_curve(in.light.x));
-        return vec4(display(haze_lit(underwater_color() * sky, in.rel, in.light.x)), 1.0);
+        return WaterLit(underwater_color() * sky, vec3(0.0), 1.0);
     }
     if (top && v.y <= 0.0) || in_liquid() {
-        return shade(in, albedo);
+        let l = shade_soft_lit(in, albedo, far_soft(in));
+        return WaterLit(l.rgb, vec3(0.0), l.a);
     }
     var n = normalize(in.normal);
     var depth = 3.0;
@@ -616,13 +1065,22 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     let ndv = max(dot(n, v), 0.02);
     // A near mirror at an ordinary look, as in the reference pictures: most of what it shows is
     // what it reflects (the screen's reflections, `post/reflect.wgsl`, use the same).
-    // (^2: more of a mirror at a slant, toward Bliss's pale sky-mirror lakes; Water 12.)
-    let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.0);
+    // (^2: more of a mirror at a slant, toward Bliss's pale sky-mirror lakes; Water 12.) Now ^4
+    // from 0.04 (`water_fresnel`, as the screen's reflections and far water): in Bliss's own world
+    // its open water reads a muted navy, (91, 111, 134) at far3 at noon, where ours mirrored the
+    // pale sky at (122, 141, 162) (Far view, 11-06).
+    let fresnel = water_fresnel(ndv);
     // Shade on the water from the near shadow map only, fading to sunlit past it: the far map's
     // coarse texels shaded far water wrongly (duller, no sun's path), and the near map's edge, a
     // square seen at a slant, showed as a hard-edged rectangle of bright water (the LOD worker's
     // sea views, very likely Ronald's lake; it went with shadows off, 11-05).
-    let near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0));
+    var near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0), false);
+    // Traced (`core:rt_shadows`): the water's surface everywhere, as the land.
+    if scene.rt.x > 0.5 && in.dist < RT_REACH {
+        let up = vec3(0.0, 1.0, 0.0);
+        let traced = vec2(dot(rt_sun_soft(in.rel, up, light_dir(), false, SUN_CONE, in.clip.xy, scene.rt.z > 0.5), vec3(1.0 / 3.0)) * models_shadow(in.rel, up), 1.0);
+        near_map = mix(traced, near_map, smoothstep(RT_REACH * 0.8, RT_REACH, in.dist));
+    }
     let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
     // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
@@ -638,7 +1096,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // Deep water a murky teal, not near black: the light scattered back from inside it (Bliss's
     // "dirt" scatter) keeps it lit looking down (Tester 2's COL5 shots: deep water at 0.35 mean
     // brightness, a dark navy).
-    let deep = vec3(0.022, 0.072, 0.066);
+    let deep = WATER_DEEP;
     let deepness = 1.0 - exp(-0.35 * depth);
     let scatter_raw = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
     // The water's own colour 40 % toward grey: at a slant ours read 0.31 saturation against Bliss's
@@ -651,7 +1109,22 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // The sky toward the horizon more than the ripples' tilt would give: they tipped it up into the
     // darker blue overhead, where Bliss's lakes mirror the pale, hazy low sky (Tester 2's shots:
     // our lake's water 0.45 mean brightness against Bliss's 0.62).
-    let refl = sky_color(normalize(vec3(r.x, max(r.y * 0.5, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    // (Tipped down by less now, 0.85 of the ripple's lift where it was half: halved, it mirrored the
+    // palest band of the sky everywhere, where Bliss's open water mirrors a deeper blue.)
+    var refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    // Traced (`scene.rt.w`): the shore, the trees and what is under a roof, off the screen too, out to
+    // the near land; the far water keeps the sky's guess.
+    if scene.rt.w > 0.5 && in.dist < 256.0 {
+        // The ripples' tilt a third as strong for the ray, and what it meets a little blurred: at
+        // full tilt a sharp stained window broke into a loud mosaic across the pool (rtr2_rt).
+        let rn = normalize(mix(n, vec3(0.0, 1.0, 0.0), 0.65));
+        let rr = reflect(-v, rn);
+        let traced = traced_view(in.rel + vec3(0.0, 0.02, 0.0), normalize(vec3(rr.x, max(rr.y, 0.02), rr.z)), 1.5, 0.04, in.clip.xy);
+        // As much as the screen's reflections gave it: Fresnel's share and a little more, the body
+        // below being dark (`post/reflect.wgsl`'s amount), less looking steeply down.
+        let amount = min(fresnel + 0.15 * (1.0 - smoothstep(0.5, 0.9, ndv)), 0.97);
+        refl = mix(traced * amount / max(fresnel, 1e-3), refl, smoothstep(160.0, 256.0, in.dist));
+    }
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
     let l = light_dir();
     // Never a zero vector (light exactly behind the eye): its normalize would be NaN.
@@ -679,16 +1152,34 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
         let under = water_under(in, n, v, scatter, shadow);
         let foam_all = max(foam, (1.0 - smoothstep(0.05, 0.3 + 0.1 * wobble, under.w)) * 0.6);
         let surface = refl * fresnel + glint + (lit * 0.9 + vec3(0.03)) * foam_all;
-        let below = under.rgb * (1.0 - fresnel) * (1.0 - foam_all);
-        return vec4(below + display(haze_lit(surface, in.rel, in.light.x)), 1.0);
+        var below = under.rgb * (1.0 - fresnel) * (1.0 - foam_all);
+        // The bottom seen through the water lies under the same air as the surface: veiled by it too
+        // (on the screen's colours, near enough), or a pond's pale floor stayed a saturated blue
+        // under rain's mist when everything round it had gone grey (Tester 2's rain shots, 11-05).
+        if open_sky() {
+            let d = length(in.rel);
+            below *= (vec3(1.0) - haze_veil(in.rel, d)) * (1.0 - smoothstep(scene.params.y * 0.84, scene.params.y, d));
+            // And the mist (`mist_kept`): veiled by the haze alone, rivers and lakes under a dawn
+            // mist were bright cream ribbons with crisp edges, brighter than the mist round them
+            // (Planner on Mist's m5 sheet, 11-06).
+            below *= mist_kept(in.rel, smoothstep(0.25, 0.75, in.light.x));
+        }
+        return WaterLit(surface, below, 1.0);
     }
     let lost = (1.0 - fresnel) * through;
     let a = clamp(max(1.0 - lost, max(luma(glint), foam)), 0.02, 1.0);
     let c = (refl * fresnel + scatter * (1.0 - fresnel) * (1.0 - through) + glint + (lit * 0.9 + vec3(0.03)) * foam) / a;
-    return vec4(display(haze_lit(c, in.rel, in.light.x)), a);
+    return WaterLit(c, vec3(0.0), a);
 }
 
 // ---- texture sampling (the engine's) ----
+
+// The texture footprint's scale for the mip level: 1, or under DLSS 2^(its mip bias)
+// (`Scene::dlss.x`, NVIDIA's log2(render / output) - 1: the textures as sharp as at the
+// screen's size, which the upscaler then keeps from aliasing).
+fn mip_scale() -> f32 {
+    return exp2(scene.dlss.x);
+}
 
 fn nearest_uv(size: f32, uv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec2<f32> {
     let inv_s = 1.0 / size;
@@ -716,12 +1207,44 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
     return vec4(mix(albedo.rgb, ov.rgb * pow(in.tint, vec3(2.2)), ov.a), albedo.a);
 }
 
+// Far look 4: from 64 to 192 blocks a block's texture gives way to its average colour (its
+// smallest mip), as Distant Horizons' far blocks are one colour and Voxy's mips converge on it, so
+// far grass, sand and leaves aren't grainy.
+// Not leaves (`LEAF_CUBE`): a crown's texture and its faces' shading are what a forest shows from
+// 60 to 200 blocks; flattened, crowns there were untextured light-green discs on dark gaps, "paper
+// cut-outs" (rt-sun-shadows' spot C, 11-06), and Bliss's world vista's canopy smooth lime blobs where
+// Bliss's keeps each crown's light and shade (Ronald, 08:00).
+fn far_flat(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
+    if (far_look() & 4u) == 0u || LEAF_CUBE {
+        return albedo;
+    }
+    let f = smoothstep(64.0, 192.0, in.dist);
+    if f <= 0.0 {
+        return albedo;
+    }
+    var avg = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
+    if in.blend > 0.0 {
+        avg = mix(avg, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    }
+    return vec4(mix(albedo.rgb, avg.rgb, f), albedo.a);
+}
+
 fn opaque(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    let albedo = far_flat(in, with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv));
+    return vec4(shade(in, albedo).rgb, mirror_alpha(in, albedo.rgb));
+}
+
+// What a hole in a face with the same block behind it shows (`FACE_BACKED`): that block's leaves
+// deeper in, its texture's own colour (the smallest mip, opaque texels only) in their shade, as
+// Minecraft's fancy leaves draw the faces between leaves. The crown's outer shell opened on the sky
+// (faces between leaves aren't drawn, `cull_same`): under a canopy 11-20% sky where Minecraft and
+// Bliss show 0.5% (Bliss's own world, mc_world_forest noon).
+fn backed_hole(in: VOut, nuv: vec2<f32>) -> vec4<f32> {
+    let avg = textureSampleLevel(textures[in.layer], linear_mipped, nuv, 16.0);
+    return vec4(avg.rgb * 0.35, 1.0);
 }
 
 fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4<f32> {
@@ -736,20 +1259,149 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
 }
 
 @fragment
-fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
-    return opaque(in);
+fn fs_opaque(in: VOut) -> WorldOut {
+    return world_out(in, opaque(in));
 }
 
 @fragment
-fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+fn fs_cutout(in: VOut) -> WorldOut {
+    LEAF_CUBE = in.kind.z == 0u;
+    // Far look 1: small plants thin out from 40 to 96 blocks, so far ground isn't speckled with
+    // flowers and tufts a pixel or two across.
+    if (far_look() & 1u) != 0u && in.kind.z != 0u {
+        let f = smoothstep(40.0, 96.0, in.dist);
+        let p = floor(in.clip.xy);
+        if fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f {
+            discard;
+        }
+    }
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
-    if albedo.a <= 0.1 {
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    if albedo.a <= cutout_edge(in, nuv, du, dv) {
+        if in.kind.w != 2u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
+    }
+    if in.kind.z == 0u {
+        albedo = far_flat(in, albedo);
+    }
+    return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
+}
+
+// ---- the path tracer's G-buffer (`core:path_traced`, the engine's `draw_gbuffer`) ----
+// The opaque and cutout terrain drawn again where the world's pass left its depth (Equal), into
+// what the path tracer and its denoisers read (reports/Path tracing plan.md; the denoisers'
+// interface v1): the diffuse albedo (linear, none for a metal; a: metal), the shading normal
+// (camera-relative world axes; w: perceptual roughness) and the specular colour (F0; a: the
+// subsurface share).
+struct GbOut {
+    @location(0) albedo: vec4<f32>,
+    @location(1) normal: vec4<f32>,
+    @location(2) spec: vec4<f32>,
+}
+
+fn gbuffer(in: VOut, albedo: vec4<f32>) -> GbOut {
+    let paint = albedo.rgb * in.color;
+    let m = shade_mat(in, albedo.rgb);
+    let n = mat_normal(m, normalize(in.normal), in.rel, fract(in.uv));
+    let metal = m.metal > 0.5;
+    // No maps, no shine (as the world's pass, which adds `mat_shine` only with them): F0 0.
+    let f0 = select(select(m.f0, paint, metal), vec3(0.0), !m.has);
+    // A metal keeps half its diffuse light, as the world's pass draws it (`lit * (1 - 0.5 * metal)`,
+    // our grade): with none, the storeroom's iron and gold blocks traced near black, mirroring
+    // only the dark room (pt1_rtxd_m2).
+    return GbOut(vec4(paint * (1.0 - 0.5 * m.metal), m.metal), vec4(n, 1.0 - m.smoothness), vec4(f0, m.sss));
+}
+
+@fragment
+fn fs_gb_opaque(in: VOut) -> GbOut {
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    return gbuffer(in, far_flat(in, with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv)));
+}
+
+// Cut as `fs_cutout` cuts, so it lands where the world's pass drew.
+@fragment
+fn fs_gb_cutout(in: VOut) -> GbOut {
+    if cutout_thinned(in) {
         discard;
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    if albedo.a <= cutout_edge(in, nuv, du, dv) {
+        if in.kind.w != 2u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
+    }
+    if in.kind.z == 0u {
+        albedo = far_flat(in, albedo);
+    }
+    return gbuffer(in, albedo);
+}
+
+// Cutout blocks in two passes (the engine's `cutout_split`, on tiled GPUs): `fs_cutout`'s depth,
+// its discards alone and no colour, then `fs_cutout_shade` where the depth is theirs, with no
+// discard, so the GPU keeps hidden-surface removal for the shading (the same picture).
+fn cutout_thinned(in: VOut) -> bool {
+    if (far_look() & 1u) != 0u && in.kind.z != 0u {
+        let f = smoothstep(40.0, 96.0, in.dist);
+        let p = floor(in.clip.xy);
+        return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
+    }
+    return false;
+}
+
+fn cutout_albedo(in: VOut) -> vec4<f32> {
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    return with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+}
+
+// Cut as `fs_cutout` cuts (`cutout_edge`), so the shading finds its depth wherever it drew.
+@fragment
+fn fs_cutout_depth(in: VOut) {
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    let a = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv).a;
+    let edge = cutout_edge(in, nuv, du, dv);
+    if cutout_thinned(in) || (a <= edge && in.kind.w != 2u) {
+        discard;
+    }
+}
+
+@fragment
+fn fs_cutout_shade(in: VOut) -> WorldOut {
+    LEAF_CUBE = in.kind.z == 0u;
+    var albedo = cutout_albedo(in);
+    if in.kind.z == 0u {
+        albedo = far_flat(in, albedo);
+    }
+    return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
+}
+
+// Where a cutout's texel is cut: at alpha 0.1, but in the HDR world a leaf cube (a cutout cube:
+// leaves, `kind.z` 0) keeps its see-through holes at a distance, as Minecraft's 16 px leaves do
+// under its 0.5 test (`cutout_mipped`): its alpha one mip sharper, cut at 0.5. Our 32 px leaves'
+// mips average the holes away a level sooner, and at the 0.1 test from about 50 blocks every crown
+// was a solid mat, where Bliss's stay speckled through to the dark inside (Trees' roughness gap,
+// 11-06). `base:look_leaf_holes` 0 the old cut.
+fn cutout_edge(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> f32 {
+    if scene.frame.x < 0.5 || in.kind.z != 0u || fantasy_opt(OPT_LEAF_HOLES) < 0.5 {
+        return 0.1;
+    }
+    let lod = max(log2(max(min(length(du * in.size), length(dv * in.size)), 1e-6)), 0.0);
+    let a = textureSampleLevel(textures[in.layer], linear_mipped, nuv, max(lod - 1.0, 0.0)).a;
+    // The cut moved instead of the alpha: the same test, the sharper mip's alpha against 0.5.
+    return select(1.0, -1.0, a > 0.5);
 }
 
 // Where the cubes end, they fade into distant terrain over this many blocks (as the engine's
@@ -759,51 +1411,78 @@ const FADE_BAND: f32 = 24.0;
 // Whether this pixel, near where the cubes end (`g.extra.y` blocks across from the camera), is
 // left to distant terrain: more of them the nearer the end, in a fine noise over the screen
 // (interleaved gradient noise). A cube's pixel and the distant terrain's at the same place agree,
-// so one of the two always draws it.
+// so one of the two always draws it. The noise moves each frame (`scene.frame.w`, Jimenez's
+// 5.588238 a frame): fixed on the screen, its dots stood still as a stipple over the mid canopy at
+// view 12 (the Look session, 11-06); moving, they blend in time (and in a temporal AA's history).
 fn faded(in: VOut) -> bool {
     let end = f32(g.extra.y);
     if end <= 0.0 {
         return false;
     }
     let f = clamp((length(in.rel.xz) - (end - FADE_BAND)) / FADE_BAND, 0.0, 1.0);
-    let p = floor(in.clip.xy);
+    let p = floor(in.clip.xy) + 5.588238 * scene.frame.w;
     return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
 }
 
 // The cubes near where they end (the engine draws only those meshes with these, so the rest keep
 // early depth).
 @fragment
-fn fs_opaque_fade(in: VOut) -> @location(0) vec4<f32> {
+fn fs_opaque_fade(in: VOut) -> WorldOut {
     if faded(in) {
         discard;
     }
-    return opaque(in);
+    return world_out(in, opaque(in));
 }
 
 @fragment
-fn fs_cutout_fade(in: VOut) -> @location(0) vec4<f32> {
+fn fs_cutout_fade(in: VOut) -> WorldOut {
+    LEAF_CUBE = in.kind.z == 0u;
     if faded(in) {
         discard;
     }
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
-    if albedo.a <= 0.1 {
-        discard;
+    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    if albedo.a <= cutout_edge(in, nuv, du, dv) {
+        if in.kind.w != 2u {
+            discard;
+        }
+        albedo = backed_hole(in, nuv);
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
 
 fn translucent(in: VOut) -> vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
+    let du = dpdx(in.uv) * mip_scale();
+    let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    // Water and glass each lit, then one haze for both (one copy of it in the shader, as for distant
+    // terrain in `lod_color`; Android port, 11-06). The same colours.
+    var pre: vec3<f32>;
+    var below = vec3(0.0);
+    var a: f32;
     if in.kind.x == TINT_WATER {
-        return water(in, albedo, true);
+        let wl = water(in, albedo, true);
+        pre = wl.pre;
+        below = wl.below;
+        a = wl.a;
+    } else {
+        let l = shade_soft_lit(in, albedo, far_soft(in));
+        pre = l.rgb;
+        a = l.a;
+        // Glass with a material (the showcase's): what it mirrors isn't let through, so its share
+        // of the pixel grows by its Fresnel, the more the glossier (a clear pane mirrors the sky
+        // at a glancing look instead of fading with its alpha).
+        let m = shade_mat(in, albedo.rgb);
+        if m.has {
+            let ndv = max(dot(normalize(in.normal), -normalize(in.rel)), 0.0);
+            let f = luma(mat_fresnel(m.f0, ndv)) * (1.0 - clamp(m.rough * 1.6, 0.0, 0.85));
+            a = a + (1.0 - a) * f;
+        }
     }
-    return shade(in, albedo);
+    return vec4(below + display(haze_lit(pre, in.rel, in.light.x)), a);
 }
 
 @fragment
@@ -829,9 +1508,19 @@ const LOD_DETAIL: vec2<f32> = vec2(220.0, 520.0);
 @vertex
 fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
-    let c = vi % 4u;
     let w0 = records[f * 4u];
     let w1 = records[f * 4u + 1u];
+    // Vanilla's corner shade on the ground's box faces (`lod_ao`; after upstream Weft f69243fd),
+    // the quad split along its lighter diagonal, as the cubes'.
+    var a = vec4<u32>(3u);
+    // (A water top's bits hold its depth, `lod_water_depth`, not a corner shade.)
+    if lod_dir(w0) != LOD_FACE_GRID && lod_tint(w0) != TINT_WATER {
+        a = lod_ao(records[f * 4u + 3u]);
+    }
+    var c = vi % 4u;
+    if a.x + a.z < a.y + a.w {
+        c = (c + 1u) % 4u;
+    }
     // A box's face, or a far tile's smooth cell (`lod_corner`, in the prelude).
     let corner = lod_corner(f, c, finish(vec3(0.0), origins[ii]).xyz);
     let dir = corner.dir;
@@ -855,24 +1544,109 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let o = origins[ii] + g.cam_cube;
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.normal = corner.normal;
-    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0));
+    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0)) * mix(0.55, 1.0, f32(a[c]) / 3.0);
+    // A crown's sides go dark toward its bottom, where the canopy shades itself (`fs_lod` takes it
+    // as the crown's own shade, `CROWN_UNDER`).
+    if lod_crown(w0) && dir != 2u && dir != 3u {
+        out.ao = mix(CROWN_UNDER, 1.0, CORNERS[dir * 4u + c].y);
+    }
     // Not traced: it is past the blocks the client keeps. Its tint kind, so far water is drawn as
     // water (and far leaves as leaves).
     let kind = lod_tint(w0);
-    out.kind = vec4(kind, 1u, 0u, 0u);
+    out.kind = vec4(kind, 1u, 0u, select(0u, 1u, lod_crown(w0)));
     var tint = vec3(1.0);
-    if kind != 0u {
+    // Not with an overlay: then the tint is the overlay's, and far off only the base is drawn (a
+    // cherry's pink blossom tinted whole came out brown-red).
+    if kind != 0u && frames[g.extra.x + (w1 & FACE_TEX_MASK)] == 0u {
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
-    out.color = pow(tint, vec3(2.2));
+    out.color = pow(tint, vec3(2.2)) * select(vec3(1.0), foliage_test(), kind == TINT_GRASS || kind == TINT_FOLIAGE);
+    // Shut in by the land round it (`lod_occ`, 0 to 3): valley floors and the ground between crowns
+    // get less of the sky and the low sun, down to 0.46 (Far view, 11-05: far land evenly lit).
+    out.color *= 1.0 - 0.18 * f32(lod_occ(w0));
     return out;
+}
+
+// Far water (distant terrain's): deep, a dark mirror of the sky with the sun's path on it, as Photon's
+// and Bliss's far seas are (Planner, 11-05: "its far water is a flat dark mirror reflecting the sky").
+// Through `water()` it took the near water's shallow depth and bottom, and read pale and milky.
+// (Before the haze, which `lod_color` adds once for land and water.)
+// Near and far water's share of what they mirror at a look `ndv` (cosine to the normal): a fourth
+// power from 0.04, as the screen's reflections (`post/reflect.wgsl`). Muted navy water as Bliss's
+// in its own world, not a pale mirror (Far view, 11-06).
+fn water_fresnel(ndv: f32) -> f32 {
+    return 0.04 + 0.96 * pow(1.0 - clamp(ndv, 0.0, 1.0), 4.0);
+}
+// Deep water's colour (what its body sends back, times the light), near and far alike: a navy
+// (was a murky teal, (0.022, 0.072, 0.066) near and (0.014, 0.045, 0.045) far).
+const WATER_DEEP: vec3<f32> = vec3(0.018, 0.045, 0.085);
+// How much of a reflected ray's rise the mirrored sky is taken at (lower: nearer the horizon's pale
+// band), near and far alike.
+const WATER_SKY_LIFT: f32 = 0.85;
+
+fn far_water_lit(in: VOut) -> vec3<f32> {
+    let v = -normalize(in.rel);
+    let n = wave_normal(in.pos, in.dist, v.y);
+    let ndv = max(dot(n, v), 0.02);
+    let fresnel = water_fresnel(ndv);
+    // The clouds' shadow here once (it was asked twice, for the light and the glint).
+    let clouds = cloud_shadow(in.rel);
+    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, clouds, 1.0, in.pos, in.rel);
+    let deep = WATER_DEEP * lit;
+    let r = reflect(-v, n);
+    let refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.02), r.z)));
+    let l = light_dir();
+    let hv = normalize(l + v + vec3(0.0, 1e-4, 0.0));
+    let nh = max(dot(n, hv), 0.0);
+    let a2 = 0.0025;
+    let dd = nh * nh * (a2 - 1.0) + 1.0;
+    let spec = a2 / (3.14159 * dd * dd) * fresnel * 0.25;
+    let glint = palette().sun * light_strength() * min(spec, mix(30.0, 1.5, golden())) * smoothstep(0.0, 0.1, l.y + 0.05) * clouds;
+    let c = refl * fresnel + deep * (1.0 - fresnel) + glint;
+    return c;
+}
+
+// How dark a far crown's side gets at its bottom (`vs_lod`).
+const CROWN_UNDER: f32 = 0.5;
+// Far canopy (Ronald, 11-05: "in distant horizons is still 100x better"; the Look session's gap
+// sheet: Bliss + Distant Horizons' far forest reads as clumped crowns, lit tops and dark gaps, ours
+// as even green fields): a crown's top is laid with crowns about `CROWN_CELL` blocks across, each a
+// dome lit by the sun on its side and dark in the gaps between, where the far boxes are too coarse to
+// draw single trees. x: how much of a dome is there (1 its top, 0 a gap), yz: which way it slopes.
+const CROWN_CELL: f32 = 2.5;
+// The domes' mean shade (`crown_clumps` over a cell), what a canopy too far for them still takes.
+const CROWN_MEAN: f32 = 0.6;
+fn crown_clumps(xz: vec2<f32>) -> vec3<f32> {
+    let q = xz / CROWN_CELL;
+    let base = vec2<i32>(floor(q));
+    var best = 9.0;
+    var to = vec2(0.0);
+    for (var j = -1; j <= 1; j++) {
+        for (var i = -1; i <= 1; i++) {
+            let cell = base + vec2(i, j);
+            let at = vec2<f32>(cell) + 0.15 + 0.7 * vec2(hash3(vec3(cell.x, 7, cell.y)), hash3(vec3(cell.x, 13, cell.y)));
+            let d = q - at;
+            let l = dot(d, d);
+            if l < best {
+                best = l;
+                to = d;
+            }
+        }
+    }
+    let r = sqrt(best);
+    return vec3(1.0 - smoothstep(0.35, 0.62, r), to / max(r, 1e-4) * smoothstep(0.05, 0.6, r));
+}
+
+// How much of a far crown's colour a face facing `n` keeps: all of it toward the sun, 0.4 turned away.
+fn crown_shade(n: vec3<f32>) -> f32 {
+    return mix(0.4, 1.0, smoothstep(-0.1, 0.5, dot(normalize(n), light_dir())));
 }
 
 // Whether real cubes show this distant tile pixel's column (`Lod::mask`): then they stand there,
 // and the tile is left out.
 fn lod_hidden(in: VOut) -> bool {
-    let half = i32(g.extra.w);
+    let half = i32(g.extra.w & 0x7FFFFFu);
     let col = vec2<i32>(floor(in.pos.xz / 16.0));
     let d = col - g.cam_cube.xz;
     if abs(d.x) <= half && abs(d.y) <= half {
@@ -899,6 +1673,53 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     if lod_hidden(in) && !faded(in) {
         discard;
     }
+    return lod_color(in);
+}
+
+// The tiles wholly outside the cubes' mask (the engine's `lod_open_pipe`): `fs_lod` without its
+// discard, which never happens there. A tiled GPU then keeps hidden-surface removal for the far
+// land: on the Pixel 10 (PowerVR) the discard alone cost a third of the world pass at the vista.
+@fragment
+fn fs_lod_open(in: VOut) -> @location(0) vec4<f32> {
+    return lod_color(in);
+}
+
+// The tiles reaching toward where distant terrain ends (the engine's `lod_end_pipe`, past
+// `END_FADE` of its reach): faded out over the last of it with a dither that moves each frame
+// (`scene.frame.w`; temporal anti-aliasing averages it into a blend), so what is drawn behind shows
+// through: the sky, or the cloud layer seen edge on. Distant Horizons fades its far edge into what
+// lies behind the same way (`dh_fade`). Handed over to a colour worked out here instead, the last
+// ridges stood about 20 brighter than the clouds behind them, flat cut-outs, whatever the colour
+// (Far view, the forest vista 06-12, 11-06). Desktop only: on a phone's tiled GPU a `discard`
+// costs the whole pass (Android keeps `fs_lod_open` there; measure on the Pixel first).
+const END_FADE_FROM: f32 = 0.85;
+
+@fragment
+fn fs_lod_end(in: VOut) -> @location(0) vec4<f32> {
+    let end = scene.params.y;
+    let f = smoothstep(END_FADE_FROM * end, end, length(in.rel.xz));
+    // Each pixel's threshold steps by the golden ratio a frame from its own place in the pattern,
+    // so the few frames temporal anti-aliasing keeps cover the thresholds evenly and average to `f`.
+    // (Thresholds drawn afresh each frame left about a tenth of noise in that average, which a
+    // scripted run, the same frames each time, showed as fixed dots at the fringe: Far view, 11-06.)
+    let p = floor(in.clip.xy);
+    let t = fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y) + 0.618034 * scene.frame.w);
+    if t < f {
+        discard;
+    }
+    return lod_color(in);
+}
+
+fn lod_color(in_lod: VOut) -> vec4<f32> {
+    // What `vs_lod` always sets, set here again as constants: the compiler then drops the lighting
+    // paths they rule out (block shaders, glow textures, placed lights, plants), which it cannot see
+    // through the interpolants. The same colours from a smaller shader (Android port, 11-06).
+    var in = in_lod;
+    in.glow = 0xffffffffu;
+    in.slot = 0u;
+    in.overlay = 0u;
+    in.light = vec4(1.0, 0.0, 0.0, 0.0);
+    in.kind = vec4(in_lod.kind.x, 1u, 0u, in_lod.kind.w);
     // A texture per block, laid from the world position on the face's plane (top
     // faces and gentle slopes by x and z, walls by their side and height, up the right way), its
     // gradients from that unbroken position so block borders don't jump to a coarse mip. Far off
@@ -929,18 +1750,62 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     // A mip and a half coarser than the pixels ask, and only the nearer tiles' texture: farther
     // out the terraces' rows of top and wall texels beat into dashes, so it gives way to the
     // average between `LOD_DETAIL` blocks.
-    let t = sample(in, fract(at), d.xy * 2.8, d.zw * 2.8);
     let detail = 1.0 - smoothstep(LOD_DETAIL.x, LOD_DETAIL.y, in.dist);
     // A cutout's clear texels (leaves' gaps) show the average, not their unset color.
-    var albedo = vec4(mix(avg.rgb, t.rgb, t.a * detail), avg.a);
+    var albedo = avg;
+    // Past `LOD_DETAIL.y` the texture counts for nothing: not sampled there (gradients given, so
+    // the branch is safe), the same colour for less (Android port, 11-06).
+    if detail > 0.0 {
+        let t = sample(in, fract(at), d.xy * 2.8, d.zw * 2.8);
+        albedo = vec4(mix(avg.rgb, t.rgb, t.a * detail), avg.a);
+    }
     // Far water is the same water as near: deep there (no blocks are kept that far), with its
     // Fresnel, the sky and the sun's path. Otherwise it would be a flat grey-blue lit like land, a
     // seam at the edge of the render distance. It is left out of the screen's reflections (solid in
     // the mask): looking out to sea, their march over every far-water pixel cost too much
     // (reports/performance.md).
+    // Land and water each lit, then one haze for both: with a haze in each path the shader held two
+    // copies of it and, on the Pixel 10, ran fewer pixels at once (far water without its own haze
+    // was 6.9 ms of the vista's 44; Android port, 11-06). The same colours.
+    var pre: vec3<f32>;
     if in.kind.x == TINT_WATER {
-        let w = water(in, avg, false);
-        return vec4(w.rgb, SOLID_ALPHA);
+        pre = far_water_lit(in);
+    } else {
+        // A crown's face: its own shade toward its bottom (`vs_lod`) at any distance, and on its top the
+        // clumped crowns (`crown_clumps`), faded in where the far boxes stand for more than a tree and out
+        // where a crown is under a couple of pixels (its domes would only shimmer).
+        var lit_in = in;
+        if in.kind.w != 0u {
+            lit_in.ao = 0.95;
+            albedo = vec4(albedo.rgb * in.ao, albedo.a);
+            // The side of a crown turned from the sun is dark, the sky's light cut hard: Distant Horizons
+            // + Bliss's far crowns are yellow-green where the sun falls and near black on their shaded
+            // side and in the gaps, ours sat mid-green with the shade lifted by the sky (spot C sheet,
+            // 11-05). Down to 0.4 of the albedo as a face turns away (`crown_shade`).
+            albedo = vec4(albedo.rgb * crown_shade(in.normal), albedo.a);
+            if in.normal.y > 0.5 {
+                // Faded by the pixel's smaller side on the ground (seen at a slant its long side runs away
+                // and spans blocks), and toward the domes' mean darkness, not to none: a canopy too far
+                // for its crowns still lies darker than open ground, the shade between the trees in it.
+                let fw = min(length(dpdx(in.pos.xz)), length(dpdy(in.pos.xz))) / CROWN_CELL;
+                let amount = smoothstep(150.0, 260.0, in.dist);
+                let resolved = 1.0 - smoothstep(0.35, 1.0, fw);
+                if amount > 0.0 {
+                    let k = crown_clumps(in.pos.xz);
+                    let shade = mix(CROWN_MEAN, mix(0.12, 1.15, k.x), resolved);
+                    albedo = vec4(albedo.rgb * mix(1.0, shade, amount), albedo.a);
+                    lit_in.normal = normalize(vec3(k.y * 1.5 * amount * resolved, 1.0, k.z * 1.5 * amount * resolved));
+                    // The dome's own slope turned from the sun is shaded too (its top's `crown_shade` was flat).
+                    albedo = vec4(albedo.rgb * crown_shade(lit_in.normal) / crown_shade(in.normal), albedo.a);
+                }
+            }
+        }
+        // From about 500 blocks out, where cells are 8 blocks and more (`lod::SLOPE_LEVEL`), a box's
+        // walls lean halfway up as the slopes they stand for (`far_soft`, far look 2). Lit as upright
+        // walls they got no sun at midday and a far snow range read stone-grey under thin white lines
+        // (Far view, 11-05; the smooth tiles' facets had leaned toward the sun). Nearer, the 2-4 block
+        // steps are steps and keep their shade: leaned there too, the land within 500 lost its relief.
+        pre = shade_soft_lit(lit_in, albedo, far_soft(in) * smoothstep(450.0, 800.0, in.dist)).rgb;
     }
-    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+    return vec4(display(haze_lit(pre, in.rel, in.light.x)), SOLID_ALPHA);
 }

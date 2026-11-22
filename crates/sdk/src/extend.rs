@@ -74,6 +74,24 @@ pub mod attribute {
     pub static MINING_SPEED: Attribute = Attribute::named(crate::abi::attribute::MINING_SPEED);
     /// Multiplier on a player's field of view (1): a zoom, a speed rush.
     pub static FOV: Attribute = Attribute::named(crate::abi::attribute::FOV);
+    /// Blocks a second it climbs any wall, times the wall's grip (0: only ladders).
+    pub static CLIMB_SPEED: Attribute = Attribute::named(crate::abi::attribute::CLIMB_SPEED);
+    /// Over 0 it glides in the air at this airspeed (blocks a second), sinking `GLIDE_SINK`.
+    pub static GLIDE_SPEED: Attribute = Attribute::named(crate::abi::attribute::GLIDE_SPEED);
+    pub static GLIDE_SINK: Attribute = Attribute::named(crate::abi::attribute::GLIDE_SINK);
+    /// The wind a glider drifts with, blocks a second toward +X and +Z.
+    pub static WIND_X: Attribute = Attribute::named(crate::abi::attribute::WIND_X);
+    pub static WIND_Z: Attribute = Attribute::named(crate::abi::attribute::WIND_Z);
+    /// Rising air under a glider, blocks a second.
+    pub static LIFT: Attribute = Attribute::named(crate::abi::attribute::LIFT);
+    /// Over 0: it hangs on a rope from `ROPE_X/Y/Z` at most this long (blocks).
+    pub static ROPE_LENGTH: Attribute = Attribute::named(crate::abi::attribute::ROPE_LENGTH);
+    pub static ROPE_X: Attribute = Attribute::named(crate::abi::attribute::ROPE_X);
+    pub static ROPE_Y: Attribute = Attribute::named(crate::abi::attribute::ROPE_Y);
+    pub static ROPE_Z: Attribute = Attribute::named(crate::abi::attribute::ROPE_Z);
+    /// Blocks a second jump pulls the rope in and sneak lets it out.
+    pub static ROPE_REEL: Attribute = Attribute::named(crate::abi::attribute::ROPE_REEL);
+    pub static KNOCKBACK_RESISTANCE: Attribute = Attribute::named(crate::abi::attribute::KNOCKBACK_RESISTANCE);
 }
 
 const UNRESOLVED: u32 = u32::MAX - 1;

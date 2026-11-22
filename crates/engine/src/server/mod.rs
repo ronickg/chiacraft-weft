@@ -143,6 +143,13 @@ pub struct Player {
     /// days, and a join waiting for that check (name, key, since).
     did: Option<String>,
     did_days: Option<u32>,
+    /// The DID they claimed couldn't be checked (no chain peer answered): not counted as theirs;
+    /// asked again now and then while they are here (`did_recheck`: when next, tries left), with
+    /// the proof they gave (`did_proof`). `did_note`: what to tell them about it when they join.
+    did_unchecked: bool,
+    did_proof: String,
+    did_recheck: Option<(Instant, u32)>,
+    did_note: Option<crate::ui::text::Msg>,
     waiting: Option<(String, String, Instant)>,
     /// The join waits for the DID check, and for the achievements the rules asked about.
     did_pending: bool,
@@ -185,6 +192,8 @@ pub struct Shared {
     /// Players in the world (chiacraft): entity and key, for mods asking who a player is.
     pub players: parking_lot::RwLock<Vec<(u64, String)>>,
     pub paused: AtomicBool,
+    /// Save everything at the next turn of the loop (`ServerHandle::save_now`).
+    pub save_now: AtomicBool,
     pub hosting: AtomicBool,
     pub tick_us: AtomicU64,
     pub regions: AtomicU64,
@@ -208,6 +217,10 @@ pub struct Shared {
     pub views: parking_lot::RwLock<Vec<(u32, View)>>,
     /// Achievements mods granted this tick (chiacraft, `achievements`): the server signs them.
     pub grants: parking_lot::Mutex<Vec<crate::chiacraft::achievements::Grant>>,
+    /// `weft --server --stats` (a load test, `crates/bots`): every tick's time and its phases in
+    /// microseconds, kept until the stats line takes them (`dedicated::stats`).
+    pub stats: AtomicBool,
+    pub tick_samples: parking_lot::Mutex<Vec<(u32, [u32; 6])>>,
     /// Boxes of cubes tickets keep loaded (dim, lowest, highest cube), for the same.
     pub forced: parking_lot::RwLock<Vec<(u32, IVec3, IVec3)>>,
 }
@@ -282,6 +295,12 @@ impl ServerHandle {
 
     pub fn set_paused(&self, p: bool) {
         self.shared.paused.store(p, Ordering::Relaxed);
+    }
+
+    /// Saves the world and its players soon, paused or not (Android may end an app in the
+    /// background without a word).
+    pub fn save_now(&self) {
+        self.shared.save_now.store(true, Ordering::Relaxed);
     }
 
     pub fn is_hosting(&self) -> bool {
@@ -408,12 +427,14 @@ pub fn spawn(cfg: ServerConfig, storage: Option<Storage>) -> ServerHandle {
             // The server's parallel work (region ticks, entities) runs on a pool of its own whose
             // threads are the server's, as the server thread is.
             scope.enter();
+            crate::diag::mark_server_thread();
             let pool_scope = scope.clone();
             let pool = rayon::ThreadPoolBuilder::new()
                 .num_threads(crate::workers())
                 .thread_name(|i| format!("server {i}"))
                 .start_handler(move |_| {
                     pool_scope.enter();
+                    crate::diag::mark_server_thread();
                     crate::set_priority(crate::PRIORITY_ABOVE_NORMAL);
                 })
                 .build()
@@ -440,6 +461,9 @@ fn run(
         }
         while let Ok(line) = console_rx.try_recv() {
             server.console(&line);
+        }
+        if server.shared.save_now.swap(false, Ordering::Relaxed) {
+            server.save_all(true);
         }
         if server.shared.paused.load(Ordering::Relaxed) {
             server.idle();
@@ -664,6 +688,10 @@ impl Server {
                 told: None,
                 did: None,
                 did_days: None,
+                did_unchecked: false,
+                did_proof: String::new(),
+                did_recheck: None,
+                did_note: None,
                 waiting: None,
                 did_pending: false,
                 proofs_pending: false,
@@ -819,6 +847,10 @@ impl Server {
         let us = start.elapsed().as_micros() as u64;
         self.shared.tick_us.store(us, Ordering::Relaxed);
         self.shared.tick_max_us.fetch_max(us, Ordering::Relaxed);
+        if self.shared.stats.load(Ordering::Relaxed) {
+            let phases = std::array::from_fn(|i| self.shared.phase_us[i].load(Ordering::Relaxed) as u32);
+            self.shared.tick_samples.lock().push((us as u32, phases));
+        }
     }
 
     /// Whatever a player's or mod's action changed takes effect at once, wherever it reached:
@@ -922,6 +954,8 @@ impl Server {
                     }
                 }
                 DimEvent::SetAir { dim, air, heading } => self.dims[dim as usize].set_air(air, heading),
+                DimEvent::SetSkyEvent { dim, kind, strength } => self.dims[dim as usize].set_sky_event(kind, strength),
+                DimEvent::SkyLanding { dim, pos, seconds } => self.dims[dim as usize].landings.push((pos, seconds)),
                 DimEvent::SetTints { dim, tints } => self.dims[dim as usize].set_tints(tints),
                 DimEvent::SetRain { dim, biomes, weather } => {
                     // Only where weather comes at all.
@@ -1062,6 +1096,8 @@ impl Server {
             self.players[pi]
                 .conn
                 .send(ToClient::LodColumns { dim, all: true, cols });
+            let far = s.lock().far[dim as usize].clone();
+            self.players[pi].conn.send(lod_far(dim, far));
         }
     }
 
@@ -1258,6 +1294,8 @@ impl Server {
             players[pi]
                 .conn
                 .send(ToClient::LodColumns { dim: to, all: true, cols });
+            let far = s.lock().far[to as usize].clone();
+            players[pi].conn.send(lod_far(to, far));
         }
         let p = &mut players[pi];
         p.conn
@@ -1268,6 +1306,8 @@ impl Server {
             .send(ToClient::Weather { id: dims[to as usize].weather as u32, only: dims[to as usize].rain_here().map(|o| o.to_vec()) });
         p.conn
             .send(ToClient::Air { air: dims[to as usize].air.0.clone(), heading: dims[to as usize].air.1 });
+        let (kind, strength) = dims[to as usize].sky_event;
+        p.conn.send(ToClient::SkyEvent { kind, strength });
         if to == c.void_dim && from != to as usize {
             p.conn
                 .send(ToClient::Show(crate::net::Shown::chat(void_note(c))));
@@ -1643,6 +1683,11 @@ fn death_message(c: &Content, cause: u32, killer: Option<u32>, name: String) -> 
 
 fn void_note(c: &Content) -> Msg {
     Msg::new(if c.spawn_dim == c.void_dim { "void.no_dimension" } else { "void.here" }, Vec::new())
+}
+
+/// chiacraft, test only: an imported world's far terrain for dimension `dim`, or none (`ToClient::LodFar`).
+fn lod_far(dim: u32, far: Option<std::sync::Arc<Vec<u8>>>) -> ToClient {
+    ToClient::LodFar { dim, grid: far.map(|f| (*f).clone()).unwrap_or_default() }
 }
 
 fn lod_columns<'a>(cols: impl Iterator<Item = &'a lod_tops::LodColumn>) -> Vec<(i32, i32, i32, u32, u32)> {

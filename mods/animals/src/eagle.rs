@@ -15,12 +15,11 @@ static WINGS: Wings = Wings {
     model: "eagle",
     texture: "eagle/eagle",
     fly_size: (1.2, 0.4),
-    health: 16.0,
     // It walks little; it soars at about 14 m/s.
     speed: 1.5,
     air: 6.5,
     wander: 0.2,
-    damage: 4.0,
+    bites: true,
     height: 10.0,
     reach: 28.0,
     flight: 700,

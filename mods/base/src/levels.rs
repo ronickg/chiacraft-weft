@@ -62,7 +62,9 @@ pub fn register(r: &mut Registry) {
         for d in b.iter() {
             if d.source != 0 && d.source != d.entity && w.players().contains(&d.source) {
                 let danger = if w.players().contains(&d.entity) { 3.0 } else { 1.5 };
-                give_xp(&w, d.source, xp::kill(1, danger));
+                // A blood moon's kills in totality are worth more (`vitals::events`).
+                let blood = if crate::events::blood_totality(&w) { vitals::events::BLOOD_MOON_XP } else { 1.0 };
+                give_xp(&w, d.source, (xp::kill(1, danger) as f32 * blood).round() as u64);
             }
             if w.players().contains(&d.entity) {
                 tombstone(&w, d.entity, d.pos.into());
@@ -82,8 +84,12 @@ pub fn register(r: &mut Registry) {
     // Gives XP (for testing), or tells it.
     r.command("xp", "[amount:int]", |cmd| {
         let w = cmd.world();
-        if let Some(n) = cmd.int("amount") {
-            give_xp(&w, cmd.player(), n.max(0) as u64);
+        // Straight in, in any game mode: `give_xp` gives nothing outside survival (right for play),
+        // which left test scripts in spectator at level 1 with no perk points (Ley lines' look, 11-05).
+        if let Some(n) = cmd.int("amount")
+            && let Some(v) = w.component_mut(cmd.player(), &VITALS)
+        {
+            v.xp += n.max(0) as u64;
         }
         let Some(v) = w.component(cmd.player(), &VITALS) else { return };
         let (level, into) = levels::level_of(v.xp);
@@ -121,6 +127,8 @@ fn tick(w: &World) {
         }
         if found > 0 && !creative {
             give_xp(w, id, found);
+            // Exploring rises by the same finds (a dimension's are ten a biome's).
+            crate::skills::discovered(w, id, found >= xp::DISCOVER * 10);
         }
         let Some(v) = w.component_mut(id, &VITALS) else { continue };
         let level = levels::level_of(v.xp).0;
@@ -321,7 +329,7 @@ fn client(r: &mut Registry) {
         let tabs: [crate::window::Tab; 1] = [("window.base.tab.advancements", |c| {
             c.client().screen_open(&crate::advancements::SCREEN);
         })];
-        crate::window::window_titled(ui, S::column().pad(8.0).gap(4.0), "window.base.tab.stats", &tabs, |ui| {
+        crate::window::family_window(ui, S::column().pad(8.0).gap(4.0), Some("window.base.tab.stats"), &tabs, |ui| {
             ui.row(S::row().gap(5.0).center(), |ui| {
                 ui.panel("hud_badge", S::row().size(20.0, 24.0).center(), |ui| {
                     ui.text_bind_styled(S::default().no_wrap(), |c, t| {

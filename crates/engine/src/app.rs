@@ -242,8 +242,29 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
     }),
 ];
 
+/// The sizes last asked of the upscaler: mode, Ray Reconstruction, screen, world.
+type UpscaleSize = (weft_render::UpscaleMode, bool, (u32, u32), (u32, u32));
+
+/// What goes to the backend's upscaler this frame (`upscale_frame`): the settings, less what the
+/// upscaler doesn't run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct UpscaleChoice {
+    mode: weft_render::UpscaleMode,
+    reconstruct: bool,
+    model: u32,
+    rr_model: u32,
+    neural: bool,
+}
+
 pub(crate) struct Running {
     gpu: Box<dyn Backend>,
+    /// The backend's temporal upscaler (DLSS through Streamline on Windows), as it said at start;
+    /// the mode this frame goes to it with (`core:dlss`), and the sizes last asked of it
+    /// (mode, screen, world).
+    upscaler: weft_render::UpscalerInfo,
+    upscale_now: Option<UpscaleChoice>,
+    upscale_logged: Option<UpscaleChoice>,
+    upscale_size: Option<UpscaleSize>,
     window: Arc<Window>,
     depth: (TextureId, u32, u32),
     list: CommandList,
@@ -317,7 +338,8 @@ pub(crate) struct Running {
     ui_cached: Vec<crate::ui::render::Quad>,
     ui_animated: Vec<crate::ui::render::Animated>,
     /// Where UI asked for the player model, physical pixels.
-    /// Where 3D previews go, and whose: the player (0) or the open menu's own entity (1).
+    /// Where 3D previews go, and whose: the player (0), the open menu's own entity (1), or an
+    /// entity kind alone (2 + its index).
     previews: Vec<([f32; 4], u64)>,
     /// Texture holding the rendered inventory figure, drawn by the UI.
     preview_tex: Option<u32>,
@@ -341,6 +363,11 @@ pub(crate) struct Running {
     benches: u32,
     bench_last: [f32; 5],
     bench_line: String,
+    /// The on-screen controls of a touch screen (`touch::enabled`).
+    touch: crate::touch::Touch,
+    /// A world to start once the loading screen has been on the screen this many frames
+    /// (`begin_world`).
+    pending_world: Option<(WorldMeta, u32)>,
 }
 
 struct App {
@@ -348,12 +375,33 @@ struct App {
     opts: Options,
     run: Option<Running>,
     error: Option<String>,
+    /// The window has no surface (Android, in the background): no frames until it's back.
+    suspended: bool,
 }
 
 pub fn run(factory: BackendFactory, opts: Options) -> Result<(), String> {
-    let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
+    run_on(EventLoop::new().map_err(|e| e.to_string())?, factory, opts)
+}
+
+/// Android: the event loop of the activity `android_main` was given (crates/android).
+#[cfg(target_os = "android")]
+pub fn run_android(app: winit::platform::android::activity::AndroidApp, factory: BackendFactory, opts: Options) -> Result<(), String> {
+    use winit::platform::android::EventLoopBuilderExtAndroid;
+    let event_loop = EventLoop::builder()
+        .with_android_app(app)
+        .build()
+        .map_err(|e| e.to_string())?;
+    run_on(event_loop, factory, opts)
+}
+
+/// Android destroyed the activity (seen in winit's log, `log.rs`): the game saves and ends, which
+/// Android's main thread waits for.
+#[cfg(target_os = "android")]
+pub(crate) static ANDROID_DESTROYED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn run_on(event_loop: EventLoop<()>, factory: BackendFactory, opts: Options) -> Result<(), String> {
     event_loop.set_control_flow(ControlFlow::Poll);
-    let mut app = App { factory, opts, run: None, error: None };
+    let mut app = App { factory, opts, run: None, error: None, suspended: false };
     event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
     match app.error {
         Some(e) => Err(e),
@@ -365,9 +413,13 @@ pub fn run(factory: BackendFactory, opts: Options) -> Result<(), String> {
 /// source tree, or `--dev`) the source tree's.
 fn engine_assets(dev: bool) -> PathBuf {
     let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
-    let shipped = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.join("assets").join("core")));
+    let shipped = crate::paths::engine_assets()
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.join("assets").join("core")))
+        });
     match shipped {
         Some(s) if !dev && s.is_dir() => s,
         _ => source,
@@ -480,6 +532,7 @@ impl App {
             height: size.height,
             vsync: settings.vsync(),
             debug: self.opts.gpu_debug,
+            upscale_standin: settings.upscale_standin(),
         })
         .map_err(|e| e.to_string())?;
         // The pipelines the driver compiled last time, before any is made (saved at exit).
@@ -512,6 +565,14 @@ impl App {
         let look = Look::new(&assets, &mod_ids(), &lang);
         let textures = GameTextures::new(&mut *gpu, content(), &assets);
         let ui = UiRenderer::new(&mut *gpu, &assets)?;
+        // The HDR world's format, before any pipeline drawing into the world is made.
+        crate::post::set_hdr(settings.hdr_world());
+        // And whether they draw the motion image too, for temporal anti-aliasing.
+        // The world draws the motion image for temporal anti-aliasing with it (`core:aa` 1, not 2,
+        // from the camera alone) and for an upscaler (DLSS): with one, always, so `core:dlss` can be
+        // switched on while playing.
+        crate::post::set_motion(settings.aa_motion() || gpu.upscaler().modes != 0);
+        crate::post::set_taa(settings.aa());
         let post = crate::post::Post::new(&mut *gpu, &assets);
         let mut input = Input::default();
         for (action, key) in &content().game.keys {
@@ -525,7 +586,44 @@ impl App {
         crate::shaders::pin_time(self.opts.automated && !recording());
         let depth = make_depth(&mut *gpu, size.width, size.height);
         let gpu_name = gpu.device_name().to_string();
+        // What the GPU is, for mods (`core:gpu_*`): as found, whatever a file says.
+        for (name, v) in [
+            ("core:gpu_class", gpu.device_class() as f64),
+            ("core:gpu_memory_mb", gpu.device_memory_mb() as f64),
+            ("core:gpu_ray_query", gpu.ray_query() as u8 as f64),
+        ] {
+            if let Some(id) = crate::config::by_name(name) {
+                crate::config::put(id, v);
+            }
+        }
+        if let Some(id) = crate::config::by_name("core:gpu_name") {
+            crate::config::put_text(id, &gpu_name);
+        }
+        let upscaler = gpu.upscaler();
+        // What it runs, for the Video menu's DLSS tab (`core:gpu_dlss*`), as found.
+        for (name, v) in [
+            ("core:gpu_dlss_modes", upscaler.modes as f64),
+            ("core:gpu_dlss_models", weft_render::UpscalerInfo::model_bits(&upscaler.models) as f64),
+            ("core:gpu_dlss_rr", upscaler.reconstruct as u8 as f64),
+            ("core:gpu_dlss_rr_models", weft_render::UpscalerInfo::model_bits(&upscaler.rr_models) as f64),
+            ("core:gpu_dlss5", upscaler.neural as u8 as f64),
+            ("core:gpu_frame_gen", upscaler.frame_gen as f64),
+        ] {
+            if let Some(id) = crate::config::by_name(name) {
+                crate::config::put(id, v);
+            }
+        }
+        if let Some(id) = crate::config::by_name("core:gpu_dlss") {
+            crate::config::put_text(id, &upscaler.name);
+        }
+        if !upscaler.name.is_empty() {
+            log::info!("upscaler: {} (core:dlss picks the mode)", upscaler.name);
+        }
         let mut r = Running {
+            upscaler,
+            upscale_now: None,
+            upscale_logged: None,
+            upscale_size: None,
             gpu,
             window,
             depth,
@@ -606,6 +704,8 @@ impl App {
             benches: 0,
             bench_last: [0.0; 5],
             bench_line: String::new(),
+            touch: crate::touch::Touch::default(),
+            pending_world: None,
         };
         if let Some(world) = &self.opts.world {
             let saves_dir = r.settings.saves_dir();
@@ -613,7 +713,7 @@ impl App {
                 .into_iter()
                 .find(|w| &w.name == world)
                 .unwrap_or_else(|| saves::create(&saves_dir, world, self.opts.seed.unwrap_or(1)));
-            r.start_world(meta);
+            r.begin_world(meta);
         } else {
             r.open(screens::engine("core:title"));
             if let Some(name) = &self.opts.screen {
@@ -637,6 +737,83 @@ fn world_frame(r: &Running, info: &weft_render::FrameInfo) -> weft_render::Frame
     }
     let scaled = |v: u32| ((v as f32 * s).round() as u32).max(1);
     weft_render::FrameInfo { width: scaled(info.width), height: scaled(info.height), slot: info.slot }
+}
+
+/// With DLSS on (`core:dlss`, a mode the backend runs): the size it wants
+/// the world drawn at, and this frame goes to it (`Running::upscale_now`, with Ray Reconstruction,
+/// the models and DLSS 5 as set, where it runs them). None: the world as always.
+fn upscale_frame(r: &mut Running, info: &weft_render::FrameInfo) -> Option<weft_render::FrameInfo> {
+    use weft_render::UpscaleMode;
+    r.upscale_now = None;
+    let mode = r.settings.dlss();
+    if mode == UpscaleMode::Off || r.game.is_none() || !r.post.can_upscale() {
+        return None;
+    }
+    // Each thing asked for that doesn't run here, said once.
+    let say = |what: &str, why: &str| {
+        static SAID: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+        let mut said = SAID.lock().unwrap();
+        if !said.iter().any(|s| s == what) {
+            log::warn!("{what} is off: {why}");
+            said.push(what.to_string());
+        }
+    };
+    if !r.upscaler.has(mode) {
+        say(
+            &format!("core:dlss {} ({})", mode as u32, mode.name()),
+            "the renderer has no upscaler for it (DLSS: the streamline build on Windows, with its files)",
+        );
+        return None;
+    }
+    let reconstruct = r.settings.dlss_rr() && {
+        if !r.upscaler.reconstruct {
+            say("core:dlss_rr", "the upscaler has no Ray Reconstruction here");
+        }
+        r.upscaler.reconstruct
+    };
+    let neural = r.settings.dlss5() && {
+        if !r.upscaler.neural {
+            say("core:dlss5", "DLSS 5 needs NVIDIA's neural rendering plugin, not in the public Streamline SDK");
+        }
+        r.upscaler.neural
+    };
+    // A model the upscaler doesn't list is its default.
+    let known = |id: u32, list: &[weft_render::UpscaleModel]| if list.iter().any(|m| m.id == id) { id } else { 0 };
+    let choice = UpscaleChoice {
+        mode,
+        reconstruct,
+        model: known(r.settings.dlss_model(mode), &r.upscaler.models),
+        rr_model: known(r.settings.dlss_rr_model(), &r.upscaler.rr_models),
+        neural,
+    };
+    let screen = (info.width, info.height);
+    let render = match r.upscale_size {
+        Some((m, rr, s, w)) if m == mode && rr == reconstruct && s == screen => w,
+        _ => {
+            let w = r.gpu.upscale_render_size(mode, reconstruct, screen);
+            log::info!(
+                "upscaler {}{}: world {}x{} for the screen's {}x{}",
+                mode.name(),
+                if reconstruct { " with ray reconstruction" } else { "" },
+                w.0,
+                w.1,
+                screen.0,
+                screen.1
+            );
+            r.upscale_size = Some((mode, reconstruct, screen, w));
+            w
+        }
+    };
+    // Logged when it changes (`upscale_now` is cleared each frame, so the last one is kept apart).
+    if r.upscale_logged != Some(choice) {
+        log::debug!("upscaler: {choice:?}");
+        r.upscale_logged = Some(choice);
+    }
+    r.upscale_now = Some(choice);
+    // DLSS's advice: 8 jitter points times the scale squared.
+    let ratio = (screen.0 as f32 / render.0.max(1) as f32).max(1.0);
+    crate::post::set_jitter_phases((8.0 * ratio * ratio).round() as u32);
+    Some(weft_render::FrameInfo { width: render.0, height: render.1, slot: info.slot })
 }
 
 fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
@@ -1015,6 +1192,19 @@ impl Running {
         let _ = self.window.set_cursor_position(middle);
     }
 
+    /// Starts a world after the loading screen has been drawn: starting builds every pipeline and
+    /// waits for the world, the frame thread busy all the while, and that frame stays on the
+    /// screen meanwhile instead of black or a frozen menu. Scripted runs start at once, as before.
+    fn begin_world(&mut self, meta: WorldMeta) {
+        if self.settings.read_only {
+            self.start_world(meta);
+            return;
+        }
+        self.screens.clear();
+        self.open(Box::new(screens::Loading));
+        self.pending_world = Some((meta, 0));
+    }
+
     fn start_world(&mut self, mut meta: WorldMeta) {
         log::info!("opening world '{}' (seed {})", meta.name, meta.seed);
         if meta.format != saves::SAVE_FORMAT {
@@ -1047,6 +1237,8 @@ impl Running {
                 None
             }
         };
+        // chiacraft, test only: `--import-mc` loads a Minecraft world into a new world first.
+        crate::chiacraft::mc_import::maybe_import(&mut meta, content());
         let storage = saves::Storage::open(meta.clone(), content());
         let server = server::spawn(
             ServerConfig {
@@ -1105,6 +1297,11 @@ impl Running {
                 self.hud.invalidate();
                 self.quads_dirty = true;
                 self.set_capture(true);
+                // The world's pipelines are built: kept now, as Android ends an app without the
+                // exit that saves them (a phone compiled the shader pack's for 38 s every start).
+                if cfg!(target_os = "android") {
+                    save_pipeline_cache(&*self.gpu);
+                }
             }
             Err(e) => {
                 log::error!("{e}");
@@ -1281,12 +1478,12 @@ impl Running {
                     let mut missing = meta.missing_mods(content());
                     missing.extend(modloader::for_world(&meta).1);
                     if missing.is_empty() {
-                        self.start_world(meta);
+                        self.begin_world(meta);
                     } else {
                         self.open(Box::new(saves::MissingMods { world: meta, missing }));
                     }
                 }
-                Request::StartWorldAnyway(meta) => self.start_world(meta),
+                Request::StartWorldAnyway(meta) => self.begin_world(meta),
                 Request::LeaveWorld => self.leave_world(),
                 Request::Host => {
                     match &self.game {
@@ -2075,7 +2272,7 @@ impl Running {
                         }
                         redraw = true;
                     }
-                    Kind::Progress { bind, value, .. } | Kind::Icons { bind, value, .. } => {
+                    Kind::Progress { bind, value, .. } | Kind::Icons { bind, value, .. } | Kind::BoundImage { bind, value, .. } => {
                         let v = bind(&ctx);
                         if (v - *value).abs() > 1e-4 {
                             *value = v;
@@ -2130,7 +2327,18 @@ fn text_condition(name: &str, client: Option<&Client>, debug: bool, dev: bool) -
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, el: &ActiveEventLoop) {
-        if self.run.is_some() {
+        if let Some(r) = &mut self.run {
+            // Android: back from the background, with a new surface for the same window.
+            if self.suspended {
+                self.suspended = false;
+                el.set_control_flow(ControlFlow::Poll);
+                if let Err(e) = r.gpu.surface_restored(&*r.window) {
+                    log::error!("{e}");
+                }
+                let size = r.window.inner_size();
+                r.gpu.resize(size.width, size.height);
+                r.rebuild_all();
+            }
             return;
         }
         match self.start(el) {
@@ -2140,6 +2348,26 @@ impl ApplicationHandler for App {
                 el.exit();
             }
         }
+    }
+
+    /// Android sends the app to the background: its surface goes. The world pauses, as when the
+    /// window loses the focus.
+    fn suspended(&mut self, el: &ActiveEventLoop) {
+        let Some(r) = &mut self.run else { return };
+        self.suspended = true;
+        el.set_control_flow(ControlFlow::Wait);
+        r.touch.release_all(&mut r.input);
+        r.input.release_all();
+        if r.game.is_some() && r.screens.is_empty() {
+            r.open(screens::engine("core:pause"));
+        }
+        r.set_capture(false);
+        if let Some(server) = r.game.as_ref().and_then(|g| g.server.as_ref()) {
+            server.save_now();
+        }
+        // Android ends a background app without the exit that saves it otherwise.
+        save_pipeline_cache(&*r.gpu);
+        r.gpu.surface_lost();
     }
 
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
@@ -2170,8 +2398,25 @@ impl ApplicationHandler for App {
                 }
                 r.set_capture(false);
             }
+            WindowEvent::Touch(t) if crate::touch::enabled() => {
+                let play = r.game.is_some() && r.screens.is_empty();
+                let (w, h) = r.gpu.surface_size();
+                let scale = r.gui_scale();
+                let hud = &r.hud;
+                let slot_at = |p: Vec2| hud.hotbar_slot_at(p);
+                let mut cx = crate::touch::Cx { input: &mut r.input, play, scale, size: Vec2::new(w as f32, h as f32), slot_at: &slot_at };
+                let at = Vec2::new(t.location.x as f32, t.location.y as f32);
+                if r.touch.event(t.phase, t.id, at, &mut cx) && !r.input.captured {
+                    r.set_capture(true);
+                }
+            }
             WindowEvent::KeyboardInput { event, .. } => {
-                if let PhysicalKey::Code(code) = event.physical_key {
+                // Android's back button is Escape: out of a screen, or to the pause screen.
+                // (winit has no physical key for it, only the logical BrowserBack.)
+                let back =
+                    cfg!(target_os = "android") && event.logical_key == winit::keyboard::Key::Named(winit::keyboard::NamedKey::BrowserBack);
+                let physical = if back { PhysicalKey::Code(KeyCode::Escape) } else { event.physical_key };
+                if let PhysicalKey::Code(code) = physical {
                     match event.state {
                         ElementState::Pressed if event.repeat => r.input.key_repeat(Key::Code(code)),
                         ElementState::Pressed => r.input.key_down(Key::Code(code)),
@@ -2212,6 +2457,7 @@ impl ApplicationHandler for App {
             WindowEvent::CursorMoved { position, .. } => {
                 r.input.cursor = Vec2::new(position.x as f32, position.y as f32);
             }
+            WindowEvent::RedrawRequested if self.suspended => {}
             WindowEvent::RedrawRequested => {
                 if frame(r, &self.opts) || r.quit {
                     r.leave_world_silent();
@@ -2224,12 +2470,25 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, _el: &ActiveEventLoop) {
-        if let Some(r) = &self.run {
+        #[cfg(target_os = "android")]
+        if ANDROID_DESTROYED.load(std::sync::atomic::Ordering::Relaxed) {
+            log::info!("android: the activity was destroyed, saving and ending");
+            if let Some(r) = &mut self.run {
+                r.leave_world_silent();
+                r.close_home();
+            }
+            _el.exit();
+            return;
+        }
+        if let Some(r) = &self.run
+            && !self.suspended
+        {
             r.window.request_redraw();
         }
     }
 
     fn exiting(&mut self, _el: &ActiveEventLoop) {
+        finish_screenshots();
         if let Some(mut r) = self.run.take() {
             r.gpu.wait_idle();
             r.leave_world_silent();
@@ -2251,6 +2510,14 @@ struct UiCallbacks {
 /// One frame. Returns true when the app should quit.
 fn frame(r: &mut Running, opts: &Options) -> bool {
     r.retired = None;
+    // The loading screen has been shown (two frames, so one was presented): now the slow start.
+    if let Some((meta, shown)) = r.pending_world.take() {
+        if shown >= 2 {
+            r.start_world(meta);
+        } else {
+            r.pending_world = Some((meta, shown + 1));
+        }
+    }
     // The fps cap: what is left of this frame's share of a second, slept away.
     let cap = r.settings.fps_cap();
     if cap > 0 {
@@ -2320,7 +2587,10 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     let Some(info) = r.gpu.begin_frame() else { return false };
     let t2 = Instant::now();
     r.prof[2] = t2.duration_since(t).as_secs_f32() * 1000.0;
-    let world = world_frame(r, &info);
+    let world = match upscale_frame(r, &info) {
+        Some(w) => w,
+        None => world_frame(r, &info),
+    };
     if (r.depth.1, r.depth.2) != (world.width, world.height) {
         log::info!(
             "world drawn at {}x{} of the window's {}x{} (render scale {:.2}, density {:.1})",
@@ -2555,6 +2825,22 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
         g.client.first_person_model = r.settings.first_person_model();
         g.client.entity_render.show_avatars = r.settings.show_avatars();
         g.client.render.occlusion.on = r.settings.occlusion_culling();
+        g.client.sky.soft_wanted = r.settings.soft_clouds();
+        r.post.use_low = r.settings.post_low();
+        r.post.use_taa = r.settings.aa();
+        r.post.taa_blend = r.settings.taa_blend();
+        // The path tracer's denoiser: ours, unless Ray Reconstruction denoises the frame.
+        r.post.denoiser.mode = r.settings.pt_denoiser();
+        (r.post.denoiser.phi_color, r.post.denoiser.steps) = r.settings.pt_dn_tuning();
+        r.post.denoiser.debug = r.settings.pt_dn_debug();
+        r.post.denoiser.reconstruct = r.upscale_now.is_some_and(|c| c.reconstruct);
+        crate::denoise::set_test(r.settings.pt_denoise_test());
+        r.post.bloom_levels = r.settings.bloom_levels();
+        // The mist volume with the HDR world only, until today's (LDR) look takes it on Ronald's
+        // word (its look was never shown to him there); `core:froxels` 0 turns it off there too.
+        g.client.sky.froxels_wanted = r.settings.froxels() && crate::post::hdr();
+        g.client.sky.froxels.cell = r.settings.froxel_cell();
+        g.client.sky.cloud_shadow_wanted = crate::post::hdr() && r.settings.cloud_shadows();
         let t = Instant::now();
         if world_input {
             g.client.update(&mut *r.gpu, &r.textures, &mut r.input, dt);
@@ -2864,7 +3150,7 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
     let mut labels: Vec<(f32, f32, &crate::ui::text::Msg, u32, f32, f32)> = Vec::new();
     if let Some(g) = &r.game {
         let cam = g.client.render_camera();
-        let view_proj = cam.proj(info.width as f32 / info.height.max(1) as f32) * cam.view();
+        let view_proj = cam.proj_plain(info.width as f32 / info.height.max(1) as f32) * cam.view();
         for (pos, text, color, size) in &g.client.gizmo_labels {
             let clip = view_proj * (*pos - cam.pos).as_vec3().extend(1.0);
             if clip.w < 0.1 || (*pos - cam.pos).length_squared() > 24.0 * 24.0 {
@@ -2886,14 +3172,23 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
         let mut o = crate::ui::Ui::new();
         o.text_unit = text_unit;
         for (x, y, text, color, size, wrap) in labels {
+            // A negative width: on the HUD's plate, wrapped to the width.
+            let plate = wrap < 0.0;
+            let wrap = wrap.abs();
             let mut spans = text.spans(&r.lang, Some(&r.input));
             if wrap > 0.0 {
                 for s in &mut spans {
                     s.align = crate::ui::text::align::CENTER;
                 }
             }
+            let at = crate::ui::Style::default().at(x, y, [0.5, 0.0]);
+            if plate {
+                o.open(crate::ui::Kind::Container { class: Some("hud_plate".into()) }, at.pad(4.0));
+            }
             let id = o.text(spans, "label");
-            o.nodes[id].style = crate::ui::Style::default().at(x, y, [0.5, 0.0]);
+            if !plate {
+                o.nodes[id].style = at;
+            }
             if wrap > 0.0 {
                 o.nodes[id].style.max_w = wrap;
             }
@@ -2905,8 +3200,23 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
                 t.color = Some(color);
                 t.scale = size;
             }
+            if plate {
+                o.close();
+            }
         }
         o.layout(Vec2::new(sw as f32 / scale, sh as f32 / scale), &r.ui.font);
+        let game = crate::content::try_content().map(|c| (c, &r.textures));
+        r.ui.append(&mut *r.gpu, &r.assets, &o, &r.look, scale, game, &mut |_, _, _, _, _, _| {});
+    }
+    // A touch screen's controls, over play (`touch`).
+    if crate::touch::enabled() && r.game.is_some() && r.screens.is_empty() && !hud_hidden() {
+        let size = Vec2::new(sw as f32 / scale, sh as f32 / scale);
+        let mut o = crate::ui::Ui::new();
+        o.text_unit = text_unit;
+        let (lang, input) = (&r.lang, &r.input);
+        r.touch
+            .draw(&mut o, size, scale, &|key| Msg::new(key, Vec::new()).spans(lang, Some(input)));
+        o.layout(size, &r.ui.font);
         let game = crate::content::try_content().map(|c| (c, &r.textures));
         r.ui.append(&mut *r.gpu, &r.assets, &o, &r.look, scale, game, &mut |_, _, _, _, _, _| {});
     }
@@ -2954,10 +3264,11 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     r.list.clear();
     if let Some(g) = &mut r.game {
         let worn = g.client.worn();
+        let worn_looks = g.client.worn_looks();
         let held = [g.client.shown_held(), g.client.off_held()];
         g.client
             .entity_render
-            .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
+            .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, &worn_looks, held);
         if g.client
             .entity_render
             .draw_icons(&mut *r.gpu, &mut r.list, info)
@@ -2968,11 +3279,21 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     if let Some(g) = r.game.as_mut().filter(|_| !r.screens.is_empty()) {
         if let Some(&([x, y, w, h], whose)) = r.previews.first() {
             let worn = g.client.worn();
+            let worn_looks = g.client.worn_looks();
             let look = r.input.cursor - Vec2::new(x, y);
-            let subject = (whose == 1)
-                .then(|| g.client.menu.as_ref().map(|m| m.owner))
-                .flatten()
-                .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind)));
+            // The menu's own entity, or a kind alone (no entity: its own texture, nothing painted).
+            let subject = match whose {
+                1 => g
+                    .client
+                    .menu
+                    .as_ref()
+                    .map(|m| m.owner)
+                    .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind))),
+                k if k >= 2 => Some((u64::MAX, (k - 2) as u32)),
+                _ => None,
+            };
+            // A kind alone: its skin loads with the others (none of it may be in the world).
+            g.client.entity_render.preview_kind = (whose >= 2).then(|| (whose - 2) as u32);
             let s = crate::diag::span("preview");
             let tex = g.client.entity_render.draw_preview(
                 &mut *r.gpu,
@@ -2981,6 +3302,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
                 [w.round() as u32, h.round() as u32],
                 look,
                 &worn,
+                &worn_looks,
                 subject,
             );
             drop(s);
@@ -2997,7 +3319,25 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     // Screen effects need the world in an image they can read, and so does a world drawn smaller
     // than the screen (`render_scale`), which their last pass scales up.
     let scaled = (world_info.width, world_info.height) != (info.width, info.height);
-    let post = (r.post.on() || scaled) && r.game.is_some();
+    // The HDR world always ends in the effects' last pass, which finishes the picture.
+    let upscaling = r.upscale_now.is_some();
+    crate::post::set_upscaling(upscaling);
+    crate::post::set_mip_bias(world_info.width, info.width);
+    let post = (r.post.on() || scaled || crate::post::hdr() || r.post.taa_on() || upscaling) && r.game.is_some();
+    // Gathered over frames (temporal anti-aliasing), the world is drawn a fraction of a pixel
+    // aside each frame, and its pass draws the motion image too (whenever the pipelines have it).
+    crate::post::next_jitter(post && (r.post.taa_on() || upscaling), world_info.width, world_info.height);
+    if !upscaling {
+        crate::post::set_jitter_phases(8);
+    }
+    let motion = r
+        .game
+        .is_some()
+        .then(|| {
+            r.post
+                .motion_target(&mut *r.gpu, world_info.width, world_info.height)
+        })
+        .flatten();
     let world_target = if post {
         Target::Texture(
             r.post
@@ -3014,12 +3354,20 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
         let s = crate::diag::span("particles");
         let cam = g.client.render_camera();
+        let wind = g.client.particle_wind();
         g.client
             .particles
-            .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
+            .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam, wind);
         drop(s);
         let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
+        // `core:rt_shadows` changed: the world shader composed again, tracing or not, before
+        // anything of this frame is drawn with it.
+        if g.client.rt_switch(&mut *r.gpu) {
+            g.client
+                .render
+                .reload_shaders(&mut *r.gpu, &r.textures, &r.assets);
+        }
         // The sun's light for shadow maps (packs that use them), which the world's scene samples.
         g.client.prepare_shadows(&mut *r.gpu);
         // A copy of the world for what is seen through it (`water_behind` packs, with post on).
@@ -3041,14 +3389,23 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     let mut world = std::mem::take(&mut r.world_list);
     world.clear();
     if let Some(g) = &mut r.game {
+        // Where this frame's gathering writes its count and motion, for the effects' sharpening.
+        g.client.taa_out = r.post.taa_out(world_info.width, world_info.height);
         let s = crate::diag::span("client render");
         g.client
             .render(&mut *r.gpu, &mut world, &mut r.list, world_info, &r.textures);
         drop(s);
+        // What the pack's look works out once a frame, before anything that reads it.
+        r.list.append(&mut g.client.sky.frame_look.passes);
+        // The soft clouds' shadow on the land, before the world that reads it.
+        r.list.append(&mut g.client.sky.cloud_shadow.passes);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
         let s = crate::diag::span("shadows");
         g.client
             .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+
+        // The mist's volume, which reads the shadow maps, before the world that reads it.
+        r.list.append(&mut g.client.sky.froxels.passes);
         drop(s);
         // The opaque world copied, then what is seen through it drawn over it, reading the copy.
         if g.client.behind[2] > 0.5 {
@@ -3058,16 +3415,34 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
                 r.post
                     .copy_behind(&mut *r.gpu, &mut world, world_info, scene, depth);
             }
-            world.push(Cmd::BeginPass { color: Some((world_target, None)), depth: Some((r.depth.0, None)) });
+            // Soft clouds traced against that copy, before the sky draws them (chiacraft).
+            world.append(&mut g.client.sky.soft.passes);
+            world.push(Cmd::BeginPass {
+                motion: motion.map(|m| (m, None)),
+                color: Some((world_target, None)),
+                depth: Some((r.depth.0, None)),
+            });
             world.append(&mut g.client.late_out);
+            // The "translucent" part ends here: the copy, the sky, clouds, water, particles and the
+            // hand (the client leaves this mark to the app when the world is copied).
+            world.push(Cmd::Mark);
         }
     }
     r.list.push(Cmd::Mark);
-    r.list
-        .push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
+    r.list.push(Cmd::BeginPass {
+        // A depth of -1: no surface wrote its own motion there (`taa.wgsl`).
+        motion: motion.map(|m| (m, Some([0.0, 0.0, -1.0, 0.0]))),
+        color: Some((world_target, Some(clear))),
+        depth: Some((r.depth.0, Some(0.0))),
+    });
     r.list.append(&mut world);
     r.world_list = world;
     r.list.push(Cmd::EndPass);
+    // Path traced lighting over the world's image (`core:path_traced`), before the effects read it.
+    if let (Some(g), Target::Texture(_)) = (&mut r.game, world_target) {
+        g.client
+            .path_trace(&mut *r.gpu, &mut r.list, info.slot, r.depth.0, world_target, (world_info.width, world_info.height));
+    }
     if let Some(g) = &mut r.game {
         g.client
             .render
@@ -3080,6 +3455,24 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
             .as_ref()
             .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
+        r.post.set_depth(r.depth.0);
+        // The backend's upscaler in the engine's anti-aliasing's place, with the camera the world
+        // was drawn with.
+        if let (Some(c), Some(cam)) = (r.upscale_now, r.game.as_ref().and_then(|g| g.client.frame_camera)) {
+            r.post.set_upscale(crate::post::UpscaleFrame {
+                mode: c.mode,
+                reconstruct: c.reconstruct || c.neural,
+                output: (info.width, info.height),
+                params: weft_render::UpscaleParams {
+                    intensity: r.settings.dlss5_intensity(),
+                    reconstruct: c.reconstruct as u32,
+                    model: c.model,
+                    rr_model: c.rr_model,
+                    neural: c.neural as u32,
+                    ..cam.upscale_params()
+                },
+            });
+        }
         let _s = crate::diag::span("effects");
         r.post
             .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth, scaled);
@@ -3088,7 +3481,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         r.list.push(Cmd::Mark);
         // The UI pipeline has no depth, so it cannot draw in a pass that has one.
         r.list
-            .push(Cmd::BeginPass { color: Some((Target::Surface, None)), depth: None });
+            .push(Cmd::BeginPass { motion: None, color: Some((Target::Surface, None)), depth: None });
     }
     let s = crate::diag::span("ui draw");
     r.ui.draw(&mut *r.gpu, &mut r.list, info, scale);
@@ -3153,25 +3546,47 @@ fn save_screenshot(r: &mut Running) {
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        match crate::assets::encode_png(&path, cap.width, cap.height, &cap.rgba) {
-            Ok(()) => {
-                log::info!("screenshot saved to {}", path.display());
-                if let Some(g) = r.game.as_mut().filter(|_| own) {
-                    let open = |p: &std::path::Path, label: &str| {
-                        Arg::Msg(Msg::template(&format!("{{link:open:{}}}{{lang:{label}}}{{/link}}", p.display())))
-                    };
-                    let folder = path.parent().unwrap_or(&path);
-                    g.client.chat_line(Msg::new(
-                        "chat.screenshot",
-                        vec![open(&path, "chat.screenshot.picture"), open(folder, "chat.screenshot.folder")],
-                    ));
-                }
+        // Encoded on a thread: a PNG at 3456 x 2234 took 0.4-0.6 s of the frame (perf review).
+        // The chat line can say where it goes now; quitting waits for it (`finish_screenshots`).
+        if let Some(g) = r.game.as_mut().filter(|_| own) {
+            let open = |p: &std::path::Path, label: &str| {
+                Arg::Msg(Msg::template(&format!("{{link:open:{}}}{{lang:{label}}}{{/link}}", p.display())))
+            };
+            let folder = path.parent().unwrap_or(&path);
+            g.client.chat_line(Msg::new(
+                "chat.screenshot",
+                vec![open(&path, "chat.screenshot.picture"), open(folder, "chat.screenshot.folder")],
+            ));
+        }
+        let rgba = match r.shot_image.take() {
+            Some(id) => {
+                api::store_image(id, cap.width, cap.height, cap.rgba.clone());
+                cap.rgba
             }
-            Err(e) => log::error!("screenshot: {e}"),
+            None => cap.rgba,
+        };
+        let (w, h) = (cap.width, cap.height);
+        let job = std::thread::Builder::new()
+            .name("screenshot".into())
+            .spawn(move || match crate::assets::encode_png(&path, w, h, &rgba) {
+                Ok(()) => log::info!("screenshot saved to {}", path.display()),
+                Err(e) => log::error!("screenshot: {e}"),
+            });
+        match job {
+            Ok(j) => SHOTS.lock().unwrap_or_else(|e| e.into_inner()).push(j),
+            Err(e) => log::error!("screenshot: no thread to save it: {e}"),
         }
-        if let Some(id) = r.shot_image.take() {
-            api::store_image(id, cap.width, cap.height, cap.rgba);
-        }
+    }
+}
+
+/// Screenshots still being encoded and written.
+static SHOTS: std::sync::Mutex<Vec<std::thread::JoinHandle<()>>> = std::sync::Mutex::new(Vec::new());
+
+/// Waits for the screenshots still being written (before the game quits).
+fn finish_screenshots() {
+    let jobs = std::mem::take(&mut *SHOTS.lock().unwrap_or_else(|e| e.into_inner()));
+    for j in jobs {
+        let _ = j.join();
     }
 }
 

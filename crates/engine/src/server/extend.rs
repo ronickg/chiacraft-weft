@@ -209,6 +209,18 @@ pub const BLOCK_REACH: u32 = 6;
 pub const ENTITY_REACH: u32 = 7;
 pub const MINING_SPEED: u32 = 8;
 pub const FOV: u32 = 9;
+pub const CLIMB_SPEED: u32 = 10;
+pub const GLIDE_SPEED: u32 = 11;
+pub const GLIDE_SINK: u32 = 12;
+pub const WIND_X: u32 = 13;
+pub const WIND_Z: u32 = 14;
+pub const LIFT: u32 = 15;
+pub const ROPE_LENGTH: u32 = 16;
+pub const ROPE_X: u32 = 17;
+pub const ROPE_Y: u32 = 18;
+pub const ROPE_Z: u32 = 19;
+pub const ROPE_REEL: u32 = 20;
+pub const KNOCKBACK_RESISTANCE: u32 = 21;
 
 impl Dim {
     fn base_attribute(&self, c: &Content, entity: u64, attr: u32) -> Option<f64> {

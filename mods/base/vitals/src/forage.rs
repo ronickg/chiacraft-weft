@@ -68,6 +68,7 @@ const ALL_YEAR: u8 = 15;
 const TURF: &[&str] = &[
     "base:plains",
     "base:forest",
+    "base:old_growth_forest",
     "base:birch_forest",
     "base:savanna",
     "base:swamp",
@@ -79,23 +80,26 @@ const TURF: &[&str] = &[
     "animals:crags",
 ];
 /// Where oaks grow (the plains' and swamp's few trees are oaks, the forest's mostly).
-const OAKS: &[&str] = &["base:forest", "base:plains", "base:swamp"];
+const OAKS: &[&str] = &["base:forest", "base:old_growth_forest", "base:plains", "base:swamp"];
 const MESQUITE: &[&str] = &["base:desert", "base:savanna"];
 const ARAUCARIAS: &[&str] = &["animals:scrubland", "animals:floodplain", "animals:fern_forest", "animals:crags"];
 const SCALE_CONIFERS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:crags"];
-const BIRCHES: &[&str] = &["base:forest", "base:birch_forest"];
+const BIRCHES: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest"];
 
 pub const SOURCES: [Source; 76] = [
-    s("base:tall_grass", None, Category::Grass, 10, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
+    // A tuft of tall grass feeds 2 (it fed 10): a grazer crops five tufts for what it used to eat
+    // of one, so herds crop their ground as real ones do, 25-50% of a biome's regrowth in its
+    // best season (`GRAZED`, Ronald 11-05: "Real levels, 25-50%"; with Animals' stocking).
+    s("base:tall_grass", None, Category::Grass, 2, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
     wild("base:berry_bush", 3, Category::Fruit, 8, Eaten::Age(1), wild::FORESTS),
     browse("base:oak_leaves", Category::Leaves, 4, OAKS, GREEN),
-    browse("base:birch_leaves", Category::Leaves, 4, &["base:forest", "base:birch_forest"], GREEN),
+    browse("base:birch_leaves", Category::Leaves, 4, BIRCHES, GREEN),
     // Evergreen: a winter's browse (and the tundra's few trees).
     browse(
         "base:spruce_leaves",
         Category::Leaves,
         4,
-        &["base:taiga", "base:snowy_plains", "base:mountains", "base:sequoia_grove"],
+        &["base:taiga", "base:snowy_plains", "base:mountains", "base:sequoia_grove", "base:old_growth_forest"],
         ALL_YEAR,
     ),
     browse("base:acacia_leaves", Category::Leaves, 4, &["base:savanna"], ALL_YEAR),
@@ -110,6 +114,7 @@ pub const SOURCES: [Source; 76] = [
         &[
             "base:plains",
             "base:forest",
+            "base:old_growth_forest",
             "base:birch_forest",
             "base:taiga",
             "base:savanna",
@@ -251,7 +256,7 @@ pub const SOURCES: [Source; 76] = [
 /// Food on the ground (`notes/ECOLOGY.md`, parts 5 and 8): items animals eat that aren't a
 /// player's food (`food::FOODS` has those, each with its kind and weight): grain and seeds, as
 /// they fall from a field or a hand. By name, kind and grams.
-pub const DROPPED: [(&str, Category, f32); 14] = [
+pub const DROPPED: [(&str, Category, f32); 15] = [
     // A handful of seed, and an ear's grain.
     ("base:wheat_seeds", Category::Seeds, 10.0),
     ("base:wheat", Category::Seeds, 50.0),
@@ -275,6 +280,9 @@ pub const DROPPED: [(&str, Category, f32); 14] = [
     ("base:matamata_fruit", Category::Seeds, 20.0),
     ("animals:araucaria_cone", Category::Seeds, 50.0),
     ("animals:ginkgo_seed", Category::Fruit, 10.0),
+    // What's left of a dead animal that gives no meat of its own (`animals_core::meat::CARCASS`):
+    // a scavenger's, half a kilogram a piece.
+    ("animals:carcass", Category::Carrion, 500.0),
 ];
 
 /// What a dropped item `name` is to animals: its kind of food and grams (a food's portion,
@@ -310,9 +318,11 @@ pub fn of(block: &str, age: Option<u8>, eats: impl Fn(Category) -> bool, season:
 /// `cretaceous.rs` read it): the grass that grazers eat and that grows back. A biome not listed
 /// gets the world's default (`GRASS_COVER_ELSE`) wherever its ground takes plants; frozen ground
 /// and sand take none (`grass_grows`).
-pub const GRASS_COVER: [(&str, f32); 13] = [
+pub const GRASS_COVER: [(&str, f32); 14] = [
     ("base:plains", 0.25),
     ("base:forest", 0.12),
+    // Under the closed canopy, grass only in the clearings and along the water.
+    ("base:old_growth_forest", 0.05),
     ("base:birch_forest", 0.12),
     ("base:taiga", 0.08),
     ("base:savanna", 0.35),
@@ -328,6 +338,11 @@ pub const GRASS_COVER: [(&str, f32); 13] = [
     ("animals:fern_forest", 0.03),
 ];
 pub const GRASS_COVER_ELSE: f32 = 0.05;
+
+/// The share of its grass's regrowth a biome's grazers eat in its best season, at least and at
+/// most (`animals_core::web` checks it): real grazing takes a quarter to a half (Ronald 11-05,
+/// "Real levels, 25-50%"). The dry season may go over, and that is the grass cropped down.
+pub const GRAZED: (f32, f32) = (0.25, 0.5);
 /// Where no tall grass grows at all: frozen ground, and sand (no plant soil).
 const NO_GRASS: [&str; 4] = ["base:snowy_plains", "base:desert", "base:beach", "base:ocean"];
 

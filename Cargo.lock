@@ -592,6 +592,7 @@ version = "26.11.2"
 dependencies = [
  "base_api",
  "crafting",
+ "progression",
  "vitals",
  "weft_sdk",
 ]
@@ -1337,10 +1338,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "chiacraft-android"
+version = "26.11.2"
+dependencies = [
+ "libc",
+ "log",
+ "weft_engine",
+ "weft_render",
+ "weft_vulkan",
+ "zip",
+]
+
+[[package]]
 name = "chiacraft-bridge"
 version = "26.11.2"
 dependencies = [
  "weft_abi",
+]
+
+[[package]]
+name = "chiacraft-mcimport"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "log",
+ "lz4_flex",
+ "rayon",
+ "ruzstd",
 ]
 
 [[package]]
@@ -1440,6 +1464,19 @@ dependencies = [
  "tokio-tungstenite",
  "windows-sys 0.61.2",
  "zeroize",
+]
+
+[[package]]
+name = "chiacraft_bots"
+version = "26.11.2"
+dependencies = [
+ "chiacraft-packages",
+ "glam 0.34.1",
+ "iroh",
+ "log",
+ "parking_lot 0.13.0",
+ "tokio",
+ "weft_engine",
 ]
 
 [[package]]
@@ -1857,6 +1894,9 @@ dependencies = [
 [[package]]
 name = "crafting"
 version = "0.1.0"
+dependencies = [
+ "vitals",
+]
 
 [[package]]
 name = "cranelift-assembler-x64"
@@ -5692,6 +5732,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "progression"
+version = "0.1.0"
+dependencies = [
+ "animals_core",
+ "crafting",
+ "vitals",
+]
+
+[[package]]
 name = "pulley-interpreter"
 version = "36.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6406,6 +6455,15 @@ name = "rustversion"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
+
+[[package]]
+name = "ruzstd"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7c1c839d570d835527c9a5e4db7cb2198683a988cb9d7293fc8674e6bd58fc8"
+dependencies = [
+ "twox-hash",
+]
 
 [[package]]
 name = "ryu"
@@ -8401,6 +8459,7 @@ dependencies = [
  "arboard",
  "bytemuck",
  "chiacraft-account",
+ "chiacraft-mcimport",
  "chiacraft-packages",
  "chiacraft-sponsor",
  "chiacraft-wallet",
@@ -8457,7 +8516,9 @@ version = "26.11.2"
 dependencies = [
  "ash",
  "ash-window",
+ "bytemuck",
  "gpu-allocator",
+ "libloading 0.9.0",
  "log",
  "naga",
  "raw-window-handle",

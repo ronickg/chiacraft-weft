@@ -551,11 +551,17 @@ mod tests {
     fn every_leaf_grows_within_leaf_reach_of_a_log() {
         use crate::tree_recipes::{SEQUOIA, YOUNG, understory};
         let under: Vec<Recipe> = RECIPES.iter().map(understory).collect();
+        // Each form a tree may take in the wild too (`tree_recipes::varied`).
+        let forms: Vec<Recipe> = RECIPES
+            .iter()
+            .flat_map(|r| crate::tree_recipes::Variant::ALL.map(|v| crate::tree_recipes::varied(r, v)))
+            .collect();
         for r in RECIPES
             .iter()
             .chain([&SEQUOIA])
             .chain(YOUNG.iter())
             .chain(under.iter())
+            .chain(forms.iter())
         {
             for seed in 0..20 {
                 let t = blocks(r, seed);

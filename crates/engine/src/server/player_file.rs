@@ -22,6 +22,7 @@ impl Server {
             identity: p.identity.clone(),
             did: p.did.clone(),
             did_days: p.did_days,
+            did_unchecked: p.did_unchecked,
             achievements: p.achievements.clone(),
         };
         if let crate::admission::Verdict::Refuse(why) = self.gate.verdict(&who, trusted) {
@@ -44,8 +45,14 @@ impl Server {
             .storage
             .as_ref()
             .and_then(|s| load_player(c, &s.lock(), &key));
-        let spawn = || (c.spawn_dim, self.dims[c.spawn_dim as usize].spawn_point(c));
-        let (mut dim, mut pos, health, inv, comps, look, selected, flying, fire) = match saved {
+        // chiacraft, test only: an imported Minecraft world says where players start
+        // (`chiacraft::mc_import::spawn`).
+        let imported = self
+            .storage
+            .as_ref()
+            .and_then(|s| crate::chiacraft::mc_import::spawn(c, &s.lock().meta.dir));
+        let spawn = || imported.unwrap_or_else(|| (c.spawn_dim, self.dims[c.spawn_dim as usize].spawn_point(c)));
+        let (mut dim, mut pos, health, inv, comps, mut look, selected, flying, fire) = match saved {
             // A dimension that is gone (its mod removed), or the void while a real one exists:
             // everything else is kept, the player starts at the spawn.
             Some(s) => {
@@ -69,10 +76,31 @@ impl Server {
             .as_ref()
             .map(|s| s.lock().meta.dir.clone())
             .and_then(|d| crate::travel::arrival(&d, &key));
-        if let Some(at) = arrived {
-            dim = c.spawn_dim;
-            pos = glam::DVec3::from_array(at);
-            log::info!("{name} arrives through a portal at {:.0} {:.0} {:.0}", pos.x, pos.y, pos.z);
+        if let Some(at) = &arrived {
+            // In the portal's own dimension (by name; the spawn's for spots kept before it was
+            // saved, or if that dimension is gone), facing away from the portal.
+            dim = match &at.dim {
+                Some(n) => c.dims.iter().position(|d| d.name == *n).map_or_else(
+                    || {
+                        log::warn!("{name}'s portal is in dimension {n}, which is not there now: placed in the spawn's");
+                        c.spawn_dim
+                    },
+                    |i| i as u32,
+                ),
+                None => c.spawn_dim,
+            };
+            pos = glam::DVec3::from_array(at.pos);
+            if let Some(yaw) = at.yaw {
+                look = [yaw, 0.0];
+            }
+            log::info!(
+                "{name} arrives through a portal at {:.0} {:.0} {:.0} in {}, facing {:.2}",
+                pos.x,
+                pos.y,
+                pos.z,
+                c.dims[dim as usize].name,
+                look[0]
+            );
         }
         let time = self.dims[dim as usize].day_time();
         let r = self.dims[dim as usize].ensure_region(c, pos);
@@ -137,6 +165,13 @@ impl Server {
                     "admission.probation_on",
                     vec![Arg::Int(left.div_ceil(60) as i64)],
                 ))));
+        }
+        // What came of their DID's check (chiacraft): checked, from the cache, not theirs, or
+        // couldn't be asked: never left unsaid.
+        if let Some(note) = self.players[pi].did_note.take() {
+            self.players[pi]
+                .conn
+                .send(ToClient::Show(crate::net::Shown::chat(note)));
         }
         let p = &mut self.players[pi];
         let line = Msg::new("multiplayer.joined", vec![Arg::Text(p.name.clone())]);

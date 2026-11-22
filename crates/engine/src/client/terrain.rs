@@ -51,6 +51,9 @@ pub struct Around {
     pub hidden: u32,
     /// Over a column whose ground came first: empty sky for now.
     pub sky: u32,
+    /// The server sent it (saved, or changed): its biomes are the column's, over any this
+    /// client made itself (chiacraft: an imported world's cubes, `chiacraft::mc_import`).
+    pub from_server: bool,
 }
 
 pub enum Out {
@@ -630,7 +633,7 @@ impl Terrain {
                 .as_ref()
                 .is_some_and(|g| g.1.load(Ordering::Relaxed));
         self.gpu_on = gpu;
-        let budget = if gpu { 65536 } else { crate::background().current_num_threads() * 64 };
+        let budget = if gpu { 65536 } else { crate::client_terrain().current_num_threads() * 64 };
         if self.vis_on {
             self.request_visible(budget);
             return;
@@ -828,12 +831,12 @@ impl Terrain {
                 send(Arc::new(Vec::new()));
             } else {
                 // Mods' features run their code: on a worker, not here.
-                crate::background().spawn(move || send(super::terrain_gpu::custom_heights(c, dim, seed, first.x, first.z, &custom)));
+                crate::client_terrain().spawn(move || send(super::terrain_gpu::custom_heights(c, dim, seed, first.x, first.z, &custom)));
             }
         }
         for pos in on_cpu {
             let (tx, edits) = (tx.clone(), edits.clone());
-            crate::background().spawn(move || {
+            crate::client_terrain().spawn(move || {
                 let mut cube = crate::server::dim::generate(c, dim, seed, pos);
                 crate::server::dim::prepare(c, dim, &edits, pos, &mut cube);
                 let _ = tx.send((epoch, pos, cube));
@@ -1010,8 +1013,9 @@ impl Terrain {
         Some(around)
     }
 
-    fn hand_over(&mut self, pos: IVec3, around: Around) {
+    fn hand_over(&mut self, pos: IVec3, mut around: Around) {
         self.held.remove(&pos);
+        around.from_server = self.server.contains(&pos);
         self.out
             .push(Out::Cube { pos, cube: self.cubes[&pos].clone(), around });
     }

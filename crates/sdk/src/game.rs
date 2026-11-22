@@ -314,9 +314,12 @@ impl World {
     }
     /// The value of `c` on any holder: an entity, a block's entity, a stack in a slot.
     pub fn component<T: Value>(&self, h: impl Into<Holder>, c: &Component<T>) -> Option<T> {
-        let mut buf = vec![0u8; size_of::<T>()];
-        let n = unsafe { (host().component_get)(self.raw(), &h.into(), c.id(), buf.as_mut_ptr(), buf.len() as u32) };
-        (n as usize == buf.len()).then(|| unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const T) })
+        // Read straight into the value: mob AI reads several a mob a tick, and a heap buffer each
+        // time was most of what they cost.
+        let mut out = std::mem::MaybeUninit::<T>::uninit();
+        let len = size_of::<T>();
+        let n = unsafe { (host().component_get)(self.raw(), &h.into(), c.id(), out.as_mut_ptr() as *mut u8, len as u32) };
+        (n as usize == len).then(|| unsafe { out.assume_init() })
     }
     /// Sets `c` on any holder. An entity has it only if its kind attaches it; a stack takes any.
     pub fn set_component<T: Value>(&self, h: impl Into<Holder>, c: &Component<T>, v: T) -> bool {
@@ -449,6 +452,18 @@ impl World {
     /// `BiomeAir`, and where the wind blows to (`heading`, degrees clockwise from north, -z).
     /// Biomes not named are clear and still. Players see it (`scene.weather` in shader packs) and
     /// mods read it back (`air_at`).
+    /// chiacraft: what happens in this dimension's sky now (`weft_abi::sky_event`) and how strongly
+    /// (0 to 1), until the next call. Call it every tick if you like: players hear only of a change.
+    pub fn set_sky_event(&self, kind: u32, strength: f32) {
+        unsafe { (host().set_sky_event)(self.raw(), kind, strength) }
+    }
+
+    /// chiacraft: something falls from the sky to land at `pos` in `seconds` (a meteorite, a big
+    /// impact): its streak heads there in the players' skies.
+    pub fn sky_landing(&self, pos: [f64; 3], seconds: f32) {
+        unsafe { (host().sky_landing)(self.raw(), &pos, seconds) }
+    }
+
     pub fn set_air(&self, air: &[crate::BiomeAir], heading: f32) {
         let biomes: Vec<u32> = air.iter().map(|a| a.biome).collect();
         let fog: Vec<f32> = air.iter().map(|a| a.fog).collect();

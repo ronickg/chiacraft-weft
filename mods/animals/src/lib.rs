@@ -22,14 +22,19 @@ use weft_sdk::*;
 
 declare_mod!(deps: ["base"], init: init);
 
+pub mod anim;
 mod animal;
 mod ankylosaur;
+mod armour;
 mod birds;
+mod borkon;
+mod boss;
 mod breath;
 mod breeding;
 mod caiman;
 mod capybara;
 mod cat;
+mod choose;
 mod citipati;
 mod coats;
 mod comfort;
@@ -38,6 +43,7 @@ mod coyote;
 mod cretaceous;
 mod deer;
 mod dog;
+mod drenkaun;
 mod drink;
 mod eagle;
 mod early_bird;
@@ -53,12 +59,16 @@ mod hare;
 mod hunt;
 mod iguanodont;
 mod jaguar;
+pub mod journal;
+mod journal_screen;
 mod knockout;
 mod kryptobaatar;
 mod lizard;
 mod meat;
+mod memory;
 mod mouse;
 mod owl;
+mod prof;
 mod protoceratops;
 mod psittacosaurus;
 mod raptor;
@@ -66,9 +76,11 @@ mod raven;
 mod reindeer;
 mod rest;
 mod riding;
+mod routines;
 mod sauropod;
 mod scars;
 mod screen;
+mod senses;
 mod signatures;
 mod small_bird;
 mod species;
@@ -103,6 +115,9 @@ fn data_dir() -> String {
 // ------------------------------------------------------------------ registration
 
 fn init(r: &mut Registry) {
+    // The goal timer first: its first row ("upkeep") is the one that logs.
+    prof::init(r);
+    armour::init(r);
     dog::init(r);
     for p in species::problems() {
         weft_sdk::error!("{p}");
@@ -129,6 +144,9 @@ fn init(r: &mut Registry) {
     citipati::init(r);
     early_bird::init(r);
     sauropod::init(r);
+    boss::init(r);
+    drenkaun::init(r);
+    borkon::init(r);
     kryptobaatar::init(r);
     lizard::init(r);
     reindeer::init(r);
@@ -143,12 +161,18 @@ fn init(r: &mut Registry) {
     wolf::init(r);
     jaguar::init(r);
     voices::init(r);
+    journal::init(r);
+    journal_screen::register(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
     forage::init(r);
     drink::init(r);
     hunt::init(r);
+    anim::init(r);
+    senses::init(r);
+    memory::init(r);
+    choose::init(r);
     screen::init(r);
     taming::init(r);
     commands::init(r);
@@ -163,7 +187,13 @@ fn init(r: &mut Registry) {
             .iter()
             .find(|h| h.0 == s.name)
             .map(|&(_, item, lo, hi)| Pool::new().items(item, lo, hi));
-        let pools: Vec<Pool> = hide.into_iter().chain(meat::pool(s.name)).collect();
+        // One that gives no meat leaves carcass pieces for the scavengers.
+        let carcass = animals_core::meat::carcass(s.name).map(|(lo, hi)| Pool::new().items(animals_core::meat::CARCASS, lo, hi));
+        let pools: Vec<Pool> = hide
+            .into_iter()
+            .chain(meat::pool(s.name))
+            .chain(carcass)
+            .collect();
         if !pools.is_empty() {
             pools
                 .into_iter()

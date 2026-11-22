@@ -1,0 +1,112 @@
+# The fault set for `names.py selftest`: appended to the real lexicon, each entry breaks one rule,
+# and selftest fails unless `check` reports every one (EXPECTED in names.py). It also swaps worn
+# rule 2 back to its first, unsplit form (which turned dau + aru into dawro), and points the lang
+# check at a folder with only en and ru (written by selftest).
+
+[name.f_unknown]
+kind = "ruin"
+people = "old"
+build = ["esk", "zor"]
+form = "Eskezor"
+gloss = "an unknown root and a z"
+
+[name.f_mismatch]
+kind = "ruin"
+people = "elvish"
+build = ["bor", "duk"]
+form = "Borduk"
+gloss = "a form its build doesn't give"
+
+[name.f_wen]
+kind = "person"
+people = "elvish"
+build = ["ema"]
+form = "Emawen"
+gloss = "a Tolkien ending"
+irregular = "test"
+
+[name.f_el]
+kind = "person"
+people = "elvish"
+build = ["ema"]
+form = "Elema"
+gloss = "El- on an elf"
+irregular = "test"
+
+[name.f_twin]
+kind = "boss"
+people = "worn"
+build = ["nu", "gom"]
+form = "Nogom"
+gloss = "Nogom again by another build"
+irregular = "test"
+
+[name.f_stormforge]
+kind = "rune"
+people = "old"
+build = ["kru"]
+form = "Kru"
+gloss = "bone, with a grand epithet, its lang key in en and ru"
+epithet = "the Stormforge"
+lang_key = "rune.test.kru"
+
+[name.f_half]
+kind = "relic"
+people = "old"
+build = ["tun"]
+form = "Tun"
+gloss = "a lang key in en only"
+lang_key = "rune.test.half"
+
+[name.f_wrong]
+kind = "spell"
+people = "old"
+build = ["kru"]
+form = "Kru"
+gloss = "ru shows the Latin name"
+lang_key = "rune.test.wrong"
+
+[name.f_nowhere]
+kind = "word"
+people = "old"
+build = ["ber"]
+form = "Ber"
+gloss = "a lang key in no file"
+lang_key = "word.base.ber"
+
+[name.f_dwarf]
+kind = "person"
+people = "dwarvish"
+build = ["brok"]
+form = "Brok"
+gloss = "a dwarf with no byname"
+
+[name.f_letter]
+kind = "word"
+people = "old"
+build = ["tem"]
+form = "Telm"
+gloss = "an l in Old Eskenai"
+irregular = "test"
+
+[name.f_rude]
+kind = "word"
+people = "old"
+build = ["has"]
+form = "Kakas"
+gloss = "a bad word"
+irregular = "test"
+
+[dwarvish_root.dwir]
+means = "an i and a w in a native root"
+
+[dwarvish_root.kan]
+means = "a loan its Old word doesn't give"
+loan = ["kaun"]
+
+[drift.f_broken]
+rules = [
+  { sca = "a/o", says = "too few parts" },
+  { sca = "p,t/b/_Q", says = "an unknown category" },
+  { sca = "p,t,k/b,d/_", says = "three targets, two replacements" },
+]

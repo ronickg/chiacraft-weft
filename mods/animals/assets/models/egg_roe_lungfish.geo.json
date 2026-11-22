@@ -1,0 +1,95 @@
+{
+ "format_version": "1.12.0",
+ "minecraft:geometry": [
+  {
+   "description": {
+    "identifier": "geometry.egg_roe_lungfish",
+    "texture_width": 64,
+    "texture_height": 32
+   },
+   "bones": [
+    {
+     "name": "body",
+     "pivot": [-0.0, 0.0, -0.0],
+     "cubes": []
+    },
+    {
+     "name": "egg0_0_tilt",
+     "parent": "body",
+     "pivot": [-0.9896, 0.0, -0.007],
+     "rotation": [0.0, 5.0, 0.0],
+     "cubes": [
+      {
+       "origin": [-2.2396, 0.0, -1.257],
+       "size": [2.5, 2.5, 2.5],
+       "uv": {
+        "south": {
+         "uv": [1.0, 1.0],
+         "uv_size": [5.0, 5.0]
+        },
+        "north": {
+         "uv": [8.0, 1.0],
+         "uv_size": [5.0, 5.0]
+        },
+        "west": {
+         "uv": [15.0, 1.0],
+         "uv_size": [5.0, 5.0]
+        },
+        "east": {
+         "uv": [22.0, 1.0],
+         "uv_size": [5.0, 5.0]
+        },
+        "down": {
+         "uv": [34.0, 1.0],
+         "uv_size": [-5.0, 5.0]
+        },
+        "up": {
+         "uv": [41.0, 6.0],
+         "uv_size": [-5.0, -5.0]
+        }
+       }
+      }
+     ]
+    },
+    {
+     "name": "egg1_0_tilt",
+     "parent": "body",
+     "pivot": [0.9537, 0.0135, 0.2642],
+     "rotation": [0.0, 22.0, 0.0],
+     "cubes": [
+      {
+       "origin": [-0.2963, 0.0135, -0.9858],
+       "size": [2.5, 2.5, 2.5],
+       "uv": {
+        "south": {
+         "uv": [43.0, 1.0],
+         "uv_size": [5.0, 5.0]
+        },
+        "north": {
+         "uv": [50.0, 1.0],
+         "uv_size": [5.0, 5.0]
+        },
+        "west": {
+         "uv": [57.0, 1.0],
+         "uv_size": [5.0, 5.0]
+        },
+        "east": {
+         "uv": [1.0, 8.0],
+         "uv_size": [5.0, 5.0]
+        },
+        "down": {
+         "uv": [13.0, 8.0],
+         "uv_size": [-5.0, 5.0]
+        },
+        "up": {
+         "uv": [20.0, 13.0],
+         "uv_size": [-5.0, -5.0]
+        }
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

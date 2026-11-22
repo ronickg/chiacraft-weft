@@ -417,7 +417,7 @@ pub struct Game {
     pub carried: Vec<u32>,
     /// `HEALTH`, `BURNING`, `WORN`, `SHAPE`, `HELD`, `OFF_HELD`, `USING`, `SWAPS`, `LOOPING_ACTION`,
     /// `EFFECT`, `FORCED_POSE`, `RIDING`, then chiacraft's `HELD_LOOK`.
-    pub field_comps: [u32; 13],
+    pub field_comps: [u32; 14],
     /// `SIMULATED`.
     pub simulated_comp: u32,
     /// Entity components with `SYNC_WATCHERS` / `SYNC_MENU`.
@@ -530,6 +530,14 @@ pub struct ParticleDef {
     pub rules: Vec<ParticleRule>,
     /// Seconds one may live at most, the kinds it turns into included.
     pub longest: f32,
+    /// How the wind carries it (`abi::ParticleDesc`): the rate it takes the air's speed, its sink
+    /// through still air, its flutter and the wind that lifts it once landed.
+    pub air: f32,
+    pub sink: f32,
+    pub flutter: f32,
+    pub lift: f32,
+    /// Seconds of its motion it is drawn stretched over (`abi::ParticleDesc::streak`).
+    pub streak: f32,
 }
 
 /// `abi::ParticleRule` with what it names as numbers.
@@ -1639,6 +1647,9 @@ pub const RIDING: &str = "core:riding";
 /// chiacraft: the look (`abi::comp::LOOK`, text) of a player's item in hand, empty for none:
 /// apart from `HELD`, which mods read as a `u32`.
 pub const HELD_LOOK: &str = "core:held_look";
+/// chiacraft: the worn looks (`abi::comp::WORN_LOOK`) of what a player wears, one a line in the
+/// order of `WORN`'s items, empty for an item's own texture.
+pub const WORN_LOOKS: &str = "core:worn_looks";
 /// Entity component (`u64`, saved): the world time a system last simulated it to, so it can
 /// catch up on what it missed (`Dim::run_systems`).
 pub const SIMULATED: &str = "core:simulated";
@@ -1751,7 +1762,8 @@ pub fn freeze(
     let mut interceptors: Vec<(ModId, String, Callback)> = Vec::new();
     let mut modifiers: Vec<(ModId, String, u32, Callback)> = Vec::new();
     let mut attributes: Vec<(String, f64, f64, f64)> = vec![
-        (abi::attribute::MAX_HEALTH.into(), 20.0, 1.0, 1024.0),
+        // Up to 100000 (chiacraft): later ages' bosses have thousands (`notes/ENGINE_CHANGES.md`).
+        (abi::attribute::MAX_HEALTH.into(), 20.0, 1.0, 100_000.0),
         (abi::attribute::MOVEMENT_SPEED.into(), 1.0, 0.0, 16.0),
         (abi::attribute::VISIBILITY.into(), 1.0, 0.0, 16.0),
         (abi::attribute::JUMP_STRENGTH.into(), 1.0, 0.0, 16.0),
@@ -1761,6 +1773,18 @@ pub fn freeze(
         (abi::attribute::ENTITY_REACH.into(), 3.0, 0.0, 1024.0),
         (abi::attribute::MINING_SPEED.into(), 1.0, 0.0, 1024.0),
         (abi::attribute::FOV.into(), 1.0, 0.05, 8.0),
+        (abi::attribute::CLIMB_SPEED.into(), 0.0, 0.0, 64.0),
+        (abi::attribute::GLIDE_SPEED.into(), 0.0, 0.0, 256.0),
+        (abi::attribute::GLIDE_SINK.into(), 0.0, -64.0, 64.0),
+        (abi::attribute::WIND_X.into(), 0.0, -256.0, 256.0),
+        (abi::attribute::WIND_Z.into(), 0.0, -256.0, 256.0),
+        (abi::attribute::LIFT.into(), 0.0, -64.0, 64.0),
+        (abi::attribute::ROPE_LENGTH.into(), 0.0, 0.0, 1024.0),
+        (abi::attribute::ROPE_X.into(), 0.0, -1.0e8, 1.0e8),
+        (abi::attribute::ROPE_Y.into(), 0.0, -1.0e8, 1.0e8),
+        (abi::attribute::ROPE_Z.into(), 0.0, -1.0e8, 1.0e8),
+        (abi::attribute::ROPE_REEL.into(), 0.0, 0.0, 64.0),
+        (abi::attribute::KNOCKBACK_RESISTANCE.into(), 0.0, 0.0, 1.0),
     ];
     let mut particles: Vec<RawParticle> = engine_particles();
     let mut sky: Vec<RawSky> = Vec::new();
@@ -2303,6 +2327,7 @@ pub fn freeze(
         (FORCED_POSE, 0, own | shown, Vec::new()),
         (RIDING, 0, own | shown | save, Vec::new()),
         (HELD_LOOK, 0, shown, Vec::new()),
+        (WORN_LOOKS, 0, shown, Vec::new()),
         (SIMULATED, 8, save, vec![0; 8]),
     ] {
         components.push(RawComponent {
@@ -2333,8 +2358,9 @@ pub fn freeze(
         .filter(|(_, d)| d.runtime && d.flags & weft_abi::component_flags::CARRIED != 0)
         .map(|(i, _)| i as u32)
         .collect();
-    g.field_comps = [HEALTH, BURNING, WORN, SHAPE, HELD, OFF_HELD, USING, SWAPS, LOOPING_ACTION, EFFECT, FORCED_POSE, RIDING, HELD_LOOK]
-        .map(|n| g.component_names[n]);
+    g.field_comps =
+        [HEALTH, BURNING, WORN, SHAPE, HELD, OFF_HELD, USING, SWAPS, LOOPING_ACTION, EFFECT, FORCED_POSE, RIDING, HELD_LOOK, WORN_LOOKS]
+            .map(|n| g.component_names[n]);
     g.simulated_comp = g.component_names[SIMULATED];
     let with_flag = |f: u32| {
         g.components
@@ -2920,6 +2946,11 @@ fn freeze_particles(g: &mut Game, raws: Vec<RawParticle>, errors: &mut Vec<Strin
             shader: p.shader,
             rules,
             longest: 0.0,
+            air: d.air.max(0.0),
+            sink: d.sink,
+            flutter: d.flutter.clamp(0.0, 1.0),
+            lift: d.lift.max(0.0),
+            streak: d.streak.max(0.0),
         });
     }
     let translucent = |k: &ParticleDef| k.flags & abi::particle_flags::TRANSLUCENT != 0;

@@ -79,6 +79,8 @@ pub struct StateInfo {
     pub hardness: f32,
     pub friction: f32,
     pub drag: f32,
+    /// How well a climber holds on to its sides (`abi::comp::GRIP`).
+    pub grip: f32,
     /// Has the `conductor` tag (part of energy networks).
     pub conductor: bool,
     /// Liquid id (`Content::liquids`) for liquid blocks.
@@ -601,7 +603,12 @@ impl DimensionDef {
     /// (with its fraction): a day of `daylight` turns of light maps its half to a quarter turn,
     /// the night the rest.
     fn daylight_clock(&self, from_noon: f64, days: f64) -> f64 {
-        if self.year_days == 0 || self.day_swing <= 0.0 || self.day_length == 0 {
+        if self.year_days == 0
+            || self.day_swing <= 0.0
+            || self.day_length == 0
+            || crate::app::api::mc_days()
+            || crate::app::api::bliss_sun()
+        {
             return from_noon;
         }
         let year = self.year_days as f64;
@@ -770,6 +777,7 @@ pub struct Ids {
     pub damage: Option<u32>,
     pub name: Option<u32>,
     pub look: Option<u32>,
+    pub worn_look: Option<u32>,
     pub conductor: Option<u32>,
     pub worn: Option<u32>,
     pub loot_rolls: Option<u32>,
@@ -2557,6 +2565,7 @@ fn number_blocks(mods: &[ModMeta], blocks: Vec<(ModId, RawBlock)>, textures: &mu
         hardness: -1.0,
         friction: 0.6,
         drag: 1.0,
+        grip: 1.0,
         conductor: false,
         liquid: None,
         support: None,
@@ -2674,6 +2683,7 @@ fn number_blocks(mods: &[ModMeta], blocks: Vec<(ModId, RawBlock)>, textures: &mu
                 hardness: 1.0,
                 friction: 0.6,
                 drag: 1.0,
+                grip: 1.0,
                 conductor: false,
                 liquid: None,
                 support: None,
@@ -2973,6 +2983,7 @@ fn declare_components(
         (crate::registry::FORCED_POSE, "bytes"),
         (crate::registry::RIDING, "bytes"),
         (crate::registry::HELD_LOOK, "bytes"),
+        (crate::registry::WORN_LOOKS, "bytes"),
         (crate::registry::SHAPE, "bytes"),
         (crate::registry::SIMULATED, "u64"),
     ] {
@@ -3193,6 +3204,7 @@ fn component_ids(components: &Components) -> Ids {
         damage: id(abi::comp::WEAR),
         name: id(abi::comp::NAME),
         look: id(abi::comp::LOOK),
+        worn_look: id(abi::comp::WORN_LOOK),
         conductor: id(abi::comp::CONDUCTOR),
         worn: id(abi::comp::WORN),
         loot_rolls: id(abi::comp::LOOT_ROLLS),
@@ -3227,6 +3239,7 @@ fn flatten_components(states: &mut [StateInfo], item_defs: &mut [ItemDef], compo
             .map(|t| (t as f64 * crate::world::TPS as f64, u32_of(st, abi::comp::GROW_LIGHT).unwrap_or(0)));
         s.friction = f32_of(st, abi::comp::FRICTION).unwrap_or(s.friction);
         s.drag = f32_of(st, abi::comp::DRAG).unwrap_or(s.drag);
+        s.grip = f32_of(st, abi::comp::GRIP).unwrap_or(s.grip);
         if let Some(l) = get(st, abi::comp::LIGHT) {
             s.light = [l[0], l[1], l[2]];
         }

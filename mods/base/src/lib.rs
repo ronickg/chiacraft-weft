@@ -5,6 +5,7 @@ mod advancements;
 mod beds;
 mod blocks;
 mod book;
+mod climbing;
 mod clothing;
 mod commands;
 mod cooking;
@@ -12,42 +13,63 @@ mod crafts;
 mod crops;
 mod death;
 mod discovery;
+mod dlss;
+mod events;
 mod fall;
 mod farming;
 mod felled;
 mod felling;
 mod firebed;
+mod fireflies;
 mod first;
+mod gems;
+mod glider;
+mod grapple;
 mod growth;
 mod hints;
 mod hud;
+mod impact;
 mod items;
 mod knapping;
 mod land;
 mod leaf_decay;
 mod levels;
+mod ley;
 mod look;
 mod machines;
+mod map;
+mod metals;
+mod meteors;
 mod mobs;
 mod parts;
+mod plants3d;
+mod plants3d_files;
 mod player;
 mod recipes;
 mod redstone;
 mod seasons;
 mod shaderpack;
+mod showcase;
+mod skills;
 mod snow;
 mod sounds;
+mod stars;
 mod survival;
 mod video;
+mod video_costs;
+mod waystones;
 mod weather;
 mod weather_sound;
+mod web;
 mod wild;
+mod wind_life;
+mod wind_life_colours;
 mod window;
 mod worldgen;
 
 use weft_sdk::*;
 
-pub use base_api::{CLOUDS, FLATLANDS, MOON, OVERWORLD, STARS, SUN, tabs};
+pub use base_api::{CLOUDS, FLATLANDS, MC_FOREST, MOON, OVERWORLD, STARS, SUN, tabs};
 
 declare_mod!(deps: [], init: init);
 
@@ -82,8 +104,8 @@ fn init(r: &mut Registry) {
         (&tabs::COLORED, &Item::named("red_stained_glass")),
         (&tabs::NATURAL, &Item::named("grass")),
         (&tabs::FUNCTIONAL, &Item::named("crafting_table")),
-        (&tabs::TOOLS, &Item::named("iron_pickaxe")),
-        (&tabs::COMBAT, &Item::named("iron_sword")),
+        (&tabs::TOOLS, &Item::named("pickaxe")),
+        (&tabs::COMBAT, &Item::named("sword")),
         (&tabs::FOOD, &Item::named("apple")),
         (&tabs::INGREDIENTS, &items::IRON_INGOT),
         (&tabs::REDSTONE, &Item::named("redstone")),
@@ -97,18 +119,29 @@ fn init(r: &mut Registry) {
     items::register(r);
     player::register(r);
     survival::register(r);
+    climbing::register(r);
+    glider::register(r);
+    grapple::register(r);
     levels::register(r);
+    skills::register(r);
+    web::register(r);
     machines::register(r);
     clothing::register(r);
     cooking::register(r);
     crafts::register(r);
     recipes::register(r);
+    showcase::register(r);
     book::register(r);
     discovery::register(r);
+    metals::register(r);
     parts::register(r);
+    gems::register(r);
     first::register(r);
     knapping::register(r);
     firebed::register(r);
+    events::register(r);
+    meteors::register(r);
+    stars::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);
@@ -118,6 +151,11 @@ fn init(r: &mut Registry) {
     seasons::register(r);
     growth::register(r);
     farming::register(r);
+    fireflies::register(r);
+    wind_life::register(r);
+    ley::register(r);
+    waystones::register(r);
+    map::register(r);
     felling::register(r);
     fall::register(r);
     leaf_decay::register(r);
@@ -126,18 +164,31 @@ fn init(r: &mut Registry) {
     death::register(r);
     beds::register(r);
     hud::register(r);
+    impact::register(r);
     redstone::register(r);
     look::register(r);
     shaderpack::register(r);
+    plants3d::register(r);
     shaderpack::register_for_scripts(r);
     shaderpack::register_shafts(r);
     video::register(r);
+    video_costs::register(r, video::measured_rows);
+    dlss::register(r);
     // Its terrain is described in `worldgen`.
     // A year of four 14-day seasons (notes/SURVIVAL.md): sixteen hours of daylight at midsummer,
     // eight at midwinter.
     r.dimension(&OVERWORLD)
         .player_spawn()
         // A fair first place: level plains, temperate, by water and woods (`base_api::land::spawn`).
+        .spawn_point(|seed| fair_spawn(seed).into())
+        .sky_above(16)
+        .day_length(24000)
+        .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)
+        .set(&base_api::SEASONS, base_api::calendars::FOUR)
+        .weathers(&[&weathers::RAIN, &weathers::THUNDER]);
+    // The Minecraft forest test world (`base_api::land::MC_MIX`): the overworld's land, sky, days
+    // and seasons, so a shot there at an hour and a day matches the overworld's.
+    r.dimension(&MC_FOREST)
         .spawn_point(|seed| fair_spawn(seed).into())
         .sky_above(16)
         .day_length(24000)
@@ -154,7 +205,7 @@ fn init(r: &mut Registry) {
         .fixed_time(6000)
         .gravity(20.0)
         .sky_color(0xb0c8ff, 0xe0e8ff);
-    for dim in [&OVERWORLD, &FLATLANDS] {
+    for dim in [&OVERWORLD, &MC_FOREST, &FLATLANDS] {
         r.sky_stars(dim, &STARS).count(1500);
         r.sky_clouds(dim, &CLOUDS).texture("clouds");
         r.sky_body(dim, &SUN)

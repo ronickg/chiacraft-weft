@@ -570,15 +570,68 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:view_distance", ck::INT, 12.0, 2.0, 64.0, 1.0),
         // Distant terrain beyond the view (`client::lod`), in cubes; 0 off.
         ConfigDef::number("core:lod_distance", ck::INT, 256.0, 0.0, 2048.0, 16.0),
+        // chiacraft: distant terrain's detail, tile widths a tile splits within (`lod::split_widths`):
+        // 4 as made, 12 Distant Horizons' cells.
+        ConfigDef::number("core:lod_detail", ck::INT, 4.0, 1.0, 16.0, 1.0),
+        // chiacraft: the far ground's look for shader packs (`Globals.extra.w`'s top byte), bits:
+        // 1 small plants thin out, 2 block-scale shading softens, 4 textures give way to their
+        // average colour, all with distance (Ronald, 11-06: all three).
+        ConfigDef::number("core:far_look", ck::INT, 7.0, 0.0, 255.0, 1.0),
         // The 3D world's share of the window's pixels each way (`app::world_frame`), the UI
         // always whole; 0 picks it by the screen (fewer on high-density ones).
         ConfigDef::number("core:render_scale", ck::FLOAT, 0.0, 0.0, 1.0, 0.05),
+        // How a world drawn smaller than the window (`core:render_scale`) is scaled up: 0 bilinear,
+        // 1 FSR 1's edge-adaptive upscale (`easu` in common.wgsl), 2 Snapdragon GSR 1 (`gsr`). Live.
+        ConfigDef::number("core:upscaler", ck::INT, 0.0, 0.0, 2.0, 1.0),
+        // The GPU, as the renderer found it (`Backend::device_*`), for mods to read: put at start,
+        // never saved by a player (the base game's first quality preset, Research round 19, 7).
+        ConfigDef::text("core:gpu_name", ""),
+        ConfigDef::number("core:gpu_class", ck::INT, 0.0, 0.0, 3.0, 1.0),
+        ConfigDef::number("core:gpu_memory_mb", ck::INT, 0.0, 0.0, 1.0e7, 1.0),
+        // 1 when the GPU can trace rays (`Backend::ray_query`): `core:rt_shadows` then works.
+        ConfigDef::number("core:gpu_ray_query", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // The renderer's upscaler (`Backend::upscaler`), put at start like the GPU's: its name, its
+        // modes and models as bits (`UpscalerInfo`), Ray Reconstruction, DLSS 5, frame generation.
+        ConfigDef::text("core:gpu_dlss", ""),
+        ConfigDef::number("core:gpu_dlss_modes", ck::INT, 0.0, 0.0, 1.0e9, 1.0),
+        ConfigDef::number("core:gpu_dlss_models", ck::INT, 0.0, 0.0, 4.3e9, 1.0),
+        ConfigDef::number("core:gpu_dlss_rr", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:gpu_dlss_rr_models", ck::INT, 0.0, 0.0, 4.3e9, 1.0),
+        ConfigDef::number("core:gpu_dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:gpu_frame_gen", ck::INT, 0.0, 0.0, 8.0, 1.0),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
         // Sun shadows, for shader packs that draw them: 0 off, 1 the near map only (80 blocks
         // about the player), 2 near and far (400). The maps' size in texels: 1024, 2048 or 4096.
         ConfigDef::number("core:shadows", ck::INT, 2.0, 0.0, 2.0, 1.0),
         ConfigDef::number("core:shadow_size", ck::INT, 2048.0, 1024.0, 4096.0, 1024.0),
+        // The far shadow map's reach to each side (blocks): 0 auto, 2000 with the HDR world (at no
+        // measurable cost, more far hills and crowns shadowed: Far view, 11-05) and 400 without
+        // (today's look as made); a number sets it (`client::prepare_shadows`).
+        ConfigDef::number("core:shadow_far", ck::INT, 0.0, 0.0, 2400.0, 100.0),
+        // Sun and moon shadows traced through the scene instead of the shadow maps, on a GPU with
+        // ray queries (Vulkan's; not the Mac or phones): ultra, off unless chosen.
+        // 2: their soft edges from more rays a pixel (with TAA; about three times the cost).
+        ConfigDef::number("core:rt_shadows", ck::INT, 0.0, 0.0, 2.0, 1.0),
+        // Reflections traced through the scene on smooth surfaces (water, glass, polished stone,
+        // metals: their LabPBR maps), in place of the screen's; same GPUs.
+        ConfigDef::number("core:rt_reflections", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // Path traced lighting over the traced scene (reports/Path tracing plan.md; M0: the sun and
+        // one bounce on the terrain, with a shader pack that has `pathtrace.wgsl`); its debug views
+        // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends).
+        ConfigDef::number("core:path_traced", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:pt_debug", ck::INT, 0.0, 0.0, 7.0, 1.0),
+        // How the path tracer's light is denoised (`denoise::Denoiser`) where Ray Reconstruction
+        // doesn't do it: 0 not at all (raw, for checks), 1 ours (SVGF-like), live.
+        ConfigDef::number("core:pt_denoiser", ck::INT, 1.0, 0.0, 1.0, 1.0),
+        // Its tuning (checks only, no menu row): how far light may differ between joined texels
+        // (standard deviations) and its à-trous steps, live.
+        ConfigDef::number("core:pt_dn_phi", ck::FLOAT, 1.0, 0.25, 16.0, 0.25),
+        ConfigDef::number("core:pt_dn_steps", ck::INT, 4.0, 1.0, 5.0, 1.0),
+        // Its debug views (checks only): 0 none, 1-6 (`denoise.wgsl` `dn_debug_view`).
+        ConfigDef::number("core:pt_dn_debug", ck::INT, 0.0, 0.0, 6.0, 1.0),
+        // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
+        ConfigDef::number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
         ConfigDef::number("core:chat_width", ck::INT, 320.0, 40.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_height", ck::INT, 180.0, 20.0, 1000.0, 10.0),
@@ -615,6 +668,11 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // chiacraft (phase 5): what listing a world locks, in mojos (0.0001 TXCH; the game spends
         // only on testnet11). Taken back by delisting.
         ConfigDef::number("core:listing_deposit", ck::INT, 100_000_000.0, 1.0, 1e15, 1.0),
+        // chiacraft (phase 5): a fee a listing may pay, in mojos, for a busy testnet11 to take it
+        // in sooner; the game spends only on testnet11. None by default: a wallet holding only
+        // a sponsor's small gift has no coin for the deposit and a fee of 0.00005 TXCH, and
+        // couldn't list at all (Tester 2, 11-05); with none a listing took 17 blocks (207 s).
+        ConfigDef::number("core:listing_fee", ck::INT, 0.0, 0.0, 1e12, 1.0),
         // Where others reach this game by address; forward it, TCP and UDP.
         ConfigDef::number("core:server_port", ck::INT, 27182.0, 1.0, 65535.0, 1.0),
         // A test setting, on no screen (Ronald, 11-04: "Yes, relay-only test"): every connection goes
@@ -643,6 +701,64 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:first_person_model", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:show_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:occlusion_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // Soft volumetric clouds traced at a quarter of the pixels and blended over frames, for a
+        // pack that draws them (chiacraft's); off, the pack's own (blocky) clouds. On by default
+        // (Tester 2 and the shader look sheets, 11-05: real cumulus where the blocky ones are flat
+        // slabs, at the same GPU time).
+        ConfigDef::number("core:soft_clouds", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // Screen effects' half-size parts (`post_low`); off, every effect at full size, as before.
+        ConfigDef::number("core:post_low", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // The world drawn in 16-bit float (linear light past 1) with the screen effects after it and
+        // the picture finished in one last pass (chiacraft, the HDR world); read at start.
+        ConfigDef::number("core:hdr_world", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // Anti-aliasing: 0 off, 1 temporal (`post::Post`: the world drawn a fraction of a pixel
+        // aside each frame and gathered over frames by where each pixel was, the motion image), 2
+        // temporal from the camera alone (no motion image: cheaper on phones' tiled GPUs; leaves and
+        // mobs left to the clipping). Read at start, as the world's pipelines then draw the motion
+        // image too (1). On by default (Ronald, 11-06: "Yes, on by default"): 1, and 2 on a phone,
+        // whose tiled GPU the motion image cost a third of its world pass.
+        ConfigDef::number("core:aa", ck::INT, if cfg!(target_os = "android") { 2.0 } else { 1.0 }, 0.0, 2.0, 1.0),
+        // chiacraft, test only (the Minecraft comparison): leaves drawn as Minecraft's fancy
+        // leaves, every face between two of them and their shade on what is beside them (AO),
+        // instead of a crown's outer shell (`client::mesher`). Read when cubes are meshed.
+        ConfigDef::number("core:mc_leaves", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // Temporal anti-aliasing: the least share of each new frame (0.1: about ten gathered;
+        // less, smoother and slower to follow), live.
+        ConfigDef::number("core:taa_blend", ck::FLOAT, 0.1, 0.03, 0.5, 0.01),
+        // DLSS, the renderer's temporal upscaler, in anti-aliasing's place (`weft_render::UpscaleMode`;
+        // not `core:upscaler`, the spatial filter under a render scale): 0 off, 1 DLAA, 2 Quality,
+        // 3 Balanced, 4 Performance, 5 Ultra Performance. Live; only where the renderer has it (the
+        // `streamline` build on Windows with NVIDIA's files; `core:gpu_dlss*` say what runs), else off.
+        ConfigDef::number("core:dlss", ck::INT, 0.0, 0.0, 5.0, 1.0),
+        // Its model for each mode (the upscaler's own numbers, `UpscalerInfo::models`; DLSS: 0
+        // NVIDIA's pick, 5-6 E-F the CNN models, 10-13 J-M the transformer ones), live. 13 (M, the
+        // newest transformer) by default (Ronald via Planner, 11-06: M clean where E dithered the
+        // leaves); an upscaler without it uses its own default.
+        ConfigDef::number("core:dlss_model_dlaa", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_quality", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_balanced", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_performance", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        ConfigDef::number("core:dlss_model_ultra_performance", ck::INT, 13.0, 0.0, 31.0, 1.0),
+        // Ray Reconstruction (denoising with the upscaling, at the mode's sizes) and its model
+        // (DLSS: 0 default, 4-6 D-F), live.
+        ConfigDef::number("core:dlss_rr", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:dlss_rr_model", ck::INT, 0.0, 0.0, 31.0, 1.0),
+        // DLSS 5's neural rendering over the upscaled picture (not public yet: never runs), live.
+        ConfigDef::number("core:dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // A stand-in upscaler that only scales the picture up, for checking the upscaler's path
+        // where the renderer has none (the Linux PC); read at start.
+        ConfigDef::number("core:upscale_standin", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // A check of the path tracer's denoiser on today's frame, before the path tracer exists
+        // (`denoise::test_on`; checks only, no menu row): today's picture as the albedo, a noisy light.
+        ConfigDef::number("core:pt_denoise_test", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // DLSS 5's strength (its intensity control), live.
+        ConfigDef::number("core:dlss5_intensity", ck::FLOAT, 0.5, 0.0, 1.0, 0.05),
+        // The HDR world's bloom (chiacraft): 0 none, 1 a pyramid of 4 levels, 2 of 6 (wider glow);
+        // live. Without the HDR world the pack's own bloom effect glows as before.
+        ConfigDef::number("core:bloom", ck::INT, 2.0, 0.0, 2.0, 1.0),
+        // The mist as a volume read by every surface (`client::froxels`); off, each walks it. 2 (ultra,
+        // not held to the Mac's budget): cells a quarter of the pixels each way instead of an eighth.
+        ConfigDef::number("core:froxels", ck::INT, 1.0, 0.0, 2.0, 1.0),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
     ];

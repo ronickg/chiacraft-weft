@@ -163,6 +163,11 @@ pub struct Rules {
     /// ... and only with a DID at least this many days old (0: any age). Implies a DID.
     #[serde(default)]
     pub did_min_days: u32,
+    /// When the chain can't be asked about a player's DID (no chain peer answered in time): let
+    /// them in as an unverified guest (true), or refuse until it can be checked (false, the
+    /// default). Only where the rules ask for a DID; elsewhere they come in without one either way.
+    #[serde(default)]
+    pub did_unchecked_guest: bool,
     /// Only players who earned this achievement in a world it trusts (phase 4).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub achievement: Option<AchievementRule>,
@@ -320,6 +325,9 @@ pub struct Who {
     pub did: Option<String>,
     /// That DID's age in days, as the chain says.
     pub did_days: Option<u32>,
+    /// The player claimed a DID (a proof that checks out) the chain couldn't be asked about: no
+    /// chain peer answered. `did` is `None` then: never counted as verified.
+    pub did_unchecked: bool,
     /// Achievements the player showed when the world asked (checked credentials): (id, issuer
     /// identity hex).
     pub achievements: Vec<(String, String)>,
@@ -380,7 +388,12 @@ pub fn verdict(rules: &Rules, bans: &Bans, lists: &[BanList], who: &Who, trusted
     if rules.only_listed {
         return Verdict::Refuse(Msg::new("admission.not_listed", Vec::new()));
     }
-    if rules.needs_did() && who.did.is_none() {
+    // A DID the chain couldn't be asked about: the world's rule says guest or not now.
+    let unchecked_guest = rules.needs_did() && who.did.is_none() && who.did_unchecked && rules.did_unchecked_guest;
+    if rules.needs_did() && who.did.is_none() && !unchecked_guest {
+        if who.did_unchecked {
+            return Verdict::Refuse(Msg::new("admission.did_unchecked", Vec::new()));
+        }
         let key = if rules.did_min_days > 0 { "admission.did_required_days" } else { "admission.did_required" };
         return Verdict::Refuse(Msg::new(key, vec![Arg::Int(rules.did_min_days as i64)]));
     }
@@ -393,7 +406,7 @@ pub fn verdict(rules: &Rules, bans: &Bans, lists: &[BanList], who: &Who, trusted
         let title = if r.title.contains('.') && !r.title.contains(' ') { Arg::Key(r.title.clone()) } else { Arg::Text(r.title.clone()) };
         return Verdict::Refuse(Msg::new("admission.achievement_required", vec![title]));
     }
-    if rules.did_min_days > 0 && who.did_days.unwrap_or(0) < rules.did_min_days {
+    if rules.did_min_days > 0 && !unchecked_guest && who.did_days.unwrap_or(0) < rules.did_min_days {
         return Verdict::Refuse(Msg::new(
             "admission.did_too_young",
             vec![Arg::Int(rules.did_min_days as i64), Arg::Int(who.did_days.unwrap_or(0) as i64)],
@@ -1071,5 +1084,25 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("chiacraft-admission-account-{}", std::process::id()));
         chiacraft_account::use_file_store();
         chiacraft_account::open(&dir).expect("a test account");
+    }
+
+    #[test]
+    fn a_did_the_chain_could_not_check_follows_the_rule() {
+        let unchecked = Who { key: "k1".into(), did_unchecked: true, ..Default::default() };
+        // A world that asks for no DID lets them in either way.
+        assert_eq!(verdict(&Rules::default(), &Bans::default(), &[], &unchecked, false, 0), Verdict::Admit);
+        // One that does refuses until it can check, saying so...
+        let mut rules = Rules { did_required: true, did_min_days: 30, ..Default::default() };
+        match verdict(&rules, &Bans::default(), &[], &unchecked, false, 0) {
+            Verdict::Refuse(m) => assert_eq!(m.key, "admission.did_unchecked"),
+            v => panic!("{v:?}"),
+        }
+        // ... or lets them in as a guest, never as verified.
+        rules.did_unchecked_guest = true;
+        assert_eq!(verdict(&rules, &Bans::default(), &[], &unchecked, false, 0), Verdict::Admit);
+        assert!(unchecked.did.is_none());
+        // A DID the chain said isn't theirs is refused whatever the guest rule.
+        let not_held = Who { key: "k2".into(), ..Default::default() };
+        assert!(matches!(verdict(&rules, &Bans::default(), &[], &not_held, false, 0), Verdict::Refuse(_)));
     }
 }

@@ -11,6 +11,10 @@ pub static GRASS: Block = Block::named("grass");
 pub static SNOWY_GRASS: Block = Block::named("snowy_grass");
 pub static SAND: Block = Block::named("sand");
 pub static GRAVEL: Block = Block::named("gravel");
+/// A live impact crater's melt lining its bowl, and the broken rock (impact breccia) of its rim
+/// (`impact.rs`; Art's, Research round 17).
+pub static IMPACT_GLASS: Block = Block::named("impact_glass");
+pub static SUEVITE: Block = Block::named("suevite");
 pub static CLAY: Block = Block::named("clay");
 pub static SANDSTONE: Block = Block::named("sandstone");
 // The rock faces' stones (`land.rs`): granite on warm mountains, slate in the cold, limestone on
@@ -60,6 +64,7 @@ pub static WATER: Block = Block::named("water");
 pub static LAVA: Block = Block::named("lava");
 pub static TALL_GRASS: Block = Block::named("tall_grass");
 pub static GRAZED_GRASS: Block = Block::named("grazed_grass");
+pub static DUNG_PAT: Block = Block::named("dung_pat");
 pub static DANDELION: Block = Block::named("dandelion");
 pub static ROSE: Block = Block::named("rose");
 pub static SAPLING: Block = Block::named("sapling");
@@ -193,7 +198,11 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
 /// The tropical forest's canopy, 28-32 blocks up, three of Manaus's commonest trees, each in its
 /// own colours (`vitals::wild::OWN_COLOURS`): andiroba's dark glossy crown, matamatá's olive one
 /// (the commonest tree there), ipê's light green that turns all golden yellow in its spring bloom.
-const WOODS: [(&str, Option<&str>, &str); 9] = [
+/// The wild cherry (Prunus avium) of the old-growth and temperate forests, in groves, pink with
+/// blossom in spring (the blossom in its own colours over its young leaves, tinted), green in
+/// summer and russet in autumn as the forest's tint and season make it, its cherries a summer
+/// fruit.
+const WOODS: [(&str, Option<&str>, &str); 10] = [
     ("mesquite", Some("flat_tree"), "mesquite_pod"),
     ("acuri_palm", Some("palm_tree"), "acuri_nut"),
     ("moriche_palm", Some("palm_tree"), "moriche_fruit"),
@@ -203,6 +212,7 @@ const WOODS: [(&str, Option<&str>, &str); 9] = [
     ("andiroba", None, "andiroba_seed"),
     ("matamata", None, "matamata_fruit"),
     ("ipe", None, "ipe_seed"),
+    ("cherry", None, "cherry"),
 ];
 
 /// The sapling a tree's fruit plants (`WOODS`), for fruit that's a food (`items.rs` registers
@@ -420,6 +430,26 @@ pub fn made_leaves(state: u32) -> u32 {
         .map_or(state, |&(_, open)| open)
 }
 
+/// The state far crowns of `state` leaves are drawn in at day time `time` (distant terrain's
+/// `far_leaves`): its crowns come from trees made once, in flower (`made_leaves`), so out of the
+/// bloomer's seasons the bloom is taken off (the dense-forest session, 11-05: far wild cherries
+/// stayed pink all year).
+pub fn far_leaves(time: u64, state: u32) -> u32 {
+    static OPEN: std::sync::OnceLock<Vec<(u32, u32, u8)>> = std::sync::OnceLock::new();
+    let open = OPEN.get_or_init(|| {
+        vitals::wild::BLOOMS
+            .iter()
+            .filter_map(|&(name, seasons)| {
+                let id = Block::lookup(name)?;
+                Some((state_with(id, "bloom", "1")?, id, seasons))
+            })
+            .collect()
+    });
+    let Some(&(_, shut, seasons)) = open.iter().find(|o| o.0 == state) else { return state };
+    let season = vitals::calendar::date(time).season.index() as usize;
+    if vitals::wild::in_bloom(seasons, Some(season)) { state } else { shut }
+}
+
 /// A tree's leaves: they decay once no log is near (`leaf_decay`), unless a player placed them
 /// (`placed`, set as they are placed). The shrubs' leaves have no logs and keep.
 fn tree_leaves(b: BlockBuilder<'_>) -> BlockBuilder<'_> {
@@ -444,6 +474,12 @@ fn plant(r: &mut Registry, handle: &'static Block, tex: &str) {
 
 /// Sand and gravel: with nothing under them they fall as an entity and land as a block.
 pub fn register(r: &mut Registry) {
+    // First: soil is any dirt. The engine sets a tag by tag in the order the calls come, reading
+    // the tag as it is then, so `plant_soil` must hold the dirt before `tall_grass_soil` and
+    // `big_leaf_soil` read it below. When it came after, double tall grass, bananas and
+    // philodendrons on grass had no soil and broke at the first block update beside them (the
+    // plant fibre round the grazing herds, 11-05).
+    r.tag("plant_soil", &["#dirt"]);
     // The leaves' tint kinds besides foliage (`base_api::trees`), as green as foliage by default.
     r.tint_kind(&base_api::trees::EVERGREEN, vitals::foliage::muted(vitals::foliage::LEAVES));
     r.tint_kind(&base_api::trees::YELLOW_LEAVES, vitals::foliage::muted(vitals::foliage::LEAVES));
@@ -528,6 +564,17 @@ pub fn register(r: &mut Registry) {
         .hardness(0.6)
         .mineable("shovel")
         .falling()
+        .tab(&crate::tabs::NATURAL);
+    r.block(&IMPACT_GLASS)
+        .sound_group("glass")
+        .hardness(1.5)
+        .mineable("pickaxe")
+        .tab(&crate::tabs::NATURAL);
+    r.block(&SUEVITE)
+        .sound_group("stone")
+        .hardness(1.2)
+        .mineable("pickaxe")
+        .tag("rocks")
         .tab(&crate::tabs::NATURAL);
     r.block(&CLAY)
         .sound_group("gravel")
@@ -656,11 +703,12 @@ pub fn register(r: &mut Registry) {
         .tag("ores")
         .tag("ores/iron")
         .tab(&crate::tabs::NATURAL);
+    // Gold is the Bronze Age's (cast, soft; Ronald, 11-07: "move them to fit"): a stone pickaxe.
     r.block(&GOLD_ORE)
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool_level(tool_tier::IRON)
+        .needs_tool_level(tool_tier::STONE)
         .drops("raw_gold", 1)
         .tag("ores")
         .tag("ores/gold")
@@ -671,7 +719,7 @@ pub fn register(r: &mut Registry) {
         (&BANDED_CLAY_COAL_ORE, "banded_clay_coal_ore", "coal", 0, "coal"),
         (&RED_SANDSTONE_IRON_ORE, "red_sandstone_iron_ore", "raw_iron", tool_tier::STONE, "iron"),
         (&GRANITE_IRON_ORE, "granite_iron_ore", "raw_iron", tool_tier::STONE, "iron"),
-        (&GRANITE_GOLD_ORE, "granite_gold_ore", "raw_gold", tool_tier::IRON, "gold"),
+        (&GRANITE_GOLD_ORE, "granite_gold_ore", "raw_gold", tool_tier::STONE, "gold"),
     ] {
         r.block(block)
             .sound_group("stone")
@@ -684,11 +732,13 @@ pub fn register(r: &mut Registry) {
             .tag(&format!("ores/{kind}"))
             .tab(&crate::tabs::NATURAL);
     }
+    // Diamond is a tier above steel (`notes/CRAFTING.md`): a steel pick or better (300; star
+    // steel's 350, diamond's own 400).
     r.block(&DIAMOND_ORE)
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool_level(tool_tier::IRON)
+        .needs_tool_level(tool_tier::DIAMOND)
         .drops("diamond", 1)
         .tag("ores")
         .tag("ores/diamond")
@@ -707,6 +757,10 @@ pub fn register(r: &mut Registry) {
     leaves(r, &ACACIA_LEAVES, "leaves_acacia", "sapling", None);
     woods(r);
     grove(r);
+    // The broadleaf trees' thin wood as branch blocks (Ronald, 11-05: "All broadleaf trees").
+    for wood in base_api::trees::BRANCH_WOODS {
+        branch(r, wood);
+    }
     // Lianas: woody climbers hanging from the tropical forest's crowns, a rope one can climb;
     // cut, their stems are cordage now and then (`vitals::clothing`).
     r.block(&LIANA)
@@ -738,8 +792,12 @@ pub fn register(r: &mut Registry) {
     // Vanilla numbers: water steps every 5 ticks and reaches 7 blocks, lava every 30 and 3.
     // Players swim in water; what they wear may add more (`SWIMS_IN` on an item).
     r.set_text_on(Target::Entity("core:player"), &SWIMS_IN, "#water");
+    // A light level lost per block of water, as vanilla's (and Distant Horizons' far floors): at the
+    // engine's two, a lake's bed ten blocks down was black and its water a flat blue over nothing,
+    // where vanilla's shows its sand at sky light five (Far view, stage 1, 11-06).
     r.liquid(&WATER)
         .tint(&tints::WATER)
+        .light_opacity(1)
         .translucent()
         .renewable(2)
         .fog(0x050533, 96.0)
@@ -773,7 +831,11 @@ pub fn register(r: &mut Registry) {
         .tint(&tints::GRASS)
         .no_item();
     r.loot(&TALL_GRASS)
-        .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
+        .pool(
+            Pool::new()
+                .when(Cond::Chance(vitals::crops::WHEAT_SEED_CHANCE))
+                .item("wheat_seeds"),
+        )
         // Fibre for string and linen (`clothing.rs`).
         .pool(
             Pool::new()
@@ -790,10 +852,41 @@ pub fn register(r: &mut Registry) {
         .no_item()
         .grows(crate::growth::step_secs("base:grazed_grass", 1, 600.0), 9)
         .on_grow(|e| {
-            crate::growth::grow(e, "base:grazed_grass", false, |e| {
-                e.world().set_block(e.pos(), TALL_GRASS.id());
-            })
+            // Beside a dung pat it grows back `PAT_GROWTH` times as fast: as many tries a step.
+            let tries = if pat_near(&e.world(), e.pos().to_array()) { vitals::soil::PAT_GROWTH } else { 1 };
+            for _ in 0..tries {
+                match base_api::grow::step(e, "base:grazed_grass", false) {
+                    base_api::grow::Step::Grow => {
+                        e.world().set_block(e.pos(), TALL_GRASS.id());
+                        return;
+                    }
+                    base_api::grow::Step::Frost => return,
+                    base_api::grow::Step::Rest => {}
+                }
+            }
         });
+    // A grazer's dung pat (`vitals::soil`, `mods/animals/src/forage.rs`): it rots by warmth and
+    // rain into a tuft of fresh grass; broken, it gives the dung.
+    r.block(&DUNG_PAT)
+        .sound_group("mud")
+        .textures("dung_pat_top", "dung_pat_side", "dung_pat_top")
+        // A plant first: `.plant()` makes the model a cross, so the pat's box comes after it.
+        .plant()
+        .model_box([2.0, 0.0, 2.0], [14.0, 1.5, 14.0])
+        // Its top's corners are clear (Art's tile), so the grass shows round the pat.
+        .cutout()
+        .needs_below("#plant_soil")
+        .no_item()
+        .grows(crate::growth::step_secs("base:dung_pat", 1, 1200.0), 0)
+        .on_grow(|e| {
+            // Rotted, or broken up at last (`vitals::soil::PAT_MOST_DAYS`): a tuft of fresh grass.
+            let rots = matches!(base_api::grow::step(e, "base:dung_pat", false), base_api::grow::Step::Grow)
+                || ((e.world().random() >> 11) as f32 / (1u64 << 53) as f32) < vitals::soil::pat_break_chance();
+            if rots {
+                e.world().set_block(e.pos(), TALL_GRASS.id());
+            }
+        });
+    r.loot(&DUNG_PAT).pool(Pool::new().item("dung"));
     plant(r, &DANDELION, "flower_dandelion");
     plant(r, &ROSE, "flower_rose");
     // A wild rose gives itself and, a time in four, its hips.
@@ -966,7 +1059,7 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .hardness(3.0)
         .mineable("pickaxe")
-        .needs_tool_level(tool_tier::IRON)
+        .needs_tool_level(tool_tier::STONE)
         .tag("ore_blocks/gold")
         .tab(&crate::tabs::BUILDING);
     r.block(&DIAMOND_BLOCK)
@@ -1066,7 +1159,11 @@ pub fn register(r: &mut Registry) {
         }
     }
     r.loot(&TALL_GRASS_DOUBLE)
-        .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
+        .pool(
+            Pool::new()
+                .when(Cond::Chance(vitals::crops::WHEAT_SEED_CHANCE))
+                .item("wheat_seeds"),
+        )
         .pool(
             Pool::new()
                 .when(Cond::Chance(vitals::clothing::FIBRE_CHANCE))
@@ -1147,7 +1244,7 @@ pub fn register(r: &mut Registry) {
 
     // What may grow or stand where, from the common `dirt` and `sand` tags like modern vanilla:
     // a mod's sand tagged `sand` gets cactus and sugar cane, in the world and from players.
-    r.tag("plant_soil", &["#dirt"]);
+    // (`plant_soil` from `#dirt` is set at the top of `register`.)
     r.tag("sugar_cane", &["sugar_cane"]);
     r.tag("hay_bale", &["hay_bale"]);
     r.tag("dyes/red", &["rose"]);
@@ -1184,4 +1281,98 @@ fn grow_column(e: &mut BlockEvent, me: &'static Block) {
     if height < 3 {
         w.set_block(above, me.id());
     }
+}
+
+/// A thin branch of `wood` (the branch-block study, `base_api::trees::TREE_BRANCH`): a post 4 or 8
+/// px thick in the block's middle with an arm to each side it joins (`n` `s` `e` `w` `u` `d`, set by
+/// worldgen), in the log's bark cropped to the box, as Dynamic Trees draws its branches. Collides
+/// as its boxes; an axe takes it; a stick for it.
+/// The woods Art has drawn young bark for (`branch_<wood>`, `_across`, `_end`; all nine, Ronald:
+/// "Approve all"); another wood wears its log's until then.
+const BRANCH_BARK: &[&str] = &["oak", "birch", "acacia", "mesquite", "dogwood", "cherry", "ipe", "andiroba", "matamata", "brazil_nut"];
+
+/// A thin branch of `wood` (`base:<wood>_branch`, named on its log as `TREE_BRANCH`): a post 4 or 8
+/// px thick in the block's middle with an arm to each side it joins (`n` `s` `e` `w` `u` `d`, set by
+/// worldgen), in Art's young bark (`branch_<wood>`: grain up; `_across`: along a level arm; `_end`:
+/// its rings), the log's own until Art has drawn it. Faces an arm covers aren't drawn. Collides as
+/// its boxes; an axe takes it; a stick for it, as Dynamic Trees gives sticks for thin wood.
+fn branch(r: &mut Registry, wood: &str) {
+    let name = format!("{wood}_branch");
+    let art = BRANCH_BARK.contains(&wood);
+    let bark = if art { format!("branch_{wood}") } else { format!("log_{wood}") };
+    let across = if art { format!("branch_{wood}_across") } else { bark.clone() };
+    let end = if art { format!("branch_{wood}_end") } else { format!("log_{wood}_top") };
+    r.set_text_on(Target::Name(&format!("base:{wood}_log")), &crate::worldgen::TREE_BRANCH, &format!("base:{name}"));
+    let sides = ["n", "s", "e", "w", "u", "d"];
+    let mut b = r
+        .block(Block::generated(name))
+        .sound_group("wood")
+        .hardness(0.8)
+        .mineable("axe")
+        .tag("logs")
+        .tag("branches")
+        .tag(&format!("logs/{wood}"))
+        .set(&FLAMMABLE, 5)
+        .set(&FUEL, 100)
+        .prop("size", ["4", "8"]);
+    for side in sides {
+        b = b.prop(side, ["0", "1"]);
+    }
+    b.states(move |p, s| {
+        let h = if p.get("size") == "4" { 2.0 } else { 4.0 };
+        let (lo, hi) = (8.0 - h, 8.0 + h);
+        let on = |side: &str| p.get(side) == "1";
+        // A box's faces in -X, +X, -Y, +Y, -Z, +Z order, the bark cropped to the box's own extent,
+        // its grain along the box (`along`: 0 x, 1 y, 2 z), the rings across it; `hide` the faces
+        // an arm or the post covers (they'd only add to what the GPU draws: the bench's +8%).
+        let faces = |a: [f32; 3], c: [f32; 3], along: usize, hide: [bool; 6]| -> [(&str, [f32; 4]); 6] {
+            let zy = [a[2], 16.0 - c[1], c[2], 16.0 - a[1]];
+            let xz = [a[0], a[2], c[0], c[2]];
+            let xy = [a[0], 16.0 - c[1], c[0], 16.0 - a[1]];
+            let (x, y, z): (&str, &str, &str) = match along {
+                0 => (&end, &across, &across),
+                2 => (&across, &bark, &end),
+                _ => (&bark, &end, &bark),
+            };
+            let f = [(x, zy), (x, zy), (y, xz), (y, xz), (z, xy), (z, xy)];
+            std::array::from_fn(|i| if hide[i] { (f[i].0, abi::UV_NO_FACE) } else { f[i] })
+        };
+        let along = if on("u") || on("d") || !(on("e") || on("w") || on("n") || on("s")) {
+            1
+        } else if on("e") || on("w") {
+            0
+        } else {
+            2
+        };
+        // The post: no face where an arm leaves it (the arm's end covers it exactly).
+        let core = [on("w"), on("e"), on("d"), on("u"), on("n"), on("s")];
+        let mut s = s.model_box_faces([lo, lo, lo], [hi, hi, hi], faces([lo, lo, lo], [hi, hi, hi], along, core));
+        for (side, i) in [("w", 0), ("e", 1), ("d", 2), ("u", 3), ("n", 4), ("s", 5)] {
+            if !on(side) {
+                continue;
+            }
+            let (a, c, along) = match side {
+                "n" => ([lo, lo, 0.0], [hi, hi, lo], 2),
+                "s" => ([lo, lo, hi], [hi, hi, 16.0], 2),
+                "w" => ([0.0, lo, lo], [lo, hi, hi], 0),
+                "e" => ([hi, lo, lo], [16.0, hi, hi], 0),
+                "d" => ([lo, 0.0, lo], [hi, lo, hi], 1),
+                _ => ([lo, hi, lo], [hi, 16.0, hi], 1),
+            };
+            // An arm's end at the post is hidden; its end at the block's face stays (a thinner
+            // neighbour's arm would leave a hole round it).
+            let mut hide = [false; 6];
+            hide[i ^ 1] = true;
+            s = s.model_box_faces(a, c, faces(a, c, along, hide));
+        }
+        s
+    })
+    .drops("stick", 1)
+    .tab(&crate::tabs::NATURAL);
+}
+
+/// Whether a dung pat lies within `vitals::soil::PAT_REACH` blocks of `pos` (a block up or down).
+pub fn pat_near(w: &World, [x, y, z]: [i32; 3]) -> bool {
+    let r = vitals::soil::PAT_REACH;
+    (-1..=1).any(|dy| (-r..=r).any(|dz| (-r..=r).any(|dx| DUNG_PAT.is(w.block([x + dx, y + dy, z + dz])))))
 }

@@ -92,6 +92,7 @@ const COMMANDS: &[&str] = &[
     "set_config",
     "shot",
     "bench",
+    "bench_bg",
     "host",
     "join",
     "open",
@@ -486,11 +487,23 @@ async fn run_lines(t: T, src: String) -> R {
             }
             // `set_config base:fx_reflect 0`: changes a setting mid-run, so one run benches each
             // effect on and off over the same loaded world (Research round 16).
+            // A value that isn't a number sets a text setting (`set_config core:resource_packs mcpack`):
+            // read as a number it was 0, and the pack never loaded (the Look and Far view test packs, 11-05).
             "set_config" => {
                 let (name, value) = rest.split_once(' ').unwrap_or((rest, "0"));
-                let cfg = weft_sdk::Config::<f64>::named(Box::leak(name.trim().to_string().into_boxed_str()));
-                cfg.set(value.trim().parse().unwrap_or(0.0));
-                weft_sdk::info!("set_config {} = {}", name.trim(), cfg.get());
+                let name: &'static str = Box::leak(name.trim().to_string().into_boxed_str());
+                match value.trim().parse::<f64>() {
+                    Ok(v) => {
+                        let cfg = weft_sdk::Config::<f64>::named(name);
+                        cfg.set(v);
+                        weft_sdk::info!("set_config {} = {}", name, cfg.get());
+                    }
+                    Err(_) => {
+                        let cfg = weft_sdk::TextConfig::named(name);
+                        cfg.set(value.trim());
+                        weft_sdk::info!("set_config {} = {}", name, cfg.get());
+                    }
+                }
             }
             "shot" => {
                 let path = match launch_option("shot-dir") {
@@ -629,7 +642,7 @@ async fn run_lines(t: T, src: String) -> R {
             "until" => {
                 let (text, secs) = split_within(rest);
                 let cond = Cond::parse(text)?;
-                let waited = Instant::now();
+                let waited = crate::runner::script_clock();
                 let deadline = waited + Duration::from_secs_f32(secs);
                 loop {
                     let (ok, seen) = cond.check(&t).await?;
@@ -637,12 +650,12 @@ async fn run_lines(t: T, src: String) -> R {
                         weft_sdk::info!(
                             "script: line {} until {text}: met after {:.1} s ({:.1} s into the script)",
                             n + 1,
-                            waited.elapsed().as_secs_f32(),
+                            (crate::runner::script_clock() - waited).as_secs_f32(),
                             started.elapsed().as_secs_f32()
                         );
                         break;
                     }
-                    if Instant::now() > deadline {
+                    if crate::runner::script_clock() > deadline {
                         return Err(format!("until {text}: not within {secs} s ({seen})"));
                     }
                     t.secs(0.25).await?;

@@ -8,6 +8,10 @@ use rustc_hash::FxHashMap;
 use weft_abi::sky_kind;
 use weft_render::*;
 
+use super::cloud_shadow::CloudShadow;
+use super::frame_look::FrameLook;
+use super::froxels::Froxels;
+use super::soft_clouds::SoftClouds;
 use super::world_render::Camera;
 use crate::assets::{Assets, decode_png};
 use crate::content::{DimensionDef, content};
@@ -38,7 +42,13 @@ pub fn rgb(c: u32) -> Vec3 {
 
 /// Where on its orbit it is, in turns.
 pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
-    let moved = if s.orbit.is_infinite() {
+    // chiacraft, test only: `--mc-moon` keeps a body on its own orbit (base's moon, a turn every
+    // 8/7 days) turning with the day instead, at its phase: the moon opposite the sun all month, as
+    // Minecraft's, so like-for-like shots of an evening aren't skewed by our gibbous moon high in
+    // the sky (Planner, 11-06).
+    static MC_MOON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let mc_moon = *MC_MOON.get_or_init(|| crate::app::api::launch_options().contains_key("mc-moon"));
+    let moved = if s.orbit.is_infinite() || (mc_moon && s.orbit > 0.0) {
         d.day_turn(time)
     } else if s.orbit == 0.0 {
         0.0
@@ -50,7 +60,15 @@ pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
 
 /// Its frame in the world at `turn`: x toward it, y along its way, z out of the orbit's plane.
 pub(super) fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
-    Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(s.tilt) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
+    Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(tilt_of(s)) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
+}
+
+/// Its path's lean: none under the test flag `--mc-days` (`app::api::mc_days`).
+fn tilt_of(s: &SkyDef) -> f32 {
+    if let Some(t) = crate::app::api::sun_tilt() {
+        return t;
+    }
+    if crate::app::api::mc_days() { 0.0 } else { s.tilt }
 }
 
 /// How far around the sunset of a body is at `height` (the sine of its elevation): how much it
@@ -129,6 +147,23 @@ pub struct Sky {
     /// The cloud layer as the last frame drew it, for shader packs' cloud shadows
     /// (`Scene::clouds`, `Scene::cloud_cells`); zeros without one.
     pub cloud_shade: [[f32; 4]; 2],
+    /// Soft clouds (chiacraft, `core:soft_clouds`): their targets, history and passes.
+    pub soft: SoftClouds,
+    /// The mist's volume (`client::froxels`): wanted (`core:froxels`) and of use this frame (mist
+    /// in the air, the eye out of liquids); the client and app set both before `draw`.
+    pub froxels: Froxels,
+    pub froxels_wanted: bool,
+    pub froxels_possible: bool,
+    /// The soft clouds' shadow on the land (`client::cloud_shadow`), wanted (the HDR world and
+    /// `core:cloud_shadows`); the app sets it before `draw`.
+    pub cloud_shadow: CloudShadow,
+    pub cloud_shadow_wanted: bool,
+    /// What the pack's look works out once a frame (`client::frame_look`).
+    pub frame_look: FrameLook,
+    /// Soft clouds wanted (the setting) and possible this frame (the world copied, whose depth the
+    /// trace stops at); the client sets both before `draw`.
+    pub soft_wanted: bool,
+    pub soft_possible: bool,
 }
 
 /// A picture over the whole screen, drawn last: from inside a liquid, a block or a fire.
@@ -181,6 +216,15 @@ impl Sky {
             overlay: None,
             cloud_drift: glam::DVec2::ZERO,
             cloud_shade: [[0.0; 4]; 2],
+            soft: SoftClouds::default(),
+            froxels: Froxels::default(),
+            froxels_wanted: true,
+            froxels_possible: false,
+            cloud_shadow: CloudShadow::default(),
+            cloud_shadow_wanted: false,
+            frame_look: FrameLook::default(),
+            soft_wanted: false,
+            soft_possible: false,
         };
         s.reload(gpu, assets);
         s
@@ -209,12 +253,13 @@ impl Sky {
                         shader: &shader,
                         vertex: "vs",
                         fragment: Some("fs"),
-                        color: Some(Format::Surface),
+                        color: Some(crate::post::world_format()),
                         // Depth 0 is the far plane: it passes only where nothing was drawn.
                         depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
                         blend: Blend::Premultiplied,
                         cull_back: false,
                         topology: Topology::Triangles,
+                        motion: crate::post::motion(),
                     })
                     .map_err(|e| e.0)?;
                 // Clouds are things in the world: they hide what is behind them, and the shader says
@@ -225,17 +270,22 @@ impl Sky {
                         shader: &shader,
                         vertex: "vs_clouds",
                         fragment: Some("fs_clouds"),
-                        color: Some(Format::Surface),
+                        color: Some(crate::post::world_format()),
                         depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
                         blend: Blend::Premultiplied,
                         cull_back: false,
                         topology: Topology::Triangles,
+                        motion: crate::post::motion(),
                     })
                     .map_err(|e| e.0)?;
-                Ok((pipe, clouds, slots.pop().unwrap_or_default()))
+                Ok((pipe, clouds, slots.pop().unwrap_or_default(), shader))
             });
         match made {
-            Ok((pipe, clouds, slots)) => {
+            Ok((pipe, clouds, slots, shader)) => {
+                self.soft.set_shader(gpu, &shader);
+                self.froxels.set_shader(gpu, &shader);
+                self.cloud_shadow.set_shader(gpu, &shader);
+                self.frame_look.set_shader(gpu, &shader);
                 if let Some(old) = self.pipe.replace(pipe) {
                     gpu.destroy_pipeline(old);
                 }
@@ -310,6 +360,10 @@ impl Sky {
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
         self.drop_pictures(gpu);
+        self.soft.destroy(gpu);
+        self.froxels.destroy(gpu);
+        self.cloud_shadow.destroy(gpu);
+        self.frame_look.destroy(gpu);
         for p in [self.pipe.take(), self.clouds_pipe.take()]
             .into_iter()
             .flatten()
@@ -381,6 +435,8 @@ impl Sky {
         // world's gaps showed the clear colour, a band of navy streaks where the near sea floor
         // ended, the world playtester's under-water shots).
         if in_liquid {
+            self.soft
+                .prepare(gpu, false, frame.width, frame.height, glam::Mat4::IDENTITY, cam.pos, glam::DVec2::ZERO);
             self.list.clear();
             let aspect = frame.width as f32 / frame.height.max(1) as f32;
             let (o, px, py) = screen_rays(cam, aspect);
@@ -443,10 +499,18 @@ impl Sky {
                         .map_or(0.0, |&id| crate::config::get(id))
                 };
                 // Past all the terrain there is, distant terrain too; the cost doesn't depend on it.
-                let reach = (setting("core:view_distance") * 16.0)
-                    .max(super::lod::Lod::distance() as f64)
-                    .max(1365.0)
-                    * 1.5;
+                // chiacraft, test only: `--mc-clouds` ends them as vanilla's do, a little past the
+                // view distance where its fog closes (Bliss's instance at 32 chunks: they stop about
+                // 600 blocks out and leave a clear pale band over the horizon, where ours ran on to
+                // it as slivers; Shader and the MC import session, 11-06).
+                let reach = if crate::app::api::launch_options().contains_key("mc-clouds") {
+                    setting("core:view_distance") * 16.0 * 1.2
+                } else {
+                    (setting("core:view_distance") * 16.0)
+                        .max(super::lod::Lod::distance() as f64)
+                        .max(1365.0)
+                        * 1.5
+                };
                 let lifted = s.height as f64 + setting("core:cloud_height");
                 let (x, z) = ((cam.pos.x + time * s.drift as f64 - self.cloud_drift.x) / CELL, (cam.pos.z - self.cloud_drift.y) / CELL);
                 // Vanilla's: rain grays them, the time of day colors them, thunder darkens the rest.
@@ -454,6 +518,17 @@ impl Sky {
                 let color = rained(rgb(s.color), 1.0, look.cloud_gray) * Vec3::new(day * 0.9 + 0.1, day * 0.9 + 0.1, day * 0.85 + 0.15);
                 let color = color.lerp(Vec3::splat((color.x * 0.3 + color.y * 0.59 + color.z * 0.11) * 0.2), look.cloud_dark);
                 clouds = Some(self.list.len() as u32);
+                // Soft clouds: this frame's targets and the scene's fields for them, where the
+                // picture's cells stand (`offset`: what is added to a place to find it in them).
+                let offset = glam::DVec2::new(time * s.drift as f64 - self.cloud_drift.x, -self.cloud_drift.y);
+                let view_proj = cam.proj(aspect) * cam.view();
+                self.soft
+                    .prepare(gpu, self.soft_wanted && self.soft_possible, frame.width, frame.height, view_proj, cam.pos, offset);
+                let trace = self
+                    .soft
+                    .trace_index()
+                    .filter(|_| self.soft.scene.0[0] != 0.0)
+                    .map_or(0.0, |i| i as f32 + 1.0);
                 // The weather for packs: x how much more of the sky they cover as rain comes, y how
                 // dark their undersides go, z an overcast deck in a storm.
                 let cover = (rain * 0.75 + thunder * 0.25).min(1.0);
@@ -467,9 +542,15 @@ impl Sky {
                 // (its underside) and how much of the gaps the weather fills (`fs_clouds`' `cloud_cell`).
                 self.cloud_shade = [[index as f32 + 1.0, CELL as f32, (lifted - cam.pos.y) as f32, cover * 0.6 + thunder * 0.35], cells];
                 self.list.push(GpuSky {
-                    axes: [[cover, (rain * 0.6 + thunder * 0.4).min(1.0), thunder, 0.0], [0.0; 4], [0.0; 4]],
+                    // axes[1].x: the soft clouds' trace target, bindless index + 1 (0: none), for
+                    // `fs_cloud_resolve`.
+                    axes: [[cover, (rain * 0.6 + thunder * 0.4).min(1.0), thunder, 0.0], [trace, 0.0, 0.0, 0.0], [0.0; 4]],
                     uv: cells,
-                    color: color.powf(2.2).extend(0.8 + 0.15 * cover).to_array(),
+                    // Vanilla draws every face of a cloud's box at 0.8, so from below its underside
+                    // and the top behind it stack to about 0.96; one face at 0.8 here let the blue sky
+                    // (clouds b-r +10..+23 against vanilla's neutral, Bliss's world) and the sun show
+                    // through (Weft bug; Planner's stage 1 review, MC import's s6 sheet, 11-06).
+                    color: color.powf(2.2).extend(0.96 + 0.04 * cover).to_array(),
                     ids: [index, kind::CLOUDS, w, h],
                     extra: [CELL as f32, 4.0, (lifted - cam.pos.y) as f32, reach as f32],
                 });
@@ -486,7 +567,7 @@ impl Sky {
             // horizon: leaned with the path, the moon's square stood as a diamond (the world
             // playtester's "white rotated square"). Its picture's up toward the world's up; right
             // at the zenith the path's own frame.
-            if s.kind == sky_kind::BODY && s.tilt != 0.0 && s.spin == 0.0 {
+            if s.kind == sky_kind::BODY && tilt_of(s) != 0.0 && s.spin == 0.0 {
                 let toward = m.x_axis;
                 let right = toward.cross(Vec3::Y);
                 if right.length() > 0.05 {
@@ -561,6 +642,18 @@ impl Sky {
         list.bind(bind::sky::SCENE, scene);
         for (vertices, first_instance) in draws {
             list.push(Cmd::Draw { vertices, instances: 1, first_vertex: 0, first_instance });
+        }
+        let froxels = self.froxels_wanted && self.froxels_possible;
+        self.froxels
+            .frame(gpu, froxels, frame.width, frame.height, buf, scene);
+        self.cloud_shadow
+            .frame(gpu, self.cloud_shadow_wanted, buf, scene, clouds);
+        self.frame_look.frame(gpu, buf, scene);
+        match clouds {
+            Some(first_instance) => self.soft.record(buf, scene, first_instance),
+            None => self
+                .soft
+                .prepare(gpu, false, frame.width, frame.height, glam::Mat4::IDENTITY, cam.pos, glam::DVec2::ZERO),
         }
         if let (Some(first_instance), Some(pipe)) = (clouds, self.clouds_pipe) {
             list.pipeline(pipe);

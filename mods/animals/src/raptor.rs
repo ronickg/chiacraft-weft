@@ -7,6 +7,7 @@
 //! ones near each other fight better. Too small to ride (the Utahraptor is the mount). A pose is a look (`World::set_look`), as the chihuahua's. The model, its animations and texture are built from `source/raptor` (see
 //! `docs/creatures.md`).
 
+use crate::choose::{Band, Need, Stops, WithBand};
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
@@ -49,9 +50,9 @@ fn register(r: &mut Registry, kind: &'static EntityKind, index: usize, texture: 
     crate::rest::register(r, kind, settle, "raptor", texture, (0.6, 0.9), &[("_rest", &rest_look(kind))]);
     crate::riding::rideable(r.entity(kind), index)
         .size(animals_core::bodies::of("raptor").0, animals_core::bodies::of("raptor").1)
-        .max_health(14.0)
+        .max_health(crate::animal::health(index))
         .walk_speed(4.0)
-        .attack_damage(4.0)
+        .attack_damage(crate::animal::hit(index))
         .passive()
         .model_file("raptor")
         .animations("raptor")
@@ -74,16 +75,22 @@ fn register(r: &mut Registry, kind: &'static EntityKind, index: usize, texture: 
                 .then(crate::hunt::wary)
                 .then(crate::hunt::hunt)
                 .then(crate::commands::act(index))
-                .then(crate::breeding::behave(index))
                 .then(crate::eggs::nest(index))
-                .then(crate::rest::settle)
-                .then(crate::commands::hold)
-                .then(crate::comfort::seek)
-                .then(crate::forage::forage)
-                .then(ai::wander(0.6, 9.0)),
+                // What it does when nothing is after it or ordered, the most pressing first (`choose.rs`).
+                .band(
+                    "needs",
+                    Band::new()
+                        .with(Need::Love, crate::breeding::behave(index))
+                        .with(Need::Rest, Stops { goal: crate::rest::settle, stop: crate::rest::stop })
+                        .with(Need::Hold, crate::commands::hold)
+                        .with(Need::Comfort, crate::comfort::seek)
+                        .with(Need::Drink, crate::drink::drink)
+                        .with(Need::Eat, crate::forage::eat)
+                        .with(Need::Wander, ai::wander(0.6, 9.0)),
+                ),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity);
+            crate::taming::hurt(w, h.entity, h.source);
             crate::rest::stop(w, h.entity);
         });
 }

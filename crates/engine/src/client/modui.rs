@@ -467,12 +467,26 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                     style,
                 )
             }
+            uk::IMAGE if n.bind.is_some() => {
+                let bind = float_bind(owner, n.bind);
+                b.ui.open(Kind::BoundImage { texture: n.text.as_str().to_string(), bind, value: 0.0 }, style)
+            }
             uk::IMAGE => {
                 b.ui.open(Kind::Image { texture: n.text.as_str().to_string(), color: 0xFFFFFFFF }, style)
             }
-            // The player (data 0), or with the text "menu" the menu's own entity (data 1).
+            // The player (data 0), with the text "menu" the menu's own entity (data 1), with
+            // "kind:<name>" an entity kind with no entity behind it (data 2 + its index).
             uk::PLAYER_MODEL => {
-                b.ui.open(Kind::Custom { tag: TAG_ENTITY, data: (n.text.as_str() == "menu") as u64 }, style)
+                let text = n.text.as_str();
+                let data = match text.strip_prefix("kind:") {
+                    Some(kind) => crate::content::content()
+                        .game
+                        .entity_names
+                        .get(kind)
+                        .map_or(0, |&k| 2 + k as u64),
+                    None => (text == "menu") as u64,
+                };
+                b.ui.open(Kind::Custom { tag: TAG_ENTITY, data }, style)
             }
             uk::SPACER => {
                 b.ui.open(Kind::Container { class: None }, Style { grow: n.grow.max(1.0), ..style })
@@ -628,6 +642,7 @@ pub unsafe extern "C" fn client_entity(c: *mut abi::ClientCtx, id: u64, out: *mu
                     pos: e.pos.to_array().into(),
                     yaw: e.yaw,
                     pitch: e.pitch,
+                    pose: e.pose.0 as u32,
                     moved: e.swing,
                     health: e.health,
                     // The kind's own value: clients do not see attribute modifiers of others.

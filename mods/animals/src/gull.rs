@@ -13,12 +13,11 @@ static WINGS: Wings = Wings {
     model: "gull",
     texture: "gull/gull",
     fly_size: (0.9, 0.3),
-    health: 8.0,
     // It walks at about 1.5 m/s; it flies at about 11.
     speed: 2.0,
     air: 5.0,
     wander: 0.35,
-    damage: 1.5,
+    bites: true,
     height: 6.0,
     reach: 20.0,
     flight: 500,

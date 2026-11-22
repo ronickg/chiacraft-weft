@@ -100,8 +100,9 @@ much it can eat before starving), **damage**, **speed**, **carry weight**, **oxy
 (underwater), **torpor** (how much it takes to knock out; only goes down, never placed by
 players) and **fortitude** (heat, cold, poison resistance).
 
-**Wild levels.** A wild animal spawns with a level, 1 to 150 (proposed, a world setting; ARK's
-difficulty), most of them low: proposed weights 1-30 common, 31-90 uncommon, 91-150 rare. Each
+**Wild levels.** A wild animal spawns with a level, 0 to 200 everywhere (Ronald, 11-06: "0-200
+acrso the board"; a level-200 one is about five times a level-0 one of its species), most of them
+low: 0-39 common (60%), 40-119 uncommon (30%), 120-200 rare (10%). Each
 level is one **wild point** placed on a random stat (never torpor alone). Its stats are known
 from its level and its points, so two level-100 raptors differ: one with 30 points in speed is a
 different animal from one with 30 in health.
@@ -112,8 +113,13 @@ different animal from one with 30 in health.
 value = base * (1 + wild_points * wild_step) * (1 + tamed_points * tamed_step) * (1 + bonus)
 ```
 
-`wild_step` and `tamed_step` are per species and stat (about 0.2 health, 0.05 damage, 0.01
-speed); `bonus` is the imprint bonus (up to +20%) plus the bond bonus (up to +5%).
+`base`'s health, damage and armour come from the species' size class (by mass), role and tweaks
+on the progression curve (`animals_core::danger`, `PROGRESSION_SHEET.md`; Ronald, 11-07: "Yes, all
+of them"); small ones scale by mass inside their class (a fox beats a mouse). `wild_step` is
+0.18 for health and damage (`danger::LEVEL_STEP`: a level's points fall on the nine stats alike,
+so 200 levels make five times the base), 0.01 speed; `tamed_step` per species and stat; `bonus` is
+the imprint bonus (up to +20%) plus the bond bonus (up to +5%), and tamed points and bonus
+together stop at ×1.6 (`danger::TAME_CEILING`, as gear's grade and marks).
 
 **Taming bonus.** A tame gains `floor(level * effectiveness / 2)` bonus levels, placed like wild
 points. A clean tame of a level-100 animal becomes level 150.
@@ -342,7 +348,7 @@ ride and breed it.
 | Setting | Default |
 |---|---|
 | Tame cap per player or tribe | None |
-| Wild level range | 1-150 |
+| Wild level range | 0-200 |
 | Taming speed, breeding interval, growth speed | 1x |
 | Tames from other worlds through portals | Owner's choice per world or link (proposed default: off) |
 | Highest level of a visiting tame | No limit |
@@ -526,7 +532,7 @@ Sources: [canid immobilization](https://pmc.ncbi.nlm.nih.gov/articles/PMC3141559
   0.01/0.015...), hunger rate.
 - `animal.rs`: the `animal` component (saved; sent to whoever has its screen open): species,
   sex, life stage, bond, imprint, command, wild and tamed points per stat, unspent points, food,
-  XP. A new animal rolls its level (60% 1-30, 30% 31-90, 10% 91-150) and places a point per level
+  XP. A new animal rolls its level (60% 0-39, 30% 40-119, 10% 120-200) and places a point per level
   on a random stat. Health and speed are attribute modifiers (`animals:stats`, applied again
   after loading); damage is a step of `chain::ATTACK_DAMAGE`; the rest are kept and shown. Tames
   use food at their species' rate (meat feeds a chihuahua); nothing happens at 0 yet. The owner
@@ -944,9 +950,23 @@ vanilla's boxes. A long animal's head and tail still stick out of its box (one b
 a 9-block body). The bigger boxes need wider gaps to walk through, and the engine's path search
 led every walker one cell wide, so the big animals jammed between trunks (PC run aw_walk:
 cedarosaurs 0-6 blocks in 5 minutes against 5-14 with the old boxes); it now needs room across a
-body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod's box stops at 5.5
+body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod keeps to the open
+floodplain (its fern forest share 0.5 to 0.2, Planner's pick of option (a), 11-05): at 4.5 wide
+it stood still among the trunks. The sauropod's box stops at 5.5
 blocks (`bodies::LOW`): its neck reaches 8.6, above any reach from the ground, and a box that tall
 found no room under the fern forest's crowns.
+
+**Stocking by biome** (2026-11-05, with Plants; Ronald picked real grazing levels: herds eat 25-50%
+of what their grass grows back). A biome holds plant eaters as real grazer densities go: open
+grassland heavily, deep forest and the giant groves lightly (`STOCKING`: savanna 2.5, plains 1.4,
+forest 1, swamp 0.9, birch forest 0.55, taiga 0.35, mountains 0.26, sequoia grove 0.09; the
+Cretaceous 1). A plant eater's crowd there is its crowd times that, never under a pair
+(`Species::crowd_in`), and everything that weighs the crowd reads it at the animal's own biome:
+natural spawning's room, wild breeding, dying of want, the food webs' grazing. So a stocked
+savanna holds 40 capybaras where it held 16, and they don't starve back down. With Plants' grass
+feeding as real grass does (a tuft feeds 2, not 10), every grazed biome lands about a third. The
+savanna is held at 2.5 (3.5 would match the rest) until it has a heavy grazer, which eats as much
+with fewer animals.
 
 **Far animals keep time** (2026-11-05). With the engine's activation ranges an animal no player
 is within 48 blocks of rests, ticking only every `core:inactive_entity_interval` ticks (20). Its
@@ -1187,3 +1207,144 @@ Ronald: seasons tied in with mating and breeding; each species breeds in its rea
 - The animal screen says when its kind breeds and whether it's that season now; SPECIES.md has a
   "breeds in" row.
 - Not yet: the website's simulator (`web/`) breeds without seasons.
+
+## On a blood moon (2026-11-04)
+
+From Research round 17's addendum (Ronald: "Yes, as designed"). The numbers live in `animals_core::sky`. Totality runs 22:00-02:00 (`vitals::events`), and while it lasts:
+- **Prey watch half again as far** for hunters (`hunt::wary`, `BLOOD_MOON_WATCH` 1.5).
+- **Herds bunch up.** A herd animal on the ground (`Social::Herd`, from `wild.rs` and the capybara; a flock's wariness takes off, so birds don't) more than 4 blocks from the middle of its herd (looking 24 blocks around) walks back to it (`hunt::huddle`).
+- **Wild grey wolves howl once** in the first half hour of totality, using their ambient call. A pack's howls spread over a few seconds (`voices::howl_at_blood_moon`).
+
+This applies on every difficulty: on gentle the blood moon brings no monsters, but the animals still feel it. Coyotes don't howl at it yet.
+## Capybaras in a savanna winter (2026-11-05)
+
+Plants' herd run (`herd_sav_wi`: six capybaras at 10% food in a winter savanna) lost three of them from its counts within ten minutes. `aw_capy_winter` repeated it with every death logged (`breeding.rs`: species, id, cause, place) and found no winter deaths:
+- **One death, from the spawn:** the script places it at y 94 over ground at 72, so it died of the 22-block fall.
+- **The others were alive:** the census and entity lines count only within 48 blocks. The testkit's full entity list still held all five at 13 minutes, foraging farther out at 74-85% strength.
+
+Herd scripts should spawn on the ground and count a wider ring, or list every entity.
+
+## The field journal (2026-11-05)
+
+Ronald asked for "a dossier" on every animal. He picked a picture with basics and survival facts, unlocked by discovery, in an inventory tab.
+
+A species' page opens when the player sees one up close (within 8 blocks with no opaque block between), looks at it through the spyglass, or opens its screen. The client then gets a toast message. What the player does with it then fills in more:
+- **Seen:** Latin name, family, weight, biomes, active hours, diet and foods, temper, and group size.
+- **Hunted:** its drops (meat and hide).
+- **Tamed or ridden:** how it's tamed and with what foods, whether it can be ridden, and how fast.
+- **Bred:** breeding seasons, young (born or hatched), gestation or incubation, litter size, growth time, and lifespan.
+
+Every fact is read from the species' own rows (`animals_core::journal::facts`), so the journal says what the game does. Active hours are a new researched field, `Species::active`: Velociraptor at night and Protoceratops at any hour (from their scleral rings, Schmitz & Motani 2011), reindeer at any hour (van Oort et al. 2005), deer and wolves at dawn and dusk. The deeds are saved with the player (`journal::JOURNAL`). Creative reads every page. The screen is UI's (`journal_screen.rs`, with its inventory tab and the key I), and it reads `journal::entries(view)`. Each fact names its section on the page: the header, the chips, where it lives, or the survival rows.
+
+## Nests for the birds (2026-11-05)
+
+Birds now lay eggs in nests. Before this, their young came out as fledglings after the eggs' time, with no eggs at all (a gestation tune). Each bird builds its nest at its kind of site (`animals_core::nests::SITES`):
+- **Treetops:** the raven, the house sparrow, the great horned owl (which takes old nests in trees), the savanna hawk, and Confuciusornis (estimated).
+- **A high bare ledge, or failing that a treetop:** the golden eagle.
+- **The ground:** the snow bunting (crevices), the snowy owl (a scrape on a mound), the turkey vulture (a cave floor), the herring gull, and Gobipteryx (its eggs were found half buried in sand).
+
+When she lays (`eggs::lay_in_nest`), she looks 12 blocks around her for the highest open leaves or ledge, and uses the ground under her if there's none. A bird's nest is brooded (`life::egg_air_of`): its eggs are held at a sitting parent's 37 °C whatever the air, so a snowy owl's clutch hatches in the tundra. Before, a nest only pulled the air 60% of the way toward 37 °C. The young hatch in the nest.
+
+Since 2026-11-06 (Tester 2's eggs playtest): a bird builds its own small **cup nest** of twigs lined with grass and down (`NEST_CUP`, `source/nest/cup.py`), sized for its eggs (an eagle's an eyrie of a block or more), not the raptors' earthen dish; nests keep `nests::APART` (4 blocks) from each other, the ground fallback included (a raven had built two 2 blocks apart); a nest with eggs in it takes no new clutch, for birds and the rest alike (raptor mothers had laid again into the same dish, 6+ eggs piled), so she uses an empty nest near, builds on open ground further off, or lays round her; and a nestling stays in the nest (`birds.rs`: a baby neither flies nor flees; raven chicks had hatched and flown off at once).
+
+Not yet: a parent seen sitting on the nest, and egg eaters raiding wild nests.
+
+## Fish breed (2026-11-05)
+
+Fish now breed in their seasons; before, only the spawner made more. The seasons (researched, or estimated where only their relatives' are known):
+- **Brown trout:** autumn and early winter, on gravel in cold water, most in autumn.
+- **Pacu:** the wet season, as the rains begin.
+- **The Cretaceous's lungfish (Est.) and Lycoptera (Est.):** spring and summer.
+
+A fish in love swims to a mate of its kind within 24 blocks (`fish::court`, steering its swim; walking pathfinding doesn't work in water). When they meet, the female spawns.
+
+Fish lay visible roe (2026-11-06, Planner for Ronald's "eggs you can see per species"; before, no egg entity was used and the fry simply came after the eggs' time). Five minutes after spawning (`life::LAYING`, as every egg-layer) the female's clutch lies on the bottom under her (`eggs::lay_roe`): one clump of beads per young, each species' own look (trout orange with a dark eye texel in a heap, pacu glassy with a yellow yolk, Lycoptera straw, the lungfish's jelly balls; `animals_core::eggs`). Roe develops in water whatever its warmth (`life::roe_develops`; air eggs need 25-40 °C, a nest or a fire) and dries and waits out of it; after its incubation the fry hatch there. Lycoptera's eggs' time is paced up to 0.46 d so a line still takes ten days to four generations. Like any egg it can be taken (its egg item) and is food for egg eaters. The spawner still tops up what breeding doesn't fill.
+
+## Carcasses for the vulture (2026-11-05)
+
+The turkey vulture never ate before. A wild animal gets hungry only if it's a plant eater or a hunter with prey at home, and a vulture (95% carrion) is neither. Rotten flesh was left alone too, as poisonous. Now a scavenger (`Species::scavenges`: carrion is half its diet or more) works like this:
+- **Hunger:** it gets hungry in the wild.
+- **Smell:** hungry, it smells carrion within 64 blocks, even under a forest canopy, as turkey vultures do (Houston 1986), flies there (`birds::scent`), lands and eats.
+- **Food:** carcass pieces, a kill's meat (carrion to it), and rotten flesh, which a vulture's stomach acid makes safe.
+- **Survival:** it fasts instead of starving and gets its water from its food, so a world with patchy carrion doesn't wipe it out.
+
+Every one of our species of a kilogram or more that gives no meat leaves carcass pieces when it dies (`animals_core::meat::carcass`). Each piece is half a kilogram of carrion, and it leaves as many as its meat would be portions. For example, a wolf leaves fur plus 2-3 pieces. The carcass's icon is rotten flesh's until Art draws one.
+
+Items on the ground vanish after five minutes, so a vulture must arrive in time. Carcasses don't rot on the ground yet.
+
+## Animations: idle life, moods, fights and hunts, social (2026-11-05)
+
+Ronald picked all four sets: idle life, needs and moods, fights and hunts, social.
+
+**The system** (`mods/animals/src/anim.rs`): the behaviour asks for a state by name, and the engine plays the species' clip of that name. A species without the clip carries on as before.
+- **Held** (`anim::hold`): stare, graze, drink, sleep, watch (a sentinel's head-up look round). A held state lasts while the behaviour keeps asking, each tick or at least every `GRACE` (30) ticks, and ends by itself after, so a goal that loses the turn needs no clean-up; `clear` ends one at once, `hold_for` asks ahead (a goal that looks seldom, `/anim <clip> hold`). Held states loop.
+- **Gaits** (held too): stalk (a crouched creep), approach (a curious one's slow head-low walk), charge (head down). They play in place of the walk (and the run, for the charge) and go on under a strike.
+- **Once** (`anim::act`; `anim::play(clip, secs)` for a clip of a species' own, a boss's slam): alarm, pounce, bite, rear, howl, play, groom, nuzzle, stretch. A held state waits under it and comes back after if still asked for.
+- **By itself** (`anim::tick`, from `animal::upkeep`):
+  - a flinch when hit (its own HURT handler);
+  - idle life every 15-40 s while it stands with nothing held and nothing playing: look round, sniff the ground, a scratch;
+  - breathing and ear and tail flicks, in every idle clip;
+  - the death fall, the engine's `death` clip, which holds its last frame.
+- **Cheap:** the state sits on the animal (`HELD`, not saved), and only a change goes over the network.
+- **Testing:** `/anim <clip> [hold|once|clear|loop]` on the nearest animal (`loop`: any clip looping in place, to see a gait with ticks frozen); `/anim log` logs every change ("anim: <id> holds|plays <clip>").
+
+**Where the creature AI calls it** (11-05):
+- `senses::stare` holds stare (half aware, before it bolts); a sentinel (`watch_goal`) holds watch; a curious one coming to look (`investigate`) holds approach.
+- `forage::eat` holds graze while it chews; `drink::drink` holds drink at the water.
+- Resting (`wild::settle`, `rest::settle`): lying (its last pose) it sleeps out of its hours or after a minute lying (`routines::asleep`); a rest that ends by itself ends in a stretch; woken (scared, hurt, called) it is up at once without one. The rest looks are other kinds with their own animation file, so each lying file has the sleep clip too.
+- `hunt::wary` plays the alarm as it bolts from a hunter, `taming::behave` as it bolts from a player.
+- `hunt::stands_ground`: it rears as a stand begins (it didn't stand at its last look, `animal_stood`; staring first doesn't count) and every 8 looks after while no clip is on (`anim::busy`), stares it down, and charges when it comes within twice `CHARGE`.
+- `hunt::chase`: an ambusher stalks to its burst range, then pounces as it breaks cover.
+- `commands::fight_aiming`: each strike plays one of its species' attacks (`anim::play_named`).
+
+**Clips** are written per species in its `source/<model>` build as pose functions, exported by `to_bedrock`. Every clip other than idle, walk and run goes *over* what plays below, on the bones it moves (`override_previous_animation`), easing in and out (`as_action`; a clip's own `blend` and `loop` win). Added on top instead, a whole pose stacked on the idle's own moves. The poses that reach the ground are fitted with forward kinematics:
+- head down to sniff, drink or graze, with the legs bent as little as it takes;
+- the death fall onto the side;
+- rearing, which keeps the hind hooves down.
+
+The builds check every keyframe: no flicker, no loose joints, nothing poking along the axis. The chihuahua's existing clips already poke up to 1.5 units; its new ones stay within that.
+
+**Done, first group:**
+- **Wolf:** the howl moved out of its 8-second idle (every wolf howled every 8 s) into its own clip, which the blood moon plays.
+- **Deer.**
+- **Dog and chihuahua** (one model): first exported as animations only, while Upstream looked into the chihuahua's texture (not a bug: the 32-texel rebuild had made the face small, and Ronald chose "Keep 32"). Since 11-05 it builds in full again (`build.py`).
+- **Raptor.**
+
+**Hooks** are Creature AI's to call, in its behaviour code: stare, graze, drink, sleep, stalk, alarm, the strikes, the social clips.
+
+Not yet: the other species, and young ones' play at their own scale (the pup models share the clips).
+
+**Restarted (2026-11-05, Ronald: "Yes, restart").** The system and the four species' clips merged with dev; the creature AI's calls built (above). The new clips: the deer's watch, approach and charge, the wolf's, raptor's and chihuahua's approach, sleep in each lying file. Fixed on the way:
+- the chihuahua's one-off clips were exported looping (the engine loops a clip whose file says so, whatever the call asks): a hit chihuahua flinched forever;
+- every stalk sank its feet up to 4 units into the ground, and the wolf's and chihuahua's moonwalked (the crouch's knee bend fought the step's lift). The builds now set a gait's height from its feet (`ground.grounded`) and check every gait for both.
+
+**Batch 2 (11-05):** the fox, coyote (with its howl) and jaguar have the behaviour clips too, from one shared module, `source/_clips/canid.py`. A species binds its helpers, fits its own head-down and death fall, and sets scales where its body differs (a fox's short neck and big brush; a cat's spine that can't twist, its thick neck). The poke check found each of those.
+
+The exporter now plays an action once unless its animation says it loops (`to_bedrock`). Every hunter's strike had been exported looping, so a fox, coyote, cat, jaguar, caiman, Utahraptor or wyvern kept biting after one bite; all of them are rebuilt (animations only).
+
+The jaguar is a knock-out kind, and `hunt_` used to hand knock-out kinds to their anger before `chase()`, so only the caimans reached the ambush path. Now a knock-out kind that ambushes stalks first (`hunt::stalks_first`) and its anger takes over as it pounces (PC look an2_jaguar_amb2: stalk 7 s, breaks cover at 9 blocks, pounce). The alarm skips an animal still in its resting look (`wild::alarm`: those looks have no alarm clip).
+
+Checked on the PC (11-05): the deer's watch, sleep, stretch, idle life, stare, alarm, graze and drink under the AI; a stand that rears and charges (two of three looks; the third deer was timid and bolted); the wolves' strikes playing once, flinches on hits. Fixed from the looks:
+- a held state that waited under a clip played once came back only through `tick`; with ticks frozen it stayed under (a fox's stare under a sniff). `hold` now puts it back when the clip has ended, and `/anim <clip> hold` clears what plays first;
+- a deer that stared before it stood never reared (the stand's start is now its own mark), and the periodic rear could cut the first one.
+
+**Batch 3 (11-05):** the reindeer (the deer's clips ported, rear and charge too) and the psittacosaurus (no rear or charge: under the size that stands its ground) have the behaviour clips; the engine had logged "no clip for action stare" for both. Porting them found the deer's own clips moving its hooves: a spine pitch in stretch, alarm, watch and approach, a root dip in flinch and a constant lean in the charge sank or lifted them up to 3.7 units, and its death fall went 11 into the ground; all fixed, and the deer's, reindeer's and psittacosaurus' builds now assert every standing clip's hooves within 0.3 of the ground in every keyframe. The exporter leaves out a bone held at 0, so the idle's pose shows through such a clip (the psittacosaurus' 20° lean): keep it at 0.01.
+
+**Batch 4 (11-05):** the hare (watch sitting up, alarm thumps), capybara and protoceratops (both with rear and charge: their mothers, over `GUARDS_KG`, stand their ground; the protoceratops' rear a frill display), the cat (the jaguar's canid scales for its gaits and fall, its own poses with a two-bone paw solver; the pounce a real leap) and the caiman (a low sprawled stalk, a lunging pounce, scratch at the flank since no pose reaches the jaw without poking). Every build asserts the feet within 0.3 of the ground in every standing keyframe, the gaits grounded, only held clips and gaits looping, and the death fall on its lowest point. Fixed on the way: the caiman's bite drove its jaw 13.7 into the ground (its snout now lifts as it gapes), and the hare's lie put its folded haunches 2.2 in (refit over every part).
+
+**Batches 5 and 6 (11-05):** the mouse, vole and kryptobaatar (watch sitting up, a seed held up while grazing, hop-and-freeze alarm), the lizard (push-up alarm, a high-stanced watch; no nuzzle, as an agama leaves its eggs), the ankylosaur (rear a braced tail-club display), iguanodont (rearing onto its hind legs, thumb spikes out), sauropod (the tripod rear on hind legs and tail), citipati (rear spreading its feathered arms) and Utahraptor (the raptor's hunter set: stalk, pounce leap). Fixed on the way, all checked in their builds now: the iguanodont's and sauropod's walk and run sank the hind feet about a unit; the Utahraptor's walk floated 2.7, its bite and run sank, its resting wing feathers went 7.3 into the ground; the sauropod's idle drank upside down and its breath sank the forefeet; the citipati's idle pecked with the crest, not the beak. Left: the Utahraptor's shaggy thigh feathers go 3.2 into the ground lying (a model change), its screech crosses its arms, and the iguanodont's idle breath dips the feet 0.4.
+
+**Batches 7 and 8 (11-05):** the birds (written once in `bird.py`, fitted to each: pecking, sleeping on one leg with the head in the wing, preening, a half-open-winged alarm; the folded wings now hinge at the shoulder) and the wyvern (a roar with its fans flared, wings spread in the stretch; it stands on its wrists now, which sank 1.9). The bosses hold `watch` while no one is near and `stare` between attacks (`boss.rs`; `anim::expire` is `tick` without idle life, and `boss.rs` clears the state before each of its own clips), and Drenkaun and Borkon have those clips and a death. Fixed on the way: the bosses' and the cat's play-once clips ended on their first pose (Borkon's rise and charge snapped up to 98 units); Borkon's fight clips sank its hooves up to 13 and its lie 26.6 (`plant` grounds them).
+
+Every species has its behaviour clips now.
+
+**Social moments (11-05):** idle life (`anim::idle_act`) picks by who the animal is, from `animals_core::roles` and the kind's `biology::Social`: a young one plays (`PLAY_GROUP` 60% of its moments in a pack or herd, `PLAY_ALONE` 35%), a mother with her young within `NUZZLE_NEAR` (4 blocks) turns to one and nuzzles it (`NUZZLE`, half her moments), and anyone else looks round, sniffs, scratches or grooms (grooming twice as often in a pack or herd). PC looks an2_herd_social and _social3 (red deer brought into love, one birth each pair): a calf played and groomed, a mother nuzzled her calf, the adults groomed. Fixed on the way: idle life ran only on ticks where `(now + id) % 20` was 0, which an animal whose upkeep skips ticks in a rhythm (the AI's level of detail) could miss for good: tamed deer had no idle moments at all.
+
+Not yet: young ones' play with each other (two young playing together), a pack's grooming each other.
+
+**For the next session on animations (11-05, the work parked here):**
+- *Adding a clip set to a species:* in its `source/<model>` build, a `pose_<clip>(t)` per clip, `LOOPS` (only held clips and gaits loop: the engine loops any clip whose file says so), `BLENDS`, `BLINKS`, the clip in `build.py`'s `CLIPS`/`POSES` (sleep also into the lie/rest/bask file). The deer, reindeer and hare are the plainest examples; canids and the jaguar share `source/_clips/canid.py`; the birds share `source/bird/bird.py`.
+- *The asserts every build now has, and why:* feet within ±0.3 of the ground in every standing keyframe (the deer's own stretch, alarm and charge moved its hooves up to 3.7 before this); gaits grounded with `ground.grounded` and gait-checked (stalks moonwalked and sank); nothing below -0.3 (bites, lies and fringes went 7-26 units under); the death fall on its lowest point every frame; only held clips and gaits looping; linecheck at 0 lines.
+- *Traps:* the exporter drops a bone held at 0, so the idle's pose shows through a clip that means it straight (keep 0.01); a one-off must end on its own last pose, not its first (the bosses' and cat's builds ended them on the first: a snap of up to 98 units); `render.py` shots of cut-out planes from behind are right only since 82352334.
+- *Seeing them on the PC:* `~/Coding/chiacraft-archive/tester-tools/play/an2/an2_clips_<sp>.txt` (frozen ticks, `/anim <clip> hold|loop|once`; `/anim` reaches an animal you look at within 16 blocks or the nearest within 12, so spawn big ones within that), `an2_boss_<boss>.txt`, `an2_herd_social2.txt` (love, one hurry, five minutes of `/anim log`: `/animal hurry` grows young up too, so only once); `zoom_sheet.py` crops the shots into a sheet (`CENTER=x,y` for small animals). Sheets of every batch: `~/Coding/chiacraft-archive/images/animations-2/2026-11-05/`.
+- *Left as notes:* the Utahraptor's thigh feathers go 3.2 into the ground lying (a model change), its screech crosses its arms; the iguanodont's idle breath dips the feet 0.4; the wyvern's walk lifts its wrists about a unit; capybara and cat necks poke past small turns, so they look about mostly with the head. (a mother nuzzling her young, grooming, young ones' play at their own scale).

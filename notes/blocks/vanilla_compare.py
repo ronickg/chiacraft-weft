@@ -13,7 +13,7 @@ from PIL import Image
 
 
 def refs_in(packs):
-    """The three packs' block-texture folders under `packs` (sparse checkouts, see block-textures)."""
+    """The three packs' block-texture folders under `packs` (sparse checkouts, see game-art's guides/2 Blocks/Full set.md)."""
     return {"vanilla": f"{packs}/vanilla/assets/minecraft/textures/block",
             "faithful32": f"{packs}/faithful32/assets/minecraft/textures/block",
             "pixelperf": f"{packs}/pixelperfection/assets/minecraft/textures/block"}

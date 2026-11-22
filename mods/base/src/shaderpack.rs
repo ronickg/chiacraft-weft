@@ -15,15 +15,35 @@ use weft_sdk::*;
 
 pub const ID: &str = "chiacraft";
 
+/// chiacraft's pack, or a variant of it for a look check (`shaderpacks/chiacraft_<name>/`, a copy
+/// with one change, picked with `--shader-pack chiacraft_<name>`): both get the screen effects, so
+/// a shader change can be tried on a PC run without a build of its own (Trees, 11-06). Only
+/// `chiacraft` itself is written and kept up to date by the game.
+fn is_ours(pack: &str) -> bool {
+    pack == ID
+        || pack
+            .strip_prefix(ID)
+            .is_some_and(|rest| rest.starts_with('_'))
+}
+
 const LOOK: &str = include_str!("../shaderpack/look.wgsl");
 
-const FILES: [(&str, &str); 6] = [
+/// Numbers the pack shares with the game's own code, written in front of every file so there is
+/// one value of each (`vitals`).
+fn shared_numbers() -> String {
+    format!("// From vitals::air (mods/base/src/shaderpack.rs).\nconst MIST_TOP: f32 = {:.1};\n", vitals::air::MIST_TOP)
+}
+
+const FILES: [(&str, &str); 8] = [
     ("world.wgsl", include_str!("../shaderpack/world.wgsl")),
     ("sky.wgsl", include_str!("../shaderpack/sky.wgsl")),
     ("model.wgsl", include_str!("../shaderpack/model.wgsl")),
     ("entity.wgsl", include_str!("../shaderpack/entity.wgsl")),
     ("particle.wgsl", include_str!("../shaderpack/particle.wgsl")),
     ("weather.wgsl", include_str!("../shaderpack/weather.wgsl")),
+    ("post.wgsl", include_str!("../shaderpack/post.wgsl")),
+    // Path traced lighting (`core:path_traced`), composed by the engine with the world's prelude.
+    ("pathtrace.wgsl", include_str!("../shaderpack/pathtrace.wgsl")),
 ];
 
 // Water writes depth, so the reflections effect finds its surface.
@@ -72,26 +92,27 @@ pub fn register_for_scripts(r: &mut Registry) {
 /// The pack's screen effects (`assets/shaders/post/`: packs cannot add passes), at the strengths
 /// the video settings ask (`video.rs`: off, low, on) while chiacraft's pack is the one chosen, off
 /// with any other or none: water reflections first (only the first effect sees the water in the
-/// image's alpha), contact shadows, light in the air (`volume`, Lighting's), the light shafts,
-/// then bloom. `--no-reflect`, `--no-contact`, `--no-volume`, `--no-shafts` and `--no-bloom` leave
+/// image's alpha), contact shadows, the far shade from the sky (`far_ao`), light in the air
+/// (`volume`, Lighting's), the light shafts, then bloom. `--no-reflect`, `--no-contact`, `--no-far-ao`, `--no-volume`, `--no-shafts` and `--no-bloom` leave
 /// one out (a script comparing the look), `--shafts-debug` shows what the shafts see.
 pub fn register_shafts(r: &mut Registry) {
     use std::sync::Mutex;
     // What each effect was last set to (strength), so a change of setting or pack applies once.
-    static APPLIED: Mutex<[f32; 5]> = Mutex::new([-1.0; 5]);
+    static APPLIED: Mutex<[f32; 6]> = Mutex::new([-1.0; 6]);
     r.client_frame(|c| {
         // Out of a world: set again at the next join.
         if c.state().flags & weft_sdk::client::client_flags::JOINED == 0 {
-            *APPLIED.lock().unwrap() = [-1.0; 5];
+            *APPLIED.lock().unwrap() = [-1.0; 6];
             return;
         }
-        let pack = SHADER_PACK.get() == ID;
+        let pack = is_ours(&SHADER_PACK.get());
         let option = |name: &str| weft_sdk::client::launch_option(name).is_some();
         // The video settings (`video.rs`): 0 off, 1 low (fewer steps: strength 0.5), 2 on.
         let level = |v: i32| [0.0, 0.5, 1.0][v.clamp(0, 2) as usize];
         let want = [
             ("reflect", !option("no-reflect"), level(crate::video::FX_REFLECT.get())),
             ("contact", !option("no-contact"), level(crate::video::FX_CONTACT.get())),
+            ("far_ao", !option("no-far-ao"), level(crate::video::FX_FAR_AO.get())),
             ("volume", !option("no-volume"), level(crate::video::FX_VOLUME.get())),
             ("shafts", !option("no-shafts"), if option("shafts-debug") { 2.0 } else { level(crate::video::FX_SHAFTS.get()) }),
             ("bloom", !option("no-bloom"), if crate::video::FX_BLOOM.get() > 0 { 1.0 } else { 0.0 }),
@@ -137,7 +158,7 @@ fn install(c: &Client) {
     let mut files_changed = false;
     let files = FILES
         .iter()
-        .map(|(name, src)| (*name, format!("{LOOK}\n{src}")))
+        .map(|(name, src)| (*name, format!("{}{LOOK}\n{src}", shared_numbers())))
         .chain(std::iter::once(("pack.cfg", cfg())));
     for (name, text) in files {
         let path = dir.join(name);

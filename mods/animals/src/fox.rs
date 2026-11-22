@@ -15,11 +15,10 @@ pub(crate) static ARCTIC_FOX: EntityKind = EntityKind::named("arctic_fox");
 static BODY: Body = Body {
     model: "fox",
     texture: "fox/fox",
-    health: 10.0,
     // Trotting about, galloping after prey or away from a wolf.
     speed: 4.5,
     wander: 0.3,
-    damage: 2.0,
+    bites: true,
     rest: ("fox_lie", (0.45, 0.35)),
 };
 

@@ -12,6 +12,9 @@ struct VOut {
     @location(5) @interpolate(flat) glow: u32,
     @location(6) @interpolate(flat) effect: u32,
     @location(7) @interpolate(flat) strength: f32,
+    // Temporal anti-aliasing: how far this vertex moved on the screen since last frame
+    // (`screen_motion`), z 1: its own (`motion_texel`).
+    @location(8) motion: vec3<f32>,
 }
 
 // A layer draws the parts of its roles, and the bones it names.
@@ -25,10 +28,25 @@ fn place(bone: u32, p: vec3<f32>) -> vec3<f32> {
     return vec3(dot(b.rows[0], q), dot(b.rows[1], q), dot(b.rows[2], q));
 }
 
+// Where `place` put it last frame, in this frame's camera-relative positions (`prev_bones`).
+fn place_prev(bone: u32, p: vec3<f32>) -> vec3<f32> {
+    let b = prev_bones[bone];
+    let q = vec4(p, 1.0);
+    return vec3(dot(b.rows[0], q), dot(b.rows[1], q), dot(b.rows[2], q));
+}
+
+// The models' color and motion (`motion_texel`).
+struct ModelOut {
+    @location(0) color: vec4<f32>,
+    @location(1) motion: vec4<f32>,
+}
+
 fn vertex(vi: u32, ii: u32) -> VOut {
     let inst = instances[ii];
     var out: VOut;
     var world: vec3<f32>;
+    // Where it was last frame, for the motion image.
+    var was = vec3(0.0);
     var shade: f32;
     let boxes = inst.cuboid_count * 36u;
     if vi < boxes {
@@ -42,6 +60,9 @@ fn vertex(vi: u32, ii: u32) -> VOut {
         let grow = cub.inflate + inst.inflate;
         let local = cub.origin - vec3(grow) + CORNERS[face * 4u + c] * (cub.size + vec3(2.0 * grow));
         world = place(inst.bones + cub.bone, local);
+        if scene.taa.z > 0.5 && scene.taa_frame.y > 0.5 {
+            was = place_prev(inst.bones + cub.bone, local);
+        }
         // Constant indices: SPIRV-Cross cannot copy a runtime-indexed array out of a storage buffer to Metal.
         var r: vec4<f32>;
         switch face {
@@ -62,6 +83,9 @@ fn vertex(vi: u32, ii: u32) -> VOut {
             return out;
         }
         world = place(inst.bones + v.bone, v.pos);
+        if scene.taa.z > 0.5 && scene.taa_frame.y > 0.5 {
+            was = place_prev(inst.bones + v.bone, v.pos);
+        }
         out.uv = v.uv / inst.tex_size;
         // Face shading from the triangle's normal, like the world's free-form quads.
         let t = inst.vertices + k - k % 3u;
@@ -72,6 +96,9 @@ fn vertex(vi: u32, ii: u32) -> VOut {
         shade = n.x * n.x * 0.6 + n.z * n.z * 0.8 + n.y * n.y * select(0.5, 1.0, n.y > 0.0);
     }
     out.clip = scene.view_proj * vec4(world, 1.0);
+    if scene.taa.z > 0.5 && scene.taa_frame.y > 0.5 {
+        out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(was, 1.0), scene.taa.xy), 1.0);
+    }
     out.dist = length(world);
     out.tex = inst.tex;
     var lit = vec3(1.0);
@@ -87,7 +114,7 @@ fn vertex(vi: u32, ii: u32) -> VOut {
 }
 
 @fragment
-fn fs(in: VOut) -> @location(0) vec4<f32> {
+fn fs(in: VOut) -> ModelOut {
     let albedo = textureSample(textures[in.tex], nearest_clamp, in.uv);
     var light = in.color;
     if in.glow != 0xffffffffu {
@@ -100,7 +127,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     let f = fog_amount(in.dist, scene.params.x, scene.params.y);
-    return vec4(mix(c.rgb, scene.fog_color.rgb, f), 1.0);
+    return ModelOut(vec4(mix(c.rgb, scene.fog_color.rgb, f), 1.0), motion_texel(in.motion, in.clip.z));
 }
 
 @vertex
@@ -114,5 +141,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
 fn vs_hand(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     var out = vertex(vi, ii);
     out.clip.z = (0.5 + 0.5 * out.clip.z / out.clip.w) * out.clip.w;
+    // It moves with the camera: it stays on the screen.
+    out.motion = vec3(0.0, 0.0, 1.0);
     return out;
 }

@@ -7,6 +7,8 @@ license.workspace = true
 [dependencies]
 weft_abi.workspace = true
 chiacraft-packages = { path = "../packages" }
+# Test only: loads a Minecraft world block for block (`chiacraft::mc_import`).
+chiacraft-mcimport = { path = "../mcimport" }
 weft_noise.workspace = true
 weft_render.workspace = true
 winit.workspace = true
@@ -20,7 +22,6 @@ libloading.workspace = true
 lz4_flex.workspace = true
 png.workspace = true
 rustc-hash.workspace = true
-arboard.workspace = true
 iroh.workspace = true
 tokio.workspace = true
 zip.workspace = true
@@ -42,3 +43,14 @@ naga.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
+
+# The system clipboard; Android has none arboard reaches (clipboard.rs keeps the game's own).
+[target.'cfg(not(target_os = "android"))'.dependencies]
+arboard.workspace = true
+
+# Android: winit's NativeActivity glue (the app's entry is `android_main`, crates/android).
+[target.'cfg(target_os = "android")'.dependencies]
+winit = { workspace = true, features = ["android-native-activity"] }
+# The game is a library the activity dlopens, and Android refuses one with initial-exec TLS
+# (mimalloc's default): the dynamic model there.
+mimalloc = { workspace = true, features = ["local_dynamic_tls"] }

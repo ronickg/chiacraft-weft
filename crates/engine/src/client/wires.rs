@@ -106,11 +106,12 @@ impl Wires {
                     shader: &shader,
                     vertex: "vs",
                     fragment: Some("fs"),
-                    color: Some(Format::Surface),
+                    color: Some(crate::post::world_format()),
                     depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
                     blend: Blend::None,
                     cull_back: false,
                     topology: Topology::Triangles,
+                    motion: crate::post::motion(),
                 })
                 .map_err(|e| e.0)
             });

@@ -33,9 +33,17 @@ pub fn size(s: &Species, growing: u32) -> f32 {
     s.birth_size + (1.0 - s.birth_size) * grown
 }
 
-/// Ticks from mating to the young born, or the eggs laid.
+/// Ticks from mating to the young born, or the eggs laid. A fish lays too: its roe lies on the
+/// bottom, seen, for its incubation (`roe_develops`), then the fry come (Planner, 11-06, for
+/// Ronald's "eggs you can see per species"; before, the fry simply came after the eggs' time).
 pub fn carrying(s: &Species) -> u32 {
     if s.gestation() > 0 { s.gestation() } else { LAYING }
+}
+
+/// Whether a fish's roe develops where it lies: in water, whatever its warmth (a species' water
+/// is its habitat's; out of the water it dries and waits).
+pub fn roe_develops(in_water: bool) -> bool {
+    in_water
 }
 
 /// How many young a litter or clutch has, `roll` any random number.
@@ -226,6 +234,12 @@ pub const NEST_HOLDS: f32 = 0.6;
 /// The air at an egg in `air`, in a nest or not.
 pub fn egg_air(air: f32, nest: bool) -> f32 {
     if nest { air + (BROODING - air) * NEST_HOLDS } else { air }
+}
+
+/// The air at an egg in `air`: in a brooded nest (a bird's, `nests::site`) a sitting parent's
+/// whatever the air, else as `egg_air`.
+pub fn egg_air_of(air: f32, nest: bool, brooded: bool) -> f32 {
+    if nest && brooded { BROODING } else { egg_air(air, nest) }
 }
 
 /// Whether an egg develops in that air (`egg_air`).

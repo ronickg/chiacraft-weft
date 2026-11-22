@@ -275,17 +275,35 @@ impl ClientWorld {
     /// Above the camera a cube not here yet is taken for air: those are the new top of the view
     /// while rising, nearly always sky. Nothing but air all the way down means the same, unless
     /// the land lies under what the view reaches, seen from high up: that is left to distant terrain.
-    pub fn column_shown(&self, col: IVec2, seed: u64) -> bool {
+    /// `ground` (chiacraft, test only): the column's height in an imported world, which our
+    /// generator's (`DimensionDef::column`) knows nothing of.
+    pub fn column_shown(&self, col: IVec2, seed: u64, ground: Option<i32>) -> bool {
         let lo = self.range.0;
         let def = &crate::content::content().dims[self.dim as usize];
-        let land_below = || {
-            def.column(seed, col.x * 16 + 8, col.y * 16 + 8)
-                .is_some_and(|c| c.height >> 4 < lo)
+        let land_below = || match ground {
+            Some(h) => h >> 4 < lo,
+            None => def
+                .column(seed, col.x * 16 + 8, col.y * 16 + 8)
+                .is_some_and(|c| c.height >> 4 < lo),
+        };
+        // chiacraft: a cube of nothing but liquid and air is seen through, as air is: its ground is
+        // further down. Taken for ground, a lake's column handed distant terrain over while the cube
+        // with its bed hadn't come, and through the near water the fog showed, a pale band across the
+        // bay where near water met far (stage 1, vanilla + DH, 11-06).
+        let c = crate::content::content();
+        let see_through = |cube: &crate::world::Cube| {
+            cube.uniform_state() == Some(AIR)
+                || cube.palette().iter().all(|&st| {
+                    st == AIR
+                        || c.states
+                            .get(st as usize)
+                            .is_some_and(|i| i.liquid.is_some())
+                })
         };
         shows_ground(self.range, self.eye, land_below, |y| {
             self.cubes
                 .get(&IVec3::new(col.x, y, col.y))
-                .map(|s| (s.shown, s.cube.uniform_state() == Some(AIR), s.sky & ABOVE != 0))
+                .map(|s| (s.shown, see_through(&s.cube), s.sky & ABOVE != 0))
         })
     }
 
@@ -519,8 +537,11 @@ impl ClientWorld {
             fresh = true;
             Column { biomes: None, cubes: 0 }
         });
-        if fresh || column.biomes.is_none() && cube.biomes.is_some() {
-            column.biomes = column.biomes.take().or_else(|| cube.biomes.clone());
+        // A cube the server sent sets the column's biomes over one this client made (in an
+        // imported world they differ: chiacraft::mc_import; elsewhere both are the generator's).
+        let theirs = around.from_server && cube.biomes.is_some() && column.biomes != cube.biomes;
+        if fresh || theirs || column.biomes.is_none() && cube.biomes.is_some() {
+            column.biomes = if theirs { cube.biomes.clone() } else { column.biomes.take().or_else(|| cube.biomes.clone()) };
             for dz in -1..=1 {
                 for dx in -1..=1 {
                     self.tints_dirty.insert(col + IVec2::new(dx, dz));
@@ -714,6 +735,20 @@ impl ClientWorld {
                 .iter()
                 .flat_map(|b| b.tints.iter().copied())
                 .collect(),
+        }
+    }
+
+    /// Biome `biome`'s color of tint kind `kind` now: the mod's (`set_tints`) or the content's.
+    pub fn biome_tint(&self, biome: u32, kind: u32) -> Option<u32> {
+        let c = content();
+        let kinds = c.tint_kinds.len();
+        match &self.tints {
+            Some(t) => t.get(biome as usize * kinds + kind as usize).copied(),
+            None => c
+                .biomes
+                .get(biome as usize)
+                .and_then(|b| b.tints.get(kind as usize))
+                .copied(),
         }
     }
 
@@ -1077,7 +1112,7 @@ fn neighborhood(around: &[Option<Arc<Cube>>; 27], hidden: u32, filler: u32, pos:
                     if face && hidden & (1 << (cy * 9 + cz * 3 + cx)) != 0 {
                         let pi = pidx(x, y, z);
                         states[pi] = filler;
-                        light[pi] = 0;
+                        light[pi] = super::mesher::ABSENT;
                     }
                     continue;
                 };
@@ -1199,7 +1234,9 @@ mod tests {
                             let i = crate::world::cube::index((x & 15) as usize, (y & 15) as usize, (z & 15) as usize);
                             (cube.get(i), cube.light(i))
                         }
-                        None if [c(x), c(y), c(z)].iter().filter(|&&v| v != 1).count() == 1 && hidden & (1 << k) != 0 => (9, 0),
+                        None if [c(x), c(y), c(z)].iter().filter(|&&v| v != 1).count() == 1 && hidden & (1 << k) != 0 => {
+                            (9, crate::client::mesher::ABSENT)
+                        }
                         None => (AIR, 15),
                     };
                     assert_eq!((n.states[pidx(x, y, z)], n.light[pidx(x, y, z)]), (s, l), "at {x} {y} {z}");

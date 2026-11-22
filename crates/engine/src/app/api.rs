@@ -29,6 +29,36 @@ pub fn launch_options() -> &'static FxHashMap<String, String> {
     LAUNCH.get_or_init(FxHashMap::default)
 }
 
+/// chiacraft, test only: `--mc-days`, Minecraft's sun for like-for-like shots: no day swing over
+/// the year (`DimensionDef::daylight_clock`) and no leaned path (`client::sky::frame_of`), so an
+/// hour's sun stands where Minecraft's does (ours was at the horizon at 05:00 on spring 8 where
+/// Minecraft's is 3.5 degrees under; Shader, 11-06).
+pub fn mc_days() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| launch_options().contains_key("mc-days"))
+}
+
+/// chiacraft, test only: `--bliss-sun`, Bliss's sun for like-for-like shots against it: Minecraft's
+/// clock (no day swing, as `mc_days`) but the path still leaned, as Bliss leans it
+/// (`sunPathRotation`, 35 degrees by default; base's sun leans 35 too). With `--sun-tilt <degrees>`
+/// the lean is set outright (`sun_tilt`), to try the sign against Bliss's shadows (Trees, 11-06).
+pub fn bliss_sun() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| launch_options().contains_key("bliss-sun"))
+}
+
+/// chiacraft, test only: `--sun-tilt <degrees>`, every sky body's path leaned by that instead of
+/// its own (radians here).
+pub fn sun_tilt() -> Option<f32> {
+    static ON: OnceLock<Option<f32>> = OnceLock::new();
+    *ON.get_or_init(|| {
+        launch_options()
+            .get("sun-tilt")
+            .and_then(|v| v.parse::<f32>().ok())
+            .map(f32::to_radians)
+    })
+}
+
 /// Exit code a mod asked for with `client_op::QUIT`.
 pub fn exit_code() -> i32 {
     EXIT_CODE.load(Ordering::Relaxed)
@@ -579,7 +609,15 @@ pub unsafe extern "C" fn client_ui_rect(c: *mut abi::ClientCtx, query: Str, out:
             ui.nodes
                 .iter()
                 .position(|node| matches!(node.kind, Kind::Custom { tag: crate::client::modui::TAG_CREATIVE, data } if data == n))
-        } else if let Some(n) = q.strip_prefix("icon:").and_then(|n| n.parse::<u64>().ok()) {
+        } else if let Some(n) = q.strip_prefix("icon:").and_then(|n| {
+            // A number, or an item's name (`icon:base:part_haft`): scripts can't know numbers.
+            n.parse::<u64>().ok().or_else(|| {
+                crate::content::content()
+                    .item_names
+                    .get(n)
+                    .map(|&i| i as u64)
+            })
+        }) {
             ui.nodes.iter().position(|node| match node.kind {
                 Kind::Custom { tag: crate::client::modui::TAG_ICON, data } => data == n,
                 Kind::Item { last, .. } => last.0 as u64 == n,
@@ -688,7 +726,9 @@ pub unsafe extern "C" fn client_screen_text(
     }
 }
 
-/// chiacraft: `client_screen_text` wrapped to `width` GUI pixels, its lines centered.
+/// chiacraft: `client_screen_text` wrapped to `width` GUI pixels, its lines centered; a negative
+/// `width` draws it on the HUD's plate (`hud_plate`), wrapped to its size (a hint: the playtest's
+/// "thin small line mid-screen").
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn client_screen_text_wrapped(
     c: *mut abi::ClientCtx,
@@ -704,7 +744,7 @@ pub unsafe extern "C" fn client_screen_text_wrapped(
         let Some(r) = run(c) else { return };
         let text = crate::ui::text::Msg::new(key.as_str(), crate::client::modui::args(args));
         r.mod_screen_text
-            .push((x, y, text, color, if size > 0.0 { size } else { 1.0 }, width.max(0.0)));
+            .push((x, y, text, color, if size > 0.0 { size } else { 1.0 }, width));
     }
 }
 
@@ -734,6 +774,18 @@ pub unsafe extern "C" fn client_particle_burst(c: *mut abi::ClientCtx, burst: *c
         if let Some(g) = r.game.as_mut() {
             g.client.particles.spawn(&*burst, &g.client.world);
         }
+    }
+}
+
+/// `Host::client_image_set`: a mod's picture for the GUI (`ui::render::set_dynamic`).
+pub unsafe extern "C" fn client_image_set(_c: *mut abi::ClientCtx, name: Str, w: u32, h: u32, rgba: *const u8, len: usize) -> u32 {
+    unsafe {
+        let name = name.as_str();
+        let need = w as usize * h as usize * 4;
+        if rgba.is_null() || len < need {
+            return 0;
+        }
+        crate::ui::render::set_dynamic(name, w, h, std::slice::from_raw_parts(rgba, need)) as u32
     }
 }
 

@@ -12,18 +12,28 @@ const TAB_PAD: f32 = 2.0;
 /// A tab beside the title: its label and what a click does (open another screen).
 pub type Tab = (&'static str, fn(&ClientView));
 
+/// The inventory's family of windows (the inventory, Stats, Advancements): other mods add tabs
+/// to them at this place (`r.screen_part(&Screen::named(FAMILY), "tabs", ..)`, a button of class
+/// `tab`): the animals' Field Journal. A mod that isn't there adds none.
+pub const FAMILY: &str = "base:inventory";
+
 /// The title tab, `tabs` beside it, the close button, then `body` in the `panel` with style `s`.
 pub fn window(ui: &mut Ui, s: S, tabs: &[Tab], body: impl FnOnce(&mut Ui)) {
-    framed(ui, s, None, tabs, body);
+    framed(ui, s, None, tabs, false, body);
 }
 
 /// The same for a screen that isn't a menu (stats, advancements): its title from `title`, a
 /// translation key.
 pub fn window_titled(ui: &mut Ui, s: S, title: &str, tabs: &[Tab], body: impl FnOnce(&mut Ui)) {
-    framed(ui, s, Some(title), tabs, body);
+    framed(ui, s, Some(title), tabs, false, body);
 }
 
-fn framed(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], body: impl FnOnce(&mut Ui)) {
+/// A window of the inventory's family (`FAMILY`): other mods' tabs after its own.
+pub fn family_window(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], body: impl FnOnce(&mut Ui)) {
+    framed(ui, s, title, tabs, true, body);
+}
+
+fn framed(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], family: bool, body: impl FnOnce(&mut Ui)) {
     // The tabs stand on the frame: the column's gap tucks their bottom 3 UI px under its top
     // line, which leaves an even 12 rows of face round a label's 9 px capitals (kit 2, UI guide D).
     ui.column(S::column().stretch().gap(-1.5), |ui| {
@@ -35,6 +45,9 @@ fn framed(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], body: impl FnOnc
             });
             for &(key, open) in tabs {
                 ui.button(key, S::default().class("tab").h(TAB_H).pad(TAB_PAD), move |c| open(c));
+            }
+            if family {
+                ui.screen_parts(FAMILY, "tabs");
             }
             ui.spacer();
             // (a button's padding of 0 means the engine's own; half a GUI pixel is none here)

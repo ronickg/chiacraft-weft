@@ -148,11 +148,19 @@ fn tick(w: &World) {
             continue;
         }
 
-        let s = food::digest(v, d.digest);
+        // The perk web's slower hunger, health and stamina, through base_api's chains.
+        let q = abi::Query { entity: id, ..query() };
+        let pace = w.chain_compute(&base_api::skills::HUNGER_PACE, d.digest as f64, &q) as f32;
+        let s = food::digest(v, pace);
         let stats = v.stats();
         let capacity = v.capacity();
         let full = s.fullness(capacity);
         let (max_health, max_stamina) = stomach::max_health_stamina(stats[0], stats[1], &s, capacity);
+        let max_health = w.chain_compute(&base_api::skills::MAX_HEALTH, max_health as f64, &q) as f32;
+        let max_stamina = w.chain_compute(&base_api::skills::MAX_STAMINA, max_stamina as f64, &q) as f32;
+        // Armour lifts it with the ages (`vitals::gear::armour`: a full same-age set takes it to the
+        // age's reference, about 25 engine points in the Stone Age's middle, 65 in the Iron Age's).
+        let max_health = max_health + crate::player::armor_of(w, id).1 * base_api::HEALTH_SCALE;
         // The place, a second at a time.
         if pulse {
             let fat = full[vitals::food::FAT];

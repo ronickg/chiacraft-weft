@@ -17,6 +17,12 @@ pub struct Settings {
 /// The 3D world's share of the window's pixels each way: the setting, or on auto (0) two
 /// thirds on a high-density screen (`density`, physical pixels per point, 2 on Retina), where
 /// shading every pixel cost several times what it bought, and all of them elsewhere.
+/// How a world drawn smaller than the window is scaled up (`core:upscaler`): 0 bilinear, 1 FSR 1's
+/// EASU, 2 Snapdragon GSR 1. For the shaders as `scene.upscale.x`.
+pub fn upscaler() -> u32 {
+    number("core:upscaler") as u32
+}
+
 pub fn render_scale(density: f64) -> f32 {
     let set = number("core:render_scale") as f32;
     if set > 0.0 {
@@ -42,8 +48,13 @@ pub const GUI_MIN: (u32, u32) = (400, 320);
 /// (Playtest B9: the animal screen at GUI scale 1, its buttons' labels over each other; Researcher,
 /// round 13; Minecraft keeps to even scales for the same reason with its half-size font).
 pub fn max_gui_scale(window: (u32, u32)) -> u32 {
-    even_scale((window.0 / GUI_MIN.0).min(window.1 / GUI_MIN.1)).max(2)
+    let min = if crate::touch::enabled() { GUI_MIN_TOUCH } else { GUI_MIN };
+    even_scale((window.0 / min.0).min(window.1 / min.1)).max(2)
 }
+
+/// `GUI_MIN` on a touch screen: a phone held sideways (2400 x 1080) gets scale 4, whose GUI
+/// pixels a finger can hit, rather than 2; screens taller than its 270 GUI pixels scroll.
+pub const GUI_MIN_TOUCH: (u32, u32) = (400, 240);
 
 /// `s` rounded down to a scale the UI pixel sits whole on: 2, 4, 6... (1 below 2).
 pub fn even_scale(s: u32) -> u32 {
@@ -230,6 +241,11 @@ impl Settings {
     pub fn listing_deposit(&self) -> u64 {
         number("core:listing_deposit").max(1.0) as u64
     }
+
+    /// The fee a listing pays, in mojos (`core:listing_fee`).
+    pub fn listing_fee(&self) -> u64 {
+        number("core:listing_fee").max(0.0) as u64
+    }
     /// DID sponsors' addresses (iroh endpoint ids), tried in order.
     pub fn sponsors(&self) -> Vec<String> {
         list("core:sponsors")
@@ -244,6 +260,116 @@ impl Settings {
 
     pub fn occlusion_culling(&self) -> bool {
         number("core:occlusion_culling") != 0.0
+    }
+
+    /// Screen effects' half-size parts (`post::HOOK_LOW`), live.
+    pub fn post_low(&self) -> bool {
+        number("core:post_low") != 0.0
+    }
+
+    /// Levels of the HDR world's bloom pyramid (`core:bloom`: 0 none, 1 four, 2 six), live.
+    pub fn bloom_levels(&self) -> u32 {
+        match number("core:bloom") as i32 {
+            i32::MIN..=0 => 0,
+            1 => 4,
+            _ => 6,
+        }
+    }
+
+    /// The soft clouds' shadow on the land with the HDR world (`client::cloud_shadow`), live.
+    pub fn cloud_shadows(&self) -> bool {
+        number("core:cloud_shadows") != 0.0
+    }
+
+    /// The HDR world (`post::world_format`), read once at start.
+    pub fn hdr_world(&self) -> bool {
+        number("core:hdr_world") != 0.0
+    }
+
+    /// Temporal anti-aliasing (`core:aa` 1 or 2, `post::set_taa`), read once at start.
+    pub fn aa(&self) -> bool {
+        number("core:aa") >= 1.0
+    }
+
+    /// Whether the world's pass draws the motion image too (`core:aa` 1; 2 is from the camera
+    /// alone, `post::set_motion`), read once at start.
+    pub fn aa_motion(&self) -> bool {
+        (number("core:aa") as i32) == 1
+    }
+
+    /// DLSS, the backend's temporal upscaler (`core:dlss`, `weft_render::UpscaleMode`), live; off
+    /// unless the backend has one (the `streamline` build on Windows).
+    pub fn dlss(&self) -> weft_render::UpscaleMode {
+        weft_render::UpscaleMode::from_number(number("core:dlss").max(0.0) as u32)
+    }
+
+    /// The stand-in upscaler for checks (`core:upscale_standin`), read at start.
+    pub fn upscale_standin(&self) -> bool {
+        number("core:upscale_standin") != 0.0
+    }
+
+    /// Ray Reconstruction with DLSS (`core:dlss_rr`), live.
+    pub fn dlss_rr(&self) -> bool {
+        number("core:dlss_rr") != 0.0
+    }
+
+    /// DLSS's model for `mode` (`core:dlss_model_<mode>`, 0 its default), live.
+    pub fn dlss_model(&self, mode: weft_render::UpscaleMode) -> u32 {
+        number(&format!("core:dlss_model_{}", mode.name())).max(0.0) as u32
+    }
+
+    /// Ray Reconstruction's model (`core:dlss_rr_model`), live.
+    pub fn dlss_rr_model(&self) -> u32 {
+        number("core:dlss_rr_model").max(0.0) as u32
+    }
+
+    /// DLSS 5 over the upscaled picture (`core:dlss5`), live.
+    pub fn dlss5(&self) -> bool {
+        number("core:dlss5") != 0.0
+    }
+
+    /// DLSS 5's strength (`core:dlss5_intensity`), live.
+    pub fn dlss5_intensity(&self) -> f32 {
+        (number("core:dlss5_intensity") as f32).clamp(0.0, 1.0)
+    }
+
+    /// The denoiser's check on today's frame (`core:pt_denoise_test`), live.
+    pub fn pt_denoise_test(&self) -> bool {
+        number("core:pt_denoise_test") != 0.0
+    }
+
+    /// The denoiser's tuning (`core:pt_dn_phi`, `core:pt_dn_steps`), live.
+    pub fn pt_dn_debug(&self) -> u32 {
+        (number("core:pt_dn_debug") as u32).min(6)
+    }
+
+    pub fn pt_dn_tuning(&self) -> (f32, u32) {
+        ((number("core:pt_dn_phi") as f32).clamp(0.25, 16.0), (number("core:pt_dn_steps") as u32).clamp(1, 5))
+    }
+
+    /// How the path tracer's light is denoised (`core:pt_denoiser`: 0 raw, 1 ours), live.
+    pub fn pt_denoiser(&self) -> u32 {
+        (number("core:pt_denoiser") as u32).min(crate::denoise::SVGF)
+    }
+
+    /// Temporal anti-aliasing's least share of each new frame (`core:taa_blend`), live.
+    pub fn taa_blend(&self) -> f32 {
+        (number("core:taa_blend") as f32).clamp(0.03, 0.5)
+    }
+
+    /// The mist as a volume for packs that have one (`client::froxels`), live.
+    pub fn froxels(&self) -> bool {
+        number("core:froxels") != 0.0
+    }
+
+    /// Pixels a mist volume cell covers each way: 8 (`core:froxels` 1), 4 (2, ultra).
+    pub fn froxel_cell(&self) -> u32 {
+        if number("core:froxels") >= 2.0 { 4 } else { 8 }
+    }
+
+    /// Soft clouds for packs that draw them (`client::soft_clouds`).
+    pub fn soft_clouds(&self) -> bool {
+        number("core:soft_clouds") != 0.0
     }
 
     pub fn show_avatars(&self) -> bool {

@@ -9,6 +9,7 @@
 //! (`World::set_look`), as the Utahraptor's. The model, its animations and texture are built from
 //! `source/wyvern` (see `docs/creatures.md`).
 
+use crate::choose::{Band, Need, Stops, WithBand};
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
@@ -34,9 +35,9 @@ pub fn init(r: &mut Registry) {
     );
     crate::riding::rideable(r.entity(&WYVERN), index)
         .size(animals_core::bodies::of("wyvern").0, animals_core::bodies::of("wyvern").1)
-        .max_health(400.0)
+        .max_health(crate::animal::health(index))
         .walk_speed(5.0)
-        .attack_damage(30.0)
+        .attack_damage(crate::animal::hit(index))
         .attack_speed(0.8)
         .passive()
         .model_file("wyvern")
@@ -62,16 +63,22 @@ pub fn init(r: &mut Registry) {
                 .then(guard)
                 .then(crate::hunt::hunt)
                 .then(crate::commands::act(index))
-                .then(crate::breeding::behave(index))
                 .then(crate::eggs::nest(index))
-                .then(crate::rest::settle)
-                .then(crate::commands::hold)
-                .then(crate::comfort::seek)
-                .then(crate::forage::forage)
-                .then(ai::wander(0.4, 20.0)),
+                // What it does when nothing is after it or ordered, the most pressing first (`choose.rs`).
+                .band(
+                    "needs",
+                    Band::new()
+                        .with(Need::Love, crate::breeding::behave(index))
+                        .with(Need::Rest, Stops { goal: crate::rest::settle, stop: crate::rest::stop })
+                        .with(Need::Hold, crate::commands::hold)
+                        .with(Need::Comfort, crate::comfort::seek)
+                        .with(Need::Drink, crate::drink::drink)
+                        .with(Need::Eat, crate::forage::eat)
+                        .with(Need::Wander, ai::wander(0.4, 20.0)),
+                ),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity);
+            crate::taming::hurt(w, h.entity, h.source);
             crate::rest::stop(w, h.entity);
         });
 }

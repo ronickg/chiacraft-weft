@@ -156,6 +156,39 @@ fn parse_gui(src: &str, pixels: [f32; 2]) -> Slicing {
     }
 }
 
+/// GUI images mods paint at runtime (`Host::client_image_set`), by name (`dyn:` first): their
+/// size, pixels and a count bumped on every set, so the renderer uploads only what changed.
+struct Dynamic {
+    w: u32,
+    h: u32,
+    rgba: Vec<u8>,
+    version: u64,
+}
+
+static DYNAMIC: std::sync::Mutex<Option<FxHashMap<String, Dynamic>>> = std::sync::Mutex::new(None);
+/// What a runtime GUI image's name starts with.
+pub const DYN: &str = "dyn:";
+/// The largest side of a runtime GUI image.
+pub const DYN_MAX: u32 = 2048;
+
+/// Sets runtime GUI image `name` (`DYN` first); false if refused.
+pub fn set_dynamic(name: &str, w: u32, h: u32, rgba: &[u8]) -> bool {
+    if !name.starts_with(DYN) || w == 0 || h == 0 || w > DYN_MAX || h > DYN_MAX || rgba.len() < (w * h * 4) as usize {
+        return false;
+    }
+    let mut all = DYNAMIC.lock().unwrap_or_else(|e| e.into_inner());
+    let all = all.get_or_insert_with(FxHashMap::default);
+    let e = all
+        .entry(name.to_string())
+        .or_insert(Dynamic { w, h, rgba: Vec::new(), version: 0 });
+    e.w = w;
+    e.h = h;
+    e.rgba.clear();
+    e.rgba.extend_from_slice(&rgba[..(w * h * 4) as usize]);
+    e.version += 1;
+    true
+}
+
 pub struct UiRenderer {
     pipeline: PipelineId,
     pub font: Font,
@@ -171,6 +204,8 @@ pub struct UiRenderer {
     /// Bare textures already warned about (`check_bare`).
     warned_bare: std::collections::HashSet<String>,
     owned: Vec<TextureId>,
+    /// Runtime GUI images on the GPU: texture, the version uploaded, size.
+    dynamic: FxHashMap<String, (TextureId, u64, u32, u32)>,
     buffers: Vec<(BufferId, u32)>,
     screen: Vec<BufferId>,
     pub quads: Vec<Quad>,
@@ -233,6 +268,7 @@ impl UiRenderer {
             outset: FxHashMap::default(),
             warned_bare: Default::default(),
             owned: Vec::new(),
+            dynamic: FxHashMap::default(),
             buffers: Vec::new(),
             screen,
             quads: Vec::new(),
@@ -307,6 +343,7 @@ impl UiRenderer {
                 blend: Blend::Alpha,
                 cull_back: false,
                 topology: Topology::Triangles,
+                motion: false,
             })
             .map_err(|e| e.0)?;
         Ok((p, fx, gui))
@@ -365,6 +402,8 @@ impl UiRenderer {
         }
         self.textures.clear();
         self.strips.clear();
+        // The runtime images went with `owned`: made again from their pixels on next use.
+        self.dynamic.clear();
         // How textures slice comes with them: a pack's `.gui` must not outlive the pack.
         self.slicing.clear();
         self.outset.clear();
@@ -373,6 +412,9 @@ impl UiRenderer {
 
     /// Bindless index and size of a GUI texture, loaded the first time it is used.
     pub fn texture(&mut self, gpu: &mut dyn Backend, assets: &Assets, name: &str) -> Option<(u32, u32, u32)> {
+        if name.starts_with(DYN) {
+            return self.dynamic_texture(gpu, name);
+        }
         if let Some(t) = self.textures.get(name) {
             return *t;
         }
@@ -428,6 +470,38 @@ impl UiRenderer {
         }
         self.textures.insert(name.to_string(), loaded);
         loaded
+    }
+
+    /// A runtime GUI image (`set_dynamic`) on the GPU: uploaded when its version moved, made anew
+    /// when its size changed.
+    fn dynamic_texture(&mut self, gpu: &mut dyn Backend, name: &str) -> Option<(u32, u32, u32)> {
+        let all = DYNAMIC.lock().unwrap_or_else(|e| e.into_inner());
+        let d = all.as_ref()?.get(name)?;
+        let have = self.dynamic.get(name).copied();
+        match have {
+            Some((t, v, w, h)) if w == d.w && h == d.h => {
+                if v != d.version {
+                    gpu.write_texture(t, 0, &d.rgba);
+                    self.dynamic.insert(name.to_string(), (t, d.version, w, h));
+                }
+                Some((gpu.texture_index(t), w, h))
+            }
+            _ => {
+                if let Some((old, ..)) = have {
+                    self.owned.retain(|&o| o != old);
+                    gpu.destroy_texture(old);
+                }
+                let t = gpu.create_texture(
+                    &TextureDesc { width: d.w, height: d.h, mips: 1, format: Format::Rgba8Srgb, render_target: false },
+                    name,
+                );
+                gpu.write_texture(t, 0, &d.rgba);
+                self.owned.push(t);
+                self.dynamic
+                    .insert(name.to_string(), (t, d.version, d.w, d.h));
+                Some((gpu.texture_index(t), d.w, d.h))
+            }
+        }
     }
 
     /// Whether GUI texture `name` declares a nine-slice in its `.gui`.
@@ -780,9 +854,9 @@ impl UiRenderer {
     }
 
     /// An item's own picture, what it shows until its model has one or without a model.
-    // SYNC: our stack look (`abi::comp::LOOK`, drawn through `GameTextures::look`) is not drawn
-    // here any more: a stack's own pictures are upstream's `layers` (`abi::comp::LAYERS`). Mods
-    // that set LOOK (base's parts tools) must set LAYERS.
+    // A stack's own pictures: upstream's `layers`, or chiacraft's look (`abi::comp::LOOK`), which
+    // `stack::layers` falls back to and `GameTextures::layered` composes (lost in the Weft sync,
+    // back 11-05).
     fn plain_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, stack: &weft_abi::ItemStack) {
         let item = stack.item;
         let looks = crate::client::looks::current();
@@ -1189,6 +1263,13 @@ impl UiRenderer {
             Kind::Image { texture, color } => {
                 if let Some((idx, _, _)) = self.texture(gpu, assets, texture) {
                     self.image(r, idx, [0.0, 0.0, 1.0, 1.0], *color);
+                }
+            }
+            Kind::BoundImage { value, .. } if *value <= 0.0 => {}
+            Kind::BoundImage { texture, value, .. } => {
+                if let Some((idx, _, _)) = self.texture(gpu, assets, texture) {
+                    let alpha = (value.min(1.0) * 255.0).round() as u32;
+                    self.image(r, idx, [0.0, 0.0, 1.0, 1.0], 0xFFFF_FF00 | alpha);
                 }
             }
             Kind::Item { last, .. } => {

@@ -1,6 +1,9 @@
 pub mod camera;
+pub mod cloud_shadow;
 pub mod ctm;
 pub mod entity_render;
+pub mod frame_look;
+pub mod froxels;
 pub mod gizmo;
 pub mod lod;
 pub mod looks;
@@ -10,6 +13,7 @@ pub mod modui;
 pub mod particles;
 mod receive;
 pub mod sky;
+pub mod soft_clouds;
 pub mod stack_look;
 pub mod terrain;
 pub mod terrain_gpu;
@@ -37,6 +41,9 @@ use entity_render::EntityRenderer;
 use textures::GameTextures;
 use world::ClientWorld;
 use world_render::{Camera, WorldRenderer};
+
+/// The snow line when there is none (`snow_line`): blocks above the sea, over any mountain.
+const SNOW_LINE_NONE: f32 = 400.0;
 
 pub struct LocalPlayer {
     pub pos: DVec3,
@@ -87,6 +94,20 @@ pub struct LocalPlayer {
     /// Walking speed and jump multipliers from the server (attributes).
     pub speed_mul: f64,
     pub jump_mul: f64,
+    /// Blocks a second it climbs walls (`attribute::CLIMB_SPEED`) and its glider's air
+    /// (`GLIDE_SPEED` over 0 glides), from the server, per tick.
+    pub climb: f64,
+    pub glide: physics::Glide,
+    /// Held on to a wall at the last step, gliding at the last step: the poses for them.
+    pub on_wall: bool,
+    pub gliding: bool,
+    /// The rope it hangs on (`attribute::ROPE_LENGTH`), how much of it is let out now (pulled in
+    /// with jump, let out with sneak), the anchor that length is for, and hanging off the ground on
+    /// it at the last step.
+    pub rope: Option<physics::Rope>,
+    pub rope_len: f64,
+    pub rope_for: Option<DVec3>,
+    pub on_rope: bool,
 }
 
 pub struct ClientEntity {
@@ -102,6 +123,9 @@ pub struct ClientEntity {
     pub health: f32,
     pub hurt: f32,
     pub worn: Vec<u32>,
+    /// What it wears drawn by its own looks (`abi::comp::WORN_LOOK`), in `worn`'s order; empty
+    /// for an item's own texture.
+    pub worn_looks: Vec<String>,
     /// A player's item in hand, 0 for none, and that stack's own look (`abi::comp::LOOK`).
     pub held: u32,
     pub held_look: Option<String>,
@@ -335,6 +359,7 @@ impl ClientEntity {
             health: f32::NAN,
             hurt: 0.0,
             worn: Vec::new(),
+            worn_looks: Vec::new(),
             held: 0,
             off_held: 0,
             using: None,
@@ -442,6 +467,54 @@ impl ClientEntity {
     }
 }
 
+/// The camera a frame was drawn with, without the jitter (`Client::frame_camera`): what the
+/// backend's upscaler is told (`weft_render::UpscaleParams`).
+#[derive(Clone, Copy, Debug)]
+pub struct FrameCamera {
+    /// Camera-relative world to view (the camera at the origin), and view to clip.
+    pub view: glam::Mat4,
+    pub proj: glam::Mat4,
+    /// Takes this frame's camera-relative positions to last frame's clip space (`Scene::taa_prev`).
+    pub prev: glam::Mat4,
+    /// No last frame to go from.
+    pub fresh: bool,
+    pub fov_y: f32,
+    pub aspect: f32,
+}
+
+impl FrameCamera {
+    /// `weft_render::UpscaleParams`'s camera part; `Post::apply` fills in the rest.
+    pub fn upscale_params(&self) -> weft_render::UpscaleParams {
+        let view_proj = self.proj * self.view;
+        let clip_to_prev = self.prev * view_proj.inverse();
+        let to_world = self.view.inverse();
+        let axis = |v: glam::Vec3| {
+            to_world
+                .transform_vector3(v)
+                .normalize_or_zero()
+                .extend(0.0)
+                .to_array()
+        };
+        weft_render::UpscaleParams {
+            reset: self.fresh as u32,
+            fov_y: self.fov_y,
+            aspect: self.aspect,
+            near: 0.05,
+            view_to_clip: self.proj.to_cols_array(),
+            clip_to_view: self.proj.inverse().to_cols_array(),
+            clip_to_prev_clip: clip_to_prev.to_cols_array(),
+            prev_clip_to_clip: clip_to_prev.inverse().to_cols_array(),
+            world_to_view: self.view.to_cols_array(),
+            view_to_world: to_world.to_cols_array(),
+            right: axis(glam::Vec3::X),
+            up: axis(glam::Vec3::Y),
+            // The camera looks down its -z.
+            forward: axis(-glam::Vec3::Z),
+            ..Default::default()
+        }
+    }
+}
+
 pub struct ClientMenu {
     pub kind: u32,
     pub window: u32,
@@ -480,6 +553,8 @@ pub struct Client {
     pub entity_render: EntityRenderer,
     pub player: LocalPlayer,
     pub joined: bool,
+    /// Every block's textures were loaded once after joining (`preload_block_textures`).
+    blocks_preloaded: bool,
     pub player_id: u64,
     /// The local player as an entity: what the server says of it (health, actions, look) and
     /// what its own animation works out, brought up to date each frame (`sync_me`).
@@ -519,11 +594,18 @@ pub struct Client {
     shadow_far: (glam::Mat4, bool),
     shadow_far_bufs: Vec<BufferId>,
     shadow_far_index: u32,
-    /// What the far map holds: its light and the terrain's `terrain_epoch` when it was drawn.
-    /// It is drawn again only when either moved (`render_shadows`).
+    /// What the far map holds: its light about its anchor and the terrain's `terrain_epoch` when it
+    /// was drawn. It is drawn again only when either moved (`render_shadows`).
     shadow_far_drawn: Option<([f32; 16], u64)>,
+    /// The far map's light about its anchor (`prepare_shadows`): a place in the world snapped to
+    /// `FAR_ANCHOR`, so walking does not move it; `shadow_far` is it seen from the camera.
+    shadow_far_anchored: glam::Mat4,
+    /// Frames since the far map was last drawn (terrain that changed waits a little).
+    shadow_far_age: u32,
     /// The maps' size in texels (`core:shadow_size`), as they were made.
     shadow_size: u32,
+    /// The far shadow map's reach to each side (blocks, `core:shadow_far`; 400 as made).
+    shadow_far_reach: f32,
     pub target: Option<Hit>,
     pub target_entity: Option<u64>,
     pub selected: usize,
@@ -626,6 +708,14 @@ pub struct Client {
     /// frame; and with it on, what is drawn after the opaque world goes into `late_out` for the app
     /// to put after the copy instead of into the frame's list.
     pub behind: [f32; 4],
+    /// Last frame's projection and view without the jitter, where its camera stood and the
+    /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`.
+    taa_last: Option<(glam::Mat4, DVec3, f32)>,
+    /// Temporal anti-aliasing's count image this frame, bindless index + 1 (`Scene::taa_frame`),
+    /// set by the app before `render` (`post::Post::taa_out`).
+    pub taa_out: u32,
+    /// The camera the last frame was drawn with, for the backend's upscaler (`upscale_camera`).
+    pub frame_camera: Option<FrameCamera>,
     pub late_out: CommandList,
     /// Seconds until the next dust piece from the block being hit, and until its next knock.
     hit_dust: f32,
@@ -651,13 +741,32 @@ pub struct Client {
     aurora: f32,
     /// How closed the canopy is where the player is (a mod's air, `air_flags::CANOPY_SHIFT`).
     canopy: f32,
+    /// How wet the ground is where the player is, 0..1 (`weather_effects`, `Scene::canopy.y`).
+    wet: f32,
+    /// How far puddles have grown where the player is, 0..1 (`weather_effects`, `Scene::canopy.z`):
+    /// over minutes of rain, drying slower than the ground after.
+    puddles: f32,
+    /// Where rain turns to snow up a mountain where the player is, blocks above the sea (a mod's
+    /// air, `air_flags::SNOWLINE_SHIFT`; `SNOW_LINE_NONE` for none), eased (`Scene::canopy.w`).
+    snow_line: f32,
+    /// What happens in the sky (`weft_abi::sky_event`, chiacraft), how strongly, and when it began
+    /// (`shaders::time`).
+    sky_event: (u32, f32, f32),
+    /// What is falling from the sky: where it lands, and when (`shaders::time`).
+    sky_landing: Option<(DVec3, f32)>,
     /// The weather's look as it is by now, going over to the weather's own (`weather_effects`).
     look: weft_abi::WeatherLook,
+    /// How far the weather's sky has come in where the player is, 0..1 (`weather_effects`): it
+    /// gathers over `GLOOM_SECS` before anything falls.
+    gloom: f32,
     frame_dt: f32,
     /// Seconds left of a lightning's flash.
     lightning: f32,
     /// Lightning flashes seen so far: mods hear a new one as thunder.
     lightnings: u32,
+    /// The last flash for packs (`Scene::lightning`): seconds since it began (real time, so tests'
+    /// pinned shader clock still shows it), and a random number of its own (where it strikes).
+    lightning_seen: (f32, f32, f32),
     /// Holding the use button on an item that takes time: ticks left, ticks in all.
     using: Option<(f32, f32)>,
     /// Who else is mining what, and how far along.
@@ -861,8 +970,17 @@ impl Client {
                 climbing: false,
                 speed_mul: 1.0,
                 jump_mul: 1.0,
+                climb: 0.0,
+                glide: physics::Glide::default(),
+                on_wall: false,
+                gliding: false,
+                rope: None,
+                rope_len: 0.0,
+                rope_for: None,
+                on_rope: false,
             },
             joined: false,
+            blocks_preloaded: false,
             player_id: 0,
             sprint_stopped: false,
             me: ClientEntity::new(content().game.player_kind, DVec3::ZERO, 0.0, 0.0, ItemStack::EMPTY),
@@ -888,7 +1006,10 @@ impl Client {
             shadow_far_bufs: Vec::new(),
             shadow_far_index: 0,
             shadow_far_drawn: None,
+            shadow_far_anchored: glam::Mat4::IDENTITY,
+            shadow_far_age: 0,
             shadow_size: 2048,
+            shadow_far_reach: FAR_REACH,
             target: None,
             target_entity: None,
             selected: 0,
@@ -921,6 +1042,9 @@ impl Client {
             late: CommandList::default(),
             hand_late: CommandList::default(),
             behind: [0.0; 4],
+            taa_last: None,
+            taa_out: 0,
+            frame_camera: None,
             late_out: CommandList::default(),
             hit_dust: 0.0,
             hit_sound: 0.0,
@@ -966,10 +1090,17 @@ impl Client {
             dust: 0.0,
             aurora: 0.0,
             canopy: 0.0,
+            wet: 0.0,
+            puddles: 0.0,
+            snow_line: SNOW_LINE_NONE,
+            sky_event: (0, 0.0, 0.0),
+            sky_landing: None,
             weather_id: 0,
             look: Default::default(),
+            gloom: 0.0,
             lightning: 0.0,
             lightnings: 0,
+            lightning_seen: (1.0e4, 0.0, 0.0),
             using: None,
             others_mining: Vec::new(),
             told_mining: None,
@@ -1084,7 +1215,10 @@ impl Client {
         input.mute_moves = m.has(weft_abi::camera_flags::DETACHED);
         input.mute_hands = m.has(weft_abi::camera_flags::NO_INTERACT);
         let input = &*input;
+        crate::diag::end_parts();
+        let p = crate::diag::part("messages and terrain");
         self.take_messages(dt);
+        drop(p);
         self.read_look(input);
         self.read_controls(input);
         self.fly_speed(input);
@@ -1102,14 +1236,20 @@ impl Client {
         if input.pressed("core:inventory") && input.captured {
             self.conn.send(ToServer::OpenInventory);
         }
+        let p = crate::diag::part("physics, camera, act");
         self.step_physics(input, dt);
         self.update_camera(input, dt as f32);
         let look = self.aim(input);
         self.act(input, dt, look);
         self.send_move(dt);
+        drop(p);
+        let p = crate::diag::part("entities");
         self.animate_entities(dt);
+        drop(p);
         self.chip_block(dt);
+        let p = crate::diag::part("particles");
         self.particles.update(dt as f32);
+        drop(p);
         self.creature_sounds(dt as f32, moved);
         self.me.hurt = (self.me.hurt - dt as f32).max(0.0);
         self.dead_for = self.dead.then(|| self.dead_for.unwrap_or(0.0) + dt as f32);
@@ -1382,6 +1522,21 @@ impl Client {
                 }
                 if !flying {
                     self.player.vel += push;
+                }
+                // Out of any block it overlaps, before moving: movement doesn't clip against what
+                // the box is already inside (`physics::push_out`). From where it was too, so the
+                // eyes don't pass through the block on the way (`smooth_pos`).
+                // The same cells the move goes by: flying takes cubes not here yet for air.
+                if !self.player.noclip {
+                    let d = self.player.dims();
+                    let out = if flying {
+                        physics::push_out(c, &air_if_missing, self.player.pos, d.half_width, d.height)
+                    } else {
+                        physics::push_out(c, &block, self.player.pos, d.half_width, d.height)
+                    };
+                    if let Some(out) = out {
+                        (self.player.pos, self.player.prev) = (out, out);
+                    }
                 }
                 if flying {
                     step_player(&mut self.player, input, &air_if_missing, gravity, &bodies);
@@ -1778,7 +1933,24 @@ impl Client {
         }
     }
 
+    /// Every block state's textures, loaded once while the world comes in after joining: a mesh
+    /// loading its own mid-play decoded with the frame waiting (15-35 ms frames in a new biome,
+    /// budgeted uploads overrunning to 30 ms; perf review #9). About 0.2 ms a texture, decoded in
+    /// parallel. A pack's own looks still load when first drawn.
+    fn preload_block_textures(&mut self, gpu: &mut dyn Backend, textures: &GameTextures) {
+        if self.blocks_preloaded || !self.joined {
+            return;
+        }
+        self.blocks_preloaded = true;
+        let t = Instant::now();
+        // All of them, not only the blocks': items, entities, particles, the GUI and connected
+        // tiles otherwise loaded inside a mesh upload when first shown (about 80 at a join).
+        let n = textures.load_all(gpu);
+        log::info!(target: "load", "textures preloaded: {n} in {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
+    }
+
     fn upload_meshes(&mut self, gpu: &mut dyn Backend, textures: &GameTextures) {
+        self.preload_block_textures(gpu, textures);
         let center: IVec3 = (self.player.pos.floor().as_ivec3()) >> 4;
         // Wide enough for every column the server keeps sent (view radius + 2).
         let reach = self.view_radius + 3;
@@ -1788,12 +1960,14 @@ impl Client {
         if std::mem::take(&mut self.world.tints_changed) {
             self.render.set_biome_table(gpu, self.world.biome_tints());
         }
+        let p = crate::diag::part("tints");
         for (col, tints) in self
             .world
             .take_tints(glam::IVec2::new(center.x, center.z), reach)
         {
             self.render.upload_tints(gpu, col, &tints);
         }
+        drop(p);
         if self.joined && self.terrain_view != (center, self.view_radius) {
             self.terrain_view = (center, self.view_radius);
             let _ = self
@@ -1803,18 +1977,25 @@ impl Client {
         }
         // Enough jobs that meshing keeps up at 50 frames per second too (results are taken once
         // a frame), not only at hundreds.
+        let p = crate::diag::part("schedule meshing");
         self.world
             .schedule_meshing(center, crate::meshing().current_num_threads() * 512);
+        drop(p);
+        let p = crate::diag::part("solid cells");
         self.render.update_solid(gpu, &self.world, center);
+        drop(p);
         self.world.set_eye(center.y);
         // Uploads too, oldest first; the rest wait for the next frame (dropped if their cube
         // changed or left meanwhile). Edits and what is around the player go right away.
+        let p = crate::diag::part("uploads near (no budget)");
         let (now, later) = self.world.take_meshes(center);
         for r in now {
             self.render.upload(gpu, textures, (0, r.pos), &r.mesh);
             self.world.mark_shown(r.pos);
         }
         self.meshes.extend(later);
+        drop(p);
+        let _p = crate::diag::part("uploads (budget)");
         let start = Instant::now();
         while start.elapsed() < self.budget {
             let Some(r) = self.meshes.pop_front() else { break };
@@ -2215,7 +2396,8 @@ impl Client {
     /// Copies an engine field component into the entity (or the own player) that shows it.
     fn engine_field(&mut self, id: u64, comp: u32, bytes: &[u8]) {
         let c = content();
-        let [health, burning, worn, shape, held, off_held, using, swaps, looping, effect, forced, riding, held_look] = c.game.field_comps;
+        let [health, burning, worn, shape, held, off_held, using, swaps, looping, effect, forced, riding, held_look, worn_looks] =
+            c.game.field_comps;
         let now = self.world.time;
         let f: Vec<f32> = words(bytes).map(f32::from_le_bytes).collect();
         let shaped = || {
@@ -2244,6 +2426,11 @@ impl Client {
             e.burning = bytes.first().is_some_and(|&b| b != 0);
         } else if comp == worn {
             e.worn = words(bytes).map(u32::from_le_bytes).collect();
+        } else if comp == worn_looks {
+            e.worn_looks = String::from_utf8_lossy(bytes)
+                .split('\n')
+                .map(str::to_string)
+                .collect();
         } else if comp == held {
             e.held = words(bytes).next().map_or(0, u32::from_le_bytes);
         } else if comp == held_look {
@@ -2294,6 +2481,19 @@ impl Client {
                 .0
                 .unwrap_or(c.game.entities[c.game.player_kind as usize].size());
         }
+    }
+
+    /// The worn looks of what the local player wears (`abi::comp::WORN_LOOK`), in `worn`'s order.
+    pub fn worn_looks(&self) -> Vec<String> {
+        let c = content();
+        let w = &c.game.player_layout.worn;
+        self.inventory
+            .get(w.start as usize..w.end as usize)
+            .unwrap_or_default()
+            .iter()
+            .filter(|s| !s.is_empty() && c.worn(s.item).is_some())
+            .map(|s| crate::stack::worn_look(s).unwrap_or("").to_string())
+            .collect()
     }
 
     /// Items the local player wears.
@@ -2436,6 +2636,15 @@ impl Client {
             .inventory
             .get(w.start as usize..w.end as usize)
             .map_or(Vec::new(), |s| s.iter().filter(|s| !s.is_empty()).map(|s| s.item).collect());
+        let worn_looks: Vec<String> = self
+            .inventory
+            .get(w.start as usize..w.end as usize)
+            .map_or(Vec::new(), |s| {
+                s.iter()
+                    .filter(|s| !s.is_empty())
+                    .map(|s| crate::stack::worn_look(s).unwrap_or("").to_string())
+                    .collect()
+            });
         let (pos, held, off_held) = (self.smooth_pos(), self.shown_held().item, self.off_held().item);
         let using = self
             .using
@@ -2445,6 +2654,7 @@ impl Client {
         me.held_look = held_look;
         (me.pos, me.target, me.yaw, me.target_yaw, me.pitch) = (pos, pos, self.player.yaw, self.player.yaw, self.player.pitch);
         (me.worn, me.held, me.off_held, me.using) = (worn, held, off_held, using);
+        me.worn_looks = worn_looks;
         (me.arm_swing, me.swing_off, me.pose, me.walked) = (self.hand_swing, self.hand_swing_off, self.player.pose, me.walk);
         me.sprinting = self.player.sprinting && self.player.on_ground;
         me.age = self.start.elapsed().as_secs_f32();
@@ -2487,6 +2697,22 @@ impl Client {
         self.gpu_terrain.destroy(gpu);
     }
 
+    /// The daylight the lightmap is given (`Scene.params.z`). chiacraft, test only: with
+    /// `--mc-days`, vanilla's own (`getSkyDarken`: the sun's height doubled plus 0.2, then 0.8 of
+    /// it over a floor of 0.2), which the lightmap (`common.wgsl`, 26.1's) was made for. Ours
+    /// (`daylight`) adds 0.5, vanilla's curve for whole sky-light levels, so by 06:00 and 18:00
+    /// vanilla's land had dimmed to 0.73 of noon and ours to 0.95 (Bliss's world, shaders off).
+    fn lightmap_day(&self) -> f32 {
+        let dim = &content().dims[self.world.dim as usize];
+        if !crate::app::api::mc_days() || !dim.sky_light || !dim.daylight.is_empty() {
+            return self.daylight();
+        }
+        let turn = dim.day_turn(self.world.time as f64);
+        let g = ((turn * std::f64::consts::TAU).sin() * 2.0 + 0.2).clamp(0.0, 1.0) as f32;
+        let day = (g * 0.8 + 0.2) * (1.0 - self.look.darkness);
+        if self.lightning > 0.0 { (day + 0.5).min(1.0) } else { day }
+    }
+
     /// Fraction of full daylight for the current dimension and time.
     pub fn daylight(&self) -> f32 {
         // Rain takes away a third of the day, a lightning brings it back for a moment.
@@ -2499,19 +2725,43 @@ impl Client {
     fn weather_effects(&mut self, dt: f32) {
         let weather = &content().game.weathers[self.weather_id as usize];
         // Where the player stands: the weather only in some biomes, when a mod says where
-        // (chiacraft); clear elsewhere.
-        let here = self.world.rains_at(self.player.pos.floor().as_ivec3());
-        let (to, step) = (if here { weather.look } else { weft_abi::WeatherLook::default() }, dt / 5.0);
-        let go = |v: &mut f32, t: f32| *v += (t - *v).clamp(-step, step);
+        // (chiacraft); clear elsewhere. Asked at nine places round the player a stretch apart,
+        // so across a border into rain the sky and the rain come in over a few chunks.
+        let at = self.player.pos.floor().as_ivec3();
+        let mut wet = 0;
+        for dx in -1..=1 {
+            for dz in -1..=1 {
+                if self
+                    .world
+                    .rains_at(at + IVec3::new(dx * WEATHER_REACH, 0, dz * WEATHER_REACH))
+                {
+                    wet += 1;
+                }
+            }
+        }
+        let share = wet as f32 / 9.0;
+        let here = self.world.rains_at(at);
+        // The sky gathers first: clouds and gray over GLOOM_SECS (and clears as slowly); what
+        // falls comes once it is more than half there, over FALLS_SECS, and stops first. Both
+        // went from nothing to all in five seconds, the moment the spell began (Ronald, 11-06:
+        // "it like change in 2 seconds from clear to rain").
+        self.gloom += (share - self.gloom).clamp(-dt / GLOOM_SECS, dt / GLOOM_SECS);
+        let none = weft_abi::WeatherLook::default();
+        let to = weather.look;
+        let sky = |clear: f32, rain: f32| clear + (rain - clear) * self.gloom;
+        let falls_to = if weather.falls() { to.falls * share * smoothstep(0.55, 0.9, self.gloom) } else { 0.0 };
+        let step = dt / 5.0;
+        let go = |v: &mut f32, t: f32, step: f32| *v += (t - *v).clamp(-step, step);
         let l = &mut self.look;
-        go(&mut l.falls, if weather.falls() { to.falls } else { 0.0 });
-        go(&mut l.sky_gray, to.sky_gray);
-        go(&mut l.sky_cover, to.sky_cover);
-        go(&mut l.fog_gray, to.fog_gray);
-        go(&mut l.cloud_gray, to.cloud_gray);
-        go(&mut l.cloud_dark, to.cloud_dark);
-        go(&mut l.darkness, to.darkness);
+        go(&mut l.falls, falls_to, dt / FALLS_SECS);
+        go(&mut l.sky_gray, sky(none.sky_gray, to.sky_gray), step);
+        go(&mut l.sky_cover, sky(none.sky_cover, to.sky_cover), step);
+        go(&mut l.fog_gray, sky(none.fog_gray, to.fog_gray), step);
+        go(&mut l.cloud_gray, sky(none.cloud_gray, to.cloud_gray), step);
+        go(&mut l.cloud_dark, sky(none.cloud_dark, to.cloud_dark), step);
+        go(&mut l.darkness, sky(none.darkness, to.darkness), step);
         self.lightning = (self.lightning - dt).max(0.0);
+        self.lightning_seen.0 = (self.lightning_seen.0 + dt).min(1.0e4);
         // The air where the player is: fog rolls in over a few seconds (the weather itself changes
         // it slowly), the wind turns in seconds.
         let (fog, speed, cover, flags) = self.world.air_at(self.player.pos.floor().as_ivec3());
@@ -2524,12 +2774,40 @@ impl Client {
         self.aurora += (aurora - self.aurora).clamp(-dt / 20.0, dt / 20.0);
         let canopy = ((flags >> weft_abi::air_flags::CANOPY_SHIFT) & 255) as f32 / 255.0;
         self.canopy += (canopy - self.canopy).clamp(-dt / 10.0, dt / 10.0);
+        // The ground wets as the rain comes (in about twenty seconds) and dries after it at the
+        // pace the air there gives (a mod's `DRYING_SHIFT`; 0, about two minutes): it stayed wet
+        // only as long as the rain fell, gone 25 s after (Tester 2's after-rain shots, 11-05).
+        let falling = if self.snowing > 0.5 { 0.0 } else { self.look.falls };
+        if falling > self.wet {
+            self.wet = (self.wet + dt / 20.0).min(falling);
+        } else {
+            let drying = (flags >> weft_abi::air_flags::DRYING_SHIFT) & 255;
+            let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
+            self.wet = (self.wet - dt / secs).max(falling);
+        }
+        // Puddles grow over about ten minutes of steady rain (a shower leaves a few) and dry a third
+        // as fast as the ground after it, the last of the wet to go (at half its pace they were gone
+        // three minutes after a five-minute rain, the ground still dark: PC shpd7).
+        if falling > 0.0 {
+            self.puddles = (self.puddles + falling * dt / 600.0).min(1.0);
+        } else {
+            let drying = (flags >> weft_abi::air_flags::DRYING_SHIFT) & 255;
+            let secs = if drying == 0 { 120.0 } else { 3600.0 * (30.0f32 / 3600.0).powf((drying - 1) as f32 / 254.0) };
+            self.puddles = (self.puddles - dt / (secs * 3.0)).max(0.0);
+        }
+        let line = (flags >> weft_abi::air_flags::SNOWLINE_SHIFT) & 63;
+        let line = if line == 0 { SNOW_LINE_NONE } else { (line - 1) as f32 * 4.0 };
+        self.snow_line += (line - self.snow_line).clamp(-dt * 40.0, dt * 40.0);
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
-        if here && weather.lightning() && self.chance() < dt / 12.0 {
+        if here && self.gloom > 0.9 && weather.lightning() && self.chance() < dt / 12.0 {
             self.lightning = 0.15;
             self.lightnings = self.lightnings.wrapping_add(1);
+            // Where the camera faced as it began (radians, clockwise from -z): the pack aims most
+            // strikes near it, and the bolt stays put while the player turns.
+            let f = self.camera().forward();
+            self.lightning_seen = (0.0, self.chance(), f.x.atan2(-f.z));
         }
         if let Some(sound) = weather
             .sound
@@ -2543,6 +2821,13 @@ impl Client {
         }
     }
 
+    /// What the wind carries particles by (`gpu_layout::ParticleSimArgs::wind`): the wind where
+    /// the player is, how hard it rains, and the shaders' seconds its gusts move by, as the
+    /// plants' sway has them.
+    pub fn particle_wind(&self) -> [f32; 4] {
+        [self.wind.x, self.wind.y, self.rain(), crate::shaders::time()]
+    }
+
     /// The weather where the player is, as drawn (`ClientState::rain` and on, for mods' sound).
     pub fn weather_now(&self) -> (f32, f32, [f32; 2], f32, u32) {
         (self.rain(), self.thunder(), self.wind.to_array(), self.snowing, self.lightnings)
@@ -2552,6 +2837,15 @@ impl Client {
     /// `scene.fog_color.w` for packs, mods' rain sound).
     fn rain(&self) -> f32 {
         self.look.falls.clamp(0.0, 1.0)
+    }
+
+    /// How far the rain's sky has come where the player is, 0..1, for packs (chiacraft's
+    /// `scene.fog_color.w`: its sky's gray, its clouds, the far rain's mist): ahead of what falls,
+    /// so the sky darkens before the drops (`weather_effects`), never behind it.
+    fn sky_rain(&self) -> f32 {
+        let weather = &content().game.weathers[self.weather_id as usize];
+        let full = if weather.falls() { weather.look.falls } else { 0.0 };
+        (self.gloom * full).max(self.look.falls).clamp(0.0, 1.0)
     }
 
     /// How stormy it is, 0..1: thunder's clouds go 0.95 dark (`scene.weather.w` for packs).
@@ -2579,6 +2873,25 @@ impl Client {
     }
 
     /// The frame as every world pass sees it (`gpu_layout::Scene`).
+    /// Temporal anti-aliasing's fields (`Scene::taa`, `taa_prev`): this frame's jitter, and last
+    /// frame's camera without it, taking this frame's camera-relative positions, with the
+    /// shaders' clock then. A camera that moved more than 32 blocks (a teleport, a respawn) or a
+    /// clock that went back starts it anew, and so does a frame without it (`post::taa_active`):
+    /// `taa.z` 0 then, and the shaders skip their motion.
+    fn taa_frame(&mut self, cam: &Camera, frame: &FrameInfo) -> ([f32; 4], [[f32; 4]; 4]) {
+        let aspect = frame.width as f32 / frame.height.max(1) as f32;
+        let now = cam.proj_plain(aspect) * cam.view();
+        let j = crate::post::jitter();
+        let t = crate::shaders::time();
+        match self.taa_last.replace((now, cam.pos, t)) {
+            Some((last, at, then)) if crate::post::taa_active() && (cam.pos - at).length() < 32.0 && then <= t => {
+                let moved = glam::Mat4::from_translation((cam.pos - at).as_vec3());
+                ([j.x, j.y, 1.0, then], (last * moved).to_cols_array_2d())
+            }
+            _ => ([j.x, j.y, 0.0, t], now.to_cols_array_2d()),
+        }
+    }
+
     fn scene(&self, cam: &Camera, frame: &FrameInfo) -> Scene {
         // Fog ends where the terrain does: the view, or the distant terrain beyond it.
         let view_distance = (self.view_radius * 16).max(lod::Lod::distance()) as f32;
@@ -2603,7 +2916,7 @@ impl Client {
             right: inv.transform_vector3(Vec3::X).extend(0.0).to_array(),
             up: inv.transform_vector3(Vec3::Y).extend(0.0).to_array(),
             fog_color: self.fog_color(),
-            params: [fog_start, fog_end, self.daylight(), crate::shaders::time()],
+            params: [fog_start, fog_end, self.lightmap_day(), crate::shaders::time()],
             light: [content().dims[self.world.dim as usize].ambient as f32 / 15.0, self.brightness, ticks, 0.0],
             sun: self.sun(),
             weather: [self.wind.x, self.wind.y, self.fog, self.thunder()],
@@ -2616,15 +2929,53 @@ impl Client {
             options: pack_options(),
             hand: hand.0,
             hand_light: hand.1,
-            canopy: [self.canopy, 0.0, 0.0, 0.0],
+            canopy: [self.canopy, self.wet, self.puddles, self.snow_line],
+            // Filled in once the sky has readied them (`render`).
+            soft_clouds: [0.0; 4],
+            // Filled in once the sky has readied it (`render`).
+            frame_look: [0.0; 4],
+            lightning: [self.lightning_seen.0, self.lightning_seen.1, self.thunder(), self.lightning_seen.2],
+            froxels: [0.0; 4],
+            upscale: [crate::settings::upscaler() as f32, 0.0, 0.0, 0.0],
+            // Filled in by `render` (`taa_frame`).
+            taa: [0.0; 4],
+            taa_prev: [[0.0; 4]; 4],
+            taa_frame: [self.taa_out as f32, crate::post::motion() as u32 as f32, 0.0, 0.0],
+            dlss: [crate::post::mip_bias(), 0.0, 0.0, 0.0],
+            cloud_shadow: [0.0; 4],
+            prev_view_proj: [[0.0; 4]; 4],
+            cloud_moved: [0.0; 4],
+            // On the real clock (`shaders::clock`): tests pin the shaders' time, and a fireball's
+            // countdown and a shower's streaks stood still in their shots.
+            sky_event: [self.sky_event.0 as f32, self.sky_event.1, crate::shaders::clock() - self.sky_event.2, 0.0],
+            sky_landing: match self.sky_landing {
+                Some((at, when)) => (at - cam.pos)
+                    .as_vec3()
+                    .extend(when - crate::shaders::clock())
+                    .to_array(),
+                None => [0.0, 0.0, 0.0, -1e6],
+            },
+            frame: [crate::post::hdr() as u32 as f32, crate::post::bloom() as u32 as f32, self.sky.froxels.cell as f32, {
+                // chiacraft: a count of the frames drawn, 0 to 63 and round again, for dithers that
+                // change each frame (Far view, 11-06: the cubes' fade into distant terrain).
+                // Held under an upscaler (`post::dither_moves`).
+                static FRAME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+                if crate::post::dither_moves() { (FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 64) as f32 } else { 0.0 }
+            }],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
                 Some(_) if self.shadow_far.1 => {
-                    [self.shadow_far_index as f32, self.shadow_size as f32, 1.0, 2.0 * FAR_REACH / self.shadow_size as f32]
+                    [self.shadow_far_index as f32, self.shadow_size as f32, 1.0, 2.0 * self.shadow_far_reach / self.shadow_size as f32]
                 }
                 _ => [0.0; 4],
             },
+            rt: [
+                self.render.rt_traced() as u32 as f32,
+                (self.render.rt_frame_no() % (1 << 24)) as f32,
+                (shadow_setting("core:rt_shadows", 0.0) > 1.5) as u32 as f32,
+                self.render.rt_reflects() as u32 as f32,
+            ],
             shadow: match self.shadow_map {
                 Some(t) if self.shadow.1 => {
                     [self.shadow_index(t) as f32, self.shadow_size as f32, 1.0, 2.0 * SHADOW_REACH / self.shadow_size as f32]
@@ -2779,6 +3130,38 @@ impl Client {
         self.shadow_index
     }
 
+    /// `core:rt_shadows` turned on or off: the scene made (or let go), and whether the world shader
+    /// has to be composed again (the app does it before anything of the frame draws with it).
+    pub fn rt_switch(&mut self, gpu: &mut dyn Backend) -> bool {
+        let shadows = shadow_setting("core:rt_shadows", 0.0) > 0.5;
+        let reflections = shadow_setting("core:rt_reflections", 0.0) > 0.5;
+        let traced = shadow_setting("core:path_traced", 0.0) > 0.5;
+        self.render.set_rt_modes(shadows, reflections);
+        self.render.set_rt(gpu, shadows || reflections || traced);
+        self.render.rt_reload
+    }
+
+    /// Path traced lighting (`core:path_traced`, `WorldRenderer::path_trace`), after the world's
+    /// pass into `target` (the world's image, its size `size`) and before the effects: first the
+    /// G-buffer pass (`WorldRenderer::gbuffer_pass`), then the traced light.
+    pub fn path_trace(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        slot: usize,
+        depth: weft_render::TextureId,
+        target: weft_render::Target,
+        size: (u32, u32),
+    ) {
+        if shadow_setting("core:path_traced", 0.0) > 0.5 {
+            let debug = shadow_setting("core:pt_debug", 0.0) as u32;
+            // The G-buffer (albedo, normal and roughness, spec) the denoisers read: `render.gb_images`.
+            self.render.gbuffer_pass(gpu, list, depth, size);
+            self.render
+                .path_trace(gpu, list, slot, depth, target, size, debug, false);
+        }
+    }
+
     /// Sun shadows (`sun_shadows` packs), first their light, before the world is drawn (its scene
     /// samples the map with it): from the sun, or the moon once it has set, an orthographic box
     /// `SHADOW_REACH` blocks to each side of the camera along the light, moved in whole texels so
@@ -2839,16 +3222,33 @@ impl Client {
             self.shadow_far_map = Some(t);
             self.shadow_far_drawn = None;
         }
+        // The far map's reach (`core:shadow_far`: auto 2000 with the HDR world, 400 without; to 2400):
+        // drawn again when it changes.
+        let set = shadow_setting("core:shadow_far", 0.0) as f32;
+        let auto = if crate::post::hdr() { 2000.0 } else { FAR_REACH };
+        let reach = if set <= 0.0 { auto } else { set.clamp(200.0, 2400.0) };
+        if reach != self.shadow_far_reach {
+            self.shadow_far_reach = reach;
+            self.shadow_far_drawn = None;
+        }
         let cam = self.render_camera();
         self.shadow = (light_box(dir, cam.pos, SHADOW_REACH, SHADOW_DEPTH, size), true);
-        self.shadow_far = (light_box(dir, cam.pos, FAR_REACH, FAR_DEPTH, size), level >= 2);
+        // The far map about a place in the world, not the camera: built about the camera, its box
+        // moved by a fraction of a texel every frame the player moved, and it was drawn again each
+        // frame (Research round 16, #8: +4,500 draw records a frame walking, about 0.6 ms on the
+        // Mac). Snapped to `FAR_ANCHOR` blocks, it stays put until the player crosses into
+        // another cell; seen from the camera it is the same box, moved by camera less anchor.
+        let anchor = ((cam.pos / FAR_ANCHOR).floor() + 0.5) * FAR_ANCHOR;
+        let anchored = light_box(dir, anchor, reach, reach * FAR_DEPTH / FAR_REACH, size);
+        self.shadow_far_anchored = anchored;
+        let from_cam = glam::Mat4::from_translation((cam.pos - anchor).as_vec3());
+        self.shadow_far = (anchored * from_cam, level >= 2);
     }
 
     /// The sun's shadow map, after `render` posed this frame's models (the pass is put before the
     /// world's in the frame's list): the terrain and the models, the player's own body too.
     pub fn render_shadows(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo) {
-        let (light, true) = self.shadow else { return };
-        let Some(map) = self.shadow_map else { return };
+        let (Some(map), Some(far_map)) = (self.shadow_map, self.shadow_far_map) else { return };
         let cam = self.render_camera();
         while self.shadow_bufs.len() < gpu.frames_in_flight() {
             self.shadow_bufs.push(gpu.create_buffer(
@@ -2858,12 +3258,30 @@ impl Client {
             ));
         }
         let mut scene = self.scene(&cam, frame);
-        scene.view_proj = light.to_cols_array_2d();
         // The map is the pass's target: nothing in it may sample it.
         scene.shadow = [0.0; 4];
+        if let (light, true) = self.shadow {
+            self.render_near_shadows(gpu, list, frame, &cam, light, map, scene);
+        }
+        self.render_far_shadows(gpu, list, frame, &cam, far_map, scene);
+    }
+
+    /// The near cascade: the terrain and the models, the player's own body too.
+    #[allow(clippy::too_many_arguments)]
+    fn render_near_shadows(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        cam: &Camera,
+        light: glam::Mat4,
+        map: weft_render::TextureId,
+        mut scene: Scene,
+    ) {
+        scene.view_proj = light.to_cols_array_2d();
         let buf = self.shadow_bufs[frame.slot];
         gpu.mapped(buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
-        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((map, Some(0.0))) });
+        list.push(weft_render::Cmd::BeginPass { motion: None, color: None, depth: Some((map, Some(0.0))) });
         // Leaning structures (chiacraft, a falling tree) cast theirs, turned.
         let leaning: Vec<(u64, DVec3, (Vec3, glam::Quat))> = self
             .entities
@@ -2874,19 +3292,40 @@ impl Client {
                     .map(|l| (id, physics::Transform::of(e.pos).origin(), (l.pivot, l.now())))
             })
             .collect();
-        self.render
-            .draw_shadow(gpu, list, frame, &cam, light, buf, 0, &leaning);
+        // With traced shadows (`core:rt_shadows`) the terrain casts by its rays: the near map then
+        // holds the models alone (mobs, the player), which the world's rays don't see.
+        if !self.render.rt_traced() {
+            self.render
+                .draw_shadow(gpu, list, frame, cam, light, buf, 0, &leaning);
+        }
         self.entity_render.draw_shadow(gpu, list, frame, buf);
         list.push(weft_render::Cmd::EndPass);
-        // The far cascade: the terrain alone, coarser, to where hills stand far off.
-        let (Some(far_map), (far, true)) = (self.shadow_far_map, self.shadow_far) else { return };
-        // Kept from an earlier frame while neither the light (in whole texels and `settled` steps)
-        // nor the terrain has moved: standing still, the far map costs nothing.
-        let drawn = (far.to_cols_array(), self.render.terrain_epoch);
-        if self.shadow_far_drawn == Some(drawn) {
+    }
+
+    /// The far cascade: the terrain alone, coarser, to where hills stand far off.
+    fn render_far_shadows(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        cam: &Camera,
+        far_map: weft_render::TextureId,
+        mut scene: Scene,
+    ) {
+        let (far, true) = self.shadow_far else { return };
+        // Kept from an earlier frame while neither the light about its anchor (in whole texels and
+        // `settled` steps) nor the terrain has moved: walking within a cell, the far map costs
+        // nothing. Terrain that loads (every mesh bumps `terrain_epoch`) waits FAR_TERRAIN_WAIT
+        // frames, so streaming chunks don't redraw it every frame.
+        self.shadow_far_age = self.shadow_far_age.saturating_add(1);
+        let drawn = (self.shadow_far_anchored.to_cols_array(), self.render.terrain_epoch);
+        let light_moved = self.shadow_far_drawn.is_none_or(|d| d.0 != drawn.0);
+        let terrain_moved = self.shadow_far_drawn.is_some_and(|d| d.1 != drawn.1);
+        if !light_moved && (!terrain_moved || self.shadow_far_age < FAR_TERRAIN_WAIT) {
             return;
         }
         self.shadow_far_drawn = Some(drawn);
+        self.shadow_far_age = 0;
         while self.shadow_far_bufs.len() < gpu.frames_in_flight() {
             self.shadow_far_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,
@@ -2898,9 +3337,9 @@ impl Client {
         scene.shadow_far = [0.0; 4];
         let far_buf = self.shadow_far_bufs[frame.slot];
         gpu.mapped(far_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
-        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((far_map, Some(0.0))) });
+        list.push(weft_render::Cmd::BeginPass { motion: None, color: None, depth: Some((far_map, Some(0.0))) });
         self.render
-            .draw_shadow(gpu, list, frame, &cam, far, far_buf, 1, &[]);
+            .draw_shadow(gpu, list, frame, cam, far, far_buf, 1, &[]);
         list.push(weft_render::Cmd::EndPass);
     }
 
@@ -2918,7 +3357,31 @@ impl Client {
             self.entity_render.set_skin(gpu, entity, &png);
         }
         let cam = self.render_camera();
-        let scene = self.scene(&cam, frame);
+        // Ray tracing's scene (`core:rt_shadows`): this frame's builds and its TLAS, before the
+        // world's draws that bind it (`app` switched the world shader before this, `rt_switch`).
+        self.render.rt_frame(gpu, early, frame.slot, &cam);
+        let mut scene = self.scene(&cam, frame);
+        (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
+        let aspect = frame.width as f32 / frame.height.max(1) as f32;
+        self.frame_camera = Some(FrameCamera {
+            view: cam.view(),
+            proj: cam.proj_plain(aspect),
+            prev: glam::Mat4::from_cols_array_2d(&scene.taa_prev),
+            fresh: scene.taa[2] == 0.0,
+            fov_y: cam.fov.to_radians(),
+            aspect,
+        });
+        // The calm world pipelines (`gpu_layout::CALM_OFF`) while nothing they leave out is on, read
+        // from the scene the shaders see: no fog in the air, no thunder, no held light, the eye in
+        // no liquid (the fog then starts at 0.6 of its end).
+        let hand = scene.hand_light;
+        let calm = scene.weather[2] <= 0.0
+            && scene.lightning[2] < 0.05
+            && hand[0].max(hand[1]).max(hand[2]) <= 0.0
+            && (scene.params[0] - 0.6 * scene.params[1]).abs() <= 0.5;
+        // And dry (`gpu_layout::DRY_OFF`): no rain, the ground dry, no puddles, no snow lying here.
+        let dry = scene.fog_color[3] <= 0.0 && scene.canopy[1] <= 0.0 && scene.canopy[2] <= 0.0 && scene.ground[0] <= 0.0;
+        self.render.set_calm(if calm { 1 + dry as u8 } else { 0 });
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,
@@ -2973,6 +3436,10 @@ impl Client {
         // The sky fills what the opaque world left, and translucent things are seen against it.
         let overlays = self.overlays(textures);
         let s = crate::diag::span("render/sky");
+        // Soft clouds trace against the copy of the world (`behind`), made after this.
+        self.sky.soft_possible = self.behind[2] > 0.5;
+        // The mist's volume, when there is mist and the eye is out of liquids (`fog_through`).
+        self.sky.froxels_possible = self.fog >= 0.005 && self.eye_liquid().is_none();
         self.sky.draw(
             gpu,
             &mut late,
@@ -2989,6 +3456,12 @@ impl Client {
             &overlays,
         );
         drop(s);
+        // The sky readied this frame's soft clouds: their fields in the scene.
+        (scene.soft_clouds, scene.prev_view_proj, scene.cloud_moved) = self.sky.soft.scene;
+        scene.frame_look = self.sky.frame_look.scene;
+        scene.froxels = self.sky.froxels.scene;
+        scene.cloud_shadow = self.sky.cloud_shadow.scene;
+        gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render.draw_translucent(&mut late);
         let alive = !self.dead && !self.mode.has(weft_abi::game_mode_flags::NO_INTERACT);
         let hand = (alive && self.camera_has(weft_abi::camera_flags::HAND) && !self.hide_gui).then(|| entity_render::Hand {
@@ -3058,7 +3531,12 @@ impl Client {
             list.append(&mut hand_late);
         }
         (self.late, self.hand_late) = (late, hand_late);
-        list.push(weft_render::Cmd::Mark);
+        // The end of the "translucent" part; with the copy, the app marks it after what it draws
+        // after the copy, so the sky, clouds and water are not counted as screen effects (Research
+        // round 16, M1).
+        if self.behind[2] <= 0.5 {
+            list.push(weft_render::Cmd::Mark);
+        }
     }
 
     /// Linear rgb, and in w how hard it rains (0..1) for shader packs.
@@ -3068,7 +3546,7 @@ impl Client {
     }
 
     pub fn fog_color(&self) -> [f32; 4] {
-        self.fog_linear().extend(self.rain()).to_array()
+        self.fog_linear().extend(self.sky_rain()).to_array()
     }
 }
 
@@ -3085,13 +3563,30 @@ fn shadow_setting(name: &str, default: f64) -> f64 {
 }
 /// The far cascade's reach and depth (blocks): hills a few hundred blocks off have shadows too.
 const FAR_REACH: f32 = 400.0;
+/// The far shadow map's anchor snaps to this many blocks (`prepare_shadows`): its 400 blocks to
+/// each side cover the camera wherever it stands in the cell.
+const FAR_ANCHOR: f64 = 32.0;
+/// Seconds the weather's sky takes to gather (or clear) where the player is, and the rain to come
+/// in once it has (`Client::weather_effects`); and how far apart the places are that it asks for
+/// rain round the player (blocks: three across span about three chunks).
+const GLOOM_SECS: f32 = 90.0;
+const FALLS_SECS: f32 = 25.0;
+const WEATHER_REACH: i32 = 24;
+
+fn smoothstep(a: f32, b: f32, x: f32) -> f32 {
+    let t = ((x - a) / (b - a)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Frames the far map waits before drawing in terrain that changed (about a sixth of a second).
+const FAR_TERRAIN_WAIT: u32 = 10;
 const FAR_DEPTH: f32 = 1200.0;
 
 /// The values of the settings the shader pack reads (`Scene::options`).
-fn pack_options() -> [[f32; 4]; 4] {
-    let mut out = [[0.0; 4]; 4];
+fn pack_options() -> [[f32; 4]; 12] {
+    let mut out = [[0.0; 4]; 12];
     let names = &content().game.config_names;
-    for (i, name) in crate::packs::pack_options().iter().enumerate().take(16) {
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(48) {
         if let Some(&id) = names.get(name.as_str()) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }
@@ -3218,6 +3713,11 @@ fn swims_in(c: &crate::content::Content, kind: u32, worn: &[u32]) -> Vec<bool> {
         .collect()
 }
 
+/// Where on a player a rope holds it: its hands over its head, as a share of its height.
+const ROPE_HOLD: f64 = 1.05;
+/// The air's drag a step on a body swinging on a taut rope (0.91 off it).
+const ROPE_DRAG: f64 = 0.995;
+
 fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, gravity: f64, bodies: &[physics::Body]) {
     let c = content();
     // Held facing one way it stays put: in a bed.
@@ -3268,6 +3768,9 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         (!input_too || ((d.key.is_empty() || input.held(&d.key)) && (!on(w::SPRINTING) || sprint)))
             && (!on(w::NOT_FLYING) || !(p.flying || p.noclip))
             && (!on(w::SWIM_LIQUID) || in_swim_liquid)
+            && (!on(w::CLIMBING) || p.on_wall)
+            && (!on(w::GLIDING) || p.gliding)
+            && (!on(w::ROPE) || p.on_rope)
     };
     let want = match p.forced {
         Some((held, _)) => held,
@@ -3354,6 +3857,26 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         return;
     }
 
+    // Gliding: the air carries it, it steers by its look; holding back brakes, sneaking dives.
+    p.gliding = p.glide.speed > 0.0 && !p.on_ground && !p.in_liquid && !p.on_wall && p.riding.is_none() && p.rope.is_none();
+    if p.gliding {
+        let brake = if fwd_in < 0.0 { 1.0 } else { 0.0 };
+        let dive = if sneak { 1.0 } else { 0.0 };
+        physics::glide(&mut p.vel, forward, &p.glide, brake, dive);
+        let r = physics::move_box_with(c, block, bodies, 0, p.pos, hw, height, p.vel, 0.0);
+        p.pos = r.pos;
+        for i in 0..3 {
+            if r.hit[i] {
+                p.vel[i] = 0.0;
+            }
+        }
+        p.on_ground = r.on_ground;
+        p.landed |= p.on_ground;
+        let here = physics::around(c, block, p.pos, height);
+        (p.in_liquid, p.climbing) = (here.in_liquid, here.climbing);
+        return;
+    }
+
     // Walking is the same step mobs take; the player only brings its input.
     p.jump_cooldown = p.jump_cooldown.saturating_sub(1);
     if !jump {
@@ -3369,12 +3892,45 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         careful: sneak,
         sprint: swimming,
         swim_look: swimming.then(|| (p.pitch as f64).sin()),
+        climb: p.climb,
     };
     let frame = physics::Frame { half_width: hw, height, step: physics::STEP_UP, gravity: g };
     let w = physics::walk(c, block, bodies, 0, &mut p.pos, &mut p.vel, p.on_ground, &ctl, &frame);
     if w.jumped {
         p.jump_cooldown = 10;
         p.jumped = true;
+    }
+    p.on_wall = w.on_wall;
+    // On a rope: jump pulls it in, sneak lets it out, and the hands stay within it.
+    p.on_rope = false;
+    match p.rope {
+        Some(rope) => {
+            if p.rope_for != Some(rope.anchor) {
+                (p.rope_for, p.rope_len) = (Some(rope.anchor), rope.length);
+            }
+            if jump {
+                p.rope_len = (p.rope_len - rope.reel).max(physics::ROPE_MIN);
+            } else if sneak {
+                p.rope_len = (p.rope_len + rope.reel * 0.7).min(rope.length);
+            }
+            let hold = height * ROPE_HOLD;
+            // Hands on a wall: the rope runs slack behind as it climbs, past the anchor too.
+            if w.on_wall {
+                let reach = (p.pos + DVec3::Y * hold).distance(rope.anchor);
+                p.rope_len = p.rope_len.max(reach).min(rope.length);
+            }
+            let taut =
+                !w.on_wall && physics::rope_hold(c, block, bodies, &mut p.pos, &mut p.vel, hw, height, hold, rope.anchor, p.rope_len);
+            // Swinging on a taut rope keeps its way: little of the air's drag (0.91 a step
+            // across and 0.98 up and down, which stop a pendulum in a swing).
+            if taut && !w.on_ground {
+                p.vel.x *= ROPE_DRAG / 0.91;
+                p.vel.z *= ROPE_DRAG / 0.91;
+                p.vel.y *= ROPE_DRAG / 0.98;
+            }
+            p.on_rope = !w.on_ground && (taut || p.pos.distance(rope.anchor) <= p.rope_len + hold + 0.5);
+        }
+        None => p.rope_for = None,
     }
     let here = physics::around(c, block, p.pos, height);
     (p.in_liquid, p.climbing) = (here.in_liquid, here.climbing);

@@ -198,33 +198,8 @@ fn bind_portal(w: &World, at: [i32; 3], id: &str) -> (Vec<[i32; 3]>, bool) {
     if let Some(old) = old.filter(|o| o != id) {
         ask("unspot", &old);
     }
-    let mut room = true;
-    if !id.is_empty() {
-        match arrival_spot(w, &blocks) {
-            Some(s) => {
-                ask("spot", &format!("{id} {} {} {}", s[0], s[1], s[2]));
-            }
-            None => room = false,
-        }
-    }
+    let room = id.is_empty() || save_spot(w, id, &blocks);
     (blocks, room)
-}
-
-/// The whole portal at `at`: every portal block connected to it, within reason.
-fn portal_blocks(w: &World, at: [i32; 3]) -> Vec<[i32; 3]> {
-    let mut todo = vec![at];
-    let mut seen = HashSet::new();
-    let mut blocks = Vec::new();
-    while let Some(at) = todo.pop() {
-        if seen.len() >= 64 || !seen.insert(at) || !PORTAL.is(w.block(at)) {
-            continue;
-        }
-        blocks.push(at);
-        for d in [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] {
-            todo.push([at[0] + d[0], at[1] + d[1], at[2] + d[2]]);
-        }
-    }
-    blocks
 }
 
 // ------------------------------------------------------------------ linking at the portal
@@ -575,23 +550,93 @@ fn settle_waits(w: &World) {
     }
 }
 
-/// A place beside the portal to put arrivals: next to one of its blocks, not in it, with two
-/// blocks of room and solid ground below; the lowest such place.
-fn arrival_spot(w: &World, blocks: &[[i32; 3]]) -> Option<[i32; 3]> {
+/// Every portal block connected to the one at `start`, at most 64.
+fn portal_blocks(w: &World, start: [i32; 3]) -> Vec<[i32; 3]> {
+    let mut todo = vec![start];
+    let mut seen = HashSet::new();
+    let mut blocks = Vec::new();
+    while let Some(at) = todo.pop() {
+        if seen.len() >= 64 || !seen.insert(at) || !PORTAL.is(w.block(at)) {
+            continue;
+        }
+        blocks.push(at);
+        for d in [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] {
+            todo.push([at[0] + d[0], at[1] + d[1], at[2] + d[2]]);
+        }
+    }
+    blocks
+}
+
+/// Saves where arrivals through link `id` stand for the portal made of `blocks`, with its
+/// dimension (by name: ids shift when mods come or go) and the way to face. False if it has no room.
+fn save_spot(w: &World, id: &str, blocks: &[[i32; 3]]) -> bool {
+    let Some((s, yaw)) = arrival_spot(w, blocks) else { return false };
+    let dim = name_of(abi::entry_kind::DIMENSION, w.dimension());
+    ask("spot", &format!("{id} {} {} {} {dim} {yaw:.4}", s[0], s[1], s[2]));
+    true
+}
+
+/// Links whose arrival spot was worked out again this run: a portal bound before spots kept their
+/// dimension and facing (11-05), or whose ground changed, is set right the first time a player
+/// comes near it.
+static RESPOTTED: Mutex<Option<HashSet<String>>> = Mutex::new(None);
+
+/// Where arrivals stand, and the way they face (yaw in radians, 0 looking along -z): in front of
+/// one of the portal's faces, right against it, facing away. Walking straight on leads away from
+/// it; turning round and stepping forward walks back in (the join test, 11-05: arriving at the
+/// sheet's end, a guest walked straight past the portal without touching it).
+fn arrival_spot(w: &World, blocks: &[[i32; 3]]) -> Option<([i32; 3], f32)> {
     let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
-    let mut best: Option<[i32; 3]> = None;
+    let free = |p: [i32; 3]| !solid(p) && !PORTAL.is(w.block(p));
+    arrival_in(blocks, &solid, &free)
+}
+
+/// `arrival_spot` on any world: `solid` and `free` say what is at a block.
+fn arrival_in(blocks: &[[i32; 3]], solid: &dyn Fn([i32; 3]) -> bool, free: &dyn Fn([i32; 3]) -> bool) -> Option<([i32; 3], f32)> {
+    if blocks.is_empty() {
+        return None;
+    }
+    // A sheet standing along z (one x) faces east and west; along x (one z), north and south. A
+    // single column or a shape of neither kind: any side.
+    let one = |f: fn(&[i32; 3]) -> i32| blocks.iter().all(|b| f(b) == f(&blocks[0]));
+    let (one_x, one_z) = (one(|b| b[0]), one(|b| b[2]));
+    let faces: &[[i32; 2]] = match (one_x, one_z) {
+        (true, false) => &[[1, 0], [-1, 0]],
+        (false, true) => &[[0, 1], [0, -1]],
+        _ => &[[1, 0], [-1, 0], [0, 1], [0, -1]],
+    };
+    let n = blocks.len() as f64;
+    let middle = [blocks.iter().map(|b| b[0] as f64).sum::<f64>() / n, blocks.iter().map(|b| b[2] as f64).sum::<f64>() / n];
+    // Lowest first, then the side with the most open ground ahead (not facing a wall), then the
+    // middle of the sheet.
+    // The spot and its facing, and its rank: (height, minus the open ground ahead, off the middle).
+    type Ranked = (([i32; 3], f32), (i32, i32, f64));
+    let mut best: Option<Ranked> = None;
     for b in blocks {
-        for d in [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]] {
-            let at = [b[0] + d[0], b[1], b[2] + d[2]];
-            let up = [at[0], at[1] + 1, at[2]];
-            let down = [at[0], at[1] - 1, at[2]];
-            let free = |p: [i32; 3]| !solid(p) && !PORTAL.is(w.block(p));
-            if free(at) && free(up) && solid(down) && best.is_none_or(|b| at[1] < b[1]) {
-                best = Some(at);
+        for d in faces {
+            let at = [b[0] + d[0], b[1], b[2] + d[1]];
+            if !(free(at) && free([at[0], at[1] + 1, at[2]]) && solid([at[0], at[1] - 1, at[2]])) {
+                continue;
+            }
+            let open = (1..=3)
+                .take_while(|k| {
+                    let p = [at[0] + d[0] * k, at[1], at[2] + d[1] * k];
+                    free(p) && free([p[0], p[1] + 1, p[2]])
+                })
+                .count() as i32;
+            let off = (b[0] as f64 - middle[0]).abs() + (b[2] as f64 - middle[1]).abs();
+            let rank = (at[1], -open, off);
+            if best
+                .as_ref()
+                .is_none_or(|(_, r)| rank.0 < r.0 || (rank.0 == r.0 && (rank.1, rank.2) < (r.1, r.2)))
+            {
+                // Facing along the face's normal, away from the portal.
+                let yaw = (-(d[0] as f32)).atan2(-(d[1] as f32));
+                best = Some(((at, yaw), rank));
             }
         }
     }
-    best
+    best.map(|(s, _)| s)
 }
 
 /// Players standing in a portal, so entering (not standing) sends them; and since when each player
@@ -675,13 +720,21 @@ fn near_portals(w: &World) {
                     if PORTAL.is(w.block(p))
                         && let Some(id) = link_at(w, p)
                     {
-                        found = Some(id);
+                        found = Some((id, p));
                         break 'search;
                     }
                 }
             }
         }
-        let Some(id) = found else { continue };
+        let Some((id, p)) = found else { continue };
+        if RESPOTTED
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashSet::new)
+            .insert(id.clone())
+        {
+            save_spot(w, &id, &portal_blocks(w, p));
+        }
         if entry.1.iter().any(|(l, _)| *l == id) {
             continue;
         }
@@ -900,4 +953,59 @@ fn client(r: &mut Registry) {
             ui.button("portals.close", wide(), |v| v.client().screen_close());
         });
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::arrival_in;
+
+    /// Flat ground at y 63 (solid at 63 and below), a portal sheet, open air elsewhere.
+    fn world(portal: &[[i32; 3]]) -> (impl Fn([i32; 3]) -> bool + '_, impl Fn([i32; 3]) -> bool + '_) {
+        let solid = |p: [i32; 3]| p[1] <= 63;
+        let free = move |p: [i32; 3]| p[1] > 63 && !portal.contains(&p);
+        (solid, free)
+    }
+
+    fn ahead(yaw: f32) -> [i32; 2] {
+        [(-yaw.sin()).round() as i32, (-yaw.cos()).round() as i32]
+    }
+
+    #[test]
+    fn arrivals_stand_before_a_face_and_look_away() {
+        // A sheet along x (one z, at 10): its faces look north and south.
+        let sheet: Vec<[i32; 3]> = (0..3)
+            .flat_map(|x| (64..67).map(move |y| [x, y, 10]))
+            .collect();
+        let (solid, free) = world(&sheet);
+        let (at, yaw) = arrival_in(&sheet, &solid, &free).unwrap();
+        assert_eq!(at[1], 64);
+        assert!(at[2] == 9 || at[2] == 11, "beside a face, not the sheet's end: {at:?}");
+        assert_eq!(at[0], 1, "in front of the middle");
+        let a = ahead(yaw);
+        assert_eq!([0, at[2] - 10], a, "facing away from the portal");
+        // Turning round and stepping forward walks into the portal.
+        let back = [at[0] - a[0], at[1], at[2] - a[1]];
+        assert!(sheet.contains(&back));
+
+        // A sheet along z (one x): east or west of it.
+        let sheet: Vec<[i32; 3]> = (0..2)
+            .flat_map(|z| (64..67).map(move |y| [5, y, z]))
+            .collect();
+        let (solid, free) = world(&sheet);
+        let (at, yaw) = arrival_in(&sheet, &solid, &free).unwrap();
+        assert!(at[0] == 4 || at[0] == 6);
+        assert_eq!(ahead(yaw), [at[0] - 5, 0]);
+    }
+
+    #[test]
+    fn a_wall_on_one_side_sends_arrivals_to_the_other() {
+        let sheet: Vec<[i32; 3]> = (0..3)
+            .flat_map(|x| (64..67).map(move |y| [x, y, 10]))
+            .collect();
+        // A wall two blocks south of the sheet: the north face has the open ground.
+        let solid = |p: [i32; 3]| p[1] <= 63 || p[2] == 12;
+        let free = |p: [i32; 3]| p[1] > 63 && p[2] != 12 && !sheet.contains(&p);
+        let (at, _) = arrival_in(&sheet, &solid, &free).unwrap();
+        assert_eq!(at[2], 9);
+    }
 }

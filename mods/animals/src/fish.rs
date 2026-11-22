@@ -9,8 +9,10 @@
 //! their habitats, as often as their rarity has it there and while few of their kind are near. They
 //! swim (`swim`, by `World::fly`): drifting from point to point under the water, darting off from a
 //! walker, never swimming out of it; stranded on land, one lies on its side flapping (a look of its
-//! own) and suffocates. They don't breed in the game yet (their rows have no breeding season): the
-//! spawner keeps them.
+//! own) and suffocates. They breed in their seasons (`court`): in love, one swims to a mate of
+//! its kind near, and met, the female spawns: her roe lies on the bottom under her, seen
+//! (`eggs::lay_roe`), and hatches into fry after its time in the water. The spawner tops up what
+//! breeding doesn't.
 
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
@@ -76,6 +78,7 @@ pub fn init(r: &mut Registry) {
             .goals(
                 Goals::new()
                     .then(crate::animal::upkeep(index))
+                    .then(move |w: &World, id: u64, st: &EntityState| court(w, id, st, index))
                     .then(move |w: &World, id: u64, st: &EntityState| swim(w, id, st, index)),
             );
     }
@@ -158,6 +161,31 @@ fn swim(w: &World, id: u64, st: &EntityState, index: usize) -> bool {
     w.fly(id, [(d[0] / dist) as f32, (d[1] / dist) as f32, (d[2] / dist) as f32], speed);
     set(w, id, s);
     true
+}
+
+/// In love (`breeding`): a mate of its kind near is where it swims (`swim` takes it there), and
+/// met, the female spawns (`breeding::mated`). Never taken: swimming goes on.
+fn court(w: &World, id: u64, st: &EntityState, index: usize) -> bool {
+    if !(w.game_time() + id).is_multiple_of(10) {
+        return false;
+    }
+    let Some(mate) = crate::breeding::mate_near(w, id, st) else { return false };
+    let Some(m) = w.entity(mate) else { return false };
+    if crate::dist2(m.pos, st.pos) > 1.5 * 1.5 {
+        if let Some(s) = w.component_mut(id, &STATE)
+            && s.flee == 0
+        {
+            s.to = m.pos.to_array().map(|v| v as f32);
+            s.left = 20;
+        }
+        return false;
+    }
+    if w.component(id, &crate::animal::ANIMAL)
+        .is_some_and(|a| a.female == 1)
+    {
+        crate::breeding::mated(w, id, mate, index);
+    }
+    false
 }
 
 fn set(w: &World, id: u64, s: Swim) {

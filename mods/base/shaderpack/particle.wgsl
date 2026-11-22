@@ -19,7 +19,25 @@ struct VOut {
 fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let p = particles[ii];
     let c = CORNER[vi % 6u];
-    let world = p.pos_size.xyz + (scene.right.xyz * (c.x - 0.5) + scene.up.xyz * (0.5 - c.y)) * p.pos_size.w;
+    var across = scene.right.xyz;
+    var down = -scene.up.xyz;
+    var stretch = p.pos_size.w;
+    if p.extra.y >= 2.0 {
+        // A streak along its motion (blown sand): as long as `extra.y - 2`, its width across it
+        // turned to the camera.
+        let c2 = cos(p.extra.w);
+        down = vec3(c2 * cos(p.extra.z), sin(p.extra.w), c2 * sin(p.extra.z));
+        let side = cross(down, p.pos_size.xyz);
+        across = select(scene.right.xyz, normalize(side), length(side) > 1e-4);
+        stretch = max(p.extra.y - 2.0, p.pos_size.w);
+    } else if p.extra.y > 0.5 {
+        // A card that turns in 3D (a falling leaf): flat, then tipped by `extra.w` about the line
+        // its heading `extra.z` gives.
+        let h = vec2(cos(p.extra.z), sin(p.extra.z));
+        across = vec3(h.x, 0.0, h.y);
+        down = vec3(-h.y, 0.0, h.x) * cos(p.extra.w) + vec3(0.0, sin(p.extra.w), 0.0);
+    }
+    let world = p.pos_size.xyz + across * (c.x - 0.5) * p.pos_size.w + down * (c.y - 0.5) * stretch;
     var out: VOut;
     out.clip = scene.view_proj * vec4(world, 1.0);
     let r = vec4<f32>(f32(p.data.z & 255u), f32((p.data.z >> 8u) & 255u), f32((p.data.z >> 16u) & 255u), f32(p.data.z >> 24u)) / 255.0;
@@ -37,12 +55,32 @@ fn unpack_color(c: u32) -> vec4<f32> {
     return vec4(pow(v.rgb, vec3(2.2)), v.a);
 }
 
+// The light on a particle (no facing: `light_round`'s), but under cover as on the surfaces about
+// it: the sky's light falls off steeply under leaves (`light_on`'s Bliss curve) and the sun reaches
+// it only where the sky is open. With `light_round`'s half sun wherever there is some sky light,
+// falling leaves glowed lime in a forest's shade, in front of near-black leaves (Trees, Bliss's own
+// world at 08:00, 11-06). In the open the same light as before.
+fn particle_light(light: vec4<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let p = palette();
+    let steep = (pow(light.x, 15.0) * 2.0 + pow(light.x, 2.5)) / 3.0;
+    let sky = mix(steep, brightness_curve(light.x), smoothstep(0.9, 1.0, light.x));
+    var c = p.ambient * sky * 0.85;
+    c += p.sun * light_strength() * 0.5 * smoothstep(0.85, 1.0, light.x);
+    var held = vec3(0.0);
+    if !CALM {
+        held = held_light(rel, vec3(0.0));
+    }
+    c += block_light(max(light.yzw, held), vec3(0.0)) * block_by_day(light.x);
+    c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
+    return c;
+}
+
 fn shade(in: VOut) -> vec4<f32> {
     let albedo = textureSampleLevel(textures[in.data.y & PARTICLE_TEX_MASK], nearest_clamp, in.uv, 0.0);
     var color = unpack_color(in.data.x);
     color = particle_shade(in.data.y >> PARTICLE_SLOT_SHIFT, ParticleFrag(in.quad, albedo, color, in.life, scene.params.w));
     if in.data.w != 0xffffffffu {
-        color = vec4(color.rgb * light_round(unpack_light(in.data.w), vec3(0.0), in.rel), color.a);
+        color = vec4(color.rgb * particle_light(unpack_light(in.data.w), in.rel), color.a);
     } else {
         // Fullbright particles (sparks, flames) glow.
         color = vec4(color.rgb * 1.5, color.a);
