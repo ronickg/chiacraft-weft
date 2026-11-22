@@ -31,6 +31,8 @@ static MINIMAP: HudElement = HudElement::named("minimap");
 pub static MINIMAP_ON: Config<bool> = Config::named("minimap");
 /// The creatures on the minimap and the map.
 pub static MARKS_ON: Config<bool> = Config::named("map_creatures");
+/// Hostile mobs (`mobs.rs` tags them).
+static HOSTILE: Tag = Tag::named("hostile");
 static MINI_ZOOM: Key = Key::named("minimap_zoom");
 const MINI_IMAGE: &str = "dyn:base:minimap";
 static OPEN_KEY: Key = Key::named("map");
@@ -686,9 +688,12 @@ fn creatures(c: &Client) -> Vec<(i32, i32, n::Mark)> {
     let mine = view.player();
     let eye = [me.pos.x, me.pos.y + me.size.eye as f64, me.pos.z];
     let r2 = n::MARK_RADIUS * n::MARK_RADIUS;
+    // Known, within the radius, marked, in sight: logged when they change, for the runs.
+    let mut counts = [0usize; 4];
     let mut near: Vec<(f64, [f64; 3], n::Mark)> = Vec::new();
     for id in c.entities() {
         let Some(st) = c.entity(id) else { continue };
+        counts[0] += 1;
         if st.kind == PLAYER.id() {
             continue;
         }
@@ -700,11 +705,18 @@ fn creatures(c: &Client) -> Vec<(i32, i32, n::Mark)> {
         let category = comps::entity::CATEGORY
             .on_id(st.kind)
             .map_or("", |t| t.as_str());
+        // The kind's category is folded into the kind when it is built and may not read back
+        // (PC run mm1122_a: no dots at all): the `hostile` tag the mobs carry decides too, and a
+        // living thing (some health, not an item) is a creature.
+        let hostile = HOSTILE.on_entity(st.kind) || category == "core:hostile";
+        let creature = category == "core:passive" || (st.kind != ITEM.id() && st.health > 0.0 && st.max_health > 0.0);
         let tame = view.component_of(id, &base_api::TAME_OF) == Some(mine);
-        if let Some(mark) = n::Mark::of(category, tame) {
+        if let Some(mark) = n::Mark::of(hostile, creature, tame) {
             near.push((d2, at, mark));
         }
+        counts[1] += 1;
     }
+    counts[2] = near.len();
     near.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut opaque: HashMap<u32, bool> = HashMap::new();
     let mut out = Vec::new();
@@ -719,6 +731,13 @@ fn creatures(c: &Client) -> Vec<(i32, i32, n::Mark)> {
                 break;
             }
         }
+    }
+    counts[3] = out.len();
+    static LOGGED: Mutex<[usize; 4]> = Mutex::new([0; 4]);
+    let mut last = LOGGED.lock().unwrap();
+    if *last != counts {
+        *last = counts;
+        weft_sdk::info!("map: creatures {} known, {} near, {} marked, {} in sight", counts[0], counts[1], counts[2], counts[3]);
     }
     out
 }

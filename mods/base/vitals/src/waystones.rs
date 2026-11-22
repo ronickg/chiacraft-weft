@@ -149,15 +149,16 @@ pub enum Mark {
 }
 
 impl Mark {
-    /// By its spawn category (`core:hostile`, `core:passive` ...; empty for what is no creature:
-    /// items, arrows, boats) and whether the player owns it. `None`: not marked.
-    pub fn of(category: &str, mine: bool) -> Option<Mark> {
-        if category.is_empty() {
+    /// By whether it is hostile (the `hostile` tag or the `core:hostile` spawn category), a
+    /// creature at all (a living thing: not an item, an arrow or a boat) and the player's own.
+    /// `None`: not marked.
+    pub fn of(hostile: bool, creature: bool, mine: bool) -> Option<Mark> {
+        if !creature && !hostile {
             return None;
         }
         Some(if mine {
             Mark::Tame
-        } else if category == "core:hostile" {
+        } else if hostile {
             Mark::Hostile
         } else {
             Mark::Wild
@@ -222,10 +223,10 @@ mod tests {
 
     #[test]
     fn creatures_are_marked_by_kind() {
-        assert_eq!(Mark::of("core:hostile", false), Some(Mark::Hostile));
-        assert_eq!(Mark::of("core:passive", false), Some(Mark::Wild));
-        assert_eq!(Mark::of("core:passive", true), Some(Mark::Tame));
-        assert_eq!(Mark::of("", false), None);
+        assert_eq!(Mark::of(true, true, false), Some(Mark::Hostile));
+        assert_eq!(Mark::of(false, true, false), Some(Mark::Wild));
+        assert_eq!(Mark::of(false, true, true), Some(Mark::Tame));
+        assert_eq!(Mark::of(false, false, false), None);
         let c = [Mark::Hostile, Mark::Wild, Mark::Tame].map(Mark::colour);
         assert!(c[0] != c[1] && c[1] != c[2] && c[0] != c[2]);
         // The radius fits the minimap's widest zoom (its circle's radius in blocks) and the cap
