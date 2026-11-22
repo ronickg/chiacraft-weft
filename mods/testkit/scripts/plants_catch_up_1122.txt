@@ -1,0 +1,58 @@
+# Plants catching up at the time they missed (First hours, 11-22: World::grow_time). Time skipped
+# with /tk skip is caught up like an unloaded area: each growth step at its own moment. A row of
+# maize (tender, 10 °C to grow, killed at 0 °C) and a row of spring wheat (-2 °C), both on
+# farmland by water, sown on summer day 2 at the spawn's biome.
+# Read the /tk get replies after each skip:
+# - after 14 days (summer to autumn): maize and wheat several ages on (they grew through summer's
+#   warmth; before the fix every caught-up step read the end day, autumn);
+# - after 28 more (through autumn into winter): the maize gone (an autumn night's frost), the
+#   farmland left; wheat ripe or gone by its own frost.
+# Also the two /growth replies (the rate here in summer, then in winter) and the shots.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /tk mode creative
+chat /tk fill ~-6 ~-2 ~-6 ~6 ~-1 ~6 base:grass
+chat /tk fill ~-6 ~ ~-6 ~6 ~6 ~6 core:air
+chat /tk fill ~-3 ~-1 ~-4 ~3 ~-1 ~-4 base:water
+chat /tk fill ~-3 ~-1 ~-3 ~3 ~-1 ~-2 base:farmland
+chat /tk fill ~-3 ~ ~-3 ~3 ~ ~-3 base:maize
+chat /tk fill ~-3 ~ ~-2 ~3 ~ ~-2 base:wheat
+chat /season summer 2
+wait 2
+chat /growth
+look 0 -35
+wait 1
+shot cu_sown.png
+chat /tk get ~-2 ~ ~-3
+chat /tk get ~ ~ ~-3
+chat /tk get ~2 ~ ~-3
+chat /tk get ~-2 ~ ~-2
+chat /tk get ~ ~ ~-2
+chat /tk get ~2 ~ ~-2
+# 14 days on: summer into autumn.
+chat /tk skip 336000
+wait 15
+idle
+shot cu_autumn.png
+chat /tk get ~-2 ~ ~-3
+chat /tk get ~ ~ ~-3
+chat /tk get ~2 ~ ~-3
+chat /tk get ~-2 ~ ~-2
+chat /tk get ~ ~ ~-2
+chat /tk get ~2 ~ ~-2
+# 28 days more: through autumn into winter.
+chat /tk skip 672000
+wait 20
+idle
+chat /growth
+shot cu_winter.png
+chat /tk get ~-2 ~ ~-3
+chat /tk get ~ ~ ~-3
+chat /tk get ~2 ~ ~-3
+chat /tk get ~-2 ~ ~-2
+chat /tk get ~ ~ ~-2
+chat /tk get ~2 ~ ~-2
+chat /tk get ~ ~-1 ~-3
+quit
