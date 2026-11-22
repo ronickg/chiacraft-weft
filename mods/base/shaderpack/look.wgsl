@@ -137,11 +137,13 @@ const OPT_WATER_FOAM: u32 = 43u;
 // sky mirrored where the ripples point it, no extra share at a slant.
 const OPT_WATER_MIRROR: u32 = 44u;
 
-// How much of the mist lies as the evening's (`OPT_EVENING_MIST`): half with the sun about 25° up
-// in the west (17:00), all from about 12° (18:00), into the dusk.
+// How much of the mist lies as the evening's (`OPT_EVENING_MIST`): none with the sun 25° up in the
+// west (17:00), a little at 12° (18:00), all with it on the horizon, into the dusk. (It began at 32°
+// up and drowned the 17:00 land in orange, where Bliss's shows its golden layer only at sunset:
+// lsG_ev against bliss_ctl, 11-22.)
 fn evening_mist() -> f32 {
     let west = smoothstep(0.1, -0.1, scene.sun.x);
-    let low = 1.0 - smoothstep(0.2, 0.55, scene.sun.y);
+    let low = 1.0 - smoothstep(0.03, 0.3, scene.sun.y);
     return clamp(fantasy_opt(OPT_EVENING_MIST), 0.0, 1.0) * west * low * smoothstep(-0.2, -0.05, scene.sun.y);
 }
 
