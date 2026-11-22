@@ -57,12 +57,15 @@ pub static LOOK_SKY_HUE: Config<f32> = Config::named("look_sky_hue");
 pub static LOOK_EXPOSURE_ABS: Config<f32> = Config::named("look_exposure_abs");
 /// The HDR world's warmth on sunlit foliage toward a leaf-top yellow: 0.7 as made, 0 none.
 pub static LOOK_SPLIT_WARM: Config<f32> = Config::named("look_split_warm");
+/// The HDR world's evening mist, Bliss's evening fog (the 18:00 warm veil): with the sun low in the
+/// west the mist lies densest at the low land, thinning with height. 0 as made, 1 all the way.
+pub static LOOK_EVENING_MIST: Config<f32> = Config::named("look_evening_mist");
 
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -106,4 +109,5 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_SKY_HUE).float(0.0, 0.0, 1.0);
     r.config(&LOOK_EXPOSURE_ABS).float(0.0, 0.0, 1.0);
     r.config(&LOOK_SPLIT_WARM).float(0.7, 0.0, 1.0);
+    r.config(&LOOK_EVENING_MIST).float(0.0, 0.0, 1.0);
 }

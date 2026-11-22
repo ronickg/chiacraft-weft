@@ -106,6 +106,19 @@ const OPT_EXPOSURE_ABS: u32 = 35u;
 // The HDR world's warmth on sunlit foliage (`base:look_split_warm`, read raw: 0.7 as made, 0
 // none). With the 4300 K sun it counts the warmth twice (Bliss has no such grade).
 const OPT_SPLIT_WARM: u32 = 36u;
+// The HDR world's evening mist (`base:look_evening_mist`, read raw: 0 as made, 1 all the way): with
+// the sun low in the west the mist lies as Bliss's evening fog does (`overworld_fog.glsl:16-35`,
+// Ronald's 0.18 uniform + 0.09 cloudy), densest at the low land and halving every 6.7 blocks up, no
+// sharp-topped layer: the 18:00 warm veil over the land (Research's code read, 11-22).
+const OPT_EVENING_MIST: u32 = 37u;
+
+// How much of the mist lies as the evening's (`OPT_EVENING_MIST`): half with the sun about 25° up
+// in the west (17:00), all from about 12° (18:00), into the dusk.
+fn evening_mist() -> f32 {
+    let west = smoothstep(0.1, -0.1, scene.sun.x);
+    let low = 1.0 - smoothstep(0.2, 0.55, scene.sun.y);
+    return clamp(fantasy_opt(OPT_EVENING_MIST), 0.0, 1.0) * west * low * smoothstep(-0.2, -0.05, scene.sun.y);
+}
 
 // The surface's light from the sun and in all, before its tint (`light_on`, `surface_light`), for
 // the debug view.
@@ -1338,6 +1351,13 @@ fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
         // ridges stand out of, the banks only varying it inside (a soft fall with height read as a
         // thin even veil with no top: the MC comparison's natural-mist sheets, 11-05). Storms' dust
         // and snow keep the old shape.
+        // The evening's: Bliss's height fall (2^(-0.15 (y - 53)), floored 8 blocks under it), its
+        // cloudy part as the banks; about 0.008 a block at sea level with `/air` 0.3.
+        let ev = evening_mist() * (1.0 - s);
+        var even = 0.0;
+        if ev > 0.0 {
+            even = f * open * 0.075 * exp2(-0.15 * (max(p.y, 45.0) - 53.0)) * (0.67 + smoothstep(0.25, 0.75, banks));
+        }
         if s < 0.5 {
             // The top heaves with the banks, up to 5 blocks either way, so it is a lumpy sea that
             // crowns break through, not a flat sheet (a level top laid straight stripes along
@@ -1355,9 +1375,9 @@ fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
             // edges soft (hard-edged blobs on the crowns, the same sheet).
             let wisp = exp(-max(p.y - floor, 0.0) / 5.0) * smoothstep(0.4, 0.9, smoothstep(0.25, 0.75, banks))
                 * (1.0 - smoothstep(0.2, 0.5, scene.sun.y)) * (1.0 - layer) * (1.0 - smoothstep(top + 25.0, top + 45.0, p.y));
-            return f * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11;
+            return mix(f * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11, even, ev);
         }
-        return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11;
+        return mix(f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11, even, ev);
     }
     return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
 }
