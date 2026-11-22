@@ -29,7 +29,10 @@ chat /kill @e[type=base:zombie]
 chat /kill @e[type=base:spider]
 chat /kill @e[type=base:skeleton]
 chat /kill @e[type=base:arrow]
+chat /tk fill -1 200 -25 1 202 -1 core:air
 respawn
+wait 2
+chat /tp 0.5 200 -0.5
 wait 1
 chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
@@ -40,278 +43,356 @@ chat /tk spawn base:zombie 0 200 -22
 op health
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
-press core:attack
-wait 0.9
-respawn
-chat /gear spear flint slot=0
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+respawn
+wait 1
+chat /tp 0.5 200 -0.5
+chat /gear spear flint slot=0
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
 press core:attack
 wait 0.9
 expect alive
@@ -321,7 +402,10 @@ chat /kill @e[type=base:zombie]
 chat /kill @e[type=base:spider]
 chat /kill @e[type=base:skeleton]
 chat /kill @e[type=base:arrow]
+chat /tk fill -1 200 -25 1 202 -1 core:air
 respawn
+wait 2
+chat /tp 0.5 200 -0.5
 wait 1
 chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
@@ -333,278 +417,356 @@ chat /tk spawn base:spider 1 200 -22
 op health
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
-press core:attack
-wait 0.9
-respawn
-chat /gear spear flint slot=0
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+respawn
+wait 1
+chat /tp 0.5 200 -0.5
+chat /gear spear flint slot=0
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
 press core:attack
 wait 0.9
 expect alive
@@ -614,7 +776,10 @@ chat /kill @e[type=base:zombie]
 chat /kill @e[type=base:spider]
 chat /kill @e[type=base:skeleton]
 chat /kill @e[type=base:arrow]
+chat /tk fill -1 200 -25 1 202 -1 core:air
 respawn
+wait 2
+chat /tp 0.5 200 -0.5
 wait 1
 chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
@@ -626,278 +791,356 @@ chat /tk spawn base:skeleton 1 200 -22
 op health
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
-press core:attack
-wait 0.9
-respawn
-chat /gear spear flint slot=0
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+respawn
+wait 1
+chat /tp 0.5 200 -0.5
+chat /gear spear flint slot=0
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
 press core:attack
 wait 0.9
 expect alive
@@ -907,7 +1150,10 @@ chat /kill @e[type=base:zombie]
 chat /kill @e[type=base:spider]
 chat /kill @e[type=base:skeleton]
 chat /kill @e[type=base:arrow]
+chat /tk fill -1 200 -25 1 202 -1 core:air
 respawn
+wait 2
+chat /tp 0.5 200 -0.5
 wait 1
 chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
@@ -919,278 +1165,356 @@ chat /tk spawn base:spider 1 200 -22
 op health
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
-press core:attack
-wait 0.9
-respawn
-chat /gear spear flint slot=0
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+respawn
+wait 1
+chat /tp 0.5 200 -0.5
+chat /gear spear flint slot=0
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
 press core:attack
 wait 0.9
 expect alive
@@ -1200,7 +1524,10 @@ chat /kill @e[type=base:zombie]
 chat /kill @e[type=base:spider]
 chat /kill @e[type=base:skeleton]
 chat /kill @e[type=base:arrow]
+chat /tk fill -1 200 -25 1 202 -1 core:air
 respawn
+wait 2
+chat /tp 0.5 200 -0.5
 wait 1
 chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
@@ -1211,278 +1538,356 @@ chat /tk spawn base:zombie 0 200 -22
 op health
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
-press core:attack
-wait 0.9
-respawn
-chat /gear spear flint slot=0
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+respawn
+wait 1
+chat /tp 0.5 200 -0.5
+chat /gear spear flint slot=0
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
 press core:attack
 wait 0.9
 expect alive
@@ -1492,7 +1897,10 @@ chat /kill @e[type=base:zombie]
 chat /kill @e[type=base:spider]
 chat /kill @e[type=base:skeleton]
 chat /kill @e[type=base:arrow]
+chat /tk fill -1 200 -25 1 202 -1 core:air
 respawn
+wait 2
+chat /tp 0.5 200 -0.5
 wait 1
 chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
@@ -1505,278 +1913,356 @@ chat /tk spawn base:skeleton 2 200 -22
 op health
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
-press core:attack
-wait 0.9
-respawn
-chat /gear spear flint slot=0
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+respawn
+wait 1
+chat /tp 0.5 200 -0.5
+chat /gear spear flint slot=0
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
 press core:attack
 wait 0.9
 expect alive
@@ -1786,7 +2272,10 @@ chat /kill @e[type=base:zombie]
 chat /kill @e[type=base:spider]
 chat /kill @e[type=base:skeleton]
 chat /kill @e[type=base:arrow]
+chat /tk fill -1 200 -25 1 202 -1 core:air
 respawn
+wait 2
+chat /tp 0.5 200 -0.5
 wait 1
 chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
@@ -1797,278 +2286,356 @@ chat /tk spawn base:zombie 0 200 -22
 op health
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
-press core:attack
-wait 0.9
-respawn
-chat /gear spear flint slot=0
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+respawn
+wait 1
+chat /tp 0.5 200 -0.5
+chat /gear spear flint slot=0
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
 press core:attack
 wait 0.9
 expect alive
@@ -2078,7 +2645,10 @@ chat /kill @e[type=base:zombie]
 chat /kill @e[type=base:spider]
 chat /kill @e[type=base:skeleton]
 chat /kill @e[type=base:arrow]
+chat /tk fill -1 200 -25 1 202 -1 core:air
 respawn
+wait 2
+chat /tp 0.5 200 -0.5
 wait 1
 chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
@@ -2090,278 +2660,356 @@ chat /tk spawn base:spider 1 200 -22
 op health
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
-press core:attack
-wait 0.9
-respawn
-chat /gear spear flint slot=0
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+respawn
+wait 1
+chat /tp 0.5 200 -0.5
+chat /gear spear flint slot=0
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
 press core:attack
 wait 0.9
 expect alive
@@ -2371,7 +3019,10 @@ chat /kill @e[type=base:zombie]
 chat /kill @e[type=base:spider]
 chat /kill @e[type=base:skeleton]
 chat /kill @e[type=base:arrow]
+chat /tk fill -1 200 -25 1 202 -1 core:air
 respawn
+wait 2
+chat /tp 0.5 200 -0.5
 wait 1
 chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
@@ -2383,278 +3034,356 @@ chat /tk spawn base:skeleton 1 200 -22
 op health
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
-press core:attack
-wait 0.9
-respawn
-chat /gear spear flint slot=0
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+respawn
+wait 1
+chat /tp 0.5 200 -0.5
+chat /gear spear flint slot=0
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
 press core:attack
 wait 0.9
 expect alive
@@ -2664,7 +3393,10 @@ chat /kill @e[type=base:zombie]
 chat /kill @e[type=base:spider]
 chat /kill @e[type=base:skeleton]
 chat /kill @e[type=base:arrow]
+chat /tk fill -1 200 -25 1 202 -1 core:air
 respawn
+wait 2
+chat /tp 0.5 200 -0.5
 wait 1
 chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
@@ -2676,278 +3408,356 @@ chat /tk spawn base:spider 1 200 -22
 op health
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
-press core:attack
-wait 0.9
-respawn
-chat /gear spear flint slot=0
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
-press core:attack
-wait 0.9
-chat /tp 0.5 200 -0.5
-look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 respawn
+wait 1
+chat /tp 0.5 200 -0.5
 chat /gear spear flint slot=0
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
 press core:attack
 wait 0.9
 chat /tp 0.5 200 -0.5
 look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+respawn
+wait 1
+chat /tp 0.5 200 -0.5
+chat /gear spear flint slot=0
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
+press core:attack
+wait 0.9
+chat /tp 0.5 200 -0.5
+look 0 -8
+aim 6
 press core:attack
 wait 0.9
 expect alive

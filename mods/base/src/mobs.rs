@@ -54,6 +54,8 @@ pub fn register(r: &mut Registry) {
         .hostile()
         .burns_in_sun()
         .attack_damage(curve("zombie").hit)
+        // Its band's seconds between hits (`vitals::combat::Band::interval`).
+        .attack_speed(1.0 / curve("zombie").interval)
         .reach(1.3)
         .goals(hostile(ai::Goals::new().aggressive(35.0)));
     r.entity(&SPIDER)
@@ -67,6 +69,8 @@ pub fn register(r: &mut Registry) {
         .walk_speed(3.6)
         .hostile()
         .attack_damage(curve("spider").hit)
+        // Its band's seconds between hits (`vitals::combat::Band::interval`).
+        .attack_speed(1.0 / curve("spider").interval)
         // Vanilla's reach goes by a mob's width: a body this wide stops further off.
         .reach(2.4)
         // In daylight it only fights back.

@@ -61,7 +61,13 @@ for i in range(NIGHT_SECS // WAVE_SECS):
     # player starts it whole, back from the death screen if the last one killed them.
     for kind in ("base:zombie", "base:spider", "base:skeleton", "base:arrow"):
         o(f"chat /kill @e[type={kind}]")
+    # The lane cleared again: a death leaves a tombstone where the player fell (night4: 48 of
+    # them stacked at the lane's end pushed the player aside and stood in the mobs' way).
+    o(f"chat /tk fill -1 200 {FAR_Z - 3} 1 202 -1 core:air")
     o("respawn")
+    # A respawn lands at the world's spawn: back to the lane once it's there.
+    o("wait 2")
+    o("chat /tp 0.5 200 -0.5")
     o("wait 1")
     o("chat /tp 0.5 200 -0.5")
     o("chat /gear spear flint slot=0")
@@ -74,9 +80,13 @@ for i in range(NIGHT_SECS // WAVE_SECS):
         # A death mid-wave: back up and armed again within 10 swings, not healed.
         if n and n % 10 == 0:
             o("respawn")
+            o("wait 1")
+            o("chat /tp 0.5 200 -0.5")
             o("chat /gear spear flint slot=0")
         o("chat /tp 0.5 200 -0.5")
+        # Facing the nearest creature, as a player would (night4: a fixed look landed one swing in three).
         o("look 0 -8")
+        o("aim 6")
         o("press core:attack")
         o(f"wait {SWING}")
     o("expect alive")

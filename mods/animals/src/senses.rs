@@ -76,6 +76,9 @@ value! {
         /// Wild ones of its kind within `KIN` (itself among them), and their middle.
         pub kin: u16,
         pub kin_mid: [f32; 3],
+        /// Its herd's or pack's leader among those kin: the lowest id, itself if it is lowest
+        /// (`animals_core::groups`, `group.rs`).
+        pub leader: u64,
         /// A hungry hunter's nearest prey it can take with its kin near (0: none), and its mass.
         pub prey: u64,
         pub prey_kg: f32,
@@ -363,6 +366,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     // A skittish one notices sooner, a calm one later.
     let eyes = eyes * (1.0 + roles::SKITTISH * roles::lean(me.persona()[0]));
     let (mut kin, mut mid) = (1u16, [p.x, p.y, p.z]);
+    let mut leader = id;
     let mut prey: Vec<(u64, f32, f64)> = Vec::new();
     // The hunters it senses, best first after the loop.
     let mut hunters: Vec<(Sensed, u64, Vec3, Vec3)> = Vec::new();
@@ -389,6 +393,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         if kin_too && d2 <= kin_r * kin_r {
             kin += 1;
             mid = [mid[0] + e.pos.x, mid[1] + e.pos.y, mid[2] + e.pos.z];
+            leader = animals_core::groups::leader([leader, t]);
         }
         if hunter {
             let d = d2.sqrt() as f32;
@@ -482,6 +487,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         players(w, id, st, out, mine, facing, field, secs, player_noise, full);
     }
     out.kin = kin;
+    out.leader = leader;
     out.kin_mid = mid.map(|v| (v / kin as f64) as f32);
     // One adult of a herd at a time stands watch, the watch going round (by id and time).
     let herd = social == animals_core::biology::Social::Herd;

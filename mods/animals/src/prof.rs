@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -137,6 +137,21 @@ pub fn init(r: &mut Registry) {
                     }
                 }
                 format!("{n} animals at {:.0}% water", v * 100.0)
+            }
+            "food" => {
+                // Every wild animal within 96 blocks has this share of its food.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(1.0).clamp(0.0, 1.0) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if let Some(a) = w.component_mut(id, &crate::animal::ANIMAL)
+                        && a.species != 0
+                    {
+                        a.food = (a.stat(crate::species::FOOD) * v) as u16;
+                        n += 1;
+                    }
+                }
+                format!("{n} animals at {:.0}% food", v * 100.0)
             }
             "kill" => {
                 // The player kills the wild animal nearest him (a hunter's kill: fear there, and
@@ -197,15 +212,17 @@ pub fn init(r: &mut Registry) {
                     .take(8)
                     .filter_map(|&(d2, id)| {
                         let s = w.component(id, &crate::senses::SENSES)?;
-                        let kind = name_of(abi::entry_kind::ENTITY, w.entity(id)?.kind);
+                        let e = w.entity(id)?;
+                        let kind = name_of(abi::entry_kind::ENTITY, e.kind);
                         Some(format!(
-                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}",
+                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {} lead {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}, nav {} moved {:.3} ground {} pose {} using {}",
                             d2.sqrt(),
                             s.player,
                             s.fright,
                             s.threat,
                             s.aware,
                             s.kin,
+                            s.leader,
                             if s.sentinel != 0 { " sentinel" } else { "" },
                             s.heading,
                             s.wind,
@@ -215,7 +232,13 @@ pub fn init(r: &mut Registry) {
                             crate::routines::activity_of(&w, id),
                             ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate"]
                                 .get(crate::choose::doing(&w, id) as usize)
-                                .unwrap_or(&"?")
+                                .unwrap_or(&"?"),
+                            // Its walk, for a check that wandering moves it.
+                            w.navigating(id) as u8,
+                            e.moved,
+                            e.on_ground,
+                            e.pose,
+                            e.using
                         ))
                     })
                     .collect();
