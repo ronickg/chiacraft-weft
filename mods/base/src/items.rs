@@ -131,40 +131,20 @@ pub fn register(r: &mut Registry) {
         Some(b) => drop(rice.places(b)),
         None => drop(rice),
     }
-    // Buckskin, brain-tanned from a hide at a tanning frame (`crafts.rs`): clothes and books. Leather
-    // armor is sole leather's (`materials/leather`), bark-tanned for days in a pit.
-    // Upstream's mushrooms and berries (Weft sync 11-22; their blocks are in `blocks.rs`), kept as
-    // they came but eaten our way: `base_api::eat` refuses them until they have rows in the
-    // vitals' food table. Cutting them is this block and their blocks.
-    // SYNC: give our porcini and chanterelle, cooked polypore, toadstool, snowberry and raspberry rows in
-    // `vitals::food::FOODS` (then the food loop above registers the edible ones and these go).
-    // Upstream's porcini and chanterelle items are our mushroom blocks' (`blocks.rs`, the same
-    // names): their `porcini_mushroom` and `chanterelle_mushroom` drop ours.
-    r.item(Item::generated("cooked_dryads_saddle".into()))
-        .use_ticks(32)
-        .on_use(base_api::eat)
-        .tag("mushrooms")
-        .tab(&crate::tabs::FOOD);
-    r.item(&TOADSTOOL)
-        .use_ticks(16)
-        .on_use(base_api::eat)
-        .gives_effect(&crate::effects::NAUSEA, 1, 20.0)
-        .gives_effect(&crate::effects::POISON, 1, 30.0)
-        .tag("mushrooms")
-        .tab(&crate::tabs::FOOD);
-    r.item(&SNOWBERRY)
-        .use_ticks(16)
-        .on_use(base_api::eat)
-        .gives_effect(&crate::effects::NAUSEA, 1, 20.0)
-        .gives_effect(&crate::effects::POISON, 1, 30.0)
-        .tab(&crate::tabs::FOOD);
-    r.item(&RASPBERRY)
-        .use_ticks(16)
-        .on_use(base_api::eat)
-        .tab(&crate::tabs::FOOD);
+    // Upstream's mushrooms and berries (Weft sync 11-22, kept until Ronald's call; their blocks
+    // are in `blocks.rs`). The edible ones (raspberry, snowberry, toadstool, cooked dryad's saddle)
+    // are rows of the vitals' food table, registered by the food loop above and eaten our way:
+    // the toadstool poisons and the snowberry may make one sick (`vitals::food`), in place of
+    // upstream's nausea and poison effects. The raw dryad's saddle is only cooked. Upstream's
+    // porcini and chanterelle items are our mushroom blocks' (`blocks.rs`, the same names): their
+    // `porcini_mushroom` and `chanterelle_mushroom` drop ours. Cutting them is this block, their
+    // food rows and their blocks.
     r.item(&DRYADS_SADDLE)
         .tag("mushrooms")
         .tab(&crate::tabs::INGREDIENTS);
+    r.tag("mushrooms", &["toadstool", "cooked_dryads_saddle"]);
+    // Buckskin, brain-tanned from a hide at a tanning frame (`crafts.rs`): clothes and books. Leather
+    // armor is sole leather's (`materials/leather`), bark-tanned for days in a pit.
     r.item(Item::generated("leather".into()))
         .tag("leather")
         .tab(&crate::tabs::INGREDIENTS);

@@ -444,8 +444,8 @@ fn init(r: &mut Registry) {
         .tag("dry");
     // Deep under Mars, where its glow crystals grow.
     r.biome(&CRYSTAL_CAVES).tag("cave").tag("dark");
-    // SYNC: eating goes through the vitals: testmod:apple needs a row in vitals::food::FOODS
-    // (`every_food_has_nutrition`), or base_api::eat refuses it.
+    // Weft's test apple eats through upstream's hunger (`components::eat`), not the vitals: it
+    // is no part of our food table, and `every_food_has_nutrition` skips testmod.
     r.item(&APPLE)
         .set(&base_api::components::FOOD, base_api::components::Food { hunger: 4, saturation: 2.4 })
         .use_ticks(32)
