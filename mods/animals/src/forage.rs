@@ -313,11 +313,8 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     let drops = s.eats.iter().any(|&(c, _)| vitals::forage::dropped_kind(c));
     // The cheap reasons first: most animals most of the time aren't hungry.
     // A herd member grazes with its leader (`groups::JOIN_EAT`).
-    let hungry = if crate::group::leader_doing(w, id) == Some(crate::choose::Need::Eat as u8) {
-        animals_core::groups::JOIN_EAT
-    } else {
-        HUNGRY
-    };
+    let hungry =
+        if crate::group::leader_doing(w, id) == Some(crate::choose::Need::Eat as u8) { animals_core::groups::JOIN_EAT } else { HUNGRY };
     let fed = full >= FULL || (f[3] == 0.0 && full >= hungry);
     if fed || !((s.hungry_in_the_wild() || animal::tamed(w, id)) && (grows || drops)) {
         if f[3] != 0.0 {
