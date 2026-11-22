@@ -35,6 +35,16 @@ pub const GROUP: u16 = 2;
 /// Clutton-Brock, Guinness and Albon 1982): the group moves on together instead of one at a time.
 pub const JOIN_DRINK: f32 = 0.9;
 pub const JOIN_EAT: f32 = 0.85;
+/// How pressing joining is, at least, once it is under those (the band's score for drinking or
+/// eating): above a midday rest (`needs::REST` plus `routines::SLEEPY` for a twilight animal at its
+/// lowest, held at `KEEP_AT`), so a resting member gets up to go with its herd, under a night's
+/// sleep. ai1122_drink1: at the drink's own score (about 0.35) the herd lay on while its leader
+/// drank.
+pub const JOIN_PULL: f32 = 0.85;
+const MIDDAY_REST: f32 = (crate::needs::REST + crate::routines::SLEEPY * (1.0 - 0.35)) * crate::needs::KEEP_AT;
+const NIGHT_SLEEP: f32 = (crate::needs::REST + crate::routines::SLEEPY) * crate::needs::KEEP_AT;
+const _: () = assert!(JOIN_PULL > MIDDAY_REST && JOIN_PULL < NIGHT_SLEEP);
+
 // Joining starts before it would on its own (and before the dusk drink), and stops where it would.
 const _: () = assert!(
     JOIN_DRINK > crate::routines::DRINKS_AT
