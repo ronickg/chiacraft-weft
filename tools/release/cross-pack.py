@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Makes the folder `weft --dist` makes, for a build for another system that can't run here (a
+"""Makes the folder `weft dist` makes, for a build for another system that can't run here (a
 Windows build cross-compiled on a Mac): the executable, the engine's assets in assets/core, and
 every mod not marked `dist = false` packed into run/mods/<mod>.zip with its library.
 
@@ -7,12 +7,14 @@ every mod not marked `dist = false` packed into run/mods/<mod>.zip with its libr
 
 e.g. tools/release/cross-pack.py target/x86_64-pc-windows-gnu/dist weft.exe dist/chiacraft
 
-Run it from the repository root. It mirrors crates/app/src/main.rs `make_dist` and
+Run it from the repository root. It mirrors crates/app/src/main.rs `make_dist` (including
+mod-abi.txt, the hash crates/abi computes from its own source) and
 crates/engine/src/modloader.rs `pack`: each zip holds the mod's library at the top (the file name
 the game looks for on that system: <mod>.dll, lib<mod>.so or lib<mod>.dylib), then everything
 under the mod's assets/ at the same paths. Unlike the engine it leaves out .DS_Store files.
 """
 
+import re
 import shutil
 import sys
 import zipfile
@@ -27,6 +29,17 @@ def library(build: Path, exe: str, name: str) -> Path:
     else:
         file = f"lib{name}.so"
     return build / file
+
+
+def abi_version(root: Path) -> str:
+    """crates/abi's ABI_VERSION: FNV-1a over the files its `concat!(include_str!(...))` names."""
+    src = root / "crates" / "abi" / "src"
+    line = next(l for l in (src / "lib.rs").read_text().splitlines() if "pub const ABI_VERSION" in l)
+    h = 0xCBF29CE484222325
+    for name in re.findall(r'include_str!\("([^"]+)"\)', line):
+        for b in (src / name).read_bytes():
+            h = ((h ^ b) * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
+    return f"{h:016x}"
 
 
 def marked_dev(mod: Path) -> bool:
@@ -62,6 +75,7 @@ def main() -> None:
         sys.exit(f"cross-pack: {build / exe} is not built")
     out.mkdir(parents=True, exist_ok=True)
     shutil.copy2(build / exe, out / exe)
+    (out / "mod-abi.txt").write_text(abi_version(root))
     shutil.copytree(
         root / "crates" / "engine" / "assets",
         out / "assets" / "core",

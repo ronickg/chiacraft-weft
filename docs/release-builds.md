@@ -43,7 +43,7 @@ or `<branch>-<commit>`. Inside, one folder `chiacraft/`:
 | `libMoltenVK.dylib`, `MoltenVK-LICENSE` | macOS only: Vulkan on Metal, so players need no Vulkan SDK |
 | `README.txt`, `BUILD.txt`, `LICENSE` | how to run it, which commit (and on macOS, whether it is signed) |
 
-The game itself makes this folder (`weft --dist`); `tools/release/package.sh` runs that, checks
+The game itself makes this folder (`weft dist <dir>`); `tools/release/package.sh` runs that, checks
 the result and archives it. The same script runs anywhere the game builds:
 
 ```
@@ -95,7 +95,7 @@ tools/release/cross-windows.sh          # dist/chiacraft-<commit>-windows-x64.zi
 
 It builds as CI does (`--profile dist`, no debug info), niced with 4 jobs, then runs
 `package.sh` with `TARGET=x86_64-pc-windows-gnu`. A Windows `weft.exe` can't run on the Mac, so
-it can't make its own folder with `--dist`. `package.sh` then calls `tools/release/cross-pack.py`
+it can't make its own folder with `weft dist`. `package.sh` then calls `tools/release/cross-pack.py`
 instead, which makes the same folder: the executable, `assets/core`, and each mod zipped with
 its `.dll` at the top and its `assets/`. The script also gives bindgen (run by aws-lc-sys)
 mingw's C headers. Without them the build stops with `'stdlib.h' file not found`. On the Mac
