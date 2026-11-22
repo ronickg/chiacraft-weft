@@ -168,13 +168,16 @@ pub fn mark_owner(w: &World, id: u64) {
                 if !keys.iter().any(|(q, _)| *q == p) {
                     keys.push((p, crate::player_key(p)));
                 }
-                keys.iter().any(|(q, key)| *q == p && key.len() == 64 && key.as_bytes() == k)
+                keys.iter()
+                    .any(|(q, key)| *q == p && key.len() == 64 && key.as_bytes() == k)
             })
         }
         _ => None,
     }
     .unwrap_or(0);
-    if w.component(id, &base_api::TAME_OF).is_some_and(|v| v != want) {
+    if w.component(id, &base_api::TAME_OF)
+        .is_some_and(|v| v != want)
+    {
         w.set_component(id, &base_api::TAME_OF, want);
     }
 }

@@ -722,8 +722,11 @@ fn creatures(c: &Client) -> Vec<(i32, i32, n::Mark)> {
     let mut out = Vec::new();
     for (_, at, mark) in near {
         let seen = n::clear_line(eye, at, |b| {
-            c.block(b)
-                .is_some_and(|state| *opaque.entry(state).or_insert_with(|| block_info(state).is_some_and(|i| i.opaque())))
+            c.block(b).is_some_and(|state| {
+                *opaque
+                    .entry(state)
+                    .or_insert_with(|| block_info(state).is_some_and(|i| i.opaque()))
+            })
         });
         if seen {
             out.push((at[0].floor() as i32, at[2].floor() as i32, mark));
