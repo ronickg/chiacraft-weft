@@ -162,7 +162,12 @@ pub fn register(r: &mut Registry) {
     r.storage(&STASH, 54);
     // What an edit sets wins, the rest stays; the testmod ones load after or before this mod
     // depending on order, which edits don't care about.
-    r.edit(&EDITED).max_stack(8);
+    // chiacraft: testmod's content only when testmod is loaded (`--test` runs; a `--script` run
+    // loads testkit without it, see `lib.rs`).
+    let testmod = r.has_mod("testmod");
+    if testmod {
+        r.edit(&EDITED).max_stack(8);
+    }
     r.biome(&EDITED_BIOME).set(&WARMTH, 1.0).tag("edited_a");
     r.edit(&EDITED_BIOME).set(&WARMTH, 2.0);
     r.weather(&STORM).no_falling().weight(0);
@@ -178,14 +183,16 @@ pub fn register(r: &mut Registry) {
         .size(0.9, 2.5)
         .set(&WARMTH, 3.0)
         .attach(&MARK);
-    r.edit(TIN_ORE.ore()).per_cube(7);
     // Testmod's records: one of its changed, one more of the same kind.
     static STONE_STYLE: Record = Record::named("testmod:stone_style");
     static BRICK_STYLE: Record = Record::named("brick_style");
-    r.edit(&STONE_STYLE).set(&STYLE_WEIGHT, 5.0);
-    r.record(&BRICK_STYLE)
-        .tag(STYLE.name())
-        .set(&STYLE_WEIGHT, 1.0);
+    if testmod {
+        r.edit(TIN_ORE.ore()).per_cube(7);
+        r.edit(&STONE_STYLE).set(&STYLE_WEIGHT, 5.0);
+        r.record(&BRICK_STYLE)
+            .tag(STYLE.name())
+            .set(&STYLE_WEIGHT, 1.0);
+    }
     r.block(&LAMP)
         .prop("lit", ["false", "true"])
         .states(|p, s| if p.is("lit", "true") { s.light(13) } else { s })
@@ -197,35 +204,39 @@ pub fn register(r: &mut Registry) {
     r.edit(&OAK_STAIRS).light(7);
     r.set("#testkit:lamp*", &WARMTH, 1.5);
     r.tag("testkit:lit", &["lamp[lit=true]"]);
-    r.shapeless(&base_api::recipes::SMELTING, "base:stick", 1, &["testmod:edited"], 200)
-        .named("smelt_edited");
-    r.remove(&Recipe::named("smelt_edited"));
+    if testmod {
+        r.shapeless(&base_api::recipes::SMELTING, "base:stick", 1, &["testmod:edited"], 200)
+            .named("smelt_edited");
+        r.remove(&Recipe::named("smelt_edited"));
+    }
     r.loot(&EDITED_LOOT)
         .pool(Pool::new().item("base:stick"))
         .pool(Pool::new().item("base:dirt"));
     r.edit(&EDITED_LOOT)
         .remove_item(&comps::loot::POOLS, "#1")
-        .replace_drop("base:stick", "testmod:edited")
+        .replace_drop("base:stick", if testmod { "testmod:edited" } else { "base:stick" })
         .pool(Pool::new().items("base:cobblestone", 2, 2));
-    r.edit(OIL.liquid())
-        .flow_delay(12)
-        .block(|b| b.tag("testkit:edited"));
-    let off = |at: i32, of: Expr| (of - Expr::blocks(at as f64)).abs();
-    r.edit(&MARS).tag("testkit:edited");
-    r.edit(MARS.terrain())
-        .field(
-            "testkit:probe",
-            off(PROBE[0], Expr::x())
-                .max(off(PROBE[1], Expr::z()))
-                .ramp_blocks(1.0, 1.0)
-                .not(),
-        )
-        .rule_before(
-            "#0",
-            BiomeRule::new("base:plains")
-                .named("probe")
-                .field("testkit:probe", 0.5..),
-        );
+    if testmod {
+        r.edit(OIL.liquid())
+            .flow_delay(12)
+            .block(|b| b.tag("testkit:edited"));
+        let off = |at: i32, of: Expr| (of - Expr::blocks(at as f64)).abs();
+        r.edit(&MARS).tag("testkit:edited");
+        r.edit(MARS.terrain())
+            .field(
+                "testkit:probe",
+                off(PROBE[0], Expr::x())
+                    .max(off(PROBE[1], Expr::z()))
+                    .ramp_blocks(1.0, 1.0)
+                    .not(),
+            )
+            .rule_before(
+                "#0",
+                BiomeRule::new("base:plains")
+                    .named("probe")
+                    .field("testkit:probe", 0.5..),
+            );
+    }
     r.menu(&GEAR).equipment().player_inventory().screen(|ui| {
         ui.panel("panel", S::column().pad(7.0).gap(4.0), |ui| {
             ui.title();
