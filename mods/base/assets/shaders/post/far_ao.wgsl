@@ -12,6 +12,17 @@ fn apply(p: PostPixel) -> vec4<f32> {
         // over: four rings evenly turned, 28 samples, so no pattern is left either.
         keep = (far_ao(p, 0.0) + far_ao(p, 0.25) + far_ao(p, 0.5) + far_ao(p, 0.75)) * 0.25;
     }
+    // With base's `look_ao_power` (option 41, read raw: Bliss's strength) the shade falls on the
+    // land alone, not on the haze in front of it, as Bliss's falls on the sky's light before its
+    // fog: the air's share (the clear haze toward the sky's colour) is taken off, the rest shaded,
+    // the air put back. Darkening it all, the shade's blue went with it (lsK, 11-22: 5 10 29 at
+    // noon against Bliss's 0 19 65).
+    if scene.options[10][1] > 0.0 && keep < 1.0 {
+        let pos = post_position(p, p.uv);
+        let dist = length(pos);
+        let air = min(sky_color(pos / max(dist, 1e-3)) * haze_veil(pos, dist), p.color.rgb);
+        return vec4(air + (p.color.rgb - air) * keep, p.color.a);
+    }
     return vec4(p.color.rgb * keep, p.color.a);
 }
 
