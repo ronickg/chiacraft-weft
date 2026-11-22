@@ -85,3 +85,6 @@ Upstream keeps a texture's rules in `block/<name>/<name>.ctm` beside its tiles, 
 - The plain picture is now tile `0.png` in the folder: the first tile, so items and far terrain still show it. Where dev kept it out of the random set (cobblestone, mossy cobblestone, redstone ore) it has weight 0.
 - Reeds: our four tiles are back (the merge had taken upstream's). The picture an item shows is now our top tile (3), since the vertical method takes its alone picture from there.
 - Obsidian, glowstone and tall grass: upstream's variant folders are dropped. Ours are single pictures, as on dev.
+
+## Our shader pack and upstream's new sky passes (11-22)
+With our pack on, upstream's atmosphere pass and lightning bolts don't run, because the pack has no `vs_atmosphere`, `fs_atmosphere` or `fs_lightning`. The engine treats them as optional, so nothing breaks; the bolts and the atmosphere just don't show. Upstream's face layers (grass-side overlays) draw with our `fs_translucent`. Bringing them into the pack is his call, after the look A/B.
