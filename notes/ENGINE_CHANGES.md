@@ -342,6 +342,17 @@ Upstream replaced scatters with features (`features.rs`, SDK `feature.rs`). What
   - **Android: redo the cutout split on upstream's backend.** Our two-pass leaves (`world_render.rs` `cutout_split_pipelines`, `cutout_prepass`) needed our backend's `Blend::NoColor`, which went with Android and the backend taking upstream's. `cutout_split_pipelines` returns None. The Android hand pass (`hand_own_pass`, `PassBreak`) went too. *Why later:* the Android 120 fps goal (Planner, 11-22).
   - **Capped draws:** `Backend::indirect_count` is gone, and upstream's backends compact the draw records themselves (`world_render.rs` `INDIRECT_COUNT = true`). Our capped-draw code stays but never runs, until the PC bench (`pl1122_`) decides.
 
+- **Sync adaptations: small edits to make our layer fit upstream's new files** (verdict: keep in engine). Each is the least that keeps one of ours working on upstream's code:
+  - `crates/engine/src/conditions.rs`: `Body` has `climbing`, `gliding` and `rope`, and `asks_hold(c, when)` replaces the old `pose_when` bits. Its users: `crates/engine/src/client/environment.rs` (`..Default::default()`), the client's player, entity_render's hands-busy and `server/actions.rs`'s no-fall. *Why:* our climb, glide and rope poses on upstream's condition-driven poses.
+  - `crates/engine/src/tag_bits.rs`: the particle tags `FLOATS` and `BLOCK_TINT`. *Why:* our particles' flags became tags upstream.
+  - `crates/engine/src/blocks.rs`: `grip: 1.0` in its two `StateInfo` literals. *Why:* our grip field (movement) on upstream's built-in blocks.
+  - `crates/engine/src/hitbox.rs`: `#[derive(Clone)]` on `Rig`, and `build: &[]` in its `Motion`s. *Why:* our `EntityKind` is Clone (packages' content), and our model `Motion` has the painter's build (part hitboxes don't follow it; nothing of ours uses them).
+  - `crates/engine/src/client/wake.rs`: drawn into `post::world_format()` with `post::motion()`. *Why:* our `after` pass, HDR target and TAA motion.
+  - `crates/engine/src/entries.rs`: `#[allow(clippy::unit_return_expecting_ord)]` on `bake`. *Why:* clippy denies upstream's `|_| ()` key.
+  - `backends/wgpu/src/lib.rs`: it skips `BufferKind::Accel`, has `Compare::Equal` and `FillBuffer` (zero only), and ignores the motion target. *Why:* our backend API (RT buffers, motion target, buffer fills) on upstream's new wgpu backend. RT, path tracing, DLSS and TAA motion don't work on wgpu; the default renderer stays vulkan.
+- **Upstream's far LOD removed** (verdict: keep ours until the LOD A/B): `crates/engine/src/client/lod/cache.rs`, `crates/engine/src/client/lod/cover.rs`, `crates/engine/src/client/lod/detail.rs`, `crates/engine/src/client/lod/forest.rs` and `crates/engine/src/client/world_render/far_lod.rs` are deleted. *Why:* our far terrain draws distant land (Planner, 11-22); upstream's comes back if it wins the A/B.
+- **Taken as upstream's at this sync** (their rows left the file index): crates/android/Cargo.toml, crates/engine/src/clipboard.rs, crates/engine/src/touch.rs (Android is upstream's), the two engine sounds, crates/engine/src/server/area.rs (holds-liquid gave way to upstream's `shares_cell_with`), crates/engine/src/server/path.rs (upstream's wide paths), crates/sdk/src/ai.rs (their mob moods), crates/engine/src/loot.rs (our 2 lines were folded into upstream's content code) and crates/engine/src/server/extend.rs (our climb and glide attributes moved to `registry::attr`).
+
 ## What this means for syncing with upstream
 
 - **Synced with Weft v26.11.2** (upstream `2db18c23`) on `sync/weft-26.11.2`, merge `e9c8405c`
@@ -527,7 +538,6 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `backends/vulkan/src/streamline.rs` | **new: move candidate** | +826 / −0 | — | keep in engine | `upscalers-dlss` 826 |
 | `backends/vulkan/src/upscale.rs` | **new: move candidate** | +147 / −0 | — | keep in engine | `upscalers-dlss` 147 |
 | `crates/abi/src/lib.rs` |  | +450 / −4 | 120 | keep in engine | `sound` 129, `entities-animals` 62, `item-stacks-tools` 44, `movement-climb-glide-grapple` 37, `lod-trees-crowns` 34, `wind-life` 25, `weather-clouds` 24, `biome-tints-season` 23, `sky-events` 21, `survival-hooks` 9, `wet-snowline` 7, `ui-pixel-kit` 6, `entity-ranges-ai-cost` 6, `holds-liquid` 5, `held-item-scale` 4, `froxels-mist` 3, `day-rate` 3, `knockback-health` 3, `felling-lean` 2, `held-light-night` 2, `continent-scale` 2 |
-| `crates/android/Cargo.toml` | new (upstream has its own crates/android) | +21 / −0 | 1 | take upstream's | `android` 21 |
 | `crates/android/src/lib.rs` | new (upstream has its own crates/android) | +237 / −0 | 4 | take upstream's | `android` 237 |
 | `crates/app/Cargo.toml` |  | +6 / −0 | 2 | keep in engine | `upscalers-dlss` 6 |
 | `crates/app/src/main.rs` |  | +55 / −7 | 7 | keep in engine | `phase6-sandbox` 27, `phase2-packages` 15, `frame-perf` 13, `android` 7, `fix-vulkan-sync` 1 |
@@ -551,8 +561,6 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/engine/assets/shaders/upscale_guides.wgsl` | **new: move candidate** | +189 / −0 | — | keep in engine | `upscalers-dlss` 181, `path-tracing` 8 |
 | `crates/engine/assets/shaders/world.wgsl` |  | +237 / −37 | 30 | keep in engine | `plain-look` 131, `lod-ported-f69243fd` 60, `felling-lean` 23, `lod-water` 19, `test-mc-compare` 18, `canopy-light` 18, `lod-smooth-ground` 6 |
 | `crates/engine/assets/sounds/SOURCES.md` | **new: move candidate** | +10 / −0 | — | keep in engine | `sound` 10 |
-| `crates/engine/assets/sounds/item/pickup.ogg` | new (upstream has one too) | binary | 1 | take upstream's | `sound` |
-| `crates/engine/assets/sounds/ui/click.ogg` | new (upstream has one too) | binary | 1 | take upstream's | `sound` |
 | `crates/engine/assets/textures/block/destroy_0.png` |  | binary | 0 | move out | `cracks-32px` |
 | `crates/engine/assets/textures/block/destroy_1.png` |  | binary | 1 | move out | `cracks-32px` |
 | `crates/engine/assets/textures/block/destroy_2.png` |  | binary | 1 | move out | `cracks-32px` |
@@ -622,7 +630,6 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/engine/src/client/world.rs` |  | +133 / −14 | 13 | keep in engine | `biome-tints-season` 49, `weather-clouds` 36, `frame-perf` 18, `test-mc-compare` 15, `wind-life` 15, `lod-loading` 9, `lod-ported-f69243fd` 5 |
 | `crates/engine/src/client/world_render.rs` |  | +1405 / −124 | 21 | keep in engine | `android` 409, `sun-shadows` 276, `frame-perf` 179, `lod-fade-end` 142, `calm-pipelines` 104, `felling-lean` 84, `path-tracing` 83, `rt-shadows-reflections` 83, `fix-vulkan-sync` 40, `taa` 40, `upscalers-dlss` 24, `lod-smooth-ground` 16, `lod-far-look` 14, `biome-tints-season` 11, `test-mc-compare` 9, `diagnostics` 6, `material-maps` 6, `depth-water-shafts` 2, `hdr-world` 2, `holds-liquid` 1 |
 | `crates/engine/src/client/world_render/rt.rs` | **new: move candidate** | +928 / −0 | — | keep in engine | `rt-shadows-reflections` 601, `path-tracing` 327 |
-| `crates/engine/src/clipboard.rs` |  | +21 / −0 | 3 | take upstream's | `android` 21 |
 | `crates/engine/src/commands.rs` |  | +72 / −1 | 3 | keep in engine | `mac-paste` 73 |
 | `crates/engine/src/components.rs` |  | +7 / −0 | 15 | keep in engine | `item-stacks-tools` 3, `holds-liquid` 1, `movement-climb-glide-grapple` 1, `phase2-packages` 1, `held-item-scale` 1 |
 | `crates/engine/src/config.rs` |  | +383 / −6 | 28 | keep in engine | `fix-small` 146, `phase3-links` 57, `upscalers-dlss` 29, `run-settings` 27, `path-tracing` 17, `server-identity` 17, `phase4-admission` 13, `hdr-world` 12, `rt-shadows-reflections` 9, `render-scale-cache` 8, `phase5-finder` 8, `entity-ranges-ai-cost` 8, `taa` 6, `soft-clouds` 5, `test-mc-compare` 4, `lod-far-look` 4, `sun-shadows` 4, `net-path-log` 4, `froxels-mist` 3, `lod-detail-setting` 3, `frame-perf` 2, `video-presets` 2 |
@@ -637,7 +644,6 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/engine/src/input.rs` |  | +3 / −2 | 8 | move out | `sync-port` 5 |
 | `crates/engine/src/lib.rs` |  | +59 / −7 | 18 | keep in engine | `frame-perf` 48, `android` 6, `survival-hooks` 5, `phase3-links` 4, `path-tracing` 1, `phase4-admission` 1 |
 | `crates/engine/src/log.rs` |  | +77 / −7 | 2 | keep in engine | `frame-perf` 77, `android` 7 |
-| `crates/engine/src/loot.rs` |  | +2 / −0 | 5 | keep in engine | `item-stacks-tools` 2, `phase2-packages` 2 |
 | `crates/engine/src/minecraft.rs` | deleted | +0 / −499 | 1 | keep in engine | `removed-mc-pack` 499 |
 | `crates/engine/src/model.rs` |  | +38 / −1 | 7 | keep in engine | `entities-animals` 40 |
 | `crates/engine/src/modloader.rs` |  | +341 / −35 | 12 | keep in engine | `phase2-packages` 323, `phase6-sandbox` 32, `phase3-links` 25, `android` 1 |
@@ -655,16 +661,13 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/engine/src/server/achievements.rs` | **new: move candidate** | +348 / −0 | — | move out | `phase4-admission` 348 |
 | `crates/engine/src/server/actions.rs` |  | +126 / −30 | 39 | keep in engine | `phase4-admission` 148, `item-stacks-tools` 3, `movement-climb-glide-grapple` 3, `sync-port` 3, `entities-animals` 1 |
 | `crates/engine/src/server/admission.rs` | **new: move candidate** | +882 / −0 | — | move out | `phase4-admission` 882 |
-| `crates/engine/src/server/area.rs` |  | +1 / −1 | 10 | take upstream's | `holds-liquid` 2 |
 | `crates/engine/src/server/builtin.rs` |  | +57 / −4 | 14 | keep in engine | `phase4-admission` 29, `fix-small` 16, `sync-port` 16 |
 | `crates/engine/src/server/dim.rs` |  | +241 / −26 | 77 | keep in engine | `entity-ranges-ai-cost` 92, `drops-at-feet` 35, `entities-animals` 25, `item-stacks-tools` 24, `sync-port` 17, `weather-clouds` 16, `sky-events` 13, `knockback-health` 11, `fix-small` 10, `lod-trees-crowns` 8, `holds-liquid` 6, `felling-lean` 5, `biome-tints-season` 5, `day-rate` 4, `fix-wide-paths` 4, `continent-scale` 1 |
 | `crates/engine/src/server/entity.rs` |  | +183 / −12 | 38 | keep in engine | `entities-animals` 177, `entity-ranges-ai-cost` 17 |
-| `crates/engine/src/server/extend.rs` |  | +12 / −0 | 17 | keep in engine | `movement-climb-glide-grapple` 11, `knockback-health` 1 |
 | `crates/engine/src/server/liquid.rs` |  | +2 / −0 | 13 | keep in engine | `holds-liquid` 3, `felling-lean` 2 |
 | `crates/engine/src/server/load.rs` |  | +28 / −24 | 10 | move out | `phase3-links` 52 |
 | `crates/engine/src/server/menu.rs` |  | +3 / −0 | 19 | keep in engine | `fix-small` 3 |
 | `crates/engine/src/server/mod.rs` |  | +284 / −36 | 41 | keep in engine | `phase3-links` 177, `phase4-admission` 78, `android` 12, `test-mc-compare` 10, `bots` 9, `phase6-sandbox` 7, `weather-clouds` 7, `server-identity` 5, `phase1-account` 5, `sky-events` 4, `day-rate` 3, `diagnostics` 2, `biome-tints-season` 1 |
-| `crates/engine/src/server/path.rs` |  | +119 / −7 | 3 | take upstream's | `fix-wide-paths` 114, `sync-port` 12 |
 | `crates/engine/src/server/player_file.rs` |  | +141 / −14 | 10 | keep in engine | `phase4-admission` 81, `server-identity` 35, `phase3-links` 29, `test-mc-compare` 8, `day-rate` 2 |
 | `crates/engine/src/server/regions.rs` |  | +145 / −1 | 15 | keep in engine | `weather-clouds` 79, `day-rate` 31, `sky-events` 20, `biome-tints-season` 16 |
 | `crates/engine/src/server/riding.rs` |  | +8 / −4 | 12 | keep in engine | `sync-port` 10, `entities-animals` 2 |
@@ -673,7 +676,6 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/engine/src/server/terrain.rs` |  | +307 / −27 | 7 | keep in engine | `terrain-cpu-features` 170, `lod-loading` 69, `lod-trees-crowns` 52, `biome-tints-season` 26, `phase2-packages` 16, `continent-scale` 13 |
 | `crates/engine/src/settings.rs` |  | +241 / −1 | 12 | keep in engine | `gui-scale-small-windows` 92, `upscalers-dlss` 37, `path-tracing` 19, `hdr-world` 19, `phase4-admission` 17, `render-scale-cache` 11, `froxels-mist` 10, `taa` 7, `android` 6, `frame-perf` 5, `soft-clouds` 5, `video-presets` 5, `phase5-finder` 4, `net-path-log` 4 |
 | `crates/engine/src/stack.rs` |  | +37 / −3 | 10 | keep in engine | `item-stacks-tools` 40 |
-| `crates/engine/src/touch.rs` | new (upstream has one too) | +332 / −0 | 7 | take upstream's | `android` 332 |
 | `crates/engine/src/ui/edit.rs` |  | +6 / −4 | 2 | keep in engine | `mac-paste` 10 |
 | `crates/engine/src/ui/font.rs` |  | +259 / −63 | 1 | keep in engine | `theme-title-fonts` 295, `ui-pixel-kit` 26 |
 | `crates/engine/src/ui/lang.rs` |  | +4 / −0 | 0 | keep in engine | `entities-animals` 4 |
@@ -683,7 +685,6 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/noise/src/fixed.rs` |  | +115 / −0 | 0 | keep in engine | `continent-scale` 19 |
 | `crates/render/src/lib.rs` |  | +345 / −0 | 6 | keep in engine | `upscalers-dlss` 201, `rt-shadows-reflections` 80, `android` 36, `render-scale-cache` 17, `path-tracing` 11 |
 | `crates/render/src/shader.rs` |  | +24 / −1 | 0 | keep in engine | `rt-shadows-reflections` 25 |
-| `crates/sdk/src/ai.rs` |  | +19 / −2 | 5 | take upstream's | `fix-mob-moods` 21 |
 | `crates/sdk/src/camera.rs` |  | +5 / −2 | 6 | move out | `sync-port` 7 |
 | `crates/sdk/src/client.rs` |  | +39 / −0 | 18 | keep in engine | `weather-clouds` 14, `movement-climb-glide-grapple` 8, `theme-title-fonts` 8, `item-stacks-tools` 5, `hud-chat-crosshair-outline` 4 |
 | `crates/sdk/src/component.rs` |  | +43 / −0 | 23 | keep in engine | `item-stacks-tools` 34, `sync-port` 5, `holds-liquid` 2, `movement-climb-glide-grapple` 1, `held-item-scale` 1 |
@@ -704,7 +705,6 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 |---|---|---|---|
 | `backends/vulkan/src/lib.rs` | keep in engine | `upscalers-dlss` 377, `path-tracing` 228, `fix-vulkan-sync` 154, `rt-shadows-reflections` 138, `fix-vulkan-oom` 96, `diagnostics` 92, `depth-water-shafts` 30 | `android` 852, `render-scale-cache` 79, `fix-vulkan-lifetime` 61 |
 | `crates/abi/src/lib.rs` | keep in engine | `sound` 129, `entities-animals` 62, `item-stacks-tools` 44, `movement-climb-glide-grapple` 37, `wind-life` 25, `biome-tints-season` 23, `sky-events` 21 (move out), `survival-hooks` 9 (move out), `wet-snowline` 7 (move out), `ui-pixel-kit` 6, `entity-ranges-ai-cost` 6, `held-item-scale` 4, `froxels-mist` 3, `day-rate` 3, `felling-lean` 2, `continent-scale` 2 | `lod-trees-crowns` 34, `weather-clouds` 24, `holds-liquid` 5, `knockback-health` 3, `held-light-night` 2 |
-| `crates/android/Cargo.toml` | take upstream's | — | `android` 21 |
 | `crates/android/src/lib.rs` | take upstream's | — | `android` 237 |
 | `crates/app/src/main.rs` | keep in engine | `phase6-sandbox` 27, `phase2-packages` 15, `frame-perf` 13, `fix-vulkan-sync` 1 | `android` 7 |
 | `crates/engine/Cargo.toml` | keep in engine | `phase4-admission` 5 (move out), `phase3-links` 2 (move out), `phase1-account` 2 (move out), `phase2-packages` 1 | `android` 11, `test-mc-compare` 2 |
@@ -719,8 +719,6 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/engine/assets/shaders/terrain.wgsl` | keep in engine | `terrain-cpu-features` 29 (move out), `continent-scale` 2 | `lod-trees-crowns` 162, `lod-smooth-ground` 22, `lod-water` 8 |
 | `crates/engine/assets/shaders/ui.wgsl` | move out | `survival-hooks` 26 (move out), `theme-title-fonts` 6 (move out) | — |
 | `crates/engine/assets/shaders/world.wgsl` | keep in engine | `plain-look` 131 (move out), `felling-lean` 23, `canopy-light` 18 | `lod-ported-f69243fd` 60, `lod-water` 19, `test-mc-compare` 18, `lod-smooth-ground` 6 |
-| `crates/engine/assets/sounds/item/pickup.ogg` | take upstream's | — | — |
-| `crates/engine/assets/sounds/ui/click.ogg` | take upstream's | — | — |
 | `crates/engine/assets/textures/block/destroy_1.png` | move out | — | — |
 | `crates/engine/assets/textures/block/destroy_2.png` | move out | — | — |
 | `crates/engine/assets/textures/block/destroy_3.png` | move out | — | — |
@@ -750,7 +748,6 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/engine/src/client/textures.rs` | keep in engine | `item-stacks-tools` 87, `material-maps` 76, `frame-perf` 24 | — |
 | `crates/engine/src/client/world.rs` | keep in engine | `biome-tints-season` 49, `frame-perf` 18, `wind-life` 15 | `weather-clouds` 36, `test-mc-compare` 15, `lod-loading` 9, `lod-ported-f69243fd` 5 |
 | `crates/engine/src/client/world_render.rs` | keep in engine | `sun-shadows` 276, `frame-perf` 179, `lod-fade-end` 142, `calm-pipelines` 104, `felling-lean` 84, `path-tracing` 83, `rt-shadows-reflections` 83, `fix-vulkan-sync` 40, `taa` 40, `upscalers-dlss` 24, `lod-far-look` 14, `biome-tints-season` 11, `diagnostics` 6, `material-maps` 6, `depth-water-shafts` 2, `hdr-world` 2 | `android` 409, `lod-smooth-ground` 16, `test-mc-compare` 9, `holds-liquid` 1 |
-| `crates/engine/src/clipboard.rs` | take upstream's | — | `android` 21 |
 | `crates/engine/src/commands.rs` | keep in engine | `mac-paste` 73 | — |
 | `crates/engine/src/components.rs` | keep in engine | `item-stacks-tools` 3, `movement-climb-glide-grapple` 1, `phase2-packages` 1, `held-item-scale` 1 | `holds-liquid` 1 |
 | `crates/engine/src/config.rs` | keep in engine | `fix-small` 146, `phase3-links` 57 (move out), `upscalers-dlss` 29, `run-settings` 27, `path-tracing` 17, `server-identity` 17, `phase4-admission` 13 (move out), `hdr-world` 12, `rt-shadows-reflections` 9, `phase5-finder` 8 (move out), `entity-ranges-ai-cost` 8, `taa` 6, `lod-far-look` 4, `sun-shadows` 4, `net-path-log` 4, `froxels-mist` 3, `frame-perf` 2 | `render-scale-cache` 8, `soft-clouds` 5, `test-mc-compare` 4, `lod-detail-setting` 3, `video-presets` 2 |
@@ -763,7 +760,6 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/engine/src/input.rs` | move out | `sync-port` 5 (move out) | — |
 | `crates/engine/src/lib.rs` | keep in engine | `frame-perf` 48, `survival-hooks` 5 (move out), `phase3-links` 4 (move out), `path-tracing` 1, `phase4-admission` 1 (move out) | `android` 6 |
 | `crates/engine/src/log.rs` | keep in engine | `frame-perf` 77 | `android` 7 |
-| `crates/engine/src/loot.rs` | keep in engine | `item-stacks-tools` 2, `phase2-packages` 2 | — |
 | `crates/engine/src/minecraft.rs` | keep in engine | `removed-mc-pack` 499 | — |
 | `crates/engine/src/modloader.rs` | keep in engine | `phase2-packages` 323, `phase6-sandbox` 32, `phase3-links` 25 (move out) | `android` 1 |
 | `crates/engine/src/net/codec.rs` | move out | `phase4-admission` 1 (move out) | — |
@@ -779,11 +775,9 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/engine/src/server/builtin.rs` | keep in engine | `phase4-admission` 29 (move out), `fix-small` 16, `sync-port` 16 (move out) | — |
 | `crates/engine/src/server/dim.rs` | keep in engine | `entity-ranges-ai-cost` 92, `drops-at-feet` 35 (move out), `entities-animals` 25, `item-stacks-tools` 24, `sync-port` 17 (move out), `sky-events` 13 (move out), `fix-small` 10, `felling-lean` 5, `biome-tints-season` 5, `day-rate` 4, `continent-scale` 1 | `weather-clouds` 16, `knockback-health` 11, `lod-trees-crowns` 8, `holds-liquid` 6, `fix-wide-paths` 4 |
 | `crates/engine/src/server/entity.rs` | keep in engine | `entities-animals` 177, `entity-ranges-ai-cost` 17 | — |
-| `crates/engine/src/server/extend.rs` | keep in engine | `movement-climb-glide-grapple` 11 | `knockback-health` 1 |
 | `crates/engine/src/server/liquid.rs` | keep in engine | `felling-lean` 2 | `holds-liquid` 3 |
 | `crates/engine/src/server/load.rs` | move out | `phase3-links` 52 (move out) | — |
 | `crates/engine/src/server/mod.rs` | keep in engine | `phase3-links` 177 (move out), `phase4-admission` 78 (move out), `bots` 9, `phase6-sandbox` 7, `server-identity` 5, `phase1-account` 5 (move out), `sky-events` 4 (move out), `day-rate` 3, `diagnostics` 2, `biome-tints-season` 1 | `android` 12, `test-mc-compare` 10, `weather-clouds` 7 |
-| `crates/engine/src/server/path.rs` | take upstream's | `sync-port` 12 (move out) | `fix-wide-paths` 114 |
 | `crates/engine/src/server/player_file.rs` | keep in engine | `phase4-admission` 81 (move out), `server-identity` 35, `phase3-links` 29 (move out), `day-rate` 2 | `test-mc-compare` 8 |
 | `crates/engine/src/server/regions.rs` | keep in engine | `day-rate` 31, `sky-events` 20 (move out), `biome-tints-season` 16 | `weather-clouds` 79 |
 | `crates/engine/src/server/riding.rs` | keep in engine | `sync-port` 10 (move out), `entities-animals` 2 | — |
@@ -792,12 +786,10 @@ One line per file. **Upstream** is how many upstream commits since our base touc
 | `crates/engine/src/server/terrain.rs` | keep in engine | `terrain-cpu-features` 170 (move out), `biome-tints-season` 26, `phase2-packages` 16, `continent-scale` 13 | `lod-loading` 69, `lod-trees-crowns` 52 |
 | `crates/engine/src/settings.rs` | keep in engine | `gui-scale-small-windows` 92, `upscalers-dlss` 37, `path-tracing` 19, `hdr-world` 19, `phase4-admission` 17 (move out), `froxels-mist` 10, `taa` 7, `frame-perf` 5, `phase5-finder` 4 (move out), `net-path-log` 4 | `render-scale-cache` 11, `android` 6, `soft-clouds` 5, `video-presets` 5 |
 | `crates/engine/src/stack.rs` | keep in engine | `item-stacks-tools` 40 | — |
-| `crates/engine/src/touch.rs` | take upstream's | — | `android` 332 |
 | `crates/engine/src/ui/edit.rs` | keep in engine | `mac-paste` 10 | — |
 | `crates/engine/src/ui/mod.rs` | keep in engine | `ui-pixel-kit` 35, `load-checks` 19, `gui-scale-small-windows` 9, `movement-climb-glide-grapple` 8 | `russian` 3 |
 | `crates/engine/src/ui/render.rs` | keep in engine | `ui-pixel-kit` 198, `movement-climb-glide-grapple` 89, `theme-title-fonts` 44 (move out), `item-stacks-tools` 21, `survival-hooks` 10 (move out), `fix-small` 5, `upscalers-dlss` 1 | — |
 | `crates/render/src/lib.rs` | keep in engine | `upscalers-dlss` 201, `rt-shadows-reflections` 80, `path-tracing` 11 | `android` 36, `render-scale-cache` 17 |
-| `crates/sdk/src/ai.rs` | take upstream's | — | `fix-mob-moods` 21 |
 | `crates/sdk/src/client.rs` | keep in engine | `movement-climb-glide-grapple` 8, `theme-title-fonts` 8 (move out), `item-stacks-tools` 5, `hud-chat-crosshair-outline` 4 | `weather-clouds` 14 |
 | `crates/sdk/src/component.rs` | keep in engine | `item-stacks-tools` 34, `sync-port` 5 (move out), `movement-climb-glide-grapple` 1, `held-item-scale` 1 | `holds-liquid` 2 |
 | `crates/sdk/src/content.rs` | keep in engine | `sound` 11, `survival-hooks` 9 (move out), `item-stacks-tools` 5, `movement-climb-glide-grapple` 5, `sync-port` 1 (move out) | `holds-liquid` 2 |
