@@ -512,11 +512,16 @@ impl Screen for Title {
                     });
                     ui.nodes[mods].style.grow = 1.0;
                     let icon = cx.look.texture("menu_editor", "");
-                    let e = ui.button("button_secondary", Style::default().w(20.0).h(20.0), Rc::new(|c: &mut Ctx| open(c, "core:editor")), |ui| {
-                        if let Some(texture) = icon {
-                            ui.add(Kind::Image { texture, color: 0xFFFFFFFF }, Style::default().w(9.0).h(9.0).at(5.5, 5.5, [0.0, 0.0]));
-                        }
-                    });
+                    let e = ui.button(
+                        "button_secondary",
+                        Style::default().w(20.0).h(20.0),
+                        Rc::new(|c: &mut Ctx| open(c, "core:editor")),
+                        |ui| {
+                            if let Some(texture) = icon {
+                                ui.add(Kind::Image { texture, color: 0xFFFFFFFF }, Style::default().w(9.0).h(9.0).at(5.5, 5.5, [0.0, 0.0]));
+                            }
+                        },
+                    );
                     ui.nodes[e].tooltip = Some(cx.t("menu.editor", &[]));
                     ui.set_id(e, "editor");
                 });

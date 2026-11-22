@@ -529,7 +529,8 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
                 let data = match text.strip_prefix("kind:") {
                     Some(kind) => crate::content::content()
                         .game
-                        .entity_names
+                        .catalog
+                        .ids(weft_abi::entry_kind::ENTITY)
                         .get(kind)
                         .map_or(0, |&k| 2 + k as u64),
                     None => (text == "menu") as u64,

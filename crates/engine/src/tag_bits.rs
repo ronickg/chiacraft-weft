@@ -23,7 +23,7 @@ tag_bits! {
         INSTANT_BREAK, NO_BREAK, NO_PLACE, NO_COSTS, ALWAYS_FLY, NOCLIP, NO_INTERACT, HIDDEN, NO_HUD,
         CREATIVE_INVENTORY,
     }
-    particle of particle { COLLIDE, FULLBRIGHT, TRANSLUCENT, SHRINK }
+    particle of particle { COLLIDE, FULLBRIGHT, TRANSLUCENT, SHRINK, FLOATS, BLOCK_TINT }
     config of config { RESTART_REQUIRED, PERCENT, ON_RELEASE }
     entity of entity { NO_GRAVITY, SWIMS, SOLID, KINEMATIC, RIDERS_FALL, WEARS, PICKS_UP, POSES } [
         /// What every kind does unless a tag in `OFF` takes it away.

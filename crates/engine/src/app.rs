@@ -508,7 +508,7 @@ fn run_on(event_loop: EventLoop<()>, renderers: Renderers, opts: Options) -> Res
 
 /// The engine's own assets: those a distribution ships, else (a build run from the source tree, or
 /// `--dev`) the source tree's.
-pub(crate) fn engine_assets(dev: bool) -> PathBuf {
+pub fn engine_assets(dev: bool) -> PathBuf {
     let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
     let shipped = crate::paths::shipped().map(|d| d.join("assets").join("core"));
     match shipped {
@@ -553,9 +553,9 @@ impl App {
         // Mods first: the engine's settings are `core:` configs like theirs.
         let off = modloader::off_file(&self.opts.run_dir, self.opts.automated);
         let core_assets = engine_assets(self.opts.dev);
-        // SYNC: our data packages' folders (`package_dirs`, phase 2) after the mods' folders, as in
-        // `dedicated.rs`; match the modloader group's `load`.
-        let mods = modloader::load(&self.opts.mod_dirs, &self.opts.package_dirs, &self.opts.cache_dir, &off, &self.opts.mods_off, &core_assets)?;
+        // chiacraft: our data packages' folders (`package_dirs`, phase 2) after the mods' folders.
+        let mods =
+            modloader::load(&self.opts.mod_dirs, &self.opts.package_dirs, &self.opts.cache_dir, &off, &self.opts.mods_off, &core_assets)?;
         modloader::tidy_store(&self.opts.run_dir.join("saves"));
         crate::config::set_automated(self.opts.automated);
         // The account, before anything needs the network key: made quietly on the first start.
@@ -1485,7 +1485,10 @@ impl Running {
         if self.entering.as_ref().is_some_and(|e| !e.expanded) || self.gpu.compiling() {
             return;
         }
-        let Some(OpeningWorld::Streaming { mut conn, server, dir, view, skin, chat_history, world, identity }) = self.opening_world.take() else { return };
+        let Some(OpeningWorld::Streaming { mut conn, server, dir, view, skin, chat_history, world, identity }) = self.opening_world.take()
+        else {
+            return;
+        };
         conn.send(net::ToServer::View(view as u32));
         match Client::new(&mut *self.gpu, &self.assets, &self.textures, &self.cache_dir, conn, view, skin) {
             Ok(mut client) => {
@@ -2322,7 +2325,13 @@ impl Running {
                     Some(item) => requests.push(Request::Open(Box::new(crate::game_screens::RecipeView::item(item, uses)))),
                     // Nothing under the mouse in a menu: every recipe, by kind (the HUD shows R).
                     None if menu && !right_click => {
-                        let mut kinds: Vec<String> = content().game.recipe_kinds.iter().cloned().collect();
+                        let mut kinds: Vec<String> = content()
+                            .game
+                            .catalog
+                            .ids(weft_abi::entry_kind::RECIPE_KIND)
+                            .keys()
+                            .cloned()
+                            .collect();
                         kinds.sort();
                         requests.push(Request::Open(Box::new(crate::game_screens::RecipeView::new(
                             crate::game_screens::RecipeQuery::Kinds(kinds),
@@ -3311,7 +3320,13 @@ fn world_keys(r: &mut Running) {
             let view = if held.item != 0 {
                 crate::game_screens::RecipeView::item(held.item, uses)
             } else {
-                let mut kinds: Vec<String> = content().game.recipe_kinds.iter().cloned().collect();
+                let mut kinds: Vec<String> = content()
+                    .game
+                    .catalog
+                    .ids(weft_abi::entry_kind::RECIPE_KIND)
+                    .keys()
+                    .cloned()
+                    .collect();
                 kinds.sort();
                 crate::game_screens::RecipeView::new(crate::game_screens::RecipeQuery::Kinds(kinds))
             };
@@ -3422,9 +3437,15 @@ fn refresh_hud(r: &mut Running) {
         // Any other screen over play (chiacraft): the HUD shows what it shows under a menu.
         let menu_open = top.is_some() && !chat_open;
         r.hud.knob = r.touches.knob();
-        if r.hud
-            .update(r.game.as_ref().map(|g| &g.client), r.debug, crate::settings::debug_groups(), chat_open, menu_open, &r.lang, &r.input)
-        {
+        if r.hud.update(
+            r.game.as_ref().map(|g| &g.client),
+            r.debug,
+            crate::settings::debug_groups(),
+            chat_open,
+            menu_open,
+            &r.lang,
+            &r.input,
+        ) {
             r.quads_dirty = true;
         }
     }
@@ -3719,13 +3740,9 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         r.quads_dirty = true;
     }
     if let Some(g) = &mut r.game {
-        g.client.entity_render.preload(
-            &mut *r.gpu,
-            &r.assets,
-            &g.client.entities,
-            &g.client.entity_components,
-            &g.client.me,
-        );
+        g.client
+            .entity_render
+            .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &g.client.me);
         if g.client
             .entity_render
             .draw_icons(&mut *r.gpu, &mut r.list, info)

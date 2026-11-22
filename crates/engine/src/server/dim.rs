@@ -2623,8 +2623,7 @@ impl Dim {
                 }
                 let n = rule.group[0] + (self.rng.next() % (rule.group[1] - rule.group[0] + 1) as u64) as u32;
                 // A mod may turn it down (`question::NATURAL_SPAWN`: no food there for them).
-                let q =
-                    abi::Query { pos: abi::BlockPos { x, y, z }, other: rule.entity as u64, amount: n as f64, ..abi::Query::DEFAULT };
+                let q = abi::Query { pos: abi::BlockPos { x, y, z }, other: rule.entity as u64, amount: n as f64, ..abi::Query::DEFAULT };
                 if !self.ask(0, c, abi::question::NATURAL_SPAWN, &q) {
                     continue;
                 }
@@ -3234,7 +3233,7 @@ impl Dim {
                 forced,
                 |d, keys_too| {
                     // A pose fallen back to goes without the keys, sprinting counted, as a player's.
-                    let body = crate::conditions::Body { in_liquid, flying, sprinting: sprints || !keys_too };
+                    let body = crate::conditions::Body { in_liquid, flying, sprinting: sprints || !keys_too, ..Default::default() };
                     let ask = crate::conditions::Ask { pos, entity: id, body: Some(body), ..Default::default() };
                     (!keys_too || d.key.is_empty() || walk.is_some_and(|w| w.holds(&d.key)))
                         && d.when

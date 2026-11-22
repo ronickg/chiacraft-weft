@@ -161,10 +161,12 @@ fn steps(w: &mut Vec<i32>, e: &Expr, seed: u64) -> (i32, i32) {
 ///
 /// The crowns come from sample runs of the shape on real ground spread over the world: a run at
 /// one spot only said what that spot allowed (a clearing, a rock face), for every site.
-// SYNC: upstream replaced the dimension's scatters (`DimensionDef::scatters`, `ScatterDef`) with
-// features (`features::FeatureDef`: `Spread::Grid` with `Chance::Density`, `Shape::Plan`). Read
-// them here (grid spacing as the cell, `reach[0]`, the density, the plan callback, our thinning)
-// and check the sites' hash in `terrain.wgsl`'s `lod` still matches `features`' grid starts.
+// SYNC: upstream replaced the dimension's scatters (`DimensionDef::scatters`, `ScatterDef`,
+// `abi::ScatterArgs`) with features (`features::FeatureDef`: `Spread::Grid` with
+// `Chance::Density`, `Shape::Plan`). Until the far trees read them (grid spacing as the cell,
+// `reach[0]`, the density, sample runs of the plan callback through `crown_of`, our thinning) and
+// the sites' hash in `terrain.wgsl`'s `lod` is checked against `features`' grid starts, no
+// scatters are described: distant terrain has no far trees.
 pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize>)> {
     let (mut w, custom) = describe(c, dim, seed)?;
     let def = &c.dims[dim as usize];
@@ -174,95 +176,33 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
         .and_then(|t| t.faces)
         .map_or(i32::MAX, |f| f.fall);
     w[d::SCATTER_OFF as usize] = w.len() as i32;
-    w.push(def.scatters.len() as i32);
-    let biomes = c.biomes.len().max(1);
-    let mut buf = vec![weft_abi::ScatterBlock { offset: [0; 3].into(), state: 0, force: 0 }; 4096];
-    // Where the sample runs stand: spread over some 20 km, on the ground there.
-    let spots: Vec<[i32; 3]> = (0..RUN_SPOTS as i32)
-        .filter_map(|k| {
-            let (x, z) = ((k * 2_741 + 113) % 20_011 - 10_000, (k * 7_919 + 457) % 20_021 - 10_000);
-            let col = def.column(seed, x, z)?;
-            (col.height != i32::MIN).then_some([x, col.height + 1, z])
-        })
-        .collect();
-    for sc in &def.scatters {
-        let key = seed ^ sc.salt;
-        w.extend_from_slice(&[sc.cell, sc.reach, key as u32 as i32, (key >> 32) as u32 as i32, biomes as i32]);
-        let head = w.len();
-        w.extend_from_slice(&[0, 0, 0]);
-        if let Some(t) = &sc.thin {
-            let (start, len) = steps(&mut w, t.mask.expr(), seed);
-            (w[head], w[head + 1], w[head + 2]) = (start, len, t.keep as i32);
-        }
-        for b in 0..biomes as u32 {
-            let density = sc
-                .density
-                .and_then(|d| c.components.get::<f32>(crate::components::BIOME, b, d))
-                .unwrap_or(0.0);
-            let threshold = (density as f64 * (1u64 << 53) as f64).ceil() as u64;
-            // Each run's crown, with its top for sorting.
-            let mut runs: Vec<(i32, [u32; 2])> = Vec::new();
-            for (k, &pos) in spots.iter().enumerate() {
-                if threshold == 0 || runs.len() >= RUNS {
-                    break;
-                }
-                let mut args = weft_abi::ScatterArgs {
-                    seed,
-                    dim,
-                    pos: pos.into(),
-                    biome: b,
-                    random: weft_noise::mix(k as u64),
-                    out: buf.as_mut_ptr(),
-                    cap: buf.len() as u32,
-                    len: 0,
-                };
-                if !crate::host::invoke(sc.owner, sc.shape, &mut args) {
-                    continue;
-                }
-                let blocks = &buf[..(args.len as usize).min(buf.len())];
-                if let Some(run) = crown_of(blocks) {
-                    runs.push(run);
-                }
-            }
-            let thinned = sc.thin.as_ref().is_some_and(|t| {
-                t.biomes
-                    .is_none_or(|comp| c.components.has(crate::components::BIOME, b, comp))
-            });
-            let mut entry = [0i32; words::SCATTER_BIOME as usize];
-            if !runs.is_empty() {
-                (entry[0], entry[1], entry[2]) = (threshold as u32 as i32, (threshold >> 32) as u32 as i32, thinned as i32);
-                // Crowns spread over the runs from the lowest to the tallest, so the sites keep the
-                // mix of sizes (a forest's few emergents among the rest), not one median tree.
-                runs.sort_by_key(|r| r.0);
-                let n = layout::lod::SHAPES as usize;
-                for i in 0..n {
-                    let run = runs[(2 * i + 1) * runs.len() / (2 * n)].1;
-                    entry[3 + 2 * i] = run[0] as i32;
-                    entry[4 + 2 * i] = run[1] as i32;
-                }
-            }
-            w.extend_from_slice(&entry);
-        }
-        w.push(sc.ground.len() as i32);
-        for &b in &sc.ground {
-            let bd = &c.blocks[b as usize];
-            w.extend_from_slice(&[bd.first_state as i32, bd.states as i32]);
-        }
-    }
+    w.push(0);
     Some((w, custom))
 }
 
+/// A block a sample run put (`crown_of`): where, relative to the site, which state, and whether
+/// it was forced over what was there.
+#[allow(dead_code)]
+struct RunBlock {
+    offset: glam::IVec3,
+    state: u32,
+    force: u32,
+}
+
 /// Sample runs of a scatter's shape per biome for its crowns, and the spots tried for them.
+#[allow(dead_code)]
 const RUNS: usize = 16;
+#[allow(dead_code)]
 const RUN_SPOTS: usize = 48;
 
 /// What a run of a scatter's shape looks like from afar (`gpu_layout::terrain::crown`), and its
 /// top: its crown, of the block it puts most into air (a tree's leaves; else the one it forces
 /// most, a boulder's stone, as none at all was air, drawn violet), and the trunk under it. None
 /// when it put nothing.
-fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
+#[allow(dead_code)]
+fn crown_of(blocks: &[RunBlock]) -> Option<(i32, [u32; 2])> {
     use layout::crown as cr;
-    let commonest = |forced: bool, keep: &dyn Fn(&weft_abi::ScatterBlock) -> bool| {
+    let commonest = |forced: bool, keep: &dyn Fn(&RunBlock) -> bool| {
         let mut n = rustc_hash::FxHashMap::<u32, u32>::default();
         for b in blocks
             .iter()
@@ -276,13 +216,13 @@ fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
     // logs (a 2x2 trunk 30 high is 120 of them) outnumbered its leaves, and far off it stood as a
     // crown of logs from the ground up, a bare pillar (Far view, 11-05: the far forests' pillars).
     let high = blocks.iter().map(|b| b.offset.y).max()?;
-    let upper = |b: &weft_abi::ScatterBlock| 2 * b.offset.y >= high;
+    let upper = |b: &RunBlock| 2 * b.offset.y >= high;
     let leaves = commonest(false, &upper).or_else(|| commonest(true, &|_| true))?;
     let crown: Vec<_> = blocks.iter().filter(|b| b.state == leaves).collect();
     let top = crown.iter().map(|b| b.offset.y).max()?;
     let bottom = crown.iter().map(|b| b.offset.y).min()?.clamp(0, top);
     // Out from the trunk at a layer, and at all.
-    let out = |b: &&weft_abi::ScatterBlock| ((b.offset.x * b.offset.x + b.offset.z * b.offset.z) as f32).sqrt();
+    let out = |b: &&RunBlock| ((b.offset.x * b.offset.x + b.offset.z * b.offset.z) as f32).sqrt();
     let width = |y: i32| {
         crown
             .iter()
@@ -302,9 +242,7 @@ fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
     let round =
         if radius < 0.5 || top == widest { 15 } else { ((width((widest + top + 1) / 2) / radius * 15.0).round() as i32).clamp(1, 15) };
     // The trunk: what stands under the crown at its middle, as wide as it is at the bottom.
-    let under = |b: &weft_abi::ScatterBlock| {
-        b.state != leaves && b.offset.x.abs() <= 3 && b.offset.z.abs() <= 3 && (0..bottom).contains(&b.offset.y)
-    };
+    let under = |b: &RunBlock| b.state != leaves && b.offset.x.abs() <= 3 && b.offset.z.abs() <= 3 && (0..bottom).contains(&b.offset.y);
     let trunk = commonest(false, &under).or_else(|| commonest(true, &under));
     let trunk_width = trunk.map_or(0, |t| {
         let low = blocks
@@ -502,6 +440,7 @@ impl GpuTerrain {
             lod_queue: VecDeque::new(),
             slots: Vec::new(),
             desc: None,
+            lod_desc: None,
             on,
         }
     }

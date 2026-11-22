@@ -836,7 +836,11 @@ impl EntityRenderer {
                 .skin_painters
                 .iter()
                 .filter_map(|p| {
-                    let kind = *c.game.entity_names.get(&p.kind)?;
+                    let kind = *c
+                        .game
+                        .catalog
+                        .ids(weft_abi::entry_kind::ENTITY)
+                        .get(&p.kind)?;
                     let comp = c.components.id(&p.comp)?;
                     Some((kind, (comp, p.owner, p.cb)))
                 })
@@ -1967,9 +1971,8 @@ impl EntityRenderer {
             });
         }
         if let Some(own) = own_hand {
-            if gpu.hand_own_pass() {
-                list.push(Cmd::PassBreak);
-            }
+            // (Our Android hand pass, `Cmd::PassBreak`, went with our Android backend: upstream's
+            // came in, Weft sync 11-22.)
             let hand_bob = hand.as_ref().and_then(|h| h.bob);
             self.draw_own_hand(gpu, list, frame, cam, hand_bob, scene, own, own_first, own_items, &hand_items, boxes.len(), buf, glow);
         }
@@ -2166,7 +2169,7 @@ impl EntityRenderer {
             };
             let held_how = Play { looping: true, aim: true, hand: true, ..how };
             // Hands on a wall or a glider's bar: the pose's clip has the arms, not what is held.
-            let hands_busy = pose.when & (weft_abi::pose_when::CLIMBING | weft_abi::pose_when::GLIDING | weft_abi::pose_when::ROPE) != 0;
+            let hands_busy = crate::conditions::asks_hold(c, pose.when);
             if hands_busy {
                 // Nothing of the hands: the item rides along on the raised arm.
             } else if e.held.item != 0 {

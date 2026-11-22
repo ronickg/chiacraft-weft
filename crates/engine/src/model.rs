@@ -840,6 +840,7 @@ type Channels = [Option<usize>; 3];
 
 /// An animation on a model: which channel drives each bone, resolved once, as written and with
 /// the sides swapped.
+#[derive(Clone)]
 pub struct Bound {
     pub anim: Arc<Animation>,
     pub bones: Vec<Channels>,

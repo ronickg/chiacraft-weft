@@ -454,7 +454,7 @@ pub fn relight_after(
     lost_light: &[IVec3],
 ) -> usize {
     let st = &c.states[state as usize];
-    if st.opacity == 0 && st.light == [0; 3] && st.liquid_in().is_none() {
+    if st.opacity == 0 && st.light == [0; 3] && st.liquid.is_none() {
         relight_opened(c, dim, cubes, dirty, changed, lost_light)
     } else {
         relight_around(c, dim, cubes, dirty, changed)

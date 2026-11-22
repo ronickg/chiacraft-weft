@@ -924,11 +924,15 @@ impl UiRenderer {
     /// otherwise its own picture (`plain_icon`).
     pub fn slot_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, stack: &weft_abi::ItemStack) {
         let looks = crate::client::looks::current();
-        let icon = c.items.get(stack.item as usize).filter(|_| stack.item != 0).map(|def| {
-            let look = looks.item(stack.item);
-            let model = look.and_then(|l| l.model.as_deref()).unwrap_or(&def.model);
-            (look.and_then(|l| l.icon).unwrap_or(def.icon), !model.is_empty())
-        });
+        let icon = c
+            .items
+            .get(stack.item as usize)
+            .filter(|_| stack.item != 0)
+            .map(|def| {
+                let look = looks.item(stack.item);
+                let model = look.and_then(|l| l.model.as_deref()).unwrap_or(&def.model);
+                (look.and_then(|l| l.icon).unwrap_or(def.icon), !model.is_empty())
+            });
         match icon {
             // A model and an icon: the icon (a stack's own layers, `stack::layers`, go the usual way).
             Some((icon, true)) if icon != u32::MAX && crate::stack::layers(stack).is_none() => {

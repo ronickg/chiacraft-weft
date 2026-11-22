@@ -363,8 +363,6 @@ impl Particles {
         };
         // A kind with pictures of its own colored like its block (a leaf off its tree) takes the
         // block's tint on whichever face it has it (chiacraft).
-        // SYNC: particle flags are tags now (`tag_bits::particle`); `BLOCK_TINT` (sdk
-        // `effects.rs`'s `block_tint`) needs a particle tag of its own there.
         let tinted_like = c
             .states
             .get(b.block as usize)

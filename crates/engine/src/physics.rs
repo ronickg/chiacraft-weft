@@ -1210,7 +1210,7 @@ pub fn occupied(c: &Content, block: &impl Cells, bodies: &[Body<'_>], skip: u64,
 pub fn push_out(c: &Content, block: &impl Cells, pos: DVec3, half_width: f64, height: f64) -> Option<DVec3> {
     let me = Aabb::around(pos, half_width, height);
     let mut inside = Vec::new();
-    each_solid(c, block, me, |s| {
+    each_solid_with_state(c, block, me, |s, _| {
         if s.intersects(&me) {
             inside.push(s);
         }
@@ -1955,7 +1955,7 @@ pub fn wall_grip(c: &Content, block: &impl Cells, pos: DVec3, half_width: f64, h
                     let p = IVec3::new(x, y, z);
                     let Some((main, extras)) = block.cell(p) else { continue };
                     let b = p.as_dvec3();
-                    for s in std::iter::once(main).chain(extras.iter().copied()) {
+                    for s in std::iter::once(main).chain(extras.extras.iter().copied()) {
                         let st = &c.states[s as usize];
                         let touches = st.collision.iter().any(|bx| {
                             let bx = bx.map(|v| v as f64);

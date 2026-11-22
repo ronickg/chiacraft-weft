@@ -205,7 +205,7 @@ async fn endpoint(settings: &Settings, who: Who) -> Result<Endpoint, String> {
     let mut b = Endpoint::builder(presets::N0).relay_mode(relay_mode());
     // The relay-only test (`core:net_relay_only`): no IP transport at all, so nothing goes direct
     // and nothing direct is published; every path is the relay.
-    if settings.net_relay_only() {
+    if crate::settings::net_relay_only() {
         log::info!("net: relay only (core:net_relay_only): no direct paths");
         b = b.clear_ip_transports();
     }

@@ -54,7 +54,7 @@ impl Server {
                 continue;
             };
             let Some(subject) = p
-                .identity
+                .account
                 .as_deref()
                 .and_then(chiacraft_wallet::IdentityKey::from_hex)
             else {
@@ -80,7 +80,7 @@ impl Server {
                     continue;
                 }
             };
-            log::info!("{} earned '{}': signed", p.name, c.achievement.id);
+            log::info!("{} earned '{}': signed", p.identity.name, c.achievement.id);
             if let Some(d) = &dir {
                 record(d, &c);
             }
@@ -283,7 +283,7 @@ impl Server {
                 .send(ToClient::Revocations(r.to_json()));
         }
         let Some(dir) = self.storage.as_ref().map(|s| s.lock().meta.dir.clone()) else { return };
-        let Some(me) = self.players[pi].identity.clone() else { return };
+        let Some(me) = self.players[pi].account.clone() else { return };
         let done = anchors(&dir);
         if done.is_empty() {
             return;

@@ -447,7 +447,7 @@ impl Entity {
     /// Its collision box now.
     /// What it is doing, as conditions ask (`conditions::Body`).
     pub fn body(&self) -> crate::conditions::Body {
-        crate::conditions::Body { in_liquid: self.in_liquid, flying: self.flying, sprinting: self.sprinting }
+        crate::conditions::Body { in_liquid: self.in_liquid, flying: self.flying, sprinting: self.sprinting, ..Default::default() }
     }
 
     pub fn aabb(&self, c: &Content) -> physics::Aabb {

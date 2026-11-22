@@ -61,7 +61,7 @@ pub fn may_spend(network: ChainNetwork) -> Result<(), String> {
 /// The game's reader, started now if it isn't running (or runs on another network). Blocks
 /// briefly; never call it from an async task (the reader runs its own runtime).
 pub fn reader(settings: &crate::settings::Settings) -> Result<Arc<ChainReader>, String> {
-    start(&settings.run_dir, &settings.chain(), settings.chain_peers())
+    start(&settings.run_dir, &crate::settings::chain(), crate::settings::chain_peers())
 }
 
 /// [`reader`] from its parts (a dedicated server, tests).

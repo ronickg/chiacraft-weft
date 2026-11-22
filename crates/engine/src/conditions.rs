@@ -70,6 +70,24 @@ pub struct Body {
     pub in_liquid: bool,
     pub flying: bool,
     pub sprinting: bool,
+    /// chiacraft: holding on to a wall it climbs, gliding, hanging on a rope (`core:climbing`,
+    /// `core:gliding`, `core:rope`); only the client's own player knows these.
+    pub climbing: bool,
+    pub gliding: bool,
+    pub rope: bool,
+}
+
+/// chiacraft: condition `id` (`Content::conds`) asks for climbing, gliding or the rope somewhere
+/// (a pose for them): its hands are busy and it doesn't fall.
+pub fn asks_hold(c: &Content, id: Option<u32>) -> bool {
+    fn any(e: &Expr) -> bool {
+        match e {
+            Expr::All(v) | Expr::Any(v) => v.iter().any(any),
+            Expr::Not(_) => false,
+            Expr::Is(id, _) => matches!(*id, k::CLIMBING | k::GLIDING | k::ROPE),
+        }
+    }
+    id.and_then(|i| c.conds.get(i as usize)).is_some_and(any)
 }
 
 /// Condition texts met while freezing, by id, compiled at its end.
@@ -353,6 +371,9 @@ fn known(c: &Content, id: u32, arg: &Arg, a: &Ask) -> Option<bool> {
         (k::IN_LIQUID, _) => a.body.is_some_and(|b| b.in_liquid),
         (k::FLYING, _) => a.body.is_some_and(|b| b.flying),
         (k::SPRINTING, _) => a.body.is_some_and(|b| b.sprinting),
+        (k::CLIMBING, _) => a.body.is_some_and(|b| b.climbing),
+        (k::GLIDING, _) => a.body.is_some_and(|b| b.gliding),
+        (k::ROPE, _) => a.body.is_some_and(|b| b.rope),
         _ => return None,
     })
 }

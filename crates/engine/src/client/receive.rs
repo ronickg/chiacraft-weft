@@ -303,15 +303,8 @@ impl Client {
             }
             ToClient::Cracks(list) => self.others_mining = list,
             ToClient::StopSprint => self.sprint_stopped = true,
-            ToClient::LodColumns { dim, all, cols } => {
-                // Our far terrain (chiacraft, `lod.rs` stays ours) takes them as (x, z, height,
-                // top, under); upstream's light, spans and removed scatters it has no use for.
-                let cols: Vec<_> = cols
-                    .iter()
-                    .map(|c| (c.x, c.z, c.y, c.top, c.under))
-                    .collect();
-                self.lod.set_columns(dim, all, &cols);
-            }
+            // Our far terrain's form (chiacraft, `lod.rs` stays ours): (x, z, height, top, under).
+            ToClient::LodColumns { dim, all, cols } => self.lod.set_columns(dim, all, &cols),
             ToClient::LodFar { dim, grid } => self.lod.set_far(dim, &grid),
             ToClient::Camera { mode, locked, transition, easing } => self.camera_from_server(mode, locked, transition, easing),
             ToClient::Knock { push } => {

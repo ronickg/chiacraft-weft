@@ -1197,7 +1197,7 @@ pub fn draw_custom(
     match tag {
         // Only in first person: from behind or in front it would sit over the player, not where
         // a hit lands (as vanilla hides it there).
-        TAG_CROSSHAIR if client.is_none_or(|c| c.camera_has(weft_abi::camera_flags::HAND)) => loaded(ren, look, "crosshair", r, scale),
+        TAG_CROSSHAIR if client.is_none_or(|c| c.camera_has(crate::tag_bits::camera::HAND)) => loaded(ren, look, "crosshair", r, scale),
         TAG_CROSSHAIR => {}
         TAG_EDIT_GRID => {
             let step = crate::hud_editor::GRID * scale;

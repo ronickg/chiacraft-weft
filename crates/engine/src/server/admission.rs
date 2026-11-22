@@ -65,9 +65,9 @@ impl Player {
 
     fn who(&self) -> Who {
         Who {
-            name: self.name.clone(),
-            key: self.key.clone(),
-            identity: self.identity.clone(),
+            name: self.identity.name.clone(),
+            key: self.identity.key.clone(),
+            identity: self.account.clone(),
             did: self.did.clone(),
             did_days: self.did_days,
             did_unchecked: self.did_unchecked,
@@ -134,7 +134,7 @@ impl Server {
             .identity
             .as_ref()
             .and_then(|i| i.cert.owner.split_once(':').map(|(id, _)| id.to_string()));
-        if owner.is_some() && owner == p.identity {
+        if owner.is_some() && owner == p.account {
             return true;
         }
         self.storage.as_ref().is_some_and(|s| {
@@ -148,7 +148,7 @@ impl Server {
 
     /// The probation player `pi` is on now, if any.
     pub(super) fn probation_of(&mut self, pi: usize) -> Option<Probation> {
-        let key = self.players[pi].key.clone();
+        let key = self.players[pi].identity.key.clone();
         let trusted = self.trusted(pi, &key);
         let p = &self.players[pi];
         let (who, played, lifted) = (p.who(), std::time::Duration::from_secs(p.played_now()), p.lifted);
@@ -170,7 +170,7 @@ impl Server {
             return;
         }
         player.told = Some(Instant::now());
-        log::info!("{} is on probation: not yet ({})", player.name, if act == Act::Build { "building" } else { "containers" });
+        log::info!("{} is on probation: not yet ({})", player.identity.name, if act == Act::Build { "building" } else { "containers" });
         let key = match act {
             Act::Build => "admission.probation_build",
             Act::Containers => "admission.probation_containers",
@@ -198,7 +198,7 @@ impl Server {
         if let Some(pi) = self
             .players
             .iter()
-            .position(|p| p.joined && p.name.eq_ignore_ascii_case(what))
+            .position(|p| p.joined && p.identity.name.eq_ignore_ascii_case(what))
         {
             return Some((self.players[pi].who(), Some(pi)));
         }
@@ -231,7 +231,7 @@ impl Server {
         let here = self
             .players
             .iter()
-            .position(|p| p.joined && (p.key == what || p.identity.as_deref() == Some(what)));
+            .position(|p| p.joined && (p.identity.key == what || p.account.as_deref() == Some(what)));
         Some((who, here))
     }
 
@@ -239,7 +239,7 @@ impl Server {
     /// identity's DID's owner key signed: whether it was started.
     pub(super) fn check_did(&mut self, pi: usize, key: &str, proof: &str) -> bool {
         let p = &self.players[pi];
-        let Some(identity) = p.identity.clone() else { return false };
+        let Some(identity) = p.account.clone() else { return false };
         if proof.is_empty() {
             return false;
         }
@@ -268,7 +268,7 @@ impl Server {
             let Some(pi) = self
                 .players
                 .iter()
-                .position(|p| p.key == d.key || p.waiting.as_ref().is_some_and(|w| w.1 == d.key))
+                .position(|p| p.identity.key == d.key || p.waiting.as_ref().is_some_and(|w| w.1 == d.key))
             else {
                 continue;
             };
@@ -332,7 +332,7 @@ impl Server {
             // rules apply to them as to anyone coming in (a DID that isn't theirs, or too young
             // for the world, and they leave).
             if was_unchecked && !p.did_unchecked && p.joined {
-                let key = p.key.clone();
+                let key = p.identity.key.clone();
                 let trusted = self.trusted(pi, &key);
                 let who = self.players[pi].who();
                 let mut rules = self.gate.rules.clone();
@@ -351,7 +351,7 @@ impl Server {
             } else if !p.proofs_pending
                 && let Some((name, key, _)) = p.waiting.take()
             {
-                self.join(c, pi, name, key);
+                self.prepare_join(c, pi, name, key);
             }
         }
         for pi in 0..self.players.len() {
@@ -369,12 +369,12 @@ impl Server {
                     p.did_recheck = Some((Instant::now() + DID_RECHECK, DID_RECHECKS));
                     p.did_note = Some(Msg::new(
                         "admission.did.unchecked",
-                        vec![Arg::Text(crate::chiacraft::did::short_did(&did_of_proof(&p.did_proof, p.identity.as_deref())))],
+                        vec![Arg::Text(crate::chiacraft::did::short_did(&did_of_proof(&p.did_proof, p.account.as_deref())))],
                     ));
                 }
                 p.did_pending = false;
                 p.proofs_pending = false;
-                self.join(c, pi, name, key);
+                self.prepare_join(c, pi, name, key);
             }
         }
         // Ask again about DIDs that couldn't be checked, for players here.
@@ -385,7 +385,7 @@ impl Server {
             if !due {
                 continue;
             }
-            let (key, proof) = (self.players[pi].key.clone(), self.players[pi].did_proof.clone());
+            let (key, proof) = (self.players[pi].identity.key.clone(), self.players[pi].did_proof.clone());
             // Spent one try; the answer sets the next (or none).
             let tries = self.players[pi]
                 .did_recheck
@@ -406,7 +406,7 @@ impl Server {
             if !self.players[pi].joined {
                 continue;
             }
-            let key = self.players[pi].key.clone();
+            let key = self.players[pi].identity.key.clone();
             let trusted = self.trusted(pi, &key);
             let who = self.players[pi].who();
             // Only bans: a player already in stays in when the allow list changes.
@@ -504,11 +504,11 @@ fn ban_for(s: &mut Server, x: &Ctx, until: Option<u64>) -> Vec<Msg> {
     let Some((who, here)) = s.whom(what) else {
         return say("unknown_player", vec![text(what)]);
     };
-    if here.is_some_and(|pi| s.trusted(pi, &s.players[pi].key.clone())) {
+    if here.is_some_and(|pi| s.trusted(pi, &s.players[pi].identity.key.clone())) {
         return say("not_the_trusted", vec![text(&who.name)]);
     }
     let reason = x.a.text("reason").unwrap_or("").to_string();
-    let by = s.players[x.pi].name.clone();
+    let by = s.players[x.pi].identity.name.clone();
     if let Err(e) = s
         .gate
         .edit_bans(|b| adm::ban_all(b, &who, &reason, &by, until))
@@ -635,11 +635,11 @@ pub(super) fn probation(s: &mut Server, x: &Ctx) -> Vec<Msg> {
         return match s.whom(what) {
             Some((_, Some(pi))) => {
                 s.players[pi].lifted = true;
-                log::info!("{} is off probation", s.players[pi].name);
+                log::info!("{} is off probation", s.players[pi].identity.name);
                 s.players[pi]
                     .conn
                     .send(ToClient::Show(crate::net::Shown::chat(Msg::new("admission.probation_lifted_you", Vec::new()))));
-                say("probation_lifted", vec![text(&s.players[pi].name.clone())])
+                say("probation_lifted", vec![text(&s.players[pi].identity.name.clone())])
             }
             Some((who, None)) => match &s.storage {
                 // Someone not here: their file says so for next time.

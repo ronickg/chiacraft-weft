@@ -5266,9 +5266,8 @@ pub mod condition {
     pub const GLIDING: u32 = 26;
     /// chiacraft: hanging on a rope (`attribute::ROPE_LENGTH`), off the ground (poses).
     pub const ROPE: u32 = 27;
-    // SYNC: our pose conditions (`pose_when::CLIMBING`, `GLIDING`, `ROPE` before the
-    // rework) are conditions now; the engine's condition evaluation (server/conditions,
-    // physics poses) must answer 25..27 from the shared movement step.
+    // chiacraft: 25..27 are answered from `conditions::Body`, which only the client's own player
+    // fills in (its movement step); the server holds them false.
     pub const NAMES: [&str; 28] = [
         "core:day",
         "core:night",

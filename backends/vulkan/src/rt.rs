@@ -104,7 +104,7 @@ impl Rt {
                 asked: vec![Vec::new(); FRAMES],
                 compactions: Vec::new(),
                 serial: 0,
-                accels: Slab::new(),
+                accels: Slab::default(),
                 memory: 0,
                 generation: 0,
                 built: (0, 0, 0),

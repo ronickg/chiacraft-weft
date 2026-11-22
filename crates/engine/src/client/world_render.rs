@@ -16,7 +16,6 @@ use crate::content::Content;
 mod rt;
 pub use crate::gpu_layout::Globals;
 
-
 const FACE_WORDS: u32 = 4;
 const QUAD_WORDS: u32 = 8;
 const PAGE_BYTES: u64 = 64 << 20;
@@ -905,56 +904,10 @@ impl WorldRenderer {
 
     /// `cutout_split`: None when `cutout_prepass()` is off, the pack lacks `fs_cutout_depth` or
     /// `fs_cutout_shade`, or one fails.
-    fn cutout_split_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 4]> {
-        if !cutout_prepass()
-            || !["fs_cutout_depth", "fs_cutout_shade"]
-                .iter()
-                .all(|e| crate::packs::pack_uses("world.wgsl", e))
-        {
-            return None;
-        }
-        let mut made = Vec::new();
-        for (label, vs, fs, depth, blend) in [
-            (
-                "faces cutout depth",
-                "vs_face",
-                "fs_cutout_depth",
-                DepthState { write: true, compare: Compare::GreaterEqual },
-                Blend::NoColor,
-            ),
-            ("faces cutout shade", "vs_face", "fs_cutout_shade", DepthState { write: false, compare: Compare::Equal }, Blend::None),
-            (
-                "quads cutout depth",
-                "vs_quad",
-                "fs_cutout_depth",
-                DepthState { write: true, compare: Compare::GreaterEqual },
-                Blend::NoColor,
-            ),
-            ("quads cutout shade", "vs_quad", "fs_cutout_shade", DepthState { write: false, compare: Compare::Equal }, Blend::None),
-        ] {
-            match gpu.create_pipeline(&PipelineDesc {
-                label,
-                shader,
-                vertex: vs,
-                fragment: Some(fs),
-                color: Some(crate::post::world_format()),
-                depth: Some(depth),
-                blend,
-                cull_back: true,
-                topology: Topology::Triangles,
-                motion: crate::post::motion(),
-            }) {
-                Ok(p) => made.push(p),
-                Err(e) => {
-                    log::error!("world shader {fs}: {}", e.0);
-                    for p in made {
-                        gpu.destroy_pipeline(p);
-                    }
-                    return None;
-                }
-            }
-        }
-        made.try_into().ok()
+    // chiacraft: the split needs a depth-only blend (`Blend::NoColor`), which went with our
+    // Android backend when upstream's came in (Weft sync 11-22); no split until the backend has it.
+    fn cutout_split_pipelines(_gpu: &mut dyn Backend, _shader: &Shader) -> Option<[PipelineId; 4]> {
+        None
     }
 
     /// The two passes of a run of `kind` (0 faces, 1 quads) and `layer` (1 cutout) when cutout
@@ -2217,7 +2170,7 @@ impl WorldRenderer {
         let now = (cam.forward(), cam.pos);
         let turned = self.table.looks[1].is_some_and(|(f, p)| f.dot(now.0) < 0.985 || p.distance(now.1) > 4.0);
         self.table.looks = [Some(now), self.table.looks[0]];
-        let capped = !gpu.indirect_count() && cap_draws() && !turned;
+        let capped = !INDIRECT_COUNT && cap_draws() && !turned;
         let mut issued = (0u64, 0u64);
         // Everything opaque that never discards first, then all that may (cutout, the fade band,
         // distant terrain): a discarding fragment can't hide what is drawn after it, so Apple's
@@ -2293,7 +2246,7 @@ impl WorldRenderer {
                 max: draws,
             });
         }
-        self.table.log_draws(gpu.indirect_count(), capped, issued);
+        self.table.log_draws(INDIRECT_COUNT, capped, issued);
         if !cpu_opaque_drawn {
             self.emit(list, 0..firsts);
         }
@@ -2714,7 +2667,7 @@ impl CubeTable {
             words[faces_word(self.per_bucket.len())] = 0;
         }
         use crate::gpu_layout::bind::occlusion as b;
-        if !gpu.indirect_count() {
+        if !INDIRECT_COUNT {
             // Its draws then draw every record (`Backend::indirect_count`): the ones the culling
             // doesn't write this frame have to draw nothing, so all start zeroed. After the last
             // frame's draws read them.
@@ -2954,8 +2907,15 @@ impl Occlusion {
 
 /// `WEFT_OLD_ORDER=1`: the world pass in the order before opaque-first (the table's groups, then
 /// the CPU's runs), to compare.
+/// chiacraft: upstream's backends draw with a count everywhere (with no `drawIndirectCount`
+/// they compact the records themselves), so `Backend::indirect_count` is gone; our capped draws
+/// and the zeroing for draws without a count stay for a backend that lacks it.
+const INDIRECT_COUNT: bool = true;
+
 /// Cutout blocks drawn depth first, then shaded with no discard (`cutout_split`): on Android, where
-/// GPUs are tiled (`WEFT_CUTOUT_PREPASS=0/1` to compare or to try it elsewhere).
+/// GPUs are tiled (`WEFT_CUTOUT_PREPASS=0/1` to compare or to try it elsewhere). Unused while
+/// `cutout_split_pipelines` has no depth-only blend.
+#[allow(dead_code)]
 fn cutout_prepass() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| match std::env::var("WEFT_CUTOUT_PREPASS").as_deref() {

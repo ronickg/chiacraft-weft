@@ -680,7 +680,9 @@ pub unsafe extern "C" fn client_ui_rect(c: *mut abi::ClientCtx, query: Str, out:
             // A number, or an item's name (`icon:base:part_haft`): scripts can't know numbers.
             n.parse::<u64>().ok().or_else(|| {
                 crate::content::content()
-                    .item_names
+                    .game
+                    .catalog
+                    .ids(weft_abi::entry_kind::ITEM)
                     .get(n)
                     .map(|&i| i as u64)
             })

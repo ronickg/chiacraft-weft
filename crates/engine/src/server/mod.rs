@@ -1434,15 +1434,14 @@ impl Server {
         p.conn
             .send(ToClient::Edits { dim: to, specs: dims[to as usize].edits.iter().map(|e| e.spec(c)).collect(), all: true });
         let d = &dims[to as usize];
-        p.conn
-            .send(ToClient::Clock {
-                dim: to,
-                time: d.day_time(),
-                ticks: d.time,
-                weather: d.weather_wire(),
-                rate: p.sent_rate,
-                day_rate: d.day_rate as f32,
-            });
+        p.conn.send(ToClient::Clock {
+            dim: to,
+            time: d.day_time(),
+            ticks: d.time,
+            weather: d.weather_wire(),
+            rate: p.sent_rate,
+            day_rate: d.day_rate as f32,
+        });
         p.conn
             .send(ToClient::Weather { id: d.weather_wire(), only: d.rain_here().map(|o| o.to_vec()) });
         p.conn

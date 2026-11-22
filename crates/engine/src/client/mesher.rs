@@ -221,16 +221,8 @@ fn draw_block(
                     let light = std::array::from_fn(|i| light[rotated(i)]);
                     mesh.quads[RenderLayer::Translucent as usize].push(quad(corners, WHOLE, tex, biome, l.tint, light));
                 } else {
-                    let mut rec = crate::gpu_layout::face_record(
-                        [x, y, z],
-                        dir as u32,
-                        ao,
-                        l.tint as u32,
-                        cube.turn[dir] as u32,
-                        tex,
-                        biome,
-                        light,
-                    );
+                    let mut rec =
+                        crate::gpu_layout::face_record([x, y, z], dir as u32, ao, l.tint as u32, cube.turn[dir] as u32, tex, biome, light);
                     // chiacraft: its back face hidden by the same block behind it (leaves in a
                     // crown): its holes would show past the crown, the sky from under a canopy.
                     if k == 0 && info.layer == RenderLayer::Cutout && info.flags & bf::CULL_SAME != 0 {

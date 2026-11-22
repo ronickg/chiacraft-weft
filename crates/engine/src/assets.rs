@@ -544,7 +544,13 @@ pub fn load_texture(assets: &Assets, name: &str) -> LoadedTexture {
             px[y * side * 4..y * side * 4 + w * 4].copy_from_slice(row);
         }
         let size = img.height.next_power_of_two();
-        return LoadedTexture { size, frames: vec![mip_chain(scale_nearest(&px, img.height, size), size)], glow: vec![None], anim: None };
+        return LoadedTexture {
+            size,
+            frames: vec![mip_chain(scale_nearest(&px, img.height, size), size)],
+            glow: vec![None],
+            mat: vec![None],
+            anim: None,
+        };
     }
     let size = img.width.next_power_of_two();
     let count = img.height / img.width;

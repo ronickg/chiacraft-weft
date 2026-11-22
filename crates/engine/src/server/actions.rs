@@ -375,8 +375,7 @@ impl Server {
                 let Some(e) = r.entities.get_mut(entity) else { return };
                 let splash = entity::splashes(e.in_liquid, here.in_liquid, -walked.y);
                 // Held on to a wall or gliding, as its client moved it: no fall builds up.
-                let held =
-                    pose.def().when & (weft_abi::pose_when::CLIMBING | weft_abi::pose_when::GLIDING | weft_abi::pose_when::ROPE) != 0;
+                let held = crate::conditions::asks_hold(c, pose.def().when);
                 let fell = entity::track_fall(&mut e.fall, walked.y, on_ground, here.in_liquid || here.climbing || held);
                 e.sprinting = sprint;
                 e.flying = flying;

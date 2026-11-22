@@ -86,7 +86,9 @@ impl<'c> Resolver<'c> {
             .iter()
             .find_map(|n| {
                 self.c
-                    .biome_names
+                    .game
+                    .catalog
+                    .ids(weft_abi::entry_kind::BIOME)
                     .get(*n)
                     .map(|&b| (b as u16, n.to_string()))
             })
@@ -374,7 +376,14 @@ impl FarTerrain {
         let biomes = grid
             .biomes
             .iter()
-            .map(|n| c.biome_names.get(n).copied().unwrap_or(0))
+            .map(|n| {
+                c.game
+                    .catalog
+                    .ids(weft_abi::entry_kind::BIOME)
+                    .get(n)
+                    .copied()
+                    .unwrap_or(0)
+            })
             .collect();
         log::info!("far terrain of an imported world: {} x {} blocks", grid.w4 * 4, grid.h4 * 4);
         Some(FarTerrain { grid, states, biomes })

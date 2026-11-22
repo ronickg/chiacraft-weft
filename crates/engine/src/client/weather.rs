@@ -165,7 +165,11 @@ impl Weather {
                     .unwrap_or(0);
                 // Wherever a mod's weather says it snows now (`set_air`), snow.
                 if world.air_at(cell).3 & weft_abi::air_flags::SNOWING != 0
-                    && let Some(&snow) = c.game.precipitation_names.get("core:snow")
+                    && let Some(&snow) = c
+                        .game
+                        .catalog
+                        .ids(weft_abi::entry_kind::PRECIPITATION)
+                        .get("core:snow")
                 {
                     kind = snow as u16;
                 }

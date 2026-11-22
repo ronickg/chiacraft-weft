@@ -1598,7 +1598,7 @@ fn engine_attributes() -> Vec<RawEntry> {
     use abi::attribute as a;
     // In `attr`'s order.
     [
-        (a::MAX_HEALTH, 20.0, 0.5, 1024.0),
+        (a::MAX_HEALTH, 20.0, 0.5, 100_000.0),
         (a::MOVEMENT_SPEED, 1.0, 0.0, 16.0),
         (a::VISIBILITY, 1.0, 0.0, 16.0),
         (a::JUMP_STRENGTH, 1.0, 0.0, 16.0),
@@ -2281,15 +2281,22 @@ pub fn freeze(
     g.sounds = sounds;
     let mut key_modifiers = Vec::new();
     // Data packages' last (chiacraft), so a package never moves a code mod's binding.
-    (g.keys, _) = tables.bake_by(kind(ek::KEY), ek::KEY, mod_name, errors, |e| from_packages.contains(&e.name), |e, errors| {
-        let key = e.text(abi::comp::KEY_DEFAULT).unwrap_or_default();
-        let slots = crate::input::Binding::parse_slots(key).unwrap_or_else(|| {
-            errors.push(format!("key {}: unknown key {key:?}", e.name));
-            [None; crate::input::SLOTS]
-        });
-        key_modifiers.push(e.text(abi::comp::key::WHILE_HELD).map(str::to_owned));
-        KeyDef { name: e.name.clone(), default: slots, contexts: e.flags(crate::input::context::TAGS), while_held: Vec::new() }
-    });
+    (g.keys, _) = tables.bake_by(
+        kind(ek::KEY),
+        ek::KEY,
+        mod_name,
+        errors,
+        |e| from_packages.contains(&e.name),
+        |e, errors| {
+            let key = e.text(abi::comp::KEY_DEFAULT).unwrap_or_default();
+            let slots = crate::input::Binding::parse_slots(key).unwrap_or_else(|| {
+                errors.push(format!("key {}: unknown key {key:?}", e.name));
+                [None; crate::input::SLOTS]
+            });
+            key_modifiers.push(e.text(abi::comp::key::WHILE_HELD).map(str::to_owned));
+            KeyDef { name: e.name.clone(), default: slots, contexts: e.flags(crate::input::context::TAGS), while_held: Vec::new() }
+        },
+    );
     let key_names: Vec<_> = g.keys.iter().map(|k| k.name.as_str()).collect();
     let modifiers = crate::input::resolve_modifiers(&key_names, &key_modifiers, errors);
     for (key, modifiers) in g.keys.iter_mut().zip(modifiers) {

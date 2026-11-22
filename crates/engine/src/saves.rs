@@ -682,7 +682,15 @@ impl Storage {
     }
 
     /// `around`: the cubes beside it for its far columns' light; `None` leaves it out of them.
-    fn save_cube(&mut self, c: &Content, dim: u32, pos: IVec3, cube: &Cube, around: Option<&crate::server::lod_tops::Around>, entities: &[u8]) {
+    fn save_cube(
+        &mut self,
+        c: &Content,
+        dim: u32,
+        pos: IVec3,
+        cube: &Cube,
+        around: Option<&crate::server::lod_tops::Around>,
+        entities: &[u8],
+    ) {
         if !c.dims[dim as usize].saved {
             return;
         }

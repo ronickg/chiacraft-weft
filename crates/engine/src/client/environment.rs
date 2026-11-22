@@ -135,7 +135,12 @@ impl Client {
                 pos: point,
                 state,
                 entity: self.player_id,
-                body: Some(crate::conditions::Body { in_liquid, flying: self.player.flying, sprinting: self.player.sprinting }),
+                body: Some(crate::conditions::Body {
+                    in_liquid,
+                    flying: self.player.flying,
+                    sprinting: self.player.sprinting,
+                    ..Default::default()
+                }),
                 ..Default::default()
             };
             if !crate::conditions::client_holds(Some(self), &condition, &ask) {

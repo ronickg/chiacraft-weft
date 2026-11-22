@@ -779,7 +779,9 @@ unsafe extern "C" fn body_move_to(w: *mut abi::WorldCtx, entity: u64, pos: *cons
 unsafe extern "C" fn body_turn(w: *mut abi::WorldCtx, entity: u64, pivot: *const abi::Vec3, rot: *const [f32; 4], ticks: u32) {
     unsafe {
         let d = dim(w);
-        let pivot = d.place.to_world(crate::world::dvec(*pivot));
+        let pivot = d
+            .space_pose(space_id(w))
+            .to_world(crate::world::dvec(*pivot));
         let Some(e) = d.entities.get(entity) else { return };
         let local = crate::physics::Transform::of(e.pos).to_local(pivot);
         let rot = *rot;
@@ -1051,7 +1053,7 @@ unsafe extern "C" fn entity_walk(w: *mut abi::WorldCtx, id: u64, dir: *const [f3
 unsafe extern "C" fn entity_fly(w: *mut abi::WorldCtx, id: u64, dir: *const [f32; 3], speed: f32) {
     unsafe {
         let d = dim(w);
-        let mul = d.attribute(content(), id, crate::server::MOVEMENT_SPEED, false) as f32;
+        let mul = d.attribute(space_id(w), content(), id, crate::registry::attr::MOVEMENT_SPEED, false) as f32;
         if let Some(e) = d.entities.get_mut(id) {
             e.fly = Some((*dir, speed * mul));
         }
@@ -1888,7 +1890,8 @@ unsafe extern "C" fn recipe_info(kind: Str, recipe: u32, out: *mut abi::RecipeIn
     let Some(r) = recipe_at(kind, recipe) else { return 0 };
     let (width, height) = r.shaped.as_ref().map_or((0, 0), |s| (s.0, s.1));
     unsafe {
-        *out = abi::RecipeInfo { time: r.time, inputs: r.inputs.len() as u32, outputs: r.outputs.len() as u32, entry: r.entry, width, height }
+        *out =
+            abi::RecipeInfo { time: r.time, inputs: r.inputs.len() as u32, outputs: r.outputs.len() as u32, entry: r.entry, width, height }
     };
     1
 }
@@ -2224,7 +2227,7 @@ unsafe extern "C" fn game_mode(w: *mut abi::WorldCtx, entity: u64) -> u32 {
 unsafe extern "C" fn liquid_of(state: u32) -> u32 {
     try_content()
         .and_then(|c| c.states.get(state as usize))
-        .and_then(|s| s.liquid_in())
+        .and_then(|s| s.liquid)
         .map_or(u32::MAX, |l| l as u32)
 }
 
@@ -2561,12 +2564,13 @@ unsafe extern "C" fn raining_at(w: *mut abi::WorldCtx, pos: *const abi::BlockPos
     unsafe {
         let biome = biome_at(w, pos);
         let d = dim(w);
-        let weather = d.weather_in(biome);
+        let p = &*pos;
+        let weather = d.weather_in(biome, glam::DVec3::new(p.x as f64 + 0.5, p.y as f64 + 0.5, p.z as f64 + 0.5));
         (content()
             .game
             .weathers
             .get(weather as usize)
-            .is_some_and(|w| w.flags & abi::weather_flags::FALLS != 0)) as u32
+            .is_some_and(|w| w.falls())) as u32
     }
 }
 
@@ -2624,6 +2628,16 @@ unsafe extern "C" fn reg_command_permission(r: *mut abi::Registrar, command: Str
         r.game
             .command_permissions
             .push((owner, command.as_str().to_string(), level));
+    }
+}
+
+unsafe extern "C" fn reg_entity_skin(r: *mut abi::Registrar, kind: Str, comp: Str, cb: Callback) {
+    unsafe {
+        let r = reg(r);
+        let owner = r.owner;
+        r.game
+            .skin_painters
+            .push(registry::SkinPainter { kind: kind.as_str().to_string(), comp: comp.as_str().to_string(), owner, cb });
     }
 }
 

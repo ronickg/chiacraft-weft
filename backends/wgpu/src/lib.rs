@@ -540,6 +540,8 @@ impl WgpuBackend {
         let entries: Vec<_> = shader
             .buffers
             .iter()
+            // chiacraft: acceleration structures (ray tracing) are the Vulkan backend's alone.
+            .filter(|&&(_, kind)| !matches!(kind, BufferKind::Accel))
             .filter_map(|&(binding, kind)| Some((binding, kind, *used.get(&binding)?)))
             .map(|(binding, kind, visibility)| wgpu::BindGroupLayoutEntry {
                 binding,
@@ -549,6 +551,7 @@ impl WgpuBackend {
                         BufferKind::Uniform => wgpu::BufferBindingType::Uniform,
                         BufferKind::StorageRead => wgpu::BufferBindingType::Storage { read_only: true },
                         BufferKind::StorageWrite => wgpu::BufferBindingType::Storage { read_only: false },
+                        BufferKind::Accel => unreachable!("filtered out above"),
                     },
                     has_dynamic_offset: false,
                     min_binding_size: None,
@@ -921,6 +924,7 @@ impl Backend for WgpuBackend {
             Compare::GreaterEqual => wgpu::CompareFunction::GreaterEqual,
             Compare::Less => wgpu::CompareFunction::Less,
             Compare::LessEqual => wgpu::CompareFunction::LessEqual,
+            Compare::Equal => wgpu::CompareFunction::Equal,
         };
         let raw = self.checked(desc.label, || {
             self.device
@@ -1042,7 +1046,9 @@ impl Backend for WgpuBackend {
         let mut compacted: Vec<u64> = Vec::new();
         for (i, cmd) in list.cmds.iter().enumerate() {
             match *cmd {
-                Cmd::BeginPass { color, depth } => {
+                // SYNC: our TAA motion target (`motion`, chiacraft) isn't drawn on wgpu: the pass
+                // has only its color, and pipelines made with `PipelineDesc::motion` one target.
+                Cmd::BeginPass { color, depth, motion: _ } => {
                     // The encoder is free again once the pass before is gone.
                     drop(std::mem::replace(&mut pass, Pass::None));
                     compacted = self.compact_draws(&mut enc, &list.cmds[i..]);
@@ -1211,6 +1217,19 @@ impl Backend for WgpuBackend {
                     cp.set_bind_group(0, &group, &[]);
                     cp.dispatch_workgroups(t.desc.width.div_ceil(8), t.desc.height.div_ceil(8), 1);
                 }
+                // chiacraft: our zeroing of a buffer (draws without a count); wgpu clears to 0 only.
+                Cmd::FillBuffer { buffer, offset, size, value } => {
+                    pass = Pass::None;
+                    self.written(buffer.0, &mut read_back);
+                    if value != 0 {
+                        log::warn!("wgpu: FillBuffer with {value:#x} cleared to 0 instead");
+                    }
+                    enc.clear_buffer(&self.buffers.get(buffer.0).raw, offset, Some(size));
+                }
+                // SYNC: chiacraft's ray tracing (BLAS/TLAS, `BindAccel`), the path tracer's extra
+                // targets (`PassExtras`) and the upscaler (`Upscale`) are the Vulkan backend's alone;
+                // on wgpu they draw nothing, and the settings that use them must stay off there.
+                Cmd::PassExtras(_) | Cmd::BuildBlas(_) | Cmd::BuildTlas(_) | Cmd::BindAccel { .. } | Cmd::Upscale { .. } => {}
                 Cmd::Mark => {
                     if let Some(t) = &self.timer
                         && marks < MAX_MARKS - 1

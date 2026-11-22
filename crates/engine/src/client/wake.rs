@@ -190,11 +190,13 @@ impl Wakes {
                     shader: &shader,
                     vertex: "vs",
                     fragment: Some("fs"),
-                    color: Some(Format::Surface),
+                    // chiacraft: drawn into the world's target (`after`), HDR or not, with TAA's motion.
+                    color: Some(crate::post::world_format()),
                     depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
                     blend: Blend::Alpha,
                     cull_back: false,
                     topology: Topology::Triangles,
+                    motion: crate::post::motion(),
                 })
                 .map_err(|e| e.0)
             });

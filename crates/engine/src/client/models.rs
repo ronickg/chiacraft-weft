@@ -726,13 +726,7 @@ fn push_kind(
             add_geometry(&parts, &worn_on, &mut tables.0, &mut tables.1);
             let (c1, v1) = (tables.0.len() as u32, tables.1.len() as u32);
             add_worn_geometry(&parts, &worn_on, &mut tables.0, &mut tables.1);
-            (
-                (c0, c1 - c0),
-                (v0, v1 - v0),
-                (c1, tables.0.len() as u32 - c1),
-                (v1, tables.1.len() as u32 - v1),
-                bounds_of(&parts),
-            )
+            ((c0, c1 - c0), (v0, v1 - v0), (c1, tables.0.len() as u32 - c1), (v1, tables.1.len() as u32 - v1), bounds_of(&parts))
         }
     };
     let (anims, actions, items) = bind_kind(&parts, clips.0, clips.1, clips.2);

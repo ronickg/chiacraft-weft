@@ -24,6 +24,8 @@ pub struct Body {
     pub scale: f64,
 }
 
+// chiacraft: Clone, as entity kinds are (`registry::EntityKind`, packages' content).
+#[derive(Clone)]
 pub struct Rig {
     parts: Vec<abi::HitboxPart>,
     bones: Vec<crate::registry::Part>,
@@ -46,7 +48,12 @@ impl Rig {
     ) {
         (self.anims, self.actions) = model::bind_actions(&bones, own, stock);
         let mut rest = Vec::new();
-        model::pose(&bones, Mat4::IDENTITY, &model::Motion { pitch: 0.0, head_yaw: 0.0, aim_root: None, clips: &[] }, &mut rest);
+        model::pose(
+            &bones,
+            Mat4::IDENTITY,
+            &model::Motion { pitch: 0.0, head_yaw: 0.0, aim_root: None, clips: &[], build: &[] },
+            &mut rest,
+        );
         self.bindings = self
             .parts
             .iter()
@@ -95,7 +102,7 @@ impl Rig {
         let lying = model::body_tilt(b.posture.pose, b.pitch).is_some();
         let (pitch, head_yaw) = model::head_look(sleeping, lying, b.pitch, b.yaw - b.body_yaw);
         let clips = clips.as_ref().map_or(&[][..], |a| &a[..count]);
-        model::pose(&self.bones, Mat4::IDENTITY, &model::Motion { pitch, head_yaw, aim_root: None, clips }, out);
+        model::pose(&self.bones, Mat4::IDENTITY, &model::Motion { pitch, head_yaw, aim_root: None, clips, build: &[] }, out);
     }
 }
 

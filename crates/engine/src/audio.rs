@@ -1094,7 +1094,10 @@ impl Audio {
             self.begin(assets, id, p, false, 0.0, 20_000.0, Duration::ZERO);
             return;
         };
-        for (n, arrival) in std::iter::once(direct).chain(echoes.iter().copied()).enumerate() {
+        for (n, arrival) in std::iter::once(direct)
+            .chain(echoes.iter().copied())
+            .enumerate()
+        {
             let id = self.next_id;
             self.next_id += 1;
             let at = Play { pos: Some(arrival.pos), volume: p.volume * arrival.gain, ..p };

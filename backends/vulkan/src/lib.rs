@@ -475,7 +475,8 @@ impl VulkanBackend {
             let mut indexing = vk::PhysicalDeviceDescriptorIndexingProperties::default();
             let mut driver = vk::PhysicalDeviceDriverProperties::default();
             // The driver's name where the GPU can say it (1.2, or the extension).
-            let says_driver = (api >= vk::API_VERSION_1_2 && props.api_version >= vk::API_VERSION_1_2) || has_ext(khr::driver_properties::NAME);
+            let says_driver =
+                (api >= vk::API_VERSION_1_2 && props.api_version >= vk::API_VERSION_1_2) || has_ext(khr::driver_properties::NAME);
             let mut props2 = vk::PhysicalDeviceProperties2::default().push_next(&mut indexing);
             if says_driver {
                 props2 = props2.push_next(&mut driver);
@@ -1265,7 +1266,8 @@ impl VulkanBackend {
         let mut attachments = Vec::new();
         let mut color_ref = Vec::new();
         for &(format, load) in &key.0 {
-            color_ref.push(vk::AttachmentReference { attachment: attachments.len() as u32, layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL });
+            color_ref
+                .push(vk::AttachmentReference { attachment: attachments.len() as u32, layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL });
             attachments.push(
                 vk::AttachmentDescription::default()
                     .format(format)
@@ -1941,9 +1943,9 @@ impl VulkanBackend {
                 self.device.update_descriptor_sets(&[write], &[]);
                 index
             };
-            let id = self
-                .textures
-                .insert(Texture { image, view, alloc, desc: desc.clone(), layout: vk::ImageLayout::UNDEFINED, index, usage });
+            let id =
+                self.textures
+                    .insert(Texture { image, view, alloc, desc: desc.clone(), layout: vk::ImageLayout::UNDEFINED, index, usage });
             self.uploads.push(Upload::InitTexture(id));
             TextureId(id)
         }
@@ -3079,13 +3081,14 @@ fn layout_stages(layout: vk::ImageLayout, src: bool) -> (vk::PipelineStageFlags,
     match (layout, src) {
         // Contents dropped: only the work that last used the image (for writing it again after
         // it was read) and the swapchain's acquire, which waits at colour output.
-        (L::UNDEFINED, true) => (
-            shaders | S::COLOR_ATTACHMENT_OUTPUT | S::EARLY_FRAGMENT_TESTS | S::LATE_FRAGMENT_TESTS | S::TRANSFER,
-            A::empty(),
-        ),
+        (L::UNDEFINED, true) => {
+            (shaders | S::COLOR_ATTACHMENT_OUTPUT | S::EARLY_FRAGMENT_TESTS | S::LATE_FRAGMENT_TESTS | S::TRANSFER, A::empty())
+        }
         (L::COLOR_ATTACHMENT_OPTIMAL, true) => (S::COLOR_ATTACHMENT_OUTPUT, A::COLOR_ATTACHMENT_WRITE),
         (L::COLOR_ATTACHMENT_OPTIMAL, false) => (S::COLOR_ATTACHMENT_OUTPUT, A::COLOR_ATTACHMENT_READ | A::COLOR_ATTACHMENT_WRITE),
-        (L::DEPTH_STENCIL_ATTACHMENT_OPTIMAL, true) => (S::EARLY_FRAGMENT_TESTS | S::LATE_FRAGMENT_TESTS, A::DEPTH_STENCIL_ATTACHMENT_WRITE),
+        (L::DEPTH_STENCIL_ATTACHMENT_OPTIMAL, true) => {
+            (S::EARLY_FRAGMENT_TESTS | S::LATE_FRAGMENT_TESTS, A::DEPTH_STENCIL_ATTACHMENT_WRITE)
+        }
         (L::DEPTH_STENCIL_ATTACHMENT_OPTIMAL, false) => {
             (S::EARLY_FRAGMENT_TESTS | S::LATE_FRAGMENT_TESTS, A::DEPTH_STENCIL_ATTACHMENT_READ | A::DEPTH_STENCIL_ATTACHMENT_WRITE)
         }

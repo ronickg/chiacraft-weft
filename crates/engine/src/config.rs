@@ -925,11 +925,8 @@ mod tests {
     /// joining player nameless) keeps the name and every other value where it was.
     #[test]
     fn a_content_switch_keeps_values_by_name() {
-        let old = [
-            text_def("core:debug_lines", "fps=always"),
-            text_def("core:name", "Steve"),
-            num_def("core:zoom", ck::INT, 1.0, 0.0, 9.0, 1.0),
-        ];
+        let old =
+            [text_def("core:debug_lines", "fps=always"), text_def("core:name", "Steve"), num_def("core:zoom", ck::INT, 1.0, 0.0, 9.0, 1.0)];
         let bits = [0f64.to_bits(), 0f64.to_bits(), 7f64.to_bits()];
         let texts = ["fps=always".to_string(), "bob".to_string(), String::new()];
         let new = [

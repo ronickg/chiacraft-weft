@@ -3303,7 +3303,7 @@ impl Client {
             .get(w.start as usize..w.end as usize)
             .unwrap_or_default()
             .iter()
-            .filter(|s| !s.is_empty() && c.worn(s.item).is_some())
+            .filter(|s| c.worn(s).is_some())
             .map(|s| crate::stack::worn_look(s).unwrap_or("").to_string())
             .collect()
     }
@@ -3318,7 +3318,7 @@ impl Client {
             .unwrap_or_default();
         slots
             .iter()
-            .filter(|s| !s.is_empty() && c.worn(s.item).is_some())
+            .filter(|s| c.worn(s).is_some())
             .map(|s| s.item)
             .collect()
     }
@@ -4619,10 +4619,15 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
     let feet_wet = physics::in_liquid(c, block, p.pos, 0.0);
     // `input`: the action held and sprinting count, which a pose fallen back to goes without.
     let holds = |d: &crate::registry::PoseDef, input_too: bool| {
-        // SYNC: our poses for climbing, gliding and the rope (`pose_when::CLIMBING`, `GLIDING`,
-        // `ROPE`, on `p.on_wall`, `p.gliding`, `p.on_rope`) need those states in upstream's pose
-        // conditions (`conditions::Body`); until then those poses never hold.
-        let body = crate::conditions::Body { in_liquid: in_swim_liquid, flying: p.flying || p.noclip, sprinting: sprint || !input_too };
+        // chiacraft: our climbing, gliding and rope poses hold on `core:climbing`, `core:gliding`, `core:rope`.
+        let body = crate::conditions::Body {
+            in_liquid: in_swim_liquid,
+            flying: p.flying || p.noclip,
+            sprinting: sprint || !input_too,
+            climbing: p.on_wall,
+            gliding: p.gliding,
+            rope: p.on_rope,
+        };
         let ask = crate::conditions::Ask { pos: p.pos, body: Some(body), ..Default::default() };
         (!input_too || d.key.is_empty() || input.held(&d.key))
             && d.when
