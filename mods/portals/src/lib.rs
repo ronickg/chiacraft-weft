@@ -113,13 +113,13 @@ fn init(r: &mut Registry) {
             let full = [0.0, 0.0, 16.0, 16.0];
             // The doorway's sheet (both faces show it whole), its posts and lintel.
             s.model_box_faces(
-                [1.0, 2.0, 7.5],
-                [15.0, 34.0, 8.5],
+                [2.0, 2.0, 7.5],
+                [14.0, 34.0, 8.5],
                 [(door, no), (door, no), (door, no), (door, no), (door, full), (door, full)],
             )
-            .model_box_faces([0.0, 2.0, 6.0], [1.0, 35.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
-            .model_box_faces([15.0, 2.0, 6.0], [16.0, 35.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
-            .model_box_faces([1.0, 34.0, 6.0], [15.0, 35.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
+            .model_box_faces([0.0, 2.0, 6.0], [2.0, 36.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
+            .model_box_faces([14.0, 2.0, 6.0], [16.0, 36.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
+            .model_box_faces([2.0, 34.0, 6.0], [14.0, 36.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
             .light(if state == "open" { 11 } else { 4 })
         })
         .block_entity()

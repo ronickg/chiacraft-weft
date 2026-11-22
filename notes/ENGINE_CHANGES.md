@@ -257,9 +257,12 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 - **Linking at the portal (phase 3, 2026-11-22):** all of it is in our own folder
   `crates/engine/src/chiacraft`; no Weft file changed.
   - `bridge.rs` has new questions: `my_worlds`, `joined`, `ask_link` (client) and `incoming`,
-    `answer`, `friend_worlds`, `ask_from_here`, `link_age`, `friends_ask` (server).
+    `answer`, `friend_worlds`, `ask_from_here`, `link_age`, `portal_state`, `friends_ask`
+    (server); `spot`/`unspot` also tell the link's other world.
   - `worlds/links.rs`: a friend's request is accepted (the `friends_ask` switch), `request`
-    returns the link id, and there's `request_from` for a world that isn't open.
+    returns the link id, and there's `request_from` for a world that isn't open. A signed
+    portal note (`Message::Portal`, `set_portal_here`, `portal_state`) tells the other world
+    when a portal is bound to the link, so travel opens only with a portal in each world.
   - `worlds/friends.rs`: `is_friend_identity` and `known_worlds`.
   - `worlds/saved_worlds.rs`: `settings` and `joined_last`.
   - *Why:* the portal mod can't sign or reach the inbox through Weft's mod interface.
