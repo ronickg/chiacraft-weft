@@ -45,6 +45,37 @@ pub struct FeatureDef {
     pub transforms: Vec<Transform>,
     /// Palette ids, the seed picks one per start; none: the template's defaults.
     pub palettes: Vec<u32>,
+    /// chiacraft: starts on a grid thinned by where they stand (`comp::feature::THIN`), before
+    /// the shape is worked out; distant terrain thins its far trees alike.
+    pub thin: Option<Thin>,
+}
+
+/// chiacraft: where `mask` is over 0, one start in `keep` stays (0: none), in biomes with
+/// component `biomes` (all when `None`).
+#[derive(Clone)]
+pub struct Thin {
+    pub mask: crate::server::terrain::Mask,
+    pub keep: u32,
+    pub biomes: Option<u32>,
+}
+
+impl Thin {
+    /// Whether it takes away the start at (`x`, `z`) in `biome` with random bits `random`.
+    pub fn removes(&self, c: &Content, f: &weft_noise::fixed::Fields, x: i32, z: i32, biome: u32, random: u64) -> bool {
+        if self
+            .biomes
+            .is_some_and(|b| !c.components.has(crate::components::BIOME, biome, b))
+        {
+            return false;
+        }
+        (self.keep == 0 || random % self.keep as u64 != 0) && self.mask.value(f, x * 16, z * 16) > 0
+    }
+
+    /// Whether it applies in `biome` at all.
+    pub fn applies_in(&self, c: &Content, biome: u32) -> bool {
+        self.biomes
+            .is_none_or(|b| c.components.has(crate::components::BIOME, biome, b))
+    }
 }
 
 /// Where a feature on a grid may stand.
@@ -355,6 +386,13 @@ pub fn grid_site(
     }
     let chance = chance.in_biome(c, col.biome);
     if weft_noise::unit(h.rotate_left(17)) >= chance as f64 {
+        return None;
+    }
+    // chiacraft: thinned where it stands, as distant terrain does (`terrain_gpu::describe_lod`).
+    if f.thin
+        .as_ref()
+        .is_some_and(|t| t.removes(c, &def.fields(seed), x, z, col.biome, random))
+    {
         return None;
     }
     let surface = (fit.ground.is_some() || !fit.over_caves)

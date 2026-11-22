@@ -815,9 +815,6 @@ pub struct DimensionDef {
     /// Per cube column, the heights of mods' own landforms the GPU's terrain takes
     /// (`terrain_gpu::custom_heights`, chiacraft): their code runs once per column.
     pub custom_cache: weft_noise::cache::ColumnCache<Vec<i32>>,
-    // SYNC: our scatter thinning (`ScatterThin`: a mask, one site in `keep`, in some biomes;
-    // `abi::comp::feature::THIN`) went with `ScatterDef`, which upstream's features replaced. It
-    // needs a home on `features::FeatureDef` before far forests can copy groves and glades again.
 }
 
 impl DimensionDef {
@@ -3308,7 +3305,30 @@ fn freeze_features(
             errors.push(format!("{what}: stage u32::MAX is reserved for the completed generation view"));
             return None;
         }
+        // chiacraft: thinning (`comp::feature::THIN`), for starts on a grid.
+        let thin_steps: Vec<abi::ExprStep> = e.or(f::THIN, Vec::new());
+        let thin = crate::server::terrain::Mask::from_steps(&thin_steps).map(|mask| crate::features::Thin {
+            mask,
+            keep: e.or(f::THIN_KEEP, 0u32),
+            biomes: e
+                .text(f::THIN_BIOMES)
+                .filter(|t| !t.is_empty())
+                .map(|name| {
+                    let id = components.id(name);
+                    if id.is_none() {
+                        errors.push(format!("{what}: thinning component {name:?} is not set on any biome"));
+                    }
+                    id.unwrap_or(u32::MAX)
+                }),
+        });
+        if !thin_steps.is_empty() && thin.is_none() {
+            errors.push(format!("{what}: malformed thinning mask (it may use only temperature, humidity and continent)"));
+        }
+        if thin.is_some() && !matches!(spread, Spread::Grid { .. }) {
+            errors.push(format!("{what}: only starts on a grid (`spacing`) are thinned"));
+        }
         let mut def = FeatureDef {
+            thin,
             impostor: e.has(f::IMPOSTOR),
             surface_cover: e
                 .has(f::SURFACE_PROJECTION)

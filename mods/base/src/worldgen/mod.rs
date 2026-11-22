@@ -405,8 +405,7 @@ pub fn register(r: &mut Registry) {
         .density(&TREES)
         // A forest's clearings and its cherry groves keep one tree in four (the groves' own trees,
         // `CHERRY_SITES`, fill them; among a full forest's crowns theirs only showed one or two).
-        // SYNC: thinning (`thin`, `thin_in`) has no home on upstream's feature builder yet (terrain group, sdk/terrain.rs line 689); until it has, this feature is not thinned: 
-        // .thin_in(&STAND_TREES, stand_over(-CLEARING).and(cherry_grove().not()).not(), 4)
+        .thin_in(&STAND_TREES, stand_over(-CLEARING).and(cherry_grove().not()).not(), 4)
         .plan(tree);
     r.scatter(&GIANT_SITES)
         .spacing(24)
@@ -421,8 +420,7 @@ pub fn register(r: &mut Registry) {
         .reach(8)
         .ground("#plant_soil")
         .density(&STAND_TREES)
-        // SYNC: thinning (`thin`, `thin_in`) has no home on upstream's feature builder yet (terrain group, sdk/terrain.rs line 689); until it has, this feature is not thinned: 
-        // .thin(stand_over(STAND + 1).and(cherry_grove().not()).not(), 0)
+        .thin(stand_over(STAND + 1).and(cherry_grove().not()).not(), 0)
         .plan(tree);
     // Wild cherries in groves (`CHERRY_TREES`): a site per 4 x 4 cell only in the grove patches (a
     // noise some 320 blocks across, about 1.8% of the ground), among the forest's trees; a little taller than the oaks, so
@@ -432,8 +430,7 @@ pub fn register(r: &mut Registry) {
         .reach(8)
         .ground("#plant_soil")
         .density(&CHERRY_TREES)
-        // SYNC: thinning (`thin`, `thin_in`) has no home on upstream's feature builder yet (terrain group, sdk/terrain.rs line 689); until it has, this feature is not thinned: 
-        // .thin(cherry_grove().not(), 0)
+        .thin(cherry_grove().not(), 0)
         .plan(cherry);
     // Boulders where a biome has them (`BOULDERS`): a heap of stone two to five blocks across, half
     // sunk in the ground, mossy in the woods and the wet.
@@ -448,8 +445,7 @@ pub fn register(r: &mut Registry) {
         .spacing(4)
         .reach(1)
         .density(&SHRUBS)
-        // SYNC: thinning (`thin`, `thin_in`) has no home on upstream's feature builder yet (terrain group, sdk/terrain.rs line 689); until it has, this feature is not thinned: 
-        // .thin(Expr::fbm(0x5B2B, 24.0, 1).ramp(0.0, 0.0).not(), 0)
+        .thin(Expr::fbm(0x5B2B, 24.0, 1).ramp(0.0, 0.0).not(), 0)
         .plan(shrub);
     // Young trees where light comes in: in clearings and at the stands' edges, none deep in a
     // stand (`stand_over`).
@@ -458,8 +454,7 @@ pub fn register(r: &mut Registry) {
         .reach(base_api::tree_recipes::UNDERSTORY_REACH)
         .ground("#plant_soil")
         .density(&YOUNG_TREES)
-        // SYNC: thinning (`thin`, `thin_in`) has no home on upstream's feature builder yet (terrain group, sdk/terrain.rs line 689); until it has, this feature is not thinned: 
-        // .thin(stand_over(STAND), 0)
+        .thin(stand_over(STAND), 0)
         .plan(young_tree);
     r.decoration(decorate);
 }

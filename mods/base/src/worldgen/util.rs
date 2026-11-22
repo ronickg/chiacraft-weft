@@ -6,8 +6,6 @@ use super::*;
 /// `STAND`, its clearings where it's under `-CLEARING`; one patch is some 40 blocks across. As a
 /// mask that is on where the noise is `edge` or more (one octave of `fbm` is `perlin2` exactly),
 /// so the engine thins sites by it near and in distant terrain alike.
-// SYNC: used only by the thinning that waits for a home on the feature builder (`mod.rs`).
-#[allow(dead_code)]
 pub(super) fn stand_over(edge: i32) -> Expr {
     let e = edge as f64 / fixed::ONE as f64;
     Expr::fbm(0x57A4D, 40.0, 1).ramp(e, e)
@@ -16,8 +14,6 @@ pub(super) fn stand_over(edge: i32) -> Expr {
 /// Where the wild cherry groves stand (`vitals::wild::CHERRY_GROVE_*`), as a mask: on in a grove
 /// patch, in any biome (only those with `CHERRY_TREES` grow cherries there; the forests' own trees
 /// thin there, so it's also a small glade in the other woods).
-// SYNC: used only by the thinning that waits for a home on the feature builder (`mod.rs`).
-#[allow(dead_code)]
 pub(super) fn cherry_grove() -> Expr {
     Expr::fbm(0xC4E77, vitals::wild::CHERRY_GROVE_SIZE, 1).ramp(vitals::wild::CHERRY_GROVE_FROM, vitals::wild::CHERRY_GROVE_FROM)
 }

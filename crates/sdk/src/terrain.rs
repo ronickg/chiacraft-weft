@@ -56,6 +56,11 @@ fn step(kind: u32, a: i32) -> Step {
 pub struct Expr(Vec<Step>);
 
 impl Expr {
+    /// chiacraft: its steps as sent to the engine (`FeatureBuilder::thin`).
+    pub(crate) fn into_steps(self) -> Vec<Step> {
+        self.0
+    }
+
     fn leaf(step: Step) -> Expr {
         Expr(vec![step])
     }
@@ -685,12 +690,6 @@ impl TerrainBuilder<'_> {
         self.set(&ours::FAR_LEAVES, call)
     }
 }
-
-// SYNC: our scatter thinning (`ScatterBuilder::thin`, `thin_in`: a mask over the standard fields
-// and a keep, evaluated exactly by distant terrain) went with upstream's scatter builder, which
-// features replaced (`feature.rs`). It needs a home on the feature builder (`abi::ScatterDesc::thin`
-// as a feature component, read into `server::terrain::Mask`), and `terrain_gpu::describe_lod`
-// reads it from there.
 
 /// chiacraft: a steep face's block as distant terrain asks for it (`TerrainBuilder::faces`).
 #[repr(transparent)]

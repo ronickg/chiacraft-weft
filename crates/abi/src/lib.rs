@@ -1126,8 +1126,6 @@ pub mod comp {
         /// in `THIN_KEEP` (`u32`) stays (by its random bits; 0: none), in biomes with the
         /// component `THIN_BIOMES` (`str`; none: in all). Distant terrain applies it alike, so far
         /// forests thin where near ones do.
-        // SYNC: was `ScatterDesc::thin`, `thin_keep`, `thin_biomes` (scatters are grid features
-        // now); features.rs and client/lod.rs must apply it to `spread::GRID` starts.
         pub const THIN: &str = "feature.thin";
         pub const THIN_KEEP: &str = "feature.thin_keep";
         pub const THIN_BIOMES: &str = "feature.thin_biomes";

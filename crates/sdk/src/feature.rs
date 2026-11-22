@@ -16,6 +16,17 @@ use crate::comps::feature as f;
 use crate::terrain::Column;
 use crate::{Block, Feature, Gen, LootTable, Palette, Placed, Registry, Template, WithComponents, callback, host};
 
+/// chiacraft: our feature components beside upstream's (`abi::comp::feature`): thinning.
+mod ours {
+    use crate::Component;
+    use crate::Text;
+    use crate::abi::{self, comp::feature as f};
+    use crate::kind::Feature;
+    pub static THIN: Component<Vec<abi::ExprStep>, Feature> = Component::named(f::THIN);
+    pub static THIN_KEEP: Component<u32, Feature> = Component::named(f::THIN_KEEP);
+    pub static THIN_BIOMES: Component<Text, Feature> = Component::named(f::THIN_BIOMES);
+}
+
 /// One of the 8 ways a template is placed: quarter turns clockwise seen from above, after a
 /// mirror across x. Blocks turn and mirror with it, a door's hinge and a stair's corner too.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -225,6 +236,20 @@ impl FeatureBuilder<'_> {
     pub fn spacing(self, blocks: i32) -> Self {
         self.set(&f::SPREAD, abi::spread::GRID)
             .set(&f::SPACING, blocks)
+    }
+    /// chiacraft: starts on the grid thinned by where they stand: where `mask` is over 0, only
+    /// one in `keep` stays (by `Plan::random() % keep == 0`; 0 keeps none). Better than the same
+    /// test in `plan`: distant terrain can't run the plan at every start, but evaluates this one
+    /// exactly, so far forests have the near ones' groves and glades. The mask may use only the
+    /// standard fields (temperature, humidity, continent), position and noise.
+    pub fn thin(self, mask: crate::terrain::Expr, keep: u32) -> Self {
+        self.set(&ours::THIN, mask.into_steps())
+            .set(&ours::THIN_KEEP, keep)
+    }
+    /// chiacraft: `thin` only in biomes that have `component`.
+    pub fn thin_in<T: crate::Data, K>(self, component: &crate::Component<T, K>, mask: crate::terrain::Expr, keep: u32) -> Self {
+        self.thin(mask, keep)
+            .set_text(&ours::THIN_BIOMES, component.name())
     }
     /// Show the shape of this grid feature as an impostor in distant terrain.
     pub fn impostor(self) -> Self {
