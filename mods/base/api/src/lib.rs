@@ -655,6 +655,12 @@ pub fn hint(w: &World, player: u64, key: &str, args: &[i64]) {
 /// is `vitals::ley`: `ley::strength(w.seed(), x, z)` is what magic, mana and machines draw on.
 pub static LEY_SIGHT: Component<f32> = Component::named("base:ley_sight");
 
+/// Whose tame a creature is, as its watchers' clients may know: the owner's player entity while
+/// that player is in the world, 0 otherwise. Base registers it (sent to every watcher) and its map
+/// marks the local player's tames in their own colour; a mod with tames attaches it to its kinds
+/// and keeps it (animals: `animal::mark_owner`).
+pub static TAME_OF: Component<u64> = Component::named("base:tame_of");
+
 /// Things a player has done that other mods know of and the base game's advancements read
 /// (`advancements.rs`, the "Surviving" group): a bit each (`milestones`), kept through death.
 pub static MILESTONES: Component<u32> = Component::named("base:milestones");
