@@ -22,6 +22,7 @@ chat /tk time 6000
 chat /tk mode spectator
 chat /tk ring animals:red_deer 10 4 10
 wait 2
+chat /animalprof food 1.0
 chat /animalprof water 1.0
 chat /tp ~ ~30 ~
 look 0 -89
@@ -29,10 +30,12 @@ wait 5
 chat /animalprof senses
 shot herd_follow_1.png
 wait 30
+chat /animalprof food 1.0
 chat /animalprof water 1.0
 chat /animalprof senses
 shot herd_follow_2.png
 wait 30
+chat /animalprof food 1.0
 chat /animalprof water 1.0
 chat /animalprof senses
 shot herd_follow_3.png

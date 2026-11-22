@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -137,6 +137,21 @@ pub fn init(r: &mut Registry) {
                     }
                 }
                 format!("{n} animals at {:.0}% water", v * 100.0)
+            }
+            "food" => {
+                // Every wild animal within 96 blocks has this share of its food.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(1.0).clamp(0.0, 1.0) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if let Some(a) = w.component_mut(id, &crate::animal::ANIMAL)
+                        && a.species != 0
+                    {
+                        a.food = (a.stat(crate::species::FOOD) * v) as u16;
+                        n += 1;
+                    }
+                }
+                format!("{n} animals at {:.0}% food", v * 100.0)
             }
             "kill" => {
                 // The player kills the wild animal nearest him (a hunter's kill: fear there, and
