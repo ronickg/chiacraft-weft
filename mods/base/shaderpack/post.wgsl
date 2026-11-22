@@ -422,7 +422,15 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         // Not in rain: its mist taking the glow too turned a storm's land to milk (the storm sheet,
         // 11-05), where Bliss's stays dark and readable.
         let fog = mist_over(uv, pass_) * (1.0 - 0.85 * rain_amount());
-        col = mix(col, glow, clamp((BLOOM_MIX * (1.0 + air * (1.0 - rain_amount())) + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
+        // Or by day added on top, as Bliss's (`base:look_bloom_add`, read raw: 0 as made, 1 all the
+        // way): the glow x 0.5 E^0.2 (0.23 at its noon exposure) x (1.5 - 2 r^2), so +35% at the
+        // centre and +12% in the corners (`composite11.fsh:99, 141, 154`; Research's code read,
+        // 11-22). The mist's share stays mixed.
+        let add = clamp(fantasy_opt(OPT_BLOOM_ADD), 0.0, 1.0) * smoothstep(0.0, 0.15, scene.sun.y);
+        let kept = BLOOM_MIX * (1.0 + air * (1.0 - rain_amount())) * (1.0 - add);
+        col = mix(col, glow, clamp((kept + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
+        let r2 = dot(uv - vec2(0.5), uv - vec2(0.5));
+        col += glow * 0.234 * (1.5 - 2.0 * r2) * add * fantasy_opt(OPT_BLOOM);
     }
     // Veiling glare: a little of the sky's light over the whole picture, as a lens and the eye
     // scatter it, so the darkest shade is a dim sky blue, not black. In Bliss's own world (imported)

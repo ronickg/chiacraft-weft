@@ -111,6 +111,9 @@ const OPT_SPLIT_WARM: u32 = 36u;
 // Ronald's 0.18 uniform + 0.09 cloudy), densest at the low land and halving every 6.7 blocks up, no
 // sharp-topped layer: the 18:00 warm veil over the land (Research's code read, 11-22).
 const OPT_EVENING_MIST: u32 = 37u;
+// The HDR world's bloom by day added on top as Bliss's (`base:look_bloom_add`, read raw: 0 as made,
+// mixed in keeping the light's sum; 1 all the way).
+const OPT_BLOOM_ADD: u32 = 38u;
 
 // How much of the mist lies as the evening's (`OPT_EVENING_MIST`): half with the sun about 25° up
 // in the west (17:00), all from about 12° (18:00), into the dusk.
