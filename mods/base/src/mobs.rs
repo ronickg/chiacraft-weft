@@ -462,11 +462,11 @@ fn shoot_bow(u: &mut ItemUse) -> bool {
     // Three blocks a tick at full draw.
     let v = look_dir(s.yaw, s.pitch) * (power * FULL_SPEED * 20.0);
     // Its hit at full draw: the arrow's level (a plain one is flint-tipped), the bow's times (its
-    // damage over a Sound yew bow's), the web's ranged damage.
+    // power over a Sound yew bow's), the web's ranged damage.
     let level = arrow
         .and_then(|slot| base_api::ITEM_LEVEL.on_stack(&inv.get(slot)))
         .unwrap_or(vitals::gear::ARROW_LEVEL);
-    let bow_times = ATTACK_DAMAGE
+    let bow_times = crate::parts::BOW_POWER
         .on_stack(&u.stack())
         .zip(crafting::kinds::kind("bow"))
         .map_or(1.0, |(d, k)| d / k.damage);
