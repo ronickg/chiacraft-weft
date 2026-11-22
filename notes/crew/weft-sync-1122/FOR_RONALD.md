@@ -79,3 +79,9 @@ All 71 of upstream's new items and blocks are tagged in `mods/base/progression` 
 - **Wheels:** their recipe (dyed wool, `#wool/*`) is left out in `vehicles.rs`, the line kept in a comment, so the three wheels are creative only.
 - **The car's stripe** (`/spawncar`): upstream's blue wool isn't registered, so it is our white wool.
 - **Potion of poison:** upstream's own poison damage (it can't kill) clashed with our survival's (it can, with our death message); ours is kept, so the potion's poison can now kill.
+
+## Connected textures moved to upstream's folder form (11-22)
+Upstream keeps a texture's rules in `block/<name>/<name>.ctm` beside its tiles, and stops the game when a `<name>.png` sits next to that folder. Our 44 rules files and the 3D plants pack's 16 are moved into that form, with the same rules as on dev:
+- The plain picture is now tile `0.png` in the folder: the first tile, so items and far terrain still show it. Where dev kept it out of the random set (cobblestone, mossy cobblestone, redstone ore) it has weight 0.
+- Reeds: our four tiles are back (the merge had taken upstream's). The picture an item shows is now our top tile (3), since the vertical method takes its alone picture from there.
+- Obsidian, glowstone and tall grass: upstream's variant folders are dropped. Ours are single pictures, as on dev.

@@ -307,9 +307,11 @@ def main():
             write(m, img, os.path.join(MOD, name + ".json"), os.path.join(TEX, name + ".png"))
             names.append(name)
             report.append((name, quads(m), img.size[0]))
-        with open(os.path.join(TEX, tex + ".ctm"), "w") as f:
+        # upstream's form: the rules in a folder named after the texture, tiles named in full
+        os.makedirs(os.path.join(TEX, tex), exist_ok=True)
+        with open(os.path.join(TEX, tex, tex + ".ctm"), "w") as f:
             f.write(f"# 3D plants pack (mods/base/source/plants3d/build.py): {VARIANTS} model tiles picked by position\n"
-                    f"method = random\ntiles = {' '.join(names)}\n")
+                    f"method = random\ntiles = {' '.join('base:block/' + n for n in names)}\n")
     # sugar cane: the vertical method's four pieces, each a model
     names = []
     for piece in range(4):
@@ -318,9 +320,10 @@ def main():
         write(m, img, os.path.join(MOD, name + ".json"), os.path.join(TEX, name + ".png"))
         names.append(name)
         report.append((name, quads(m), img.size[0]))
-    with open(os.path.join(TEX, "reeds.ctm"), "w") as f:
+    os.makedirs(os.path.join(TEX, "reeds"), exist_ok=True)
+    with open(os.path.join(TEX, "reeds", "reeds.ctm"), "w") as f:
         f.write("# 3D plants pack (mods/base/source/plants3d/build.py): bottom, middle, top and alone, each a model\n"
-                f"method = vertical\nconnect = block\ntiles = {' '.join(names)}\n")
+                f"method = vertical\nconnect = block\ntiles = {' '.join('base:block/' + n for n in names)}\n")
     # the list base builds into the game (src/plants3d.rs writes them next to it as a resource pack)
     files = []
     for dirpath, _, names in os.walk(ROOT):
