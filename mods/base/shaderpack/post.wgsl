@@ -237,6 +237,9 @@ fn fs_exposure(in: VOut) -> @location(0) vec4<f32> {
 // and clamped: never more than a fifth brighter at night outdoors (nights stay dark), so a torch
 // still matters.
 const EXPOSURE_REF: f32 = 0.35;
+fn exposure_abs() -> f32 {
+    return clamp(fantasy_opt(OPT_EXPOSURE_ABS), 0.0, 1.0);
+}
 fn auto_exposure(mean: f32) -> f32 {
     let target_at = 0.18 / log2(2.5 * max(mean, 1e-5) + 1.045);
     let ref_at = 0.18 / log2(2.5 * EXPOSURE_REF + 1.045);
@@ -248,7 +251,10 @@ fn auto_exposure(mean: f32) -> f32 {
     // against Bliss's 71/71/73 (dev 41/49/55); the vista's land 84/97/96 (dev 87/100/100, Bliss
     // 85/109/98). Only with the sun up: night and the 05:00 blue hour keep half the curve.
     let day_e = smoothstep(0.0, 0.15, scene.sun.y) * select(0.0, 1.0, open_sky());
-    let k = pow(target_at / ref_at, mix(0.5, 1.0, day_e)) * mix(1.0, 0.83, day_e);
+    var k = pow(target_at / ref_at, mix(0.5, 1.0, day_e)) * mix(1.0, 0.83, day_e);
+    // Or by day Bliss's curve in its own units (`base:look_exposure_abs`): our light x41.
+    let abs_k = (log2(2.5 * EXPOSURE_REF * 41.0 + 1.045)) / log2(2.5 * max(mean, 1e-5) * 41.0 + 1.045);
+    k = mix(k, abs_k, day_e * exposure_abs());
     let night = smoothstep(0.0, -0.15, scene.sun.y) * select(1.0, 0.0, !open_sky());
     // Under rain the view is darker and stays so (a storm's mood; brought up, its mist went milky):
     // no brighter than as made, in a storm a little darker.
@@ -452,7 +458,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
             let d = max(textureLoad(textures[pass_.depth], px, 0).r, 1e-7);
             let wp = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
             let near = 1.0 - smoothstep(300.0, 900.0, length(wp.xyz / wp.w));
-            col *= mix(1.0, land, (1.0 - rain_amount()) * select(1.0, 0.0, sky_px) * near);
+            col *= mix(1.0, land, (1.0 - rain_amount()) * select(1.0, 0.0, sky_px) * near * (1.0 - exposure_abs()));
             // Evening twilight, the sun just under the horizon in the west: the land lit up against the
             // sky, as Bliss's evening (its own world at 19:00: land 86 against a sky of 138, ours 60
             // against 162; a stronger exposure lifted both, tw1). Its morning at the same depth stays

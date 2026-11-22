@@ -98,6 +98,14 @@ const OPT_DEBUG: u32 = 33u;
 // between the horizon and the zenith, normalised: `deferred.vsh:121-151`), `base:look_sky_hue` read
 // raw: 0 the palette's fill as made, 1 all the way to the sky's hue.
 const OPT_SKY_HUE: u32 = 34u;
+// The HDR world's exposure by day in Bliss's own units (`base:look_exposure_abs`, read raw: 0 as
+// made, 1 all the way): its curve fed our light x41 (our light is in units about 41x smaller than
+// Bliss's, sun luma 1.77 against 72.7: Research's code read, 11-22), so its slope is Bliss's gentle
+// one; without our 0.83 and the near land's dim. Still 1 at an average sunlit view.
+const OPT_EXPOSURE_ABS: u32 = 35u;
+// The HDR world's warmth on sunlit foliage (`base:look_split_warm`, read raw: 0.7 as made, 0
+// none). With the 4300 K sun it counts the warmth twice (Bliss has no such grade).
+const OPT_SPLIT_WARM: u32 = 36u;
 
 // The surface's light from the sun and in all, before its tint (`light_on`, `surface_light`), for
 // the debug view.
@@ -2067,8 +2075,10 @@ fn lottes(x: vec3<f32>) -> vec3<f32> {
 const HEJL_TOE: f32 = 0.25;
 
 // The HDR world's daytime warmth on sunlit foliage (`finish_picture`): how far it goes toward a
-// leaf-top yellow.
-const SPLIT_WARM: f32 = 0.7;
+// leaf-top yellow (`base:look_split_warm`, 0.7 by default).
+fn split_warm() -> f32 {
+    return clamp(fantasy_opt(OPT_SPLIT_WARM), 0.0, 1.0);
+}
 // 1 where the picture's pixel is land, 0 sky or cloud (set by `hdr_light` before `finish_picture`).
 var<private> LAND_PIXEL: f32 = 1.0;
 
@@ -2252,7 +2262,7 @@ fn finish_picture(c_in: vec3<f32>) -> vec3<f32> {
         // Green leading red as well: terracotta, sand and cream stone have more green than blue too,
         // and went pale yellow (our mesa's red bands, the nave's orange floor).
         let leafy_px = smoothstep(0.0, 0.08, (t.g - t.b) / max(l, 1e-4) * 0.5) * smoothstep(0.0, 0.04, (t.g - t.r) / max(l, 1e-4));
-        let hi = smoothstep(0.06, 0.3, l) * k * SPLIT_WARM * LAND_PIXEL * leafy_px;
+        let hi = smoothstep(0.06, 0.3, l) * k * split_warm() * LAND_PIXEL * leafy_px;
         let was_green = t.g > t.r;
         var warm = mix(t, vec3(l) * vec3(1.35, 1.08, 0.45), hi);
         if was_green {
