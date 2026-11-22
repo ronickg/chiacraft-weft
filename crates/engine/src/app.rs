@@ -2891,7 +2891,10 @@ fn client_events(r: &mut Running) {
     }
     // Upstream waits for its entering overlay (`r.entering`, which we don't have); ours waits for
     // the join, after which nothing clears the screens.
-    let dead = r.game.as_ref().is_some_and(|g| g.client.dead && g.client.joined);
+    let dead = r
+        .game
+        .as_ref()
+        .is_some_and(|g| g.client.dead && g.client.joined);
     if dead && !r.screens.iter().any(|(s, _)| s.name() == "core:death") {
         r.screens.clear();
         r.open(screens::engine("core:death"));
