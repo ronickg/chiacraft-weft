@@ -3746,26 +3746,6 @@ impl Client {
         // counts on for a second at most, so they stop with the game.
         let ticks = (self.smooth_time() % (1 << 20) as f64) as f32;
         let hand = self.hand_light(cam);
-        // chiacraft: what the shader pack decides its look by (`--log scene=debug`, every 2 s):
-        // the eye in a liquid (fog start 0.6 of its end or not), the open sky, the rain, the wet
-        // ground (weft sync 11-22: hazier and wetter than dev).
-        if log::log_enabled!(target: "scene", log::Level::Debug) {
-            static LAST: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-            let now = self.start.elapsed().as_secs();
-            if now >= LAST.load(std::sync::atomic::Ordering::Relaxed) + 2 {
-                LAST.store(now, std::sync::atomic::Ordering::Relaxed);
-                let fc = self.fog_color();
-                let sun = self.sun();
-                log::debug!(
-                    target: "scene",
-                    "fog {:.1}..{:.1} (in liquid {}), fog colour {:.3} {:.3} {:.3} rain {:.3}, sun {:.2} {:.2} {:.2} {:.2}, weather {} gloom {:.2} falls {:.2}, wet {:.2} puddles {:.2} canopy {:.2}, air fog {:.2}, daylight {:.2} sunlight {:.2}, rain mist {:.2}, layers {:?}",
-                    fog_start, fog_end, (fog_start - 0.6 * fog_end).abs() > 0.5, fc[0], fc[1], fc[2], fc[3],
-                    sun[0], sun[1], sun[2], sun[3], self.weather_id, self.gloom, self.look.falls,
-                    self.wet, self.puddles, self.canopy, self.fog, environment.daylight, environment.sunlight, self.environment.rain_mist,
-                    self.environment.active_layers(),
-                );
-            }
-        }
         let cloud_detail = content()
             .game
             .catalog
@@ -4381,19 +4361,6 @@ impl Client {
         scene.frame_look = self.sky.frame_look.scene;
         scene.froxels = self.sky.froxels.scene;
         scene.cloud_shadow = self.sky.cloud_shadow.scene;
-        // chiacraft debug (`--log scenedump=debug`): every field the shader pack reads, every 2 s,
-        // to compare two builds' frames value by value.
-        if log::log_enabled!(target: "scenedump", log::Level::Debug) {
-            static LAST_DUMP: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-            let now = self.start.elapsed().as_secs() / 2;
-            if LAST_DUMP.swap(now, std::sync::atomic::Ordering::Relaxed) != now {
-                let s = &scene;
-                log::debug!(target: "scenedump", "fog_color {:?} params {:?} light {:?} sun {:?} weather {:?} eye {:?} ground {:?} behind {:?} clouds {:?} cloud_cells {:?} moon {:?}", s.fog_color, s.params, s.light, s.sun, s.weather, s.eye, s.ground, s.behind, s.clouds, s.cloud_cells, s.moon);
-                log::debug!(target: "scenedump", "options {:?} hand {:?} hand_light {:?} canopy {:?} soft_clouds {:?} cloud_moved {:?}", s.options, s.hand, s.hand_light, s.canopy, s.soft_clouds, s.cloud_moved);
-                log::debug!(target: "scenedump", "shadow {:?} shadow_far {:?} sky_event {:?} sky_landing {:?} frame_look {:?} lightning {:?} frame {:?}", s.shadow, s.shadow_far, s.sky_event, s.sky_landing, s.frame_look, s.lightning, s.frame);
-                log::debug!(target: "scenedump", "cloud_shadow {:?} froxels {:?} upscale {:?} rt {:?} taa {:?} taa_frame {:?} dlss {:?}", s.cloud_shadow, s.froxels, s.upscale, s.rt, s.taa, s.taa_frame, s.dlss);
-            }
-        }
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render
             .draw_translucent(&mut late, &cam, atmosphere.as_ref());
