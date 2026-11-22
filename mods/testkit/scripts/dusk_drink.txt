@@ -1,0 +1,46 @@
+# Dusk drinking (creature AI step 8, fix a97f5992, never re-run): a plant eater goes to water at
+# dawn and dusk from 80% water (`routines::DRINKS_AT`), at other hours only under 50%
+# (`needs::THIRSTY`). Before the fix the needs band still scored thirst from 50% at dusk, so they
+# ate on instead (t2_routine8).
+# The A/B: the same herd at 70% water, at noon and at dusk.
+# PASS: at noon (routine_noon_*) no ANIMAL_SENSES row says "doing drink"; at dusk most red deer and
+# hares say "doing drink" (or the "anim: <id> hold drink" lines), and dusk_drink_2.png shows them
+# heads down at the pond (the pond is straight ahead, 10-14 blocks off).
+# Flat pad by a pond, creative, still, mobs off; 12 red deer and 8 hares 6-18 blocks off.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /air 0 0 0
+chat /tk fill ~-30 ~-1 ~-30 ~30 ~-1 ~30 base:grass
+chat /tk fill ~-30 ~ ~-30 ~30 ~3 ~30 core:air
+chat /tk fill ~-3 ~-1 ~-14 ~3 ~-1 ~-10 base:water
+wait 2
+chat /tk time 6000
+chat /tk ring animals:red_deer 12 6 18
+chat /tk ring animals:hare 8 6 14
+wait 3
+chat /anim log
+# Noon (hour 12): 70% water is above THIRSTY, so nobody drinks.
+chat /animalprof water 0.7
+wait 15
+chat /animalprof senses
+wait 15
+chat /animalprof senses
+look 0 -20
+wait 1
+shot dusk_drink_noon.png
+# Dusk (hour 18, the DUSK window 17-20): 70% is under DRINKS_AT, so they go to the pond.
+chat /tk time 12000
+chat /animalprof water 0.7
+wait 15
+chat /animalprof senses
+look 0 -20
+wait 1
+shot dusk_drink_1.png
+wait 15
+chat /animalprof senses
+look 0 -20
+wait 1
+shot dusk_drink_2.png
+quit

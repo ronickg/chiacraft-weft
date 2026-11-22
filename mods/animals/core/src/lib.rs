@@ -5,6 +5,7 @@
 
 use std::sync::Mutex;
 
+pub mod ambient;
 pub mod balance;
 pub mod biology;
 pub mod bodies;
