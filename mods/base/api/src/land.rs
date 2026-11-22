@@ -3,7 +3,7 @@
 //! (`cargo run -p base_api --example land_map`) and any other mod read one source.
 //!
 //! The engine sums the features; most are its expressions (`Expr`, run on the CPU and the GPU
-//! alike), several of ours are mods' code (`Feature::custom`, on the CPU) because they need to
+//! alike), several of ours are mods' code (`Landform::custom`, on the CPU) because they need to
 //! know the land around them:
 //! - **Rivers** run where the rain gathers: a network of nodes, each draining downhill to a
 //!   neighbour (`net`), so streams meet into rivers that grow toward the sea or a lake, and end
@@ -26,7 +26,7 @@
 use std::cell::Cell;
 
 use weft_sdk::noise::fixed::{self, Fields, ONE, div_floor, q4, q12, ramp, shape};
-use weft_sdk::terrain::{Expr, Feature, preset};
+use weft_sdk::terrain::{Expr, Landform, preset};
 
 use crate::SEA;
 
@@ -757,19 +757,19 @@ pub const STRATA_TILT: i32 = 3;
 
 /// The engine's features of the land, in the order they're added; `mesas` and `rivers` go after
 /// them (`land_height`, `rivers`).
-pub fn features() -> Vec<Feature> {
+pub fn features() -> Vec<Landform> {
     vec![
         preset::continents(CONTINENTS),
         preset::hills(HILLS.0 * COAST_CALM, HILLS.1).mask(HILLS_AREA.mask()),
         preset::hills(HILLS.0 * (1.0 - COAST_CALM), HILLS.1).mask(HILLS_INLAND.mask()),
-        Feature::new(Expr::blocks(COAST_CLIFF))
+        Landform::new(Expr::blocks(COAST_CLIFF))
             .mask(COAST_CLIFF_AREA.mask())
             .named("coast_cliffs"),
-        Feature::new(Expr::blocks(-OCEAN_DEEP)).mask(OCEAN_DEEP_AREA.mask()),
-        Feature::new(Expr::blocks(ISLAND_HEIGHT))
+        Landform::new(Expr::blocks(-OCEAN_DEEP)).mask(OCEAN_DEEP_AREA.mask()),
+        Landform::new(Expr::blocks(ISLAND_HEIGHT))
             .mask(ISLANDS_AREA.mask())
             .named("islands"),
-        Feature::new(Expr::blocks(HIGHLANDS))
+        Landform::new(Expr::blocks(HIGHLANDS))
             .mask(HIGHLANDS_AREA.mask())
             .named("highlands"),
         preset::dunes(DUNES.0, DUNES.1).mask(DUNES_AREA.mask()),
@@ -778,7 +778,7 @@ pub fn features() -> Vec<Feature> {
             .named("mountain_rise"),
         // Mesas, canyons, karst, reefs, lakes, rivers, craters, tarns and their streams: one
         // callback, so a column's ground under them is worked out once (`customs`).
-        Feature::custom(customs).named("land"),
+        Landform::custom(customs).named("land"),
     ]
 }
 

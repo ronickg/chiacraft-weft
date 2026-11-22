@@ -51,13 +51,13 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&CHARGING, 0u64, 0);
     r.entity_component(&STOOD, 0u64, 0);
     for s in &SPECIES {
-        r.attach(s.kind, &HUNT);
-        r.attach(s.kind, &WARY);
-        r.attach(s.kind, &CHARGING);
-        r.attach(s.kind, &STOOD);
+        r.edit(s.kind).attach(&HUNT);
+        r.edit(s.kind).attach(&WARY);
+        r.edit(s.kind).attach(&CHARGING);
+        r.edit(s.kind).attach(&STOOD);
     }
     // A kill feeds the hunter that made it, by the prey's mass against its own.
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             let Some(a) = w.component(d.source, &ANIMAL) else { continue };
@@ -446,7 +446,7 @@ fn stands_ground(w: &World, id: u64, st: &EntityState, threat: u64) -> bool {
         w.navigate(id, t.pos, roles::CHARGE_SPEED);
     }
     if d2 <= roles::CHARGE * roles::CHARGE {
-        w.damage(threat, t.max_health * roles::CHARGE_HIT, id, damage_cause::ATTACK);
+        w.damage(threat, Damage::new(t.max_health * roles::CHARGE_HIT, damage_cause::ATTACK).by(id));
         weft_sdk::info!("{} {id} charges {} ({})", s.name, threat, if mother { "guarding its young" } else { "a lone hunter" });
     } else if (w.game_time() + id).is_multiple_of(40) {
         weft_sdk::info!(

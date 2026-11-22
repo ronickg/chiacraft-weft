@@ -115,6 +115,88 @@ const fn n(pats: &'static [&'static str], tier: u8, path: Path, kind: Kind, get:
 
 /// The rules, first match wins.
 pub const RULES: &[Rule] = &[
+    // Upstream Weft's content (11-22 sync): kept until Ronald's call
+    // (`notes/crew/weft-sync-1122/mods.md`, "For Ronald"). First here so its bush stem and berry
+    // leaves aren't taken for our growing stages and trees. Its plants and fungi are tagged like
+    // ours but had `Not`: upstream's worldgen that grows them wasn't taken, so today they come
+    // only from creative or commands.
+    n(
+        &[
+            "base:short_grass",
+            "base:tall_tallgrass",
+            "base:bluegrass",
+            "base:tulip_*",
+            "base:inula",
+            "base:verbascum",
+            "base:lavender",
+            "base:moss",
+            "base:bush_stem",
+            "base:raspberry_leaves",
+            "base:snowberry_leaves",
+            "base:porcini_mushroom",
+            "base:chanterelle_mushroom",
+            "base:toadstool_mushroom",
+            "base:dryads_saddle_mushroom",
+        ],
+        0,
+        Shared,
+        Plant,
+        Not,
+        "upstream's grasses, flowers, moss, berry bushes and forest mushrooms: no worldgen of ours grows them yet",
+    ),
+    n(
+        &["base:raspberry", "base:snowberry", "base:toadstool", "base:dryads_saddle", "base:cooked_dryads_saddle"],
+        0,
+        Shared,
+        Food,
+        Not,
+        "upstream's berries and mushrooms (food rows in `vitals::food`): from its bushes and fungi, which don't grow yet; the dryad's saddle cooks over a fire",
+    ),
+    n(
+        &["base:clay_ball"],
+        0,
+        Shared,
+        Material,
+        Not,
+        "upstream's clay ball: our clay drops clay, so none comes in yet (4 make a clay block)",
+    ),
+    r(&["base:oak_wood", "base:birch_wood", "base:spruce_wood"], 0, Shared, Wood, Made),
+    r(&["base:oak_log_hollow", "base:birch_log_hollow", "base:spruce_log_hollow"], 0, Shared, Wood, Made),
+    r(&["base:oak_door"], 0, Shared, Building, Made),
+    n(
+        &["base:shield"],
+        2,
+        Tech,
+        Armour,
+        Made,
+        "upstream's shield: planks round an iron boss, so the Iron Age's (whole, not built from parts)",
+    ),
+    n(&["base:woodcutter"], 2, Tech, Station, Made, "upstream's woodcutter: an iron blade on planks; cuts beams and eighths"),
+    n(&["base:music_player"], 2, Tech, Building, Made, "upstream's music player: planks round an iron works"),
+    n(
+        &["base:thruster", "base:helm", "base:assembler", "base:rotor", "base:linear_guide", "base:guide_rail", "base:assembly_tool"],
+        3,
+        Tech,
+        Machine,
+        Made,
+        "upstream's ships and vehicles: redstone, pistons and iron, the Age of Steam's like our machines",
+    ),
+    n(
+        &["base:wheel_small", "base:wheel", "base:wheel_large", "base:grab_tool"],
+        3,
+        Tech,
+        Machine,
+        Not,
+        "upstream's wheels take dyed wool (`#wool/*`), which our game doesn't make; the grab tool has no recipe",
+    ),
+    n(
+        &["base:potion_*", "base:glass_bottle"],
+        2,
+        Magic,
+        Food,
+        Not,
+        "upstream's potions and their bottle: no brewing yet, only creative or commands",
+    ),
     // ---- not items: what breaks into something else, liquids, stages, the world's own
     n(&["base:water", "base:lava"], 0, Shared, Technical, Not, "liquids, carried in buckets"),
     n(

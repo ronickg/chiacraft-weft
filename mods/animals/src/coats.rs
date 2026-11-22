@@ -35,8 +35,8 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&GENOME, Genome::default(), component_flags::SAVE | component_flags::SYNC_WATCHERS | component_flags::SYNC_MENU);
     r.entity_component(&SIZE, [0u32; 2], 0);
     for (i, s) in SPECIES.iter().enumerate() {
-        r.attach(s.kind, &GENOME);
-        r.attach(s.kind, &SIZE);
+        r.edit(s.kind).attach(&GENOME);
+        r.edit(s.kind).attach(&SIZE);
         r.entity_skin(s.kind, &GENOME, move |g, skin| paint_skin(i, g, skin));
     }
     for p in animals_core::problems() {

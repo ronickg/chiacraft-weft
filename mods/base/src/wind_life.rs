@@ -50,8 +50,8 @@ static SAND_TAG: Tag = Tag::named("sand");
 pub fn register(r: &mut Registry) {
     r.entity_component(&FALL, 1.0, component_flags::SYNC_OWNER);
     r.entity_component(&DUST, 0.0, component_flags::SYNC_OWNER);
-    r.attach(&PLAYER, &FALL);
-    r.attach(&PLAYER, &DUST);
+    r.edit(&PLAYER).attach(&FALL);
+    r.edit(&PLAYER).attach(&DUST);
     for (i, kind) in LEAVES.iter().enumerate() {
         r.particle(kind)
             .textures(&[&format!("leaf_{i}")])

@@ -124,7 +124,20 @@ pub fn register_shafts(r: &mut Registry) {
                 continue;
             }
             applied[k] = s;
-            let known = c.post_effect(name, s);
+            // As `post_effect` does, but with a priority in this list's order: the engine runs the
+            // environment's screen effects by priority, then by name, which put bloom first and
+            // the light in the air after it (the whole picture veiled and flat, the 11-22 sync).
+            let layer = format!("post/{name}");
+            let known = if s <= 0.0 {
+                c.clear_environment(&layer);
+                true
+            } else {
+                c.environment(
+                    &Environment::new(&layer)
+                        .priority(1000 + k as i32)
+                        .post(&Shader::named(name), s),
+                )
+            };
             weft_sdk::info!("screen effect {name} at {s}{}", if known { "" } else { " (no such effect)" });
         }
     });

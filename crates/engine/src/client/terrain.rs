@@ -7,6 +7,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+use weft_abi::entry_kind as ek;
 
 use crossbeam_channel::{Receiver, Sender, select, unbounded};
 use glam::{IVec2, IVec3};
@@ -33,12 +34,18 @@ pub enum In {
         cube: Arc<Cube>,
         edit: bool,
     },
-    Blocks(Vec<(IVec3, u32)>, Vec<(IVec3, Vec<u32>)>),
+    Blocks(Vec<(IVec3, u32)>, Vec<(IVec3, crate::world::placement::CellLayout)>),
+    SpaceLanded(u64),
     Unload(IVec3),
     Saved(Vec<IVec3>),
     Edits {
-        specs: Vec<String>,
+        edits: Vec<AreaFill>,
         all: bool,
+    },
+    /// Every cube held within `reach` cubes of `center` lit again from nothing (`area::relight_anew`).
+    Relight {
+        center: IVec3,
+        reach: i32,
     },
     /// What came from the server in one frame, handled in one round (one batch out).
     Many(Vec<In>),
@@ -63,7 +70,7 @@ pub enum Out {
         cube: Arc<Cube>,
         around: Around,
     },
-    Blocks(Vec<(IVec3, u32)>, Vec<(IVec3, Vec<u32>)>),
+    Blocks(Vec<(IVec3, u32)>, Vec<(IVec3, crate::world::placement::CellLayout)>),
     Unload(IVec3),
     /// The view now spans cubes `lo..=hi` up and down.
     Range {
@@ -79,6 +86,7 @@ pub struct Batch {
     pub resets: u64,
     pub whole: bool,
     pub out: Vec<Out>,
+    pub landings: Vec<u64>,
 }
 
 /// The client's end: send what the server says and where the player is, take finished batches.
@@ -117,7 +125,8 @@ fn visibility_on(gpu: bool) -> bool {
     let c = content();
     match c
         .game
-        .config_names
+        .catalog
+        .ids(ek::CONFIG)
         .get("core:client_visibility")
         .map(|&id| crate::config::get(id) as i32)
     {
@@ -159,15 +168,8 @@ fn band_of(def: &crate::content::DimensionDef, seed: u64, col: IVec2) -> Option<
 /// meshing while loading, and the terrain thread waits for this. Below normal priority like the
 /// other bulk work: the frame's culling comes first.
 pub fn pool() -> &'static rayon::ThreadPool {
-    static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
-    POOL.get_or_init(|| {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(crate::workers())
-            .thread_name(|i| format!("terrain light {i}"))
-            .start_handler(|_| crate::lower_priority())
-            .build()
-            .expect("terrain light pool")
-    })
+    static POOL: crate::Pool = crate::Pool::new();
+    crate::pool(&POOL, "terrain light", crate::workers(), true)
 }
 
 /// The terrain as the visibility fill sees it.
@@ -343,6 +345,7 @@ struct Terrain {
     waiting: FxHashMap<IVec3, (Cube, bool)>,
     gen_tx: Sender<Made>,
     out: Vec<Out>,
+    landings: Vec<u64>,
     pending: Arc<AtomicU64>,
     gpu: Option<(Sender<super::terrain_gpu::Job>, Arc<std::sync::atomic::AtomicBool>)>,
     /// The features of this dimension whose heights the CPU gives the GPU (chiacraft, mods'
@@ -392,6 +395,7 @@ impl Terrain {
             waiting: FxHashMap::default(),
             gen_tx,
             out: Vec::new(),
+            landings: Vec::new(),
             pending,
             gpu: None,
             gpu_custom: None,
@@ -436,9 +440,14 @@ impl Terrain {
             if out_tx.len() < BACKLOG {
                 self.request();
             }
-            if !self.out.is_empty()
+            if !(self.out.is_empty() && self.landings.is_empty())
                 && out_tx
-                    .send(Batch { resets: self.epoch, whole: std::mem::take(&mut self.whole), out: std::mem::take(&mut self.out) })
+                    .send(Batch {
+                        resets: self.epoch,
+                        whole: std::mem::take(&mut self.whole),
+                        out: std::mem::take(&mut self.out),
+                        landings: std::mem::take(&mut self.landings),
+                    })
                     .is_err()
             {
                 return;
@@ -501,7 +510,7 @@ impl Terrain {
                 }
                 for (p, parts) in &extras {
                     if let Some(cube) = self.cubes.get_mut(&crate::world::cube_of(*p)) {
-                        Arc::make_mut(cube).set_extras(crate::world::local_index(*p), parts.clone());
+                        Arc::make_mut(cube).set_layout(crate::world::local_index(*p), parts.clone());
                     }
                 }
                 self.out.push(Out::Blocks(changes, extras));
@@ -509,28 +518,41 @@ impl Terrain {
             In::Unload(pos) => {
                 self.server.remove(&pos);
             }
+            In::SpaceLanded(frame) => self.landings.push(frame),
             In::Saved(list) => {
                 for p in list {
                     self.saved.insert(p);
                 }
             }
-            In::Edits { specs, all } => {
+            In::Edits { edits, all } => {
                 self.whole |= !all;
-                let parsed: Vec<AreaFill> = specs.iter().filter_map(|s| AreaFill::parse(c, s)).collect();
                 if all {
-                    self.edits = Arc::new(parsed);
+                    self.edits = Arc::new(edits);
                     return;
                 }
                 let mut dirty = FxHashSet::default();
-                for fill in &parsed {
+                for fill in &edits {
                     area::fill_cubes(c, self.dim, fill, &mut self.cubes, &mut dirty);
                 }
-                Arc::make_mut(&mut self.edits).extend(parsed);
+                Arc::make_mut(&mut self.edits).extend(edits);
                 for &p in &dirty {
                     if self.conn.remove(&p).is_some() {
                         self.edited.push(p);
                     }
                 }
+                self.emit_all(dirty);
+            }
+            In::Relight { center, reach } => {
+                let start = std::time::Instant::now();
+                let set: Vec<IVec3> = self
+                    .cubes
+                    .keys()
+                    .filter(|p| (**p - center).abs().max_element() <= reach)
+                    .copied()
+                    .collect();
+                let mut dirty = FxHashSet::default();
+                area::relight_anew(c, self.dim, &mut self.cubes, &mut dirty, &set);
+                log::info!("relit {} cubes ({} changed) in {:.0} ms", set.len(), dirty.len(), start.elapsed().as_secs_f64() * 1000.0);
                 self.emit_all(dirty);
             }
         }
@@ -788,17 +810,12 @@ impl Terrain {
         while self.generating.len() + self.waiting.len() < budget {
             let Some(pos) = self.wanted.pop() else { break };
             if self.missing(pos) {
-                self.ask(pos);
+                self.ask_column(vec![pos]);
             }
         }
     }
 
-    /// Has cube `pos` made: on the GPU when it can, else on a worker.
-    fn ask(&mut self, pos: IVec3) {
-        self.ask_column(vec![pos]);
-    }
-
-    /// Has the cubes `list` of one cube column made.
+    /// Has the cubes `list` of one cube column made: on the GPU when it can, else on a worker.
     fn ask_column(&mut self, list: Vec<IVec3>) {
         let c = content();
         let (tx, epoch, dim, seed, edits) = (self.gen_tx.clone(), self.epoch, self.dim, self.seed, self.edits.clone());
@@ -852,7 +869,7 @@ impl Terrain {
             return;
         }
         // Edits that came while it was being made.
-        let lit = !area::catch_up(content(), &self.edits, pos, &mut cube);
+        let lit = !area::catch_up(&self.edits, pos, &mut cube);
         self.waiting.insert(pos, (cube, lit));
     }
 

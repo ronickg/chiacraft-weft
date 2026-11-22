@@ -36,7 +36,7 @@ pub fn init(r: &mut Registry) {
                 .map(|v| v.round() as u16);
             let i = r
                 .item(Item::generated(name))
-                .set(&base_api::FOOD, base_api::Food { hunger, saturation })
+                .set(&base_api::components::FOOD, base_api::components::Food { hunger, saturation })
                 .set(&base_api::NUTRITION, base_api::Nutrition { units, protein, energy, fat, greens, water })
                 .set(&base_api::FRESHNESS, base_api::freshness::FRESH)
                 .use_ticks(32)

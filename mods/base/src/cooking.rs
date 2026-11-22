@@ -10,13 +10,14 @@
 //! What the pot and the rack make is stamped with its day as it's made, so it ages wherever it is
 //! kept (`survival/food.rs` for the rest of food).
 
-use base_api::{BOWL, FRESHNESS, FUEL, HOT, MADE, MEAL, MEAL_NUTRITION, Nutrition, freshness};
+use base_api::components::FUEL;
+use base_api::{BOWL, FRESHNESS, HOT, MADE, MEAL, MEAL_NUTRITION, Nutrition, freshness};
 use vitals::food;
 use vitals::meals;
 use vitals::preserve::{self, Method};
 use weft_sdk::*;
 
-pub use base_api::{CRAFTING, SMELTING};
+pub use base_api::recipes::{CRAFTING, SMELTING};
 
 pub static COOKING_POT: Block = Block::named("cooking_pot");
 pub static DRYING_RACK: Block = Block::named("drying_rack");
@@ -90,21 +91,24 @@ pub fn register(r: &mut Registry) {
     r.entity_component(&ROASTING, Roasting { cook: 0, cook_max: 0, item: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
     r.system(&ROASTING, tick_campfires);
     // It cooks what a furnace cooks of food, a little slower, with no fuel.
-    r.machine(&CAMPFIRE, &CAMPFIRE_MENU)
-        .block(|b| {
-            b.sound_group("wood")
-                .textures("campfire_top", "campfire_side", "campfire_side")
-                .model_box([0.0, 0.0, 0.0], [16.0, 7.0, 16.0])
-                .light_rgb(15, 11, 6)
-                .hardness(2.0)
-                .mineable("axe")
-                .item_texture("campfire")
-                .tag("campfires")
-                .tab(&crate::tabs::FUNCTIONAL)
-        })
-        .group("input", Slots::single().accepts("food"))
-        .group("output", Slots::single().output())
-        .attach(&ROASTING)
+    r.block(&CAMPFIRE)
+        .sound_group("wood")
+        .texture("campfire_side")
+        .top("campfire_top")
+        .bottom("campfire_side")
+        .model_box([0.0, 0.0, 0.0], [16.0, 7.0, 16.0])
+        .light_rgb(15, 11, 6)
+        .hardness(2.0)
+        .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
+        .item_texture("campfire")
+        .tag("campfires")
+        .tab(&crate::tabs::FUNCTIONAL)
+        .entity(|e| e.attach(&ROASTING).inventory(2))
+        .opens(&CAMPFIRE_MENU);
+    r.menu(&CAMPFIRE_MENU)
+        .group("input", Slots::single().accepts("#food").holder())
+        .group("output", Slots::single().output().holder())
+        .player_inventory()
         .screen(|ui| {
             crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
@@ -130,28 +134,23 @@ pub fn register(r: &mut Registry) {
     r.system(&COOKING, tick_pots);
     r.system(&DRYING, tick_racks);
 
-    r.machine(&COOKING_POT, &POT_MENU)
-        .block(|b| {
-            b.sound_group("stone")
-                .faces([
-                    "cooking_pot_side",
-                    "cooking_pot_side",
-                    "cooking_pot_top",
-                    "cooking_pot_side",
-                    "cooking_pot_side",
-                    "cooking_pot_side",
-                ])
-                .model_box([2.0, 0.0, 2.0], [14.0, 10.0, 14.0])
-                .hardness(3.0)
-                .mineable("pickaxe")
-                .item_texture("cooking_pot")
-                .tab(&crate::tabs::FUNCTIONAL)
-        })
-        .group("ingredients", Slots::grid(2, 2).accepts("food"))
-        .group("bowl", Slots::single().accepts("bowl"))
-        .group("fuel", Slots::single().accepts("fuel"))
-        .group("output", Slots::single().output())
-        .attach(&COOKING)
+    r.block(&COOKING_POT)
+        .sound_group("stone")
+        .texture("cooking_pot_side")
+        .bottom("cooking_pot_top")
+        .model_box([2.0, 0.0, 2.0], [14.0, 10.0, 14.0])
+        .hardness(3.0)
+        .mined_by("pickaxe", weft_sdk::abi::tool_tier::HAND)
+        .item_texture("cooking_pot")
+        .tab(&crate::tabs::FUNCTIONAL)
+        .entity(|e| e.attach(&COOKING).inventory(7))
+        .opens(&POT_MENU);
+    r.menu(&POT_MENU)
+        .group("ingredients", Slots::grid(2, 2).accepts("#food").holder())
+        .group("bowl", Slots::single().accepts("#bowl").holder())
+        .group("fuel", Slots::single().accepts("#fuel").holder())
+        .group("output", Slots::single().output().holder())
+        .player_inventory()
         .screen(|ui| {
             crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
@@ -176,21 +175,22 @@ pub fn register(r: &mut Registry) {
             });
         });
 
-    r.machine(&DRYING_RACK, &RACK_MENU)
-        .block(|b| {
-            b.sound_group("wood")
-                .texture("drying_rack")
-                // A frame of sticks: the texture's gaps are see-through.
-                .cutout()
-                .model_box([0.0, 0.0, 0.0], [16.0, 14.0, 16.0])
-                .hardness(1.5)
-                .mineable("axe")
-                .item_texture("drying_rack")
-                .set(&base_api::FLAMMABLE, 20)
-                .tab(&crate::tabs::FUNCTIONAL)
-        })
-        .group("rack", Slots::row(4).accepts("food"))
-        .attach(&DRYING)
+    r.block(&DRYING_RACK)
+        .sound_group("wood")
+        .texture("drying_rack")
+        // A frame of sticks: the texture's gaps are see-through.
+        .cutout()
+        .model_box([0.0, 0.0, 0.0], [16.0, 14.0, 16.0])
+        .hardness(1.5)
+        .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
+        .item_texture("drying_rack")
+        .set(&base_api::components::FLAMMABLE, 20)
+        .tab(&crate::tabs::FUNCTIONAL)
+        .entity(|e| e.attach(&DRYING).inventory(4))
+        .opens(&RACK_MENU);
+    r.menu(&RACK_MENU)
+        .group("rack", Slots::row(4).accepts("#food").holder())
+        .player_inventory()
         .screen(|ui| {
             crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {

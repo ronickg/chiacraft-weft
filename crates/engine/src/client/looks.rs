@@ -43,7 +43,10 @@ pub struct Drawn<'a> {
 }
 
 impl Drawn<'_> {
-    /// The textures it shows on a face. A plant has one face, the first.
+    pub fn cube(&self) -> Option<&ModelBox> {
+        if self.model == BlockModel::Boxes { ModelBox::full_cube(self.boxes) } else { None }
+    }
+    /// The textures its geometry shows on a face.
     pub fn on_face(&self, dir: usize) -> Vec<u32> {
         match self.model {
             BlockModel::Boxes => self
@@ -52,23 +55,63 @@ impl Drawn<'_> {
                 .filter(|b| super::mesher::box_face(b, dir).is_some())
                 .map(|b| b.textures[dir])
                 .collect(),
-            BlockModel::Cube => vec![self.textures[dir]],
-            BlockModel::Cross if dir == 0 => vec![self.textures[0]],
             _ => Vec::new(),
         }
     }
 }
 
-/// What an item is drawn as: in the hand and on the ground (`Looks::item_draw`), in a slot
-/// (`Looks::slot_draw`).
+/// Resolved geometry and colors, shared by slots, hands and dropped stacks: in the hand and on the
+/// ground (`Looks::item_draw`), in a slot (`Looks::slot_draw`).
 pub enum ItemDraw<'a> {
-    /// Its own boxes.
-    Model(&'a [ModelBox]),
-    /// A sprite.
-    Icon(u32),
-    /// As its block shows, `Looks::block_sprite` or else `block_shape`.
-    Block(u32),
+    Model { boxes: std::borrow::Cow<'a, [ModelBox]>, state: u32 },
+    Sprite(SpriteLayer),
+    Sprites(Vec<SpriteLayer>),
     Nothing,
+}
+
+pub struct SpriteLayer {
+    pub texture: SpriteTexture,
+    pub color: u32,
+}
+
+pub enum SpriteTexture {
+    Id(u32),
+    Layers(&'static str),
+}
+
+impl SpriteLayer {
+    pub fn texture(&self, textures: &super::textures::GameTextures) -> u32 {
+        match self.texture {
+            SpriteTexture::Id(id) => id,
+            SpriteTexture::Layers(spec) => textures.layered(spec),
+        }
+    }
+    pub fn outline(&self, looks: &Looks, c: &Content) -> Option<String> {
+        match self.texture {
+            SpriteTexture::Layers(spec) => Some(format!("layers:{spec}")),
+            SpriteTexture::Id(id) => {
+                let name = looks.texture_name(c, id)?;
+                Some(
+                    crate::content::tinted_copy(name)
+                        .map_or(name, |(of, _)| of)
+                        .to_string(),
+                )
+            }
+        }
+    }
+}
+
+impl ItemDraw<'_> {
+    pub fn solid(&self) -> bool {
+        matches!(self, Self::Model { .. })
+    }
+    pub fn sprites(&self) -> &[SpriteLayer] {
+        match self {
+            Self::Sprite(sprite) => std::slice::from_ref(sprite),
+            Self::Sprites(sprites) => sprites,
+            _ => &[],
+        }
+    }
 }
 
 impl Looks {
@@ -89,39 +132,62 @@ impl Looks {
         }
     }
 
-    pub fn item_draw<'a>(&'a self, c: &'a Content, item: u32) -> ItemDraw<'a> {
-        self.draw(c, item, false)
+    pub fn item_draw<'a>(&'a self, c: &'a Content, stack: &weft_abi::ItemStack, biome: Option<u16>, front: &str) -> ItemDraw<'a> {
+        self.draw(c, stack, biome, front, false)
     }
 
     /// What a slot shows: like `item_draw`, except that an item with a model and an icon shows
     /// its icon, as Hytale's inventory does (painted for the slot, it reads better small than
-    /// the model would); the model is for the hand and the ground.
-    pub fn slot_draw<'a>(&'a self, c: &'a Content, item: u32) -> ItemDraw<'a> {
-        self.draw(c, item, true)
+    /// the model would); the model is for the hand and the ground (chiacraft).
+    pub fn slot_draw<'a>(&'a self, c: &'a Content, stack: &weft_abi::ItemStack, biome: Option<u16>, front: &str) -> ItemDraw<'a> {
+        self.draw(c, stack, biome, front, true)
     }
 
-    fn draw<'a>(&'a self, c: &'a Content, item: u32, icon_first: bool) -> ItemDraw<'a> {
+    fn draw<'a>(&'a self, c: &'a Content, stack: &weft_abi::ItemStack, biome: Option<u16>, front: &str, icon_first: bool) -> ItemDraw<'a> {
+        let item = stack.item;
         let Some(def) = c.items.get(item as usize).filter(|_| item != 0) else { return ItemDraw::Nothing };
         let look = self.item(item);
         let model = look.and_then(|l| l.model.as_deref()).unwrap_or(&def.model);
         let icon = look.and_then(|l| l.icon).unwrap_or(def.icon);
-        match def.block {
-            _ if icon_first && icon != u32::MAX => ItemDraw::Icon(icon),
-            _ if !model.is_empty() => ItemDraw::Model(model),
-            _ if icon != u32::MAX => ItemDraw::Icon(icon),
-            Some(state) => ItemDraw::Block(state),
-            None => ItemDraw::Nothing,
+        if !model.is_empty() && !(icon_first && icon != u32::MAX) {
+            return ItemDraw::Model { boxes: model.into(), state: 0 };
+        }
+        if icon != u32::MAX {
+            let (texture, color) = match crate::stack::layers(stack) {
+                Some(spec) => (SpriteTexture::Layers(spec), 0xFF_FFFF),
+                None => {
+                    let tint = c
+                        .item_fluid
+                        .get(&item)
+                        .map_or(0, |&l| c.states[c.liquids[l as usize].first_state as usize].tint);
+                    (SpriteTexture::Id(icon), c.kind_color(tint, biome))
+                }
+            };
+            return ItemDraw::Sprite(SpriteLayer { texture, color });
+        }
+        def.block
+            .map_or(ItemDraw::Nothing, |state| self.block_draw(c, c.facing_toward(state, front), biome))
+    }
+
+    pub fn block_draw<'a>(&'a self, c: &'a Content, state: u32, biome: Option<u16>) -> ItemDraw<'a> {
+        let Some(s) = c.states.get(state as usize) else { return ItemDraw::Nothing };
+        if let Some(t) = self.block_sprite(state, s) {
+            ItemDraw::Sprites(
+                super::mesher::face_layers(c, s, t, 0)
+                    .iter()
+                    .map(|l| SpriteLayer { texture: SpriteTexture::Id(l.tex), color: c.kind_color(l.tint, biome) })
+                    .collect(),
+            )
+        } else {
+            ItemDraw::Model { boxes: self.block_shape(state, s).into(), state }
         }
     }
 
     /// The sprite a block's item shows if it is flat.
     pub fn block_sprite(&self, state: u32, s: &StateInfo) -> Option<u32> {
         let d = self.drawn(state, s);
-        if d.model == BlockModel::Boxes {
-            return None;
-        }
         s.item_sprite()
-            .map(|t| if s.liquid.is_none() { d.textures[0] } else { t })
+            .map(|t| if s.liquid.is_none() { s.item_face.map_or(t, |f| d.textures[f as usize]) } else { t })
     }
 
     /// The boxes a block's item shows if it isn't.
@@ -140,22 +206,7 @@ impl Looks {
 }
 
 /// Every texture name there is, the content's first, numbering new ones.
-pub struct Names {
-    pub list: Vec<String>,
-    ids: FxHashMap<String, u32>,
-}
-
-impl Names {
-    pub fn id(&mut self, name: &str) -> u32 {
-        if let Some(&i) = self.ids.get(name) {
-            return i;
-        }
-        let i = self.list.len() as u32;
-        self.list.push(name.to_string());
-        self.ids.insert(name.to_string(), i);
-        i
-    }
-}
+pub type Names = crate::content::Interner;
 
 /// What a model file draws, by texture ids. A face it names no texture for shows `own` of that
 /// face. A cube parent is a whole cube's box.
@@ -180,15 +231,7 @@ pub fn set(looks: Looks) {
 /// The packs' models, and the names of all textures so far.
 pub fn load(assets: &Assets, c: &Content) -> (Looks, Names) {
     let mut looks = Looks::default();
-    let mut names = Names {
-        list: c.textures.clone(),
-        ids: c
-            .textures
-            .iter()
-            .enumerate()
-            .map(|(i, n)| (n.clone(), i as u32))
-            .collect(),
-    };
+    let mut names = Names::new(c.textures.clone());
     let mut id = |name: &str| names.id(name);
     let read = |name: &str| {
         assets
@@ -207,14 +250,28 @@ pub fn load(assets: &Assets, c: &Content) -> (Looks, Names) {
         let Some(m) = from_pack(&format!("{ns}:block/{path}")) else { continue };
         for st in b.first_state..b.first_state + b.states {
             let s = &c.states[st as usize];
+            // The file is written for the block unturned, as the mod's own model is.
+            let t = s.turn;
+            let own = |i: usize| s.textures[t.face(i)];
             let mut look = StateLook::default();
             match &m.cube {
                 // Only a cube is kept one: it hides the faces against its neighbors. Anything
                 // else is redrawn as a cube's box.
-                Some(cube) if s.model == BlockModel::Cube => {
-                    look.textures = Some(std::array::from_fn(|i| if cube[i].is_empty() { s.textures[i] } else { id(&cube[i]) }))
+                Some(cube) if ModelBox::full_cube(&s.boxes).is_some() => {
+                    let own: [u32; 6] = std::array::from_fn(|i| if cube[i].is_empty() { own(i) } else { id(&cube[i]) });
+                    let textures = crate::content::turned_faces(t, own);
+                    let mut cube = s.boxes[0].clone();
+                    cube.textures = textures;
+                    look.boxes = Some(vec![cube]);
+                    look.textures = Some(textures);
                 }
-                _ => look.boxes = Some(file_boxes(&m, &|i| s.textures[i], &mut id)).filter(|b| !b.is_empty()),
+                _ => {
+                    let boxes: Vec<ModelBox> = file_boxes(&m, &own, &mut id)
+                        .iter()
+                        .map(|b| b.turned(t))
+                        .collect();
+                    look.boxes = Some(boxes).filter(|b| !b.is_empty());
+                }
             }
             if looks.states.len() <= st as usize {
                 looks.states.resize_with(st as usize + 1, || None);
@@ -223,8 +280,7 @@ pub fn load(assets: &Assets, c: &Content) -> (Looks, Names) {
         }
     }
     for (i, d) in c.items.iter().enumerate().skip(1) {
-        let Some((ns, path)) = d.name.split_once(':') else { continue };
-        let Some(m) = from_pack(&format!("{ns}:item/{path}")) else { continue };
+        let Some(m) = from_pack(&c.item_model_file(i as u32)) else { continue };
         let icon = m.sprite.as_deref().filter(|t| !t.is_empty()).map(&mut id);
         let own = icon.unwrap_or(if d.icon == u32::MAX { 0 } else { d.icon });
         let model = (!m.boxes.is_empty()).then(|| file_boxes(&m, &|_| own, &mut id));

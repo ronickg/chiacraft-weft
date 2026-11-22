@@ -68,15 +68,15 @@ pub fn register(r: &mut Registry) {
         .choice(2, &["off", "looks", "on"])
         .world();
     r.entity_component(&BUILT, Built { cells: [0; 64], len: 0, next: 0 }, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
-    r.attach(&PLAYER, &BUILT);
+    r.edit(&PLAYER).attach(&BUILT);
     r.entity_component(
         &STAR,
         Star { x: 0, z: 0, until: 0, set: 0 },
         component_flags::SAVE | component_flags::KEEP_ON_RESPAWN | component_flags::SYNC_OWNER,
     );
-    r.attach(&PLAYER, &STAR);
+    r.edit(&PLAYER).attach(&STAR);
     // Where players build, for big impacts to keep away from.
-    r.on(&actions::PLACE_BLOCK, |b| {
+    r.on_event(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for e in b.iter().filter(|e| e.player != 0) {
             built_at(&w, e.player, e.pos);
@@ -104,7 +104,7 @@ pub fn register(r: &mut Registry) {
         .tag("dyes")
         .tab(&crate::tabs::INGREDIENTS);
     // Dying ends a player's watch of the blood moon; a blood-moon monster's death may leave ash.
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         let mut watching = WATCHING.lock().unwrap();
         let watching = watching.get_or_insert_with(HashMap::new);
@@ -224,8 +224,8 @@ fn spawn_near(w: &World, player: u64, cap: u32, health: f32) {
         if id == 0 {
             continue;
         }
-        w.attribute_add_modifier(id, &attribute::MAX_HEALTH, MODIFIER, attr_op::MULTIPLY_BASE, (health - 1.0) as f64, 0);
-        w.attribute_add_modifier(id, &attribute::MOVEMENT_SPEED, MODIFIER, attr_op::MULTIPLY_BASE, (ev::BLOOD_MOON_SPEED - 1.0) as f64, 0);
+        w.attribute_add_modifier(id, MODIFIER, &Modifier::percent(&attribute::MAX_HEALTH, (health - 1.0) as f64), 0);
+        w.attribute_add_modifier(id, MODIFIER, &Modifier::percent(&attribute::MOVEMENT_SPEED, (ev::BLOOD_MOON_SPEED - 1.0) as f64), 0);
         w.heal(id, 1000.0);
         WALKING.lock().unwrap().push((id, dim));
         weft_sdk::info!(
@@ -254,15 +254,15 @@ fn pick_kind(w: &World) -> &'static EntityKind {
     for (name, weight) in ev::BLOOD_MOON_WEIGHTS {
         if pick < weight {
             return match name {
-                "zombie" => &crate::mobs::ZOMBIE,
-                "spider" => &crate::mobs::SPIDER,
-                "skeleton" => &crate::mobs::SKELETON,
+                "zombie" => &base_api::entities::ZOMBIE,
+                "spider" => &base_api::entities::SPIDER,
+                "skeleton" => &base_api::entities::SKELETON,
                 _ => &crate::mobs::CREEPER,
             };
         }
         pick -= weight;
     }
-    &crate::mobs::ZOMBIE
+    &base_api::entities::ZOMBIE
 }
 
 /// The blood moon over: its monsters walk away from the nearest player and are gone out of sight.
@@ -498,7 +498,10 @@ fn site(w: &World) -> Result<BlockPos, String> {
                 away.push((cx * ev::BUILT_CELL as f64 + half, cz * ev::BUILT_CELL as f64 + half, build + half * 1.5));
             }
         }
-        if let Some(bed) = w.component(p, &base_api::BED_SPAWN).filter(|b| b.set != 0) {
+        if let Some(bed) = w
+            .component(p, &base_api::components::BED_SPAWN)
+            .filter(|b| b.set != 0)
+        {
             away.push((bed.bed[0] as f64, bed.bed[2] as f64, build));
         }
         if let Some(g) = w.component(p, &base_api::GRAVE).filter(|g| g.set != 0) {
@@ -641,13 +644,14 @@ fn tell_all(w: &World, site: Option<BlockPos>) {
         let band = format!("events.base.band.{band}");
         match site {
             Some(s) => {
-                w.hint(p, "hint.base.star_fell", &[Arg::Key(&band), Arg::Key(&dir)]);
+                w.hint("hint.base.star_fell", &[Arg::Key(&band), Arg::Key(&dir)])
+                    .to(p);
                 if let Some(star) = w.component_mut(p, &STAR) {
                     *star = Star { x: s.x, z: s.z, until: day + ev::POINTER_DAYS, set: 1 };
                 }
             }
             None => {
-                w.hint(p, "hint.base.star_sea", &[]);
+                w.hint("hint.base.star_sea", &[]).to(p);
             }
         }
     }

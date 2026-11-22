@@ -1,5 +1,5 @@
 //! Climbing any wall on stamina (`vitals::climb`, `notes/SYSTEMS.md`). The engine climbs
-//! (`core:climb_speed` times the wall's `grip`, the `CLIMBING` pose while it holds on); here: each
+//! (`core:wall_climb_speed` times the wall's `grip`, the `CLIMBING` pose while it holds on); here: each
 //! wall's grip, the speed the body allows (what one carries, wet, cold), stamina by the second on
 //! a wall, and the hands letting go when it runs out until some has come back.
 
@@ -11,7 +11,7 @@ use vitals::climb::{self, GRIP_LOOSE, GRIP_NONE, GRIP_ROUGH, GRIP_SMOOTH};
 use vitals::effects::{self, Effect};
 use weft_sdk::*;
 
-/// Held on to a wall (the engine's `pose_when::CLIMBING`): arms reaching, no bob.
+/// Held on to a wall (the engine's `core:climbing` condition): arms reaching, no bob.
 pub static CLIMB: Pose = Pose::named("climb");
 
 /// Each wall's grip (`vitals::climb`), by name or tag; the rest keep the engine's 1 (stone, dirt
@@ -56,9 +56,9 @@ const GRIPS: &[(&str, f32)] = &[
 pub fn register(r: &mut Registry) {
     r.pose(&CLIMB)
         .action("climb")
-        .bob(false)
+        .no_bob()
         .priority(40)
-        .when(abi::pose_when::CLIMBING | abi::pose_when::NOT_FLYING);
+        .when(Cond::new("core:climbing") & !Cond::flying());
     for &(what, grip) in GRIPS {
         r.set(what, &GRIP, grip);
     }
@@ -138,7 +138,7 @@ fn tick(w: &World) {
         // Respawning drops modifiers: said again now and then.
         if (speed - h.speed).abs() > 1e-3 || w.game_time().is_multiple_of(100) {
             h.speed = speed;
-            w.attribute_add_modifier(id, &attribute::CLIMB_SPEED, "base:climbing", attr_op::ADD, speed as f64, 0);
+            w.attribute_add_modifier(id, "base:climbing", &Modifier::add(&attribute::WALL_CLIMB_SPEED, speed as f64), 0);
         }
     }
 }

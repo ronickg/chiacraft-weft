@@ -51,7 +51,7 @@ pub fn doing(w: &World, id: u64) -> u8 {
 pub fn init(r: &mut Registry) {
     r.entity_component(&DOING, 0u8, 0);
     for s in &crate::species::SPECIES {
-        r.attach(s.kind, &DOING);
+        r.edit(s.kind).attach(&DOING);
     }
 }
 

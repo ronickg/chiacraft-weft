@@ -17,7 +17,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::app::{Ctx, Request};
 use crate::content::{AIR, Content};
-use crate::screens::{BuildCx, Screen, button, frame, label};
+use crate::screens::{BuildCx, Screen, back_button, bound_button, button, frame, label, on_off};
 use crate::ui::text::{self, Arg};
 use crate::ui::{Kind, Style, Ui};
 use crate::world::Cube;
@@ -41,6 +41,8 @@ pub struct WorldMeta {
     pub day_offsets: Vec<(String, i64)>,
     /// Each dimension's weather by name, and the tick it changes.
     pub weather: Vec<(String, String, u64)>,
+    /// Timers on each dimension (`Host::timer`): when, the event, its value.
+    pub timers: Vec<(String, u64, String, Vec<u8>)>,
     /// Players given a permission level: their key and the level.
     pub ops: Vec<(String, u32)>,
     /// Area edits per dimension (`server::area::AreaFill::spec`), in order.
@@ -59,6 +61,10 @@ pub struct WorldMeta {
     pub key_index: Option<u32>,
     pub key_generation: u32,
     pub created: u64,
+    /// What a player new to the world starts in.
+    pub game_mode: crate::world::GameMode,
+    /// Its owner may use commands (the player on this machine; a server's operators are `ops`).
+    pub cheats: bool,
 }
 
 pub fn now_secs() -> u64 {
@@ -80,6 +86,7 @@ impl WorldMeta {
             day_offsets: Vec::new(),
             ops: Vec::new(),
             weather: Vec::new(),
+            timers: Vec::new(),
             edits: Vec::new(),
             forced: Vec::new(),
             next_entity: 1,
@@ -89,6 +96,8 @@ impl WorldMeta {
             key_index: None,
             key_generation: 0,
             created: 0,
+            game_mode: crate::world::GameMode::SURVIVAL,
+            cheats: true,
         };
         for (_, k, v) in crate::kv::pairs(&src) {
             match k {
@@ -100,6 +109,8 @@ impl WorldMeta {
                 "key_index" => m.key_index = v.parse().ok(),
                 "key_generation" => m.key_generation = v.parse().unwrap_or(0),
                 "created" => m.created = v.parse().unwrap_or(0),
+                "game_mode" => m.game_mode = crate::world::GameMode::parse(v).unwrap_or_default(),
+                "cheats" => m.cheats = v != "false",
                 _ => {
                     if let Some(d) = k.strip_prefix("weather.") {
                         let w: Vec<&str> = v.split_whitespace().collect();
@@ -118,6 +129,17 @@ impl WorldMeta {
                                     .push((d.to_string(), name.to_string(), until.parse().unwrap_or(0)));
                             }
                             _ => {}
+                        }
+                    } else if let Some(d) = k.strip_prefix("timer.") {
+                        let d = d.rsplit_once('.').map_or(d, |(d, _)| d);
+                        let w: Vec<&str> = v.split_whitespace().collect();
+                        if let [at, event, ref data @ ..] = w[..] {
+                            let data = data.first().unwrap_or(&"");
+                            let bytes = (0..data.len() / 2)
+                                .filter_map(|i| u8::from_str_radix(&data[i * 2..i * 2 + 2], 16).ok())
+                                .collect();
+                            m.timers
+                                .push((d.to_string(), at.parse().unwrap_or(0), event.to_string(), bytes));
                         }
                     } else if let Some(key) = k.strip_prefix("op.") {
                         m.ops.push((key.to_string(), v.parse().unwrap_or(0)));
@@ -156,6 +178,13 @@ impl WorldMeta {
         for (d, weather, until) in &self.weather {
             s.push_str(&format!("weather.{d} = {weather} {until}\n"));
         }
+        for (i, (d, at, event, data)) in self.timers.iter().enumerate() {
+            let hex: String = data.iter().map(|b| format!("{b:02x}")).collect();
+            s.push_str(&format!(
+                "timer.{d}.{i} = {at} {event} {hex}
+"
+            ));
+        }
         for (key, level) in &self.ops {
             s.push_str(&format!("op.{key} = {level}\n"));
         }
@@ -180,6 +209,7 @@ impl WorldMeta {
         for (id, h) in &self.packages {
             s.push_str(&format!("package.{id} = {h}\n"));
         }
+        s.push_str(&format!("game_mode = {}\ncheats = {}\n", self.game_mode.name(), self.cheats));
         let _ = std::fs::create_dir_all(&self.dir);
         // Whole or not at all: a crash in the middle must not leave half of it.
         let tmp = self.dir.join("world.new");
@@ -229,6 +259,7 @@ pub fn create(saves: &Path, name: &str, seed: u64) -> WorldMeta {
         day_offsets: Vec::new(),
         ops: Vec::new(),
         weather: Vec::new(),
+        timers: Vec::new(),
         edits: Vec::new(),
         forced: Vec::new(),
         next_entity: 1,
@@ -238,6 +269,8 @@ pub fn create(saves: &Path, name: &str, seed: u64) -> WorldMeta {
         key_index: Some(crate::world_address::random_index()),
         key_generation: 0,
         created: now_secs(),
+        game_mode: crate::world::GameMode::SURVIVAL,
+        cheats: true,
     };
     m.save();
     m
@@ -308,6 +341,11 @@ impl IdTable {
             .iter()
             .enumerate()
             .map(|(i, n)| {
+                // Earlier saves filled a large block's other cells with directional placeholders.
+                // The owner's shape reconstructs those entries when its cube loads.
+                if n == "core:covered" || n.starts_with("core:covered[") {
+                    return AIR;
+                }
                 c.state_by_name(n).unwrap_or_else(|| {
                     missing.insert(i as u32);
                     unknown
@@ -540,10 +578,7 @@ impl Storage {
         }
         let lod = dim_dirs
             .iter()
-            .enumerate()
-            .map(|(dim, dir)| {
-                crate::server::lod_tops::DimTops::read(&dir.join("lod.bin"), c, dim as u32, meta.seed, &mut |w| ids.runtime_id(w))
-            })
+            .map(|dir| crate::server::lod_tops::DimTops::read(&dir.join("lod.bin"), &mut |w| ids.runtime_id(w)))
             .collect();
         let far = dim_dirs
             .iter()
@@ -601,6 +636,11 @@ impl Storage {
         &self.saved[dim as usize]
     }
 
+    pub fn lod_columns(&mut self, dim: u32) -> Vec<crate::server::lod_tops::LodColumn> {
+        let lod = &mut self.lod[dim as usize];
+        if lod.request(crate::content::content(), dim, self.meta.seed) { lod.columns.values().cloned().collect() } else { Vec::new() }
+    }
+
     /// The cube and the serialized entities that were in it.
     pub fn load(&mut self, dim: u32, pos: IVec3) -> Option<(Cube, Vec<u8>)> {
         let (r, i) = region_of(pos);
@@ -630,18 +670,27 @@ impl Storage {
         Some((cube?, data[4 + len..].to_vec()))
     }
 
-    pub fn save(&mut self, c: &Content, dim: u32, pos: IVec3, cube: &Cube, entities: &[u8]) {
-        self.save_cube(c, dim, pos, cube, entities, true);
+    pub fn save(&mut self, c: &Content, dim: u32, pos: IVec3, cube: &Cube, around: &crate::server::lod_tops::Around, entities: &[u8]) {
+        self.save_cube(c, dim, pos, cube, Some(around), entities);
     }
 
     /// chiacraft, test only: a cube of an imported world (`chiacraft::mc_import`). Like `save`,
     /// but its tops are left out of `lod_tops`: the import's far grid (`far`) covers distant
     /// terrain, and millions of columns there would swamp it.
     pub fn save_imported(&mut self, c: &Content, dim: u32, pos: IVec3, cube: &Cube) {
-        self.save_cube(c, dim, pos, cube, &[], false);
+        self.save_cube(c, dim, pos, cube, None, &[]);
     }
 
-    fn save_cube(&mut self, c: &Content, dim: u32, pos: IVec3, cube: &Cube, entities: &[u8], tops: bool) {
+    /// `around`: the cubes beside it for its far columns' light; `None` leaves it out of them.
+    fn save_cube(
+        &mut self,
+        c: &Content,
+        dim: u32,
+        pos: IVec3,
+        cube: &Cube,
+        around: Option<&crate::server::lod_tops::Around>,
+        entities: &[u8],
+    ) {
         if !c.dims[dim as usize].saved {
             return;
         }
@@ -669,6 +718,10 @@ impl Storage {
             .palette()
             .iter()
             .chain(cube.all_extras().flat_map(|(_, parts)| parts))
+            .chain(
+                cube.layouts()
+                    .flat_map(|(_, layout)| layout.covers.iter().map(|p| &p.state)),
+            )
         {
             let w = match kept.get(&s) {
                 Some(&w) => w,
@@ -698,9 +751,9 @@ impl Storage {
             }
         }
         self.saved[dim as usize].insert(pos);
-        if tops {
+        if let Some(around) = around {
             let seed = self.meta.seed;
-            self.lod[dim as usize].saved(c, dim, seed, pos, &cube);
+            self.lod[dim as usize].saved(c, dim, seed, pos, &cube, around);
         }
     }
 
@@ -758,7 +811,7 @@ impl Screen for ConfirmDelete {
                     }
                     c.requests.push(Request::Close);
                 });
-                button(ui, cx, "menu.cancel", &[], 145.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.cancel", &[], 145.0, |c| c.requests.push(Request::Close));
             });
         });
     }
@@ -789,7 +842,7 @@ impl Screen for MissingMods {
                     c.requests.push(Request::StartWorldAnyway(world.clone()))
                 });
                 ui.set_id(go, "continue");
-                button(ui, cx, "menu.cancel", &[], 145.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.cancel", &[], 145.0, |c| c.requests.push(Request::Close));
             });
         });
     }
@@ -806,84 +859,37 @@ impl Screen for WorldSelect {
         "core:worlds"
     }
 
+    /// Like the title screen: the buttons down a bar on the left, the worlds as pictures filling
+    /// the rest, each with its name and game mode; the rest of what is known of it in its tooltip.
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         let worlds = list(&cx.settings.saves_dir());
         let selected = worlds
             .iter()
             .position(|w| self.selected.as_ref() == Some(&w.dir));
-        frame(ui, cx, "world.select", |ui| {
-            // The list takes whatever height is left and scrolls; the buttons below always show.
-            let list = ui.panel(
-                "panel",
-                Style::default()
-                    .pad(8.0)
-                    .gap(4.0)
-                    .stretch()
-                    .w(300.0)
-                    .h(0.0)
-                    .grow()
-                    .min_h(60.0)
-                    .scroll(),
-                |ui| {
-                    if worlds.is_empty() {
-                        label(ui, cx, "world.empty", &[], "dim");
-                    }
-                    for (i, w) in worlds.iter().enumerate() {
-                        let when = format_age(now_secs().saturating_sub(w.last_played));
-                        let info = cx.t(
-                            "world.info",
-                            &[
-                                Arg::Text(
-                                    w.dir
-                                        .file_name()
-                                        .unwrap_or_default()
-                                        .to_string_lossy()
-                                        .into(),
-                                ),
-                                Arg::Text(when),
-                            ],
-                        );
-                        let (name, dir) = (w.name.clone(), w.dir.clone());
-                        // A list's row (`list_row`: dark at rest, a gold rim when selected), not
-                        // a column of main buttons.
-                        let b = ui.button(
-                            "list_row",
-                            Style::default().pad(4.0).stretch().gap(2.0),
-                            Rc::new(move |c: &mut Ctx| {
-                                if let Some(s) = c.screen::<WorldSelect>() {
-                                    s.selected = Some(dir.clone());
-                                }
-                                c.requests.push(Request::Rebuild);
-                            }),
-                            |ui| {
-                                ui.text(text::plain(&name), "button");
-                                ui.text(info, "dim");
-                            },
-                        );
-                        if let Kind::Button { selected: s, .. } = &mut ui.nodes[b].kind {
-                            *s = selected == Some(i);
-                        }
-                        ui.set_id(b, &format!("world:{i}"));
-                    }
-                },
-            );
-            ui.set_id(list, "worlds");
-            ui.container(Style::row().gap(6.0), |ui| {
+        ui.root_style(Style::default().stretch());
+        ui.panel("background", Style::row().grow().stretch(), |ui| {
+            ui.panel("sidebar", Style::default().w(180.0).pad(12.0).gap(4.0).stretch(), |ui| {
+                // As wide as the bar, whatever the language says.
+                let t = label(ui, cx, "world.select", &[], "title");
+                if let Some(t) = ui.text_mut(t) {
+                    t.wrap = false;
+                    let chars = cx.lang.get("world.select").chars().count().max(1) as f32;
+                    t.scale = (156.0 / (chars * 6.0)).clamp(1.0, 3.0);
+                }
+                ui.spacer();
                 let sel = selected.and_then(|i| worlds.get(i)).cloned();
-                let play = button(ui, cx, "world.play", &[], 145.0, move |c| {
+                let play = button(ui, cx, "world.play", &[], 156.0, move |c| {
                     if let Some(w) = &sel {
-                        c.requests.push(Request::StartWorld(w.clone()));
+                        enter(c, w);
                     }
                 });
                 if let Kind::Button { enabled, .. } = &mut ui.nodes[play].kind {
                     *enabled = selected.is_some();
                 }
                 ui.set_id(play, "play");
-                button(ui, cx, "world.create", &[], 145.0, |c| c.requests.push(Request::Screen("core:create_world".into())));
-            });
-            ui.container(Style::row().gap(6.0), |ui| {
+                button(ui, cx, "world.create", &[], 156.0, |c| c.requests.push(Request::Screen("core:create_world".into())));
                 let sel = selected.and_then(|i| worlds.get(i)).cloned();
-                let del = button(ui, cx, "world.delete", &[], 145.0, move |c| {
+                let del = button(ui, cx, "world.delete", &[], 156.0, move |c| {
                     if let Some(w) = &sel {
                         c.requests
                             .push(Request::Open(Box::new(ConfirmDelete { world: w.clone() })));
@@ -892,8 +898,26 @@ impl Screen for WorldSelect {
                 if let Kind::Button { enabled, .. } = &mut ui.nodes[del].kind {
                     *enabled = selected.is_some();
                 }
+                // The selected world's cheats, changed where it is chosen.
                 let sel = selected.and_then(|i| worlds.get(i)).cloned();
-                let addr = button(ui, cx, "world.new_address", &[], 70.0, move |c| {
+                let on = sel.as_ref().is_some_and(|w| w.cheats);
+                let cheats = button(ui, cx, "world.cheats", &[on_off(on)], 156.0, move |c| {
+                    if let Some(mut w) = sel.clone() {
+                        w.cheats = !w.cheats;
+                        w.save();
+                        c.requests.push(Request::Rebuild);
+                    }
+                });
+                // Hardcore stays without.
+                let hardcore = selected
+                    .and_then(|i| worlds.get(i))
+                    .is_some_and(is_hardcore);
+                if let Kind::Button { enabled, .. } = &mut ui.nodes[cheats].kind {
+                    *enabled = selected.is_some() && !hardcore;
+                }
+                // A new address for the selected world (chiacraft, `friends`).
+                let sel = selected.and_then(|i| worlds.get(i)).cloned();
+                let addr = button(ui, cx, "world.new_address", &[], 156.0, move |c| {
                     if let Some(w) = &sel {
                         c.requests
                             .push(Request::Open(Box::new(crate::friends::ConfirmNewAddress { world: w.clone() })));
@@ -904,12 +928,150 @@ impl Screen for WorldSelect {
                 }
                 ui.set_id(addr, "new_address");
                 let dir = cx.settings.run_dir.join("saves");
-                let open = button(ui, cx, "world.folder", &[], 70.0, move |_| crate::packs::open_folder(&dir));
+                let open = button(ui, cx, "world.folder", &[], 156.0, move |_| crate::packs::open_folder(&dir));
                 ui.set_id(open, "saves_folder");
-                button(ui, cx, "menu.back", &[], 70.0, |c| c.requests.push(Request::Close));
+                ui.add(Kind::Container { class: None }, Style::default().h(6.0));
+                back_button(ui, cx, "menu.back", &[], 156.0, |c| c.requests.push(Request::Close));
             });
+            // As many pictures to a row as fit.
+            let free = cx.size.x - 180.0 - 2.0 * 12.0;
+            let columns = (((free + TILE_GAP) / (TILE_W + TILE_GAP)).floor() as usize).max(1);
+            let list = ui.container(
+                Style::default()
+                    .grow()
+                    .pad(12.0)
+                    .gap(TILE_GAP)
+                    .self_align(crate::ui::Align::Stretch)
+                    .scroll(),
+                |ui| {
+                    if worlds.is_empty() {
+                        label(ui, cx, "world.empty", &[], "dim");
+                    }
+                    for (row, line) in worlds.chunks(columns).enumerate() {
+                        ui.container(Style::row().gap(TILE_GAP), |ui| {
+                            for (k, w) in line.iter().enumerate() {
+                                let i = row * columns + k;
+                                tile(ui, cx, w, i, selected == Some(i));
+                            }
+                        });
+                    }
+                },
+            );
+            ui.set_id(list, "worlds");
         });
     }
+}
+
+/// A world's tile in the list, across.
+const TILE_W: f32 = 136.0;
+const TILE_GAP: f32 = 6.0;
+
+/// A world's picture as last seen, whole, and made small for the list.
+pub const PREVIEW: &str = "preview.png";
+pub const PREVIEW_SMALL: &str = "preview_small.png";
+
+/// The picture a world shows in the list (`small`) or going into it: the last frame it was seen
+/// in, else a question mark.
+fn picture(w: &WorldMeta, small: bool) -> String {
+    let file = |name: &str| crate::ui::render::file_texture(&w.dir.join(name));
+    small
+        .then(|| file(PREVIEW_SMALL))
+        .flatten()
+        .or_else(|| file(PREVIEW))
+        .unwrap_or_else(|| "core:gui/world_unknown".into())
+}
+
+/// Into the world, its picture growing from where it is in the list.
+fn enter(c: &mut Ctx, w: &WorldMeta) {
+    let i = list_index(c, w);
+    let from = c
+        .top
+        .as_ref()
+        .and_then(|t| {
+            t.ui.find(&format!("picture:{i}"))
+                .map(|n| t.ui.nodes[n].rect)
+        })
+        .unwrap_or_default();
+    c.requests
+        .push(Request::EnterWorld { world: w.clone(), picture: picture(w, false), from });
+}
+
+/// Where `w` is in the list as built (its picture's id).
+fn list_index(c: &Ctx, w: &WorldMeta) -> usize {
+    list(&c.settings.saves_dir())
+        .iter()
+        .position(|x| x.dir == w.dir)
+        .unwrap_or(0)
+}
+
+/// World `w`, `i`-th in the list: its picture over its name and game mode, selected with a
+/// click, played with two.
+fn tile(ui: &mut Ui, cx: &BuildCx, w: &WorldMeta, i: usize, selected: bool) {
+    let dir = w.dir.clone();
+    let b = ui.button(
+        "button",
+        Style::default().w(TILE_W).pad(4.0).gap(2.0),
+        Rc::new(move |c: &mut Ctx| {
+            if let Some(s) = c.screen::<WorldSelect>() {
+                s.selected = Some(dir.clone());
+            }
+            c.requests.push(Request::Rebuild);
+        }),
+        |ui| {
+            let p = ui.add(
+                Kind::Image { texture: picture(w, true), color: 0xFFFFFFFF },
+                Style::default()
+                    .w(TILE_W - 8.0)
+                    .h((TILE_W - 8.0) * 9.0 / 16.0),
+            );
+            ui.set_id(p, &format!("picture:{i}"));
+            let name = ui.text(text::plain(&w.name), "button");
+            if let Some(t) = ui.text_mut(name) {
+                t.wrap = false;
+            }
+            let key = if is_hardcore(w) { "gamemode.hardcore".to_string() } else { format!("gamemode.{}", w.game_mode.name()) };
+            let mut chars = cx.lang.get(&key).chars();
+            let mode: String = chars
+                .next()
+                .map(|f| f.to_uppercase().chain(chars).collect())
+                .unwrap_or_default();
+            ui.text(text::plain(&mode), "dim");
+        },
+    );
+    if let Kind::Button { selected: s, .. } = &mut ui.nodes[b].kind {
+        *s = selected;
+    }
+    let world = w.clone();
+    ui.on_double_click(b, Rc::new(move |c: &mut Ctx| enter(c, &world)));
+    ui.set_id(b, &format!("world:{i}"));
+    let when = format_age(now_secs().saturating_sub(w.last_played));
+    let folder: String = w
+        .dir
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into();
+    let mut tip = cx.t("world.info", &[Arg::Text(folder), Arg::Text(when)]);
+    tip.push(text::Span::text("\n", None));
+    tip.extend(cx.t("world.cheats", &[on_off(w.cheats)]));
+    ui.nodes[b].tooltip = Some(tip);
+}
+
+/// A world of one life: no cheats for it, ever.
+fn is_hardcore(w: &WorldMeta) -> bool {
+    w.configs
+        .iter()
+        .any(|(n, v)| n == "core:lives" && *v == 1.0)
+}
+
+/// The name shown for choice `i` of the world screen: a game mode, or past them hardcore.
+fn mode_key(i: usize, modes: usize) -> String {
+    if i >= modes { "gamemode.hardcore".into() } else { format!("gamemode.{}", game_mode(i).name()) }
+}
+
+/// The `i`-th game mode, the engine's first.
+fn game_mode(i: usize) -> crate::world::GameMode {
+    crate::world::GameMode::all().nth(i).unwrap_or_default()
 }
 
 fn format_age(s: u64) -> String {
@@ -921,12 +1083,18 @@ fn format_age(s: u64) -> String {
     }
 }
 
-/// A new world: its name, seed, and its game rules that are toggles or choices (a mod's
-/// difficulty, mobs spawning) and have a name in the language files (not test switches), each a
-/// button that steps through its values; the rest keep their defaults and change with `/rule`.
-#[derive(Default)]
+/// A new world: its name and seed, the mode new players start in, whether its owner has commands,
+/// its rules (`ConfigScreen` over the world's settings, which start at their defaults here).
 pub struct CreateWorld {
-    rules: Rc<std::cell::RefCell<Vec<(String, f64)>>>,
+    mode: Rc<std::cell::Cell<usize>>,
+    cheats: Rc<std::cell::Cell<bool>>,
+}
+
+impl CreateWorld {
+    pub fn new() -> CreateWorld {
+        crate::config::load_world(&[]);
+        CreateWorld { mode: Rc::default(), cheats: Rc::new(std::cell::Cell::new(false)) }
+    }
 }
 
 impl Screen for CreateWorld {
@@ -935,75 +1103,55 @@ impl Screen for CreateWorld {
     }
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
-        use weft_abi::{config_kind as ck, config_scope};
-        let c = crate::content::content();
-        let defs: Vec<crate::config::ConfigDef> = c
-            .game
-            .configs
-            .iter()
-            .filter(|d| d.scope == config_scope::WORLD && matches!(d.kind, ck::BOOL | ck::CHOICE))
-            .filter(|d| cx.lang.has(&text::lang_key("config", &d.name)))
-            .cloned()
-            .collect();
-        {
-            let mut rules = self.rules.borrow_mut();
-            if rules.is_empty() {
-                *rules = defs.iter().map(|d| (d.name.clone(), d.default)).collect();
-            }
-        }
         frame(ui, cx, "world.create", |ui| {
             ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(260.0), |ui| {
                 label(ui, cx, "world.name", &[], "default");
-                // The default name in the player's language (it was "New World" in every one).
+                // The default name in the player's language (chiacraft; it was "New World" in every one).
                 let name = ui.add(Kind::input(cx.lang.get("world.default_name"), 32), Style::default().h(18.0).stretch());
                 ui.set_id(name, "name");
                 label(ui, cx, "world.seed", &[], "default");
                 let seed = ui.add(Kind::input("", 32), Style::default().h(18.0).stretch());
                 ui.set_id(seed, "seed");
-                for (i, d) in defs.iter().enumerate() {
-                    let key = text::lang_key("config", &d.name);
-                    let (kind, choices) = (d.kind, d.choices.clone());
-                    let (rules, rules2) = (self.rules.clone(), self.rules.clone());
-                    let b = ui.button(
-                        "button",
-                        Style::default().min_h(20.0).pad_xy(6.0, 4.0).stretch(),
-                        Rc::new(move |_: &mut Ctx| {
-                            let mut r = rules.borrow_mut();
-                            let v = r[i].1;
-                            r[i].1 = if kind == ck::BOOL { 1.0 - v } else { (v + 1.0) % choices.len().max(1) as f64 };
-                        }),
-                        |ui| {
-                            let choices = d.choices.clone();
-                            ui.text_bound(
-                                "button",
-                                Box::new(move |_: &Ctx| {
-                                    let v = rules2.borrow()[i].1;
-                                    let shown = if kind == ck::BOOL {
-                                        crate::screens::on_off(v != 0.0)
-                                    } else {
-                                        Arg::Key(format!("{key}.{}", choices.get(v as usize).cloned().unwrap_or_default()))
-                                    };
-                                    ("settings.config_value".into(), vec![Arg::Key(key.clone()), shown])
-                                }),
-                            );
-                        },
-                    );
-                    ui.set_id(b, &format!("rule_{}", d.name));
-                }
             });
-            let rules = self.rules.clone();
+            // Every game mode, then hardcore: survival with one life and no cheats.
+            let modes = crate::world::GameMode::all().count();
+            let (mode, shown, cheats) = (self.mode.clone(), self.mode.clone(), self.cheats.clone());
+            bound_button(
+                ui,
+                260.0,
+                move || ("world.game_mode".into(), vec![Arg::Key(mode_key(shown.get(), modes))]),
+                move |_| {
+                    let next = (mode.get() + 1) % (modes + 1);
+                    mode.set(next);
+                    // Creative and spectator come with cheats, as vanilla's.
+                    let m = game_mode(next);
+                    cheats.set(next < modes && (m == crate::world::GameMode::CREATIVE || m == crate::world::GameMode::SPECTATOR));
+                },
+            );
+            let (cheats, shown) = (self.cheats.clone(), self.cheats.clone());
+            bound_button(ui, 260.0, move || ("world.cheats".into(), vec![on_off(shown.get())]), move |_| cheats.set(!cheats.get()));
+            button(ui, cx, "world.rules", &[], 260.0, |c| c.requests.push(Request::Screen("core:world_rules".into())));
             ui.container(Style::row().gap(6.0), |ui| {
+                let (mode, cheats) = (self.mode.clone(), self.cheats.clone());
                 let create_button = button(ui, cx, "world.create", &[], 120.0, move |c| {
                     let name = c.input_text("name").unwrap_or_default();
                     let seed = parse_seed(&c.input_text("seed").unwrap_or_default());
                     let name = if name.trim().is_empty() { "World".to_string() } else { name.trim().to_string() };
-                    let mut world = create(&c.settings.saves_dir(), &name, seed);
-                    world.configs = rules.borrow().clone();
-                    world.save();
-                    c.requests.push(Request::StartWorldAnyway(world));
+                    let mut meta = create(&c.settings.saves_dir(), &name, seed);
+                    let modes = crate::world::GameMode::all().count();
+                    let hardcore = mode.get() >= modes;
+                    if hardcore {
+                        if let Some(lives) = crate::config::by_name("core:lives") {
+                            crate::config::set(lives, 1.0);
+                        }
+                    }
+                    let picked = if hardcore { crate::world::GameMode::SURVIVAL } else { game_mode(mode.get()) };
+                    (meta.game_mode, meta.cheats, meta.configs) = (picked, cheats.get() && !hardcore, crate::config::world_values());
+                    meta.save();
+                    c.requests.push(Request::StartWorldAnyway(meta));
                 });
                 ui.set_id(create_button, "create");
-                button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
             });
         });
     }

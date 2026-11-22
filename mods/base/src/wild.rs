@@ -3,7 +3,7 @@
 //! Tufts and mats grazed down (a bitten look) grow back, bushes ripen their fruit through four
 //! stages, fruit and seed heads ripen in their season (a ripe look), mushrooms and water hyacinth spread near the old ones, kelp
 //! grows up towards the surface, the rest stand. What picking one gives plants it again. Plants of
-//! the bed stand in the water (`holds_liquid`): breaking one leaves the water. `worldgen.rs` puts
+//! the bed stand in the water (`shares_cell_with("#water")`): breaking one leaves the water. `worldgen.rs` puts
 //! them where they grow.
 
 use std::sync::OnceLock;
@@ -47,7 +47,7 @@ pub fn register(r: &mut Registry) {
             Ground::Water => b.needs_below("#water"),
             Ground::Bed => b
                 .needs_below(if p.form == Form::Column { "#kelp_soil" } else { "#water_bed" })
-                .holds_liquid(),
+                .shares_cell_with("#water"),
         };
         let full = p.block;
         // Spreading plants come up in the shade too (mushrooms), and the bed's under water that
@@ -146,20 +146,20 @@ pub fn register(r: &mut Registry) {
                 };
                 table = table.pool(match ripe {
                     Some(ripe) => Pool::new()
-                        .when(Cond::BlockState(ripe))
+                        .when(Cond::state(ripe))
                         .entry(Entry::item(gives).count(3, 3)),
                     None => Pool::new().entry(Entry::item(gives)),
                 });
             }
             if let Some(chance) = fibre {
-                table.pool(Pool::new().when(Cond::Chance(chance)).item("plant_fibre"));
+                table.pool(Pool::new().when(Cond::chance(chance)).item("plant_fibre"));
             }
         }
     }
     flowers(r);
     // A plant of the bed (eelgrass, kelp) is set only into water, where it goes in with the water
-    // (`.holds_liquid()`), as the world grows it; never on dry ground.
-    r.intercept(&actions::PLACE_BLOCK, |a| {
+    // (`.shares_cell_with("#water")`), as the world grows it; never on dry ground.
+    r.before_event(&actions::PLACE_BLOCK, |a| {
         let name = block_name(a.state()).split('[').next().unwrap_or("");
         let bed = wild::of(name).is_some_and(|p| p.ground == Ground::Bed);
         if bed && !WATER.at(&a.world(), a.pos()) { Verdict::Deny } else { Verdict::Abstain }
@@ -264,7 +264,7 @@ pub fn upper_of(s: u32, roll: f32) -> Option<u32> {
 }
 
 /// A column's growth step (kelp): one more on top while it is still a block below the surface.
-/// It goes into the water source there as a part of its cell (`.holds_liquid()`), which keeps the
+/// It goes into the water source there as a part of its cell (`.shares_cell_with("#water")`), which keeps the
 /// water; `set_block` would put it in place of the water.
 fn grow_up(e: &mut BlockEvent) {
     let w = e.world();

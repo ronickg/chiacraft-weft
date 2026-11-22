@@ -741,11 +741,11 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(mix(0.3, 0.15, wet), mix(1.0, 0.85, wet), dist));
         // The rainbow stands in the falling rain under the clouds, in front of them: drawn in the sky
         // alone, the shower's clouds hid it (the after-rain check from under the clouds, 11-05).
-        // Rain's mist between the eye and the cloud, as over the land (`rain_depth`), toward the
+        // Rain's mist between the eye and the cloud, as over the land (`wet_depth`), toward the
         // colour the land's mist takes: from the vista, 14 blocks under a storm's deck, all of it in
         // view was near and dark over land kilometres off and fully misted, and the two met in a hard
         // line at the horizon (fading by the deck's reach alone could not close it).
-        let misted = 1.0 - exp(-rain_depth(length(rel)));
+        let misted = 1.0 - exp(-wet_depth(length(rel)));
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
         // A lightning flash glows inside the deck; its bolt hangs under the deck, in front of it.
         color += lightning_in_clouds(dir) * albedo + lightning_bolt(dir);

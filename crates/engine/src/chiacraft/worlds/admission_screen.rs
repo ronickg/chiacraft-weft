@@ -164,7 +164,7 @@ impl Screen for Admission {
                         use crate::chiacraft::worlds::listing;
                         label(ui, cx, "listing.title", &[], "default");
                         let listed = dir.as_deref().and_then(listing::load);
-                        let deposit = listing::txch(cx.settings.listing_deposit());
+                        let deposit = listing::txch(crate::settings::listing_deposit());
                         match &listed {
                             Some(l) if l.confirmed => label(ui, cx, "listing.is_listed", &[Arg::Text(listing::txch(l.amount))], "dim"),
                             Some(_) => label(ui, cx, "listing.is_pending", &[], "dim"),
@@ -199,7 +199,7 @@ impl Screen for Admission {
                     // Players here now, and anyone else by name, key or DID.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
                         label(ui, cx, "admission.screen.players", &[], "default");
-                        let me = cx.settings.name();
+                        let me = crate::settings::name();
                         let here: Vec<String> = cx
                             .client
                             .map(|c| c.players.clone())

@@ -49,14 +49,15 @@ pub fn register(r: &mut Registry) {
         .tag("dowsing_rods")
         .tab(&crate::tabs::TOOLS);
     // A forked branch lashed with cordage, a tektite (star glass, the ancients' own) at its tip.
-    r.shapeless(&base_api::CRAFTING, "dowsing_rod", 1, &["#stick", "#stick", "#string", "#tektite"], 0);
+    r.shapeless(&base_api::recipes::CRAFTING, "dowsing_rod", 1, &["#stick", "#stick", "#string", "#tektite"], 0);
     r.block(&LEY_STONE)
         .sound_group("stone")
         .hardness(2.5)
-        .mineable("pickaxe")
-        .needs_tool_level(0)
+        .mined_by("pickaxe", 0)
         .on_use(crate::waystones::stone_used)
-        .textures("ley_stone_top", "ley_stone_side", "ley_stone_top")
+        .texture("ley_stone_side")
+        .top("ley_stone_top")
+        .bottom("ley_stone_top")
         .tag("ley_stone")
         .tab(&crate::tabs::BUILDING);
     // Not to be carried off: waking it (later) is what it is for.
@@ -64,7 +65,9 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .unbreakable()
         .on_use(crate::waystones::stone_used)
-        .textures("waystone_top", "waystone_side", "ley_stone_top")
+        .texture("waystone_side")
+        .top("waystone_top")
+        .bottom("ley_stone_top")
         .tag("waystones")
         .tab(&crate::tabs::BUILDING);
     r.particle(&MOTE)
@@ -82,9 +85,9 @@ pub fn register(r: &mut Registry) {
         .category(&sound_categories::PLAYERS)
         .pitch(0.95, 1.05);
     r.entity_component(&SEED, [0; 3], component_flags::SYNC_OWNER);
-    r.attach(&PLAYER, &SEED);
+    r.edit(&PLAYER).attach(&SEED);
     r.entity_component(&base_api::LEY_SIGHT, 0.0, component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN);
-    r.attach(&PLAYER, &base_api::LEY_SIGHT);
+    r.edit(&PLAYER).attach(&base_api::LEY_SIGHT);
     r.world_tick(hand_seed);
     r.decoration(waystones).dimension(&crate::OVERWORLD);
     r.client_frame(frame);
@@ -179,7 +182,7 @@ pub(crate) fn sees_lines(c: &Client) -> bool {
     let view = c.view();
     let me = view.player();
     let rod = DOWSING_ROD.id();
-    let holding = rod != u32::MAX && (c.held_item(me, Hand::Main) == rod || c.held_item(me, Hand::Off) == rod);
+    let holding = rod != u32::MAX && (c.held(me, Hand::Main).item == rod || c.held(me, Hand::Off).item == rod);
     holding || view.component(&base_api::LEY_SIGHT).unwrap_or(0.0) > 0.0
 }
 
@@ -413,7 +416,7 @@ fn frame(c: &Client) {
     let Some([lo, hi, here]) = view.component(&SEED) else { return };
     let me = view.player();
     let rod = DOWSING_ROD.id();
-    let holding = rod != u32::MAX && (c.held_item(me, Hand::Main) == rod || c.held_item(me, Hand::Off) == rod);
+    let holding = rod != u32::MAX && (c.held(me, Hand::Main).item == rod || c.held(me, Hand::Off).item == rod);
     let sight = view.component(&base_api::LEY_SIGHT).unwrap_or(0.0);
     if here == 0 || (!holding && sight <= 0.0) {
         s.dip = 0.0;

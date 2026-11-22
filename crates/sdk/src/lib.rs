@@ -3,22 +3,29 @@
 pub use weft_abi as abi;
 
 pub mod ai;
-mod cache;
 pub mod camera;
 pub mod client;
 mod component;
 pub mod riding;
 pub mod shape;
 pub mod shapes;
-pub mod signal;
+
 pub use weft_noise as noise;
 mod command;
+pub mod comps;
 mod config;
 mod content;
+pub mod editor;
 mod effects;
+pub mod environment;
+pub use environment::{ENVIRONMENT, Environment, EnvironmentValues};
+mod entry;
 mod extend;
 pub mod facing;
+mod feature;
 mod game;
+mod generation;
+mod out;
 mod show;
 pub mod terrain;
 mod ui;
@@ -26,25 +33,28 @@ mod view;
 mod world;
 
 pub use abi::{
-    BlockPos, EntitySize, Holder, ItemStack, OpenMenu, Rect, UV_FROM_BOX, UV_NO_FACE, Vec3, Who, air_flags, held_keys, hud_anchor,
-    tool_tier,
+    BlockPos, Blocking, EmbeddedProjectile, EntitySize, Holder, ItemStack, OpenMenu, ProjectileCatch, Rect, UV_FROM_BOX, UV_NO_FACE, Vec3,
+    Who, air_flags, held_keys, hitbox_part, hitbox_part_id, hud_anchor, tool_tier,
 };
-pub use cache::ColumnCache;
-pub use camera::{Shot, cameras, easing, shot};
-pub use client::{BiomeAir, Channel, Client, Hand, Packet, Payload, keys, launch_option, screens};
+pub use camera::{CameraFrame, Shot, cameras, easing, shot};
+pub use client::{BiomeAir, Channel, Client, DisplaySource, Hand, Packet, Payload, keys, launch_option, screens};
 pub use command::{ClientCommand, Command, CommandOptions, ServerCommand};
 pub use component::*;
 pub use config::*;
 pub use content::*;
 pub use effects::*;
 pub use extend::*;
-pub use facing::{Dir, Facings, Toward};
+pub use facing::{Dir, Facings, Orientation, Toward};
+pub use feature::*;
 pub use game::*;
+pub use generation::Generation;
+pub use out::{Drawing, Output};
 pub use riding::{Exit, RiderRules, Seat, Steering, steer};
-pub use shape::{EntityFilter, Fill, Filter, Shape};
+pub use shape::{EntityFilter, Fill, Shape};
 pub use show::{ChatFormat, Show, TextPlaceBuilder, text_places};
 pub use ui::*;
 pub use view::View;
+pub use weft_noise::cache::ColumnCache;
 pub use world::*;
 
 use std::ffi::c_void;
@@ -112,12 +122,21 @@ macro_rules! trace { ($($t:tt)*) => { $crate::__log_macro!($crate::abi::log_leve
 /// ```ignore
 /// weft_sdk::declare_mod!(deps: ["base"], init: init);
 /// ```
+///
+/// `deps` are needed: without one the mod is off. `after` and `before` only order it among mods
+/// that are there, the later one's edits winning where two change one thing:
+///
+/// ```ignore
+/// weft_sdk::declare_mod!(deps: ["base"], after: ["othermod"], before: [], init: init);
+/// ```
 #[macro_export]
 macro_rules! declare_mod {
-    (deps: [$($dep:literal),* $(,)?], init: $init:path $(,)?) => {
+    (deps: [$($dep:literal),* $(,)?], $(after: [$($after:literal),* $(,)?],)? $(before: [$($before:literal),* $(,)?],)? init: $init:path $(,)?) => {
         #[unsafe(no_mangle)]
         pub extern "C" fn weft_mod() -> *const $crate::abi::ModDecl {
             static DEPS: &[$crate::abi::Str] = &[$($crate::abi::Str::new($dep)),*];
+            static AFTER: &[$crate::abi::Str] = &[$($($crate::abi::Str::new($after)),*)?];
+            static BEFORE: &[$crate::abi::Str] = &[$($($crate::abi::Str::new($before)),*)?];
             unsafe extern "C" fn __weft_init(
                 host: *const $crate::abi::Host,
                 me: $crate::abi::ModId,
@@ -130,6 +149,8 @@ macro_rules! declare_mod {
                 id: $crate::abi::Str::new(env!("CARGO_CRATE_NAME")),
                 version: $crate::abi::Str::new(env!("CARGO_PKG_VERSION")),
                 deps: $crate::abi::Slice::new(DEPS),
+                after: $crate::abi::Slice::new(AFTER),
+                before: $crate::abi::Slice::new(BEFORE),
                 init: __weft_init,
             };
             &DECL
@@ -143,7 +164,7 @@ pub unsafe fn __init(host: *const Host, me: ModId, reg: *mut abi::Registrar, id:
     ME.store(me.0, Ordering::Relaxed);
     let _ = MOD_ID.set(id);
     install_panic_hook();
-    let mut r = Registry { raw: reg, ns: id };
+    let mut r = Registry { raw: reg, ns: id, derived: Vec::new() };
     REGISTRAR.store(reg, Ordering::Relaxed);
     let result = guard(|| f(&mut r));
     REGISTRAR.store(std::ptr::null_mut(), Ordering::Relaxed);
@@ -163,12 +184,6 @@ pub(crate) fn reg_mistake(message: &str) {
 /// Texture folders: an asset name never starts with one of them, the call already picks it.
 const TEXTURE_FOLDERS: [&str; 5] = ["block", "item", "entity", "gui", "particle"];
 
-/// Every asset argument goes through here. The call implies a folder (`block`, `item`, `entity`,
-/// `gui`, `particle`, or one of the asset kinds that have their own root: sounds, models,
-/// animations, shaders): `"x"` is that folder of this mod, `"other:x"` the same folder of mod
-/// `other`, and subfolders are fine (`"armor/iron_1"`). Leaving the folder (`"block/x"` for an
-/// item, `..`, an absolute path) is a load error. Gives `ns:folder/path` (or `ns:path` for an
-/// empty folder).
 /// Whether texture `name` (`beauty_of_nature:block/log_oak_inner`, or without a namespace this
 /// mod's) is in its mod's files: to make something of every mod's logs only where they have the
 /// picture for it. Resource packs don't count; they are each player's.
@@ -182,7 +197,20 @@ pub fn asset_exists(name: &str, kind: &str, ext: &str) -> bool {
     unsafe { (host().asset_exists)(abi::Str::new(&full), abi::Str::new(kind), abi::Str::new(ext)) != 0 }
 }
 
+/// Every asset argument goes through here. The call implies a folder (`block`, `item`, `entity`,
+/// `gui`, `particle`, or one of the asset kinds that have their own root: sounds, models,
+/// animations, shaders): `"x"` is that folder of this mod, `"other:x"` the same folder of mod
+/// `other`, and subfolders are fine (`"armor/iron_1"`). Leaving the folder (`"block/x"` for an
+/// item, `..`, an absolute path) is a load error. Gives `ns:folder/path` (or `ns:path` for an
+/// empty folder).
 pub(crate) fn asset(folder: &str, name: &str) -> String {
+    if matches!(folder, "block" | "item") && name.contains([' ', '#', '@']) {
+        return abi::map_layer_names(name, |layer| asset(folder, layer));
+    }
+    // Said of the source by a block made of others, the engine fills it in (`{source.side}`).
+    if name.contains("{source") {
+        return name.to_string();
+    }
     let (ns, path) = name.split_once(':').unwrap_or((mod_id(), name));
     if let Err(why) = asset_check(folder, ns, path) {
         let shown = if folder.is_empty() { String::new() } else { format!(" in {folder}/") };
@@ -264,6 +292,18 @@ pub(crate) fn full_name(name: &str) -> String {
 pub(crate) fn qualify(ns: &str, name: &str) -> String {
     let base = name.split('[').next().unwrap_or(name);
     if name.starts_with('#') || base.contains(':') || name.is_empty() { name.to_string() } else { format!("{ns}:{name}") }
+}
+
+/// A block matcher with each name qualified (`qualify`), `!` kept: what every call taking
+/// "which blocks" sends.
+pub(crate) fn qualify_matcher(ns: &str, text: &str) -> String {
+    abi::matcher_terms(text)
+        .map(|t| match t.strip_prefix('!') {
+            Some(t) => format!("!{}", qualify(ns, t)),
+            None => qualify(ns, t),
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[cfg(test)]

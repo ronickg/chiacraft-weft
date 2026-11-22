@@ -2,7 +2,7 @@
 //! side by side, so a listed command always has one.
 
 use glam::{DVec3, IVec3};
-use weft_abi::{ItemStack, Who, damage_cause as damage};
+use weft_abi::{ItemStack, Who, damage_cause as damage, entry_kind as ek};
 
 use super::Server;
 use crate::commands::Args;
@@ -62,19 +62,25 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
     ("give", "<who:targets> <item:item> [count:int] | <item:item> [count:int]", give, p::GAME_MASTER),
     ("time", "set <time:time> | add <ticks:int> | query", time, p::GAME_MASTER),
     ("summon", "<entity:entity> [pos:pos] [count:int]", summon, p::GAME_MASTER),
-    // chiacraft: `/kill` as before Weft folded it into `/clear <targets>` (the crew's tests and
-    // scripts use it).
+    // chiacraft: `/kill` as before Weft folded it into `/clear entity <targets>` (the crew's
+    // tests and scripts use it).
     ("kill", "[who:targets]", kill, p::GAME_MASTER),
-    ("clear", "[who:targets] | [item:item]", clear, p::GAME_MASTER),
+    ("clear", " | item <who:targets> [filter:item] | item [filter:item] | entity <who:targets>", clear, p::GAME_MASTER),
     ("setblock", "<pos:pos> <block:block>", set_block, p::GAME_MASTER),
     ("insert", "<pos:pos> <item:item> [count:int]", insert, p::GAME_MASTER),
     ("block", "<pos:pos>", block, p::GAME_MASTER),
     ("gamemode", "<mode:word(#core:game_modes)> [who:targets]", game_mode, p::GAME_MASTER),
     ("heal", "[who:targets]", heal, p::GAME_MASTER),
+    (
+        "effect",
+        "give <who:targets> <effect:word(#core:effects)> [seconds:int(infinite)] [level:int] | clear <who:targets> [effect:word(#core:effects)]",
+        effect,
+        p::GAME_MASTER,
+    ),
     ("tick", "query | rate <tps:int> | freeze | unfreeze | step [ticks:int] | sprint <ticks:int>", tick, p::ADMIN),
     ("regions", "", regions, p::GAME_MASTER),
     ("seed", "", seed, p::GAME_MASTER),
-    ("weather", "<weather:word(#core:weathers)> [ticks:int]", weather, p::GAME_MASTER),
+    ("weather", "vary | default | <weather:word(#core:weathers)> [ticks:int]", weather, p::GAME_MASTER),
     ("op", "<who:targets> [level:int]", op, p::ADMIN),
     ("deop", "<who:targets>", deop, p::ADMIN),
     ("rule", "[name:word(#core:rules)] [value:word]", rule, p::ADMIN),
@@ -87,6 +93,12 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
     ("say", "<text:text>", say_all, p::GAME_MASTER),
     ("msg", "<who:player> <text:text>", whisper, p::EVERYONE),
     ("tellraw", "<who:targets> <text:text>", tellraw, p::GAME_MASTER),
+    (
+        "structure",
+        "save <name:word> <from:pos> <to:pos> | load <name:word> [pos:pos] [transform:int] | undo | locate <name:word> [radius:int]",
+        structure,
+        p::GAME_MASTER,
+    ),
     // chiacraft: admission rules and bans (`server::admission`).
     ("ban", "<who:word> [reason:text]", super::admission::ban, p::ADMIN),
     ("tempban", "<who:word> <time:word> [reason:text]", super::admission::tempban, p::ADMIN),
@@ -114,6 +126,85 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
         p::ADMIN,
     ),
 ];
+
+/// Most blocks `/structure save` takes at once.
+const MOST_SAVED: i64 = 1 << 22;
+
+/// `/structure`: a box of the world saved to `structures/<name>.json` beside the saves, a
+/// template or a saved file placed (turned by `transform`, `abi::transform`), the last placing
+/// undone, the nearest start of a feature found.
+fn structure(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    let (c, a, dim) = (x.c, x.a, x.me.0);
+    let name = a.text("name").unwrap_or("");
+    if a.get("save").is_some() {
+        let (Some(from), Some(to)) = (a.pos("from"), a.pos("to")) else { return Vec::new() };
+        let (lo, hi) = (from.floor().as_ivec3().min(to.floor().as_ivec3()), from.floor().as_ivec3().max(to.floor().as_ivec3()));
+        let size = hi - lo + IVec3::ONE;
+        if size.x as i64 * size.y as i64 * size.z as i64 > MOST_SAVED || name.is_empty() || name.contains(['/', '\\', '.', ':']) {
+            return say("structure.bad", vec![text(name)]);
+        }
+        let Some(dir) = s.structures_dir() else { return say("structure.no_folder", Vec::new()) };
+        let Some(parts) = s.dims[dim as usize]
+            .region_at(lo)
+            .and_then(|r| r.capture(0, c, lo, hi))
+        else {
+            return say("not_loaded", Vec::new());
+        };
+        let file = dir.join(format!("{name}.json"));
+        let written = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&file, crate::template::write_json(size, &parts)));
+        return match written {
+            Ok(()) => say("structure.saved", vec![text(name), int(parts.blocks.len())]),
+            Err(e) => say("structure.not_saved", vec![text(&e.to_string())]),
+        };
+    }
+    if a.get("load").is_some() {
+        let at = a.pos("pos").unwrap_or(x.here).floor().as_ivec3();
+        let t = crate::template::Transform::new(a.int("transform").unwrap_or(0).clamp(0, 7) as u32);
+        let file_def;
+        let def = match c.game.catalog.ids(ek::TEMPLATE).get(name) {
+            Some(&t) => &c.templates[t as usize],
+            None => {
+                let Some(path) = s.structures_dir().map(|d| d.join(format!("{name}.json"))) else {
+                    return say("structure.unknown", vec![text(name)]);
+                };
+                let parts = match crate::template::read_file(&path) {
+                    Ok(p) => p,
+                    Err(_) => return say("structure.unknown", vec![text(name)]),
+                };
+                let mut errors = Vec::new();
+                file_def = crate::template::TemplateDef::from_parts(name, parts, |b| c.parse_state(b), &mut errors);
+                for e in errors {
+                    log::warn!("/structure load: {e}");
+                }
+                &file_def
+            }
+        };
+        return match s.dims[dim as usize].region_at(at) {
+            Some(r) => match r.place_template(0, c, def, at, t, None) {
+                Some(_) => say("structure.placed", vec![text(name)]),
+                None => say("not_loaded", Vec::new()),
+            },
+            None => say("not_loaded", Vec::new()),
+        };
+    }
+    if a.get("undo").is_some() {
+        let at = x.here.floor().as_ivec3();
+        let Some(r) = s.dims[dim as usize].region_at(at) else { return say("not_loaded", Vec::new()) };
+        return match r.last_placing() {
+            Some(id) if r.unplace(0, c, id) => say("structure.undone", Vec::new()),
+            _ => say("structure.nothing", Vec::new()),
+        };
+    }
+    let radius = a.int("radius").unwrap_or(4096).clamp(1, 1 << 16) as i32;
+    let seed = s.dims[dim as usize].seed();
+    match crate::features::nearest(c, dim, seed, name, x.here.floor().as_ivec3(), radius) {
+        Some(p) => {
+            let coords = Msg::template(&format!("{{link:suggest:/tp {} {} {}}}[{}, {}, {}]{{/link}}", p.x, p.y, p.z, p.x, p.y, p.z));
+            say("structure.found", vec![text(name), Arg::Msg(coords)])
+        }
+        None => say("structure.none", vec![text(name), int(radius)]),
+    }
+}
 
 fn title(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     use weft_abi::show_place as place;
@@ -161,7 +252,7 @@ fn title(s: &mut Server, x: &Ctx) -> Vec<Msg> {
 }
 
 fn say_all(s: &mut Server, x: &Ctx) -> Vec<Msg> {
-    let name = s.players[x.pi].name.clone();
+    let name = s.players[x.pi].identity.name.clone();
     let line = Msg::new("chat.say", vec![Arg::Text(name), text(x.a.text("text").unwrap_or(""))]);
     s.show(Who::All, Shown::chat(line));
     Vec::new()
@@ -170,8 +261,15 @@ fn say_all(s: &mut Server, x: &Ctx) -> Vec<Msg> {
 fn whisper(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let said = text(x.a.text("text").unwrap_or(""));
     let to = x.a.text("who").unwrap_or("");
-    let Some(target) = s.players.iter().find(|p| p.name == to).map(|p| p.entity) else { return Vec::new() };
-    let name = s.players[x.pi].name.clone();
+    let Some(target) = s
+        .players
+        .iter()
+        .find(|p| p.identity.name == to)
+        .map(|p| p.entity)
+    else {
+        return Vec::new();
+    };
+    let name = s.players[x.pi].identity.name.clone();
     let heard = Msg::new("chat.whisper", vec![Arg::Text(name), said.clone()]);
     s.show(Who::Player(target), Shown { from: Shown::PLAYER, ..Shown::chat(heard) });
     vec![Msg::new("chat.whisper_to", vec![text(to), said])]
@@ -299,40 +397,41 @@ fn summon(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     }
     let r = s.dims[me.0 as usize].ensure_region(c, pos);
     for _ in 0..count {
-        r.spawn(c, kind, pos);
+        r.spawn_by(0, c, kind, pos, weft_abi::spawn_cause::COMMAND, |_| {});
     }
     say("summon.done", vec![int(count), text(&kname)])
 }
 
-/// `/clear <targets>`: kills them. `/clear [item]`: empties the player's own inventory, or only
-/// the stacks of `item`.
-/// `/kill [targets]`: kills them, or the player.
+/// `/kill [targets]`: kills them, or the player (chiacraft).
 fn kill(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let c = x.c;
     let who = x.targets(s, "who");
     for &(d, id) in &who {
         if let Some(r) = s.dims[d as usize].entity_region(id) {
-            r.damage(c, id, f32::MAX, 0, damage::VOID);
+            r.damage(0, c, id, &weft_abi::Damage::new(f32::MAX, damage::VOID));
         }
     }
     say("clear.killed", vec![int(who.len())])
 }
 
 fn clear(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    if x.a.get("item").is_none() && x.a.get("entity").is_none() {
+        return weather(s, x);
+    }
     let c = x.c;
-    if x.a.get("who").is_some() {
-        let who = x.targets(s, "who");
+    let who = x.targets(s, "who");
+    if x.a.get("entity").is_some() {
         for &(d, id) in &who {
             if let Some(r) = s.dims[d as usize].entity_region(id) {
-                r.damage(c, id, f32::MAX, 0, damage::VOID);
+                r.damage(0, c, id, &weft_abi::Damage::new(f32::MAX, damage::VOID));
             }
         }
         return say("clear.killed", vec![int(who.len())]);
     }
-    let (d, id) = x.me;
-    let filter = x.a.id("item");
+    let filter = x.a.id("filter");
     let mut total: u64 = 0;
-    if let Some(r) = s.dims[d as usize].entity_region(id) {
+    for (d, id) in who {
+        let Some(r) = s.dims[d as usize].entity_region(id) else { continue };
         let slots = r.entities.inventories.get(&id).map_or(0, Vec::len) as u32;
         for slot in 0..slots {
             let stack = r.entities.inventory_slot(id, slot);
@@ -354,7 +453,7 @@ fn set_block(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     }
     match s.dims[dim as usize].region_at(p) {
         Some(r) => {
-            r.set(c, p, state);
+            r.set(0, c, p, state);
             say("setblock.done", vec![Arg::Name(Name::Block(state))])
         }
         None => say("not_loaded", Vec::new()),
@@ -366,7 +465,7 @@ fn insert(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let (Some(p), Some(item)) = (block_at(a), a.id("item")) else { return Vec::new() };
     let count = a.int("count").unwrap_or(1).clamp(1, 1 << 20) as u32;
     match s.dims[dim as usize].region_at(p) {
-        Some(r) => match r.anchored(p) {
+        Some(r) => match r.anchored(0, p) {
             Some(owner) => {
                 let left = r
                     .entities
@@ -412,16 +511,20 @@ fn weather(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     if !x.c.dims[d.id as usize].has_weather() {
         return say("weather.none", Vec::new());
     }
-    let named = x.a.text("weather").unwrap_or("");
-    let names = &x.c.game.weather_names;
+    if x.a.get("vary").is_some() || x.a.get("default").is_some() {
+        d.set_manual_weather(None, 0);
+        return say("weather.done", Vec::new());
+    }
+    let named = x.a.text("weather").unwrap_or("clear");
+    let names = x.c.game.catalog.ids(ek::WEATHER);
     let Some(&w) = names
         .get(named)
         .or_else(|| names.get(&format!("core:{named}")))
     else {
         return say("weather.unknown", vec![text(named)]);
     };
-    let ticks = x.a.int("ticks").map_or(12000, |t| t.max(1) as u64);
-    d.set_manual_weather(w as u16, ticks);
+    let ticks = x.a.int("ticks").map_or(u64::MAX, |t| t.max(1) as u64);
+    d.set_manual_weather(Some(w as u16), ticks);
     say("weather.done", Vec::new())
 }
 
@@ -435,7 +538,7 @@ fn set_level(s: &mut Server, x: &Ctx, level: u32) -> Vec<Msg> {
     for (_, id) in x.targets(s, "who") {
         if let Some(pi) = s.players.iter().position(|p| p.joined && p.entity == id) {
             s.set_permission(pi, level);
-            lines.extend(say("op.done", vec![text(&s.players[pi].name), int(level)]));
+            lines.extend(say("op.done", vec![text(&s.players[pi].identity.name), int(level)]));
         }
     }
     lines
@@ -456,7 +559,7 @@ fn heal(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let c = x.c;
     for (d, id) in x.targets(s, "who") {
         if let Some(r) = s.dims[d as usize].entity_region(id) {
-            let max = r.max_health(c, id);
+            let max = r.max_health(0, c, id);
             if let Some(e) = r.entities.get_mut(id) {
                 if e.alive() {
                     e.health = max;
@@ -465,6 +568,54 @@ fn heal(s: &mut Server, x: &Ctx) -> Vec<Msg> {
         }
     }
     say("heal.done", Vec::new())
+}
+
+/// `/effect give`: an effect for 30 seconds (or `infinite`) at level 1 unless said; `/effect clear`: all of them,
+/// or the one named. Short names do when only one mod has that effect.
+fn effect(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    let c = x.c;
+    let named = x.a.text("effect");
+    let names = c.game.catalog.ids(ek::ENTITY_EFFECT);
+    let found = named.map(|n| {
+        names.get(n).copied().or_else(|| {
+            let mut short = names
+                .iter()
+                .filter(|(k, _)| k.rsplit(':').next() == Some(n));
+            match (short.next(), short.next()) {
+                (Some((_, &id)), None) => Some(id),
+                _ => None,
+            }
+        })
+    });
+    if let (Some(n), Some(None)) = (named, found) {
+        return say("effect.unknown", vec![text(n)]);
+    }
+    let one = found.flatten();
+    let give = x.a.get("give").is_some();
+    // A day of seconds and level 255 at most, as vanilla's amplifier.
+    let ticks = match x.a.text("seconds") {
+        Some(_) => weft_abi::INFINITE_TICKS,
+        None => x.a.int("seconds").map_or(30, |t| t.clamp(0, 1_000_000)) as u32 * crate::world::TPS,
+    };
+    let level = x.a.int("level").map_or(1, |l| l.clamp(1, 255)) as u32;
+    let comp = c.game.fields.effect;
+    for (d, id) in x.targets(s, "who") {
+        let Some(r) = s.dims[d as usize].entity_region(id) else { continue };
+        match (give, one) {
+            (true, Some(e)) => r.give_effect(0, c, id, e, level, ticks),
+            (false, _) => {
+                let on: Vec<u32> = crate::world::effects_on(r.entities.comps.get(&(id, comp)).map(|b| &b[..]), r.time)
+                    .map(|f| f.id)
+                    .filter(|&f| one.is_none_or(|o| o == f))
+                    .collect();
+                for e in on {
+                    r.give_effect(0, c, id, e, 1, 0);
+                }
+            }
+            _ => {}
+        }
+    }
+    say(if give { "effect.given" } else { "effect.cleared" }, Vec::new())
 }
 
 /// Vanilla's `/tick`: the world's speed, frozen with steps, or a sprint through many ticks as fast
@@ -539,6 +690,10 @@ fn rule(_s: &mut Server, x: &Ctx) -> Vec<Msg> {
         return say("rule.unknown", vec![text(name)]);
     };
     if let Some(typed) = a.text("value") {
+        // A world made with its rules locked keeps them.
+        if crate::config::get(c.game.rules_locked) != 0.0 {
+            return say("rule.locked", Vec::new());
+        }
         let Some(v) = d.read(typed) else {
             let (name, typed) = (text(&d.name), text(typed));
             return match d.kind {

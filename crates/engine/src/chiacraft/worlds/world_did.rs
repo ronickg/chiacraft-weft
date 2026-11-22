@@ -92,7 +92,7 @@ pub fn get(settings: &crate::settings::Settings, dir: PathBuf, identity: Arc<cra
         let owner = session
             .did()
             .ok_or("get your own DID first (Account screen)")?;
-        let network = crate::chiacraft::chain::network(&settings.chain())?;
+        let network = crate::chiacraft::chain::network(&crate::settings::chain())?;
         let address = session
             .first_puzzle_hash()
             .map(|ph| chain::address(Bytes32::from(ph), network))
@@ -102,7 +102,7 @@ pub fn get(settings: &crate::settings::Settings, dir: PathBuf, identity: Arc<cra
             key: key_hex(&identity),
             generation: identity.cert.generation,
         };
-        let sponsors = settings.sponsors();
+        let sponsors = crate::settings::sponsors();
         if sponsors.is_empty() {
             return Err("no DID sponsor is set (setting core:sponsors)".into());
         }
@@ -162,7 +162,7 @@ pub fn list(settings: &crate::settings::Settings, dir: PathBuf) {
 /// chain first, then for the spend to show.
 fn list_now(settings: &crate::settings::Settings, dir: &Path, mut d: WorldDid) -> Result<(), String> {
     let session = chiacraft_account::current().ok_or("no account is open")?;
-    let network = crate::chiacraft::chain::network(&settings.chain())?;
+    let network = crate::chiacraft::chain::network(&crate::settings::chain())?;
     let world = Bytes32::from(hex32(&d.launcher).ok_or("a damaged did.json")?);
     let owner = Bytes32::from(hex32(&d.owner).ok_or("a damaged did.json")?);
     let reader = crate::chiacraft::chain::reader(settings)?;

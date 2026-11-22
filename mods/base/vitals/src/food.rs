@@ -392,6 +392,29 @@ pub const FOODS: &[Food] = &[
         poison: 0.0,
         category: Category::Fruit,
     },
+    // Upstream Weft's berries (11-22 sync, kept until Ronald's call), picked from their bushes by
+    // hand: its raspberry as our raspberries; its snowberry (Symphoricarpos) as a handful of white
+    // berries that upset the stomach (saponins): no poison, but a one-in-two chance of sickness.
+    Food {
+        name: "base:raspberry",
+        grams: 100.0,
+        per100: per(85.8, 1.2, 5.4, 0.7, 6.5, 26.2),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (2.0, 2.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    Food {
+        name: "base:snowberry",
+        grams: 50.0,
+        per100: per(84.2, 0.7, 12.1, 0.3, 2.4, 9.7),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (2.0, 2.0),
+        poison: 0.5,
+        category: Category::Fruit,
+    },
     // Black huckleberries (USDA's wild blueberries stand in) and beach plums (USDA's plums stand
     // in, the wild fruit tarter), a handful each.
     Food {
@@ -604,6 +627,29 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (3.0, 3.0),
         poison: 1.0,
+        category: Category::Fungi,
+    },
+    // Upstream Weft's forest mushrooms (11-22 sync, kept until Ronald's call): its toadstool as our
+    // red one, poisonous; the dryad's saddle (a polypore, too tough raw) cooked, as cooked white
+    // mushrooms (USDA, boiled), a 75 g shelf.
+    Food {
+        name: "base:toadstool",
+        grams: 50.0,
+        per100: per(92.4, 3.1, 3.3, 0.3, 1.0, 2.1),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (3.0, 3.0),
+        poison: 1.0,
+        category: Category::Fungi,
+    },
+    Food {
+        name: "base:cooked_dryads_saddle",
+        grams: 75.0,
+        per100: per(91.1, 2.2, 5.3, 0.5, 2.2, 4.0),
+        meal: Meal::Cooked,
+        raw: false,
+        keeps: (2.0, 2.0),
+        poison: 0.0,
         category: Category::Fungi,
     },
     // Wild meat (the animals mod's, `animals_core::meat`), from USDA rows: venison (deer, raw;

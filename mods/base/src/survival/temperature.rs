@@ -30,7 +30,7 @@ static HUD_ROOM: HudElement = HudElement::named("room");
 
 pub fn register(r: &mut Registry) {
     r.entity_component(&ROOM, Shelter { wall: 0, gain: 0 }, component_flags::SYNC_OWNER);
-    r.attach(&PLAYER, &ROOM);
+    r.edit(&PLAYER).attach(&ROOM);
     // "Sheltered · log walls, +18 °C" (over the air outside), under the vitals' bars while in a room.
     r.hud_element(&HUD_ROOM, hud_anchor::TOP_LEFT, 8, |ui| {
         // One line, wide enough not to wrap (in a narrow top-left column it broke a letter a line).

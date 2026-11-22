@@ -42,8 +42,7 @@ pub fn register(r: &mut Registry) {
         r.block(block)
             .sound_group("stone")
             .hardness(3.0)
-            .mineable("pickaxe")
-            .needs_tool_level(tool_tier::STONE)
+            .mined_by("pickaxe", tool_tier::STONE)
             .drops(&format!("raw_{metal}"), 1)
             .tag("ores")
             .tag(&format!("ores/{metal}"))
@@ -64,15 +63,26 @@ pub const VEINS: [(&str, &str, i32, u32, u32); 7] = [
 ];
 
 /// The ores in worldgen (`worldgen.rs`, with the others, left out where they'd touch a cave).
+/// Each row is its own feature: a feature name is registered once, so the rows past an ore's
+/// first are named `copper_ore/<biome>` (`copper_ore/deep` for the one anywhere).
 pub fn ores(r: &mut Registry) {
+    let mut seen: Vec<&str> = Vec::new();
     for (metal, biome, max_y, veins, size) in VEINS {
         let block = if metal == "copper" { &COPPER_ORE } else { &TIN_ORE };
-        let o = r
-            .ore(block)
+        let first = !seen.contains(&metal);
+        seen.push(metal);
+        let o = r.ore(block);
+        let o = if first {
+            o
+        } else {
+            let place = if biome.is_empty() { "deep" } else { biome };
+            o.named(&format!("{metal}_ore/{place}"))
+        };
+        let o = o
             .y(i32::MIN, max_y)
-            .veins(veins)
+            .per_cube(veins)
             .vein_size(size)
-            .replace("#stone_ore_replaceables");
+            .replaces("#stone_ore_replaceables");
         // A biome tag is written `#cold`.
         drop(if biome.is_empty() { o } else { o.biome(&format!("#{biome}")) });
     }

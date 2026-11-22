@@ -7,6 +7,7 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use weft_abi::entry_kind as entries;
 
 use crossbeam_channel::{Receiver, Sender};
 use glam::IVec3;
@@ -150,16 +151,22 @@ fn steps(w: &mut Vec<i32>, e: &Expr, seed: u64) -> (i32, i32) {
 }
 
 /// `describe` for distant terrain, with what steep faces need (`d::FACE_FALL`) and the
-/// dimension's scattered things (trees) after it (`d::SCATTER_OFF` points there): per scatter
-/// its cell, reach, hash seed, biome count and thinning (`ScatterThin`: its mask's place and
-/// length, keep), the mask's steps, then per biome the chance as a threshold on the site's bits
-/// (`dim::scatter_site`'s test, exactly), whether the thinning applies there and the crowns its
-/// shape callback makes there (`crown_of`), each site drawn with one of them; then the ground it
-/// stands on (`ScatterDef::ground`) as state ranges (count, then first and count each), none for
-/// any.
+/// dimension's scattered things (trees) after it (`d::SCATTER_OFF` points there): its grid
+/// features drawn by a plan in the vegetation stage (`far_trees`). Per feature its spacing as the
+/// cell, reach, hash seed (`seed ^ salt`), biome count and thinning (`features::Thin`: its mask's
+/// place and length, keep), the mask's steps, then per biome the chance as a threshold on the
+/// start's bits (`features::grid_site`'s test, exactly; 0 where the feature's biomes leave it
+/// out), whether the thinning applies there and the crowns its plan makes there (`crown_of`),
+/// each site drawn with one of them; then the ground it stands on (`Fit::ground`) as state ranges
+/// (count, then first and count each), none for any.
 ///
-/// The crowns come from sample runs of the shape on real ground spread over the world: a run at
+/// The crowns come from sample runs of the plan on real ground spread over the world: a run at
 /// one spot only said what that spot allowed (a clearing, a rock face), for every site.
+///
+/// chiacraft: a far site is where `features::grid_site` puts the start (`grid_position` with the
+/// whole spacing as room, a plan having no footprint), so far and near trees stand on the same
+/// spots. What the far sites don't see: the `y` range, `max_slope`, and the higher-priority
+/// features that keep a start out (`start_at`'s separation, structures).
 pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize>)> {
     let (mut w, custom) = describe(c, dim, seed)?;
     let def = &c.dims[dim as usize];
@@ -169,9 +176,11 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
         .and_then(|t| t.faces)
         .map_or(i32::MAX, |f| f.fall);
     w[d::SCATTER_OFF as usize] = w.len() as i32;
-    w.push(def.scatters.len() as i32);
+    let trees: Vec<usize> = (0..def.features.len())
+        .filter(|&fi| far_trees(&def.features[fi]))
+        .collect();
+    w.push(trees.len() as i32);
     let biomes = c.biomes.len().max(1);
-    let mut buf = vec![weft_abi::ScatterBlock { offset: [0; 3].into(), state: 0, force: 0 }; 4096];
     // Where the sample runs stand: spread over some 20 km, on the ground there.
     let spots: Vec<[i32; 3]> = (0..RUN_SPOTS as i32)
         .filter_map(|k| {
@@ -180,20 +189,20 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
             (col.height != i32::MIN).then_some([x, col.height + 1, z])
         })
         .collect();
-    for sc in &def.scatters {
-        let key = seed ^ sc.salt;
-        w.extend_from_slice(&[sc.cell, sc.reach, key as u32 as i32, (key >> 32) as u32 as i32, biomes as i32]);
+    for &fi in &trees {
+        let f = &def.features[fi];
+        let crate::features::Spread::Grid { spacing, chance } = f.spread else { continue };
+        let key = seed ^ f.salt;
+        w.extend_from_slice(&[spacing, f.reach[0], key as u32 as i32, (key >> 32) as u32 as i32, biomes as i32]);
         let head = w.len();
         w.extend_from_slice(&[0, 0, 0]);
-        if let Some(t) = &sc.thin {
+        if let Some(t) = &f.thin {
             let (start, len) = steps(&mut w, t.mask.expr(), seed);
             (w[head], w[head + 1], w[head + 2]) = (start, len, t.keep as i32);
         }
         for b in 0..biomes as u32 {
-            let density = sc
-                .density
-                .and_then(|d| c.components.get::<f32>(crate::components::BIOME, b, d))
-                .unwrap_or(0.0);
+            let allowed = f.biome.as_ref().is_none_or(|set| crate::refs::has(set, b));
+            let density = if allowed { chance.in_biome(c, b) } else { 0.0 };
             let threshold = (density as f64 * (1u64 << 53) as f64).ceil() as u64;
             // Each run's crown, with its top for sorting.
             let mut runs: Vec<(i32, [u32; 2])> = Vec::new();
@@ -201,28 +210,16 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
                 if threshold == 0 || runs.len() >= RUNS {
                     break;
                 }
-                let mut args = weft_abi::ScatterArgs {
-                    seed,
-                    dim,
-                    pos: pos.into(),
-                    biome: b,
-                    random: weft_noise::mix(k as u64),
-                    out: buf.as_mut_ptr(),
-                    cap: buf.len() as u32,
-                    len: 0,
-                };
-                if !crate::host::invoke(sc.owner, sc.shape, &mut args) {
+                let pos = IVec3::from_array(pos);
+                let transform = f.transforms.first().copied().unwrap_or_default();
+                let Some(start) = crate::features::make_start(c, def, dim, seed, fi, pos, b, weft_noise::mix(k as u64), transform) else {
                     continue;
-                }
-                let blocks = &buf[..(args.len as usize).min(buf.len())];
-                if let Some(run) = crown_of(blocks) {
+                };
+                if let Some(run) = crown_of(&run_blocks(&start, pos)) {
                     runs.push(run);
                 }
             }
-            let thinned = sc.thin.as_ref().is_some_and(|t| {
-                t.biomes
-                    .is_none_or(|comp| c.components.has(crate::components::BIOME, b, comp))
-            });
+            let thinned = f.thin.as_ref().is_some_and(|t| t.applies_in(c, b));
             let mut entry = [0i32; words::SCATTER_BIOME as usize];
             if !runs.is_empty() {
                 (entry[0], entry[1], entry[2]) = (threshold as u32 as i32, (threshold >> 32) as u32 as i32, thinned as i32);
@@ -238,16 +235,75 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
             }
             w.extend_from_slice(&entry);
         }
-        w.push(sc.ground.len() as i32);
-        for &b in &sc.ground {
-            let bd = &c.blocks[b as usize];
-            w.extend_from_slice(&[bd.first_state as i32, bd.states as i32]);
+        let ground = f.fit.ground.map_or(Vec::new(), |m| state_runs(c, m));
+        w.push(ground.len() as i32);
+        for (first, count) in ground {
+            w.extend_from_slice(&[first as i32, count as i32]);
         }
     }
     Some((w, custom))
 }
 
-/// Sample runs of a scatter's shape per biome for its crowns, and the spots tried for them.
+/// chiacraft: whether distant terrain draws a feature's starts as far trees: one on a grid drawn
+/// by a plan in the vegetation stage (`r.scatter(..).plan(..)`: trees, boulders, shrubs), as our
+/// scatters were. Structures and villages are not.
+fn far_trees(f: &crate::features::FeatureDef) -> bool {
+    matches!(f.spread, crate::features::Spread::Grid { .. })
+        && matches!(f.shape, crate::features::Shape::Plan(..))
+        && f.stage == weft_abi::stage::VEGETATION
+}
+
+/// chiacraft: what a sample start put, relative to where it stands (`crown_of`): its blocks and
+/// fills (a fill's cells, up to 4096); templates and vein cells, which trees don't use, are left
+/// out.
+fn run_blocks(start: &crate::features::Start, pos: IVec3) -> Vec<RunBlock> {
+    use crate::features::Put;
+    let mut out = Vec::new();
+    for p in &start.puts {
+        match p {
+            Put::Block { at, state, force } => out.push(RunBlock { offset: *at - pos, state: *state, force: *force as u32 }),
+            Put::Fill { lo, hi, state, .. } => {
+                for y in lo.y..=hi.y {
+                    for z in lo.z..=hi.z {
+                        for x in lo.x..=hi.x {
+                            if out.len() >= 4096 {
+                                return out;
+                            }
+                            out.push(RunBlock { offset: IVec3::new(x, y, z) - pos, state: *state, force: 1 });
+                        }
+                    }
+                }
+            }
+            Put::Cells(_) | Put::Piece(_) => {}
+        }
+    }
+    out
+}
+
+/// chiacraft: the states matcher `m` takes, as runs (first, count), for the far sites' ground test.
+fn state_runs(c: &Content, m: u32) -> Vec<(u32, u32)> {
+    let mut out: Vec<(u32, u32)> = Vec::new();
+    for s in 0..c.states.len() as u32 {
+        if !c.matchers.has(m, s) {
+            continue;
+        }
+        match out.last_mut() {
+            Some((first, count)) if *first + *count == s => *count += 1,
+            _ => out.push((s, 1)),
+        }
+    }
+    out
+}
+
+/// A block a sample run put (`crown_of`): where, relative to the site, which state, and whether
+/// it was forced over what was there.
+struct RunBlock {
+    offset: glam::IVec3,
+    state: u32,
+    force: u32,
+}
+
+/// Sample runs of a feature's plan per biome for its crowns, and the spots tried for them.
 const RUNS: usize = 16;
 const RUN_SPOTS: usize = 48;
 
@@ -255,9 +311,9 @@ const RUN_SPOTS: usize = 48;
 /// top: its crown, of the block it puts most into air (a tree's leaves; else the one it forces
 /// most, a boulder's stone, as none at all was air, drawn violet), and the trunk under it. None
 /// when it put nothing.
-fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
+fn crown_of(blocks: &[RunBlock]) -> Option<(i32, [u32; 2])> {
     use layout::crown as cr;
-    let commonest = |forced: bool, keep: &dyn Fn(&weft_abi::ScatterBlock) -> bool| {
+    let commonest = |forced: bool, keep: &dyn Fn(&RunBlock) -> bool| {
         let mut n = rustc_hash::FxHashMap::<u32, u32>::default();
         for b in blocks
             .iter()
@@ -271,13 +327,13 @@ fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
     // logs (a 2x2 trunk 30 high is 120 of them) outnumbered its leaves, and far off it stood as a
     // crown of logs from the ground up, a bare pillar (Far view, 11-05: the far forests' pillars).
     let high = blocks.iter().map(|b| b.offset.y).max()?;
-    let upper = |b: &weft_abi::ScatterBlock| 2 * b.offset.y >= high;
+    let upper = |b: &RunBlock| 2 * b.offset.y >= high;
     let leaves = commonest(false, &upper).or_else(|| commonest(true, &|_| true))?;
     let crown: Vec<_> = blocks.iter().filter(|b| b.state == leaves).collect();
     let top = crown.iter().map(|b| b.offset.y).max()?;
     let bottom = crown.iter().map(|b| b.offset.y).min()?.clamp(0, top);
     // Out from the trunk at a layer, and at all.
-    let out = |b: &&weft_abi::ScatterBlock| ((b.offset.x * b.offset.x + b.offset.z * b.offset.z) as f32).sqrt();
+    let out = |b: &&RunBlock| ((b.offset.x * b.offset.x + b.offset.z * b.offset.z) as f32).sqrt();
     let width = |y: i32| {
         crown
             .iter()
@@ -297,9 +353,7 @@ fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
     let round =
         if radius < 0.5 || top == widest { 15 } else { ((width((widest + top + 1) / 2) / radius * 15.0).round() as i32).clamp(1, 15) };
     // The trunk: what stands under the crown at its middle, as wide as it is at the bottom.
-    let under = |b: &weft_abi::ScatterBlock| {
-        b.state != leaves && b.offset.x.abs() <= 3 && b.offset.z.abs() <= 3 && (0..bottom).contains(&b.offset.y)
-    };
+    let under = |b: &RunBlock| b.state != leaves && b.offset.x.abs() <= 3 && b.offset.z.abs() <= 3 && (0..bottom).contains(&b.offset.y);
     let trunk = commonest(false, &under).or_else(|| commonest(true, &under));
     let trunk_width = trunk.map_or(0, |t| {
         let low = blocks
@@ -405,10 +459,12 @@ impl Readback {
 pub struct GpuTerrain {
     pipeline: Option<PipelineId>,
     lod_pipeline: Option<PipelineId>,
+    pub far_lod_pipeline: Option<PipelineId>,
     rx: Receiver<Job>,
     queue: VecDeque<Job>,
     /// Distant terrain tiles asked for (`lod::Lod`).
     pub lod_tx: Sender<super::lod::LodJob>,
+    pub lod_shader: Option<u64>,
     lod_rx: Receiver<super::lod::LodJob>,
     lod_queue: VecDeque<super::lod::LodJob>,
     slots: Vec<Slot>,
@@ -421,25 +477,64 @@ pub struct GpuTerrain {
     pub on: Arc<AtomicBool>,
 }
 
+/// The terrain's pipelines: label and entry point.
+const PIPELINES: [(&str, &str); 2] = [("terrain", "generate"), ("terrain lod", "lod")];
+const FAR_LOD_PIPELINE: (&str, &str) = ("far terrain lod", "lod_far");
+
+// chiacraft: our far terrain (`client::lod`) stays ours until an A/B against upstream's; its
+// `lod_far` entry (GPU coarse terrain) isn't in our `terrain.wgsl`, so the pipeline isn't made.
+// SYNC: upstream's far LOD (`lod_far`, `world_render::far_lod`) comes back with the LOD A/B.
+fn far_lod_enabled() -> bool {
+    false
+}
+
 impl GpuTerrain {
+    /// Its pipelines compiled ahead on another thread (`Backend::precompile`), from the title
+    /// screen on: a phone's driver needs most of a minute for them the first time.
+    pub fn precompile(gpu: &mut dyn Backend, assets: &crate::assets::Assets) {
+        if !enabled() {
+            return;
+        }
+        match Self::shader(assets) {
+            Ok(s) => {
+                for (label, entry) in PIPELINES
+                    .into_iter()
+                    .chain(far_lod_enabled().then_some(FAR_LOD_PIPELINE))
+                {
+                    gpu.precompile(&ComputeDesc { label, shader: &s, entry });
+                }
+            }
+            Err(e) => log::error!("terrain shader: {e}"),
+        }
+    }
+
+    // Not a shader packs may replace: it has to make the CPU's blocks exactly.
+    fn shader(assets: &crate::assets::Assets) -> Result<weft_render::Shader, String> {
+        crate::packs::engine_shader(assets, "terrain.wgsl", &layout::prelude()).map_err(|e| e.0)
+    }
+
     pub fn new(gpu: &mut dyn Backend, assets: &crate::assets::Assets, rx: Receiver<Job>, on: Arc<AtomicBool>) -> GpuTerrain {
-        // Not a shader packs may replace: it has to make the CPU's blocks exactly.
-        let pipelines = crate::packs::engine_shader(assets, "terrain.wgsl", &layout::prelude())
-            .map_err(|e| e.0)
-            .and_then(|s| {
-                let terrain = gpu
-                    .create_compute(&ComputeDesc { label: "terrain", shader: &s, entry: "generate" })
-                    .map_err(|e| e.0)?;
-                let lod = gpu
-                    .create_compute(&ComputeDesc { label: "terrain lod", shader: &s, entry: "lod" })
-                    .map_err(|e| e.0)?;
-                Ok((terrain, lod))
+        let pipelines = Self::shader(assets).and_then(|s| {
+            let [terrain, lod] = PIPELINES.map(|(label, entry)| {
+                gpu.create_compute(&ComputeDesc { label, shader: &s, entry })
+                    .map_err(|e| e.0)
             });
-        let (pipeline, lod_pipeline) = match pipelines {
-            Ok((p, l)) => (Some(p), Some(l)),
+            let (terrain, lod) = (terrain?, lod?);
+            let far = far_lod_enabled()
+                .then(|| {
+                    let (label, entry) = FAR_LOD_PIPELINE;
+                    gpu.create_compute(&ComputeDesc { label, shader: &s, entry })
+                        .map_err(|e| log::warn!("far LOD compute: {e}"))
+                        .ok()
+                })
+                .flatten();
+            Ok((terrain, lod, far, s.hash))
+        });
+        let (pipeline, lod_pipeline, far_lod_pipeline, lod_shader) = match pipelines {
+            Ok((p, l, far, hash)) => (Some(p), Some(l), far, Some(hash)),
             Err(e) => {
                 log::error!("terrain on the GPU unavailable, generating on the CPU: {e}");
-                (None, None)
+                (None, None, None, None)
             }
         };
         on.store(pipeline.is_some() && enabled(), Ordering::Relaxed);
@@ -447,9 +542,11 @@ impl GpuTerrain {
         GpuTerrain {
             pipeline,
             lod_pipeline,
+            far_lod_pipeline,
             rx,
             queue: VecDeque::new(),
             lod_tx,
+            lod_shader,
             lod_rx,
             lod_queue: VecDeque::new(),
             slots: Vec::new(),
@@ -472,7 +569,7 @@ impl GpuTerrain {
                 gpu.destroy_buffer(b);
             }
         }
-        for p in [self.pipeline.take(), self.lod_pipeline.take()]
+        for p in [self.pipeline.take(), self.lod_pipeline.take(), self.far_lod_pipeline.take()]
             .into_iter()
             .flatten()
         {
@@ -528,6 +625,7 @@ impl GpuTerrain {
         }
         let stride = 4 + custom * SAMPLES;
         let mut jobs = vec![0i32; batch.len() * stride];
+        log::debug!(target: "load", "lod dispatch {} tiles", batch.len());
         for (i, j) in batch.iter().enumerate() {
             let r = i * stride;
             let o = j.key.origin();
@@ -579,7 +677,7 @@ impl GpuTerrain {
                         .map(|(i, job)| (job, back.cube(i).to_vec()))
                         .collect();
                     drop(back);
-                    crate::server::dim::warm_scatters(content(), made[0].0.dim, made[0].0.seed, x, z);
+                    crate::features::warm(content(), made[0].0.dim, made[0].0.seed, x, z);
                     for (job, words) in made {
                         crate::client_terrain().spawn(move || finish(job, unpack(&words)));
                     }
@@ -642,21 +740,15 @@ impl GpuTerrain {
 }
 
 fn unpacking() -> &'static rayon::ThreadPool {
-    static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
-    POOL.get_or_init(|| {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(4)
-            .thread_name(|i| format!("terrain unpack {i}"))
-            .start_handler(|_| crate::lower_priority())
-            .build()
-            .expect("terrain unpack pool")
-    })
+    static POOL: crate::Pool = crate::Pool::new();
+    crate::pool(&POOL, "terrain unpack", 4, true)
 }
 
 fn enabled() -> bool {
     let c = content();
     c.game
-        .config_names
+        .catalog
+        .ids(entries::CONFIG)
         .get("core:terrain_gpu")
         .is_none_or(|&id| crate::config::get(id) != 0.0)
 }
@@ -664,7 +756,8 @@ fn enabled() -> bool {
 fn checking() -> bool {
     let c = content();
     c.game
-        .config_names
+        .catalog
+        .ids(entries::CONFIG)
         .get("core:terrain_check")
         .is_some_and(|&id| crate::config::get(id) != 0.0)
 }
@@ -720,7 +813,7 @@ fn finish(job: Job, (blocks, biomes, cols): Unpacked) {
         let biome_differs = (0..256).find(|&i| cube.biome(i % 16, i / 16) != want.biome(i % 16, i / 16));
         // Light too, against the way it was done before (lit as it will be below).
         let mut lit = cube.clone();
-        area::catch_up(c, &job.edits, job.pos, &mut lit);
+        area::catch_up(&job.edits, job.pos, &mut lit);
         let mut old = lit.clone();
         crate::world::light::prelight(c, &mut lit, c.dims[job.dim as usize].sky_light);
         crate::world::light::prelight_reference(c, &mut old, c.dims[job.dim as usize].sky_light);

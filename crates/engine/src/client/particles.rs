@@ -6,8 +6,9 @@
 
 use std::collections::VecDeque;
 
+use crate::tag_bits::particle as pf;
 use glam::{DVec3, IVec3, Vec3};
-use weft_abi::{ParticleBurst, particle_flags as pf};
+use weft_abi::ParticleBurst;
 use weft_render::*;
 
 use super::textures::GameTextures;
@@ -340,48 +341,44 @@ impl Particles {
         if !pos.is_finite() {
             return;
         }
-        // Block dust shows the block's side texture (a box model's first box's).
+        // Dust uses the side's base layer, with that layer's own tint.
         let looks = super::looks::current();
-        let side = |s: &crate::content::StateInfo| {
-            let d = looks.drawn(b.block as u32, s);
-            match d.boxes.first() {
-                Some(b) if d.model == weft_abi::BlockModel::Boxes => b.textures[1],
-                // A piece of wire shows its dot, red: the picture has no color of its own.
-                _ if d.model == weft_abi::BlockModel::Wire => d.textures[3],
-                _ => d.textures[1],
-            }
-        };
         let dust = c
             .states
             .get(b.block as usize)
             .filter(|_| k.frames.is_empty());
-        let layer = dust.map_or(0, side);
+        // The biome's tint now (a mod's, `set_biome_tints`: the season's leaves), as its blocks
+        // are drawn (chiacraft).
+        let biome_color = |kind: u8, biome: Option<u16>| {
+            biome
+                .zip(kind.checked_sub(1))
+                .and_then(|(b, k)| world.biome_tint(b as u32, k as u32))
+                .unwrap_or_else(|| c.kind_color(kind, biome))
+        };
+        let biome_here = || {
+            let p = pos.floor().as_ivec3();
+            world
+                .cube(p >> 4i32)
+                .map(|cube| cube.biome((p.x & 15) as usize, (p.z & 15) as usize))
+        };
         // A kind with pictures of its own colored like its block (a leaf off its tree) takes the
-        // block's tint on whichever face it has it.
+        // block's tint on whichever face it has it (chiacraft).
         let tinted_like = c
             .states
             .get(b.block as usize)
             .filter(|s| k.flags & pf::BLOCK_TINT != 0 && !k.frames.is_empty() && s.tint != 0);
-        // Only if the side it shows is a tinted one: grass blocks' sides are dirt with a tinted
-        // overlay, and their dust stays brown like vanilla's. Wire's picture is gray, its red
-        // comes from its power when drawn: dust takes vanilla's wire at middling power.
-        let dust_tint = if dust.is_some_and(|s| s.model == weft_abi::BlockModel::Wire) {
-            0xC8_1414
-        } else {
-            dust.filter(|s| s.tint != 0 && s.tint_faces & 2 != 0)
-                .or(tinted_like)
-                .map_or(0xFF_FFFF, |s| {
-                    let p = pos.floor().as_ivec3();
-                    let biome = world
-                        .cube(p >> 4i32)
-                        .map_or(0, |cube| cube.biome((p.x & 15) as usize, (p.z & 15) as usize));
-                    // The biome's tint now (a mod's, `set_biome_tints`: the season's leaves),
-                    // as its blocks are drawn.
-                    world
-                        .biome_tint(biome as u32, s.tint as u32 - 1)
-                        .unwrap_or_else(|| crate::content::item_tint(s.tint))
-                })
-        };
+        let (layer, dust_tint) = dust.map_or((0, tinted_like.map_or(0xFF_FFFF, |s| biome_color(s.tint, biome_here()))), |s| {
+            let d = looks.drawn(b.block, s);
+            let (tex, dir) = match d.boxes.first() {
+                Some(b) if d.model == weft_abi::BlockModel::Boxes => (b.textures[1], 1),
+                _ if d.model == weft_abi::BlockModel::Wire => (d.textures[3], 3),
+                _ => (d.textures[1], 1),
+            };
+            let layer = super::mesher::face_layers(c, s, tex & crate::gpu_layout::face::TEX_MASK, dir)[0];
+            // Wire's gray picture takes the color of wire at middling power.
+            let tint = if d.model == weft_abi::BlockModel::Wire { 0xC8_1414 } else { biome_color(layer.tint, biome_here()) };
+            (layer.tex, tint)
+        });
         let tint = multiply(dust_tint, b.color & 0xFF_FFFF);
         // Drawn apart by how they blend and kept apart by how long they live; bursts beyond
         // what there is room for are dropped.
@@ -413,7 +410,8 @@ impl Particles {
             let piece = [(self.random() * 12.0) as u8, (self.random() * 12.0) as u8];
             let at = pos + off.as_dvec3();
             // A block can still be here on this client: the news of it going come separately.
-            let through = k.flags & pf::COLLIDE != 0 && crate::physics::collides(c, &|p| world.block_or_air(p), particle_box(at));
+            let through = k.flags & pf::COLLIDE != 0
+                && crate::physics::collides(c, &super::world::SeenCells { world, air_if_missing: false }, particle_box(at));
             // Born in a liquid is no going into one.
             let middle = (at + DVec3::Y * 0.1).floor().as_ivec3();
             // Where no cube has come yet (just after a teleport) the block is `u32::MAX`: no liquid.

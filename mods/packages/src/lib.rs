@@ -158,9 +158,13 @@ fn block(r: &mut Registry, id: &str, d: &BlockDef, code: Option<&std::sync::Arc<
     if let Some(f) = &d.textures {
         let side = f.side.clone().unwrap_or_else(|| id.to_string());
         let pick = |face: &Option<String>| face.clone().unwrap_or_else(|| side.clone());
-        // -X, +X, -Y, +Y, -Z, +Z
-        let faces = [pick(&f.west), pick(&f.east), pick(&f.bottom), pick(&f.top), pick(&f.north), pick(&f.south)];
-        b = b.faces(faces.each_ref().map(String::as_str));
+        b = b
+            .west(&pick(&f.west))
+            .east(&pick(&f.east))
+            .bottom(&pick(&f.bottom))
+            .top(&pick(&f.top))
+            .north(&pick(&f.north))
+            .south(&pick(&f.south));
     }
     if let Some(h) = d.hardness {
         b = b.hardness(h);
@@ -175,10 +179,10 @@ fn block(r: &mut Registry, id: &str, d: &BlockDef, code: Option<&std::sync::Arc<
         b = b.sound_group(&sound_group(s));
     }
     if let Some(m) = &d.mineable {
-        b = b.mineable(m);
+        b = b.mined_by(m, weft_sdk::abi::tool_tier::HAND);
     }
     if let Some(l) = d.tool_level {
-        b = b.needs_tool_level(l);
+        b = b.set(&weft_sdk::HARVEST_LEVEL, l);
     }
     match &d.drops {
         Some(Drops::Name(n)) if n == "nothing" => b = b.drops_nothing(),
@@ -230,10 +234,7 @@ fn item(r: &mut Registry, id: &str, d: &ItemDef, code: Option<&std::sync::Arc<sa
         i = i.durability(n);
     }
     if let Some(t) = &d.tool {
-        i = i.tool(t);
-    }
-    if let Some(l) = d.tool_level {
-        i = i.tool_level(l);
+        i = i.tool(t, d.tool_level.unwrap_or(0));
     }
     if let Some(s) = d.mining_speed {
         i = i.mining_speed(s);

@@ -51,6 +51,8 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:crowberries | fruit | 100 | 10 | 1 | 7 | 1 | 5 | 85 | 6 min | 10 + 10 | cooling |
 | base:cherry | fruit | 100 | 10 | 1 | 14 | 0 | 3 | 82 | 6 min | 3 + 3 | cooling |
 | base:raspberries | fruit | 100 | 10 | 1 | 5 | 1 | 9 | 86 | 5 min | 2 + 2 | cooling |
+| base:raspberry | fruit | 100 | 10 | 1 | 5 | 1 | 9 | 86 | 5 min | 2 + 2 | cooling |
+| base:snowberry | fruit | 50 | 5 | 0 | 6 | 0 | 2 | 42 | 3 min | 2 + 2 | cooling |
 | base:huckleberries | fruit | 100 | 10 | 1 | 12 | 0 | 3 | 84 | 5 min | 5 + 5 | cooling |
 | base:beach_plums | fruit | 100 | 10 | 1 | 10 | 0 | 2 | 87 | 5 min | 5 + 5 | cooling |
 | base:prickly_pear_fruit | fruit | 100 | 10 | 1 | 6 | 0 | 5 | 88 | 5 min | 7 + 7 | cooling |
@@ -70,6 +72,8 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:cooked_wild_rice | seeds | 150 | 15 | 6 | 29 | 0 | 3 | 111 | 12 min | 3 + 3 | hot when cooked |
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
+| base:toadstool | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
+| base:cooked_dryads_saddle | fungi | 75 | 8 | 2 | 4 | 0 | 2 | 68 | 4 min | 2 + 2 | hot when cooked |
 | animals:venison | meat | 200 | 20 | 44 | 0 | 5 | 0 | 147 | 27 min | 2 + 2 | raw |
 | animals:cooked_venison | meat | 150 | 15 | 45 | 0 | 5 | 0 | 98 | 24 min | 4 + 4 | hot when cooked |
 | animals:hare | meat | 150 | 15 | 33 | 0 | 3 | 0 | 109 | 20 min | 2 + 2 | raw |
@@ -110,6 +114,7 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | base:crowberries (20) | base:dried_berries | - | - | 112 |
 | base:cherry (6) | base:dried_berries | - | - | 112 |
 | base:raspberries (4) | base:dried_berries | - | - | 112 |
+| base:raspberry (4) | base:dried_berries | - | - | 112 |
 | base:huckleberries (10) | base:dried_berries | - | - | 112 |
 | base:beach_plums (10) | base:dried_berries | - | - | 112 |
 | base:prickly_pear_fruit (14) | base:dried_berries | - | - | 112 |

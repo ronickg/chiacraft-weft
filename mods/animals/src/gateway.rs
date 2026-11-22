@@ -6,7 +6,7 @@
 //! world: through the gateway there if one is near, or a new one built where you arrive, so the
 //! way back is always open.
 
-use base_api::OVERWORLD;
+use base_api::dimensions::OVERWORLD;
 use weft_sdk::*;
 
 use crate::cretaceous::CRETACEOUS;
@@ -46,14 +46,13 @@ pub fn init(r: &mut Registry) {
     r.block(&AMBER_ORE)
         .sound_group("base:block.stone")
         .hardness(3.0)
-        .mineable("pickaxe")
-        .needs_tool_level(1)
+        .mined_by("pickaxe", 1)
         .drops("amber", 1)
         .tab(&NATURAL);
     r.block(&AMBER_BLOCK)
         .sound_group("base:block.glass")
         .hardness(1.5)
-        .mineable("pickaxe")
+        .mined_by("pickaxe", weft_sdk::abi::tool_tier::HAND)
         .light(4)
         .tab(&BUILDING)
         .on_use(|u| {
@@ -74,18 +73,20 @@ pub fn init(r: &mut Registry) {
     r.ore(&AMBER_ORE)
         .dimension(&OVERWORLD)
         .y(0, 64)
-        .veins(3)
+        .per_cube(3)
         .vein_size(4)
-        .replace("#stone_ore_replaceables");
+        .replaces("#stone_ore_replaceables");
+    // A feature name is registered once: the Cretaceous's seams are their own feature.
     r.ore(&AMBER_ORE)
+        .named("amber_ore/cretaceous")
         .dimension(&CRETACEOUS)
         .y(0, 80)
-        .veins(6)
+        .per_cube(6)
         .vein_size(5)
-        .replace("#stone_ore_replaceables");
+        .replaces("#stone_ore_replaceables");
 
     r.entity_component(&CROSSING, Crossing::default(), 0);
-    r.attach(&PLAYER, &CROSSING);
+    r.edit(&PLAYER).attach(&CROSSING);
     r.world_tick(cross);
 }
 

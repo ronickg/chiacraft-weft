@@ -73,15 +73,15 @@ const DUSK_BEFORE: f32 = 2.0;
 pub fn register(r: &mut Registry) {
     r.config(&SHOW).bool(true);
     r.entity_component(&SEEN, 0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
-    r.attach(&PLAYER, &SEEN);
+    r.edit(&PLAYER).attach(&SEEN);
     r.entity_component(&WAS_FREEZING, 0, 0);
-    r.attach(&PLAYER, &WAS_FREEZING);
+    r.edit(&PLAYER).attach(&WAS_FREEZING);
     r.entity_component(&NIGHT_SHOWN, u32::MAX, 0);
-    r.attach(&PLAYER, &NIGHT_SHOWN);
+    r.edit(&PLAYER).attach(&NIGHT_SHOWN);
     r.world_tick(watch);
     // A campfire built: the night hint has done its work (Ronald, 11-04: "Campfire keeps you
     // safe"; its light keeps monsters from spawning near it).
-    r.on(&actions::PLACE_BLOCK, |b| {
+    r.on_event(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
             if CAMPFIRE_TAG.on_block(c.state) {
@@ -90,7 +90,7 @@ pub fn register(r: &mut Registry) {
         }
     });
     // After dying: where the tombstone is, each time.
-    r.on(&PLAYER_RESPAWNED, |b| {
+    r.on_event(&PLAYER_RESPAWNED, |b| {
         let w = b.world();
         for p in b.iter() {
             if let Some(g) = w.component(p.player, &GRAVE).filter(|g| g.set != 0) {

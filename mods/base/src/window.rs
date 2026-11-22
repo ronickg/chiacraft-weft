@@ -13,7 +13,7 @@ const TAB_PAD: f32 = 2.0;
 pub type Tab = (&'static str, fn(&ClientView));
 
 /// The inventory's family of windows (the inventory, Stats, Advancements): other mods add tabs
-/// to them at this place (`r.screen_part(&Screen::named(FAMILY), "tabs", ..)`, a button of class
+/// to them at this place (`r.screen_part(&Menu::named(FAMILY), "tabs", ..)`, a button of class
 /// `tab`): the animals' Field Journal. A mod that isn't there adds none.
 pub const FAMILY: &str = "base:inventory";
 
@@ -58,7 +58,7 @@ fn framed(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], family: bool, bo
                     .size(7.0, 7.0)
                     .pad(0.5)
                     .tooltip("window.base.close_tip"),
-                |c| c.client().screen_close(),
+                |c| c.client().menu_close(),
             );
             ui.row(S::row().w(4.0), |_| {});
         });

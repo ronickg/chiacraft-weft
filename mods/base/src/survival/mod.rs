@@ -46,7 +46,7 @@ pub fn register(r: &mut Registry) {
         .world();
     // Gentle's grace: no monsters appear by themselves in a new world's first nights
     // (`Difficulty::grace_nights`, counted from the world's first day, `calendar::START_DAY`).
-    r.intercept(&question::NATURAL_SPAWN, |q| {
+    r.before_event(&question::NATURAL_SPAWN, |q| {
         static HOSTILE: Tag = Tag::named("hostile");
         let w = q.world();
         let nights = base_api::difficulty().grace_nights;
@@ -62,7 +62,7 @@ pub fn register(r: &mut Registry) {
         Vitals::new(MAX_AIR),
         component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
-    r.attach(&PLAYER, &VITALS);
+    r.edit(&PLAYER).attach(&VITALS);
     r.world_tick(tick);
     food::register(r);
     temperature::register(r);
@@ -70,7 +70,7 @@ pub fn register(r: &mut Registry) {
     body::register(r);
     // Dying empties the stomach but for a light meal (the one a new player arrives with: Research
     // round 4, H1, so the first death isn't a spiral), and costs part of the XP into the level.
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             let Some(v) = w.component_mut(d.entity, &VITALS) else { continue };

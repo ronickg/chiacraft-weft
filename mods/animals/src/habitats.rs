@@ -20,7 +20,7 @@ fn tag(biome: &str) -> String {
 /// The dimension species `s` lives in (`Species::cretaceous`): its spawn rules hold only there,
 /// though the overworld and the Cretaceous share their beaches and seas.
 pub fn world(s: &animals_core::species::Species) -> &'static str {
-    if s.cretaceous() { crate::cretaceous::CRETACEOUS.name() } else { base_api::OVERWORLD.name() }
+    if s.cretaceous() { crate::cretaceous::CRETACEOUS.name() } else { base_api::dimensions::OVERWORLD.name() }
 }
 
 pub fn init(r: &mut Registry) {
@@ -29,7 +29,7 @@ pub fn init(r: &mut Registry) {
     for s in &SPECIES {
         for &(biome, _) in s.habitats {
             if !tagged.contains(&biome) {
-                r.tag_on(Target::Biome(biome), &tag(biome));
+                r.edit(Biome::generated(biome.to_string())).tag(&tag(biome));
                 tagged.push(biome);
             }
             if s.in_water() {
@@ -37,7 +37,7 @@ pub fn init(r: &mut Registry) {
             }
             let (few, most) = s.bio.social.group();
             r.natural_spawn(s.kind)
-                .dimension(world(s))
+                .dimension(if s.cretaceous() { &crate::cretaceous::CRETACEOUS } else { &base_api::dimensions::OVERWORLD })
                 .biome(&format!("#{}", tag(biome)))
                 .ground(&format!("#{GROUND}"))
                 .light(7, 15)

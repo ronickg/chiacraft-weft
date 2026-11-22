@@ -60,7 +60,7 @@ fn say(w: &World, player: u64, key: &str, arg: &str) {
     w.send(player, &SAY, &format!("{key}\t{arg}"));
 }
 
-static SCREEN: Screen = Screen::named("portal");
+static SCREEN: weft_sdk::Menu = weft_sdk::Menu::named("portal");
 
 // ------------------------------------------------------------------ the engine's bridge
 
@@ -101,8 +101,8 @@ fn init(r: &mut Registry) {
                 "base"
             };
             let pad = "portal_pad";
+            // Turned to its facing by upstream's `.facing(..)` (the SDK's `turns`).
             let s = s
-                .oriented(p.orientation())
                 .hitbox([0.0, 0.0, 0.0], [16.0, 2.0, 16.0])
                 .model_box_faces([0.0, 0.0, 0.0], [16.0, 2.0, 16.0], [(pad, abi::UV_FROM_BOX); 6]);
             if state == "base" {
@@ -122,7 +122,7 @@ fn init(r: &mut Registry) {
             .model_box_faces([2.0, 34.0, 6.0], [14.0, 36.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
             .light(if state == "open" { 11 } else { 4 })
         })
-        .block_entity()
+        .entity(|e| e)
         .on_use(|u| {
             let (w, player, pos) = (u.world(), u.player(), u.pos());
             w.send(player, &OPEN, &menu_for(&w, player, [pos.x, pos.y, pos.z]));
@@ -130,7 +130,7 @@ fn init(r: &mut Registry) {
         });
     // The block's own block entity (`block_entity`, named like the block) holds the link.
     r.entity_component(&LINK, [0u8; 64], abi::component_flags::SAVE);
-    r.attach(&PORTAL_ENTITY, &LINK);
+    r.edit(&PORTAL_ENTITY).attach(&LINK);
 
     r.packet(&BIND, |p, text| bind(p, &text));
     r.packet(&ASKED, |p, text| asked(&p.world(), p.player(), &text));
@@ -964,7 +964,7 @@ fn guest(ui: &mut Ui, m: &Menu) {
                     .send(&ASKED, &format!("{pos}\t{id}\t{key}\t{label}")),
                 None => {}
             }
-            v.client().screen_close();
+            v.client().menu_close();
         });
     }
 }
@@ -1039,7 +1039,7 @@ static GO: Mutex<Option<String>> = Mutex::new(None);
 fn client(r: &mut Registry) {
     r.client_packet(&OPEN, |c, text| {
         *MENU.lock().unwrap() = Some(parse_menu(&text));
-        c.screen_open(&SCREEN);
+        c.menu_open(&SCREEN);
     });
     // A line for the player goes through a command of the mod's own, whose reply the client
     // shows in its own language.
@@ -1089,7 +1089,7 @@ fn client(r: &mut Registry) {
             cmd.reply(key, &[Arg::Text(arg)]);
         }
     });
-    r.screen(&SCREEN, |ui| {
+    r.menu(&SCREEN).screen(|ui| {
         let menu = MENU.lock().unwrap();
         let Some(m) = menu.as_ref() else { return };
         let wide = || S::default().w(280.0);
@@ -1118,7 +1118,7 @@ fn client(r: &mut Registry) {
                         let msg = format!("{id}\t{how}");
                         ui.button(key, wide(), move |v| {
                             v.client().send(&ANSWER, &msg);
-                            v.client().screen_close();
+                            v.client().menu_close();
                         });
                     }
                 }
@@ -1133,7 +1133,7 @@ fn client(r: &mut Registry) {
                     let key = if *new { "portals.to_new" } else { "portals.to" };
                     ui.button_args(key, &[Arg::Text(name)], wide(), move |v| {
                         v.client().send(&BIND, &msg);
-                        v.client().screen_close();
+                        v.client().menu_close();
                     });
                 }
                 if !m.friends.is_empty() {
@@ -1143,23 +1143,23 @@ fn client(r: &mut Registry) {
                     let msg = format!("{}\t{key}\t{inbox}\t{name}", m.pos);
                     ui.button_args("portals.to_friend", &[Arg::Text(name)], wide(), move |v| {
                         v.client().send(&FRIEND, &msg);
-                        v.client().screen_close();
+                        v.client().menu_close();
                     });
                 }
                 if m.leads_to.is_some() {
                     let msg = format!("{}\t", m.pos);
                     ui.button("portals.unbind", wide(), move |v| {
                         v.client().send(&BIND, &msg);
-                        v.client().screen_close();
+                        v.client().menu_close();
                     });
                 }
                 let (key, to) = if m.friends_ask { ("portals.friends_ask_on", "0") } else { ("portals.friends_ask_off", "1") };
                 ui.button(key, wide(), move |v| {
                     v.client().send(&FRIENDS_ASK, &to.to_string());
-                    v.client().screen_close();
+                    v.client().menu_close();
                 });
             }
-            ui.button("portals.close", wide(), |v| v.client().screen_close());
+            ui.button("portals.close", wide(), |v| v.client().menu_close());
         });
     });
 }

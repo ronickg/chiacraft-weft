@@ -1,6 +1,6 @@
 //! Sound: events (`registry::SoundDef`) play one of their files, positioned in the world or not;
-//! every category has its own volume (`core:volume_*` settings). World sounds go through one
-//! track whose low-pass filter muffles them under water and whose send feeds a reverb in caves.
+//! every category has its own volume (`core:volume_*` settings). All categories share one
+//! environment track with low-pass filtering, volume gain and a reverb send.
 //! Music streams on its own track after quiet stretches. Without an audio device everything
 //! here does nothing.
 //!
@@ -14,19 +14,20 @@
 //! kept while memory allows), a large one streams. A file that is too large, broken or panics
 //! its decoder logs once and plays nothing.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::{Duration, Instant};
 
 use glam::{DVec3, Quat};
 use kira::effect::filter::{FilterBuilder, FilterHandle};
-use kira::effect::reverb::ReverbBuilder;
+use kira::effect::reverb::{ReverbBuilder, ReverbHandle};
 use kira::sound::static_sound::{StaticSoundData, StaticSoundHandle};
 use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
 use kira::sound::{FromFileError, PlaybackState};
 use kira::track::{SendTrackBuilder, SendTrackHandle, SpatialTrackBuilder, SpatialTrackHandle, TrackBuilder, TrackHandle};
 use kira::{AudioManager, AudioManagerSettings, Decibels, DefaultBackend, Mix, Tween};
 use rustc_hash::{FxHashMap, FxHashSet};
+use weft_abi::{MusicSource, MusicStatus, Str, local_music as op};
 
 use crate::assets::Assets;
 use crate::content::content;
@@ -58,14 +59,60 @@ pub struct Play {
     pub pitch: f32,
 }
 
+pub(crate) fn travel_time(distance: f64) -> f64 {
+    distance / 343.0
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct Arrival {
+    pub pos: DVec3,
+    pub distance: f64,
+    pub gain: f32,
+    pub cutoff: f32,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) struct SourceFilter {
+    pub cutoff: f32,
+    pub gain: f32,
+}
+
+impl Default for SourceFilter {
+    fn default() -> Self {
+        Self { cutoff: 20_000.0, gain: 1.0 }
+    }
+}
+
+impl SourceFilter {
+    pub fn from_liquid(source: u16, listener: Option<u16>) -> Self {
+        if Some(source) == listener {
+            return Self::default();
+        }
+        content().liquids[source as usize].source_filter
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub struct Acoustics {
+    pub cutoff: f32,
+    pub reverb: f32,
+    pub volume: f32,
+    pub feedback: f32,
+    pub damping: f32,
+}
+
+impl Default for Acoustics {
+    fn default() -> Self {
+        Self { cutoff: 20_000.0, reverb: 0.0, volume: 1.0, feedback: 0.85, damping: 0.60 }
+    }
+}
+
 /// Where the listener is, for positions and the environment.
 pub struct Listener {
     pub pos: DVec3,
     pub yaw: f32,
     pub pitch: f32,
-    pub underwater: bool,
-    /// No sky light at the head: caves echo.
-    pub enclosed: bool,
+    pub acoustics: Acoustics,
     pub dim: u32,
     /// The conditions music asks for that hold now, by id.
     pub holds: Vec<u32>,
@@ -161,6 +208,9 @@ struct Voice {
     falloff: i32,
     /// Asked for before it started (its file was being read).
     lowpass: f32,
+    /// When it is to be heard: later than asked for a far one (an arrival's travel time,
+    /// `play_paths`).
+    due: Instant,
     started: Instant,
     track: Track,
     filter: Option<FilterHandle>,
@@ -171,9 +221,13 @@ struct Voice {
 pub struct Audio {
     mgr: AudioManager<DefaultBackend>,
     listener: kira::listener::ListenerHandle,
+    /// Where the listener is (Kira's listener stays at zero: positions are sent relative to it,
+    /// subtracted in f64), and in which dimension.
     ear: DVec3,
+    ear_dim: Option<u32>,
     reverb: SendTrackHandle,
-    world: TrackHandle,
+    reverb_shape: ReverbHandle,
+    environment: TrackHandle,
     lowpass: FilterHandle,
     /// Per category (`sound_category`): its track.
     groups: Vec<TrackHandle>,
@@ -195,7 +249,7 @@ pub struct Audio {
     queue: Vec<(u64, Play, bool, f32, f32)>,
     music: Option<StreamingSoundHandle<FromFileError>>,
     next_music: Instant,
-    state: (bool, bool),
+    state: Acoustics,
     /// Per category, then the master volume.
     volumes: Vec<f64>,
     rng: weft_noise::Rng,
@@ -208,10 +262,188 @@ pub struct Audio {
     pub dropped: u32,
     /// Automated runs (tests, scripts): everything plays and counts, silently.
     pub muted: bool,
+    /// The window is in front (a phone's app in the background is silent).
+    active: bool,
     /// Each category's volume setting id, then the master volume's, looked up once.
     volume_ids: Option<Vec<Option<u32>>>,
     /// Every event's files were looked for (`check_files`).
     checked: bool,
+}
+
+fn audio_position(source: DVec3, listener: DVec3) -> glam::Vec3 {
+    (source - listener).as_vec3()
+}
+
+pub(crate) struct LocalMusic {
+    tracks: Vec<LocalTrack>,
+    volume: f32,
+    playing: Option<LocalPlayback>,
+    failed: Option<MusicSource>,
+}
+
+#[derive(PartialEq)]
+struct LocalTrack {
+    name: String,
+    stamp: (u64, Option<std::time::SystemTime>),
+    duration: f64,
+}
+
+struct LocalPlayback {
+    source: MusicSource,
+    name: String,
+    duration: f64,
+    paused: bool,
+    sound: StreamingSoundHandle<kira::sound::FromFileError>,
+    track: SpatialTrackHandle,
+    filter: FilterHandle,
+    source_filter: SourceFilter,
+}
+
+impl Default for LocalMusic {
+    fn default() -> Self {
+        Self { tracks: Vec::new(), volume: 1.0, playing: None, failed: None }
+    }
+}
+
+pub(crate) fn music_folder(run: &Path) -> PathBuf {
+    run.join("music")
+}
+
+impl LocalMusic {
+    pub fn refresh(&mut self, folder: &Path) -> std::io::Result<bool> {
+        std::fs::create_dir_all(folder)?;
+        let mut tracks: Vec<_> = std::fs::read_dir(folder)?
+            .flatten()
+            .filter_map(|entry| {
+                if !entry.file_type().ok()?.is_file() {
+                    return None;
+                }
+                let path = entry.path();
+                let format = path.extension()?.to_str()?;
+                if !["mp3", "flac", "ogg", "wav"]
+                    .iter()
+                    .any(|ext| format.eq_ignore_ascii_case(ext))
+                {
+                    return None;
+                }
+                let name = entry.file_name().into_string().ok()?;
+                let metadata = entry.metadata().ok()?;
+                let stamp = (metadata.len(), metadata.modified().ok());
+                let duration = self
+                    .tracks
+                    .binary_search_by(|track| track.name.cmp(&name))
+                    .ok()
+                    .map(|i| &self.tracks[i])
+                    .filter(|track| track.stamp == stamp)
+                    .map_or_else(
+                        || StreamingSoundData::from_file(&path).map_or(0.0, |data| data.duration().as_secs_f64()),
+                        |track| track.duration,
+                    );
+                Some(LocalTrack { name, stamp, duration })
+            })
+            .collect();
+        tracks.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+        let changed = self.tracks != tracks;
+        self.tracks = tracks;
+        Ok(changed)
+    }
+
+    pub fn track(&self, index: u32) -> weft_abi::MusicTrack {
+        self.tracks
+            .get(index as usize)
+            .map_or(weft_abi::MusicTrack { file: Str::EMPTY, duration: 0.0 }, |track| weft_abi::MusicTrack {
+                file: Str::new(&track.name),
+                duration: track.duration,
+            })
+    }
+
+    pub fn status(&self, source: MusicSource) -> MusicStatus {
+        let empty = MusicStatus { track: Str::EMPTY, position: 0.0, duration: 0.0, volume: self.volume, state: op::STOPPED };
+        if self.failed == Some(source) {
+            return MusicStatus { state: op::ERROR, ..empty };
+        }
+        self.playing
+            .as_ref()
+            .filter(|p| p.source == source)
+            .map_or(empty, |p| MusicStatus {
+                track: Str::new(&p.name),
+                position: p.sound.position(),
+                duration: p.duration,
+                volume: self.volume,
+                state: if p.paused { op::PAUSED } else { op::PLAYING },
+            })
+    }
+
+    pub fn source(&self) -> Option<MusicSource> {
+        self.playing.as_ref().map(|p| p.source)
+    }
+
+    pub fn fail(&mut self, source: MusicSource) {
+        if self.source() == Some(source) {
+            self.playing = None;
+        }
+        self.failed = Some(source);
+    }
+
+    pub fn update(&mut self, source: Option<(DVec3, SourceFilter)>, listener: DVec3) -> bool {
+        let Some(playback) = &mut self.playing else { return false };
+        if let Some(error) = playback.sound.pop_error() {
+            log::warn!("local music {}: {error}", playback.name);
+            self.failed = Some(playback.source);
+        } else if let Some((position, filter)) = source.filter(|_| playback.sound.state() != PlaybackState::Stopped) {
+            playback
+                .track
+                .set_position(audio_position(position, listener), Tween::default());
+            if filter != playback.source_filter {
+                playback.filter.set_cutoff(f64::from(filter.cutoff), QUICK);
+                playback.track.set_volume(db(f64::from(filter.gain)), QUICK);
+                playback.source_filter = filter;
+                log::trace!(target: "acoustics::paths", "local music at {position}: source cutoff {:.0}, gain {:.3}", filter.cutoff, filter.gain);
+            }
+            return false;
+        }
+        self.playing = None;
+        true
+    }
+
+    pub fn control(&mut self, source: MusicSource, op: u32, value: f64) -> bool {
+        if op == op::VOLUME && value.is_finite() {
+            self.volume = value.clamp(0.0, 1.0) as f32;
+            if let Some(playback) = &mut self.playing {
+                playback
+                    .sound
+                    .set_volume(db(f64::from(self.volume)), Tween::default());
+            }
+            return true;
+        }
+        if op == op::STOP {
+            let failed = self.failed == Some(source);
+            if failed {
+                self.failed = None;
+            }
+            let active = self.playing.as_ref().is_some_and(|p| p.source == source);
+            if active {
+                self.playing = None;
+            }
+            return active || failed;
+        }
+        let Some(playback) = self.playing.as_mut().filter(|p| p.source == source) else { return false };
+        match op {
+            op::TOGGLE_PAUSE => {
+                if playback.paused {
+                    playback.sound.resume(Tween::default());
+                } else {
+                    playback.sound.pause(Tween::default());
+                }
+                playback.paused = !playback.paused;
+            }
+            op::SEEK if value.is_finite() => playback
+                .sound
+                .seek_to(playback.duration * value.clamp(0.0, 1.0)),
+            _ => return false,
+        }
+        true
+    }
 }
 
 fn sound_path(assets: &Assets, name: &str) -> Option<PathBuf> {
@@ -282,32 +514,35 @@ impl Audio {
             .is_ok();
         let made = (|| -> Result<Audio, kira::ResourceLimitReached> {
             let listener = mgr.add_listener(glam::Vec3::ZERO, Quat::IDENTITY)?;
-            let reverb = mgr.add_send_track(
-                SendTrackBuilder::new().with_effect(
-                    ReverbBuilder::new()
-                        .mix(Mix::WET)
-                        .damping(0.6)
-                        .feedback(0.85),
-                ),
-            )?;
-            let mut wb = TrackBuilder::new()
-                .sub_track_capacity(64)
+            let acoustics = Acoustics::default();
+            let mut wet = SendTrackBuilder::new();
+            let reverb_shape = wet.add_effect(
+                ReverbBuilder::new()
+                    .mix(Mix::WET)
+                    .damping(f64::from(acoustics.damping))
+                    .feedback(f64::from(acoustics.feedback)),
+            );
+            let reverb = mgr.add_send_track(wet)?;
+            let mut track = TrackBuilder::new()
+                .sub_track_capacity(content().game.sound_categories.len())
                 .with_send(&reverb, Decibels::SILENCE);
-            let lowpass = wb.add_effect(FilterBuilder::new().cutoff(20_000.0));
-            let mut world = mgr.add_sub_track(wb)?;
+            let lowpass = track.add_effect(FilterBuilder::new().cutoff(acoustics.cutoff as f64));
+            let mut environment = mgr.add_sub_track(track)?;
             let mut groups = Vec::new();
-            for k in &crate::content::content().game.sound_categories {
+            for _ in &crate::content::content().game.sound_categories {
                 let b = TrackBuilder::new()
                     .sub_track_capacity(256)
                     .sound_capacity(256);
-                groups.push(if k.world { world.add_sub_track(b)? } else { mgr.add_sub_track(b)? });
+                groups.push(environment.add_sub_track(b)?);
             }
             Ok(Audio {
                 mgr,
                 listener,
                 ear: DVec3::ZERO,
+                ear_dim: None,
                 reverb,
-                world,
+                reverb_shape,
+                environment,
                 lowpass,
                 groups,
                 files: FxHashMap::default(),
@@ -322,13 +557,14 @@ impl Audio {
                 queue: Vec::new(),
                 music: None,
                 next_music: Instant::now() + Duration::from_secs(20),
-                state: (false, false),
+                state: acoustics,
                 volumes: Vec::new(),
                 rng: weft_noise::Rng(0x2545_F491_4F6C_DD1D),
                 played: 0,
                 recent: std::collections::VecDeque::new(),
                 dropped: 0,
                 muted: false,
+                active: true,
                 volume_ids: None,
                 checked: false,
             })
@@ -344,6 +580,28 @@ impl Audio {
 
     fn random(&mut self) -> f32 {
         self.rng.float()
+    }
+
+    pub fn set_active(&mut self, active: bool) {
+        if self.active == active {
+            return;
+        }
+        self.active = active;
+        self.apply_master_volume();
+        if let Some(music) = &mut self.music {
+            if active {
+                music.resume(Tween::default());
+            } else {
+                music.pause(Tween::default());
+            }
+        }
+    }
+
+    fn apply_master_volume(&mut self) {
+        let volume = if self.muted || !self.active { 0.0 } else { self.volumes.last().copied().unwrap_or(1.0) };
+        self.mgr
+            .main_track()
+            .set_volume(db(volume), Tween::default());
     }
 
     /// Forgets read files, for packs that changed them (F3+T).
@@ -442,7 +700,7 @@ impl Audio {
                 v.pos = Some(p);
             }
             if let Track::Spatial(tr) = &mut v.track {
-                tr.set_position(p.as_vec3(), t);
+                tr.set_position(audio_position(p, self.ear), t);
             }
         }
         if ch.what & sc::LOWPASS != 0 && ch.lowpass.is_finite() {
@@ -608,7 +866,8 @@ impl Audio {
     }
 
     /// Settings, listener, environment, music, files read and sounds asked for, once a frame.
-    pub fn update(&mut self, assets: &Assets, l: Option<&Listener>) {
+    /// `local_playing`: a jukebox's track plays (`LocalMusic`), so the game's music waits.
+    pub fn update(&mut self, assets: &Assets, l: Option<&Listener>, local_playing: bool) {
         let ids = self.volume_ids.get_or_insert_with(|| {
             let mut ids: Vec<Option<u32>> = crate::content::content()
                 .game
@@ -620,21 +879,37 @@ impl Audio {
             ids
         });
         // UI has no setting of its own: full volume.
-        let mut volumes: Vec<f64> = ids
+        let volumes: Vec<f64> = ids
             .iter()
             .map(|id| id.map_or(1.0, |id| crate::config::get(id) / 100.0))
             .collect();
-        if self.muted {
-            *volumes.last_mut().unwrap() = 0.0;
-        }
         if volumes != self.volumes {
             for (g, v) in self.groups.iter_mut().zip(&volumes) {
                 g.set_volume(db(*v), Tween::default());
             }
-            self.mgr
-                .main_track()
-                .set_volume(db(*volumes.last().unwrap()), Tween::default());
             self.volumes = volumes;
+            self.apply_master_volume();
+        }
+        let acoustics = l.map_or_else(Acoustics::default, |l| l.acoustics);
+        if acoustics != self.state {
+            if acoustics.feedback != self.state.feedback {
+                self.reverb_shape
+                    .set_feedback(acoustics.feedback as f64, QUICK);
+            }
+            if acoustics.damping != self.state.damping {
+                self.reverb_shape
+                    .set_damping(acoustics.damping as f64, QUICK);
+            }
+            self.state = acoustics;
+            self.lowpass.set_cutoff(acoustics.cutoff as f64, QUICK);
+            self.environment
+                .set_volume(db(acoustics.volume as f64), QUICK);
+            if let Err(e) = self
+                .environment
+                .set_send(&self.reverb, db(acoustics.reverb as f64), QUICK)
+            {
+                log::debug!("environment reverb: {e:?}");
+            }
         }
         if !self.checked {
             self.check_files(assets);
@@ -653,6 +928,7 @@ impl Audio {
             on
         });
         let Some(l) = l else {
+            self.ear_dim = None;
             if let Some(m) = &mut self.music {
                 m.stop(Tween { duration: Duration::from_secs(2), ..Default::default() });
                 self.music = None;
@@ -668,26 +944,36 @@ impl Audio {
             self.queue.clear();
             return;
         };
-        let orientation = Quat::from_rotation_y(l.yaw) * Quat::from_rotation_x(l.pitch);
-        self.ear = l.pos;
-        self.listener
-            .set_position(l.pos.as_vec3(), Tween::default());
-        self.listener.set_orientation(orientation, Tween::default());
-        if (l.underwater, l.enclosed) != self.state {
-            self.state = (l.underwater, l.enclosed);
-            self.lowpass
-                .set_cutoff(if l.underwater { 900.0 } else { 20_000.0 }, QUICK);
-            if let Err(e) =
-                self.world
-                    .set_send(&self.reverb, if l.enclosed && !l.underwater { Decibels(-9.0) } else { Decibels::SILENCE }, QUICK)
-            {
-                log::debug!("cave reverb: {e:?}");
+        // Another dimension: what played in the last one ends.
+        if self.ear_dim != Some(l.dim) {
+            if self.ear_dim.is_some() {
+                for v in &mut self.voices {
+                    if let Some(h) = &mut v.handle {
+                        h.stop(QUICK);
+                    }
+                    self.live.remove(&v.id);
+                }
+                self.voices.clear();
+            }
+            self.ear_dim = Some(l.dim);
+        }
+        // Kira's listener stays at zero. Subtract in f64 before mixing nearby positions in f32.
+        if l.pos != self.ear {
+            self.ear = l.pos;
+            for v in &mut self.voices {
+                if let (Track::Spatial(t), Some(p)) = (&mut v.track, v.pos) {
+                    t.set_position(audio_position(p, l.pos), Tween::default());
+                }
             }
         }
+        let orientation = Quat::from_rotation_y(l.yaw) * Quat::from_rotation_x(l.pitch);
+        self.listener.set_orientation(orientation, Tween::default());
         for (id, p, looped, fade, lowpass) in std::mem::take(&mut self.queue) {
-            self.begin(assets, id, p, looped, fade, lowpass);
+            self.begin(assets, id, p, looped, fade, lowpass, Duration::ZERO);
         }
-        self.music(assets, l);
+        if self.active && !local_playing {
+            self.music(assets, l);
+        }
     }
 
     /// Takes what the reading thread finished and starts the sounds that waited for it.
@@ -753,9 +1039,9 @@ impl Audio {
             return;
         }
         let g = self.category(self.voices[i].sound);
-        let (listener, group) = (&self.listener, &mut self.groups[g]);
+        let (listener, ear, group) = (&self.listener, self.ear, &mut self.groups[g]);
         let v = &mut self.voices[i];
-        if let Err(e) = v.make_track(group, listener) {
+        if let Err(e) = v.make_track(group, listener, ear) {
             log::debug!("sound {id}: {e}");
             self.forget(id);
             return;
@@ -792,12 +1078,40 @@ impl Audio {
 
     /// A one-shot nobody holds a handle to.
     pub fn play(&mut self, assets: &Assets, p: Play) {
-        let id = self.next_id;
-        self.next_id += 1;
-        self.begin(assets, id, p, false, 0.0, 20_000.0);
+        self.play_paths(assets, p, 0.0, &[]);
     }
 
-    fn begin(&mut self, assets: &Assets, id: u64, p: Play, looped: bool, fade: f32, lowpass: f32) {
+    /// A one-shot heard along `paths` (`client::acoustics`): the direct arrival and its echoes,
+    /// each from where it comes, as loud and muffled as it says, after its travel time less
+    /// `age` (seconds since it was made). Without paths it plays where it is, now.
+    pub(crate) fn play_paths(&mut self, assets: &Assets, p: Play, age: f64, paths: &[Arrival]) {
+        if !self.active {
+            return;
+        }
+        let Some((&direct, echoes)) = paths.split_first().filter(|_| p.pos.is_some()) else {
+            let id = self.next_id;
+            self.next_id += 1;
+            self.begin(assets, id, p, false, 0.0, 20_000.0, Duration::ZERO);
+            return;
+        };
+        for (n, arrival) in std::iter::once(direct)
+            .chain(echoes.iter().copied())
+            .enumerate()
+        {
+            let id = self.next_id;
+            self.next_id += 1;
+            let at = Play { pos: Some(arrival.pos), volume: p.volume * arrival.gain, ..p };
+            let delay = Duration::from_secs_f64((travel_time(arrival.distance) - age).max(0.0));
+            let before = self.voices.len();
+            self.begin(assets, id, at, false, 0.0, arrival.cutoff.clamp(20.0, 20_000.0), delay);
+            if n > 0 && self.voices.len() == before {
+                log::trace!(target: "acoustics", "reflection of sound {}: no room", p.sound);
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn begin(&mut self, assets: &Assets, id: u64, p: Play, looped: bool, fade: f32, lowpass: f32, delay: Duration) {
         let held = self.live.contains(&id);
         let c = content();
         let Some(def) = c.game.sounds.get(p.sound as usize) else {
@@ -815,7 +1129,7 @@ impl Audio {
         let volume = p.volume.max(0.0);
         let pitch = if p.pitch > 0.0 { p.pitch } else { def.pitch[0] + (def.pitch[1] - def.pitch[0]) * self.random() };
         // Heard up to `range` blocks (further for loud ones), full volume within `full_within`.
-        let reach = (def.range * (volume * def.volume).max(1.0)).max(1.5);
+        let reach = (def.reach(volume * def.volume) as f32).max(1.5);
         let near = def.full_within.clamp(0.0, reach - 0.5);
         let stream = matches!(self.file(assets, &name), File::Stream(_));
         if !self.room(p.sound, def.voices, stream, (def.priority, audible(volume, p.pos, near, reach, self.ear))) {
@@ -839,11 +1153,13 @@ impl Audio {
             near,
             falloff: def.falloff,
             lowpass,
+            due: Instant::now() + delay,
             started: Instant::now(),
             track: Track::None,
             filter: None,
             handle: None,
-            wait: Some(Wait { file: name.clone(), asked: Instant::now() }),
+            // A late file counts from when it is due to be heard.
+            wait: Some(Wait { file: name.clone(), asked: Instant::now() + delay }),
         });
         let open = match self.file(assets, &name) {
             File::Ready(d) => Ok(Some((**d).clone())),
@@ -864,6 +1180,61 @@ impl Audio {
                 }
             }
             Err(None) => self.forget(id),
+        }
+    }
+
+    pub(crate) fn start_local(
+        &mut self,
+        local: &mut LocalMusic,
+        folder: &Path,
+        source: MusicSource,
+        pos: DVec3,
+        listener: DVec3,
+        source_filter: SourceFilter,
+        name: &str,
+    ) -> bool {
+        if local
+            .tracks
+            .binary_search_by(|track| track.name.as_str().cmp(name))
+            .is_err()
+        {
+            local.fail(source);
+            return false;
+        }
+        let result = (|| -> Result<LocalPlayback, String> {
+            let data = StreamingSoundData::from_file(folder.join(name)).map_err(|err| err.to_string())?;
+            let duration = data.duration().as_secs_f64();
+            let mut builder = SpatialTrackBuilder::new()
+                .distances((4.0, 48.0))
+                .volume(db(f64::from(source_filter.gain)))
+                .sound_capacity(1);
+            let filter = builder.add_effect(FilterBuilder::new().cutoff(f64::from(source_filter.cutoff)));
+            let mut track = self.groups[crate::registry::MUSIC_CATEGORY as usize]
+                .add_spatial_sub_track(&self.listener, audio_position(pos, listener), builder)
+                .map_err(|err| format!("{err:?}"))?;
+            let sound = track
+                .play(data.volume(db(f64::from(local.volume))))
+                .map_err(|err| err.to_string())?;
+            Ok(LocalPlayback { source, name: name.to_owned(), duration, paused: false, sound, track, filter, source_filter })
+        })();
+        match result {
+            Ok(playback) => {
+                if let Some(mut music) = self.music.take() {
+                    music.stop(Tween::default());
+                }
+                self.next_music = Instant::now() + Duration::from_secs(20);
+                self.played += 1;
+                local.failed = None;
+                local.playing = Some(playback);
+                log::debug!("local music: {name}");
+                log::trace!(target: "acoustics::paths", "local music at {pos}: source cutoff {:.0}, gain {:.3}", source_filter.cutoff, source_filter.gain);
+                true
+            }
+            Err(err) => {
+                log::warn!("local music {name}: {err}");
+                local.fail(source);
+                false
+            }
         }
     }
 
@@ -937,9 +1308,10 @@ fn audible(volume: f32, pos: Option<DVec3>, near: f32, reach: f32, ear: DVec3) -
 }
 
 impl Voice {
-    /// Its own track: positioned ones move with the listener's ears, held ones get a low-pass
-    /// to muffle.
-    fn make_track(&mut self, group: &mut TrackHandle, listener: &kira::listener::ListenerHandle) -> Result<(), String> {
+    /// Its own track: positioned ones move with the listener's ears, held ones and muffled
+    /// arrivals get a low-pass.
+    fn make_track(&mut self, group: &mut TrackHandle, listener: &kira::listener::ListenerHandle, ear: DVec3) -> Result<(), String> {
+        let muffled = self.held || self.lowpass < 20_000.0;
         let filter = FilterBuilder::new().cutoff(self.lowpass as f64);
         self.track = match self.pos {
             Some(pos) => {
@@ -952,18 +1324,18 @@ impl Voice {
                     .distances((self.near, self.reach))
                     .attenuation_function(curve)
                     .persist_until_sounds_finish(true);
-                if self.held {
+                if muffled {
                     self.filter = Some(b.add_effect(filter));
                 }
                 Track::Spatial(
                     group
-                        .add_spatial_sub_track(listener, pos.as_vec3(), b)
+                        .add_spatial_sub_track(listener, audio_position(pos, ear), b)
                         .map_err(|e| format!("{e:?}"))?,
                 )
             }
             None => {
                 let mut b = TrackBuilder::new().persist_until_sounds_finish(true);
-                if self.held {
+                if muffled {
                     self.filter = Some(b.add_effect(filter));
                 }
                 Track::Plain(group.add_sub_track(b).map_err(|e| format!("{e:?}"))?)
@@ -982,7 +1354,11 @@ impl Voice {
     }
 
     fn play_static(&mut self, data: StaticSoundData) -> Result<Handle, String> {
-        let mut data = data.volume(self.volume_db()).playback_rate(self.pitch);
+        let delay = self.due.saturating_duration_since(Instant::now());
+        let mut data = data
+            .volume(self.volume_db())
+            .playback_rate(self.pitch)
+            .start_time(delay);
         if self.looped {
             data = data.loop_region(..);
         }
@@ -997,7 +1373,11 @@ impl Voice {
     }
 
     fn play_stream(&mut self, data: StreamingSoundData<FromFileError>) -> Result<Handle, String> {
-        let mut data = data.volume(self.volume_db()).playback_rate(self.pitch);
+        let delay = self.due.saturating_duration_since(Instant::now());
+        let mut data = data
+            .volume(self.volume_db())
+            .playback_rate(self.pitch)
+            .start_time(delay);
         if self.looped {
             data = data.loop_region(..);
         }

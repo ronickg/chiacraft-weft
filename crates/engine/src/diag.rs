@@ -197,7 +197,7 @@ pub fn memory() -> u64 {
     proc_kb("/proc/self/status", "VmRSS:")
 }
 
-#[cfg(all(not(windows), not(target_os = "linux"), not(target_os = "android")))]
+#[cfg(not(any(windows, target_os = "linux", target_os = "android")))]
 pub fn memory() -> u64 {
     0
 }
@@ -239,7 +239,7 @@ pub fn total_memory() -> u64 {
     proc_kb("/proc/meminfo", "MemTotal:")
 }
 
-#[cfg(all(not(windows), not(target_os = "linux"), not(target_os = "android")))]
+#[cfg(not(any(windows, target_os = "linux", target_os = "android")))]
 pub fn total_memory() -> u64 {
     0
 }
@@ -270,6 +270,7 @@ pub fn cpu_name() -> String {
     std::env::var("PROCESSOR_IDENTIFIER").unwrap_or_default()
 }
 
+#[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
 fn tidy_cpu_name(raw: &str) -> String {
     let mut s = raw
         .replace("(R)", "")
@@ -598,6 +599,30 @@ fn current_mod() -> Option<String> {
 
 static CRASH_DIR: OnceLock<PathBuf> = OnceLock::new();
 
+pub(crate) fn vulkan_startup_faulted() -> bool {
+    #[cfg(windows)]
+    return native::fault_marker().is_some_and(|p| p.is_file());
+    #[cfg(not(windows))]
+    false
+}
+
+pub(crate) fn renderer_starting(vulkan: bool) {
+    #[cfg(windows)]
+    native::VULKAN_STARTING.store(vulkan, Ordering::Relaxed);
+    #[cfg(not(windows))]
+    let _ = vulkan;
+}
+
+pub(crate) fn renderer_started() {
+    #[cfg(windows)]
+    if native::VULKAN_STARTING.load(Ordering::Relaxed)
+        && native::VULKAN_STARTING.swap(false, Ordering::Relaxed)
+        && let Some(path) = native::fault_marker()
+    {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
 /// Panics and (on Windows) native faults write `crash-reports/crash-<time>.txt` naming the mod
 /// that was running, with a backtrace and the last log lines.
 pub fn install_crash_handler(run_dir: &std::path::Path) {
@@ -617,7 +642,7 @@ pub fn install_crash_handler(run_dir: &std::path::Path) {
         write_report(&format!("panic{at}: {msg}"));
         previous(info);
     }));
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     native::install();
 }
 
@@ -664,7 +689,19 @@ fn write_report(what: &str) {
 
 #[cfg(windows)]
 mod native {
+    use std::path::PathBuf;
     use std::sync::atomic::{AtomicBool, Ordering};
+
+    pub(super) static VULKAN_STARTING: AtomicBool = AtomicBool::new(false);
+
+    pub(super) fn fault_marker() -> Option<PathBuf> {
+        Some(
+            super::CRASH_DIR
+                .get()?
+                .parent()?
+                .join("vulkan-startup-fault"),
+        )
+    }
 
     #[repr(C)]
     struct ExceptionPointers {
@@ -696,10 +733,64 @@ mod native {
                 0xC000_00FD => "stack overflow",
                 _ => "native exception",
             };
+            if code == 0xC000_0005
+                && VULKAN_STARTING.load(Ordering::Relaxed)
+                && let Some(path) = fault_marker()
+            {
+                let _ = std::fs::write(path, b"Vulkan access violation before the first frame\n");
+            }
             super::write_report(&format!("{name} (code {code:#010x})"));
         }
         // Let Windows end the process as it would have.
         0
+    }
+}
+
+/// Linux has no exception filter: these arrive as signals instead. The report is written from
+/// the handler, then the default action is put back and the signal raised again, so the process
+/// still dies with the same signal it would have.
+///
+/// Writing the report is not async-signal-safe (it allocates, takes the log lock and reads the
+/// backtrace), so this is best effort like the Windows filter: a fault taken while one of those
+/// locks is held reports as much as it can and then re-raises.
+#[cfg(target_os = "linux")]
+mod native {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    pub fn install() {
+        // SAFETY: `sa_sigaction` holds a valid handler with the signature `SA_SIGINFO` asks for,
+        // and the struct is zeroed before its fields are set.
+        unsafe {
+            for sig in [libc::SIGSEGV, libc::SIGBUS, libc::SIGILL, libc::SIGFPE] {
+                let mut action: libc::sigaction = std::mem::zeroed();
+                action.sa_sigaction = handler as *const () as usize;
+                // Back to the default action on the first delivery, so the re-raise below ends
+                // the process instead of running this again.
+                action.sa_flags = libc::SA_SIGINFO | libc::SA_RESETHAND;
+                libc::sigemptyset(&mut action.sa_mask);
+                libc::sigaction(sig, &action, std::ptr::null_mut());
+            }
+        }
+    }
+
+    extern "C" fn handler(sig: libc::c_int, _info: *mut libc::siginfo_t, _ctx: *mut libc::c_void) {
+        static ONCE: AtomicBool = AtomicBool::new(false);
+        if !ONCE.swap(true, Ordering::Relaxed) {
+            let name = match sig {
+                libc::SIGSEGV => "segmentation fault",
+                libc::SIGBUS => "bus error",
+                libc::SIGILL => "illegal instruction",
+                libc::SIGFPE => "arithmetic exception",
+                _ => "native signal",
+            };
+            super::write_report(&format!("{name} (signal {sig})"));
+        }
+        // SAFETY: restoring the default action and re-raising is the documented way to die from a
+        // handler; async-signal-safe.
+        unsafe {
+            libc::signal(sig, libc::SIG_DFL);
+            libc::raise(sig);
+        }
     }
 }
 

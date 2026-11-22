@@ -7,7 +7,7 @@
 use vitals::crafts::{self, Station};
 use weft_sdk::*;
 
-pub use base_api::CRAFTING;
+pub use base_api::recipes::CRAFTING;
 
 pub static TANNING_FRAME: Block = Block::named("tanning_frame");
 pub static TANNING_PIT: Block = Block::named("tanning_pit");
@@ -41,7 +41,7 @@ fn is(item: u32, want: &'static str) -> bool {
         return false;
     }
     match want.strip_prefix('#') {
-        Some(tag) => Tag::named(tag).on_item(item),
+        Some(tag) => Tag::<kind::Any>::named(tag).on_item(item),
         None => item_name(item) == want,
     }
 }
@@ -136,27 +136,29 @@ fn station(
     let c = crafts::craft(s);
     let index = crafts::STATIONS.iter().position(|&x| x == s).unwrap_or(0) as u32;
     let name = s.name();
-    let mut m = r
-        .machine(block, menu)
-        .block(move |b| {
-            b.sound_group(sound)
-                .textures(&format!("{name}_top"), &format!("{name}_side"), &format!("{name}_side"))
-                .model_box(from, to)
-                .hardness(1.5)
-                .mineable(tool)
-                .tab(&crate::tabs::FUNCTIONAL)
+    let size = if c.with.is_some() { 3 } else { 2 };
+    r.block(block)
+        .sound_group(sound)
+        .texture(&format!("{name}_side"))
+        .top(&format!("{name}_top"))
+        .bottom(&format!("{name}_side"))
+        .model_box(from, to)
+        .hardness(1.5)
+        .mined_by(tool, weft_sdk::abi::tool_tier::HAND)
+        .tab(&crate::tabs::FUNCTIONAL)
+        .entity(move |e| {
+            e.attach_with(&WAITING, Waiting { station: index, done: 0.0, item: 0 })
+                .inventory(size)
         })
-        .group(
-            "input",
-            Slots::single()
-                .accepts(c.input.trim_start_matches('#'))
-                .limit(s.holds()),
-        );
+        .opens(menu);
+    let mut m = r
+        .menu(menu)
+        .group("input", Slots::single().accepts(c.input).limit(s.holds()).holder());
     if let Some(with) = c.with {
-        m = m.group("with", Slots::single().accepts(with.trim_start_matches('#')));
+        m = m.group("with", Slots::single().accepts(with).holder());
     }
-    m.group("output", Slots::single().output())
-        .attach_with(&WAITING, Waiting { station: index, done: 0.0, item: 0 })
+    m.group("output", Slots::single().output().holder())
+        .player_inventory()
         .screen(move |ui| {
             crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {

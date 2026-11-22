@@ -325,7 +325,7 @@ static TICKS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0
 
 pub fn init(r: &mut Registry) {
     // A wild animal that dies (hunted, killed by another, starved...) is gone from its pool.
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             if !crate::animal::tamed(&w, d.entity) {

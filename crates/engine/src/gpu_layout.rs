@@ -17,6 +17,10 @@ macro_rules! shared {
 }
 
 shared! {
+    rain_cover {
+        CELL = 4,
+        CUBES = 16,
+    }
     /// Block face record, four words. Word 0: x, y, z in the cube (4 bits each), direction,
     /// corner AO (2 bits per corner), tint kind. Word 1: texture, biome. Words 2 and 3: corner
     /// light, 16 bits per corner.
@@ -65,6 +69,9 @@ shared! {
         TINT_SHIFT = 24,
         /// Tint flag: no directional shading (plants).
         FLAT = 16,
+        LIQUID = 32,
+        /// A clipped model face has uniform light in word 6 and its six clipping planes in word 7.
+        CLIP = 64,
     }
     /// Distant terrain record (`client::lod`), four words in the faces' pages: x, z in the tile
     /// (11 bits each), direction, tint kind; texture and biome like a face's; y (signed 16 bits)
@@ -130,6 +137,7 @@ shared! {
         ICON = 2,
         FONT = 3,
         GUI = 4,
+        PREMULTIPLIED = 5,
     }
     /// Particle data word y: texture index and shader slot.
     particle {
@@ -145,6 +153,7 @@ shared! {
         GLOW = 4,
         OVERLAY = 5,
         CLOUDS = 6,
+        LIGHTNING = 7,
     }
 }
 
@@ -190,13 +199,14 @@ pub mod terrain {
             /// A condition of a rule: the field, from, to.
             COND = 3,
             CAVE = 5,
-            /// Per scatter: cell, reach, hash seed (two words), biomes, its thinning mask's steps
-            /// (where they start and how many, `STEP` each) and keep. After it the mask's steps,
-            /// a `SCATTER_BIOME` per biome, then the ground it stands on (`ScatterDef::ground`) as
-            /// state ranges: how many, then first and count each (none: any).
+            /// Per far-tree feature (a grid feature's plan, `terrain_gpu::describe_lod`): spacing,
+            /// reach, hash seed (two words), biomes, its thinning mask's steps (where they start
+            /// and how many, `STEP` each) and keep. After it the mask's steps, a `SCATTER_BIOME`
+            /// per biome, then the ground it stands on (`features::Fit::ground`) as state ranges:
+            /// how many, then first and count each (none: any).
             SCATTER = 8,
-            /// Per scatter and biome: threshold (two words), thinned, then `lod::SHAPES` crowns
-            /// its shape callback made there, two words each (`crown`).
+            /// Per far-tree feature and biome: threshold (two words), thinned, then `lod::SHAPES`
+            /// crowns its plan made there, two words each (`crown`).
             SCATTER_BIOME = 3 + 2 * 8,
             /// Per CPU-made feature (`Feature::custom`) and cube: heights at the 256 columns and
             /// the 25 corners caves measure from, after the job's own words.
@@ -614,13 +624,14 @@ pub trait Wgsl {
 }
 
 macro_rules! wgsl_types {
-    ($($t:ty => $s:literal, $a:literal, $n:literal),* $(,)?) => { $(impl Wgsl for $t { const TY: &'static str = $s; const LAYOUT: (usize, usize) = ($a, $n); })* };
+    ($($t:ty => $s:literal, $a:literal, $n:expr),* $(,)?) => { $(impl Wgsl for $t { const TY: &'static str = $s; const LAYOUT: (usize, usize) = ($a, $n); })* };
 }
 wgsl_types! {
     f32 => "f32", 4, 4, u32 => "u32", 4, 4, i32 => "i32", 4, 4,
     [f32; 2] => "vec2<f32>", 8, 8, [f32; 3] => "vec3<f32>", 16, 12, [f32; 4] => "vec4<f32>", 16, 16,
     [u32; 4] => "vec4<u32>", 16, 16, [i32; 4] => "vec4<i32>", 16, 16,
     [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96, [[f32; 4]; 8] => "array<vec4<f32>, 8>", 16, 128, [[f32; 4]; 12] => "array<vec4<f32>, 12>", 16, 192,
+    GpuSky => "Sky", 16, core::mem::size_of::<GpuSky>(),
 }
 
 /// Declares a GPU buffer struct: the Rust type and, from the same fields, its WGSL text
@@ -673,9 +684,9 @@ gpu_struct! {
         pub fog_color: [f32; 4],
         /// x fog start, y fog end, z daylight 0..1, w seconds (shader effects).
         pub params: [f32; 4],
-        /// x the dimension's ambient light 0..1, y the Brightness setting 0 (moody) .. 1
+        /// x resolved linear ambient light, y the Brightness setting 0 (moody) .. 1
         /// (bright), z game ticks with the fraction of the current one (animated textures;
-        /// wraps every 2^20).
+        /// wraps every 2^20), w how much the player sees as if all were lit (night vision).
         pub light: [f32; 4],
         /// xyz toward the sun (unit), w how far it is above the horizon (0 under it or in a
         /// dimension without sky light). For shader packs' shadows; follows the day, whatever
@@ -737,7 +748,7 @@ gpu_struct! {
         /// turns to snow up a mountain, blocks above the sea (a mod's air,
         /// `air_flags::SNOWLINE_SHIFT`; 400 for none).
         pub canopy: [f32; 4],
-        /// Soft clouds (`core:soft_clouds`, with a pack whose sky has `fs_cloud_trace` and
+        /// Soft clouds (always on, with a pack whose sky has `fs_cloud_trace` and
         /// `fs_cloud_resolve`; chiacraft): x the bindless index + 1 of this frame's clouds, traced
         /// at a quarter of the pixels each way and blended over frames, which `fs_clouds` draws
         /// from (0: off, the blocky clouds); y the index + 1 of last frame's, the history
@@ -819,6 +830,25 @@ gpu_struct! {
         /// levels (NVIDIA's log2(render / output) - 1; 0 without), which a pack's world shader adds
         /// to its block textures' level; yzw unused.
         pub dlss: [f32; 4],
+        // Upstream Weft's, after chiacraft's (whose shader pack reads the fields above).
+        /// x solar sky-light multiplier, yz cloud fog start/end in blocks, w local rain mist.
+        pub environment: [f32; 4],
+        /// The cloud layer visible this frame, with zero opacity when absent.
+        pub cloud: GpuSky,
+        /// Width and height of the current depth copy. Zero if using the texture cloud path.
+        pub atmosphere_extent: [u32; 4],
+        /// Start and end of the fade from voxel clouds to their projected footprint.
+        pub cloud_lod: [f32; 4],
+        /// Current and previous origins of the world-space cloud cache, in voxel columns.
+        pub cloud_cache: [i32; 4],
+        /// Cloud cache side, rain cache row width, and whether the depth pyramid is available.
+        pub atmosphere_cache: [u32; 4],
+        /// Camera position relative to the cover map's horizontal origin, then an enabled flag.
+        pub rain_cover: [f32; 4],
+        /// Lightning origins relative to the camera, with flash strength in w.
+        pub lightning_start: [[f32; 4]; 3],
+        /// Channel ends relative to the camera, with w set for ground strikes.
+        pub lightning_end: [[f32; 4]; 3],
     }
 }
 
@@ -836,8 +866,11 @@ gpu_struct! {
         /// x bindless picture (`u32::MAX` none), y `sky` kind, z shader slot, w 1 if additive.
         pub ids: [u32; 4],
         /// x half size across (a body's tangent). Overlay: x tiles across, y 1 for the screen's
-        /// lower part only, z where its frame starts in the picture.
+        /// lower part only, z where its frame starts in the picture. Weather clouds: tile size,
+        /// height, base relative to the eye, and forced weather class (clear/rain/thunder).
         pub extra: [f32; 4],
+        /// Direct solar light for procedural clouds, linear RGB with a precomputed path scale in w.
+        pub cloud_sun: [f32; 4],
     }
 }
 
@@ -850,8 +883,7 @@ gpu_struct! {
         pub ids: [u32; 4],
         /// Origins are relative to this cube.
         pub cam_cube: [i32; 4],
-        /// x start of the overlay table in `frames` (per texture: overlay texture + 1, or 0),
-        /// y how far across from the camera the cubes end, fading into distant terrain before it
+        /// x unused (upstream's overlay table went with overlays becoming face layers), y how far across from the camera the cubes end, fading into distant terrain before it
         /// (`WorldRenderer::lod_fade`, 0: no fade), z tint kinds, w half the width of `lod_mask` in the
         /// low 24 bits and `core:far_look` in the top 8 (chiacraft).
         pub extra: [u32; 4],
@@ -905,9 +937,20 @@ gpu_struct! {
         pub light: u32,
         /// Entity effect slot (`shaders/entity_effect/<name>.wgsl`, 0 none).
         pub effect: u32,
+        /// 1: something worn, drawn on the kind's worn geometry instead of its skin's (read when
+        /// queued).
+        pub worn: u32,
         // Whole 16 bytes: WGSL rounds the array stride up to them.
-        pub pad0: u32,
         pub pad1: u32,
+    }
+}
+
+gpu_struct! {
+    pub struct GpuDryVolume as "DryVolume" {
+        pub origin: [f32; 4],
+        pub inverse: [f32; 4],
+        pub lo: [f32; 4],
+        pub hi: [f32; 4],
     }
 }
 
@@ -920,8 +963,9 @@ gpu_struct! {
         pub inflate: f32,
         pub faces: [[f32; 4]; 6],
         pub role: u32,
-        // Three words, not a vec3: WGSL would align that to 16 bytes.
-        pub pad0: u32,
+        /// The bone whose covering draws it: its own, or the one it is worn on.
+        pub cover: u32,
+        // Whole 16 bytes: WGSL rounds the array stride up to them.
         pub pad1: u32,
         pub pad2: u32,
     }
@@ -933,7 +977,8 @@ gpu_struct! {
         pub bone: u32,
         pub uv: [f32; 2],
         pub role: u32,
-        pub pad: u32,
+        /// As `GpuCuboid::cover`.
+        pub cover: u32,
     }
 }
 
@@ -965,7 +1010,7 @@ gpu_struct! {
         /// x gravity, y speed kept this step, z speed kept on the ground this step, w the seconds
         /// of its motion it is drawn stretched over (0: a square).
         pub motion: [f32; 4],
-        /// x color, y color at the end, z `abi::particle_flags`, w shader slot.
+        /// x color, y color at the end, z `crate::tag_bits::particle`, w shader slot.
         pub data: [u32; 4],
         /// x first in `frames`, y how many, none for block dust; z first in `rules`, w how many.
         pub frames: [u32; 4],
@@ -1014,7 +1059,8 @@ pub struct OcclusionView {
     pub cam_cube: [i32; 4],
     /// The depth's size.
     pub size: [u32; 2],
-    /// Records made by the CPU that aren't cubes.
+    /// Records made by the CPU that are distant terrain's tiles, tested by the boxes that follow
+    /// the draws' origins.
     pub skip: [u32; 2],
     pub levels: u32,
     /// Whether there is a last frame to go by.
@@ -1027,7 +1073,8 @@ pub struct OcclusionView {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CubeEntry {
     pub cube: [i32; 3],
-    /// `page * 4 + kind * 2 + layer`, `u32::MAX` for a free place.
+    /// `page * 8 + kind * 4 + layer` (`mesher::LAYERS`, not 2: translucent ones aren't here),
+    /// `u32::MAX` for a free place.
     pub bucket: u32,
     pub start: u32,
     /// Faces by direction rank, 16 bits each; quads: how many, in the first.
@@ -1061,6 +1108,20 @@ gpu_struct! {
         pub pos: [i32; 4],
         /// x texture index, y light (as `GpuParticle`), z its piece's number among the levels.
         pub data: [u32; 4],
+        pub offset: [f32; 4],
+    }
+}
+
+gpu_struct! {
+    pub struct GpuWake as "WakeStrip" {
+        pub left_from: [f32; 4],
+        pub right_from: [f32; 4],
+        pub left_to: [f32; 4],
+        pub right_to: [f32; 4],
+        /// Wake distance and age at each end, or splash camera XZ (mod 256) and profile range.
+        pub course: [f32; 4],
+        /// x is one for a splash sheet, y is its normalized age as f32 bits.
+        pub style: [u32; 4],
     }
 }
 
@@ -1071,6 +1132,8 @@ gpu_struct! {
         pub place: [f32; 4],
         /// x its left in the picture, y its top, z how much of the picture high, w alpha.
         pub uv: [f32; 4],
+        /// Wind slope in x/z, unscrolled height phase at the strip's top, and rain flag.
+        pub wind: [f32; 4],
         /// x texture index, y light of the column (as `GpuParticle`), z a number of its own, w how
         /// much of the picture shows (0..255).
         pub data: [u32; 4],
@@ -1227,7 +1290,7 @@ bindings! {
         BIOMES "biomes": "array<u32>",
         // Two words per texture, see `GameTextures::world_tables`.
         TEX_INFO "tex_info": "array<u32>",
-        // Animated frames: texture | ticks << 16; then the overlay table.
+        // Animated frames: texture | ticks << 16.
         FRAMES "frames": "array<u32>",
         // Camera-relative positions of moving structures drawn this frame (0: none, the
         // world's cubes): a cube's `origin.w` picks one, its `origin.xyz` is then the cube in
@@ -1247,6 +1310,11 @@ bindings! {
         // Material maps per bindless color index (chiacraft): two words each, its LabPBR
         // specular map's index and its normal map's, all ones: none. `mat_at` reads them.
         MAT_MAP "mat_map": "array<u32>",
+        BODY_ROTATIONS "body_rotations": "array<vec4<f32>>",
+        DRY_VOLUMES "dry_volumes": "array<DryVolume>",
+        CLOUD_CELLS "cloud_cells": "array<u32>",
+        RAIN_DEPTH "rain_depth": "array<vec2<u32>>",
+        RAIN_COVER "rain_cover": "array<i32>",
     }
     // `item_boxes`: item models in their own space, kept between frames
     // (`EntityRenderer::item_model`); an item instance is a box in `boxes` whose rows place
@@ -1299,9 +1367,19 @@ bindings! {
         COLUMNS "columns": "array<WeatherColumn>",
         SCENE "scene": "Scene",
     }
+    wake "wake.wgsl" {
+        STRIPS "strips": "array<WakeStrip>",
+        SCENE "scene": "Scene",
+    }
     sky "sky.wgsl" {
         OBJECTS "sky": "array<Sky>",
         SCENE "scene": "Scene",
+        WORLD_DEPTH "world_depth": "array<f32>",
+        CLOUD_CELLS "cloud_cells": "array<u32>",
+        CLOUD_CELLS_OUT "cloud_cells_out": "array<u32>",
+        RAIN_DEPTH "rain_depth": "array<vec2<u32>>",
+        RAIN_DEPTH_OUT "rain_depth_out": "array<vec2<u32>>",
+        RAIN_COVER "rain_cover": "array<i32>",
     }
     ui "ui.wgsl" {
         QUADS "quads": "array<Quad>",
@@ -1453,6 +1531,7 @@ fn structs() -> String {
         GpuBox::wgsl(),
         Instance::wgsl(),
         GpuCuboid::wgsl(),
+        GpuDryVolume::wgsl(),
         GpuCorner::wgsl(),
         GpuBone::wgsl(),
         GpuParticle::wgsl(),
@@ -1460,6 +1539,7 @@ fn structs() -> String {
         GpuParticleKind::wgsl(),
         GpuParticleRule::wgsl(),
         GpuWireQuad::wgsl(),
+        GpuWake::wgsl(),
         GpuWeather::wgsl(),
         GpuSky::wgsl(),
         Quad::wgsl(),
@@ -1478,7 +1558,12 @@ pub fn prelude(shader: &str, common: &str) -> String {
     s.push_str(&records());
     s.push_str(&structs());
     for (i, (name, ty)) in bindings(shader).iter().enumerate() {
-        s.push_str(&format!("@group(1) @binding({i}) var<storage, read> {name}: {ty};\n"));
+        let access = if matches!(*name, "atmosphere_out" | "cloud_cells_out" | "rain_depth_out" | "atmosphere_history_out") {
+            "read_write"
+        } else {
+            "read"
+        };
+        s.push_str(&format!("@group(1) @binding({i}) var<storage, {access}> {name}: {ty};\n"));
     }
     if shader == "world.wgsl" {
         s.push_str(SOLID_AT);
@@ -1490,6 +1575,14 @@ pub fn prelude(shader: &str, common: &str) -> String {
     s.push_str(DRY_OFF);
     s.push_str(common);
     s.push('\n');
+    if matches!(shader, "sky.wgsl" | "world.wgsl") {
+        s.push_str(include_str!("../assets/shaders/atmosphere-cache.wgsl"));
+    } else {
+        s.push_str(
+            "fn cloud_cache_value(view: Scene, cell: vec2<i32>, band: i32) -> u32 { return 0xffffffffu; }
+             fn rain_exposed(view: Scene, rel: vec3<f32>) -> bool { return true; }\n",
+        );
+    }
     s
 }
 
@@ -1941,7 +2034,8 @@ pub fn particle_sim_prelude(window_reach: i32) -> String {
         let access = if matches!(*name, "sim" | "dst") { "read_write" } else { "read" };
         s.push_str(&format!("@group(1) @binding({i}) var<storage, {access}> {name}: {ty};\n"));
     }
-    use weft_abi::{particle_event as pe, particle_flags as pf, particle_then as pt, particle_when as pw};
+    use crate::tag_bits::particle as pf;
+    use weft_abi::{particle_event as pe, particle_then as pt, particle_when as pw};
     s.push_str(&format!(
         "struct SimArgs {{\n    first: u32,\n    count: u32,\n    dt: f32,\n    pad: f32,\n    shift: vec4<f32>,\n    rel: vec4<f32>,\n    origin: vec4<i32>,\n    center: vec4<i32>,\n    wind: vec4<f32>,\n}}\nvar<immediate> args: SimArgs;\nconst WINDOW_REACH: i32 = {window_reach};\nconst PARTICLE_FLAG_COLLIDE: u32 = {}u;\nconst PARTICLE_FLAG_FULLBRIGHT: u32 = {}u;\nconst PARTICLE_FLAG_SHRINK: u32 = {}u;\nconst PARTICLE_FLAG_FLOATS: u32 = {}u;\n",
         pf::COLLIDE, pf::FULLBRIGHT, pf::SHRINK, pf::FLOATS

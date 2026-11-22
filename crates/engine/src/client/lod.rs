@@ -61,7 +61,8 @@ const SLOPE_LEVEL: u32 = 3;
 fn split_widths() -> f64 {
     content()
         .game
-        .config_names
+        .catalog
+        .ids(weft_abi::entry_kind::CONFIG)
         .get("core:lod_detail")
         .map_or(4.0, |&id| crate::config::get(id) as f64)
         .max(1.0)
@@ -389,7 +390,7 @@ fn openness(high: &dyn Fn(i32, i32) -> i32, i: i32, j: i32, h: i32, s: i32) -> u
 /// The texture (its average color) and tint kind a distant face of `state` in direction `dir`
 /// is drawn in. A box model's faces are its boxes' own (its block's textures may be unset, and
 /// came out as the missing texture's magenta): its largest box's. A plant's is its picture.
-fn face_of(c: &Content, looks: &super::looks::Looks, ctm: &super::ctm::Ctm, state: u32, dir: usize) -> (u32, u32) {
+fn face_of(c: &Content, looks: &super::looks::Looks, state: u32, dir: usize) -> (u32, u32) {
     let info = &c.states[state as usize];
     let drawn = looks.drawn(state, info);
     let volume = |b: &crate::content::ModelBox| (0..3).map(|a| (b.max[a] - b.min[a]).abs()).product::<f32>();
@@ -402,16 +403,20 @@ fn face_of(c: &Content, looks: &super::looks::Looks, ctm: &super::ctm::Ctm, stat
         weft_abi::BlockModel::Cross | weft_abi::BlockModel::Wire => drawn.textures[0],
         _ => drawn.textures[dir],
     };
-    // No overlays out there, but a face with one keeps its base untinted, as near: the overlay takes
-    // the tint. Tinted whole, a cherry's pink blossom (its young leaves a tinted overlay) came out
-    // brown-red far off in spring, round patches across the forests (Planner, 11-06: the test
-    // world's shots).
-    // (The tint kind is kept for an overlay's tint: the shaders leave the base untinted where the
-    // texture has an overlay, `frames`' overlay table, as near.)
-    let overlay = ctm.has_overlay(tex & face::TEX_MASK);
-    let paint = crate::content::face_paint(info, dir, overlay);
-    let tint = if paint.base_tinted || paint.overlay_tinted { info.tint as u32 } else { 0 };
-    (tex & face::TEX_MASK, tint)
+    // No upper layers out there: the face's tint kind is that of whichever of its layers takes
+    // one (upstream's face layers, `mesher::face_layers`). A face with a tinted upper layer
+    // (a cherry's young leaves over its pink blossom) is tinted by the shader only where the
+    // texture has that layer, as near (Planner, 11-06: brown-red patches when tinted whole).
+    let tex = tex & face::TEX_MASK;
+    let tint = crate::client::mesher::face_layers(c, info, tex, dir)
+        .iter()
+        .map(|l| l.tint as u32)
+        .find(|&t| t != 0)
+        .unwrap_or(0);
+    // The picture is the face's bottom layer: a texture tinted by a kind or of several layers is
+    // only their name (`x@core:grass`), never a picture of its own (`Content::layers`).
+    let tex = c.layers(tex).first().map_or(tex, |l| l.tex);
+    (tex, tint)
 }
 
 /// How far the ground falls per block to its lowest neighbour, from a `drop` between samples `s`
@@ -453,8 +458,7 @@ pub fn mesh(
         crown(words, i, j).map(|c| if canopy { Crown { bottom: c.bottom.min(at(i, j).0 + 1), trunk: None, ..c } } else { c })
     };
     let looks = super::looks::current();
-    let ctm = super::ctm::current();
-    let face_of = |state: u32, dir: usize| face_of(c, &looks, &ctm, state, dir);
+    let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
     let terrain = c.dims.get(dim as usize).and_then(|d| d.terrain.as_ref());
     // Crowns' leaves as the dimension draws them at this time of year (`far_leaves`).
     let far_leaves = terrain.and_then(|t| t.far_leaves);
@@ -791,8 +795,7 @@ pub fn mesh_smooth(
         crown(words, i, j).map_or(g, |c| (c.top, c.leaves, g.2, c.leaves))
     };
     let looks = super::looks::current();
-    let ctm = super::ctm::current();
-    let face_of = |state: u32, dir: usize| face_of(c, &looks, &ctm, state, dir);
+    let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
     let faces = c
         .dims
         .get(dim as usize)
@@ -992,7 +995,8 @@ impl Lod {
     pub fn distance() -> i32 {
         let c = content();
         c.game
-            .config_names
+            .catalog
+            .ids(weft_abi::entry_kind::CONFIG)
             .get("core:lod_distance")
             .map_or(0, |&id| crate::config::get(id) as i32)
             * 16

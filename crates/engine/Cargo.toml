@@ -13,6 +13,7 @@ weft_noise.workspace = true
 weft_render.workspace = true
 winit.workspace = true
 glam.workspace = true
+parry3d-f64 = { version = "0.31.1", default-features = false, features = ["required-features", "std", "alloc"] }
 bytemuck.workspace = true
 log.workspace = true
 rayon.workspace = true
@@ -28,6 +29,10 @@ zip.workspace = true
 kira.workspace = true
 serde_json.workspace = true
 serde = { version = "1", features = ["derive"] }
+reqwest.workspace = true
+rustls.workspace = true
+webpki-roots.workspace = true
+sha2.workspace = true
 mimalloc.workspace = true
 # The player's account (MIT, ours): the network key follows the account's 24 words.
 chiacraft-account = { path = "../account" }
@@ -38,19 +43,21 @@ chiacraft-wallet = { path = "../wallet", features = ["chain"] }
 chiacraft-sponsor = { path = "../sponsor" }
 iroh-mainline-address-lookup = "0.6.1"
 
+[build-dependencies]
+syn = { version = "2", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"
+
 [dev-dependencies]
 naga.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
 
-# The system clipboard; Android has none arboard reaches (clipboard.rs keeps the game's own).
+# NativeActivity: no Java of our own to build.
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.22.4"
+winit = { workspace = true, features = ["android-native-activity"] }
+
 [target.'cfg(not(target_os = "android"))'.dependencies]
 arboard.workspace = true
-
-# Android: winit's NativeActivity glue (the app's entry is `android_main`, crates/android).
-[target.'cfg(target_os = "android")'.dependencies]
-winit = { workspace = true, features = ["android-native-activity"] }
-# The game is a library the activity dlopens, and Android refuses one with initial-exec TLS
-# (mimalloc's default): the dynamic model there.
-mimalloc = { workspace = true, features = ["local_dynamic_tls"] }

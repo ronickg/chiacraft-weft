@@ -14,7 +14,7 @@ use weft_sdk::*;
 
 pub static GLIDER: Item = Item::named("glider");
 
-/// Gliding (the engine's `pose_when::GLIDING`): upright, arms up on the bar, no bob.
+/// Gliding (the engine's `core:gliding` condition): upright, arms up on the bar, no bob.
 pub static GLIDE: Pose = Pose::named("glide");
 
 /// Jump pressed in the air, from the client: open or close it.
@@ -39,12 +39,18 @@ pub fn register(r: &mut Registry) {
         .durability(wing.durability())
         .tab(&crate::tabs::TOOLS);
     // Leather stretched on a frame of sticks, lashed with string.
-    r.shaped(&base_api::CRAFTING, "glider", 1, &["LLL", "sTs", "s s"], &[('L', "base:leather"), ('s', "#stick"), ('T', "#string")]);
+    r.shaped(
+        &base_api::recipes::CRAFTING,
+        "glider",
+        1,
+        &["LLL", "sTs", "s s"],
+        &[('L', "base:leather"), ('s', "#stick"), ('T', "#string")],
+    );
     r.pose(&GLIDE)
         .action("glide")
-        .bob(false)
+        .no_bob()
         .priority(45)
-        .when(abi::pose_when::GLIDING | abi::pose_when::NOT_FLYING);
+        .when(Cond::new("core:gliding") & !Cond::flying());
     r.set_animations(&PLAYER, "base:player");
     r.bone_model(&PLAYER, WING_MODEL, "body");
     r.packet(&TOGGLE, |p, ()| toggle(&p.world(), p.player()));
@@ -52,7 +58,7 @@ pub fn register(r: &mut Registry) {
     let was = std::sync::atomic::AtomicBool::new(false);
     r.client_frame(move |c| {
         // The camera for the frame overlay: a HUD binding sees no client state.
-        FIRST_PERSON.store(c.state().camera == cameras::FIRST_PERSON.camera_id(), std::sync::atomic::Ordering::Relaxed);
+        FIRST_PERSON.store(c.state().camera == cameras::FIRST_PERSON.id(), std::sync::atomic::Ordering::Relaxed);
         let now = c.key_held(&client::keys::JUMP) && c.screen().is_empty();
         if now && !was.swap(true, std::sync::atomic::Ordering::Relaxed) {
             c.send(&TOGGLE, &());
@@ -237,13 +243,13 @@ fn air(w: &World, id: u64, st: &EntityState) {
         (&attribute::WIND_Z, wz),
         (&attribute::LIFT, lift),
     ] {
-        w.attribute_add_modifier(id, a, MOD, attr_op::ADD, v as f64, HOLD);
+        w.attribute_add_modifier(id, MOD, &Modifier::add(a, v as f64), HOLD);
     }
 }
 
 /// The ground under a point: its height and kind, or `None` past `reach`.
 fn ground(w: &World, from: Vec3, reach: f64) -> Option<(f64, Ground)> {
-    let hit = w.raycast(from, Vec3::new(0.0, -1.0, 0.0), reach, true)?;
+    let hit = w.raycast(from, Vec3::new(0.0, -1.0, 0.0), reach, Ray::blocks().liquids())?;
     let name = block_name(hit.state);
     let n = name.split_once(':').map_or(name, |(_, n)| n);
     let has = |k: &str| n.contains(k);

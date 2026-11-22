@@ -125,7 +125,7 @@ fn vertex(vi: u32, ii: u32) -> VOut {
     out.tex = inst.tex;
     var lit = vec3(1.0);
     if inst.light != 0xffffffffu {
-        lit = lightmap(unpack_light(inst.light), scene.params.z, scene.light.x, scene.light.y);
+        lit = lightmap(unpack_light(inst.light), scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
     }
     out.graded = select(0u, 1u, inst.light != 0xffffffffu);
     out.sky = select(1.0, unpack_light(inst.light).x, inst.light != 0xffffffffu);

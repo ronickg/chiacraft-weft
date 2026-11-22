@@ -25,9 +25,9 @@ pub static FLOOR: Component<[f64; 3]> = Component::named("animal_floor");
 pub fn init(r: &mut Registry) {
     r.entity_component(&FLOOR, [f64::NAN, 0.0, 0.0], 0);
     for s in crate::species::SPECIES.iter() {
-        r.attach(s.kind, &FLOOR);
+        r.edit(s.kind).attach(&FLOOR);
     }
-    r.modify(&chain::DAMAGE, stage::MULTIPLY, |m| {
+    r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
         let q = *m.query();
         let w = m.world();
         let Some(a) = w.component(q.entity, &ANIMAL) else { return };
@@ -40,7 +40,7 @@ pub fn init(r: &mut Registry) {
         let mut hit = raw * player_cap(&w, q.other, q.cause, size, level);
         let capped = hit;
         // 2. Armour.
-        if DamageCause::flags_of(q.cause) & damage_flags::BYPASSES_ARMOR == 0 {
+        if !comps::damage_cause::BYPASSES_ARMOR.on_id(q.cause) {
             hit *= 1.0 - vitals::combat::armour_cut(armour(&a), hit);
         }
         // 3. The floor (not for what ends a life outright: the void, `/kill`).

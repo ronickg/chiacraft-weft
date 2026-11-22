@@ -35,7 +35,7 @@ pub fn register(r: &mut Registry) {
         .texture("snow")
         .sound_group("snow")
         .hardness(0.1)
-        .mineable("shovel")
+        .mined_by("shovel", weft_sdk::abi::tool_tier::HAND)
         .drops_nothing()
         .no_item()
         .grows(air::SNOW_MELT_SECS, 0)

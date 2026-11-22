@@ -1,6 +1,7 @@
-//! Screen effects mods turn on (`client_op::POST_EFFECT`): `shaders/post/<name>.wgsl` snippets in
-//! one pipeline. With none on, the world is drawn straight to the screen; with some,
-//! it goes into an image the effects read one after another, the last one onto the screen.
+//! Screen effects selected by the resolved environment: `shaders/post/<name>.wgsl` snippets in
+//! one pipeline. With none on, the world is drawn straight to the screen; with some, or drawn
+//! smaller than the screen (`core:render_scale`), it goes into an image the effects read one
+//! after another, the last one onto the screen, stretched (with none, a pass without an effect).
 
 use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
 
@@ -665,14 +666,8 @@ impl Post {
         }
     }
 
-    /// Turns `name` on at `strength` (0 = off). False if no such effect exists.
-    pub fn set(&mut self, name: &str, strength: f32) -> bool {
-        let known = self.slots.slot(name) != 0;
-        self.active.retain(|(n, _)| n != name);
-        if strength > 0.0 && known {
-            self.active.push((name.to_string(), strength));
-        }
-        known || strength <= 0.0
+    pub fn has(&self, name: &str) -> bool {
+        self.slots.slot(name) != 0
     }
 
     /// Whether this frame needs the scene drawn into an image first.
@@ -684,6 +679,12 @@ impl Post {
     /// on draws it across, filtered).
     pub fn can_scale(&self) -> bool {
         self.pipeline.is_some()
+    }
+
+    /// Whether a scene drawn smaller can be stretched over the screen (upstream's name for
+    /// `can_scale`).
+    pub fn stretches(&self) -> bool {
+        self.can_scale()
     }
 
     /// Whether this frame is gathered over frames (`use_taa`, the motion image, and the pipelines):

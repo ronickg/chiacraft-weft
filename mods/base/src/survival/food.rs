@@ -3,7 +3,8 @@
 //! Food stacks carry when they were made and age: fresh, stale, spoiled, or hot off the fire.
 //! Well fed from three foods; food poisoning from raw, stale or spoiled food.
 
-use base_api::{FOOD, FRESHNESS, HOT, MADE, MEAL, VITALS, Vitals, freshness};
+use base_api::components::FOOD;
+use base_api::{FRESHNESS, HOT, MADE, MEAL, VITALS, Vitals, freshness};
 use vitals::effects::Effect;
 use vitals::{calendar, food, meals, stomach};
 use weft_sdk::*;
@@ -38,7 +39,7 @@ pub fn register(r: &mut Registry) {
     r.stack_component(&FRESHNESS, 0);
     // No room in the stomach: it doesn't start eating (the other way round it would only find out
     // at the end).
-    r.intercept(&actions::USE_ITEM, |q| {
+    r.before_event(&actions::USE_ITEM, |q| {
         let w = q.world();
         if w.outside_survival(q.entity()) {
             return Verdict::Abstain;
@@ -97,7 +98,7 @@ pub fn register(r: &mut Registry) {
     });
     // Opening a chest (or any block's inventory) brings its food's freshness up to date: it has
     // aged all along from its stamp, the stamp just says so now.
-    r.intercept(&actions::USE_BLOCK, |q| {
+    r.before_event(&actions::USE_BLOCK, |q| {
         let w = q.world();
         let be = w.block_entity(q.pos());
         if be != 0 {

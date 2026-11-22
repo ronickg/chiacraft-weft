@@ -392,7 +392,7 @@ pub fn cost_cell(ui: &mut Ui, key: &'static str, get: fn() -> f64) {
 
 /// The top of a tab: the frame now (and after a restart, `after`: ms more or less than now, an
 /// estimate), the Measure button for `rows`, and once, in a world, the offer to measure.
-pub fn top_line(ui: &mut Ui, screen: &'static Screen, rows: fn() -> Vec<Measured>, after: fn([u32; 2]) -> Option<f64>) {
+pub fn top_line(ui: &mut Ui, screen: &'static Menu, rows: fn() -> Vec<Measured>, after: fn([u32; 2]) -> Option<f64>) {
     ui.row(S::row().gap(3.0).center(), move |ui| {
         ui.text_bind_styled(S::default().max_w(250.0), move |_, t| {
             let l = *LIVE.lock().unwrap();
@@ -424,11 +424,11 @@ pub fn top_line(ui: &mut Ui, screen: &'static Screen, rows: fn() -> Vec<Measured
             ui.text_styled(S::default().class("dim").max_w(250.0), "video.base.cost.offer", &[]);
             ui.button("video.base.cost.measure_now", S::default().h(12.0).pad(2.0), move |c| {
                 start(rows(), window());
-                c.client().screen_open(screen);
+                c.client().menu_open(screen);
             });
             ui.button("video.base.cost.not_now", S::default().h(12.0).pad(2.0), move |c| {
                 OFFERED.set(true);
-                c.client().screen_open(screen);
+                c.client().menu_open(screen);
             });
         });
     }

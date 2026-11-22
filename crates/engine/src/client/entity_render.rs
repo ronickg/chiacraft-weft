@@ -7,11 +7,12 @@ use super::models::{MAX_LAYERS, PoseLod, Posed};
 use crate::gpu_layout::box_mode;
 use glam::{DVec3, IVec3, Mat4, Quat, Vec3, Vec4};
 use rustc_hash::FxHashMap;
+use weft_abi::entry_kind as ek;
 
 use super::models::{Act, Clips, Fade, Play};
 use crate::block_model::Display;
 use crate::gpu_layout::rows;
-use crate::model::{Drive, role};
+use crate::model::{self, Drive, role};
 use weft_abi::ItemStack;
 use weft_render::*;
 
@@ -23,6 +24,7 @@ use crate::assets::{Assets, decode_png};
 use crate::content::content;
 use crate::gpu_layout::{GpuBox, Scene};
 use crate::physics::Hit;
+use crate::physics::Transform;
 
 /// A skin a mod painted: the component it was painted from, the texture of the kind it was
 /// painted over (the looks drawn with it), and the GPU copy.
@@ -86,8 +88,8 @@ const OUTLINE_DARK: f32 = 0.4;
 pub struct Crack {
     pub pos: IVec3,
     pub progress: f32,
-    pub at: DVec3,
-    pub state: u32,
+    pub place: Transform,
+    pub part: crate::world::placement::Part,
 }
 
 pub struct Hand {
@@ -95,6 +97,8 @@ pub struct Hand {
     pub lowered: f32,
     /// Radians the hand lags behind a turning camera: pitch, yaw.
     pub lag: (f32, f32),
+    /// The bob to draw it with when the camera's own leaves walking out (`core:camera_bob` off).
+    pub bob: Option<(Vec3, f32, f32)>,
     /// The body shows too, not only what the clips bring up.
     pub body: bool,
 }
@@ -135,9 +139,19 @@ const ICON_CELLS: u32 = 16;
 #[derive(Clone, Copy)]
 enum Carrying {
     /// In a hand: a model, or a sprite or block when it is none.
-    Held { stack: ItemStack, model: Option<u32>, off: bool },
+    Held {
+        stack: ItemStack,
+        model: Option<u32>,
+        off: bool,
+    },
     /// A model on one of its bones.
-    On { model: u32, bone: usize },
+    On {
+        model: u32,
+        bone: usize,
+    },
+    Embedded {
+        stack: ItemStack,
+    },
 }
 
 /// Something on an entity this frame: its place in `posed`, what, its light, its age and who.
@@ -146,6 +160,8 @@ struct Carry {
     holder: usize,
     what: Carrying,
     lit: u32,
+    /// The biome its holder is in.
+    biome: Option<u16>,
     age: f32,
     id: u64,
 }
@@ -155,6 +171,19 @@ struct Sprite {
     size: u32,
     /// Opaque pixels and which of their sides touch another one (left, right, below, above).
     pixels: Vec<(u8, u8, u32)>,
+}
+
+#[derive(Clone, Copy)]
+struct ItemModel {
+    boxes: (u32, u32),
+    solid: bool,
+}
+
+struct PlayerSkin {
+    texture: TextureId,
+    index: u32,
+    size: [u32; 2],
+    slim: bool,
 }
 
 pub struct EntityRenderer {
@@ -173,6 +202,9 @@ pub struct EntityRenderer {
     /// Models into the sun's shadow map, when the shader pack draws one and its model shader has
     /// `fs_shadow`.
     shadow_pipe: Option<PipelineId>,
+    box_preview_pipe: PipelineId,
+    translucent_preview_pipe: PipelineId,
+    box_preview_buffers: Vec<(BufferId, u32)>,
     pub models: Models,
     buffers: Vec<(BufferId, u32)>,
     /// The held item's projection: a fixed field of view, like vanilla, so it keeps its shape
@@ -185,10 +217,10 @@ pub struct EntityRenderer {
     preview_target: Option<(TextureId, TextureId, [u32; 2], u32)>,
     /// Texture, bindless index and size, by name; and the glow masks of those that have one.
     skins: FxHashMap<String, Option<(TextureId, u32, [u32; 2])>>,
-    /// Players' own skins by entity, replacing the player kind's texture on them.
-    player_skins: FxHashMap<u64, (TextureId, u32, [u32; 2])>,
+    /// Players' own skins by entity, replacing the player kind's texture on them, and if their arms are slim.
+    player_skins: FxHashMap<u64, PlayerSkin>,
     /// Skins received and not uploaded yet.
-    pub skin_pending: Vec<(u64, Vec<u8>)>,
+    pub skin_pending: Vec<(u64, crate::net::Skin)>,
     /// Skins mods painted (`Host::reg_entity_skin`), by entity.
     painted: FxHashMap<u64, Painted>,
     /// Builds their painters set, by entity (this frame's parts' scales go to `Models::builds`).
@@ -209,7 +241,7 @@ pub struct EntityRenderer {
     /// Players who left, their skins and avatars to go.
     pub gone_pending: Vec<u64>,
     /// The setting: other than the kind's own model, a player's avatar shows.
-    pub show_avatars: bool,
+    show_avatars: bool,
     /// What plays on who coming in and going out, by entity and model: clips are the model's.
     fades: FxHashMap<(u64, u32), Vec<Fade>>,
     /// Actions asked for with no clip on a model, once said so.
@@ -217,13 +249,12 @@ pub struct EntityRenderer {
     /// When the last frame was, and from where.
     last_draw: std::time::Instant,
     last_cam: DVec3,
-    /// The local player's stacks in hand: others show by the item alone.
-    own_stacks: [ItemStack; 2],
     icon_views: Vec<BufferId>,
     icon_sheets: Vec<IconSheet>,
-    /// Frames drawn, for what doesn't happen every one; and the entities `preload` last went through.
+    /// Frames drawn, for pose LOD; assets are prepared on changes.
     frame_count: u32,
-    preloaded: usize,
+    preloaded: bool,
+    pub changed_items: rustc_hash::FxHashSet<u64>,
     /// Stacks whose picture comes next, and the model it is of.
     icons_todo: Vec<(ItemStack, u32)>,
     /// Pictures by model: however many stacks show as one have the one.
@@ -238,25 +269,18 @@ pub struct EntityRenderer {
     sprites: FxHashMap<String, Option<Sprite>>,
     /// Entities to pose this frame, kept between frames.
     posed: Vec<Posed>,
-    /// `preload`'s kinds and items already looked at this frame.
-    seen_kinds: Vec<bool>,
-    seen_items: Vec<bool>,
     /// Item models drawn instanced: pipelines for the world and the hand, each item's boxes
     /// (first, count) in `item_boxes`, the GPU copy (buffer, capacity, boxes uploaded) and the
     /// texture generation they were made with.
     item_pipe: PipelineId,
     hand_item_pipe: PipelineId,
     /// Boxes of each item's model, (first, count), by item and its stack's `layers` if any.
-    item_models: FxHashMap<(u32, Option<&'static str>), (u32, u32)>,
+    item_models: FxHashMap<(u32, Option<&'static str>, Option<u16>), ItemModel>,
     item_boxes: Vec<GpuBox>,
     item_buf: Option<(BufferId, u32, usize)>,
     item_generation: u64,
     /// This frame's item instances: (item, instance).
     instances: Vec<(u64, GpuBox)>,
-}
-
-fn shader(assets: &Assets) -> Result<Shader, ShaderError> {
-    crate::packs::shader(assets, "entity.wgsl")
 }
 
 pub const HOOK: crate::shaders::Hook = crate::shaders::Hook {
@@ -292,7 +316,7 @@ fn light_boxes(boxes: &mut [GpuBox], from: usize, light: u32) {
 
 impl EntityRenderer {
     pub fn new(gpu: &mut dyn Backend, assets: &Assets) -> Result<EntityRenderer, String> {
-        let (pipeline, overlay) = Self::pipelines(gpu, assets)?;
+        let (pipeline, overlay, box_preview_pipe, translucent_preview_pipe) = Self::pipelines(gpu, assets)?;
         let ([model_pipe, preview_pipe, model_hand_pipe], shadow_pipe, kind_shaders, effect_slots) = Self::model_pipelines(gpu, assets)?;
         let models = Models::new(gpu, assets);
         let frames = gpu.frames_in_flight();
@@ -312,14 +336,14 @@ impl EntityRenderer {
             avatar_pending: Vec::new(),
             gone_pending: Vec::new(),
             frame_count: 0,
-            preloaded: 0,
+            preloaded: false,
+            changed_items: Default::default(),
             icon_of_model: FxHashMap::default(),
             show_avatars: true,
             fades: FxHashMap::default(),
             warned_actions: Default::default(),
             last_draw: std::time::Instant::now(),
             last_cam: DVec3::ZERO,
-            own_stacks: [ItemStack::default(); 2],
             icon_views,
             icon_sheets: Vec::new(),
             icons_todo: Vec::new(),
@@ -330,7 +354,6 @@ impl EntityRenderer {
             item_buf: None,
             item_generation: 0,
             instances: Vec::new(),
-            seen_items: Vec::new(),
             pipeline,
             overlay,
             camera_kick: (Vec3::ZERO, 0.0, 0.0),
@@ -342,6 +365,9 @@ impl EntityRenderer {
             hand_views,
             preview,
             preview_pipe,
+            box_preview_pipe,
+            translucent_preview_pipe,
+            box_preview_buffers: Vec::new(),
             preview_target: None,
             preview_kind: None,
             skins: FxHashMap::default(),
@@ -360,13 +386,12 @@ impl EntityRenderer {
             effect_slots,
             sprites: FxHashMap::default(),
             posed: Vec::new(),
-            seen_kinds: Vec::new(),
         })
     }
 
     /// Item models instanced in the world and in the hand.
     fn item_pipelines(gpu: &mut dyn Backend, assets: &Assets) -> Result<(PipelineId, PipelineId), String> {
-        let s = shader(assets).map_err(|e| e.0)?;
+        let s = crate::packs::shader(assets, "entity.wgsl").map_err(|e| e.0)?;
         let mut pipe = |label, vertex| {
             gpu.create_pipeline(&PipelineDesc {
                 label,
@@ -385,8 +410,8 @@ impl EntityRenderer {
         Ok((pipe("items", "vs_item")?, pipe("hand item", "vs_hand_item")?))
     }
 
-    fn pipelines(gpu: &mut dyn Backend, assets: &Assets) -> Result<(PipelineId, PipelineId), String> {
-        let s = shader(assets).map_err(|e| e.0)?;
+    fn pipelines(gpu: &mut dyn Backend, assets: &Assets) -> Result<(PipelineId, PipelineId, PipelineId, PipelineId), String> {
+        let s = crate::packs::shader(assets, "entity.wgsl").map_err(|e| e.0)?;
         let main = gpu
             .create_pipeline(&PipelineDesc {
                 label: "entities",
@@ -415,7 +440,35 @@ impl EntityRenderer {
                 motion: crate::post::motion(),
             })
             .map_err(|e| e.0)?;
-        Ok((main, overlay))
+        let preview = gpu
+            .create_pipeline(&PipelineDesc {
+                label: "block preview",
+                shader: &s,
+                vertex: "vs",
+                fragment: Some("fs"),
+                color: Some(Format::Rgba8Srgb),
+                depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
+                blend: Blend::None,
+                cull_back: true,
+                topology: Topology::Triangles,
+                motion: false,
+            })
+            .map_err(|e| e.0)?;
+        let translucent = gpu
+            .create_pipeline(&PipelineDesc {
+                label: "translucent block preview",
+                shader: &s,
+                vertex: "vs",
+                fragment: Some("fs_overlay"),
+                color: Some(Format::Rgba8Srgb),
+                depth: Some(DepthState { write: false, compare: Compare::GreaterEqual }),
+                blend: Blend::Alpha,
+                cull_back: true,
+                topology: Topology::Triangles,
+                motion: false,
+            })
+            .map_err(|e| e.0)?;
+        Ok((main, overlay, preview, translucent))
     }
 
     /// The model pipelines (screen, inventory figure image, first person hand) with every entity
@@ -439,7 +492,7 @@ impl EntityRenderer {
             .iter()
             .map(|d| {
                 let slot = effect_slots.slot(&d.shader);
-                if slot == 0 {
+                if slot == 0 && d.shader_given && !d.shader.is_empty() {
                     log::warn!("entity effect {}: no shader entity_effect/{}", d.name, d.shader);
                 }
                 slot
@@ -513,6 +566,7 @@ impl EntityRenderer {
             Err(e) => log::error!("model shader: {e}"),
         }
         self.models.reload(gpu, assets);
+        self.preloaded = false;
         // Avatars are models, gone with the others: they come back from what was sent.
         for (id, a) in self.avatars.drain() {
             a.destroy(gpu);
@@ -547,7 +601,11 @@ impl EntityRenderer {
         self.item_models.clear();
         self.item_boxes.clear();
         match Self::pipelines(gpu, assets) {
-            Ok((a, b)) => {
+            Ok((a, b, preview, translucent)) => {
+                gpu.destroy_pipeline(self.box_preview_pipe);
+                gpu.destroy_pipeline(self.translucent_preview_pipe);
+                self.box_preview_pipe = preview;
+                self.translucent_preview_pipe = translucent;
                 gpu.destroy_pipeline(self.pipeline);
                 gpu.destroy_pipeline(self.overlay);
                 self.pipeline = a;
@@ -557,20 +615,26 @@ impl EntityRenderer {
         }
     }
 
-    /// Uploads player `entity`'s own skin.
-    pub fn set_skin(&mut self, gpu: &mut dyn Backend, entity: u64, png: &[u8]) {
-        let Some(img) = crate::assets::decode_png(png) else { return };
+    pub fn set_show_avatars(&mut self, show: bool) {
+        if self.show_avatars != show {
+            self.show_avatars = show;
+            self.changed_items.extend(self.avatar_sent.keys().copied());
+        }
+    }
+
+    /// Uploads the player's skin with the model chosen in their profile.
+    pub fn set_skin(&mut self, gpu: &mut dyn Backend, entity: u64, skin: &crate::net::Skin) {
+        let Some(img) = crate::assets::decode_png(&skin.png) else { return };
         let t = gpu.create_texture(
             &TextureDesc { width: img.width, height: img.height, mips: 1, format: Format::Rgba8Srgb, render_target: false },
             "player skin",
         );
         gpu.write_texture(t, 0, &img.rgba);
-        if let Some(old) = self
-            .player_skins
-            .insert(entity, (t, gpu.texture_index(t), [img.width, img.height]))
-        {
-            gpu.destroy_texture(old.0);
+        let skin = PlayerSkin { texture: t, index: gpu.texture_index(t), size: [img.width, img.height], slim: skin.slim };
+        if let Some(old) = self.player_skins.insert(entity, skin) {
+            gpu.destroy_texture(old.texture);
         }
+        self.changed_items.insert(entity);
     }
 
     /// Takes in player `entity`'s avatar: a model made of what it sent, painted with its picture.
@@ -613,6 +677,7 @@ impl EntityRenderer {
             old.destroy(gpu);
         }
         self.avatar_sent.insert(entity, sent);
+        self.changed_items.insert(entity);
     }
 
     /// Skins, glow masks and icon sheets: loaded when first used, freed on a reload and at the end.
@@ -633,13 +698,11 @@ impl EntityRenderer {
     }
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
-        for (t, ..) in self
-            .player_skins
-            .drain()
-            .map(|(_, v)| v)
-            .chain(self.painted.drain().map(|(_, p)| p.tex))
-        {
-            gpu.destroy_texture(t);
+        for skin in self.player_skins.drain().map(|(_, v)| v) {
+            gpu.destroy_texture(skin.texture);
+        }
+        for p in self.painted.drain().map(|(_, p)| p) {
+            gpu.destroy_texture(p.tex.0);
         }
         for a in self.avatars.drain().map(|(_, v)| v) {
             a.destroy(gpu);
@@ -656,6 +719,11 @@ impl EntityRenderer {
         gpu.destroy_pipeline(self.preview_pipe);
         if let Some(s) = self.shadow_pipe.take() {
             gpu.destroy_pipeline(s);
+        }
+        gpu.destroy_pipeline(self.box_preview_pipe);
+        gpu.destroy_pipeline(self.translucent_preview_pipe);
+        for (buffer, _) in self.box_preview_buffers.drain(..) {
+            gpu.destroy_buffer(buffer);
         }
         if let Some((c, d, ..)) = self.preview_target.take() {
             gpu.destroy_texture(c);
@@ -675,18 +743,16 @@ impl EntityRenderer {
         }
     }
 
-    /// Gets ready what this frame draws, before anything is recorded: it may put new models in the
-    /// tables. Loads skins and worn textures the first time something visible uses them; `worn` is
-    /// what the local player wears.
+    /// Prepares changed displayed stacks before recording draws, including models and textures
+    /// supplied by stack data. The local player's presentation follows prediction each frame.
+    /// `comps`: the entities' components, for the skins mods paint (chiacraft).
     pub fn preload(
         &mut self,
         gpu: &mut dyn Backend,
         assets: &Assets,
         entities: &FxHashMap<u64, ClientEntity>,
         comps: &FxHashMap<(u64, u32), Vec<u8>>,
-        worn: &[u32],
-        worn_looks: &[String],
-        held: [ItemStack; 2],
+        me: &ClientEntity,
     ) {
         let c = content();
         self.frame_count = self.frame_count.wrapping_add(1);
@@ -701,15 +767,40 @@ impl EntityRenderer {
             if let Some(a) = self.avatars.remove(&id) {
                 a.destroy(gpu);
             }
-            if let Some((t, ..)) = self.player_skins.remove(&id) {
-                gpu.destroy_texture(t);
+            if let Some(skin) = self.player_skins.remove(&id) {
+                gpu.destroy_texture(skin.texture);
             }
         }
-        for s in held {
-            self.load_sprite(assets, &s);
-            self.models.model_for(assets, s);
+        let mut changed = std::mem::take(&mut self.changed_items);
+        if !self.preloaded {
+            changed.extend(entities.keys());
+            self.preloaded = true;
         }
-        self.own_stacks = held;
+        for (id, e) in changed
+            .iter()
+            .filter_map(|id| entities.get(id).map(|e| (*id, e)))
+            .chain(std::iter::once((self.local, me)))
+        {
+            self.load(gpu, assets, &c.game.entities[e.look() as usize].texture);
+            for stack in e.displayed() {
+                self.load_sprite(assets, &stack);
+                self.models.model_for(assets, stack);
+                for embedded in crate::stack::embedded(&stack) {
+                    if let Some(kind) = c.game.catalog.find(ek::ENTITY, &embedded.kind) {
+                        self.load(gpu, assets, &c.game.entities[kind as usize].texture);
+                    }
+                }
+            }
+            let drawn = self.model_of(id, e.look());
+            for &stack in &e.worn {
+                if let Some((_, texture)) = c.worn(&stack) {
+                    self.load(gpu, assets, texture);
+                }
+                self.models.prepare_worn(assets, drawn, stack);
+            }
+        }
+        changed.clear();
+        self.changed_items = changed;
         let wanted = std::mem::take(&mut super::models::ICONS.lock().unwrap().wanted);
         for stack in wanted {
             match self.models.model_for(assets, stack) {
@@ -722,67 +813,6 @@ impl EntityRenderer {
         }
         for skin in std::mem::take(&mut self.models.new_skins) {
             self.load(gpu, assets, &skin);
-        }
-        // Others' stacks in hand with layers of their own (only players' have them): their sprite
-        // before the first frame they are drawn, or a flat one is made and kept.
-        for e in entities
-            .values()
-            .filter(|e| e.held != 0 && e.held_look.is_some())
-        {
-            self.load_sprite(assets, &held_shown(e, e.held, false));
-        }
-        // What is new shows up soon enough; going through thousands of entities each frame to learn
-        // that nothing is costs more than the rest of this.
-        if entities.len() == self.preloaded && self.frame_count % 16 != 0 {
-            self.models.sync(gpu);
-            return;
-        }
-        self.preloaded = entities.len();
-        // Each kind and item looked at once per frame, without listing thousands of entities.
-        let mut seen = std::mem::take(&mut self.seen_kinds);
-        seen.clear();
-        seen.resize(c.game.entities.len(), false);
-        let mut seen_items = std::mem::take(&mut self.seen_items);
-        seen_items.clear();
-        seen_items.resize(c.items.len(), false);
-        for e in entities.values() {
-            if !e.item.is_empty() && seen_items.get(e.item.item as usize).is_some_and(|s| !s) {
-                seen_items[e.item.item as usize] = true;
-            }
-            if !e.item.is_empty() {
-                self.load_sprite(assets, &e.item);
-            }
-            if !e.item.is_empty() && !c.game.item_model_for_stack.is_empty() {
-                self.models.model_for(assets, e.item);
-            }
-            if !std::mem::replace(&mut seen[e.look() as usize], true) {
-                self.load(gpu, assets, &c.game.entities[e.look() as usize].texture);
-            }
-            for (k, &i) in e.worn.iter().enumerate() {
-                if let Some((_, t)) = worn_texture(c, i, k, &e.worn_looks) {
-                    self.load(gpu, assets, t);
-                }
-            }
-            for i in [e.held, e.off_held] {
-                if i != 0 && seen_items.get(i as usize).is_some_and(|s| !s) {
-                    seen_items[i as usize] = true;
-                    self.load_sprite(assets, &ItemStack { item: i, count: 1, data: 0 });
-                }
-            }
-        }
-        self.seen_kinds = seen;
-        self.seen_items = seen_items;
-        self.load(gpu, assets, &c.game.entities[c.game.player_kind as usize].texture);
-        if let Some(k) = self
-            .preview_kind
-            .filter(|&k| (k as usize) < c.game.entities.len())
-        {
-            self.load(gpu, assets, &c.game.entities[k as usize].texture);
-        }
-        for (k, &i) in worn.iter().enumerate() {
-            if let Some((_, t)) = worn_texture(c, i, k, worn_looks) {
-                self.load(gpu, assets, t);
-            }
         }
         self.models.sync(gpu);
     }
@@ -806,7 +836,11 @@ impl EntityRenderer {
                 .skin_painters
                 .iter()
                 .filter_map(|p| {
-                    let kind = *c.game.entity_names.get(&p.kind)?;
+                    let kind = *c
+                        .game
+                        .catalog
+                        .ids(weft_abi::entry_kind::ENTITY)
+                        .get(&p.kind)?;
                     let comp = c.components.id(&p.comp)?;
                     Some((kind, (comp, p.owner, p.cb)))
                 })
@@ -950,14 +984,22 @@ impl EntityRenderer {
         })
     }
 
-    /// The opaque pixels of a stack's sprite, read the first time it is held or dropped.
+    /// The opaque pixels of a stack's sprites, read the first time it is held or dropped.
     fn load_sprite(&mut self, assets: &Assets, stack: &ItemStack) {
-        let Some(name) = sprite_name(stack) else { return };
+        let looks = super::looks::current();
+        let c = content();
+        let draw = looks.item_draw(c, stack, None, "west");
+        for name in draw.sprites().iter().filter_map(|s| s.outline(&looks, c)) {
+            self.load_sprite_named(assets, name);
+        }
+    }
+
+    fn load_sprite_named(&mut self, assets: &Assets, name: String) {
         if self.sprites.contains_key(&name) {
             return;
         }
-        // Its own pictures one over the other, as its icon shows them.
-        let img = match crate::stack::layers(stack) {
+        // A stack's own pictures one over the other, as its icon shows them.
+        let img = match name.strip_prefix("layers:") {
             // Chiacraft's look: its layers composed as its icon is.
             Some(spec) if crate::stack::is_look(spec) => super::stack_look::compose(spec, |n| crate::assets::read_image(assets, n))
                 .map(|(size, rgba)| crate::assets::Image { width: size, height: size, rgba }),
@@ -973,7 +1015,7 @@ impl EntityRenderer {
                     .map(|rgba| crate::assets::Image { width: t.size, height: t.size, rgba: rgba.clone() })
             }
             None => assets
-                .read(&name, "textures", "png")
+                .read(&assets.picture(&name), "textures", "png")
                 .and_then(|b| decode_png(&b)),
         };
         let sprite = img.map(|img| {
@@ -1007,43 +1049,34 @@ impl EntityRenderer {
     }
 
     /// An item's model as boxes in the unit cube, made once: a block item's shape, else its
-    /// sprite one texel thick (flat when the sprite could not be read). (first box, count).
-    fn item_model(&mut self, textures: &GameTextures, stack: &ItemStack) -> Option<(u32, u32)> {
+    /// sprite one texel thick (flat when the sprite could not be read). (first box, count). A
+    /// block's layers tinted by a kind take its colors in `biome`, where the item is.
+    fn item_model(&mut self, textures: &GameTextures, stack: &ItemStack, biome: Option<u16>) -> Option<ItemModel> {
+        let c = content();
+        let looks = super::looks::current();
         let (item, layers) = (stack.item, crate::stack::layers(stack));
-        if let Some(&m) = self.item_models.get(&(item, layers)) {
+        if let Some(&m) = self.item_models.get(&(item, layers, biome)) {
             return Some(m);
         }
-        let c = content();
+        let draw = looks.item_draw(c, stack, biome, "west");
         let first = self.item_boxes.len();
         let white = Vec4::new(1.0, 1.0, 1.0, 0.0);
-        let looks = super::looks::current();
-        let mut sprite_color = white;
-        let sprite = match looks.item_draw(c, item) {
-            ItemDraw::Model(model) => {
-                boxes_shape(&mut self.item_boxes, textures, Mat4::IDENTITY, model, &c.states[0], white);
-                None
-            }
-            ItemDraw::Icon(t) => Some(layers.map_or(t, |l| textures.layered(l))),
-            ItemDraw::Block(state) => {
-                let s = &c.states[state as usize];
-                let sprite = looks.block_sprite(state, s);
-                if sprite.is_none() {
-                    boxes_shape(&mut self.item_boxes, textures, Mat4::IDENTITY, &looks.block_shape(state, s), s, white);
-                }
-                if crate::content::face_paint(s, 0, false).base_tinted {
-                    let [r, g, b, _] = (crate::content::item_tint(s.tint) << 8)
-                        .to_be_bytes()
-                        .map(|v| v as f32 / 255.0);
-                    sprite_color = Vec4::new(r, g, b, 0.0);
-                }
-                sprite
-            }
-            ItemDraw::Nothing => return None,
-        };
-        if let Some(t) = sprite {
+        if let ItemDraw::Model { boxes, state } = &draw {
+            boxes_shape(&mut self.item_boxes, textures, Mat4::IDENTITY, boxes, &c.states[*state as usize], biome, white);
+        }
+        if matches!(draw, ItemDraw::Nothing) {
+            return None;
+        }
+        for (k, sprite) in draw.sprites().iter().enumerate() {
+            let t = sprite.texture(textures);
+            let [r, g, b, _] = (sprite.color << 8).to_be_bytes().map(|v| v as f32 / 255.0);
+            let color = Vec4::new(r, g, b, 0.0);
             let l = textures.texture(t);
-            match sprite_name(stack)
-                .and_then(|n| self.sprites.get(&n))
+            // A layer over another is a hair thicker, so it covers it on both sides.
+            let more = k as f32 * 0.002;
+            match sprite
+                .outline(&looks, c)
+                .and_then(|name| self.sprites.get(&name))
                 .and_then(|s| s.as_ref())
             {
                 Some(sp) => {
@@ -1051,22 +1084,22 @@ impl EntityRenderer {
                     // Only the outline: a side face against a neighboring pixel would fight
                     // with it. Mode 4: every face takes the color of this one texel.
                     for &(x, y, hidden) in &sp.pixels {
-                        let m = Mat4::from_translation(Vec3::new(x as f32 / n, 1.0 - (y as f32 + 1.0) / n, 7.5 / 16.0))
-                            * Mat4::from_scale(Vec3::new(1.0 / n, 1.0 / n, 1.0 / 16.0));
+                        let m = Mat4::from_translation(Vec3::new(x as f32 / n, 1.0 - (y as f32 + 1.0) / n, 7.5 / 16.0 - more))
+                            * Mat4::from_scale(Vec3::new(1.0 / n, 1.0 / n, 1.0 / 16.0 + 2.0 * more));
                         self.item_boxes.push(GpuBox {
                             rows: rows(m),
                             uvo: [(x as f32 + 0.5) / n, (y as f32 + 0.5) / n, 0.0, 0.0],
-                            color: sprite_color.to_array(),
+                            color: color.to_array(),
                             ids: [0, box_mode::TEXEL, l, hidden],
                             ..Default::default()
                         });
                     }
                 }
                 None => {
-                    let m = Mat4::from_translation(Vec3::new(0.0, 0.0, 0.5)) * Mat4::from_scale(Vec3::new(1.0, 1.0, 0.0));
+                    let m = Mat4::from_translation(Vec3::new(0.0, 0.0, 0.5 + more)) * Mat4::from_scale(Vec3::new(1.0, 1.0, 0.0));
                     self.item_boxes.push(GpuBox {
                         rows: rows(m),
-                        color: sprite_color.to_array(),
+                        color: color.to_array(),
                         ids: [0, box_mode::FACES, l | l << 16, l | l << 16],
                         ids2: [l | l << 16, 0, 0, 0],
                         ..Default::default()
@@ -1074,8 +1107,8 @@ impl EntityRenderer {
                 }
             }
         }
-        let m = (first as u32, (self.item_boxes.len() - first) as u32);
-        self.item_models.insert((item, layers), m);
+        let m = ItemModel { boxes: (first as u32, (self.item_boxes.len() - first) as u32), solid: draw.solid() };
+        self.item_models.insert((item, layers, biome), m);
         Some(m)
     }
 
@@ -1138,15 +1171,7 @@ impl EntityRenderer {
 
     /// Model instances of `entity`, of `kind`: its skin (a player's own if they sent one) and what
     /// it wears (how many in `.1`).
-    fn layers(
-        &self,
-        kind: u32,
-        entity: u64,
-        worn: &[u32],
-        worn_looks: &[String],
-        light: u32,
-        effect: (u32, f32),
-    ) -> ([Instance; MAX_LAYERS], usize) {
+    fn layers(&self, kind: u32, entity: u64, worn: &[ItemStack], light: u32, effect: (u32, f32)) -> ([Instance; MAX_LAYERS], usize) {
         let c = content();
         let k = &c.game.entities[kind as usize];
         let mut out = ([Instance::default(); MAX_LAYERS], 0);
@@ -1164,14 +1189,17 @@ impl EntityRenderer {
             .player_skins
             .get(&entity)
             .filter(|_| kind == c.game.player_kind)
+            .map(|o| (o.index, o.size))
             .or_else(|| {
                 self.painted
                     .get(&entity)
                     .filter(|p| p.texture == k.texture)
-                    .map(|p| &p.tex)
+                    .map(|p| (p.tex.1, p.tex.2))
             });
+        // Worn textures are laid out on the model's own texture size (`worn_tex_size`).
         let layout = size;
-        let (skin, size) = own.map_or((skin, size), |o| (&o.1, o.2));
+        let (skin, size) = own.map_or((*skin, size), |o| o);
+        let skin = &skin;
         let base = Instance {
             color: [1.0; 3],
             light,
@@ -1184,25 +1212,28 @@ impl EntityRenderer {
             glow: glow(&k.texture),
             ..Default::default()
         };
-        // An avatar is painted its own way, which armor's textures know nothing of.
-        if let Some(a) = self.avatar_of(entity, kind) {
-            let size = self
-                .models
-                .kinds
-                .get(a.kind as usize)
-                .and_then(|m| m.texture)
-                .unwrap_or(a.size);
-            out.0[0] = Instance { tex: a.index, tex_size: size.map(|v| v as f32), glow: a.glow.map_or(u32::MAX, |g| g.1), ..base };
-            out.1 = 1;
-            return out;
-        }
-        out.0[0] = base;
+        // An avatar is painted its own way; what it wears goes on its own worn geometry.
+        let avatar = self.avatar_of(entity, kind);
+        out.0[0] = match avatar {
+            Some(a) => {
+                let size = self
+                    .models
+                    .kinds
+                    .get(a.kind as usize)
+                    .and_then(|m| m.texture)
+                    .unwrap_or(a.size);
+                Instance { tex: a.index, tex_size: size.map(|v| v as f32), glow: a.glow.map_or(u32::MAX, |g| g.1), ..base }
+            }
+            None => base,
+        };
         out.1 = 1;
-        for (k, &i) in worn.iter().enumerate() {
-            if let Some((w, t)) = worn_texture(c, i, k, worn_looks) {
+        let model = self.model_of(entity, kind);
+        for stack in worn {
+            let i = stack.item;
+            if let Some((w, t)) = c.worn(stack) {
                 if let Some(Some((_, idx, size))) = self.skins.get(t).filter(|_| out.1 < MAX_LAYERS) {
                     let names = c.worn_bones(i);
-                    let bone_mask = self.models.kinds.get(kind as usize).map_or(0, |m| {
+                    let bone_mask = self.models.kinds.get(model as usize).map_or(0, |m| {
                         m.parts
                             .iter()
                             .take(32)
@@ -1217,6 +1248,7 @@ impl EntityRenderer {
                         bone_mask,
                         inflate: w.inflate,
                         glow: glow(t),
+                        worn: 1,
                         ..base
                     };
                     out.1 += 1;
@@ -1243,7 +1275,7 @@ impl EntityRenderer {
     pub fn action_of<'a>(&self, id: u64, e: &'a ClientEntity) -> Option<&'a str> {
         let (name, start, looping) = e.action.as_ref()?;
         let m = self.models.kinds.get(self.model_kind(id, e) as usize)?;
-        let last = *m.action(e.held, name).last()?;
+        let last = *m.action(e.held.item, name).last()?;
         let done = m
             .anims
             .get(last as usize)?
@@ -1253,17 +1285,41 @@ impl EntityRenderer {
 
     pub fn clip_length(&self, id: u64, e: &ClientEntity, name: &str) -> Option<f32> {
         let m = self.models.kinds.get(self.model_kind(id, e) as usize)?;
-        let last = *m.action(e.held, name).last()?;
+        let last = *m.action(e.held.item, name).last()?;
         Some(m.anims.get(last as usize)?.anim.length)
     }
 
     fn model_kind(&self, id: u64, e: &ClientEntity) -> u32 {
-        let look = e.look();
-        self.avatar_of(id, look).map_or(look, |a| a.kind)
+        self.model_of(id, e.look())
+    }
+
+    /// The model `entity` of `kind` is drawn with: its avatar's,
+    /// else the player's for a skin of 64 x 64, else the kind's own.
+    fn model_of(&self, entity: u64, kind: u32) -> u32 {
+        if kind != content().game.player_kind {
+            return kind;
+        }
+        if let Some(a) = self.avatar_of(entity, kind) {
+            return a.kind;
+        }
+        let skin = self
+            .player_skins
+            .get(&entity)
+            .filter(|s| s.size == [64, 64]);
+        match (skin, self.models.skinned) {
+            (Some(skin), Some(models)) => {
+                if skin.slim {
+                    models.slim
+                } else {
+                    models.classic
+                }
+            }
+            _ => kind,
+        }
     }
 
     fn avatar_of(&self, entity: u64, kind: u32) -> Option<&AvatarLook> {
-        if self.avatars.is_empty() || !self.show_avatars || kind != content().game.player_kind {
+        if self.avatars.is_empty() || (!self.show_avatars && entity != self.local) || kind != content().game.player_kind {
             return None;
         }
         self.avatars.get(&entity)
@@ -1293,7 +1349,13 @@ impl EntityRenderer {
                 Vec4::new(-1.0, 1.0, 0.5, 1.0),
             );
             for &vb in &self.icon_views {
-                let v = Scene { view_proj: proj.to_cols_array_2d(), params: [1e9, 2e9, 1.0, crate::shaders::time()], ..Default::default() };
+                let v = Scene {
+                    view_proj: proj.to_cols_array_2d(),
+                    params: [1e9, 2e9, 1.0, crate::shaders::time()],
+                    environment: [1.0, 0.0, 0.0, 0.0],
+                    light: [0.04, 0.0, 0.0, 0.0],
+                    ..Default::default()
+                };
                 gpu.mapped(vb)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&v));
             }
         }
@@ -1359,32 +1421,37 @@ impl EntityRenderer {
         true
     }
 
-    /// Renders the local player's model into a `size` texture (physical pixels), turned towards
-    /// `look` (relative to the texture's top left) like the inventory figure; or `subject`'s
-    /// (entity, kind), such as an animal's in its own screen. Returns the texture's bindless
-    /// index for the UI to draw.
-    pub fn draw_preview(
+    /// Prepares a local appearance without a world, using the inventory figure's renderer.
+    pub fn prepare_preview(
         &mut self,
         gpu: &mut dyn Backend,
-        list: &mut CommandList,
-        frame: &FrameInfo,
-        size: [u32; 2],
-        look: glam::Vec2,
-        worn: &[u32],
-        worn_looks: &[String],
-        subject: Option<(u64, u32)>,
-    ) -> Option<u32> {
-        let c = content();
+        assets: &Assets,
+        skin: Option<&crate::net::Skin>,
+        avatar: Option<crate::net::AvatarData>,
+    ) {
+        self.load(gpu, assets, &content().game.entities[content().game.player_kind as usize].texture);
+        if let Some(skin) = skin {
+            self.set_skin(gpu, self.local, skin);
+        }
+        if let Some(avatar) = avatar {
+            self.set_avatar(gpu, self.local, std::sync::Arc::new(avatar));
+        }
+        for skin in std::mem::take(&mut self.models.new_skins) {
+            self.load(gpu, assets, &skin);
+        }
+        self.models.sync(gpu);
+    }
+
+    pub fn set_preview_model(&mut self, slim: bool) {
+        if let Some(skin) = self.player_skins.get_mut(&self.local) {
+            skin.slim = slim;
+        }
+    }
+
+    fn preview_surface(&mut self, gpu: &mut dyn Backend, size: [u32; 2]) -> Option<(TextureId, TextureId, u32)> {
         if size[0] == 0 || size[1] == 0 {
             return None;
         }
-        // The local player (the inventory's figure), or another entity (a menu's own, such as an
-        // animal's screen), fitted to the frame by its size and seen from three quarters.
-        let (entity, look_kind) = subject.unwrap_or((self.local, c.game.player_kind));
-        let def = c.game.entities.get(look_kind as usize)?;
-        let player = subject.is_none();
-        let worn: &[u32] = if player { worn } else { &[] };
-        let worn_looks: &[String] = if player { worn_looks } else { &[] };
         if self.preview_target.is_none_or(|t| t.2 != size) {
             if let Some((col, dep, ..)) = self.preview_target.take() {
                 gpu.destroy_texture(col);
@@ -1396,6 +1463,90 @@ impl EntityRenderer {
             self.preview_target = Some((col, dep, size, gpu.texture_index(col)));
         }
         let (col, dep, _, index) = self.preview_target?;
+        Some((col, dep, index))
+    }
+
+    /// Unregistered block boxes use the same depth-tested faces as held block models.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_box_preview(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        size: [u32; 2],
+        textures: &GameTextures,
+        boxes: &[crate::content::ModelBox],
+        view: crate::ui::render::ModelView,
+        translucent: bool,
+    ) -> Option<u32> {
+        let (col, dep, index) = self.preview_surface(gpu, size)?;
+        let mut faces = Vec::new();
+        boxes_shape(&mut faces, textures, Mat4::IDENTITY, boxes, &content().states[0], None, Vec4::new(1.0, 1.0, 1.0, 0.0));
+        light_boxes(&mut faces, 0, FULL_LIGHT);
+        let projection = view.projection([size[0] as f32, size[1] as f32], boxes);
+        if translucent {
+            let depth = |quad: &GpuBox| {
+                let point = |row: [f32; 4]| row[3] + (row[0] + row[1]) * 0.5;
+                projection
+                    .project_point3(Vec3::from(quad.rows.map(point)))
+                    .z
+            };
+            faces.sort_by(|a, b| depth(a).total_cmp(&depth(b)));
+        }
+
+        let scene = Scene {
+            view_proj: projection.to_cols_array_2d(),
+            params: [1e9, 2e9, 1.0, crate::shaders::time()],
+            environment: [1.0, 0.0, 0.0, 0.0],
+            ..Default::default()
+        };
+        let scene_buffer = self.preview[frame.slot];
+        gpu.mapped(scene_buffer)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
+        let buffer = crate::gpu_layout::frame_buffer(
+            gpu,
+            &mut self.box_preview_buffers,
+            frame.slot,
+            faces.len().max(1) as u32,
+            size_of::<GpuBox>() as u64,
+            usage::STORAGE,
+            "preview boxes",
+        );
+        gpu.mapped(buffer)[..faces.len() * size_of::<GpuBox>()].copy_from_slice(bytemuck::cast_slice(&faces));
+        list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(col), Some([0.0; 4]))), depth: Some((dep, Some(0.0))) });
+        if !faces.is_empty() {
+            list.pipeline(if translucent { self.translucent_preview_pipe } else { self.box_preview_pipe });
+            list.bind(crate::gpu_layout::bind::entity::BOXES, buffer);
+            list.bind(crate::gpu_layout::bind::entity::SCENE, scene_buffer);
+            list.bind(crate::gpu_layout::bind::entity::GLOW_MAP, textures.glow_buffer());
+            list.draw(faces.len() as u32 * 36, 1);
+        }
+        list.push(Cmd::EndPass);
+        Some(index)
+    }
+
+    /// Renders the local player's model into a `size` texture (physical pixels), turned towards
+    /// `look` (relative to the texture's top left) like the inventory figure; or `subject`'s
+    /// (entity, kind), such as an animal's in its own screen. Returns the texture's bindless
+    /// index for the UI to draw.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_preview(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        size: [u32; 2],
+        look: glam::Vec2,
+        worn: &[ItemStack],
+        subject: Option<(u64, u32)>,
+    ) -> Option<u32> {
+        let c = content();
+        // The local player (the inventory's figure), or another entity (a menu's own, such as an
+        // animal's screen), fitted to the frame by its size and seen from three quarters.
+        let (entity, look_kind) = subject.unwrap_or((self.local, c.game.player_kind));
+        let def = c.game.entities.get(look_kind as usize)?;
+        let player = subject.is_none();
+        let worn: &[ItemStack] = if player { worn } else { &[] };
+        let (col, dep, index) = self.preview_surface(gpu, size)?;
         let (x, y, w, h) = (0.0, 0.0, size[0] as f32, size[1] as f32);
         let (sw, sh) = (w, h);
         // Pixels a block: the player as before; another kind by its height and its length, about
@@ -1417,12 +1568,10 @@ impl EntityRenderer {
             Vec4::new(0.0, 0.0, 0.1, 0.0),
             Vec4::new(2.0 * cx / sw - 1.0, 1.0 - 2.0 * feet / sh, 0.5, 1.0),
         );
-        let layers = self.layers(look_kind, entity, worn, worn_looks, FULL_LIGHT, (0, 0.0));
+        let layers = self.layers(look_kind, entity, worn, FULL_LIGHT, (0, 0.0));
         self.models.begin();
         let root = Mat4::from_rotation_y(yaw) * Mat4::from_scale(Vec3::splat(1.0 / 16.0));
-        let kind = self
-            .avatar_of(entity, look_kind)
-            .map_or(look_kind, |a| a.kind);
+        let kind = self.model_of(entity, look_kind);
         let clock = crate::shaders::time();
         let idle = |m: &super::models::KindModel, t: f32| {
             let mut clips = Clips::default();
@@ -1453,7 +1602,13 @@ impl EntityRenderer {
         }
         let vb = self.preview[frame.slot];
         // Full daylight, no fog.
-        let v = Scene { view_proj: proj.to_cols_array_2d(), params: [1e9, 2e9, 1.0, crate::shaders::time()], ..Default::default() };
+        let v = Scene {
+            view_proj: proj.to_cols_array_2d(),
+            params: [1e9, 2e9, 1.0, crate::shaders::time()],
+            environment: [1.0, 0.0, 0.0, 0.0],
+            light: [0.04, 0.0, 0.0, 0.0],
+            ..Default::default()
+        };
         gpu.mapped(vb)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&v));
         list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(col), Some([0.0; 4]))), depth: Some((dep, Some(0.0))) });
         self.models
@@ -1469,6 +1624,7 @@ impl EntityRenderer {
         list: &mut CommandList,
         frame: &FrameInfo,
         cam: &Camera,
+        now: u64,
         entities: &FxHashMap<u64, ClientEntity>,
         me: Option<&ClientEntity>,
         // The local player's body where it isn't shown (the first person without `BODY`): it still
@@ -1477,9 +1633,11 @@ impl EntityRenderer {
         hand: Option<Hand>,
         textures: &GameTextures,
         light: &impl Fn(IVec3) -> u32,
+        biome: &impl Fn(IVec3) -> Option<u16>,
         scene: &Scene,
         scene_buf: BufferId,
-        target: Option<(Hit, DVec3)>,
+        target: Option<(Hit, Transform)>,
+        placement: Option<(IVec3, crate::world::placement::Part)>,
         breaking: &[Crack],
         gizmo_lines: &[super::gizmo::Line],
         gizmo_fills: &[super::gizmo::Fill],
@@ -1523,6 +1681,16 @@ impl EntityRenderer {
         // The first person's whole body for the sun's shadow map alone (`shadow_me`): its place
         // in `posed` and its layers before any were left out.
         let mut own_shadow: Option<(usize, [Instance; MAX_LAYERS], usize)> = None;
+        let hidden = |e: &ClientEntity| {
+            e.effects.iter().any(|f| {
+                f.until > now
+                    && c.game
+                        .entity_effects
+                        .get(f.id as usize)
+                        .is_some_and(|d| d.hides)
+            })
+        };
+        let own_body = me.filter(|_| hand.as_ref().is_none_or(|h| h.body));
         for (id, e) in entities
             .iter()
             .map(|(i, e)| (*i, e))
@@ -1531,6 +1699,16 @@ impl EntityRenderer {
             let base = rel(e.pos);
             let far2 = base.length_squared();
             if far2 > 160.0 * 160.0 {
+                continue;
+            }
+            // Invisible to everyone else.
+            if hidden(e) && id != self.local {
+                continue;
+            }
+            if e.stuck.is_some_and(|s| {
+                let host = if s.host == self.local { own_body } else { entities.get(&s.host).filter(|h| !hidden(h)) };
+                host.is_none()
+            }) {
                 continue;
             }
             // Out of the view it has nothing to show. What it may have on goes by its model's reach.
@@ -1549,15 +1727,21 @@ impl EntityRenderer {
                 }
             }
             let lit = shade(e.pos + DVec3::Y * 0.5);
+            let here = biome(e.pos.floor().as_ivec3());
             // The effect a mod put on it, else the red of a recent hit; boxes only show the red.
             let hurt = (e.hurt / 0.5).clamp(0.0, 1.0);
-            let effect = match e.effect {
-                Some((id, s, _)) => (self.effect_slots.get(id as usize).copied().unwrap_or(0), s),
+            let shader_effect = e.shader_effect(now, |id| self.effect_slots.get(id as usize).is_some_and(|&s| s != 0));
+            let effect = match shader_effect {
+                Some((id, s)) => (self.effect_slots.get(id as usize).copied().unwrap_or(0), s),
                 None if hurt > 0.0 => (self.effect_slots[weft_abi::entity_effect::HURT as usize], hurt),
                 None => (0, 0.0),
             };
             if !e.item.is_empty() {
-                self.pose_ground_item(id, e, base, lit, effect, hurt, textures, &mut posed, &mut instances);
+                let holder = posed.len();
+                self.pose_ground_item(id, e, base, lit, here, effect, hurt, textures, &mut posed, &mut instances);
+                if posed.len() > holder && e.item.data != 0 {
+                    carried.push(Carry { holder, what: Carrying::Embedded { stack: e.item }, lit, biome: here, age: e.age, id });
+                }
                 continue;
             }
             let look = e.look();
@@ -1568,7 +1752,9 @@ impl EntityRenderer {
             let body = own_view && hand.as_ref().is_some_and(|h| h.body);
             let in_view = own_view && !body;
             let effect = if own_view { (0, 0.0) } else { effect };
-            let (mut layers, mut layer_count) = self.layers(look, id, &e.worn, &e.worn_looks, lit, effect);
+            // Arms held in the view are bare, as vanilla's: armor is for a body.
+            let worn: &[ItemStack] = if in_view { &[] } else { &e.worn };
+            let (mut layers, mut layer_count) = self.layers(look, id, worn, lit, effect);
             if layer_count == 0 {
                 continue;
             }
@@ -1581,20 +1767,16 @@ impl EntityRenderer {
             // Lying down in its low box: head first where it looks when swimming (vanilla's
             // setupRotations), flat when crawling, turned around the middle of the body.
             let pose = e.pose.def();
-            let lying = match pose.tilt {
-                weft_abi::pose_tilt::ALONG_LOOK => Some(e.pitch - std::f32::consts::FRAC_PI_2),
-                weft_abi::pose_tilt::FACE_DOWN => Some(-std::f32::consts::FRAC_PI_2),
-                // On its back, the head toward its back's side.
-                weft_abi::pose_tilt::ON_BACK => Some(std::f32::consts::FRAC_PI_2),
-                _ => None,
-            };
+            let lying = model::body_tilt(e.pose, e.pitch);
             let sleeping = pose.tilt == weft_abi::pose_tilt::ON_BACK;
             let body_yaw = if sleeping { e.yaw } else { e.body_yaw };
-            let swim = lying.map_or(Mat4::IDENTITY, |a| {
-                Mat4::from_translation(Vec3::new(0.0, 0.3, 0.0))
-                    * Mat4::from_rotation_x(a)
-                    * Mat4::from_translation(Vec3::new(0.0, -0.9, 0.0))
-            });
+            // A projectile points all of itself where it flies, not just a head.
+            let flies = c.game.entities[e.kind as usize].projectile.is_some();
+            let swim = match lying {
+                _ if flies => Mat4::from_rotation_x(e.pitch),
+                Some(a) => model::tilted_body(a),
+                None => Mat4::IDENTITY,
+            };
             // Its build (its painter's bone scales) for this model's parts, and how far that lifts it.
             let (build, lift) = self.build_of(id, kind);
             let mut root = Mat4::from_translation(base)
@@ -1603,16 +1785,10 @@ impl EntityRenderer {
                 * Mat4::from_scale(Vec3::splat(e.scale / 16.0))
                 * Mat4::from_translation(Vec3::Y * lift);
             // Its head up to look ahead when lying down.
-            let (pitch, head_yaw) = if sleeping {
-                (0.0, 0.0)
-            } else if lying.is_some() {
-                (std::f32::consts::FRAC_PI_4, 0.0)
-            } else {
-                (e.pitch, e.yaw - e.body_yaw)
-            };
+            let (pitch, head_yaw) = model::head_look(sleeping || flies, lying.is_some(), e.pitch, e.yaw - e.body_yaw);
             // Far away a pose lasts a few frames, each entity at its own turn. Who is dying or was
             // just hit still shows it.
-            let every = if id == self.local || e.dying.is_some() || e.effect.is_some() || e.hurt > 0.0 {
+            let every = if id == self.local || e.dying.is_some() || shader_effect.is_some() || e.hurt > 0.0 {
                 1
             } else if far2 < 32.0 * 32.0 {
                 1
@@ -1633,7 +1809,7 @@ impl EntityRenderer {
             let (clips, standing) = if lod == PoseLod::Kept {
                 (Clips::default(), 0)
             } else {
-                self.clips_of(id, e, kind, look, lying, in_view, hand.as_ref().filter(|_| in_view).map(|h| h.lowered), dt)
+                self.clips_of(id, e, kind, look, lying, in_view, hand.as_ref().filter(|_| in_view).map(|h| h.lowered))
             };
             if own_view {
                 // Its model goes where the camera is: the camera doesn't sit in the torso, whatever pose it's in.
@@ -1687,15 +1863,12 @@ impl EntityRenderer {
                 layers,
                 layer_count,
             });
-            let carry = |what| Carry { holder: posed.len() - 1, what, lit, age: e.age, id };
+            let carry = |what| Carry { holder: posed.len() - 1, what, lit, biome: here, age: e.age, id };
             if !sleeping {
-                for (item, off) in [(e.held, false), (e.off_held, true)] {
-                    if item != 0 {
-                        // Its stack is known of the local player only; of others, the main hand's
-                        // own layers (`HELD_LOOK`).
-                        let shown = if id == self.local { self.own_stacks[off as usize] } else { held_shown(e, item, off) };
-                        let model = self.models.model_seen(shown);
-                        carried.push(carry(Carrying::Held { stack: shown, model, off }));
+                for (stack, off) in [(e.held, false), (e.off_held, true)] {
+                    if !stack.is_empty() {
+                        let model = self.models.model_seen(stack);
+                        carried.push(carry(Carrying::Held { stack, model, off }));
                     }
                 }
             }
@@ -1736,9 +1909,16 @@ impl EntityRenderer {
 
         gizmo_line_boxes(&mut boxes, gizmo_lines, cam.pos);
         let overlay_start = boxes.len();
-        if let Some((hit, at)) = target {
+        if let Some((hit, place)) = target {
             let px_at_1 = 2.0 * (cam.fov.to_radians() * 0.5).tan() / frame.height.max(1) as f32;
-            outline_boxes(&mut boxes, &c.states[hit.state as usize].selection, rel(hit.block.as_dvec3() + at), px_at_1);
+            let origin = hit.origin.as_dvec3() + hit.part().shift();
+            let root = Mat4::from_rotation_translation(place.rotation().as_quat(), rel(place.to_world(origin)));
+            let selection = (c.states[hit.state as usize].outlined(), Vec3::ZERO);
+            let preview = placement.map(|(pos, part)| {
+                let offset = pos.as_dvec3() + part.shift() - origin;
+                (c.states[part.state as usize].outlined(), offset.as_vec3())
+            });
+            outline_boxes(&mut boxes, std::iter::once(selection).chain(preview), root, px_at_1);
         }
         gizmo_fill_boxes(&mut boxes, gizmo_fills, cam.pos);
         crack_boxes(&mut boxes, breaking, textures, cam.pos, light);
@@ -1791,10 +1971,10 @@ impl EntityRenderer {
             });
         }
         if let Some(own) = own_hand {
-            if gpu.hand_own_pass() {
-                list.push(Cmd::PassBreak);
-            }
-            self.draw_own_hand(gpu, list, frame, cam, scene, own, own_first, own_items, &hand_items, boxes.len(), buf, glow);
+            // (Our Android hand pass, `Cmd::PassBreak`, went with our Android backend: upstream's
+            // came in, Weft sync 11-22.)
+            let hand_bob = hand.as_ref().and_then(|h| h.bob);
+            self.draw_own_hand(gpu, list, frame, cam, hand_bob, scene, own, own_first, own_items, &hand_items, boxes.len(), buf, glow);
         }
         self.instances = instances;
     }
@@ -1808,6 +1988,7 @@ impl EntityRenderer {
         e: &ClientEntity,
         base: Vec3,
         lit: u32,
+        biome: Option<u16>,
         effect: (u32, f32),
         hurt: f32,
         textures: &GameTextures,
@@ -1845,8 +2026,8 @@ impl EntityRenderer {
                 layers,
                 layer_count: 1,
             });
-        } else if let Some(m) = self.item_model(textures, &e.item) {
-            instances.push((run_key(m), item_instance(ground_transform(base, e.age, e.item.item), m.0, hurt, lit)));
+        } else if let Some(ItemModel { boxes: m, solid }) = self.item_model(textures, &e.item, biome) {
+            instances.push((run_key(m), item_instance(ground_transform(base, e.age, solid), m.0, hurt, lit)));
         }
     }
 
@@ -1872,6 +2053,7 @@ impl EntityRenderer {
         list: &mut CommandList,
         frame: &FrameInfo,
         cam: &Camera,
+        bob: Option<(Vec3, f32, f32)>,
         scene: &Scene,
         (i, own, count, arms_up): (usize, [Instance; MAX_LAYERS], usize, u32),
         own_first: usize,
@@ -1883,8 +2065,9 @@ impl EntityRenderer {
     ) {
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
         let item_buf = self.item_buf.map(|b| b.0);
-        let hand_cam = Camera { fov: 70.0, ..*cam };
-        let hv = Scene { view_proj: (hand_cam.proj(aspect) * cam.view()).to_cols_array_2d(), ..*scene };
+        // The hand bobs walking even where the view doesn't (`Hand::bob`).
+        let hand_cam = Camera { fov: 70.0, bob: bob.unwrap_or(cam.bob), ..*cam };
+        let hv = Scene { view_proj: (hand_cam.proj(aspect) * hand_cam.view()).to_cols_array_2d(), ..*scene };
         let hb = self.hand_views[frame.slot];
         gpu.mapped(hb)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&hv));
         self.models.begin_batch();
@@ -1929,7 +2112,6 @@ impl EntityRenderer {
         lying: Option<f32>,
         in_view: bool,
         lowered: Option<f32>,
-        dt: f32,
     ) -> (Clips, usize) {
         let c = content();
         let pose = e.pose.def();
@@ -1939,13 +2121,16 @@ impl EntityRenderer {
         // Smaller steps, quicker: a small one's legs go round faster (`ClientEntity::scale`).
         let how = Play { clock: e.age, distance: e.walk * 0.6 / e.scale.max(0.05), speed: e.swing, ..Play::default() };
         // Stands for what it says unless a mod swapped it for now, and has a clip for that.
-        let swapped = |item: u32, name: &'static str| -> &str {
+        let replacement = |item: u32, name: &str| -> Option<&str> {
             match e.swaps.iter().find(|s| s.0 == name) {
-                Some(s) if !m.action_seen(item, &s.1, in_view).is_empty() => &s.1,
-                _ => name,
+                Some(s) if !m.action_seen(item, &s.1, in_view).is_empty() => Some(&s.1),
+                _ => None,
             }
         };
+        let swapped = |item, name: &'static str| replacement(item, name).unwrap_or(name);
         let act = |a: Act| if e.swaps.is_empty() { m.act(a) } else { m.action(0, swapped(0, a.name())) };
+        // Upstream plays these through `model::Posture`; chiacraft keeps its own for the run gait
+        // and the smaller steps of a small one (`how`).
         m.play(&mut clips, act(Act::Idle), &Play { looping: true, ..how });
         // A rider sits, whatever its mount's walking does to where it is.
         if e.vehicle.is_some() {
@@ -1984,30 +2169,44 @@ impl EntityRenderer {
             };
             let held_how = Play { looping: true, aim: true, hand: true, ..how };
             // Hands on a wall or a glider's bar: the pose's clip has the arms, not what is held.
-            let hands_busy = pose.when & (weft_abi::pose_when::CLIMBING | weft_abi::pose_when::GLIDING | weft_abi::pose_when::ROPE) != 0;
+            let hands_busy = crate::conditions::asks_hold(c, pose.when);
             if hands_busy {
                 // Nothing of the hands: the item rides along on the raised arm.
-            } else if e.held != 0 {
-                m.play(&mut clips, m.action_seen(e.held, hold_in(e.held, e.off_held != 0), in_view), &held_how);
+            } else if e.held.item != 0 {
+                m.play(&mut clips, m.action_seen(e.held.item, hold_in(e.held.item, e.off_held.item != 0), in_view), &held_how);
             } else if in_view {
                 m.play(&mut clips, m.action_seen(0, "hold_empty", true), &held_how);
             }
-            if e.off_held != 0 && !hands_busy {
-                m.play(&mut clips, m.action_seen(e.off_held, hold_in(e.off_held, true), in_view), &Play { mirror: true, ..held_how });
+            if e.off_held.item != 0 && !hands_busy {
+                m.play(
+                    &mut clips,
+                    m.action_seen(e.off_held.item, hold_in(e.off_held.item, true), in_view),
+                    &Play { mirror: true, ..held_how },
+                );
             }
             let progress = Play { drive: Drive::Progress, aim: in_view, hand: true, ..how };
             if let Some(lowered) = lowered {
-                m.play(&mut clips, m.action_seen(e.held, swapped(e.held, "equip"), true), &Play { progress: lowered, ..progress });
+                m.play(
+                    &mut clips,
+                    m.action_seen(e.held.item, swapped(e.held.item, "equip"), true),
+                    &Play { progress: lowered, ..progress },
+                );
             }
             if let Some(p) = e.arm_swing {
-                let item = if e.swing_off { e.off_held } else { e.held };
+                let item = if e.swing_off { e.off_held.item } else { e.held.item };
                 let swing =
                     if item == 0 && !in_view { act(Act::Swing) } else { m.action_seen(item, swapped(item, m.swing_of(item)), in_view) };
                 m.play(&mut clips, swing, &Play { progress: p, mirror: e.swing_off, ..progress });
             }
             if let Some((p, off)) = e.using {
-                let item = if off { e.off_held } else { e.held };
-                m.play(&mut clips, m.action_seen(item, swapped(item, "use"), in_view), &Play { progress: p, mirror: off, ..progress });
+                let item = if off { e.off_held.item } else { e.held.item };
+                // Used until let go (a bow drawn), it plays by the seconds held and stays at its end.
+                let how = if super::endless_use(e.use_ticks) {
+                    Play { drive: Drive::Clock, clock: p, mirror: off, ..progress }
+                } else {
+                    Play { progress: p, mirror: off, ..progress }
+                };
+                m.play(&mut clips, m.action_seen(item, swapped(item, "use"), in_view), &how);
             }
         }
         if let Some(d) = e.dying {
@@ -2015,7 +2214,7 @@ impl EntityRenderer {
         }
         if let Some((name, start, looping)) = &e.action {
             let secs = e.age - start;
-            let list = m.action_seen(e.held, name, in_view);
+            let list = m.action_seen(e.held.item, name, in_view);
             if list.is_empty() && !self.warned_actions.contains(&(kind, name.clone())) {
                 log::warn!("no clip for action {name} on {}", c.game.entities[look as usize].name);
                 self.warned_actions.insert((kind, name.clone()));
@@ -2031,7 +2230,7 @@ impl EntityRenderer {
         // Coming and going smoothly. Nearly all of a crowd has nothing here to look at.
         if clips.n > standing || (!self.fades.is_empty() && self.fades.contains_key(&(id, kind))) {
             let fades = self.fades.entry((id, kind)).or_default();
-            super::models::fade_clips(fades, m, &mut clips, standing, dt);
+            super::models::fade_clips(fades, m, &mut clips, standing, e.age);
             if fades.is_empty() {
                 self.fades.remove(&(id, kind));
             }
@@ -2168,7 +2367,7 @@ impl EntityRenderer {
     ) -> (Vec<(GpuBox, u32)>, Vec<(u32, u32, Instance)>) {
         let mut hand_items: Vec<(GpuBox, u32)> = Vec::new();
         let mut own_items: Vec<(u32, u32, Instance)> = Vec::new();
-        for Carry { holder, what, lit, age, id } in carried {
+        for Carry { holder, what, lit, biome, age, id } in carried {
             let at = firsts[holder];
             let parts = self
                 .models
@@ -2178,6 +2377,12 @@ impl EntityRenderer {
                 .unwrap_or_default();
             let own = own_holder == Some(holder);
             let (model, root, off, slot) = match what {
+                Carrying::Embedded { stack } => {
+                    for (model, first, layer) in self.embedded_models(stack, posed[holder].kind, at, lit) {
+                        self.models.queue(model, first, [layer]);
+                    }
+                    continue;
+                }
                 Carrying::On { model, bone } => (Some(model), self.models.bone(at + bone), false, model + 2),
                 Carrying::Held { stack, model, off } => {
                     let item = stack.item;
@@ -2197,11 +2402,11 @@ impl EntityRenderer {
                         }
                     };
                     if model.is_none() {
-                        if let Some(m) = self.item_model(textures, &stack) {
+                        if let Some(ItemModel { boxes: m, solid }) = self.item_model(textures, &stack, biome) {
                             let display = self.models.displays.get(&item).copied();
                             // In its own first-person hand, as much bigger as its kind says.
                             let grow = if own { first_person_held_scale(posed[holder].kind) } else { 1.0 };
-                            let inst = item_instance(held_transform(arm, item, off, display, grow), m.0, 0.0, lit);
+                            let inst = item_instance(held_transform(arm, item, solid, off, display, grow), m.0, 0.0, lit);
                             if own {
                                 hand_items.push((inst, m.1));
                             } else {
@@ -2230,6 +2435,15 @@ impl EntityRenderer {
                     self.models.queue(kind, bones, [l]);
                 }
             }
+            if let Carrying::Held { stack, .. } = what {
+                for (model, first, layer) in self.embedded_models(stack, kind, bones as usize, lit) {
+                    if own {
+                        own_items.push((model, first, layer));
+                    } else {
+                        self.models.queue(model, first, [layer]);
+                    }
+                }
+            }
         }
         (hand_items, own_items)
     }
@@ -2242,38 +2456,96 @@ impl EntityRenderer {
                 .draw(gpu, list, frame, super::models::Batch::Shadow, pipe, view);
         }
     }
+
+    fn embedded_models(&mut self, stack: ItemStack, kind: u32, bones: usize, lit: u32) -> Vec<(u32, u32, Instance)> {
+        let mut out = Vec::new();
+        for projectile in crate::stack::embedded(&stack) {
+            let Some(model) = content().game.catalog.find(ek::ENTITY, &projectile.kind) else { continue };
+            let bone = self.models.kinds[kind as usize]
+                .parts
+                .iter()
+                .position(|p| p.name == projectile.bone)
+                .unwrap_or(0);
+            let Some(root) = embedded_root(&projectile, self.models.bone(bones + bone)) else { continue };
+            let first = self.models.pose_clips(model, root, &[]);
+            let (layers, count) = self.layers(model, 0, &[], lit, (0, 0.0));
+            if count > 0 {
+                out.push((model, first, layers[0]));
+            }
+        }
+        out
+    }
 }
 
-/// The selection outline at `o`: twelve thin boxes along the edges of each selection box,
+fn embedded_root(projectile: &weft_abi::EmbeddedProjectile, attached: Mat4) -> Option<Mat4> {
+    let direction = Vec3::from_array(projectile.direction).try_normalize()?;
+    Some(attached * Mat4::from_rotation_translation(Quat::from_rotation_arc(-Vec3::Z, direction), Vec3::from_array(projectile.position)))
+}
+
+/// The selection outline (and the placement preview's) in `root`: thin boxes along the edges of
+/// each box, both collected in the same frame so a shared edge produces one box. Each is
 /// see-through and about a pixel wide wherever the edge is (vanilla's faint thin lines);
 /// `px_at_1` is a pixel's size a block away. Ronald: solid black ones, a fixed 0.012 blocks
 /// thick, were 3 px up close and too heavy; he picked "thin and faint like vanilla", about 1 px
 /// at about 40 % dark. Drawn with the overlays.
-fn outline_boxes(out: &mut Vec<GpuBox>, selection: &[[f32; 6]], o: Vec3, px_at_1: f32) {
-    for sel in selection {
-        let (mn, mx) = (Vec3::new(sel[0], sel[1], sel[2]), Vec3::new(sel[3], sel[4], sel[5]));
-        for axis in 0..3 {
-            for corner in 0..4 {
+fn outline_boxes<'a>(out: &mut Vec<GpuBox>, shapes: impl IntoIterator<Item = (&'a [[f32; 6]], Vec3)>, root: Mat4, px_at_1: f32) {
+    const EPS: f32 = 1e-5;
+    let mut edges: Vec<(usize, Vec3, f32)> = Vec::new();
+    for (shape, offset) in shapes {
+        for sel in shape {
+            let min = offset + Vec3::new(sel[0], sel[1], sel[2]);
+            let max = offset + Vec3::new(sel[3], sel[4], sel[5]);
+            for axis in 0..3 {
                 let (u, v) = ((axis + 1) % 3, (axis + 2) % 3);
-                // The edge's middle, and its half width there: OUTLINE_PX pixels across.
-                let mut mid = (o + mn + o + mx) * 0.5;
-                mid[u] = if corner & 1 == 0 { o[u] + mn[u] } else { o[u] + mx[u] };
-                mid[v] = if corner & 2 == 0 { o[v] + mn[v] } else { o[v] + mx[v] };
-                let t = (mid.length() * px_at_1 * OUTLINE_PX * 0.5).max(0.0015);
-                let mut lo = mid - Vec3::splat(t);
-                let mut size = Vec3::splat(t * 2.0);
-                lo[axis] = o[axis] + mn[axis] - t;
-                size[axis] = mx[axis] - mn[axis] + t * 2.0;
-                let m = Mat4::from_translation(lo) * Mat4::from_scale(size);
-                out.push(GpuBox {
-                    rows: rows(m),
-                    color: [0.0, 0.0, 0.0, 0.0],
-                    ids: [0, box_mode::FILLED, OUTLINE_DARK.to_bits(), 0],
-                    ..Default::default()
-                });
+                for corner in 0..4 {
+                    let mut start = min;
+                    let mut end = max[axis];
+                    start[u] = if corner & 1 == 0 { min[u] } else { max[u] };
+                    start[v] = if corner & 2 == 0 { min[v] } else { max[v] };
+                    edges.retain(|&(other_axis, other_start, other_end)| {
+                        if axis != other_axis
+                            || (start[u] - other_start[u]).abs() > EPS
+                            || (start[v] - other_start[v]).abs() > EPS
+                            || start[axis] > other_end + EPS
+                            || other_start[axis] > end + EPS
+                        {
+                            return true;
+                        }
+                        start[axis] = start[axis].min(other_start[axis]);
+                        end = end.max(other_end);
+                        false
+                    });
+                    edges.push((axis, start, end));
+                }
             }
         }
     }
+    for (axis, start, end) in edges {
+        // The edge's middle, and its half width there: OUTLINE_PX pixels across.
+        let mut mid = start;
+        mid[axis] = (start[axis] + end) * 0.5;
+        let t = (root.transform_point3(mid).length() * px_at_1 * OUTLINE_PX * 0.5).max(0.0015);
+        let lo = start - Vec3::splat(t);
+        let mut size = Vec3::splat(2.0 * t);
+        size[axis] += end - start[axis];
+        let m = root * Mat4::from_translation(lo) * Mat4::from_scale(size);
+        out.push(GpuBox {
+            rows: rows(m),
+            color: [0.0, 0.0, 0.0, 0.0],
+            ids: [0, box_mode::FILLED, OUTLINE_DARK.to_bits(), 0],
+            ..Default::default()
+        });
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn adjacent_block_outlines_share_the_seam() {
+    let cube = [[0.0, 0.0, 0.0, 1.0, 1.0, 1.0]];
+    let mut boxes = Vec::new();
+    outline_boxes(&mut boxes, [(cube.as_slice(), Vec3::ZERO), (cube.as_slice(), Vec3::X)], Mat4::IDENTITY, 0.001);
+    // Twelve outer segments, plus the four edges around their shared face.
+    assert_eq!(boxes.len(), 16);
 }
 
 /// Gizmo lines: thin boxes like the outline, a little thicker so they read from afar.
@@ -2318,21 +2590,23 @@ fn gizmo_fill_boxes(out: &mut Vec<GpuBox>, fills: &[super::gizmo::Fill], cam: DV
 /// textured like the block's own faces there.
 fn crack_boxes(out: &mut Vec<GpuBox>, breaking: &[Crack], textures: &GameTextures, cam: DVec3, light: &impl Fn(IVec3) -> u32) {
     let c = content();
-    for &Crack { pos: p, progress, at, state } in breaking {
+    for &Crack { pos: p, progress, place, part } in breaking {
         if progress <= 0.0 {
             continue;
         }
         let stage = ((progress * 10.0) as usize).min(9);
         let l = textures.texture(c.crack_textures[stage]);
-        let lit = light((p.as_dvec3() + at + DVec3::splat(0.5)).floor().as_ivec3());
+        let lit = light(place.cell_at(p));
+        let root =
+            Mat4::from_rotation_translation(place.rotation().as_quat(), (place.to_world(p.as_dvec3() + part.shift()) - cam).as_vec3());
         let shape = c
             .states
-            .get(state as usize)
-            .map_or(&[][..], |s| &s.selection[..]);
+            .get(part.state as usize)
+            .map_or(&[][..], |s| s.outlined());
         for b in shape {
             let (mn, mx) = (Vec3::new(b[0], b[1], b[2]), Vec3::new(b[3], b[4], b[5]));
             let (a, b) = (mn - Vec3::splat(0.004), mx + Vec3::splat(0.004));
-            let m = Mat4::from_translation((p.as_dvec3() + at - cam).as_vec3() + a) * Mat4::from_scale(b - a);
+            let m = root * Mat4::from_translation(a) * Mat4::from_scale(b - a);
             out.push(GpuBox {
                 rows: rows(m),
                 dims: mn.extend(1.0).to_array(),
@@ -2345,17 +2619,25 @@ fn crack_boxes(out: &mut Vec<GpuBox>, breaking: &[Crack], textures: &GameTexture
     }
 }
 
-/// Two layers of flames facing the camera, the inner one smaller, like vanilla's burning mobs.
+/// Flames facing the camera up the whole body, like vanilla's burning mobs: a stack of quads,
+/// each higher, narrower and a little further back, in front of the body so it doesn't hide them.
 fn fire_boxes(out: &mut Vec<GpuBox>, textures: &GameTextures, base: Vec3, width: f32, height: f32, cam_yaw: f32, age: f32) {
     let c = content();
-    let frame = |offset: f32| textures.frame_now(c.fire_texture, age * crate::world::TPS as f32 + offset);
-    for (i, (scale, back)) in [(1.4, 0.0), (1.0, 0.2)].into_iter().enumerate() {
-        let l = frame(i as f32 * 11.0);
-        let w = width * scale;
+    // Vanilla's units: the body's width times 1.4.
+    let unit = width * 1.4;
+    let (mut left, mut half) = (height / unit, 0.5f32);
+    for i in 0..16 {
+        if left <= 0.0 {
+            break;
+        }
+        // Every other one at another point of the animation, as vanilla's two pictures.
+        let l = textures.frame_now(c.fire_texture, age * crate::world::TPS as f32 + i as f32 * 11.0);
+        let w = 2.0 * half * unit;
+        // Toward the camera is +Z here.
         let m = Mat4::from_translation(base)
             * Mat4::from_rotation_y(cam_yaw)
-            * Mat4::from_translation(Vec3::new(-w / 2.0, 0.0, back * width))
-            * Mat4::from_scale(Vec3::new(w, height * scale * 0.95, 0.0));
+            * Mat4::from_translation(Vec3::new(-w / 2.0, 0.45 * i as f32 * unit, (0.3 - 0.03 * i as f32) * unit))
+            * Mat4::from_scale(Vec3::new(w, 1.4 * unit, 0.0));
         out.push(GpuBox {
             rows: rows(m),
             color: [1.0, 1.0, 1.0, 0.0],
@@ -2363,18 +2645,8 @@ fn fire_boxes(out: &mut Vec<GpuBox>, textures: &GameTextures, base: Vec3, width:
             ids2: [l | l << 16, 0, 0, 0],
             ..Default::default()
         });
+        (left, half) = (left - 0.45, half * 0.9);
     }
-}
-
-/// What another entity holds in a hand, as far as it is known: the item, and in the main hand
-/// that stack's own `layers` the server sends with it (chiacraft's `HELD_LOOK` field).
-fn held_shown(e: &ClientEntity, item: u32, off: bool) -> ItemStack {
-    let layers = content().ids.layers;
-    let data = match (off, e.held_look.as_deref(), layers) {
-        (false, Some(l), Some(comp)) => crate::stack::with(0, comp, Some(l.as_bytes())),
-        _ => 0,
-    };
-    ItemStack { item, count: 1, data }
 }
 
 /// Which model an item instance draws: its boxes, first and count.
@@ -2382,61 +2654,39 @@ fn run_key(m: (u32, u32)) -> u64 {
     (m.0 as u64) << 32 | m.1 as u64
 }
 
-/// Texture a held item is drawn from as a solid sprite: its own `layers`, its icon, or the
-/// texture of a plant block.
-fn sprite_name(stack: &ItemStack) -> Option<String> {
-    if let Some(spec) = crate::stack::layers(stack) {
-        return Some(format!("layers:{spec}"));
-    }
-    let c = content();
-    let looks = super::looks::current();
-    let t = match looks.item_draw(c, stack.item) {
-        ItemDraw::Icon(t) => t,
-        ItemDraw::Block(state) => looks.block_sprite(state, &c.states[state as usize])?,
-        _ => return None,
-    };
-    looks.texture_name(c, t).map(str::to_string)
-}
-
-/// Model boxes (a block's, or an item's from its file) in the unit cube `m` maps, tinted like
-/// `s` (an item's own boxes pass air: no tint).
+/// Model boxes (a block's, or an item's from its file) in the unit cube `m` maps, each face's
+/// layers one over the other as in the world, a kind's in `biome` (an item's own boxes pass air).
 fn boxes_shape(
     out: &mut Vec<GpuBox>,
     textures: &GameTextures,
     m: Mat4,
     boxes: &[crate::content::ModelBox],
     s: &crate::content::StateInfo,
+    biome: Option<u16>,
     color: Vec4,
 ) {
-    let tint = crate::content::item_tint(s.tint) & 0xff_ffff;
+    let c = content();
     for b in boxes {
         for d in 0..6 {
             let Some((corners, uv)) = super::mesher::box_face(b, d) else { continue };
             let (n, shade) = super::mesher::face_look(&corners);
+            let shade = if b.flat { 1.0 } else { shade };
             let [p0, p1, _, p3] = corners.map(Vec3::from_array);
-            let overlay = textures
-                .overlays
-                .get(b.textures[d] as usize)
-                .filter(|&&o| o != 0)
-                .map(|o| o - 1);
-            let mut face = |texture: u32, tinted: bool, lift: f32| {
+            for (k, l) in super::mesher::face_layers(c, s, b.textures[d], d)
+                .iter()
+                .enumerate()
+            {
+                // Each layer over the one before, just outside it.
+                let lift = k as f32 * 0.002;
                 let place = Mat4::from_cols((p1 - p0).extend(0.0), (p3 - p0).extend(0.0), Vec4::ZERO, (p0 + n * lift).extend(1.0));
                 out.push(GpuBox {
                     rows: rows(m * place),
                     dims: [shade, 0.0, 0.0, 0.0],
                     uvo: uv.map(|v| v / 16.0),
                     color: color.to_array(),
-                    ids: [0, box_mode::QUAD, textures.texture(texture), 0],
-                    ids2: [0, 0, tinted as u32, tint],
+                    ids: [0, box_mode::QUAD, textures.texture(l.tex), 0],
+                    ids2: [0, 0, (l.tint != 0) as u32, c.kind_color(l.tint, biome)],
                 });
-            };
-            let paint = crate::content::face_paint(s, d, overlay.is_some());
-            // Faces the block tints take the tint here, not from a tinted copy drawn on top (the
-            // untinted faces would show through cutout holes and at the edges).
-            face(b.textures[d], paint.base_tinted, 0.0);
-            // The part of a face over it (a grass side's green), just outside it.
-            if let Some(o) = overlay {
-                face(o, paint.overlay_tinted, 0.002);
             }
         }
     }
@@ -2447,23 +2697,6 @@ fn item_instance(m: Mat4, first: u32, hurt: f32, light: u32) -> GpuBox {
     GpuBox { rows: rows(m), color: [1.0, 1.0, 1.0, hurt], ids: [0, 0, first, 0], ids2: [0, light, 0, 0], ..Default::default() }
 }
 
-/// Whether the item is posed as a block (else as a sprite). A handheld item's model (a sword,
-/// a pickaxe) lies in its square as its sprite would, so it is held like the sprite.
-fn shows_block(item: u32) -> bool {
-    let c = content();
-    let looks = super::looks::current();
-    match looks.item_draw(c, item) {
-        ItemDraw::Model(_) => !c.items.get(item as usize).is_some_and(|d| d.handheld),
-        ItemDraw::Block(state) => looks
-            .block_sprite(state, &c.states[state as usize])
-            .is_none(),
-        _ => false,
-    }
-}
-
-/// Where an item goes in the hand of a model, from its arm at the shoulder (pixels): vanilla's
-/// ItemInHandLayer, then the item model's third person display transform. Vanilla's model space is
-/// ours turned around z, and it measures from a shoulder one pixel closer to the body.
 /// How much bigger than held items are drawn in kind `kind`'s own first-person hand
 /// (`comp::FIRST_PERSON_HELD_SCALE`, 1 without it).
 fn first_person_held_scale(kind: u32) -> f32 {
@@ -2475,9 +2708,11 @@ fn first_person_held_scale(kind: u32) -> f32 {
         .unwrap_or(1.0)
 }
 
-/// An item held by `arm`: its model file's display (or the defaults), `grow` times as big about
-/// where it's held.
-fn held_transform(arm: Mat4, item: u32, off: bool, display: Option<Display>, grow: f32) -> Mat4 {
+/// Where an item goes in the hand of a model, from its arm at the shoulder (pixels): vanilla's
+/// ItemInHandLayer, then the item model's third person display transform. Vanilla's model space is
+/// ours turned around z, and it measures from a shoulder one pixel closer to the body. `grow`
+/// times as big about where it's held.
+fn held_transform(arm: Mat4, item: u32, solid: bool, off: bool, display: Option<Display>, grow: f32) -> Mat4 {
     use std::f32::consts::{FRAC_PI_2, PI};
     let deg = |d: f32| d.to_radians();
     let hand = arm
@@ -2490,13 +2725,9 @@ fn held_transform(arm: Mat4, item: u32, off: bool, display: Option<Display>, gro
     // handheld.json or generated.json.
     let plain = |rotation, translation, scale| Display { rotation, translation, scale: [scale; 3] };
     let d = display.unwrap_or_else(|| {
-        if shows_block(item) {
+        if solid {
             plain([0.0, 0.0, 0.0], [0.0, 2.5, 0.0], 0.375)
-        } else if content()
-            .items
-            .get(item as usize)
-            .is_some_and(|d| d.handheld)
-        {
+        } else if content().item_has(item, content().ids.handheld) {
             plain([0.0, -90.0, 55.0], [0.0, 4.0, 0.5], 0.85)
         } else {
             plain([0.0, 0.0, 0.0], [0.0, 3.0, 1.0], 0.55)
@@ -2518,7 +2749,7 @@ fn held_transform(arm: Mat4, item: u32, off: bool, display: Option<Display>, gro
 
 /// How an item is held unless it says: a long tool lower down.
 fn hold_of(c: &crate::content::Content, m: &super::models::KindModel, item: u32) -> &'static str {
-    let tool = c.items.get(item as usize).is_some_and(|d| d.handheld);
+    let tool = c.item_has(item, c.ids.handheld);
     if tool && !m.has_own(item, "hold") { "hold_tool" } else { "hold" }
 }
 
@@ -2541,9 +2772,9 @@ fn ground_spin(base: Vec3, age: f32) -> Mat4 {
 
 /// Dropped items spin and bob: a block a quarter of a block across, a sprite half a block
 /// (vanilla's ground transforms).
-fn ground_transform(base: Vec3, age: f32, item: u32) -> Mat4 {
+fn ground_transform(base: Vec3, age: f32, solid: bool) -> Mat4 {
     let spin = ground_spin(base, age);
-    if shows_block(item) {
+    if solid {
         spin * Mat4::from_translation(Vec3::splat(-0.125)) * Mat4::from_scale(Vec3::splat(0.25))
     } else {
         spin * Mat4::from_translation(Vec3::new(-0.25, 0.0, -0.25)) * Mat4::from_scale(Vec3::splat(0.5))
@@ -2577,18 +2808,4 @@ mod worn_tests {
         // No layout known: the layer's own size.
         assert_eq!(worn_tex_size([0, 0], [128, 64]), [128.0, 64.0]);
     }
-}
-
-/// The texture worn item `i`, the `k`th thing worn, is drawn with: its own look
-/// (`abi::comp::WORN_LOOK`, composed by `load`) if it has one, else its item's.
-fn worn_texture<'a>(c: &'a crate::content::Content, i: u32, k: usize, looks: &'a [String]) -> Option<(weft_abi::Worn, &'a str)> {
-    let (w, t) = c.worn(i)?;
-    Some((
-        w,
-        looks
-            .get(k)
-            .map(String::as_str)
-            .filter(|l| !l.is_empty())
-            .unwrap_or(t),
-    ))
 }

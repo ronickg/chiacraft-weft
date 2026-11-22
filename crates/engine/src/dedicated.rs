@@ -1,4 +1,4 @@
-//! `weft --server`: the world and the network with nobody playing on this machine, no window and
+//! `weft server`: the world and the network with nobody playing on this machine, no window and
 //! no GPU. Options: `--world name` (made if new), `--seed n`, `--port n`, `--run-dir dir`. What it
 //! keeps is where a game keeps it (`config/`, `saves/`). `config/whitelist.txt`, keys one a line,
 //! limits who may join; without it anyone can, and nobody may do more than play until `op`.
@@ -16,8 +16,9 @@ use crate::{config, modloader, net, saves, settings::Settings};
 
 pub fn run(opts: Options) -> Result<(), String> {
     let off = modloader::off_file(&opts.run_dir, false);
-    let _mods = modloader::load(&opts.mod_dirs, &opts.package_dirs, &opts.cache_dir, &off)?;
-    crate::settings::migrate(&opts.run_dir);
+    // chiacraft: our data packages' folders (`package_dirs`, phase 2) after the mods' folders.
+    let _mods =
+        modloader::load(&opts.mod_dirs, &opts.package_dirs, &opts.cache_dir, &off, &opts.mods_off, &crate::app::engine_assets(opts.dev))?;
     config::load(&opts.run_dir);
     if let Some(port) = crate::app::api::launch_options().get("port") {
         config::override_for_run("core:server_port", port);
@@ -27,7 +28,7 @@ pub fn run(opts: Options) -> Result<(), String> {
     }
     let settings = Settings::new(&opts.run_dir);
     // Joining players' DIDs are read from this chain (chiacraft), when the world asks for them.
-    crate::chiacraft::chain::configure(&settings.run_dir, &settings.chain(), settings.chain_peers());
+    crate::chiacraft::chain::configure(&settings.run_dir, &crate::settings::chain(), crate::settings::chain_peers());
 
     let name = opts.world.as_deref().unwrap_or("world");
     let saves_dir = settings.saves_dir();
@@ -54,7 +55,7 @@ pub fn run(opts: Options) -> Result<(), String> {
     let mut server = server::spawn(
         ServerConfig {
             seed: meta.seed,
-            view_radius: settings.view_distance(),
+            view_radius: crate::settings::view_distance(),
             dedicated: true,
             whitelist: Some(whitelist),
             identity: Some(identity.clone()),

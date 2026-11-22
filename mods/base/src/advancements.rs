@@ -8,9 +8,9 @@ use std::time::Instant;
 
 use weft_sdk::*;
 
-use crate::items::ARMOR;
+use crate::items::*;
 
-pub use base_api::{ADVANCEMENTS, Advancements};
+pub use base_api::components::{ADVANCEMENTS, Advancements};
 
 /// What a player has to do, by what things are rather than which they are: a mod's mob tagged
 /// `hostile` or food tagged `cooked_meat` counts without anything here knowing of it.
@@ -116,7 +116,7 @@ static ALL: [Advancement; 31] = [
 /// Server to the player who made it: the index into `ALL`.
 static MADE: Channel<u32> = Channel::named("advancement_made");
 static CHIME: Sound = Sound::named("ui.advancement");
-pub static SCREEN: Screen = Screen::named("advancements");
+pub use base_api::menus::ADVANCEMENTS as SCREEN;
 static OPEN: Key = Key::named("advancements");
 
 const TOAST_SECS: f32 = 5.0;
@@ -136,35 +136,35 @@ pub fn register(r: &mut Registry) {
         Advancements { done: 0 },
         component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
-    r.attach(&PLAYER, &ADVANCEMENTS);
+    r.edit(&PLAYER).attach(&ADVANCEMENTS);
     r.sound(&CHIME)
         .files(&["random/advancement"])
         .category(&sound_categories::UI);
 
     r.world_tick(check_players);
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
             grant_where(&w, c.player, |rule| matches!(rule, Rule::Break(t) if t.on_block(c.state)));
         }
     });
-    r.on(&actions::PLACE_BLOCK, |b| {
+    r.on_event(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
             placed(&w, c.player, c.state);
         }
     });
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             grant_where(&w, d.source, |rule| matches!(rule, Rule::Kill(t) if t.on_entity(d.kind)));
         }
     });
-    r.on(&actions::USE_ITEM, |b| {
+    r.on_event(&actions::USE_ITEM, |b| {
         let w = b.world();
         for u in b.iter() {
             let hot = base_api::food_age(&u.stack, w.day_time()).1;
-            grant_where(&w, u.player, |rule| match rule {
+            grant_where(&w, u.entity, |rule| match rule {
                 Rule::Eat(t) => t.on_item(u.stack.item),
                 Rule::EatHot => hot,
                 _ => false,
@@ -306,10 +306,10 @@ fn client(r: &mut Registry) {
 
     // Every group a chain of tiles, gold framed once made, with the details in their tooltips.
     // Built when the screen opens, from what the player has made by then.
-    r.screen(&SCREEN, |ui| {
+    r.menu(&SCREEN).screen(|ui| {
         let done = ui.view().component(&ADVANCEMENTS).map_or(0, |a| a.done);
         let tabs: [crate::window::Tab; 1] = [("window.base.tab.stats", |c| {
-            c.client().screen_open(&crate::levels::SCREEN);
+            c.client().menu_open(&crate::levels::SCREEN);
         })];
         crate::window::family_window(ui, S::column().pad(8.0).gap(6.0), Some("advancements.base.title"), &tabs, |ui| {
             ui.row(S::row().gap(8.0), |ui| {
@@ -350,14 +350,14 @@ fn client(r: &mut Registry) {
             });
         });
     });
-    r.key(&OPEN, "L").on_press_client(|c| {
-        c.screen_open(&SCREEN);
+    r.key(&OPEN, "L").on_client(|c| {
+        c.menu_open(&SCREEN);
     });
     // The pause menu stretches its mods' parts across the screen; sized and centered like its own
     // buttons (200 wide) instead.
     r.screen_part(&screens::PAUSE, "buttons", 0, |ui| {
         ui.button("advancements.base.button", S::column().min_w(200.0).self_align(abi::ui_align::CENTER), |c| {
-            c.client().screen_open(&SCREEN);
+            c.client().menu_open(&SCREEN);
         });
     });
 }

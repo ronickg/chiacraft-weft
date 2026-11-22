@@ -14,7 +14,7 @@ use vitals::skills::{self, SKILLS};
 use vitals::web::Node as Kind;
 use weft_sdk::*;
 
-pub static SCREEN: Screen = Screen::named("web");
+pub static SCREEN: Menu = Menu::named("web");
 static OPEN: Key = Key::named("web");
 
 /// The well the web is drawn in (GUI pixels).
@@ -114,9 +114,9 @@ fn signature(c: &ClientView) -> u64 {
 }
 
 pub fn register(r: &mut Registry) {
-    r.key(&OPEN, "K").on_press_client(|c| {
+    r.key(&OPEN, "K").on_client(|c| {
         open_on_home(&c.view());
-        c.screen_open(&SCREEN);
+        c.menu_open(&SCREEN);
     });
     // Rebuilt when a node is taken, a skill rises or a point comes (the server's answer).
     r.client_frame(|c| {
@@ -132,13 +132,13 @@ pub fn register(r: &mut Registry) {
         }
     });
     // A tab beside the inventory's own (Stats, Advancements).
-    r.screen_part(&Screen::named(crate::window::FAMILY), "tabs", 5, |ui| {
+    r.screen_part(&Menu::named(crate::window::FAMILY), "tabs", 5, |ui| {
         ui.button("web.base.tab", S::default().class("tab").h(13.0).pad(2.0), |c| {
             open_on_home(c);
-            c.client().screen_open(&SCREEN);
+            c.client().menu_open(&SCREEN);
         });
     });
-    r.screen(&SCREEN, screen).on_key(|c, key| {
+    r.menu(&SCREEN).screen(screen).on_key(|c, key| {
         let step = PAN_STEP / ZOOMS[view().zoom];
         let pan = match key {
             "KeyW" | "ArrowUp" => Some((0.0, -step)),
@@ -169,10 +169,10 @@ fn screen(ui: &mut Ui) {
     }
     let tabs: [crate::window::Tab; 2] = [
         ("window.base.tab.stats", |c| {
-            c.client().screen_open(&crate::levels::SCREEN);
+            c.client().menu_open(&crate::levels::SCREEN);
         }),
         ("window.base.tab.advancements", |c| {
-            c.client().screen_open(&crate::advancements::SCREEN);
+            c.client().menu_open(&crate::advancements::SCREEN);
         }),
     ];
     crate::window::window_titled(ui, S::row().pad(6.0).gap(6.0), "web.base.title", &tabs, |ui| {

@@ -224,7 +224,7 @@ fn send_atlas(w: &World, player: u64) {
 
 pub fn register(r: &mut Registry) {
     r.entity_component(&MAP_KEY, [0, 0], component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
-    r.attach(&PLAYER, &MAP_KEY);
+    r.edit(&PLAYER).attach(&MAP_KEY);
     r.sound(&WAKE)
         .files(&["random/ley_wake"])
         .category(&sound_categories::BLOCKS)
@@ -242,12 +242,12 @@ pub fn register(r: &mut Registry) {
     r.packet(&ASK, |p, ()| send_atlas(&p.world(), p.player()));
     r.packet(&TRAVEL, |p, to| start_travel(&p.world(), p.player(), (to.i, to.j)));
     r.world_tick(tick);
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         for e in b.iter() {
             cancel(&b.world(), e.entity, "hint.base.waystone.cancel_hurt");
         }
     });
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         for e in b.iter() {
             cancel(&b.world(), e.player, "hint.base.waystone.cancel_moved");
         }
@@ -273,7 +273,7 @@ pub fn register(r: &mut Registry) {
             let f = base_api::land::fields(w.seed());
             let (gx, gz) = (nd.x, nd.z + n::ARRIVE_SOUTH);
             let y = (base_api::land::height(&f, gx * 16, gz * 16) >> 4).max(base_api::SEA) + 2;
-            w.entity_edit(p)
+            w.entity_modify(p)
                 .pos([gx as f64 + 0.5, y as f64, gz as f64 + 0.5])
                 .velocity([0.0, 0.0, 0.0])
                 .fall_distance(0.0);
@@ -334,14 +334,15 @@ fn stone_top(w: &World, node: &Node, y: i32) -> Option<i32> {
 /// taking the offering. True when it did something (woke, or said why not).
 pub fn rod_used(u: &mut ItemUse) -> bool {
     let w = u.world();
-    let p = u.player();
+    let p = u.entity();
     let Some((node, _)) = near_waystone(&w, p) else { return false };
     if with_atlas(&w, p, |h| h.atlas.woken.contains(&node.cell)) {
-        w.hint(p, "hint.base.waystone.already", &[]);
+        w.hint("hint.base.waystone.already", &[]).to(p);
         return true;
     }
     if !take_offering(&w, p) {
-        w.hint(p, "hint.base.waystone.offering", &[Arg::Int(n::OFFERING.1 as i64), Arg::Name(&format!("item:{}", n::OFFERING.0))]);
+        w.hint("hint.base.waystone.offering", &[Arg::Int(n::OFFERING.1 as i64), Arg::Name(&format!("item:{}", n::OFFERING.0))])
+            .to(p);
         return true;
     }
     wake(&w, p, &node);
@@ -396,10 +397,10 @@ fn wake(w: &World, player: u64, node: &Node) {
             .spread_box([0.4, 2.0, 0.4])
             .velocity([0.0, 1.5, 0.0]),
     );
-    drop(w.play_sound(&WAKE, at, 1.0));
-    w.hint(player, "hint.base.waystone.woke", &[]);
+    drop(w.play_sound(&WAKE, Vec3::from(at), 1.0));
+    w.hint("hint.base.waystone.woke", &[]).to(player);
     if crate::ley::heart_opened(w, node, 0, top) {
-        w.hint(player, "hint.base.waystone.stone", &[]);
+        w.hint("hint.base.waystone.stone", &[]).to(player);
     }
     weft_sdk::info!("waystone: player {player} woke {} {} ({} lines)", node.x, node.z, node.lines);
     send_atlas(w, player);
@@ -418,7 +419,7 @@ pub fn stone_used(u: &mut Use) -> bool {
     }
     let Some((node, _)) = near_waystone(&w, p) else { return false };
     if !with_atlas(&w, p, |h| h.atlas.woken.contains(&node.cell)) {
-        w.hint(p, "hint.base.waystone.sleeps", &[]);
+        w.hint("hint.base.waystone.sleeps", &[]).to(p);
         return true;
     }
     send_atlas(&w, p);
@@ -438,12 +439,12 @@ static TRIPS: Mutex<Vec<(u64, Trip)>> = Mutex::new(Vec::new());
 
 fn start_travel(w: &World, player: u64, to: (i32, i32)) {
     let Some((from, _)) = near_waystone(w, player) else {
-        w.hint(player, "hint.base.waystone.not_at_one", &[]);
+        w.hint("hint.base.waystone.not_at_one", &[]).to(player);
         return;
     };
     let woken = with_atlas(w, player, |h| h.atlas.woken.clone());
     if !woken.contains(&from.cell) {
-        w.hint(player, "hint.base.waystone.sleeps", &[]);
+        w.hint("hint.base.waystone.sleeps", &[]).to(player);
         return;
     }
     let Some(dest) = ley::node(w.seed(), to.0, to.1).filter(|d| d.waystone() && woken.contains(&d.cell) && d.cell != from.cell) else {
@@ -455,7 +456,8 @@ fn start_travel(w: &World, player: u64, to: (i32, i32)) {
     let mut trips = TRIPS.lock().unwrap();
     trips.retain(|(p, _)| *p != player);
     trips.push((player, Trip { from: [st.pos.x, st.pos.y, st.pos.z], to: dest, lands, dist }));
-    w.hint(player, "hint.base.waystone.channel", &[Arg::Int(n::CHANNEL_SECS as i64), Arg::Int(dist.round() as i64)]);
+    w.hint("hint.base.waystone.channel", &[Arg::Int(n::CHANNEL_SECS as i64), Arg::Int(dist.round() as i64)])
+        .to(player);
 }
 
 fn cancel(w: &World, player: u64, why: &str) {
@@ -463,7 +465,7 @@ fn cancel(w: &World, player: u64, why: &str) {
     let before = trips.len();
     trips.retain(|(p, _)| *p != player);
     if trips.len() != before {
-        w.hint(player, why, &[]);
+        w.hint(why, &[]).to(player);
     }
 }
 
@@ -479,20 +481,21 @@ fn arrive(w: &World, player: u64, t: &Trip) {
             .speed(2.5)
             .outward(),
     );
-    drop(w.play_sound(&WAKE, from, 0.6).pitch(1.3));
-    w.entity_edit(player)
+    drop(w.play_sound(&WAKE, Vec3::from(from), 0.6).pitch(1.3));
+    w.entity_modify(player)
         .pos(to)
         .velocity([0.0, 0.0, 0.0])
         .fall_distance(0.0);
     drop(w.spawn_particles(&FLARE, to).count(80).speed(2.5).outward());
-    drop(w.play_sound(&WAKE, to, 0.6).pitch(1.3));
+    drop(w.play_sound(&WAKE, Vec3::from(to), 0.6).pitch(1.3));
     // The food: what walking a share of the way would have digested.
     if let Some(v) = w.component_mut(player, &base_api::VITALS) {
         let mut s = v.stomach();
         s.digest(n::travel_secs(t.dist), 1.0);
         v.set_stomach(&s);
     }
-    w.hint(player, "hint.base.waystone.arrived", &[Arg::Int(t.dist.round() as i64)]);
+    w.hint("hint.base.waystone.arrived", &[Arg::Int(t.dist.round() as i64)])
+        .to(player);
     weft_sdk::info!("waystone: player {player} travelled {:.0} blocks to {} {}", t.dist, t.to.x, t.to.z);
 }
 
@@ -509,7 +512,7 @@ fn tick(w: &World) {
             let Some(st) = w.entity(p) else { continue };
             let drift = (st.pos.x - t.from[0]).hypot(st.pos.z - t.from[2]) + (st.pos.y - t.from[1]).abs();
             if drift > n::CHANNEL_DRIFT {
-                w.hint(p, "hint.base.waystone.cancel_moved", &[]);
+                w.hint("hint.base.waystone.cancel_moved", &[]).to(p);
                 continue;
             }
             if now >= t.lands {

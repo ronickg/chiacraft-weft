@@ -5,16 +5,12 @@ use weft_sdk::*;
 
 use crate::items::ARMOR;
 
-pub use base_api::{FEET, HEAD, LEGS};
+pub use base_api::slots::{self, EQUIPMENT};
 
-pub static INVENTORY: Menu = Menu::named("inventory");
-pub static CRAFTING: Menu = Menu::named("crafting_table");
+pub use base_api::menus::{CRAFTING, INVENTORY};
 static HUD_ARMOR: HudElement = HudElement::named("armor");
 static HUD_AIR: HudElement = HudElement::named("air");
 static HUD_ATTACK: HudElement = HudElement::named("attack_indicator");
-
-/// Head to feet.
-pub const EQUIPMENT: [&EquipmentSlot; 4] = [&HEAD, &base_api::CHEST, &LEGS, &FEET];
 
 /// Armor and the health it adds (engine points) of what `entity` wears, from the curve by each
 /// piece's shell and slot (`vitals::gear::armour`), carried by each piece built from parts
@@ -43,24 +39,25 @@ pub fn register(r: &mut Registry) {
     // Third person sways and jolts as first person does (chiacraft's feel; Weft's own behind and
     // front cameras are still).
     drop(
-        r.camera(&cameras::BEHIND)
-            .with(weft_sdk::abi::camera_flags::EFFECTS),
+        r.edit(&cameras::BEHIND)
+            .tag(weft_sdk::abi::comp::camera::EFFECTS),
     );
     drop(
-        r.camera(&cameras::FRONT)
-            .with(weft_sdk::abi::camera_flags::EFFECTS),
+        r.edit(&cameras::FRONT)
+            .tag(weft_sdk::abi::comp::camera::EFFECTS),
     );
     // Held items about as big in the view as they were before the Weft sync (Ronald: "our items
     // a bit bigger"): Weft holds them in the posed hand, smaller than our old corner.
-    r.set_on(Target::Entity("core:player"), &FIRST_PERSON_HELD_SCALE, FIRST_PERSON_ITEMS);
-    r.player_inventory()
+    r.edit(&PLAYER)
+        .set(&FIRST_PERSON_HELD_SCALE, FIRST_PERSON_ITEMS);
+    r.player_slots()
         .group("hotbar", Slots::row(9).hotbar())
         .group("main", Slots::grid(9, 3));
     for (slot, covers, piece) in [
-        (&HEAD, worn::HEAD, "helmet"),
-        (&base_api::CHEST, worn::CHEST, "chestplate"),
-        (&LEGS, worn::LEGS, "leggings"),
-        (&FEET, worn::FEET, "boots"),
+        (&slots::HEAD, worn::HEAD, "helmet"),
+        (&slots::CHEST, worn::CHEST, "chestplate"),
+        (&slots::LEGS, worn::LEGS, "leggings"),
+        (&slots::FEET, worn::FEET, "boots"),
     ] {
         r.equipment_slot(slot, covers, &format!("slot_{piece}"));
     }
@@ -76,11 +73,12 @@ pub fn register(r: &mut Registry) {
         r.equipment_slot(slot, parts, &format!("slot_{piece}"));
     }
     // Upstream's off-hand: a second item to hold (a shield, a torch).
-    r.equipment_slot(&OFF_HAND, &[], "slot_offhand");
+    r.equipment_slot(&OFF_HAND, &[], "slot_offhand")
+        .priority(1, "#offhand_preferred");
     // Armor is a step of the damage chain (`vitals::combat`: armour / (armour + 5 × hit), at most
     // 80 %: big hits go through more of it), and wears when the hit actually lands, a quarter of
     // the damage per piece (at least 1) like vanilla.
-    r.modify(&chain::DAMAGE, stage::MULTIPLY, |m| {
+    r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
         let q = *m.query();
         if !armor_applies(q.cause) {
             return;
@@ -88,7 +86,7 @@ pub fn register(r: &mut Registry) {
         let (armour, _) = armor_of(&m.world(), q.entity);
         m.value *= 1.0 - vitals::combat::armour_cut(armour, m.value as f32) as f64;
     });
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter().filter(|h| armor_applies(h.cause)) {
             let Some(worn) = w.inventory(h.entity).find_group(EQUIPMENT_GROUP) else { continue };
@@ -148,21 +146,34 @@ pub fn register(r: &mut Registry) {
     });
 
     // The equipment slots take what is worn there and show its silhouette while empty.
+    // SYNC: upstream's engine crafting (`Slots::crafting()`: the engine fills the result and uses
+    // the grid up, shift-click crafts all) is off on our grids: ours makes the result itself
+    // (`craft_result`: stale food, `first.rs`'s lashed axe, parts) and uses it up with XP, skills
+    // and advancements (`consume_grid`). Move those onto the engine's crafting to get its
+    // shift-click.
     r.menu(&INVENTORY)
         .group("grid", Slots::grid(2, 2))
         .group("result", Slots::single().output().large())
         .equipment()
         .player_inventory()
+        // Last, so the slots before keep their numbers.
+        .group(
+            "trash",
+            Slots::single()
+                .trash()
+                .background("slot_trash")
+                .tooltip("storage.base.trash"),
+        )
         .recipes(&crate::recipes::CRAFTING)
         .on_change(craft_result)
         .on_take(consume_grid)
         .screen(|ui| {
             let tabs: [crate::window::Tab; 2] = [
                 ("window.base.tab.stats", |c| {
-                    c.client().screen_open(&crate::levels::SCREEN);
+                    c.client().menu_open(&crate::levels::SCREEN);
                 }),
                 ("window.base.tab.advancements", |c| {
-                    c.client().screen_open(&crate::advancements::SCREEN);
+                    c.client().menu_open(&crate::advancements::SCREEN);
                 }),
             ];
             // The recipe book beside it, hand recipes only (`book.rs`).
@@ -193,6 +204,7 @@ pub fn register(r: &mut Registry) {
                             // Upstream's off-hand slot, under the grid.
                             ui.spacer();
                             ui.group(OFF_HAND.name());
+                            ui.group("trash");
                         });
                     });
                     ui.player_inventory(false);
@@ -270,7 +282,7 @@ pub fn register(r: &mut Registry) {
 }
 
 pub fn armor_applies(cause: u32) -> bool {
-    DamageCause::flags_of(cause) & damage_flags::BYPASSES_ARMOR == 0
+    !comps::damage_cause::BYPASSES_ARMOR.on_id(cause)
 }
 
 /// The `result` slot shows what the `grid` makes.

@@ -86,7 +86,7 @@ const GIFT_TICKS: (u32, u32) = (6000, 12000);
 pub fn init(r: &mut Registry) {
     r.entity_component(&SIGNATURE, Signature::default(), 0);
     for s in &SPECIES {
-        r.attach(s.kind, &SIGNATURE);
+        r.edit(s.kind).attach(&SIGNATURE);
     }
     r.sound(&BARK)
         .files(&["chihuahua/bark1", "chihuahua/bark2", "chihuahua/bark3"])
@@ -196,7 +196,7 @@ pub fn alarm(w: &World, id: u64, st: &EntityState) -> bool {
 }
 
 fn bark(w: &World, at: [f64; 3]) {
-    w.play_sound(&BARK, at, 1.0);
+    w.play_sound(&BARK, Vec3::from(at), 1.0);
 }
 
 fn mark(w: &World, e: &EntityState) {

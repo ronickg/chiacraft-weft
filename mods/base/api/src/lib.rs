@@ -1,12 +1,18 @@
-//! What other mods use of the base game, as types: its events with their values, components,
-//! value chains, recipe kinds, equipment slots, creative tabs and dimensions. A mod adds
-//! `base_api` to its `Cargo.toml` and gets these checked when it compiles, without depending on
-//! the game's code; the engine still compares the value layouts when the mods load.
+//! Typed handles and shared value types for the base game. Add `base_api` to your mod's
+//! `Cargo.toml` to use them. The engine checks shared value layouts when mods load.
 //!
-//! Names here are full (`base:..`): the statics compile into whichever mod uses them.
+//! Content handles use explicit `base:` names so they resolve to the base game's entries
+//! in every mod. Shared vocabulary such as the `fuel` component keeps its unqualified name.
 
 use weft_sdk::*;
 
+/// Shared components, their value types, and food-item helpers.
+pub mod components;
+
+/// Events emitted by the base game.
+pub mod events;
+
+// Ours: the land, trees and skills the game shares with other mods.
 pub mod branchy;
 pub mod colonize;
 pub mod grow;
@@ -15,17 +21,11 @@ pub mod skills;
 pub mod tree_recipes;
 pub mod trees;
 
-value! {
-    /// Fired when a furnace finishes one item.
-    pub struct Smelted { pub furnace: u64, pub input: u32, pub output: ItemStack }
-}
-pub static SMELTED: Event<Smelted> = Event::named("base:smelted");
+/// Item and block tags exposed by the base game.
+pub mod tags;
 
-value! {
-    /// A furnace's state, synced to whoever has it open.
-    pub struct Smelting { pub burn: u32, pub burn_max: u32, pub cook: u32, pub cook_max: u32, pub cooking_item: u32 }
-}
-pub static SMELTING_STATE: Component<Smelting> = Component::named("base:smelting");
+/// Attributes exposed by the base game.
+pub mod attributes;
 
 /// Portions a stomach holds (`vitals::stomach::PORTIONS`).
 pub const PORTIONS: usize = vitals::stomach::PORTIONS;
@@ -478,33 +478,23 @@ impl Vitals {
     }
 }
 
-value! {
-    /// A player's advancements, a bit each in the order of the base game's list.
-    pub struct Advancements { pub done: u64 }
-}
-pub static ADVANCEMENTS: Component<Advancements> = Component::named("base:advancements");
+/// Value chains exposed by the base game.
+pub mod chains;
 
-value! {
-    /// Where a player respawns: the foot of the bed they last used and its dimension
-    /// (`dimension_key`), when `set` is 1. Kept through death.
-    pub struct BedSpawn { pub bed: [i32; 3], pub set: u32, pub dim_key: u64 }
-}
-pub static BED_SPAWN: Component<BedSpawn> = Component::named("base:bed_spawn");
+/// HUD elements exposed by the base game.
+pub mod hud;
 
-value! {
-    /// Marks an item as food (what it gives comes from the `vitals` food table, by the item's
-    /// name); `hunger` and `saturation` are the base game's old numbers, kept for other mods.
-    pub struct Food { pub hunger: u32, pub saturation: f32 }
-}
+// `Food`, `FOOD`, `FUEL` and `FLAMMABLE` are in `components`; what a food gives comes from the
+// `vitals` food table by the item's name (`eat` below), `Food`'s hunger and saturation are the
+// base game's old numbers, kept for other mods.
+// SYNC: `components::FoodItem::food` still eats with upstream's hunger `components::eat`; point it
+// at ours (`eat` here) or keep our food on `.on_use(base_api::eat)`.
+
 value! {
     /// Protection while worn: about 4% less damage per point, less against big hits unless
     /// `toughness` holds them back, the way modern's armor works.
     pub struct Armor { pub points: u32, pub toughness: f32 }
 }
-
-// The common vocabulary the base game reads; any mod may set these on its own content.
-pub static FOOD: Component<Food> = Component::named("food");
-
 value! {
     /// What a portion of a food holds, in grams (its size in units of 10 g), from the vitals'
     /// food table: shown in its tooltip.
@@ -566,7 +556,7 @@ pub fn eat(u: &mut ItemUse) -> bool {
     let (age, hot) = food_age(&stack, w.day_time());
     let fresh = vitals::food::freshness(f, age, difficulty().keep);
     let roll = w.random_below(1000) as f32 / 1000.0;
-    let Some(v) = w.component_mut(u.player(), &VITALS) else { return false };
+    let Some(v) = w.component_mut(u.entity(), &VITALS) else { return false };
     let mut s = v.stomach();
     if s.eat(food, fresh.quality(), if hot { 0.0 } else { vitals::food::HOT_FOR }, v.capacity())
         .is_err()
@@ -599,7 +589,7 @@ pub fn eat_meal(u: &mut ItemUse) -> bool {
     let (age, hot) = food_age(&stack, w.day_time());
     let fresh = vitals::food::freshness_of(vitals::meals::keeps(&foods), age, difficulty().keep);
     let roll = w.random_below(1000) as f32 / 1000.0;
-    let Some(v) = w.component_mut(u.player(), &VITALS) else { return false };
+    let Some(v) = w.component_mut(u.entity(), &VITALS) else { return false };
     let mut s = v.stomach();
     if s.eat_meal(&foods, fresh.quality(), if hot { 0.0 } else { vitals::food::HOT_FOR }, v.capacity())
         .is_err()
@@ -717,28 +707,17 @@ pub fn has_room(w: &World, player: u64, item: u32) -> bool {
     w.component(player, &VITALS)
         .is_some_and(|v| v.stomach().room(v.capacity()) + 1e-4 >= vitals::food::FOODS[food].units())
 }
-/// Burn time in ticks.
-pub static FUEL: Component<u32> = Component::named("fuel");
+// SYNC: upstream made armor attributes (`attributes::ARMOR`, `ARMOR_TOUGHNESS`, given worn by
+// `Modifier::add(..).worn()`); ours is still this stack component, as a piece built from parts
+// (`parts.rs`) carries its own points on its stack. Move ours onto the attributes once a stack
+// can carry its own modifiers.
 pub static ARMOR: Component<Armor> = Component::named("armor");
 /// A weapon's or tool's item level (`vitals::curve`: tier × 10 + depth, its working material's):
 /// on today's tools as their item's, on a tool built from parts as its stack's. Against a big
 /// creature it counts at most its size's cap over the creature (`vitals::combat::Band::cap`).
 pub static ITEM_LEVEL: Component<f32> = Component::named("base:item_level");
-/// How readily fire takes it.
-pub static FLAMMABLE: Component<u32> = Component::named("flammable");
 
-/// A furnace's cooking time: base is the recipe's time, `entity` the furnace, `item` the input.
-pub static SMELT_TIME: Chain = Chain::named("base:smelt_time");
-
-pub static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
-pub static SMELTING: RecipeKind = RecipeKind::named("base:smelting");
-
-/// The player's equipment slots, head to feet.
-pub static HEAD: EquipmentSlot = EquipmentSlot::named("base:head");
-pub static CHEST: EquipmentSlot = EquipmentSlot::named("base:chest");
-pub static LEGS: EquipmentSlot = EquipmentSlot::named("base:legs");
-pub static FEET: EquipmentSlot = EquipmentSlot::named("base:feet");
-/// Clothes' slots, head to feet, worn under armor (`vitals::clothing`).
+/// Clothes' slots, head to feet, worn under armor (`vitals::clothing`); armor's are in `slots`.
 pub static HAT: EquipmentSlot = EquipmentSlot::named("base:hat");
 pub static COAT: EquipmentSlot = EquipmentSlot::named("base:coat");
 pub static TROUSERS: EquipmentSlot = EquipmentSlot::named("base:trousers");
@@ -747,33 +726,38 @@ pub const CLOTHES: [&EquipmentSlot; 4] = [&HAT, &COAT, &TROUSERS, &SHOES];
 /// A cloak, over clothes and armor (`vitals::clothing::CLOAKS`).
 pub static CLOAK: EquipmentSlot = EquipmentSlot::named("base:cloak");
 
-pub static OVERWORLD: Dimension = Dimension::named("base:overworld");
-pub static FLATLANDS: Dimension = Dimension::named("base:flatlands");
 /// The Minecraft forest test world (`land::MC_MIX`): the overworld's land on the same seed under
 /// Minecraft's temperate forest mix, for like-for-like comparisons with the Minecraft shader shots.
 /// Reached with `/dim base:mc_forest`; no normal world goes there.
 pub static MC_FOREST: Dimension = Dimension::named("base:mc_forest");
 
+/// Dimensions registered by the base game.
+pub mod dimensions;
+
+/// Vanilla's entity kinds.
+pub mod entities;
+
 /// What is in the sky of the game's dimensions. Any of them can be changed or taken out by a mod:
-/// `r.sky_body(&OVERWORLD, &MOON).size(40.0)`, `r.sky_remove(&OVERWORLD, &STARS)`.
-pub static SUN: SkyObject = SkyObject::named("base:sun");
-pub static MOON: SkyObject = SkyObject::named("base:moon");
-pub static STARS: SkyObject = SkyObject::named("base:stars");
-pub static CLOUDS: SkyObject = SkyObject::named("base:clouds");
+/// `r.edit(OVERWORLD.sky(&MOON)).size(40.0)`, `r.remove(OVERWORLD.sky(&STARS))`.
+pub mod sky_objects;
+
+/// Vanilla's blocks.
+pub mod blocks;
+
+/// Vanilla's menus.
+pub mod menus;
+
+/// Vanilla's items.
+pub mod items;
+
+/// Vanilla's equipment slots.
+pub mod slots;
+
+/// Vanilla's recipe types.
+pub mod recipes;
 
 /// Vanilla's creative tabs.
-pub mod tabs {
-    use weft_sdk::CreativeTab;
-    pub static BUILDING: CreativeTab = CreativeTab::named("base:building");
-    pub static COLORED: CreativeTab = CreativeTab::named("base:colored");
-    pub static NATURAL: CreativeTab = CreativeTab::named("base:natural");
-    pub static FUNCTIONAL: CreativeTab = CreativeTab::named("base:functional");
-    pub static TOOLS: CreativeTab = CreativeTab::named("base:tools");
-    pub static COMBAT: CreativeTab = CreativeTab::named("base:combat");
-    pub static FOOD: CreativeTab = CreativeTab::named("base:food");
-    pub static INGREDIENTS: CreativeTab = CreativeTab::named("base:ingredients");
-    pub static REDSTONE: CreativeTab = CreativeTab::named("base:redstone");
-}
+pub mod tabs;
 
 #[cfg(test)]
 mod tests {

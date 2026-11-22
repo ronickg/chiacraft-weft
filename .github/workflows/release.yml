@@ -1,5 +1,5 @@
-# Builds the game for Windows, Linux and macOS (Apple silicon and Intel) and publishes them on
-# GitHub. Nothing is published unless all of them build.
+# Builds the game for Windows, Linux, macOS (Apple silicon and Intel) and Android and publishes
+# them on GitHub. Nothing is published unless all of them build.
 #   - push a tag like v0.2.0 (the version in Cargo.toml must match), or
 #   - run it by hand from the Actions tab and give an existing tag (for a release that was tagged
 #     before this workflow existed).
@@ -11,8 +11,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to release, e.g. v0.1.0
+        description: Release tag, e.g. v0.1.0
         required: true
+      draft:
+        description: Build the selected commit and attach files to its existing draft
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -42,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ inputs.draft && github.sha || inputs.tag || github.ref }}
 
       - name: Tag matches the version
         shell: bash
@@ -61,14 +65,14 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
 
-      # The game and every mod in the workspace; `--dist` then packs the mods.
+      # The game and every mod in the workspace; `dist` then packs the mods.
       - name: Build
         run: cargo build --release --workspace
 
       - name: Make the distribution
         shell: bash
         run: |
-          target/release/${{ matrix.exe }} --dist dist/Weft
+          target/release/${{ matrix.exe }} dist dist/Weft
           test -f dist/Weft/${{ matrix.exe }}
           test -n "$(ls dist/Weft/run/mods)"
 
@@ -121,15 +125,64 @@ jobs:
         if: runner.os != 'Windows'
         run: tar -czf "$ARCHIVE.tar.gz" -C dist Weft
 
+      # What mods have to be built against, the same on every system: for the mod index.
+      - name: Mod ABI
+        if: matrix.platform == 'linux-x64'
+        run: cp dist/Weft/mod-abi.txt .
+
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.platform }}
-          path: Weft-*
+          path: |
+            Weft-*
+            mod-abi.txt
+          if-no-files-found: error
+          compression-level: 0
+
+  # Phones: one APK for 64-bit ARM (`.github/android/build.py`). Signed with the release key from
+  # the secrets ANDROID_KEYSTORE (the keystore in base64) and ANDROID_KEYSTORE_PASSWORD; without
+  # them with a key made for this run, which can't update an APK installed before.
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.draft && github.sha || inputs.tag || github.ref }}
+
+      - name: Tag matches the version
+        run: |
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          if [ "$TAG" != "v$version" ]; then
+            echo "tag $TAG does not match version $version in Cargo.toml"
+            exit 1
+          fi
+          echo "ARCHIVE=Weft-$version-android-arm64" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+
+      - name: APK
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          WEFT_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE" ]; then
+            echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            export WEFT_KEYSTORE="$RUNNER_TEMP/release.keystore"
+          fi
+          python3 .github/android/build.py "$ARCHIVE.apk"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android
+          path: Weft-*.apk
           if-no-files-found: error
           compression-level: 0
 
   publish:
-    needs: build
+    needs: [build, android]
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -144,7 +197,14 @@ jobs:
           path: archives
           merge-multiple: true
 
+      - name: Attach files to draft
+        if: inputs.draft
+        run: |
+          test "$(gh release view "$TAG" --json isDraft,targetCommitish --jq 'select(.isDraft) | .targetCommitish')" = "$GITHUB_SHA"
+          gh release upload "$TAG" archives/* --clobber
+
       - name: Publish
+        if: ${{ !inputs.draft }}
         run: |
           gh release create "$TAG" archives/* \
             --verify-tag --title "Weft ${TAG#v}" \

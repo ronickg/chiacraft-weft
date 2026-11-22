@@ -1,19 +1,27 @@
 use weft_sdk::*;
 
-pub static STICK: Item = Item::named("stick");
-pub static COAL: Item = Item::named("coal");
-pub static IRON_INGOT: Item = Item::named("iron_ingot");
-pub static GOLD_INGOT: Item = Item::named("gold_ingot");
-pub static DIAMOND: Item = Item::named("diamond");
-pub static WHEAT_SEEDS: Item = Item::named("wheat_seeds");
-pub static WHEAT: Item = Item::named("wheat");
-pub static BUCKET: Item = Item::named("bucket");
+pub use base_api::items::*;
 
-pub use base_api::{ARMOR, Armor, FLAMMABLE, FOOD, FUEL, Food};
+// Ours: armour is our stack component (`base_api::ARMOR`, a piece built from parts carries its
+// points); upstream's armor attributes and `ARMOR_PIECE` tag stay in base_api for their code.
+pub use base_api::components::{FLAMMABLE, FOOD, FUEL, Food};
+pub use base_api::{ARMOR, Armor};
 /// Tags of armor pieces, head to feet (every armour kind's items).
 pub const ARMOR_SLOTS: [&str; 4] = ["armor_head", "armor_chest", "armor_legs", "armor_feet"];
 
 pub fn register(r: &mut Registry) {
+    r.item(&SHIELD)
+        .tag("offhand_preferred")
+        .max_stack(1)
+        .durability(336)
+        .use_until_released()
+        .set(&comps::BLOCKS_ATTACKS, Blocking { delay_ticks: 0, arc: 180.0, wear_threshold: 3.0, wear_base: 1, wear_factor: 1.0 })
+        .set(
+            &comps::CATCH_PROJECTILES,
+            ProjectileCatch { bone: "guard".into(), min: [-4.0, -6.0, -4.0], max: [4.0, 6.0, -4.0], direction: [0.0, 0.0, 1.0] },
+        )
+        .tab(&crate::tabs::COMBAT);
+    r.shaped(&crate::recipes::CRAFTING, "shield", 1, &["pip", "ppp", " p "], &[('p', "#planks"), ('i', "#ingots/iron")]);
     r.item(&STICK)
         .tag("stick")
         .handheld()
@@ -48,6 +56,9 @@ pub fn register(r: &mut Registry) {
     r.item(&WHEAT)
         .tag("crops/wheat")
         .tab(&crate::tabs::INGREDIENTS);
+    // What gravel and clay drop.
+    // Flint is `first.rs`'s (struck on a rock).
+    r.item(&CLAY_BALL).tab(&crate::tabs::INGREDIENTS);
     // Filled buckets come with their liquids (blocks.rs); the engine fills and pours them.
     r.item(&BUCKET).max_stack(16).tab(&crate::tabs::TOOLS);
     r.set("lava_bucket", &FUEL, 20000);
@@ -120,6 +131,20 @@ pub fn register(r: &mut Registry) {
         Some(b) => drop(rice.places(b)),
         None => drop(rice),
     }
+    // Upstream's mushrooms and berries (Weft sync 11-22, kept until Ronald's call; their blocks
+    // are in `blocks.rs`). The edible ones (raspberry, snowberry, toadstool, cooked dryad's saddle)
+    // are rows of the vitals' food table, registered by the food loop above and eaten our way:
+    // the toadstool poisons and the snowberry may make one sick (`vitals::food`), in place of
+    // upstream's nausea and poison effects. The raw dryad's saddle is only cooked. Upstream's
+    // porcini and chanterelle items are our mushroom blocks' (`blocks.rs`, the same names): their
+    // `porcini_mushroom` and `chanterelle_mushroom` drop ours. Cutting them is this block, their
+    // food rows and their blocks.
+    // Upstream's `#mushrooms` tag is `#mushroom_foods` here: `mushrooms` is worldgen's biome
+    // component (`worldgen::statics::MUSHROOMS`), and one name can't be both.
+    r.item(&DRYADS_SADDLE)
+        .tag("mushroom_foods")
+        .tab(&crate::tabs::INGREDIENTS);
+    r.tag("mushroom_foods", &["toadstool", "cooked_dryads_saddle"]);
     // Buckskin, brain-tanned from a hide at a tanning frame (`crafts.rs`): clothes and books. Leather
     // armor is sole leather's (`materials/leather`), bark-tanned for days in a pit.
     r.item(Item::generated("leather".into()))

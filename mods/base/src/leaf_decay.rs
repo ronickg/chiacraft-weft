@@ -32,7 +32,7 @@ struct Due {
 static DUE: Mutex<Due> = Mutex::new(Due { list: Vec::new(), waiting: None });
 
 pub fn register(r: &mut Registry) {
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         logs_gone(
             &w,
@@ -42,7 +42,7 @@ pub fn register(r: &mut Registry) {
         );
     });
     // A player's leaves are theirs to keep.
-    r.on(&actions::PLACE_BLOCK, |b| {
+    r.on_event(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for e in b
             .iter()

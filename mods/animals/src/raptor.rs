@@ -24,7 +24,7 @@ const AID_RANGE: f64 = 16.0;
 pub fn init(r: &mut Registry) {
     // Tamed raptors fight better together: a tenth more damage for each other tame raptor of
     // its species within 8 blocks, up to three.
-    r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
+    r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
         let (w, id) = (m.world(), m.query().entity);
         if !is_tame_raptor(&w, id) {
             return;

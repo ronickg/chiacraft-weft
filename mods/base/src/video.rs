@@ -94,7 +94,7 @@ fn take_waiting(c: &Client) {
     }
 }
 
-pub static SCREEN: Screen = Screen::named("video");
+pub static SCREEN: Menu = Menu::named("video");
 
 /// The GPU as the engine found it (`core:gpu_*`): its name, its kind (0 not known, 1 integrated,
 /// 2 discrete, 3 another), its own memory in MB.
@@ -418,7 +418,7 @@ fn step_row(row: &Row, dir: i32) {
 /// rows. The quality presets touch only what costs (`fantasy_caps`). The pack reads the look
 /// rows through its options (Lighting's `look.rs`); fireflies, motes and sky events are the base
 /// mod's own.
-pub static FANTASY_SCREEN: Screen = Screen::named("video_fantasy");
+pub static FANTASY_SCREEN: Menu = Menu::named("video_fantasy");
 /// 0 off, 1 subtle, 2 storybook, 3 custom.
 pub static FANTASY: Config<i32> = Config::named("fantasy");
 pub static FX_FIREFLIES: Config<i32> = Config::named("fx_fireflies");
@@ -718,7 +718,7 @@ fn step_extra(i: usize, dir: i32) {
     }
 }
 
-pub static EXTRA_SCREEN: Screen = Screen::named("video_extra");
+pub static EXTRA_SCREEN: Menu = Menu::named("video_extra");
 
 fn step_fantasy(i: usize, dir: i32) {
     step_row(&FANTASY_ROWS[i], dir);
@@ -909,19 +909,19 @@ pub fn register(r: &mut Registry) {
     r.client_frame(|_| {
         AT_START.get_or_init(|| (HDR_WORLD.get(), AA.get()));
     });
-    r.screen(&SCREEN, |ui| {
+    r.menu(&SCREEN).screen(|ui| {
         let mut tabs: Vec<crate::window::Tab> = vec![
             ("video.base.fantasy.title", |c| {
-                c.client().screen_open(&FANTASY_SCREEN);
+                c.client().menu_open(&FANTASY_SCREEN);
             }),
             ("video.base.extra.title", |c| {
-                c.client().screen_open(&EXTRA_SCREEN);
+                c.client().menu_open(&EXTRA_SCREEN);
             }),
         ];
         // DLSS's tab, where the renderer has it.
         if crate::dlss::available() {
             tabs.push(("video.base.dlss.title", |c| {
-                c.client().screen_open(&crate::dlss::SCREEN);
+                c.client().menu_open(&crate::dlss::SCREEN);
             }));
         }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.title", &tabs, |ui| {
@@ -973,18 +973,18 @@ pub fn register(r: &mut Registry) {
             }
         });
     });
-    r.screen(&EXTRA_SCREEN, |ui| {
+    r.menu(&EXTRA_SCREEN).screen(|ui| {
         let mut tabs: Vec<crate::window::Tab> = vec![
             ("video.base.title", |c| {
-                c.client().screen_open(&SCREEN);
+                c.client().menu_open(&SCREEN);
             }),
             ("video.base.fantasy.title", |c| {
-                c.client().screen_open(&FANTASY_SCREEN);
+                c.client().menu_open(&FANTASY_SCREEN);
             }),
         ];
         if crate::dlss::available() {
             tabs.push(("video.base.dlss.title", |c| {
-                c.client().screen_open(&crate::dlss::SCREEN);
+                c.client().menu_open(&crate::dlss::SCREEN);
             }));
         }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.extra.title", &tabs, |ui| {
@@ -998,18 +998,18 @@ pub fn register(r: &mut Registry) {
             }
         });
     });
-    r.screen(&FANTASY_SCREEN, |ui| {
+    r.menu(&FANTASY_SCREEN).screen(|ui| {
         let mut tabs: Vec<crate::window::Tab> = vec![
             ("video.base.title", |c| {
-                c.client().screen_open(&SCREEN);
+                c.client().menu_open(&SCREEN);
             }),
             ("video.base.extra.title", |c| {
-                c.client().screen_open(&EXTRA_SCREEN);
+                c.client().menu_open(&EXTRA_SCREEN);
             }),
         ];
         if crate::dlss::available() {
             tabs.push(("video.base.dlss.title", |c| {
-                c.client().screen_open(&crate::dlss::SCREEN);
+                c.client().menu_open(&crate::dlss::SCREEN);
             }));
         }
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.fantasy.title", &tabs, |ui| {
@@ -1039,7 +1039,7 @@ pub fn register(r: &mut Registry) {
     // On the settings screen, beside the engine's own.
     r.screen_part(&screens::SETTINGS, "buttons", 0, |ui| {
         ui.button("video.base.open", S::column().min_w(200.0).self_align(abi::ui_align::CENTER), |c| {
-            c.client().screen_open(&SCREEN);
+            c.client().menu_open(&SCREEN);
         });
     });
 }

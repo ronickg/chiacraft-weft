@@ -1,6 +1,6 @@
-//! Terrain from parts: a base height plus height features, biome rules that pick each column's
+//! Terrain from parts: a base height plus landforms, biome rules that pick each column's
 //! biome and surface, water and caves. The mod that owns a dimension describes its terrain and
-//! any mod can edit it afterwards (add a biome before another, a feature, a cave biome), so the
+//! any mod can edit it afterwards (add a biome before another, a landform, a cave biome), so the
 //! engine evaluates the merged result. Heights, masks and fields are expressions (`Expr`) the
 //! engine runs on the CPU and the GPU alike, so a mod's own shapes are as fast as the presets.
 //!
@@ -9,47 +9,42 @@
 //!     .stone("basalt")
 //!     .base_height(60.0)
 //!     .field("mars:peaks", Expr::noise(500.0).ramp(0.2, 0.5))
-//!     .feature(preset::hills(8.0, 220.0))
-//!     .feature(preset::mountains(60.0, 160.0).mask(Expr::field("mars:peaks")))
-//!     .biome(BiomeRule::new("peaks").field("mars:peaks", 0.5..))
-//!     .biome(BiomeRule::new("dust"));
+//!     .landform(preset::hills(8.0, 220.0))
+//!     .landform(preset::mountains(60.0, 160.0).mask(Expr::field("mars:peaks")))
+//!     .rule(BiomeRule::new("peaks").field("mars:peaks", 0.5..))
+//!     .rule(BiomeRule::new("dust"));
 //! // Another mod, whose savanna biome declares its climate and surface:
-//! r.terrain(&OVERWORLD).biome_before("base:desert", BiomeRule::new("savanna"));
+//! r.edit(OVERWORLD.terrain()).rule_before("base:desert", BiomeRule::new("savanna"));
 //! ```
 
-use crate::abi::BlockPos;
-use std::marker::PhantomData;
 use std::ops::{Add, Bound, Mul, Neg, RangeBounds, Sub};
 
-use crate::abi::{self, Slice, Str, expr as ek, rule_field as rf, terrain_op as op};
+use crate::abi::{self, ExprStep as Step, expr as ek, rule_field as rf};
+use crate::comps::terrain as t;
 use crate::noise::fixed::{Fields, ONE, q4, q12, salt};
-use crate::{Dimension, Gen, Registry, Scatter, callback, host, qualify};
+use crate::{Component, Dimension, Gen, Registry, WithComponents, callback, qualify};
+
+/// chiacraft: our terrain components beside upstream's (`abi::comp::terrain`): the continent
+/// scale, steep faces and far crowns' leaves for distant terrain, and CPU landforms' heights.
+mod ours {
+    use crate::Component;
+    use crate::abi::{self, comp::terrain as t};
+    use crate::kind::Terrain;
+    pub static CONTINENT_SCALE: Component<f64, Terrain> = Component::named(t::CONTINENT_SCALE);
+    pub static FACES: Component<abi::Callback, Terrain> = Component::named(t::FACES);
+    pub static FACE_FALL: Component<i32, Terrain> = Component::named(t::FACE_FALL);
+    pub static FAR_LEAVES: Component<abi::Callback, Terrain> = Component::named(t::FAR_LEAVES);
+}
 
 /// Surface `height` and `biome` id of a column.
 pub type Column = abi::TerrainColumn;
 
-#[derive(Clone)]
-struct Step {
-    kind: u32,
-    salt: u64,
-    a: i32,
-    b: i32,
-    c: i32,
-    name: String,
-}
-
-impl Step {
-    fn new(kind: u32, a: i32) -> Step {
-        Step { kind, salt: 0, a, b: 0, c: 0, name: String::new() }
-    }
-
-    fn desc(&self) -> abi::ExprStep {
-        abi::ExprStep { kind: self.kind, salt: self.salt, a: self.a, b: self.b, c: self.c, name: Str::new(&self.name) }
-    }
+fn step(kind: u32, a: i32) -> Step {
+    Step { kind, a, ..Default::default() }
 }
 
 /// A number for every column of a terrain, worked out from where the column is: the height a
-/// feature adds, the strength of a mask, a field biome rules ask for. Built from numbers, the
+/// landform adds, the strength of a mask, a field biome rules ask for. Built from numbers, the
 /// position and noise with `+`, `-`, `*` and the methods here; the engine runs it on the CPU
 /// and the GPU with the same integer math, so every machine gets the same world.
 ///
@@ -61,6 +56,11 @@ impl Step {
 pub struct Expr(Vec<Step>);
 
 impl Expr {
+    /// chiacraft: its steps as sent to the engine (`FeatureBuilder::thin`).
+    pub(crate) fn into_steps(self) -> Vec<Step> {
+        self.0
+    }
+
     fn leaf(step: Step) -> Expr {
         Expr(vec![step])
     }
@@ -72,46 +72,46 @@ impl Expr {
 
     fn with(mut self, other: Expr, kind: u32) -> Expr {
         self.0.extend(other.0);
-        self.then(Step::new(kind, 0))
+        self.then(step(kind, 0))
     }
 
     fn noise_raw(salt: u64, scale: i32, octaves: u32) -> Expr {
-        Expr(vec![Step::new(ek::X, 0), Step::new(ek::Z, 0), Step { salt, b: octaves as i32, ..Step::new(ek::NOISE, scale) }])
+        Expr(vec![step(ek::X, 0), step(ek::Z, 0), Step { salt, b: octaves as i32, ..step(ek::NOISE, scale) }])
     }
 
     fn ramp_raw(self, from: i32, to: i32) -> Expr {
-        self.then(Step { b: to, ..Step::new(ek::RAMP, from) })
+        self.then(Step { b: to, ..step(ek::RAMP, from) })
     }
 
     /// A plain number.
     pub fn value(v: f64) -> Expr {
-        Expr::leaf(Step::new(ek::CONST, q12(v)))
+        Expr::leaf(step(ek::CONST, q12(v)))
     }
 
     /// A length in blocks.
     pub fn blocks(b: f64) -> Expr {
-        Expr::leaf(Step::new(ek::CONST, q4(b)))
+        Expr::leaf(step(ek::CONST, q4(b)))
     }
 
     /// An integer as it is, for `idiv` and `modulo` by a count.
     pub fn int(n: i32) -> Expr {
-        Expr::leaf(Step::new(ek::CONST, n))
+        Expr::leaf(step(ek::CONST, n))
     }
 
     /// The column's position, a length.
     pub fn x() -> Expr {
-        Expr::leaf(Step::new(ek::X, 0))
+        Expr::leaf(step(ek::X, 0))
     }
 
     pub fn z() -> Expr {
-        Expr::leaf(Step::new(ek::Z, 0))
+        Expr::leaf(step(ek::Z, 0))
     }
 
     /// A field of the terrain: `temperature`, `humidity`, `continent`, or one declared with
     /// `TerrainBuilder::field` before what uses it. Worked out once per column however many
     /// times it is used, so share costly parts through a field.
     pub fn field(name: &str) -> Expr {
-        Expr::leaf(Step { name: name.to_string(), ..Step::new(ek::FIELD, 0) })
+        Expr::leaf(Step { name: name.to_string(), ..step(ek::FIELD, 0) })
     }
 
     /// About -1.4..1.4, cold to hot.
@@ -153,12 +153,7 @@ impl Expr {
     /// and `radius` blocks big times 0.5 to 1.5: the square of the distance to the nearest, in
     /// units of its radius (below 1 inside it), 2 or more where none is near.
     pub fn sites(salt: u64, spacing: f64, chance: f64, radius: f64) -> Expr {
-        Expr(vec![Step::new(ek::X, 0), Step::new(ek::Z, 0)]).then(Step {
-            salt,
-            b: q12(chance),
-            c: q4(radius),
-            ..Step::new(ek::SITE, q4(spacing))
-        })
+        Expr(vec![step(ek::X, 0), step(ek::Z, 0)]).then(Step { salt, b: q12(chance), c: q4(radius), ..step(ek::SITE, q4(spacing)) })
     }
 
     /// This expression at another position: `noise.at(Expr::x() + warp, Expr::z())` bends it.
@@ -176,7 +171,7 @@ impl Expr {
     }
 
     pub fn abs(self) -> Expr {
-        self.then(Step::new(ek::ABS, 0))
+        self.then(step(ek::ABS, 0))
     }
 
     pub fn min(self, other: Expr) -> Expr {
@@ -222,10 +217,6 @@ impl Expr {
     pub fn and(self, other: Expr) -> Expr {
         self * other
     }
-
-    fn steps(&self) -> Vec<abi::ExprStep> {
-        self.0.iter().map(Step::desc).collect()
-    }
 }
 
 impl Add for Expr {
@@ -257,89 +248,93 @@ impl Neg for Expr {
 }
 
 /// Adds to the height of every column, scaled by its mask.
-pub struct Feature {
+pub struct Landform {
     name: String,
     height: Expr,
     mask: Option<Expr>,
     /// chiacraft: `FeatureArgs`, a CPU height instead of `height`.
-    custom: abi::Callback,
+    custom: Option<abi::Callback>,
 }
 
-impl Feature {
-    /// A feature adding `height` (a length) at every column.
-    pub fn new(height: Expr) -> Feature {
-        Feature { name: String::new(), height, mask: None, custom: abi::Callback::NONE }
+impl Landform {
+    /// A landform adding `height` (a length) at every column.
+    pub fn new(height: Expr) -> Landform {
+        Landform { name: String::new(), height, mask: None, custom: None }
     }
 
-    /// chiacraft: a feature of your own computed on the CPU: the height it adds at (x, z).
+    /// chiacraft: a landform of your own computed on the CPU: the height it adds at (x, z).
     /// Positions and the height are in 1/16 block and noise values in 1/4096 (`ONE`): terrain
     /// is integers only, so every machine agrees. It runs for every column, on many threads at
     /// once, and like a generator it must be a pure function of its input. Distant terrain asks
     /// the CPU for its heights; where an `Expr` can say it, `new` is cheaper.
-    pub fn custom(height: impl Fn(&Fields, i32, i32) -> i32 + Send + Sync + 'static) -> Feature {
+    pub fn custom(height: impl Fn(&Fields, i32, i32) -> i32 + Send + Sync + 'static) -> Landform {
         let custom =
             callback(move |a: &mut abi::FeatureArgs| a.height = height(&Fields::with_continent_scale(a.seed, a.continent_scale), a.x, a.z));
-        Feature { name: String::new(), height: Expr::int(0), mask: None, custom }
+        Landform { name: String::new(), height: Expr::int(0), mask: None, custom: Some(custom) }
     }
 
-    /// Other mods find the feature by this name.
-    pub fn named(mut self, name: &str) -> Feature {
+    /// Other mods find the landform by this name.
+    pub fn named(mut self, name: &str) -> Landform {
         self.name = name.to_string();
         self
     }
 
     /// Where it applies, 0..1: nothing where it is 0 or less (and its height isn't worked out
     /// there), all of it from 1.
-    pub fn mask(mut self, mask: Expr) -> Feature {
+    pub fn mask(mut self, mask: Expr) -> Landform {
         self.mask = Some(mask);
         self
     }
-}
 
-impl From<Expr> for Feature {
-    fn from(height: Expr) -> Feature {
-        Feature::new(height)
+    fn raw(self, ns: &str) -> abi::Landform {
+        abi::Landform { name: qualify(ns, &self.name), height: self.height.0, mask: self.mask.map_or(Vec::new(), |m| m.0) }
     }
 }
 
-/// Ready-made features. Each is `Feature::new` of its `shape`, which can be changed or
+impl From<Expr> for Landform {
+    fn from(height: Expr) -> Landform {
+        Landform::new(height)
+    }
+}
+
+/// Ready-made landforms. Each is `Landform::new` of its `shape`, which can be changed or
 /// combined into a new kind.
 pub mod preset {
     use super::*;
 
     /// Oceans and land masses: `depth` blocks above or below the base height.
-    pub fn continents(depth: f64) -> Feature {
-        Feature::new(shape::continents(depth))
+    pub fn continents(depth: f64) -> Landform {
+        Landform::new(shape::continents(depth))
     }
 
     /// Rolling hills.
-    pub fn hills(height: f64, size: f64) -> Feature {
-        Feature::new(shape::hills(height, size))
+    pub fn hills(height: f64, size: f64) -> Landform {
+        Landform::new(shape::hills(height, size))
     }
 
     /// Mountain ranges along ridge lines `width` blocks apart, with rough detail on top.
-    pub fn mountains(height: f64, width: f64) -> Feature {
-        Feature::new(shape::mountains(height, width))
+    pub fn mountains(height: f64, width: f64) -> Landform {
+        Landform::new(shape::mountains(height, width))
     }
 
     /// Flat-topped mesas `height` blocks high in terraces of `step`.
-    pub fn plateaus(height: f64, size: f64, step: f64) -> Feature {
-        Feature::new(shape::plateaus(height, size, step))
+    pub fn plateaus(height: f64, size: f64, step: f64) -> Landform {
+        Landform::new(shape::plateaus(height, size, step))
     }
 
     /// Winding cuts `depth` deep and about `width` wide; below sea level they fill with water.
-    pub fn canyons(depth: f64, width: f64) -> Feature {
-        Feature::new(shape::canyons(depth, width))
+    pub fn canyons(depth: f64, width: f64) -> Landform {
+        Landform::new(shape::canyons(depth, width))
     }
 
     /// Parallel sand waves `wavelength` blocks apart.
-    pub fn dunes(height: f64, wavelength: f64) -> Feature {
-        Feature::new(shape::dunes(height, wavelength))
+    pub fn dunes(height: f64, wavelength: f64) -> Landform {
+        Landform::new(shape::dunes(height, wavelength))
     }
 
     /// Bowls with a raised rim, one per `spacing`-block cell at most.
-    pub fn craters(radius: f64, depth: f64, spacing: f64) -> Feature {
-        Feature::new(shape::craters(radius, depth, spacing))
+    pub fn craters(radius: f64, depth: f64, spacing: f64) -> Landform {
+        Landform::new(shape::craters(radius, depth, spacing))
     }
 }
 
@@ -400,52 +395,32 @@ pub mod shape {
 /// continent, any field) and sets only what differs here. Rules are tried in order; the first
 /// match wins and the last one is used where none does.
 #[derive(Clone)]
-pub struct BiomeRule {
-    name: String,
-    fields: u32,
-    biome: String,
-    ranges: Vec<(String, f64, f64)>,
-    height: (i32, i32),
-    top: String,
-    filler: String,
-    depth: i32,
-    under: (String, i32),
-    deep_top: (String, i32),
-    bare_above: i32,
-    ice: String,
-}
+pub struct BiomeRule(abi::BiomeRule);
 
 impl BiomeRule {
     /// A rule for `biome`, named like it.
     pub fn new(biome: &str) -> BiomeRule {
-        BiomeRule { fields: rf::BIOME, biome: biome.to_string(), ..BiomeRule::blank() }
+        BiomeRule(abi::BiomeRule { fields: rf::BIOME, biome: biome.to_string(), ..BiomeRule::blank().0 })
     }
 
-    pub(crate) fn blank() -> BiomeRule {
-        BiomeRule {
-            name: String::new(),
-            fields: 0,
-            biome: String::new(),
-            ranges: Vec::new(),
-            height: (i32::MIN, i32::MAX),
-            top: String::new(),
-            filler: String::new(),
+    fn blank() -> BiomeRule {
+        BiomeRule(abi::BiomeRule {
+            height: [i32::MIN, i32::MAX],
             depth: 3,
-            under: (String::new(), 0),
-            deep_top: (String::new(), i32::MIN),
+            deep_below: i32::MIN,
             bare_above: i32::MAX,
-            ice: String::new(),
-        }
+            ..Default::default()
+        })
     }
 
     /// A name of its own, for a second rule of the same biome (other mods find rules by name).
     pub fn named(mut self, name: &str) -> Self {
-        self.name = name.to_string();
+        self.0.name = name.to_string();
         self
     }
     /// In an edit: the rule picks this biome instead.
     pub fn biome(mut self, biome: &str) -> Self {
-        (self.biome, self.fields) = (biome.to_string(), self.fields | rf::BIOME);
+        (self.0.biome, self.0.fields) = (biome.to_string(), self.0.fields | rf::BIOME);
         self
     }
     /// Where the field (`temperature`, `humidity`, `continent` or one the terrain declares) is in
@@ -453,11 +428,14 @@ impl BiomeRule {
     /// same field, the new range replaces the old.
     pub fn field(mut self, name: &str, range: impl RangeBounds<f64>) -> Self {
         let (min, max) = range_f64(range);
-        match self.ranges.iter_mut().find(|r| r.0 == name) {
-            Some(r) => (r.1, r.2) = (min, max),
-            None => self.ranges.push((name.to_string(), min, max)),
+        match self.0.ranges.iter_mut().find(|r| r.name == name) {
+            Some(r) => (r.min, r.max) = (min, max),
+            None => self
+                .0
+                .ranges
+                .push(abi::RuleRange { name: name.to_string(), min, max }),
         }
-        self.fields |= rf::RANGES;
+        self.0.fields |= rf::RANGES;
         self
     }
     /// Climate, about -1.4..1.4. Usually the biome's.
@@ -473,85 +451,57 @@ impl BiomeRule {
     }
     /// Surface heights, like `..=SEA + 1`.
     pub fn height(mut self, range: impl RangeBounds<i32>) -> Self {
-        (self.height, self.fields) = (range_i32(range), self.fields | rf::HEIGHT);
+        let (min, max) = range_i32(range);
+        (self.0.height, self.0.fields) = ([min, max], self.0.fields | rf::HEIGHT);
         self
     }
     /// Top block, then `depth` blocks of filler, then the terrain's stone.
     pub fn surface(mut self, top: &str, filler: &str, depth: i32) -> Self {
-        (self.top, self.filler, self.depth) = (top.to_string(), filler.to_string(), depth);
-        self.fields |= rf::SURFACE;
+        (self.0.top, self.0.filler, self.0.depth) = (top.to_string(), filler.to_string(), depth);
+        self.0.fields |= rf::SURFACE;
         self
     }
     /// The lowest `layers` of the filler become `block` (sandstone under sand).
     pub fn under(mut self, block: &str, layers: i32) -> Self {
-        (self.under, self.fields) = ((block.to_string(), layers), self.fields | rf::UNDER);
+        (self.0.under, self.0.under_layers) = (block.to_string(), layers);
+        self.0.fields |= rf::UNDER;
         self
     }
     /// Top block for columns lower than `below` (gravel on deep sea floors).
     pub fn deep_top(mut self, block: &str, below: i32) -> Self {
-        (self.deep_top, self.fields) = ((block.to_string(), below), self.fields | rf::DEEP_TOP);
+        (self.0.deep_top, self.0.deep_below) = (block.to_string(), below);
+        self.0.fields |= rf::DEEP_TOP;
         self
     }
     /// Plain stone above this height (bare peaks).
     pub fn bare_above(mut self, y: i32) -> Self {
-        (self.bare_above, self.fields) = (y, self.fields | rf::BARE_ABOVE);
+        (self.0.bare_above, self.0.fields) = (y, self.0.fields | rf::BARE_ABOVE);
         self
     }
     /// The water surface freezes into `block`.
     pub fn frozen(mut self, block: &str) -> Self {
-        (self.ice, self.fields) = (block.to_string(), self.fields | rf::FROZEN);
+        (self.0.ice, self.0.fields) = (block.to_string(), self.0.fields | rf::FROZEN);
         self
     }
 
-    /// What `desc` points at: its names qualified with `ns`, and its ranges.
-    pub(crate) fn names(&self, ns: &str) -> RuleNames {
-        let q = |s: &str| if s.is_empty() { String::new() } else { qualify(ns, s) };
-        let names = [
-            if self.name.is_empty() { &self.biome } else { &self.name },
-            &self.biome,
-            &self.top,
-            &self.filler,
-            &self.under.0,
-            &self.deep_top.0,
-            &self.ice,
-        ]
-        .map(|s| q(s));
-        let ranges = self
-            .ranges
-            .iter()
-            .map(|(name, min, max)| abi::FieldRange { name: Str::new(name), min: *min, max: *max })
-            .collect();
-        RuleNames { names, ranges }
-    }
-
-    pub(crate) fn desc(&self, n: &RuleNames) -> abi::BiomeRuleDesc {
-        let names = &n.names;
-        abi::BiomeRuleDesc {
-            name: Str::new(&names[0]),
-            fields: self.fields,
-            biome: Str::new(&names[1]),
-            ranges: Slice::new(&n.ranges),
-            height: [self.height.0, self.height.1],
-            top: Str::new(&names[2]),
-            filler: Str::new(&names[3]),
-            depth: self.depth,
-            under: Str::new(&names[4]),
-            under_layers: self.under.1,
-            deep_top: Str::new(&names[5]),
-            deep_below: self.deep_top.1,
-            bare_above: self.bare_above,
-            ice: Str::new(&names[6]),
+    /// As sent: names qualified with `ns`, the rule named like its biome unless it has a name.
+    pub(crate) fn qualified(&self, ns: &str) -> abi::BiomeRule {
+        let r = &self.0;
+        let q = |s: &str| qualify(ns, s);
+        abi::BiomeRule {
+            name: q(if r.name.is_empty() { &r.biome } else { &r.name }),
+            biome: q(&r.biome),
+            top: q(&r.top),
+            filler: q(&r.filler),
+            under: q(&r.under),
+            deep_top: q(&r.deep_top),
+            ice: q(&r.ice),
+            ..r.clone()
         }
     }
 }
 
-/// The strings a rule's `BiomeRuleDesc` points at, kept while it is sent.
-pub(crate) struct RuleNames {
-    names: [String; 7],
-    ranges: Vec<abi::FieldRange>,
-}
-
-fn range_f64(r: impl RangeBounds<f64>) -> (f64, f64) {
+pub(crate) fn range_f64(r: impl RangeBounds<f64>) -> (f64, f64) {
     let at = |b: Bound<&f64>, open: f64| match b {
         Bound::Included(v) | Bound::Excluded(v) => *v,
         Bound::Unbounded => open,
@@ -589,166 +539,146 @@ impl Caves {
 }
 
 impl Registry {
-    /// The terrain of a dimension: yours to describe, or another mod's to edit
-    /// (`r.terrain(&OVERWORLD)`). Edits apply after the owner's description, in load order.
-    pub fn terrain<'a>(&'a mut self, dimension: &crate::Dimension) -> TerrainBuilder<'a> {
-        TerrainBuilder { raw: self.raw, ns: self.ns, dimension: dimension.name().to_string(), _p: PhantomData }
+    /// The terrain of your dimension; another mod's is `r.edit(OVERWORLD.terrain())`, applied
+    /// after the owner's description in load order.
+    pub fn terrain(&mut self, dimension: &Dimension) -> TerrainBuilder<'_> {
+        self.terrain_entry(dimension.terrain())
+    }
+
+    fn terrain_entry(&mut self, terrain: &'static crate::Terrain) -> TerrainBuilder<'_> {
+        TerrainBuilder { reg: self, e: crate::entry::Entry::of(terrain) }
     }
 }
 
 pub struct TerrainBuilder<'a> {
-    raw: *mut abi::Registrar,
-    ns: &'static str,
-    dimension: String,
-    _p: PhantomData<&'a mut Registry>,
+    reg: &'a mut Registry,
+    e: crate::entry::Entry,
 }
 
-/// One edit, owning everything its `TerrainDesc` points at while it is sent.
-struct Op {
-    op: u32,
-    anchor: String,
-    block: String,
-    level: i32,
-    to: i32,
-    value: f64,
-    size: f64,
-    feature: Option<Feature>,
-    rule: Option<BiomeRule>,
-    field: Option<Expr>,
-    face: abi::Callback,
-}
-
-impl Op {
-    fn new(op: u32) -> Op {
-        Op {
-            op,
-            anchor: String::new(),
-            block: String::new(),
-            level: 0,
-            to: 0,
-            value: 0.0,
-            size: 0.0,
-            feature: None,
-            rule: None,
-            field: None,
-            face: abi::Callback::NONE,
-        }
-    }
-}
+crate::entry::entry_builder!(
+    Terrain => TerrainBuilder, terrain_entry;
+);
 
 impl TerrainBuilder<'_> {
-    fn send(self, o: Op) -> Self {
-        let q = |s: &str| if s.is_empty() { String::new() } else { qualify(self.ns, s) };
-        // Field names are used as written.
-        let anchor = if o.op == op::FIELD { o.anchor.clone() } else { q(&o.anchor) };
-        let block = q(&o.block);
-        let fname = o.feature.as_ref().map_or(String::new(), |f| q(&f.name));
-        let height = o.feature.as_ref().map_or(Vec::new(), |f| f.height.steps());
-        let mask = o
-            .feature
-            .as_ref()
-            .and_then(|f| f.mask.as_ref())
-            .map_or(Vec::new(), Expr::steps);
-        let field = o.field.as_ref().map_or(Vec::new(), Expr::steps);
-        let custom = o.feature.as_ref().map_or(abi::Callback::NONE, |f| f.custom);
-        let feature = abi::FeatureDesc { name: Str::new(&fname), height: Slice::new(&height), mask: Slice::new(&mask), custom };
-        let r = o.rule.unwrap_or_else(BiomeRule::blank);
-        let names = r.names(self.ns);
-        let rule = r.desc(&names);
-        let desc = abi::TerrainDesc {
-            dimension: Str::new(&self.dimension),
-            op: o.op,
-            anchor: Str::new(&anchor),
-            block: Str::new(&block),
-            level: o.level,
-            to: o.to,
-            value: o.value,
-            size: o.size,
-            feature,
-            rule,
-            field: Slice::new(&field),
-            face: o.face,
-        };
-        unsafe { (host().reg_terrain)(self.raw, &desc) }
-        self
+    fn q(&self, name: &str) -> String {
+        qualify(self.reg.ns, name)
+    }
+
+    fn rule_as_sent(&self, rule: BiomeRule) -> abi::BiomeRule {
+        rule.qualified(self.reg.ns)
     }
 
     /// The block the ground is made of.
     pub fn stone(self, block: &str) -> Self {
-        self.send(Op { block: block.to_string(), ..Op::new(op::STONE) })
+        let block = self.q(block);
+        self.set_text(&t::STONE, &block)
     }
-    /// The ground height where no feature adds anything.
+    /// The ground height where no landform adds anything (64 unless said).
     pub fn base_height(self, y: f64) -> Self {
-        self.send(Op { value: y, ..Op::new(op::BASE_HEIGHT) })
-    }
-    /// How many blocks across land masses and seas are (the continent noise's scale; 900 when
-    /// not given). Masks and rules on continentalness follow it.
-    pub fn continent_scale(self, blocks: f64) -> Self {
-        self.send(Op { value: blocks, ..Op::new(op::CONTINENT_SCALE) })
+        self.set(&t::BASE_HEIGHT, y)
     }
     /// Everything up to `level` that isn't ground is `water`.
     pub fn sea(self, level: i32, water: &str) -> Self {
-        self.send(Op { level, block: water.to_string(), ..Op::new(op::SEA) })
+        let block = self.q(water);
+        self.set(&t::SEA, abi::TerrainSea { level, block })
     }
     pub fn caves(self, caves: Caves) -> Self {
-        self.send(Op { block: caves.lava, level: caves.lava_from, to: caves.lava_to, ..Op::new(op::CAVES) })
+        let lava = self.q(&caves.lava);
+        self.set(&t::CAVES, abi::TerrainCaves { lava, from: caves.lava_from, to: caves.lava_to })
     }
     /// A named value over the terrain's columns, for biome rules (`BiomeRule::field`) and
     /// other expressions (`Expr::field`), worked out once per column. The name is used as written:
     /// give yours your mod's prefix (`mymod:aridity`). Declaring `temperature`, `humidity`,
     /// `continent` or another mod's field again replaces it for everything that uses it.
     pub fn field(self, name: &str, value: Expr) -> Self {
-        self.send(Op { anchor: name.to_string(), field: Some(value), ..Op::new(op::FIELD) })
+        self.push(&t::FIELDS, abi::TerrainField { name: name.to_string(), value: value.0 })
     }
-    pub fn feature(self, f: impl Into<Feature>) -> Self {
-        self.send(Op { feature: Some(f.into()), ..Op::new(op::FEATURE) })
+    pub fn landform(self, f: impl Into<Landform>) -> Self {
+        let mut f = f.into();
+        // chiacraft: a CPU landform's height goes as a callback under its name
+        // (`comp::terrain::CPU_HEIGHT`), so it needs one: an unnamed one gets its own.
+        let custom = f.custom.take();
+        if custom.is_some() && f.name.is_empty() {
+            static UNNAMED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            f.name = format!("cpu_landform_{}", UNNAMED.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+        }
+        let f = f.raw(self.reg.ns);
+        let name = f.name.clone();
+        let s = self.push(&t::LANDFORMS, f);
+        match custom {
+            Some(cb) => {
+                // Registered once per landform at load: the component's name lives on.
+                let key: &'static str = Box::leak(format!("{}{name}", abi::comp::terrain::CPU_HEIGHT).into_boxed_str());
+                let comp: &'static Component<abi::Callback, crate::kind::Terrain> = Box::leak(Box::new(Component::named(key)));
+                s.set(comp, cb)
+            }
+            None => s,
+        }
     }
-    pub fn feature_remove(self, name: &str) -> Self {
-        self.send(Op { anchor: name.to_string(), ..Op::new(op::FEATURE_REMOVE) })
+    pub fn landform_remove(self, name: &str) -> Self {
+        let name = self.q(name);
+        self.remove_item(&t::LANDFORMS, &name)
     }
-    /// Limits the named feature further: its mask is multiplied by `mask`.
-    pub fn feature_mask(self, name: &str, mask: Expr) -> Self {
-        self.send(Op { anchor: name.to_string(), feature: Some(Feature::new(Expr::int(0)).mask(mask)), ..Op::new(op::FEATURE_MASK) })
+    /// Limits the named landform further: its mask is multiplied by `mask`.
+    pub fn landform_mask(self, name: &str, mask: Expr) -> Self {
+        let name = self.q(name);
+        self.push(&t::MASKS, abi::LandformMask { name, mask: mask.0 })
     }
     /// A rule after all others.
-    pub fn biome(self, rule: BiomeRule) -> Self {
-        self.send(Op { rule: Some(rule), ..Op::new(op::BIOME) })
+    pub fn rule(self, rule: BiomeRule) -> Self {
+        let rule = self.rule_as_sent(rule);
+        self.push(&t::RULES, rule)
     }
     /// A rule tried right before the rule named `rule` (a biome's rule is named like the biome).
-    pub fn biome_before(self, rule: &str, new: BiomeRule) -> Self {
-        self.send(Op { anchor: rule.to_string(), rule: Some(new), ..Op::new(op::BIOME_BEFORE) })
+    pub fn rule_before(self, rule: &str, new: BiomeRule) -> Self {
+        let (anchor, new) = (self.q(rule), self.rule_as_sent(new));
+        self.insert_before(&t::RULES, &anchor, new)
     }
-    pub fn biome_after(self, rule: &str, new: BiomeRule) -> Self {
-        self.send(Op { anchor: rule.to_string(), rule: Some(new), ..Op::new(op::BIOME_AFTER) })
+    pub fn rule_after(self, rule: &str, new: BiomeRule) -> Self {
+        let (anchor, new) = (self.q(rule), self.rule_as_sent(new));
+        self.insert_after(&t::RULES, &anchor, new)
     }
-    pub fn biome_replace(self, rule: &str, new: BiomeRule) -> Self {
-        self.send(Op { anchor: rule.to_string(), rule: Some(new), ..Op::new(op::BIOME_REPLACE) })
+    pub fn rule_replace(self, rule: &str, new: BiomeRule) -> Self {
+        let (anchor, new) = (self.q(rule), self.rule_as_sent(new));
+        self.replace_item(&t::RULES, &anchor, new)
     }
-    pub fn biome_remove(self, rule: &str) -> Self {
-        self.send(Op { anchor: rule.to_string(), ..Op::new(op::BIOME_REMOVE) })
+    pub fn rule_remove(self, rule: &str) -> Self {
+        let anchor = self.q(rule);
+        self.remove_item(&t::RULES, &anchor)
     }
-    /// Changes what the closure sets on the rule and keeps the rest:
-    /// `biome_edit("base:desert", |r| r.temperature(0.5..))`.
-    pub fn biome_edit(self, rule: &str, edit: impl FnOnce(BiomeRule) -> BiomeRule) -> Self {
-        self.send(Op { anchor: rule.to_string(), rule: Some(edit(BiomeRule::blank())), ..Op::new(op::BIOME_EDIT) })
+    /// Changes what `f` sets of the rule named `rule`, the rest stays:
+    /// `.rule_edit("base:desert", |r| r.height(..=90))`.
+    pub fn rule_edit(self, rule: &str, f: impl FnOnce(BiomeRule) -> BiomeRule) -> Self {
+        let mut edit = self.rule_as_sent(f(BiomeRule::blank()));
+        edit.name = self.q(rule);
+        self.push(&t::RULE_EDITS, edit)
     }
     /// A biome in 3D: whole cubes at least `depth` blocks under the surface where a 3D noise of
-    /// patches about `size` blocks across is above `threshold` (-1..1). Biomes are kept per
+    /// patches about `size` blocks across is above `threshold` (-1..1). A threshold of -1
+    /// matches any cube deep enough, as a fallback after patch rules. Biomes are kept per
     /// column of each cube, so underground ones change every 16 blocks of height at most.
     pub fn cave_biome(self, biome: &str, depth: i32, size: f64, threshold: f64) -> Self {
-        self.send(Op { rule: Some(BiomeRule::new(biome)), level: depth, size, value: threshold, ..Op::new(op::CAVE_BIOME) })
+        let name = self.q(biome);
+        self.push(&t::CAVE_BIOMES, abi::CaveBiome { name, depth, size, threshold })
     }
     pub fn cave_biome_remove(self, biome: &str) -> Self {
-        self.send(Op { anchor: biome.to_string(), ..Op::new(op::CAVE_BIOME_REMOVE) })
+        let name = self.q(biome);
+        self.remove_item(&t::CAVE_BIOMES, &name)
     }
 
-    /// What steep faces show, for distant terrain, which runs no decorations: where the ground
-    /// falls `fall` blocks or more to its lowest neighbour, `f(face)` turns the block the surface
-    /// rules put there into the one the generator's own passes would (bare rock). No scattered
-    /// things stand on such faces far away. Pure, called from many threads.
+    /// chiacraft: how many blocks across land masses and seas are (the continent noise's scale;
+    /// 900 when not given). Masks and rules on continentalness follow it.
+    pub fn continent_scale(self, blocks: f64) -> Self {
+        self.set(&ours::CONTINENT_SCALE, blocks)
+    }
+
+    /// chiacraft: what steep faces show, for distant terrain, which runs no decorations: where
+    /// the ground falls `fall` blocks or more to its lowest neighbour, `f(face)` turns the block
+    /// the surface rules put there into the one the generator's own passes would (bare rock). No
+    /// scattered things stand on such faces far away. Pure, called from many threads.
     pub fn faces(self, fall: i32, f: impl Fn(&mut Face) + Send + Sync + 'static) -> Self {
         let face = callback(move |a: &mut abi::FaceArgs| f(Face::wrap(a)));
-        self.send(Op { level: fall, face, ..Op::new(op::FACES) })
+        self.set(&ours::FACE_FALL, fall).set(&ours::FACES, face)
     }
 
     /// chiacraft: the state far trees' crowns are drawn in at a time of year: `f(time, state)`
@@ -756,157 +686,12 @@ impl TerrainBuilder<'_> {
     /// crowns from sample trees once, so leaves that change with the seasons (a bloom) answer here,
     /// and the far tiles are made again when an answer changes. Pure, called from many threads.
     pub fn far_leaves(self, f: impl Fn(u64, u32) -> u32 + Send + Sync + 'static) -> Self {
-        let face = callback(move |a: &mut abi::FarLeavesArgs| a.state = f(a.time, a.state));
-        self.send(Op { face, ..Op::new(op::FAR_LEAVES) })
+        let call = callback(move |a: &mut abi::FarLeavesArgs| a.state = f(a.time, a.state));
+        self.set(&ours::FAR_LEAVES, call)
     }
 }
 
-impl Dimension {
-    /// Height and biome of column (`x`, `z`) for `seed`, generated or not: from the terrain or
-    /// the dimension's `column`. A dimension with neither gives height `i32::MIN`.
-    pub fn column(&self, seed: u64, x: i32, z: i32) -> Column {
-        let mut out = Column { height: i32::MIN, biome: 0 };
-        unsafe { (host().dim_column)(self.id(), seed, x, z, &mut out) };
-        out
-    }
-
-    /// Whether caves took the surface block of column (`x`, `z`), so nothing should stand there.
-    pub fn surface_carved(&self, seed: u64, x: i32, z: i32) -> bool {
-        unsafe { (host().dim_surface_carved)(self.id(), seed, x, z) != 0 }
-    }
-}
-
-impl Registry {
-    /// Something scattered over the ground (trees): one site per `cell` x `cell` square at a
-    /// seeded spot, kept with the chance the biome's `density` component gives, in every
-    /// dimension where such biomes stand. The engine skips sites under the sea and where caves
-    /// took the ground, fits the parts that reach into neighboring cubes, and keeps players
-    /// from spawning in one.
-    ///
-    /// ```ignore
-    /// static TREES: Scatter = Scatter::named("trees");
-    /// r.scatter(&TREES).cell(5).reach(2).density(&TREE_DENSITY).shape(|s| {
-    ///     let [x, y, z] = s.pos();
-    ///     for dy in 0..5 { s.force([x, y + dy, z], LOG.id()); }
-    /// });
-    /// ```
-    pub fn scatter<'a>(&'a mut self, scatter: &Scatter) -> ScatterBuilder<'a> {
-        ScatterBuilder {
-            raw: self.raw,
-            name: scatter.name().to_string(),
-            dimensions: String::new(),
-            density: String::new(),
-            ground: String::new(),
-            thin: None,
-            thin_biomes: String::new(),
-            desc: abi::ScatterDesc::DEFAULT,
-            _p: PhantomData,
-        }
-    }
-
-    /// Runs `f` on every generated cube after the generator and scatters (grass, flowers,
-    /// boulders), in every dimension but bare ones unless `.dimension(..)` limits it.
-    /// `g.columns()` has the surface of every column. Pure, like a generator.
-    pub fn decoration<'a>(&'a mut self, f: impl Fn(&mut Gen) + Send + Sync + 'static) -> DecorationBuilder<'a> {
-        DecorationBuilder {
-            raw: self.raw,
-            dimensions: String::new(),
-            cb: callback(move |a: &mut abi::GenArgs| f(Gen::wrap(a))),
-            _p: PhantomData,
-        }
-    }
-}
-
-pub struct ScatterBuilder<'a> {
-    raw: *mut abi::Registrar,
-    name: String,
-    dimensions: String,
-    density: String,
-    ground: String,
-    thin: Option<Expr>,
-    thin_biomes: String,
-    desc: abi::ScatterDesc,
-    _p: PhantomData<&'a mut Registry>,
-}
-
-impl ScatterBuilder<'_> {
-    /// Grid cell size in blocks (8 by default): at most one site per cell.
-    pub fn cell(mut self, blocks: i32) -> Self {
-        self.desc.cell = blocks;
-        self
-    }
-    /// How far the shape puts blocks sideways from its site. Up and down it may go 32 and 16
-    /// unless `reach_y` says otherwise.
-    pub fn reach(mut self, blocks: i32) -> Self {
-        self.desc.reach = blocks;
-        self
-    }
-    /// Only place where the surface block belongs to this block or tag (for example,
-    /// `.ground("#plant_soil")`). Without this constraint, any valid surface is allowed.
-    pub fn ground(mut self, blocks: &str) -> Self {
-        self.ground = blocks.to_string();
-        self
-    }
-    /// How far above and below its site the shape may put blocks (a giant tree, roots going
-    /// deep); what goes further is left out.
-    pub fn reach_y(mut self, up: i32, down: i32) -> Self {
-        self.desc.reach_up = up;
-        self.desc.reach_down = down;
-        self
-    }
-    /// The biome component (0..1) that is the chance of a site per cell; biomes without it get
-    /// none.
-    pub fn density(mut self, component: &crate::Component<f32>) -> Self {
-        self.density = component.name().to_string();
-        self
-    }
-    /// Only in this dimension (call again for more).
-    pub fn dimension(mut self, dimension: &Dimension) -> Self {
-        self.dimensions = format!("{} {}", self.dimensions, dimension.name());
-        self
-    }
-    /// The blocks of one site. Pure: it runs again for each cube the site reaches.
-    pub fn shape(mut self, f: impl Fn(&mut Site) + Send + Sync + 'static) -> Self {
-        self.desc.shape = callback(move |a: &mut abi::ScatterArgs| f(Site::wrap(a)));
-        self
-    }
-    /// Sites thinned by where they stand: where `mask` is over 0, only one in `keep` stays (by
-    /// `Site::random() % keep == 0`; 0 keeps none). Better than the same test in `shape`:
-    /// distant terrain can't run `shape` at every site, but evaluates this one exactly, so far
-    /// forests have the near ones' groves and glades.
-    pub fn thin(mut self, mask: Expr, keep: u32) -> Self {
-        self.thin = Some(mask);
-        self.desc.thin_keep = keep;
-        self
-    }
-    /// `thin` only in biomes that have `component`.
-    pub fn thin_in<T: crate::Value>(self, component: &crate::Component<T>, mask: Expr, keep: u32) -> Self {
-        let mut s = self.thin(mask, keep);
-        s.thin_biomes = component.name().to_string();
-        s
-    }
-}
-
-impl Drop for ScatterBuilder<'_> {
-    fn drop(&mut self) {
-        if std::thread::panicking() {
-            return;
-        }
-        let thin = self.thin.as_ref().map_or(Vec::new(), Expr::steps);
-        let desc = abi::ScatterDesc {
-            name: Str::new(&self.name),
-            dimensions: Str::new(&self.dimensions),
-            density: Str::new(&self.density),
-            ground: Str::new(&self.ground),
-            thin: Slice::new(&thin),
-            thin_biomes: Str::new(&self.thin_biomes),
-            ..self.desc
-        };
-        unsafe { (host().reg_scatter)(self.raw, &desc) }
-    }
-}
-
-/// A steep face's block as distant terrain asks for it (`TerrainBuilder::faces`).
+/// chiacraft: a steep face's block as distant terrain asks for it (`TerrainBuilder::faces`).
 #[repr(transparent)]
 pub struct Face {
     args: abi::FaceArgs,
@@ -936,7 +721,13 @@ impl Face {
     /// The block the terrain leaves at the top of the column.
     pub fn surface_block(&self) -> u32 {
         let [x, _, z] = self.args.pos;
-        unsafe { (host().dim_surface_block)(self.args.dim, self.args.seed, x, z) }
+        crate::Generation::new(abi::GenSource {
+            dim: self.args.dim,
+            seed: self.args.seed,
+            before: abi::stage::UNDERGROUND,
+            ctx: std::ptr::null(),
+        })
+        .surface_block(x, z)
     }
     /// How far the ground falls to its lowest neighbour.
     pub fn fall(&self) -> i32 {
@@ -952,71 +743,22 @@ impl Face {
     }
 }
 
-/// One site of a scatter: where it stands and where its blocks go (world coordinates).
-pub struct Site {
-    args: abi::ScatterArgs,
-}
+impl Dimension {
+    /// Inspect the deterministic result before `stage` (use `abi::stage::POST_PROCESS`
+    /// for terrain, structures and vegetation), without loading the live world.
+    pub fn generation(&self, seed: u64, stage: u32) -> crate::Generation<'_> {
+        crate::Generation::new(abi::GenSource { dim: self.id(), seed, before: stage, ctx: std::ptr::null() })
+    }
+    /// Height and biome of column (`x`, `z`) for `seed`, generated or not: from the terrain or
+    /// the dimension's `column`. A dimension with neither gives height `i32::MIN`.
+    pub fn column(&self, seed: u64, x: i32, z: i32) -> Column {
+        self.generation(seed, abi::stage::UNDERGROUND).column(x, z)
+    }
 
-impl Site {
-    fn wrap(a: &mut abi::ScatterArgs) -> &mut Site {
-        unsafe { &mut *(a as *mut abi::ScatterArgs as *mut Site) }
-    }
-    /// The block above the ground.
-    pub fn pos(&self) -> BlockPos {
-        self.args.pos
-    }
-    pub fn biome(&self) -> u32 {
-        self.args.biome
-    }
-    pub fn dimension(&self) -> u32 {
-        self.args.dim
-    }
-    pub fn seed(&self) -> u64 {
-        self.args.seed
-    }
-    /// Random bits of this site, the same every time it is shaped.
-    pub fn random(&self) -> u64 {
-        self.args.random
-    }
-    /// `state` at `pos` where there is air.
-    pub fn put(&mut self, pos: impl Into<BlockPos>, state: u32) {
-        self.push(pos.into(), state, 0);
-    }
-    /// `state` at `pos` whatever is there (a trunk through another tree's leaves).
-    pub fn put_force(&mut self, pos: impl Into<BlockPos>, state: u32) {
-        self.push(pos.into(), state, 1);
-    }
-    fn push(&mut self, pos: BlockPos, state: u32, force: u32) {
-        let a = &mut self.args;
-        if a.len < a.cap {
-            let offset = [pos.x - a.pos.x, pos.y - a.pos.y, pos.z - a.pos.z];
-            unsafe { *a.out.add(a.len as usize) = abi::ScatterBlock { offset: offset.into(), state, force } };
-            a.len += 1;
-        }
-    }
-}
-
-pub struct DecorationBuilder<'a> {
-    raw: *mut abi::Registrar,
-    dimensions: String,
-    cb: abi::Callback,
-    _p: PhantomData<&'a mut Registry>,
-}
-
-impl DecorationBuilder<'_> {
-    /// Only in this dimension (call again for more).
-    pub fn dimension(mut self, dimension: &Dimension) -> Self {
-        self.dimensions = format!("{} {}", self.dimensions, dimension.name());
-        self
-    }
-}
-
-impl Drop for DecorationBuilder<'_> {
-    fn drop(&mut self) {
-        if std::thread::panicking() {
-            return;
-        }
-        unsafe { (host().reg_decoration)(self.raw, Str::new(&self.dimensions), self.cb) }
+    /// Whether caves took the surface block of column (`x`, `z`), so nothing should stand there.
+    pub fn surface_carved(&self, seed: u64, x: i32, z: i32) -> bool {
+        self.generation(seed, abi::stage::UNDERGROUND)
+            .surface_carved(x, z)
     }
 }
 
@@ -1034,20 +776,16 @@ impl Gen {
 
     /// Any column of this dimension, in world coordinates.
     pub fn column(&self, x: i32, z: i32) -> Column {
-        let mut out = Column { height: i32::MIN, biome: 0 };
-        unsafe { (host().dim_column)(self.args.dim, self.args.seed, x, z, &mut out) };
-        out
+        self.view().column(x, z)
     }
 
     /// Whether caves took the surface block of column (`x`, `z`), in world coordinates.
     pub fn surface_carved(&self, x: i32, z: i32) -> bool {
-        unsafe { (host().dim_surface_carved)(self.args.dim, self.args.seed, x, z) != 0 }
+        self.view().surface_carved(x, z)
     }
 
-    /// The block the terrain leaves at the top of column (`x`, `z`), in world coordinates: 0
-    /// where caves took it or the dimension has no terrain. `get` only sees this cube, so this is
-    /// how to know the ground under its lowest layer.
+    /// The block at the terrain's reference surface, in this callback's generation view.
     pub fn surface_block(&self, x: i32, z: i32) -> u32 {
-        unsafe { (host().dim_surface_block)(self.args.dim, self.args.seed, x, z) }
+        self.view().surface_block(x, z)
     }
 }

@@ -22,7 +22,7 @@ use weft_sdk::*;
 
 use crate::waystones::{ASK, ATLAS, Atlas, Cell, OPEN, TRAVEL};
 
-pub static SCREEN: Screen = Screen::named("map");
+pub static SCREEN: Menu = Menu::named("map");
 /// The minimap (the HUD's top right), its setting and its zoom key.
 static MINIMAP: HudElement = HudElement::named("minimap");
 pub static MINIMAP_ON: Config<bool> = Config::named("minimap");
@@ -196,7 +196,7 @@ fn change(c: &ClientView, f: impl FnOnce(&mut State)) {
 }
 
 pub fn register(r: &mut Registry) {
-    r.key(&OPEN_KEY, "M").on_press_client(|c| {
+    r.key(&OPEN_KEY, "M").on_client(|c| {
         {
             let mut s = STATE.lock().unwrap();
             if s.closed_by_key
@@ -228,7 +228,7 @@ pub fn register(r: &mut Registry) {
     });
     r.client_frame(frame);
     r.config(&MINIMAP_ON).bool(true);
-    r.key(&MINI_ZOOM, "N").on_press_client(|_| {
+    r.key(&MINI_ZOOM, "N").on_client(|_| {
         let mut s = STATE.lock().unwrap();
         s.mini_zoom = (s.mini_zoom + 1) % n::MINI_ZOOMS.len();
         s.mini_painted = None;
@@ -254,7 +254,7 @@ pub fn register(r: &mut Registry) {
             }
         });
     });
-    r.screen(&SCREEN, screen).on_key(|c, key| {
+    r.menu(&SCREEN).screen(screen).on_key(|c, key| {
         let z = n::ZOOMS[STATE.lock().unwrap().zoom];
         let step = 32 * z;
         let pan = match key {
@@ -273,7 +273,7 @@ pub fn register(r: &mut Registry) {
             "KeyC" | "Home" => change(c, |s| s.pan = (0, 0)),
             "KeyM" => {
                 STATE.lock().unwrap().closed_by_key = Some(Instant::now());
-                c.client().screen_close();
+                c.client().menu_close();
             }
             _ => {}
         }
@@ -292,7 +292,7 @@ fn open(c: &Client) {
         s.painted = None;
     }
     paint(c);
-    c.screen_open(&SCREEN);
+    c.menu_open(&SCREEN);
 }
 
 // ------------------------------------------------------------------ every frame
@@ -727,5 +727,5 @@ fn screen(ui: &mut Ui) {
 fn go(c: &ClientView, cell: (i32, i32)) {
     let client = c.client();
     client.send(&TRAVEL, &Cell { i: cell.0, j: cell.1 });
-    client.screen_close();
+    client.menu_close();
 }

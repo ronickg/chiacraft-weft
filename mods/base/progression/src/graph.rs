@@ -358,6 +358,28 @@ const RECIPES_LIST: &[Recipe] = &[
     s("animals:cooked_hare", &[("animals:hare", 1.0)], Fire),
     s("animals:cooked_trout", &[("animals:trout", 1.0)], Fire),
     s("animals:cooked_pacu", &[("animals:pacu", 1.0)], Fire),
+    // Upstream Weft's content (11-22 sync): kept until Ronald's call (items.rs, recipes.rs,
+    // doors.rs, assembly.rs, redstone.rs, woodcutter.rs; `content::RULES`).
+    c("base:shield", 1.0, &[("#planks", 6.0), ("base:iron_ingot", 1.0)], Table),
+    c("base:oak_door", 3.0, &[("base:oak_planks", 6.0)], Table),
+    c("base:oak_wood", 4.0, &[("base:oak_log", 4.0)], Hand),
+    c("base:birch_wood", 4.0, &[("base:birch_log", 4.0)], Hand),
+    c("base:spruce_wood", 4.0, &[("base:spruce_log", 4.0)], Hand),
+    c("base:oak_log_hollow", 4.0, &[("base:oak_log", 4.0)], Table),
+    c("base:birch_log_hollow", 4.0, &[("base:birch_log", 4.0)], Table),
+    c("base:spruce_log_hollow", 4.0, &[("base:spruce_log", 4.0)], Table),
+    c("base:clay", 1.0, &[("base:clay_ball", 4.0)], Hand),
+    c("base:mossy_cobblestone", 1.0, &[("base:cobblestone", 1.0), ("base:moss", 1.0)], Hand),
+    s("base:cooked_dryads_saddle", &[("base:dryads_saddle", 1.0)], Fire),
+    c("base:woodcutter", 1.0, &[("base:iron_ingot", 1.0), ("#planks", 3.0)], Table),
+    c("base:music_player", 1.0, &[("#planks", 8.0), ("base:iron_ingot", 1.0)], Table),
+    c("base:assembly_tool", 1.0, &[("base:iron_ingot", 1.0), ("#stick", 1.0)], Hand),
+    c("base:thruster", 1.0, &[("base:iron_ingot", 6.0), ("base:furnace", 2.0), ("base:redstone", 1.0)], Table),
+    c("base:helm", 1.0, &[("#stick", 3.0), ("#planks", 4.0)], Table),
+    c("base:linear_guide", 1.0, &[("base:iron_ingot", 4.0), ("base:piston", 1.0), ("base:redstone", 1.0)], Table),
+    c("base:guide_rail", 6.0, &[("base:iron_ingot", 6.0), ("#stick", 3.0)], Table),
+    c("base:assembler", 1.0, &[("base:iron_ingot", 6.0), ("base:redstone", 1.0), ("base:piston", 1.0)], Table),
+    c("base:rotor", 1.0, &[("base:iron_ingot", 4.0), ("base:assembler", 1.0), ("base:redstone", 1.0)], Table),
 ];
 
 /// Every recipe.

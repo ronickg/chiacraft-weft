@@ -95,15 +95,20 @@ A texture with either map has both (the missing one is neutral: rough, 4%, flat)
 shader pack that uses them (chiacraft's does: highlights, the sky and the screen mirrored on smooth blocks).
 
 ## Overlays
-If `<texture>.png` has a `<texture>_overlay.png` next to it, the overlay is drawn over the face
-and takes the block's tint instead of the face itself.\
-There is exactly one overlay per texture and it is always tinted, (there are no `_overlay1` or conditions).\
-That's how grass sides are done: the dirt side stays brown, the grass fringe gets the biome's color.\
+A block's face is layers, pictures one over the other, set in code:
+`.sides("dirt").layer("grass_side_overlay").tint_kind(&tints::GRASS)`.\
+That's how grass sides are done: the dirt stays brown, the grass fringe gets the biome's color.\
+Each layer is drawn by itself over the one under it, with its own animation, `.ctm` and tint.\
+A fixed tint (`.tint(0x303038)`) makes a tinted copy of the picture when the game loads, every
+frame and connected tile too, so one picture is many blocks. A pack changes them by replacing
+the pictures, like any other.\
 Different looks for different block states (a lit furnace) are different textures, not overlays.
 
-The overlay has no `_e` of its own, the glow of a face comes from the base texture's `_e`.
+Each layer's `_e` glows where that layer shows.
 
 ## Debugging
 A broken picture never stops the game: a texture that is missing or has a wrong size shows the missing
 texture pattern, and the log says which file caused it.\
 `F3+T` reloads the textures, so a `.anim` or an `_e` file can be changed while the game is running.
+
+`BlockModel::Cube` and `Cross` are registration presets expanded into model boxes when content is loaded. All block geometry uses the same box renderer; a single full cube with standard UVs uses packed faces automatically. `block.item_sprite(Dir::West)` selects a face as a flat item icon independently of the model. The `comps::block::ITEM_FACE` value 255 draws the model instead.
