@@ -240,6 +240,15 @@ class Builder:
                     return a, "flat"
         elif b:
             a, how = I.block_icon(b, self.tex)
+            # A flower out of bloom (`<name>_green`, bloom=0) or a grazed tuft (`<name>_grazed`,
+            # age 0) is listed in its first state: the card shows it in bloom / grown (Ronald, via
+            # Planner, 11-22), the first state kept as a second picture.
+            opened = [re.sub(r"_(green|grazed)$", "", t) if t else t for t in b["textures"]]
+            if a is not None and b.get("states", 2) > 1 and opened != b["textures"] and all(self.tex.path(t) for t in opened if t):
+                self.first_state = (a, "first state (" + ("out of bloom" if "_green" in b["textures"][3] else "grazed") + ")")
+                a2, how2 = I.block_icon(dict(b, textures=opened), self.tex)
+                if a2 is not None:
+                    return a2, how2
             if a is not None:
                 return a, how
         for guess in (f"block/{n}", f"block/{n}_side", f"block/{n}_top"):
@@ -493,8 +502,14 @@ class Builder:
                     bx.append(["light", "/".join(map(str, b["light"]))])
                 e["facts"].insert(0, ["As a block", bx])
             # Pictures.
+            self.first_state = None
             a, how = self.icon_of(i)
             e["img"] = self.img(a, f"icons/{ns}/{n}.png") if a is not None else None
+            if self.first_state and e["img"]:
+                e["variants_title"] = "As the game shows it"
+                e["variants"] = [{"label": "in bloom" if "bloom" in self.first_state[1] else "grown", "img": e["img"], "note": "the card's picture"},
+                                 {"label": self.first_state[1], "img": self.img(self.first_state[0], f"icons/{ns}/{n}_first.png"),
+                                  "note": "the item and the block's first state"}]
             e["pix"] = how != "cube"
             if n in SHOW_KINDS and ns == "base":
                 main, vs = self.built_variants(n, i)
