@@ -3,7 +3,7 @@
 
     tools/release/android-pack.py <stage> <stamp>
 
-<stage>/apk-assets/game.zip   the folder `weft --dist` makes, without the executable: the
+<stage>/apk-assets/game.zip   the folder `weft dist` makes, without the executable: the
                               engine's assets in assets/core and every mod not marked
                               `dist = false` packed into run/mods/<mod>.zip, its assets only
 <stage>/apk-assets/game.stamp <stamp>: the game unpacks game.zip again when it changes
