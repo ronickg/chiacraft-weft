@@ -1405,6 +1405,7 @@ item.base.hand_drill.tooltip = Две палки, вращаемые ладон�
 block.base.campfire_laid = Сложенный костёр
 block.base.campfire_laid.tooltip = Два бревна и две палки, ещё не зажжён. Держите на нём лучковое или ручное сверло, чтобы добыть уголёк.
 command.base.knap.no_room = Здесь нет места для желвака: встаньте на открытое место.
+command.base.firstclock = Первые часы, {0} с игры: {1}
 command.base.impact.started = Падает метеорит: кратер радиусом {0} у {1} {2}, {3} столбцов за {4} тиков
 command.base.impact.no_ground = Нет загруженной земли для удара у {0} {1}
 

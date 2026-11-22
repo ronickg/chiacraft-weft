@@ -188,6 +188,37 @@ runs at half speed from 10:00 to dusk, about 13 real minutes.
 So a new player has the axe as the sun goes down, and the fire just after: the first night is
 the deadline you feel.
 
+### Timing it: the first 30 minutes (planned 11-22, runs parked)
+
+The clock (`mods/base/src/first_clock.rs`, `vitals::first::CLOCK_STEPS`) notes, per player,
+the second of survival play each step first came true: `rock` (or `bone` in the bone lands),
+`edge` (a flake or splinter), `head`, `string`, `axe`, `fire` (a lit one within 4 blocks),
+`logs`, `planks`, `table`, `pickaxe`, `stone`. It logs `first-clock: <player> <step> at <s> s`
+as each comes and a summary at 1800 s; `/firstclock` shows the player's own.
+
+**The run.** Three fresh worlds (seeds 1, 7, 42; plains spawns), survival, mobs on, one player
+who hasn't read this file: the Playtester reading the screen, or Ronald. 30 minutes each,
+no commands, no `/tk`. Afterwards the `first-clock:` lines from run.log, a death count, and
+where they got stuck (what they tried, which hint they read). A script can't play this blind
+(the 11-04 playtest: hops on terraces scatter, the book has no labels to read), so the
+scripts only check the clock itself (`first_day_1122.txt` ends with `/firstclock`).
+
+**What it should show** (new player, from the table above):
+
+| Step | Target | Too slow past | Too fast under | If too slow, look at |
+|---|---|---|---|---|
+| rock | 2.5 min | 5 | 0.5 | the spawn guarantee (`SPAWN_LEAST`, `NEAR_SPAWN_TIMES`) |
+| edge | 4 | 7 | 1 | the `knap` hint, `FLAKE_FROM_FLINT` |
+| head | 7 | 11 | 2 | the knapping screen's how-to line, the sneak hint |
+| string | 9 | 13 | 3 | `FIBRE_CUT`, the `flake` hint |
+| **axe** | **13** | **17** | **8** | the `lash` hint, the book's 2x2 (Ronald's B: 13-15) |
+| fire | 16 | 22 | 9 | the dusk hint naming the drill, `BOW_DRILL` |
+| logs | 17 | 23 | 10 | the tree hint (`TREE_LOOK`), felling time at the wood tier |
+| table, pickaxe, stone | 22-25 | 30 | 14 | the pick head (13 clicks), stone 6 under the surface (11-04) |
+
+The axe is the one Ronald set; the rest follow from it. A step past "too slow" in two of the
+three worlds is a fix (a number in `vitals::first` or a hint), then the same three seeds again.
+
 ## Choices for Ronald
 
 1. **The pace.**

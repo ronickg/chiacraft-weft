@@ -256,6 +256,16 @@ pub const DRILLS: [Drill; 2] = [BOW_DRILL, HAND_DRILL];
 /// and a cobble"); the first one of a shape is the knapping screen's, by hand.
 pub const HEAD_FROM_BOOK_SECS: f32 = 8.0;
 
+/// The first hours' clock (`first_clock.rs`): the steps of the way in it times, in their usual
+/// order, each the first second of survival play it was true (a bone stands for the rock in the
+/// bone lands; the fire is a lit one within `CLOCK_FIRE_REACH` blocks) ...
+pub const CLOCK_STEPS: [&str; 12] = ["rock", "bone", "edge", "head", "string", "axe", "fire", "logs", "planks", "table", "pickaxe", "stone"];
+/// ... the summary logged at half an hour of play (Ronald, 11-05: "B: about 13-15 min" to the
+/// first axe; OVERVIEW: "the first 30 minutes timed") ...
+pub const CLOCK_REPORT_SECS: u32 = 1800;
+/// ... and how near a fire counts as the player's.
+pub const CLOCK_FIRE_REACH: i32 = 4;
+
 /// Blocks over a fire bed that keep the rain off it.
 pub const ROOF_REACH: i32 = 24;
 

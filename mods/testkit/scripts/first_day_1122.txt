@@ -5,7 +5,7 @@
 # the axe; then a hoe (the one shortcut: /gear) tills, wheat is sown and harvested ripe.
 # Setup is creative (/tk fill, /tk set put things on the ground), every item after it is picked up
 # or made. /tk hand moves a stack the player has into the hand (scripts can't know pickup slots).
-# Read: every `/tk inv me` reply (the bag after each step), the `/tk get` replies, run.log lines
+# Read: the two `/firstclock` replies (each step's second of play), every `/tk inv me` reply (the bag after each step), the `/tk get` replies, run.log lines
 # "first: strike", "knapping:", "felling", "died" (there should be none), and the shots.
 # Expect: base:rock, then base:sharp_flake (80% a strike, three strikes), base:part_felling_axe_head
 # after the screen, base:stick x6+, base:plant_fibre ~18, base:string x5, base:axe, base:bow_drill,
@@ -265,6 +265,7 @@ key Escape
 until screen none within 10
 chat /tk inv me
 until chat base:axe within 5
+chat /firstclock
 until chat base:bow_drill within 5
 # 7. The first fire: the bed put down ahead, the bow drill held on it (6 s), up to three tries.
 chat /tk hand me base:fire_bed
@@ -322,5 +323,7 @@ wait 1.5
 chat /tk get ~ ~-1 ~-1
 chat /tk inv me
 shot fd_end.png
+# The first hours' clock: every step from rock to axe, fire and logs, with its second.
+chat /firstclock
 expect alive
 quit
