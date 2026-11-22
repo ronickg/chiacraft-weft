@@ -1,0 +1,44 @@
+# Herds drink with their leader (creature AI step 9, slice 2: `groups::JOIN_DRINK`). At noon, fed,
+# every red deer at 85% water: alone none drinks (it would only under 50%). Then only the herd's
+# leader is made thirsty (`/animalprof lead 0.3`): it goes to the pond, and the others, seeing it
+# drink, go with it (a member drinks with its leader from 90%).
+# PASS: no "anim: <id> holds drink" line before the "leaders ... at 30% water" line; after it, the
+# leader's id holds drink and so do most of the others (several ids within a few seconds), and
+# herd_drink_2.png shows the herd at the pond (straight ahead, 10-14 blocks off).
+# FAIL: only the leader drinks.
+loaded
+idle
+wait 3
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /air 0 0 0
+chat /tk fill ~-30 ~-1 ~-30 ~30 ~-1 ~30 base:grass
+chat /tk fill ~-30 ~ ~-30 ~30 ~3 ~30 core:air
+chat /tk fill ~-3 ~-1 ~-14 ~3 ~-1 ~-10 base:water
+wait 2
+chat /tk time 6000
+chat /tk mode spectator
+chat /tk ring animals:red_deer 10 6 14
+wait 3
+chat /anim log
+chat /animalprof food 1.0
+chat /animalprof water 0.85
+wait 15
+chat /animalprof senses
+look 0 -20
+wait 1
+shot herd_drink_1.png
+chat /animalprof food 1.0
+chat /animalprof water 0.85
+chat /animalprof lead 0.3
+wait 12
+chat /animalprof senses
+look 0 -20
+wait 1
+shot herd_drink_2.png
+wait 15
+chat /animalprof senses
+look 0 -20
+wait 1
+shot herd_drink_3.png
+quit

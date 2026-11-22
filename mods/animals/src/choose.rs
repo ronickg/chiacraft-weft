@@ -82,11 +82,16 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; 10] {
             .checked_sub(1)
             .map_or(1.0, |i| crate::routines::activity(w, i));
         let fed = a.food as f32 / a.stat(crate::species::FOOD).max(1.0);
-        s[Need::Eat as usize] = needs::hunger_score(fed, at(Need::Eat));
+        // A herd member does as its leader does: drinks and grazes with it from more left
+        // (`groups::JOIN_DRINK`, `JOIN_EAT`).
+        let lead = crate::group::leader_doing(w, id);
+        let eat_from = if lead == Some(Need::Eat as u8) { animals_core::groups::JOIN_EAT } else { needs::HUNGRY };
+        s[Need::Eat as usize] = needs::hunger_score_from(fed, eat_from, at(Need::Eat));
         // A plant eater drinks at dawn and dusk from more water left (`routines::DRINKS_AT`), as
         // its drink goal does.
         let dusk = a.species().is_some_and(|s| s.forages_wild()) && animals_core::routines::drinking_hour(crate::routines::hour(w));
         let start = if dusk { animals_core::routines::DRINKS_AT } else { needs::THIRSTY };
+        let start = if lead == Some(Need::Drink as u8) { start.max(animals_core::groups::JOIN_DRINK) } else { start };
         s[Need::Drink as usize] = needs::thirst_score_from(1.0 - a.thirst, start, at(Need::Drink));
     }
     s[Need::Comfort as usize] = match w

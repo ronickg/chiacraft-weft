@@ -28,6 +28,22 @@ const _: () = assert!(SLOT_FAR + FOLLOW_FROM * 2.0 <= 16.0);
 /// Fewest of its kind near (itself among them) for a group to keep together.
 pub const GROUP: u16 = 2;
 
+/// Doing as its leader does (slice 2): a member whose leader is drinking drinks too from this much
+/// of its water left, one whose leader grazes eats from this much of its food (instead of
+/// `needs::THIRSTY` and `HUNGRY`, or the dusk drink's `routines::DRINKS_AT`). Herd animals
+/// graze, drink and rest in step (Rook and Penning 1991 on grazing synchrony; red deer in
+/// Clutton-Brock, Guinness and Albon 1982): the group moves on together instead of one at a time.
+pub const JOIN_DRINK: f32 = 0.9;
+pub const JOIN_EAT: f32 = 0.85;
+// Joining starts before it would on its own (and before the dusk drink), and stops where it would.
+const _: () = assert!(
+    JOIN_DRINK > crate::routines::DRINKS_AT
+        && JOIN_DRINK > crate::needs::THIRSTY
+        && JOIN_DRINK < crate::needs::SLAKED
+        && JOIN_EAT > crate::needs::HUNGRY
+        && JOIN_EAT < crate::needs::FULL
+);
+
 /// The ring's radius for a group of `kin`.
 pub fn ring(kin: u16) -> f32 {
     (SLOT_NEAR + SLOT_PER * (kin.max(1) as f32).sqrt()).min(SLOT_FAR)
@@ -74,6 +90,16 @@ mod tests {
             seen[(a / std::f32::consts::TAU * 8.0) as usize % 8] = true;
         }
         assert!(seen.iter().filter(|&&s| s).count() >= 5);
+    }
+
+    #[test]
+    fn members_join_before_they_would_alone() {
+        use crate::needs::{THIRSTY, hunger_score_from, thirst_score_from};
+        // At 85% water a member drinks with its leader, and not on its own; full, it doesn't.
+        assert!(thirst_score_from(0.85, JOIN_DRINK, false) > 0.0);
+        assert_eq!(thirst_score_from(0.85, THIRSTY, false), 0.0);
+        assert_eq!(thirst_score_from(0.95, JOIN_DRINK, false), 0.0);
+        assert!(hunger_score_from(0.8, JOIN_EAT, false) > 0.0);
     }
 
     #[test]

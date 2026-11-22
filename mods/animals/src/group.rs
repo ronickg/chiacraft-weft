@@ -80,6 +80,17 @@ fn stuck(w: &World, id: u64, st: &EntityState) -> bool {
     true
 }
 
+/// What `id`'s leader is doing of its needs (`choose::doing`), if `id` is a wild member of a
+/// group that isn't its leader (slice 2: it drinks and grazes when its leader does).
+pub fn leader_doing(w: &World, id: u64) -> Option<u8> {
+    let s = w.component(id, &SENSES)?;
+    if s.kin < GROUP || s.leader == 0 || s.leader == id || crate::animal::tamed(w, id) {
+        return None;
+    }
+    w.entity(s.leader).filter(|e| e.health > 0.0)?;
+    Some(crate::choose::doing(w, s.leader))
+}
+
 /// For a wild member of a group that isn't its leader: whether it walks to its place now. None:
 /// it wanders on its own (alone, the leader, tame, or its leader gone until its next look).
 fn follow(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {
