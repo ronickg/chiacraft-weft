@@ -1,6 +1,7 @@
 # Herds keep together (creature AI step 9, group plans, slice 1: `group.rs`). A wild herd's
 # leader (the lowest id of its kind near) wanders as before; the others keep to their own place
 # in a ring round it (2-8 blocks, `animals_core::groups`) and walk back once 3 blocks off it.
+# 17:30, when red deer (twilight animals) are about, not resting; 6 hares (alone) wander too.
 # Flat open pad, spectator (animals don't sense one) 30 blocks above, mobs off, midday, everyone fed and watered so
 # the needs band leaves them to wander. 10 red deer on a ring 4-10 blocks out.
 # PASS:
@@ -22,9 +23,10 @@ chat /air 0 0 0
 chat /tk fill ~-30 ~-1 ~-30 ~30 ~-1 ~30 base:grass
 chat /tk fill ~-30 ~ ~-30 ~30 ~6 ~30 core:air
 wait 2
-chat /tk time 6000
+chat /tk time 11500
 chat /tk mode spectator
 chat /tk ring animals:red_deer 10 4 10
+chat /tk ring animals:hare 6 12 20
 wait 2
 chat /animalprof food 1.0
 chat /animalprof water 1.0

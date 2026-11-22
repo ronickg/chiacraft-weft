@@ -2499,7 +2499,9 @@ impl Dim {
             let e = &mut list[i];
             let nav = e.nav.as_mut().unwrap();
             nav.path = path;
-            (nav.next, nav.repath, nav.found_for, nav.stuck) = (1, e.age + 20, Some(nav.target), 0);
+            // The stuck count goes on across a new path: a path that ends short of its target
+            // asks for one every 20 ticks, which reset it and so walked in place for good.
+            (nav.next, nav.repath, nav.found_for) = (1, e.age + 20, Some(nav.target));
         }
         for e in list.iter_mut().filter(|e| walks(e)) {
             let frame = e.nav.as_ref().and_then(|n| n.frame);
