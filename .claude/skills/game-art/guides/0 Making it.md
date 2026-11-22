@@ -109,6 +109,16 @@ again (once or twice) rather than fixed by hand:
   green fringe. Key out pixels where green clearly beats red and blue (the beans, 11-04).
 - Glows (the sun, fire, magic) blend into magenta as a pink ring: ask for glows on green, or take
   the pink pixels out after cutting (`r > 200, g < 160, b > 100`).
+- A sheet of many icons whose parts don't touch (an effect icon of dots and sparks) breaks the
+  connected-shape cutter: cut by grid cell instead (ask for an exact cols x rows grid; the Weft
+  redraw's `notes/art/weft-redraw/gridicons.py`, 11-22). Purple or pink icons go on green, and green fringe is keyed out
+  after (`g > r + 15 and g > b + 15`).
+- Bright pink and purple petals share magenta's hue: a magenta defringe eats them. Draw one colour
+  (red) and recolour the rest in code, or skip the defringe for those (the tulips, 11-22).
+- Upstream's picture of a model block (a machine face) keeps its layout: double it to 32 a block
+  and draw each colour class with our approved material tile, keeping upstream's light and dark as
+  relative brightness (`notes/blocks/weft_machines.py`), rather than generating a new face whose
+  parts wouldn't sit where the model's UVs read them.
 
 ## Part-built tools (crafting)
 

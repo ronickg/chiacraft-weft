@@ -288,6 +288,7 @@ These describe **how the reference builds each kind of item**, not exact designs
 - Our approved items win over the family notes above (section 9) where they differ (the regen test, 11-05: Guides 3's notes turned our diamond into cubes and our coal grey). A diamond is our shard cluster: 3-4 faceted teal shards pointing outwards with white facet tips and one sparkle, never a cluster of cubes or a cut brilliant. Coal stays glossy black-brown with blue-grey glints, never matte grey, whatever the fuel note says.
 - Diamond armour is 3-5 large faceted crystal plates per piece (helmet, chestplate, leggings, boots) with dark leather showing between them, never small scales: "scales sewn on a backing" came out as noise at 2x in all three regen runs (11-05).
 - The hoe is the least stable design: one regen run in three drew it right, the others a spear point or a blade with a spike. Paste the hoe line above whole, attach a drawn hoe of ours with `--like`, and check its head sits across the haft before keeping it.
+- A family of colour variants (potions, 24 at once) is one generated base recoloured in code, never 24 prompts (the Weft redraw, approved 11-22): one flask, its liquid re-shaded in HLS to each effect's colour from `effects.rs`, so potion, effect icon and particles agree (`notes/art/weft-redraw/potions.py`, archived with the batch). Metal variants of a drawn tool (gold and diamond shears from iron) map the grey pixels by brightness rank onto the material's ramp, or gold comes out pale.
 
 How to prompt, check and cut it: `0 Making it.md`.
 
