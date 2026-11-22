@@ -4,7 +4,9 @@ use weft_sdk::{
 };
 
 use base_api::blocks::{GLASS, HELM, IRON_BLOCK as IRON, OAK_PLANKS as PLANKS, WHEEL, WHEEL_LARGE, WHEEL_SMALL};
-static STRIPE: Block = Block::named("base:blue_wool");
+// Upstream's car has a blue wool stripe; our game has only the one (white) wool, so it is that
+// (Weft sync 11-22, for Ronald).
+static STRIPE: Block = Block::named("base:wool");
 static AIR: Block = Block::named("core:air");
 
 pub fn register(r: &mut Registry) {
@@ -40,7 +42,11 @@ pub fn register(r: &mut Registry) {
                 }
                 s
             });
-        r.shaped(&base_api::recipes::CRAFTING, block.name(), 1, recipe, &[('w', "#wool/*"), ('i', "#ingots/iron")]);
+        // Upstream's recipe takes dyed wool (`#wool/*`), which our game doesn't make: left out
+        // for now, so the wheels come only from creative or commands (Weft sync 11-22, for
+        // Ronald; `progression` lists them as not made). Upstream's line, to put back:
+        // r.shaped(&base_api::recipes::CRAFTING, block.name(), 1, recipe, &[('w', "#wool/*"), ('i', "#ingots/iron")]);
+        let _ = recipe;
     }
     r.command("spawncar", "[at:pos]", spawn_car);
 }

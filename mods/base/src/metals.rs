@@ -63,11 +63,22 @@ pub const VEINS: [(&str, &str, i32, u32, u32); 7] = [
 ];
 
 /// The ores in worldgen (`worldgen.rs`, with the others, left out where they'd touch a cave).
+/// Each row is its own feature: a feature name is registered once, so the rows past an ore's
+/// first are named `copper_ore/<biome>` (`copper_ore/deep` for the one anywhere).
 pub fn ores(r: &mut Registry) {
+    let mut seen: Vec<&str> = Vec::new();
     for (metal, biome, max_y, veins, size) in VEINS {
         let block = if metal == "copper" { &COPPER_ORE } else { &TIN_ORE };
-        let o = r
-            .ore(block)
+        let first = !seen.contains(&metal);
+        seen.push(metal);
+        let o = r.ore(block);
+        let o = if first {
+            o
+        } else {
+            let place = if biome.is_empty() { "deep" } else { biome };
+            o.named(&format!("{metal}_ore/{place}"))
+        };
+        let o = o
             .y(i32::MIN, max_y)
             .per_cube(veins)
             .vein_size(size)

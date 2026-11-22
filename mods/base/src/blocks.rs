@@ -1372,6 +1372,14 @@ pub fn pat_near(w: &World, [x, y, z]: [i32; 3]) -> bool {
 // Their statics are in `base_api::blocks`. Upstream's clover, fern and coarse dirt are left out
 // (ours registers those), and so are its gravel flint, hoe tilling, tinted glass and wool and
 // grass overlay (ours stay).
+/// Upstream's "cut with shears" (`Cond::tool("#tools/shears")`), for its bushes and grasses
+/// below. Our game has no shears, and a condition naming a tag nothing carries stops the game at
+/// load, so it never holds: they drop what they drop unsheared (Weft sync 11-22, for Ronald: give
+/// a tool of ours the `tools/shears` tag, or make shears, and put upstream's condition back).
+fn sheared() -> Cond {
+    Cond::chance(0.0)
+}
+
 fn upstream_blocks(r: &mut Registry) {
     wood_block(r, &OAK_WOOD, "oak");
     wood_block(r, &BIRCH_WOOD, "birch");
@@ -1412,7 +1420,7 @@ fn upstream_blocks(r: &mut Registry) {
         .signal_blocker()
         .mined_by("shears", tool_tier::HAND)
         .tab(&crate::tabs::NATURAL);
-    let shears = Cond::tool("#tools/shears");
+    let shears = sheared();
     r.loot(&BUSH_LEAVES)
         .pool(Pool::new().when(shears.clone()).item(BUSH_LEAVES.name()))
         .pool(
@@ -1467,7 +1475,7 @@ fn upstream_blocks(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     r.loot(&INULA).pool(
         Pool::new()
-            .when(Cond::tool("#tools/shears"))
+            .when(sheared())
             .item(INULA.name()),
     );
     r.block(&VERBASCUM)
@@ -1479,7 +1487,7 @@ fn upstream_blocks(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     r.loot(&VERBASCUM).pool(
         Pool::new()
-            .when(Cond::tool("#tools/shears"))
+            .when(sheared())
             .item(VERBASCUM.name()),
     );
     r.block(&LAVENDER)
@@ -1491,7 +1499,7 @@ fn upstream_blocks(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     r.loot(&LAVENDER).pool(
         Pool::new()
-            .when(Cond::tool("#tools/shears"))
+            .when(sheared())
             .item(LAVENDER.name()),
     );
     r.block(&MOSS)
@@ -1608,7 +1616,7 @@ fn berry_leaves(r: &mut Registry, handle: &'static Block, texture: &'static str,
     r.loot(handle)
         .pool(
             Pool::new()
-                .when(Cond::tool("#tools/shears"))
+                .when(sheared())
                 .item(handle.name()),
         )
         .pool(

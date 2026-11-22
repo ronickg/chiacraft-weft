@@ -31,7 +31,9 @@ pub static NAUSEA: EntityEffect = EntityEffect::named("nausea");
 pub static GLASS_BOTTLE: Item = Item::named("glass_bottle");
 
 static MAGIC: DamageCause = DamageCause::named("magic");
-static POISONED: DamageCause = DamageCause::named("poison");
+/// Ours, registered by the survival (`survival/body.rs`, lethal, with its death message): the
+/// potion's poison hurts as the survival's does.
+static POISONED: &DamageCause = &crate::survival::body::POISON;
 static WITHERED: DamageCause = DamageCause::named("wither");
 
 static BLINDNESS_SCREEN: Shader = Shader::named("blindness");
@@ -62,7 +64,6 @@ pub fn register(r: &mut Registry) {
     r.damage_cause(&MAGIC)
         .bypasses_armor()
         .death_message("death.base.magic");
-    r.damage_cause(&POISONED).bypasses_armor().not_lethal();
     r.damage_cause(&WITHERED)
         .bypasses_armor()
         .death_message("death.base.wither");
@@ -113,7 +114,7 @@ pub fn register(r: &mut Registry) {
     // Vanilla's: a heal or a hurt every so many ticks, half as many with every level.
     for (e, color, amount, cause, first, harmful) in [
         (&REGENERATION, 0xCD5CAB, -1.0, &damage_causes::HEAL, 50, false),
-        (&POISON, 0x87A363, 1.0, &POISONED, 25, true),
+        (&POISON, 0x87A363, 1.0, POISONED, 25, true),
         (&WITHER, 0x736156, 1.0, &WITHERED, 40, true),
     ] {
         let mut b = status(r, e, color);

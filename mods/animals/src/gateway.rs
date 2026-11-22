@@ -76,7 +76,9 @@ pub fn init(r: &mut Registry) {
         .per_cube(3)
         .vein_size(4)
         .replaces("#stone_ore_replaceables");
+    // A feature name is registered once: the Cretaceous's seams are their own feature.
     r.ore(&AMBER_ORE)
+        .named("amber_ore/cretaceous")
         .dimension(&CRETACEOUS)
         .y(0, 80)
         .per_cube(6)
