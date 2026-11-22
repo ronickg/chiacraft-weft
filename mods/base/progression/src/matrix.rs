@@ -104,6 +104,10 @@ pub fn species() -> Vec<String> {
             same_age(size, d.role, d.area_level(level), them, s.name, &mut out);
         }
     }
+    // Base's hostile mobs, on the same curve (`vitals::mobs`).
+    for m in vitals::mobs::MOBS {
+        same_age(m.size(), m.role, m.level(), m.stats(), m.name, &mut out);
+    }
     out
 }
 
@@ -117,6 +121,13 @@ pub fn tweaks() -> Vec<String> {
         for (stat, t) in d.tweaks {
             if !t.ok() {
                 out.push(format!("{}'s {} tweak ×{} (\"{}\") is out of bounds or gives no reason", d.species, stat.name(), t.x, t.why));
+            }
+        }
+    }
+    for m in vitals::mobs::MOBS {
+        for (stat, t) in m.tweaks {
+            if !t.ok() {
+                out.push(format!("{}'s {stat:?} tweak ×{} (\"{}\") is out of bounds or gives no reason", m.name, t.x, t.why));
             }
         }
     }

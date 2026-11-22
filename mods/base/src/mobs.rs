@@ -12,6 +12,16 @@ pub static CREEPER: EntityKind = EntityKind::named("creeper");
 
 use base_api::entities::COW;
 
+/// The mobs `vitals::mobs` gives numbers, by their row's name.
+static MOB_KINDS: [(&EntityKind, &str); 4] = [(&ZOMBIE, "zombie"), (&SPIDER, "spider"), (&SKELETON, "skeleton"), (&CREEPER, "creeper")];
+
+/// A mob's numbers on the curve (`vitals::mobs`).
+fn curve(name: &str) -> vitals::combat::Stats {
+    vitals::mobs::mob(name)
+        .map(|m| m.stats())
+        .expect("a row in vitals::mobs")
+}
+
 pub fn register(r: &mut Registry) {
     // The engine's player kind, drawn as the same humanoid as the zombie.
     r.set_model(&PLAYER, humanoid(false));
@@ -27,11 +37,11 @@ pub fn register(r: &mut Registry) {
         .sound("hurt")
         .sound("death")
         .size(0.6, 1.95)
-        .max_health(20.0)
+        .max_health(curve("zombie").health)
         .walk_speed(2.6)
         .hostile()
         .burns_in_sun()
-        .attack_damage(3.0)
+        .attack_damage(curve("zombie").hit)
         .reach(1.3)
         .goals(hostile(ai::Goals::new().aggressive(35.0)));
     r.entity(&SPIDER)
@@ -41,10 +51,10 @@ pub fn register(r: &mut Registry) {
         .sound("hurt")
         .sound("death")
         .size(1.3, 0.9)
-        .max_health(16.0)
+        .max_health(curve("spider").health)
         .walk_speed(3.6)
         .hostile()
-        .attack_damage(2.0)
+        .attack_damage(curve("spider").hit)
         // Vanilla's reach goes by a mob's width: a body this wide stops further off.
         .reach(2.4)
         // In daylight it only fights back.
@@ -54,6 +64,22 @@ pub fn register(r: &mut Registry) {
                 .neutral(),
         ));
     r.entity_component(&FUSE, 0u32, 0);
+    // Their armour (`vitals::mobs`), through the same formula as the player's and the animals'.
+    r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        if !crate::player::armor_applies(q.cause) {
+            return;
+        }
+        let Some(kind) = m.world().entity(q.entity).map(|e| e.kind) else { return };
+        let Some(mob) = MOB_KINDS
+            .iter()
+            .find(|(k, _)| k.id() == kind)
+            .and_then(|(_, n)| vitals::mobs::mob(n))
+        else {
+            return;
+        };
+        m.value *= 1.0 - vitals::combat::armour_cut(mob.stats().armour, m.value as f32) as f64;
+    });
     // Ours: the creeper stays (upstream removed it; our blood moon sends creepers, `events.rs`).
     // Its look: `models/creeper.geo.json` (vanilla's layout, 64 x 32) and `textures/entity/creeper.png`.
     r.entity(&CREEPER)
@@ -61,7 +87,7 @@ pub fn register(r: &mut Registry) {
         .sound("death")
         .tag("hostile")
         .size(0.6, 1.7)
-        .max_health(20.0)
+        .max_health(curve("creeper").health)
         .walk_speed(2.5)
         .hostile()
         .attach(&FUSE)
@@ -76,7 +102,7 @@ pub fn register(r: &mut Registry) {
         .tag("immune_effect/base:regeneration")
         .equipment()
         .size(0.6, 1.99)
-        .max_health(20.0)
+        .max_health(curve("skeleton").health)
         .walk_speed(2.5)
         .hostile()
         .burns_in_sun()
