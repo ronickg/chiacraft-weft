@@ -6,6 +6,8 @@ pub use base_api::blocks::OAK_DOOR;
 
 pub fn register(r: &mut Registry) {
     r.block(&OAK_DOOR)
+        // Its particles and anything showing the block whole (chiacraft: there is no `oak_door` picture).
+        .texture("door_oak")
         .sound_group("wood")
         .facing(Facings::HORIZONTAL, Toward::Player)
         .prop("open", ["false", "true"])

@@ -60,7 +60,13 @@ impl Server {
             .storage
             .as_ref()
             .and_then(|s| load_player(c, &s.lock(), &key, |dim| self.dims[dim as usize].time));
-        let spawn = || (c.spawn_dim, self.dims[c.spawn_dim as usize].spawn_point(c));
+        // chiacraft, test only: an imported Minecraft world says where players start
+        // (`chiacraft::mc_import::spawn`).
+        let imported = self
+            .storage
+            .as_ref()
+            .and_then(|s| crate::chiacraft::mc_import::spawn(c, &s.lock().meta.dir));
+        let spawn = || imported.unwrap_or_else(|| (c.spawn_dim, self.dims[c.spawn_dim as usize].spawn_point(c)));
         let mut data = saved.unwrap_or_else(|| {
             let (dim, pos) = spawn();
             let mut entity = Entity::new(0, c.game.player_kind, pos, -1.0);

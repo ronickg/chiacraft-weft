@@ -413,6 +413,9 @@ fn face_of(c: &Content, looks: &super::looks::Looks, state: u32, dir: usize) -> 
         .map(|l| l.tint as u32)
         .find(|&t| t != 0)
         .unwrap_or(0);
+    // The picture is the face's bottom layer: a texture tinted by a kind or of several layers is
+    // only their name (`x@core:grass`), never a picture of its own (`Content::layers`).
+    let tex = c.layers(tex).first().map_or(tex, |l| l.tex);
     (tex, tint)
 }
 

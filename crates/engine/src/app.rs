@@ -1394,6 +1394,8 @@ impl Running {
                 None
             }
         };
+        // chiacraft, test only: `--import-mc` loads a Minecraft world into a new world first.
+        crate::chiacraft::mc_import::maybe_import(&mut meta, content());
         if self.gpu.compiling() && self.entering.is_none() {
             log::info!("waiting for shaders to compile");
             self.screens.clear();
