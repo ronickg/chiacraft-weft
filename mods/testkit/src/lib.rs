@@ -21,7 +21,10 @@ use std::sync::OnceLock;
 
 use weft_sdk::*;
 
-declare_mod!(deps: ["testmod"], init: init);
+// Ours: no dependency on testmod (upstream's has one). testmod is loaded only for `--test` runs
+// (`play = false`, run-dir/test-mods), and a `--script` run must start without it: with the
+// dependency the loader turned testkit off and no script could run (Tester 2, 11-22).
+declare_mod!(deps: [], init: init);
 
 static PLAN: OnceLock<(Option<String>, Option<String>)> = OnceLock::new();
 

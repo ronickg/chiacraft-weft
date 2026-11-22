@@ -92,13 +92,9 @@ pub fn register(r: &mut Registry) {
             }
         }
     });
-    // Drawn as long as the use button is held, shot when it is let go.
-    r.item(&BOW)
-        .durability(384)
-        .handheld()
-        .use_until_released()
-        .on_release(shoot_bow)
-        .tab(&crate::tabs::COMBAT);
+    // Drawn as long as the use button is held, shot when it is let go (upstream's). The bow itself
+    // is ours, a tool of parts (`parts.rs`), so this only adds the drawing and shooting.
+    r.edit(&BOW).use_until_released().on_release(shoot_bow);
     // An arrow in the head hurts half as much again, a bow's critical hit: `part` is the part
     // of the hitbox it went into.
     r.modify(&chain::PROJECTILE_DAMAGE, &phase::MULTIPLY, |m| {
