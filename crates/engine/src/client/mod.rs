@@ -704,8 +704,8 @@ pub struct Client {
     late: CommandList,
     hand_late: CommandList,
     /// The world's copy for what is seen through (`gpu_layout::Scene::behind`), set by the app each
-    /// frame; and with it on, what is drawn after the opaque world goes into `late_out` for the app
-    /// to put after the copy instead of into the frame's list.
+    /// frame. What is drawn after the opaque world goes into `late_out` for the app to put after
+    /// the occlusion's depth (and after the copy, with it on).
     pub behind: [f32; 4],
     /// Last frame's projection and view without the jitter, where its camera stood and the
     /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`.
@@ -3520,22 +3520,13 @@ impl Client {
             .draw(gpu, &mut late, frame, &cam, scene_buf, &self.world, self.look.falls, ticks, self.frame_dt);
         drop(s);
         self.sky.draw_overlay(&mut hand_late, scene_buf);
-        if self.behind[2] > 0.5 {
-            // After the copy of the world (the app puts it there).
-            self.late_out.clear();
-            self.late_out.append(&mut late);
-            self.late_out.append(&mut hand_late);
-        } else {
-            list.append(&mut late);
-            list.append(&mut hand_late);
-        }
+        // Drawn by the app once the solid world's depth was taken for the next frame's occlusion
+        // culling (upstream 85f85db9a): the sky, clouds, translucent things, particles, weather and
+        // the hand hide nothing behind them for good. With the copy, after the copy.
+        self.late_out.clear();
+        self.late_out.append(&mut late);
+        self.late_out.append(&mut hand_late);
         (self.late, self.hand_late) = (late, hand_late);
-        // The end of the "translucent" part; with the copy, the app marks it after what it draws
-        // after the copy, so the sky, clouds and water are not counted as screen effects (Research
-        // round 16, M1).
-        if self.behind[2] <= 0.5 {
-            list.push(weft_render::Cmd::Mark);
-        }
     }
 
     /// Linear rgb, and in w how hard it rains (0..1) for shader packs.

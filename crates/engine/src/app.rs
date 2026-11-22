@@ -3414,6 +3414,12 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         // The opaque world copied, then what is seen through it drawn over it, reading the copy.
         if g.client.behind[2] > 0.5 {
             world.push(Cmd::EndPass);
+            // The solid world's depth, before clouds, water and the hand would hide chunks behind
+            // them in the next frame (upstream 85f85db9a).
+            g.client
+                .render
+                .occlusion
+                .take_depth(&mut *r.gpu, &mut world, r.depth.0, [r.depth.1, r.depth.2]);
             if let Some(scene) = g.client.scene_buffer(info.slot) {
                 let depth = r.gpu.texture_index(r.depth.0);
                 r.post
@@ -3442,16 +3448,28 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     r.list.append(&mut world);
     r.world_list = world;
     r.list.push(Cmd::EndPass);
-    // Path traced lighting over the world's image (`core:path_traced`), before the effects read it.
-    if let (Some(g), Target::Texture(_)) = (&mut r.game, world_target) {
-        g.client
-            .path_trace(&mut *r.gpu, &mut r.list, info.slot, r.depth.0, world_target, (world_info.width, world_info.height));
-    }
-    if let Some(g) = &mut r.game {
+    // Without the copy: the solid world's depth for the next frame's occlusion culling, then what is
+    // drawn over it (`Client::late_out`), so clouds, water and the hand hide no chunks behind them
+    // (upstream 85f85db9a). With the copy both happened in the world's list.
+    if let Some(g) = r.game.as_mut().filter(|g| g.client.behind[2] <= 0.5) {
         g.client
             .render
             .occlusion
             .take_depth(&mut *r.gpu, &mut r.list, r.depth.0, [r.depth.1, r.depth.2]);
+        r.list.push(Cmd::BeginPass {
+            motion: motion.map(|m| (m, None)),
+            color: Some((world_target, None)),
+            depth: Some((r.depth.0, None)),
+        });
+        r.list.append(&mut g.client.late_out);
+        // The end of the "translucent" part.
+        r.list.push(Cmd::Mark);
+        r.list.push(Cmd::EndPass);
+    }
+    // Path traced lighting over the world's image (`core:path_traced`), before the effects read it.
+    if let (Some(g), Target::Texture(_)) = (&mut r.game, world_target) {
+        g.client
+            .path_trace(&mut *r.gpu, &mut r.list, info.slot, r.depth.0, world_target, (world_info.width, world_info.height));
     }
     if post {
         let scene = r
