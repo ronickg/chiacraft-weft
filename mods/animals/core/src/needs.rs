@@ -226,6 +226,12 @@ pub fn hunger_score(fed: f32, eating: bool) -> f32 {
     need_score(fed, HUNGRY, EAT_FLOOR, eating)
 }
 
+/// `hunger_score` from `start` instead of `HUNGRY` (a herd member grazing with its leader,
+/// `groups::JOIN_EAT`).
+pub fn hunger_score_from(fed: f32, start: f32, eating: bool) -> f32 {
+    need_score(fed, start.max(HUNGRY), EAT_FLOOR, eating)
+}
+
 /// How pressing thirst is at `water` (its share of its water): as hunger, from `THIRSTY`.
 pub fn thirst_score(water: f32, drinking: bool) -> f32 {
     need_score(water, THIRSTY, DRINK_FLOOR, drinking)

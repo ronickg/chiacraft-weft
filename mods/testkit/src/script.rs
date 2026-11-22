@@ -94,6 +94,8 @@ const COMMANDS: &[&str] = &[
     "chat",
     "say_config",
     "set_config",
+    "compare",
+    "hour",
     "shot",
     "bench",
     "bench_bg",
@@ -136,6 +138,8 @@ const NEED_ARGS: &[&str] = &[
     "chat",
     "say_config",
     "set_config",
+    "compare",
+    "hour",
     "shot",
     "host",
     "join",
@@ -409,6 +413,7 @@ async fn run_lines(t: T, src: String) -> R {
     let started = Instant::now();
     let mut via: Vec<[f64; 5]> = Vec::new();
     let mut origin = [0.0f64; 3];
+    let mut compare_on = false;
     for (n, line) in src.lines().enumerate() {
         let line = line.split('#').next().unwrap_or("").trim();
         if line.is_empty() {
@@ -429,6 +434,27 @@ async fn run_lines(t: T, src: String) -> R {
             "loaded" => {
                 t.loaded().await?;
                 weft_sdk::info!("script: loaded at {:.2} s", started.elapsed().as_secs_f32());
+                // `--config testkit:compare_mode=1`: compare mode from the first load on.
+                if crate::compare::COMPARE_MODE.get() && !compare_on {
+                    compare_on = true;
+                    weft_sdk::info!("script: {}", crate::compare::apply(&t.c(), true, ""));
+                }
+            }
+            // `compare on [overrides]` / `compare off`: compare mode (`compare.rs`).
+            "compare" => {
+                let (state, overrides) = rest.split_once(' ').unwrap_or((rest, ""));
+                compare_on = state == "on";
+                weft_sdk::info!("script: {}", crate::compare::apply(&t.c(), compare_on, overrides));
+            }
+            // `hour 18`: the clock to that hour and frozen there, the sky settled (`/time set`,
+            // a second, `/tick freeze`, 8 s): the hour-shot recipe in one step.
+            "hour" => {
+                t.c().say("/tick unfreeze");
+                t.c()
+                    .say(&format!("/time set {}", crate::compare::hour_ticks(num(0, 12.0))));
+                t.secs(1.0).await?;
+                t.c().say("/tick freeze");
+                t.secs(8.0).await?;
             }
             "idle" => {
                 t.idle().await?;
