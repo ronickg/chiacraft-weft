@@ -176,6 +176,7 @@ const TOP: [&str; 2] = ["bed_top_foot", "bed_top_head_0"];
 
 pub fn register(r: &mut Registry) {
     r.block(&BED)
+        .texture("bed_foot_south")
         .sound_group("wood")
         .facing(Facings::HORIZONTAL, Toward::Player)
         // One block on two cells, its own the foot, the head away from the player.

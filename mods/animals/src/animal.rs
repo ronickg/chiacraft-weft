@@ -227,7 +227,8 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                 apply(w, id, st, health, speed, if new { f32::MAX } else { 0.0 });
             }
         }
-        false
+        // Knocked down by its stagger, it lies there and nothing after this goal runs.
+        crate::armour::lie_down(w, id, index, st)
     }
 }
 

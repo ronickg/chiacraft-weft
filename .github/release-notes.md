@@ -7,7 +7,7 @@
 
 **Textures:** the game comes with its own. If Minecraft is installed through the official launcher or Prism, Weft builds a resource pack from your copy on the first start (Settings > Resource Packs to turn it off). Nothing from Mojang is included or downloaded.
 
-**Multiplayer:** pause menu > Multiplayer > Open to Friends gives a ticket; your friend pastes it into Multiplayer > Join. It also works by address, with the port forwarded, and `weft --server` runs a world with no window (see the README).
+**Multiplayer:** pause menu > Multiplayer > Open to Friends gives a ticket; your friend pastes it into Multiplayer > Join. It also works by address, with the port forwarded, and `weft server` runs a world with no window (see the README).
 
 **Mods:** put a mod's `.zip` into the mods folder: the Mods screen has a button that opens it. Mods are native libraries and have to be built for your system and the same engine version, see the [modding cheat sheet](https://github.com/Weft-Rust/Weft/blob/master/docs/modding.md).
 

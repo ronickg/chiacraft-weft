@@ -16,6 +16,13 @@ static HUD_ATTACK: HudElement = HudElement::named("attack_indicator");
 /// piece's shell and slot (`vitals::gear::armour`), carried by each piece built from parts
 /// (`parts::ARMOUR_OF`). A worn-out piece stops nothing.
 pub fn armor_of(w: &World, entity: u64) -> (f32, f32) {
+    armor_against(w, entity, 0)
+}
+
+/// `armor_of` against `foe` (0: none): each piece's armour counts as much as the foe lets gear of
+/// its item level count (`base_api::chains::GEAR_COUNTS`: a big creature caps over-tier armour as
+/// it caps over-tier weapons). Health from armour is never capped: it's the player's, not the hit's.
+pub fn armor_against(w: &World, entity: u64, foe: u64) -> (f32, f32) {
     let Some(worn) = w.inventory(entity).find_group(EQUIPMENT_GROUP) else { return (0.0, 0.0) };
     (0..worn.len())
         .filter_map(|i| {
@@ -24,9 +31,16 @@ pub fn armor_of(w: &World, entity: u64) -> (f32, f32) {
             if crate::parts::broken(&s) {
                 return None;
             }
-            crate::parts::ARMOUR_OF
-                .on_stack_own(&s)
-                .map(|a| (a.armour, a.health))
+            let a = crate::parts::ARMOUR_OF.on_stack_own(&s)?;
+            let counts = match (foe, base_api::ITEM_LEVEL.on_stack(&s)) {
+                (0, _) | (_, None) => 1.0,
+                (_, Some(level)) => {
+                    let q = abi::Query { entity, other: foe, amount: level as f64, ..abi::Query::DEFAULT };
+                    w.chain_compute(&base_api::chains::GEAR_COUNTS, 1.0, &q)
+                        .clamp(0.0, 1.0) as f32
+                }
+            };
+            Some((a.armour * counts, a.health))
         })
         .fold((0.0, 0.0), |t, a| (t.0 + a.0, t.1 + a.1))
 }
@@ -83,7 +97,7 @@ pub fn register(r: &mut Registry) {
         if !armor_applies(q.cause) {
             return;
         }
-        let (armour, _) = armor_of(&m.world(), q.entity);
+        let (armour, _) = armor_against(&m.world(), q.entity, q.other);
         m.value *= 1.0 - vitals::combat::armour_cut(armour, m.value as f32) as f64;
     });
     r.on_event(&actions::HURT, |b| {

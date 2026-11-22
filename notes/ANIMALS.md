@@ -1109,9 +1109,11 @@ the bare nest and blotched eggs (`CHOSEN` in each build). `/animal nest`: the ne
 now.
 
 **House style** (2026-11-02, decided with Ronald): every model is made with the blocky-model
-skill in one style so they match: 64 texels a block for every model (Hytale's density for
-characters), real sizes, the skill's light and materials (`scripts/house.py`), props as entities.
-The five animals predate it (19 to 131 texels a block) and are to be rebuilt to it.
+skill in one style so they match: real sizes, the skill's light and materials
+(`scripts/house.py`), props as entities. First 64 texels a block (Hytale's density for
+characters); since 11-03 every animal is 32 texels a block, the blocks' density (Ronald: "Yes,
+rebuild at 32"), and on 11-07, after the chihuahua, red fox and brown hare side by side at 32 and
+64, small ones too ("Keep 32").
 
 **The wyvern** (2026-11-02; `wyvern.rs`, `source/wyvern`; asked for by Ronald: a wyvern that
 flies, can be ridden, breathes fire, rare and dangerous, huge, like Game of Thrones'). A

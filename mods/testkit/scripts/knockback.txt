@@ -4,8 +4,8 @@ loaded
 idle
 chat /rule core:mob_spawning 0
 chat /time set 6000
-chat /tk attr_mod me core:entity_reach testkit:reach 0 3 0
-chat /tk attr_mod me core:max_health testkit:hp 0 300 0
+chat /tk attr_mod me core:entity_reach testkit:reach core:add 3 0
+chat /tk attr_mod me core:max_health testkit:hp core:add 300 0
 chat /tk mode spectator
 chat /tp 0.5 206 -0.5
 wait 2

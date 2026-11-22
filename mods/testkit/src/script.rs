@@ -40,6 +40,7 @@
 //! expect <condition>  # checks it now; a miss fails the run (with its line) and the script goes on
 //! until <condition> [within 30]  # waits for it, seconds; not in time stops the run
 //! op trace 0 4 0 9 6 9 40   # a testkit server operation (`/tk`), its answer into the log
+//! respawn             # back from the death screen (the server ignores it while alive)
 //! quit
 //! ```
 //!
@@ -121,6 +122,7 @@ const COMMANDS: &[&str] = &[
     "await_file",
     "chatf",
     "op",
+    "respawn",
 ];
 /// Commands that mean nothing without an argument.
 const NEED_ARGS: &[&str] = &[
@@ -698,6 +700,7 @@ async fn run_lines(t: T, src: String) -> R {
                     t.secs(0.25).await?;
                 }
             }
+            "respawn" => t.c().respawn(),
             "quit" => return Ok(()),
             _ => t.fail(format!("unknown script line '{line}'")),
         }

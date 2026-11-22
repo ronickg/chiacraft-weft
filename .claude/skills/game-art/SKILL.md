@@ -127,7 +127,8 @@ The game's icons are 32 × 32 (the "A2" set, merged 2026-11-03). Earlier ways, k
 sheets of 16 items cut and shrunk smoothly to 48 × 48 (`gen_items.sh`, `items_style.txt`,
 `icons.py`), and the item lab's prompt rounds (`notes/ui-codex/lab/`, where the exact grid with
 its guide image won). Don't "clean" generated pixel art (grid guessing, palette cuts): it mangled
-the icons. Items stay flat pictures, as in Minecraft; 3D held models are set aside
+the icons (the one cleanup kept is `pixfix`, orphan speckle and the outline, which
+`art.py` runs on every item cut since 11-22). Items stay flat pictures, as in Minecraft; 3D held models are set aside
 (`mods/base/source/items/`).
 
 ## UI parts (the kit)

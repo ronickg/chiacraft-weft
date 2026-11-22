@@ -15,6 +15,14 @@ from PIL import Image
 TINTS = {"grass": (124, 189, 76), "foliage": (92, 160, 48), "water": (63, 118, 228)}
 
 
+def tile(folder):
+    """A connected-texture folder's first tile (`0.png`, else its lowest number), or None."""
+    if not os.path.isdir(folder):
+        return None
+    tiles = [f for f in os.listdir(folder) if re.fullmatch(r"\d+\.png", f)]
+    return os.path.join(folder, min(tiles, key=lambda f: int(f[:-4]))) if tiles else None
+
+
 class Textures:
     """Texture files of a source tree by the engine's names (`base:block/log_oak`)."""
 
@@ -25,15 +33,47 @@ class Textures:
         self.used = set()
 
     def path(self, name):
+        """The file of texture `name`: `<path>.png`, or a connected-texture folder's first tile
+        (`<path>/0.png`, beside its `<name>.ctm`, since the Weft sync of 11-22); a tinted layer's
+        `@kind` is left out."""
+        name = name.split("@", 1)[0]
         ns, rest = name.split(":", 1) if ":" in name else ("base", name)
-        p = f"{self.root}/mods/{ns}/assets/textures/{rest}.png"
-        if os.path.exists(p):
-            return p
-        p = f"{self.root}/crates/engine/assets/textures/{rest}.png"
-        return p if os.path.exists(p) else None
+        for base in (f"{self.root}/mods/{ns}/assets/textures", f"{self.root}/crates/engine/assets/textures"):
+            p = f"{base}/{rest}.png"
+            if os.path.exists(p):
+                return p
+            p = tile(f"{base}/{rest}")
+            if p:
+                return p
+        return None
 
     def get(self, name):
-        """RGBA array of the texture's first frame (a strip's top square), or None."""
+        """RGBA array of the texture's first frame (a strip's top square), or None. `a+b` is `b`
+        drawn over `a` (a block face's layers), `name@kind` tinted by the biome colour of `kind`
+        (grass, foliage, water)."""
+        if "+" in name or "@" in name:
+            if name in self.cache:
+                return self.cache[name]
+            out = None
+            for part in name.split("+"):
+                base, _, kind = part.partition("@")
+                a = self.get(base)
+                if a is None:
+                    continue
+                a = a.astype(float)
+                kind = kind.split(":")[-1]
+                if kind:
+                    # Our own leaf kinds (`evergreen`, `yellow_leaves`) are the biome's foliage.
+                    a[..., :3] *= np.array(TINTS.get(kind, TINTS["foliage"])) / 255.0
+                if out is None:
+                    out = a
+                elif a.shape == out.shape:
+                    al = a[..., 3:4] / 255.0
+                    out[..., :3] = a[..., :3] * al + out[..., :3] * (1 - al)
+                    out[..., 3:4] = np.maximum(out[..., 3:4], a[..., 3:4])
+            out = None if out is None else np.clip(out, 0, 255).astype(np.uint8)
+            self.cache[name] = out
+            return out
         p = self.path(name)
         if p:
             self.used.add(p)
@@ -252,7 +292,10 @@ def iso_cube(top, left, right, size=128, tint_top=None, tint_sides=None):
 
 # Shapes of a block by its id's ending, in block units.
 SHAPES = {"_vertical_slab": [(0, 0, 0, 1, 1, 0.5)], "_slab": [(0, 0, 0, 1, 0.5, 1)],
-          "_stairs": [(0, 0, 0, 1, 0.5, 1), (0, 0.5, 0, 1, 1, 0.5)]}
+          "_stairs": [(0, 0, 0, 1, 0.5, 1), (0, 0.5, 0, 1, 1, 0.5)],
+          # Upstream's (`shapes.rs`, the Weft sync of 11-22): a beam is a quarter block
+          # (1 x 1/2 x 1/2), an eighth half a block each way; drawn in the middle of the cell.
+          "_beam": [(0, 0, 0.25, 1, 0.5, 0.75)], "_eighth": [(0.25, 0, 0.25, 0.75, 0.5, 0.75)]}
 
 
 def shape_of(i):
@@ -281,7 +324,8 @@ def block_icon(block, tex):
     the rest."""
     t = block["textures"]
     imgs = [tex.get(x) if x else None for x in t]
-    tint, top_only = tint_of(block)
+    # A face named `name@kind` carries its own tint (`Textures.get`).
+    tint, top_only = tint_of(block) if not any("@" in (x or "") for x in t) else (None, False)
     end, boxes = shape_of(block["id"])
     if block.get("boxes") and imgs[3] is not None:
         # Boxes the sources give (a snow layer, a button, loose stones): drawn where they sit.

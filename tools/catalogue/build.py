@@ -145,10 +145,15 @@ class Builder:
         self.looks.shells_drawn, self.looks.drawn_shapes = S.drawn_parts(root)
         self.overrides = S.texture_overrides(root)
         self.src_blocks = S.block_defs(root)
+        for k, v in S.cylinders(root).items():
+            self.src_blocks.setdefault(k, v)
         self.eggs = S.egg_looks(root)
         self.reg = json.load(open(registry)) if registry else {"items": [], "blocks": [], "entities": []}
         self.reg_items = {i["id"]: i for i in self.reg["items"]}
         self.reg_blocks = {b["id"]: b for b in self.reg["blocks"]}
+        # Upstream's registry names nearly every model Boxes (cubes and plants alike).
+        models = [b.get("model") for b in self.reg["blocks"]]
+        self.all_boxes = bool(models) and models.count("Boxes") > 0.9 * len(models)
         self.entries = []
         self.made = 0
         self.mat_from = self._materials_from()
@@ -222,6 +227,14 @@ class Builder:
         # The registry knows each state's faces and the tints, but not a box model's boxes, a crop's
         # grown stage or which state rests: the sources' look wins there.
         reg, src = self.reg_blocks.get(i), S.block_def(self.src_blocks, i)
+        if reg and reg.get("model") == "Boxes" and "solid" in reg and self.all_boxes:
+            # Upstream's registry (since the Weft sync of 11-22) calls every model Boxes: a solid
+            # block or one outside the cutout layer (water, lava) is drawn as a cube, the rest
+            # (plants, torches, ladders) flat, a door flat.
+            cube = (reg["solid"] or reg.get("layer") != "Cutout") and not n.endswith("_door")
+            reg = dict(reg, model="Cube" if cube else "Cross")
+            if src and src.get("model") == "Plant":
+                reg["model"] = "Cross"
         b = reg or src
         if reg and src:
             if "crop" in src:
@@ -251,6 +264,18 @@ class Builder:
                     return a2, how2
             if a is not None:
                 return a, how
+        # A hollow log (`shapes_of("hollow_log", .., "_hollow")`): its log's four walls, the
+        # inside (`<log>_inner`) seen through the top.
+        if n.endswith("_hollow"):
+            top, side = self.cube_faces(f"{ns}:{n[:-len('_hollow')]}")
+            if side is not None:
+                inner = self.tex.get(f"{ns}:block/{n[:-len('_hollow')]}_inner")
+                w = 2 / 16
+                walls = [(0, 0, 0, w, 1, 1), (1 - w, 0, 0, 1, 1, 1), (0, 0, 0, 1, 1, w), (0, 0, 1 - w, 1, 1, 1)]
+                back = I.iso_boxes(walls[:1] + walls[2:3], top, inner if inner is not None else side, inner if inner is not None else side)
+                front = I.iso_boxes(walls[1:2] + walls[3:4], top, side, side)
+                al = front[..., 3:4] > 0
+                return np.where(al, front, back), "cube"
         for guess in (f"block/{n}", f"block/{n}_side", f"block/{n}_top"):
             a = self.tex.get(f"{ns}:{guess}")
             if a is not None:
@@ -280,6 +305,22 @@ class Builder:
             if t is not None:
                 return I.iso_cube(t, sd if sd is not None else t, sd if sd is not None else t), "cube"
         return None, None
+
+    def cube_faces(self, i):
+        """(top, side) pictures of block `i`: the registry's or the sources' faces, else its
+        texture files named by its words (`oak_log`: `log_oak_top`, `log_oak`)."""
+        b = self.reg_blocks.get(i) or S.block_def(self.src_blocks, i)
+        if b and b.get("textures"):
+            return self.tex.get(b["textures"][3]), self.tex.get(b["textures"][5])
+        ns, n = i.split(":", 1)
+        words = set(n.split("_"))
+        found = sorted((os.path.basename(p)[:-4] for p in glob.glob(f"{self.root}/mods/{ns}/assets/textures/block/*.png")
+                        if set(os.path.basename(p)[:-4].split("_")) - {"top"} == words), key=len)
+        if not found:
+            return None, None
+        side = found[0]
+        top = next((f for f in found if "top" in f.split("_")), side)
+        return self.tex.get(f"{ns}:block/{top}"), self.tex.get(f"{ns}:block/{side}")
 
     def egg_look(self, kind):
         """The egg look of the species whose entity is `kind` (`velociraptor_osmolskae` is species
@@ -449,7 +490,8 @@ class Builder:
                 continue
             ids.setdefault(i, "item")
         for i, b in self.reg_blocks.items():
-            if b.get("item") and not i.startswith(("core:", "testkit:")):
+            # `unknown`: upstream's stand-in for a block a world names but the game lacks.
+            if b.get("item") and not i.startswith(("core:", "testkit:")) and i.split(":")[1] != "unknown":
                 ids.setdefault(i, "block")
         self.ids = ids
         log(f"{len(ids)} items and blocks")
