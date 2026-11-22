@@ -127,6 +127,15 @@ const OPT_GLARE: u32 = 40u;
 // The far shade from the sky as strong as Bliss's (`base:look_ao_power`, read raw by
 // `post_low/far_ao.wgsl` as option 41: 0 as made).
 const OPT_AO_POWER: u32 = 41u;
+// Water as Bliss's (lookstage2, 11-22: Bliss's lakes dark navy with a smooth shore, ours light blue
+// with cream foam and blotches). Absorption by depth (`base:look_water_absorb`): 0 as made, 1 Bliss's
+// per-colour coefficients (water and dirt), floored dark; more is stronger.
+const OPT_WATER_ABSORB: u32 = 42u;
+// The foam at the shore and over the shallows (`base:look_water_foam`): 1 as made, 0 none (Bliss's).
+const OPT_WATER_FOAM: u32 = 43u;
+// The mirror (`base:look_water_mirror`): 0 as made; 1 Bliss's Fresnel (fifth power from 0.02), the
+// sky mirrored where the ripples point it, no extra share at a slant.
+const OPT_WATER_MIRROR: u32 = 44u;
 
 // How much of the mist lies as the evening's (`OPT_EVENING_MIST`): half with the sun about 25° up
 // in the west (17:00), all from about 12° (18:00), into the dusk.
