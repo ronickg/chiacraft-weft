@@ -4381,6 +4381,19 @@ impl Client {
         scene.frame_look = self.sky.frame_look.scene;
         scene.froxels = self.sky.froxels.scene;
         scene.cloud_shadow = self.sky.cloud_shadow.scene;
+        // chiacraft debug (`--log scenedump=debug`): every field the shader pack reads, every 2 s,
+        // to compare two builds' frames value by value.
+        if log::log_enabled!(target: "scenedump", log::Level::Debug) {
+            static LAST_DUMP: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let now = self.start.elapsed().as_secs() / 2;
+            if LAST_DUMP.swap(now, std::sync::atomic::Ordering::Relaxed) != now {
+                let s = &scene;
+                log::debug!(target: "scenedump", "fog_color {:?} params {:?} light {:?} sun {:?} weather {:?} eye {:?} ground {:?} behind {:?} clouds {:?} cloud_cells {:?} moon {:?}", s.fog_color, s.params, s.light, s.sun, s.weather, s.eye, s.ground, s.behind, s.clouds, s.cloud_cells, s.moon);
+                log::debug!(target: "scenedump", "options {:?} hand {:?} hand_light {:?} canopy {:?} soft_clouds {:?} cloud_moved {:?}", s.options, s.hand, s.hand_light, s.canopy, s.soft_clouds, s.cloud_moved);
+                log::debug!(target: "scenedump", "shadow {:?} shadow_far {:?} sky_event {:?} sky_landing {:?} frame_look {:?} lightning {:?} frame {:?}", s.shadow, s.shadow_far, s.sky_event, s.sky_landing, s.frame_look, s.lightning, s.frame);
+                log::debug!(target: "scenedump", "cloud_shadow {:?} froxels {:?} upscale {:?} rt {:?} taa {:?} taa_frame {:?} dlss {:?}", s.cloud_shadow, s.froxels, s.upscale, s.rt, s.taa, s.taa_frame, s.dlss);
+            }
+        }
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render
             .draw_translucent(&mut late, &cam, atmosphere.as_ref());
