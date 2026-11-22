@@ -145,6 +145,9 @@ const OPT_TWILIGHT: u32 = 45u;
 // Looking down at a lake the mirror is a few percent; the rest is the body's light, which kept our
 // open water a light blue (lsL, 11-22: 102 123 133 against Bliss's dark navy 68 93 125).
 const OPT_WATER_BODY: u32 = 46u;
+// The blue near air's share with the sun low (`base:look_low_air`): 0 as made (a fifth), up to 1
+// (all of it, as with the sun high), for Bliss's blue shade at 08:00 and 18:00.
+const OPT_LOW_AIR: u32 = 47u;
 fn water_body() -> f32 {
     let b = fantasy_opt(OPT_WATER_BODY);
     return select(1.0, b, b >= 0.0);
@@ -2035,7 +2038,11 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             let low = 1.0 - smoothstep(0.03, 0.3, scene.sun.y);
             let near = vec3(1.0) - exp(-vec3(4.9e-5, 1.0e-4, 3.5e-4) * min(dist, 250.0));
             let blue_sky = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
-            var add = blue_sky * near * mix(0.2, 1.0, high);
+            // With the sun low a fifth of it as made; `base:look_low_air` sets that share (Bliss's
+            // 08:00 and 18:00 shade is blue, 9 26 58 and 28 35 58, ours green 11 16 22 and 41 47 30:
+            // its near air keeps the sky's blue with the sun low, as it is lit by the whole sky).
+            let low_k = fantasy_opt(OPT_LOW_AIR);
+            var add = blue_sky * near * mix(select(0.2, low_k, low_k > 0.0), 1.0, high);
             // With the sun low the air takes the sun's own colour through its phase, as Bliss's
             // clear air does (overworld_fog.glsl:256-268: sun x shadow x (Rayleigh phase x its
             // coefficient + Mie phase x its one), plus the averaged sky): gold all round, brightest
@@ -2060,7 +2067,9 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         let blue_k = max(fantasy_opt(OPT_TWILIGHT), 0.0);
         if blue_k > 0.0 {
             let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
-            let tw = smoothstep(-0.3, -0.17, scene.sun.y) * (1.0 - smoothstep(-0.02, 0.1, scene.sun.y)) * evening * (1.0 - rain_amount());
+            // From sunset: begun with the sun 6° up, the 18:30 land went a grey-blue (lsR_tw 0.5: 87 83 88
+            // where Bliss's is dim and warm, 35 36 69).
+            let tw = smoothstep(-0.3, -0.17, scene.sun.y) * (1.0 - smoothstep(-0.04, 0.0, scene.sun.y)) * evening * (1.0 - rain_amount());
             if tw > 0.0 {
                 let fill = vec3(1.0) - exp(-vec3(1.5e-3, 3.0e-3, 6.0e-3) * min(dist, 600.0));
                 let sky_up = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
