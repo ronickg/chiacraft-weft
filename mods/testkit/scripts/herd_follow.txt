@@ -1,0 +1,42 @@
+# Herds keep together (creature AI step 9, group plans, slice 1: `group.rs`). A wild herd's
+# leader (the lowest id of its kind near) wanders as before; the others keep to their own place
+# in a ring round it (2-8 blocks, `animals_core::groups`) and walk back once 3 blocks off it.
+# Flat open pad, spectator (animals don't sense one) 30 blocks above, mobs off, midday, everyone fed and watered so
+# the needs band leaves them to wander. 10 red deer on a ring 4-10 blocks out.
+# PASS:
+# - every ANIMAL_SENSES row of a deer shows the same "lead <id>" (or two leaders if the herd
+#   split past 16 blocks), and that id is the lowest of the herd;
+# - "keeps up with its leader" lines in the log as the leader walks off;
+# - the shots herd_follow_1..4 show one group that has moved over the pad, not deer scattered
+#   across it (before this, each wandered its own way: compare the spread in 1 and 4).
+# FAIL: no "lead" field (old build), or the herd spread over 30+ blocks by shot 4.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /air 0 0 0
+chat /tk fill ~-40 ~-1 ~-40 ~40 ~-1 ~40 base:grass
+chat /tk fill ~-40 ~ ~-40 ~40 ~6 ~40 core:air
+wait 2
+chat /tk time 6000
+chat /tk mode spectator
+chat /tk ring animals:red_deer 10 4 10
+wait 2
+chat /animalprof water 1.0
+chat /tp ~ ~30 ~
+look 0 -89
+wait 5
+chat /animalprof senses
+shot herd_follow_1.png
+wait 30
+chat /animalprof water 1.0
+chat /animalprof senses
+shot herd_follow_2.png
+wait 30
+chat /animalprof water 1.0
+chat /animalprof senses
+shot herd_follow_3.png
+wait 30
+chat /animalprof senses
+shot herd_follow_4.png
+quit

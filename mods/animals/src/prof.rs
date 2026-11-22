@@ -199,13 +199,14 @@ pub fn init(r: &mut Registry) {
                         let s = w.component(id, &crate::senses::SENSES)?;
                         let kind = name_of(abi::entry_kind::ENTITY, w.entity(id)?.kind);
                         Some(format!(
-                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}",
+                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {} lead {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}",
                             d2.sqrt(),
                             s.player,
                             s.fright,
                             s.threat,
                             s.aware,
                             s.kin,
+                            s.leader,
                             if s.sentinel != 0 { " sentinel" } else { "" },
                             s.heading,
                             s.wind,

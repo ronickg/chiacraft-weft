@@ -14,6 +14,7 @@ pub mod coats;
 pub mod danger;
 pub mod eggs;
 pub mod evolution;
+pub mod groups;
 pub mod hides;
 pub mod journal;
 pub mod life;

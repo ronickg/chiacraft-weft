@@ -53,6 +53,7 @@ mod fish;
 mod forage;
 mod fox;
 mod gateway;
+mod group;
 mod gull;
 mod habitats;
 mod hare;
