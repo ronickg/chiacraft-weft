@@ -73,3 +73,9 @@ All 71 of upstream's new items and blocks are tagged in `mods/base/progression` 
 7. **Shield:** in the Iron Age, because its recipe needs iron. Should it be an early armour piece, or built from parts?
 8. **Snowberry:** upstream made it poisonous; ours gives a chance of sickness instead.
 9. Upstream's names for vanilla tools, armour and wool we never register (47 lang keys) were taken out.
+
+## Startup fixes (11-22): what changed in upstream's content
+- **Shears:** with no shears and no `tools/shears` tag the game stopped at load, so upstream's "cut with shears" condition never holds for now (`sheared()` in `blocks.rs`): bush leaves, inula, verbascum, lavender and the sheared grasses drop what they drop unsheared. To undo: give a tool of ours the `tools/shears` tag, or make shears, and put `Cond::tool("#tools/shears")` back.
+- **Wheels:** their recipe (dyed wool, `#wool/*`) is left out in `vehicles.rs`, the line kept in a comment, so the three wheels are creative only.
+- **The car's stripe** (`/spawncar`): upstream's blue wool isn't registered, so it is our white wool.
+- **Potion of poison:** upstream's own poison damage (it can't kill) clashed with our survival's (it can, with our death message); ours is kept, so the potion's poison can now kill.
