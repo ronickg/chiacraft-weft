@@ -5,6 +5,8 @@ chat /rule core:mob_spawning 0
 chat /tp alice 4.5 151 7.5
 wait 3
 chat /tk fill 0 150 0 8 150 8 base:stone
+chat /tk fill 0 151 0 8 156 8 core:air   # clear the terrain above the platform (suffocation)
+chat /tp alice 4.5 151 7.5
 host pe-ticket.txt
 await_file pe-mark-bob-in 300
 chat /tp bob 5.5 151 6.5
@@ -26,7 +28,7 @@ shot pe-alice-3-linked.png         # chat: "A portal here now leads to 'pe-bob-h
 press core:use
 wait 2
 shot pe-alice-4-waiting.png        # "Waiting for a portal in 'pe-bob-home'..."
-close
+key Escape                         # close the screen
 mark pe-mark-accepted
 await_file pe-mark-bob-portal 300  # bob bound a portal in his own world, not hosted yet
 wait 20
