@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -152,6 +152,23 @@ pub fn init(r: &mut Registry) {
                     }
                 }
                 format!("{n} animals at {:.0}% food", v * 100.0)
+            }
+            "lead" => {
+                // Every wild group leader within 96 blocks (lowest id of its kind near, with kin)
+                // has this share of its water (`group.rs`: its herd drinks with it).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(0.3).clamp(0.0, 1.0) as f32;
+                let mut led = Vec::new();
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    let leads = w
+                        .component(id, &crate::senses::SENSES)
+                        .is_some_and(|s| s.kin >= animals_core::groups::GROUP && s.leader == id);
+                    if leads && let Some(a) = w.component_mut(id, &crate::animal::ANIMAL) {
+                        a.thirst = (1.0 - v).clamp(0.0, 1.0);
+                        led.push(id.to_string());
+                    }
+                }
+                format!("leaders {} at {:.0}% water", led.join(" "), v * 100.0)
             }
             "kill" => {
                 // The player kills the wild animal nearest him (a hunter's kill: fear there, and

@@ -174,6 +174,12 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
     } else {
         THIRSTY
     };
+    // A herd member drinks with its leader (`groups::JOIN_DRINK`).
+    let thirsty = if crate::group::leader_doing(w, id) == Some(crate::choose::Need::Drink as u8) {
+        thirsty.max(animals_core::groups::JOIN_DRINK)
+    } else {
+        thirsty
+    };
     let calm = water >= SLAKED || (d[3] == 0.0 && water >= thirsty);
     if calm || !((s.hungry_in_the_wild() || animal::tamed(w, id)) && lasts(w, id, &a).is_some()) {
         if d[3] != 0.0 {
