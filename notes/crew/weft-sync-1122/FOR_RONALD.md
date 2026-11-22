@@ -40,7 +40,8 @@ Branch `claude/upstream-fixes-1122-e85f21`, merge commit 2dd1fdb62 (upstream mas
 - **Lighting and outlines:**
   - The lightmap is upstream's (night vision, sunlight), under our vanilla colour shading.
   - The block outline uses upstream's merged edges, in our thin dark style.
-- **Dropped test switches:** mc-moon, mc-days, mc-clouds, mc_leaves, FACE_INNER and `--mc-days`. The Minecraft-import spawn is gone too.
+- **Test switches:** mc-moon, mc-days, mc-clouds and `core:mc_leaves` (with `face::INNER`) are back, as the stage 1/2 looks use them. The Minecraft-import spawn is gone.
+- **Screen effects** are upstream environment layers now, run by priority then name; base gives its six their old order (reflect, contact, far_ao, volume, shafts, bloom last).
 - **Network:** moves are sent every tick, empty ones too.
 
 ## Upstream's new content we took: each piece in its own file or block, easy to cut

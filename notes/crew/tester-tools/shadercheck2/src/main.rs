@@ -42,6 +42,9 @@ fn main() {
             }
         }
     }
+    // The engine's own world shader (the plain look), which carries chiacraft's face flags too.
+    let builtin = format!("{}{}", g::prelude("world.wgsl", &common), rd("crates/engine/assets/shaders/world.wgsl"));
+    check("engine world.wgsl", builtin, &[&client::world_render::HOOK]);
     let pt = format!("{}{}{}", g::prelude("world.wgsl", &common), g::PT_DECLS, pack("pathtrace.wgsl"));
     check("pathtrace.wgsl", pt, &[]);
     std::process::exit(if bad > 0 { 1 } else { 0 });

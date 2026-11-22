@@ -80,15 +80,35 @@ fn light16(l: u32) -> u32 {
     crate::gpu_layout::corner_light([l & 0xFF, (l >> 8) & 0xFF, (l >> 16) & 0xFF, l >> 24])
 }
 
+/// chiacraft, test only: `core:mc_leaves`, leaves as Minecraft's fancy leaves.
+fn mc_leaves() -> bool {
+    static ID: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
+    ID.get_or_init(|| crate::config::by_name("core:mc_leaves"))
+        .is_some_and(|id| crate::config::get(id) != 0.0)
+}
+
+/// Whether a state is drawn with holes and hides its own kind's faces (leaves).
+fn culls_same(info: &crate::content::StateInfo) -> bool {
+    info.layer == RenderLayer::Cutout && info.flags & bf::CULL_SAME != 0
+}
+
 pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
     let mut mesh = Mesh::default();
+    let mc_leaves = mc_leaves();
     let states = &n.states;
     let looks = super::looks::current();
     // Rows along x of the padded volume (bit x + 1): blocks, and opaque ones. A block with an
     // opaque block on every side shows nothing, and underground that is nearly all of them.
     let mut filled = [0u32; PAD * PAD];
     let mut solid = [0u32; PAD * PAD];
-    for (row, (f, o)) in filled.iter_mut().zip(solid.iter_mut()).enumerate() {
+    // What shades corners (AO): the solid blocks, and with `core:mc_leaves` (chiacraft) leaves too.
+    let mut shades = [0u32; PAD * PAD];
+    for (row, ((f, o), sh)) in filled
+        .iter_mut()
+        .zip(solid.iter_mut())
+        .zip(shades.iter_mut())
+        .enumerate()
+    {
         for (x, &s) in states[row * PAD..(row + 1) * PAD].iter().enumerate() {
             if s != 0 {
                 *f |= 1 << x;
@@ -97,6 +117,9 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
                     && ctm.hides(c.tight[s as usize].flags, s)
                 {
                     *o |= 1 << x;
+                    *sh |= 1 << x;
+                } else if mc_leaves && culls_same(&c.states[s as usize]) {
+                    *sh |= 1 << x;
                 }
             }
         }
@@ -106,8 +129,11 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
     }
     let mut outside = rustc_hash::FxHashSet::default();
     let row = |y: i32, z: i32| ((y + 1) as usize) * PAD + (z + 1) as usize;
-    // Padded index to its bit in `solid`.
-    let opaque = |i: usize| solid[i / PAD] >> (i % PAD) & 1 != 0;
+    // Padded index to whether it shades corners (`shades`).
+    let opaque = |i: usize| shades[i / PAD] >> (i % PAD) & 1 != 0;
+    // Leaves that shade corners (`core:mc_leaves`): Minecraft never counts them view-blocking, so
+    // a corner between two of them is still read (vanilla's `BlockModelLighter`).
+    let leafy = |i: usize| opaque(i) && solid[i / PAD] >> (i % PAD) & 1 == 0;
 
     for y in 0..16i32 {
         for z in 0..16i32 {
@@ -120,18 +146,18 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
                 let i = pidx(x, y, z);
                 if let Some(layout) = n.extras.get(&i) {
                     for part in layout.residents(states[i]) {
-                        draw_block(c, n, ctm, &looks, &opaque, &mut mesh, x, y, z, part);
+                        draw_block(c, n, ctm, &looks, &opaque, &leafy, &mut mesh, x, y, z, part);
                     }
                     for &part in &layout.covers {
                         let (owner, resident) = part.owner(glam::IVec3::new(x, y, z));
                         if (owner.cmplt(glam::IVec3::ZERO).any() || owner.cmpge(glam::IVec3::splat(16)).any())
                             && outside.insert((owner, resident))
                         {
-                            draw_block(c, n, ctm, &looks, &opaque, &mut mesh, x, y, z, part);
+                            draw_block(c, n, ctm, &looks, &opaque, &leafy, &mut mesh, x, y, z, part);
                         }
                     }
                 } else {
-                    draw_block(c, n, ctm, &looks, &opaque, &mut mesh, x, y, z, Part::aligned(states[i]));
+                    draw_block(c, n, ctm, &looks, &opaque, &leafy, &mut mesh, x, y, z, Part::aligned(states[i]));
                 }
             }
         }
@@ -151,6 +177,7 @@ fn draw_block(
     ctm: &super::ctm::Ctm,
     looks: &super::looks::Looks,
     opaque: &impl Fn(usize) -> bool,
+    leafy: &impl Fn(usize) -> bool,
     mesh: &mut Mesh,
     x: i32,
     y: i32,
@@ -205,7 +232,7 @@ fn draw_block(
             if !n.extras.contains_key(&ni) && face_hidden(c, ctm, s, n.states[ni]) {
                 continue;
             }
-            let (ao, light) = corner_data(c, n, ctm, opaque, x, y, z, dir);
+            let (ao, light) = corner_data(c, n, ctm, opaque, leafy, x, y, z, dir);
             for (k, l) in face_layers(c, info, textures[dir] & face::TEX_MASK, dir)
                 .iter()
                 .enumerate()
@@ -225,11 +252,19 @@ fn draw_block(
                         crate::gpu_layout::face_record([x, y, z], dir as u32, ao, l.tint as u32, cube.turn[dir] as u32, tex, biome, light);
                     // chiacraft: its back face hidden by the same block behind it (leaves in a
                     // crown): its holes would show past the crown, the sky from under a canopy.
-                    if k == 0 && info.layer == RenderLayer::Cutout && info.flags & bf::CULL_SAME != 0 {
+                    // Not with `core:mc_leaves`, which draws the faces between leaves as
+                    // Minecraft's fancy leaves do: the holes show those, lit, and the fill's dark
+                    // average covered them (the plain look's shaded leaves luma 16 against
+                    // vanilla's 23, Trees, 11-06).
+                    if k == 0 && culls_same(info) && !mc_leaves() {
                         let [bx, by, bz] = NORMALS[dir ^ 1];
                         if c.states[n.states[pidx(x + bx, y + by, z + bz)] as usize].block == info.block {
                             rec[0] |= crate::gpu_layout::face::BACKED;
                         }
+                    }
+                    // A face into leaves (`core:mc_leaves` only: `leafy` holds leaves only then).
+                    if leafy(ni) {
+                        rec[0] |= crate::gpu_layout::face::INNER;
                     }
                     mesh.faces[if k == 0 { info.layer as usize } else { UPPER }].push(rec);
                 }
@@ -401,7 +436,12 @@ pub const DIR_RANK: [u8; 6] = [3, 0, 4, 1, 5, 2];
 /// it), or the same block, which culls its own (glass).
 pub fn face_hidden(c: &Content, ctm: &super::ctm::Ctm, state: u32, neighbor: u32) -> bool {
     let (info, n) = (&c.states[state as usize], &c.states[neighbor as usize]);
-    ctm.hides(n.flags, neighbor) || n.block == info.block && info.layer != RenderLayer::Opaque && info.flags & bf::CULL_SAME != 0
+    ctm.hides(n.flags, neighbor)
+        || n.block == info.block
+            && info.layer != RenderLayer::Opaque
+            && info.flags & bf::CULL_SAME != 0
+            // chiacraft, `core:mc_leaves`: the faces between leaves drawn, as Minecraft's fancy leaves.
+            && !(mc_leaves() && culls_same(info))
 }
 
 pub fn box_face(bx: &crate::content::ModelBox, dir: usize) -> Option<([[f32; 3]; 4], [f32; 4])> {
@@ -432,11 +472,13 @@ fn tilted(p: [f32; 3], t: &weft_abi::BoxTilt) -> [f32; 3] {
     (o + turn * (glam::Vec3::from_array(p) - o)).to_array()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn corner_data(
     c: &Content,
     n: &Neighborhood,
     ctm: &super::ctm::Ctm,
     opaque: &impl Fn(usize) -> bool,
+    leafy: &impl Fn(usize) -> bool,
     x: i32,
     y: i32,
     z: i32,
@@ -467,7 +509,8 @@ fn corner_data(
         let i2 = pidx(p2[0], p2[1], p2[2]);
         let i3 = pidx(p3[0], p3[1], p3[2]);
         let (s1, s2, s3) = (opaque(i1), opaque(i2), opaque(i3));
-        let ao = if s1 && s2 { 0 } else { 3 - (s1 as u32 + s2 as u32 + s3 as u32) };
+        // Two solid sides hide the corner; with a leaf among them it still counts (`leafy`).
+        let ao = if s1 && s2 && !leafy(i1) && !leafy(i2) { 0 } else { 3 - (s1 as u32 + s2 as u32 + s3 as u32) };
         ao_bits |= ao << (k * 2);
 
         // Only what light could come from into the cell before the face: a slab's closed side
@@ -480,7 +523,10 @@ fn corner_data(
         let r3 = (t(i3).lets_into(t(i1), to_b) && r1) || (t(i3).lets_into(t(i2), to_a) && r2);
         let mut sum = [0u32; 4];
         let mut count = 0;
-        for (idx, solid) in [(i0, false), (i1, s1 || !r1), (i2, s2 || !r2), (i3, s3 || (s1 && s2) || !r3)] {
+        // Light comes from every cell but solid ones; leaves under `core:mc_leaves` shade the
+        // corner (AO above) and still give their own light, as vanilla's do.
+        let (h1, h2, h3) = (s1 && !leafy(i1), s2 && !leafy(i2), s3 && !leafy(i3));
+        for (idx, solid) in [(i0, false), (i1, h1 || !r1), (i2, h2 || !r2), (i3, h3 || (h1 && h2) || !r3)] {
             // A block with holes is still opaque to light, there is none in it to go by.
             if solid || n.light[idx] == ABSENT || ctm.is_open(n.states[idx]) {
                 continue;

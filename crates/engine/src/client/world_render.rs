@@ -1760,7 +1760,15 @@ impl WorldRenderer {
                 self.overlays,
                 fade,
                 crate::content::content().tint_kinds.len() as u32,
+                // chiacraft, test only: bit 23 while leaves' smaller mips darken as Minecraft's
+                // (`core:mc_leaves`), so far tiles can take their opaque texels' colour back.
                 self.lod_half
+                    | (crate::content::content()
+                        .game
+                        .config_names
+                        .get("core:mc_leaves")
+                        .is_some_and(|&id| crate::config::get(id) != 0.0) as u32)
+                        << 23
                     | (crate::content::content()
                         .game
                         .config_names

@@ -196,7 +196,9 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     if origins[ii].w != 0 {
         shade = normal_shade(quat_vector(body_rotations[origins[ii].w], FACE_DIRS[dir]));
     }
-    out.color = tint * shade * AO[a[c]];
+    // A face between leaves (`core:mc_leaves`, chiacraft): Minecraft's AO reads the leaf in front
+    // as a quarter of 0.2, a fifth darker at every corner (Trees, stage 1).
+    out.color = tint * shade * (AO[a[c]] - select(0.0, 0.2, (w0 & FACE_INNER) != 0u));
     return out;
 }
 
@@ -606,6 +608,13 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, fract(in.uv), du, dv);
     var albedo = sample(in, nuv, du, dv);
+    // Leaves far off as Distant Horizons colours them: the average of their opaque texels (its
+    // `ClientBlockStateColorCache`, holes skipped). With Minecraft's dark leaf mips on (chiacraft,
+    // test only, `core:mc_leaves`, bit 23) a smaller texel sums its opaque ones with the holes as
+    // black, so over the opaque share (its alpha) it is their average again.
+    if ((g.extra.w >> 23u) & 1u) != 0u && any(in.tint != vec3(1.0)) && albedo.a > 0.05 && albedo.a < 0.995 {
+        albedo = vec4(albedo.rgb / albedo.a, albedo.a);
+    }
     // Far water as Distant Horizons draws it (its `ColumnBox` keeps the sea floor's top under
     // water, drawn first; the water over it at the texture's alpha, mixed in gamma as vanilla's
     // screen mixes): over a bed that the water above has darkened (a block of sky light taken per
