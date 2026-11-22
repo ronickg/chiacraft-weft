@@ -1738,13 +1738,13 @@ fn haze_veil(rel: vec3<f32>, dist: f32) -> vec3<f32> {
     // land in a flat light grey, a wash brighter than the deck over it, from the vista 200 blocks up
     // nothing but grey (Tester 2's weather sheet, 11-05). Now a third gone at about 180 blocks in
     // rain, about 90 in a storm: the land keeps its shapes and colours, darker, under a slate sky.)
-    return vec3(1.0) - exp(-((rayleigh + vec3(mie)) * far + vec3(rain_depth(dist))));
+    return vec3(1.0) - exp(-((rayleigh + vec3(mie)) * far + vec3(wet_depth(dist))));
 }
 
 // Rain's mist between the eye and what lies `dist` blocks off, as an optical depth (`haze_veil`);
 // the clouds take it too (`sky.wgsl`), so a deck and the land at the same distance go the same
 // colour and meet at the horizon without a line.
-fn rain_depth(dist: f32) -> f32 {
+fn wet_depth(dist: f32) -> f32 {
     // A quarter of what it was (0.0022 + 0.0030): a storm's land lost 60 % of its colour at 200
     // blocks, one veil over the whole land, contrast 7-11 on the forest vista where Photon's and
     // Unbound's stay green and readable under the deck (the Look session's rain check, 11-05). Now
