@@ -130,7 +130,8 @@ pub fn gems_of(sockets: u8, sets: &[Set]) -> GemsOf {
 pub fn give_back(w: &World, player: u64, sets: &[Set]) {
     for s in sets {
         if s.gem.cracks() && w.random().is_multiple_of(CRACK_ONE_IN as u64) {
-            w.chat("gem.base.cracked", &[Arg::Key(s.gem.key)]).to(player);
+            w.chat("gem.base.cracked", &[Arg::Key(s.gem.key)])
+                .to(player);
             continue;
         }
         let left = w.inventory(player).insert(stack_of(s));

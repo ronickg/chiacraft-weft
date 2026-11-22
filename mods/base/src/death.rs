@@ -161,61 +161,62 @@ fn client(r: &mut Registry) {
         });
     });
     // The death screen, the engine's with what happened.
-    r.menu(&screens::DEATH).screen(|ui| {
-        // The UI redo: a dark red-brown vignette (`death`), and in its middle a window with the
-        // title, what happened, where the tombstone is, and the two ways on.
-        ui.panel("death", S::column().center().stretch(), |ui| {
-            ui.panel(
-                "panel",
-                S::column()
-                    .pad(10.0)
-                    .gap(6.0)
-                    .w(240.0)
-                    .self_align(abi::ui_align::CENTER),
-                |ui| {
-                    ui.text_styled(
-                        S::column()
-                            .class("title")
-                            .scale(2.0)
-                            .no_wrap()
-                            .self_align(abi::ui_align::CENTER),
-                        "death.title",
-                        &[],
-                    );
-                    ui.text_bind_styled(S::column().self_align(abi::ui_align::CENTER), |_, out| {
-                        let last = LAST.lock().unwrap();
-                        match last.as_ref() {
-                            Some(d) if !d.killer.is_empty() => out.set(&d.cause, &[Arg::Key(&d.killer)]),
-                            Some(d) => out.set(&d.cause, &[]),
-                            None => out.set("death.base.cause.generic", &[]),
-                        }
-                    });
-                    ui.panel("well", S::column().pad(5.0).stretch(), |ui| {
-                        ui.text_bind_styled(S::column().max_w(216.0), |_, out| {
-                            let (grave, dropped) = LAST
-                                .lock()
-                                .unwrap()
-                                .as_ref()
-                                .map_or((None, false), |d| (d.grave, d.dropped));
-                            match (grave, dropped) {
-                                (Some([x, y, z]), _) => {
-                                    out.set("death.base.grave", &[Arg::Int(x as i64), Arg::Int(y as i64), Arg::Int(z as i64)])
-                                }
-                                (None, true) => out.set("death.base.dropped", &[]),
-                                (None, false) => out.set("death.base.no_grave", &[]),
+    r.menu(&screens::DEATH)
+        .screen(|ui| {
+            // The UI redo: a dark red-brown vignette (`death`), and in its middle a window with the
+            // title, what happened, where the tombstone is, and the two ways on.
+            ui.panel("death", S::column().center().stretch(), |ui| {
+                ui.panel(
+                    "panel",
+                    S::column()
+                        .pad(10.0)
+                        .gap(6.0)
+                        .w(240.0)
+                        .self_align(abi::ui_align::CENTER),
+                    |ui| {
+                        ui.text_styled(
+                            S::column()
+                                .class("title")
+                                .scale(2.0)
+                                .no_wrap()
+                                .self_align(abi::ui_align::CENTER),
+                            "death.title",
+                            &[],
+                        );
+                        ui.text_bind_styled(S::column().self_align(abi::ui_align::CENTER), |_, out| {
+                            let last = LAST.lock().unwrap();
+                            match last.as_ref() {
+                                Some(d) if !d.killer.is_empty() => out.set(&d.cause, &[Arg::Key(&d.killer)]),
+                                Some(d) => out.set(&d.cause, &[]),
+                                None => out.set("death.base.cause.generic", &[]),
                             }
                         });
-                    });
-                    ui.row(S::row().gap(6.0).self_align(abi::ui_align::CENTER), |ui| {
-                        ui.button("death.respawn", S::column().min_w(110.0), |c| c.client().respawn());
-                        ui.button("menu.save_quit", S::column().class("button_secondary").min_w(110.0), |c| c.client().world_leave());
-                    });
-                },
-            );
-        });
-    })
-    .keep_on_escape()
-    .closes_on_respawn();
+                        ui.panel("well", S::column().pad(5.0).stretch(), |ui| {
+                            ui.text_bind_styled(S::column().max_w(216.0), |_, out| {
+                                let (grave, dropped) = LAST
+                                    .lock()
+                                    .unwrap()
+                                    .as_ref()
+                                    .map_or((None, false), |d| (d.grave, d.dropped));
+                                match (grave, dropped) {
+                                    (Some([x, y, z]), _) => {
+                                        out.set("death.base.grave", &[Arg::Int(x as i64), Arg::Int(y as i64), Arg::Int(z as i64)])
+                                    }
+                                    (None, true) => out.set("death.base.dropped", &[]),
+                                    (None, false) => out.set("death.base.no_grave", &[]),
+                                }
+                            });
+                        });
+                        ui.row(S::row().gap(6.0).self_align(abi::ui_align::CENTER), |ui| {
+                            ui.button("death.respawn", S::column().min_w(110.0), |c| c.client().respawn());
+                            ui.button("menu.save_quit", S::column().class("button_secondary").min_w(110.0), |c| c.client().world_leave());
+                        });
+                    },
+                );
+            });
+        })
+        .keep_on_escape()
+        .closes_on_respawn();
     // Over the hotbar after respawning: the way to the tombstone, and the grace left.
     r.hud_element(&GRAVE_MARK, hud_anchor::ABOVE_HOTBAR, 2, |ui| {
         ui.text_bind(|c, out| {

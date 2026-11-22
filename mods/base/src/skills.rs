@@ -77,7 +77,8 @@ pub fn register(r: &mut Registry) {
             if !w.outside_survival(u.entity()) {
                 u.set_stack(StackData::shrink(u.stack(), 1));
             }
-            w.hint("web.base.unlearn", &[Arg::Int(left as i64)]).to(u.entity());
+            w.hint("web.base.unlearn", &[Arg::Int(left as i64)])
+                .to(u.entity());
             true
         })
         .tab(&crate::tabs::INGREDIENTS);
@@ -226,7 +227,8 @@ fn tick(w: &World) {
             let xp: u64 = (from + 1..=level).map(skills::up_xp).sum();
             give_xp(w, id, xp);
             let key = format!("web.base.skill.{}", skills::SKILLS[i].id());
-            w.hint("web.base.skill_up", &[Arg::Key(&key), Arg::Int(level as i64)]).to(id);
+            w.hint("web.base.skill_up", &[Arg::Key(&key), Arg::Int(level as i64)])
+                .to(id);
         }
         refresh(w, id);
     }

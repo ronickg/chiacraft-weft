@@ -113,10 +113,12 @@ pub fn looked_at_any(w: &World, player: u64, range: f64, pick: impl Fn(u64) -> b
     let (sy, cy) = (st.yaw as f64).sin_cos();
     let (sp, cp) = (st.pitch as f64).sin_cos();
     let dir = [-sy * cp, sp, -cy * cp];
-    let wall = w.target_block(player, range, false).map_or(range, |hit| {
-        let c = hit.pos.to_array().map(|v| v as f64 + 0.5);
-        ((c[0] - eye[0]).powi(2) + (c[1] - eye[1]).powi(2) + (c[2] - eye[2]).powi(2)).sqrt()
-    });
+    let wall = w
+        .looked_at(player, range, Ray::blocks())
+        .map_or(range, |hit| {
+            let c = hit.pos.to_array().map(|v| v as f64 + 0.5);
+            ((c[0] - eye[0]).powi(2) + (c[1] - eye[1]).powi(2) + (c[2] - eye[2]).powi(2)).sqrt()
+        });
     w.entities_near(eye, range, None)
         .into_iter()
         .filter(|&id| id != player && pick(id))

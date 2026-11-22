@@ -38,11 +38,18 @@ const FIRST_PERSON_ITEMS: f32 = 1.8;
 pub fn register(r: &mut Registry) {
     // Third person sways and jolts as first person does (chiacraft's feel; Weft's own behind and
     // front cameras are still).
-    drop(r.edit(&cameras::BEHIND).tag(weft_sdk::abi::comp::camera::EFFECTS));
-    drop(r.edit(&cameras::FRONT).tag(weft_sdk::abi::comp::camera::EFFECTS));
+    drop(
+        r.edit(&cameras::BEHIND)
+            .tag(weft_sdk::abi::comp::camera::EFFECTS),
+    );
+    drop(
+        r.edit(&cameras::FRONT)
+            .tag(weft_sdk::abi::comp::camera::EFFECTS),
+    );
     // Held items about as big in the view as they were before the Weft sync (Ronald: "our items
     // a bit bigger"): Weft holds them in the posed hand, smaller than our old corner.
-    r.edit(&PLAYER).set(&FIRST_PERSON_HELD_SCALE, FIRST_PERSON_ITEMS);
+    r.edit(&PLAYER)
+        .set(&FIRST_PERSON_HELD_SCALE, FIRST_PERSON_ITEMS);
     r.player_slots()
         .group("hotbar", Slots::row(9).hotbar())
         .group("main", Slots::grid(9, 3));

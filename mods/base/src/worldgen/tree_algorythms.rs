@@ -231,10 +231,10 @@ pub(super) fn gap_growth(s: &mut Plan, log: u32, [x, y, z]: [i32; 3], h: u64) {
         1 => base_api::trees::young_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
             let state = made_leaves(state);
             if force {
-            s.set([x, y, z], state);
-        } else {
-            s.put([x, y, z], state);
-        }
+                s.set([x, y, z], state);
+            } else {
+                s.put([x, y, z], state);
+            }
         }),
         _ => {}
     }

@@ -61,7 +61,9 @@ pub fn init(r: &mut Registry) {
         .tab(&NATURAL);
     r.block(&RED_SANDSTONE)
         .sound_group("base:block.stone")
-        .texture("red_sandstone_side").top("red_sandstone_top").bottom("red_sandstone_bottom")
+        .texture("red_sandstone_side")
+        .top("red_sandstone_top")
+        .bottom("red_sandstone_bottom")
         .hardness(0.8)
         .mined_by("pickaxe", 0)
         .tab(&BUILDING);
@@ -90,7 +92,9 @@ pub fn init(r: &mut Registry) {
             for (b, side) in [(block, format!("{name}_side")), (upper, format!("{name}_upper_side"))] {
                 r.block(b)
                     .sound_group("base:block.gravel")
-                    .texture(&side).top(&format!("{name}_top")).bottom(&format!("{name}_top"))
+                    .texture(&side)
+                    .top(&format!("{name}_top"))
+                    .bottom(&format!("{name}_top"))
                     .hardness(0.9)
                     .mined_by("shovel", weft_sdk::abi::tool_tier::HAND)
                     .tab(&NATURAL);
@@ -102,7 +106,9 @@ pub fn init(r: &mut Registry) {
         if p.form == vitals::wild::Form::Log {
             r.block(block)
                 .sound_group("base:block.wood")
-                .texture(name).top(&format!("{name}_top")).bottom(&format!("{name}_top"))
+                .texture(name)
+                .top(&format!("{name}_top"))
+                .bottom(&format!("{name}_top"))
                 .hardness(1.0)
                 .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
                 .tab(&NATURAL);
@@ -247,42 +253,42 @@ pub fn init(r: &mut Registry) {
         t = t.field(name, field);
     }
     for f in base_api::land::features() {
-        t = t.feature(f);
+        t = t.landform(f);
     }
     // The warm seas' lagoons and reefs as the overworld's (`base_api::land::reef_part`); the
     // coral blocks are the overworld's decoration, the Cretaceous's reefs are bare (its own reef
     // builders, rudist clams, if anyone draws them).
-    t.biome(
+    t.rule(
         BiomeRule::new("base:coral_reef")
             .height(SEA - 2..=SEA - 2)
             .temperature(base_api::land::REEF_WARM_RULE..)
             .continent(..base_api::land::REEF_COAST),
     )
-    .biome(
+    .rule(
         BiomeRule::new("base:lagoon")
             .height(SEA - base_api::land::REEF_LAGOON.1..=SEA - base_api::land::REEF_LAGOON.0)
             .temperature(base_api::land::REEF_WARM_RULE..)
             .continent(..base_api::land::REEF_COAST),
     )
-    .biome(
+    .rule(
         BiomeRule::new("base:ocean")
             .height(..=SEA - 2)
             .continent(..base_api::land::OCEAN_CONTINENT),
     )
-    .biome(
+    .rule(
         BiomeRule::new("base:beach")
             .height(..=SEA + 1)
             .continent(..0.1),
     )
-    .biome(BiomeRule::new("crags").field(base_api::land::MOUNTAINS_FIELD, base_api::land::MOUNTAIN_BIOME..))
-    .biome(
+    .rule(BiomeRule::new("crags").field(base_api::land::MOUNTAINS_FIELD, base_api::land::MOUNTAIN_BIOME..))
+    .rule(
         BiomeRule::new("floodplain")
             .height(..=SEA + FLOODPLAIN_RISE)
             .humidity(-0.12..),
     )
-    .biome(BiomeRule::new("red_dunes"))
-    .biome(BiomeRule::new("scrubland"))
-    .biome(BiomeRule::new("fern_forest"));
+    .rule(BiomeRule::new("red_dunes"))
+    .rule(BiomeRule::new("scrubland"))
+    .rule(BiomeRule::new("fern_forest"));
 
     r.decoration(ferns).dimension(&CRETACEOUS);
 }
@@ -323,8 +329,20 @@ fn woods(r: &mut Registry) {
             .prop("felled", ["no", "a", "b"])
             .states(move |p, s| match p.get("axis") {
                 "y" => s.texture(&side).top(&top).bottom(&top),
-                "x" => s.west(&top).east(&top).bottom(&side).top(&side).north(&side).south(&side),
-                _ => s.west(&side).east(&side).bottom(&side).top(&side).north(&top).south(&top),
+                "x" => s
+                    .west(&top)
+                    .east(&top)
+                    .bottom(&side)
+                    .top(&side)
+                    .north(&side)
+                    .south(&side),
+                _ => s
+                    .west(&side)
+                    .east(&side)
+                    .bottom(&side)
+                    .top(&side)
+                    .north(&top)
+                    .south(&top),
             })
             .placement(|p, props| {
                 props.set(
@@ -346,7 +364,7 @@ fn woods(r: &mut Registry) {
             // Faces between two leaves of one kind aren't drawn, as base's (`blocks.rs`).
             .cull_same()
             .light_opacity(1)
-            .tint(base_api::trees::leaf_tint(vitals::wild::turn(&format!("animals:{wood}_leaves"))))
+            .tint_kind(base_api::trees::leaf_tint(vitals::wild::turn(&format!("animals:{wood}_leaves"))))
             .tag("leaves")
             .mined_by("shears", weft_sdk::abi::tool_tier::HAND)
             .tab(&NATURAL);

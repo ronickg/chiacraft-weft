@@ -498,7 +498,10 @@ fn site(w: &World) -> Result<BlockPos, String> {
                 away.push((cx * ev::BUILT_CELL as f64 + half, cz * ev::BUILT_CELL as f64 + half, build + half * 1.5));
             }
         }
-        if let Some(bed) = w.component(p, &base_api::components::BED_SPAWN).filter(|b| b.set != 0) {
+        if let Some(bed) = w
+            .component(p, &base_api::components::BED_SPAWN)
+            .filter(|b| b.set != 0)
+        {
             away.push((bed.bed[0] as f64, bed.bed[2] as f64, build));
         }
         if let Some(g) = w.component(p, &base_api::GRAVE).filter(|g| g.set != 0) {
@@ -641,7 +644,8 @@ fn tell_all(w: &World, site: Option<BlockPos>) {
         let band = format!("events.base.band.{band}");
         match site {
             Some(s) => {
-                w.hint("hint.base.star_fell", &[Arg::Key(&band), Arg::Key(&dir)]).to(p);
+                w.hint("hint.base.star_fell", &[Arg::Key(&band), Arg::Key(&dir)])
+                    .to(p);
                 if let Some(star) = w.component_mut(p, &STAR) {
                     *star = Star { x: s.x, z: s.z, until: day + ev::POINTER_DAYS, set: 1 };
                 }

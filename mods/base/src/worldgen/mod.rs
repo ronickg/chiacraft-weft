@@ -26,8 +26,8 @@ use weft_sdk::terrain::*;
 pub use consts::*;
 pub use statics::*;
 // Ours, not `crate::blocks::MUSHROOMS` (upstream's mushroom list).
-use statics::MUSHROOMS;
 use decor::*;
+use statics::MUSHROOMS;
 use tree_algorythms::*;
 use util::*;
 
@@ -386,7 +386,8 @@ pub fn register(r: &mut Registry) {
 
     // Wild cherry groves (`vitals::wild::CHERRY_GROVES`).
     for (biome, chance) in vitals::wild::CHERRY_GROVES {
-        r.edit(Biome::generated(biome.to_string())).set(&CHERRY_TREES, chance);
+        r.edit(Biome::generated(biome.to_string()))
+            .set(&CHERRY_TREES, chance);
     }
 
     // The overworld's shape, its snow and its bare rock (`land.rs`), before the plants below.

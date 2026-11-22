@@ -92,17 +92,19 @@ pub fn register(r: &mut Registry) {
     r.system(&ROASTING, tick_campfires);
     // It cooks what a furnace cooks of food, a little slower, with no fuel.
     r.block(&CAMPFIRE)
-            .sound_group("wood")
-                .texture("campfire_side").top("campfire_top").bottom("campfire_side")
-                .model_box([0.0, 0.0, 0.0], [16.0, 7.0, 16.0])
-                .light_rgb(15, 11, 6)
-                .hardness(2.0)
-                .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
-                .item_texture("campfire")
-                .tag("campfires")
-                .tab(&crate::tabs::FUNCTIONAL)
-            .entity(|e| e.attach(&ROASTING).inventory(2))
-            .opens(&CAMPFIRE_MENU);
+        .sound_group("wood")
+        .texture("campfire_side")
+        .top("campfire_top")
+        .bottom("campfire_side")
+        .model_box([0.0, 0.0, 0.0], [16.0, 7.0, 16.0])
+        .light_rgb(15, 11, 6)
+        .hardness(2.0)
+        .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
+        .item_texture("campfire")
+        .tag("campfires")
+        .tab(&crate::tabs::FUNCTIONAL)
+        .entity(|e| e.attach(&ROASTING).inventory(2))
+        .opens(&CAMPFIRE_MENU);
     r.menu(&CAMPFIRE_MENU)
         .group("input", Slots::single().accepts("#food").holder())
         .group("output", Slots::single().output().holder())
@@ -133,15 +135,16 @@ pub fn register(r: &mut Registry) {
     r.system(&DRYING, tick_racks);
 
     r.block(&COOKING_POT)
-            .sound_group("stone")
-                .texture("cooking_pot_side").bottom("cooking_pot_top")
-                .model_box([2.0, 0.0, 2.0], [14.0, 10.0, 14.0])
-                .hardness(3.0)
-                .mined_by("pickaxe", weft_sdk::abi::tool_tier::HAND)
-                .item_texture("cooking_pot")
-                .tab(&crate::tabs::FUNCTIONAL)
-            .entity(|e| e.attach(&COOKING).inventory(7))
-            .opens(&POT_MENU);
+        .sound_group("stone")
+        .texture("cooking_pot_side")
+        .bottom("cooking_pot_top")
+        .model_box([2.0, 0.0, 2.0], [14.0, 10.0, 14.0])
+        .hardness(3.0)
+        .mined_by("pickaxe", weft_sdk::abi::tool_tier::HAND)
+        .item_texture("cooking_pot")
+        .tab(&crate::tabs::FUNCTIONAL)
+        .entity(|e| e.attach(&COOKING).inventory(7))
+        .opens(&POT_MENU);
     r.menu(&POT_MENU)
         .group("ingredients", Slots::grid(2, 2).accepts("#food").holder())
         .group("bowl", Slots::single().accepts("#bowl").holder())
@@ -173,18 +176,18 @@ pub fn register(r: &mut Registry) {
         });
 
     r.block(&DRYING_RACK)
-            .sound_group("wood")
-                .texture("drying_rack")
-                // A frame of sticks: the texture's gaps are see-through.
-                .cutout()
-                .model_box([0.0, 0.0, 0.0], [16.0, 14.0, 16.0])
-                .hardness(1.5)
-                .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
-                .item_texture("drying_rack")
-                .set(&base_api::components::FLAMMABLE, 20)
-                .tab(&crate::tabs::FUNCTIONAL)
-            .entity(|e| e.attach(&DRYING).inventory(4))
-            .opens(&RACK_MENU);
+        .sound_group("wood")
+        .texture("drying_rack")
+        // A frame of sticks: the texture's gaps are see-through.
+        .cutout()
+        .model_box([0.0, 0.0, 0.0], [16.0, 14.0, 16.0])
+        .hardness(1.5)
+        .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
+        .item_texture("drying_rack")
+        .set(&base_api::components::FLAMMABLE, 20)
+        .tab(&crate::tabs::FUNCTIONAL)
+        .entity(|e| e.attach(&DRYING).inventory(4))
+        .opens(&RACK_MENU);
     r.menu(&RACK_MENU)
         .group("rack", Slots::row(4).accepts("#food").holder())
         .player_inventory()

@@ -46,7 +46,9 @@ pub fn register(r: &mut Registry) {
         .sound_group("wood")
         // Art's unlit tiles (11-04): the lit one's logs and stones, no flames; the side is drawn
         // for this 14 x 5 x 14 box, its logs in the bottom rows.
-        .texture("campfire_laid_side").top("campfire_laid_top").bottom("campfire_laid_side")
+        .texture("campfire_laid_side")
+        .top("campfire_laid_top")
+        .bottom("campfire_laid_side")
         .not_solid()
         .hardness(1.0)
         .mined_by("axe", weft_sdk::abi::tool_tier::HAND)

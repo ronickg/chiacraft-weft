@@ -129,11 +129,21 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
             "y" => s.texture(&side).top(&top).bottom(&top),
             // The bark runs along the log.
             "x" => s
-                .west(&top).east(&top).bottom(&side).top(&side).north(&side).south(&side)
+                .west(&top)
+                .east(&top)
+                .bottom(&side)
+                .top(&side)
+                .north(&side)
+                .south(&side)
                 .face_turns([0, 0, 1, 1, 1, 1]),
             "bark" => s.texture(&side),
             _ => s
-                .west(&side).east(&side).bottom(&side).top(&side).north(&top).south(&top)
+                .west(&side)
+                .east(&side)
+                .bottom(&side)
+                .top(&side)
+                .north(&top)
+                .south(&top)
                 .face_turns([1, 1, 0, 0, 0, 0]),
         })
         .placement(axis_placement)
@@ -250,9 +260,24 @@ fn grove(r: &mut Registry) {
         .set(&FUEL, 300)
         .prop("axis", ["y", "x", "z"])
         .states(|p, s| match p.get("axis") {
-            "y" => s.texture("log_sequoia_mossy").top("log_sequoia_mossy_top").bottom("log_sequoia_mossy_top"),
-            "x" => s.west("log_sequoia_mossy_top").east("log_sequoia_mossy_top").bottom("log_sequoia_mossy").top("log_sequoia_mossy").north("log_sequoia_mossy").south("log_sequoia_mossy"),
-            _ => s.west("log_sequoia_mossy").east("log_sequoia_mossy").bottom("log_sequoia_mossy").top("log_sequoia_mossy").north("log_sequoia_mossy_top").south("log_sequoia_mossy_top"),
+            "y" => s
+                .texture("log_sequoia_mossy")
+                .top("log_sequoia_mossy_top")
+                .bottom("log_sequoia_mossy_top"),
+            "x" => s
+                .west("log_sequoia_mossy_top")
+                .east("log_sequoia_mossy_top")
+                .bottom("log_sequoia_mossy")
+                .top("log_sequoia_mossy")
+                .north("log_sequoia_mossy")
+                .south("log_sequoia_mossy"),
+            _ => s
+                .west("log_sequoia_mossy")
+                .east("log_sequoia_mossy")
+                .bottom("log_sequoia_mossy")
+                .top("log_sequoia_mossy")
+                .north("log_sequoia_mossy_top")
+                .south("log_sequoia_mossy_top"),
         })
         .placement(axis_placement)
         .tab(&crate::tabs::NATURAL);
@@ -473,7 +498,10 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     r.block(&GRASS)
         .sound_group("grass")
-        .texture("grass_side").bottom("dirt").top("grass_top").tint_kind(&tints::GRASS)
+        .texture("grass_side")
+        .bottom("dirt")
+        .top("grass_top")
+        .tint_kind(&tints::GRASS)
         .hardness(0.6)
         .mined_by("shovel", tool_tier::HAND)
         .drops("dirt", 1)
@@ -484,7 +512,9 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     r.block(&SNOWY_GRASS)
         .sound_group("grass")
-        .texture("grass_snow_side").top("snow").bottom("dirt")
+        .texture("grass_snow_side")
+        .top("snow")
+        .bottom("dirt")
         .hardness(0.6)
         .mined_by("shovel", tool_tier::HAND)
         .drops("dirt", 1)
@@ -522,7 +552,9 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     r.block(&SANDSTONE)
         .sound_group("stone")
-        .texture("sandstone_side").top("sandstone_top").bottom("sandstone_bottom")
+        .texture("sandstone_side")
+        .top("sandstone_top")
+        .bottom("sandstone_bottom")
         .hardness(0.8)
         .mined_by("pickaxe", 0)
         .tab(&crate::tabs::BUILDING);
@@ -584,7 +616,9 @@ pub fn register(r: &mut Registry) {
     // Packed by its own weight: opaque, slippery like ice, mined with a pickaxe.
     r.block(&GLACIER_ICE)
         .sound_group("glass")
-        .texture("glacier_ice_side").top("glacier_ice_top").bottom("glacier_ice_top")
+        .texture("glacier_ice_side")
+        .top("glacier_ice_top")
+        .bottom("glacier_ice_top")
         .hardness(0.5)
         .friction(0.98)
         .mined_by("pickaxe", 0)
@@ -703,7 +737,9 @@ pub fn register(r: &mut Registry) {
     // grain sweeps up; broken, it gives the log.
     r.block(&BRAZIL_NUT_BUTTRESS)
         .sound_group("wood")
-        .texture("buttress_brazil_nut").top("log_brazil_nut_top").bottom("log_brazil_nut_top")
+        .texture("buttress_brazil_nut")
+        .top("log_brazil_nut_top")
+        .bottom("log_brazil_nut_top")
         .hardness(2.0)
         .mined_by("axe", tool_tier::HAND)
         .tab(&crate::tabs::NATURAL);
@@ -807,7 +843,9 @@ pub fn register(r: &mut Registry) {
     // rain into a tuft of fresh grass; broken, it gives the dung.
     r.block(&DUNG_PAT)
         .sound_group("mud")
-        .texture("dung_pat_side").top("dung_pat_top").bottom("dung_pat_top")
+        .texture("dung_pat_side")
+        .top("dung_pat_top")
+        .bottom("dung_pat_top")
         // A plant first: `.plant()` makes the model a cross, so the pat's box comes after it.
         .plant()
         .model_box([2.0, 0.0, 2.0], [14.0, 1.5, 14.0])
@@ -934,7 +972,12 @@ pub fn register(r: &mut Registry) {
     }
     r.block(&CRAFTING_TABLE)
         .sound_group("wood")
-        .west("crafting_table_side").east("crafting_table_side").bottom("crafting_table_bottom").top("crafting_table_top").north("crafting_table_front").south("crafting_table_front")
+        .west("crafting_table_side")
+        .east("crafting_table_side")
+        .bottom("crafting_table_bottom")
+        .top("crafting_table_top")
+        .north("crafting_table_front")
+        .south("crafting_table_front")
         .hardness(2.5)
         .mined_by("axe", tool_tier::HAND)
         .set(&FUEL, 300)
@@ -965,14 +1008,24 @@ pub fn register(r: &mut Registry) {
         .hardness(0.3)
         .tab(&crate::tabs::NATURAL);
     r.block(&BRICKS)
-        .west("bricks_side_1").east("bricks_side_4").bottom("bricks_bottom").top("bricks_top").north("bricks_side_3").south("bricks_side_2")
+        .west("bricks_side_1")
+        .east("bricks_side_4")
+        .bottom("bricks_bottom")
+        .top("bricks_top")
+        .north("bricks_side_3")
+        .south("bricks_side_2")
         .sound_group("stone")
         .hardness(2.0)
         .mined_by("pickaxe", 0)
         .tab(&crate::tabs::BUILDING);
     r.block(&STONE_BRICKS)
         .sound_group("stone")
-        .west("stonebrick_side_1").east("stonebrick_side_4").bottom("stonebrick_bottom").top("stonebrick_top").north("stonebrick_side_3").south("stonebrick_side_2")
+        .west("stonebrick_side_1")
+        .east("stonebrick_side_4")
+        .bottom("stonebrick_bottom")
+        .top("stonebrick_top")
+        .north("stonebrick_side_3")
+        .south("stonebrick_side_2")
         .hardness(1.5)
         .mined_by("pickaxe", 0)
         .tab(&crate::tabs::BUILDING);
@@ -1009,7 +1062,9 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::COLORED);
     r.block(&PODZOL)
         .sound_group("gravel")
-        .texture("dirt").top("podzol").bottom("dirt")
+        .texture("dirt")
+        .top("podzol")
+        .bottom("dirt")
         .hardness(0.5)
         .mined_by("shovel", tool_tier::HAND)
         .tag("dirt")
@@ -1023,7 +1078,9 @@ pub fn register(r: &mut Registry) {
     ] {
         r.block(b)
             .sound_group(sound)
-            .texture(side).top(top).bottom(bottom)
+            .texture(side)
+            .top(top)
+            .bottom(bottom)
             .hardness(0.5)
             .mined_by("shovel", tool_tier::HAND)
             .tag("dirt")
@@ -1144,7 +1201,9 @@ pub fn register(r: &mut Registry) {
                 "7" | "8" => "compost_bin_top_full",
                 _ => "compost_bin_top_filling",
             };
-            s.texture("compost_bin_side").top(top).bottom("compost_bin_side")
+            s.texture("compost_bin_side")
+                .top(top)
+                .bottom("compost_bin_side")
         })
         .hardness(0.6)
         .mined_by("axe", tool_tier::HAND)
@@ -1154,14 +1213,18 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::FUNCTIONAL);
     r.block(&BOOKSHELF)
         .sound_group("wood")
-        .texture("bookshelf").top("planks_oak").bottom("planks_oak")
+        .texture("bookshelf")
+        .top("planks_oak")
+        .bottom("planks_oak")
         .hardness(1.5)
         .mined_by("axe", tool_tier::HAND)
         .set(&FLAMMABLE, 30)
         .tab(&crate::tabs::BUILDING);
     r.block(&HAY_BALE)
         .sound_group("grass")
-        .texture("hay_bale_side").top("hay_bale_top").bottom("hay_bale_top")
+        .texture("hay_bale_side")
+        .top("hay_bale_top")
+        .bottom("hay_bale_top")
         .hardness(0.5)
         .set(&FLAMMABLE, 60)
         .tab(&crate::tabs::BUILDING);
@@ -1352,7 +1415,12 @@ fn upstream_blocks(r: &mut Registry) {
     let shears = Cond::tool("#tools/shears");
     r.loot(&BUSH_LEAVES)
         .pool(Pool::new().when(shears.clone()).item(BUSH_LEAVES.name()))
-        .pool(Pool::new().when(!shears.clone()).when(Cond::chance(0.05)).item("sapling"));
+        .pool(
+            Pool::new()
+                .when(!shears.clone())
+                .when(Cond::chance(0.05))
+                .item("sapling"),
+        );
     berry_leaves(r, &RASPBERRY_LEAVES, "raspberry_leaves", "raspberry_leaves_berried", &crate::items::RASPBERRY);
     berry_leaves(r, &SNOWBERRY_LEAVES, "raspberry_leaves", "snowberry_leaves_berried", &crate::items::SNOWBERRY);
     r.block(&SHORT_GRASS)

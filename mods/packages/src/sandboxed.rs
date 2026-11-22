@@ -469,7 +469,7 @@ pub fn on_item<'a>(mut i: ItemBuilder<'a>, runs: &Arc<Runs>, id: &str) -> ItemBu
         let rs = runs.clone();
         i = i.on_use(move |u| {
             let w = u.world();
-            let (player, held) = (u.player(), u.stack());
+            let (player, held) = (u.entity(), u.stack());
             let ev = ItemUseEvent {
                 player,
                 stack: stack(held),
@@ -566,7 +566,14 @@ pub fn register(r: &mut Registry, runs: &Arc<Runs>) -> Result<(), String> {
                     sandbox::Chain::Damage => &chain::DAMAGE,
                     sandbox::Chain::AttackDamage => &chain::MELEE,
                 };
-                r.modify(chain, stage, move |m| {
+                // A sandboxed mod's stage numbers (the old 100 add, 200 multiply, 300 final) as
+                // the engine's phases.
+                let phase = match stage {
+                    ..=149 => &phase::ADD,
+                    150..=249 => &phase::MULTIPLY,
+                    _ => &phase::FINAL,
+                };
+                r.modify(chain, phase, move |m| {
                     let w = m.world();
                     let q = query(m.query());
                     let (base, value) = (m.base, m.value);
@@ -618,14 +625,14 @@ fn event(r: &mut Registry, e: sandbox::Event, cb: u32, runs: Arc<Runs>) {
         sandbox::Event::ItemUsed => r.on_event(&actions::USE_ITEM, move |b| {
             let batch = b
                 .iter()
-                .map(|u| EventValue::ItemUsed(U { player: u.player, stack: stack(u.stack), pos: t3(u.pos), on_block: u.has_target != 0 }))
+                .map(|u| EventValue::ItemUsed(U { player: u.entity, stack: stack(u.stack), pos: t3(u.pos), on_block: u.has_target != 0 }))
                 .collect();
             run(&runs, b.world(), cb, batch)
         }),
         sandbox::Event::ItemPickedUp => r.on_event(&actions::PICKUP_ITEM, move |b| {
             let batch = b
                 .iter()
-                .map(|p| EventValue::Pickup(P { player: p.player, stack: stack(p.stack) }))
+                .map(|p| EventValue::Pickup(P { player: p.entity, stack: stack(p.stack) }))
                 .collect();
             run(&runs, b.world(), cb, batch)
         }),
@@ -943,7 +950,7 @@ impl Game for WorldGame {
     }
     fn play_sound(&mut self, sound: &str, pos: [f64; 3], volume: f32) {
         if let Some(Effect::Sound(s)) = self.effect(abi::entry_kind::SOUND, sound) {
-            drop(self.w.play_sound(s, pos, volume));
+            drop(self.w.play_sound(s, Vec3::from(pos), volume));
         }
     }
     fn spawn_particles(&mut self, particle: &str, pos: [f64; 3], count: u32) {

@@ -41,7 +41,7 @@ fn say(w: &World, player: u64, key: &str, arg: &str) {
     w.send(player, &SAY, &format!("{key}\t{arg}"));
 }
 
-static SCREEN: Menu = Menu::named("portal");
+static SCREEN: weft_sdk::Menu = weft_sdk::Menu::named("portal");
 
 // ------------------------------------------------------------------ the engine's bridge
 
@@ -69,7 +69,7 @@ fn init(r: &mut Registry) {
         .translucent()
         .light(11)
         .tab(&BUILDING)
-        .block_entity()
+        .entity(|e| e)
         .on_use(|u| {
             let (w, player, pos) = (u.world(), u.player(), u.pos());
             let owner = is_owner(player);

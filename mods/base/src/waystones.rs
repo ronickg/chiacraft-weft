@@ -341,7 +341,8 @@ pub fn rod_used(u: &mut ItemUse) -> bool {
         return true;
     }
     if !take_offering(&w, p) {
-        w.hint("hint.base.waystone.offering", &[Arg::Int(n::OFFERING.1 as i64), Arg::Name(&format!("item:{}", n::OFFERING.0))]).to(p);
+        w.hint("hint.base.waystone.offering", &[Arg::Int(n::OFFERING.1 as i64), Arg::Name(&format!("item:{}", n::OFFERING.0))])
+            .to(p);
         return true;
     }
     wake(&w, p, &node);
@@ -455,7 +456,8 @@ fn start_travel(w: &World, player: u64, to: (i32, i32)) {
     let mut trips = TRIPS.lock().unwrap();
     trips.retain(|(p, _)| *p != player);
     trips.push((player, Trip { from: [st.pos.x, st.pos.y, st.pos.z], to: dest, lands, dist }));
-    w.hint("hint.base.waystone.channel", &[Arg::Int(n::CHANNEL_SECS as i64), Arg::Int(dist.round() as i64)]).to(player);
+    w.hint("hint.base.waystone.channel", &[Arg::Int(n::CHANNEL_SECS as i64), Arg::Int(dist.round() as i64)])
+        .to(player);
 }
 
 fn cancel(w: &World, player: u64, why: &str) {
@@ -492,7 +494,8 @@ fn arrive(w: &World, player: u64, t: &Trip) {
         s.digest(n::travel_secs(t.dist), 1.0);
         v.set_stomach(&s);
     }
-    w.hint("hint.base.waystone.arrived", &[Arg::Int(t.dist.round() as i64)]).to(player);
+    w.hint("hint.base.waystone.arrived", &[Arg::Int(t.dist.round() as i64)])
+        .to(player);
     weft_sdk::info!("waystone: player {player} travelled {:.0} blocks to {} {}", t.dist, t.to.x, t.to.z);
 }
 

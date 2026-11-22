@@ -2569,11 +2569,14 @@ pub async fn advancements_by_tags(t: T) -> R {
     fn made(t: &T) -> u64 {
         t.c()
             .view()
-            .component(&base_api::ADVANCEMENTS)
+            .component(&base_api::components::ADVANCEMENTS)
             .map_or(0, |a| a.done)
     }
     for food in ["base:cooked_beef", "base:cooked_porkchop", "base:cooked_chicken", "base:cooked_mutton"] {
-        t.check(Item::lookup(food).is_some_and(|i| Tag::named("cooked_meat").on_item(i)), format!("{food} is cooked meat"));
+        t.check(
+            Item::lookup(food).is_some_and(|i| Tag::<weft_sdk::kind::Any>::named("cooked_meat").on_item(i)),
+            format!("{food} is cooked meat"),
+        );
     }
     t.flat().await?;
     t.cmd("/feed 0").await?;

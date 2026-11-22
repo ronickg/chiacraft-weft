@@ -71,7 +71,9 @@ pub fn register(r: &mut Registry) {
     {
         r.block(b)
             .sound_group("wood")
-            .texture(side).top(top).bottom(top)
+            .texture(side)
+            .top(top)
+            .bottom(top)
             .hardness(1.0)
             .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
             .tab(&crate::tabs::NATURAL);

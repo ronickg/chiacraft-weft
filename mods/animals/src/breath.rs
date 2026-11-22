@@ -73,8 +73,7 @@ static POISON: Mutex<Option<HashMap<u64, (u64, u32)>>> = Mutex::new(None);
 pub fn init(r: &mut Registry) {
     r.entity_component(&BREATH, Breath::default(), 0);
     r.edit(&crate::wyvern::WYVERN).attach(&BREATH);
-    r.key(&KEY, "V")
-        .on_server(|w, p| ridden(w, p));
+    r.key(&KEY, "V").on_server(|w, p| ridden(w, p));
     // The streams: puffs that fly out of the mouth and fade (fire rising, frost and venom
     // sinking, sparks quick).
     r.particle(&FLAME)

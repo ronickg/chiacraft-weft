@@ -196,7 +196,7 @@ pub fn alarm(w: &World, id: u64, st: &EntityState) -> bool {
 }
 
 fn bark(w: &World, at: [f64; 3]) {
-    w.play_sound(&BARK, at, 1.0);
+    w.play_sound(&BARK, Vec3::from(at), 1.0);
 }
 
 fn mark(w: &World, e: &EntityState) {

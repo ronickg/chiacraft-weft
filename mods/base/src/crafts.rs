@@ -139,7 +139,9 @@ fn station(
     let size = if c.with.is_some() { 3 } else { 2 };
     r.block(block)
         .sound_group(sound)
-        .texture(&format!("{name}_side")).top(&format!("{name}_top")).bottom(&format!("{name}_side"))
+        .texture(&format!("{name}_side"))
+        .top(&format!("{name}_top"))
+        .bottom(&format!("{name}_side"))
         .model_box(from, to)
         .hardness(1.5)
         .mined_by(tool, weft_sdk::abi::tool_tier::HAND)
@@ -149,13 +151,9 @@ fn station(
                 .inventory(size)
         })
         .opens(menu);
-    let mut m = r.menu(menu).group(
-        "input",
-        Slots::single()
-            .accepts(c.input)
-            .limit(s.holds())
-            .holder(),
-    );
+    let mut m = r
+        .menu(menu)
+        .group("input", Slots::single().accepts(c.input).limit(s.holds()).holder());
     if let Some(with) = c.with {
         m = m.group("with", Slots::single().accepts(with).holder());
     }

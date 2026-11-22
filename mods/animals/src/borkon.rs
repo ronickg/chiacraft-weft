@@ -91,7 +91,9 @@ pub fn init(r: &mut Registry) {
     // The heights' offerings: their flowers, wool, and the dwarves' gold.
     r.shapeless(&CRAFTING, "mountain_offering", 1, &["base:edelweiss", "base:gentian", "base:wool", "base:gold_ingot"], 0);
     r.block(&ALTAR)
-        .texture("borkon_altar_side").top("borkon_altar_top").bottom("base:granite")
+        .texture("borkon_altar_side")
+        .top("borkon_altar_top")
+        .bottom("base:granite")
         .sound_group("base:block.stone")
         .hardness(4.0)
         .mined_by("pickaxe", 1)
@@ -111,13 +113,15 @@ pub fn init(r: &mut Registry) {
 fn summon(w: &World, player: u64, at: [i32; 3]) -> bool {
     let Some(form) = boss::offering(&DEF, w, player, at) else { return false };
     if at[1] < HEIGHT {
-        w.hint("hint.animals.borkon.height", &[Arg::Int(at[1] as i64), Arg::Int(HEIGHT as i64)]).to(player);
+        w.hint("hint.animals.borkon.height", &[Arg::Int(at[1] as i64), Arg::Int(HEIGHT as i64)])
+            .to(player);
         weft_sdk::info!("borkon altar {at:?}: at {} high, {HEIGHT} wanted", at[1]);
         return true;
     }
     let rock = rock_round(w, at);
     if rock < ROCK {
-        w.hint("hint.animals.borkon.rock", &[Arg::Int(rock as i64), Arg::Int(ROCK as i64)]).to(player);
+        w.hint("hint.animals.borkon.rock", &[Arg::Int(rock as i64), Arg::Int(ROCK as i64)])
+            .to(player);
         weft_sdk::info!("borkon altar {at:?}: {rock} stone round it, {ROCK} wanted");
         return true;
     }
@@ -279,7 +283,12 @@ fn strike(w: &World, id: u64, st: &EntityState, c: &Warden, a: &Attack, hit: f32
                 for e in w.entities_near(at, FALL_RADIUS, None) {
                     if e != id && !hits.iter().any(|(h, _)| *h == e) && !boss::spared(w, e) {
                         hits.push((e, [0.0, -k, 0.0]));
-                        w.attribute_add_modifier(e, "animals:borkon_rubble", &Modifier::percent(&attribute::MOVEMENT_SPEED, FALL_SLOW), FALL_SLOW_TICKS);
+                        w.attribute_add_modifier(
+                            e,
+                            "animals:borkon_rubble",
+                            &Modifier::percent(&attribute::MOVEMENT_SPEED, FALL_SLOW),
+                            FALL_SLOW_TICKS,
+                        );
                     }
                 }
             }

@@ -55,7 +55,9 @@ pub fn register(r: &mut Registry) {
         .hardness(2.5)
         .mined_by("pickaxe", 0)
         .on_use(crate::waystones::stone_used)
-        .texture("ley_stone_side").top("ley_stone_top").bottom("ley_stone_top")
+        .texture("ley_stone_side")
+        .top("ley_stone_top")
+        .bottom("ley_stone_top")
         .tag("ley_stone")
         .tab(&crate::tabs::BUILDING);
     // Not to be carried off: waking it (later) is what it is for.
@@ -63,7 +65,9 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .unbreakable()
         .on_use(crate::waystones::stone_used)
-        .texture("waystone_side").top("waystone_top").bottom("ley_stone_top")
+        .texture("waystone_side")
+        .top("waystone_top")
+        .bottom("ley_stone_top")
         .tag("waystones")
         .tab(&crate::tabs::BUILDING);
     r.particle(&MOTE)

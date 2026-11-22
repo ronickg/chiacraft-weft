@@ -81,7 +81,9 @@ pub fn register(r: &mut Registry) {
     // ---- light: a warm lamp of frosted glass in a bronze frame
     r.block(Block::generated("bronze_lantern".to_string()))
         .sound_group("glass")
-        .texture("bronze_lantern").top("bronze_lantern_top").bottom("bronze_lantern_top")
+        .texture("bronze_lantern")
+        .top("bronze_lantern_top")
+        .bottom("bronze_lantern_top")
         .light_rgb(15, 12, 8)
         .hardness(1.0)
         .mined_by("pickaxe", weft_sdk::abi::tool_tier::HAND)

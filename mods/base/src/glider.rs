@@ -39,7 +39,13 @@ pub fn register(r: &mut Registry) {
         .durability(wing.durability())
         .tab(&crate::tabs::TOOLS);
     // Leather stretched on a frame of sticks, lashed with string.
-    r.shaped(&base_api::recipes::CRAFTING, "glider", 1, &["LLL", "sTs", "s s"], &[('L', "base:leather"), ('s', "#stick"), ('T', "#string")]);
+    r.shaped(
+        &base_api::recipes::CRAFTING,
+        "glider",
+        1,
+        &["LLL", "sTs", "s s"],
+        &[('L', "base:leather"), ('s', "#stick"), ('T', "#string")],
+    );
     r.pose(&GLIDE)
         .action("glide")
         .no_bob()

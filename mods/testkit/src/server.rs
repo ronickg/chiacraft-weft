@@ -592,7 +592,7 @@ const OPS: &[(&str, &str, Run)] = &[
     ("play", "<sound:word>", |w, cmd, _, me| {
         static BOOM: Sound = Sound::named("testmod:boom");
         let _ = word(cmd, "sound")?;
-        w.play_sound(&BOOM, [me[0] as f64, me[1] as f64, me[2] as f64], 1.0);
+        w.play_sound(&BOOM, Vec3::new(me[0] as f64, me[1] as f64, me[2] as f64), 1.0);
         Ok(String::new())
     }),
     ("bodyfall", "<id:int>", |w, cmd, _, _| {

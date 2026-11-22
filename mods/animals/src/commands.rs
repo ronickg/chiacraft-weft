@@ -124,8 +124,7 @@ pub fn init(r: &mut Registry) {
         }
     });
     for (i, (key, default)) in WHISTLES.iter().enumerate() {
-        r.key(key, default)
-            .on_server(move |w, p| whistle(w, p, i));
+        r.key(key, default).on_server(move |w, p| whistle(w, p, i));
     }
     r.command("tribe", "[action:word(create,join,leave,info)] [name:text]", tribe_command)
         .permission(permission::EVERYONE);

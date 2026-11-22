@@ -389,7 +389,7 @@ fn dart_flies(w: &World, id: u64, st: &EntityState) -> bool {
         w.damage(target, Damage::new(1.0, damage_cause::ATTACK).by(shooter));
         add_torpor(w, target, DART_TORPOR);
         w.despawn(id);
-    } else if st.flags & entity_flags::BLOCKED != 0 || st.on_ground != 0 || st.age > 100 {
+    } else if st.flags & abi::entity_state::BLOCKED != 0 || st.on_ground != 0 || st.age > 100 {
         w.despawn(id);
     }
     true
