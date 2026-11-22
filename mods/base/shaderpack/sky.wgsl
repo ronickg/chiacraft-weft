@@ -1025,7 +1025,7 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
 // sky and taking the sunset's colours and the moon's light, thicker under rain. Behind the blocky
 // clouds it gives the sky depth.
 fn cirrus(c: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
-    if dir.y <= 0.02 {
+    if dir.y <= 0.02 || fantasy_opt(OPT_CIRRUS_OFF) > 0.5 {
         return c;
     }
     let p = palette();

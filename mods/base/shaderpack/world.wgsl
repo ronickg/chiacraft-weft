@@ -530,7 +530,10 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
         if k_sun != 1.0 && in.kind.z == 0u {
             let c_open = min(canopy(), 1.0);
             let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
-            light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
+            let extra = palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
+            light += paint * extra;
+            LIGHT_SUN += extra;
+            LIGHT_ALL += extra;
         }
         // A leaf cube's light through it is `leaf_sss`'s (`shade_soft_lit`), from its colour, and
         // only with the leaf light on; off, none, as Ronald's Bliss (no SSS). With `leaf_through`'s
@@ -653,6 +656,11 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
+    }
+    // The debug view: the sun's or the sky's light alone, on white (`look_debug`).
+    let debug = look_debug();
+    if debug != 0u {
+        return vec4(select(LIGHT_ALL - LIGHT_SUN, LIGHT_SUN, debug == 1u), lit.a);
     }
     // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
     // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
@@ -1004,8 +1012,20 @@ fn water_under(in: VOut, n: vec3<f32>, v: vec3<f32>, scatter: vec3<f32>, shadow:
         }
     }
     let bottom = behind_color(at);
-    let gone = exp(-vec3(0.42, 0.11, 0.07) * through);
-    var seen = bottom * gone + deep * (vec3(1.0) - gone);
+    var gone = exp(-vec3(0.42, 0.11, 0.07) * through);
+    var fill = deep;
+    // As Bliss's (`OPT_WATER_ABSORB`): water's own coefficients and its dirt's, per block, over
+    // twice the depth the view goes down (outdoors), never darker than a floor of eight blocks'
+    // worth; the body's own light only as much as the water held (up to 12 blocks of it).
+    let absorb = max(fantasy_opt(OPT_WATER_ABSORB), 0.0);
+    if absorb > 0.0 {
+        let coef = (vec3(0.263, 0.0565, 0.0101) + 0.15 * vec3(0.65, 0.85, 1.05)) * absorb;
+        let d = 2.0 * through * max(abs(v.y), 0.05);
+        gone = mix(exp(-2.0 * coef * d), exp(-8.0 * coef), 1.0 - exp(-0.1 * d));
+        let l = min(through, 12.0);
+        fill = deep * (vec3(1.0) - exp(-coef * l));
+    }
+    var seen = bottom * gone + fill * (vec3(1.0) - gone);
     // The sun's light focused by the waves onto the bottom, less as it goes deeper.
     let floor_world = in.pos + (straight.xyz - in.rel);
     let lightning = caustics(floor_world.xz) * light_strength() * shadow * exp(-through * 0.25) * smoothstep(0.1, 0.8, through);
@@ -1101,7 +1121,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     let scatter_raw = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
     // The water's own colour 40 % toward grey: at a slant ours read 0.31 saturation against Bliss's
     // 0.10-0.19 (Terrain's water sheet; Water 12).
-    let scatter = mix(vec3(luma(scatter_raw)), scatter_raw, 0.6);
+    let scatter = mix(vec3(luma(scatter_raw)), scatter_raw, 0.6) * water_body();
     // How much of the bottom shows: the way through the water to it, longer at a slant; never all
     // of it, so even the shallowest water tints what lies under it.
     let through = exp(-0.28 * depth / max(v.y, 0.2)) * 0.82;
@@ -1111,7 +1131,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // our lake's water 0.45 mean brightness against Bliss's 0.62).
     // (Tipped down by less now, 0.85 of the ripple's lift where it was half: halved, it mirrored the
     // palest band of the sky everywhere, where Bliss's open water mirrors a deeper blue.)
-    var refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    var refl = sky_color(normalize(vec3(r.x, max(r.y * water_sky_lift(), 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
     // Traced (`scene.rt.w`): the shore, the trees and what is under a roof, off the screen too, out to
     // the near land; the far water keeps the sky's guess.
     if scene.rt.w > 0.5 && in.dist < 256.0 {
@@ -1122,7 +1142,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
         let traced = traced_view(in.rel + vec3(0.0, 0.02, 0.0), normalize(vec3(rr.x, max(rr.y, 0.02), rr.z)), 1.5, 0.04, in.clip.xy);
         // As much as the screen's reflections gave it: Fresnel's share and a little more, the body
         // below being dark (`post/reflect.wgsl`'s amount), less looking steeply down.
-        let amount = min(fresnel + 0.15 * (1.0 - smoothstep(0.5, 0.9, ndv)), 0.97);
+        let amount = min(fresnel + 0.15 * (1.0 - smoothstep(0.5, 0.9, ndv)) * (1.0 - water_mirror()), 0.97);
         refl = mix(traced * amount / max(fresnel, 1e-3), refl, smoothstep(160.0, 256.0, in.dist));
     }
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
@@ -1144,13 +1164,13 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // Foam where it laps the land, in a wobbling line on the pixel grid.
     let px = floor(in.pos.xz * 16.0) / 16.0;
     let wobble = noise3(vec3(px.x * 2.0, scene.params.w * 0.6, px.y * 2.0));
-    let foam = (1.0 - smoothstep(0.06, 0.22 + 0.16 * wobble, shore)) * 0.7;
+    let foam = (1.0 - smoothstep(0.06, 0.22 + 0.16 * wobble, shore)) * 0.7 * clamp(fantasy_opt(OPT_WATER_FOAM), 0.0, 1.0);
     // With the world's copy (`scene.behind`, drawn in the see-through pass): what lies under the
     // surface itself, bent by the waves, tinted by the true depth, with caustics, and foam wherever
     // the water meets something. Opaque from here: the water does its own mixing.
     if see_through && top && scene.behind.z > 0.5 {
         let under = water_under(in, n, v, scatter, shadow);
-        let foam_all = max(foam, (1.0 - smoothstep(0.05, 0.3 + 0.1 * wobble, under.w)) * 0.6);
+        let foam_all = max(foam, (1.0 - smoothstep(0.05, 0.3 + 0.1 * wobble, under.w)) * 0.6 * clamp(fantasy_opt(OPT_WATER_FOAM), 0.0, 1.0));
         let surface = refl * fresnel + glint + (lit * 0.9 + vec3(0.03)) * foam_all;
         var below = under.rgb * (1.0 - fresnel) * (1.0 - foam_all);
         // The bottom seen through the water lies under the same air as the surface: veiled by it too
@@ -1576,7 +1596,16 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
 // power from 0.04, as the screen's reflections (`post/reflect.wgsl`). Muted navy water as Bliss's
 // in its own world, not a pale mirror (Far view, 11-06).
 fn water_fresnel(ndv: f32) -> f32 {
-    return 0.04 + 0.96 * pow(1.0 - clamp(ndv, 0.0, 1.0), 4.0);
+    let c = 1.0 - clamp(ndv, 0.0, 1.0);
+    // Bliss's (`OPT_WATER_MIRROR`): a fifth power from 0.02.
+    return mix(0.04 + 0.96 * pow(c, 4.0), 0.02 + 0.98 * pow(c, 5.0), water_mirror());
+}
+fn water_mirror() -> f32 {
+    return clamp(fantasy_opt(OPT_WATER_MIRROR), 0.0, 1.0);
+}
+// The rise the mirrored sky is taken at: `WATER_SKY_LIFT`, or all of it with Bliss's mirror.
+fn water_sky_lift() -> f32 {
+    return mix(WATER_SKY_LIFT, 1.0, water_mirror());
 }
 // Deep water's colour (what its body sends back, times the light), near and far alike: a navy
 // (was a murky teal, (0.022, 0.072, 0.066) near and (0.014, 0.045, 0.045) far).
@@ -1593,9 +1622,9 @@ fn far_water_lit(in: VOut) -> vec3<f32> {
     // The clouds' shadow here once (it was asked twice, for the light and the glint).
     let clouds = cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, clouds, 1.0, in.pos, in.rel);
-    let deep = WATER_DEEP * lit;
+    let deep = WATER_DEEP * lit * water_body();
     let r = reflect(-v, n);
-    let refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.02), r.z)));
+    let refl = sky_color(normalize(vec3(r.x, max(r.y * water_sky_lift(), 0.02), r.z)));
     let l = light_dir();
     let hv = normalize(l + v + vec3(0.0, 1e-4, 0.0));
     let nh = max(dot(n, hv), 0.0);
