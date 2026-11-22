@@ -125,8 +125,18 @@ fn hidden(cube_lo: vec3<f32>, cube_hi: vec3<f32>) -> bool {
 @compute @workgroup_size(256)
 fn test(@builtin(global_invocation_id) id: vec3<u32>) {
     let i = id.x;
-    // Distant terrain isn't in cubes, and what moves isn't where it was.
-    if i >= args.count || (i >= view.skip.x && i < view.skip.y) {
+    if i >= args.count {
+        return;
+    }
+    // Distant terrain isn't in cubes: its tiles' boxes follow the draws' origins, two corners each
+    // (upstream a80a4e07f).
+    if i >= view.skip.x && i < view.skip.y {
+        let at = args.count + 2u * (i - view.skip.x);
+        let lo = vec3<f32>(origins[at].xyz) - view.cam_frac.xyz;
+        let hi = vec3<f32>(origins[at + 1u].xyz) - view.cam_frac.xyz;
+        if hidden(lo, hi) {
+            draws[i * 5u + 1u] = 0u;
+        }
         return;
     }
     let o = origins[i];

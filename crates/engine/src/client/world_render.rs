@@ -1938,7 +1938,9 @@ impl WorldRenderer {
         let end_from = END_FADE * crate::client::lod::Lod::distance() as f32;
         let mask_half = self.lod_half as i32 + 1;
         let cam_col = IVec2::new(cam_cube.x, cam_cube.z);
-        let mut lod: Vec<DrawRecord> = self
+        // Each with its box, from the camera's cube in blocks, for the occlusion test to go by
+        // (upstream a80a4e07f).
+        let mut lod: Vec<(DrawRecord, [i32; 6])> = self
             .lod_draw
             .iter()
             .filter_map(|key| {
@@ -1971,10 +1973,14 @@ impl WorldRenderer {
                 } else {
                     6
                 };
-                Some((kind, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center))
+                let lo = [o.x - cam_cube.x * 16, y0 - cam_cube.y * 16, o.y - cam_cube.z * 16];
+                let size = key.size();
+                let bounds = [lo[0], lo[1], lo[2], lo[0] + size, lo[1] + (y1 - y0), lo[2] + size];
+                Some(((kind, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center), bounds))
             })
             .collect();
-        lod.sort_by_key(|d| (d.0, d.2, d.5.length_squared().to_bits()));
+        lod.sort_by_key(|d| (d.0.0, d.0.2, d.0.5.length_squared().to_bits()));
+        let (lod, lod_bounds): (Vec<DrawRecord>, Vec<[i32; 6]>) = lod.into_iter().unzip();
         let lods = lod.len() as u32;
         let n = opaque + lods + trans.len() as u32;
         let (gpu_draws, gpu_faces) = self.table.drawn_last(gpu, frame.slot);
@@ -1982,7 +1988,8 @@ impl WorldRenderer {
         self.faces_drawn = faces_drawn + gpu_faces;
         let mut runs = std::mem::take(&mut self.runs);
         runs.clear();
-        let obuf = crate::gpu_layout::frame_buffer(gpu, &mut self.origins, frame.slot, n, 16, usage::STORAGE, "origins");
+        // After the draws' origins, two more for each distant tile: the corners of its box.
+        let obuf = crate::gpu_layout::frame_buffer(gpu, &mut self.origins, frame.slot, n + 2 * lods, 16, usage::STORAGE, "origins");
         // Then, for temporal anti-aliasing's motion, two vec4 a structure after them all: where it
         // was last frame (camera relative as now) and how it was turned; their count in entry 0's
         // last slot, which the world's own cubes never read.
@@ -2064,6 +2071,11 @@ impl WorldRenderer {
         drop(span);
         for (j, d) in lod.iter().enumerate() {
             put(opaque + j as u32, d);
+        }
+        let boxes = &mut gpu.mapped(obuf)[n as usize * 16..(n + 2 * lods) as usize * 16];
+        for (j, b) in lod_bounds.iter().enumerate() {
+            boxes[j * 32..j * 32 + 12].copy_from_slice(bytemuck::cast_slice(&b[..3]));
+            boxes[j * 32 + 16..j * 32 + 28].copy_from_slice(bytemuck::cast_slice(&b[3..]));
         }
         for (j, d) in trans.iter().enumerate() {
             put(opaque + lods + j as u32, d);
