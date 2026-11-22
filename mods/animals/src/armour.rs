@@ -172,7 +172,9 @@ fn staggered(w: &World, id: u64, s: &animals_core::species::Species, st: &Entity
             .roll_loot(&EntityKind::named(s.name), &ctx)
             .into_iter()
             .find(|x| !x.is_empty());
-        let dropped = one.as_ref().map_or_else(|| "nothing".to_string(), |x| weft_sdk::item_name(x.item).to_string());
+        let dropped = one
+            .as_ref()
+            .map_or_else(|| "nothing".to_string(), |x| weft_sdk::item_name(x.item).to_string());
         if let Some(one) = one {
             w.spawn_item(at, ItemStack::new(one.item, 1));
         }
