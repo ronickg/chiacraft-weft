@@ -342,7 +342,13 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fr
 /// flowers do (`wild.rs`). Leaves that don't bloom are left as they are.
 /// `tint`: the leaves' tint kind, put on each state's texture (upstream's `tint_kind` colours only
 /// the faces set so far, and a state's texture replaces the block's).
-fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'static str, tint: Option<&'static TintKind>) -> BlockBuilder<'a> {
+fn bloom<'a>(
+    b: BlockBuilder<'a>,
+    leaves: &str,
+    open: &'static str,
+    shut: &'static str,
+    tint: Option<&'static TintKind>,
+) -> BlockBuilder<'a> {
     let Some(seasons) = vitals::wild::blooms(leaves) else { return b };
     b.prop("bloom", 0..=1)
         .states(move |p, s| {
@@ -1485,11 +1491,8 @@ fn upstream_blocks(r: &mut Registry) {
         .needs_below("#plant_soil")
         .item_texture("inula")
         .tab(&crate::tabs::NATURAL);
-    r.loot(&INULA).pool(
-        Pool::new()
-            .when(sheared())
-            .item(INULA.name()),
-    );
+    r.loot(&INULA)
+        .pool(Pool::new().when(sheared()).item(INULA.name()));
     r.block(&VERBASCUM)
         .sound_group("grass")
         .tall_plant("verbascum_bottom", "verbascum_top")
@@ -1497,11 +1500,8 @@ fn upstream_blocks(r: &mut Registry) {
         .needs_below("#plant_soil")
         .item_texture("verbascum")
         .tab(&crate::tabs::NATURAL);
-    r.loot(&VERBASCUM).pool(
-        Pool::new()
-            .when(sheared())
-            .item(VERBASCUM.name()),
-    );
+    r.loot(&VERBASCUM)
+        .pool(Pool::new().when(sheared()).item(VERBASCUM.name()));
     r.block(&LAVENDER)
         .sound_group("grass")
         .tall_plant("lavender_bottom", "lavender_top")
@@ -1509,11 +1509,8 @@ fn upstream_blocks(r: &mut Registry) {
         .needs_below("#plant_soil")
         .item_texture("lavender")
         .tab(&crate::tabs::NATURAL);
-    r.loot(&LAVENDER).pool(
-        Pool::new()
-            .when(sheared())
-            .item(LAVENDER.name()),
-    );
+    r.loot(&LAVENDER)
+        .pool(Pool::new().when(sheared()).item(LAVENDER.name()));
     r.block(&MOSS)
         .grid_placement()
         .on_sides(Facings::ALL)
@@ -1626,11 +1623,7 @@ fn berry_leaves(r: &mut Registry, handle: &'static Block, texture: &'static str,
         .states(|p, s| s.texture(if p.is("berried", "true") { texture_berried } else { texture }))
         .on_use(move |u| pick_berries(u, item));
     r.loot(handle)
-        .pool(
-            Pool::new()
-                .when(sheared())
-                .item(handle.name()),
-        )
+        .pool(Pool::new().when(sheared()).item(handle.name()))
         .pool(
             Pool::new()
                 .when(Cond::state("berried=true"))

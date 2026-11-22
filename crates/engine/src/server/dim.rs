@@ -337,7 +337,11 @@ pub fn finish_generated(
 /// into them and washed them out, dropping their loot, the next one then, for ever: a bench's
 /// far spot never went idle (weft sync 11-22). Dev's `holds_liquid` plants were wet by themselves.
 /// The cells it changed, with the block that is now their second part.
-pub(crate) fn in_their_liquid(c: &Content, blocks: &mut [u32], layouts: &rustc_hash::FxHashMap<usize, crate::world::placement::CellLayout>) -> Vec<(usize, u32)> {
+pub(crate) fn in_their_liquid(
+    c: &Content,
+    blocks: &mut [u32],
+    layouts: &rustc_hash::FxHashMap<usize, crate::world::placement::CellLayout>,
+) -> Vec<(usize, u32)> {
     if c.shares_cell.is_empty() {
         return Vec::new();
     }

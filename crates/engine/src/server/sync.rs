@@ -445,7 +445,11 @@ fn send_entities(
         // goes idle after a far teleport (weft sync 11-22).
         if log::log_enabled!(target: "churn", log::Level::Debug) {
             for v in spawn.iter().take(8) {
-                let name = c.game.entities.get(v.kind as usize).map_or("?", |k| k.name.as_str());
+                let name = c
+                    .game
+                    .entities
+                    .get(v.kind as usize)
+                    .map_or("?", |k| k.name.as_str());
                 log::debug!(target: "churn", "spawn {} {} at {:.1} {:.1} {:.1}, age {}", v.id, name, v.pos.x, v.pos.y, v.pos.z, tick.saturating_sub(v.born));
             }
         }
