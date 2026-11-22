@@ -722,8 +722,13 @@ impl Face {
     /// The block the terrain leaves at the top of the column.
     pub fn surface_block(&self) -> u32 {
         let [x, _, z] = self.args.pos;
-        crate::Generation::new(abi::GenSource { dim: self.args.dim, seed: self.args.seed, before: abi::stage::UNDERGROUND, ctx: std::ptr::null() })
-            .surface_block(x, z)
+        crate::Generation::new(abi::GenSource {
+            dim: self.args.dim,
+            seed: self.args.seed,
+            before: abi::stage::UNDERGROUND,
+            ctx: std::ptr::null(),
+        })
+        .surface_block(x, z)
     }
     /// How far the ground falls to its lowest neighbour.
     pub fn fall(&self) -> i32 {

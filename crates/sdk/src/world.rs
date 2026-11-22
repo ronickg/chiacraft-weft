@@ -180,7 +180,7 @@ impl World {
     /// nothing collides with it, stands on it or picks its blocks (a falling tree).
     pub fn body_turn(&self, entity: u64, pivot: impl Into<Vec3>, rot: [f32; 4], ticks: u32) {
         let pivot = pivot.into();
-        unsafe { (host().body_turn)(self.raw, entity, &pivot, &rot, ticks) }
+        unsafe { (host().body_turn)(self.raw(), entity, &pivot, &rot, ticks) }
     }
 
     /// What a comparator reads of the block at `pos` (`signal_read`) may be different now.
