@@ -235,6 +235,15 @@ fn send_space_changes(conn: &mut crate::net::ServerConn, dim: u32, frame: u64, s
         .cloned()
         .collect();
     if !changes.is_empty() || !extras.is_empty() {
+        if log::log_enabled!(target: "churn", log::Level::Debug) {
+            let c = crate::content::content();
+            for (pos, state) in changes.iter().take(8) {
+                log::debug!(target: "churn", "block {} {} {} now {}", pos.x, pos.y, pos.z, c.state_name(*state));
+            }
+            for (pos, _) in space.resend.iter().filter(|(pos, _)| sent(*pos)).take(4) {
+                log::debug!(target: "churn", "cube resent {} {} {}", pos.x, pos.y, pos.z);
+            }
+        }
         conn.send(ToClient::Blocks { dim, frame, changes, extras });
     }
     let changes: Vec<_> = space
@@ -396,6 +405,11 @@ fn send_entities(
         .map(|id| (id, killed(&id)))
         .collect();
     if !gone.is_empty() {
+        if log::log_enabled!(target: "churn", log::Level::Debug) {
+            for (id, killed) in gone.iter().take(8) {
+                log::debug!(target: "churn", "despawn {id} killed {killed}");
+            }
+        }
         p.conn.send(ToClient::Despawn(gone));
     }
     // Components every viewer gets: all of newly seen entities, changes of known ones.
@@ -427,6 +441,14 @@ fn send_entities(
         }
     }
     if !spawn.is_empty() {
+        // chiacraft: what keeps coming into view (`--log churn=debug`), for the bench that never
+        // goes idle after a far teleport (weft sync 11-22).
+        if log::log_enabled!(target: "churn", log::Level::Debug) {
+            for v in spawn.iter().take(8) {
+                let name = c.game.entities.get(v.kind as usize).map_or("?", |k| k.name.as_str());
+                log::debug!(target: "churn", "spawn {} {} at {:.1} {:.1} {:.1}, age {}", v.id, name, v.pos.x, v.pos.y, v.pos.z, tick.saturating_sub(v.born));
+            }
+        }
         p.conn.send(ToClient::Spawn(spawn));
     }
     for reg in &dim.regions {
