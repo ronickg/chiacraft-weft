@@ -1,0 +1,10 @@
+[package]
+name = "shadercheck2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+weft_engine = { path = "../../../../crates/engine" }
+
+# Its own workspace, so the game's workspace doesn't build it.
+[workspace]
