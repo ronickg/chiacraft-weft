@@ -655,6 +655,13 @@ impl Dim {
         space_id == 0 || self.bodies.contains_key(&space_id)
     }
 
+    /// The time of the growth step being run (catching up on unloaded time included), if one is.
+    pub(crate) fn growing_at(&self) -> Option<u64> {
+        self.space
+            .growing_at
+            .or_else(|| self.bodies.values().find_map(|b| b.growing_at))
+    }
+
     pub(crate) fn space(&self, space_id: u64) -> &Space {
         if space_id == 0 { &self.space } else { &self.bodies[&space_id] }
     }

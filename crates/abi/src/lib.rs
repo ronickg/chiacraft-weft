@@ -4630,6 +4630,9 @@ pub struct Host {
     pub set_day_time: unsafe extern "C" fn(world: *mut WorldCtx, time: u64),
     /// The time of day's clock, which `set_day_time` sets (0 sunrise, 6000 noon, then on past a day).
     pub day_time: unsafe extern "C" fn(world: *mut WorldCtx) -> u64,
+    /// `day_time` as of the growth step being run (a plant catching up on unloaded time steps at
+    /// the time it missed), else `day_time` now.
+    pub grow_time: unsafe extern "C" fn(world: *mut WorldCtx) -> u64,
     /// As if `ticks` passed at once: the day moves on, and growth, machines and timers catch up.
     pub skip_ticks: unsafe extern "C" fn(world: *mut WorldCtx, ticks: u64),
     /// Fills a shape with one block at the end of the tick, the whole dimension at once: loaded

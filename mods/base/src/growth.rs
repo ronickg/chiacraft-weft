@@ -2,8 +2,9 @@
 //! (`vitals::plants`) from the ground where it stands (`base_api::ground_at`: the day's mean air
 //! and the soil's water from the last days' rain), and goes ahead with that chance. So wheat
 //! rests through winter and a drought, berries ripen only in their season, and a field by water
-//! keeps growing when the rain stops. Unloaded plants catch up at today's season. `/growth` says
-//! how a crop would grow where you stand. Frost hurts the tender ones (`vitals::plants`, `frost`):
+//! keeps growing when the rain stops. Unloaded plants catch up step by step, each step at the
+//! time it missed (`World::grow_time`): that day's season, air and soil water, that night's frost.
+//! `/growth` says how a crop would grow where you stand. Frost hurts the tender ones (`vitals::plants`, `frost`):
 //! a growth step in air colder than the plant takes (a night's frost where it stands; a fire
 //! nearby keeps it off) kills spring wheat, takes a berry bush's fruit, and kills a cane's or a
 //! cactus's stalk down to its base, which grows again in spring.

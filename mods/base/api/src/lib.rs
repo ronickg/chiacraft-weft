@@ -224,10 +224,13 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
             }
         }
     }
-    let hour = ((w.day_time() % 24000) as f32 / 1000.0 + 6.0) % 24.0;
+    // Now, or the moment a plant catching up on unloaded time is stepping at (`grow_time`): its
+    // hour's frost and its season, not today's.
+    let time = w.grow_time();
+    let hour = ((time % 24000) as f32 / 1000.0 + 6.0) % 24.0;
     // Today, in this dimension's calendar (none: always a spring or autumn day).
     let kind = SEASONS.on_dimension(w.dimension()).unwrap_or(0);
-    let date = calendar::date(w.day_time());
+    let date = calendar::date(time);
     let year = if kind > 0 { date.from_midwinter() } else { 0.25 };
     // In a forest the wind drops, and a blizzard with it (`vitals::air::shelter`).
     let calm = vitals::air::sheltered_wind(around.wind, vitals::air::shelter(around.canopy, cover(w, eye)));
@@ -367,7 +370,9 @@ pub fn ground_at(w: &World, pos: [i32; 3]) -> Ground {
     use vitals::{calendar, plants};
     let biome = w.biome(pos);
     let c = CLIMATE.on_biome(biome).unwrap_or(TEMPERATE);
-    let time = w.day_time();
+    // The growth step's own time: a plant catching up on unloaded time grows at the season and
+    // the rain of the days it missed (`World::grow_time`; now outside a growth step).
+    let time = w.grow_time();
     let seasons = SEASONS.on_dimension(w.dimension()).unwrap_or(0) > 0;
     let date = calendar::date(time);
     let height = (pos[1] - SEA).max(0) as f32 * ALTITUDE;
