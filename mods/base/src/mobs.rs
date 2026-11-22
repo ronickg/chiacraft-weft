@@ -76,6 +76,22 @@ pub fn register(r: &mut Registry) {
                 .neutral(),
         ));
     r.entity_component(&FUSE, 0u32, 0);
+    // A skeleton's arrow hits for its row's hit (`vitals::mobs`), not by its speed: set first, so
+    // armour and the rest still apply.
+    r.modify(&chain::DAMAGE, &phase::BASE, |m| {
+        let q = *m.query();
+        if q.cause != damage_cause::PROJECTILE {
+            return;
+        }
+        if m.world()
+            .entity(q.other)
+            .is_some_and(|e| e.kind == SKELETON.id())
+        {
+            // In the head, half as much again, as every arrow (`PROJECTILE_DAMAGE` above).
+            let head = if q.part == hitbox_part::HEAD { 2.0 } else { 1.0 };
+            m.value = curve("skeleton").hit as f64 * head;
+        }
+    });
     // One line per hit between a player and a mob, and per death of either (night checks:
     // `mods/testkit/scripts/night_survival.txt`).
     r.on_event(&actions::HURT, |b| {
