@@ -18,6 +18,7 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | tames capped by their saddle and ceiling | passes |
 | tweaks inside ×0.75-×1.25 with a reason | passes |
 | grade and gems at most +60% over a plain item | passes |
+| stagger: same-age fights break every part, knockdowns at most a third of a fight | passes |
 
 ## The ages
 

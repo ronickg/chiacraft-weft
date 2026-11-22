@@ -30,5 +30,6 @@ pub fn checks() -> Vec<(&'static str, Vec<String>)> {
         ("tames capped by their saddle and ceiling", matrix::tames()),
         ("tweaks inside ×0.75-×1.25 with a reason", matrix::tweaks()),
         ("grade and gems at most +60% over a plain item", matrix::gem_ceiling()),
+        ("stagger: same-age fights break every part, knockdowns at most a third of a fight", matrix::stagger()),
     ]
 }
