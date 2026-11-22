@@ -145,6 +145,8 @@ class Builder:
         self.looks.shells_drawn, self.looks.drawn_shapes = S.drawn_parts(root)
         self.overrides = S.texture_overrides(root)
         self.src_blocks = S.block_defs(root)
+        for k, v in S.cylinders(root).items():
+            self.src_blocks.setdefault(k, v)
         self.eggs = S.egg_looks(root)
         self.reg = json.load(open(registry)) if registry else {"items": [], "blocks": [], "entities": []}
         self.reg_items = {i["id"]: i for i in self.reg["items"]}
@@ -251,6 +253,18 @@ class Builder:
                     return a2, how2
             if a is not None:
                 return a, how
+        # A hollow log (`shapes_of("hollow_log", .., "_hollow")`): its log's four walls, the
+        # inside (`<log>_inner`) seen through the top.
+        if n.endswith("_hollow"):
+            top, side = self.cube_faces(f"{ns}:{n[:-len('_hollow')]}")
+            if side is not None:
+                inner = self.tex.get(f"{ns}:block/{n[:-len('_hollow')]}_inner")
+                w = 2 / 16
+                walls = [(0, 0, 0, w, 1, 1), (1 - w, 0, 0, 1, 1, 1), (0, 0, 0, 1, 1, w), (0, 0, 1 - w, 1, 1, 1)]
+                back = I.iso_boxes(walls[:1] + walls[2:3], top, inner if inner is not None else side, inner if inner is not None else side)
+                front = I.iso_boxes(walls[1:2] + walls[3:4], top, side, side)
+                al = front[..., 3:4] > 0
+                return np.where(al, front, back), "cube"
         for guess in (f"block/{n}", f"block/{n}_side", f"block/{n}_top"):
             a = self.tex.get(f"{ns}:{guess}")
             if a is not None:
@@ -280,6 +294,22 @@ class Builder:
             if t is not None:
                 return I.iso_cube(t, sd if sd is not None else t, sd if sd is not None else t), "cube"
         return None, None
+
+    def cube_faces(self, i):
+        """(top, side) pictures of block `i`: the registry's or the sources' faces, else its
+        texture files named by its words (`oak_log`: `log_oak_top`, `log_oak`)."""
+        b = self.reg_blocks.get(i) or S.block_def(self.src_blocks, i)
+        if b and b.get("textures"):
+            return self.tex.get(b["textures"][3]), self.tex.get(b["textures"][5])
+        ns, n = i.split(":", 1)
+        words = set(n.split("_"))
+        found = sorted((os.path.basename(p)[:-4] for p in glob.glob(f"{self.root}/mods/{ns}/assets/textures/block/*.png")
+                        if set(os.path.basename(p)[:-4].split("_")) - {"top"} == words), key=len)
+        if not found:
+            return None, None
+        side = found[0]
+        top = next((f for f in found if "top" in f.split("_")), side)
+        return self.tex.get(f"{ns}:block/{top}"), self.tex.get(f"{ns}:block/{side}")
 
     def egg_look(self, kind):
         """The egg look of the species whose entity is `kind` (`velociraptor_osmolskae` is species

@@ -15,6 +15,14 @@ from PIL import Image
 TINTS = {"grass": (124, 189, 76), "foliage": (92, 160, 48), "water": (63, 118, 228)}
 
 
+def tile(folder):
+    """A connected-texture folder's first tile (`0.png`, else its lowest number), or None."""
+    if not os.path.isdir(folder):
+        return None
+    tiles = [f for f in os.listdir(folder) if re.fullmatch(r"\d+\.png", f)]
+    return os.path.join(folder, min(tiles, key=lambda f: int(f[:-4]))) if tiles else None
+
+
 class Textures:
     """Texture files of a source tree by the engine's names (`base:block/log_oak`)."""
 
@@ -25,15 +33,45 @@ class Textures:
         self.used = set()
 
     def path(self, name):
+        """The file of texture `name`: `<path>.png`, or a connected-texture folder's first tile
+        (`<path>/0.png`, beside its `<name>.ctm`, since the Weft sync of 11-22); a tinted layer's
+        `@kind` is left out."""
+        name = name.split("@", 1)[0]
         ns, rest = name.split(":", 1) if ":" in name else ("base", name)
-        p = f"{self.root}/mods/{ns}/assets/textures/{rest}.png"
-        if os.path.exists(p):
-            return p
-        p = f"{self.root}/crates/engine/assets/textures/{rest}.png"
-        return p if os.path.exists(p) else None
+        for base in (f"{self.root}/mods/{ns}/assets/textures", f"{self.root}/crates/engine/assets/textures"):
+            p = f"{base}/{rest}.png"
+            if os.path.exists(p):
+                return p
+            p = tile(f"{base}/{rest}")
+            if p:
+                return p
+        return None
 
     def get(self, name):
-        """RGBA array of the texture's first frame (a strip's top square), or None."""
+        """RGBA array of the texture's first frame (a strip's top square), or None. `a+b` is `b`
+        drawn over `a` (a block face's layers), `name@kind` tinted by the biome colour of `kind`
+        (grass, foliage, water)."""
+        if "+" in name or "@" in name:
+            if name in self.cache:
+                return self.cache[name]
+            out = None
+            for part in name.split("+"):
+                base, _, kind = part.partition("@")
+                a = self.get(base)
+                if a is None:
+                    continue
+                a = a.astype(float)
+                if kind in TINTS:
+                    a[..., :3] *= np.array(TINTS[kind]) / 255.0
+                if out is None:
+                    out = a
+                elif a.shape == out.shape:
+                    al = a[..., 3:4] / 255.0
+                    out[..., :3] = a[..., :3] * al + out[..., :3] * (1 - al)
+                    out[..., 3:4] = np.maximum(out[..., 3:4], a[..., 3:4])
+            out = None if out is None else np.clip(out, 0, 255).astype(np.uint8)
+            self.cache[name] = out
+            return out
         p = self.path(name)
         if p:
             self.used.add(p)
