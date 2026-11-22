@@ -95,6 +95,16 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 - **Account (phase 1):** the network key follows the account's 24 words; joining proves the account (170fff57, 308a0544).
 - **Data packages (phase 2):** local packages, package identity, switching content between worlds without a restart, downloading a world's packages on join, signing and trust (d2b75419 to 91f907c3).
 - **Linked worlds (phase 3):** your world runs while you visit others, every world has its own address, link requests, portal blocks, travel, invites, friends (94a0f394 to b15162ec).
+- **Linking at the portal (phase 3, 2026-11-22):** all of it is in our own folder
+  `crates/engine/src/chiacraft`; no Weft file changed.
+  - `bridge.rs` has new questions: `my_worlds`, `joined`, `ask_link` (client) and `incoming`,
+    `answer`, `friend_worlds`, `ask_from_here`, `link_age`, `friends_ask` (server).
+  - `worlds/links.rs`: a friend's request is accepted (the `friends_ask` switch), `request`
+    returns the link id, and there's `request_from` for a world that isn't open.
+  - `worlds/friends.rs`: `is_friend_identity` and `known_worlds`.
+  - `worlds/saved_worlds.rs`: `settings` and `joined_last`.
+  - *Why:* the portal mod can't sign or reach the inbox through Weft's mod interface.
+  - *Verdict:* move out with `move-links` (`notes/crew/move-out-plan.md`).
 - **Admission (phase 4):** admission rules, bans and shared ban lists (bd9b4aa9 onward).
 - **Finding worlds (phase 5):** Find Worlds lists other players' worlds and joins the online ones (65045b6e, a774a47e).
 - **Sandboxed mods (phase 6):** wasmtime components for server halves, API 1.1 to 1.3, client halves, personal mods, write caps and call cost (ed5ff455 to 0276a52c).

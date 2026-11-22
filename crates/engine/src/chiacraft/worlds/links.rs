@@ -188,6 +188,11 @@ pub struct Store {
     /// Invites used (their nonces): each is good once.
     #[serde(default)]
     pub invites_used: Vec<String>,
+    /// Ask before linking with friends' worlds too. Off: a request from a world whose owner is on
+    /// the Friends list (`friends`) is accepted without asking, as if allowed (portals link at a
+    /// touch; `notes/portals-easy-link.md`).
+    #[serde(default)]
+    pub friends_ask: bool,
 }
 
 struct State {
@@ -299,14 +304,28 @@ fn reply_address(account_key: &iroh::SecretKey) -> Result<(String, String), Stri
     Ok((me, vouch))
 }
 
-/// Asks the world at `address` to link with this player's world `from` (named `from_name`).
+/// Asks the world at `address` to link with this player's world `from` (named `from_name`); the
+/// link's id once accepted (known now: the hash of what was asked).
 pub fn request(
     account_key: &iroh::SecretKey,
     from: &crate::world_address::WorldIdentity,
     from_name: &str,
     address: &str,
     note: &str,
-) -> Result<(), String> {
+) -> Result<String, String> {
+    request_to(account_key, from, from_name, address, "", note)
+}
+
+/// Asks as `request` does, with the asked owner's account endpoint `inbox` when known (a friend's),
+/// so the request reaches them while the world itself is closed.
+fn request_to(
+    account_key: &iroh::SecretKey,
+    from: &crate::world_address::WorldIdentity,
+    from_name: &str,
+    address: &str,
+    inbox: &str,
+    note: &str,
+) -> Result<String, String> {
     let target = crate::world_address::parse(address).ok_or("that is not a world address")?;
     if target.key.parse::<iroh::PublicKey>().is_err() {
         return Err("that is not a world address".into());
@@ -327,7 +346,7 @@ pub fn request(
         reply_vouch,
         invite: target.invite.clone(),
     };
-    with(|s| {
+    let id = with(|s| {
         if s.store.links.iter().any(|l| {
             (l.body.from == request.body.from && l.body.to == request.body.to)
                 || (l.body.from == request.body.to && l.body.to == request.body.from)
@@ -340,16 +359,60 @@ pub fn request(
         s.store
             .outbox
             .retain(|q| !matches!(&q.message, Message::Request(r) if r.body.from == request.body.from && r.body.to == request.body.to));
-        queue(s, "", &target.key, address, Message::Request(request.clone()));
+        queue(s, inbox, &target.key, address, Message::Request(request.clone()));
+        let id = request.body.id();
         s.store
             .outgoing
             .push(Outgoing { request, to_name: target.name });
         save(s);
-        Ok(())
+        Ok(id)
     })
     .unwrap_or_else(|| Err("links are not ready".into()))?;
     crate::net::p2p::wake_outbox();
-    Ok(())
+    Ok(id)
+}
+
+/// Asks the world at `address` (its owner's inbox `inbox`, if known) to link with this player's
+/// world with key `from`, which needn't be open: for portals, where a visitor links one of their
+/// own worlds to the world they are in. The link's id.
+pub fn request_from(account_key: &iroh::SecretKey, from: &str, address: &str, inbox: &str, note: &str) -> Result<String, String> {
+    let saves = with(|s| s.saves.clone()).ok_or("links are not ready")?;
+    let (world, name) = my_world(&saves, from).ok_or("that world is not on this computer")?;
+    request_to(account_key, &world, &name, address, inbox, note)
+}
+
+/// This player's worlds that have keys: key and name.
+pub fn my_worlds() -> Vec<(String, String)> {
+    let Some(saves) = with(|s| s.saves.clone()) else { return Vec::new() };
+    crate::saves::list(&saves)
+        .into_iter()
+        .filter(|m| m.key_index.is_some())
+        .filter_map(|mut m| Some((crate::world_address::for_world(&mut m).ok()?.key(), m.name.clone())))
+        .collect()
+}
+
+/// The waiting request `id`, if one came in.
+pub fn incoming(id: &str) -> Option<Incoming> {
+    with(|s| {
+        s.store
+            .incoming
+            .iter()
+            .find(|i| i.request.body.id() == id)
+            .cloned()
+    })
+    .flatten()
+}
+
+/// Whether friends' requests are asked about too (`Store::friends_ask`).
+pub fn friends_ask() -> bool {
+    with(|s| s.store.friends_ask).unwrap_or(false)
+}
+
+pub fn set_friends_ask(ask: bool) {
+    with(|s| {
+        s.store.friends_ask = ask;
+        save(s);
+    });
 }
 
 /// Accepts waiting request `id` (a link id); `always` also accepts this owner from now on.
@@ -501,6 +564,10 @@ fn receive_request(s: &mut State, peer: &str, r: Request) -> Result<(), String> 
     };
     if s.store.allow.contains(&owner) {
         log::info!("link request from '{}' for '{to_name}': accepted (its owner is always accepted)", r.from_name);
+        return accept_request(s, &r, &owner);
+    }
+    if !s.store.friends_ask && crate::friends::is_friend_identity(&owner) {
+        log::info!("link request from '{}' for '{to_name}': accepted (its owner is a friend)", r.from_name);
         return accept_request(s, &r, &owner);
     }
     if !r.invite.is_empty() {

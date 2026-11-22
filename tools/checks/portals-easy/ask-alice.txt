@@ -1,0 +1,32 @@
+# Linking at the portal, run A (a stranger asks, the owner answers), the owner's side. Run beside
+# ask-bob.txt from the same folder; delete pe-ticket.txt and pe-mark-* first (README.md).
+loaded
+chat /rule core:mob_spawning 0
+chat /tp alice 4.5 151 7.5
+wait 3
+chat /tk fill 0 150 0 8 150 8 base:stone
+host pe-ticket.txt
+await_file pe-mark-bob-in 300
+chat /tp bob 5.5 151 6.5
+chat /give bob portals:portal 1
+mark pe-mark-placed
+await_file pe-mark-bob-asked 300   # bob placed a portal at 5 151 4 and asked to link his world there
+wait 5
+shot pe-alice-1-asks.png           # chat: "'pe-bob-home' asks to lead a portal there..."
+chat /tp bob 1.5 151 6.5           # out of the way of alice's aim
+chat /tp alice 5.5 151 7.5
+wait 2
+look 0 -30                         # at bob's portal (its +z face), 1.5 blocks down and ahead
+press core:use
+wait 2
+shot pe-alice-2-screen.png         # the portal screen: "'pe-bob-home' asks to lead this portal there." and Accept, ...
+tap_once portals:portal text:accept
+wait 4
+shot pe-alice-3-linked.png         # chat: "A portal here now leads to 'pe-bob-home'..."
+press core:use
+wait 2
+shot pe-alice-4-leads.png          # the screen says "This portal leads to 'pe-bob-home'."
+close
+mark pe-mark-accepted
+await_file pe-mark-bob-done 300
+quit

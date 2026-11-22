@@ -121,6 +121,19 @@ pub fn set_settings(settings: &crate::settings::Settings) {
     *SETTINGS.lock() = Some(settings.clone());
 }
 
+/// The settings set when the game started (for questions asked outside a screen).
+pub fn settings() -> Option<crate::settings::Settings> {
+    SETTINGS.lock().clone()
+}
+
+/// The world joined last (first in the list, since every join puts it there): while the player
+/// is in a world over the network, the one they are in. Portals check against it, so a server
+/// can't name another world for the player's game to ask a link of.
+pub fn joined_last() -> Option<SavedWorld> {
+    let settings = settings()?;
+    load(&settings.run_dir).into_iter().next()
+}
+
 pub fn forget(run_dir: &Path, key: &str) {
     let mut worlds = load(run_dir);
     worlds.retain(|w| w.key != key);

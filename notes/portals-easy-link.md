@@ -76,17 +76,18 @@ If A's world doesn't let visitors build (admission or a protection mod), B can't
    to Bea's inbox. The portal waits for the link id.
 3. Bea's inbox accepts at once if A is Bea's friend and Bea leaves "Friends may link" on.
    Otherwise Bea is asked on her Links screen. Either way A's portal binds when the answer comes.
-4. Bea's side of the link exists too. The next time Bea right-clicks a portal in her world, the
-   links no portal leads to yet come first, marked "new". Until she binds one, arrivals land at
-   her world's spawn, as they do today.
+4. Bea's side of the link exists too. The next time Bea right-clicks a portal in her world, it is
+   in her list of links. Until she binds a portal to it, arrivals land at her world's spawn, as
+   they do today. Listing first the links no portal leads to, marked "new", is left for later.
 
 Both owners agree, each through their own friend list (or a click). Neither game signs for the
 other.
 
 ## What an owner sees and can undo
 
-- **A chat line** in the world for every link made at a portal. Automatic: "'Bea's farm' (a
-  friend) now leads from the portal at 10 64 -3". Asked: "... asks ...".
+- **A chat line** in the world for every link made at a portal. Made: "A portal here now leads
+  to 'Bea's farm'. End the link on the Links screen if you didn't mean it." Asked: "'Bea's farm'
+  asks to lead a portal there. Right-click the portal to answer."
 - **The portal screen.** As owner you see where the portal leads, the waiting request with
   Accept / Always / Decline, the button to make it lead nowhere, and the "Friends may link"
   switch.
@@ -94,7 +95,7 @@ other.
   every portal on it then leads nowhere ("This portal's link has ended").
 - **Breaking the portal** drops its wait. Removing a friend stops their automatic links from then
   on; links already made stay until ended.
-- `/portal friends on|off` does the same as the switch.
+- `/portalfriends on|off` does the same as the switch.
 
 ## Abuse cases
 

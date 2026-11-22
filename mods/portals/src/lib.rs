@@ -7,6 +7,13 @@
 //! before it changes anything. A player stepping into a bound portal is told to join the linked
 //! world. What the engine knows beyond Weft's mod interface (is this player the owner, what links
 //! does this world have) the mod asks through the engine's bridge (`chiacraft_bridge`).
+//!
+//! Linking at the portal (`notes/portals-easy-link.md`): a visitor right-clicking an unbound portal
+//! picks one of their own worlds, and their own game asks this world for a link from it (signed by
+//! their world, checked by the owner's inbox as any request is). The owner's portal screen lists
+//! friends' worlds, to ask one of them the same way. Either way the portal *waits* for that link
+//! (its id is known when it is asked: the hash of the request) and binds when the link is made:
+//! at once when the owner's inbox accepts friends, or when the owner answers at the portal.
 
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -36,6 +43,18 @@ static NEAR: Channel<String> = Channel::named("near");
 /// Server to a client: a line to show the player, as a translation key and one argument
 /// (`key\targ`), so it reads in the player's own language.
 static SAY: Channel<String> = Channel::named("say");
+
+/// Client to server, a visitor: their game asked for a link from their world for the portal at
+/// `x y z` (`x y z\tlink id\tworld key\tworld name`).
+static ASKED: Channel<String> = Channel::named("asked");
+/// Client to server, the owner: the answer to the request for link `id` (`id\taccept`, `always`,
+/// `decline` or `block`).
+static ANSWER: Channel<String> = Channel::named("answer");
+/// Client to server, the owner: ask a friend's world to link, for the portal at `x y z`
+/// (`x y z\tworld key\tfriend's inbox\tworld name`).
+static FRIEND: Channel<String> = Channel::named("friend");
+/// Client to server, the owner: ask about friends' link requests too (`1`) or not (`0`).
+static FRIENDS_ASK: Channel<String> = Channel::named("friends_ask");
 
 fn say(w: &World, player: u64, key: &str, arg: &str) {
     w.send(player, &SAY, &format!("{key}\t{arg}"));
@@ -72,17 +91,7 @@ fn init(r: &mut Registry) {
         .block_entity()
         .on_use(|u| {
             let (w, player, pos) = (u.world(), u.player(), u.pos());
-            let owner = is_owner(player);
-            let mut msg = format!("{}\n{} {} {}\n", if owner { "owner" } else { "guest" }, pos.x, pos.y, pos.z);
-            if owner {
-                for l in ask("links", "").lines() {
-                    let mut f = l.split('\t');
-                    if let (Some(id), Some(name)) = (f.next(), f.next()) {
-                        msg.push_str(&format!("{id}\t{name}\n"));
-                    }
-                }
-            }
-            w.send(player, &OPEN, &msg);
+            w.send(player, &OPEN, &menu_for(&w, player, [pos.x, pos.y, pos.z]));
             true
         });
     // The block's own block entity (`block_entity`, named like the block) holds the link.
@@ -90,6 +99,27 @@ fn init(r: &mut Registry) {
     r.attach(&PORTAL_ENTITY, &LINK);
 
     r.packet(&BIND, |p, text| bind(p, &text));
+    r.packet(&ASKED, |p, text| asked(&p.world(), p.player(), &text));
+    r.packet(&ANSWER, |p, text| answer(&p.world(), p.player(), &text));
+    r.packet(&FRIEND, |p, text| ask_friend(&p.world(), p.player(), &text));
+    r.packet(&FRIENDS_ASK, |p, text| set_friends_ask(&p.world(), p.player(), text == "1"));
+    r.command("portalfriends", "[mode:word(on,off)]", |cmd| {
+        let (w, player) = (cmd.world(), cmd.player());
+        if !is_owner(player) {
+            cmd.reply("portals.msg.not_owner", &[]);
+            return;
+        }
+        match cmd.text("mode") {
+            Some("on") => ask("set_friends_ask", "0"),
+            Some("off") => ask("set_friends_ask", "1"),
+            _ => String::new(),
+        };
+        let key = if ask("friends_ask", "") == "1" { "portals.msg.friends_off" } else { "portals.msg.friends_on" };
+        let _ = w;
+        cmd.reply(key, &[]);
+    })
+    .permission(permission::EVERYONE);
+    r.world_tick(settle_waits);
     r.world_tick(walk_in);
     r.world_tick(near_portals);
     client(r);
@@ -119,8 +149,6 @@ fn bind(p: &Packet, text: &str) {
     if !PORTAL.is(w.block([x, y, z])) {
         return;
     }
-    let old = link_at(&w, [x, y, z]);
-    let mut value = [0u8; 64];
     let name = if id.is_empty() {
         String::new()
     } else {
@@ -128,27 +156,41 @@ fn bind(p: &Packet, text: &str) {
             say(&w, player, "portals.msg.link_gone", "");
             return;
         };
-        if id.len() != 64 || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
+        if !is_id(id) {
             return;
         }
-        value.copy_from_slice(id.as_bytes());
         name
     };
-    // The whole portal: every portal block connected to this one, within reason.
-    let mut todo = vec![[x, y, z]];
-    let mut seen = HashSet::new();
-    let mut blocks = Vec::new();
-    while let Some(at) = todo.pop() {
-        if seen.len() >= 64 || !seen.insert(at) || !PORTAL.is(w.block(at)) {
-            continue;
-        }
-        blocks.push(at);
-        let e = w.block_entity(at);
+    let (blocks, room) = bind_portal(&w, [x, y, z], id);
+    // The owner chose: whatever this portal waited for no longer binds it.
+    with_waits(&w, |ws| ws.list.retain(|x| !blocks.contains(&x.pos)));
+    if !id.is_empty() && !room {
+        say(&w, player, "portals.msg.no_room", "");
+    }
+    if name.is_empty() {
+        say(&w, player, "portals.msg.unbound", &blocks.len().to_string());
+    } else {
+        say(&w, player, "portals.msg.bound", &name);
+    }
+}
+
+fn is_id(id: &str) -> bool {
+    id.len() == 64 && id.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Binds the portal at `at` (and every portal block touching it) to link `id` (empty: to
+/// nothing), with the arrival spot beside it: its blocks, and whether arrivals have room.
+fn bind_portal(w: &World, at: [i32; 3], id: &str) -> (Vec<[i32; 3]>, bool) {
+    let old = link_at(w, at);
+    let mut value = [0u8; 64];
+    if !id.is_empty() {
+        value.copy_from_slice(id.as_bytes());
+    }
+    let blocks = portal_blocks(w, at);
+    for b in &blocks {
+        let e = w.block_entity(*b);
         if let Some(v) = (e != 0).then(|| w.component_mut(e, &LINK)).flatten() {
             *v = value;
-        }
-        for d in [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] {
-            todo.push([at[0] + d[0], at[1] + d[1], at[2] + d[2]]);
         }
     }
     // Where arrivals through this link stand: beside the portal, on solid ground, with room. The
@@ -156,18 +198,380 @@ fn bind(p: &Packet, text: &str) {
     if let Some(old) = old.filter(|o| o != id) {
         ask("unspot", &old);
     }
+    let mut room = true;
     if !id.is_empty() {
-        match arrival_spot(&w, &blocks) {
+        match arrival_spot(w, &blocks) {
             Some(s) => {
                 ask("spot", &format!("{id} {} {} {}", s[0], s[1], s[2]));
             }
-            None => say(&w, player, "portals.msg.no_room", ""),
+            None => room = false,
         }
     }
-    if name.is_empty() {
-        say(&w, player, "portals.msg.unbound", &seen.len().to_string());
-    } else {
-        say(&w, player, "portals.msg.bound", &name);
+    (blocks, room)
+}
+
+/// The whole portal at `at`: every portal block connected to it, within reason.
+fn portal_blocks(w: &World, at: [i32; 3]) -> Vec<[i32; 3]> {
+    let mut todo = vec![at];
+    let mut seen = HashSet::new();
+    let mut blocks = Vec::new();
+    while let Some(at) = todo.pop() {
+        if seen.len() >= 64 || !seen.insert(at) || !PORTAL.is(w.block(at)) {
+            continue;
+        }
+        blocks.push(at);
+        for d in [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] {
+            todo.push([at[0] + d[0], at[1] + d[1], at[2] + d[2]]);
+        }
+    }
+    blocks
+}
+
+// ------------------------------------------------------------------ linking at the portal
+
+/// Waiting asks, at most: per visitor, and per world.
+const MAX_WAITS_PER_PLAYER: usize = 3;
+const MAX_WAITS: usize = 16;
+/// A wait gives up after this long (the link requests it waits for do too).
+const WAIT_SECS: u64 = 14 * 86_400;
+/// A link that was already made when a visitor said they asked for it binds only if it is this
+/// new: one made by their ask moments ago (a friend's is accepted before their game tells us),
+/// never an older link of the world's.
+const FRESH_SECS: u64 = 600;
+
+/// A portal waiting for a link to be made: the one asked for at it.
+#[derive(Clone)]
+struct Wait {
+    /// The portal block it was asked at.
+    pos: [i32; 3],
+    /// The link's id (the hash of the request: known when it is asked).
+    id: String,
+    /// The other world's key and name: the link must be with that world.
+    world: String,
+    name: String,
+    /// Who asked (a player entity), and whether that was the owner (for a friend's world).
+    player: u64,
+    by_owner: bool,
+    since: u64,
+    /// The owner has been told about the request.
+    told: bool,
+}
+
+#[derive(Default)]
+struct Waits {
+    /// The server run they belong to (`world` on the bridge): another world opened anew loads its own.
+    run: String,
+    file: String,
+    list: Vec<Wait>,
+    last: Option<std::time::Instant>,
+    /// When each visitor's ask was last told to the owner.
+    told: std::collections::HashMap<u64, std::time::Instant>,
+}
+
+static WAITS: Mutex<Option<Waits>> = Mutex::new(None);
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+}
+
+/// The waits of the world being served (loaded from `waits.txt` in its save the first time).
+fn with_waits<R>(w: &World, f: impl FnOnce(&mut Waits) -> R) -> R {
+    let _ = w;
+    let mut g = WAITS.lock().unwrap();
+    let run = ask("world", "");
+    if g.as_ref().is_none_or(|x| x.run != run) {
+        let dir = ask("data_dir", "portals");
+        let file = if dir.is_empty() { String::new() } else { format!("{dir}/waits.txt") };
+        let list = std::fs::read_to_string(&file)
+            .unwrap_or_default()
+            .lines()
+            .filter_map(parse_wait)
+            .collect();
+        *g = Some(Waits { run, file, list, ..Default::default() });
+    }
+    f(g.as_mut().unwrap())
+}
+
+fn parse_wait(line: &str) -> Option<Wait> {
+    let mut f = line.split('\t');
+    let c: Vec<i32> = f
+        .next()?
+        .split(' ')
+        .filter_map(|n| n.parse().ok())
+        .collect();
+    let [x, y, z] = c[..] else { return None };
+    let id = f.next()?.to_string();
+    let world = f.next()?.to_string();
+    let name = f.next()?.to_string();
+    let by_owner = f.next()? == "1";
+    let since = f.next()?.parse().ok()?;
+    is_id(&id).then_some(Wait { pos: [x, y, z], id, world, name, player: 0, by_owner, since, told: false })
+}
+
+fn save_waits(ws: &Waits) {
+    if ws.file.is_empty() {
+        return;
+    }
+    let text: String = ws
+        .list
+        .iter()
+        .map(|x| {
+            format!(
+                "{} {} {}\t{}\t{}\t{}\t{}\t{}\n",
+                x.pos[0],
+                x.pos[1],
+                x.pos[2],
+                x.id,
+                x.world,
+                x.name.replace(['\t', '\n'], " "),
+                if x.by_owner { 1 } else { 0 },
+                x.since
+            )
+        })
+        .collect();
+    if let Err(e) = std::fs::write(&ws.file, text) {
+        weft_sdk::warn!("saving portal waits: {e}");
+    }
+}
+
+fn pos_of(text: &str) -> Option<[i32; 3]> {
+    let c: Vec<i32> = text.split(' ').filter_map(|n| n.parse().ok()).collect();
+    let [x, y, z] = c[..] else { return None };
+    Some([x, y, z])
+}
+
+/// What the portal screen shows the player who right-clicked the portal at `at` (see `Menu`).
+fn menu_for(w: &World, player: u64, at: [i32; 3]) -> String {
+    let owner = is_owner(player);
+    let mut msg = format!("{}\n{} {} {}\n", if owner { "owner" } else { "guest" }, at[0], at[1], at[2]);
+    if let Some((name, _)) = link_at(w, at).and_then(|id| link(&id)) {
+        msg.push_str(&format!("N\t{name}\n"));
+    }
+    let blocks = portal_blocks(w, at);
+    let waits = with_waits(w, |ws| {
+        ws.list
+            .iter()
+            .filter(|x| blocks.contains(&x.pos) && (owner || x.player == player))
+            .cloned()
+            .collect::<Vec<_>>()
+    });
+    for x in &waits {
+        let incoming = if owner { ask("incoming", &x.id) } else { String::new() };
+        if incoming.is_empty() {
+            msg.push_str(&format!("P\t{}\n", x.name));
+        } else {
+            msg.push_str(&format!("W\t{}\t{}\n", x.id, x.name));
+        }
+    }
+    if owner {
+        msg.push_str(&format!("A\t{}\n", ask("friends_ask", "")));
+        for l in ask("links", "").lines() {
+            let mut f = l.split('\t');
+            if let (Some(id), Some(name)) = (f.next(), f.next()) {
+                msg.push_str(&format!("L\t{id}\t{name}\n"));
+            }
+        }
+        for l in ask("friend_worlds", "").lines() {
+            msg.push_str(&format!("F\t{l}\n"));
+        }
+    }
+    msg
+}
+
+/// A visitor's game asked for a link from their world for the portal at `x y z`.
+fn asked(w: &World, player: u64, text: &str) {
+    let mut f = text.split('\t');
+    let (Some(at), Some(id), Some(world), name) = (f.next().and_then(pos_of), f.next(), f.next(), f.next().unwrap_or("")) else {
+        return;
+    };
+    if is_owner(player) || !is_id(id) || world.is_empty() || !PORTAL.is(w.block(at)) {
+        return;
+    }
+    if link_at(w, at).is_some() {
+        say(w, player, "portals.msg.bound_already", "");
+        return;
+    }
+    // Made already: only if just now, with their world (a friend's ask is accepted at once).
+    if let Some((_, key)) = link(id) {
+        let age: u64 = ask("link_age", id).parse().unwrap_or(u64::MAX);
+        if key != world || age > FRESH_SECS {
+            return;
+        }
+    }
+    let name: String = name.chars().filter(|c| !c.is_control()).take(64).collect();
+    let added = with_waits(w, |ws| {
+        if ws.list.iter().any(|x| x.id == id) {
+            return Ok(false);
+        }
+        let mine = ws
+            .list
+            .iter()
+            .filter(|x| !x.by_owner && x.player == player)
+            .count();
+        if mine >= MAX_WAITS_PER_PLAYER || ws.list.len() >= MAX_WAITS {
+            return Err(());
+        }
+        ws.list.push(Wait {
+            pos: at,
+            id: id.to_string(),
+            world: world.to_string(),
+            name: name.clone(),
+            player,
+            by_owner: false,
+            since: now_secs(),
+            told: false,
+        });
+        save_waits(ws);
+        Ok(true)
+    });
+    match added {
+        Ok(true) => say(w, player, "portals.msg.asked", &name),
+        Ok(false) => {}
+        Err(()) => say(w, player, "portals.msg.too_many", ""),
+    }
+}
+
+/// The owner answers the request a portal waits for.
+fn answer(w: &World, player: u64, text: &str) {
+    if !is_owner(player) {
+        say(w, player, "portals.msg.not_owner", "");
+        return;
+    }
+    let (id, how) = text.split_once('\t').unwrap_or((text, ""));
+    if !is_id(id) || !["accept", "always", "decline", "block"].contains(&how) {
+        return;
+    }
+    let r = ask("answer", &format!("{id} {how}"));
+    if let Some(why) = r.strip_prefix('!') {
+        say(w, player, "portals.msg.failed", why);
+    } else if how == "decline" || how == "block" {
+        with_waits(w, |ws| {
+            ws.list.retain(|x| x.id != id);
+            save_waits(ws);
+        });
+        say(w, player, "portals.msg.declined", "");
+    }
+    // Accepted: the link is made, and `settle_waits` binds the portal.
+}
+
+/// The owner asks a friend's world to link, for the portal at `x y z`.
+fn ask_friend(w: &World, player: u64, text: &str) {
+    if !is_owner(player) {
+        say(w, player, "portals.msg.not_owner", "");
+        return;
+    }
+    let mut f = text.split('\t');
+    let (Some(at), Some(key), inbox, name) = (f.next().and_then(pos_of), f.next(), f.next().unwrap_or(""), f.next().unwrap_or("")) else {
+        return;
+    };
+    if !PORTAL.is(w.block(at)) {
+        return;
+    }
+    let id = ask("ask_from_here", &format!("{key}\t{inbox}"));
+    if let Some(why) = id.strip_prefix('!') {
+        say(w, player, "portals.msg.failed", why);
+        return;
+    }
+    if !is_id(&id) {
+        return;
+    }
+    let name: String = name.chars().filter(|c| !c.is_control()).take(64).collect();
+    with_waits(w, |ws| {
+        let blocks = portal_blocks(w, at);
+        ws.list.retain(|x| !blocks.contains(&x.pos));
+        ws.list.push(Wait {
+            pos: at,
+            id,
+            world: key.to_string(),
+            name: name.clone(),
+            player,
+            by_owner: true,
+            since: now_secs(),
+            told: true,
+        });
+        save_waits(ws);
+    });
+    say(w, player, "portals.msg.asked_friend", &name);
+}
+
+fn set_friends_ask(w: &World, player: u64, ask_them: bool) {
+    if !is_owner(player) {
+        say(w, player, "portals.msg.not_owner", "");
+        return;
+    }
+    ask("set_friends_ask", if ask_them { "1" } else { "0" });
+    say(w, player, if ask_them { "portals.msg.friends_off" } else { "portals.msg.friends_on" }, "");
+}
+
+/// About once a second: portals whose link was made bind to it; the owner hears of new asks.
+fn settle_waits(w: &World) {
+    let due = with_waits(w, |ws| {
+        if ws.last.is_some_and(|t| t.elapsed().as_millis() < 1000) {
+            return false;
+        }
+        ws.last = Some(std::time::Instant::now());
+        !ws.list.is_empty()
+    });
+    if !due {
+        return;
+    }
+    let players = w.players();
+    let owners: Vec<u64> = players.iter().copied().filter(|p| is_owner(*p)).collect();
+    let now = now_secs();
+    let list = with_waits(w, |ws| ws.list.clone());
+    let mut done = Vec::new();
+    let mut told = Vec::new();
+    for x in &list {
+        if !PORTAL.is(w.block(x.pos)) || x.since + WAIT_SECS < now {
+            done.push(x.id.clone());
+            continue;
+        }
+        if let Some((name, key)) = link(&x.id) {
+            done.push(x.id.clone());
+            // A visitor's ask never replaces where the portal leads now; the owner's does.
+            if key != x.world || (!x.by_owner && link_at(w, x.pos).is_some()) {
+                continue;
+            }
+            let (blocks, room) = bind_portal(w, x.pos, &x.id);
+            weft_sdk::info!("the portal at {:?} now leads to '{name}' ({} blocks)", x.pos, blocks.len());
+            for o in &owners {
+                say(w, *o, "portals.msg.linked", &name);
+                if !room {
+                    say(w, *o, "portals.msg.no_room", "");
+                }
+            }
+            if !x.by_owner && players.contains(&x.player) {
+                say(w, x.player, "portals.msg.bound", &name);
+            }
+            continue;
+        }
+        if !x.told && !x.by_owner && !owners.is_empty() && !ask("incoming", &x.id).is_empty() {
+            told.push(x.id.clone());
+            let quiet = with_waits(w, |ws| {
+                ws.told
+                    .get(&x.player)
+                    .is_some_and(|t| t.elapsed().as_secs() < 60)
+            });
+            if !quiet {
+                with_waits(w, |ws| ws.told.insert(x.player, std::time::Instant::now()));
+                for o in &owners {
+                    say(w, *o, "portals.msg.asks", &x.name);
+                }
+            }
+        }
+    }
+    if !done.is_empty() || !told.is_empty() {
+        with_waits(w, |ws| {
+            ws.list.retain(|x| !done.contains(&x.id));
+            for x in ws.list.iter_mut().filter(|x| told.contains(&x.id)) {
+                x.told = true;
+            }
+            if !done.is_empty() {
+                save_waits(ws);
+            }
+        });
     }
 }
 
@@ -290,11 +694,90 @@ fn near_portals(w: &World) {
 
 // ------------------------------------------------------------------ the client half
 
-/// What the portal screen shows: owner or not, the portal's position, and the links to pick.
+/// A visitor's side of the portal screen: an unbound portal can be linked with one of their own
+/// worlds. Their own game signs the request (`ask_link`), towards the world it joined, and only
+/// on this click; the server is told the link id so the portal waits for it.
+fn guest(ui: &mut Ui, m: &Menu) {
+    if m.leads_to.is_some() {
+        ui.text("portals.not_owner");
+        return;
+    }
+    if m.here.is_empty() || m.mine.is_empty() {
+        ui.text("portals.guest_no_worlds");
+        return;
+    }
+    ui.text("portals.guest_pick");
+    for (key, name) in &m.mine {
+        let (pos, here, key, label) = (m.pos.clone(), m.here.clone(), key.clone(), name.clone());
+        ui.button_args("portals.to_mine", &[Arg::Text(name)], S::default().w(280.0), move |v| {
+            let id = ask("ask_link", &format!("{key}\t{here}"));
+            match id.strip_prefix('!') {
+                Some(why) => v
+                    .client()
+                    .say(&format!("/portal_note portals.msg.failed {why}")),
+                None if id.len() == 64 => v
+                    .client()
+                    .send(&ASKED, &format!("{pos}\t{id}\t{key}\t{label}")),
+                None => {}
+            }
+            v.client().screen_close();
+        });
+    }
+}
+
+/// What the portal screen shows: owner or not, the portal's position, where it leads, and what
+/// can be picked. The server sends it as lines: the role, the position, then tagged lines
+/// (`N` leads to, `W` a request waiting for the owner, `P` an ask waiting for the other side,
+/// `A` friends asked about too, `L` a link, `F` a friend's world).
+#[derive(Default)]
 struct Menu {
     owner: bool,
     pos: String,
+    leads_to: Option<String>,
+    /// Requests for this portal waiting for the owner: link id and world name.
+    waiting: Vec<(String, String)>,
+    /// Asks for this portal waiting for the other side's answer: world names.
+    pending: Vec<String>,
+    friends_ask: bool,
     links: Vec<(String, String)>,
+    /// Friends' worlds: key, name, the friend's inbox.
+    friends: Vec<(String, String, String)>,
+    /// A visitor's own worlds (from their own game, never from the server): key and name.
+    mine: Vec<(String, String)>,
+    /// The world the visitor is in, as their own game joined it.
+    here: String,
+}
+
+fn parse_menu(text: &str) -> Menu {
+    let mut lines = text.lines();
+    let mut m = Menu { owner: lines.next() == Some("owner"), pos: lines.next().unwrap_or("").to_string(), ..Default::default() };
+    for l in lines {
+        let f: Vec<&str> = l.split('\t').collect();
+        match f[..] {
+            ["N", name] => m.leads_to = Some(name.to_string()),
+            ["W", id, name] => m.waiting.push((id.to_string(), name.to_string())),
+            ["P", name] => m.pending.push(name.to_string()),
+            ["A", a] => m.friends_ask = a == "1",
+            ["L", id, name] => m.links.push((id.to_string(), name.to_string())),
+            ["F", key, name, inbox] => m
+                .friends
+                .push((key.to_string(), name.to_string(), inbox.to_string())),
+            _ => {}
+        }
+    }
+    if !m.owner && m.leads_to.is_none() {
+        m.here = ask("joined", "")
+            .split_once('\t')
+            .map(|(k, _)| k.to_string())
+            .unwrap_or_default();
+        m.mine = ask("my_worlds", "")
+            .lines()
+            .filter_map(|l| l.split_once('\t'))
+            .filter(|(k, _)| *k != m.here)
+            .map(|(k, n)| (k.to_string(), n.to_string()))
+            .collect();
+    }
+    m
 }
 
 static MENU: Mutex<Option<Menu>> = Mutex::new(None);
@@ -304,14 +787,7 @@ static GO: Mutex<Option<String>> = Mutex::new(None);
 
 fn client(r: &mut Registry) {
     r.client_packet(&OPEN, |c, text| {
-        let mut lines = text.lines();
-        let owner = lines.next() == Some("owner");
-        let pos = lines.next().unwrap_or("").to_string();
-        let links = lines
-            .filter_map(|l| l.split_once('\t'))
-            .map(|(id, name)| (id.to_string(), name.to_string()))
-            .collect();
-        *MENU.lock().unwrap() = Some(Menu { owner, pos, links });
+        *MENU.lock().unwrap() = Some(parse_menu(&text));
         c.screen_open(&SCREEN);
     });
     // A line for the player goes through a command of the mod's own, whose reply the client
@@ -357,28 +833,71 @@ fn client(r: &mut Registry) {
     r.screen(&SCREEN, |ui| {
         let menu = MENU.lock().unwrap();
         let Some(m) = menu.as_ref() else { return };
+        let wide = || S::default().w(280.0);
         ui.panel("panel", S::column().pad(8.0).gap(4.0).min_w(300.0), |ui| {
             ui.text_styled(S::column().class("title").scale(1.5).no_wrap(), "portals.title", &[]);
+            match &m.leads_to {
+                Some(name) => ui.text_args("portals.leads_to", &[Arg::Text(name)]),
+                None => ui.text("portals.leads_nowhere"),
+            }
+            for name in &m.pending {
+                ui.text_args("portals.pending", &[Arg::Text(name)]);
+            }
             if !m.owner {
-                ui.text("portals.not_owner");
-            } else if m.links.is_empty() {
-                ui.text("portals.no_links");
+                guest(ui, m);
             } else {
-                ui.text("portals.pick");
+                for (id, name) in &m.waiting {
+                    ui.text_args("portals.waiting", &[Arg::Text(name)]);
+                    for (key, how) in [
+                        ("portals.accept", "accept"),
+                        ("portals.always", "always"),
+                        ("portals.decline", "decline"),
+                        ("portals.block", "block"),
+                    ] {
+                        let msg = format!("{id}\t{how}");
+                        ui.button(key, wide(), move |v| {
+                            v.client().send(&ANSWER, &msg);
+                            v.client().screen_close();
+                        });
+                    }
+                }
+                if m.links.is_empty() && m.friends.is_empty() {
+                    ui.text("portals.no_links");
+                }
+                if !m.links.is_empty() {
+                    ui.text("portals.pick");
+                }
                 for (id, name) in &m.links {
                     let msg = format!("{}\t{id}", m.pos);
-                    ui.button_args("portals.to", &[Arg::Text(name)], S::default().w(280.0), move |v| {
+                    ui.button_args("portals.to", &[Arg::Text(name)], wide(), move |v| {
                         v.client().send(&BIND, &msg);
                         v.client().screen_close();
                     });
                 }
-                let msg = format!("{}\t", m.pos);
-                ui.button("portals.unbind", S::default().w(280.0), move |v| {
-                    v.client().send(&BIND, &msg);
+                if !m.friends.is_empty() {
+                    ui.text("portals.pick_friend");
+                }
+                for (key, name, inbox) in &m.friends {
+                    let msg = format!("{}\t{key}\t{inbox}\t{name}", m.pos);
+                    ui.button_args("portals.to_friend", &[Arg::Text(name)], wide(), move |v| {
+                        v.client().send(&FRIEND, &msg);
+                        v.client().screen_close();
+                    });
+                }
+                if m.leads_to.is_some() {
+                    let msg = format!("{}\t", m.pos);
+                    ui.button("portals.unbind", wide(), move |v| {
+                        v.client().send(&BIND, &msg);
+                        v.client().screen_close();
+                    });
+                }
+                let (key, to) = if m.friends_ask { ("portals.friends_ask_on", "0") } else { ("portals.friends_ask_off", "1") };
+                ui.button(key, wide(), move |v| {
+                    v.client().send(&FRIENDS_ASK, &to.to_string());
                     v.client().screen_close();
                 });
             }
-            ui.button("portals.close", S::default().w(280.0), |v| v.client().screen_close());
+            ui.button("portals.close", wide(), |v| v.client().screen_close());
         });
     });
 }
