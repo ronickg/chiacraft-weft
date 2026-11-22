@@ -45,6 +45,18 @@ pub fn init(r: &mut Registry) {
             m.value *= vitals::combat::cap_share(size, q.amount as f32, level) as f64;
         }
     });
+    // A tame's blows: its owner's web (the Taming and Conjuring regions' tame damage, a
+    // beastmaster's keystone), as a player's melee damage is theirs. Its saddle and the size's cap
+    // still bound what counts (`player_cap`).
+    r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
+        let (w, q) = (m.world(), *m.query());
+        if !crate::animal::tamed(&w, q.entity) {
+            return;
+        }
+        if let Some(owner) = crate::commands::owner(&w, q.entity) {
+            m.value *= base_api::skills::times(&w, owner, base_api::skills::Family::TameDamage) as f64;
+        }
+    });
     r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
         let q = *m.query();
         let w = m.world();
@@ -53,7 +65,7 @@ pub fn init(r: &mut Registry) {
         let size = danger::size(s);
         let level = danger::danger(s.name).map_or(0.0, |d| d.area_level(a.level().min(danger::LEVELS.1)));
         let raw = m.value as f32;
-        let by_player = q.cause == damage_cause::ATTACK && w.players_iter().any(|p| p == q.other);
+        let by_player = (q.cause == damage_cause::ATTACK || q.cause == damage_cause::PROJECTILE) && w.players_iter().any(|p| p == q.other);
         // 1. A player's weapon, capped by the animal's size.
         let mut hit = raw * player_cap(&w, q.other, q.cause, size, level);
         let capped = hit;

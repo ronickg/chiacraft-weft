@@ -7,6 +7,12 @@ use base_api::entities::*;
 use base_api::items::{ARROW as ARROW_ITEM, BOW, EGG};
 /// Ticks of whatever a mob counts: a skeleton's reload, a chicken's next egg.
 static FUSE: Component<u32> = Component::named("fuse");
+/// A player's arrow on the curve (`vitals::gear::arrow_hit`): its hit at full draw (the bow's
+/// times and the web's ranged damage in it), its item level (what an over-tier cap reads) and who
+/// shot it. A skeleton's arrow has none: it hits for its row's hit (below).
+static ARROW_SHOT: Component<[f64; 3]> = Component::named("arrow_shot");
+/// A full draw's speed, blocks a tick (vanilla's 3): an arrow hits by its speed over this.
+const FULL_SPEED: f64 = 3.0;
 /// Ours: vanilla's creeper (upstream removed it).
 pub static CREEPER: EntityKind = EntityKind::named("creeper");
 
@@ -80,6 +86,8 @@ pub fn register(r: &mut Registry) {
                 .neutral(),
         ));
     r.entity_component(&FUSE, 0u32, 0);
+    r.entity_component(&ARROW_SHOT, [0.0; 3], 0);
+    r.edit(&ARROW).attach(&ARROW_SHOT);
     // A skeleton's arrow hits for its row's hit (`vitals::mobs`), not by its speed: set first, so
     // armour and the rest still apply.
     r.modify(&chain::DAMAGE, &phase::BASE, |m| {
@@ -203,15 +211,25 @@ pub fn register(r: &mut Registry) {
     // Drawn as long as the use button is held, shot when it is let go (upstream's). The bow itself
     // is ours, a tool of parts (`parts.rs`), so this only adds the drawing and shooting.
     r.edit(&BOW).use_until_released().on_release(shoot_bow);
-    // An arrow in the head hurts half as much again, a bow's critical hit: `part` is the part
-    // of the hitbox it went into.
+    // A player's arrow hits on the curve (`vitals::gear::arrow_hit`) by its speed, as vanilla's
+    // does by its own: less drawn, less. Its item level counts against a big creature at most its
+    // size's cap over it, as a blade's (`base_api::chains::GEAR_COUNTS`). In the head it hurts
+    // twice as much, a bow's critical hit: `part` is the part of the hitbox it went into.
     r.modify(&chain::PROJECTILE_DAMAGE, &phase::MULTIPLY, |m| {
         let q = *m.query();
-        let arrow = m
-            .world()
-            .entity(q.entity)
-            .is_some_and(|e| e.kind == ARROW.id());
-        if arrow && q.part == hitbox_part::HEAD {
+        let w = m.world();
+        if !w.entity(q.entity).is_some_and(|e| e.kind == ARROW.id()) {
+            return;
+        }
+        if let Some([hit, level, owner]) = w.component(q.entity, &ARROW_SHOT).filter(|a| a[0] > 0.0) {
+            let counts = w.chain_compute(
+                &base_api::chains::GEAR_COUNTS,
+                1.0,
+                &abi::Query { entity: owner as u64, other: q.other, amount: level, ..abi::Query::DEFAULT },
+            );
+            m.value = hit * (q.amount / FULL_SPEED) * counts;
+        }
+        if q.part == hitbox_part::HEAD {
             m.value *= 2.0;
         }
     });
@@ -430,7 +448,7 @@ fn skeleton() -> ai::Goals {
 fn shoot_bow(u: &mut ItemUse) -> bool {
     let (w, id) = (u.world(), u.entity());
     let t = u.held_ticks() as f32 / 20.0;
-    let power = ((t * t + t * 2.0) / 3.0).min(1.0) as f64;
+    let power = vitals::gear::draw_power(t) as f64;
     if power < 0.1 {
         return false;
     }
@@ -442,8 +460,19 @@ fn shoot_bow(u: &mut ItemUse) -> bool {
     }
     let Some(s) = w.entity(id) else { return false };
     // Three blocks a tick at full draw.
-    let v = look_dir(s.yaw, s.pitch) * (power * 3.0 * 20.0);
-    w.spawn_with(
+    let v = look_dir(s.yaw, s.pitch) * (power * FULL_SPEED * 20.0);
+    // Its hit at full draw: the arrow's level (a plain one is flint-tipped), the bow's times (its
+    // damage over a Sound yew bow's), the web's ranged damage.
+    let level = arrow
+        .and_then(|slot| base_api::ITEM_LEVEL.on_stack(&inv.get(slot)))
+        .unwrap_or(vitals::gear::ARROW_LEVEL);
+    let bow_times = ATTACK_DAMAGE
+        .on_stack(&u.stack())
+        .zip(crafting::kinds::kind("bow"))
+        .map_or(1.0, |(d, k)| d / k.damage);
+    let web = base_api::skills::times(&w, id, base_api::skills::Family::RangedDamage);
+    let hit = vitals::gear::arrow_hit(level, bow_times) * web;
+    let shot = w.spawn_with(
         &ARROW,
         s.eye(),
         &Spawn::new()
@@ -452,6 +481,7 @@ fn shoot_bow(u: &mut ItemUse) -> bool {
             .inherit_velocity()
             .yaw(s.yaw),
     );
+    w.set_component(shot, &ARROW_SHOT, [hit as f64, level as f64, id as f64]);
     if !creative {
         if let Some(slot) = arrow {
             inv.set(slot, consume_one(inv.get(slot)));
