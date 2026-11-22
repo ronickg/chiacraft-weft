@@ -194,6 +194,8 @@ pub fn register(r: &mut Registry) {
             .set(&STYLE_WEIGHT, 1.0);
     }
     r.block(&LAMP)
+        // It has no picture of its own (`block/lamp` would draw magenta): one of testkit's.
+        .texture("varied_cube")
         .prop("lit", ["false", "true"])
         .states(|p, s| if p.is("lit", "true") { s.light(13) } else { s })
         .tag("testkit:lamps")

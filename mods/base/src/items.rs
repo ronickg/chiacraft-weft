@@ -139,10 +139,12 @@ pub fn register(r: &mut Registry) {
     // porcini and chanterelle items are our mushroom blocks' (`blocks.rs`, the same names): their
     // `porcini_mushroom` and `chanterelle_mushroom` drop ours. Cutting them is this block, their
     // food rows and their blocks.
+    // Upstream's `#mushrooms` tag is `#mushroom_foods` here: `mushrooms` is worldgen's biome
+    // component (`worldgen::statics::MUSHROOMS`), and one name can't be both.
     r.item(&DRYADS_SADDLE)
-        .tag("mushrooms")
+        .tag("mushroom_foods")
         .tab(&crate::tabs::INGREDIENTS);
-    r.tag("mushrooms", &["toadstool", "cooked_dryads_saddle"]);
+    r.tag("mushroom_foods", &["toadstool", "cooked_dryads_saddle"]);
     // Buckskin, brain-tanned from a hide at a tanning frame (`crafts.rs`): clothes and books. Leather
     // armor is sole leather's (`materials/leather`), bark-tanned for days in a pit.
     r.item(Item::generated("leather".into()))

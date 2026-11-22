@@ -2048,7 +2048,8 @@ impl Interner {
     }
 }
 
-/// Every texture a block state draws must be a file in its mod's assets (`textures/<path>.png`):
+/// Every texture a block state draws must be a file in its mod's assets (`textures/<path>.png`, or
+/// connected texture rules `textures/<path>/<last part>.ctm`), each layer of layer text alone:
 /// a missing one would draw as the magenta checker, and quietly (a resource pack can only replace
 /// a texture, not add one). Only what a state shows counts: a state made of boxes draws its boxes'
 /// textures, not the block's default `block/<name>` it was given first (a bed, a piston). Item
@@ -2069,24 +2070,26 @@ fn check_texture_files(mods: &[ModMeta], textures: &Interner, states: &[StateInf
         }
     }
     for (i, name) in textures.list.iter().enumerate() {
-        let Some((ns, rel)) = name.split_once(':') else { continue };
-        let Some(m) = mods.iter().find(|m| m.id == ns) else { continue };
-        if ns == "core" || !m.assets.is_dir() {
-            continue;
-        }
-        if m.assets
-            .join("textures")
-            .join(format!("{rel}.png"))
-            .is_file()
-        {
-            continue;
-        }
-        if rel.starts_with("block/") {
-            if drawn[i] {
-                errors.push(format!("texture {name}: no file textures/{rel}.png in {ns}'s assets (it would draw magenta)"));
+        // A name may be layer text (`a#RRGGBB@kind b`): each layer's own name is a file.
+        for layer in abi::layers(name) {
+            let Some((ns, rel)) = layer.name.split_once(':') else { continue };
+            let Some(m) = mods.iter().find(|m| m.id == ns) else { continue };
+            if ns == "core" || !m.assets.is_dir() {
+                continue;
             }
-        } else {
-            log::warn!("texture {name}: no file textures/{rel}.png in {ns}'s assets");
+            // A picture, or a folder of connected texture tiles with its rules (`assets::ctm_rules`).
+            let last = rel.rsplit('/').next().unwrap_or(rel);
+            let root = m.assets.join("textures");
+            if root.join(format!("{rel}.png")).is_file() || root.join(rel).join(format!("{last}.ctm")).is_file() {
+                continue;
+            }
+            if rel.starts_with("block/") {
+                if drawn[i] {
+                    errors.push(format!("texture {name}: no file textures/{rel}.png in {ns}'s assets (it would draw magenta)"));
+                }
+            } else {
+                log::warn!("texture {name}: no file textures/{rel}.png in {ns}'s assets");
+            }
         }
     }
 }
