@@ -4,7 +4,9 @@
 //!
 //! 1. **The gear cap.** A player's weapon counts at most its size's cap in item levels over the
 //!    animal (`vitals::combat::cap_share`; `base_api::ITEM_LEVEL` on the held stack): an iron sword
-//!    hits a Stone Age utahraptor as a sword twenty levels over it, not forty.
+//!    hits a Stone Age utahraptor as a sword twenty levels over it, not forty. A tame's bite counts
+//!    at most the cap over it too, by its wild level, and a player's over-tier armour against it
+//!    (`base_api::chains::GEAR_COUNTS`, answered here and read by base's armour step).
 //! 2. **Armour**: `armour / (armour + 5 × hit)` at most 80 %, so a light blow bounces off a
 //!    gastonia's plates and a heavy one goes through. What bypasses armour (fire, falls, starving)
 //!    bypasses it here too.
@@ -27,6 +29,14 @@ pub fn init(r: &mut Registry) {
     for s in crate::species::SPECIES.iter() {
         r.edit(s.kind).attach(&FLOOR);
     }
+    // Over-tier armour against an animal counts at most its size's cap, as a weapon does
+    // (`base_api::chains::GEAR_COUNTS`, read by base's armour step).
+    r.modify(&base_api::chains::GEAR_COUNTS, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        if let Some((size, level)) = foe(&m.world(), q.other) {
+            m.value *= vitals::combat::cap_share(size, q.amount as f32, level) as f64;
+        }
+    });
     r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
         let q = *m.query();
         let w = m.world();
@@ -66,11 +76,15 @@ pub fn init(r: &mut Registry) {
 }
 
 /// The share of a hit by `attacker` (with `cause`) a creature of `size` at area level `level`
-/// lets count: a player's held weapon at most its size's cap in item levels over it
-/// (`vitals::combat::cap_share`), everything else whole.
+/// lets count (`vitals::combat::cap_share`): a player's held weapon at most its size's cap in item
+/// levels over it, a tame's bite at most the cap in area levels over it (its wild level's: tamed
+/// points, imprint and bond are its grade, under their own ceiling), everything else whole.
 pub fn player_cap(w: &World, attacker: u64, cause: u32, size: vitals::combat::Size, level: f32) -> f32 {
-    if cause != damage_cause::ATTACK || !w.players_iter().any(|p| p == attacker) {
+    if cause != damage_cause::ATTACK {
         return 1.0;
+    }
+    if !w.players_iter().any(|p| p == attacker) {
+        return tame_level(w, attacker).map_or(1.0, |at| vitals::combat::cap_share(size, at, level));
     }
     let held = w
         .inventory(attacker)
@@ -99,4 +113,23 @@ pub fn floor(w: &World, entity: u64, size: vitals::combat::Size, max_health: f32
         w.set_component(entity, &FLOOR, [left as f64, now as f64, stagger]);
     }
     (took, over, stagger)
+}
+
+/// The area level a tame fights at: its wild level's (`danger::Danger::area_level`), its tamed
+/// points left out (they're its grade). None for a wild one or anything not an animal.
+pub fn tame_level(w: &World, id: u64) -> Option<f32> {
+    if !crate::animal::tamed(w, id) {
+        return None;
+    }
+    let a = w.component(id, &ANIMAL)?;
+    let wild: u32 = a.wild.iter().map(|&p| p as u32).sum();
+    Some(danger::danger(a.species()?.name)?.area_level(wild.min(danger::LEVELS.1)))
+}
+
+/// An animal's size class and the area level it fights at (a tame at its wild level's).
+pub fn foe(w: &World, id: u64) -> Option<(vitals::combat::Size, f32)> {
+    let a = w.component(id, &ANIMAL)?;
+    let s = a.species()?;
+    let level = danger::danger(s.name)?.area_level(a.level().min(danger::LEVELS.1));
+    Some((danger::size(s), tame_level(w, id).unwrap_or(level)))
 }

@@ -64,6 +64,19 @@ pub fn register(r: &mut Registry) {
                 .neutral(),
         ));
     r.entity_component(&FUSE, 0u32, 0);
+    // Over-tier armour against them counts at most their size's cap (`base_api::chains::GEAR_COUNTS`).
+    r.modify(&base_api::chains::GEAR_COUNTS, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        let Some(kind) = m.world().entity(q.other).map(|e| e.kind) else { return };
+        let Some(mob) = MOB_KINDS
+            .iter()
+            .find(|(k, _)| k.id() == kind)
+            .and_then(|(_, n)| vitals::mobs::mob(n))
+        else {
+            return;
+        };
+        m.value *= vitals::combat::cap_share(mob.size(), q.amount as f32, mob.level()) as f64;
+    });
     // Their armour (`vitals::mobs`), through the same formula as the player's and the animals'.
     r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
         let q = *m.query();
