@@ -1,91 +1,49 @@
-<p align="center"><img src="docs/img/banner.png" alt="Weft"></p>
+# chiacraft
 
-<p align="center">
-  <a href="https://discord.gg/zTEekbrc7U"><img src="https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
-</p>
+chiacraft is a survival block game built on [Weft](https://github.com/Weft-Rust/Weft), a voxel sandbox engine written in Rust by [VortexSo4](https://github.com/VortexSo4). This repository is a fork of Weft: the engine in `crates/` is Weft's, and the game is our mods on top of it.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Rust-1.95%2B-B7410E?logo=rust&logoColor=white" alt="Rust 1.95+">
-  <img src="https://img.shields.io/badge/graphics-Vulkan-A41E22?logo=vulkan&logoColor=white" alt="Vulkan">
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-2A6CB0" alt="Windows, Linux and macOS">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-3B2F7E" alt="MPL-2.0"></a>
-</p>
+> chiacraft is not an official Weft project and isn't endorsed by Weft's author. For Weft itself (its releases, Discord and issue tracker), go to [Weft's repository](https://github.com/Weft-Rust/Weft). Please don't report chiacraft bugs there.
 
-<p align="center">
-  <a href="https://github.com/Weft-Rust/Weft/releases"><b>Download</b></a> ·
-  <a href="docs/modding.md"><b>Modding</b></a> ·
-  <a href="docs"><b>Documentation</b></a> ·
-  <a href="#project-status"><b>Project status</b></a> ·
-  <a href="#contributing"><b>Contributing</b></a>
-</p>
+> Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft. chiacraft contains no Minecraft code or assets.
 
-Weft is a voxel sandbox engine written in Rust. The game itself is a mod, `mods/base`, built only on the public SDK: it has no private hooks into the engine, so anything it does, another mod can do or change. Weft is not a Minecraft clone and does not read Minecraft worlds; it plays like one and borrows its numbers where that makes sense.
+## What chiacraft adds
 
-> Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft. Weft contains no Minecraft code or assets.
+- **The game** (`mods/base`): survival with temperature, seasons, food and levels; farming and crops; progression through the ages.
+- **Animals** (`mods/animals`): species with life cycles, eggs, and their own needs and senses.
+- **Portals** (`mods/portals`): link your world to other players' worlds and walk between them.
+- **Packages** (`mods/packages`, `crates/packages`): data packages. Missing mods download on the way, with consent.
+- **Accounts** (`crates/account`, `crates/wallet`, `crates/bridge`): a player identity (a DID) and achievements on Chia, so no one can take an account away.
+- **Sandboxed mods** (`crates/sandbox`).
+- **A test kit** (`mods/testkit`): scripted game runs for checks.
 
-## Features
+The goal and the decisions are in [notes/PLAN.md](notes/PLAN.md). Where everything stands is in [notes/OVERVIEW.md](notes/OVERVIEW.md).
 
-- The world is made of cubic 16x16x16 chunks, so there is no limit on height or depth, and the terrain is generated on the GPU, which allows distant terrain to be drawn far past the view distance. World generation is deterministic and includes caves, several dimensions, and biomes whose colors blend into each other on the borders.
+## Staying close to Weft
 
-- Instead of random ticks, the world is split into regions that are ticked in parallel, and plants, furnaces and other timed blocks catch up on the time nobody was there for, so crops keep growing and furnaces keep smelting even while their chunks are not loaded.
+We change Weft's engine only where our own crates and mods can't do the job. Every change we make to Weft's code is listed with its files and the reason in [notes/ENGINE_CHANGES.md](notes/ENGINE_CHANGES.md). We take Weft's updates regularly. Where Weft has fixed something we fixed ourselves, we take Weft's version.
 
-- Blocks can emit colored RGB light and use connected or randomized texture variants, textures can be animated or glowing, and models are made in Blockbench with keyframe animations. The look of the game can be changed with resource packs and shader packs.
-
-- As for gameplay, there are survival and creative modes, crafting and smelting, mobs with pathfinding, liquids that can be picked up with a bucket regardless of which liquid it is, machines powered by energy, and moving structures that you can stand and build on.
-
-- Multiplayer works peer to peer: Open to Friends in the pause menu gives you a ticket, and a friend can join with it without any server or port forwarding.
-
-- Mods are native libraries behind a C ABI, packed as zip files and loaded in parallel. Content is registered through builders, behavior hooks into the game through events, interceptors and value chains, and recipes, loot and world generation are driven by tags, which is described in more detail in [Modding](#modding).
-
-- For development, textures, translations, shaders and UI can be reloaded in game, and there are debug overlays, a recipe viewer, and crash reports that name the mod which was running at the moment of the crash.
-
-## Download
-
-Get the latest build for your system from [Releases](https://github.com/Weft-Rust/Weft/releases), unpack it and run `weft`. You need a GPU with Vulkan; on macOS it comes with the game (Apple Silicon, macOS 12 or newer). Windows is the main tested platform; Linux and macOS are reported to work well too. The release notes have the steps for each system.
-
-Weft ships with its own textures.
+Weft's own README, as of the last sync, is kept at [docs/weft-README.md](docs/weft-README.md). The engine docs in [`docs/`](docs) are Weft's, plus a few of ours ([packages](docs/packages.md), [sandboxed mods](docs/sandboxed-mods.md), [release builds](docs/release-builds.md)).
 
 ## Build from source
 
-Requires Rust 1.95 or newer.
+You need Rust 1.95 or newer and a GPU with Vulkan. On macOS, Vulkan runs through MoltenVK.
 
 ```sh
-git clone https://github.com/Weft-Rust/Weft.git
-cd Weft
 cargo run --release
 ```
 
-Run it from the repository root. Release builds pack each mod in `mods/` into `run/mods/` on start; settings, saves and logs go to `run/`. `cargo run --release -- --dist <dir>` makes a standalone build to share.
-
-A game from a release writes nothing next to itself, so it can live in a read-only folder and be replaced by an update:
-
-| | Saves, mods, packs, logs | Settings | Cache |
-|---|---|---|---|
-| Linux | `$XDG_DATA_HOME/weft` (`~/.local/share/weft`) | `$XDG_CONFIG_HOME/weft` (`~/.config/weft`) | `$XDG_CACHE_HOME/weft` (`~/.cache/weft`) |
-| Windows | `%APPDATA%\Weft` | `%APPDATA%\Weft\config` | `%LOCALAPPDATA%\Weft` |
-| macOS | `~/Library/Application Support/Weft` | `.../Weft/config` | `~/Library/Caches/Weft` |
-
-A game that already has a `run/config` folder next to it keeps everything in `run/`, as older versions did; make that folder to keep a copy portable. `--run-dir <dir>` puts everything in one folder of your choice.
-
+Run it from the repository root. Release builds pack each mod in `mods/` into `run/mods/` when the game starts; settings, saves and logs go to `run/`. To make packaged builds for each platform, see [docs/release-builds.md](docs/release-builds.md) and `tools/release/`.
 
 ## Modding
 
-Copy [`examples/examplemod`](examples/examplemod): every kind of registration is there as a commented example. Then read the [modding cheat sheet](docs/modding.md); the guides for worldgen, machines, models, UI, tooltips, textures, CTM, resource packs and shaders are in [`docs/`](docs). [`mods/base`](mods/base) is the game itself and [`mods/testmod`](mods/testmod) shows a mod extending and replacing it without engine changes.
+Modding works as it does in Weft. Start from [`examples/examplemod`](examples/examplemod) and the [modding guide](docs/modding.md). `mods/base` is built only on the public SDK, like Weft's own base game.
 
-## Project status
+## Status
 
-Early. The mod interface and the save format can still change between versions. A mod built against another engine version refuses to load and asks to be rebuilt rather than crashing.
+Early and private. Saves, the mod interface and the game itself still change often.
 
-## Running a server
+## Licence
 
-`weft --server --world myworld --port 27182` runs a world with no window and no GPU. Forward the port, TCP and UDP, and players join with `host:port` in the Multiplayer screen, or with the ticket it logs. It keeps what a game keeps in the same folders as above, or in `--run-dir`.
+[MPL-2.0](LICENSE), the same as Weft. Weft is © its authors under MPL-2.0. Files we changed stay under MPL-2.0 with their licence notices kept. Anyone we give a build to can get its source.
 
-Type `stop` to save and leave, `list`, `say <text>`, `op <player> [level]` or `deop <player>`. Nobody can use commands until you `op` them. To limit who may join, list their keys one a line in `config/whitelist.txt`: anyone refused is logged with the line to add.
-
-## Contributing
-
-Issues and pull requests are welcome, for the engine, mods, textures or docs. Read the [AI policy](AI_POLICY.md) before opening a pull request, it applies to everyone and the template asks for it.
-
-## License - [MPL-2.0](LICENSE)
-
-Made by [VortexSo4](https://github.com/VortexSo4).
+Much of chiacraft is written with AI tools (Claude). Weft's [AI policy](AI_POLICY.md) applies to anything sent to Weft. We don't send pull requests there at the moment.
