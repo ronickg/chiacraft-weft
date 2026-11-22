@@ -136,6 +136,11 @@ const OPT_WATER_FOAM: u32 = 43u;
 // The mirror (`base:look_water_mirror`): 0 as made; 1 Bliss's Fresnel (fifth power from 0.02), the
 // sky mirrored where the ripples point it, no extra share at a slant.
 const OPT_WATER_MIRROR: u32 = 44u;
+// The evening's blue hour as Bliss's (`base:look_twilight`): 0 as made; above 0 the sky goes a deep,
+// saturated blue from sunset to about 10° under, and the land is lit by that sky at this many times
+// its light (Bliss's bliss_tw, 11-22: land 5 23 78 at 19:00, 0 10 75 at 19:30, dark at 20:00, where
+// ours was grey-black, 10 13 21, at 19:00).
+const OPT_TWILIGHT: u32 = 45u;
 
 // How much of the mist lies as the evening's (`OPT_EVENING_MIST`): none with the sun 25° up in the
 // west (17:00), a little at 12° (18:00), all with it on the horizon, into the dusk. (It began at 32°
@@ -295,6 +300,19 @@ fn palette_now() -> Palette {
         let morning = smoothstep(-0.05, 0.05, scene.sun.x);
         let twilight = smoothstep(-0.3, -0.14, scene.sun.y) * (1.0 - smoothstep(-0.02, 0.06, scene.sun.y)) * morning;
         p.ambient *= mix(1.0, mix(0.7, TWILIGHT_RISE, smoothstep(-0.16, -0.02, scene.sun.y)), twilight);
+    }
+    // The evening's blue hour (`OPT_TWILIGHT`): from the sun 7° up to 10° under, fading out by 17°
+    // under; the sky's own colour pushed to a deep blue (its brightness kept), and the light in the
+    // shade that blue sky's, at the setting's strength.
+    let blue_k = max(fantasy_opt(OPT_TWILIGHT), 0.0);
+    if blue_k > 0.0 {
+        let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
+        let tw = smoothstep(-0.3, -0.17, scene.sun.y) * (1.0 - smoothstep(0.02, 0.12, scene.sun.y)) * evening * (1.0 - rain_amount());
+        let deep = vec3(0.08, 0.3, 1.0);
+        p.zenith = mix(p.zenith, deep * (luma(p.zenith) / luma(deep)), tw * 0.7);
+        p.horizon = mix(p.horizon, mix(p.horizon, deep * (luma(p.horizon) / luma(deep)), 0.5), tw);
+        let sky = p.zenith * 0.65 + p.horizon * 0.35;
+        p.ambient = mix(p.ambient, sky * blue_k, tw);
     }
     return p;
 }
