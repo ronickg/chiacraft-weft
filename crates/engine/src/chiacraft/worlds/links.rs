@@ -19,6 +19,10 @@
 //! note <a line from the asker>
 //! ```
 //!
+//! A link opens for travel only once both worlds have a portal bound to it: each world tells the
+//! other when it binds one (or no longer has one) with a note its key signs, `chiacraft link
+//! portal v1\nlink <id>\nby <world key>\nready <0|1>\ncreated <secs>`, sent like the rest.
+//!
 //! Its id is the BLAKE3 hash of that text. Ending a link is a tombstone, `chiacraft link revoke
 //! v1\nlink <id>\nby <world key>\ncreated <secs>`, signed by the world ending it; it can't be
 //! undone, and a link ended can't come back.
@@ -30,6 +34,7 @@ use serde::{Deserialize, Serialize};
 
 const SIGNED_LABEL: &str = "chiacraft link v1\n";
 const REVOKE_LABEL: &str = "chiacraft link revoke v1\n";
+const PORTAL_LABEL: &str = "chiacraft link portal v1\n";
 /// Requests waiting for an answer, at most; older ones go first when more come.
 const MAX_INCOMING: usize = 100;
 /// A request or answer older than this (or this far ahead) is refused; queued ones give up.
@@ -150,6 +155,22 @@ impl Revoke {
     }
 }
 
+/// A world saying it has (or no longer has) a portal bound to a link, signed by its key.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Portal {
+    pub link: String,
+    pub by: String,
+    pub ready: bool,
+    pub created: u64,
+    pub sig: String,
+}
+
+impl Portal {
+    fn signed(&self) -> Vec<u8> {
+        format!("{PORTAL_LABEL}link {}\nby {}\nready {}\ncreated {}", self.link, self.by, u8::from(self.ready), self.created).into_bytes()
+    }
+}
+
 /// What goes between account endpoints.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind")]
@@ -157,6 +178,7 @@ pub enum Message {
     Request(Request),
     Accept(Accept),
     Revoke(Revoke),
+    Portal(Portal),
 }
 
 /// A message waiting to be delivered: to an account endpoint (`inbox`), or, while that is not
@@ -193,6 +215,12 @@ pub struct Store {
     /// touch; `notes/portals-easy-link.md`).
     #[serde(default)]
     pub friends_ask: bool,
+    /// Links this player's worlds have a portal bound to: (link id, world key).
+    #[serde(default)]
+    pub portals_here: Vec<(String, String)>,
+    /// What the other worlds said of their portals, the latest note per link and world.
+    #[serde(default)]
+    pub portals_far: Vec<Portal>,
 }
 
 struct State {
@@ -524,6 +552,7 @@ pub fn receive(peer: &str, message: Message) -> Result<(), String> {
             Message::Request(r) => receive_request(s, peer, r),
             Message::Accept(a) => receive_accept(s, peer, a),
             Message::Revoke(r) => receive_revoke(s, r),
+            Message::Portal(p) => receive_portal(s, p),
         };
         save(s);
         r
@@ -652,6 +681,88 @@ fn receive_revoke(s: &mut State, r: Revoke) -> Result<(), String> {
     s.store.links.remove(i);
     s.store.revoked.push(r.link);
     Ok(())
+}
+
+fn receive_portal(s: &mut State, p: Portal) -> Result<(), String> {
+    let Some(l) = s.store.links.iter().find(|l| l.id() == p.link) else { return Ok(()) };
+    if (p.by != l.body.from && p.by != l.body.to) || !verify(&p.by, &p.signed(), &p.sig) {
+        return Err("a portal note neither world signed".into());
+    }
+    if s.store
+        .portals_far
+        .iter()
+        .any(|x| x.link == p.link && x.by == p.by && x.created > p.created)
+    {
+        return Ok(());
+    }
+    log::info!("the world '{}' {} a portal for its link", &p.by[..12.min(p.by.len())], if p.ready { "has" } else { "no longer has" });
+    s.store
+        .portals_far
+        .retain(|x| !(x.link == p.link && x.by == p.by));
+    s.store.portals_far.push(p);
+    Ok(())
+}
+
+/// World `world` (this player's) has a portal bound to link `link` now, or no longer has one:
+/// remembered, and the other world is told (a note `world`'s key signs). Nothing is sent when
+/// nothing changed.
+pub fn set_portal_here(world: &crate::world_address::WorldIdentity, link: &str, here: bool) {
+    let key = world.key();
+    let changed = with(|s| {
+        let had = s
+            .store
+            .portals_here
+            .iter()
+            .any(|(l, w)| l == link && *w == key);
+        if had == here {
+            return false;
+        }
+        if here {
+            s.store.portals_here.push((link.to_string(), key.clone()));
+        } else {
+            s.store
+                .portals_here
+                .retain(|(l, w)| !(l == link && *w == key));
+        }
+        if let Some(l) = s.store.links.iter().find(|l| l.id() == link).cloned() {
+            let mut p =
+                Portal { link: link.to_string(), by: key.clone(), ready: here, created: crate::saves::now_secs(), sig: String::new() };
+            p.sig = hex(&world.secret.sign(&p.signed()).to_bytes());
+            let other = if l.body.from == key { &l.body.to } else { &l.body.from };
+            // Two worlds of this one player: the store above already says it.
+            if my_world(&s.saves, other).is_none() {
+                queue(s, &l.peer_inbox, other, "", Message::Portal(p));
+            }
+        }
+        save(s);
+        true
+    })
+    .unwrap_or(false);
+    if changed {
+        crate::net::p2p::wake_outbox();
+    }
+}
+
+/// For link `link` seen from world `world`: whether `world` has a portal bound to it, and whether
+/// the other world has (its note, or this player's own other world).
+pub fn portal_state(link: &str, world: &str) -> (bool, bool) {
+    with(|s| {
+        let here = |w: &str| {
+            s.store
+                .portals_here
+                .iter()
+                .any(|(l, x)| l == link && x == w)
+        };
+        let Some(l) = s.store.links.iter().find(|l| l.id() == link) else { return (false, false) };
+        let other = if l.body.from == world { &l.body.to } else { &l.body.from };
+        let far = here(other)
+            || s.store
+                .portals_far
+                .iter()
+                .any(|p| p.link == link && p.by == *other && p.ready);
+        (here(world), far)
+    })
+    .unwrap_or((false, false))
 }
 
 const INVITE_HEADER: &str = "chiacraft-invite-1";

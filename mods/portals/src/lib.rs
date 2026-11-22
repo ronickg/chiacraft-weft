@@ -81,13 +81,47 @@ fn link(id: &str) -> Option<(String, String)> {
 // ------------------------------------------------------------------ registration
 
 fn init(r: &mut Registry) {
+    // A pad set flat on the ground. Once its link is whole (a portal bound in each world), a
+    // doorway two blocks tall stands over it: lit and moving while the other world is open, dim
+    // and still while it is offline. Drawn, not solid: the player walks onto the pad through it.
     r.block(&PORTAL)
         .sound_group("base:block.glass")
         .hardness(1.5)
         .not_solid()
         .translucent()
-        .light(11)
         .tab(&BUILDING)
+        .facing(Facings::HORIZONTAL, Toward::Player)
+        .prop("state", ["base", "closed", "open"])
+        .states(|p, s| {
+            let state = if p.is("state", "open") {
+                "open"
+            } else if p.is("state", "closed") {
+                "closed"
+            } else {
+                "base"
+            };
+            let pad = "portal_pad";
+            let s = s
+                .oriented(p.orientation())
+                .hitbox([0.0, 0.0, 0.0], [16.0, 2.0, 16.0])
+                .model_box_faces([0.0, 0.0, 0.0], [16.0, 2.0, 16.0], [(pad, abi::UV_FROM_BOX); 6]);
+            if state == "base" {
+                return s.light(3);
+            }
+            let (door, frame) = if state == "open" { ("portal", "portal_frame") } else { ("portal_dim", "portal_frame_dim") };
+            let no = abi::UV_NO_FACE;
+            let full = [0.0, 0.0, 16.0, 16.0];
+            // The doorway's sheet (both faces show it whole), its posts and lintel.
+            s.model_box_faces(
+                [1.0, 2.0, 7.5],
+                [15.0, 34.0, 8.5],
+                [(door, no), (door, no), (door, no), (door, no), (door, full), (door, full)],
+            )
+            .model_box_faces([0.0, 2.0, 6.0], [1.0, 35.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
+            .model_box_faces([15.0, 2.0, 6.0], [16.0, 35.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
+            .model_box_faces([1.0, 34.0, 6.0], [15.0, 35.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
+            .light(if state == "open" { 11 } else { 4 })
+        })
         .block_entity()
         .on_use(|u| {
             let (w, player, pos) = (u.world(), u.player(), u.pos());
@@ -120,6 +154,7 @@ fn init(r: &mut Registry) {
     })
     .permission(permission::EVERYONE);
     r.world_tick(settle_waits);
+    r.world_tick(refresh_portals);
     r.world_tick(walk_in);
     r.world_tick(near_portals);
     client(r);
@@ -241,6 +276,14 @@ struct Waits {
     last: Option<std::time::Instant>,
     /// When each visitor's ask was last told to the owner.
     told: std::collections::HashMap<u64, std::time::Instant>,
+    /// Bound portals seen near players this run, by position: their link.
+    known: std::collections::HashMap<[i32; 3], String>,
+    /// When each other world was last asked whether it is open.
+    asked: std::collections::HashMap<String, std::time::Instant>,
+    /// When portals' looks were last set.
+    looked: Option<std::time::Instant>,
+    /// Owners told this run which links still need a portal here.
+    reminded: HashSet<u64>,
 }
 
 static WAITS: Mutex<Option<Waits>> = Mutex::new(None);
@@ -321,8 +364,8 @@ fn pos_of(text: &str) -> Option<[i32; 3]> {
 fn menu_for(w: &World, player: u64, at: [i32; 3]) -> String {
     let owner = is_owner(player);
     let mut msg = format!("{}\n{} {} {}\n", if owner { "owner" } else { "guest" }, at[0], at[1], at[2]);
-    if let Some((name, _)) = link_at(w, at).and_then(|id| link(&id)) {
-        msg.push_str(&format!("N\t{name}\n"));
+    if let Some((id, (name, key))) = link_at(w, at).and_then(|id| Some((id.clone(), link(&id)?))) {
+        msg.push_str(&format!("N\t{name}\t{}\n", look_of(w, &id, &key)));
     }
     let blocks = portal_blocks(w, at);
     let waits = with_waits(w, |ws| {
@@ -342,11 +385,19 @@ fn menu_for(w: &World, player: u64, at: [i32; 3]) -> String {
     }
     if owner {
         msg.push_str(&format!("A\t{}\n", ask("friends_ask", "")));
-        for l in ask("links", "").lines() {
-            let mut f = l.split('\t');
-            if let (Some(id), Some(name)) = (f.next(), f.next()) {
-                msg.push_str(&format!("L\t{id}\t{name}\n"));
-            }
+        // Links no portal here leads to yet come first, marked new.
+        let mut links: Vec<(bool, String)> = ask("links", "")
+            .lines()
+            .filter_map(|l| {
+                let mut f = l.split('\t');
+                let (id, name) = (f.next()?, f.next()?);
+                let new = ask("portal_state", id).split('\t').next() != Some("1");
+                Some((new, format!("L\t{id}\t{name}\t{}\n", if new { 1 } else { 0 })))
+            })
+            .collect();
+        links.sort_by_key(|(new, _)| !*new);
+        for (_, l) in links {
+            msg.push_str(&l);
         }
         for l in ask("friend_worlds", "").lines() {
             msg.push_str(&format!("F\t{l}\n"));
@@ -518,7 +569,7 @@ fn settle_waits(w: &World) {
                 }
             }
             if !x.by_owner && players.contains(&x.player) {
-                say(w, x.player, "portals.msg.bound", &name);
+                say(w, x.player, "portals.msg.finish", &x.name);
             }
             continue;
         }
@@ -677,6 +728,9 @@ fn walk_in(w: &World) {
         match link_at(w, at) {
             None => say(w, player, "portals.msg.unbound_portal", ""),
             Some(id) => match link(&id) {
+                // Open only with a portal in each world, and the other world answering.
+                Some((name, _)) if !far_portal(&id) => say(w, player, "portals.msg.waiting_far", &name),
+                Some((name, key)) if !online(w, &key) => say(w, player, "portals.msg.offline", &name),
                 Some((name, key)) => {
                     let ticket = ask("ticket", &format!("{player} {id}"));
                     w.send(player, &TRAVEL, &format!("{key}\t{name}\t{ticket}"));
@@ -740,7 +794,144 @@ fn near_portals(w: &World) {
         }
         entry.1.push((id.clone(), std::time::Instant::now()));
         if let Some((name, key)) = link(&id) {
-            w.send(player, &NEAR, &format!("{key}\t{name}"));
+            let state = look_of(w, &id, &key);
+            w.send(player, &NEAR, &format!("{key}\t{name}\t{state}"));
+        }
+    }
+}
+
+// ------------------------------------------------------------------ both portals, and the look
+
+/// Whether the other world of link `id` has a portal bound to it too (it said so, signed).
+fn far_portal(id: &str) -> bool {
+    ask("portal_state", id)
+        .split('\t')
+        .nth(1)
+        .is_some_and(|f| f == "1")
+}
+
+/// How often the other worlds are asked whether they are open, at most.
+const STATUS_SECS: u64 = 8;
+
+/// Whether the world with key `key` answers now: its status is asked through this game's own
+/// endpoint every few seconds while a portal to it is near players (`chiacraft/status/1`).
+fn online(w: &World, key: &str) -> bool {
+    let ask_now = with_waits(w, |ws| {
+        let due = ws
+            .asked
+            .get(key)
+            .is_none_or(|t| t.elapsed().as_secs() >= STATUS_SECS);
+        if due {
+            ws.asked.insert(key.to_string(), std::time::Instant::now());
+        }
+        due
+    });
+    if ask_now {
+        ask("warm", key);
+    }
+    !ask("warmed", key).is_empty()
+}
+
+/// What the portal bound to link `id` (to world `key`) shows: only its pad until the other world
+/// has a portal too, then its doorway, open or (the other world offline) closed.
+fn look_of(w: &World, id: &str, key: &str) -> &'static str {
+    if !far_portal(id) {
+        "base"
+    } else if online(w, key) {
+        "open"
+    } else {
+        "closed"
+    }
+}
+
+/// How far around players portals are looked for to set their look, in blocks.
+const LOOK_BLOCKS: i32 = 12;
+
+/// Every two seconds: portals near players show what their link is now (pad, doorway open or
+/// closed); a portal broken stops counting as the world's portal for its link; owners hear once a
+/// run which links still need a portal here.
+fn refresh_portals(w: &World) {
+    let due = with_waits(w, |ws| {
+        if ws.looked.is_some_and(|t| t.elapsed().as_secs() < 2) {
+            return false;
+        }
+        ws.looked = Some(std::time::Instant::now());
+        true
+    });
+    if !due {
+        return;
+    }
+    // Portals near players, bound or not.
+    let mut found: Vec<([i32; 3], Option<String>)> = Vec::new();
+    for player in w.players() {
+        let Some(st) = w.entity(player) else { continue };
+        let c = [st.pos.x.floor() as i32, st.pos.y.floor() as i32, st.pos.z.floor() as i32];
+        for dy in -3..=3 {
+            for dx in -LOOK_BLOCKS..=LOOK_BLOCKS {
+                for dz in -LOOK_BLOCKS..=LOOK_BLOCKS {
+                    let p = [c[0] + dx, c[1] + dy, c[2] + dz];
+                    if PORTAL.is(w.block(p)) && !found.iter().any(|(q, _)| *q == p) {
+                        found.push((p, link_at(w, p)));
+                    }
+                }
+            }
+        }
+    }
+    // Portals known before and gone now (broken, or bound elsewhere).
+    let gone: Vec<String> = with_waits(w, |ws| {
+        let before = std::mem::take(&mut ws.known);
+        let mut gone = Vec::new();
+        for (p, id) in before {
+            if PORTAL.is(w.block(p)) && link_at(w, p).as_deref() == Some(id.as_str()) {
+                ws.known.insert(p, id);
+            } else {
+                gone.push(id);
+            }
+        }
+        for (p, id) in &found {
+            if let Some(id) = id {
+                ws.known.insert(*p, id.clone());
+            }
+        }
+        gone.retain(|id| !ws.known.values().any(|k| k == id));
+        gone
+    });
+    for id in gone {
+        weft_sdk::info!("the portal for a link is gone: arrivals through it have no place here now");
+        ask("unspot", &id);
+    }
+    for (p, id) in &found {
+        let state = match id.as_deref().and_then(|id| Some((id, link(id)?))) {
+            Some((id, (_, key))) => look_of(w, id, &key),
+            None => "base",
+        };
+        if w.prop(*p, "state") != Some(state) {
+            w.prop_set(*p, "state", state);
+        }
+    }
+    remind_owners(w);
+}
+
+/// An owner in the world hears, once a run, of each link no portal here leads to yet.
+fn remind_owners(w: &World) {
+    let owners: Vec<u64> = w.players().into_iter().filter(|p| is_owner(*p)).collect();
+    let new: Vec<u64> = with_waits(w, |ws| {
+        owners
+            .into_iter()
+            .filter(|o| ws.reminded.insert(*o))
+            .collect()
+    });
+    if new.is_empty() {
+        return;
+    }
+    for l in ask("links", "").lines() {
+        let mut f = l.split('\t');
+        let (Some(id), Some(name)) = (f.next(), f.next()) else { continue };
+        let here = ask("portal_state", id).split('\t').next() == Some("1");
+        if !here {
+            for o in &new {
+                say(w, *o, "portals.msg.needs_portal", name);
+            }
         }
     }
 }
@@ -787,12 +978,16 @@ struct Menu {
     owner: bool,
     pos: String,
     leads_to: Option<String>,
+    /// What the link is now: `base` (waiting for the other world's portal), `closed` (that world
+    /// is offline) or `open`.
+    look: String,
     /// Requests for this portal waiting for the owner: link id and world name.
     waiting: Vec<(String, String)>,
     /// Asks for this portal waiting for the other side's answer: world names.
     pending: Vec<String>,
     friends_ask: bool,
-    links: Vec<(String, String)>,
+    /// Links: id, name, and whether no portal here leads there yet (new).
+    links: Vec<(String, String, bool)>,
     /// Friends' worlds: key, name, the friend's inbox.
     friends: Vec<(String, String, String)>,
     /// A visitor's own worlds (from their own game, never from the server): key and name.
@@ -807,11 +1002,14 @@ fn parse_menu(text: &str) -> Menu {
     for l in lines {
         let f: Vec<&str> = l.split('\t').collect();
         match f[..] {
-            ["N", name] => m.leads_to = Some(name.to_string()),
+            ["N", name, look] => {
+                m.leads_to = Some(name.to_string());
+                m.look = look.to_string();
+            }
             ["W", id, name] => m.waiting.push((id.to_string(), name.to_string())),
             ["P", name] => m.pending.push(name.to_string()),
             ["A", a] => m.friends_ask = a == "1",
-            ["L", id, name] => m.links.push((id.to_string(), name.to_string())),
+            ["L", id, name, new] => m.links.push((id.to_string(), name.to_string(), new == "1")),
             ["F", key, name, inbox] => m
                 .friends
                 .push((key.to_string(), name.to_string(), inbox.to_string())),
@@ -850,9 +1048,17 @@ fn client(r: &mut Registry) {
         c.say(&format!("/portal_note {key} {arg}"));
     });
     r.client_packet(&NEAR, |c, text| {
-        let (key, name) = text.split_once('\t').unwrap_or((&text, ""));
-        ask("warm", key);
-        c.say(&format!("/portal_note portals.msg.near {name}"));
+        let mut f = text.split('\t');
+        let (key, name, look) = (f.next().unwrap_or(""), f.next().unwrap_or(""), f.next().unwrap_or("open"));
+        let note = match look {
+            "base" => "portals.msg.waiting_far",
+            "closed" => "portals.msg.offline",
+            _ => {
+                ask("warm", key);
+                "portals.msg.near"
+            }
+        };
+        c.say(&format!("/portal_note {note} {name}"));
     });
     r.client_packet(&TRAVEL, |c, text| {
         let mut f = text.split('\t');
@@ -889,9 +1095,11 @@ fn client(r: &mut Registry) {
         let wide = || S::default().w(280.0);
         ui.panel("panel", S::column().pad(8.0).gap(4.0).min_w(300.0), |ui| {
             ui.text_styled(S::column().class("title").scale(1.5).no_wrap(), "portals.title", &[]);
-            match &m.leads_to {
-                Some(name) => ui.text_args("portals.leads_to", &[Arg::Text(name)]),
-                None => ui.text("portals.leads_nowhere"),
+            match (&m.leads_to, m.look.as_str()) {
+                (Some(name), "base") => ui.text_args("portals.waiting_far", &[Arg::Text(name)]),
+                (Some(name), "closed") => ui.text_args("portals.offline", &[Arg::Text(name)]),
+                (Some(name), _) => ui.text_args("portals.leads_to", &[Arg::Text(name)]),
+                (None, _) => ui.text("portals.leads_nowhere"),
             }
             for name in &m.pending {
                 ui.text_args("portals.pending", &[Arg::Text(name)]);
@@ -920,9 +1128,10 @@ fn client(r: &mut Registry) {
                 if !m.links.is_empty() {
                     ui.text("portals.pick");
                 }
-                for (id, name) in &m.links {
+                for (id, name, new) in &m.links {
                     let msg = format!("{}\t{id}", m.pos);
-                    ui.button_args("portals.to", &[Arg::Text(name)], wide(), move |v| {
+                    let key = if *new { "portals.to_new" } else { "portals.to" };
+                    ui.button_args(key, &[Arg::Text(name)], wide(), move |v| {
                         v.client().send(&BIND, &msg);
                         v.client().screen_close();
                     });

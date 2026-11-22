@@ -13,6 +13,9 @@
 //! - `ticket <player entity> <link id>`: a travel ticket (`travel`) this world signs for that player
 //!   to go through the link, or empty;
 //! - `spot <link id> <x> <y> <z>`: arrivals through the link stand here; `unspot <link id>` forgets it;
+//!   either way the other world is told whether this one has a portal for the link (`links`);
+//! - `portal_state <link id>`: `<here>\t<far>`, each `1` or empty: whether this world, and the
+//!   other, have a portal bound to the link (it opens for travel only with both);
 //! - `data_dir <mod>`: a folder in the world's save for that mod's own files (made if missing),
 //!   or empty (no world open, or a name that isn't lowercase letters, digits and `_`).
 //! - `achievement <player entity>\t<id>\t<title>\t<description>\t<icon item or empty>`: the
@@ -241,6 +244,11 @@ fn answer(q: &str, arg: &str) -> String {
             })();
             result.unwrap_or_else(|e| format!("!{e}"))
         }
+        "portal_state" => {
+            let Some(world) = &info.world_key else { return String::new() };
+            let (here, far) = crate::links::portal_state(arg, world);
+            format!("{}\t{}", if here { "1" } else { "" }, if far { "1" } else { "" })
+        }
         "friends_ask" => {
             if crate::links::friends_ask() {
                 "1".into()
@@ -299,7 +307,11 @@ fn answer(q: &str, arg: &str) -> String {
                 ("spot", _) => return String::new(),
                 _ => None,
             };
+            let ready = spot.is_some();
             crate::travel::set_spot(dir, link, spot);
+            if let Some(id) = &info.identity {
+                crate::links::set_portal_here(id, link, ready);
+            }
             "1".into()
         }
         _ => String::new(),
