@@ -64,6 +64,16 @@ const _: () = assert!(
         && JOIN_EAT < crate::needs::FULL
 );
 
+/// Migration's first step: one that finds no water within its look round (`drink.rs`, 16 blocks)
+/// goes to the nearest water it or a wild one of its kind near remembers drinking at, up to this
+/// many blocks off; its herd goes with it (a member keeps to its place round its leader, and
+/// drinks with it). Herds of the dry seasons walk tens of kilometres to the water they know
+/// (wildebeest and zebra in the Serengeti, red deer to their summer and winter ranges): here a few
+/// chunks, the reach of what one herd shares.
+pub const WATER_TREK: f32 = 96.0;
+// Further than it looks or goes back on its own (`drink.rs` LOOK 16, RECALL 32).
+const _: () = assert!(WATER_TREK > 32.0);
+
 /// The ring's radius for a group of `kin`.
 pub fn ring(kin: u16) -> f32 {
     (SLOT_NEAR + SLOT_PER * (kin.max(1) as f32).sqrt()).min(SLOT_FAR)
