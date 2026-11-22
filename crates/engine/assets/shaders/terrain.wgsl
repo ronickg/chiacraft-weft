@@ -518,7 +518,9 @@ fn generate(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_inde
     let co = u32(desc[D_CAVE_OFF]);
     for (var k = 0u; k < ncb; k++) {
         let b = co + k * WORDS_CAVE;
-        if (oy + 15 < c.height - desc[b + 1u] && perlin3(bitcast<u32>(desc[b + 4u]), (ox + i32(t % 16u)) * 16, (oy + 8) * 16, (oz + i32(t / 16u)) * 16, desc[b + 2u], desc[b + 2u], desc[b + 2u]) > desc[b + 3u]) {
+        if (oy + 15 < c.height - desc[b + 1u] &&
+            (desc[b + 3u] <= -ONE ||
+            perlin3(bitcast<u32>(desc[b + 4u]), (ox + i32(t % 16u)) * 16, (oy + 8) * 16, (oz + i32(t / 16u)) * 16, desc[b + 2u], desc[b + 2u], desc[b + 2u]) > desc[b + 3u])) {
             biome = desc[b];
             break;
         }

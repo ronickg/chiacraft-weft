@@ -26,6 +26,7 @@
 use super::font::Font;
 use super::lang::Lang;
 use crate::input::{Input, key_name};
+use weft_abi::entry_kind as ek;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Arg {
@@ -420,7 +421,7 @@ fn push_icons(spec: &str, cx: &Ctx, out: &mut Vec<Span>, st: &State) {
             _ => {}
         }
     }
-    let Some((w, h)) = size.or_else(|| texture_size(&name).map(|(w, h)| (w as f32, h as f32))) else { return };
+    let Some((w, h)) = size.or_else(|| crate::assets::texture_size(&name).map(|(w, h)| (w as f32, h as f32))) else { return };
     // At most a line's worth, whatever a value says.
     let whole = (n.floor() as u32).min(64);
     let mut pictures: Vec<(String, [f32; 4])> = (0..whole)
@@ -503,10 +504,6 @@ fn gui_texture(name: &str) -> String {
         return String::new();
     }
     format!("{ns}:gui/{path}")
-}
-
-fn texture_size(name: &str) -> Option<(u32, u32)> {
-    crate::assets::texture_size(name)
 }
 
 fn push_text(out: &mut Vec<Span>, s: &str, st: &State) {
@@ -604,7 +601,7 @@ fn format_depth(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>, st:
                 .next()
                 .and_then(|s| s.split_once('x'))
                 .and_then(|(w, h)| Some((w.parse::<f32>().ok()?, h.parse::<f32>().ok()?)));
-            if let Some((w, h)) = size.or_else(|| texture_size(name).map(|(w, h)| (w as f32, h as f32))) {
+            if let Some((w, h)) = size.or_else(|| crate::assets::texture_size(name).map(|(w, h)| (w as f32, h as f32))) {
                 out.push(st.span(Piece::Image(image_id(name), w * FONT_PER_GUI, h * FONT_PER_GUI, [0.0, 0.0, 1.0, 1.0]), None));
             }
         } else if let Some(spec) = tag.strip_prefix("icons:") {
@@ -727,7 +724,9 @@ fn shape_of(n: &Name) -> Option<(u32, String)> {
     };
     let (source, key) = c.shapes.get(name)?;
     Some((
-        c.block_names
+        c.game
+            .catalog
+            .ids(ek::BLOCK)
             .get(source)
             .map(|&b| c.blocks[b as usize].first_state)?,
         key.clone(),
@@ -967,11 +966,11 @@ pub fn layout_with(spans: &[Span], font: &Font, max_width: Option<f32>, line_hei
 
 /// A key's name for players: translated (`keyname.ShiftLeft`) when the language has it.
 /// `Ctrl+T`: the modifiers (`keyname.ctrl` ..., either side's key), then the key.
-/// What a player reads for a binding: its keys, `x2` after a double tap's (`Wx2`).
+/// What a player reads for a binding: its keys, `*2` after a double tap's (`W*2`).
 pub fn display_binding(lang: &Lang, b: crate::input::Binding) -> String {
     let chord = display_chord(lang, b.chord);
     match b.trigger {
-        crate::input::Trigger::Double => format!("{chord}x2"),
+        crate::input::Trigger::Double => format!("{chord}*2"),
         _ => chord,
     }
 }
@@ -984,6 +983,10 @@ pub fn display_chord(lang: &Lang, c: crate::input::Chord) -> String {
             out.push('+');
         }
     }
+    if let Some(w) = c.with {
+        out += &display_key(lang, w);
+        out.push('+');
+    }
     out + &display_key(lang, c.key)
 }
 
@@ -995,6 +998,29 @@ pub fn display_key(lang: &Lang, k: crate::input::Key) -> String {
 
 pub fn plain(s: &str) -> Vec<Span> {
     vec![Span::text(s, None)]
+}
+
+/// The spans holding chars `from..to` of their text, cut where a span crosses either end.
+pub fn slice(spans: &[Span], from: usize, to: usize) -> Vec<Span> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    for s in spans {
+        match &s.piece {
+            Piece::Text(t) => {
+                let n = t.chars().count();
+                let (a, b) = (from.max(at), to.min(at + n));
+                if a < b {
+                    let mut part = s.clone();
+                    part.piece = Piece::Text(t.chars().skip(a - at).take(b - a).collect());
+                    out.push(part);
+                }
+                at += n;
+            }
+            _ if (from..to).contains(&at) => out.push(s.clone()),
+            _ => {}
+        }
+    }
+    out
 }
 
 /// The text of spans, without icons or formatting.
@@ -1042,7 +1068,7 @@ mod tests {
         assert_eq!(spans.iter().map(text).collect::<Vec<_>>(), ["a", "b", "c", "d", "e"]);
         assert_eq!((spans[2].when.len(), spans[3].fx, spans[4].fx), (2, fx_id("core:wave"), 0));
         // Sneak held, not creative: only the unconditional parts and the effect remain.
-        let font = Font::parse_hex(include_str!("../../assets/fonts/unifont.hex"));
+        let font = Font::new(include_str!("../../assets/fonts/unifont.hex"), None);
         assert!(refresh(&mut spans, &|t| matches!(t, Test::Keys(_))));
         let shown: String = layout(&spans, &font, None)
             .items
@@ -1068,7 +1094,7 @@ ab",
             &cx,
             &mut spans,
         );
-        let font = Font::parse_hex(include_str!("../../assets/fonts/unifont.hex"));
+        let font = Font::new(include_str!("../../assets/fonts/unifont.hex"), None);
         let l = layout(&spans, &font, Some(100.0));
         let (ix, iw, ih) = l
             .items
@@ -1092,7 +1118,7 @@ ab",
 
     #[test]
     fn wrapping_never_loses_or_panics() {
-        let font = Font::parse_hex(include_str!("../../assets/fonts/unifont.hex"));
+        let font = Font::new(include_str!("../../assets/fonts/unifont.hex"), None);
         let text = "Cubes: 5583 loaded, 0 meshing, 725 draws  double  spaces and a_very_long_word_without_breaks";
         let inked = text.chars().filter(|c| *c != ' ').count();
         for width in [0.0, 8.0, 13.0, 40.0, 100.0, 1000.0] {

@@ -11,6 +11,7 @@ struct VOut {
     @location(2) @interpolate(flat) data: vec4<u32>,
     @location(3) @interpolate(flat) life: f32,
     @location(4) dist: f32,
+    @location(5) rel: vec3<f32>,
 }
 
 @vertex
@@ -44,6 +45,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     out.data = p.data;
     out.life = p.extra.x;
     out.dist = length(world);
+    out.rel = world;
     return out;
 }
 
@@ -57,7 +59,7 @@ fn shade(in: VOut) -> vec4<f32> {
     var color = unpack_color(in.data.x);
     color = particle_shade(in.data.y >> PARTICLE_SLOT_SHIFT, ParticleFrag(in.quad, albedo, color, in.life, scene.params.w));
     if in.data.w != 0xffffffffu {
-        let light = lightmap(unpack_light(in.data.w), scene.params.z, scene.light.x, scene.light.y);
+        let light = lightmap(unpack_light(in.data.w), scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
         color = vec4(color.rgb * pow(light, vec3(2.2)), color.a);
     }
     let fog = fog_amount(in.dist, scene.params.x, scene.params.y);
@@ -79,5 +81,5 @@ fn fs_blend(in: VOut) -> @location(0) vec4<f32> {
     if c.a < 0.01 {
         discard;
     }
-    return c;
+    return through_cloud(c, in.rel, scene);
 }

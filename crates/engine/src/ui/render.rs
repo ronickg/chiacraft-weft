@@ -18,6 +18,55 @@ pub use crate::gpu_layout::Quad;
 use crate::model::{Animation, Prop};
 use crate::shaders::{Hook, Slots};
 
+#[derive(Clone, Copy)]
+pub struct ModelView {
+    pub yaw: f32,
+    pub pitch: f32,
+    pub zoom: f32,
+}
+
+impl ModelView {
+    pub fn bounds(boxes: &[crate::content::ModelBox]) -> (glam::Vec3, glam::Vec3) {
+        let (mut min, mut max) = (glam::Vec3::ZERO, glam::Vec3::ONE);
+        for bx in boxes {
+            for face in 0..6 {
+                if let Some((corners, _)) = crate::client::mesher::box_face(bx, face) {
+                    for p in corners {
+                        min = min.min(glam::Vec3::from(p));
+                        max = max.max(glam::Vec3::from(p));
+                    }
+                }
+            }
+        }
+        (min, max)
+    }
+
+    pub fn projection(self, size: [f32; 2], boxes: &[crate::content::ModelBox]) -> glam::Mat4 {
+        let (min, max) = Self::bounds(boxes);
+        let center = (min + max) * 0.5;
+        let right = glam::Vec3::new(self.yaw.cos(), 0.0, -self.yaw.sin());
+        let toward = glam::Vec3::new(self.yaw.sin() * self.pitch.cos(), self.pitch.sin(), self.yaw.cos() * self.pitch.cos());
+        let up = toward.cross(right);
+        // Pixels per block are independent of camera angle and model dimensions.
+        let scale = size[0].min(size[1]) * 0.52 * self.zoom;
+        let x = right * (2.0 * scale / size[0]);
+        let y = up * (2.0 * scale / size[1]);
+        let z = toward * (0.45 / (max - min).length().max(1.0));
+        glam::Mat4::from_cols(
+            glam::Vec4::new(x.x, y.x, z.x, 0.0),
+            glam::Vec4::new(x.y, y.y, z.y, 0.0),
+            glam::Vec4::new(x.z, y.z, z.z, 0.0),
+            glam::Vec4::new(-x.dot(center), -y.dot(center), 0.5 - z.dot(center), 1.0),
+        )
+    }
+}
+
+impl Default for ModelView {
+    fn default() -> Self {
+        Self { yaw: std::f32::consts::FRAC_PI_4, pitch: std::f32::consts::FRAC_PI_6, zoom: 1.0 }
+    }
+}
+
 /// Quads of a node and its children moved by keyframes every frame: `animation = ns:name` in the
 /// `.gui` of a class's texture names `animations/<name>.animation.json`, whose `open` animation
 /// plays once when the screen opens and `idle` loops after. Any bone: position in GUI pixels (y up),
@@ -85,6 +134,19 @@ pub enum Slicing {
 
 /// GUI texture names starting with this are a skin file's face (`screens::face_texture`).
 pub const FACE: &str = "skin_face:";
+
+/// GUI texture names starting with this are a picture on disk, `file:<path>|<anything>`: what
+/// follows the `|` (its time of change) makes a new picture a new name.
+pub const FILE: &str = "file:";
+
+/// The GUI texture name of picture `path` as it is now, `None` if there is none.
+pub fn file_texture(path: &std::path::Path) -> Option<String> {
+    let changed = std::fs::metadata(path).ok()?.modified().ok()?;
+    let stamp = changed
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis());
+    Some(format!("{FILE}{}|{stamp}", path.display()))
+}
 
 /// The 8x8 face of a skin (64x64 or 64x32), its hat layer drawn over it.
 fn face_of(skin: &crate::assets::Image) -> Option<Vec<u8>> {
@@ -213,7 +275,10 @@ pub struct UiRenderer {
     icon_clips: Vec<[f32; 4]>,
     /// Stack counts drawn over queued item icons: (icon number, count, text pixel size).
     /// Item nodes of the tree being built: where, what, and their clip.
-    stacks: Vec<(Rect, weft_abi::ItemStack, [f32; 4])>,
+    /// chiacraft: with the icon's size in GUI pixels (`defer_stack_sized`) and the slot's number
+    /// drawn in its corner (0 none, the hotbar's keys).
+    stacks: Vec<(Rect, weft_abi::ItemStack, [f32; 4], f32, u64)>,
+    overlays: Vec<Quad>,
     /// Text effects and GUI fills the shader has, and the effect slot by `text::fx_id`.
     fx: Slots,
     gui: Slots,
@@ -221,6 +286,8 @@ pub struct UiRenderer {
     /// UI animation files by name, and the nodes the last `build` animated.
     anims: FxHashMap<String, Vec<Arc<Animation>>>,
     pub animated: Vec<Animated>,
+    /// The biome under the player: what block items here take their tint kinds' colors from.
+    pub biome: Option<u16>,
 }
 
 pub const FX: Hook =
@@ -274,11 +341,13 @@ impl UiRenderer {
             quads: Vec::new(),
             icon_clips: Vec::new(),
             stacks: Vec::new(),
+            overlays: Vec::new(),
             fx,
             gui,
             fx_slots: Vec::new(),
             anims: FxHashMap::default(),
             animated: Vec::new(),
+            biome: None,
         })
     }
 
@@ -438,6 +507,18 @@ impl UiRenderer {
                     self.owned.push(t);
                     (gpu.texture_index(t), 8, 8)
                 });
+            self.textures.insert(name.to_string(), loaded);
+            return loaded;
+        }
+        if let Some(file) = name.strip_prefix(FILE) {
+            let path = file.rsplit_once('|').map_or(file, |(p, _)| p);
+            let loaded = crate::assets::decode_png_file(std::path::Path::new(path)).map(|(w, h, rgba)| {
+                let t = gpu
+                    .create_texture(&TextureDesc { width: w, height: h, mips: 1, format: Format::Rgba8Srgb, render_target: false }, "file");
+                gpu.write_texture(t, 0, &rgba);
+                self.owned.push(t);
+                (gpu.texture_index(t), w, h)
+            });
             self.textures.insert(name.to_string(), loaded);
             return loaded;
         }
@@ -606,24 +687,10 @@ impl UiRenderer {
         }
     }
 
-    /// Share `v` of a picture in `r`: its nearest state, or cut off toward `dir` (`ui::meter`).
+    /// Share `v` of a picture in `r`, tinted `color`: its nearest state, or cut off toward `dir`
+    /// (`ui::meter`).
     #[allow(clippy::too_many_arguments)]
-    fn meter_picture(&mut self, gpu: &mut dyn Backend, assets: &Assets, name: &str, v: f32, dir: u32, r: Rect, scale: f32) {
-        self.meter_picture_tinted(gpu, assets, name, v, dir, r, scale, 0xFFFFFFFF)
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn meter_picture_tinted(
-        &mut self,
-        gpu: &mut dyn Backend,
-        assets: &Assets,
-        name: &str,
-        v: f32,
-        dir: u32,
-        r: Rect,
-        scale: f32,
-        color: u32,
-    ) {
+    fn meter_picture(&mut self, gpu: &mut dyn Backend, assets: &Assets, name: &str, v: f32, dir: u32, r: Rect, scale: f32, color: u32) {
         let Some((picture, crop)) = super::meter::part(name, v, dir) else { return };
         match self.texture(gpu, assets, &picture) {
             Some((idx, _, _)) => self.image(cropped(r, crop), idx, crop, color),
@@ -678,6 +745,14 @@ impl UiRenderer {
     }
 
     pub fn image(&mut self, r: Rect, tex: u32, uv: [f32; 4], color: u32) {
+        self.texture_quad(r, tex, uv, color, ui_mode::TEXTURE, None);
+    }
+
+    pub fn premultiplied_image(&mut self, r: Rect, tex: u32, uv: [f32; 4], color: u32) {
+        self.texture_quad(r, tex, uv, color, ui_mode::PREMULTIPLIED, None);
+    }
+
+    fn texture_quad(&mut self, r: Rect, tex: u32, uv: [f32; 4], color: u32, mode: u32, clip: Option<Rect>) {
         self.quads.push(Quad {
             p0: [r.x, r.y],
             u: [r.w, 0.0],
@@ -685,7 +760,8 @@ impl UiRenderer {
             uv,
             color,
             tex,
-            mode: ui_mode::TEXTURE,
+            mode,
+            clip: clip.map_or([0.0; 4], |r| [r.x, r.y, r.x + r.w, r.y + r.h]),
             ..Default::default()
         });
     }
@@ -842,14 +918,24 @@ impl UiRenderer {
         self.slot_icon(c, tex, x, y, size, &weft_abi::ItemStack { item, count: 1, data: 0 });
     }
 
-    /// A stack as slots show it: an item with an icon shows its icon (`Looks::slot_draw`, painted
-    /// for the slot), one with only a model its model's picture once drawn (`model_icon`), and
+    /// A stack as slots show it (chiacraft): an item with an icon shows its icon even when it has a
+    /// model (painted for the slot, it reads better small than the model would, as Hytale's
+    /// inventory does), one with only a model its model's picture once drawn (`model_icon`), and
     /// otherwise its own picture (`plain_icon`).
     pub fn slot_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, stack: &weft_abi::ItemStack) {
         let looks = crate::client::looks::current();
-        let icon_first = matches!(looks.slot_draw(c, stack.item), crate::client::looks::ItemDraw::Icon(_));
-        if icon_first || !self.model_icon(x, y, size, *stack) {
-            self.plain_icon(c, tex, x, y, size, stack);
+        let icon = c.items.get(stack.item as usize).filter(|_| stack.item != 0).map(|def| {
+            let look = looks.item(stack.item);
+            let model = look.and_then(|l| l.model.as_deref()).unwrap_or(&def.model);
+            (look.and_then(|l| l.icon).unwrap_or(def.icon), !model.is_empty())
+        });
+        match icon {
+            // A model and an icon: the icon (a stack's own layers, `stack::layers`, go the usual way).
+            Some((icon, true)) if icon != u32::MAX && crate::stack::layers(stack).is_none() => {
+                self.sprite_quad(tex, Rect { x, y, w: size, h: size }, icon, 0xFFFFFFFF, None);
+            }
+            _ if self.model_icon(x, y, size, *stack) => {}
+            _ => self.plain_icon(c, tex, x, y, size, stack),
         }
     }
 
@@ -858,28 +944,8 @@ impl UiRenderer {
     // `stack::layers` falls back to and `GameTextures::layered` composes (lost in the Weft sync,
     // back 11-05).
     fn plain_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, stack: &weft_abi::ItemStack) {
-        let item = stack.item;
         let looks = crate::client::looks::current();
-        match looks.slot_draw(c, item) {
-            // Its own pictures, one over the other.
-            crate::client::looks::ItemDraw::Icon(_) if crate::stack::layers(stack).is_some() => {
-                let t = tex.layered(crate::stack::layers(stack).unwrap_or_default());
-                self.icon(tex, x, y, size, t, 0xFFFFFFFF);
-            }
-            crate::client::looks::ItemDraw::Model(model) => self.boxes_icon(tex, x, y, size, model, &c.states[0]),
-            crate::client::looks::ItemDraw::Icon(icon) => {
-                // A liquid's item is its texture, tinted as the liquid is (water is gray).
-                let color = c
-                    .item_fluid
-                    .get(&item)
-                    .and_then(|&l| c.states.get(c.liquids[l as usize].first_state as usize))
-                    .filter(|s| s.tint != 0)
-                    .map_or(0xFFFFFFFF, |s| crate::content::item_tint(s.tint) << 8 | 0xFF);
-                self.icon(tex, x, y, size, icon, color);
-            }
-            crate::client::looks::ItemDraw::Block(state) => self.state_icon(c, tex, x, y, size, state),
-            crate::client::looks::ItemDraw::Nothing => {}
-        }
+        self.draw_icon(c, tex, x, y, size, looks.item_draw(c, stack, self.biome, "south"));
     }
 
     /// Texture `t` as a flat icon, multiplied by `color`.
@@ -907,34 +973,128 @@ impl UiRenderer {
         }
     }
 
-    /// A block state the way block items show: a sprite for flat blocks, else an isometric model.
-    pub fn state_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, state: u32) {
-        let Some(s) = c.states.get(state as usize) else { return };
-        let looks = crate::client::looks::current();
-        if let Some(t) = looks.block_sprite(state, s) {
-            let tint = if crate::content::face_paint(s, 0, false).base_tinted {
-                crate::content::item_tint(s.tint) << 8 | 0xFF
-            } else {
-                0xFFFFFFFF
-            };
-            self.quads.push(Quad {
-                p0: [x, y],
-                u: [size, 0.0],
-                v: [0.0, size],
-                uv: [0.0, 0.0, 1.0, 1.0],
-                color: tint,
-                tex: tex.texture(t),
-                mode: ui_mode::ICON,
-                ..Default::default()
-            });
-            return;
+    fn draw_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, draw: crate::client::looks::ItemDraw<'_>) {
+        match draw {
+            crate::client::looks::ItemDraw::Model { boxes, state } => {
+                self.boxes_icon(c, tex, x, y, size, &boxes, &c.states[state as usize])
+            }
+            draw => {
+                for sprite in draw.sprites() {
+                    self.sprite_quad(tex, Rect { x, y, w: size, h: size }, sprite.texture(tex), sprite.color << 8 | 0xFF, None);
+                }
+            }
         }
-        self.boxes_icon(tex, x, y, size, &looks.block_shape(state, s), s);
     }
 
-    /// Model boxes drawn isometric, tinted like `s` (air for an item's own model).
+    /// A block state the way block items show: a sprite for flat blocks, else an isometric model.
+    pub fn state_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, state: u32) {
+        let looks = crate::client::looks::current();
+        self.draw_icon(c, tex, x, y, size, looks.block_draw(c, state, self.biome));
+    }
+
+    /// Texture `texture` (`Content::textures`) flat over `r`, as an item's picture shows.
+    pub fn picture_icon(&mut self, tex: &GameTextures, r: crate::ui::Rect, texture: u32) {
+        self.sprite_quad(tex, r, texture, 0xFFFFFFFF, None);
+    }
+
+    pub fn picture_layers(&mut self, c: &Content, tex: &GameTextures, r: Rect, clip: Rect, texture: u32) {
+        for layer in crate::client::mesher::face_layers(c, &c.states[0], texture, 0).iter() {
+            self.sprite_quad(tex, r, layer.tex, c.kind_color(layer.tint, self.biome) << 8 | 0xff, Some(clip));
+        }
+    }
+
+    fn sprite_quad(&mut self, tex: &GameTextures, r: Rect, texture: u32, color: u32, clip: Option<Rect>) {
+        self.texture_quad(r, tex.texture(texture), [0.0, 0.0, 1.0, 1.0], color, ui_mode::ICON, clip);
+    }
+
+    /// Model boxes as a slot shows a block: for what isn't registered yet, drawn the same way as
+    /// what is.
+    pub fn block_icon(&mut self, c: &Content, tex: &GameTextures, r: crate::ui::Rect, boxes: &[crate::content::ModelBox]) {
+        self.boxes_icon(c, tex, r.x, r.y, r.w.min(r.h), boxes, &c.states[0]);
+    }
+
+    /// The char index in text field `node` nearest to `p` (GUI units), where a click puts the caret.
+    pub fn preview_grid(&mut self, r: Rect, boxes: &[crate::content::ModelBox], view: ModelView, fine: u32, major: u32) {
+        let start = self.quads.len();
+        let (min, max) = ModelView::bounds(boxes);
+        let matrix = view.projection([r.w, r.h], boxes);
+        let at = |p: [f32; 3]| {
+            let p = matrix.project_point3(glam::Vec3::from(p));
+            [r.x + (p.x + 1.0) * r.w * 0.5, r.y + (1.0 - p.y) * r.h * 0.5]
+        };
+        let (x0, x1) = ((min.x.floor() - 0.5).max(-8.0), (max.x.ceil() + 0.5).min(8.0));
+        let (z0, z1) = ((min.z.floor() - 0.5).max(-8.0), (max.z.ceil() + 0.5).min(8.0));
+        for x in (x0 * 16.0) as i32..=(x1 * 16.0) as i32 {
+            self.preview_line(
+                at([x as f32 / 16.0, 0.0, z0]),
+                at([x as f32 / 16.0, 0.0, z1]),
+                if x % 16 == 0 { major } else { fine },
+                if x % 16 == 0 { 1.0 } else { 0.5 },
+            );
+        }
+        for z in (z0 * 16.0) as i32..=(z1 * 16.0) as i32 {
+            self.preview_line(
+                at([x0, 0.0, z as f32 / 16.0]),
+                at([x1, 0.0, z as f32 / 16.0]),
+                if z % 16 == 0 { major } else { fine },
+                if z % 16 == 0 { 1.0 } else { 0.5 },
+            );
+        }
+        for quad in &mut self.quads[start..] {
+            quad.clip = [r.x, r.y, r.x + r.w, r.y + r.h];
+        }
+    }
+
+    fn preview_line(&mut self, a: [f32; 2], b: [f32; 2], color: u32, width: f32) {
+        let delta = glam::Vec2::from(b) - glam::Vec2::from(a);
+        let normal = glam::Vec2::new(-delta.y, delta.x).normalize_or_zero() * width;
+        self.quads.push(Quad {
+            p0: [a[0] - normal.x * 0.5, a[1] - normal.y * 0.5],
+            u: delta.to_array(),
+            v: normal.to_array(),
+            color,
+            mode: ui_mode::SOLID,
+            ..Default::default()
+        });
+    }
+
+    pub fn caret_at(&self, ui: &crate::ui::Ui, node: usize, p: glam::Vec2) -> Option<usize> {
+        let n = ui.nodes.get(node)?;
+        let Kind::Input { value, caret, area, .. } = &n.kind else { return None };
+        let px = ui.text_unit;
+        if let Some(a) = area {
+            // Rows as drawn, the nearest boundary in the row under the click.
+            let [sx, sy] = a.scroll.get();
+            let lh = self.font.line_height * px;
+            let rows = a.rows(value, &self.font, Some(a.room(n.rect.w).max(px) / px));
+            let ri = (((p.y - n.rect.y - 4.0 + sy) / lh).floor().max(0.0) as usize).min(rows.len() - 1);
+            let row = &rows[ri];
+            let x = p.x - n.rect.x - 4.0 + sx;
+            let col = (0..=row.widths.len()).min_by(|&i, &j| {
+                (row.x(i) * px - x)
+                    .abs()
+                    .total_cmp(&(row.x(j) * px - x).abs())
+            });
+            return Some(row.at + col.unwrap_or(0));
+        }
+        let width = |s: &str| super::text::layout(&super::text::plain(s), &self.font, None).width * px;
+        // As drawn: slid left so the caret is in sight.
+        let before: String = value.chars().take(*caret).collect();
+        let x = p.x - n.rect.x - 4.0 + (width(&before) - (n.rect.w - 8.0) + px).max(0.0);
+        let chars: Vec<char> = value.chars().collect();
+        // The boundary between two chars the click is nearest to.
+        (0..=chars.len()).min_by(|&i, &j| {
+            let d = |k: usize| (width(&chars[..k].iter().collect::<String>()) - x).abs();
+            d(i).total_cmp(&d(j))
+        })
+    }
+
+    /// Model boxes drawn isometric, each face's layers one over the other as in the world (`s` is
+    /// air for an item's own model).
+    #[allow(clippy::too_many_arguments)]
     fn boxes_icon(
         &mut self,
+        c: &Content,
         tex: &GameTextures,
         x: f32,
         y: f32,
@@ -942,8 +1102,6 @@ impl UiRenderer {
         boxes: &[crate::content::ModelBox],
         s: &crate::content::StateInfo,
     ) {
-        let grass = crate::content::item_tint(s.tint) << 8 | 0xFF;
-        let color_of = |tinted: bool| if tinted { grass } else { 0xFFFFFFFF };
         let shade = |c: u32, k: f32| {
             let ch = |s: u32| (((c >> s) & 255) as f32 * k) as u32;
             ch(24) << 24 | ch(16) << 16 | ch(8) << 8 | 0xFF
@@ -964,6 +1122,7 @@ impl UiRenderer {
             for face in 0..6 {
                 let Some((corners, uv)) = crate::client::mesher::box_face(b, face) else { continue };
                 let (n, k) = crate::client::mesher::face_look(&corners);
+                let k = if b.flat { 1.0 } else { k };
                 if n.dot(toward) <= 0.0 {
                     continue;
                 }
@@ -973,26 +1132,10 @@ impl UiRenderer {
                 let u = [top_right[0] - p0[0], top_right[1] - p0[1]];
                 let v = [bottom_left[0] - p0[0], bottom_left[1] - p0[1]];
                 let uv = uv.map(|t| t / 16.0);
-                let overlay = tex
-                    .overlays
-                    .get(b.textures[face] as usize)
-                    .filter(|&&ov| ov != 0);
-                let paint = crate::content::face_paint(s, face, overlay.is_some());
-                self.quads.push(Quad {
-                    p0,
-                    u,
-                    v,
-                    uv,
-                    color: shade(color_of(paint.base_tinted), k),
-                    tex: tex.texture(b.textures[face]),
-                    mode: ui_mode::ICON,
-                    ..Default::default()
-                });
-                // The part of a face over it.
-                if let Some(&ov) = overlay {
-                    let color = shade(color_of(paint.overlay_tinted), k);
+                for l in crate::client::mesher::face_layers(c, s, b.textures[face], face).iter() {
+                    let color = shade(c.kind_color(l.tint, self.biome) << 8 | 0xFF, k);
                     self.quads
-                        .push(Quad { p0, u, v, uv, color, tex: tex.texture(ov - 1), mode: ui_mode::ICON, ..Default::default() });
+                        .push(Quad { p0, u, v, uv, color, tex: tex.texture(l.tex), mode: ui_mode::ICON, ..Default::default() });
                 }
             }
         }
@@ -1028,6 +1171,7 @@ impl UiRenderer {
     ) {
         self.icon_clips.clear();
         self.stacks.clear();
+        self.overlays.clear();
         let mut icons = Vec::new();
         self.node(gpu, assets, ui, look, 0, scale, &mut icons, custom, None);
         if let Some((c, t)) = game {
@@ -1040,14 +1184,36 @@ impl UiRenderer {
                     q.clip = clip;
                 }
             }
-            for (r, stack, clip) in std::mem::take(&mut self.stacks) {
+            for (r, stack, clip, icon, number) in std::mem::take(&mut self.stacks) {
                 let start = self.quads.len();
-                self.stack_icon(c, t, r, stack, scale, ui.text_unit);
+                self.stack_icon_sized(c, t, r, stack, icon, scale, ui.text_unit);
+                if number > 0 {
+                    self.slot_number(r, number, scale, ui.text_unit);
+                }
                 for q in &mut self.quads[start..] {
                     q.clip = clip;
                 }
             }
         }
+        self.quads.append(&mut self.overlays);
+    }
+
+    /// A node's stack, drawn after the screen's backgrounds and with that node's clip.
+    pub fn defer_stack(&mut self, r: Rect, stack: weft_abi::ItemStack) {
+        self.defer_stack_sized(r, stack, 16.0, 0);
+    }
+
+    /// `defer_stack` with the icon `icon` GUI pixels wide (`stack_icon_sized`) and the slot's
+    /// number `number` in its top left corner (0 none: `slot_number`), chiacraft's slots.
+    pub fn defer_stack_sized(&mut self, r: Rect, stack: weft_abi::ItemStack, icon: f32, number: u64) {
+        self.stacks.push((r, stack, [0.0; 4], icon, number));
+    }
+
+    /// Draw above node backgrounds and item icons.
+    pub fn defer_overlay(&mut self, draw: impl FnOnce(&mut Self)) {
+        let start = self.quads.len();
+        draw(self);
+        self.overlays.extend(self.quads.drain(start..));
     }
 
     /// A stack the one way slots, the hotbar, item nodes and the held cursor stack show it: the
@@ -1141,13 +1307,13 @@ impl UiRenderer {
         gpu: &mut dyn Backend,
         assets: &Assets,
         ui: &Ui,
+        hovered: Option<super::NodeId>,
         look: &Look,
         scale: f32,
         at: glam::Vec2,
         game: Option<(&Content, &GameTextures)>,
     ) {
-        let Some(tip) = ui
-            .hovered
+        let Some(tip) = hovered
             .and_then(|h| ui.nodes.get(h))
             .and_then(|n| n.tooltip.as_ref())
         else {
@@ -1203,6 +1369,8 @@ impl UiRenderer {
         let n = &ui.nodes[id];
         let r = Rect { x: n.rect.x * scale, y: n.rect.y * scale, w: n.rect.w * scale, h: n.rect.h * scale };
         let (quad_start, icon_start) = (self.quads.len(), icons.len());
+        let stack_start = self.stacks.len();
+        let overlay_start = self.overlays.len();
         let hovered = ui.hovered == Some(id);
         if let Some(color) = n.style.fill {
             self.rect(r, color);
@@ -1278,7 +1446,7 @@ impl UiRenderer {
                         .clip
                         .map_or([0.0; 4], |c| [c.x * scale, c.y * scale, (c.x + c.w) * scale, (c.y + c.h) * scale]);
                     self.stacks
-                        .push((r, weft_abi::ItemStack::new(last.0, last.1.max(1)), clip));
+                        .push((r, weft_abi::ItemStack::new(last.0, last.1.max(1)), clip, 16.0, 0));
                 }
             }
             Kind::Progress { value, .. } if *value < 0.0 => {}
@@ -1300,12 +1468,16 @@ impl UiRenderer {
                             }
                         }
                     }
-                    Some(fill) => self.meter_picture(gpu, assets, &fill, v, *dir, r, scale),
+                    Some(fill) => self.meter_picture(gpu, assets, &fill, v, *dir, r, scale, !0),
                     None => self.checker(cropped(r, super::meter::crop(v, *dir)), scale),
                 }
             }
             Kind::Icons { class, count, value, dir, shake, effects, change, .. } if *value >= 0.0 => {
                 use weft_abi::{icon_effect as fx, ui_dir};
+                let class = effects
+                    .iter()
+                    .find(|e| e.kind == fx::LOOK && e.value > 0.0 && !e.class.is_empty())
+                    .map_or(class.as_str(), |e| e.class.as_str());
                 let now = crate::shaders::clock();
                 let tick = (now * crate::world::TPS as f32) as i64;
                 let full = look.texture(class, "full");
@@ -1332,19 +1504,23 @@ impl UiRenderer {
                     .iter()
                     .find(|e| e.kind == fx::PREVIEW && e.value > *value)
                     .map(|e| (e.value, 0.5 - 0.5 * (now / e.amount.max(0.1) * std::f32::consts::TAU).cos()));
+                // Past `count` the rows go on above (or to the right of a column).
+                let (icons, rows, step) = super::icon_rows(*count, effects);
                 let wave = effects
                     .iter()
                     .find(|e| e.kind == fx::WAVE && e.value > 0.0)
-                    .map(|e| ((tick % (*count as i64 + 5)) as u32, e.amount));
+                    .map(|e| ((tick % (icons as i64 + 5)) as u32, e.amount));
                 let shaking = effects
                     .iter()
                     .filter(|e| e.kind == fx::SHAKE)
                     .map(|e| e.value.max(0.0) * if e.amount > 0.0 { e.amount } else { 1.0 })
                     .fold(if shake.is_some_and(|s| *value <= s) { 1.0f32 } else { 0.0 }, f32::max);
-                for i in 0..*count {
+                for i in 0..icons {
                     // A value counts halves of an icon, as vanilla's bars do.
                     let v = shown / 2.0 - i as f32;
-                    let slot = if matches!(*dir, ui_dir::LEFT | ui_dir::UP) { count - 1 - i } else { i } as f32 * 8.0 * scale;
+                    let (row, col) = (i / count.max(&1), i % count.max(&1));
+                    let slot = if matches!(*dir, ui_dir::LEFT | ui_dir::UP) { count - 1 - col } else { col } as f32 * 8.0 * scale;
+                    let across = if matches!(*dir, ui_dir::UP | ui_dir::DOWN) { row } else { rows - 1 - row } as f32 * step * scale;
                     let mut jump = if shaking > 0.0 {
                         let h = weft_noise::hash(0, tick, i as i64, 0);
                         ((h % 1000) as f32 / 1000.0 * (shaking + 1.0))
@@ -1358,7 +1534,7 @@ impl UiRenderer {
                     {
                         jump -= high.max(1.0);
                     }
-                    let (dx, dy) = if matches!(*dir, ui_dir::UP | ui_dir::DOWN) { (0.0, slot) } else { (slot, 0.0) };
+                    let (dx, dy) = if matches!(*dir, ui_dir::UP | ui_dir::DOWN) { (across, slot) } else { (slot, across) };
                     let rr = Rect { x: r.x + dx, y: r.y + dy + jump * scale, w: 9.0 * scale, h: 9.0 * scale };
                     if let Some((idx, _, _)) = empty {
                         self.image(rr, idx, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
@@ -1368,13 +1544,13 @@ impl UiRenderer {
                         if pv > 0.0 && pv > v {
                             let a = (alpha * 255.0) as u32;
                             if let Some(full) = &full {
-                                self.meter_picture_tinted(gpu, assets, full, pv.min(1.0), *dir, rr, scale, 0xFFFFFF00 | a);
+                                self.meter_picture(gpu, assets, full, pv.min(1.0), *dir, rr, scale, 0xFFFFFF00 | a);
                             }
                         }
                     }
                     if v > 0.0 {
                         match &full {
-                            Some(full) => self.meter_picture(gpu, assets, full, v.min(1.0), *dir, rr, scale),
+                            Some(full) => self.meter_picture(gpu, assets, full, v.min(1.0), *dir, rr, scale, !0),
                             None => self.checker(rr, scale),
                         }
                     }
@@ -1386,16 +1562,101 @@ impl UiRenderer {
                         if ov > 0.0
                             && let Some(o) = &overlay
                         {
-                            self.meter_picture(gpu, assets, o, ov.min(1.0), *dir, rr, scale);
+                            self.meter_picture(gpu, assets, o, ov.min(1.0), *dir, rr, scale, !0);
                         }
                     }
                 }
             }
             Kind::Icons { .. } => {}
-            Kind::Slider { value, .. } => {
-                let k = Rect { x: r.x + (r.w - 8.0 * scale) * value.clamp(0.0, 1.0), y: r.y, w: 8.0 * scale, h: r.h };
-                self.class_background(gpu, assets, look, "slider", "", r, scale);
-                self.class_background(gpu, assets, look, "slider_knob", if hovered { "hover" } else { "" }, k, scale);
+            Kind::Slider(s) => {
+                let width = (super::slider::Slider::KNOB_WIDTH * scale).min(r.w);
+                let knob_x = |value| r.x + (r.w - width) * value;
+                background(self, &s.track, "");
+                if let Some([a, b]) = s.fill {
+                    let a = knob_x(s.thumbs[a].value) + width / 2.0;
+                    let b = knob_x(s.thumbs[b].value) + width / 2.0;
+                    self.rect(
+                        Rect { x: a.min(b), y: r.y + r.h / 2.0 - scale, w: (b - a).abs(), h: 2.0 * scale },
+                        look.text("slider_fill", ""),
+                    );
+                }
+                if s.enabled {
+                    let custom_knob = (s.track != "slider").then(|| format!("{}_knob", s.track));
+                    let knob = custom_knob
+                        .as_deref()
+                        .filter(|class| look.texture(class, "").is_some())
+                        .unwrap_or("slider_knob");
+                    let active = ui.focused == Some(id) || ui.pressed == Some(id);
+                    let draw = |me: &mut UiRenderer, index, t: &super::slider::Thumb| {
+                        let k = Rect { x: knob_x(t.value), y: r.y, w: width, h: r.h };
+                        let highlight = if active && index == s.active || hovered && s.thumbs.len() == 1 { "hover" } else { "" };
+                        me.class_background(gpu, assets, look, knob, highlight, k, scale);
+                    };
+                    let mut draw = draw;
+                    for (i, thumb) in s.thumbs.iter().enumerate().filter(|(i, _)| *i != s.active) {
+                        draw(self, i, thumb);
+                    }
+                    if let Some(thumb) = s.thumbs.get(s.active) {
+                        draw(self, s.active, thumb);
+                    }
+                }
+            }
+            Kind::Input { value, caret, area: Some(area), .. } => {
+                background(self, "input", if ui.focused == Some(id) { "focused" } else { "" });
+                let px = scale * ui.text_unit;
+                let lh = self.font.line_height * px;
+                let (room_w, room_h) = (area.room(n.rect.w).max(ui.text_unit) * scale, r.h - 8.0 * scale);
+                let rows = area.rows(value, &self.font, Some(room_w / px));
+                let max_scroll = (rows.len() as f32 * lh - room_h).max(0.0);
+                area.max_scroll.set(max_scroll / scale);
+                let ri = super::row_of(&rows, *caret);
+                let caret_x = rows[ri].x(*caret - rows[ri].at) * px;
+                let caret_y = ri as f32 * lh;
+                // Moved only as far as keeps the caret in sight, so the text stays put while it
+                // moves about inside.
+                let [mut sx, mut sy] = area.scroll.get().map(|v| v * scale);
+                sy = sy.clamp(0.0, max_scroll);
+                if ui.focused == Some(id) && area.follow_caret.replace(false) {
+                    sx = if area.wrap { 0.0 } else { sx.min(caret_x).max(caret_x + px - room_w).max(0.0) };
+                    sy = sy.min(caret_y).max(caret_y + lh - room_h).max(0.0);
+                }
+                area.scroll.set([sx / scale, sy / scale]);
+                let (tx, ty) = (r.x + 4.0 * scale - sx, r.y + 4.0 * scale - sy);
+                let start = self.quads.len();
+                if let Some(a) = ui.anchor.filter(|&a| ui.focused == Some(id) && a != *caret) {
+                    let (lo, hi) = (a.min(*caret), a.max(*caret));
+                    for (i, row) in rows.iter().enumerate() {
+                        let len = row.end - row.start;
+                        if hi < row.at || lo > row.at + len {
+                            continue;
+                        }
+                        let x0 = row.x(lo.saturating_sub(row.at)) * px;
+                        // Past a line's end the selection takes the line break too.
+                        let past = hi > row.at + len && rows.get(i + 1).is_none_or(|n| n.line != row.line);
+                        let x1 = row.x(hi - row.at) * px + if past { px * 4.0 } else { 0.0 };
+                        if x1 > x0 {
+                            let rect = Rect { x: tx + x0, y: ty + i as f32 * lh, w: x1 - x0, h: lh };
+                            self.class_background(gpu, assets, look, "input_selection", "", rect, scale);
+                        }
+                    }
+                }
+                for (i, row) in rows.iter().enumerate() {
+                    let y = ty + i as f32 * lh;
+                    if y + lh < r.y || y > r.y + r.h {
+                        continue;
+                    }
+                    let layout = super::text::layout(&row.spans, &self.font, None);
+                    self.glyph_run(&layout.items, tx + row.indent * px, y, px, look.text("input", ""), None, icons);
+                }
+                if ui.focused == Some(id) {
+                    let rect = Rect { x: tx + caret_x, y: ty + caret_y, w: px.max(1.0), h: lh };
+                    self.class_background(gpu, assets, look, "caret", "", rect, scale);
+                }
+                let field =
+                    [r.x + 2.0 * scale, r.y + 2.0 * scale, r.x + r.w - (4.0 + super::Scrollbar::ROOM) * scale, r.y + r.h - 2.0 * scale];
+                for q in &mut self.quads[start..] {
+                    q.clip = field;
+                }
             }
             Kind::Input { value, caret, .. } => {
                 background(self, "input", if ui.focused == Some(id) { "focused" } else { "" });
@@ -1445,7 +1706,7 @@ impl UiRenderer {
             }
             Kind::Custom { tag, data } => {
                 // What engine-drawn nodes use, loaded for `draw_loaded`.
-                for class in ["slot", "hotbar", "hotbar_selected", "slot_highlight", "well", "crosshair"] {
+                for class in ["slot", "hotbar", "hotbar_selected", "slot_highlight", "well", "crosshair", "effect", "close"] {
                     if let Some(name) = look.texture(class, "") {
                         if let Some(t) = self.texture(gpu, assets, &name) {
                             self.declared_slicing(assets, &name, [t.1 as f32, t.2 as f32]);
@@ -1469,6 +1730,12 @@ impl UiRenderer {
         let clip = n
             .clip
             .map_or([0.0; 4], |c| [c.x * scale, c.y * scale, (c.x + c.w) * scale, (c.y + c.h) * scale]);
+        for (_, _, stack_clip, _, _) in &mut self.stacks[stack_start..] {
+            *stack_clip = clip;
+        }
+        for q in &mut self.overlays[overlay_start..] {
+            q.clip = clip;
+        }
         if n.clip.is_some() {
             for q in &mut self.quads[quad_start..] {
                 // Quads may carry their own clip (text fields): keep the overlap of both.
@@ -1481,7 +1748,7 @@ impl UiRenderer {
         }
         self.icon_clips.resize(icon_start, [0.0; 4]);
         self.icon_clips.resize(icons.len(), clip);
-        let (children_quads, children_icons) = (self.quads.len(), icons.len());
+        let (children_quads, children_icons, children_stacks) = (self.quads.len(), icons.len(), self.stacks.len());
         for &c in &n.children {
             self.node(gpu, assets, ui, look, c, scale, icons, custom, inner_surface);
         }
@@ -1513,11 +1780,19 @@ impl UiRenderer {
             for i in &mut icons[children_icons..] {
                 i.1 += sink;
             }
+            // Item stacks are drawn later (`defer_stack`): they sink with the rest.
+            for st in &mut self.stacks[children_stacks..] {
+                st.0.y += sink;
+            }
         }
-        if let Some(bar) = n.scrollbar {
+        if let Some(mut bar) = n.scrollbar {
+            if let Kind::Input { area: Some(area), .. } = &n.kind {
+                bar.offset = area.scroll.get()[1];
+            }
             let start = self.quads.len();
             let px = |r: super::Rect| Rect { x: r.x * scale, y: r.y * scale, w: r.w * scale, h: r.h * scale };
-            let track = px(super::Rect { x: bar.track.x + (bar.track.w - 6.0) / 2.0, w: 6.0, ..bar.track });
+            let width = bar.track.w.min(6.0);
+            let track = px(super::Rect { x: bar.track.x + (bar.track.w - width) / 2.0, w: width, ..bar.track });
             self.class_background(gpu, assets, look, "scrollbar", "", track, scale);
             let handle = bar.handle();
             let over = ui.dragging_bar() == Some(id);
@@ -1653,5 +1928,43 @@ mod animation_tests {
             q[0].u,
             q[0].v
         );
+    }
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::*;
+
+    #[test]
+    fn orbit_preserves_user_scale() {
+        let mut large = crate::content::ModelBox::whole([0; 6]);
+        large.max = [4.0, 2.0, 1.0];
+        let pixel_scale = |view: ModelView, size: [f32; 2], boxes: &[crate::content::ModelBox]| {
+            let matrix = view.projection(size, boxes);
+            let origin = matrix.project_point3(glam::Vec3::ZERO);
+            let mut scale = glam::Vec2::ZERO;
+            for axis in [glam::Vec3::X, glam::Vec3::Y, glam::Vec3::Z] {
+                let d = matrix.project_point3(axis) - origin;
+                let pixels = glam::Vec2::new(d.x * size[0] * 0.5, d.y * size[1] * 0.5);
+                scale += pixels * pixels;
+            }
+            scale.sqrt()
+        };
+        for size in [[240.0, 160.0], [120.0, 220.0]] {
+            let baseline = pixel_scale(ModelView::default(), size, &[]);
+            for boxes in [&[][..], std::slice::from_ref(&large)] {
+                for yaw in -8..=8 {
+                    for pitch in [-1.3, -0.4, 0.0, 0.7, 1.3] {
+                        for zoom in [0.3, 1.0, 3.0] {
+                            let scale = pixel_scale(ModelView { yaw: yaw as f32 * 0.4, pitch, zoom }, size, boxes);
+                            let error = (scale / (baseline * zoom) - glam::Vec2::ONE)
+                                .abs()
+                                .max_element();
+                            assert!(error < 0.0001, "scale changed with orbit or model size: {scale:?}");
+                        }
+                    }
+                }
+            }
+        }
     }
 }

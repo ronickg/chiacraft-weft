@@ -7,6 +7,7 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use weft_abi::entry_kind as entries;
 
 use crossbeam_channel::{Receiver, Sender};
 use glam::IVec3;
@@ -160,6 +161,10 @@ fn steps(w: &mut Vec<i32>, e: &Expr, seed: u64) -> (i32, i32) {
 ///
 /// The crowns come from sample runs of the shape on real ground spread over the world: a run at
 /// one spot only said what that spot allowed (a clearing, a rock face), for every site.
+// SYNC: upstream replaced the dimension's scatters (`DimensionDef::scatters`, `ScatterDef`) with
+// features (`features::FeatureDef`: `Spread::Grid` with `Chance::Density`, `Shape::Plan`). Read
+// them here (grid spacing as the cell, `reach[0]`, the density, the plan callback, our thinning)
+// and check the sites' hash in `terrain.wgsl`'s `lod` still matches `features`' grid starts.
 pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize>)> {
     let (mut w, custom) = describe(c, dim, seed)?;
     let def = &c.dims[dim as usize];
@@ -405,10 +410,12 @@ impl Readback {
 pub struct GpuTerrain {
     pipeline: Option<PipelineId>,
     lod_pipeline: Option<PipelineId>,
+    pub far_lod_pipeline: Option<PipelineId>,
     rx: Receiver<Job>,
     queue: VecDeque<Job>,
     /// Distant terrain tiles asked for (`lod::Lod`).
     pub lod_tx: Sender<super::lod::LodJob>,
+    pub lod_shader: Option<u64>,
     lod_rx: Receiver<super::lod::LodJob>,
     lod_queue: VecDeque<super::lod::LodJob>,
     slots: Vec<Slot>,
@@ -421,25 +428,64 @@ pub struct GpuTerrain {
     pub on: Arc<AtomicBool>,
 }
 
+/// The terrain's pipelines: label and entry point.
+const PIPELINES: [(&str, &str); 2] = [("terrain", "generate"), ("terrain lod", "lod")];
+const FAR_LOD_PIPELINE: (&str, &str) = ("far terrain lod", "lod_far");
+
+// chiacraft: our far terrain (`client::lod`) stays ours until an A/B against upstream's; its
+// `lod_far` entry (GPU coarse terrain) isn't in our `terrain.wgsl`, so the pipeline isn't made.
+// SYNC: upstream's far LOD (`lod_far`, `world_render::far_lod`) comes back with the LOD A/B.
+fn far_lod_enabled() -> bool {
+    false
+}
+
 impl GpuTerrain {
+    /// Its pipelines compiled ahead on another thread (`Backend::precompile`), from the title
+    /// screen on: a phone's driver needs most of a minute for them the first time.
+    pub fn precompile(gpu: &mut dyn Backend, assets: &crate::assets::Assets) {
+        if !enabled() {
+            return;
+        }
+        match Self::shader(assets) {
+            Ok(s) => {
+                for (label, entry) in PIPELINES
+                    .into_iter()
+                    .chain(far_lod_enabled().then_some(FAR_LOD_PIPELINE))
+                {
+                    gpu.precompile(&ComputeDesc { label, shader: &s, entry });
+                }
+            }
+            Err(e) => log::error!("terrain shader: {e}"),
+        }
+    }
+
+    // Not a shader packs may replace: it has to make the CPU's blocks exactly.
+    fn shader(assets: &crate::assets::Assets) -> Result<weft_render::Shader, String> {
+        crate::packs::engine_shader(assets, "terrain.wgsl", &layout::prelude()).map_err(|e| e.0)
+    }
+
     pub fn new(gpu: &mut dyn Backend, assets: &crate::assets::Assets, rx: Receiver<Job>, on: Arc<AtomicBool>) -> GpuTerrain {
-        // Not a shader packs may replace: it has to make the CPU's blocks exactly.
-        let pipelines = crate::packs::engine_shader(assets, "terrain.wgsl", &layout::prelude())
-            .map_err(|e| e.0)
-            .and_then(|s| {
-                let terrain = gpu
-                    .create_compute(&ComputeDesc { label: "terrain", shader: &s, entry: "generate" })
-                    .map_err(|e| e.0)?;
-                let lod = gpu
-                    .create_compute(&ComputeDesc { label: "terrain lod", shader: &s, entry: "lod" })
-                    .map_err(|e| e.0)?;
-                Ok((terrain, lod))
+        let pipelines = Self::shader(assets).and_then(|s| {
+            let [terrain, lod] = PIPELINES.map(|(label, entry)| {
+                gpu.create_compute(&ComputeDesc { label, shader: &s, entry })
+                    .map_err(|e| e.0)
             });
-        let (pipeline, lod_pipeline) = match pipelines {
-            Ok((p, l)) => (Some(p), Some(l)),
+            let (terrain, lod) = (terrain?, lod?);
+            let far = far_lod_enabled()
+                .then(|| {
+                    let (label, entry) = FAR_LOD_PIPELINE;
+                    gpu.create_compute(&ComputeDesc { label, shader: &s, entry })
+                        .map_err(|e| log::warn!("far LOD compute: {e}"))
+                        .ok()
+                })
+                .flatten();
+            Ok((terrain, lod, far, s.hash))
+        });
+        let (pipeline, lod_pipeline, far_lod_pipeline, lod_shader) = match pipelines {
+            Ok((p, l, far, hash)) => (Some(p), Some(l), far, Some(hash)),
             Err(e) => {
                 log::error!("terrain on the GPU unavailable, generating on the CPU: {e}");
-                (None, None)
+                (None, None, None, None)
             }
         };
         on.store(pipeline.is_some() && enabled(), Ordering::Relaxed);
@@ -447,14 +493,15 @@ impl GpuTerrain {
         GpuTerrain {
             pipeline,
             lod_pipeline,
+            far_lod_pipeline,
             rx,
             queue: VecDeque::new(),
             lod_tx,
+            lod_shader,
             lod_rx,
             lod_queue: VecDeque::new(),
             slots: Vec::new(),
             desc: None,
-            lod_desc: None,
             on,
         }
     }
@@ -472,7 +519,7 @@ impl GpuTerrain {
                 gpu.destroy_buffer(b);
             }
         }
-        for p in [self.pipeline.take(), self.lod_pipeline.take()]
+        for p in [self.pipeline.take(), self.lod_pipeline.take(), self.far_lod_pipeline.take()]
             .into_iter()
             .flatten()
         {
@@ -528,6 +575,7 @@ impl GpuTerrain {
         }
         let stride = 4 + custom * SAMPLES;
         let mut jobs = vec![0i32; batch.len() * stride];
+        log::debug!(target: "load", "lod dispatch {} tiles", batch.len());
         for (i, j) in batch.iter().enumerate() {
             let r = i * stride;
             let o = j.key.origin();
@@ -579,7 +627,7 @@ impl GpuTerrain {
                         .map(|(i, job)| (job, back.cube(i).to_vec()))
                         .collect();
                     drop(back);
-                    crate::server::dim::warm_scatters(content(), made[0].0.dim, made[0].0.seed, x, z);
+                    crate::features::warm(content(), made[0].0.dim, made[0].0.seed, x, z);
                     for (job, words) in made {
                         crate::client_terrain().spawn(move || finish(job, unpack(&words)));
                     }
@@ -642,21 +690,15 @@ impl GpuTerrain {
 }
 
 fn unpacking() -> &'static rayon::ThreadPool {
-    static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
-    POOL.get_or_init(|| {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(4)
-            .thread_name(|i| format!("terrain unpack {i}"))
-            .start_handler(|_| crate::lower_priority())
-            .build()
-            .expect("terrain unpack pool")
-    })
+    static POOL: crate::Pool = crate::Pool::new();
+    crate::pool(&POOL, "terrain unpack", 4, true)
 }
 
 fn enabled() -> bool {
     let c = content();
     c.game
-        .config_names
+        .catalog
+        .ids(entries::CONFIG)
         .get("core:terrain_gpu")
         .is_none_or(|&id| crate::config::get(id) != 0.0)
 }
@@ -664,7 +706,8 @@ fn enabled() -> bool {
 fn checking() -> bool {
     let c = content();
     c.game
-        .config_names
+        .catalog
+        .ids(entries::CONFIG)
         .get("core:terrain_check")
         .is_some_and(|&id| crate::config::get(id) != 0.0)
 }
@@ -720,7 +763,7 @@ fn finish(job: Job, (blocks, biomes, cols): Unpacked) {
         let biome_differs = (0..256).find(|&i| cube.biome(i % 16, i / 16) != want.biome(i % 16, i / 16));
         // Light too, against the way it was done before (lit as it will be below).
         let mut lit = cube.clone();
-        area::catch_up(c, &job.edits, job.pos, &mut lit);
+        area::catch_up(&job.edits, job.pos, &mut lit);
         let mut old = lit.clone();
         crate::world::light::prelight(c, &mut lit, c.dims[job.dim as usize].sky_light);
         crate::world::light::prelight_reference(c, &mut old, c.dims[job.dim as usize].sky_light);

@@ -10,11 +10,15 @@ use glam::{DVec3, IVec3};
 use weft_abi::ItemStack;
 
 use crate::world::Cube;
+use crate::world::placement::Part;
 use codec::Wire;
 
 pub mod codec;
 pub mod p2p;
 pub mod screens;
+
+/// An attack press handled by the held item without an entity target.
+pub const ITEM_ATTACK: u64 = 0;
 
 /// Ticket others can use to join this host, once hosting is online.
 pub fn current_ticket() -> Option<String> {
@@ -57,6 +61,15 @@ pub fn start_join(ticket: &str, settings: &crate::settings::Settings) -> Result<
 
 /// A struct that travels in messages, written field by field.
 macro_rules! wire_struct {
+    (schema; $(#[$m:meta])* pub struct $name:ident { $(pub $f:ident: $t:ty),* $(,)? }) => {
+        wire_struct! { $(#[$m])* pub struct $name { $(pub $f: $t),* } }
+        impl $name {
+            pub fn schema() -> String {
+                let fields = [$(format!("{}:{}", stringify!($f), <$t as weft_abi::data::Data>::schema())),*];
+                format!("{{{}}}", fields.join(","))
+            }
+        }
+    };
     ($(#[$m:meta])* pub struct $name:ident { $(pub $f:ident: $t:ty),* $(,)? }) => {
         $(#[$m])*
         pub struct $name {
@@ -74,6 +87,53 @@ macro_rules! wire_struct {
 
         impl codec::Item for $name {}
     };
+}
+
+wire_struct! {
+    /// Capacity for the held item and the first menu slot showing this inventory slot.
+    #[derive(Clone)]
+    pub struct DragSlot { pub slot: u32, pub room: u32 }
+}
+
+wire_struct! {
+    schema;
+    #[derive(Default)]
+    pub struct HealthField { pub current: f32, pub maximum: f32 }
+}
+wire_struct! {
+    /// `scale`: how big it is against its kind (chiacraft, `Host::set_entity_scale`).
+    pub struct ShapeField { pub width: f32, pub height: f32, pub eye: f32, pub look: u32, pub scale: f32 }
+}
+impl Default for ShapeField {
+    fn default() -> Self {
+        Self { width: 0.0, height: 0.0, eye: 0.0, look: u32::MAX, scale: 1.0 }
+    }
+}
+impl ShapeField {
+    pub fn size(&self) -> Option<weft_abi::EntitySize> {
+        (self.width > 0.0).then_some(weft_abi::EntitySize { width: self.width, height: self.height, eye: self.eye })
+    }
+    pub fn look(&self) -> Option<u32> {
+        (self.look != u32::MAX).then_some(self.look)
+    }
+}
+wire_struct! {
+    pub struct RidingField { pub mount: u64, pub seat: u32 }
+}
+wire_struct! {
+    pub struct StuckField { pub host: u64, pub at: [f32; 3], pub yaw: f32 }
+}
+wire_struct! {
+    pub struct ForcedPoseField { pub pose: u32, pub yaw: f32 }
+}
+wire_struct! {
+    #[derive(Default)]
+    pub struct UsingField { pub ticks: u32, pub offhand: bool }
+}
+
+wire_struct! {
+    #[derive(Clone)]
+    pub struct Skin { pub png: Vec<u8>, pub slim: bool }
 }
 
 /// One variant's fields written or read in order.
@@ -253,10 +313,17 @@ wire_struct! {
     pub struct EntityView {
         pub id: u64,
         pub kind: u32,
+        pub has_space: bool,
         pub pos: DVec3,
         pub yaw: f32,
         pub pitch: f32,
-        pub item: ItemStack,
+        // The tick it came into the world (`Moves::tick`'s), its clips' clock.
+        pub born: u64,
+        // Where its body faces (`physics::turn_body`) and its legs are, for those seeing it from now on.
+        pub body_yaw: f32,
+        pub strode: f32,
+        pub stride: f32,
+        pub rotation: Option<[f32; 4]>,
     }
 }
 
@@ -278,6 +345,7 @@ wire_struct! {
 }
 
 impl GizmoShape {
+    pub const ASSEMBLY: &'static str = "core:assembly_preview";
     /// Not a `gizmo_kind`: a label.
     pub const TEXT: u8 = u8::MAX;
 
@@ -291,12 +359,37 @@ impl GizmoShape {
 }
 
 /// Someone's mining as others see it: who, the cell, which of what is in it, how far along (0..1).
-pub type Crack = (u64, IVec3, u32, f32);
+pub type Crack = (u64, IVec3, Part, f32);
 
-/// An entity's move: id, position, yaw, pitch, crouching, and its frame: the solid body it
-/// stands on (0: the world), which clients draw it relative to.
-/// An entity, where it is, its look, pose, whether it sprints, and the body it stands on.
-pub type Move = (u64, DVec3, f32, f32, crate::world::Pose, bool, u64);
+wire_struct! {
+    #[derive(Clone, Copy, Debug)]
+    pub struct Lightning {
+        pub dim: u32,
+        pub tick: u64,
+        pub origin: DVec3,
+        pub end: DVec3,
+        pub ground: bool,
+        pub seed: u64,
+        pub strength: f32,
+    }
+}
+
+wire_struct! {
+    #[derive(Clone, Copy, Debug)]
+    pub struct Move {
+        pub id: u64,
+        pub pos: DVec3,
+        pub yaw: f32,
+        pub pitch: f32,
+        pub body_yaw: f32,
+        pub strode: f32,
+        pub stride: f32,
+        pub pose: crate::world::Pose,
+        pub sprinting: bool,
+        pub frame: u64,
+        pub rotation: Option<[f32; 4]>,
+    }
+}
 
 /// The longest message a connection takes.
 pub const MAX_MESSAGE: usize = 64 << 20;
@@ -304,8 +397,10 @@ pub const MAX_MESSAGE: usize = 64 << 20;
 messages! {
     #[derive(Clone)]
     pub enum ToClient: ClientTag, to_server = false; {
-        /// `look` (yaw, pitch), `selected` and `flying` as it left them.
-        Welcome { player: u64, dim: u32, pos: DVec3, seed: u64, look: [f32; 2], selected: u32, flying: bool },
+        /// Where to stream and draw the world while the player is still absent.
+        PrepareJoin { dim: u32, pos: DVec3, seed: u64, look: [f32; 2] },
+        /// The player has entered the prepared world and can now act.
+        Welcome { player: u64, vel: DVec3, selected: u32, flying: bool },
         /// `edit`: sent again because blocks in it changed (shown whole, at once), not loading.
         /// `frame`: the body it is a cube of, in that body's coordinates; 0 for the world.
         Cube { dim: u32, frame: u64, pos: IVec3, cube: Arc<Cube>, edit: bool },
@@ -316,8 +411,9 @@ messages! {
         /// Area edits of the dimension (`AreaFill::spec`): `all` replaces what the client has,
         /// otherwise they come after it. Clients make them on what they generate.
         Edits { dim: u32, specs: Vec<String>, all: bool },
-        /// Columns of dimension `dim` whose top isn't the terrain's, for distant terrain: (x, z,
+        /// Columns of dimension `dim` whose top isn't the terrain's, for distant terrain (x, z,
         /// height, top, under), `top` `u32::MAX` for one that is again; `all`: every one there is.
+        /// Our far terrain's form (chiacraft, `client::lod`), not Weft's `LodColumn` with spans.
         LodColumns { dim: u32, all: bool, cols: Vec<(i32, i32, i32, u32, u32)> },
         /// chiacraft, test only: an imported world's far terrain for dimension `dim` (`far.bin`,
         /// `chiacraft_mcimport::far`), which distant tiles show instead of the terrain formula;
@@ -325,16 +421,21 @@ messages! {
         LodFar { dim: u32, grid: Vec<u8> },
         /// Of the world, or of body `frame`.
         /// `extras`: what else is in cells, after `changes` (which take it away).
-        Blocks { dim: u32, frame: u64, changes: Vec<(IVec3, u32)>, extras: Vec<(IVec3, Vec<u32>)> },
+        Blocks { dim: u32, frame: u64, changes: Vec<(IVec3, u32)>, extras: Vec<(IVec3, crate::world::placement::CellLayout)> },
         /// What moving bodies' lights give cells of the world besides what is there, for a client
         /// to work out light as the server would: (cell, its light), none taking it away.
         BodyGlow { dim: u32, cells: Vec<(IVec3, [u8; 3])> },
         /// The world's light on body `frame`, by its cubes.
         BodyLight { frame: u64, lights: Vec<(IVec3, u32)> },
+        /// Dry sections of a body's hull, as local half-open box bounds.
+        BodyAir { frame: u64, boxes: Vec<(IVec3, IVec3)> },
         /// Power of pieces of wire: (cell, face, level), of the world or of body `frame`.
-        Signals { dim: u32, frame: u64, changes: Vec<(IVec3, u8, u8)> },
-        /// The time of day and how fast it runs (`DimSet::day_rate`).
-        Time { dim: u32, time: u64, rate: f32 },
+        Signals { dim: u32, frame: u64, changes: Vec<(crate::wire::Site, u8, u8)> },
+        /// The dimension's time of day, the ticks it ran (what entity effects end by, unlike the time
+        /// `/time set` moves), its weather (`registry::WeatherDef` by id) and the ticks a second the
+        /// server runs at; `day_rate`: how fast its time of day runs against ticks (chiacraft,
+        /// `DimSet::day_rate`).
+        Clock { dim: u32, time: u64, ticks: u64, weather: u32, rate: u32, day_rate: f32 },
         /// `frame`: the solid body it was put on and the position relative to that body (clients
         /// draw bodies ahead of the server, so only the relative position is right for them).
         Teleport { dim: u32, pos: DVec3, frame: Option<(u64, DVec3)> },
@@ -344,11 +445,11 @@ messages! {
         Moves { tick: u64, moves: Vec<Move> },
         /// Entities out of sight, and whether they were killed (they play the death animation).
         Despawn(Vec<(u64, bool)>),
+        SpaceLanded { dim: u32, frame: u64, destination: u64, cubes: Vec<IVec3> },
         /// Items picked up: (item entity, who took it). They fly to the taker before going.
         Taken(Vec<(u64, u64)>),
         /// A use (right click) did something: the arm swings, and dips if the held item was used.
         Swing { used_item: bool, off_hand: bool },
-        GameMode(crate::world::GameMode),
         /// Everyone online, sent when someone joins or leaves.
         Players(Vec<String>),
         /// Own inventory: (slot, stack) for changed slots.
@@ -356,7 +457,7 @@ messages! {
         /// Own synced components: (component id, bytes).
         Components(Vec<(u32, Vec<u8>)>),
         /// A hit knocks the player back, `away` being flat and of length 1 (`physics::knock`).
-        Knock { away: [f32; 3] },
+        Knock { push: [f32; 3] },
         /// Velocity change in blocks per tick (a mod's push, a sprinting hit).
         Velocity { add: [f32; 3] },
         /// A mod set the player's velocity, in blocks per tick.
@@ -367,18 +468,14 @@ messages! {
         Flying(bool),
         /// A mod put this hotbar slot in the player's hand.
         Selected(u32),
-        /// Ticks a second the server runs at.
-        TickRate(u32),
-        /// The player's walking speed and jump multipliers.
-        /// The player's attributes that changed, by id.
-        Attributes(Vec<(u32, f32)>),
         /// Mining that block is not allowed (`action::BREAK_BLOCK`).
         BreakRefused { frame: u64, pos: IVec3 },
         /// Holding the use button started on an item that takes this many ticks, or it ended.
         /// Ticks it takes, and whether in the other hand.
         Using(Option<(u32, bool)>),
-        /// The dimension's weather now (`registry::WeatherDef` by id); `only`: the biomes it falls
-        /// in (a mod's weather by place, chiacraft); `None`: everywhere.
+        /// The dimension's weather now (`registry::WeatherDef` by id, as in `Clock`); `only`: the
+        /// biomes it falls in (a mod's weather by place, chiacraft, `DimSet::set_rain`); `None`:
+        /// wherever the weather field says.
         Weather { id: u32, only: Option<Vec<u32>> },
         /// The air in the dimension's biomes (a mod's, `set_air`): (biome, fog 0..1, wind m/s,
         /// snow lying 0..1, `air_flags`), and where the wind blows to, degrees clockwise from
@@ -397,8 +494,6 @@ messages! {
         EntitySwing { id: u64, off: bool },
         /// Who is mining what, besides this player.
         Cracks(Vec<Crack>),
-        /// The player's `permission` level, for what its client offers.
-        Permission(u32),
         /// A sprinting hit landed, which ends the sprint.
         StopSprint,
         /// Camera mode `mode` (`u32::MAX`: the player's own again), `locked` till told; the
@@ -407,7 +502,8 @@ messages! {
         /// `block`: the state it was opened on (0: none), `name`: what it belongs to is called.
         OpenMenu { kind: u32, window: u32, slots: u32, owner: u64, block: u32, name: String },
         MenuSlots(Vec<(u32, ItemStack)>),
-        Cursor(ItemStack),
+        /// The held stack and how many of it can go into each menu slot.
+        Cursor { stack: ItemStack, targets: Vec<DragSlot> },
         CloseMenu,
         Died,
         /// Formatted by the client in its own language.
@@ -424,11 +520,11 @@ messages! {
         /// The server's values of `SYNCED` settings: (config id, value).
         Configs(Vec<(u32, f64)>),
         /// Sound events: (event, position, volume, pitch or 0).
-        Sounds(Vec<(u32, DVec3, f32, f32)>),
+        Sounds(Vec<(u32, Option<DVec3>, f32, f32)>),
         /// Keyframe animations started on entities: (entity, name, looping); empty name = none.
         PlayAction(Vec<(u64, String, bool)>),
         /// A player's own skin (PNG), for their entity.
-        Skin { entity: u64, png: Vec<u8> },
+        Skin { entity: u64, skin: Skin },
         /// Not let in, or sent away, with the reason in the player's own language (chiacraft:
         /// admission rules and bans). The connection ends after it.
         Refused(crate::ui::text::Msg),
@@ -453,6 +549,10 @@ messages! {
         Avatar { entity: u64, avatar: AvatarData },
         /// That player left: what they brought can go.
         PlayerGone { entity: u64 },
+        ControllerEdit { controller: u64, face: u8, data: Vec<u8> },
+        HelmProfile { mount: u64, controller: u64, data: Vec<u8> },
+        BodyGrab(Option<u64>),
+        Lightning(Lightning),
     }
 }
 
@@ -466,10 +566,12 @@ messages! {
         /// saying it is this identity's), or empty; the world checks on chain that the key
         /// still holds the DID (chiacraft, phase 4).
         Join { name: String, key: String, account: String, did: String },
+        /// The scene is ready and controls can be given to the player.
+        Ready,
         /// `frame`: the body it rides and its position relative to that body as the client shows it
         /// (the client shows bodies behind the server; only the relative position agrees).
         /// `jumped`: it jumped since the last one.
-        Move { pos: DVec3, yaw: f32, pitch: f32, on_ground: bool, pose: crate::world::Pose, sprint: bool, flying: bool, jumped: bool, frame: Option<(u64, DVec3)> },
+        Move { pos: DVec3, vel: DVec3, yaw: f32, pitch: f32, on_ground: bool, pose: crate::world::Pose, sprint: bool, flying: bool, jumped: bool, frame: Option<(u64, DVec3)> },
         /// Where the mount the player steers went this tick (its client moves it).
         /// `flies`: its steering flies it this tick (no fall to count).
         MountMove { pos: DVec3, yaw: f32, vel: DVec3, on_ground: bool, flies: bool },
@@ -478,22 +580,25 @@ messages! {
         /// May it turn on camera mode `mode` (`camera_flags::ASK`)? Answered with `Camera`.
         Camera(u32),
         /// Started mining this block (`frame` and `part` like `Break`'s).
-        StartBreak { pos: IVec3, part: u32, frame: u64 },
+        StartBreak { pos: IVec3, part: Part, frame: u64 },
         /// Stopped mining without finishing.
         StopBreak,
-        /// Let go of the use button before the item took effect.
-        StopUsing,
+        /// Actions (key ids) that went down and up since the last.
+        Keys { down: Vec<u32>, up: Vec<u32> },
+        HelmHeld { mount: u64, controller: u64, held: u64 },
+        ControllerSave { controller: u64, data: Vec<u8> },
         /// The main hand's item goes to the other hand and back.
         SwapHands,
         /// `frame`: the structure (entity) the block is part of, its position in the structure's
         /// coordinates; 0 for the world. `face`: of its selection that was hit.
-        /// `part`: which of what is in the cell.
-        Break { pos: IVec3, part: u32, face: u8, frame: u64 },
+        /// `part`: which of what is in the cell; `hit`: where on it, from its corner (`Use`'s).
+        Break { pos: IVec3, part: Part, face: u8, hit: [f32; 3], frame: u64 },
         /// Right click on a block: the block reacts first (chests), otherwise the held item is used or
         /// placed against the clicked face. `frame` like `Break`'s; `look` in world space.
-        /// `hit`: where on the block, from its corner.
-        Use { pos: IVec3, part: u32, face: u8, look: [f32; 3], hit: [f32; 3], sneak: bool, frame: u64 },
-        UseItem { target: Option<(IVec3, u8)> },
+        /// `hit`: where on the block, from its corner. `placed`: the cell the client already
+        /// shows the held block in, sent back as it really is whatever happens.
+        Use { pos: IVec3, part: Part, face: u8, look: [f32; 3], hit: [f32; 3], sneak: bool, by_face: bool, frame: u64, placed: Option<IVec3> },
+        UseItem,
         Select(u32),
         Attack(u64),
         /// A swing that spends its charge, whatever it hit, sent after any `Attack` of that swing.
@@ -502,7 +607,8 @@ messages! {
         OpenInventory,
         Click { slot: u32, button: u8, shift: bool },
         /// Creative inventory: a full stack of this item onto the menu cursor.
-        /// Click on a creative entry: 0 left (stack), 1 right (one).
+        /// Click on a creative entry: 0 left (stack), 1 right (one), `menu::HOTBAR_SWAP + n` a
+        /// number key (a stack into that hotbar slot).
         CreativeTake { item: u32, button: u8 },
         /// Middle click on a block whose item is not in the hotbar: bring it into the selected slot
         /// from the inventory, or in creative make one.
@@ -520,11 +626,14 @@ messages! {
         Gizmos(Vec<String>),
         Packet { channel: u32, data: Vec<u8> },
         /// The player's skin (PNG, 64 x 64 or 64 x 32).
-        Skin(Vec<u8>),
+        Skin(Skin),
         /// The player's own model.
         Avatar(AvatarData),
         /// The client's view distance in cubes: what the server announces edited cubes in.
         View(u32),
+        GrabBody,
+        ReleaseBody,
+        TurnGrab([f32; 2]),
         /// The player's credentials for the achievement the world asked about
         /// (`ToClient::AskAchievement`; chiacraft): JSON, at most a few.
         Proofs(Vec<String>),
@@ -562,6 +671,10 @@ impl<S: Message, R> Conn<S, R> {
 
     pub fn is_closed(&self) -> bool {
         self.closed
+    }
+
+    pub(crate) fn close(&mut self) {
+        self.closed = true;
     }
 }
 

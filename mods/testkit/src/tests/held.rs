@@ -1,4 +1,4 @@
-//! Blocks standing in water (`.holds_liquid()`, Weft's waterlogging), with testmod's waterweed and
+//! Blocks standing in water (`.shares_cell_with("#water")`, Weft's waterlogging), with testmod's waterweed and
 //! sea slab: the water is a part of the cell beside the block (`/tk parts`), so "wet" is the block
 //! and a water source in one cell. Placing, breaking, buckets, pistons, swimming and how the water
 //! around them is drawn. The engine's own checks are its unit tests (`liquid.rs`).

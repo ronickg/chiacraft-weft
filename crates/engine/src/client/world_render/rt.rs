@@ -618,7 +618,7 @@ impl WorldRenderer {
             let quads = matches!(kind, 1 | 5);
             pipes[usize::from(quads) * 2 + usize::from(layer == 1)]
         };
-        let Some((_, obuf, ibuf, _, _)) = self.buffers else { return };
+        let Some((_, obuf, ibuf, ..)) = self.buffers else { return };
         // The table's draws, as `draw` made them this frame.
         if let Some(o) = self.table.out.as_ref() {
             let (draws, origins, slot) = (o.draws, o.origins, self.gb_draws_slot);

@@ -1,6 +1,6 @@
 // What cubes get drawn is decided here. `table` has every cube of the world with something opaque
 // or cutout to draw; `cull` writes the draws of those in view and not behind what the last frame
-// drew. `depths` holds that frame's depth and under it ever smaller copies, each texel the farthest
+// drew (distant terrain's tiles too, by their boxes). `depths` holds that frame's depth and under it ever smaller copies, each texel the farthest
 // of those it covers. `test` does the same for the draws the CPU made, by zeroing their instances.
 // The prelude (`gpu_layout::occlusion_prelude`) declares the bindings and `args`.
 
@@ -128,8 +128,7 @@ fn test(@builtin(global_invocation_id) id: vec3<u32>) {
     if i >= args.count {
         return;
     }
-    // Distant terrain isn't in cubes: its tiles' boxes follow the draws' origins, two corners each
-    // (upstream a80a4e07f).
+    // Distant terrain isn't in cubes: its tiles' boxes follow the draws' origins, two corners each.
     if i >= view.skip.x && i < view.skip.y {
         let at = args.count + 2u * (i - view.skip.x);
         let lo = vec3<f32>(origins[at].xyz) - view.cam_frac.xyz;
@@ -183,7 +182,7 @@ fn cull(@builtin(global_invocation_id) id: vec3<u32>) {
     if hidden(lo, lo + vec3<f32>(16.0)) {
         return;
     }
-    if (e.bucket & 2u) != 0u {
+    if (e.bucket & 4u) != 0u {
         put_draw(e.bucket, rel, e.start, e.counts[0]);
         atomicAdd(&faces_drawn.count, e.counts[0]);
         return;

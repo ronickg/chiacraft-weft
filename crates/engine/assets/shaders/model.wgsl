@@ -17,7 +17,7 @@ struct VOut {
     @location(8) motion: vec3<f32>,
 }
 
-// A layer draws the parts of its roles, and the bones it names.
+// A layer draws the parts of its roles, and those covering the bones it names.
 fn drawn(inst: Instance, role: u32, bone: u32) -> bool {
     return ((inst.roles >> role) & 1u) != 0u || (bone < 32u && ((inst.bone_mask >> bone) & 1u) != 0u);
 }
@@ -26,6 +26,17 @@ fn place(bone: u32, p: vec3<f32>) -> vec3<f32> {
     let b = bones[bone];
     let q = vec4(p, 1.0);
     return vec3(dot(b.rows[0], q), dot(b.rows[1], q), dot(b.rows[2], q));
+}
+
+// A local normal in world space, through the bone's cofactors so stretched and flattened bones
+// shade right too.
+fn turn_normal(bone: u32, n: vec3<f32>) -> vec3<f32> {
+    let b = bones[bone];
+    let x = vec3(b.rows[0].x, b.rows[1].x, b.rows[2].x);
+    let y = vec3(b.rows[0].y, b.rows[1].y, b.rows[2].y);
+    let z = vec3(b.rows[0].z, b.rows[1].z, b.rows[2].z);
+    let m = mat3x3(cross(y, z), cross(z, x), cross(x, y));
+    return normalize(m * n * sign(dot(x, cross(y, z))) + vec3(0.0, 1e-6, 0.0));
 }
 
 // Where `place` put it last frame, in this frame's camera-relative positions (`prev_bones`).
@@ -51,7 +62,7 @@ fn vertex(vi: u32, ii: u32) -> VOut {
     let boxes = inst.cuboid_count * 36u;
     if vi < boxes {
         let cub = cuboids[inst.cuboids + vi / 36u];
-        if !drawn(inst, cub.role, cub.bone) {
+        if !drawn(inst, cub.role, cub.cover) {
             out.clip = vec4(0.0, 0.0, 0.0, 1.0);
             return out;
         }
@@ -74,11 +85,12 @@ fn vertex(vi: u32, ii: u32) -> VOut {
             default: { r = cub.faces[5]; }
         }
         out.uv = (r.xy + UVS[c] * r.zw) / inst.tex_size;
-        shade = SHADE[face];
+        // The face's direction after the bone turns it, as the triangles below and the world.
+        shade = normal_shade(turn_normal(inst.bones + cub.bone, FACE_DIRS[face]));
     } else {
         let k = vi - boxes;
         let v = corners[inst.vertices + k];
-        if !drawn(inst, v.role, v.bone) {
+        if !drawn(inst, v.role, v.cover) {
             out.clip = vec4(0.0, 0.0, 0.0, 1.0);
             return out;
         }
@@ -93,7 +105,7 @@ fn vertex(vi: u32, ii: u32) -> VOut {
         let b = place(inst.bones + corners[t + 1u].bone, corners[t + 1u].pos);
         let c2 = place(inst.bones + corners[t + 2u].bone, corners[t + 2u].pos);
         let n = normalize(cross(b - a, c2 - a) + vec3(0.0, 1e-6, 0.0));
-        shade = n.x * n.x * 0.6 + n.z * n.z * 0.8 + n.y * n.y * select(0.5, 1.0, n.y > 0.0);
+        shade = normal_shade(n);
     }
     out.clip = scene.view_proj * vec4(world, 1.0);
     if scene.taa.z > 0.5 && scene.taa_frame.y > 0.5 {
@@ -103,7 +115,9 @@ fn vertex(vi: u32, ii: u32) -> VOut {
     out.tex = inst.tex;
     var lit = vec3(1.0);
     if inst.light != 0xffffffffu {
-        lit = lightmap(unpack_light(inst.light), scene.params.z, scene.light.x, scene.light.y);
+        let light = unpack_light(inst.light);
+        lit = lightmap(light, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
+        lit = min(vec3(1.0), lit + lightning_ground(scene, world, light.x));
     }
     out.color = pow(inst.color * lit * shade, vec3(2.2));
     out.shader = inst.shader;

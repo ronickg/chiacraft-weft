@@ -14,9 +14,11 @@ Examples to copy from:
 ## Blocks and items
 A block or item made of boxes takes Blockbench's **Java Block/Item** model: export it as `models/block/<name>.json` or `models/item/<name>.json` in your mod and it is picked up by the name, no code needed. Entities take the **Bedrock Entity** format instead (below). Two formats because the two want different things: a block is boxes whose faces each show some texture and never moves, a mob is bones that turn, swing and play keyframes over one skin. Each format is the one Blockbench made for that job.
 
-From a Java model the engine reads `elements` (`from`, `to`, `rotation`, and `faces` with their `texture`, `uv` and `rotation`), `textures` with `#name` references and `parent`, another model file or one of vanilla's cube parents (`block/cube_all`, `block/cube`, `block/cube_column`, `block/cube_bottom_top`) which give a plain cube its face textures. A face whose `#name` no texture sets shows the block's own texture of that face, so a file can bring only the shape and leave the textures to `.texture(..)` / `.textures(..)` in code. Faces the file leaves out aren't drawn. `uv` is 0 to 16 across a picture of any size, fractions included, so a face can be a part of an unwrap.
+From a Java model the engine reads `elements` (`from`, `to`, `rotation`, and `faces` with their `texture`, `uv` and `rotation`), `textures` with `#name` references and `parent`, another model file or one of vanilla's cube parents (`block/cube_all`, `block/cube`, `block/cube_column`, `block/cube_bottom_top`) which give a plain cube its face textures. A face whose `#name` no texture sets shows the block's own texture of that face, so a file can bring only the shape and leave the textures to `.texture(..)` / `.top(..)` and the like in code. An element with `"shade": false` is drawn without the shading by side (`.unshaded()` in code). Faces the file leaves out aren't drawn. `uv` is 0 to 16 across a picture of any size, fractions included, so a face can be a part of an unwrap.
 
 In code the same is `.model_box(min, max)` (pixels, 0..16), whose faces show the state's textures. A block's model decides its shape for everyone, collision and selection included (box by box, so a stair is one slab and a quarter, unless `.hitbox(min, max)`, in the same pixels, says otherwise).
+
+Block and item texture arguments, including the six faces of `.model_box_faces(min, max, faces)`, accept the shared layer text syntax. Separate layers with spaces, use `#RRGGBB` for a fixed tint and `@kind` for a biome tint. Each layer's asset name is relative to the setter's texture folder, so `"base:stone base:ore_overlay"` combines two block textures. UV rectangles and face rotations apply to every layer.
 
 For items, `models/item/<name>.json` with `"parent": "item/generated"` and a `layer0` texture is a flat item showing that texture; with `elements` the item is drawn as those boxes in the hand and on the ground. Its slot still shows its picture (`textures/item/<name>.png`), as Hytale's inventory does, and shows the boxes only for an item with no picture of its own. A face without a texture shows the item's own icon. A `handheld` item's boxes are held the way its sprite would be, so lay them out in the 16x16 square as the sprite lies, handle at the bottom left (a sword turned 45 degrees: `mods/base/source/items/stone_sword`); other items' boxes are held like a block.
 
@@ -63,9 +65,9 @@ r.entity(&ORB).texture("orb").model(Model::from(vec![
 ```
 
 ## Model from Blockbench
-Make the model as a Bedrock Entity, export it as `<name>.geo.json` and drop it into `assets/models/`. A file named like the entity is picked up on its own (`idol.geo.json` for `idol`), and `r.set_model("idol", "other_name")` points at another one. Either way the file replaces any model written in code. Animations work the same way, from `animations/<name>.animation.json`.
+Make the model as a Bedrock Entity, export it as `<name>.geo.json` and drop it into `assets/models/`. A file named like the entity is picked up on its own (`idol.geo.json` for `idol`), and `r.set_model(&IDOL, "other_name")` points at another one. Either way the file replaces any model written in code. Animations work the same way, from `animations/<name>.animation.json`.
 
-The engine reads bones with their `pivot`, `parent` and resting `rotation`, boxes with `origin` (absolute, the way Blockbench writes it), `size`, `uv` (a pair or per face), `mirror` and `inflate`, and `poly_mesh` bones, triangles and quads alike, with normalized uvs if you use them. The geometry's `texture_width` and `texture_height` override the numbers you gave to `Model::uv`, so the skin can be any size.
+The engine reads bones with their `pivot`, `parent` and resting `rotation`, boxes with `origin` (absolute, the way Blockbench writes it), `size`, `uv` (a pair or per face), `mirror` and `inflate`, and `poly_mesh` bones, triangles and quads alike, with normalized uvs if you use them. The geometry's `texture_width` and `texture_height` override the numbers you gave to `Model::uv_size`, so the skin can be any size.
 
 Two things trip people up. A rotated box is drawn unrotated (the log warns about it), so put it in its own bone and rotate the bone. And list parent bones before their children, as Blockbench does. Molang expressions aren't evaluated, only plain numbers.
 
@@ -88,7 +90,7 @@ A role tells the engine what a bone is: which stock clips move it, what armor co
 | a bone under `head` | stays with the head, and is gone with it from your own eyes |
 | anything else | stays still |
 
-The player's model is `humanoid(false)` set by base (`r.set_model("core:player", ..)` sets any kind's model, the engine's included); its sneaking pose comes from `body`, `head` and the arms and legs.
+The player's model is `humanoid(false)` set by base (`r.set_model(&PLAYER, ..)` sets any kind's model, the engine's included); its sneaking pose comes from `body`, `head` and the arms and legs.
 
 ## Animations
 One file holds any number of animations, and an animation's name is whatever follows the last dot, so `animation.idol.bow` is just `bow`:
@@ -108,7 +110,9 @@ One file holds any number of animations, and an animation's name is whatever fol
 ```
 Each bone can carry `rotation` (degrees), `position` (model pixels) and `scale`, as keyframes at times in seconds. A keyframe is a plain `[x, y, z]` or an object with `pre`, `post` and `"lerp_mode": "catmullrom"` when you want a jump or a smooth curve. Between keys the value is linear. `loop` is `true` to repeat, `false` to play once and go back to normal, or `"hold_on_last_frame"` to stay in the last pose.
 
-Keyframes are added on top of what is below them, and of a bone's resting angle, so even a walking leg can be animated. Set `"override_previous_animation": true` (Blockbench's Override box) and they go over what is below on the bones they name instead: `blend_weight` then says how much of that it hides, and its own angles stay what the file has. So 1 replaces it, and 0.9 on a greatsword's `hold` leaves a tenth of the walk on the arms, so they stir without dangling. A clip only ever touches the bones it names: arms only and the walk goes on, the whole body for a heavy swing and it doesn't. The angles follow Blockbench's convention: a Bedrock arm turned -90 degrees on x points forward.
+Clips go by the server's ticks, not by when a client happened to see something start: every player sees a mob in the same pose at the same moment, which is how an arrow stays on the arm it went into for all of them.
+
+Keyframes are added on top of what is below them, and of a bone's resting angle, so even a walking leg can be animated. Set `"override_previous_animation": true` (Blockbench's Override box) and they go over what is below on the bones they name instead, scale included (an arrow a `hold` clip hides at scale 0 shows again in `use`): `blend_weight` then says how much of that it hides, and its own angles stay what the file has. So 1 replaces it, and 0.9 on a greatsword's `hold` leaves a tenth of the walk on the arms, so they stir without dangling. A clip only ever touches the bones it names: arms only and the walk goes on, the whole body for a heavy swing and it doesn't. The angles follow Blockbench's convention: a Bedrock arm turned -90 degrees on x points forward.
 
 Without override `blend_weight` scales the clip: a number, or `query.modified_move_speed` for how fast it walks. `anim_time_update` says what moves the clip's time: `query.modified_distance_moved` for steps, or anything with `progress` in it to stretch the clip over however long the action takes. Other Molang isn't evaluated.
 
@@ -123,7 +127,7 @@ What plays goes by the name of an action, and that name is all there is to it. T
 | `hold` | something in hand (`hold_tool` for tools that don't have their own) | clock |
 | `hold_empty` | nothing in hand, for `.first_person` only by default | clock |
 | `equip` | the hand going down and up as it changes items or recharges | progress |
-| `swing`, `use` | swinging (`swing_held` with an item that has no `swing` of its own), and using what it holds | progress |
+| `swing`, `use` | swinging (`swing_held` with an item that has no `swing` of its own), and using what it holds | progress; seconds held for an item used until let go (a bow), staying at its end |
 | `death` | dying | clock |
 
 The engine has clips for all of these (`assets/animations/stock_*.animation.json`), picked by the shape of the model: walking on two legs, four, eight. So any model with the right [bone names](#roles) walks without a single keyframe. Your own clip of the same name takes over on the bones it names, and the stock one keeps moving the others.
@@ -134,8 +138,8 @@ Anything else is yours to name. Started from code, everyone who sees the entity 
 ```rust
 world.action_play(entity_id, "bow", false);    // false plays once, true repeats
 world.action_play(entity_id, "", false);       // back to normal
-world.action_override(creeper, "walk", "flee_cat"); // plays flee_cat wherever it would walk
-world.action_override_clear(creeper, "walk");
+world.action_override(mob, "walk", "flee_cat"); // plays flee_cat wherever it would walk
+world.action_override_clear(mob, "walk");
 ```
 `action_override` is the one for a mob's goal, and `ai::with_action_override("walk", "flee_cat", goal)` does it for as long as the goal runs. Without a `flee_cat` clip it just goes on walking.
 
@@ -144,7 +148,7 @@ The file is found by the entity's name, or by `.animations("name")` when it is c
 ### Animations for something that already exists
 A file can also be attached to an entity that belongs to someone else, the player for example:
 ```rust
-r.set_animations("core:player", "mymod:player");
+r.set_animations(&PLAYER, "mymod:player");
 ```
 After that the player has the animations of your `animations/player.animation.json`, and `action_play(player, "wave", false)` plays one.
 
@@ -162,7 +166,7 @@ r.item(&GREATSWORD).two_handed();                     // does nothing while the 
 r.item(&MAP).one_handed_action("hold_one");               // two hands, or one with this action
 r.item(&BOW).use_priority(10);                        // goes before the other hand on a right click
 ```
-A right click goes to the block first (not while sneaking), then to the hands by `use_priority`, the main hand if they are equal. The next hand gets its turn when the item does nothing, which `on_use` says by returning `false`: a bow with no arrows lets the torches in the other hand go down. Hits are for the main hand. The second hand itself is an equipment slot, `r.equipment_slot(&OFF_HAND, 0, "slot_offhand")`, and base registers it. A menu with `.equipment()` has it; its screen places it with `ui.group(OFF_HAND.name())`, as `ui.equipment()` draws only what is worn.
+A right click goes to the block first (not while sneaking), then to the hands by `use_priority`, the main hand if they are equal. The next hand gets its turn when the item does nothing, which `on_use` says by returning `false`: a bow with no arrows lets the torches in the other hand go down. Hits are for the main hand. The second hand itself is an equipment slot. Base registers it with `.priority(1, "#offhand_preferred")`. Tag an item `offhand_preferred` to send it there on a shift-click or shift-drag when the hand has room. A menu with `.equipment()` has it; its screen places it with `ui.group(OFF_HAND.name())`, as `ui.equipment()` draws only what is worn.
 
 Where the item sits in the hand comes from `display.thirdperson_righthand` of `models/item/<name>.json`, which is Blockbench's Display tab, the same from the eyes and from outside; the other hand mirrors it. And `models/item/<name>.geo.json` makes the item out of bones (its texture is `textures/item/<name>.png`). Its origin is the palm with -Z along the arm, and its bones go in the same clips as the arms, so a gun's slide is one more bone in `swing`. On the ground and in the inventory it still shows its sprite.
 
@@ -180,27 +184,33 @@ Two more clips say how it lies when it isn't in a hand, both moving a bone calle
 - `ground`: on the ground. It turns and bobs by itself at half size, and for a sword to lie flat this is `root` turned 90 degrees on x.
 - `gui`: in a slot, turned like a block is, then made to fit. The picture is drawn once, so nothing moves in it and it may not be scaled.
 
-A model that depends on the stack, a sword that broke say:
+A look that depends on the stack, a sword that broke say, is the item's `condition`:
 ```rust
-r.item_model_for_stack(&SWORD, |s| (s.wear() > 100).then_some("mymod:sword_broken"));
+r.item(&SWORD).condition(|s, v| if s.wear() > 100 { v.model("sword_broken"); });
 ```
-It is asked once per kind of stack. The stacks in other players' hands aren't sent, so there they show the usual model.
+`v.texture(..)` swaps the flat picture; `v.worn_model(model, bone)` and `v.worn_texture(texture)` choose its equipment appearance. The same public stack data reaches other clients, so these choices also work on observed entities.
+
+The callback reads components marked `abi::stack_flags::VISUAL` (`r.stack_component(&STYLE, abi::stack_flags::VISUAL)`). Wear and the built-in appearance components are marked already. Its input contains only public visual data, including in nested stacks, with the top-level count normalized to one. One result is shared by all display uses; changing another component still synchronizes that value but reuses the appearance. A stack's `MODEL`, `WORN_MODEL` and `WORN_TEXTURE` override its item's defaults when the callback leaves those choices unset.
 
 ## Models on models
 A second model can sit on a bone of the first, with its own texture and clips, like a tail:
 ```rust
 r.bone_model(&PLAYER, "tailmod:tail", "body");                                  // on every player
-r.item(&TAIL).wearable_model(&base_api::CHEST, "tailmod:tail", "body");           // on who wears it
+r.item(&TAIL).wearable_model(&base_api::slots::CHEST, "tailmod:tail", "body");           // on who wears it
 ```
 Draw it in the pixels of the model it goes on, with the same origin (`player_template.geo.json` in the example mod is good to draw on top of). What plays on the wearer plays on it: its own `walk` plays with theirs, and when someone's `walk` names a bone `tail` that is in your model, it moves. Nobody knowing of the other two mods is needed for that.
 
 ## Bones that move by themselves
 On top of clips. A bone whose name starts with `hanging` hangs down whichever way what holds it turns, and swings when that moves: a lantern on a chain is a hook and two `hanging_` links, with no code. For something other than hanging:
 ```rust
-r.bone_motion("tailmod:tail", "tail2", BoneMotion::SPRINGY);                                   // keeps its shape, lags behind
+r.bone_motion_with_limit("tailmod:tail", "tail2", BoneMotion::SPRINGY, 45.0);
 r.bone_motion("mymod:banner", "cloth", BoneMotion { gravity: 20.0, spring: 5.0, drag: 1.5 });
 ```
-A file can say the same, for those without code: `models/<model>.bones` with lines like `tail2 = 5 30 5` (gravity, spring, drag).
+In `models/<model>.bones` or an avatar's `avatar.bones`, write `tail2 = 5 30 5 45` (gravity, spring, drag, maximum angle in degrees).
+An entry in the file overrides the mod's settings for that bone, so a resource pack can change the swing.
+Each bone measures its angle from its animated direction after its parent moves. Zero locks it to that direction and 180 allows a full swing.
+Omitting the angle, or calling `r.bone_motion`, uses 30 degrees for a positive spring and 180 otherwise.
+To record the pivot, tip and animated direction of each simulated bone every frame, run with `--log bones=trace`. Positions are relative to the camera in blocks.
 
 Each frame on the client, from `r.client_entity_frame(&KIND, |c, e| ..)` (any number of mods on one kind, the local player too) or `r.client_frame`:
 ```rust
@@ -210,16 +220,18 @@ c.bone_scale(e.id(), "hat", [0.0; 3]);                                    // 0 h
 c.bone_position(e.id(), "tip");                                           // where it was in the world, for sparks off a sword
 c.action_current(e.id());                                                 // what `action_play` has it doing, until its clip is over
 c.clip_length(e.id(), "bow");                                             // seconds
-c.held_item(e.id(), Hand::Main);                                    // the item id in a hand
+c.held(e.id(), Hand::Main);                                                // the public stack in a hand
 ```
-The bones are looked for in the entity's model and in what it holds and has on. An entity out of the view isn't posed, so `bone_position` has nothing for it, and far away a pose lasts a few frames. This runs on each client by itself, so nobody else's swing is exactly yours. `r.client_entity_frame` is the other hook: one per kind, for a mob's own cosmetics, and it replaces the engine's steps and such unless you call `e.run_engine_effects()`.
+The bones are looked for in the entity's model and in what it holds and has on. An entity out of the view isn't posed, so `bone_position` has nothing for it, and far away a pose lasts a few frames. This runs on each client by itself, so nobody else's swing is exactly yours. A kind with `.own_effects()` gets no steps and such from the engine, its `client_entity_frame` does them.
 
 `World::action_stop(id)` ends what `action_play` started. `action::WALK`, `action::HOLD` and so on are the engine's action names, if you'd rather a typo didn't compile.
 
 ## A player's own model
-Players can bring a model with no mod at all: `skins/avatar/` holds `avatar.geo.json` and `avatar.png`, and if they like `avatar.animation.json`, `avatar.bones` and `avatar_e.png` (a glow mask). Everyone sees it from the next time they join; `examples/avatar` is one to start from.
+Profile's Change Skin button opens the skins folder. Put a PNG there as `skin.png`; it is loaded when joining a world. Arm Width selects classic or slim arms, with changes sent to everyone in the current world. A 64x64 skin includes the outer layer; legacy 64x32 skins use classic arms and mirrored limbs.
 
-It is the same as any model: the bone names above make walking, holding and swinging work with no clips, its own clips go over them by name, items go on `mainItem` and `offItem`. No code comes with it, so it can't do any harm: all of it together stays under 512 KB, with limits on bones, boxes, clips and how far it reaches, and what goes past them shows as the usual player. Armor's textures are painted for the usual player, so it doesn't show on an avatar. A player can turn others' models off with Players' Own Models in the settings, and a world with `core:allow_avatars` off doesn't pass them on.
+Players can bring a model with no mod at all: `skins/avatar/` holds `avatar.geo.json` and `avatar.png`, and if they like `avatar.animation.json`, `avatar.bones` and `avatar_e.png` (a glow mask). Everyone sees it from the next time they join; `examples/avatar` is one to start from. An avatar defines its own geometry and takes precedence over the skin model choice.
+
+It is the same as any model: the bone names above make walking, holding and swinging work with no clips, its own clips go over them by name, items go on `mainItem` and `offItem`. No code comes with it, so it can't do any harm: all of it together stays under 512 KB, with limits on bones, boxes, clips and how far it reaches, and what goes past them shows as the usual player. Armor goes on it as on any model (see below). A player can turn others' models off under Model Visibility in Profile, and a world with `core:allow_avatars` off doesn't pass them on.
 
 ## Armor and other worn items
 An item shows up on the wearer when it sits in an equipment slot. The slots are declared once, with the bones what is worn there covers and the silhouette of the empty slot, and an item only names its slot:
@@ -229,6 +241,13 @@ r.equipment_slot(&BACK, &["body", "leftWing", "rightWing"], "slot_back"); // a s
 r.item(&RUBY_HELMET).wearable(&HEAD, 1.0, "armor/ruby_1")
 ```
 A slot covers bones by name. A name with a [role](#roles) (`head`, `leftArm`, `leg0` ...) covers every bone of that role, so armor fits any model; any other name covers that bone only. The base game's slots use `worn::HEAD`, `worn::CHEST`, `worn::LEGS` and `worn::FEET`. `wearable` takes how far the piece sticks out from the body in pixels (vanilla armor uses 1.0, and 0.5 for the leggings layer) and its texture.
-The slot then takes the item in the inventory, shift-clicks put it there, and a new slot of any mod shows up in the inventory screen by itself (`.equipment()` on the menu, `ui.equipment()` on its screen). That texture is drawn on the same boxes as the wearer's, so it follows the wearer's skin layout, and the 64x32 files in `mods/base/assets/textures/entity/armor/` show how (the name is under `entity/`). It works on any model with the right roles, mobs made with `humanoid` included.
+The slot then takes the item in the inventory, shift-clicks put it there, and a new slot of any mod shows up in the inventory screen by itself (`.equipment()` on the menu, `ui.equipment()` on its screen).
+
+The texture is laid out like vanilla armor's, the 64x32 files in `mods/base/assets/textures/entity/armor/` (the name is under `entity/`), and every model wears it the same way, players' own models too. Per covered bone:
+- **The model's own armor**: a bone called `armor_<bone>` (`armor_head`, `armor_leftArm`), a child of the bone it is for, with its boxes painted on the armor texture. It and everything under it is drawn only for what is worn there, never with the skin. A model whose head is a pumpkin or whose arms are wings says this way exactly where a helmet or a sleeve sits.
+- **Otherwise vanilla's piece, fitted**: the head, `body`, the arms and the legs get vanilla's piece stretched over their biggest box, so a 10 pixel head wears a 10 pixel helmet and ears or a muzzle on the same bone stay outside. On `humanoid` this is exactly its own boxes.
+- **Any other bone** a slot covers is worn on its own boxes, with a texture laid out like the wearer's skin.
 
 Items in the world and in the hand are flat sprites with some thickness, the boxes of a block, or [a model of their own](#blocks-and-items). `F3+T` reloads models and animations along with textures while the game runs.
+
+Items can select a model asset explicitly with `.model_file("mymod:item/tool")`.

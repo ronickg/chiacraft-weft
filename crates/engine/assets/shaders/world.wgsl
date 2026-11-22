@@ -1,6 +1,7 @@
 
 var<private> TRI_FLIP: array<u32, 6> = array<u32, 6>(1u, 2u, 3u, 1u, 3u, 0u);
 var<private> AO: array<f32, 4> = array<f32, 4>(0.42, 0.62, 0.8, 1.0);
+const WORLD_LIQUID: u32 = 1u;
 
 struct VOut {
     @builtin(position) clip: vec4<f32>,
@@ -12,9 +13,8 @@ struct VOut {
     @location(4) dist: f32,
     @location(5) @interpolate(flat) layer2: u32,
     @location(6) @interpolate(flat) blend: f32,
-    // Overlay texture + 1 (0: none) and the tint it takes; without an overlay the tint is also
-    // in `color` (`tint` then only colors emission).
-    @location(7) @interpolate(flat) overlay: u32,
+    @location(7) clip_cube: vec3<f32>,
+    // The face's tint, also in `color`; alone it colors emission.
     @location(8) tint: vec3<f32>,
     // Glow mask texture (LabPBR emission), all ones: none.
     @location(9) @interpolate(flat) glow: u32,
@@ -23,7 +23,10 @@ struct VOut {
     @location(11) pos: vec3<f32>,
     @location(12) @interpolate(flat) size: f32,
     // 1 on a see-through face with the same block behind it (`FACE_BACKED`): its holes are filled.
+    // 2 on water (`WATER_TINT`); a far water top's depth from bit 8 (chiacraft).
     @location(13) @interpolate(flat) backed: u32,
+    @location(14) rel: vec3<f32>,
+    @location(15) @interpolate(flat) flags: u32,
 }
 
 fn shader_of(tex: u32) -> u32 {
@@ -136,8 +139,10 @@ fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
     var at = vec3<f32>(origin.xyz) * 16.0 + local;
     let k = origin.w;
     if k != 0 {
+        // Its lean about its pivot first (chiacraft), then upstream's turn of the whole body.
         let pivot = offsets[k * 3 + 2].xyz;
         at = quat_turn(offsets[k * 3 + 1], at - pivot) + pivot;
+        at = quat_vector(body_rotations[k], at);
     }
     let pos = at - g.cam_frac.xyz + offsets[k * 3].xyz;
     return vec4(pos, 1.0);
@@ -163,7 +168,9 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     var out: VOut;
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
-    out.uv = UVS[(c + ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
+    out.rel = pos.xyz;
+    out.flags = 0u;
+    out.uv = UVS[(c + 4u - ((w0 >> FACE_TURN_SHIFT) & FACE_TURN_MASK)) % 4u];
     out.backed = select(0u, 1u, (w0 & FACE_BACKED) != 0u);
     if ((w0 >> FACE_TINT_SHIFT) & TINT_MASK) == WATER_TINT {
         out.backed |= 2u;
@@ -178,24 +185,18 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.light = on_body(corner_light(w2, w3, c), origins[ii].w);
     let o = origins[ii] + g.cam_cube;
     out.slot = shader_of(tex_id);
-    out.pos = vec3<f32>(o.xyz * 16) + local;
+    out.pos = pos.xyz + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
     let tint_kind = (w0 >> FACE_TINT_SHIFT) & TINT_MASK;
     var tint = vec3(1.0);
     if tint_kind != 0u {
         tint = tint_color(tint_kind, w1 >> FACE_BIOME_SHIFT, o.x * 16 + i32(local.x), o.z * 16 + i32(local.z));
     }
     out.tint = tint;
-    // A face between leaves (`core:mc_leaves`): Minecraft's AO reads the leaf in front as a
-    // quarter of 0.2, a fifth darker at every corner (chiacraft, Trees, stage 1).
-    let ao = AO[a[c]] - select(0.0, 0.2, (w0 & FACE_INNER) != 0u);
-    let ov = frames[g.extra.x + tex_id];
-    if ov != 0u {
-        out.overlay = texture_frame(ov - 1u).a + 1u;
-        out.color = vec3(SHADE[dir] * ao);
-    } else {
-        out.overlay = 0u;
-        out.color = tint * SHADE[dir] * ao;
+    var shade = SHADE[dir];
+    if origins[ii].w != 0 {
+        shade = normal_shade(quat_vector(body_rotations[origins[ii].w], FACE_DIRS[dir]));
     }
+    out.color = tint * shade * AO[a[c]];
     return out;
 }
 
@@ -212,9 +213,12 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     let uvw = records[base + 5u];
     let uv = quad_uv_fine(uvw, records[base], records[base + 1u], records[base + 2u], records[base + 3u]);
     var uvs = array<vec2<f32>, 4>(vec2(uv.x, uv.w), vec2(uv.z, uv.w), vec2(uv.z, uv.y), vec2(uv.x, uv.y));
-    let n = normalize(cross(p1 - p0, p2 - p1));
+    var n = normalize(cross(p1 - p0, p2 - p1));
+    if origins[ii].w != 0 {
+        n = quat_vector(body_rotations[origins[ii].w], n);
+    }
     // Face shading blended by normal; plants opt out like vanilla's crossed squares.
-    var shade = n.x * n.x * 0.6 + n.z * n.z * 0.8 + n.y * n.y * select(0.5, 1.0, n.y > 0.0);
+    var shade = normal_shade(n);
     if ((uvw >> QUAD_TINT_SHIFT) & QUAD_FLAT) != 0u {
         shade = 1.0;
     }
@@ -222,6 +226,19 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     var out: VOut;
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
+    out.rel = pos.xyz;
+    let light0 = records[base + 6u];
+    var light1 = records[base + 7u];
+    if ((uvw >> QUAD_TINT_SHIFT) & QUAD_CLIP) != 0u {
+        let planes = vec3<u32>(light1) >> vec3<u32>(0u, 2u, 4u);
+        let min_pos = -f32(QUAD_POS_OFFSET) / 16.0;
+        let max_pos = f32(QUAD_POS_MASK - QUAD_POS_OFFSET) / 16.0;
+        let lo = select(vec3(min_pos), vec3(0.0), (planes & vec3(1u)) != vec3(0u));
+        let hi = select(vec3(max_pos), vec3(16.0), (planes & vec3(2u)) != vec3(0u));
+        out.clip_cube = (local - lo) / (hi - lo) - 0.5;
+        light1 = light0;
+    }
+    out.flags = select(0u, WORLD_LIQUID, origins[ii].w == 0 && ((uvw >> QUAD_TINT_SHIFT) & QUAD_LIQUID) != 0u);
     out.uv = uvs[c];
     let tex_id = w4 & FACE_TEX_MASK;
     let fr = texture_frame(tex_id);
@@ -230,10 +247,10 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.layer2 = fr.b;
     out.blend = fr.blend;
     out.glow = glow_of(fr.a);
-    out.light = on_body(corner_light(records[base + 6u], records[base + 7u], c), origins[ii].w);
+    out.light = on_body(corner_light(light0, light1, c), origins[ii].w);
     let o = origins[ii] + g.cam_cube;
     out.slot = shader_of(tex_id);
-    out.pos = vec3<f32>(o.xyz * 16) + local;
+    out.pos = pos.xyz + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
     let tint_kind = (uvw >> QUAD_TINT_SHIFT) & TINT_MASK;
     out.backed = select(0u, 2u, tint_kind == WATER_TINT);
     var tint = vec3(1.0);
@@ -241,14 +258,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         tint = tint_color(tint_kind, w4 >> FACE_BIOME_SHIFT, o.x * 16 + i32(round(local.x)), o.z * 16 + i32(round(local.z)));
     }
     out.tint = tint;
-    let ov = frames[g.extra.x + tex_id];
-    if ov != 0u {
-        out.overlay = texture_frame(ov - 1u).a + 1u;
-        out.color = vec3(shade);
-    } else {
-        out.overlay = 0u;
-        out.color = tint * shade;
-    }
+    out.color = tint * shade;
     return out;
 }
 
@@ -258,12 +268,14 @@ fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
 }
 
 fn shade_unfogged(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
-    var light = in.color * lightmap(in.light, scene.params.z, scene.light.x, scene.light.y);
+    if any(abs(in.clip_cube) > vec3(0.5)) { discard; }
+    let lit_color = lightmap(in.light, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
+    var light = in.color * min(vec3(1.0), lit_color + lightning_ground(scene, in.rel, in.light.x));
     // Glowing texels are lifted towards full brightness by their mask: lit = albedo * max(light,
     // emission), so they stay their own (tinted, unshaded) color in the dark.
     if in.glow != 0xffffffffu {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
-        light = max(light, select(in.tint, vec3(1.0), in.overlay != 0u) * e);
+        light = max(light, in.tint * e);
     }
     if in.slot == 0u {
         // Vanilla multiplies the texel by its light in sRGB values (26.3 terrain.fsh: an RGBA8
@@ -343,23 +355,13 @@ fn sample(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4<f32> {
     return mix(a, b, in.blend);
 }
 
-// The tinted overlay over the base texture; its tint is a gamma-space factor like the others.
-fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4<f32> {
-    if in.overlay == 0u {
-        return albedo;
-    }
-    let ov = textureSampleGrad(textures[in.overlay - 1u], linear_mipped, nuv, du, dv);
-    // Tinted and laid over in sRGB values, as vanilla's overlay quad (a 2.2 power darkened its
-    // low channels, as `shade_unfogged`'s did).
-    return vec4(srgb_decode(mix(srgb_encode(albedo.rgb), srgb_encode(ov.rgb) * in.tint, ov.a)), albedo.a);
-}
-
 @fragment
 fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    let albedo = sample(in, nuv, du, dv);
+    clip_dry_liquid(in);
     return vec4(shade(in, albedo).rgb, 1.0);
 }
 
@@ -391,7 +393,8 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    var albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    var albedo = sample_cutout(in, nuv, du, dv);
+    clip_dry_liquid(in);
     // Vanilla's alpha test (GL_GREATER 0.1).
     if albedo.a <= 0.1 {
         if (in.backed & 1u) == 0u {
@@ -400,6 +403,54 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
         albedo = backed_hole(in, nuv);
     }
     return vec4(shade(in, albedo).rgb, 1.0);
+}
+
+fn translucent_albedo(in: VOut) -> vec4<f32> {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    return sample(in, nuv, du, dv);
+}
+
+fn translucent(in: VOut) -> vec4<f32> {
+    return shade(in, translucent_albedo(in));
+}
+
+fn in_dry_hull(rel: vec3<f32>) -> bool {
+    let count = u32(dry_volumes[0].origin.x);
+    for (var i = 1u; i <= count; i++) {
+        let hull = dry_volumes[i];
+        let local = quat_vector(hull.inverse, rel - hull.origin.xyz);
+        if any(local < hull.lo.xyz) || any(local >= hull.hi.xyz) {
+            continue;
+        }
+        for (var j = u32(hull.origin.w); j < u32(hull.lo.w); j++) {
+            let bounds = dry_volumes[j];
+            if all(local >= bounds.lo.xyz) && all(local < bounds.hi.xyz) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+fn clip_dry_liquid(in: VOut) {
+    if (in.flags & WORLD_LIQUID) != 0u && in_dry_hull(in.rel) {
+        discard;
+    }
+}
+
+fn through_world_atmosphere(color: vec4<f32>, rel: vec3<f32>, pixel: vec2<f32>) -> vec4<f32> {
+    if scene.atmosphere_extent.x != 0u {
+        let dist = length(rel);
+        let dir = rel / max(dist, 0.000001);
+        let limit = select(dist, min(dist, scene.params.y), scene.environment.w >= 1.0);
+        let s = scene.cloud;
+        let exact_cloud = trace_cloud(s, dir, limit, scene);
+        let resolved = resolve_rain(s, dir, limit, exact_cloud, scene, pixel);
+        return vec4(resolved.rgb + color.rgb * (1.0 - resolved.a), color.a);
+    }
+    return through_cloud(color, rel, scene);
 }
 
 // The water's tint kind (`content`: core:grass, core:foliage, core:water come first). Its faces
@@ -419,11 +470,9 @@ fn to_gamma(c: vec3<f32>) -> vec3<f32> {
 
 @fragment
 fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
-    let du = dpdx(in.uv);
-    let dv = dpdy(in.uv);
-    let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    let albedo = translucent_albedo(in);
     let lit = shade(in, albedo);
+    clip_dry_liquid(in);
     // Water over the world as it was before it (`scene.behind`), mixed as vanilla's 8-bit screen
     // mixes it, in gamma (chiacraft, stage 1 against vanilla + Distant Horizons): blended in linear
     // light the deep bed added next to nothing and the lakes stood flat and bright, (45, 86, 168)
@@ -436,13 +485,20 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
         // water was drawn but no bed under it, and the far tile was left out: a pale ring of near
         // water over the sky's colour across every lake (stage 1, the bay at 400-530 blocks).
         if textureLoad(textures[u32(scene.behind.y)], px, 0).r <= 0.0 {
-            return vec4(far_water(in, albedo), 1.0);
+            return through_world_atmosphere(vec4(far_water(in, albedo), 1.0), in.rel, in.clip.xy);
         }
         let under = textureLoad(textures[u32(scene.behind.x)], px, 0).rgb;
         let mixed = mix(to_gamma(under), to_gamma(lit.rgb), lit.a);
-        return vec4(pow(mixed, vec3(2.2)), 1.0);
+        return through_world_atmosphere(vec4(pow(mixed, vec3(2.2)), 1.0), in.rel, in.clip.xy);
     }
-    return lit;
+    return through_world_atmosphere(lit, in.rel, in.clip.xy);
+}
+
+@fragment
+fn fs_layers(in: VOut) -> @location(0) vec4<f32> {
+    let color = translucent(in);
+    clip_dry_liquid(in);
+    return color;
 }
 
 // Water at `albedo`'s alpha over a dark sea floor, mixed in gamma, then fogged (`fs_lod`'s far water).
@@ -453,14 +509,14 @@ fn far_water(in: VOut, albedo: vec4<f32>) -> vec3<f32> {
     let depth = in.backed >> 8u;
     if depth > 0u {
         let left = vec4(max(15.0 - f32(depth), 0.0) / 15.0, 0.0, 0.0, 0.0);
-        bed = FAR_BED_ALBEDO * lightmap(left, scene.params.z, scene.light.x, scene.light.y);
+        bed = FAR_BED_ALBEDO * lightmap(left, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
     }
     let water = pow(mix(bed, to_gamma(lit), albedo.a), vec3(2.2));
     return fogged(water, plain_fog(in.dist));
 }
 
 // Distant terrain (`client::lod`): a record is the `dir` face of a box in its tile, drawn with its
-// block's texture laid block by block (its mips far off), its overlay and tint, and vanilla's
+// block's texture laid block by block (its mips far off), its tint, and vanilla's
 // corner shade (chiacraft, after upstream Weft f69243fd, PR #107; it was the texture's average
 // colour, flat), full sky light. Its pixels in columns whose cubes show their ground are dropped
 // (`lod_mask`); it sits a little lower so the cubes win along the edges.
@@ -506,6 +562,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     var out: VOut;
     out.clip = scene.view_proj * pos;
     out.dist = length(pos.xyz);
+    out.rel = pos.xyz;
     let o = origins[ii] + g.cam_cube;
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.uv = lod_uv(dir, out.pos + vec3(0.0, 0.125, 0.0));
@@ -528,16 +585,8 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
         tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
-    let shade = SHADE[dir] * AO[a[c]];
-    // With an overlay the overlay takes the tint, the base none (as the cubes' faces).
-    let ov = frames[g.extra.x + tex_id];
-    if ov != 0u {
-        out.overlay = texture_frame(ov - 1u).a + 1u;
-        out.color = vec3(shade);
-    } else {
-        out.overlay = 0u;
-        out.color = tint * shade;
-    }
+    // Overlays are upstream's face layers now, which distant tiles don't have.
+    out.color = tint * SHADE[dir] * AO[a[c]];
     return out;
 }
 
@@ -556,15 +605,7 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, fract(in.uv), du, dv);
-    var albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
-    // Leaves far off as Distant Horizons colours them: the average of their opaque texels (its
-    // `ClientBlockStateColorCache`, holes skipped). With Minecraft's dark leaf mips on (test only,
-    // `core:mc_leaves`, bit 23) a smaller texel sums its opaque ones with the holes as black, so
-    // over the opaque share (its alpha) it is their average again: the far canopy stood -4 -8 0
-    // darker and less green than vanilla + DH's (MC import's pixel diff, 11-06).
-    if ((g.extra.w >> 23u) & 1u) != 0u && any(in.tint != vec3(1.0)) && albedo.a > 0.05 && albedo.a < 0.995 {
-        albedo = vec4(albedo.rgb / albedo.a, albedo.a);
-    }
+    var albedo = sample(in, nuv, du, dv);
     // Far water as Distant Horizons draws it (its `ColumnBox` keeps the sea floor's top under
     // water, drawn first; the water over it at the texture's alpha, mixed in gamma as vanilla's
     // screen mixes): over a bed that the water above has darkened (a block of sky light taken per

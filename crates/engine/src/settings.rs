@@ -14,21 +14,10 @@ pub struct Settings {
     pub read_only: bool,
 }
 
-/// The 3D world's share of the window's pixels each way: the setting, or on auto (0) two
-/// thirds on a high-density screen (`density`, physical pixels per point, 2 on Retina), where
-/// shading every pixel cost several times what it bought, and all of them elsewhere.
 /// How a world drawn smaller than the window is scaled up (`core:upscaler`): 0 bilinear, 1 FSR 1's
 /// EASU, 2 Snapdragon GSR 1. For the shaders as `scene.upscale.x`.
 pub fn upscaler() -> u32 {
     number("core:upscaler") as u32
-}
-
-pub fn render_scale(density: f64) -> f32 {
-    let set = number("core:render_scale") as f32;
-    if set > 0.0 {
-        return set.clamp(0.5, 1.0);
-    }
-    if density >= 1.5 { 0.67 } else { 1.0 }
 }
 
 /// The largest GUI scale a window shows whole (vanilla's 320x240 per step); auto uses it.
@@ -48,7 +37,7 @@ pub const GUI_MIN: (u32, u32) = (400, 320);
 /// (Playtest B9: the animal screen at GUI scale 1, its buttons' labels over each other; Researcher,
 /// round 13; Minecraft keeps to even scales for the same reason with its half-size font).
 pub fn max_gui_scale(window: (u32, u32)) -> u32 {
-    let min = if crate::touch::enabled() { GUI_MIN_TOUCH } else { GUI_MIN };
+    let min = if touch_controls() { GUI_MIN_TOUCH } else { GUI_MIN };
     even_scale((window.0 / min.0).min(window.1 / min.1)).max(2)
 }
 
@@ -177,334 +166,308 @@ impl Settings {
         Settings { run_dir: run_dir.to_path_buf(), read_only: false }
     }
 
-    pub fn language(&self) -> String {
-        config::text(id("core:language"))
-    }
-    /// 0 = automatic.
-    /// Frames a second at most, 0 for no cap.
-    pub fn fps_cap(&self) -> u32 {
-        number("core:fps_cap") as u32
-    }
-
-    pub fn gui_scale(&self) -> u32 {
-        number("core:gui_scale") as u32
-    }
-    pub fn view_distance(&self) -> i32 {
-        number("core:view_distance") as i32
-    }
-    pub fn vsync(&self) -> bool {
-        number("core:vsync") != 0.0
-    }
-    pub fn fov(&self) -> f32 {
-        number("core:fov") as f32
-    }
-    pub fn sensitivity(&self) -> f32 {
-        number("core:sensitivity") as f32
-    }
-    /// 0 moody .. 1 bright.
-    pub fn brightness(&self) -> f32 {
-        number("core:brightness") as f32
-    }
-    /// Bit per debug overlay group shown (F3 + number).
-    pub fn debug_groups(&self) -> u32 {
-        number("core:debug_groups") as u32
-    }
-    /// Mouse up looks down instead.
-    pub fn invert_y(&self) -> bool {
-        number("core:invert_y") != 0.0
-    }
-    /// The sneak key switches sneaking on and off instead of being held.
-    /// The sprint key switches sprinting on and off instead of being held.
-    pub fn name(&self) -> String {
-        config::text(id("core:name"))
-    }
-    pub fn server_port(&self) -> u16 {
-        number("core:server_port") as u16
-    }
-    /// Every connection through the relay only (`core:net_relay_only`, a test setting).
-    pub fn net_relay_only(&self) -> bool {
-        number("core:net_relay_only") != 0.0
-    }
-    /// Extra iroh relay URLs; empty uses the public defaults.
-    pub fn relays(&self) -> Vec<String> {
-        list("core:relays")
-    }
-    /// The Chia network for DIDs (chiacraft): `off`, `testnet11` or `mainnet`.
-    pub fn chain(&self) -> String {
-        config::text(id("core:chain")).trim().to_lowercase()
-    }
-    /// Own full nodes (`host:port`) instead of the DNS introducers.
-    pub fn chain_peers(&self) -> Vec<String> {
-        list("core:chain_peers")
-    }
-    /// What listing a world locks, in mojos (phase 5).
-    pub fn listing_deposit(&self) -> u64 {
-        number("core:listing_deposit").max(1.0) as u64
-    }
-
-    /// The fee a listing pays, in mojos (`core:listing_fee`).
-    pub fn listing_fee(&self) -> u64 {
-        number("core:listing_fee").max(0.0) as u64
-    }
-    /// DID sponsors' addresses (iroh endpoint ids), tried in order.
-    pub fn sponsors(&self) -> Vec<String> {
-        list("core:sponsors")
-    }
-    /// Enabled resource packs, highest priority first.
-    pub fn resource_packs(&self) -> Vec<String> {
-        list("core:resource_packs")
-    }
-    pub fn shader_pack(&self) -> Option<String> {
-        Some(config::text(id("core:shader_pack"))).filter(|p| !p.is_empty())
-    }
-
-    pub fn occlusion_culling(&self) -> bool {
-        number("core:occlusion_culling") != 0.0
-    }
-
-    /// Screen effects' half-size parts (`post::HOOK_LOW`), live.
-    pub fn post_low(&self) -> bool {
-        number("core:post_low") != 0.0
-    }
-
-    /// Levels of the HDR world's bloom pyramid (`core:bloom`: 0 none, 1 four, 2 six), live.
-    pub fn bloom_levels(&self) -> u32 {
-        match number("core:bloom") as i32 {
-            i32::MIN..=0 => 0,
-            1 => 4,
-            _ => 6,
-        }
-    }
-
-    /// The soft clouds' shadow on the land with the HDR world (`client::cloud_shadow`), live.
-    pub fn cloud_shadows(&self) -> bool {
-        number("core:cloud_shadows") != 0.0
-    }
-
-    /// The HDR world (`post::world_format`), read once at start.
-    pub fn hdr_world(&self) -> bool {
-        number("core:hdr_world") != 0.0
-    }
-
-    /// Temporal anti-aliasing (`core:aa` 1 or 2, `post::set_taa`), read once at start.
-    pub fn aa(&self) -> bool {
-        number("core:aa") >= 1.0
-    }
-
-    /// Whether the world's pass draws the motion image too (`core:aa` 1; 2 is from the camera
-    /// alone, `post::set_motion`), read once at start.
-    pub fn aa_motion(&self) -> bool {
-        (number("core:aa") as i32) == 1
-    }
-
-    /// DLSS, the backend's temporal upscaler (`core:dlss`, `weft_render::UpscaleMode`), live; off
-    /// unless the backend has one (the `streamline` build on Windows).
-    pub fn dlss(&self) -> weft_render::UpscaleMode {
-        weft_render::UpscaleMode::from_number(number("core:dlss").max(0.0) as u32)
-    }
-
-    /// The stand-in upscaler for checks (`core:upscale_standin`), read at start.
-    pub fn upscale_standin(&self) -> bool {
-        number("core:upscale_standin") != 0.0
-    }
-
-    /// Ray Reconstruction with DLSS (`core:dlss_rr`), live.
-    pub fn dlss_rr(&self) -> bool {
-        number("core:dlss_rr") != 0.0
-    }
-
-    /// DLSS's model for `mode` (`core:dlss_model_<mode>`, 0 its default), live.
-    pub fn dlss_model(&self, mode: weft_render::UpscaleMode) -> u32 {
-        number(&format!("core:dlss_model_{}", mode.name())).max(0.0) as u32
-    }
-
-    /// Ray Reconstruction's model (`core:dlss_rr_model`), live.
-    pub fn dlss_rr_model(&self) -> u32 {
-        number("core:dlss_rr_model").max(0.0) as u32
-    }
-
-    /// DLSS 5 over the upscaled picture (`core:dlss5`), live.
-    pub fn dlss5(&self) -> bool {
-        number("core:dlss5") != 0.0
-    }
-
-    /// DLSS 5's strength (`core:dlss5_intensity`), live.
-    pub fn dlss5_intensity(&self) -> f32 {
-        (number("core:dlss5_intensity") as f32).clamp(0.0, 1.0)
-    }
-
-    /// The denoiser's check on today's frame (`core:pt_denoise_test`), live.
-    pub fn pt_denoise_test(&self) -> bool {
-        number("core:pt_denoise_test") != 0.0
-    }
-
-    /// The denoiser's tuning (`core:pt_dn_phi`, `core:pt_dn_steps`), live.
-    pub fn pt_dn_debug(&self) -> u32 {
-        (number("core:pt_dn_debug") as u32).min(6)
-    }
-
-    pub fn pt_dn_tuning(&self) -> (f32, u32) {
-        ((number("core:pt_dn_phi") as f32).clamp(0.25, 16.0), (number("core:pt_dn_steps") as u32).clamp(1, 5))
-    }
-
-    /// How the path tracer's light is denoised (`core:pt_denoiser`: 0 raw, 1 ours), live.
-    pub fn pt_denoiser(&self) -> u32 {
-        (number("core:pt_denoiser") as u32).min(crate::denoise::SVGF)
-    }
-
-    /// Temporal anti-aliasing's least share of each new frame (`core:taa_blend`), live.
-    pub fn taa_blend(&self) -> f32 {
-        (number("core:taa_blend") as f32).clamp(0.03, 0.5)
-    }
-
-    /// The mist as a volume for packs that have one (`client::froxels`), live.
-    pub fn froxels(&self) -> bool {
-        number("core:froxels") != 0.0
-    }
-
-    /// Pixels a mist volume cell covers each way: 8 (`core:froxels` 1), 4 (2, ultra).
-    pub fn froxel_cell(&self) -> u32 {
-        if number("core:froxels") >= 2.0 { 4 } else { 8 }
-    }
-
-    /// Soft clouds for packs that draw them (`client::soft_clouds`).
-    pub fn soft_clouds(&self) -> bool {
-        number("core:soft_clouds") != 0.0
-    }
-
-    pub fn show_avatars(&self) -> bool {
-        number("core:show_avatars") != 0.0
-    }
-
-    pub fn first_person_model(&self) -> bool {
-        number("core:first_person_model") != 0.0
-    }
-
-    pub fn set(&self, name: &str, v: f64) {
-        config::set(id(&format!("core:{name}")), v);
-    }
-    pub fn set_text(&self, name: &str, v: &str) {
-        config::set_text(id(&format!("core:{name}")), v);
-    }
-    pub fn set_resource_packs(&self, packs: &[String]) {
-        self.set_text("resource_packs", &packs.join(","));
-    }
-
     pub fn saves_dir(&self) -> PathBuf {
         self.run_dir.join("saves")
     }
+}
 
-    /// Every key as its `core:key.<action>` setting says.
-    pub fn apply_binds(&self, input: &mut Input) {
-        let actions: Vec<String> = input.binds.iter().map(|b| b.action.clone()).collect();
-        for action in actions {
-            match Binding::parse_slots(&config::text(id(&format!("core:key.{action}")))) {
-                Some(k) => input.rebind(&action, k),
-                None => log::warn!("key binding {action}: unknown key {}", config::text(id(&format!("core:key.{action}")))),
-            }
-        }
-    }
+pub fn language() -> String {
+    config::text(id("core:language"))
+}
+/// 0 = automatic.
+pub fn gui_scale() -> u32 {
+    number("core:gui_scale") as u32
+}
+/// The part of the screen's size the world is drawn at.
+pub fn render_scale() -> f32 {
+    number("core:render_scale") as f32
+}
+pub fn view_distance() -> i32 {
+    number("core:view_distance") as i32
+}
+pub fn vsync() -> bool {
+    number("core:vsync") != 0.0
+}
+pub fn fps_limit() -> u32 {
+    number("core:fps_limit") as u32
+}
+/// The chosen renderer's name (`core:renderer`).
+pub fn renderer() -> String {
+    let id = id("core:renderer");
+    crate::content::content()
+        .game
+        .configs
+        .get(id as usize)
+        .map(|d| d.show(config::get(id)))
+        .unwrap_or_default()
+}
+pub fn fov() -> f32 {
+    number("core:fov") as f32
+}
+pub fn fov_effects() -> f32 {
+    number("core:fov_effects") as f32
+}
+pub fn camera_bob() -> bool {
+    number("core:camera_bob") != 0.0
+}
+pub fn sensitivity() -> f32 {
+    number("core:sensitivity") as f32
+}
+/// 0 moody .. 1 bright.
+pub fn brightness() -> f32 {
+    number("core:brightness") as f32
+}
+/// Bit per debug overlay group shown (F3 + number).
+pub fn debug_groups() -> u32 {
+    number("core:debug_groups") as u32
+}
+pub fn advanced_tooltips() -> bool {
+    number("core:advanced_tooltips") != 0.0
+}
+/// Mouse up looks down instead.
+pub fn invert_y() -> bool {
+    number("core:invert_y") != 0.0
+}
+/// The HUD's buttons and steering for fingers.
+pub fn touch_controls() -> bool {
+    number("core:touch_controls") != 0.0
+}
 
-    pub fn set_bind(&self, action: &str, keys: &Slots) {
-        config::set_text(id(&format!("core:key.{action}")), &Binding::slots_id(keys));
+pub fn auto_jump() -> bool {
+    number("core:auto_jump") != 0.0
+}
+pub fn name() -> String {
+    config::text(id("core:name"))
+}
+pub fn server_port() -> u16 {
+    number("core:server_port") as u16
+}
+/// Extra iroh relay URLs; empty uses the public defaults.
+pub fn relays() -> Vec<String> {
+    list("core:relays")
+}
+/// Enabled resource packs, highest priority first.
+pub fn resource_packs() -> Vec<String> {
+    list("core:resource_packs")
+}
+pub fn shader_pack() -> Option<String> {
+    Some(config::text(id("core:shader_pack"))).filter(|p| !p.is_empty())
+}
+
+pub fn occlusion_culling() -> bool {
+    number("core:occlusion_culling") != 0.0
+}
+pub fn frustum_culling() -> bool {
+    number("core:frustum_culling") != 0.0
+}
+
+pub fn slim_skin() -> bool {
+    number("core:skin_model") != 0.0
+}
+
+pub fn show_avatars() -> bool {
+    number("core:show_avatars") != 0.0
+}
+
+pub fn first_person_model() -> bool {
+    number("core:first_person_model") != 0.0
+}
+
+/// Every connection through the relay only (`core:net_relay_only`, a test setting).
+pub fn net_relay_only() -> bool {
+    number("core:net_relay_only") != 0.0
+}
+
+/// The Chia network for DIDs (chiacraft): `off`, `testnet11` or `mainnet`.
+pub fn chain() -> String {
+    config::text(id("core:chain")).trim().to_lowercase()
+}
+
+/// Own full nodes (`host:port`) instead of the DNS introducers.
+pub fn chain_peers() -> Vec<String> {
+    list("core:chain_peers")
+}
+
+/// What listing a world locks, in mojos (phase 5).
+pub fn listing_deposit() -> u64 {
+    number("core:listing_deposit").max(1.0) as u64
+}
+
+/// The fee a listing pays, in mojos (`core:listing_fee`).
+pub fn listing_fee() -> u64 {
+    number("core:listing_fee").max(0.0) as u64
+}
+
+/// DID sponsors' addresses (iroh endpoint ids), tried in order.
+pub fn sponsors() -> Vec<String> {
+    list("core:sponsors")
+}
+
+/// Screen effects' half-size parts (`post::HOOK_LOW`), live.
+pub fn post_low() -> bool {
+    number("core:post_low") != 0.0
+}
+
+/// Levels of the HDR world's bloom pyramid (`core:bloom`: 0 none, 1 four, 2 six), live.
+pub fn bloom_levels() -> u32 {
+    match number("core:bloom") as i32 {
+        i32::MIN..=0 => 0,
+        1 => 4,
+        _ => 6,
     }
 }
 
-/// Brings settings files written by older versions up to date.
-pub fn migrate(run_dir: &Path) {
-    let config = crate::paths::config(run_dir);
-    merge_settings(&config);
-    for dir in [config, run_dir.join("test-config")] {
-        migrate_bindings(&dir.join("core.txt"));
+/// The soft clouds' shadow on the land with the HDR world (`client::cloud_shadow`), live.
+pub fn cloud_shadows() -> bool {
+    number("core:cloud_shadows") != 0.0
+}
+
+/// The HDR world (`post::world_format`), read once at start.
+pub fn hdr_world() -> bool {
+    number("core:hdr_world") != 0.0
+}
+
+/// Temporal anti-aliasing (`core:aa` 1 or 2, `post::set_taa`), read once at start.
+pub fn aa() -> bool {
+    number("core:aa") >= 1.0
+}
+
+/// Whether the world's pass draws the motion image too (`core:aa` 1; 2 is from the camera
+/// alone, `post::set_motion`), read once at start.
+pub fn aa_motion() -> bool {
+    (number("core:aa") as i32) == 1
+}
+
+/// DLSS, the backend's temporal upscaler (`core:dlss`, `weft_render::UpscaleMode`), live; off
+/// unless the backend has one (the `streamline` build on Windows).
+pub fn dlss() -> weft_render::UpscaleMode {
+    weft_render::UpscaleMode::from_number(number("core:dlss").max(0.0) as u32)
+}
+
+/// The stand-in upscaler for checks (`core:upscale_standin`), read at start.
+pub fn upscale_standin() -> bool {
+    number("core:upscale_standin") != 0.0
+}
+
+/// Ray Reconstruction with DLSS (`core:dlss_rr`), live.
+pub fn dlss_rr() -> bool {
+    number("core:dlss_rr") != 0.0
+}
+
+/// DLSS's model for `mode` (`core:dlss_model_<mode>`, 0 its default), live.
+pub fn dlss_model(mode: weft_render::UpscaleMode) -> u32 {
+    number(&format!("core:dlss_model_{}", mode.name())).max(0.0) as u32
+}
+
+/// Ray Reconstruction's model (`core:dlss_rr_model`), live.
+pub fn dlss_rr_model() -> u32 {
+    number("core:dlss_rr_model").max(0.0) as u32
+}
+
+/// DLSS 5 over the upscaled picture (`core:dlss5`), live.
+pub fn dlss5() -> bool {
+    number("core:dlss5") != 0.0
+}
+
+/// DLSS 5's strength (`core:dlss5_intensity`), live.
+pub fn dlss5_intensity() -> f32 {
+    (number("core:dlss5_intensity") as f32).clamp(0.0, 1.0)
+}
+
+/// The denoiser's check on today's frame (`core:pt_denoise_test`), live.
+pub fn pt_denoise_test() -> bool {
+    number("core:pt_denoise_test") != 0.0
+}
+
+/// The denoiser's tuning (`core:pt_dn_phi`, `core:pt_dn_steps`), live.
+pub fn pt_dn_debug() -> u32 {
+    (number("core:pt_dn_debug") as u32).min(6)
+}
+
+pub fn pt_dn_tuning() -> (f32, u32) {
+    ((number("core:pt_dn_phi") as f32).clamp(0.25, 16.0), (number("core:pt_dn_steps") as u32).clamp(1, 5))
+}
+
+/// How the path tracer's light is denoised (`core:pt_denoiser`: 0 raw, 1 ours), live.
+pub fn pt_denoiser() -> u32 {
+    (number("core:pt_denoiser") as u32).min(crate::denoise::SVGF)
+}
+
+/// Temporal anti-aliasing's least share of each new frame (`core:taa_blend`), live.
+pub fn taa_blend() -> f32 {
+    (number("core:taa_blend") as f32).clamp(0.03, 0.5)
+}
+
+/// The mist as a volume for packs that have one (`client::froxels`), live.
+pub fn froxels() -> bool {
+    number("core:froxels") != 0.0
+}
+
+/// Pixels a mist volume cell covers each way: 8 (`core:froxels` 1), 4 (2, ultra).
+pub fn froxel_cell() -> u32 {
+    if number("core:froxels") >= 2.0 { 4 } else { 8 }
+}
+
+pub fn set(name: &str, v: f64) {
+    config::set(id(&format!("core:{name}")), v);
+}
+pub fn set_text(name: &str, v: &str) {
+    config::set_text(id(&format!("core:{name}")), v);
+}
+pub fn set_resource_packs(packs: &[String]) {
+    set_text("resource_packs", &packs.join(","));
+}
+
+/// Every key as its `core:key.<action>` setting says.
+pub fn apply_binds(input: &mut Input) {
+    let actions: Vec<String> = input.binds.iter().map(|b| b.action.clone()).collect();
+    for action in actions {
+        match Binding::parse_slots(&config::text(id(&format!("core:key.{action}")))) {
+            Some(k) => input.rebind(&action, k),
+            None => log::warn!("key binding {action}: unknown key {}", config::text(id(&format!("core:key.{action}")))),
+        }
     }
 }
 
-/// Sneak and sprint switched by two settings of their own become toggled bindings, and a sprint
-/// or fly key saved when they had one binding gets the double tap the engine now gives them.;
-/// TODO remove in 26.11.3
-fn migrate_bindings(path: &Path) {
-    let Ok(src) = std::fs::read_to_string(path) else { return };
-    let mut pairs: Vec<(String, String)> = crate::kv::pairs(&src)
-        .map(|(_, k, v)| (k.to_string(), v.to_string()))
-        .collect();
-    let before = pairs.clone();
-    let mut toggled = Vec::new();
-    pairs.retain(|(k, v)| match k.strip_prefix("toggle_") {
-        Some(action @ ("sneak" | "sprint")) => {
-            if matches!(v.as_str(), "true" | "1") {
-                toggled.push(format!("key.core:{action}"));
-            }
-            false
-        }
-        _ => true,
-    });
-    for (k, v) in &mut pairs {
-        match (k.as_str(), v.as_str()) {
-            ("key.core:sprint", "ControlLeft") => *v = "ControlLeft, double KeyW".into(),
-            ("key.core:fly", "KeyF") => *v = "KeyF, double Space".into(),
-            _ => {}
-        }
-        if toggled.contains(k) && !v.starts_with("toggle ") {
-            *v = format!("toggle {v}");
-        }
-    }
-    if pairs != before {
-        let out: String = pairs
-            .iter()
-            .map(|(k, v)| {
-                format!(
-                    "{k} = {v}
-"
-                )
-            })
-            .collect();
-        let _ = std::fs::write(path, out);
-    }
+pub fn set_bind(action: &str, keys: &Slots) {
+    config::set_text(id(&format!("core:key.{action}")), &Binding::slots_id(keys));
 }
 
-/// The old `config/settings.txt` joins `config/core.txt` once (lists were one line per entry).
-fn merge_settings(config: &Path) {
-    let (old, new) = (config.join("settings.txt"), config.join("core.txt"));
-    let Ok(src) = std::fs::read_to_string(&old) else { return };
-    let mut out = std::fs::read_to_string(&new).unwrap_or_default();
-    let (mut packs, mut relays) = (Vec::new(), Vec::new());
-    for (_, k, v) in crate::kv::pairs(&src) {
-        match k {
-            "resource_pack" => packs.push(v),
-            "relay" => relays.push(v),
-            _ => out.push_str(&format!(
-                "{k} = {v}
-"
-            )),
-        }
-    }
-    out.push_str(&format!(
-        "resource_packs = {}
-relays = {}
-",
-        packs.join(","),
-        relays.join(",")
-    ));
-    if std::fs::write(&new, out).is_ok() {
-        let _ = std::fs::remove_file(&old);
-    }
-}
-
+/// The system's language as a lang code (`ru_ru`), English when the system doesn't say.
 pub fn system_language() -> String {
-    let lang = std::env::var("LANG").unwrap_or_default().to_lowercase();
-    if lang.starts_with("ru") || sys_locale_ru() { "ru_ru".into() } else { "en_us".into() }
+    ["LC_ALL", "LC_MESSAGES", "LANG"]
+        .iter()
+        .find_map(|v| std::env::var(v).ok().filter(|s| !s.is_empty()))
+        .or_else(os_language)
+        .and_then(|locale| lang_code(&locale))
+        .unwrap_or_else(|| crate::ui::lang::FALLBACK.into())
+}
+
+/// `ru_RU.UTF-8` and `ru-RU` are `ru_ru`; `C`, `POSIX` and a language without a region are none.
+fn lang_code(locale: &str) -> Option<String> {
+    let code = locale
+        .split(['.', '@'])
+        .next()?
+        .replace('-', "_")
+        .to_lowercase();
+    let (lang, region) = code.split_once('_')?;
+    (!lang.is_empty() && !region.is_empty()).then_some(code)
 }
 
 #[cfg(windows)]
-fn sys_locale_ru() -> bool {
+fn os_language() -> Option<String> {
     unsafe extern "system" {
         fn GetUserDefaultUILanguage() -> u16;
+        fn LCIDToLocaleName(lcid: u32, name: *mut u16, len: i32, flags: u32) -> i32;
     }
-    // Primary language id 0x19 is Russian.
-    unsafe { GetUserDefaultUILanguage() & 0x3FF == 0x19 }
+    const LOCALE_NAME_MAX_LENGTH: usize = 85;
+    let mut name = [0u16; LOCALE_NAME_MAX_LENGTH];
+    // Characters written with the closing zero, 0 when the language has no name.
+    let written = unsafe { LCIDToLocaleName(GetUserDefaultUILanguage().into(), name.as_mut_ptr(), name.len() as i32, 0) };
+    (written > 1).then(|| String::from_utf16_lossy(&name[..written as usize - 1]))
 }
 
 #[cfg(not(windows))]
-fn sys_locale_ru() -> bool {
-    false
+fn os_language() -> Option<String> {
+    None
 }

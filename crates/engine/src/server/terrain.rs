@@ -1,4 +1,4 @@
-//! Terrain described as data (`Host::reg_terrain`): a base height plus height features, biome
+//! Terrain described as data (`entry_kind::TERRAIN`): a base height plus height features, biome
 //! rules that pick each column's biome and surface, water and caves. The dimension's mod
 //! describes it, other mods edit it, and the merged result is evaluated here, so structures,
 //! decorations and spawn search all read the same columns from one cache.
@@ -6,183 +6,62 @@
 //! Heights, masks and the fields rules look at are expressions (`abi::ExprStep`), run here and
 //! by `shaders/terrain.wgsl` with the same integer math.
 //!
-//! chiacraft additions (kept beside upstream's expressions, ENGINE_CHANGES.md): a feature may
-//! instead be a CPU callback (`abi::FeatureDesc::custom`, `FeatureArgs`) over `weft_noise::fixed::Fields`
-//! (our land: rivers, lakes, karst, craters, reefs, tarns), whose heights distant terrain gets from
-//! the CPU; the continent field's scale per dimension (`terrain_op::CONTINENT_SCALE`); what steep
-//! faces show for distant terrain (`terrain_op::FACES`); scatter thinning masks (`Mask`).
+//! chiacraft additions (kept beside upstream's expressions, ENGINE_CHANGES.md): a landform may
+//! instead take its height from a CPU callback (`comp::terrain::CPU_HEIGHT`, `abi::FeatureArgs`)
+//! over `weft_noise::fixed::Fields` (our land: rivers, lakes, karst, craters, reefs, tarns), whose
+//! heights distant terrain gets from the CPU; the continent field's scale per dimension
+//! (`comp::terrain::CONTINENT_SCALE`); what steep faces show for distant terrain
+//! (`comp::terrain::FACES`); far crowns' leaves by the season (`comp::terrain::FAR_LEAVES`);
+//! scatter thinning masks (`Mask`).
 
 use std::sync::Arc;
 
-use parking_lot::Mutex;
-use rustc_hash::FxHashMap;
-use weft_abi::{self as abi, Callback, ModId, TerrainColumn, expr as ek, rule_field as rf, terrain_op as op};
+use weft_abi::{self as abi, BiomeRule, Callback, ExprStep, ModId, TerrainColumn, expr as ek, rule_field as rf};
+use weft_noise::cache::ColumnCache;
 use weft_noise::fixed::{Fields, ONE, div_floor, fbm, hash, perlin2, perlin3, q4, q12, ramp, salt, seed32, site};
 
+use crate::entries::Entry;
 use crate::gpu_layout::terrain::limit;
 
-/// One `TerrainDesc` as sent, owned.
-#[derive(Clone)]
-pub struct RawTerrain {
-    pub owner: ModId,
-    pub dimension: String,
-    pub op: u32,
-    pub anchor: String,
-    pub block: String,
-    pub level: i32,
-    pub to: i32,
-    pub value: f64,
-    pub size: f64,
-    pub feature: RawFeature,
-    pub rule: RawRule,
-    pub field: Vec<RawStep>,
-    /// chiacraft: `terrain_op::FACES`, `abi::FaceArgs`.
-    pub face: Callback,
+fn step(kind: u32, a: i32) -> ExprStep {
+    ExprStep { kind, a, ..Default::default() }
 }
 
-/// One `ExprStep` as sent, owned.
-#[derive(Clone)]
-pub struct RawStep {
-    pub kind: u32,
-    pub salt: u64,
-    pub a: i32,
-    pub b: i32,
-    pub c: i32,
-    pub name: String,
+fn noise(salt: u64, size: i32, octaves: i32) -> ExprStep {
+    ExprStep { salt, b: octaves, ..step(ek::NOISE, size) }
 }
 
-impl RawStep {
-    fn new(kind: u32, a: i32) -> RawStep {
-        RawStep { kind, salt: 0, a, b: 0, c: 0, name: String::new() }
+/// The fields `edit.fields` names replace those of `rule`.
+pub(crate) fn merge(rule: &mut BiomeRule, edit: &BiomeRule) {
+    let has = |f: u32| edit.fields & f != 0;
+    if has(rf::BIOME) {
+        rule.biome.clone_from(&edit.biome);
     }
-
-    fn noise(salt: u64, size: i32, octaves: i32) -> RawStep {
-        RawStep { salt, b: octaves, ..RawStep::new(ek::NOISE, size) }
-    }
-}
-
-#[derive(Clone)]
-pub struct RawFeature {
-    pub name: String,
-    pub height: Vec<RawStep>,
-    pub mask: Vec<RawStep>,
-    /// chiacraft: a CPU height (`abi::FeatureArgs`) instead of `height`, and the mod it runs in.
-    pub owner: ModId,
-    pub custom: Callback,
-}
-
-#[derive(Clone)]
-pub struct RawRule {
-    pub name: String,
-    pub fields: u32,
-    pub biome: String,
-    pub ranges: Vec<(String, f64, f64)>,
-    pub height: (i32, i32),
-    pub top: String,
-    pub filler: String,
-    pub depth: i32,
-    pub under: (String, i32),
-    pub deep_top: (String, i32),
-    pub bare_above: i32,
-    pub ice: String,
-}
-
-impl RawRule {
-    /// The fields of `edit` named in its `fields` replace this rule's.
-    fn apply(&mut self, edit: &RawRule) {
-        let has = |f: u32| edit.fields & f != 0;
-        if has(rf::BIOME) {
-            self.biome = edit.biome.clone();
-        }
-        if has(rf::RANGES) {
-            for r in &edit.ranges {
-                match self.ranges.iter_mut().find(|x| x.0 == r.0) {
-                    Some(x) => *x = r.clone(),
-                    None => self.ranges.push(r.clone()),
-                }
+    if has(rf::RANGES) {
+        for r in &edit.ranges {
+            match rule.ranges.iter_mut().find(|x| x.name == r.name) {
+                Some(x) => *x = r.clone(),
+                None => rule.ranges.push(r.clone()),
             }
         }
-        if has(rf::HEIGHT) {
-            self.height = edit.height;
-        }
-        if has(rf::SURFACE) {
-            (self.top, self.filler, self.depth) = (edit.top.clone(), edit.filler.clone(), edit.depth);
-        }
-        if has(rf::UNDER) {
-            self.under = edit.under.clone();
-        }
-        if has(rf::DEEP_TOP) {
-            self.deep_top = edit.deep_top.clone();
-        }
-        if has(rf::BARE_ABOVE) {
-            self.bare_above = edit.bare_above;
-        }
-        if has(rf::FROZEN) {
-            self.ice = edit.ice.clone();
-        }
     }
-}
-
-/// # Safety
-/// The strings in `r` must be valid for the call.
-pub unsafe fn copy_rule(r: &abi::BiomeRuleDesc) -> RawRule {
-    unsafe {
-        let s = |s: abi::Str| s.as_str().to_string();
-        RawRule {
-            name: s(r.name),
-            fields: r.fields,
-            biome: s(r.biome),
-            ranges: r
-                .ranges
-                .as_slice()
-                .iter()
-                .map(|f| (s(f.name), f.min, f.max))
-                .collect(),
-            height: (r.height[0], r.height[1]),
-            top: s(r.top),
-            filler: s(r.filler),
-            depth: r.depth,
-            under: (s(r.under), r.under_layers),
-            deep_top: (s(r.deep_top), r.deep_below),
-            bare_above: r.bare_above,
-            ice: s(r.ice),
-        }
+    if has(rf::HEIGHT) {
+        rule.height = edit.height;
     }
-}
-
-/// # Safety
-/// The strings in `steps` must be valid for the call.
-pub unsafe fn copy_steps(steps: abi::Slice<abi::ExprStep>) -> Vec<RawStep> {
-    unsafe {
-        steps
-            .as_slice()
-            .iter()
-            .map(|s| RawStep { kind: s.kind, salt: s.salt, a: s.a, b: s.b, c: s.c, name: s.name.as_str().to_string() })
-            .collect()
+    if has(rf::SURFACE) {
+        (rule.top, rule.filler, rule.depth) = (edit.top.clone(), edit.filler.clone(), edit.depth);
     }
-}
-
-/// # Safety
-/// The pointers in `d` must be valid for the call.
-pub unsafe fn copy(owner: ModId, d: &abi::TerrainDesc) -> RawTerrain {
-    unsafe {
-        let s = |s: abi::Str| s.as_str().to_string();
-        let f = &d.feature;
-        RawTerrain {
-            owner,
-            dimension: s(d.dimension),
-            op: d.op,
-            anchor: s(d.anchor),
-            block: s(d.block),
-            level: d.level,
-            to: d.to,
-            value: d.value,
-            size: d.size,
-            feature: RawFeature { name: s(f.name), height: copy_steps(f.height), mask: copy_steps(f.mask), owner, custom: f.custom },
-            rule: copy_rule(&d.rule),
-            field: copy_steps(d.field),
-            face: d.face,
-        }
+    if has(rf::UNDER) {
+        (rule.under, rule.under_layers) = (edit.under.clone(), edit.under_layers);
+    }
+    if has(rf::DEEP_TOP) {
+        (rule.deep_top, rule.deep_below) = (edit.deep_top.clone(), edit.deep_below);
+    }
+    if has(rf::BARE_ABOVE) {
+        rule.bare_above = edit.bare_above;
+    }
+    if has(rf::FROZEN) {
+        rule.ice.clone_from(&edit.ice);
     }
 }
 
@@ -208,7 +87,7 @@ const MUL_LIMIT: i32 = 46340;
 
 impl Expr {
     /// `raw` checked; `field` finds the fields it may use by name.
-    fn resolve(raw: &[RawStep], field: &dyn Fn(&str) -> Option<usize>) -> Result<Expr, String> {
+    fn resolve(raw: &[ExprStep], field: &dyn Fn(&str) -> Option<usize>) -> Result<Expr, String> {
         if raw.len() > MAX_STEPS {
             return Err(format!("{} steps, at most {MAX_STEPS}", raw.len()));
         }
@@ -344,7 +223,7 @@ pub struct Mask(Expr);
 impl Mask {
     /// From the steps as sent; `None` for none or a malformed one (or one asking for a field of a
     /// terrain's own: thinning sees only the standard ones).
-    pub fn from_steps(steps: &[RawStep]) -> Option<Mask> {
+    pub fn from_steps(steps: &[ExprStep]) -> Option<Mask> {
         if steps.is_empty() {
             return None;
         }
@@ -404,7 +283,6 @@ pub struct Columns {
     pub rules: [u32; 256],
 }
 
-#[derive(Clone)]
 pub struct Terrain {
     pub stone: u32,
     /// Q4.
@@ -417,11 +295,12 @@ pub struct Terrain {
     pub caves: Option<Caves>,
     /// Biomes of cubes deep underground.
     pub cave_biomes: Vec<CaveBiome>,
-    /// chiacraft: what steep faces show (`terrain_op::FACES`): from what fall, whose callback.
+    /// chiacraft: what steep faces show (`comp::terrain::FACES`): from what fall, whose callback.
     pub faces: Option<Faces>,
-    /// chiacraft: far crowns' leaves by the time of year (`terrain_op::FAR_LEAVES`), whose callback.
+    /// chiacraft: far crowns' leaves by the time of year (`comp::terrain::FAR_LEAVES`), whose
+    /// callback.
     pub far_leaves: Option<FarLeaves>,
-    /// chiacraft: the continent noise's scale (Q4, `terrain_op::CONTINENT_SCALE`; the
+    /// chiacraft: the continent noise's scale (Q4, `comp::terrain::CONTINENT_SCALE`; the
     /// `continent` field follows it).
     pub continent_scale: i32,
     cache: ColumnCache<Columns>,
@@ -431,23 +310,26 @@ pub struct Terrain {
     corners: ColumnCache<[i32; 25]>,
 }
 
-/// The terrain being merged from the owner's description and the edits, still by name.
-struct Draft {
-    stone: Option<String>,
-    base: f64,
-    sea: Option<(i32, String)>,
-    caves: Option<(String, i32, i32)>,
-    fields: Vec<(String, Vec<RawStep>)>,
-    features: Vec<RawFeature>,
-    rules: Vec<RawRule>,
-    cave_biomes: Vec<(String, i32, f64, f64)>,
-    faces: Option<Faces>,
-    far_leaves: Option<FarLeaves>,
-    /// Blocks.
-    continent_scale: f64,
+/// chiacraft: a clone (a content switch keeps a dimension's definition) is the same terrain with
+/// empty caches: what they held is computed again on demand.
+impl Clone for Terrain {
+    fn clone(&self) -> Terrain {
+        let mut t = Terrain::new(
+            self.stone,
+            self.base,
+            self.sea,
+            self.fields.clone(),
+            self.features.clone(),
+            self.rules.clone(),
+            self.caves.clone(),
+            self.cave_biomes.clone(),
+        );
+        (t.faces, t.far_leaves, t.continent_scale) = (self.faces, self.far_leaves, self.continent_scale);
+        t
+    }
 }
 
-/// chiacraft: steep faces as the generator's own passes make them (`terrain_op::FACES`), for
+/// chiacraft: steep faces as the generator's own passes make them (`comp::terrain::FACES`), for
 /// distant terrain: ground falling `fall` blocks or more shows what `face` says.
 #[derive(Clone, Copy)]
 pub struct Faces {
@@ -466,7 +348,7 @@ impl Faces {
     }
 }
 
-/// chiacraft: far crowns' leaves by the time of year (`terrain_op::FAR_LEAVES`).
+/// chiacraft: far crowns' leaves by the time of year (`comp::terrain::FAR_LEAVES`).
 #[derive(Clone, Copy)]
 pub struct FarLeaves {
     pub owner: ModId,
@@ -486,30 +368,24 @@ impl FarLeaves {
 const STANDARD_FIELDS: [&str; 3] = ["temperature", "humidity", "continent"];
 
 /// The fields every terrain has, climate and continentalness (about -1.4..1.4, Q12), which
-/// a terrain may declare again. The same integers as `weft_noise::fixed::Fields` (our land's
-/// CPU copies read those).
-fn standard_fields() -> Vec<(String, Vec<RawStep>)> {
-    let (t, h) = (noise_field(salt::TEMPERATURE, 1100 * 16, 3, 5734, 0), noise_field(salt::HUMIDITY, 800 * 16, 3, 5734, 0));
+/// a terrain may declare again; the continent field's land masses `continent_scale` (Q4) across
+/// (chiacraft). The same integers as `weft_noise::fixed::Fields` (our land's CPU copies read those).
+fn standard_fields(continent_scale: i32) -> Vec<abi::TerrainField> {
+    let field = |name: &str, value| abi::TerrainField { name: name.into(), value };
     vec![
-        (STANDARD_FIELDS[0].into(), t),
-        (STANDARD_FIELDS[1].into(), h),
-        (STANDARD_FIELDS[2].into(), continent_field(weft_noise::fixed::CONTINENT_SCALE)),
+        field(STANDARD_FIELDS[0], noise_field(salt::TEMPERATURE, 1100 * 16, 3, 5734, 0)),
+        field(STANDARD_FIELDS[1], noise_field(salt::HUMIDITY, 800 * 16, 3, 5734, 0)),
+        field(STANDARD_FIELDS[2], noise_field(salt::CONTINENT, continent_scale, 4, 6554, 614)),
     ]
 }
 
 /// `noise(salt, size (Q4), octaves) * scale (Q12) + add`, at the column.
-fn noise_field(salt: u64, size: i32, octaves: i32, scale: i32, add: i32) -> Vec<RawStep> {
-    let step = RawStep::new;
-    let mut v = vec![step(ek::X, 0), step(ek::Z, 0), RawStep::noise(salt, size, octaves), step(ek::CONST, scale), step(ek::MUL, 0)];
+fn noise_field(salt: u64, size: i32, octaves: i32, scale: i32, add: i32) -> Vec<ExprStep> {
+    let mut v = vec![step(ek::X, 0), step(ek::Z, 0), noise(salt, size, octaves), step(ek::CONST, scale), step(ek::MUL, 0)];
     if add != 0 {
         v.extend([step(ek::CONST, add), step(ek::ADD, 0)]);
     }
     v
-}
-
-/// The continent field with land masses `scale` (Q4) across (`Fields::continent`).
-fn continent_field(scale: i32) -> Vec<RawStep> {
-    noise_field(salt::CONTINENT, scale, 4, 6554, 614)
 }
 
 /// Looks up content by full name while terrains are built.
@@ -518,127 +394,61 @@ pub struct Names<'a> {
     pub block: &'a dyn Fn(&str) -> Option<u32>,
     pub biome: &'a dyn Fn(&str) -> Option<u32>,
     /// A biome's own climate and surface, which its rules start from.
-    pub biome_rule: &'a dyn Fn(&str) -> Option<&'a RawRule>,
+    pub biome_rule: &'a dyn Fn(&str) -> Option<&'a BiomeRule>,
 }
 
-/// Merges `ops` (the owner's first, then the other mods' in load order) into a terrain.
-/// Missing names are `errors`; an edit whose target is gone is skipped with a warning.
-pub fn build(
-    dimension: &str,
-    owner_name: &dyn Fn(ModId) -> String,
-    ops: Vec<RawTerrain>,
-    names: &Names,
-    errors: &mut Vec<String>,
-) -> Terrain {
-    let mut d = Draft {
-        stone: None,
-        base: 64.0,
-        sea: None,
-        caves: None,
-        fields: standard_fields(),
-        features: Vec::new(),
-        rules: Vec::new(),
-        cave_biomes: Vec::new(),
-        faces: None,
-        far_leaves: None,
-        continent_scale: weft_noise::fixed::CONTINENT_SCALE as f64 / 16.0,
-    };
-    let rule_name = |r: &RawRule| if r.name.is_empty() { r.biome.clone() } else { r.name.clone() };
-    for o in ops {
-        let who = owner_name(o.owner);
-        let missing = |what: &str| log::warn!("{who}: the terrain of {dimension} has no {what} {}, edit skipped", o.anchor);
-        let new_rule = |rules: &[RawRule], r: &RawRule, errors: &mut Vec<String>| {
-            let n = rule_name(r);
-            if rules.iter().any(|x| rule_name(x) == n) {
-                errors.push(format!(
-                    "{who}: the terrain of {dimension} already has a biome rule named {n} (name the new one, or use replace_biome)"
-                ));
-                return false;
+/// The terrain a folded `entry_kind::TERRAIN` entry describes; missing names are `errors`.
+pub fn build(dimension: &str, e: &Entry, names: &Names, errors: &mut Vec<String>) -> Terrain {
+    use abi::comp::terrain as t;
+    // chiacraft: the continent scale (blocks), the noise's own when not given.
+    let mut continent_scale = weft_noise::fixed::CONTINENT_SCALE;
+    if let Some(v) = e.get::<f64>(t::CONTINENT_SCALE) {
+        if v >= 1.0 {
+            continent_scale = q4(v).min(1 << 24);
+        } else {
+            errors.push(format!("the continent scale of {dimension} must be at least a block, not {v}"));
+        }
+    }
+    let mut field_defs = standard_fields(continent_scale);
+    for f in e.or::<Vec<abi::TerrainField>>(t::FIELDS, Vec::new()) {
+        match field_defs.iter_mut().find(|x| x.name == f.name) {
+            Some(x) => {
+                log::info!("the terrain of {dimension} gets another {} field", f.name);
+                *x = f;
             }
-            true
-        };
-        let rule_at = |rules: &[RawRule]| rules.iter().position(|r| rule_name(r) == o.anchor);
-        match o.op {
-            op::STONE => d.stone = Some(o.block),
-            op::BASE_HEIGHT => d.base = o.value,
-            op::SEA => d.sea = Some((o.level, o.block)),
-            op::CAVES => d.caves = Some((o.block, o.level, o.to)),
-            op::FIELD => match d.fields.iter_mut().find(|f| f.0 == o.anchor) {
-                Some(f) => {
-                    log::info!("{who}: the terrain of {dimension} gets another {} field", o.anchor);
-                    f.1 = o.field;
-                }
-                None => d.fields.push((o.anchor.clone(), o.field)),
-            },
-            op::FEATURE => {
-                if !o.feature.name.is_empty() && d.features.iter().any(|f| f.name == o.feature.name) {
-                    errors.push(format!("{who}: the terrain of {dimension} already has a feature named {}", o.feature.name));
-                } else {
-                    d.features.push(o.feature);
-                }
+            None => field_defs.push(f),
+        }
+    }
+    let mut feature_defs: Vec<abi::Landform> = Vec::new();
+    for f in e.or::<Vec<abi::Landform>>(t::LANDFORMS, Vec::new()) {
+        if !f.name.is_empty() && feature_defs.iter().any(|x| x.name == f.name) {
+            errors.push(format!("the terrain of {dimension} has two features named {}", f.name));
+        } else {
+            feature_defs.push(f);
+        }
+    }
+    for m in e.or::<Vec<abi::LandformMask>>(t::MASKS, Vec::new()) {
+        match feature_defs.iter_mut().find(|f| f.name == m.name) {
+            Some(f) if f.mask.is_empty() => f.mask = m.mask,
+            Some(f) => {
+                f.mask.extend(m.mask);
+                f.mask.push(step(ek::MUL, 0));
             }
-            op::FEATURE_REMOVE => match d.features.iter().position(|f| f.name == o.anchor) {
-                Some(i) => drop(d.features.remove(i)),
-                None => missing("feature"),
-            },
-            op::FEATURE_MASK => match d.features.iter_mut().find(|f| f.name == o.anchor) {
-                Some(f) if f.mask.is_empty() => f.mask = o.feature.mask,
-                Some(f) => {
-                    f.mask.extend(o.feature.mask);
-                    f.mask.push(RawStep::new(ek::MUL, 0));
-                }
-                None => missing("feature"),
-            },
-            op::BIOME => {
-                if new_rule(&d.rules, &o.rule, errors) {
-                    d.rules.push(o.rule);
-                }
-            }
-            op::BIOME_BEFORE | op::BIOME_AFTER => match rule_at(&d.rules) {
-                Some(i) if new_rule(&d.rules, &o.rule, errors) => d
-                    .rules
-                    .insert(i + (o.op == op::BIOME_AFTER) as usize, o.rule),
-                Some(_) => {}
-                None => missing("biome rule"),
-            },
-            op::BIOME_REPLACE => match rule_at(&d.rules) {
-                Some(i) => {
-                    let old = d.rules.remove(i);
-                    if new_rule(&d.rules, &o.rule, errors) {
-                        d.rules.insert(i, o.rule);
-                    } else {
-                        d.rules.insert(i, old);
-                    }
-                }
-                None => missing("biome rule"),
-            },
-            op::BIOME_REMOVE => match rule_at(&d.rules) {
-                Some(i) => drop(d.rules.remove(i)),
-                None => missing("biome rule"),
-            },
-            op::BIOME_EDIT => match rule_at(&d.rules) {
-                Some(i) => d.rules[i].apply(&o.rule),
-                None => missing("biome rule"),
-            },
-            op::CAVE_BIOME => d.cave_biomes.push((o.rule.biome, o.level, o.size, o.value)),
-            op::CAVE_BIOME_REMOVE => match d.cave_biomes.iter().position(|c| c.0 == o.anchor) {
-                Some(i) => drop(d.cave_biomes.remove(i)),
-                None => missing("cave biome"),
-            },
-            op::FACES => d.faces = Some(Faces { fall: o.level, owner: o.owner, face: o.face }),
-            op::FAR_LEAVES => d.far_leaves = Some(FarLeaves { owner: o.owner, call: o.face }),
-            op::CONTINENT_SCALE if o.value >= 1.0 => {
-                d.continent_scale = o.value;
-                // The continent field at that scale, unless the terrain declared its own.
-                if let Some(f) = d.fields.iter_mut().find(|f| f.0 == STANDARD_FIELDS[2]) {
-                    f.1 = continent_field(q4(o.value).min(1 << 24));
-                }
-            }
-            op::CONTINENT_SCALE => {
-                errors.push(format!("{who}: the continent scale of {dimension} must be at least a block, not {}", o.value))
-            }
-
-            n => errors.push(format!("{who}: unknown terrain edit {n} for {dimension}")),
+            None => errors.push(format!("the terrain of {dimension} has no feature {} to mask", m.name)),
+        }
+    }
+    let mut rule_defs: Vec<BiomeRule> = Vec::new();
+    for r in e.or::<Vec<BiomeRule>>(t::RULES, Vec::new()) {
+        if rule_defs.iter().any(|x| x.name == r.name) {
+            errors.push(format!("the terrain of {dimension} has two biome rules named {} (name the new one, or replace the old)", r.name));
+        } else {
+            rule_defs.push(r);
+        }
+    }
+    for edit in e.or::<Vec<BiomeRule>>(t::RULE_EDITS, Vec::new()) {
+        match rule_defs.iter_mut().find(|r| r.name == edit.name) {
+            Some(r) => merge(r, &edit),
+            None => errors.push(format!("the terrain of {dimension} has no biome rule {} to edit", edit.name)),
         }
     }
 
@@ -652,43 +462,41 @@ pub fn build(
         }
         b
     };
-    let stone = match &d.stone {
+    let stone = match e.text(t::STONE).filter(|s| !s.is_empty()) {
         Some(s) => block(s, "stone", errors).unwrap_or(0),
         None => {
             errors.push(format!("terrain of {dimension}: no stone block (`.stone(..)`)"));
             0
         }
     };
-    let sea = d
-        .sea
-        .as_ref()
-        .and_then(|(l, w)| Some((*l, block(w, "sea", errors)?)));
-    let caves = d
-        .caves
-        .as_ref()
-        .and_then(|(lava, from, to)| Some(Caves { lava: block(lava, "lava", errors)?, lava_from: *from, lava_to: *to }));
-    if d.fields.len() > limit::FIELDS as usize {
-        errors.push(format!("terrain of {dimension}: {} fields, at most {}", d.fields.len(), limit::FIELDS));
-        d.fields.truncate(limit::FIELDS as usize);
+    let sea = e
+        .get::<abi::TerrainSea>(t::SEA)
+        .and_then(|s| Some((s.level, block(&s.block, "sea", errors)?)));
+    let caves = e
+        .get::<abi::TerrainCaves>(t::CAVES)
+        .and_then(|c| Some(Caves { lava: block(&c.lava, "lava", errors)?, lava_from: c.from, lava_to: c.to }));
+    if field_defs.len() > limit::FIELDS as usize {
+        errors.push(format!("terrain of {dimension}: {} fields, at most {}", field_defs.len(), limit::FIELDS));
+        field_defs.truncate(limit::FIELDS as usize);
     }
-    let mut fields: Vec<Field> = Vec::with_capacity(d.fields.len());
-    for (i, (name, steps)) in d.fields.iter().enumerate() {
-        let expr = Expr::resolve(steps, &|n| d.fields[..i].iter().position(|f| f.0 == n)).unwrap_or_else(|e| {
-            errors.push(format!("terrain of {dimension}: field {name}: {e}"));
+    let mut fields: Vec<Field> = Vec::with_capacity(field_defs.len());
+    for (i, f) in field_defs.iter().enumerate() {
+        let expr = Expr::resolve(&f.value, &|n| field_defs[..i].iter().position(|x| x.name == n)).unwrap_or_else(|e| {
+            errors.push(format!("terrain of {dimension}: field {}: {e}", f.name));
             Expr::default()
         });
-        fields.push(Field { name: name.clone(), expr });
+        fields.push(Field { name: f.name.clone(), expr });
     }
-    let field_at = |n: &str| d.fields.iter().position(|f| f.0 == n);
-    let mut features: Vec<Feature> = Vec::with_capacity(d.features.len());
-    for f in &d.features {
+    let field_at = |n: &str| field_defs.iter().position(|f| f.name == n);
+    let mut features: Vec<Feature> = Vec::with_capacity(feature_defs.len());
+    for f in &feature_defs {
         let what = format!("terrain of {dimension}: feature {}", f.name);
         let height = Expr::resolve(&f.height, &field_at);
         let mask = (!f.mask.is_empty())
             .then(|| Expr::resolve(&f.mask, &field_at))
             .transpose();
-        // A custom feature's height is its callback's; `height` is left empty (0).
-        let custom = f.custom.is_some().then_some((f.owner, f.custom));
+        // chiacraft: a CPU feature's height is its callback's; `height` is left empty (0).
+        let custom = e.callback(&format!("{}{}", t::CPU_HEIGHT, f.name));
         let height = if custom.is_some() { Ok(Expr::default()) } else { height };
         match (height, mask) {
             (Ok(height), Ok(mask)) => features.push(Feature { name: f.name.clone(), height, mask, custom }),
@@ -700,12 +508,12 @@ pub fn build(
             ),
         }
     }
-    let mut rules = Vec::with_capacity(d.rules.len());
-    for own in &d.rules {
+    let mut rules = Vec::with_capacity(rule_defs.len());
+    for own in &rule_defs {
         let mut merged = (names.biome_rule)(&own.biome).cloned();
         let r = match &mut merged {
             Some(m) => {
-                m.apply(own);
+                merge(m, own);
                 m.name.clone_from(&own.name);
                 &*m
             }
@@ -718,40 +526,39 @@ pub fn build(
         let ranges = r
             .ranges
             .iter()
-            .filter_map(|(name, lo, hi)| {
-                let i = field_at(name);
+            .filter_map(|x| {
+                let i = field_at(&x.name);
                 if i.is_none() {
-                    errors
-                        .push(format!("terrain of {dimension}: biome rule {} asks for field {name}, which it doesn't have", rule_name(r)));
+                    errors.push(format!("terrain of {dimension}: biome rule {} asks for field {}, which it doesn't have", r.name, x.name));
                 }
-                Some((i?, q12(*lo), q12(*hi)))
+                Some((i?, q12(x.min), q12(x.max)))
             })
             .collect();
-        let what = format!("biome rule {}", rule_name(r));
+        let what = format!("biome rule {}", r.name);
         rules.push(Rule {
             biome,
             ranges,
-            height: r.height,
+            height: (r.height[0], r.height[1]),
             top: block(&r.top, &what, errors),
             filler: block(&r.filler, &what, errors),
             depth: r.depth,
-            under: block(&r.under.0, &what, errors).map(|b| (b, r.under.1)),
-            deep_top: block(&r.deep_top.0, &what, errors).map(|b| (b, r.deep_top.1)),
+            under: block(&r.under, &what, errors).map(|b| (b, r.under_layers)),
+            deep_top: block(&r.deep_top, &what, errors).map(|b| (b, r.deep_below)),
             bare_above: (r.bare_above != i32::MAX).then_some(r.bare_above),
             ice: block(&r.ice, &what, errors),
         });
     }
-    let cave_biomes = d
-        .cave_biomes
+    let cave_biomes = e
+        .or::<Vec<abi::CaveBiome>>(t::CAVE_BIOMES, Vec::new())
         .iter()
-        .map(|(b, depth, size, threshold)| CaveBiome {
-            biome: (names.biome)(b).unwrap_or_else(|| {
-                errors.push(format!("terrain of {dimension}: unknown cave biome {b}"));
+        .map(|c| CaveBiome {
+            biome: (names.biome)(&c.name).unwrap_or_else(|| {
+                errors.push(format!("terrain of {dimension}: unknown cave biome {}", c.name));
                 0
             }),
-            depth: *depth,
-            size: q4(*size),
-            threshold: q12(*threshold),
+            depth: c.depth,
+            size: q4(c.size),
+            threshold: q12(c.threshold),
         })
         .collect();
     // What no feature or rule looks at, directly or through another field, is not computed.
@@ -773,20 +580,24 @@ pub fn build(
             f.expr = Expr::default();
         }
     }
-    let mut t = Terrain::new(stone, q4(d.base), sea, fields, features, rules, caves, cave_biomes);
-    t.faces = d.faces;
-    t.far_leaves = d.far_leaves;
-    t.continent_scale = q4(d.continent_scale).min(1 << 24);
-    t
+    let mut terrain = Terrain::new(stone, q4(e.or(t::BASE_HEIGHT, 64.0)), sea, fields, features, rules, caves, cave_biomes);
+    terrain.faces = e
+        .callback(t::FACES)
+        .map(|(owner, face)| Faces { fall: e.or(t::FACE_FALL, 0i32), owner, face });
+    terrain.far_leaves = e
+        .callback(t::FAR_LEAVES)
+        .map(|(owner, call)| FarLeaves { owner, call });
+    terrain.continent_scale = continent_scale;
+    terrain
 }
 
 thread_local! {
     static ONE_COLUMN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// Runs `f` with this thread's `Terrain::surface_block` working out only the column asked for
-/// (distant terrain's faces: far cells, each in a cube column of its own). The flag is put back
-/// on the way out, a panic included, so a pool thread doing near work after can't keep it.
+/// chiacraft: runs `f` with this thread's `Terrain::surface_block` working out only the column
+/// asked for (distant terrain's faces: far cells, each in a cube column of its own). The flag is
+/// put back on the way out, a panic included, so a pool thread doing near work after can't keep it.
 pub fn one_column<R>(f: impl FnOnce() -> R) -> R {
     struct Restore(bool);
     impl Drop for Restore {
@@ -897,23 +708,24 @@ impl Terrain {
     /// Whether caves took the block at the surface of column (`x`, `z`): decorations placed from
     /// outside the cube (trees) and spawn search check it so they do not float over pits.
     pub fn surface_carved(&self, seed: u64, x: i32, z: i32) -> bool {
-        if self.caves.is_none() {
-            return false;
-        }
         let h = self.column(seed, x, z).height;
-        if self.sea.is_some_and(|s| h <= s.0) {
+        self.carved_at(seed, x, h, z)
+    }
+
+    fn carved_at(&self, seed: u64, x: i32, y: i32, z: i32) -> bool {
+        let h = self.column(seed, x, z).height;
+        if self.caves.is_none() || y > h || self.sea.is_some_and(|s| h <= s.0 && y > h - 4) {
             return false;
         }
-        let (gx, gy, gz) = (x.div_euclid(4) * 4, h.div_euclid(4) * 4, z.div_euclid(4) * 4);
+        let (gx, gy, gz) = (x.div_euclid(4) * 4, y.div_euclid(4) * 4, z.div_euclid(4) * 4);
         let (t, c) = interpolate(
             |dy, dz, dx| cave_node(seed, gx + dx as i32 * 4, gy + dy as i32 * 4, gz + dz as i32 * 4),
             (x - gx) as usize,
-            (h - gy) as usize,
+            (y - gy) as usize,
             (z - gz) as usize,
         );
-        let corners: [i32; 4] = [(0, 0), (1, 0), (0, 1), (1, 1)].map(|(dx, dz)| self.column(seed, gx + dx * 4, gz + dz * 4).height);
-        let smooth = smooth4(corners, (x - gx) as i32, (z - gz) as i32);
-        carves(t > 0, c, cavern_roof(seed, x, z), smooth - h * 16)
+        let corners = [(0, 0), (1, 0), (0, 1), (1, 1)].map(|(dx, dz)| self.column(seed, gx + dx * 4, gz + dz * 4).height);
+        carves(t > 0, c, cavern_roof(seed, x, z), smooth4(corners, x - gx, z - gz) - y * 16)
     }
 
     /// What rule `rule` puts at the top of a column `h` high, before caves.
@@ -931,34 +743,107 @@ impl Terrain {
     /// The block generation leaves at the top of column (`x`, `z`), 0 where caves took it: the
     /// ground of a decoration on the lowest layer of a cube is in the cube below.
     pub fn surface_block(&self, seed: u64, x: i32, z: i32) -> u32 {
-        let i = (z.rem_euclid(16) * 16 + x.rem_euclid(16)) as usize;
-        let (cx, cz) = (x.div_euclid(16), z.div_euclid(16));
-        // Distant terrain asks this (through the dimension's faces) for steep cells far apart,
-        // where no cube is: there its own column only, as all 256 of the cube (every feature, mods'
-        // included) cost 1-2 ms a call. Near, the cube's columns are worked out once for the many
-        // scattered things that ask in it.
-        // Far, the cave test is left out too: it worked out the column and its 4 corners' again,
-        // 6 columns a call (perf review #5), for a cave mouth at the top of a far wall, too small
-        // to see from there.
+        // chiacraft: distant terrain asks this (through the dimension's faces) for steep cells far
+        // apart, where no cube is: there its own column only, as all 256 of the cube (every
+        // feature, mods' included) cost 1-2 ms a call, and the cave test is left out too (a cave
+        // mouth at the top of a far wall is too small to see from there).
         if ONE_COLUMN.get() {
-            let (col, rule) = match self.cache.peek(seed, cx, cz) {
+            let i = (z.rem_euclid(16) * 16 + x.rem_euclid(16)) as usize;
+            let (col, rule) = match self.cache.peek(seed, x.div_euclid(16), z.div_euclid(16)) {
                 Some(c) => (c.cols[i], c.rules[i]),
                 None => self.compute(seed, x, z),
             };
             return self.surface_of(rule, col.height);
         }
-        if self.surface_carved(seed, x, z) {
-            return 0;
-        }
-        let cols = self.columns(seed, cx, cz);
-        self.surface_of(cols.rules[i], cols.cols[i].height)
+        self.read(seed, x, self.column(seed, x, z).height, z)
     }
 
-    /// Smoothed surface height (Q4) at local column (x, z) from the cube's corner grid.
+    /// The same cell evaluation as cube generation, without generating a cube.
+    pub fn read(&self, seed: u64, x: i32, y: i32, z: i32) -> u32 {
+        let cols = self.columns(seed, x.div_euclid(16), z.div_euclid(16));
+        let i = (z.rem_euclid(16) * 16 + x.rem_euclid(16)) as usize;
+        self.state(seed, y, cols.cols[i].height, cols.rules[i], self.carved_at(seed, x, y, z))
+    }
+
+    fn state(&self, seed: u64, y: i32, h: i32, rule: u32, carved: bool) -> u32 {
+        let sea = self.sea.map_or(i32::MIN, |s| s.0);
+        let rule_def = self.rules.get(rule as usize);
+        if let Some(c) = self.caves.as_ref().filter(|_| carved) {
+            return match lake(seed, y).filter(|_| (c.lava_from..c.lava_to).contains(&y)) {
+                Some(true) => c.lava,
+                Some(false) => self.stone,
+                None => 0,
+            };
+        }
+        if y > h {
+            return if y <= sea {
+                if y == sea {
+                    rule_def
+                        .and_then(|r| r.ice)
+                        .unwrap_or_else(|| self.sea.map_or(0, |s| s.1))
+                } else {
+                    self.sea.map_or(0, |s| s.1)
+                }
+            } else {
+                0
+            };
+        }
+        if rule_def.and_then(|r| r.bare_above).is_some_and(|v| h > v) {
+            return self.stone;
+        }
+        if y == h {
+            return self.surface_of(rule, h);
+        }
+        let depth = rule_def.map_or(0, |r| r.depth);
+        if y >= h - depth {
+            return match rule_def.and_then(|r| r.under) {
+                Some((b, layers)) if y < h - depth + layers => b,
+                _ => rule_def.and_then(|r| r.filler).unwrap_or(self.stone),
+            };
+        }
+        self.stone
+    }
+
     fn smooth(corners: &[i32; 25], x: usize, z: usize) -> i32 {
         let (cx, cz) = (x / 4, z / 4);
         let c = |dx: usize, dz: usize| corners[(cz + dz) * 5 + cx + dx];
         smooth4([c(0, 0), c(1, 0), c(0, 1), c(1, 1)], (x % 4) as i32, (z % 4) as i32)
+    }
+
+    fn cave_biome(&self, seed: u64, ox: i32, oy: i32, oz: i32, i: usize, height: i32) -> Option<u16> {
+        self.cave_biomes.iter().enumerate().find_map(|(k, b)| {
+            (oy + 15 < height - b.depth
+                && (b.threshold <= -ONE
+                    || perlin3(
+                        seed32(seed, salt::CAVE_BIOME ^ k as u64),
+                        (ox + (i % 16) as i32) * 16,
+                        (oy + 8) * 16,
+                        (oz + (i / 16) as i32) * 16,
+                        b.size,
+                        b.size,
+                        b.size,
+                    ) > b.threshold))
+                .then_some(b.biome as u16)
+        })
+    }
+
+    /// Replace leftover surface biome IDs in saved deep cubes. The extra depth
+    /// leaves the old surface alone if the terrain profile has changed since saving.
+    pub(super) fn backfill_cave_biomes(&self, seed: u64, pos: glam::IVec3, biomes: &mut [u16; 256]) {
+        let Some(fallback) = self.cave_biomes.iter().find(|b| b.threshold <= -ONE) else { return };
+        let [ox, oy, oz] = (pos * 16).to_array();
+        let cols = self.columns(seed, pos.x, pos.z);
+        for (i, (id, col)) in biomes.iter_mut().zip(&cols.cols).enumerate() {
+            let saved = u32::from(*id);
+            if oy + 47 < col.height.saturating_sub(fallback.depth)
+                && self.rules.iter().any(|r| r.biome == saved)
+                && !self.cave_biomes.iter().any(|b| b.biome == saved)
+            {
+                *id = self
+                    .cave_biome(seed, ox, oy, oz, i, col.height)
+                    .unwrap_or(*id);
+            }
+        }
     }
 
     /// Fills cube `pos` with stone, surface layers, water and caves and sets its biomes; returns
@@ -968,12 +853,9 @@ impl Terrain {
         let (ox, oy, oz) = (cx * 16, cy * 16, cz * 16);
         let cols = self.columns(seed, cx, cz);
         for (i, c) in cols.cols.iter().enumerate() {
-            let (x, z) = ((ox + (i % 16) as i32) * 16, (oz + (i / 16) as i32) * 16);
-            let deep = self.cave_biomes.iter().enumerate().find(|&(k, b)| {
-                oy + 15 < c.height - b.depth
-                    && perlin3(seed32(seed, salt::CAVE_BIOME ^ k as u64), x, (oy + 8) * 16, z, b.size, b.size, b.size) > b.threshold
-            });
-            biomes[i] = deep.map_or(c.biome, |(_, b)| b.biome) as u16;
+            biomes[i] = self
+                .cave_biome(seed, ox, oy, oz, i, c.height)
+                .unwrap_or(c.biome as u16);
         }
         let max_h = cols.cols.iter().map(|c| c.height).max().unwrap_or(0);
         let sea = self.sea.map_or(i32::MIN, |s| s.0);
@@ -992,19 +874,10 @@ impl Terrain {
                     .height
             })
         });
-        let stone = self.stone;
-        let water = self.sea.map_or(0, |s| s.1);
         for z in 0..16usize {
             for x in 0..16usize {
                 let i = z * 16 + x;
                 let h = cols.cols[i].height;
-                let rule = self.rules.get(cols.rules[i] as usize);
-                let bare = rule.and_then(|r| r.bare_above).is_some_and(|y| h > y);
-                let top = self.surface_of(cols.rules[i], h);
-                let filler = rule.and_then(|r| r.filler).unwrap_or(stone);
-                let depth = rule.map_or(0, |r| r.depth);
-                let under = rule.and_then(|r| r.under);
-                let ice = rule.and_then(|r| r.ice);
                 let closed = if cave.is_some() { cavern_roof(seed, ox + x as i32, oz + z as i32) } else { 0 };
                 let smooth = Self::smooth(&corners, x, z);
                 // Keeps a seal under water so seas and canyons do not drain into caves.
@@ -1016,28 +889,7 @@ impl Terrain {
                 };
                 for y in 0..16usize {
                     let wy = oy + y as i32;
-                    let mut s = if wy > h {
-                        if wy <= sea { if wy == sea { ice.unwrap_or(water) } else { water } } else { 0 }
-                    } else if bare {
-                        stone
-                    } else if wy == h {
-                        top
-                    } else if wy >= h - depth {
-                        match under {
-                            Some((b, layers)) if wy < h - depth + layers => b,
-                            _ => filler,
-                        }
-                    } else {
-                        stone
-                    };
-                    if let Some(c) = self.caves.as_ref().filter(|_| carved(y)) {
-                        s = match lake(seed, wy).filter(|_| (c.lava_from..c.lava_to).contains(&wy)) {
-                            Some(true) => c.lava,
-                            Some(false) => stone,
-                            None => 0,
-                        };
-                    }
-                    blocks[(y * 16 + z) * 16 + x] = s;
+                    blocks[(y * 16 + z) * 16 + x] = self.state(seed, wy, h, cols.rules[i], carved(y));
                 }
             }
         }
@@ -1140,97 +992,32 @@ fn cavern_roof(seed: u64, x: i32, z: i32) -> i32 {
     ramp(perlin2(seed32(seed, salt::CAVERN_ROOF), x * 16, z * 16, 120 * 16), 1638, 1024)
 }
 
-const SHARDS: usize = 32;
-
-/// Data computed once per column of cubes and shared by every cube of it. Generation runs on
-/// many threads at once, so the map is split into locked shards; a shard that grows past its
-/// share of the capacity drops a quarter of its entries (clearing it whole made a view of 64,
-/// some 13k columns, compute most columns twice).
-pub struct ColumnCache<T> {
-    shards: [Mutex<FxHashMap<(u64, i32, i32), Arc<std::sync::OnceLock<Arc<T>>>>>; SHARDS],
-    per_shard: usize,
-}
-
-/// A clone is an empty cache of the same size: what it held is computed again on demand.
-impl<T> Clone for ColumnCache<T> {
-    fn clone(&self) -> Self {
-        ColumnCache::new(self.per_shard * SHARDS)
-    }
-}
-
-impl<T> ColumnCache<T> {
-    pub fn new(capacity: usize) -> ColumnCache<T> {
-        ColumnCache { shards: std::array::from_fn(|_| Mutex::new(FxHashMap::default())), per_shard: capacity.div_ceil(SHARDS).max(1) }
-    }
-
-    fn shard(&self, x: i32, z: i32) -> &Mutex<FxHashMap<(u64, i32, i32), Arc<std::sync::OnceLock<Arc<T>>>>> {
-        let h = weft_noise::hash(0, x as i64, 0, z as i64) as u32;
-        &self.shards[(h >> 27) as usize % SHARDS]
-    }
-
-    fn peek(&self, seed: u64, x: i32, z: i32) -> Option<Arc<T>> {
-        self.shard(x, z)
-            .lock()
-            .get(&(seed, x, z))
-            .and_then(|c| c.get().cloned())
-    }
-
-    /// The value for cube column (`x`, `z`) under `seed`, computing it with `make` on a miss.
-    /// Threads asking while it is computed wait for it: the cubes of a column come together,
-    /// and each computed it again.
-    pub fn get(&self, seed: u64, x: i32, z: i32, make: impl FnOnce() -> T) -> Arc<T> {
-        let cell = {
-            let mut map = self.shard(x, z).lock();
-            match map.get(&(seed, x, z)) {
-                Some(cell) => cell.clone(),
-                None => {
-                    if map.len() >= self.per_shard {
-                        let mut n = 0usize;
-                        map.retain(|_, _| {
-                            n += 1;
-                            n % 4 != 0
-                        });
-                    }
-                    map.entry((seed, x, z)).or_default().clone()
-                }
-            }
-        };
-        cell.get_or_init(|| Arc::new(make())).clone()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn step(kind: u32, a: i32) -> RawStep {
-        RawStep::new(kind, a)
-    }
+    use crate::entries::RawEntry;
+    use abi::{comp::terrain as t, value_op as vo};
 
-    fn expr(steps: Vec<RawStep>) -> Expr {
+    fn expr(steps: Vec<ExprStep>) -> Expr {
         Expr::resolve(&steps, &|_| None).unwrap()
     }
 
     /// `noise * height`, Q4 sizes and heights from blocks.
     fn hills(height: i32, size: i32) -> Feature {
-        let height = expr(vec![
-            step(ek::X, 0),
-            step(ek::Z, 0),
-            RawStep::noise(salt::HILLS, size * 16, 4),
-            step(ek::CONST, height * 16),
-            step(ek::MUL, 0),
-        ]);
+        let height =
+            expr(vec![step(ek::X, 0), step(ek::Z, 0), noise(salt::HILLS, size * 16, 4), step(ek::CONST, height * 16), step(ek::MUL, 0)]);
         Feature { name: String::new(), height, mask: None, custom: None }
     }
 
     /// Ridge lines `width` blocks apart, squared, with rough detail on top.
     fn mountains(height: i32, width: i32) -> Feature {
-        let ridge = |out: &mut Vec<RawStep>| {
+        let ridge = |out: &mut Vec<ExprStep>| {
             out.extend([
                 step(ek::CONST, ONE),
                 step(ek::X, 0),
                 step(ek::Z, 0),
-                RawStep::noise(salt::MOUNTAINS, width * 16, 4),
+                noise(salt::MOUNTAINS, width * 16, 4),
                 step(ek::CONST, 2 * ONE),
                 step(ek::MUL, 0),
                 step(ek::ABS, 0),
@@ -1246,7 +1033,7 @@ mod tests {
         steps.extend([
             step(ek::X, 0),
             step(ek::Z, 0),
-            RawStep::noise(salt::HILLS, 60 * 16, 4),
+            noise(salt::HILLS, 60 * 16, 4),
             step(ek::CONST, height * 16),
             step(ek::MUL, 0),
             step(ek::CONST, 7),
@@ -1288,6 +1075,26 @@ mod tests {
         let mut blocks = vec![0u32; 4096];
         t.generate(seed, pos, &mut blocks, &mut [0; 256]);
         blocks
+    }
+
+    #[test]
+    fn deep_cave_fallback_covers_new_and_saved_cubes() {
+        let mut t = terrain(Vec::new(), vec![rule(1)], None, 64.0);
+        t.cave_biomes
+            .push(CaveBiome { biome: 2, depth: 48, size: 96 * 16, threshold: -ONE });
+        let mut biomes = [0; 256];
+        let mut blocks = [0; 4096];
+        t.generate(5, [0, 3, 0], &mut blocks, &mut biomes);
+        assert_eq!(biomes, [1; 256]);
+        t.generate(5, [0, -625, 0], &mut blocks, &mut biomes);
+        assert_eq!(biomes, [2; 256]);
+        biomes.fill(1);
+        biomes[0] = 3; // A custom saved biome, outside the surface rules.
+        t.backfill_cave_biomes(5, glam::IVec3::new(0, 3, 0), &mut biomes);
+        assert_eq!(biomes[1], 1);
+        t.backfill_cave_biomes(5, glam::IVec3::new(0, -625, 0), &mut biomes);
+        assert_eq!(biomes[0], 3);
+        assert_eq!(biomes[1..], [2; 255]);
     }
 
     #[test]
@@ -1357,25 +1164,6 @@ mod tests {
         assert_eq!(checked, 16384);
     }
 
-    #[test]
-    fn far_surface_block_is_the_column_s_own_before_caves() {
-        // Distant terrain's faces (`one_column`): what the top of the column is, its own column
-        // worked out once, caves left out; the near answer where caves didn't take the surface.
-        let t = terrain(vec![hills(16, 110)], Vec::new(), Some(1), 64.0);
-        let mut same = 0;
-        for i in 0..256 {
-            let (x, z) = (i % 16, i / 16);
-            let near = t.surface_block(3, x, z);
-            let far = one_column(|| t.surface_block(3, x, z));
-            assert_ne!(far, 0, "at {x} {z}: caves never take a far face's top");
-            if near != 0 {
-                assert_eq!(far, near, "at {x} {z}");
-                same += 1;
-            }
-        }
-        assert!(same > 0);
-    }
-
     /// The point check decorations use agrees with what generation put there.
     #[test]
     fn surface_block_matches_generation() {
@@ -1392,6 +1180,33 @@ mod tests {
         }
     }
 
+    /// Point reads and cube generation share material, cave, sea and surface decisions.
+    #[test]
+    fn reads_match_cubes() {
+        let mut r = rule(0);
+        r.top = Some(3);
+        r.filler = Some(4);
+        r.under = Some((5, 2));
+        r.ice = Some(6);
+        r.deep_top = Some((8, 62));
+        r.bare_above = Some(72);
+        let mut t = terrain(vec![hills(16, 110)], vec![r], Some(7), 64.0);
+        t.sea = Some((64, 2));
+        for seed in [3, 11] {
+            for cx in -1..=1 {
+                for cz in -1..=1 {
+                    for cy in [-2, 0, 3, 4, 5] {
+                        let made = cube(&t, seed, [cx, cy, cz]);
+                        for i in (0..4096).step_by(13) {
+                            let (x, y, z) = (cx * 16 + (i % 16) as i32, cy * 16 + (i / 256) as i32, cz * 16 + (i / 16 % 16) as i32);
+                            assert_eq!(made[i], t.read(seed, x, y, z), "seed {seed}, at {x} {y} {z}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Lava lakes lie on stone, not in every open block between two heights (lava hanging
     /// over caves below).
     #[test]
@@ -1400,7 +1215,7 @@ mod tests {
         let (mut lava, mut hanging) = (0, 0);
         for cx in -3..3 {
             for cz in -3..3 {
-                let column: FxHashMap<i32, Vec<u32>> = (-32..1).map(|cy| (cy, cube(&t, 9, [cx, cy, cz]))).collect();
+                let column: rustc_hash::FxHashMap<i32, Vec<u32>> = (-32..1).map(|cy| (cy, cube(&t, 9, [cx, cy, cz]))).collect();
                 let at = |i: usize, y: i32| {
                     column
                         .get(&(y >> 4))
@@ -1439,47 +1254,55 @@ mod tests {
         );
     }
 
-    fn raw(owner: u32, op: u32, anchor: &str, rule: Option<(&str, &str)>) -> RawTerrain {
-        let r = rule.unwrap_or(("", ""));
-        RawTerrain {
-            owner: ModId(owner),
-            dimension: "a:dim".into(),
-            op,
-            anchor: anchor.into(),
-            block: if op == op::STONE { "a:stone".into() } else { String::new() },
-            level: 0,
-            to: 0,
-            value: 0.0,
-            size: 0.0,
-            feature: RawFeature { name: String::new(), height: Vec::new(), mask: Vec::new(), owner: ModId(owner), custom: Callback::NONE },
-            field: Vec::new(),
-            face: Callback::NONE,
-            rule: RawRule {
-                name: r.0.into(),
-                fields: rf::BIOME,
-                biome: r.1.into(),
-                ranges: Vec::new(),
-                height: (i32::MIN, i32::MAX),
-                top: String::new(),
-                filler: String::new(),
-                depth: 3,
-                under: (String::new(), 0),
-                deep_top: (String::new(), i32::MIN),
-                bare_above: i32::MAX,
-                ice: String::new(),
-            },
+    fn biome_rule(name: &str, biome: &str) -> BiomeRule {
+        BiomeRule {
+            name: if name.is_empty() { biome } else { name }.into(),
+            fields: rf::BIOME,
+            biome: biome.into(),
+            height: [i32::MIN, i32::MAX],
+            depth: 3,
+            deep_below: i32::MIN,
+            bare_above: i32::MAX,
+            ..Default::default()
         }
     }
 
-    fn built(ops: Vec<RawTerrain>) -> (Vec<u32>, Vec<String>) {
+    /// A terrain entry of stone `a:stone`, then `ops` (operation, component, value, anchor) in order.
+    struct Ops(Entry, Vec<String>);
+
+    impl Ops {
+        fn new() -> Ops {
+            Ops(Entry::default(), Vec::new()).op(vo::SET, t::STONE, "a:stone".to_string(), "")
+        }
+
+        fn op<V: abi::data::Data>(mut self, op: u32, name: &str, v: V, anchor: &str) -> Ops {
+            let mut o = RawEntry::engine(abi::entry_kind::TERRAIN, "")
+                .set(name, v)
+                .ops
+                .remove(0);
+            (o.op, o.anchor) = (op, anchor.into());
+            self.0.apply(&o, weft_abi::ModId(0), &mut self.1);
+            self
+        }
+
+        fn push<V: abi::data::Data>(self, name: &str, v: V) -> Ops {
+            self.op(vo::PUSH, name, v, "")
+        }
+
+        fn build(mut self, names: &Names) -> (Terrain, Vec<String>) {
+            let t = build("a:dim", &self.0, names, &mut self.1);
+            (t, self.1)
+        }
+    }
+
+    fn built(ops: Ops) -> (Vec<u32>, Vec<String>) {
         let biomes = ["a:plains", "a:desert", "b:savanna", "b:dunes", "a:snow"];
         let names = Names {
             block: &|n| (n == "a:stone").then_some(1),
             biome: &|n| biomes.iter().position(|b| *b == n).map(|i| i as u32),
             biome_rule: &|_| None,
         };
-        let mut errors = Vec::new();
-        let t = build("a:dim", &|m| format!("mod{}", m.0), ops, &names, &mut errors);
+        let (t, errors) = ops.build(&names);
         (t.rules.iter().map(|r| r.biome).collect(), errors)
     }
 
@@ -1487,61 +1310,63 @@ mod tests {
     #[test]
     fn edits_insert_by_name() {
         let base = || {
-            vec![raw(0, op::STONE, "", None), raw(0, op::BIOME, "", Some(("", "a:desert"))), raw(0, op::BIOME, "", Some(("", "a:plains")))]
+            Ops::new()
+                .push(t::RULES, biome_rule("", "a:desert"))
+                .push(t::RULES, biome_rule("", "a:plains"))
         };
-        let mut ops = base();
-        ops.push(raw(1, op::BIOME_BEFORE, "a:desert", Some(("", "b:savanna"))));
-        ops.push(raw(1, op::BIOME_AFTER, "a:desert", Some(("", "b:dunes"))));
+        let ops = base()
+            .op(vo::INSERT_BEFORE, t::RULES, biome_rule("", "b:savanna"), "a:desert")
+            .op(vo::INSERT_AFTER, t::RULES, biome_rule("", "b:dunes"), "a:desert");
         assert_eq!(built(ops), (vec![2, 1, 3, 0], vec![]));
 
-        let mut ops = base();
-        ops.push(raw(1, op::BIOME_REPLACE, "a:desert", Some(("", "b:dunes"))));
-        ops.push(raw(1, op::BIOME_REMOVE, "a:plains", None));
+        let ops = base()
+            .op(vo::REPLACE_ITEM, t::RULES, biome_rule("", "b:dunes"), "a:desert")
+            .op(vo::REMOVE_ITEM, t::RULES, BiomeRule::default(), "a:plains");
         assert_eq!(built(ops).0, vec![3]);
 
         // A second rule of the same biome needs a name of its own.
-        let mut ops = base();
-        ops.push(raw(1, op::BIOME_BEFORE, "a:plains", Some(("", "a:desert"))));
+        let ops = base().op(vo::INSERT_BEFORE, t::RULES, biome_rule("", "a:desert"), "a:plains");
         assert_eq!(built(ops).1.len(), 1);
-        let mut ops = base();
-        ops.push(raw(1, op::BIOME_BEFORE, "a:plains", Some(("b:hot_coast", "a:desert"))));
+        let ops = base().op(vo::INSERT_BEFORE, t::RULES, biome_rule("b:hot_coast", "a:desert"), "a:plains");
         assert_eq!(built(ops), (vec![1, 1, 0], vec![]));
 
-        // Edits whose target is missing are skipped, not errors.
-        let mut ops = base();
-        ops.push(raw(1, op::BIOME_BEFORE, "a:jungle", Some(("", "b:savanna"))));
-        assert_eq!(built(ops), (vec![1, 0], vec![]));
+        // An edit whose target is missing says so, like any list edit, and changes nothing.
+        let ops = base().op(vo::INSERT_BEFORE, t::RULES, biome_rule("", "b:savanna"), "a:jungle");
+        let (rules, errors) = built(ops);
+        assert_eq!((rules, errors.len()), (vec![1, 0], 1));
 
-        // Only the given fields change.
-        let mut ops = base();
-        let mut edit = raw(1, op::BIOME_EDIT, "a:desert", None);
-        edit.rule.fields = rf::HEIGHT;
-        edit.rule.height = (0, 10);
-        ops.push(edit);
-        let names = Names { block: &|_| Some(1), biome: &|_| Some(0), biome_rule: &|_| None };
-        let t = build("a:dim", &|_| String::new(), ops, &names, &mut Vec::new());
-        assert_eq!((t.rules[0].height, t.rules.len()), ((0, 10), 2));
+        // One rule edited: only the fields the edit gives.
+        let mut taller = biome_rule("a:desert", "");
+        (taller.fields, taller.height) = (rf::HEIGHT, [0, 99]);
+        let (t, errors) = base().push(t::RULE_EDITS, taller).build(&Names {
+            block: &|_| Some(1),
+            biome: &|n| (n == "a:desert").then_some(7),
+            biome_rule: &|_| None,
+        });
+        assert_eq!((t.rules[0].biome, t.rules[0].height, errors.len()), (7, (0, 99), 1), "a:plains is unknown here");
     }
 
     /// A rule starts from its biome's climate and surface and overrides only what it sets.
     #[test]
     fn rules_inherit_the_biome() {
-        let mut desert = raw(0, op::BIOME, "", Some(("", "a:desert"))).rule;
+        let range = |name: &str, min, max| abi::RuleRange { name: name.into(), min, max };
+        let mut desert = biome_rule("", "a:desert");
         desert.fields = rf::RANGES | rf::SURFACE;
-        desert.ranges = vec![("temperature".into(), 0.35, f64::INFINITY)];
+        desert.ranges = vec![range("temperature", 0.35, f64::INFINITY)];
         (desert.top, desert.filler, desert.depth) = ("a:sand".into(), "a:sand".into(), 3);
-        let mut coast = raw(0, op::BIOME, "", Some(("a:coast", "a:desert")));
-        coast.rule.fields |= rf::RANGES | rf::HEIGHT;
-        coast.rule.ranges = vec![("temperature".into(), 0.0, 1.0)];
-        coast.rule.height = (0, 64);
-        let ops = vec![raw(0, op::STONE, "", None), coast, raw(0, op::BIOME, "", Some(("", "a:desert")))];
+        let mut coast = biome_rule("a:coast", "a:desert");
+        coast.fields |= rf::RANGES | rf::HEIGHT;
+        coast.ranges = vec![range("temperature", 0.0, 1.0)];
+        coast.height = [0, 64];
         let names = Names {
             block: &|n| Some(if n == "a:sand" { 2 } else { 1 }),
             biome: &|_| Some(0),
             biome_rule: &|n| (n == "a:desert").then_some(&desert),
         };
-        let mut errors = Vec::new();
-        let t = build("a:dim", &|_| String::new(), ops, &names, &mut errors);
+        let (t, errors) = Ops::new()
+            .push(t::RULES, coast)
+            .push(t::RULES, biome_rule("", "a:desert"))
+            .build(&names);
         assert!(errors.is_empty(), "{errors:?}");
         assert_eq!((&t.rules[0].ranges[..], t.rules[0].height, t.rules[0].top), (&[(0, 0, ONE)][..], (0, 64), Some(2)));
         assert_eq!(
@@ -1553,7 +1378,7 @@ mod tests {
     #[test]
     fn expressions_are_checked() {
         let none = |_: &str| None;
-        let ok = |steps: Vec<RawStep>| Expr::resolve(&steps, &none).map(|_| ());
+        let ok = |steps: Vec<ExprStep>| Expr::resolve(&steps, &none).map(|_| ());
         assert!(ok(vec![step(ek::X, 0), step(ek::Z, 0), step(ek::ADD, 0)]).is_ok());
         assert!(ok(vec![step(ek::ADD, 0)]).is_err(), "nothing to add");
         assert!(ok(vec![step(ek::X, 0), step(ek::Z, 0)]).is_err(), "two values left");
@@ -1561,7 +1386,7 @@ mod tests {
         assert!(ok(vec![step(99, 0)]).is_err(), "unknown step");
         assert!(ok(vec![step(ek::NOISE, 0)]).is_err(), "noise needs x and z");
         let deep = vec![step(ek::X, 0); limit::DEPTH as usize + 1];
-        let mut deep: Vec<RawStep> = deep;
+        let mut deep: Vec<ExprStep> = deep;
         deep.extend(vec![step(ek::ADD, 0); limit::DEPTH as usize]);
         assert!(ok(deep).is_err(), "too deep");
         let mut by_name = step(ek::FIELD, 0);
@@ -1578,7 +1403,7 @@ mod tests {
 
     #[test]
     fn expressions_compute() {
-        let at = |steps: Vec<RawStep>| expr(steps).eval(&[], 5, 160, -48);
+        let at = |steps: Vec<ExprStep>| expr(steps).eval(&[], 5, 160, -48);
         assert_eq!(at(vec![step(ek::X, 0), step(ek::Z, 0), step(ek::SUB, 0)]), 208);
         // Fixed point: 2.5 * 1.5, and the factors held where the product still fits.
         assert_eq!(at(vec![step(ek::CONST, 10240), step(ek::CONST, 6144), step(ek::MUL, 0)]), 15360);
@@ -1588,11 +1413,11 @@ mod tests {
         assert_eq!(at(vec![step(ek::CONST, 7), step(ek::CONST, 0), step(ek::DIV, 0)]), 0);
         assert_eq!(at(vec![step(ek::CONST, -7), step(ek::CONST, 5), step(ek::REM, 0)]), 3);
         assert_eq!(at(vec![step(ek::CONST, i32::MIN), step(ek::ABS, 0)]), i32::MIN);
-        let ramp = |from, to| RawStep { b: to, ..step(ek::RAMP, from) };
+        let ramp = |from, to| ExprStep { b: to, ..step(ek::RAMP, from) };
         assert_eq!(at(vec![step(ek::CONST, 2048), ramp(0, ONE)]), 2048);
         assert_eq!(at(vec![step(ek::CONST, -819), ramp(0, -1638)]), 2048);
         // Noise takes the position from the stack, so it can be moved (a warp).
-        let noise = |x, z| expr(vec![step(ek::CONST, x), step(ek::CONST, z), RawStep::noise(7, 100 * 16, 3)]).eval(&[], 5, 0, 0);
+        let noise = |x, z| expr(vec![step(ek::CONST, x), step(ek::CONST, z), noise(7, 100 * 16, 3)]).eval(&[], 5, 0, 0);
         assert_eq!(noise(160, -48), fbm(seed32(5, 7), 160, -48, 100 * 16, 3));
         let hills = hills(16, 110).height.eval(&[], 5, 160, -48);
         assert_eq!(hills, (fbm(seed32(5, salt::HILLS), 160, -48, 110 * 16, 4) * 16 * 16) >> 12);
@@ -1602,27 +1427,21 @@ mod tests {
     /// ones nothing asks for are never computed.
     #[test]
     fn fields_are_resolved_and_pruned() {
-        let field = |name: &str, steps: Vec<RawStep>| RawTerrain { anchor: name.into(), field: steps, ..raw(0, op::FIELD, name, None) };
-        let by_name = |n: &str| RawStep { name: n.into(), ..step(ek::FIELD, 0) };
+        let field = |name: &str, value: Vec<ExprStep>| abi::TerrainField { name: name.into(), value };
+        let by_name = |n: &str| ExprStep { name: n.into(), ..step(ek::FIELD, 0) };
         let wet_range = |name: &str| {
-            let mut r = raw(0, op::BIOME, "", Some(("", "a:desert"))).rule;
+            let mut r = biome_rule("", "a:desert");
             r.fields |= rf::RANGES;
-            r.ranges = vec![(name.into(), 0.5, f64::INFINITY)];
-            RawTerrain { rule: r, ..raw(0, op::BIOME, "", None) }
+            r.ranges = vec![abi::RuleRange { name: name.into(), min: 0.5, max: f64::INFINITY }];
+            r
         };
-        let make = |ops: Vec<RawTerrain>| {
-            let names = Names { block: &|_| Some(1), biome: &|_| Some(0), biome_rule: &|_| None };
-            let mut errors = Vec::new();
-            let t = build("a:dim", &|_| String::new(), ops, &names, &mut errors);
-            (t, errors)
-        };
+        let names = Names { block: &|_| Some(1), biome: &|_| Some(0), biome_rule: &|_| None };
         // `wet` is twice the humidity; `damp` uses `wet`; only `damp` is asked for.
-        let (t, errors) = make(vec![
-            raw(0, op::STONE, "", None),
-            field("wet", vec![by_name("humidity"), step(ek::CONST, 2 * ONE), step(ek::MUL, 0)]),
-            field("damp", vec![by_name("wet"), step(ek::CONST, 100), step(ek::ADD, 0)]),
-            wet_range("damp"),
-        ]);
+        let (t, errors) = Ops::new()
+            .push(t::FIELDS, field("wet", vec![by_name("humidity"), step(ek::CONST, 2 * ONE), step(ek::MUL, 0)]))
+            .push(t::FIELDS, field("damp", vec![by_name("wet"), step(ek::CONST, 100), step(ek::ADD, 0)]))
+            .push(t::RULES, wet_range("damp"))
+            .build(&names);
         assert!(errors.is_empty(), "{errors:?}");
         let used: Vec<(&str, bool)> = t
             .fields
@@ -1631,14 +1450,40 @@ mod tests {
             .collect();
         assert_eq!(used, [("temperature", false), ("humidity", true), ("continent", false), ("wet", true), ("damp", true)]);
         // A field can't use one declared after it, and a rule can't ask for one that is not there.
-        let (_, errors) =
-            make(vec![raw(0, op::STONE, "", None), field("early", vec![by_name("late")]), field("late", vec![step(ek::X, 0)])]);
+        let (_, errors) = Ops::new()
+            .push(t::FIELDS, field("early", vec![by_name("late")]))
+            .push(t::FIELDS, field("late", vec![step(ek::X, 0)]))
+            .build(&names);
         assert_eq!(errors.len(), 1, "{errors:?}");
-        let (_, errors) = make(vec![raw(0, op::STONE, "", None), wet_range("nothing")]);
+        let (_, errors) = Ops::new()
+            .push(t::RULES, wet_range("nothing"))
+            .build(&names);
         assert_eq!(errors.len(), 1, "{errors:?}");
         // Declared again, the standard temperature is replaced where it stands.
-        let (t, _) = make(vec![raw(0, op::STONE, "", None), field("temperature", vec![step(ek::CONST, 7)]), wet_range("temperature")]);
+        let (t, _) = Ops::new()
+            .push(t::FIELDS, field("temperature", vec![step(ek::CONST, 7)]))
+            .push(t::RULES, wet_range("temperature"))
+            .build(&names);
         assert_eq!(t.fields[0].expr.eval(&[], 1, 0, 0), 7);
+    }
+
+    #[test]
+    fn far_surface_block_is_the_column_s_own_before_caves() {
+        // Distant terrain's faces (`one_column`): what the top of the column is, its own column
+        // worked out once, caves left out; the near answer where caves didn't take the surface.
+        let t = terrain(vec![hills(16, 110)], Vec::new(), Some(1), 64.0);
+        let mut same = 0;
+        for i in 0..256 {
+            let (x, z) = (i % 16, i / 16);
+            let near = t.surface_block(3, x, z);
+            let far = one_column(|| t.surface_block(3, x, z));
+            assert_ne!(far, 0, "at {x} {z}: caves never take a far face's top");
+            if near != 0 {
+                assert_eq!(far, near, "at {x} {z}");
+                same += 1;
+            }
+        }
+        assert!(same > 0);
     }
 
     /// chiacraft: the standard fields are `weft_noise::fixed::Fields` to the integer (our land's CPU
@@ -1647,18 +1492,21 @@ mod tests {
     fn standard_fields_match_the_cpu_fields() {
         let names = Names { block: &|_| Some(1), biome: &|_| Some(0), biome_rule: &|_| None };
         let ranged = |name: &str| {
-            let mut r = raw(0, op::BIOME, "", Some(("", "a:land"))).rule;
+            let mut r = biome_rule("", "a:land");
+            r.name = format!("a:{name}");
             r.fields |= rf::RANGES;
-            r.ranges = vec![(name.into(), -10.0, 10.0)];
-            RawTerrain { rule: r, ..raw(0, op::BIOME, "", None) }
+            r.ranges = vec![abi::RuleRange { name: name.into(), min: -10.0, max: 10.0 }];
+            r
         };
         for scale in [None, Some(1800.0)] {
-            let mut ops = vec![raw(0, op::STONE, "", None), ranged("temperature"), ranged("humidity"), ranged("continent")];
+            let mut ops = Ops::new()
+                .push(t::RULES, ranged("temperature"))
+                .push(t::RULES, ranged("humidity"))
+                .push(t::RULES, ranged("continent"));
             if let Some(v) = scale {
-                ops.push(RawTerrain { value: v, ..raw(0, op::CONTINENT_SCALE, "", None) });
+                ops = ops.op(vo::SET, t::CONTINENT_SCALE, v, "");
             }
-            let mut errors = Vec::new();
-            let t = build("a:dim", &|m| format!("mod{}", m.0), ops, &names, &mut errors);
+            let (t, errors) = ops.build(&names);
             assert!(errors.is_empty(), "{errors:?}");
             for seed in [1u64, 42] {
                 let f = t.fields(seed);
@@ -1674,18 +1522,17 @@ mod tests {
         }
     }
 
-    /// chiacraft: the continent scale defaults to the noise's own and follows its op; under a
-    /// block is an error.
+    /// chiacraft: the continent scale defaults to the noise's own and follows its component; under
+    /// a block is an error.
     #[test]
-    fn continent_scale_defaults_and_follows_its_op() {
+    fn continent_scale_defaults_and_follows_its_component() {
         let names = Names { block: &|_| Some(1), biome: &|_| Some(0), biome_rule: &|_| None };
         let make = |v: Option<f64>| {
-            let mut ops = vec![raw(0, op::STONE, "", None)];
+            let mut ops = Ops::new();
             if let Some(v) = v {
-                ops.push(RawTerrain { value: v, ..raw(0, op::CONTINENT_SCALE, "", None) });
+                ops = ops.op(vo::SET, t::CONTINENT_SCALE, v, "");
             }
-            let mut errors = Vec::new();
-            let t = build("a:dim", &|m| format!("mod{}", m.0), ops, &names, &mut errors);
+            let (t, errors) = ops.build(&names);
             (t.continent_scale, errors.len())
         };
         assert_eq!(make(None), (weft_noise::fixed::CONTINENT_SCALE, 0));

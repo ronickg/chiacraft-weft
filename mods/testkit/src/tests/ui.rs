@@ -6,6 +6,7 @@ use crate::runner::{R, T};
 
 /// Screens open by name and lay out inside the window: the engine's menus and a mod's own.
 pub async fn screens(t: T) -> R {
+    t.c().menu_open(&screens::TITLE);
     t.screen("core:title").await?;
     t.shot("title").await?;
     t.laid_out(&[
@@ -20,22 +21,24 @@ pub async fn screens(t: T) -> R {
     // A mod's button in the main menu opens its own screen, with no world around.
     t.check(t.click_ui("text:About Test Mod", 0), "the test mod's main menu button");
     t.screen("testmod:about").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.screen("core:title").await?;
     for (screen, texts) in [
         (&screens::SETTINGS, &["text:View distance", "text:Language", "text:Controls", "text:Shader Packs", "text:Done"][..]),
         (&screens::LANGUAGE, &["text:English", "text:Done"][..]),
         (&screens::CONTROLS, &["text:Reset All", "text:Done"][..]),
         (&screens::WORLDS, &["text:Create New World", "id:saves_folder"][..]),
+        (&screens::CREATE_WORLD, &["text:World Rules", "text:Create New World"][..]),
+        (&screens::WORLD_RULES, &["text:World Rules", "text:Done"][..]),
         (&screens::MODS, &["id:mod:base", "id:mod:testmod", "id:mod_description"][..]),
-        (&screens::PROFILE, &["id:profile_name", "text:Copy Key"][..]),
+        (&screens::PROFILE, &["id:profile_name", "id:change_skin", "entity", "text:Done"][..]),
     ] {
         let name = screen.name();
-        t.check(t.c().screen_open(screen), format!("cannot open {name}"));
+        t.check(t.c().menu_open(screen), format!("cannot open {name}"));
         t.screen(name).await?;
         t.shot(name.trim_start_matches("core:")).await?;
         t.laid_out(texts);
-        t.c().screen_close();
+        t.c().menu_close();
         t.screen("core:title").await?;
     }
     t.flat().await?;
@@ -68,7 +71,7 @@ pub async fn screens(t: T) -> R {
     let coal = Item::lookup("base:coal").ok_or("no coal")?;
     t.check(t.c().ui_rect(&format!("icon:{coal}")).is_some(), "the item on the mod's screen");
     t.shot("about_parts").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     t.check(!t.flag(client::client_flags::PAUSED), "running again when it closed");
     Ok(())
@@ -82,7 +85,7 @@ pub async fn hud_editor(t: T) -> R {
     t.flat().await?;
     let rect = |t: &T, name: &str| t.c().ui_rect(&format!("id:hud:{name}"));
     let before = rect(&t, "core:hotbar").ok_or("no hotbar element")?;
-    t.check(t.c().screen_open(&screens::HUD_EDITOR), "cannot open the HUD editor");
+    t.check(t.c().menu_open(&screens::HUD_EDITOR), "cannot open the HUD editor");
     t.screen("core:hud_editor").await?;
     t.frames(4).await?;
     t.shot("editor").await?;
@@ -120,7 +123,7 @@ pub async fn hud_editor(t: T) -> R {
     t.secs(0.3).await?;
     let saved = std::fs::read_to_string(&file).unwrap_or_default();
     t.check(saved.contains("core:crosshair = hidden"), format!("saved: {saved:?}"));
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     t.frames(3).await?;
     t.shot("arranged").await?;
@@ -128,12 +131,12 @@ pub async fn hud_editor(t: T) -> R {
     let kept = rect(&t, "core:hotbar").ok_or("no hotbar in the game")?;
     t.check((kept.x - moved.x).abs() < 0.01, "the hotbar stays where it was put");
     // Reset all brings back the first picture.
-    t.c().screen_open(&screens::HUD_EDITOR);
+    t.c().menu_open(&screens::HUD_EDITOR);
     t.screen("core:hud_editor").await?;
     t.frames(3).await?;
     t.check(t.click_ui("text:Reset all", 0), "reset all");
     t.secs(0.3).await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     t.frames(3).await?;
     let back = rect(&t, "core:hotbar").ok_or("no hotbar after the reset")?;
@@ -162,7 +165,7 @@ pub async fn debug_lines(t: T) -> R {
     t.check(t.click_ui("id:line:fps", 0), "the frame counter's row");
     t.until("set to always", Duration::from_secs(2), |t| t.c().ui_rect("text:Always").is_some())
         .await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     t.secs(0.5).await?;
     t.debug(false).await?;
@@ -170,26 +173,26 @@ pub async fn debug_lines(t: T) -> R {
     t.shot("always").await?;
     t.check(t.c().ui_rect("text:fps").is_some(), "the frame counter without F3 when set to always");
     t.check(t.c().ui_rect("text:XYZ").is_none(), "and nothing else with it");
-    t.c().screen_open(&screens::DEBUG_OPTIONS);
+    t.c().menu_open(&screens::DEBUG_OPTIONS);
     t.screen("core:debug_options").await?;
     t.frames(3).await?;
     t.check(t.click_ui("id:line:fps", 0), "the row again");
     t.until("set to never", Duration::from_secs(2), |t| t.c().ui_rect("text:Never").is_some())
         .await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     t.debug(true).await?;
     t.frames(4).await?;
     t.check(t.c().ui_rect("text:fps").is_none(), "no frame counter set to never, F3 or not");
     t.check(t.c().ui_rect("text:XYZ").is_some(), "the other lines stay");
     t.debug(false).await?;
-    t.c().screen_open(&screens::DEBUG_OPTIONS);
+    t.c().menu_open(&screens::DEBUG_OPTIONS);
     t.screen("core:debug_options").await?;
     t.frames(3).await?;
     t.click_ui("text:Reset", 0);
     t.until("reset", Duration::from_secs(2), |t| t.c().ui_rect("text:Never").is_none())
         .await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     Ok(())
 }
@@ -264,21 +267,85 @@ pub async fn inventory_crafting(t: T) -> R {
             )
         })?;
     t.check_eq(t.c().menu_slot(4).count, 4, "planks from one log");
+    t.click_settled("slot:0", 1).await?;
+    t.until("two logs in the grid", Duration::from_secs(5), |t| t.c().menu_slot(0).count == 2)
+        .await?;
     t.click_settled(&t.hotbar(0), 0).await?;
     t.until("cursor empty", Duration::from_secs(5), |t| t.c().cursor_stack().is_empty())
         .await?;
     t.shot("grid").await?;
     t.click_settled("slot:4", 0).await?;
-    t.until("planks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == planks)
-        .await?;
+    t.frames(3).await?;
+    t.click_settled("slot:4", 0).await?;
+    t.until("two batches of planks on the cursor", Duration::from_secs(5), |t| {
+        let stack = t.c().cursor_stack();
+        stack.item == planks && stack.count == 8
+    })
+    .await?;
     t.click_settled(&t.hotbar(1), 0).await?;
     t.until("planks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(1).item == planks)
         .await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
-    t.check_eq(t.slot("me", 0).await?, ("base:oak_log".into(), 15, 0), "logs left");
-    t.check_eq(t.slot("me", 1).await?, ("base:oak_planks".into(), 4, 0), "planks made");
+    t.check_eq(t.slot("me", 0).await?, ("base:oak_log".into(), 14, 0), "logs left");
+    t.check_eq(t.slot("me", 1).await?, ("base:oak_planks".into(), 8, 0), "planks made");
     t.sync_inventory().await
+}
+
+pub async fn target_info(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let p = super::add(f, [0, 1, -3]);
+    for (block, name) in [("stone", "Stone"), ("oak_log", "Oak Log")] {
+        t.fill(p, p, block).await?;
+        t.look_at(p);
+        t.until("target name follows the block", Duration::from_secs(5), |t| t.c().ui_rect(&format!("text:{name}")).is_some())
+            .await?;
+        let target = t.c().target().ok_or("no target")?;
+        t.check_eq(target.pos.to_array(), p, "target uses block coordinates");
+        t.check_eq(target.entity, 0, "a block target is not an entity");
+        t.laid_out(&["id:hud:base:target_info", "text:Tool:"]);
+        let r = t
+            .c()
+            .ui_rect("id:hud:base:target_info")
+            .ok_or("no target panel")?;
+        t.check((r.x + r.w / 2.0 - 0.5).abs() < 0.01, "the target panel stays centered as its width changes");
+        t.shot(block).await?;
+    }
+    t.fill(p, p, "air").await?;
+    let at = super::add(f, [0, 0, -2]);
+    let cow: u64 = t
+        .op(&format!("spawn base:cow {} {} {}", at[0], at[1], at[2]))
+        .await?
+        .parse()
+        .map_err(|_| "bad cow id")?;
+    t.look_at(at);
+    t.until("entity wins the target", Duration::from_secs(5), |t| t.c().target().is_some_and(|a| a.entity == cow))
+        .await?;
+    t.until("entity name and health shown", Duration::from_secs(5), |t| {
+        t.c().ui_rect("text:Cow").is_some() && t.c().ui_rect("text:Health:").is_some()
+    })
+    .await?;
+    let health = t.c().entity(cow).ok_or("cow not visible")?;
+    t.check(health.max_health > 0.0 && health.health <= health.max_health, "a newly seen entity has a valid health maximum");
+    t.op(&format!("attr_mod {cow} core:max_health testkit:target_health core:set 40 100"))
+        .await?;
+    t.until("server health maximum reaches the client", Duration::from_secs(5), |t| {
+        t.c().entity(cow).is_some_and(|e| e.max_health == 40.0)
+    })
+    .await?;
+    t.until("target health binding updates", Duration::from_secs(5), |t| t.c().ui_rect("text:/ 40").is_some())
+        .await?;
+    t.shot("entity").await?;
+    t.c().set_look(0.0, 80.0);
+    t.until("no stale panel after looking away", Duration::from_secs(5), |t| {
+        t.c().target().is_none()
+            && t.c()
+                .ui_rect("id:hud:base:target_info")
+                .is_none_or(|r| r.w == 0.0 || r.h == 0.0)
+    })
+    .await?;
+    Ok(())
 }
 
 pub async fn creative_inventory(t: T) -> R {
@@ -296,8 +363,18 @@ pub async fn creative_inventory(t: T) -> R {
         t.click_ui(&t.hotbar(0), 0);
         t.until("bricks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(0).item == stone)
             .await?;
+        // A number key over an entry: a stack of it in that hotbar slot.
+        let Rect { x, y, w, h } = t
+            .c()
+            .ui_rect(&format!("item:{stone}"))
+            .ok_or("no bricks entry")?;
+        t.c().input_cursor(x + w / 2.0, y + h / 2.0);
+        t.frames(3).await?;
+        t.press("core:hotbar5");
+        t.until("bricks by the number key", Duration::from_secs(5), |t| t.c().inventory_slot(4).count == 64)
+            .await?;
     }
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     t.check_eq(t.slot("me", 0).await?.0, "base:bricks".into(), "creative pick");
     Ok(())
@@ -359,11 +436,11 @@ pub async fn chat_overflow(t: T) -> R {
     }
     .await;
     weft_sdk::settings::GUI_SCALE.set(2);
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     out?;
     // The settings for it, reached from the settings.
-    t.c().screen_open(&screens::SETTINGS);
+    t.c().menu_open(&screens::SETTINGS);
     t.screen("core:settings").await?;
     t.frames(2).await?;
     t.c().input_cursor(0.5, 0.5);
@@ -379,7 +456,7 @@ pub async fn chat_overflow(t: T) -> R {
     t.until("the next choice on the button", Duration::from_secs(2), |t| t.c().ui_rect("text:Chat: Commands only").is_some())
         .await?;
     weft_sdk::settings::CHAT_VISIBILITY.set(0);
-    t.c().screen_close();
+    t.c().menu_close();
     Ok(())
 }
 
@@ -585,7 +662,7 @@ pub async fn chat(t: T) -> R {
 /// Settings mods declare get a screen built from the declarations; changes apply and are saved.
 pub async fn mod_settings(t: T) -> R {
     static HUM: Config<bool> = Config::named("testmod:generator_hum");
-    t.c().screen_open(&screens::MOD_SETTINGS);
+    t.c().menu_open(&screens::MOD_SETTINGS);
     t.screen("core:mod_settings").await?;
     t.frames(2).await?;
     t.check(t.click_ui("text:Test Mod", 0), "test mod listed");
@@ -600,10 +677,10 @@ pub async fn mod_settings(t: T) -> R {
     let file = std::fs::read_to_string(format!("{}/test-config/testmod.txt", t.c().run_dir())).unwrap_or_default();
     t.check(file.contains(&format!("generator_hum = {}", !before)), format!("saved: {file:?}"));
     HUM.set(before);
-    t.c().screen_close();
-    t.c().screen_close();
+    t.c().menu_close();
+    t.c().menu_close();
     // The Sound screen has the volumes and nothing else.
-    t.c().screen_open(&screens::SOUND);
+    t.c().menu_open(&screens::SOUND);
     t.screen("core:config").await?;
     t.frames(3).await?;
     t.shot("sound").await?;
@@ -613,7 +690,7 @@ pub async fn mod_settings(t: T) -> R {
     for other in ["text:config.core", "text:Field of view", "text:Generator hum"] {
         t.check(t.c().ui_rect(other).is_none(), format!("{other} on the Sound screen"));
     }
-    t.c().screen_close();
+    t.c().menu_close();
     Ok(())
 }
 
@@ -632,7 +709,12 @@ pub async fn recipe_viewer(t: T) -> R {
     t.frames(3).await?;
     t.check(t.c().ui_rect("id:tab:base:smelting").is_some(), "smelting recipes for the ingot");
     t.shot("iron_recipes").await?;
-    t.c().screen_close();
+    t.click_ui(&format!("icon:{}", id("base:iron_ingot")), 1);
+    t.frames(4).await?;
+    t.check(t.c().ui_rect("text:uses").is_some(), "right click opens uses of the displayed item");
+    t.c().menu_close();
+    t.screen("core:recipes").await?;
+    t.c().menu_close();
     t.screen("core:menu").await?;
     t.c().input_cursor(x + w / 2.0, y + h / 2.0);
     t.frames(3).await?;
@@ -643,6 +725,12 @@ pub async fn recipe_viewer(t: T) -> R {
     t.shot("iron_uses").await?;
     // One tab per kind; the test mod's alloying shows its info line from the recipe's values.
     t.check(t.c().ui_rect("id:tab:base:crafting").is_some(), "a crafting tab");
+    t.c().input_scroll(-1.0);
+    t.frames(4).await?;
+    t.check(t.c().ui_rect("text:2 /").is_some(), "wheel turns to the next page");
+    t.c().input_scroll(1.0);
+    t.frames(4).await?;
+    t.check(t.c().ui_rect("text:1 /").is_some(), "wheel returns to the previous page");
     t.check(t.click_ui("id:tab:testmod:alloying", 0), "an alloying tab");
     t.secs(0.2).await?;
     t.frames(3).await?;
@@ -661,11 +749,11 @@ pub async fn recipe_viewer(t: T) -> R {
     t.frames(3).await?;
     t.check(t.c().ui_rect("text:#ingots/iron").is_some(), "the tag's items");
     t.shot("tag").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.screen("core:tags").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.screen("core:recipes").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.screen("core:menu").await?;
     // A kind laid out by its mod, with a fluid.
     t.op("put me 1 diamond 1").await?;
@@ -681,7 +769,7 @@ pub async fn recipe_viewer(t: T) -> R {
     t.frames(3).await?;
     t.check(t.c().ui_rect("text:laid out by the test mod").is_some(), "the infusing kind's own layout");
     t.shot("infusing").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.screen("core:menu").await?;
     // The arrow of a menu that crafts opens its recipes.
     let Some(Rect { x, y, w, h }) = t.c().ui_rect("class:arrow") else { return Err("no arrow in the inventory".into()) };
@@ -702,8 +790,8 @@ pub async fn recipe_viewer(t: T) -> R {
         "the crafting table shown as the station",
     );
     t.shot("arrow").await?;
-    t.c().screen_close();
-    t.c().screen_close();
+    t.c().menu_close();
+    t.c().menu_close();
     t.no_screen().await
 }
 
@@ -758,6 +846,96 @@ pub async fn inventory_hotkeys(t: T) -> R {
     hover(21)?;
     t.secs(0.8).await?;
     t.check(t.slot("me", 20).await?.1 == 0 && t.slot("me", 21).await?.1 == 0, "shift-sweeping moved both cobblestone stacks to the hotbar");
+    t.secs(0.5).await?;
+
+    // The drop keys over a slot: one, then with Ctrl the rest.
+    t.op("put me 12 stick 5").await?;
+    t.secs(0.2).await?;
+    hover(12)?;
+    t.frames(3).await?;
+    t.press("core:drop");
+    t.secs(0.3).await?;
+    t.check_eq(t.slot("me", 12).await?.1, 4, "Q over a slot threw one");
+    t.press("core:drop_all");
+    t.secs(0.3).await?;
+    t.check_eq(t.slot("me", 12).await?.1, 0, "Ctrl+Q threw the rest");
+
+    // A stack picked up and the button still held: slots swept over give theirs.
+    for s in [13, 14, 15] {
+        t.op(&format!("put me {s} sand 1")).await?;
+    }
+    t.secs(0.2).await?;
+    hover(13)?;
+    t.frames(3).await?;
+    t.c().input_click(0, 1.0);
+    t.frames(4).await?;
+    hover(14)?;
+    t.frames(4).await?;
+    hover(15)?;
+    t.secs(1.0).await?;
+    t.check_eq(t.c().cursor_stack().count, 3, "sweeping on with the stack picked up gathered the sand");
+    hover(13)?;
+    t.frames(3).await?;
+    t.c().input_click(0, 0.0);
+    t.secs(0.3).await?;
+
+    // Shift-clicked off with a full hotbar, worn armor goes to the main inventory.
+    for s in 0..9 {
+        t.op(&format!("put me {s} dirt 1")).await?;
+    }
+    t.op("put me 37 iron_chestplate 1").await?;
+    t.secs(0.3).await?;
+    let plate = id("base:iron_chestplate");
+    let at = (0..64)
+        .find(|&i| t.c().menu_slot(i).item == plate)
+        .ok_or("no chestplate in the menu")?;
+    t.c().input_key("ShiftLeft", 0.5);
+    t.frames(1).await?;
+    t.click_ui(&format!("slot:{at}"), 0);
+    t.secs(0.4).await?;
+    let now = (0..64).find(|&i| t.c().menu_slot(i).item == plate);
+    t.check(now.is_some_and(|i| i != at), format!("the chestplate left its slot {at} for {now:?}"));
+
+    // The trash key over a slot: its stack goes to the trash (base's, in the inventory), the
+    // next one takes its place.
+    let slots = t.c().menu().map_or(0, |m| m.slots);
+    t.op("put me 12 stick 3").await?;
+    t.op("put me 13 sand 2").await?;
+    t.secs(0.3).await?;
+    for (slot, item) in [(12, "base:stick"), (13, "base:sand")] {
+        hover(slot)?;
+        t.frames(3).await?;
+        t.press("core:trash");
+        t.secs(0.3).await?;
+        t.check_eq(t.slot("me", slot).await?.1, 0, "the stack left for the trash");
+        let shown: Vec<u32> = (0..slots).map(|i| t.c().menu_slot(i).item).collect();
+        t.check(shown.contains(&id(item)), format!("{item} shown in the trash"));
+    }
+    t.check(!(0..slots).any(|i| t.c().menu_slot(i).item == id("base:stick")), "the sticks gone for the sand");
+
+    t.op("put me 12 stick 5").await?;
+    t.until("sticks in inventory", Duration::from_secs(5), |t| t.c().menu_slot(12).count == 5)
+        .await?;
+    t.click_ui("slot:12", 1);
+    t.until("half the sticks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().count == 3)
+        .await?;
+    let trash = slots - 1;
+    for count in 1..=2 {
+        t.click_ui(&format!("slot:{trash}"), 1);
+        t.until("one stick added to trash", Duration::from_secs(5), |t| {
+            t.c().menu_slot(trash).item == id("base:stick")
+                && t.c().menu_slot(trash).count == count
+                && t.c().cursor_stack().count == 3 - count
+        })
+        .await?;
+    }
+
+    t.click_ui("slot:12", 0);
+    t.frames(3).await?;
+    t.click_ui("slot:12", 0);
+    t.until("whole stack picked up again", Duration::from_secs(5), |t| t.c().cursor_stack().count == 3)
+        .await?;
+    t.check(t.c().menu_slot(12).is_empty(), "the second left click emptied the slot");
     Ok(())
 }
 
@@ -769,7 +947,7 @@ pub async fn rebind(t: T) -> R {
     t.flat().await?;
     // `keys`: (key, seconds held, seconds before the next one).
     let bind = async |keys: &[(&str, f32, f32)]| -> R {
-        t.c().screen_open(&screens::CONTROLS);
+        t.c().menu_open(&screens::CONTROLS);
         t.screen("core:controls").await?;
         t.frames(2).await?;
         t.click_ui("id:bind:core:forward:0", 0);
@@ -783,7 +961,7 @@ pub async fn rebind(t: T) -> R {
         Ok(())
     };
     let walked = async |keys: &[&str]| -> Result<f64, String> {
-        t.c().screen_close();
+        t.c().menu_close();
         t.no_screen().await?;
         let before = t.state().pos;
         for k in keys {
@@ -795,7 +973,7 @@ pub async fn rebind(t: T) -> R {
     };
     bind(&[("Escape", 0.0, 0.0)]).await?;
     t.screen("core:controls").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     let k = {
         bind(&[("KeyK", 0.0, 0.0)]).await?;
@@ -818,11 +996,11 @@ pub async fn rebind(t: T) -> R {
     t.secs(0.1).await?;
     t.c().input_key("KeyJ", 0.05);
     t.secs(0.5).await?;
-    t.check(t.c().ui_rect("text:Jx2").is_some(), "a key pressed twice binds a double tap");
+    t.check(t.c().ui_rect("text:J*2").is_some(), "a key pressed twice binds a double tap");
     t.click_ui("id:bind:core:forward:1", 1);
     t.frames(4).await?;
-    t.check(t.c().ui_rect("text:Jx2").is_none(), "a right click clears it");
-    t.c().screen_close();
+    t.check(t.c().ui_rect("text:J*2").is_none(), "a right click clears it");
+    t.c().menu_close();
     t.no_screen().await?;
     t.check(k > 1.0, format!("K walks after rebinding forward to it (moved {k:.2})"));
     t.check(alone < 0.2 && chord > 1.0, format!("bound to Ctrl+K, K alone moved {alone:.2} and Ctrl+K {chord:.2}"));
@@ -836,7 +1014,7 @@ async fn drag_packs(t: &T) -> R {
     use weft_sdk::settings::RESOURCE_PACKS;
     t.screen("core:title").await?;
     RESOURCE_PACKS.set("testkit_a,testkit_b,testkit_c");
-    t.check(t.c().screen_open(&screens::RESOURCE_PACKS), "cannot open the resource packs");
+    t.check(t.c().menu_open(&screens::RESOURCE_PACKS), "cannot open the resource packs");
     t.screen("core:resource_packs").await?;
     t.until("the rows", Duration::from_secs(2), |t| t.c().ui_rect("id:pack_handle:testkit_c").is_some())
         .await?;
@@ -872,7 +1050,7 @@ async fn drag_packs(t: &T) -> R {
 
 /// A long list shows a scroll bar; clicking low on its track scrolls the list down.
 pub async fn scrollbar(t: T) -> R {
-    t.c().screen_open(&screens::CONTROLS);
+    t.c().menu_open(&screens::CONTROLS);
     t.screen("core:controls").await?;
     t.frames(2).await?;
     let Rect { x, y, w, h } = t
@@ -886,7 +1064,7 @@ pub async fn scrollbar(t: T) -> R {
     t.frames(4).await?;
     let moved = t.c().ui_rect("text:Walk forward").map_or(-1.0, |r| r.y);
     t.check(moved < first.y - 0.05, format!("the list scrolled (first entry at {:.3}, was {:.3})", moved, first.y));
-    t.c().screen_close();
+    t.c().menu_close();
     Ok(())
 }
 
@@ -903,14 +1081,14 @@ pub async fn pack_drag(t: T) -> R {
     for id in ids {
         let _ = std::fs::remove_dir_all(format!("{dir}/{id}"));
     }
-    t.c().screen_close();
+    t.c().menu_close();
     out
 }
 
 /// A mod's LED switches it for the next start and leaving does nothing else; the restart button
 /// shows only with something to bring in.
 pub async fn mods_switch(t: T) -> R {
-    t.c().screen_open(&screens::MODS);
+    t.c().menu_open(&screens::MODS);
     t.screen("core:mods").await?;
     t.frames(3).await?;
     t.check(t.c().ui_rect("id:mods_restart").is_none(), "nothing to restart for yet");
@@ -935,7 +1113,7 @@ pub async fn mods_switch(t: T) -> R {
     t.check(t.click_ui("id:mod_led:testmod", 0), "and back");
     t.until("nothing to restart for again", Duration::from_secs(2), |t| t.c().ui_rect("id:mods_restart").is_none())
         .await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.frames(3).await?;
     t.check(
         !std::fs::read_to_string(&file)

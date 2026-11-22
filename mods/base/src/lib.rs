@@ -2,9 +2,12 @@
 //! engine knows about stone, water or zombies.
 
 mod advancements;
+mod assembly;
 mod beds;
+mod block_entities;
 mod blocks;
 mod book;
+mod camera;
 mod climbing;
 mod clothing;
 mod commands;
@@ -14,6 +17,8 @@ mod crops;
 mod death;
 mod discovery;
 mod dlss;
+mod doors;
+mod effects;
 mod events;
 mod fall;
 mod farming;
@@ -36,11 +41,11 @@ mod leaf_decay;
 mod levels;
 mod ley;
 mod look;
-mod machines;
 mod map;
 mod metals;
 mod meteors;
 mod mobs;
+mod music_player;
 mod parts;
 mod plants3d;
 mod plants3d_files;
@@ -65,11 +70,17 @@ mod wild;
 mod wind_life;
 mod wind_life_colours;
 mod window;
+mod storage;
+mod target_info;
+mod vehicles;
+mod woodcutter;
 mod worldgen;
 
 use weft_sdk::*;
 
-pub use base_api::{CLOUDS, FLATLANDS, MC_FOREST, MOON, OVERWORLD, STARS, SUN, tabs};
+pub use base_api::{dimensions::*, sky_objects::*, tabs};
+// Ours: the Minecraft forest test world.
+pub use base_api::MC_FOREST;
 
 declare_mod!(deps: [], init: init);
 
@@ -98,6 +109,7 @@ pub(crate) fn bridge(q: &str, arg: &str) -> String {
 }
 
 fn init(r: &mut Registry) {
+    base_api::components::editor_methods(r);
     // Vanilla's creative tabs; blocks and items join them with `.tab(..)`.
     for (tab, icon) in [
         (&tabs::BUILDING, &Item::named("bricks")),
@@ -125,10 +137,12 @@ fn init(r: &mut Registry) {
     levels::register(r);
     skills::register(r);
     web::register(r);
-    machines::register(r);
     clothing::register(r);
     cooking::register(r);
     crafts::register(r);
+    // Upstream's camera modes (Weft sync 11-22).
+    camera::register(r);
+    block_entities::register(r);
     recipes::register(r);
     showcase::register(r);
     book::register(r);
@@ -174,6 +188,17 @@ fn init(r: &mut Registry) {
     video::register(r);
     video_costs::register(r, video::measured_rows);
     dlss::register(r);
+    // Upstream's new content (Weft sync 11-22), each in its own file: doors, potion effects,
+    // ships (assembly, vehicles), the music player, the woodcutter, storage sorting, the target
+    // info panel. Cutting one is deleting its file, its `mod` line and its line here.
+    doors::register(r);
+    effects::register(r);
+    assembly::register(r);
+    vehicles::register(r);
+    music_player::register(r);
+    woodcutter::register(r);
+    storage::register(r);
+    target_info::register(r);
     // Its terrain is described in `worldgen`.
     // A year of four 14-day seasons (notes/SURVIVAL.md): sixteen hours of daylight at midsummer,
     // eight at midwinter.

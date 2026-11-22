@@ -1,19 +1,31 @@
 use weft_sdk::*;
 
-pub static STICK: Item = Item::named("stick");
-pub static COAL: Item = Item::named("coal");
-pub static IRON_INGOT: Item = Item::named("iron_ingot");
-pub static GOLD_INGOT: Item = Item::named("gold_ingot");
-pub static DIAMOND: Item = Item::named("diamond");
-pub static WHEAT_SEEDS: Item = Item::named("wheat_seeds");
-pub static WHEAT: Item = Item::named("wheat");
-pub static BUCKET: Item = Item::named("bucket");
+pub use base_api::items::*;
 
-pub use base_api::{ARMOR, Armor, FLAMMABLE, FOOD, FUEL, Food};
+// Ours: armour is our stack component (`base_api::ARMOR`, a piece built from parts carries its
+// points); upstream's armor attributes and `ARMOR_PIECE` tag are there for their code.
+pub use base_api::{ARMOR, Armor};
+pub use base_api::{
+    attributes::ARMOR_TOUGHNESS,
+    components::{FLAMMABLE, FOOD, FUEL, Food},
+    tags::ARMOR_PIECE,
+};
 /// Tags of armor pieces, head to feet (every armour kind's items).
 pub const ARMOR_SLOTS: [&str; 4] = ["armor_head", "armor_chest", "armor_legs", "armor_feet"];
 
 pub fn register(r: &mut Registry) {
+    r.item(&SHIELD)
+        .tag("offhand_preferred")
+        .max_stack(1)
+        .durability(336)
+        .use_until_released()
+        .set(&comps::BLOCKS_ATTACKS, Blocking { delay_ticks: 0, arc: 180.0, wear_threshold: 3.0, wear_base: 1, wear_factor: 1.0 })
+        .set(
+            &comps::CATCH_PROJECTILES,
+            ProjectileCatch { bone: "guard".into(), min: [-4.0, -6.0, -4.0], max: [4.0, 6.0, -4.0], direction: [0.0, 0.0, 1.0] },
+        )
+        .tab(&crate::tabs::COMBAT);
+    r.shaped(&crate::recipes::CRAFTING, "shield", 1, &["pip", "ppp", " p "], &[('p', "#planks"), ('i', "#ingots/iron")]);
     r.item(&STICK)
         .tag("stick")
         .handheld()
@@ -48,6 +60,9 @@ pub fn register(r: &mut Registry) {
     r.item(&WHEAT)
         .tag("crops/wheat")
         .tab(&crate::tabs::INGREDIENTS);
+    // What gravel and clay drop.
+    // Flint is `first.rs`'s (struck on a rock).
+    r.item(&CLAY_BALL).tab(&crate::tabs::INGREDIENTS);
     // Filled buckets come with their liquids (blocks.rs); the engine fills and pours them.
     r.item(&BUCKET).max_stack(16).tab(&crate::tabs::TOOLS);
     r.set("lava_bucket", &FUEL, 20000);
@@ -122,6 +137,38 @@ pub fn register(r: &mut Registry) {
     }
     // Buckskin, brain-tanned from a hide at a tanning frame (`crafts.rs`): clothes and books. Leather
     // armor is sole leather's (`materials/leather`), bark-tanned for days in a pit.
+    // Upstream's mushrooms and berries (Weft sync 11-22; their blocks are in `blocks.rs`), kept as
+    // they came but eaten our way: `base_api::eat` refuses them until they have rows in the
+    // vitals' food table. Cutting them is this block and their blocks.
+    // SYNC: give our porcini and chanterelle, cooked polypore, toadstool, snowberry and raspberry rows in
+    // `vitals::food::FOODS` (then the food loop above registers the edible ones and these go).
+    // Upstream's porcini and chanterelle items are our mushroom blocks' (`blocks.rs`, the same
+    // names): their `porcini_mushroom` and `chanterelle_mushroom` drop ours.
+    r.item(Item::generated("cooked_dryads_saddle".into()))
+        .use_ticks(32)
+        .on_use(base_api::eat)
+        .tag("mushrooms")
+        .tab(&crate::tabs::FOOD);
+    r.item(&TOADSTOOL)
+        .use_ticks(16)
+        .on_use(base_api::eat)
+        .gives_effect(&crate::effects::NAUSEA, 1, 20.0)
+        .gives_effect(&crate::effects::POISON, 1, 30.0)
+        .tag("mushrooms")
+        .tab(&crate::tabs::FOOD);
+    r.item(&SNOWBERRY)
+        .use_ticks(16)
+        .on_use(base_api::eat)
+        .gives_effect(&crate::effects::NAUSEA, 1, 20.0)
+        .gives_effect(&crate::effects::POISON, 1, 30.0)
+        .tab(&crate::tabs::FOOD);
+    r.item(&RASPBERRY)
+        .use_ticks(16)
+        .on_use(base_api::eat)
+        .tab(&crate::tabs::FOOD);
+    r.item(&DRYADS_SADDLE)
+        .tag("mushrooms")
+        .tab(&crate::tabs::INGREDIENTS);
     r.item(Item::generated("leather".into()))
         .tag("leather")
         .tab(&crate::tabs::INGREDIENTS);

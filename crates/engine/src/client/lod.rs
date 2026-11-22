@@ -61,7 +61,8 @@ const SLOPE_LEVEL: u32 = 3;
 fn split_widths() -> f64 {
     content()
         .game
-        .config_names
+        .catalog
+        .ids(weft_abi::entry_kind::CONFIG)
         .get("core:lod_detail")
         .map_or(4.0, |&id| crate::config::get(id) as f64)
         .max(1.0)
@@ -992,7 +993,8 @@ impl Lod {
     pub fn distance() -> i32 {
         let c = content();
         c.game
-            .config_names
+            .catalog
+            .ids(weft_abi::entry_kind::CONFIG)
             .get("core:lod_distance")
             .map_or(0, |&id| crate::config::get(id) as i32)
             * 16

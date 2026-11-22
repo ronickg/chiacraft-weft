@@ -6,16 +6,17 @@
 //! idle                # until nothing is left to generate, light, send or mesh
 //! press core:inventory
 //! hold core:forward 1.5  # held 1.5 s, the next line after it; `hold core:forward 1.5 nowait` goes on at once
-//! click 0             # mouse button
+//! click 0             # mouse button; `click 0 1.5` holds it that long (drag meanwhile)
 //! cursor 0.5 0.4      # mouse at fractions of the window
 //! scroll -3
 //! type /give dia      # text into the focused field
-//! key Tab             # a key by its settings name
+//! key Tab             # a key by its settings name; `key ShiftLeft 0.5` holds it that long
 //! look 90 -20         # yaw, pitch in degrees: a negative pitch looks DOWN, a positive one up
 //! chat /give stone 10
 //! chatf ticket.txt /banlist follow {}   # chat, with `{}` replaced by that file's text (waits for it)
 //! say_config testmod:x  # a config's value as this client has it, into the chat
 //! view 32             # view distance, for measuring: tests and scripts start at 12
+//! clouds 6144         # cloud render distance in blocks, 0 to hide them
 //! vsync off           # the same for vsync
 //! occlusion off       # and for occlusion culling, to compare
 //! shot name.png       # into run/screenshots (or --shot-dir)
@@ -38,6 +39,7 @@
 //! glide yaw pitch 3   # turn smoothly in place over 3 s
 //! expect <condition>  # checks it now; a miss fails the run (with its line) and the script goes on
 //! until <condition> [within 30]  # waits for it, seconds; not in time stops the run
+//! op trace 0 4 0 9 6 9 40   # a testkit server operation (`/tk`), its answer into the log
 //! quit
 //! ```
 //!
@@ -116,9 +118,11 @@ const COMMANDS: &[&str] = &[
     "mark",
     "await_file",
     "chatf",
+    "op",
 ];
 /// Commands that mean nothing without an argument.
 const NEED_ARGS: &[&str] = &[
+    "op",
     "wait",
     "press",
     "hold",
@@ -450,13 +454,16 @@ async fn run_lines(t: T, src: String) -> R {
                     t.secs(secs).await?;
                 }
             }
-            "click" => t.c().input_click(num(0, 0.0) as u32, 0.0),
+            "click" => t.c().input_click(num(0, 0.0) as u32, num(1, 0.0)),
             "cursor" => t.c().input_cursor(num(0, 0.5), num(1, 0.5)),
             "scroll" => t.c().input_scroll(num(0, -1.0)),
             "type" => t.c().input_type(rest),
             "key" => {
-                if !t.c().input_key(rest, 0.0) {
-                    t.fail(format!("unknown key {rest}"));
+                let (name, secs) = rest
+                    .split_once(' ')
+                    .map_or((rest, 0.0), |(n, s)| (n, s.trim().parse().unwrap_or(0.0)));
+                if !t.c().input_key(name, secs) {
+                    t.fail(format!("unknown key {name}"));
                 }
             }
             "look" => t.c().set_look(num(0, 0.0), num(1, 0.0)),
@@ -474,8 +481,13 @@ async fn run_lines(t: T, src: String) -> R {
                 .await?;
                 t.c().say(&text.replace("{}", &content));
             }
+            "op" => {
+                let answer = t.op(rest).await?;
+                weft_sdk::info!("op {rest}:\n{answer}");
+            }
             // `view 64 vsync off`-like settings, past what `same_conditions` fixed.
             "view" => weft_sdk::settings::VIEW_DISTANCE.set(rest.parse().map_err(|_| "view: a number")?),
+            "clouds" => weft_sdk::settings::CLOUD_DISTANCE.set(rest.parse().map_err(|_| "clouds: a distance in blocks")?),
             "vsync" => weft_sdk::settings::VSYNC.set(rest == "on"),
             "occlusion" => {
                 static OCCLUSION: weft_sdk::Config<bool> = weft_sdk::Config::named("core:occlusion_culling");
@@ -565,8 +577,8 @@ async fn run_lines(t: T, src: String) -> R {
                 t.frames(15).await?;
             }
             "screen" => {
-                let screen = weft_sdk::Screen::generated(rest.to_string());
-                if !t.c().screen_open(screen) {
+                let screen = weft_sdk::Menu::generated(rest.to_string());
+                if !t.c().menu_open(screen) {
                     t.fail(format!("no screen {rest}"));
                 }
                 t.screen(rest).await?;

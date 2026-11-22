@@ -44,7 +44,7 @@ pub fn init(r: &mut Registry) {
                 .pitch(v.pitch * 0.92, v.pitch * 1.08)
                 .voices(AT_ONCE);
         }
-        r.sounds_on(Target::Entity(&format!("animals:{kind}")), &format!("animals:{kind}"));
+        r.sounds_on_entities(&format!("animals:{kind}"), &format!("animals:{kind}"));
     }
 }
 

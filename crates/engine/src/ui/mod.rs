@@ -5,13 +5,13 @@
 //! and multiplied by the GUI scale when drawn. Text never overflows its box: it wraps, or shrinks
 //! when wrapping is off.
 
-pub mod desc;
 pub mod edit;
 pub mod font;
 pub mod lang;
 pub mod look;
 pub mod meter;
 pub mod render;
+pub mod slider;
 pub mod text;
 
 use std::rc::Rc;
@@ -25,6 +25,7 @@ pub type NodeId = usize;
 pub type Action = Rc<dyn Fn(&mut Ctx)>;
 pub type TextBind = Box<dyn Fn(&Ctx) -> (String, Vec<Arg>)>;
 pub type FloatBind = Box<dyn Fn(&Ctx) -> f32>;
+pub type BoolBind = Box<dyn Fn(&Ctx) -> bool>;
 
 /// One of a row of icons' `abi::icon_effect`s, with its value this frame.
 pub struct IconEffect {
@@ -32,6 +33,20 @@ pub struct IconEffect {
     pub bind: Option<FloatBind>,
     pub amount: f32,
     pub value: f32,
+    /// `LOOK`: the class drawn instead.
+    pub class: String,
+}
+
+/// A row of icons as `abi::icon_effect::MAX` makes it: how many icons, in how many rows of
+/// `count`, and the pixels from one row to the next (vanilla's hearts: closer the more there are).
+pub fn icon_rows(count: u32, effects: &[IconEffect]) -> (u32, u32, f32) {
+    let count = count.max(1);
+    let icons = effects
+        .iter()
+        .find(|e| e.kind == weft_abi::icon_effect::MAX)
+        .map_or(count, |e| (e.value.max(0.0) / 2.0).ceil() as u32);
+    let rows = icons.div_ceil(count).max(1);
+    (icons, rows, (12.0 - rows as f32).clamp(3.0, 10.0))
 }
 pub type ItemBind = Box<dyn Fn(&Ctx) -> (u32, u32)>;
 
@@ -74,11 +89,17 @@ pub struct Style {
     pub self_align: Option<Align>,
     /// Children scroll inside this node (mouse wheel) and are clipped to it.
     pub scroll: bool,
+    /// Its scroll bar goes just past its right edge, taking nothing from what it holds.
+    pub bar_outside: bool,
+    pub bar_thin: bool,
     /// A plain color behind the node, RGBA.
     pub fill: Option<u32>,
     /// Placed at a point instead of in the flow: (x, y) in GUI pixels from the parent's inner
     /// corner, and which point of the node goes there (0..1 of its width and height).
     pub at: Option<[f32; 4]>,
+    /// The point of the parent's inside `at` counts from, 0..1 of its width and height (top
+    /// left unless said).
+    pub at_from: [f32; 2],
 }
 
 impl Default for Style {
@@ -97,8 +118,11 @@ impl Default for Style {
             justify: Justify::Start,
             self_align: None,
             scroll: false,
+            bar_outside: false,
+            bar_thin: false,
             fill: None,
             at: None,
+            at_from: [0.0; 2],
         }
     }
 }
@@ -108,6 +132,11 @@ impl Style {
     pub fn at(mut self, x: f32, y: f32, pivot: [f32; 2]) -> Self {
         self.at = Some([x, y, pivot[0], pivot[1]]);
         self
+    }
+    /// `at` from point `from` of the parent's inside ([1.0, 0.0] its top right corner).
+    pub fn at_from(mut self, from: [f32; 2], x: f32, y: f32, pivot: [f32; 2]) -> Self {
+        self.at_from = from;
+        self.at(x, y, pivot)
     }
     pub fn row() -> Style {
         Style { row: true, align: Align::Center, ..Default::default() }
@@ -162,6 +191,12 @@ impl Style {
     }
     pub fn scroll(mut self) -> Self {
         self.scroll = true;
+        self
+    }
+    /// `scroll` with the bar just past the right edge (in the gap beside it).
+    pub fn scroll_outside(mut self) -> Self {
+        self.scroll = true;
+        self.bar_outside = true;
         self
     }
     pub fn stretch(mut self) -> Self {
@@ -222,6 +257,9 @@ pub struct TextNode {
     pub line: Option<f32>,
 }
 
+/// Two clicks on one button closer than this are a double click.
+pub const DOUBLE_CLICK: std::time::Duration = std::time::Duration::from_millis(400);
+
 pub enum Kind {
     Container {
         class: Option<String>,
@@ -230,8 +268,11 @@ pub enum Kind {
     Button {
         class: String,
         action: Option<Action>,
+        /// Clicked twice in a row (`DOUBLE_CLICK`), after `action`.
+        on_double: Option<Action>,
         enabled: bool,
         selected: bool,
+        selected_bind: Option<BoolBind>,
     },
     Image {
         texture: String,
@@ -268,18 +309,15 @@ pub enum Kind {
         /// The last change: the value before it, when (`shaders::clock`), whether up.
         change: Option<(f32, f32, bool)>,
     },
-    /// Single-line text field; `caret` is a char index.
+    /// Text field; `caret` is a char index. With an `area` it holds several lines.
     Input {
         value: String,
         caret: usize,
         max: usize,
         on_change: Option<Rc<dyn Fn(&mut Ctx, &str)>>,
+        area: Option<Area>,
     },
-    Slider {
-        value: f32,
-        bind: FloatBind,
-        on_change: Rc<dyn Fn(&mut Ctx, f32)>,
-    },
+    Slider(slider::Slider),
     /// Engine-drawn content (slots, 3D previews) identified by a tag.
     Custom {
         tag: u32,
@@ -320,12 +358,14 @@ impl Scrollbar {
     /// Width the bar takes from the content, its gap included.
     pub const ROOM: f32 = 14.0;
     pub const HANDLE: [f32; 2] = [12.0, 15.0];
+    /// From a node's edge to its bar outside it (`Style::scroll_outside`).
+    pub const OUTSIDE_GAP: f32 = 3.0;
 
     /// The handle's rect.
     pub fn handle(&self) -> Rect {
-        let [w, h] = Self::HANDLE;
+        let (w, h) = (self.track.w, Self::HANDLE[1]);
         let y = self.track.y + (self.track.h - h).max(0.0) * (self.offset / self.max.max(1.0)).clamp(0.0, 1.0);
-        Rect { x: self.track.x + (self.track.w - w) / 2.0, y, w, h }
+        Rect { x: self.track.x, y, w, h }
     }
 
     /// Offset that puts the handle's center at height `y`.
@@ -338,10 +378,16 @@ impl Scrollbar {
 
 pub struct Ui {
     pub nodes: Vec<Node>,
+    /// The layout was built from the local music library or transport state.
+    pub read_music: bool,
+    /// The screen supplies a Back/Done button or a close icon of its own.
+    pub has_close: bool,
     stack: Vec<NodeId>,
     pub hovered: Option<NodeId>,
     pub pressed: Option<NodeId>,
     pub focused: Option<NodeId>,
+    /// An open popup confines pointer hit testing to its subtree.
+    pub modal: Option<NodeId>,
     /// Selection end in the focused text field, the caret being the other.
     pub anchor: Option<usize>,
     pub dirty: bool,
@@ -354,10 +400,6 @@ pub struct Ui {
     pub text_unit: f32,
     /// When it opened (`shaders::clock`), for `open` animations.
     pub shown: f32,
-    /// Closures the engine's own descriptor-built screens point their callbacks at; kept one
-    /// rebuild longer, for clicks queued before it.
-    pub owned: Vec<Box<dyn std::any::Any>>,
-    retired: Vec<Box<dyn std::any::Any>>,
 }
 
 impl Default for Ui {
@@ -368,8 +410,150 @@ impl Default for Ui {
 
 impl Kind {
     pub fn input(value: &str, max: usize) -> Kind {
-        Kind::Input { value: value.to_string(), caret: value.chars().count(), max, on_change: None }
+        Kind::Input { value: value.to_string(), caret: value.chars().count(), max, on_change: None, area: None }
     }
+
+    /// A field of several lines (Enter breaks the line), its text shown through `format` if given
+    /// (colors, `mono`; the glyphs' widths must not depend on what comes before them).
+    pub fn text_area(value: &str, max: usize, format: Option<Format>) -> Kind {
+        let area = Area {
+            format,
+            scroll: Rc::default(),
+            wrap: true,
+            inset: 0.0,
+            follow_caret: std::cell::Cell::new(true),
+            max_scroll: std::cell::Cell::new(0.0),
+        };
+        Kind::Input { value: value.to_string(), caret: 0, max, on_change: None, area: Some(area) }
+    }
+}
+
+pub type Format = Rc<dyn Fn(&str) -> Vec<Span>>;
+
+/// What a field of several lines has beyond a line's.
+pub struct Area {
+    pub format: Option<Format>,
+    /// How far its text is moved left and up to keep the caret in sight, GUI units; shared with
+    /// whoever builds it again, so a rebuild doesn't move the text.
+    pub scroll: Rc<std::cell::Cell<[f32; 2]>>,
+    /// Long lines go on in rows below, only as shown: the text keeps them whole.
+    pub wrap: bool,
+    /// Room kept free on the right (a button over the field's corner), GUI units.
+    pub inset: f32,
+    pub follow_caret: std::cell::Cell<bool>,
+    pub max_scroll: std::cell::Cell<f32>,
+}
+
+/// One row of a field's text as drawn: chars `start..end` of line `line`, `at` the first one's
+/// index in the whole text, with their spans, each one's width and where the row starts (a line
+/// going on in another row is moved in), in font units.
+pub struct Row {
+    pub line: usize,
+    pub start: usize,
+    pub end: usize,
+    pub at: usize,
+    pub spans: Vec<Span>,
+    pub widths: Vec<f32>,
+    pub indent: f32,
+}
+
+impl Row {
+    /// From the field's left to before the row's char `col` (counted from the row's start).
+    pub fn x(&self, col: usize) -> f32 {
+        self.indent
+            + self.widths[..col.min(self.widths.len())]
+                .iter()
+                .sum::<f32>()
+    }
+}
+
+impl Area {
+    pub fn room(&self, width: f32) -> f32 {
+        (width - 8.0 - self.inset - Scrollbar::ROOM).max(1.0)
+    }
+
+    pub fn spans(&self, s: &str) -> Vec<Span> {
+        self.format
+            .as_ref()
+            .map_or_else(|| text::plain(s), |f| f(s))
+    }
+
+    /// The text in rows: a row per line, or more where a line is wider than `room` (font units)
+    /// and the field wraps. A line breaks after its last space or punctuation that fits, else
+    /// where it stops fitting.
+    pub fn rows(&self, value: &str, font: &font::Font, room: Option<f32>) -> Vec<Row> {
+        let room = room.filter(|_| self.wrap);
+        let mut rows = Vec::new();
+        let mut at = 0;
+        for (line, l) in value.split('\n').enumerate() {
+            let spans = self.spans(l);
+            let chars: Vec<char> = l.chars().collect();
+            let widths: Vec<f32> = (0..chars.len())
+                .map(|i| text::layout(&text::slice(&spans, i, i + 1), font, None).width)
+                .collect();
+            // Rows after a line's first go in past its own indent by two more chars, as editors
+            // show them, while there is room for it.
+            let lead = chars
+                .iter()
+                .take_while(|c| matches!(c, ' ' | '\u{a0}' | '\t'))
+                .count();
+            let mut more: f32 = widths[..lead].iter().sum::<f32>() + widths.first().copied().unwrap_or(0.0) * 2.0;
+            if room.is_some_and(|room| more > room / 2.0) {
+                more = 0.0;
+            }
+            let mut start = 0;
+            loop {
+                let indent = if start == 0 { 0.0 } else { more };
+                let room = room.map(|r| r - indent);
+                let mut end = start;
+                let mut w = 0.0;
+                while end < chars.len() && (end == start || room.is_none_or(|room| w + widths[end] <= room)) {
+                    w += widths[end];
+                    end += 1;
+                }
+                if end < chars.len() {
+                    let soft = (start + 1..end)
+                        .rev()
+                        .find(|&i| matches!(chars[i - 1], ' ' | '\u{a0}' | ',' | '(' | '.'));
+                    end = soft.unwrap_or(end);
+                }
+                rows.push(Row {
+                    line,
+                    start,
+                    end,
+                    at: at + start,
+                    spans: text::slice(&spans, start, end),
+                    widths: widths[start..end].to_vec(),
+                    indent,
+                });
+                if end >= chars.len() {
+                    break;
+                }
+                start = end;
+            }
+            at += chars.len() + 1;
+        }
+        rows
+    }
+}
+
+/// The row char index `at` is drawn in: at a break, the start of the row after it.
+pub fn row_of(rows: &[Row], at: usize) -> usize {
+    (0..rows.len())
+        .find(|&i| {
+            let r = &rows[i];
+            let last_of_line = rows.get(i + 1).is_none_or(|n| n.line != r.line);
+            at < r.at + (r.end - r.start) || (at == r.at + (r.end - r.start) && last_of_line)
+        })
+        .unwrap_or(rows.len().saturating_sub(1))
+}
+
+/// Line and column (chars) of char index `at` in `s`.
+pub fn line_col(s: &str, at: usize) -> (usize, usize) {
+    let before: Vec<char> = s.chars().take(at).collect();
+    let line = before.iter().filter(|&&c| c == '\n').count();
+    let col = before.iter().rev().take_while(|&&c| c != '\n').count();
+    (line, col)
 }
 
 impl Ui {
@@ -389,10 +573,13 @@ impl Ui {
         };
         Ui {
             nodes: vec![root],
+            has_close: false,
+            read_music: false,
             stack: vec![0],
             hovered: None,
             pressed: None,
             focused: None,
+            modal: None,
             anchor: None,
             dirty: true,
             scroll: Default::default(),
@@ -400,15 +587,13 @@ impl Ui {
             size: Vec2::ZERO,
             text_unit: 0.5,
             shown: crate::shaders::clock(),
-            owned: Vec::new(),
-            retired: Vec::new(),
         }
     }
 
     pub fn clear(&mut self) {
-        let (scroll, shown, size, owned) = (std::mem::take(&mut self.scroll), self.shown, self.size, std::mem::take(&mut self.owned));
+        let (scroll, shown, size) = (std::mem::take(&mut self.scroll), self.shown, self.size);
         *self = Ui::new();
-        (self.scroll, self.shown, self.size, self.retired) = (scroll, shown, size, owned);
+        (self.scroll, self.shown, self.size) = (scroll, shown, size);
     }
 
     fn scroll_key(&self, id: NodeId) -> String {
@@ -421,15 +606,24 @@ impl Ui {
     /// Scrolls the innermost scrolling node under `p` by `lines` wheel steps; true if one moved.
     pub fn scroll_at(&mut self, p: Vec2, lines: f32) -> bool {
         let Some(id) = (0..self.nodes.len()).rev().find(|&i| {
-            self.nodes[i].style.scroll
-                    && self.nodes[i].rect.contains(p)
-                    && self.nodes[i].clip.is_none_or(|c| c.contains(p))
-                    // a screen's root scrolls only when the screen is taller than the window, and
-                    // leaves the wheel to the rest otherwise
-                    && (i != 0 || self.nodes[0].scrollbar.is_some())
+            (self.nodes[i].style.scroll || matches!(self.nodes[i].kind, Kind::Input { area: Some(_), .. }))
+                && self.nodes[i].rect.contains(p)
+                && self.nodes[i].clip.is_none_or(|c| c.contains(p))
+                && self.in_modal(i)
+                // a screen's root scrolls only when the screen is taller than the window, and
+                // leaves the wheel to the rest otherwise
+                && (i != 0 || self.nodes[0].scrollbar.is_some())
         }) else {
             return false;
         };
+        if let Kind::Input { area: Some(area), .. } = &self.nodes[id].kind {
+            let [x, y] = area.scroll.get();
+            area.scroll
+                .set([x, (y - lines * 20.0).clamp(0.0, area.max_scroll.get())]);
+            area.follow_caret.set(false);
+            self.dirty = true;
+            return true;
+        }
         // Held to its end, a node counts from there: up is further from it.
         let by = if self.nodes[id].style.justify == Justify::End { lines } else { -lines };
         let key = self.scroll_key(id);
@@ -442,9 +636,11 @@ impl Ui {
     /// Mouse pressed at `p`: on a scroll bar it starts dragging (a click on the track jumps
     /// there). True if a bar took the click.
     pub fn bar_press(&mut self, p: Vec2) -> bool {
-        let hit = (0..self.nodes.len())
-            .rev()
-            .find(|&i| self.nodes[i].scrollbar.is_some_and(|b| b.track.contains(p)) && self.nodes[i].clip.is_none_or(|c| c.contains(p)));
+        let hit = (0..self.nodes.len()).rev().find(|&i| {
+            self.nodes[i].scrollbar.is_some_and(|b| b.track.contains(p))
+                && self.nodes[i].clip.is_none_or(|c| c.contains(p))
+                && self.in_modal(i)
+        });
         let Some(id) = hit else { return false };
         self.dragging = Some(id);
         self.bar_drag(p);
@@ -458,10 +654,16 @@ impl Ui {
             self.dragging = None;
             return false;
         };
-        let key = self.scroll_key(id);
         let at = bar.offset_at(p.y);
-        let at = if self.nodes[id].style.justify == Justify::End { bar.max - at } else { at };
-        self.scroll.insert(key, at);
+        if let Kind::Input { area: Some(area), .. } = &self.nodes[id].kind {
+            let [x, _] = area.scroll.get();
+            area.scroll.set([x, at]);
+            area.follow_caret.set(false);
+        } else {
+            let key = self.scroll_key(id);
+            let at = if self.nodes[id].style.justify == Justify::End { bar.max - at } else { at };
+            self.scroll.insert(key, at);
+        }
         self.dirty = true;
         true
     }
@@ -582,7 +784,25 @@ impl Ui {
     }
 
     pub fn button(&mut self, class: &str, style: Style, action: Action, f: impl FnOnce(&mut Ui)) -> NodeId {
-        self.with(Kind::Button { class: class.to_string(), action: Some(action), enabled: true, selected: false }, style.center(), f)
+        self.with(
+            Kind::Button {
+                class: class.to_string(),
+                action: Some(action),
+                on_double: None,
+                enabled: true,
+                selected: false,
+                selected_bind: None,
+            },
+            style.center(),
+            f,
+        )
+    }
+
+    /// What clicking button `node` twice in a row does too.
+    pub fn on_double_click(&mut self, node: NodeId, action: Action) {
+        if let Kind::Button { on_double, .. } = &mut self.nodes[node].kind {
+            *on_double = Some(action);
+        }
     }
 
     pub fn text_mut(&mut self, id: NodeId) -> Option<&mut TextNode> {
@@ -651,11 +871,12 @@ impl Ui {
         } else {
             match &self.nodes[id].kind {
                 Kind::Item { .. } => [16.0, 16.0],
-                Kind::Icons { count, dir, .. } if matches!(*dir, weft_abi::ui_dir::UP | weft_abi::ui_dir::DOWN) => {
-                    [9.0, *count as f32 * 8.0 + 1.0]
+                Kind::Icons { count, dir, effects, .. } => {
+                    let (_, rows, step) = icon_rows(*count, effects);
+                    let (along, across) = (*count as f32 * 8.0 + 1.0, 9.0 + (rows - 1) as f32 * step);
+                    if matches!(*dir, weft_abi::ui_dir::UP | weft_abi::ui_dir::DOWN) { [across, along] } else { [along, across] }
                 }
-                Kind::Icons { count, .. } => [*count as f32 * 8.0 + 1.0, 9.0],
-                Kind::Slider { .. } => [100.0, 12.0],
+                Kind::Slider(_) => [100.0, 12.0],
                 Kind::Input { .. } => [120.0, 18.0],
                 _ => {
                     let children = self.nodes[id].children.clone();
@@ -679,6 +900,10 @@ impl Ui {
                         main += cm + if i > 0 { style.gap } else { 0.0 };
                         cross = cross.max(cc);
                     }
+                    // A column that will scroll is wider by its bar, so the bar covers nothing.
+                    if style.scroll && !style.bar_outside && !style.row && main + pad_h > fixed_h.unwrap_or(avail[1]) {
+                        cross += Scrollbar::ROOM;
+                    }
                     if style.row { [main, cross] } else { [cross, main] }
                 }
             }
@@ -687,10 +912,10 @@ impl Ui {
             .unwrap_or(content[0] + pad_w)
             .max(style.min[0])
             .min(style.max_w);
-        let h = fixed_h
-            .unwrap_or(content[1] + pad_h)
-            .max(style.min[1])
-            .min(style.max_h);
+        // What scrolls up and down needs no more height than it gets: a row holding a long list
+        // stays as tall as the screen, and so do the list's neighbors stretched beside it.
+        let own_h = if style.scroll && !style.row { (content[1] + pad_h).min(avail[1]) } else { content[1] + pad_h };
+        let h = fixed_h.unwrap_or(own_h).max(style.min[1]).min(style.max_h);
         self.nodes[id].measured = [w, h];
         [w, h]
     }
@@ -725,6 +950,25 @@ impl Ui {
             }
             return;
         }
+        if let Kind::Input { value, area: Some(area), .. } = &self.nodes[id].kind {
+            let room = area.room(rect.w).max(unit);
+            let rows = area.rows(value, font, Some(room / unit));
+            let max = (rows.len() as f32 * font.line_height * unit - (rect.h - 8.0)).max(0.0);
+            area.max_scroll.set(max);
+            let [x, y] = area.scroll.get();
+            let offset = y.clamp(0.0, max);
+            area.scroll.set([x, offset]);
+            self.nodes[id].scrollbar = (max > 0.0).then_some(Scrollbar {
+                track: Rect {
+                    x: rect.x + rect.w - 4.0 - Scrollbar::HANDLE[0],
+                    y: rect.y + 4.0,
+                    w: Scrollbar::HANDLE[0],
+                    h: (rect.h - 8.0).max(0.0),
+                },
+                offset,
+                max,
+            });
+        }
         let children = self.nodes[id].children.clone();
         let placed: Vec<NodeId> = children
             .iter()
@@ -733,7 +977,9 @@ impl Ui {
             .collect();
         for c in placed {
             let ([x, y, px, py], [w, h]) = (self.nodes[c].style.at.unwrap(), self.nodes[c].measured);
-            self.arrange(c, Rect { x: inner.x + x - px * w, y: inner.y + y - py * h, w, h }, font);
+            let [fx, fy] = self.nodes[c].style.at_from;
+            let (ox, oy) = (inner.x + fx * inner.w, inner.y + fy * inner.h);
+            self.arrange(c, Rect { x: ox + x - px * w, y: oy + y - py * h, w, h }, font);
         }
         let children: Vec<NodeId> = children
             .into_iter()
@@ -796,9 +1042,16 @@ impl Ui {
             scrolled = *v;
             past_end = max - scrolled;
             free = free.max(0.0);
-            if max > 0.0 && !style.row && cross_size > Scrollbar::ROOM * 2.0 {
-                cross_size -= Scrollbar::ROOM;
-                let track = Rect { x: inner.x + inner.w - Scrollbar::HANDLE[0], y: inner.y, w: Scrollbar::HANDLE[0], h: inner.h };
+            let bar_width = if style.bar_thin { 5.0 } else { Scrollbar::HANDLE[0] };
+            let bar_room = bar_width + Scrollbar::ROOM - Scrollbar::HANDLE[0];
+            if max > 0.0 && !style.row && cross_size > bar_room * 2.0 {
+                let r = self.nodes[id].rect;
+                let track = if style.bar_outside {
+                    Rect { x: r.x + r.w + Scrollbar::OUTSIDE_GAP, y: r.y, w: bar_width, h: r.h }
+                } else {
+                    cross_size -= bar_room;
+                    Rect { x: inner.x + inner.w - bar_width, y: inner.y, w: bar_width, h: inner.h }
+                };
                 let offset = if style.justify == Justify::End { max - scrolled } else { scrolled };
                 self.nodes[id].scrollbar = Some(Scrollbar { track, offset, max });
             }
@@ -861,9 +1114,10 @@ impl Ui {
                 return;
             }
             let button = matches!(n.kind, Kind::Button { .. });
-            let interactive = matches!(n.kind, Kind::Input { .. } | Kind::Slider { .. } | Kind::Custom { .. })
-                || n.tooltip.is_some()
-                || matches!(&n.kind, Kind::Text(t) if !t.layout.links.is_empty());
+            let interactive =
+                matches!(n.kind, Kind::Input { .. } | Kind::Slider(crate::ui::slider::Slider { enabled: true, .. }) | Kind::Custom { .. })
+                    || n.tooltip.is_some()
+                    || matches!(&n.kind, Kind::Text(t) if !t.layout.links.is_empty());
             // What a button contains (labels, icons) is part of the button, but for another button.
             if (button || interactive && !in_button) && id != 0 {
                 *best = Some(id);
@@ -873,8 +1127,19 @@ impl Ui {
             }
         }
         let mut best = None;
-        walk(self, 0, p, false, &mut best);
+        walk(self, self.modal.unwrap_or(0), p, false, &mut best);
         best
+    }
+
+    fn in_modal(&self, node: NodeId) -> bool {
+        fn contains(ui: &Ui, root: NodeId, node: NodeId) -> bool {
+            root == node
+                || ui.nodes[root]
+                    .children
+                    .iter()
+                    .any(|&child| contains(ui, child, node))
+        }
+        self.modal.is_none_or(|root| contains(self, root, node))
     }
 }
 

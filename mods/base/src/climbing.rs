@@ -1,5 +1,5 @@
 //! Climbing any wall on stamina (`vitals::climb`, `notes/SYSTEMS.md`). The engine climbs
-//! (`core:climb_speed` times the wall's `grip`, the `CLIMBING` pose while it holds on); here: each
+//! (`core:wall_climb_speed` times the wall's `grip`, the `CLIMBING` pose while it holds on); here: each
 //! wall's grip, the speed the body allows (what one carries, wet, cold), stamina by the second on
 //! a wall, and the hands letting go when it runs out until some has come back.
 
@@ -138,7 +138,7 @@ fn tick(w: &World) {
         // Respawning drops modifiers: said again now and then.
         if (speed - h.speed).abs() > 1e-3 || w.game_time().is_multiple_of(100) {
             h.speed = speed;
-            w.attribute_add_modifier(id, &attribute::CLIMB_SPEED, "base:climbing", attr_op::ADD, speed as f64, 0);
+            w.attribute_add_modifier(id, &attribute::WALL_CLIMB_SPEED, "base:climbing", attr_op::ADD, speed as f64, 0);
         }
     }
 }

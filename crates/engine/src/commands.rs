@@ -3,7 +3,8 @@
 //! `[name:type]` optional parameters, alternatives separated by `|`, for example
 //! `<pos:pos> | <target:player>` or `<item:item> [count:int]`.
 //!
-//! Types: int, float, word (`word(a,b)`: any word, completing a and b; `word(#set)` completes
+//! Types: int (`int(a,b)`: a whole number or one of those words, completing them, like
+//! `int(infinite)`), float, word (`word(a,b)`: any word, completing a and b; `word(#set)` completes
 //! from a word set mods add to, like `#core:rules`), text (rest of the line), item, block,
 //! entity, dim, attribute, player, time
 //! (`day`, `noon`, `night`, `midnight` or ticks), pos (three coordinates; `~` relative to the player,
@@ -13,23 +14,20 @@
 
 use crate::ui::text::{Arg, Msg};
 use glam::DVec3;
-use weft_abi::{Callback, ModId};
+use weft_abi::{Callback, ModId, entry_kind as ek};
 
 use crate::content::Content;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Kind {
     Literal(String),
-    Int,
+    /// A whole number, or one of the listed words (taken as text).
+    Int(Vec<String>),
     Float,
     /// Any word; the listed ones are suggested.
     Word(Vec<String>),
     Text,
-    Item,
-    Block,
-    Entity,
-    Dim,
-    Attribute,
+    Entry(u32),
     Player,
     Pos,
     Targets,
@@ -66,23 +64,17 @@ pub fn parse_usage(usage: &str) -> Result<Vec<Alt>, String> {
                 .split_once(':')
                 .ok_or_else(|| format!("parameter {tok} needs a type"))?;
             let kind = match ty {
-                "int" => Kind::Int,
+                "int" => Kind::Int(Vec::new()),
                 "float" => Kind::Float,
                 "word" => Kind::Word(Vec::new()),
-                w if w.starts_with("word(") && w.ends_with(')') => Kind::Word(
-                    w[5..w.len() - 1]
-                        .split(',')
-                        .map(str::trim)
-                        .filter(|s| !s.is_empty())
-                        .map(String::from)
-                        .collect(),
-                ),
+                w if w.starts_with("int(") && w.ends_with(')') => Kind::Int(words(&w[4..w.len() - 1])),
+                w if w.starts_with("word(") && w.ends_with(')') => Kind::Word(words(&w[5..w.len() - 1])),
                 "text" => Kind::Text,
-                "item" => Kind::Item,
-                "block" => Kind::Block,
-                "entity" => Kind::Entity,
-                "dim" => Kind::Dim,
-                "attribute" => Kind::Attribute,
+                "item" => Kind::Entry(ek::ITEM),
+                "block" => Kind::Entry(ek::BLOCK),
+                "entity" => Kind::Entry(ek::ENTITY),
+                "dim" => Kind::Entry(ek::DIMENSION),
+                "attribute" => Kind::Entry(ek::ATTRIBUTE),
                 "player" => Kind::Player,
                 "pos" => Kind::Pos,
                 "targets" => Kind::Targets,
@@ -96,11 +88,19 @@ pub fn parse_usage(usage: &str) -> Result<Vec<Alt>, String> {
     Ok(alts)
 }
 
+fn words(list: &str) -> Vec<String> {
+    list.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect()
+}
+
 /// Parameter names (and literal words) in order of first appearance across alternatives: the
 /// slots of `Args` and of the values handed to mods.
-pub fn slots(alts: &[Alt]) -> Vec<String> {
+pub fn slots<'a>(alts: impl IntoIterator<Item = &'a Alt>) -> Vec<String> {
     let mut names: Vec<String> = Vec::new();
-    for p in alts.iter().flatten() {
+    for p in alts.into_iter().flatten() {
         if !names.contains(&p.name) {
             names.push(p.name.clone());
         }
@@ -140,21 +140,46 @@ pub struct Origin {
     pub pitch: f32,
 }
 
+const SELECTORS: [&str; 5] = ["@p", "@a", "@e", "@s", "@r"];
+const SELECTOR_SORTS: [&str; 4] = ["nearest", "furthest", "random", "arbitrary"];
+
+#[derive(Clone, Copy)]
+enum SelectorFilter {
+    Type,
+    Distance,
+    Limit,
+    Sort,
+    Name,
+}
+
+impl SelectorFilter {
+    const KEYS: [(&str, Self); 5] =
+        [("type", Self::Type), ("distance", Self::Distance), ("limit", Self::Limit), ("sort", Self::Sort), ("name", Self::Name)];
+
+    fn of(key: &str) -> Option<Self> {
+        Self::KEYS
+            .iter()
+            .find(|(k, _)| *k == key.trim())
+            .map(|(_, f)| *f)
+    }
+}
+
+fn selector_head(tok: &str) -> Option<(char, &str)> {
+    let base = SELECTORS.iter().find(|base| tok.starts_with(**base))?;
+    Some((base.as_bytes()[1] as char, &tok[base.len()..]))
+}
+
 fn parse_selector(c: &Content, tok: &str, players: &[String]) -> Result<Selector, Msg> {
     let mut s = Selector { base: 'n', name: None, kind: None, distance: None, limit: None, sort: None };
-    let Some(rest) = tok.strip_prefix('@') else {
+    if !tok.starts_with('@') {
         if !players.iter().any(|n| n == tok) {
             return Err(err("no_player", tok));
         }
         s.name = Some(tok.to_string());
         return Ok(s);
-    };
-    let mut chars = rest.chars();
-    s.base = chars
-        .next()
-        .filter(|b| "paesr".contains(*b))
-        .ok_or_else(|| err("unknown_selector", tok))?;
-    let filters = chars.as_str();
+    }
+    let (base, filters) = selector_head(tok).ok_or_else(|| err("unknown_selector", tok))?;
+    s.base = base;
     if filters.is_empty() {
         return Ok(s);
     }
@@ -164,22 +189,22 @@ fn parse_selector(c: &Content, tok: &str, players: &[String]) -> Result<Selector
         .ok_or_else(|| err("bad_selector", tok))?;
     for f in inner.split(',').filter(|f| !f.is_empty()) {
         let (k, v) = f.split_once('=').ok_or_else(|| err("bad_filter", f))?;
-        match k.trim() {
-            "type" => {
+        match SelectorFilter::of(k) {
+            Some(SelectorFilter::Type) => {
                 let (neg, name) = v.strip_prefix('!').map_or((false, v), |n| (true, n));
-                let full = resolve(c.game.entity_names.keys(), name).ok_or_else(|| err("unknown_entity", name))?;
-                s.kind = Some((c.game.entity_names[&full], neg));
+                let full = resolve(c.game.catalog.ids(ek::ENTITY).keys(), name).ok_or_else(|| err("unknown_entity", name))?;
+                s.kind = Some((c.game.catalog.ids(ek::ENTITY)[&full], neg));
             }
-            "distance" => {
+            Some(SelectorFilter::Distance) => {
                 let num = |t: &str, d: f64| if t.is_empty() { Ok(d) } else { t.parse::<f64>().map_err(|_| err("bad_distance", v)) };
                 s.distance = Some(match v.split_once("..") {
                     Some((a, b)) => (num(a, 0.0)?, num(b, f64::INFINITY)?),
                     None => (num(v, 0.0)?, num(v, 0.0)?),
                 });
             }
-            "limit" => s.limit = Some(v.parse().map_err(|_| err("bad_limit", v))?),
-            "sort" if ["nearest", "furthest", "random", "arbitrary"].contains(&v) => s.sort = Some(v.to_string()),
-            "name" => s.name = Some(v.to_string()),
+            Some(SelectorFilter::Limit) => s.limit = Some(v.parse().map_err(|_| err("bad_limit", v))?),
+            Some(SelectorFilter::Sort) if SELECTOR_SORTS.contains(&v) => s.sort = Some(v.to_string()),
+            Some(SelectorFilter::Name) => s.name = Some(v.to_string()),
             _ => return Err(err("unknown_filter", f)),
         }
     }
@@ -286,19 +311,28 @@ fn position(t: &[&str], o: Origin) -> Option<DVec3> {
     Some(DVec3::new(coordinate(t[0], o.pos.x)?, coordinate(t[1], o.pos.y)?, coordinate(t[2], o.pos.z)?))
 }
 
-fn parse_alt(c: &Content, alt: &Alt, tokens: &[&str], here: Origin, players: &[String], slots: &[String]) -> Result<Args, Msg> {
-    let mut values: Vec<Option<Value>> = vec![None; slots.len()];
+fn parse_alt(
+    c: &Content,
+    alt: &Alt,
+    tokens: &[&str],
+    here: Origin,
+    players: &[String],
+    open: bool,
+    mut value: impl FnMut(&Param, Value),
+) -> Result<Option<(usize, usize)>, Msg> {
     let mut i = 0;
-    for p in alt {
+    for (pi, p) in alt.iter().enumerate() {
         if i >= tokens.len() {
+            if open {
+                return Ok(Some((pi, 0)));
+            }
             if p.optional {
                 continue;
             }
             return Err(err("missing", &p.name));
         }
-        let slot = slots.iter().position(|n| n == &p.name);
         let tok = tokens[i];
-        let value = match &p.kind {
+        let parsed = match &p.kind {
             // A matched literal shows up as a value under its own name, so alternatives such
             // as `add <x> | remove <x>` can be told apart.
             Kind::Literal(l) => {
@@ -307,39 +341,29 @@ fn parse_alt(c: &Content, alt: &Alt, tokens: &[&str], here: Origin, players: &[S
                 }
                 Value::Text(l.clone())
             }
-            Kind::Int => Value::Int(tok.parse().map_err(|_| err("whole_number", &p.name))?),
+            Kind::Int(named) if named.iter().any(|n| n == tok) => Value::Text(tok.to_string()),
+            Kind::Int(_) => Value::Int(tok.parse().map_err(|_| err("whole_number", &p.name))?),
             Kind::Float => Value::Float(tok.parse().map_err(|_| err("number", &p.name))?),
             Kind::Word(_) => Value::Text(tok.to_string()),
             Kind::Text => {
-                let v = Value::Text(tokens[i..].join(" "));
-                i = tokens.len();
-                if let Some(s) = slot {
-                    values[s] = Some(v);
+                if open {
+                    return Ok(Some((pi, tokens.len() - i)));
                 }
-                continue;
+                let text = tokens[i..].join(" ");
+                i = tokens.len() - 1;
+                Value::Text(text)
             }
-            Kind::Item => {
-                let n = resolve(c.item_names.keys(), tok).ok_or_else(|| err("unknown_item", tok))?;
-                Value::Id(c.item_names[&n], n)
-            }
-            Kind::Block => {
+            Kind::Entry(ek::BLOCK) => {
                 // `base:furnace[lit=true,facing=east]`: the name completes, the properties are checked.
                 let (name, props) = tok.split_once('[').map_or((tok, ""), |(n, p)| (n, p));
-                let n = resolve(c.block_names.keys(), name).ok_or_else(|| err("unknown_block", name))?;
+                let n = resolve(c.game.catalog.ids(ek::BLOCK).keys(), name).ok_or_else(|| err("unknown_block", name))?;
                 let full = if props.is_empty() { n.clone() } else { format!("{n}[{props}") };
                 Value::Id(c.parse_state(&full).map_err(|_| err("bad_state", &full))?, full)
             }
-            Kind::Entity => {
-                let n = resolve(c.game.entity_names.keys(), tok).ok_or_else(|| err("unknown_entity", tok))?;
-                Value::Id(c.game.entity_names[&n], n)
-            }
-            Kind::Dim => {
-                let n = resolve(c.dim_names.keys(), tok).ok_or_else(|| err("unknown_dimension", tok))?;
-                Value::Id(c.dim_names[&n], n)
-            }
-            Kind::Attribute => {
-                let n = resolve(c.game.attr_names.keys(), tok).ok_or_else(|| err("unknown_attribute", tok))?;
-                Value::Id(c.game.attr_names[&n], n)
+            Kind::Entry(kind) => {
+                let names = c.game.catalog.ids(*kind);
+                let n = resolve(names.keys(), tok).ok_or_else(|| err(&format!("unknown_{}", crate::entries::kind_name(*kind)), tok))?;
+                Value::Id(names[&n], n)
             }
             Kind::Player => {
                 if !players.iter().any(|n| n == tok) {
@@ -358,6 +382,13 @@ fn parse_alt(c: &Content, alt: &Alt, tokens: &[&str], here: Origin, players: &[S
                 None => Value::Int(tok.parse().map_err(|_| err("time", &p.name))?),
             },
             Kind::Pos => {
+                if open && tokens.len() - i < 3 {
+                    let mut prefix = tokens[i..].to_vec();
+                    prefix.resize(3, if tok.starts_with('^') { "^" } else { "~" });
+                    if position(&prefix, here).is_some() {
+                        return Ok(Some((pi, tokens.len() - i)));
+                    }
+                }
                 let parsed = tokens.get(i..i + 3).and_then(|t| position(t, here));
                 match parsed {
                     Some(v) => {
@@ -370,15 +401,13 @@ fn parse_alt(c: &Content, alt: &Alt, tokens: &[&str], here: Origin, players: &[S
                 }
             }
         };
-        if let Some(s) = slot {
-            values[s] = Some(value);
-        }
+        value(p, parsed);
         i += 1;
     }
     if i < tokens.len() {
         return Err(err("unexpected", tokens[i]));
     }
-    Ok(Args { names: slots.to_vec(), values })
+    Ok(None)
 }
 
 #[derive(Clone)]
@@ -414,15 +443,20 @@ impl CommandDef {
         let picked = self.alts.iter().any(|a| head(a) == first);
         for (i, alt) in self.alts.iter().enumerate() {
             let owner = self.owners[i];
-            let own: Vec<Alt> = self
-                .alts
-                .iter()
-                .zip(&self.owners)
-                .filter(|(_, o)| **o == owner)
-                .map(|(a, _)| a.clone())
-                .collect();
-            match parse_alt(c, alt, tokens, here, players, &slots(&own)) {
-                Ok(a) => return Ok((a, if owner == 0 { self.handler } else { Some(self.branches[owner - 1]) })),
+            let names = slots(
+                self.alts
+                    .iter()
+                    .zip(&self.owners)
+                    .filter(|(_, o)| **o == owner)
+                    .map(|(a, _)| a),
+            );
+            let mut values = vec![None; names.len()];
+            match parse_alt(c, alt, tokens, here, players, false, |p, v| {
+                if let Some(i) = names.iter().position(|n| n == &p.name) {
+                    values[i] = Some(v);
+                }
+            }) {
+                Ok(_) => return Ok((Args { names, values }, if owner == 0 { self.handler } else { Some(self.branches[owner - 1]) })),
                 // The mistake worth telling is in an alternative starting with the word typed.
                 Err(e) if !picked || head(alt) == first => {
                     first_err.get_or_insert(e);
@@ -489,16 +523,14 @@ impl CommandDef {
 fn type_name(k: &Kind) -> String {
     match k {
         Kind::Literal(l) => l.clone(),
-        Kind::Int => "int".into(),
+        Kind::Int(list) if list.is_empty() => "int".into(),
+        Kind::Int(list) => format!("int({})", list.join(",")),
         Kind::Float => "float".into(),
         Kind::Word(list) if list.is_empty() => "word".into(),
         Kind::Word(list) => format!("word({})", list.join(",")),
         Kind::Text => "text".into(),
-        Kind::Item => "item".into(),
-        Kind::Block => "block".into(),
-        Kind::Entity => "entity".into(),
-        Kind::Dim => "dim".into(),
-        Kind::Attribute => "attribute".into(),
+        Kind::Entry(ek::DIMENSION) => "dim".into(),
+        Kind::Entry(kind) => crate::entries::kind_name(*kind).into(),
         Kind::Player => "player".into(),
         Kind::Pos => "pos".into(),
         Kind::Targets => "targets".into(),
@@ -609,6 +641,89 @@ pub struct Completion {
     pub hint: String,
 }
 
+fn names_from<'a>(keys: impl Iterator<Item = &'a String>, partial: &str) -> Vec<String> {
+    let mut names: Vec<String> = keys
+        .filter(|n| {
+            n.starts_with(partial)
+                || n.split_once(':')
+                    .is_some_and(|(_, path)| path.starts_with(partial))
+        })
+        .cloned()
+        .collect();
+    names.sort();
+    names
+}
+
+fn entry_names(c: &Content, kind: u32, partial: &str) -> Vec<String> {
+    names_from(
+        c.game
+            .catalog
+            .ids(kind)
+            .iter()
+            .filter(|(_, id)| kind != ek::ENTITY || !c.game.is_block_entity(**id))
+            .map(|(n, _)| n),
+        partial,
+    )
+}
+
+fn complete_selector(c: &Content, partial: &str, players: &[String]) -> Vec<String> {
+    let Some((_, filters)) = selector_head(partial) else {
+        return SELECTORS
+            .into_iter()
+            .chain(players.iter().map(String::as_str))
+            .filter(|n| n.starts_with(partial))
+            .map(String::from)
+            .collect();
+    };
+    if filters.is_empty() {
+        return vec![format!("{partial}[")];
+    }
+    let Some(inner) = filters.strip_prefix('[').filter(|f| !f.contains(']')) else { return Vec::new() };
+    let tail = inner.rsplit_once(',').map_or(inner, |(_, tail)| tail);
+    let prefix = &partial[..partial.len() - tail.len()];
+    if !prefix.ends_with('[') && parse_selector(c, &format!("{prefix}]"), players).is_err() {
+        return Vec::new();
+    }
+    let Some((key, value)) = tail.split_once('=') else {
+        return SelectorFilter::KEYS
+            .iter()
+            .filter(|(key, _)| key.starts_with(tail))
+            .map(|(key, _)| format!("{prefix}{key}="))
+            .collect();
+    };
+    let Some(filter) = SelectorFilter::of(key) else { return Vec::new() };
+    let values = match filter {
+        SelectorFilter::Type => {
+            let (neg, name) = value.strip_prefix('!').map_or(("", value), |n| ("!", n));
+            entry_names(c, ek::ENTITY, name)
+                .into_iter()
+                .map(|n| format!("{neg}{n}"))
+                .collect()
+        }
+        SelectorFilter::Sort => SELECTOR_SORTS
+            .iter()
+            .filter(|v| v.starts_with(value))
+            .map(|v| v.to_string())
+            .collect(),
+        SelectorFilter::Name => players
+            .iter()
+            .filter(|n| n.starts_with(value))
+            .cloned()
+            .collect(),
+        SelectorFilter::Distance | SelectorFilter::Limit => Vec::new(),
+    };
+    let mut suggestions: Vec<_> = values
+        .into_iter()
+        .filter(|v| v != value)
+        .map(|v| format!("{prefix}{key}={v}"))
+        .collect();
+    if !value.is_empty() && parse_selector(c, &format!("{partial}]"), players).is_ok() {
+        suggestions.push(format!("{partial}]"));
+        suggestions.push(format!("{partial},"));
+    }
+    suggestions
+}
+
 pub fn complete(c: &Content, line: &str, players: &[String], permission: u32) -> Completion {
     let from = line.rfind(' ').map_or(0, |i| i + 1);
     let partial = &line[from..];
@@ -628,94 +743,30 @@ pub fn complete(c: &Content, line: &str, players: &[String], permission: u32) ->
     }
     let Some(cmd) = c.commands.iter().find(|d| d.name == done[0]) else { return out };
     let typed = &done[1..];
-    let mut seen = Vec::new();
     for alt in &cmd.alts {
-        // Find the parameter the current word belongs to.
-        let mut at = 0;
-        let mut found = None;
-        for (pi, p) in alt.iter().enumerate() {
-            let width = if p.kind == Kind::Pos {
-                3
-            } else if p.kind == Kind::Text {
-                usize::MAX / 2
-            } else {
-                1
-            };
-            // An optional selector or position the typed word cannot be skips to what follows.
-            let fits = |w: &str| match p.kind {
-                Kind::Targets => w.starts_with('@') || players.iter().any(|n| n == w),
-                Kind::Pos => w.starts_with('~') || w.starts_with('^') || w.parse::<f64>().is_ok(),
-                _ => true,
-            };
-            if p.optional && typed.len() > at && !fits(typed[at]) {
-                continue;
-            }
-            if typed.len() < at + width {
-                found = Some((pi, typed.len() - at));
-                break;
-            }
-            if let Kind::Literal(l) = &p.kind {
-                if typed[at] != l {
-                    found = None;
-                    break;
-                }
-            }
-            at += width;
-        }
-        let Some((pi, within)) = found else { continue };
+        let here = Origin::default();
+        let Ok(Some((pi, within))) = parse_alt(c, alt, typed, here, players, true, |_, _| {}) else { continue };
         let p = &alt[pi];
-        let names_from = |keys: Vec<&String>| -> Vec<String> {
-            let mut v: Vec<String> = keys
-                .into_iter()
-                .filter(|n| {
-                    n.starts_with(partial)
-                        || n.split_once(':')
-                            .is_some_and(|(_, path)| path.starts_with(partial))
-                })
-                .cloned()
-                .collect();
-            v.sort();
-            v
-        };
         let list = match &p.kind {
             Kind::Literal(l) if l.starts_with(partial) => vec![l.clone()],
-            Kind::Word(options) => {
-                let set = |o: &String| {
+            Kind::Word(options) => names_from(
+                options.iter().flat_map(|o| {
                     o.strip_prefix('#')
-                        .map(|s| c.word_sets.get(s).cloned().unwrap_or_default())
-                        .unwrap_or_else(|| vec![o.clone()])
-                };
-                names_from(
-                    options
-                        .iter()
-                        .flat_map(set)
-                        .collect::<Vec<_>>()
-                        .iter()
-                        .collect(),
-                )
-            }
-            Kind::Item => names_from(c.item_names.keys().collect()),
-            Kind::Block => names_from(c.block_names.keys().collect()),
-            Kind::Entity => names_from(
-                c.game
-                    .entity_names
-                    .iter()
-                    .filter(|(_, k)| !c.game.is_block_entity(**k))
-                    .map(|(n, _)| n)
-                    .collect(),
+                        .map_or_else(|| std::slice::from_ref(o), |s| c.word_sets.get(s).map_or(&[][..], Vec::as_slice))
+                }),
+                partial,
             ),
-            Kind::Dim => names_from(c.dim_names.keys().collect()),
-            Kind::Attribute => names_from(c.game.attr_names.keys().collect()),
+            Kind::Entry(kind) => entry_names(c, *kind, partial),
             Kind::Player => players
                 .iter()
                 .filter(|n| n.starts_with(partial))
                 .cloned()
                 .collect(),
-            Kind::Targets => ["@p", "@a", "@e", "@s", "@r"]
+            Kind::Targets => complete_selector(c, partial, players),
+            Kind::Int(named) => named
                 .iter()
-                .map(|s| s.to_string())
-                .chain(players.iter().cloned())
                 .filter(|n| n.starts_with(partial))
+                .cloned()
                 .collect(),
             Kind::Time => TIMES
                 .iter()
@@ -727,8 +778,8 @@ pub fn complete(c: &Content, line: &str, players: &[String], permission: u32) ->
             _ => Vec::new(),
         };
         for s in list {
-            if !seen.contains(&s) {
-                seen.push(s);
+            if !out.suggestions.contains(&s) {
+                out.suggestions.push(s);
             }
         }
         if out.hint.is_empty() {
@@ -743,7 +794,6 @@ pub fn complete(c: &Content, line: &str, players: &[String], permission: u32) ->
                 .join(" ");
         }
     }
-    out.suggestions = seen;
     out
 }
 

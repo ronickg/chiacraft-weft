@@ -43,7 +43,7 @@ async fn chained(t: T, o: [i32; 3]) -> R {
         ("damage_chain", 1),
         ("loot_tables", 2),
         ("tool_tiers", 3),
-        ("interceptor", 4),
+        ("refused_break", 4),
         ("watcher_sync", 5),
         ("facing_states", 6),
     ] {
@@ -53,7 +53,7 @@ async fn chained(t: T, o: [i32; 3]) -> R {
             1 => damage_chain(&s).await,
             2 => loot_tables(&s).await,
             3 => tool_tiers(&s, o).await,
-            4 => interceptor(&s, add(o, [0, 0, 12])).await,
+            4 => refused_break(&s, add(o, [0, 0, 12])).await,
             5 => watcher_sync(&s, add(o, [12, 0, 0])).await,
             _ => facing_states(&s).await,
         };
@@ -154,6 +154,17 @@ async fn sand_and_support(t: T, o: [i32; 3]) -> R {
     t.check_eq(t.block(add(o, [3, 0, 0])).await?, "base:stone".into(), "a falling body's bottom block landed");
     t.check_eq(t.block(add(o, [3, 1, 0])).await?, "base:oak_planks".into(), "the block on it landed on top");
     t.check_eq(t.block(high).await?, "core:air".into(), "nothing left up there");
+    // A slab coming down at once, its layers onto each other, all lands as blocks.
+    let (lo, hi) = (add(o, [8, 6, 0]), add(o, [17, 9, 9]));
+    t.fill(lo, hi, "sand").await?;
+    t.secs(6.0).await?;
+    let landed: u32 = t
+        .op(&format!("count {} {} sand", at(add(o, [8, 0, 0])), at(add(o, [17, 3, 9]))))
+        .await?
+        .parse()
+        .map_err(|e| format!("count: {e}"))?;
+    t.check_eq(landed, 400, "sand of a 10 by 10 by 4 slab on the ground");
+    t.check_eq(count_at(&t, "falling_block", add(o, [12, 4, 4]), 16.0).await?, 0, "no sand left falling");
     let stone = add(o, [6, 0, 0]);
     t.set(stone, "stone").await?;
     t.set(add(stone, [0, 1, 0]), "torch").await?;
@@ -274,31 +285,40 @@ async fn lava_kills(t: T, o: [i32; 3]) -> R {
     Ok(())
 }
 
-/// The test mod's generator powers its electric furnace through cables.
+/// A conducting furnace draws power and connects the next furnace.
 async fn energy_grid(t: T, g: [i32; 3]) -> R {
     t.set(g, "testmod:generator").await?;
     t.set(add(g, [-1, 0, 0]), "testmod:cable").await?;
-    t.set(add(g, [-2, 0, 0]), "testmod:cable").await?;
-    let e = add(g, [-3, 0, 0]);
-    t.set(e, "testmod:electric_furnace").await?;
+    let furnaces = [add(g, [-2, 0, 0]), add(g, [-3, 0, 0])];
+    for furnace in furnaces {
+        t.set(furnace, "testmod:electric_furnace").await?;
+        t.op(&format!("insert {} iron_ore 2", at(furnace))).await?;
+    }
     t.op(&format!("insert {} coal 4", at(g))).await?;
-    t.op(&format!("insert {} iron_ore 2", at(e))).await?;
-    t.check_eq(t.wait_slot(&at(e), 1, 20.0).await?.0, "base:iron_ingot".into(), "electric furnace output");
+    for furnace in furnaces {
+        t.check_eq(t.wait_slot(&at(furnace), 1, 20.0).await?.0, "base:iron_ingot".into(), "electric furnace output");
+    }
     Ok(())
 }
 
-/// Navigation finds the way around a wall through its only gap.
+/// Bodies of different sizes choose openings they fit through.
 async fn pathfinding(t: T, o: [i32; 3]) -> R {
-    t.fill(add(o, [3, 0, -6]), add(o, [3, 2, 6]), "cobblestone")
-        .await?;
-    t.fill(add(o, [3, 0, 5]), add(o, [3, 1, 5]), "air").await?;
-    let id = spawn(&t, "testmod:idol", o).await?;
-    let goal = add(o, [7, 0, 0]);
-    t.check_eq(t.op(&format!("navigate {id} {}", at(goal))).await?, "1".to_string(), "the walk is accepted");
-    t.secs(8.0).await?;
-    let p = pos_of(&t, id).await?;
-    let d = ((p[0] - goal[0] as f64 - 0.5).powi(2) + (p[2] - goal[2] as f64 - 0.5).powi(2)).sqrt();
-    t.check(d < 1.5, format!("the idol walked around the wall ({:.1} {:.1}, {d:.1} from the target)", p[0], p[2]));
+    for (width, height) in [(0.6_f64, 1.1_f64), (1.4, 0.9), (2.4, 2.4)] {
+        t.fill(add(o, [3, 0, -7]), add(o, [3, 3, 7]), "cobblestone")
+            .await?;
+        t.fill(add(o, [3, 0, 0]), add(o, [3, 1, 0]), "air").await?;
+        t.fill(add(o, [3, 0, 4]), add(o, [3, height.ceil() as i32 - 1, 4 + width.ceil() as i32 - 1]), "air")
+            .await?;
+        let id = spawn(&t, "testmod:idol", o).await?;
+        t.op(&format!("size {id} {width} {height}")).await?;
+        let goal = add(o, [7, 0, 0]);
+        t.check_eq(t.op(&format!("navigate {id} {}", at(goal))).await?, "1".to_string(), "the walk is accepted");
+        t.secs(8.0).await?;
+        let p = pos_of(&t, id).await?;
+        let d = ((p[0] - goal[0] as f64 - 0.5).powi(2) + (p[2] - goal[2] as f64 - 0.5).powi(2)).sqrt();
+        t.check(d < 1.5, format!("{width} x {height} body walked through a fitting gap ({:.1} {:.1}, {d:.1} from target)", p[0], p[2]));
+        t.op(&format!("remove {id}")).await?;
+    }
     Ok(())
 }
 
@@ -358,7 +378,7 @@ async fn damage_chain(t: &T) -> R {
     let both = t.op("damage 8 0").await?;
     t.cmd("/rule testkit:half_damage 0").await?;
     t.check((value(&both) - want / 2.0).abs() < 1e-3, format!("armor then halved: {both}"));
-    t.check(both.contains("base at stage 200") && both.contains("testkit at stage 300"), format!("explanation names both steps: {both}"));
+    t.check(both.contains("core:multiply base:") && both.contains("core:final testkit:"), format!("explanation names both steps: {both}"));
     Ok(())
 }
 
@@ -441,8 +461,8 @@ async fn tool_tiers(t: &T, o: [i32; 3]) -> R {
     Ok(())
 }
 
-/// An interceptor refuses breaking gold while its rule is on.
-async fn interceptor(t: &T, p: [i32; 3]) -> R {
+/// A step answers no to breaking gold while its rule is on.
+async fn refused_break(t: &T, p: [i32; 3]) -> R {
     t.set(p, "gold_block").await?;
     t.cmd("/rule testkit:protect_gold 1").await?;
     let refused = t

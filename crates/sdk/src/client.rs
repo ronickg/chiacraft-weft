@@ -4,16 +4,86 @@
 //!
 //! ```ignore
 //! static JETPACK: Key = Key::named("jetpack");
-//! r.key(&JETPACK, "J").on_press_server(|p| { let w = p.world(); /* for p.player() */ });
+//! r.key(&JETPACK, "J").on_server(|w, player| { /* on the server, for that player */ });
+//! // Any action on the server, the mouse buttons too, with how long it was held:
+//! r.on_event(&KEY, |b| for k in b.iter() { /* k.player, k.key, k.down, k.held_ticks */ });
 //! static SCAN: Key = Key::named("scan");
-//! r.key(&SCAN, "K").on_press_client(|c| { /* on this client */ });
+//! r.key(&SCAN, "K").on_client(|c| { /* on this client */ });
 //! ```
 
-use crate::abi::{self, ItemStack, Slice, Str, gizmo_kind as gk};
+use crate::abi::{self, ItemStack, Slice, Str};
 use crate::abi::{BlockPos, Vec3};
-use crate::{ClientView, Key, Registry, Screen, Value, World, callback, host};
+use crate::{ClientView, Key, Menu, Registry, Value, WithComponents, World, callback, host};
 
+pub use abi::MusicSource;
 pub use abi::{ClientState, client_flags};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MusicState {
+    Stopped,
+    Playing,
+    Paused,
+    Error,
+}
+
+#[derive(Clone, Debug)]
+pub struct MusicPlayback {
+    pub track: String,
+    pub position: f64,
+    pub duration: f64,
+    pub volume: f32,
+    pub state: MusicState,
+}
+
+#[derive(Clone, Debug)]
+pub struct MusicTrack {
+    pub file: String,
+    /// Seconds, or zero when the duration is unknown.
+    pub duration: f64,
+}
+
+impl ClientView {
+    /// File names in the client's music folder, as of the last `refresh_music`.
+    pub fn music_tracks(&self) -> Vec<String> {
+        (0..).map_while(|index| self.music_track(index)).collect()
+    }
+
+    /// Name of one file in the client's music folder.
+    pub fn music_track(&self, index: u32) -> Option<String> {
+        self.music_track_info(index).map(|track| track.file)
+    }
+
+    /// Name and duration of one file, as of the last refresh.
+    pub fn music_track_info(&self, index: u32) -> Option<MusicTrack> {
+        let mut raw = std::mem::MaybeUninit::<abi::MusicTrack>::uninit();
+        let raw = unsafe {
+            (host().client_music_track)(self.client().raw, index, raw.as_mut_ptr());
+            raw.assume_init()
+        };
+        (raw.file.len != 0).then(|| MusicTrack { file: unsafe { raw.file.as_str().to_owned() }, duration: raw.duration })
+    }
+
+    /// Local playback at this block. Position and duration are seconds, volume is 0..1.
+    pub fn music_playback(&self, source: MusicSource) -> MusicPlayback {
+        let mut raw = std::mem::MaybeUninit::<abi::MusicStatus>::uninit();
+        let raw = unsafe {
+            (host().client_music_status)(self.client().raw, source, raw.as_mut_ptr());
+            raw.assume_init()
+        };
+        MusicPlayback {
+            track: unsafe { raw.track.as_str().to_owned() },
+            position: raw.position,
+            duration: raw.duration,
+            volume: raw.volume,
+            state: match raw.state {
+                abi::local_music::PLAYING => MusicState::Playing,
+                abi::local_music::PAUSED => MusicState::Paused,
+                abi::local_music::ERROR => MusicState::Error,
+                _ => MusicState::Stopped,
+            },
+        }
+    }
+}
 
 /// The local client during a client callback. Only valid for the duration of that callback.
 #[derive(Clone, Copy)]
@@ -36,6 +106,43 @@ fn abi_str(x: &str) -> Str {
 }
 
 impl Client {
+    fn music_op(&self, source: MusicSource, op: u32, name: &str, value: f64) -> bool {
+        unsafe { (host().client_music)(self.raw, source, op, Str::new(name), value) != 0 }
+    }
+
+    /// Rescans the client's local music folder and updates open UI.
+    pub fn refresh_music(&self) -> bool {
+        self.music_op(MusicSource::default(), abi::local_music::REFRESH, "", 0.0)
+    }
+
+    /// Opens the client's local music folder in the system file manager.
+    pub fn open_music_folder(&self) -> bool {
+        self.music_op(MusicSource::default(), abi::local_music::OPEN_FOLDER, "", 0.0)
+    }
+
+    /// Streams a listed file from a block on this client, replacing its previous local track.
+    /// The audio file stays on this client.
+    pub fn play_music(&self, source: MusicSource, file: &str) -> bool {
+        self.music_op(source, abi::local_music::PLAY, file, 0.0)
+    }
+
+    pub fn toggle_music_pause(&self, source: MusicSource) -> bool {
+        self.music_op(source, abi::local_music::TOGGLE_PAUSE, "", 0.0)
+    }
+
+    pub fn stop_music(&self, source: MusicSource) -> bool {
+        self.music_op(source, abi::local_music::STOP, "", 0.0)
+    }
+
+    /// Seeks to the given fraction of the current track, from 0 to 1.
+    pub fn seek_music(&self, source: MusicSource, fraction: f32) -> bool {
+        self.music_op(source, abi::local_music::SEEK, "", f64::from(fraction))
+    }
+
+    pub fn set_music_volume(&self, volume: f32) -> bool {
+        self.music_op(MusicSource::default(), abi::local_music::VOLUME, "", f64::from(volume))
+    }
+
     pub(crate) fn from_raw(raw: *mut abi::ClientCtx) -> Client {
         Client { raw }
     }
@@ -128,10 +235,24 @@ impl Client {
         (secs >= 0.0).then_some(secs)
     }
 
-    /// The item id in `entity`'s `hand`; 0 for none. Other players' stacks aren't sent, so this
-    /// is the item without what is in it.
-    pub fn held_item(&self, entity: u64, hand: Hand) -> u32 {
-        unsafe { (host().client_held_item)(self.raw, entity, hand as u32) }
+    /// The stack in `entity`'s hand, including its public components; empty for none.
+    pub fn held(&self, entity: u64, hand: Hand) -> abi::ItemStack {
+        let mut hands = [ItemStack::EMPTY; 2];
+        unsafe { (host().client_displayed)(self.raw, entity, abi::display_source::HANDS, hands.as_mut_ptr(), hands.len()) };
+        hands[hand as usize]
+    }
+
+    /// Public stacks from a display source, in slot order, including empty slots.
+    /// Equipment, model visibility and attribute modifiers are independent.
+    pub fn displayed(&self, entity: u64, source: DisplaySource) -> Vec<ItemStack> {
+        let mut stacks = vec![ItemStack::EMPTY; 8];
+        let n = unsafe { (host().client_displayed)(self.raw, entity, source as u32, stacks.as_mut_ptr(), stacks.len()) };
+        if n > stacks.len() {
+            stacks.resize(n, ItemStack::EMPTY);
+            unsafe { (host().client_displayed)(self.raw, entity, source as u32, stacks.as_mut_ptr(), stacks.len()) };
+        }
+        stacks.truncate(n);
+        stacks
     }
 
     /// Where a bone of `entity`'s model or of what it has on was in the world the last frame: for
@@ -153,14 +274,21 @@ impl Client {
         self.input(abi::client_input::RELEASE_ALL, "", 0.0, 0.0);
     }
 
-    /// The key (yours from `Registry::key`, or one of `keys::*`) was pressed this frame. Keys
-    /// belong to the world: while a screen has the input they are up.
+    /// What the key (yours from `Registry::key`, or one of `keys::*`) does now: pressed this
+    /// frame, held, for how many ticks. Keys belong to the world: while a screen has the input
+    /// they are up.
+    pub fn key(&self, key: &Key) -> abi::KeyState {
+        let mut out = abi::KeyState::default();
+        unsafe { (host().client_key_state)(self.raw, abi_str(key.name()), &mut out) };
+        out
+    }
+
     pub fn key_pressed(&self, key: &Key) -> bool {
-        unsafe { (host().client_key_state)(self.raw, abi_str(key.name())) & 1 != 0 }
+        self.key(key).pressed != 0
     }
 
     pub fn key_held(&self, key: &Key) -> bool {
-        unsafe { (host().client_key_state)(self.raw, abi_str(key.name())) & 2 != 0 }
+        self.key(key).held != 0
     }
 
     pub fn control(&self, c: &abi::PlayerControl) {
@@ -242,11 +370,11 @@ impl Client {
     }
 
     /// A mod's screen or one of the engine's (`screens::*`).
-    pub fn screen_open(&self, screen: &Screen) -> bool {
+    pub fn menu_open(&self, screen: &Menu) -> bool {
         self.op(abi::client_op::OPEN_SCREEN, screen.name(), 0.0) != 0
     }
 
-    pub fn screen_close(&self) {
+    pub fn menu_close(&self) {
         self.op(abi::client_op::CLOSE_SCREEN, "", 0.0);
     }
 
@@ -254,6 +382,12 @@ impl Client {
     /// selection): its builder runs anew.
     pub fn rebuild_screen(&self) {
         self.op(abi::client_op::REBUILD_SCREEN, "", 0.0);
+    }
+
+    /// Sorts the group containing `slot`. With `None`, sorts each enabled group of the open
+    /// container, falling back to the player's main storage. Stacks stay within their group and slot limit.
+    pub fn menu_sort(&self, slot: Option<u32>) -> bool {
+        self.op(abi::client_op::MENU_SORT, "", slot.map_or(-1.0, |s| s as f64)) != 0
     }
 
     pub fn reload_assets(&self) {
@@ -372,47 +506,6 @@ impl Client {
         true
     }
 
-    fn draw(&self, group: Option<&crate::GizmoGroup>, kind: u32, a: Vec3, b: Vec3, color: u32) {
-        unsafe { (host().client_draw)(self.raw, abi_str(group.map_or("", |g| g.name())), kind, &a, &b, color) }
-    }
-
-    /// The server's `draw_*` for this frame only: always, or with a `group` while the player
-    /// shows it (`/gizmo <group>`). Colors are 0xRRGGBBAA.
-    pub fn draw_line(&self, group: Option<&crate::GizmoGroup>, a: impl Into<Vec3>, b: impl Into<Vec3>, color: u32) {
-        self.draw(group, gk::LINE, a.into(), b.into(), color);
-    }
-
-    pub fn draw_box(&self, group: Option<&crate::GizmoGroup>, min: impl Into<Vec3>, max: impl Into<Vec3>, color: u32) {
-        self.draw(group, gk::BOX, min.into(), max.into(), color);
-    }
-
-    /// See-through by `color`'s alpha (range previews, blueprints).
-    pub fn draw_fill(&self, group: Option<&crate::GizmoGroup>, min: impl Into<Vec3>, max: impl Into<Vec3>, color: u32) {
-        self.draw(group, gk::FILL, min.into(), max.into(), color);
-    }
-    /// The outline of a shape, this frame.
-    pub fn draw_shape(&self, group: Option<&crate::GizmoGroup>, shape: &crate::Shape, color: u32) {
-        for (a, b) in shape.outline() {
-            self.draw_line(group, a, b, color);
-        }
-    }
-
-    /// The translation `key` with `args` at a world position, `size` times as big as menu text.
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw_text(
-        &self,
-        group: Option<&crate::GizmoGroup>,
-        pos: impl Into<Vec3>,
-        key: &str,
-        args: &[crate::Arg],
-        color: u32,
-        size: f32,
-    ) {
-        let (pos, raw) = (pos.into(), crate::ui::raw_args(args));
-        let group = abi_str(group.map_or("", |g| g.name()));
-        unsafe { (host().client_draw_text)(self.raw, group, &pos, size, color, abi_str(key), Slice::new(&raw)) }
-    }
-
     /// The translation `key` with `args`, centered at fractions of the window, `size` times as
     /// big as menu text. Part of the GUI: F1 hides it with the rest.
     pub fn draw_screen_text(&self, x: f32, y: f32, key: &str, args: &[crate::Arg], color: u32, size: f32) {
@@ -453,6 +546,16 @@ impl Client {
         let got = unsafe { (host().client_command_reply)(self.raw, id, &mut out) } != 0;
         got.then(|| unsafe { out.as_str() }.to_string())
     }
+}
+
+/// Where an entity displays stacks. A source does not imply a model or attribute modifiers.
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DisplaySource {
+    Hands = abi::display_source::HANDS,
+    Equipment = abi::display_source::EQUIPMENT,
+    Shown = abi::display_source::SHOWN,
+    Ground = abi::display_source::GROUND,
 }
 
 /// Which hand.
@@ -603,10 +706,10 @@ pub struct BiomeAir {
 }
 
 impl World {
-    /// Sends `value` on `channel` to `player`'s client.
-    pub fn send<T: Payload>(&self, player: u64, channel: &Channel<T>, value: &T) {
+    /// Sends `value` on `channel` to the clients of `who` (a player's id for one).
+    pub fn send<T: Payload>(&self, who: impl Into<crate::Who>, channel: &Channel<T>, value: &T) {
         let data = value.encode();
-        unsafe { (host().send_packet)(self.raw(), player, abi_str(channel.name()), abi_str(&T::schema()), Slice::new(&data)) }
+        unsafe { (host().send_packet)(self.raw(), who.into(), abi_str(channel.name()), abi_str(&T::schema()), Slice::new(&data)) }
     }
 }
 
@@ -621,26 +724,17 @@ impl Registry {
     /// Every frame on the client, before input is handled.
     pub fn client_frame(&mut self, f: impl Fn(&Client) + Send + Sync + 'static) {
         let cb = callback(move |a: &mut abi::ClientFrameArgs| f(&Client::from_raw(a.client)));
-        unsafe { (host().reg_client_hook)(self.raw, abi::client_hook::FRAME, cb) }
+        unsafe { (host().reg_client_frame)(self.raw, cb) }
     }
 
-    /// Cosmetics of entities of `kind` on the client, every frame (wing flaps, sparks, purring),
-    /// instead of the engine's steps, idle noises and death smoke; `e.run_engine_effects()` keeps
-    /// those. One per kind: a later mod's replaces an earlier one's.
-    pub fn client_entity_cosmetics(&mut self, kind: &crate::EntityKind, f: impl Fn(&Client, &ClientEntity) + Send + Sync + 'static) {
-        unsafe { (host().reg_client_entity_cosmetics)(self.raw, abi_str(kind.name()), entity_callback(f)) }
-    }
-
-    /// Every frame on the client for each entity of `kind`, the local player too, beside whatever
-    /// else runs for them: any number of mods may watch one kind, and steps and such go on.
+    /// Every frame on the client for each entity of `kind`, the local player too: its effects
+    /// (wing flaps, sparks, purring), any number of mods on one kind. The engine's steps, idle
+    /// noises and death smoke go on unless the kind says otherwise (`.effect(..)`, `.own_effects()`).
     pub fn client_entity_frame(&mut self, kind: &crate::EntityKind, f: impl Fn(&Client, &ClientEntity) + Send + Sync + 'static) {
-        unsafe { (host().reg_client_entity_frame)(self.raw, abi_str(kind.name()), entity_callback(f)) }
-    }
-
-    /// When the top screen changes; the name is empty back in the world.
-    pub fn client_screen(&mut self, f: impl Fn(&Client, &str) + Send + Sync + 'static) {
-        let cb = callback(move |a: &mut abi::ClientScreenArgs| f(&Client::from_raw(a.client), unsafe { a.screen.as_str() }));
-        unsafe { (host().reg_client_hook)(self.raw, abi::client_hook::SCREEN, cb) }
+        drop(
+            self.edit_entity(kind.name())
+                .push(&crate::comps::entity::FRAMES, entity_callback(f)),
+        );
     }
 
     /// Server side of a channel: `f` gets every value a client sends on it, with who sent it.
@@ -666,23 +760,36 @@ impl Registry {
     }
 
     /// Key binding with a default key (`J`, `KeyJ`, `F6`, `space`, `lshift`, `mouse3`), listed
-    /// in Controls as `key.<ns>.<name>`; what it does with `.on_press_client(..)` or
-    /// `.on_press_server(..)`, or read with `Client::key_pressed`/`key_held`. Keys only act while the
+    /// in Controls as `key.<ns>.<name>`; what it does with `.on_client(..)` or
+    /// `.on_server(..)`, or read with `Client::key_pressed`/`key_held`. Keys only act while the
     /// world has the input (not while typing in the chat or with a screen open).
     pub fn key<'a>(&'a mut self, key: &'static Key, default: &str) -> KeyBuilder<'a> {
-        unsafe { (host().reg_key)(self.raw, abi_str(key.name()), abi_str(default)) }
-        KeyBuilder { reg: self, key }
+        self.key_entry(key)
+            .set_text(&crate::comps::key::DEFAULT, default)
+    }
+
+    fn key_entry(&mut self, key: &'static Key) -> KeyBuilder<'_> {
+        KeyBuilder { reg: self, e: crate::entry::Entry::of(key), key }
     }
 }
 
 pub struct KeyBuilder<'a> {
     reg: &'a mut Registry,
+    e: crate::entry::Entry,
     key: &'static Key,
 }
 
+crate::entry::entry_builder!(Key => KeyBuilder, key_entry;);
+
 impl KeyBuilder<'_> {
+    /// Only while this action's bindings are held (or toggled on), following rebinding.
+    /// Takes precedence over the same binding without this modifier.
+    pub fn while_held(self, key: &Key) -> Self {
+        self.set_text(&crate::comps::key::WHILE_HELD, key.name())
+    }
+
     /// On the client, every time the key goes down.
-    pub fn on_press_client(self, f: impl Fn(&Client) + Send + Sync + 'static) -> Self {
+    pub fn on_client(self, f: impl Fn(&Client) + Send + Sync + 'static) -> Self {
         let key = self.key;
         // By the edge of `held`, so a press is seen whichever frame hook made it.
         let was = std::sync::atomic::AtomicBool::new(false);
@@ -697,13 +804,58 @@ impl KeyBuilder<'_> {
         self
     }
 
-    /// On the server, for the player who pressed it (`p.player()`, `p.world()`): the engine
-    /// carries the press over, no channel of yours needed.
-    pub fn on_press_server(self, f: impl Fn(&Packet) + Send + Sync + 'static) -> Self {
+    /// On the server, for the player who pressed it (world, player): `crate::KEY` filtered to
+    /// this key going down.
+    pub fn on_server(self, f: impl Fn(&crate::World, u64) + Send + Sync + 'static) -> Self {
         let key = self.key;
-        let channel: &'static Channel<()> = Channel::generated(format!("{}.pressed", key.name()));
-        self.reg.packet(channel, move |p, ()| f(p));
-        KeyBuilder { reg: self.reg, key }.on_press_client(move |c| c.send(channel, &()))
+        self.reg.on_event(&crate::KEY, move |b| {
+            let w = b.world();
+            for k in b.iter().filter(|k| k.down != 0 && k.key == key.id()) {
+                f(&w, k.player);
+            }
+        });
+        self
+    }
+    /// On the server, when the player lets it go (world, player, ticks it was held): a charge.
+    pub fn on_release_server(self, f: impl Fn(&crate::World, u64, u32) + Send + Sync + 'static) -> Self {
+        let key = self.key;
+        self.reg.on_event(&crate::KEY, move |b| {
+            let w = b.world();
+            for k in b.iter().filter(|k| k.down == 0 && k.key == key.id()) {
+                f(&w, k.player, k.held_ticks);
+            }
+        });
+        self
+    }
+}
+
+/// The keys as a mount's steering or a camera mode reads them, any action by its handle, and
+/// where the player looks (radians; a detached camera's own look).
+pub struct Keys {
+    raw: *const abi::KeysCtx,
+    pub yaw: f32,
+    pub pitch: f32,
+}
+
+impl Keys {
+    pub(crate) fn of(raw: *const abi::KeysCtx, yaw: f32, pitch: f32) -> Keys {
+        Keys { raw, yaw, pitch }
+    }
+
+    /// Pressed, held and its charge: ticks held, and held before being let go this tick.
+    pub fn state(&self, key: &Key) -> abi::KeyState {
+        let mut out = abi::KeyState::default();
+        unsafe { (host().keys_state)(self.raw, abi_str(key.name()), &mut out) };
+        out
+    }
+
+    pub fn held(&self, key: &Key) -> bool {
+        self.state(key).held != 0
+    }
+
+    /// -1..1 from `minus` held to `plus` held: `axis(&keys::FORWARD, &keys::BACK)`.
+    pub fn axis(&self, plus: &Key, minus: &Key) -> f32 {
+        self.held(plus) as i32 as f32 - self.held(minus) as i32 as f32
     }
 }
 
@@ -721,6 +873,12 @@ pub mod keys {
     pub static FLY: Key = Key::named("core:fly");
     pub static INVENTORY: Key = Key::named("core:inventory");
     pub static DROP: Key = Key::named("core:drop");
+    pub static DROP_ALL: Key = Key::named("core:drop_all");
+    pub static DISMOUNT: Key = Key::named("core:dismount");
+    pub static FLY_FASTER: Key = Key::named("core:fly_faster");
+    pub static FLY_SLOWER: Key = Key::named("core:fly_slower");
+    pub static HOTBAR_NEXT: Key = Key::named("core:hotbar_next");
+    pub static HOTBAR_PREV: Key = Key::named("core:hotbar_prev");
     pub static COMMAND: Key = Key::named("core:command");
     pub static CHAT: Key = Key::named("core:chat");
     pub static DEBUG: Key = Key::named("core:debug");
@@ -739,26 +897,30 @@ pub mod keys {
 /// The engine's screens: open them, add parts to them, or register one of these handles to
 /// replace it.
 pub mod screens {
-    use crate::Screen;
-    pub static TITLE: Screen = Screen::named("core:title");
-    pub static PAUSE: Screen = Screen::named("core:pause");
-    pub static SETTINGS: Screen = Screen::named("core:settings");
-    pub static LANGUAGE: Screen = Screen::named("core:language");
-    pub static CONTROLS: Screen = Screen::named("core:controls");
-    pub static WORLDS: Screen = Screen::named("core:worlds");
-    pub static CREATE_WORLD: Screen = Screen::named("core:create_world");
-    pub static CHAT: Screen = Screen::named("core:chat");
-    pub static INVENTORY: Screen = Screen::named("core:inventory");
-    pub static MOD_SETTINGS: Screen = Screen::named("core:mod_settings");
-    pub static DEATH: Screen = Screen::named("core:death");
-    pub static MODS: Screen = Screen::named("core:mods");
-    pub static PROFILE: Screen = Screen::named("core:profile");
-    pub static MULTIPLAYER: Screen = Screen::named("core:multiplayer");
-    pub static RESOURCE_PACKS: Screen = Screen::named("core:resource_packs");
-    pub static SHADER_PACKS: Screen = Screen::named("core:shader_packs");
-    pub static SOUND: Screen = Screen::named("core:sound");
-    pub static HUD_EDITOR: Screen = Screen::named("core:hud_editor");
-    pub static DEBUG_OPTIONS: Screen = Screen::named("core:debug_options");
+    use crate::Menu;
+    pub static TITLE: Menu = Menu::named("core:title");
+    pub static PAUSE: Menu = Menu::named("core:pause");
+    pub static SETTINGS: Menu = Menu::named("core:settings");
+    pub static LANGUAGE: Menu = Menu::named("core:language");
+    pub static CONTROLS: Menu = Menu::named("core:controls");
+    pub static WORLDS: Menu = Menu::named("core:worlds");
+    pub static CREATE_WORLD: Menu = Menu::named("core:create_world");
+    pub static WORLD_RULES: Menu = Menu::named("core:world_rules");
+    pub static CHAT: Menu = Menu::named("core:chat");
+    pub static INVENTORY: Menu = Menu::named("core:inventory");
+    pub static MOD_SETTINGS: Menu = Menu::named("core:mod_settings");
+    pub static DEATH: Menu = Menu::named("core:death");
+    pub static MODS: Menu = Menu::named("core:mods");
+    pub static PROFILE: Menu = Menu::named("core:profile");
+    pub static MULTIPLAYER: Menu = Menu::named("core:multiplayer");
+    pub static RESOURCE_PACKS: Menu = Menu::named("core:resource_packs");
+    pub static SHADER_PACKS: Menu = Menu::named("core:shader_packs");
+    pub static SOUND: Menu = Menu::named("core:sound");
+    pub static HUD_EDITOR: Menu = Menu::named("core:hud_editor");
+    pub static DEBUG_OPTIONS: Menu = Menu::named("core:debug_options");
+    /// Every menu's screen, for `Registry::screen_part`: its place `side` is beside any menu,
+    /// `corner` in the top right corner inside its panel (small icon buttons).
+    pub static MENUS: Menu = Menu::named("core:menus");
 }
 
 /// One entity in `Registry::client_entity_frame`.
@@ -793,10 +955,5 @@ impl ClientEntity {
     /// Seconds since the last call.
     pub fn dt(&self) -> f32 {
         self.0.dt
-    }
-    /// What the engine does for kinds without a tick: steps, idle noises, death smoke.
-    pub fn run_engine_effects(&self) {
-        let mut a = abi::ClientEntityArgs { ..self.0 };
-        unsafe { (host().client_engine_effects)(&mut a) }
     }
 }

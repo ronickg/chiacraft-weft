@@ -1,5 +1,6 @@
 //! Finds mod libraries, loads them and runs registration in parallel.
 
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Instant;
@@ -12,6 +13,8 @@ use crate::content::{self, ModMeta, RawRegistrar};
 pub struct LoadedMod {
     pub id: String,
     pub assets: PathBuf,
+    source: PathBuf,
+    revision: u64,
     _lib: libloading::Library,
     decl: &'static abi::ModDecl,
 }
@@ -23,8 +26,9 @@ static NAMES: parking_lot::RwLock<&'static [String]> = parking_lot::RwLock::new(
 static ASSET_ROOTS: std::sync::RwLock<Vec<(String, std::path::PathBuf)>> = std::sync::RwLock::new(Vec::new());
 
 /// Whether mod asset `name` (`beauty_of_nature:block/log_oak_inner`) is a file `<kind>/...<.ext>`
-/// of the mod it names. Mods' own files only: resource packs are each client's, and what a mod
-/// registers has to be the same everywhere.
+/// of the mod it names, or for a picture a folder of connected tiles (`Assets::ctm_rules`).
+/// Mods' own files only: resource packs are each client's, and what a mod registers has to be the
+/// same everywhere.
 pub fn asset_exists(name: &str, kind: &str, ext: &str) -> bool {
     let Some((ns, rel)) = name.split_once(':') else { return false };
     if rel.is_empty() || rel.contains("..") || rel.contains('\\') || rel.starts_with('/') {
@@ -34,7 +38,17 @@ pub fn asset_exists(name: &str, kind: &str, ext: &str) -> bool {
         .read()
         .unwrap()
         .iter()
-        .any(|(id, dir)| id == ns && dir.join(kind).join(format!("{rel}.{ext}")).is_file())
+        .any(|(id, dir)| id == ns && file_or_tiles(&dir.join(kind), rel, kind, ext))
+}
+
+/// `<rel>.<ext>` in `dir`, or for a texture its folder of connected tiles.
+pub fn file_or_tiles(dir: &Path, rel: &str, kind: &str, ext: &str) -> bool {
+    let last = rel.rsplit('/').next().unwrap_or(rel);
+    dir.join(format!("{rel}.{ext}")).is_file() || (kind == "textures" && ext == "png" && dir.join(format!("{rel}/{last}.ctm")).is_file())
+}
+
+pub fn mod_loaded(id: &str) -> bool {
+    ASSET_ROOTS.read().unwrap().iter().any(|(m, _)| m == id)
 }
 
 pub fn mod_id_name(m: ModId) -> &'static str {
@@ -50,16 +64,17 @@ fn set_names(names: Vec<String>) {
 
 /// Mods found in `mod_dirs`, earlier dirs winning: a folder (`assets/` and the library) or the
 /// same packed into `<name>.zip`, unpacked into `cache` once per version of the file. A folder's
-/// library may also sit next to the engine executable instead (development builds,
-/// `target/<profile>/`).
-pub fn discover(mod_dirs: &[PathBuf], cache: &Path) -> Vec<(String, PathBuf, PathBuf)> {
-    let exe_dir = crate::paths::library_dir()
-        .map(Path::to_path_buf)
-        .or_else(|| {
-            std::env::current_exe()
-                .ok()
-                .and_then(|p| p.parent().map(Path::to_path_buf))
-        });
+/// library may also sit beside the engine's instead (development builds, `target/<profile>/`;
+/// an Android package's).
+pub struct DiscoveredMod {
+    name: String,
+    root: PathBuf,
+    library: PathBuf,
+    source: PathBuf,
+}
+
+pub fn discover(mod_dirs: &[PathBuf], cache: &Path) -> Vec<DiscoveredMod> {
+    let exe_dir = crate::paths::libraries();
     let mut found = Vec::new();
     for dir in mod_dirs {
         let Ok(entries) = std::fs::read_dir(dir) else { continue };
@@ -78,12 +93,10 @@ pub fn discover(mod_dirs: &[PathBuf], cache: &Path) -> Vec<(String, PathBuf, Pat
                 .into_owned();
             // For a name found twice, the first dir's copy stays. Before unpacking: another
             // version unpacked takes away the one before it.
-            if found
-                .iter()
-                .any(|f: &(String, PathBuf, PathBuf)| f.0 == name)
-            {
+            if found.iter().any(|f: &DiscoveredMod| f.name == name) {
                 continue;
             }
+            let source = path.clone();
             let root = if zipped {
                 match unpack(&path, &cache.join("unpacked"), &name) {
                     Ok(root) => root,
@@ -96,12 +109,14 @@ pub fn discover(mod_dirs: &[PathBuf], cache: &Path) -> Vec<(String, PathBuf, Pat
                 path
             };
             let file = libloading::library_filename(&name);
-            let lib = [Some(root.join(&file)), exe_dir.as_ref().map(|d| d.join(&file))]
+            // Android's is named as Linux's, so it has a folder of its own (`ANDROID`).
+            let android = cfg!(target_os = "android").then(|| root.join(ANDROID).join(&file));
+            let lib = [android, Some(root.join(&file)), exe_dir.as_ref().map(|d| d.join(&file))]
                 .into_iter()
                 .flatten()
                 .find(|p| p.exists());
             match lib {
-                Some(lib) => found.push((name, root, lib)),
+                Some(library) => found.push(DiscoveredMod { name, root, library, source }),
                 // The library is named after the mod (its crate), and so must be the folder or zip.
                 None => log::error!(
                     "mod {}: no {} in it; a mod's folder or zip is named like its crate",
@@ -111,7 +126,7 @@ pub fn discover(mod_dirs: &[PathBuf], cache: &Path) -> Vec<(String, PathBuf, Pat
             }
         }
     }
-    found.sort_by(|a, b| a.0.cmp(&b.0));
+    found.sort_by(|a, b| a.name.cmp(&b.name));
     found
 }
 
@@ -143,16 +158,20 @@ fn unpack(archive: &Path, cache: &Path, name: &str) -> Result<PathBuf, String> {
     Ok(dest)
 }
 
+/// Where a mod keeps its library for Android phones: the same file name as Linux's.
+const ANDROID: &str = "android";
+
 /// The libraries of mod `name` to pack, with their file names: those in its folder, one per
 /// system, so that one zip serves them all (`discover` picks the system's own), and this system's
 /// from next to the engine executable if the folder has none.
 fn libraries(dir: &Path, name: &str) -> Vec<(String, PathBuf)> {
-    let mut libs: Vec<(String, PathBuf)> = [format!("{name}.dll"), format!("lib{name}.so"), format!("lib{name}.dylib")]
-        .into_iter()
-        .map(|f| (dir.join(&f), f))
-        .filter(|(p, _)| p.exists())
-        .map(|(p, f)| (f, p))
-        .collect();
+    let mut libs: Vec<(String, PathBuf)> =
+        [format!("{name}.dll"), format!("lib{name}.so"), format!("lib{name}.dylib"), format!("{ANDROID}/lib{name}.so")]
+            .into_iter()
+            .map(|f| (dir.join(&f), f))
+            .filter(|(p, _)| p.exists())
+            .map(|(p, f)| (f, p))
+            .collect();
     let own = libloading::library_filename(name)
         .to_string_lossy()
         .into_owned();
@@ -192,20 +211,38 @@ pub fn pack(dir: &Path, out: &Path) -> Result<PathBuf, String> {
     }
     let mut files = Vec::new();
     collect(&dir.join("assets"), &mut files);
-    for f in files {
+    for f in &files {
         let rel = f
             .strip_prefix(dir)
             .unwrap()
             .to_string_lossy()
             .replace('\\', "/");
-        add(rel, &f)?;
+        add(rel, f)?;
     }
+    zip.set_comment(fingerprint(dir, &name));
     zip.finish().map_err(|e| e.to_string())?;
     Ok(path)
 }
 
-/// `pack`, unless `<out>/<name>.zip` is already newer than the library and every asset. Returns
-/// the archive and whether it was written.
+/// What a mod folder packs, as a text the archive keeps (its comment): every file's path, size
+/// and time. A file added, taken away or renamed changes it, also one copied in with an older
+/// time than the archive's.
+fn fingerprint(dir: &Path, name: &str) -> String {
+    let mut files = Vec::new();
+    collect(&dir.join("assets"), &mut files);
+    files.extend(libraries(dir, name).into_iter().map(|l| l.1));
+    files.sort();
+    // The std hasher may change with the compiler: then everything is packed again once.
+    let mut h = std::hash::DefaultHasher::new();
+    for f in &files {
+        let meta = std::fs::metadata(f).ok();
+        std::hash::Hash::hash(&(f, meta.as_ref().map(|m| m.len()), meta.and_then(|m| m.modified().ok())), &mut h);
+    }
+    format!("weft {:016x}", std::hash::Hasher::finish(&h))
+}
+
+/// `pack`, unless `<out>/<name>.zip` was packed from the folder as it is (`fingerprint`).
+/// Returns the archive and whether it was written.
 pub fn pack_if_stale(dir: &Path, out: &Path) -> Result<(PathBuf, bool), String> {
     let name = dir
         .file_name()
@@ -213,15 +250,12 @@ pub fn pack_if_stale(dir: &Path, out: &Path) -> Result<(PathBuf, bool), String> 
         .to_string_lossy()
         .into_owned();
     let zip = out.join(format!("{name}.zip"));
-    let mut inputs = Vec::new();
-    collect(&dir.join("assets"), &mut inputs);
-    inputs.extend(libraries(dir, &name).into_iter().map(|l| l.1));
-    let modified = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
-    let newest = inputs.iter().filter_map(|p| modified(p)).max();
-    if let (Some(z), Some(n)) = (modified(&zip), newest) {
-        if z >= n {
-            return Ok((zip, false));
-        }
+    let packed = std::fs::File::open(&zip)
+        .ok()
+        .and_then(|f| zip::ZipArchive::new(f).ok())
+        .map(|a| a.comment().to_vec());
+    if packed.is_some_and(|c| c == fingerprint(dir, &name).as_bytes()) {
+        return Ok((zip, false));
     }
     pack(dir, out).map(|p| (p, true))
 }
@@ -255,14 +289,65 @@ struct Switches {
     file: PathBuf,
     wanted: Vec<String>,
     at_start: Vec<String>,
+    /// Off for this run only: shown off, not written to the file.
+    run_only: Vec<String>,
+}
+
+impl Switches {
+    fn save(&self) {
+        let saved: Vec<&str> = self
+            .wanted
+            .iter()
+            .filter(|w| !self.run_only.contains(w))
+            .map(String::as_str)
+            .collect();
+        let result = self
+            .file
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| std::fs::write(&self.file, saved.join("\n")));
+        if let Err(e) = result {
+            log::error!("{}: {e}", self.file.display());
+        }
+    }
 }
 
 static OFF: OnceLock<Vec<ModMeta>> = OnceLock::new();
+static NEWLY_DISABLED: OnceLock<Vec<String>> = OnceLock::new();
+static LOAD_ERRORS: OnceLock<rustc_hash::FxHashMap<String, String>> = OnceLock::new();
 static SWITCHES: parking_lot::Mutex<Option<Switches>> = parking_lot::Mutex::new(None);
 
 /// Mods found but not running, for the mods screen: turned off, or needing one that is.
 pub fn turned_off() -> &'static [ModMeta] {
     OFF.get().map_or(&[], |v| v.as_slice())
+}
+
+/// Mods automatically disabled on this start, excluding ones already disabled through dependencies.
+pub fn newly_disabled() -> &'static [String] {
+    NEWLY_DISABLED.get().map_or(&[], |v| v.as_slice())
+}
+
+pub fn load_error(id: &str) -> Option<&'static str> {
+    LOAD_ERRORS.get()?.get(id).map(String::as_str)
+}
+
+fn dependencies(id: &str) -> Option<Vec<String>> {
+    if load_error(id).is_some() {
+        return None;
+    }
+    content::try_content()
+        .into_iter()
+        .flat_map(|c| &c.mods)
+        .chain(turned_off())
+        .find(|m| m.id == id)
+        .map(|m| m.deps.clone())
+        .or_else(|| {
+            crate::mod_index::index()?
+                .iter()
+                .find(|m| m.id == id)?
+                .fitting()
+                .map(|b| b.deps.clone())
+        })
 }
 
 /// Whether a mod would run on the next start, as things are set now.
@@ -271,39 +356,64 @@ pub fn wanted_on(id: &str) -> bool {
         .lock()
         .as_ref()
         .map_or(Vec::new(), |s| s.wanted.clone());
-    let metas: Vec<&ModMeta> = content::try_content()
-        .map_or(Vec::new(), |c| c.mods.iter().collect())
-        .into_iter()
-        .chain(turned_off())
-        .collect();
-    runs(id, &wanted, &|m| {
-        metas
-            .iter()
-            .find(|o| o.id == m)
-            .map_or(Vec::new(), |o| o.deps.clone())
-    })
+    runs(id, &wanted, &dependencies)
 }
 
 /// Not itself turned off, and neither is anything it needs, however far down.
-fn runs(id: &str, off: &[String], deps: &dyn Fn(&str) -> Vec<String>) -> bool {
-    !off.iter().any(|o| o == id) && deps(id).iter().all(|d| d != id && runs(d, off, deps))
+fn runs(id: &str, off: &[String], deps: &dyn Fn(&str) -> Option<Vec<String>>) -> bool {
+    let mut todo = vec![id.to_string()];
+    let mut seen = rustc_hash::FxHashSet::default();
+    while let Some(id) = todo.pop() {
+        if !seen.insert(id.clone()) {
+            continue;
+        }
+        if off.contains(&id) {
+            return false;
+        }
+        let Some(needs) = deps(&id) else { return false };
+        todo.extend(needs);
+    }
+    true
+}
+
+fn enable(id: &str, off: &mut Vec<String>, deps: &dyn Fn(&str) -> Option<Vec<String>>) {
+    let mut todo = vec![id.to_string()];
+    let mut seen = rustc_hash::FxHashSet::default();
+    while let Some(id) = todo.pop() {
+        if !seen.insert(id.clone()) {
+            continue;
+        }
+        off.retain(|m| m != &id);
+        todo.extend(deps(&id).unwrap_or_default());
+    }
 }
 
 /// Turns a mod on or off from the next start.
 pub fn toggle(id: &str) {
     let mut guard = SWITCHES.lock();
     let Some(s) = guard.as_mut() else { return };
-    match s.wanted.iter().position(|w| w == id) {
-        Some(i) => drop(s.wanted.remove(i)),
-        None => s.wanted.push(id.to_string()),
+    if runs(id, &s.wanted, &dependencies) {
+        s.wanted.push(id.to_string());
+    } else {
+        enable(id, &mut s.wanted, &dependencies);
     }
     s.wanted.sort();
-    if let Some(d) = s.file.parent() {
-        let _ = std::fs::create_dir_all(d);
-    }
-    if let Err(e) = std::fs::write(&s.file, s.wanted.join("\n")) {
-        log::error!("{}: {e}", s.file.display());
-    }
+    s.save();
+}
+
+fn automatically_disabled(off: &[ModMeta], wanted: &[String]) -> Vec<String> {
+    // Missing dependencies cause automatic disabling; only explicit switches suppress the notice.
+    let deps = |id: &str| {
+        Some(
+            off.iter()
+                .find(|m| m.id == id)
+                .map_or(Vec::new(), |m| m.deps.clone()),
+        )
+    };
+    off.iter()
+        .filter(|m| runs(&m.id, wanted, &deps))
+        .map(|m| m.id.clone())
+        .collect()
 }
 
 /// Something was switched that a restart would bring in.
@@ -314,7 +424,19 @@ pub fn restart_pending() -> bool {
         .is_some_and(|s| s.wanted != s.at_start)
 }
 
-pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path, off_file: &Path) -> Result<Vec<LoadedMod>, String> {
+/// What a mod has to be built against to load (`weft --mod-abi`).
+pub const ABI_VERSION: u64 = abi::ABI_VERSION;
+
+/// `package_dirs`: folders of data packages (chiacraft), installed into the store under `cache`.
+/// `also_off`: off for this run only, besides what the player turned off (a launcher's choice).
+pub fn load(
+    mod_dirs: &[PathBuf],
+    package_dirs: &[PathBuf],
+    cache: &Path,
+    off_file: &Path,
+    also_off: &[String],
+    core_assets: &Path,
+) -> Result<Vec<LoadedMod>, String> {
     let start = Instant::now();
     let mut wanted: Vec<String> = std::fs::read_to_string(off_file)
         .unwrap_or_default()
@@ -322,9 +444,16 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path, off_fi
         .map(|l| l.trim().to_string())
         .filter(|l| !l.is_empty())
         .collect();
+    let run_only = also_off
+        .iter()
+        .filter(|id| !wanted.contains(id))
+        .cloned()
+        .collect();
+    wanted.extend(also_off.iter().cloned());
     wanted.sort();
-    *SWITCHES.lock() = Some(Switches { file: off_file.to_path_buf(), at_start: wanted.clone(), wanted: wanted.clone() });
+    wanted.dedup();
     let mut off: Vec<ModMeta> = Vec::new();
+    let mut errors = rustc_hash::FxHashMap::default();
     let shadow = cache.join("mods");
     std::fs::create_dir_all(&shadow).ok();
     if let Ok(entries) = std::fs::read_dir(&shadow) {
@@ -334,41 +463,63 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path, off_fi
     }
 
     let mut mods = Vec::new();
-    for (name, dir, lib_path) in discover(mod_dirs, cache) {
+    for DiscoveredMod { name, root: dir, library: lib_path, source } in discover(mod_dirs, cache) {
+        let rejected = |reason: String, off: &mut Vec<ModMeta>, errors: &mut rustc_hash::FxHashMap<String, String>| {
+            log::warn!("mod {name} is off: {reason}");
+            errors.insert(name.clone(), reason);
+            off.push(ModMeta {
+                revision: 0,
+                id: name.clone(),
+                version: String::new(),
+                deps: Vec::new(),
+                after: Vec::new(),
+                before: Vec::new(),
+                order: 0,
+                assets: dir.join("assets"),
+                source: source.clone(),
+                package: None,
+            });
+        };
         // Windows locks loaded libraries; loading a copy keeps the original rebuildable.
         let copy = shadow.join(format!("{}-{}", std::process::id(), lib_path.file_name().unwrap().to_string_lossy()));
-        let load_from = if std::fs::copy(&lib_path, &copy).is_ok() { copy } else { lib_path.clone() };
+        let load_from = if cfg!(windows) && std::fs::copy(&lib_path, &copy).is_ok() { copy } else { lib_path.clone() };
         let lib = match unsafe { libloading::Library::new(&load_from) } {
             Ok(lib) => lib,
-            // A mod that won't load is a good reason to have turned it off.
-            Err(_) if wanted.contains(&name) => {
-                off.push(ModMeta {
-                    id: name.clone(),
-                    version: String::new(),
-                    deps: Vec::new(),
-                    order: 0,
-                    assets: dir.join("assets"),
-                    package: None,
-                });
+            Err(e) => {
+                rejected(format!("could not load library: {e}"), &mut off, &mut errors);
                 continue;
             }
-            Err(e) => return Err(format!("loading mod {name} from {}: {e}", lib_path.display())),
         };
-        let entry: libloading::Symbol<unsafe extern "C" fn() -> *const abi::ModDecl> =
-            unsafe { lib.get(abi::ENTRY_SYMBOL) }.map_err(|_| format!("{} is not a Weft mod", lib_path.display()))?;
-        let decl = unsafe { &*entry() };
-        if decl.abi_version != abi::ABI_VERSION {
-            return Err(format!(
-                "mod {name} was built against another mod ABI ({:016x}, this engine has {:016x}); rebuild it against the current weft_sdk",
-                decl.abi_version,
-                abi::ABI_VERSION
-            ));
+        let entry: libloading::Symbol<unsafe extern "C" fn() -> *const abi::ModDecl> = match unsafe { lib.get(abi::ENTRY_SYMBOL) } {
+            Ok(entry) => entry,
+            Err(_) => {
+                rejected("not a Weft mod".into(), &mut off, &mut errors);
+                continue;
+            }
+        };
+        let decl = unsafe { entry() };
+        if decl.is_null() {
+            rejected("empty mod declaration".into(), &mut off, &mut errors);
+            continue;
         }
+        // Only the version prefix is safe to read before the ABI agrees.
+        let version = unsafe { std::ptr::read(decl.cast::<u64>()) };
+        if version != abi::ABI_VERSION {
+            rejected(format!("built for mod ABI {version:016x}; this engine needs {:016x}", abi::ABI_VERSION), &mut off, &mut errors);
+            continue;
+        }
+        let decl = unsafe { &*decl };
         let id = unsafe { decl.id.as_str() }.to_string();
         if id != name {
-            return Err(format!("mod {name} is the crate {id}: name its folder or zip {id}"));
+            rejected(format!("the library declares mod {id}; its folder or zip must use that name"), &mut off, &mut errors);
+            continue;
         }
-        mods.push(LoadedMod { id, assets: dir.join("assets"), _lib: lib, decl });
+        let mut revision = DefaultHasher::new();
+        let versioned = if source.is_file() { &source } else { &lib_path };
+        if let Ok(file) = std::fs::metadata(versioned) {
+            (file.len(), file.modified().ok()).hash(&mut revision);
+        }
+        mods.push(LoadedMod { id, assets: dir.join("assets"), source, revision: revision.finish(), _lib: lib, decl });
     }
     mods.sort_by(|a, b| a.id.cmp(&b.id));
     // Out go the ones turned off, then what needs them, and what needs that.
@@ -382,30 +533,54 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path, off_fi
                 .collect()
         }
     };
+    // A mod needing one that isn't there is off too, rather than the game not starting.
+    let found: Vec<String> = mods.iter().map(|m| m.id.clone()).collect();
+    let missing = |d: &String| !found.contains(d);
     loop {
-        let Some(i) = mods
-            .iter()
-            .position(|m| wanted.contains(&m.id) || deps_of(m).iter().any(|d| off.iter().any(|o| &o.id == d)))
-        else {
+        let Some(i) = mods.iter().position(|m| {
+            wanted.contains(&m.id)
+                || deps_of(m)
+                    .iter()
+                    .any(|d| missing(d) || off.iter().any(|o| &o.id == d))
+        }) else {
             break;
         };
         let m = mods.remove(i);
         if wanted.contains(&m.id) {
             log::info!("mod {} is turned off", m.id);
+        } else if let Some(d) = deps_of(&m).iter().find(|d| missing(d)) {
+            log::warn!("mod {} is off, as it needs {d}, which isn't there", m.id);
         } else {
             log::warn!("mod {} is off, as it needs one that is", m.id);
         }
         off.push(ModMeta {
+            revision: 0,
             id: m.id.clone(),
             version: unsafe { m.decl.version.as_str() }.to_string(),
             deps: deps_of(&m),
+            after: Vec::new(),
+            before: Vec::new(),
             order: 0,
             assets: m.assets.clone(),
+            source: m.source.clone(),
             package: None,
         });
     }
     off.sort_by(|a, b| a.id.cmp(&b.id));
+    let newly_disabled = automatically_disabled(&off, &wanted);
+    wanted.extend(newly_disabled.iter().cloned());
+    wanted.sort();
+    wanted.dedup();
+    let switches = Switches { file: off_file.to_path_buf(), at_start: wanted.clone(), wanted, run_only };
+    if !newly_disabled.is_empty() {
+        log::info!("automatically disabled mods: {}", newly_disabled.join(", "));
+        switches.save();
+    }
+    *SWITCHES.lock() = Some(switches);
+    let _ = NEWLY_DISABLED.set(newly_disabled);
     let _ = OFF.set(off);
+    let _ = LOAD_ERRORS.set(errors);
+    set_names(mods.iter().map(|m| m.id.clone()).collect());
 
     let register = mods.iter().find_map(|m| unsafe {
         m._lib
@@ -422,18 +597,22 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path, off_fi
     let metas: Vec<ModMeta> = mods
         .iter()
         .map(|m| unsafe {
-            ModMeta {
-                id: m.id.clone(),
-                version: m.decl.version.as_str().to_string(),
-                deps: m
-                    .decl
-                    .deps
-                    .as_slice()
+            let names = |list: &abi::Slice<abi::Str>| {
+                list.as_slice()
                     .iter()
                     .map(|d| d.as_str().to_string())
-                    .collect(),
+                    .collect()
+            };
+            ModMeta {
+                revision: m.revision,
+                id: m.id.clone(),
+                version: m.decl.version.as_str().to_string(),
+                deps: names(&m.decl.deps),
+                after: names(&m.decl.after),
+                before: names(&m.decl.before),
                 order: 0,
                 assets: m.assets.clone(),
+                source: m.source.clone(),
                 package: None,
             }
         })
@@ -457,9 +636,24 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path, off_fi
         })
         .collect();
     log::info!("{} mods registered in {:.1} ms", mods.len(), start.elapsed().as_secs_f64() * 1000.0);
+    // Load order is part of the game's behaviour (later mods win on conflicts), so every mod is logged.
+    for m in &metas {
+        log::info!("loaded mod {} {}", m.id, m.version);
+    }
+    let step_order = std::fs::read_to_string(off_file.with_file_name("step_order.txt")).unwrap_or_default();
     let store = chiacraft_packages::store::Store::new(cache);
     let installed = install(&store, package_dirs, &metas);
-    *LOADER.lock() = Some(Loader { metas, regs, register, store, installed: installed.clone(), current: None, built: Vec::new() });
+    *LOADER.lock() = Some(Loader {
+        metas,
+        regs,
+        register,
+        store,
+        installed: installed.clone(),
+        current: None,
+        built: Vec::new(),
+        step_order,
+        core_assets: core_assets.to_path_buf(),
+    });
     use_packages(&installed)?;
     Ok(mods)
 }
@@ -494,6 +688,10 @@ struct Loader {
     current: Option<Vec<String>>,
     /// Every content built: by its sorted package hashes.
     built: Vec<(Vec<String>, &'static content::Content)>,
+    /// The player's step order (`step_order.txt` beside the off file), for every build.
+    step_order: String,
+    /// The engine's own assets, for every build.
+    core_assets: PathBuf,
 }
 
 static LOADER: parking_lot::Mutex<Option<Loader>> = parking_lot::Mutex::new(None);
@@ -725,11 +923,15 @@ pub fn tidy_store(saves: &Path) {
 fn build(l: &Loader, set: &[PackageRef]) -> Result<content::Content, String> {
     let mut metas = l.metas.clone();
     metas.extend(set.iter().map(|p| ModMeta {
+        revision: 0,
         id: p.id.clone(),
         version: p.version.clone(),
         deps: p.deps.clone(),
+        after: Vec::new(),
+        before: Vec::new(),
         order: 0,
         assets: p.dir.join("assets"),
+        source: p.dir.clone(),
         package: Some(p.hash.hex()),
     }));
     for m in &metas {
@@ -753,7 +955,7 @@ fn build(l: &Loader, set: &[PackageRef]) -> Result<content::Content, String> {
         }
         regs.push(reg);
     }
-    content::freeze(metas, regs).map_err(|e| e.join("\n"))
+    content::freeze(metas, regs, &l.step_order, &l.core_assets).map_err(|e| e.join("\n"))
 }
 
 #[cfg(test)]
@@ -762,17 +964,58 @@ mod tests {
 
     #[test]
     fn a_mod_needs_what_it_depends_on_running() {
-        let deps = |m: &str| -> Vec<String> {
-            match m {
-                "top" => vec!["middle".to_string()],
+        let deps = |m: &str| -> Option<Vec<String>> {
+            Some(match m {
+                "top" => vec!["middle".to_string(), "base".to_string()],
                 "middle" => vec!["base".to_string()],
-                _ => Vec::new(),
-            }
+                "cycle" => vec!["cycle".to_string()],
+                "base" => Vec::new(),
+                _ => return None,
+            })
         };
         let off = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
         assert!(runs("top", &off(&[]), &deps));
         assert!(!runs("top", &off(&["base"]), &deps), "all the way down");
         assert!(runs("base", &off(&["top"]), &deps), "not the other way");
+        assert!(!runs("missing", &off(&[]), &deps));
+        assert!(runs("cycle", &off(&[]), &deps), "a cycle terminates");
+        let mut disabled = off(&["middle", "base", "unrelated"]);
+        enable("top", &mut disabled, &deps);
+        assert_eq!(disabled, off(&["unrelated"]));
+        assert!(runs("top", &disabled, &deps));
+
+        let off_mods: Vec<ModMeta> = [
+            ("base", vec![]),
+            ("middle", vec!["base"]),
+            ("top", vec!["middle", "base"]),
+            ("broken", vec![]),
+            ("addon", vec!["broken"]),
+            ("absent_dep", vec!["absent"]),
+            ("cycle", vec!["cycle"]),
+        ]
+        .into_iter()
+        .map(|(id, deps)| ModMeta {
+            revision: 0,
+            id: id.to_string(),
+            version: String::new(),
+            deps: off(&deps),
+            after: Vec::new(),
+            before: Vec::new(),
+            order: 0,
+            assets: PathBuf::new(),
+            source: PathBuf::new(),
+            package: None,
+        })
+        .collect();
+        let wanted = off(&["base", "cycle"]);
+        let automatic = automatically_disabled(&off_mods, &wanted);
+        assert_eq!(automatic, off(&["broken", "addon", "absent_dep"]));
+        let mut saved = wanted.clone();
+        saved.extend(automatic);
+        assert!(automatically_disabled(&off_mods, &saved).is_empty());
+        enable("top", &mut saved, &deps);
+        assert!(runs("top", &saved, &deps));
+        assert_eq!(saved, off(&["cycle", "broken", "addon", "absent_dep"]));
     }
 
     /// A player's copy of a mod that also came with the game: theirs is the one, still unpacked.
@@ -795,7 +1038,8 @@ mod tests {
         }
         let found = discover(&zips, &tmp.join("cache"));
         assert_eq!(found.len(), 1);
-        assert_eq!(std::fs::read_to_string(&found[0].2).unwrap(), "mine");
+        assert_eq!(std::fs::read_to_string(&found[0].library).unwrap(), "mine");
+        assert_eq!(found[0].source.parent(), Some(zips[0].as_path()));
         std::fs::remove_dir_all(&tmp).unwrap();
     }
 
@@ -817,7 +1061,8 @@ mod tests {
         assert_eq!(names, ["assets/a.txt", "libmymod.dylib", "libmymod.so", "mymod.dll"]);
         let found = discover(&[mods], &tmp.join("cache"));
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].2.file_name().unwrap(), libloading::library_filename("mymod"));
+        assert_eq!(found[0].library.file_name().unwrap(), libloading::library_filename("mymod"));
+        assert_eq!(found[0].source, zip);
         std::fs::remove_dir_all(&tmp).unwrap();
     }
 }

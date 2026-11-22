@@ -7,8 +7,11 @@ license.workspace = true
 [dependencies]
 weft_engine.workspace = true
 weft_vulkan.workspace = true
+weft_wgpu.workspace = true
 weft_render.workspace = true
 log.workspace = true
+png.workspace = true
+rustc-hash.workspace = true
 
 [features]
 # DLSS through NVIDIA's Streamline (Windows), see backends/vulkan/src/streamline.rs.

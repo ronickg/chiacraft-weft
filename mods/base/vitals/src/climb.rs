@@ -1,5 +1,5 @@
 //! Climbing any wall on stamina (`mods/base/src/climbing.rs`; the engine climbs by
-//! `core:climb_speed` times the wall's `grip`): pushing into a wall in the air holds on to it and
+//! `core:wall_climb_speed` times the wall's `grip`): pushing into a wall in the air holds on to it and
 //! climbs, sneaking hangs still, sneaking into it climbs down, a wall that ends under the knees is
 //! climbed over. Stamina pays by the second (`stamina::CLIMB`); run out and the hands let go.
 //! What one carries, being wet and being cold make it slower and dearer.

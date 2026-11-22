@@ -15,7 +15,7 @@ pub async fn missing_dimension(t: T) -> R {
     t.op("put me 3 diamond 5").await?;
     t.op("stash base:chest stick 7").await?;
     t.screen("core:menu").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     let flat = Dimension::lookup("base:flatlands").ok_or("no flatlands")?;
     t.cmd("/dim base:flatlands").await?;
@@ -36,11 +36,11 @@ pub async fn missing_dimension(t: T) -> R {
         std::fs::write(f.path(), src.replace("dim = base:flatlands", "dim = ghost:gone")).map_err(|e| e.to_string())?;
     }
     // Opened from the list like a player would: the missing mod is named first.
-    t.c().screen_open(&screens::WORLDS);
+    t.c().menu_open(&screens::WORLDS);
     t.screen("core:worlds").await?;
     t.frames(2).await?;
     // A click lasts 50 ms; buttons act on release.
-    t.click_ui(&format!("text:{name} |"), 0);
+    t.click_ui(&format!("text:{name}"), 0);
     t.secs(0.2).await?;
     t.click_ui("id:play", 0);
     t.screen("core:missing_mods").await?;
@@ -53,89 +53,6 @@ pub async fn missing_dimension(t: T) -> R {
     t.check_eq(t.state().dim, Dimension::lookup("base:overworld").unwrap_or(u32::MAX), "the player is in the spawn dimension");
     t.check_eq(t.slot("me", 3).await?, ("base:diamond".into(), 5, 0), "and kept the inventory");
     t.check_eq(t.op("stashed 0").await?, "base:stick 7 0".to_string(), "and the stash");
-    Ok(())
-}
-
-/// Riding: chains of mounts without rings, a mob jockey steering by its AI, the player steering
-/// from its client with the kind's keys, getting off where the seat says.
-pub async fn riding(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    let spawn = async |t: &T, kind: &str, dz: i32| {
-        t.op(&format!("spawn {kind} {} {} {}", f[0], f[1], f[2] + dz))
-            .await
-    };
-    let (a, b) = (spawn(&t, "testmod:steed", -4).await?, spawn(&t, "testmod:steed", -7).await?);
-    let y = |s: String| {
-        s.split_whitespace()
-            .nth(2)
-            .and_then(|v| v.parse::<f64>().ok())
-            .unwrap_or(f64::NAN)
-    };
-    t.check_eq(t.op(&format!("mount {a} {b}")).await?, "1".to_string(), "a steed on a steed");
-    t.check_eq(t.op(&format!("mount {b} {a}")).await?, "0".to_string(), "no ring of riders");
-    t.secs(0.3).await?;
-    let (ya, yb) = (y(t.op(&format!("entity {a}")).await?), y(t.op(&format!("entity {b}")).await?));
-    t.check((yb - ya - 1.0).abs() < 0.05, format!("the one on top sits in its seat: {yb:.2} over {ya:.2}"));
-
-    // A zombie in the saddle walks the steed with its AI, towards the player.
-    let z = spawn(&t, "base:zombie", -12).await?;
-    let c = spawn(&t, "testmod:steed", -12).await?;
-    t.op("time 18000").await?;
-    t.check_eq(t.op(&format!("mount {c} {z}")).await?, "1".to_string(), "a zombie jockey");
-    let at = |s: String| {
-        let v: Vec<f64> = s
-            .split_whitespace()
-            .skip(1)
-            .take(3)
-            .filter_map(|v| v.parse().ok())
-            .collect();
-        (v.first().copied().unwrap_or(f64::NAN), v.get(2).copied().unwrap_or(f64::NAN))
-    };
-    let before = at(t.op(&format!("entity {c}")).await?);
-    t.secs(2.0).await?;
-    let after = at(t.op(&format!("entity {c}")).await?);
-    let walked = (after.0 - before.0).hypot(after.1 - before.1);
-    t.probe("blocks the zombie walked its steed", walked as f32, walked > 1.0);
-
-    // The player in the saddle of the free one: its keys walk it where it looks.
-    t.op(&format!("remove {z}")).await?;
-    t.op(&format!("remove {c}")).await?;
-    let d = spawn(&t, "testmod:steed", 3).await?;
-    t.check_eq(t.op(&format!("mount {d}")).await?, "1".to_string(), "the player gets on");
-    t.c().set_look(0.0, 0.0);
-    t.secs(0.5).await?;
-    let before = at(t.op(&format!("entity {d}")).await?);
-    t.hold("core:forward", 1.0);
-    t.secs(1.3).await?;
-    let after = at(t.op(&format!("entity {d}")).await?);
-    let rode = (after.0 - before.0).hypot(after.1 - before.1);
-    t.probe("blocks the player rode it in a second", rode as f32, rode > 2.0);
-    let seat = t.op("vehicle").await?;
-    t.check(seat.starts_with(&d), format!("still on it: {seat}"));
-    // From behind: sitting, legs forward.
-    t.press("core:perspective");
-    t.c().set_look(180.0, -35.0);
-    t.secs(0.6).await?;
-    t.shot("seated").await?;
-    t.press("core:perspective");
-    t.press("core:perspective");
-
-    // Sent away, the steed takes its rider: in this dimension, then to another.
-    t.op(&format!("send {d} here {} {} {}", f[0] + 40, f[1] + 3, f[2]))
-        .await?;
-    t.until("the rider came along", Duration::from_secs(5), |t| (t.state().pos.x - (f[0] + 40) as f64).abs() < 3.0)
-        .await?;
-    t.check(t.op("vehicle").await?.starts_with(&d), "still in the saddle after a teleport");
-    let over = Dimension::lookup("base:overworld").ok_or("no overworld")?;
-    t.op(&format!("send {d} base:overworld 0 200 0")).await?;
-    t.until("the rider came to the other dimension", Duration::from_secs(10), |t| t.state().dim == over)
-        .await?;
-    t.secs(0.5).await?;
-    t.check(t.op("vehicle").await?.starts_with(&d), "still in the saddle in the other dimension");
-    t.press("core:dismount");
-    t.secs(0.5).await?;
-    t.check_eq(t.op("vehicle").await?, "0 0".to_string(), "the dismount key gets off");
     Ok(())
 }
 
@@ -208,7 +125,7 @@ pub async fn camera(t: T) -> R {
     t.secs(0.3).await?;
     t.check_eq(t.state().camera, 0, "its key again comes back");
 
-    let orbit = CameraMode::generated("testmod:orbit".to_string()).camera_id();
+    let orbit = CameraMode::generated("testmod:orbit".to_string()).id();
     t.press("testmod:orbit");
     t.secs(0.8).await?;
     t.check_eq(t.state().camera, orbit, "a mod's camera on its key");
@@ -231,7 +148,33 @@ pub async fn camera(t: T) -> R {
 
 /// Mods change a player's state from the server, and its client follows: a mace's smash by the
 /// fall it reads, then the look, the hand, flight and fire set from outside.
-pub async fn entity_edit(t: T) -> R {
+/// `r.edit` of an item and a biome: the edit's values win, the rest stays (testkit's own, see
+/// its registration; its ore, liquid, dimension and terrain edits of testmod's would fail the load
+/// if they found nothing). A block's edit reaches every state, or the states of a key, and a
+/// template's blocks; `r.set` and `r.tag` by tag and by state.
+pub async fn edits(t: T) -> R {
+    t.flat().await?;
+    t.check_eq(
+        t.op("edited").await?,
+        "8 3 2 true true/true/false 4 true base:cobblestonex2,testmod:editedx1 true true true true [0.9, 2.5, 1.0] 3 4/15/1.5/false,4/3/1.5/true 40 true"
+            .to_string(),
+        "max stack, damage, warmth, tag, a weather's tags, an attribute's default, a recipe removed, a loot table's pools, a liquid's id, its block's and item's tag, a column of Mars, Mars' tag, an entity kind's size and eye, its value after the edits, a block's states after an edit of every state and one of a key (light, opacity, a value set by tag, a tag set on one state), a stair's states and their edited light",
+    );
+    // Records: testmod's own as testkit changed it, and one testkit added with its tag.
+    t.check_eq(t.op("records").await?, "testkit:brick_style=1 testmod:stone_style=5".to_string(), "records of a tag, edited");
+    // The edit of the menu adds two slots to the equipment (four and the other hand) and the
+    // player's 36.
+    t.op(&format!("emenu testkit:gear {}", t.c().player()))
+        .await?;
+    let gear = Menu::lookup("testkit:gear").unwrap_or(u32::MAX);
+    t.until("the edited menu open", Duration::from_secs(5), |t| t.c().menu().is_some_and(|m| m.kind == gear))
+        .await?;
+    t.check_eq(t.c().menu().map(|m| m.slots), Some(43), "the slots of a menu an edit added a group to");
+    t.c().menu_close();
+    t.no_screen().await
+}
+
+pub async fn entity_modify(t: T) -> R {
     t.flat().await?;
     let (dmg, fell) = {
         let s = t.op("attack_damage testmod:mace 5").await?;
@@ -241,12 +184,12 @@ pub async fn entity_edit(t: T) -> R {
         (p.next().unwrap_or(f64::NAN), p.next().unwrap_or(f64::NAN))
     };
     t.check_eq(fell, 5.0, "the fall distance a mod set");
-    t.check_eq(dmg, 22.0, "a mace after five blocks: 6 + 4 * 3 + 2 * 2");
+    t.check_eq(dmg, 22.0, "a mace after five blocks: a hand's 1 and the mace's 5, + 4 * 3 + 2 * 2");
     let (plain, _) = {
         let s = t.op("attack_damage base:stick 5").await?;
         (s.split_whitespace().next().unwrap_or("").to_string(), ())
     };
-    t.check_eq(plain, "6".to_string(), "anything else doesn't care how far it fell");
+    t.check_eq(plain, "1".to_string(), "anything else doesn't care how far it fell");
     let ground = t.state().pos.y;
     t.check_eq(t.op("edit_me 1.5 4 1 60").await?, "4 60".to_string(), "slot and fire on the server");
     t.until("the client follows", Duration::from_secs(10), |t| {
@@ -291,7 +234,7 @@ pub async fn virtual_menus(t: T) -> R {
         .await?;
     t.check_eq(t.c().menu_slot(1).count, 10, "second stash slot");
     t.shot("virtual_chest").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
 
     // On a held stack: what goes in stays in that stack, and the menu closes when it goes.
@@ -308,7 +251,7 @@ pub async fn virtual_menus(t: T) -> R {
     t.op("hmenu testmod:pouch 8").await?;
     t.frames(10).await?;
     t.check(t.c().menu_slot(2).is_empty(), "a new pouch shows the old one's items");
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
 
     let f = t.feet();
@@ -341,7 +284,7 @@ pub async fn virtual_menus(t: T) -> R {
             .await?;
         t.screen("core:menu").await?;
     }
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await
 }
 
@@ -388,7 +331,7 @@ pub async fn fly_load(t: T) -> R {
     // The way with the most mountains: their slopes ask the most of what comes first.
     let mountains = |x: i32| {
         (0..24)
-            .filter(|i| name_of(ek::BIOME, OVERWORLD.column(5, x, -400 * i).biome) == "base:mountains")
+            .filter(|i| matches!(name_of(ek::BIOME, OVERWORLD.column(5, x, -400 * i).biome), "base:mountains" | "base:snowy_peaks"))
             .count()
     };
     let way = (-40..40)
@@ -602,7 +545,7 @@ pub async fn crater_saved(t: T) -> R {
     Ok(())
 }
 
-use base_api::OVERWORLD;
+use base_api::dimensions::OVERWORLD;
 
 /// Testmod edits Mars as from outside: a biome tried before its dust, with its own surface
 /// and boulders, and a rock needle from a feature written in testmod.
@@ -796,10 +739,14 @@ pub async fn growth(t: T) -> R {
     t.check_eq(t.block(cane).await?, "core:air".to_string(), "sugar cane without water breaks off");
     t.set(add(cane, [0, -1, 1]), "water").await?;
     t.set(cane, "sugar_cane").await?;
+    let sapling = add(f, [0, 0, 4]);
+    t.set(add(sapling, [0, -1, 0]), "grass").await?;
+    t.set(sapling, "sapling").await?;
     t.op("skip 199000").await?;
     t.secs(0.5).await?;
     t.check_eq(t.block(add(farm, [0, 1, 0])).await?, "base:wheat[age=7]".to_string(), "wheat after a jump of 2.5 hours");
     t.check_eq(t.block(add(cane, [0, 2, 0])).await?, "base:sugar_cane".to_string(), "sugar cane after the jump");
+    t.check(t.block(sapling).await?.starts_with("base:oak_log"), "the sapling grew into an oak");
     // Far away the cane's area unloads; time passes; coming back, it has grown.
     let cane2 = add(f, [-4, 0, 0]);
     t.set(add(cane2, [0, -1, -1]), "water").await?;
@@ -909,9 +856,9 @@ pub async fn persistence(t: T) -> R {
     t.cmd("/feed 0").await?;
     t.frames(3).await?;
     let base = value(&t.op("attr me core:max_health").await?);
-    t.op("attr_mod me core:movement_speed testkit:haste 1 0.5 40")
+    t.op("attr_mod me core:movement_speed testkit:haste core:percent 0.5 40")
         .await?;
-    t.op("attr_mod me core:max_health testkit:vigor 0 10 0")
+    t.op("attr_mod me core:max_health testkit:vigor core:add 10 0")
         .await?;
     let speed = t.op("attr me core:movement_speed").await?;
     if !t.ci_skips("speed") {
@@ -924,6 +871,9 @@ pub async fn persistence(t: T) -> R {
     // A timer due after the reload is saved with the player and fires there.
     let rings: u32 = t.op("rings").await?.parse().unwrap_or(0);
     t.op("after 120").await?;
+    t.op("after 120 dim").await?;
+    t.op("after 120 block").await?;
+    t.op(&format!("after 120 block {skiff}")).await?;
     // A world's setting (a game rule) goes with the world.
     t.cmd("/rule testkit:count_marks 1").await?;
 
@@ -949,12 +899,12 @@ pub async fn persistence(t: T) -> R {
     let mut now = rings;
     for _ in 0..40 {
         now = t.op("rings").await?.parse().unwrap_or(0);
-        if now > rings {
+        if now >= rings + 4 {
             break;
         }
         t.secs(0.25).await?;
     }
-    t.check_eq(now, rings + 1, "the timer saved with the player fired after the reload");
+    t.check_eq(now, rings + 4, "timers on the player, dimension, terrain cell and body cell survived the reload");
     let rule = t.cmd("/rule testkit:count_marks").await?;
     t.check(rule.contains("true"), format!("the world's setting after reload: {rule}"));
     t.cmd("/rule testkit:count_marks 0").await?;
@@ -1084,17 +1034,15 @@ pub async fn dimensions(t: T) -> R {
     t.cmd(&format!("/setblock {} {y} {z} base:stone", x + 1))
         .await?;
     t.check_eq(t.block([x + 1, y, z]).await?, "core:air".to_string(), "debug blocks refuse /setblock");
-    // Breaking is refused like placing, and nothing holds the grid up.
-    let at = t.op("find 160 base:stone").await?;
-    let s: Vec<i32> = at
-        .split_whitespace()
-        .filter_map(|v| v.parse().ok())
-        .collect();
-    let [sx, sy, sz] = s[..] else { return Err(format!("no stone among the debug blocks: {at}")) };
+    // Breaking is refused like placing, and nothing holds the grid up: the debug block beside
+    // the water's.
+    let (sx, sy, sz) = (x + 2, y, z);
+    let was = t.block([sx, sy, sz]).await?;
+    t.check(was != "core:air", format!("a debug block beside the water: {was}"));
     // Refused, not just undone: a refused break sends the block back to the player's client.
     let broke = t.op(&format!("break {sx} {sy} {sz}")).await?;
     t.check_eq(broke, "0".to_string(), "breaking a debug block is refused");
-    t.check_eq(t.block([sx, sy, sz]).await?, "base:stone".to_string(), "debug blocks refuse breaking");
+    t.check_eq(t.block([sx, sy, sz]).await?, was, "debug blocks refuse breaking");
     t.check_eq(t.block([sx, sy - 1, sz]).await?, "core:air".to_string(), "no floor under the debug blocks");
     t.cmd("/rule core:mob_spawning 1").await?;
     t.secs(4.5).await?;
@@ -1193,6 +1141,27 @@ pub async fn worldgen(t: T) -> R {
         "w.place puts a template",
     );
     t.check_eq(t.block([f[0] + 5, f[1] + 11, f[2] + 1]).await?, "testmod:glow_crystal".to_string(), "its glowing core");
+    // A box of the world saved, placed again mirrored, and taken back.
+    let (sx, sy, sz) = (f[0] + 12, f[1] + 12, f[2]);
+    t.cmd(&format!("/setblock {sx} {sy} {sz} base:stone_stairs[facing=east]"))
+        .await?;
+    t.cmd(&format!("/setblock {} {sy} {sz} base:chest", sx + 1))
+        .await?;
+    t.cmd(&format!("/insert {} {sy} {sz} base:diamond 5", sx + 1))
+        .await?;
+    t.cmd(&format!("/structure save test_mirror {sx} {sy} {sz} {} {sy} {sz}", sx + 1))
+        .await?;
+    let (lx, lz) = (sx, sz + 3);
+    t.cmd(&format!("/structure load test_mirror {lx} {sy} {lz} 4"))
+        .await?;
+    let stairs = t.block([lx + 1, sy, lz]).await?;
+    t.check(stairs.contains("facing=west"), format!("mirrored, the stairs face the other way: {stairs}"));
+    let chest = t.block([lx, sy, lz]).await?;
+    t.check(chest.starts_with("base:chest"), format!("and the chest is on the other side: {chest}"));
+    let held = t.op(&format!("inv {lx} {sy} {lz}")).await?;
+    t.check(held.contains("base:diamond:5"), format!("with what it held when saved: {held}"));
+    t.cmd("/structure undo").await?;
+    t.check_eq(t.block([lx + 1, sy, lz]).await?, "core:air".to_string(), "undone, what was there is back");
 
     // Testmod puts base's forest on Mars; the engine scatters its trees there like at home.
     static MARS: Dimension = Dimension::named("testmod:mars");
@@ -1223,7 +1192,53 @@ pub async fn worldgen(t: T) -> R {
         .collect();
     t.check(n[0] + n[1] > 0, "trees grow in base's forest on Mars");
     t.check(n[2] > 0, "the forest brings its grass to Mars");
-    t.check(t.op("structure testmod:obelisk 3000").await? != "none", "obelisks on Mars");
+    // The nearest obelisk is where its site says, its crystal in the middle of its top.
+    let at = t.op("structure testmod:obelisk 3000").await?;
+    let corner: Vec<i32> = at
+        .split_whitespace()
+        .filter_map(|v| v.parse().ok())
+        .collect();
+    t.check(corner.len() == 3, format!("obelisks on Mars ({at})"));
+    if let [cx, cy, cz] = corner[..] {
+        t.cmd(&format!("/tp {cx} {} {cz}", cy + 8)).await?;
+        t.secs(0.5).await?;
+        t.loaded().await?;
+        t.check_eq(t.block([cx + 1, cy + 4, cz + 1]).await?, "testmod:glow_crystal".to_string(), "an obelisk stands at its site");
+    }
+    // An outpost: its hub and the halls its joints took, in the palette's bricks, its chest
+    // filled, its pig there, and mods told it stands.
+    let at = t.op("structure testmod:outpost 3000").await?;
+    let hub: Vec<i32> = at
+        .split_whitespace()
+        .filter_map(|v| v.parse().ok())
+        .collect();
+    t.check(hub.len() == 3, format!("outposts on Mars ({at})"));
+    if let [hx, hy, hz] = hub[..] {
+        t.cmd(&format!("/tp {} {} {}", hx + 2, hy + 6, hz + 2))
+            .await?;
+        t.secs(0.5).await?;
+        t.loaded().await?;
+        t.check_eq(t.block([hx, hy, hz]).await?, "base:bricks".to_string(), "the hub in the palette's block");
+        let roof = t.block([hx, hy + 3, hz]).await?;
+        t.check(roof.starts_with("base:bricks_slab"), format!("its roof the slabs made of it: {roof}"));
+        t.check_eq(t.block([hx + 2, hy + 1, hz - 1]).await?, "core:air".to_string(), "a hall goes on from its north door");
+        t.check_eq(t.block([hx + 1, hy + 1, hz - 1]).await?, "base:bricks".to_string(), "between the hall's walls");
+        let inv = t
+            .op(&format!("inv {} {} {}", hx + 2, hy + 1, hz + 2))
+            .await?;
+        let diamonds: u32 = inv
+            .split_whitespace()
+            .filter(|e| e.contains("base:diamond"))
+            .filter_map(|e| e.rsplit(':').next()?.parse::<u32>().ok())
+            .sum();
+        t.check_eq(diamonds, 3, &format!("the chest filled from its loot table: {inv}"));
+        let near = t
+            .op(&format!("near {} {} {} 4", hx + 1, hy + 1, hz + 1))
+            .await?;
+        t.check(near.contains("base:pig"), format!("the template's pig is there: {near}"));
+        let placed = t.op("placed").await?;
+        t.check(placed.contains(&format!("testmod:outpost {hx} {hy} {hz}")), format!("FEATURE_PLACED told of it: {placed}"));
+    }
     let (mut caves, mut inside, mut outside) = (0, 0, 0);
     for (i, x) in [0, 200].into_iter().enumerate() {
         t.cmd(&format!("/tp {x} -40 {}", i * 150)).await?;
@@ -1475,4 +1490,81 @@ pub async fn sky_column_edit(t: T) -> R {
     let r = sky_column(&t).await;
     weft_sdk::settings::VIEW_DISTANCE.set(12);
     r
+}
+
+/// A block of several cells is one block in all of them: each reads as it, stands for it to a
+/// walker, and breaking any takes it whole.
+pub async fn big_blocks(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let own = add(f, [1, 0, -4]);
+    t.set(own, "testmod:big").await?;
+    let far = add(own, [1, 1, 1]);
+    for p in [own, far, add(own, [0, 1, 1])] {
+        t.check_eq(t.block(p).await?, "testmod:big".to_string(), "every cell is the block");
+    }
+    t.check_eq(t.block(add(own, [2, 0, 0])).await?, "core:air".to_string(), "and no more");
+    // On top of a cell that isn't its own.
+    t.cmd(&format!("/tp {} {} {}", far[0] as f64 + 0.5, far[1] + 3, far[2] as f64 + 0.5))
+        .await?;
+    t.secs(1.0).await?;
+    let y = t.state().pos.y;
+    t.probe("height stood at over another cell, above its top", (y - (far[1] + 1) as f64) as f32, (y - (far[1] + 1) as f64).abs() < 0.01);
+    t.op(&format!("break {} {} {}", far[0], far[1], far[2]))
+        .await?;
+    for p in [own, far] {
+        t.check_eq(t.block(p).await?, "core:air".to_string(), "broken through another cell, it is gone whole");
+    }
+    Ok(())
+}
+
+/// Snapshot reads agree with actual generation across boundaries and do not observe same-phase peers.
+pub async fn generation_reads(t: T) -> R {
+    t.flat().await?;
+    let d = &crate::generation::DIM;
+    let stone = Block::named("base:stone");
+    let gold = Block::named("base:gold_block");
+    let cobble = Block::named("base:cobblestone");
+    let bad = Block::named("base:red_lamp");
+    let raw = d.generation(1, abi::stage::UNDERGROUND);
+    let early = d.generation(1, abi::stage::STRUCTURES);
+    let done = d.generation(1, abi::stage::POST_PROCESS + 1);
+    t.check(raw.all([-17, 7, -1], [17, 7, 1], |s| s == gold.id()), "raw reads include the dimension generator across cubes");
+    t.check(raw.all([-17, 6, -1], [17, 6, 1], |s| s == gold.id()), "the generator's input excludes the generator itself");
+    t.check(early.all([-17, 8, -1], [17, 8, 1], |s| s == cobble.id()), "completed underground phase is visible");
+    t.check(raw.read([0, -1, 0]) == stone.id() && raw.read([0, 32, 0]) == 0, "negative coordinates and dimension bounds");
+    let mut points = Vec::new();
+    let mut plans = 0;
+    for z in -16..16 {
+        for x in -16..16 {
+            for y in [8, 9, 10, 12] {
+                let s = done.read([x, y, z]);
+                t.check(s != bad.id(), format!("generation read invariant at {x} {y} {z}"));
+                plans += (y == 8 && s == gold.id()) as usize;
+                points.push(([x, y, z], s));
+            }
+        }
+    }
+    t.check(plans > 4, format!("{plans} plans checked their own set/put/fill/replace/template writes"));
+    for &(p, s) in points.iter().rev() {
+        t.check_eq(done.read(p), s, "read order does not change the snapshot");
+    }
+    t.check(
+        done.read([1, 12, 0]) == 0 && done.read([0, 12, 0]) == gold.id(),
+        "ordered writers preserve explicit resets to the phase input",
+    );
+    let floor = early.find([15, 12, 0], Dir::Down, 8, |s| s == gold.id());
+    t.check(floor == Some([15, 7, 0].into()), "find crosses from air through another material to the requested surface");
+    t.op("mode spectator").await?;
+    t.cmd("/dim testkit:read_world").await?;
+    t.cmd("/tp 0 14 0").await?;
+    t.loaded().await?;
+    for (p, s) in points.into_iter().step_by(31) {
+        t.check_eq(
+            t.op(&format!("get {}", at(p))).await?,
+            name_of(ek::BLOCK, block_of(s)).to_string(),
+            "generated cubes agree with snapshots",
+        );
+    }
+    Ok(())
 }

@@ -10,6 +10,7 @@
 //! With `TESTKIT_CI=1` (CI's software Vulkan) what `ci-skip.txt` names is left out, by name.
 //! Without those options the mod only registers its message channels.
 
+mod generation;
 mod runner;
 mod script;
 mod server;
@@ -20,7 +21,7 @@ use std::sync::OnceLock;
 
 use weft_sdk::*;
 
-declare_mod!(deps: [], init: init);
+declare_mod!(deps: ["testmod"], init: init);
 
 static PLAN: OnceLock<(Option<String>, Option<String>)> = OnceLock::new();
 
@@ -105,21 +106,29 @@ pub(crate) fn same_conditions(c: &Client) {
     use weft_sdk::settings::*;
     // Tests look at what the hands hold, in the view.
     static FIRST_PERSON_MODEL: Config<bool> = Config::named("core:first_person_model");
+    static AUTO_JUMP: Config<bool> = Config::named("core:auto_jump");
     let scripted = PLAN.get().is_some_and(|p| p.1.is_some());
-    if FIRST_PERSON_MODEL.get() && !scripted {
-        FIRST_PERSON_MODEL.set(false);
+    if !scripted {
+        if FIRST_PERSON_MODEL.get() {
+            FIRST_PERSON_MODEL.set(false);
+        }
+        if AUTO_JUMP.get() {
+            AUTO_JUMP.set(false);
+        }
     }
     // The player's packs would change every picture.
     let packs = !RESOURCE_PACKS.get().is_empty() || !SHADER_PACK.get().is_empty();
     LANGUAGE.set("en_us");
     GUI_SCALE.set(2);
     VIEW_DISTANCE.set(12);
+    CLOUD_DISTANCE.set(6144);
     FOV.set(70.0);
     BRIGHTNESS.set(0.5);
     VSYNC.set(true);
     RESOURCE_PACKS.set("");
     SHADER_PACK.set("");
     DEBUG_GROUPS.set(u32::MAX);
+    ADVANCED_TOOLTIPS.set(false);
     DEBUG_LINES.set("");
     if packs {
         c.reload_assets();

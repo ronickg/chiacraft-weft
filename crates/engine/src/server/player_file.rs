@@ -1,25 +1,40 @@
 //! A player coming and going: its file, joining, the mode it left in.
 
 use super::*;
+use weft_abi::entry_kind as ek;
+
+pub(super) struct Arrival {
+    pub data: PlayerData,
+    clock: u64,
+    started: Instant,
+    pub ready: bool,
+    /// Through a portal (chiacraft, `travel`): a few seconds before anything can hurt them.
+    portal: bool,
+}
 
 impl Server {
-    pub(super) fn join(&mut self, c: &'static Content, pi: usize, name: String, key: String) {
+    pub(super) fn prepare_join(&mut self, c: &'static Content, pi: usize, name: String, key: String) {
         let key = if key.is_empty() { name.clone() } else { key };
         let name = self.name_for(&name, &key);
-        if self.players.iter().any(|p| p.joined && p.key == key) {
+        if self
+            .players
+            .iter()
+            .any(|p| p.streams_world() && p.identity.key == key)
+        {
             self.players[pi]
                 .conn
                 .send(ToClient::Disconnect(format!("{name} is already playing")));
             return;
         }
-        // The world's admission rules and bans (chiacraft, `admission`), read again when they
-        // change. The key is what the connection proved, not what the client claims.
+        // The world's admission rules and bans (chiacraft, `admission`, which has the allow list
+        // in place of Weft's whitelist), read again when they change. The key is what the
+        // connection proved, not what the client claims.
         let trusted = self.trusted(pi, &key);
         let p = &self.players[pi];
         let who = crate::admission::Who {
             name: name.clone(),
             key: key.clone(),
-            identity: p.identity.clone(),
+            identity: p.account.clone(),
             did: p.did.clone(),
             did_days: p.did_days,
             did_unchecked: p.did_unchecked,
@@ -44,30 +59,24 @@ impl Server {
         let saved = self
             .storage
             .as_ref()
-            .and_then(|s| load_player(c, &s.lock(), &key));
-        // chiacraft, test only: an imported Minecraft world says where players start
-        // (`chiacraft::mc_import::spawn`).
-        let imported = self
-            .storage
-            .as_ref()
-            .and_then(|s| crate::chiacraft::mc_import::spawn(c, &s.lock().meta.dir));
-        let spawn = || imported.unwrap_or_else(|| (c.spawn_dim, self.dims[c.spawn_dim as usize].spawn_point(c)));
-        let (mut dim, mut pos, health, inv, comps, mut look, selected, flying, fire) = match saved {
-            // A dimension that is gone (its mod removed), or the void while a real one exists:
-            // everything else is kept, the player starts at the spawn.
-            Some(s) => {
-                let ((dim, pos), keep) = match s.0 {
-                    Some(d) if d != c.void_dim || c.spawn_dim == c.void_dim => ((d, s.1), true),
-                    _ => (spawn(), false),
-                };
-                if !keep {
-                    log::warn!("player {name} was in a dimension that is not there now, placed at the spawn");
-                }
-                (dim, pos, s.2, s.3, s.4, s.5, s.6, s.7, s.8)
-            }
-            None => {
-                let (d, p) = spawn();
-                (d, p, -1.0, None, Vec::new(), [0.0, 0.0], 0, false, 0)
+            .and_then(|s| load_player(c, &s.lock(), &key, |dim| self.dims[dim as usize].time));
+        let spawn = || (c.spawn_dim, self.dims[c.spawn_dim as usize].spawn_point(c));
+        let mut data = saved.unwrap_or_else(|| {
+            let (dim, pos) = spawn();
+            let mut entity = Entity::new(0, c.game.player_kind, pos, -1.0);
+            entity.mode = self
+                .storage
+                .as_ref()
+                .map_or(GameMode::SURVIVAL, |s| s.lock().meta.game_mode);
+            PlayerData { dim: Some(dim), entity, inventory: None, components: Vec::new(), deaths: 0 }
+        });
+        let dim = match data.dim {
+            Some(d) if d != c.void_dim || c.spawn_dim == c.void_dim => d,
+            _ => {
+                let (d, pos) = spawn();
+                data.entity.pos = pos;
+                log::warn!("player {name} was in a dimension that is not there now, placed at the spawn");
+                d
             }
         };
         // Through a portal (chiacraft): beside this world's portal for that link.
@@ -76,6 +85,7 @@ impl Server {
             .as_ref()
             .map(|s| s.lock().meta.dir.clone())
             .and_then(|d| crate::travel::arrival(&d, &key));
+        let mut dim = dim;
         if let Some(at) = &arrived {
             // In the portal's own dimension (by name; the spawn's for spots kept before it was
             // saved, or if that dimension is gone), facing away from the portal.
@@ -89,74 +99,132 @@ impl Server {
                 ),
                 None => c.spawn_dim,
             };
-            pos = glam::DVec3::from_array(at.pos);
+            data.entity.pos = glam::DVec3::from_array(at.pos);
             if let Some(yaw) = at.yaw {
-                look = [yaw, 0.0];
+                (data.entity.yaw, data.entity.pitch) = (yaw, 0.0);
             }
             log::info!(
                 "{name} arrives through a portal at {:.0} {:.0} {:.0} in {}, facing {:.2}",
-                pos.x,
-                pos.y,
-                pos.z,
+                data.entity.pos.x,
+                data.entity.pos.y,
+                data.entity.pos.z,
                 c.dims[dim as usize].name,
-                look[0]
+                data.entity.yaw
             );
         }
-        let time = self.dims[dim as usize].day_time();
+        let pos = data.entity.pos;
+        let look = [data.entity.yaw, data.entity.pitch];
+        let p = &mut self.players[pi];
+        p.identity = Arc::new(PlayerIdentity { name, key });
+        p.dim = dim;
+        let portal = arrived.is_some();
+        p.arrival = Some(Arrival { data, clock: self.dims[dim as usize].time, started: Instant::now(), ready: false, portal });
+        log::debug!(target: "load", "streaming spawn for {} before joining", p.identity.name);
+        p.conn
+            .send(ToClient::PrepareJoin { dim, pos, seed: self.cfg.seed, look });
+        self.send_lod_columns(pi, dim);
+        let p = &mut self.players[pi];
+        p.conn.send(ToClient::Edits {
+            dim,
+            specs: self.dims[dim as usize]
+                .edits
+                .iter()
+                .map(|e| e.spec(c))
+                .collect(),
+            all: true,
+        });
+        p.conn.send(ToClient::Configs(crate::config::synced()));
+    }
+
+    /// Activate after the simulation step, so this tick ends with a welcome and
+    /// the player can begin moving on the next one.
+    pub(super) fn finish_joins(&mut self, c: &'static Content) {
+        for pi in 0..self.players.len() {
+            let p = &mut self.players[pi];
+            let Some(arrival) = &p.arrival else { continue };
+            if p.conn.is_closed() {
+                p.arrival = None;
+            } else if arrival.ready {
+                let arrival = p.arrival.take().unwrap();
+                self.join(c, pi, arrival);
+            } else if (self.cfg.dedicated || pi != 0) && arrival.started.elapsed() >= Duration::from_secs(60) {
+                p.conn
+                    .send(ToClient::Disconnect("world entry timed out".into()));
+                p.conn.close();
+                p.arrival = None;
+            }
+        }
+    }
+
+    fn join(&mut self, c: &'static Content, pi: usize, arrival: Arrival) {
+        let dim = self.players[pi].dim;
+        let portal = arrival.portal;
+        let PlayerData { mut entity, inventory, mut components, deaths, .. } = arrival.data;
+        let time = self.dims[dim as usize].time;
+        extend::rebase_clock(c, &mut entity, &mut components, time as i64 - arrival.clock as i64);
+        let pos = entity.pos;
         let r = self.dims[dim as usize].ensure_region(c, pos);
         let id = r.new_id();
-        let mut e = Entity::new(id, c.game.player_kind, pos, health);
+        let mut e = entity;
+        e.id = id;
+        e.kind = c.game.player_kind;
         e.player = true;
-        e.mode = self
-            .storage
-            .as_ref()
-            .map_or(GameMode::SURVIVAL, |s| saved_mode(&s.lock(), &key));
-        (e.yaw, e.pitch) = (look[0], look[1]);
-        (e.flying, e.fire) = (flying, fire);
-        // The first connection is the one playing on this machine, the world's owner.
-        let permission = if pi == 0 && !self.cfg.dedicated {
+        let flying = e.flying;
+        let vel = e.vel;
+        // The first connection is the one playing on this machine, the world's owner, with
+        // commands if the world was made with cheats.
+        let cheats = self.storage.as_ref().is_none_or(|s| s.lock().meta.cheats);
+        let permission = if pi == 0 && !self.cfg.dedicated && cheats {
             abi::permission::OWNER
         } else {
             self.storage
                 .as_ref()
-                .and_then(|s| s.lock().meta.ops.iter().find(|o| o.0 == key).map(|o| o.1))
+                .and_then(|s| {
+                    s.lock()
+                        .meta
+                        .ops
+                        .iter()
+                        .find(|o| o.0 == self.players[pi].identity.key)
+                        .map(|o| o.1)
+                })
                 .unwrap_or(abi::permission::EVERYONE)
         };
         e.permission = permission;
-        e.selected = selected.min(c.game.player_layout.hotbar.saturating_sub(1));
+        self.identities
+            .write()
+            .insert(id, self.players[pi].identity.clone());
+        e.selected = e
+            .selected
+            .min(c.game.player_layout.hotbar.saturating_sub(1));
         let selected = e.selected;
-        let mode = e.mode;
-        r.entities.insert_with(c, e, inv, comps);
-        mode_modifiers(c, r, id, mode);
-        let worn = worn_of(c, &r.entities, id);
+        r.entities.insert_with(c, e, inventory, components);
+        r.keep_sources(c, id);
         // Known only now that the modifiers are back; a new player (no saved health) starts full.
-        let max = r.max_health(c, id);
+        let max = r.max_health(0, c, id);
         let mut dead = false;
         if let Some(e) = r.entities.get_mut(id) {
-            e.worn = worn;
             if e.health < 0.0 {
                 e.health = max;
             }
             // Out of a portal: a few seconds before anything can hurt them, to find their feet.
-            if arrived.is_some() {
+            if portal {
                 e.hurt_cooldown = e.hurt_cooldown.max(ARRIVAL_PROTECTION);
             }
             dead = !e.alive();
         }
-        r.emit_engine(c, abi::event::PLAYER_JOINED, &abi::PlayerEvent { player: id });
+        r.emit_engine(0, c, abi::event::PLAYER_JOINED, &abi::PlayerEvent { player: id });
         let p = &mut self.players[pi];
-        p.name = name;
-        p.key = key;
         p.joined = true;
-        p.dim = dim;
         p.entity = id;
         p.last_place = (None, pos);
+        p.deaths = deaths;
         p.first_sync = true;
-        p.glow_sent = false;
-        match &p.identity {
-            Some(identity) => log::info!("{} joined (account identity {identity})", p.name),
-            None => log::info!("{} joined", p.name),
+        match &p.account {
+            Some(account) => log::info!("{} joined (account identity {account})", p.identity.name),
+            None => log::info!("{} joined", p.identity.name),
         }
+        p.conn
+            .send(ToClient::Welcome { player: id, vel, selected, flying });
         if let Some(probation) = self.probation_of(pi) {
             let left = self.players[pi].probation_left(&probation);
             self.players[pi]
@@ -174,30 +242,22 @@ impl Server {
                 .send(ToClient::Show(crate::net::Shown::chat(note)));
         }
         let p = &mut self.players[pi];
-        let line = Msg::new("multiplayer.joined", vec![Arg::Text(p.name.clone())]);
+        let line = Msg::new("multiplayer.joined", vec![Arg::Text(p.identity.name.clone())]);
+        let skin = p.skin.clone();
+        let avatar = p.avatar.clone();
         for q in self.players.iter_mut().filter(|q| q.joined) {
             q.conn
                 .send(ToClient::Show(crate::net::Shown::chat(line.clone())));
+            if let Some(skin) = &skin {
+                q.conn
+                    .send(ToClient::Skin { entity: id, skin: (**skin).clone() });
+            }
+            if let Some(avatar) = &avatar {
+                q.conn
+                    .send(ToClient::Avatar { entity: id, avatar: (**avatar).clone() });
+            }
         }
         let p = &mut self.players[pi];
-        p.conn
-            .send(ToClient::Welcome { player: id, dim, pos, seed: self.cfg.seed, look, selected, flying });
-        self.send_lod_columns(pi, dim);
-        let p = &mut self.players[pi];
-        p.conn.send(ToClient::Edits {
-            dim,
-            specs: self.dims[dim as usize]
-                .edits
-                .iter()
-                .map(|e| e.spec(c))
-                .collect(),
-            all: true,
-        });
-        p.conn.send(ToClient::Configs(crate::config::synced()));
-        let rate = self.dims[dim as usize].day_rate as f32;
-        p.conn.send(ToClient::Time { dim, time, rate });
-        p.conn.send(ToClient::GameMode(mode));
-        p.conn.send(ToClient::Permission(permission));
         // Left while dead: still dead, as in vanilla.
         if dead {
             p.conn.send(ToClient::Died);
@@ -209,16 +269,16 @@ impl Server {
         // The anchors of their achievements from this world (chiacraft), since they were here.
         self.send_anchor_proofs(pi);
         // The skins of who is here already.
-        let skins: Vec<(u64, Arc<Vec<u8>>)> = self
+        let skins: Vec<(u64, Arc<crate::net::Skin>)> = self
             .players
             .iter()
             .filter(|o| o.joined && o.entity != id)
             .filter_map(|o| o.skin.clone().map(|s| (o.entity, s)))
             .collect();
-        for (entity, png) in skins {
+        for (entity, skin) in skins {
             self.players[pi]
                 .conn
-                .send(ToClient::Skin { entity, png: png.to_vec() });
+                .send(ToClient::Skin { entity, skin: (*skin).clone() });
         }
         let avatars: Vec<(u64, Arc<crate::net::AvatarData>)> = self
             .players
@@ -236,20 +296,31 @@ impl Server {
 
 pub(super) fn save_player(s: &Storage, p: &Player, d: &Dim) {
     let c = content();
-    let path = s.player_path(&p.key);
+    let path = s.player_path(&p.identity.key);
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
     let Some(e) = d.entities.get(p.entity) else { return };
+    let comps = d
+        .entities
+        .comps
+        .iter()
+        .filter(|((id, _), _)| *id == p.entity)
+        .map(|((_, comp), bytes)| (*comp, bytes.as_ref()))
+        .collect();
+    let mut bytes = Vec::new();
+    super::persist::write(c, &mut bytes, &[(e, d.entities.inventories.get(&p.entity), comps, None)], d.time);
     let mut text = format!(
-        "name = {}\ndim = {}\npos = {} {} {}\nlook = {} {}\nselected = {}\nhealth = {}\n",
-        p.name, c.dims[p.dim as usize].name, e.pos.x, e.pos.y, e.pos.z, e.yaw, e.pitch, e.selected, e.health
+        "name = {}\ndim = {}\ndeaths = {}\nentity = {}\n",
+        p.identity.name,
+        c.dims[p.dim as usize].name,
+        p.deaths,
+        crate::kv::hex(&bytes)
     );
-    text.push_str(&format!("flying = {}\nfire = {}\n", e.flying as u8, e.fire));
     // chiacraft: who vouched for the key (to ban an absent player by identity), the time played
     // here (probation), and whether the owner let them off probation.
-    if let Some(identity) = &p.identity {
-        text.push_str(&format!("identity = {identity}\n"));
+    if let Some(account) = &p.account {
+        text.push_str(&format!("identity = {account}\n"));
     }
     if let Some(did) = &p.did {
         text.push_str(&format!("did = {did}\n"));
@@ -258,48 +329,13 @@ pub(super) fn save_player(s: &Storage, p: &Player, d: &Dim) {
     if p.lifted {
         text.push_str("probation = lifted\n");
     }
-    if e.mode != GameMode::SURVIVAL {
-        text.push_str(&format!("mode = {}\n", e.mode.name()));
-    }
-    if let Some(inv) = d.entities.inventories.get(&p.entity) {
-        let items: Vec<String> = inv
-            .iter()
-            .map(|s| {
-                if s.is_empty() {
-                    "-".into()
-                } else {
-                    format!("{}*{}*{}", c.items[s.item as usize].name, s.count, crate::stack::to_text(crate::stack::for_save(s.data)))
-                }
-            })
-            .collect();
-        text.push_str(&format!("inventory = {}\n", items.join(" ")));
-    }
-    for ((id, comp), bytes) in &d.entities.comps {
-        if *id == p.entity && c.game.components[*comp as usize].flags & cf::SAVE != 0 {
-            let named = crate::stack::holds_stacks(c, *comp).then(|| crate::stack::contents_to_names(c, bytes));
-            let bytes = named.as_deref().unwrap_or(bytes);
-            text.push_str(&format!("comp.{} = {}\n", c.game.components[*comp as usize].name, crate::kv::hex(bytes)));
-        }
-    }
     // Whole or not at all: a crash in the middle must not leave half a player.
     let tmp = path.with_extension("new");
     if let Err(err) = std::fs::write(&tmp, text).and_then(|_| std::fs::rename(&tmp, &path)) {
-        log::error!("saving player {}: {err}", p.name);
+        log::error!("saving player {}: {err}", p.identity.name);
     }
 }
 
-pub(super) fn saved_mode(s: &Storage, key: &str) -> GameMode {
-    let src = std::fs::read_to_string(s.player_path(key)).unwrap_or_default();
-    crate::kv::get(&src, "mode")
-        .and_then(GameMode::parse)
-        .unwrap_or_default()
-}
-
-/// Dimension (`None`: unknown now), position, health, inventory, components.
-pub(super) type PlayerData = (Option<u32>, DVec3, f32, Option<Vec<ItemStack>>, Vec<(u32, Box<[u8]>)>, [f32; 2], u32, bool, u32);
-
-/// A saved player. Content that no longer exists is dropped with a log line; a file that cannot
-/// be read is kept as `.bak` before it gets overwritten by a fresh player.
 impl Server {
     /// The name a joining player goes by here (chiacraft): the one their game sent, without
     /// control characters, trimmed, at most 32 characters; an empty one (a game that sent none)
@@ -331,7 +367,16 @@ impl Server {
     }
 }
 
-pub(super) fn load_player(c: &Content, s: &Storage, key: &str) -> Option<PlayerData> {
+pub(super) struct PlayerData {
+    pub dim: Option<u32>,
+    pub entity: Entity,
+    pub inventory: Option<Vec<ItemStack>>,
+    pub components: Vec<(u32, Box<[u8]>)>,
+    pub deaths: u32,
+}
+
+/// Account metadata wraps the same entity record as cube saves.
+pub(super) fn load_player(c: &Content, s: &Storage, key: &str, time: impl Fn(u32) -> u64) -> Option<PlayerData> {
     let path = s.player_path(key);
     let src = match std::fs::read_to_string(&path) {
         Ok(src) => src,
@@ -342,73 +387,19 @@ pub(super) fn load_player(c: &Content, s: &Storage, key: &str) -> Option<PlayerD
             return None;
         }
     };
-    let (mut dim, mut pos, mut health, mut inv, mut comps) = (None, None, -1.0, None, Vec::new());
-    let (mut look, mut selected, mut flying, mut fire) = ([0.0f32; 2], 0u32, false, 0u32);
-    for (_, k, v) in crate::kv::pairs(&src) {
-        match k {
-            "dim" => {
-                dim = c.dim_names.get(v).copied();
-                if dim.is_none() {
-                    log::warn!("player {key}: dimension {v} does not exist now");
-                }
-            }
-            "look" => {
-                let n: Vec<f32> = v
-                    .split_whitespace()
-                    .filter_map(|x| x.parse().ok())
-                    .collect();
-                if n.len() == 2 {
-                    look = [n[0], n[1]];
-                }
-            }
-            "selected" => selected = v.parse().unwrap_or(0),
-            "flying" => flying = v == "1",
-            "fire" => fire = v.parse().unwrap_or(0),
-            "pos" => {
-                let n: Vec<f64> = v
-                    .split_whitespace()
-                    .filter_map(|x| x.parse().ok())
-                    .collect();
-                if n.len() == 3 {
-                    pos = Some(DVec3::new(n[0], n[1], n[2]));
-                }
-            }
-            "health" => health = v.parse().unwrap_or(-1.0),
-            "inventory" => {
-                let mut slots = vec![ItemStack::EMPTY; c.game.player_layout.slots as usize];
-                for (i, tok) in v.split_whitespace().enumerate().take(slots.len()) {
-                    let parts: Vec<&str> = tok.split('*').collect();
-                    if parts.len() == 3 {
-                        let item = c.item_names.get(parts[0]).copied();
-                        if item.is_none() {
-                            log::warn!("player {key}: dropped {} {} (no such item now)", parts[1], parts[0]);
-                        }
-                        if let Some(item) = item {
-                            slots[i] = ItemStack { item, count: parts[1].parse().unwrap_or(1), data: crate::stack::from_text(parts[2]) };
-                        }
-                    }
-                }
-                inv = Some(slots);
-            }
-            _ => {
-                if let Some(name) = k.strip_prefix("comp.") {
-                    let id = c.game.component(name);
-                    if id.is_none() {
-                        log::warn!("player {key}: dropped component {name} (not registered now)");
-                    }
-                    if let Some(id) = id {
-                        let bytes = crate::kv::unhex(v);
-                        let bytes = if crate::stack::holds_stacks(c, id) { crate::stack::contents_from_names(c, &bytes) } else { bytes };
-                        comps.push((id, c.game.fit_component(id, bytes)));
-                    }
-                }
-            }
-        }
-    }
-    let Some(pos) = pos else {
-        log::error!("player {key}: no position in the file; kept as .bak, the player starts anew");
+    let dim = crate::kv::get(&src, "dim").and_then(|name| c.game.catalog.find(ek::DIMENSION, name));
+    let destination = dim
+        .filter(|&d| d != c.void_dim || c.spawn_dim == c.void_dim)
+        .unwrap_or(c.spawn_dim);
+    let now = time(destination);
+    let bytes = crate::kv::unhex(crate::kv::get(&src, "entity").unwrap_or_default());
+    let Some((entity, inventory, components, _)) = super::persist::read(c, &bytes, now).pop() else {
+        log::error!("player {key}: invalid entity record; kept as .bak, the player starts anew");
         let _ = std::fs::copy(&path, path.with_extension("bak"));
         return None;
     };
-    Some((dim, pos, health, inv, comps, look, selected, flying, fire))
+    let deaths = crate::kv::get(&src, "deaths")
+        .and_then(|d| d.parse().ok())
+        .unwrap_or(0);
+    Some(PlayerData { dim, entity, inventory, components, deaths })
 }

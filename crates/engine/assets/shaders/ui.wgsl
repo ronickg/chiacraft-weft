@@ -95,6 +95,10 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         }
         return t * in.color;
     }
+    if in.mode == UI_MODE_PREMULTIPLIED {
+        let t = strip_pixel(in, step);
+        return vec4(t.rgb / max(t.a, 0.00001), t.a) * in.color;
+    }
     if in.mode == UI_MODE_FONT {
         // `layer` 1: a smooth font's coverage (linear); else a bitmap's whole pixels.
         var t = textureSampleLevel(textures[in.tex], nearest_clamp, in.uv, 0.0);

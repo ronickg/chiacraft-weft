@@ -161,7 +161,15 @@ pub async fn tooltips(t: T) -> R {
             t.probe("diamond block icon in the tooltip", block, block > 0.0008);
         }
     }
-    t.c().screen_close();
+    settings::ADVANCED_TOOLTIPS.set(true);
+    t.frames(4).await?;
+    if let Some(Rect { x, y, w, h }) = t.c().ui_rect("slot:36") {
+        t.c().input_cursor(x + w / 2.0, y + h / 2.0);
+        t.frames(4).await?;
+        t.shot("advanced").await?;
+    }
+    settings::ADVANCED_TOOLTIPS.set(false);
+    t.c().menu_close();
     t.no_screen().await
 }
 
@@ -192,6 +200,73 @@ pub async fn night_light(t: T) -> R {
     t.probe("floor by the glowstone is lit", crate::runner::lum(by_glow), crate::runner::lum(by_glow) > 50.0);
     let red = by_lamp[0] - by_lamp[1];
     t.probe("floor by the red lamp is reddish (red minus green)", red, red > 15.0);
+    t.set(glow, "air").await?;
+    t.set(lamp, "lava").await?;
+    t.secs(0.5).await?;
+    let lava = t.shot("lava").await?;
+    let warm = avg_around(&t, &lava, floor(add(lamp, [1, 0, 1])), 0.02);
+    t.note(format!("floor by lava: {warm:?}"));
+    t.check(warm[0] > warm[1] + 15.0 && warm[1] > warm[2] + 5.0, "lava lights the floor orange");
+    Ok(())
+}
+
+/// Light that moves with entities, which clients draw alone, in a closed dark room: the player's
+/// own (`LIGHT` set while it lives), an effect's until it ends (by ticks, which `/time set`
+/// doesn't move), and the item a block entity shows.
+pub async fn moving_light(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    t.fill(add(f, [-5, -1, -9]), add(f, [5, 4, 2]), "stone")
+        .await?;
+    t.fill(add(f, [-4, 0, -8]), add(f, [4, 3, 1]), "air")
+        .await?;
+    t.fill(add(f, [-4, -1, -8]), add(f, [4, -1, 1]), "birch_planks")
+        .await?;
+    t.cmd("/time set 18000").await?;
+    t.c().set_look(0.0, -35.0);
+    let floor = [f[0] as f64 + 0.5, f[1] as f64, f[2] as f64 - 2.5];
+    let color = |what: &'static str| {
+        let t = &t;
+        async move { Ok::<_, String>(avg_around(t, &t.shot(what).await?, floor, 0.03)) }
+    };
+    t.op("glow me 0 0 15").await?;
+    t.secs(0.5).await?;
+    let c = color("own light").await?;
+    t.probe("the floor in the player's own blue light (blue minus red)", c[2] - c[0], c[2] - c[0] > 15.0);
+    t.op("glow me 0 0 0").await?;
+    t.op("lit me 400").await?;
+    t.secs(0.5).await?;
+    let c = color("effect light").await?;
+    t.probe("the floor in the green light of an effect (green minus red)", c[1] - c[0], c[1] - c[0] > 15.0);
+    t.op("lit me 1").await?;
+    t.secs(1.5).await?;
+    let c = color("effect over").await?;
+    t.probe("dark again once the effect is over", crate::runner::lum(c), crate::runner::lum(c) < 20.0);
+    let p = add(f, [0, 0, -4]);
+    t.set(p, "testkit:pedestal").await?;
+    t.op(&format!("insert {} {} {} base:red_lamp", p[0], p[1], p[2]))
+        .await?;
+    t.secs(0.5).await?;
+    let c = color("shown item").await?;
+    t.probe("the floor by a pedestal showing a red lamp is reddish", c[0] - c[1], c[0] - c[1] > 15.0);
+    t.op(&format!("stack_light {} {} {} 0 0 0 15", p[0], p[1], p[2]))
+        .await?;
+    t.secs(0.5).await?;
+    let c = color("shown stack light").await?;
+    t.probe("shown stack data overrides the item's red light", c[2] - c[0], c[2] - c[0] > 15.0);
+    t.set(p, "air").await?;
+    let carrier = t
+        .op(&format!("spawn testmod:display_carrier {} {} {}", p[0], p[1], p[2]))
+        .await?;
+    for (slot, label) in [(0, "main stack light"), (6, "off stack light"), (2, "equipment stack light")] {
+        t.op(&format!("put {carrier} {slot} stick 1")).await?;
+        t.op(&format!("stack_light {carrier} {slot} 0 0 15"))
+            .await?;
+        t.secs(0.5).await?;
+        let c = color(label).await?;
+        t.probe(label, c[2] - c[0], c[2] - c[0] > 15.0);
+        t.op(&format!("put {carrier} {slot} stick 0")).await?;
+    }
     Ok(())
 }
 
@@ -245,13 +320,14 @@ pub async fn break_overlay(t: T) -> R {
     let wall = add(f, [0, 0, -2]);
     t.fill(wall, add(wall, [0, 1, 0]), "cobblestone").await?;
     let ladder = add(wall, [0, 0, 1]);
-    t.set(ladder, "ladder[facing=south]").await?;
+    t.set(ladder, "ladder[west=false,north=true]").await?;
     t.look_at(ladder);
     t.frames(3).await?;
     let (w, h) = (t.state().window[0], t.state().window[1]);
     let before = t.grab().await?;
     // Mining slowly, so a late picture still finds the button down and the block there.
-    t.op("attr_mod me core:mining_speed slow 0 -0.75 0").await?;
+    t.op("attr_mod me core:mining_speed slow core:add -0.75 0")
+        .await?;
     t.secs(0.2).await?;
     t.hold("core:attack", 2.0);
     t.secs(1.0).await?;
@@ -336,7 +412,6 @@ pub async fn multiplayer(t: T) -> R {
         .filter_map(|&id| t.c().entity(id))
         .any(|e| name_of(abi::entry_kind::ENTITY, e.kind) == "core:player");
     // What they hold reaches the others, to draw it in their hand.
-    static HELD: weft_sdk::Component<u32> = weft_sdk::Component::named("core:held");
     if let Some(other) = t.c().entities().iter().copied().find(|&id| {
         t.c()
             .entity(id)
@@ -344,7 +419,7 @@ pub async fn multiplayer(t: T) -> R {
     }) {
         t.op(&format!("put {other} 0 stone 1")).await?;
         let stone = Item::lookup("base:stone").unwrap_or(u32::MAX);
-        t.until("what the other player holds", Duration::from_secs(5), |t| t.c().view().component_of(other, &HELD) == Some(stone))
+        t.until("what the other player holds", Duration::from_secs(5), |t| t.c().held(other, weft_sdk::Hand::Main).item == stone)
             .await?;
     }
     // A synced setting the host changes while the other player is in reaches them.
@@ -387,7 +462,7 @@ pub async fn client_hooks(t: T) -> R {
     t.c().input_key("F9", 0.0);
     t.until("probe key seen", Duration::from_secs(3), |_| crate::runner::PROBES.with(|p| p.get()) > before)
         .await?;
-    t.c().screen_open(&screens::CONTROLS);
+    t.c().menu_open(&screens::CONTROLS);
     t.screen("core:controls").await?;
     for _ in 0..40 {
         if t.c().ui_rect("text:test probe").is_some() {
@@ -398,7 +473,7 @@ pub async fn client_hooks(t: T) -> R {
         t.frames(2).await?;
     }
     t.check(t.c().ui_rect("text:test probe").is_some(), "Controls does not list the mod's key");
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     let f = t.feet();
     let b = [f[0] as f64 + 2.0, f[1] as f64, f[2] as f64 - 4.0];

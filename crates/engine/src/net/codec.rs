@@ -10,6 +10,7 @@ use glam::{DVec3, IVec3};
 use weft_abi::{ItemStack, ParticleBurst};
 
 use super::{ToClient, ToServer};
+use crate::server::lod_tops::{LodColumn, Span};
 use crate::world::{Cube, GameMode, Pose};
 
 #[derive(Default)]
@@ -50,6 +51,16 @@ impl<'a> R<'a> {
 const MAX_LEN: usize = 1 << 20;
 
 pub trait Wire: Sized {
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut w = W::default();
+        self.put(&mut w);
+        w.0
+    }
+    fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        let mut r = R(bytes);
+        let value = Self::get(&mut r)?;
+        r.0.is_empty().then_some(value)
+    }
     fn put(&self, w: &mut W);
     fn get(r: &mut R) -> Option<Self>;
 }
@@ -164,6 +175,65 @@ macro_rules! tuples {
     )*};
 }
 tuples!((0 A, 1 B), (0 A, 1 B, 2 C), (0 A, 1 B, 2 C, 3 D), (0 A, 1 B, 2 C, 3 D, 4 E), (0 A, 1 B, 2 C, 3 D, 4 E, 5 F), (0 A, 1 B, 2 C, 3 D, 4 E, 5 F, 6 G));
+
+impl Wire for Span {
+    fn put(&self, w: &mut W) {
+        (self.bottom, self.top, self.block, self.light).put(w);
+    }
+    fn get(r: &mut R) -> Option<Self> {
+        let (bottom, top, block, light) = Wire::get(r)?;
+        Some(Span { bottom, top, block, light })
+    }
+}
+
+impl Wire for LodColumn {
+    fn put(&self, w: &mut W) {
+        (self.x, self.z, self.y, self.top, self.under, self.light).put(w);
+        self.spans.put(w);
+        self.removed_scatter.put(w);
+    }
+    fn get(r: &mut R) -> Option<Self> {
+        let (x, z, y, top, under, light) = Wire::get(r)?;
+        Some(LodColumn { x, z, y, top, under, light, spans: Wire::get(r)?, removed_scatter: Wire::get(r)? })
+    }
+}
+
+use crate::world::placement::{CellLayout, Part};
+
+impl Wire for crate::wire::Site {
+    fn put(&self, w: &mut W) {
+        self.cell.put(w);
+        self.offset.put(w);
+        self.port.put(w);
+    }
+    fn get(r: &mut R) -> Option<Self> {
+        Some(Self { cell: Wire::get(r)?, offset: Wire::get(r)?, port: Wire::get(r)? })
+    }
+}
+
+impl Wire for Part {
+    fn put(&self, w: &mut W) {
+        self.state.put(w);
+        self.offset.put(w);
+    }
+    fn get(r: &mut R) -> Option<Self> {
+        Some(Self { state: Wire::get(r)?, offset: Wire::get(r)? })
+    }
+}
+
+impl Item for Part {}
+
+impl Wire for CellLayout {
+    fn put(&self, w: &mut W) {
+        self.extras.put(w);
+        self.offsets.put(w);
+        self.covers.put(w);
+    }
+    fn get(r: &mut R) -> Option<Self> {
+        let layout = Self { extras: Wire::get(r)?, offsets: Wire::get(r)?, covers: Wire::get(r)? };
+        (layout.offsets.len() <= layout.extras.len() + 1).then_some(layout)
+    }
+}
 
 impl Wire for IVec3 {
     fn put(&self, w: &mut W) {
@@ -296,7 +366,7 @@ impl Wire for ParticleBurst {
 macro_rules! items {
     ($($t:ty),*) => {$(impl Item for $t {})*};
 }
-items!(u32, u64, i32, f32, f64, bool, String, IVec3, DVec3, ItemStack, Arc<Cube>, Msg, ParticleBurst);
+items!(u32, u64, i32, f32, f64, bool, String, IVec3, DVec3, ItemStack, Arc<Cube>, Msg, ParticleBurst, Span, LodColumn);
 
 pub fn encode_client(m: &ToClient) -> Vec<u8> {
     let mut w = W::default();
@@ -327,18 +397,22 @@ mod tests {
     fn server_messages_roundtrip() {
         let msgs = [
             ToServer::Join { name: "Ann".into(), key: "k".into(), account: "id:sig".into(), did: "l:o:s".into() },
+            ToServer::Ready,
             ToServer::Use {
                 pos: IVec3::new(-5, 70, 3),
-                part: 7,
+                part: Part { state: 7, offset: IVec3::new(0, 32768, 0) },
                 face: 3,
                 hit: [0.5, 1.0, 0.25],
                 look: [0.1, -0.5, 0.8],
                 sneak: true,
+                by_face: true,
                 frame: 0,
+                placed: Some(IVec3::new(-5, 71, 3)),
             },
             ToServer::Move {
                 jumped: false,
                 pos: DVec3::new(1.5, 64.0, -3.25),
+                vel: DVec3::new(-4.5, 0.0, 1.0),
                 yaw: 1.0,
                 pitch: -0.5,
                 on_ground: true,
@@ -347,12 +421,13 @@ mod tests {
                 flying: false,
                 frame: Some((7, DVec3::ONE)),
             },
-            ToServer::UseItem { target: Some((IVec3::new(1, 2, 3), 4)) },
+            ToServer::UseItem,
             ToServer::Click { slot: 7, button: 1, shift: true },
             ToServer::Drag { slots: vec![3, 4, 9], button: 0 },
             ToServer::Chat("/give stone 5".into()),
             ToServer::Gizmos(vec!["regions".into(), "mymod:pipes".into()]),
             ToServer::Packet { channel: 3, data: vec![1, 2, 255] },
+            ToServer::Skin(crate::net::Skin { png: vec![1, 2, 3], slim: true }),
             ToServer::Leave,
         ];
         for m in msgs {
@@ -364,7 +439,10 @@ mod tests {
     #[test]
     fn tags_follow_the_message_table() {
         for m in [
+            ToClient::PrepareJoin { dim: 2, pos: DVec3::new(-5.5, 70.0, 3.0), seed: 7, look: [1.0, -0.5] },
+            ToClient::Welcome { player: 8, vel: DVec3::new(0.0, -12.0, 1.0), selected: 3, flying: false },
             ToClient::Died,
+            ToClient::Skin { entity: 7, skin: crate::net::Skin { png: vec![4, 5, 6], slim: false } },
             ToClient::Show(crate::net::Shown::chat(Msg::new(
                 "chat.message",
                 vec![Arg::Text("me".into()), Arg::Int(-3), Arg::Msg(Msg::new("k", vec![Arg::Float(1.5, 2)]))],

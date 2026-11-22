@@ -20,10 +20,12 @@ crate-type = ["cdylib"]
 # In your own repository point it at a copy of `crates/sdk` with `crates/abi`, or at the game's git repository.
 # Here the SDK sits two folders up
 weft_sdk = { path = "../../crates/sdk" }
+# Shared types and builders of the base game, including food.
+base_api = { path = "../../mods/base/api" }
 # Anything else you need is yours to add linked into your library.
 
-# Makes this folder its own cargo root so it is not part of the game's build. Needed only
-# while the mod lives inside another cargo project, remove in a repository of its own.
+# Makes this folder its own cargo root so it is not part of the game's build.
+# Remove if you want to nest the mod in `Weft/mods/`.
 # Several mods in one repository: `members = ["mod_a", "mod_b"]`
 # shared settings in `[workspace.package]` and `[workspace.dependencies]`.
 [workspace]
