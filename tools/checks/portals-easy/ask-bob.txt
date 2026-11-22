@@ -2,10 +2,13 @@
 # places a pad and links his world there; alice (not his friend) accepts. Then bob places his own
 # portal at home, and hosts: alice's doorway opens and she comes through.
 open pe-bob-home
+loaded
+chat /tp bob 4.5 151 6.5            # load the platform's chunks before filling
 wait 3
 chat /tk fill 0 150 0 8 150 8 base:stone
 chat /tk fill 0 151 0 8 156 8 core:air   # clear the terrain above the platform (suffocation)
 chat /tk set 5 151 4 portals:portal
+chat /tp bob 4.5 151 6.5
 leave
 join pe-ticket.txt
 loaded
@@ -29,7 +32,14 @@ wait 2
 shot pe-bob-3-finish.png           # chat: "Linked here. Now place a portal in 'pe-bob-home' ..."
 leave
 open pe-bob-home
+loaded
+chat /tp bob 4.5 151 6.5            # load the platform's chunks before filling
 wait 3
+chat /tk fill 0 150 0 8 150 8 base:stone
+chat /tk fill 0 151 0 8 156 8 core:air   # clear the terrain above the platform (suffocation)
+chat /tk set 5 151 4 portals:portal
+chat /tp bob 4.5 151 6.5
+wait 2
 shot pe-bob-4-reminder.png         # chat: "The link with 'pe-alice-1' needs a portal here ..."
 chat /tp bob 5.5 151 6.5
 wait 2

@@ -3,9 +3,13 @@
 loaded                             # the launcher opens pe2-bob-other (--world) for the first copy
 wait 3
 open pe2-bob-home
+loaded
+chat /tp bob 4.5 151 6.5            # load the platform's chunks before filling
+wait 3
 chat /tk fill 0 150 0 8 150 8 base:stone
 chat /tk fill 0 151 0 8 156 8 core:air   # clear the terrain above the platform (suffocation)
 chat /tk set 5 151 4 portals:portal
+chat /tp bob 4.5 151 6.5
 host pe2-bob-ticket.txt
 join pe2-alice-ticket.txt          # waits for alice's world; bob's own keeps running
 loaded
@@ -29,6 +33,14 @@ await_file pe2-mark-alice-asked 300
 wait 4                             # alice's ask for pe2-bob-other was accepted here without asking
 leave
 open pe2-bob-home
+loaded
+chat /tp bob 4.5 151 6.5            # load the platform's chunks before filling
+wait 3
+chat /tk fill 0 150 0 8 150 8 base:stone
+chat /tk fill 0 151 0 8 156 8 core:air   # clear the terrain above the platform (suffocation)
+chat /tk set 5 151 4 portals:portal
+chat /tp bob 4.5 151 6.5
+wait 2
 chat /tp bob 5.5 151 6.5
 wait 2
 look 0 -37
