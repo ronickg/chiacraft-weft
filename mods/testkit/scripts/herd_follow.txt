@@ -9,14 +9,17 @@
 # - "keeps up with its leader" lines in the log as the leader walks off;
 # - the shots herd_follow_1..4 show one group that has moved over the pad, not deer scattered
 #   across it (before this, each wandered its own way: compare the spread in 1 and 4).
+# Each row also shows its walk (nav 1: walking somewhere, moved: blocks last tick, ground,
+# pose, using): in ai1122_herd2 every deer said "doing wander" without moving at all.
 # FAIL: no "lead" field (old build), or the herd spread over 30+ blocks by shot 4.
 loaded
 idle
+wait 3
 chat /rule core:mob_spawning 0
 chat /tk mode creative
 chat /air 0 0 0
-chat /tk fill ~-40 ~-1 ~-40 ~40 ~-1 ~40 base:grass
-chat /tk fill ~-40 ~ ~-40 ~40 ~6 ~40 core:air
+chat /tk fill ~-30 ~-1 ~-30 ~30 ~-1 ~30 base:grass
+chat /tk fill ~-30 ~ ~-30 ~30 ~6 ~30 core:air
 wait 2
 chat /tk time 6000
 chat /tk mode spectator
@@ -27,6 +30,8 @@ chat /animalprof water 1.0
 chat /tp ~ ~30 ~
 look 0 -89
 wait 5
+chat /animalprof senses
+wait 2
 chat /animalprof senses
 shot herd_follow_1.png
 wait 30

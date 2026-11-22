@@ -212,9 +212,10 @@ pub fn init(r: &mut Registry) {
                     .take(8)
                     .filter_map(|&(d2, id)| {
                         let s = w.component(id, &crate::senses::SENSES)?;
-                        let kind = name_of(abi::entry_kind::ENTITY, w.entity(id)?.kind);
+                        let e = w.entity(id)?;
+                        let kind = name_of(abi::entry_kind::ENTITY, e.kind);
                         Some(format!(
-                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {} lead {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}",
+                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {} lead {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}, nav {} moved {:.3} ground {} pose {} using {}",
                             d2.sqrt(),
                             s.player,
                             s.fright,
@@ -231,7 +232,13 @@ pub fn init(r: &mut Registry) {
                             crate::routines::activity_of(&w, id),
                             ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate"]
                                 .get(crate::choose::doing(&w, id) as usize)
-                                .unwrap_or(&"?")
+                                .unwrap_or(&"?"),
+                            // Its walk, for a check that wandering moves it.
+                            w.navigating(id) as u8,
+                            e.moved,
+                            e.on_ground,
+                            e.pose,
+                            e.using
                         ))
                     })
                     .collect();
