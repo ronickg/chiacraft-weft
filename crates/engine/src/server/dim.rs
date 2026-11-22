@@ -309,6 +309,7 @@ pub fn finish_generated(
     if changed {
         crate::generation::validate(c, dim, &mut blocks, "feature");
     }
+    let wet = in_their_liquid(c, &mut blocks, &generated.layouts);
     let mut cube = if blocks.iter().all(|&b| b == blocks[0]) {
         Cube::uniform(blocks[0], 0)
     } else {
@@ -320,10 +321,47 @@ pub fn finish_generated(
     for (i, layout) in generated.layouts.drain() {
         cube.set_layout(i, layout);
     }
+    for (i, plant) in wet {
+        cube.set_layout(i, crate::world::placement::CellLayout { extras: vec![plant], ..crate::world::placement::CellLayout::EMPTY });
+    }
     if !generated.extras.is_empty() || !generated.placed.is_empty() {
         cube.generated = Some(Box::new(generated));
     }
     cube
+}
+
+/// chiacraft: a generated block that may share its cell with a liquid (`shares_cell_with`: kelp,
+/// eelgrass) and stands beside that liquid goes in with it, the liquid's source the cell's main
+/// state and the block its second part, as a plant growing into water does (base's `grow_up`). A
+/// generator writes one state per cell, so the sea's plants stood dry in the water, which flowed
+/// into them and washed them out, dropping their loot, the next one then, for ever: a bench's
+/// far spot never went idle (weft sync 11-22). Dev's `holds_liquid` plants were wet by themselves.
+/// The cells it changed, with the block that is now their second part.
+pub(crate) fn in_their_liquid(c: &Content, blocks: &mut [u32], layouts: &rustc_hash::FxHashMap<usize, crate::world::placement::CellLayout>) -> Vec<(usize, u32)> {
+    if c.shares_cell.is_empty() {
+        return Vec::new();
+    }
+    let at = |x: i32, y: i32, z: i32| ((y * 16 + z) * 16 + x) as usize;
+    let mut wet = Vec::new();
+    for i in 0..blocks.len().min(4096) {
+        let s = blocks[i];
+        if layouts.contains_key(&i) || !c.shares_cell.contains_key(&c.states[s as usize].block) {
+            continue;
+        }
+        let (x, y, z) = ((i % 16) as i32, (i / 256) as i32, ((i / 16) % 16) as i32);
+        let liquid = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
+            .iter()
+            .map(|d| (x + d[0], y + d[1], z + d[2]))
+            .filter(|&(x, y, z)| (0..16).contains(&x) && (0..16).contains(&y) && (0..16).contains(&z))
+            .find_map(|(x, y, z)| c.states[blocks[at(x, y, z)] as usize].liquid)
+            .map(|l| c.liquids[l as usize].first_state)
+            .filter(|&source| c.may_share(s, source));
+        if let Some(source) = liquid {
+            blocks[i] = source;
+            wet.push((i, s));
+        }
+    }
+    wet
 }
 
 use weft_noise::hash;

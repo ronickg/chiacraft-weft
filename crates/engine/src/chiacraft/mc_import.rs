@@ -189,7 +189,12 @@ fn chunk_cubes(c: &Content, r: &Resolver, dim: usize, chunk: &anvil::Chunk, lo: 
                 r.count_stand_in(p, n);
             }
         }
+        // Minecraft's kelp and seagrass stand in water (waterlogged); ours share the cell with it.
+        let wet = crate::server::dim::in_their_liquid(c, &mut states[..], &Default::default());
         let mut cube = Cube::from_states(&states);
+        for (i, plant) in wet {
+            cube.set_layout(i, crate::world::placement::CellLayout { extras: vec![plant], ..crate::world::placement::CellLayout::EMPTY });
+        }
         // Our biomes are per column (the client tints a column by the first of its cubes to
         // arrive): every cube takes the biome at its column's surface, not Minecraft's 3D one,
         // whose caves turned an island's grass and leaves teal.
