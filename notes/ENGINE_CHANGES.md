@@ -482,182 +482,295 @@ Every engine file that differs from Weft (`git diff 2db18c238 HEAD -- crates/ ba
 
 One line per file. **Upstream** is how many upstream commits since our base touched it (more than 0: expect a conflict). **New** marks a whole file we added inside Weft's crates: a candidate to move into our own crates. **Rows** gives each row's lines in the file, biggest first.
 
-| File | | + / − | Upstream | Rows |
-|---|---|---|---|---|
-| `backends/vulkan/Cargo.toml` |  | +13 / −0 | 0 | `upscalers-dlss` 13 |
-| `backends/vulkan/build.rs` | **new: move candidate** | +24 / −0 | — | `upscalers-dlss` 24 |
-| `backends/vulkan/src/lib.rs` |  | +1768 / −287 | 11 | `android` 852, `upscalers-dlss` 377, `path-tracing` 228, `fix-vulkan-sync` 154, `rt-shadows-reflections` 138, `fix-vulkan-oom` 96, `diagnostics` 92, `render-scale-cache` 79, `fix-vulkan-lifetime` 61, `depth-water-shafts` 30 |
-| `backends/vulkan/src/ngx.rs` | **new: move candidate** | +838 / −0 | — | `upscalers-dlss` 838 |
-| `backends/vulkan/src/rt.rs` | **new: move candidate** | +591 / −0 | — | `rt-shadows-reflections` 591 |
-| `backends/vulkan/src/streamline.rs` | **new: move candidate** | +826 / −0 | — | `upscalers-dlss` 826 |
-| `backends/vulkan/src/upscale.rs` | **new: move candidate** | +147 / −0 | — | `upscalers-dlss` 147 |
-| `crates/abi/src/lib.rs` |  | +450 / −4 | 120 | `sound` 129, `entities-animals` 62, `item-stacks-tools` 44, `movement-climb-glide-grapple` 37, `lod-trees-crowns` 34, `wind-life` 25, `weather-clouds` 24, `biome-tints-season` 23, `sky-events` 21, `survival-hooks` 9, `wet-snowline` 7, `ui-pixel-kit` 6, `entity-ranges-ai-cost` 6, `holds-liquid` 5, `held-item-scale` 4, `froxels-mist` 3, `day-rate` 3, `knockback-health` 3, `felling-lean` 2, `held-light-night` 2, `continent-scale` 2 |
-| `crates/android/Cargo.toml` | new (upstream has its own crates/android) | +21 / −0 | 1 | `android` 21 |
-| `crates/android/src/lib.rs` | new (upstream has its own crates/android) | +237 / −0 | 4 | `android` 237 |
-| `crates/app/Cargo.toml` |  | +6 / −0 | 2 | `upscalers-dlss` 6 |
-| `crates/app/src/main.rs` |  | +55 / −7 | 7 | `phase6-sandbox` 27, `phase2-packages` 15, `frame-perf` 13, `android` 7, `fix-vulkan-sync` 1 |
-| `crates/engine/Cargo.toml` |  | +23 / −1 | 5 | `android` 11, `phase4-admission` 5, `test-mc-compare` 2, `phase3-links` 2, `phase1-account` 2, `phase2-packages` 1 |
-| `crates/engine/assets/lang/en_us.lang` |  | +296 / −6 | 46 | `phase4-admission` 155, `phase3-links` 53, `phase5-finder` 28, `phase1-account` 22, `phase2-packages` 15, `android` 10, `sound` 5, `survival-hooks` 5, `fix-small` 4, `phase6-sandbox` 2, `mac-paste` 1, `russian` 1 |
-| `crates/engine/assets/lang/fr_fr.lang` |  | +203 / −0 | 43 | `phase4-admission` 152, `phase5-finder` 27, `android` 10, `sound` 5, `survival-hooks` 5, `fix-small` 4 |
-| `crates/engine/assets/lang/ru_ru.lang` |  | +309 / −0 | 45 | `phase4-admission` 153, `russian` 103, `phase5-finder` 27, `android` 10, `sound` 5, `survival-hooks` 5, `fix-small` 4, `mac-paste` 1, `phase3-links` 1 |
-| `crates/engine/assets/minecraft.txt` | deleted | +0 / −19 | 1 | `removed-mc-pack` 19 |
-| `crates/engine/assets/shaders/common.wgsl` |  | +252 / −0 | 20 | `upscalers-dlss` 246, `frame-perf` 4, `depth-water-shafts` 2 |
-| `crates/engine/assets/shaders/denoise.wgsl` | **new: move candidate** | +552 / −0 | — | `path-tracing` 545, `upscalers-dlss` 7 |
-| `crates/engine/assets/shaders/model.wgsl` |  | +31 / −2 | 5 | `upscalers-dlss` 30, `taa` 3 |
-| `crates/engine/assets/shaders/occlusion.wgsl` |  | +58 / −16 | 3 | `frame-perf` 74 |
-| `crates/engine/assets/shaders/particle.wgsl` |  | +19 / −1 | 3 | `wind-life` 20 |
-| `crates/engine/assets/shaders/particle_sim.wgsl` |  | +180 / −5 | 0 | `wind-life` 185 |
-| `crates/engine/assets/shaders/post.wgsl` |  | +90 / −2 | 0 | `frame-perf` 58, `depth-water-shafts` 32, `upscalers-dlss` 4 |
-| `crates/engine/assets/shaders/rt_expand.wgsl` | **new: move candidate** | +83 / −0 | — | `rt-shadows-reflections` 83 |
-| `crates/engine/assets/shaders/sky.wgsl` |  | +13 / −1 | 10 | `plain-look` 10, `fix-small` 4 |
-| `crates/engine/assets/shaders/taa.wgsl` | **new: move candidate** | +273 / −0 | — | `upscalers-dlss` 201, `taa` 72 |
-| `crates/engine/assets/shaders/terrain.wgsl` |  | +198 / −46 | 8 | `lod-trees-crowns` 162, `terrain-cpu-features` 29, `lod-smooth-ground` 22, `lod-water` 8, `continent-scale` 2 |
-| `crates/engine/assets/shaders/ui.wgsl` |  | +26 / −6 | 1 | `survival-hooks` 26, `theme-title-fonts` 6 |
-| `crates/engine/assets/shaders/upscale_guides.wgsl` | **new: move candidate** | +189 / −0 | — | `upscalers-dlss` 181, `path-tracing` 8 |
-| `crates/engine/assets/shaders/world.wgsl` |  | +237 / −37 | 30 | `plain-look` 131, `lod-ported-f69243fd` 60, `felling-lean` 23, `lod-water` 19, `test-mc-compare` 18, `canopy-light` 18, `lod-smooth-ground` 6 |
-| `crates/engine/assets/sounds/SOURCES.md` | **new: move candidate** | +10 / −0 | — | `sound` 10 |
-| `crates/engine/assets/sounds/item/pickup.ogg` | new (upstream has one too) | binary | 1 | `sound` |
-| `crates/engine/assets/sounds/ui/click.ogg` | new (upstream has one too) | binary | 1 | `sound` |
-| `crates/engine/assets/textures/block/destroy_0.png` |  | binary | 0 | `cracks-32px` |
-| `crates/engine/assets/textures/block/destroy_1.png` |  | binary | 1 | `cracks-32px` |
-| `crates/engine/assets/textures/block/destroy_2.png` |  | binary | 1 | `cracks-32px` |
-| `crates/engine/assets/textures/block/destroy_3.png` |  | binary | 1 | `cracks-32px` |
-| `crates/engine/assets/textures/block/destroy_4.png` |  | binary | 1 | `cracks-32px` |
-| `crates/engine/assets/textures/block/destroy_5.png` |  | binary | 1 | `cracks-32px` |
-| `crates/engine/assets/textures/block/destroy_6.png` |  | binary | 1 | `cracks-32px` |
-| `crates/engine/assets/textures/block/destroy_7.png` |  | binary | 1 | `cracks-32px` |
-| `crates/engine/assets/textures/block/destroy_8.png` |  | binary | 1 | `cracks-32px` |
-| `crates/engine/assets/textures/block/destroy_9.png` |  | binary | 1 | `cracks-32px` |
-| `crates/engine/assets/textures/entity/player.png` |  | binary | 2 | `entities-animals` |
-| `crates/engine/assets/textures/gui/button_secondary.png` | **new: move candidate** | binary | — | `theme-title-fonts` |
-| `crates/engine/assets/textures/gui/button_secondary_disabled.png` | **new: move candidate** | binary | — | `theme-title-fonts` |
-| `crates/engine/assets/textures/gui/button_secondary_hover.png` | **new: move candidate** | binary | — | `theme-title-fonts` |
-| `crates/engine/assets/textures/gui/button_secondary_pressed.png` | **new: move candidate** | binary | — | `theme-title-fonts` |
-| `crates/engine/assets/textures/gui/list_row.png` | **new: move candidate** | binary | — | `theme-title-fonts` |
-| `crates/engine/assets/textures/gui/list_row_disabled.png` | **new: move candidate** | binary | — | `theme-title-fonts` |
-| `crates/engine/assets/textures/gui/list_row_hover.png` | **new: move candidate** | binary | — | `theme-title-fonts` |
-| `crates/engine/assets/textures/gui/list_row_pressed.png` | **new: move candidate** | binary | — | `theme-title-fonts` |
-| `crates/engine/src/app.rs` |  | +1328 / −161 | 74 | `phase3-links` 405, `phase2-packages` 196, `upscalers-dlss` 190, `android` 147, `render-scale-cache` 97, `frame-perf` 53, `sound` 41, `phase5-finder` 37, `diagnostics` 36, `entities-animals` 32, `hud-chat-crosshair-outline` 29, `fix-vulkan-lifetime` 25, `item-stacks-tools` 25, `depth-water-shafts` 19, `ui-pixel-kit` 19, `phase4-admission` 17, `rt-shadows-reflections` 16, `phase1-account` 15, `theme-title-fonts` 14, `path-tracing` 12, `hdr-world` 12, `sun-shadows` 12, `gui-scale-small-windows` 12, `video-presets` 9, `server-identity` 7, `fix-small` 7, `taa` 4, `froxels-mist` 4, `test-mc-compare` 3, `soft-clouds` 3, `wind-life` 2, `movement-climb-glide-grapple` 1, `phase6-sandbox` 1, `removed-mc-pack` 1 |
-| `crates/engine/src/app/api.rs` |  | +121 / −3 | 11 | `sound` 78, `test-mc-compare` 25, `movement-climb-glide-grapple` 12, `item-stacks-tools` 4, `theme-title-fonts` 4 |
-| `crates/engine/src/assets.rs` |  | +202 / −16 | 4 | `material-maps` 88, `test-mc-compare` 72, `sky-events` 28, `phase2-packages` 19, `item-stacks-tools` 12 |
-| `crates/engine/src/audio.rs` |  | +746 / −76 | 6 | `sound` 822 |
-| `crates/engine/src/bench.rs` |  | +27 / −5 | 1 | `diagnostics` 32 |
-| `crates/engine/src/chiacraft/account_screen.rs` | **new: move candidate** | +204 / −0 | — | `phase1-account` 197, `theme-title-fonts` 4, `phase4-admission` 3 |
-| `crates/engine/src/chiacraft/achievements.rs` | **new: move candidate** | +330 / −0 | — | `phase4-admission` 330 |
-| `crates/engine/src/chiacraft/achievements_screen.rs` | **new: move candidate** | +120 / −0 | — | `phase4-admission` 120 |
-| `crates/engine/src/chiacraft/bridge.rs` | **new: move candidate** | +200 / −0 | — | `phase3-links` 154, `phase4-admission` 16, `phase2-packages` 16, `phase6-sandbox` 10, `entities-animals` 4 |
-| `crates/engine/src/chiacraft/chain.rs` | **new: move candidate** | +137 / −0 | — | `phase4-admission` 137 |
-| `crates/engine/src/chiacraft/did.rs` | **new: move candidate** | +177 / −0 | — | `phase4-admission` 177 |
-| `crates/engine/src/chiacraft/mc_import.rs` | **new: move candidate** | +395 / −0 | — | `test-mc-compare` 395 |
-| `crates/engine/src/chiacraft/mod.rs` | **new: move candidate** | +47 / −0 | — | `phase4-admission` 36, `survival-hooks` 10, `test-mc-compare` 1 |
-| `crates/engine/src/chiacraft/package_trust.rs` | **new: move candidate** | +135 / −0 | — | `phase2-packages` 135 |
-| `crates/engine/src/chiacraft/worlds/admission.rs` | **new: move candidate** | +1108 / −0 | — | `phase4-admission` 1108 |
-| `crates/engine/src/chiacraft/worlds/admission_screen.rs` | **new: move candidate** | +419 / −0 | — | `phase4-admission` 382, `phase5-finder` 37 |
-| `crates/engine/src/chiacraft/worlds/finder.rs` | **new: move candidate** | +283 / −0 | — | `phase5-finder` 153, `phase4-admission` 130 |
-| `crates/engine/src/chiacraft/worlds/finder_screen.rs` | **new: move candidate** | +118 / −0 | — | `phase5-finder` 107, `phase4-admission` 11 |
-| `crates/engine/src/chiacraft/worlds/friends.rs` | **new: move candidate** | +352 / −0 | — | `phase3-links` 352 |
-| `crates/engine/src/chiacraft/worlds/links.rs` | **new: move candidate** | +744 / −0 | — | `phase3-links` 744 |
-| `crates/engine/src/chiacraft/worlds/listing.rs` | **new: move candidate** | +274 / −0 | — | `phase5-finder` 249, `phase4-admission` 25 |
-| `crates/engine/src/chiacraft/worlds/mod.rs` | **new: move candidate** | +15 / −0 | — | `survival-hooks` 9, `phase5-finder` 3, `phase4-admission` 3 |
-| `crates/engine/src/chiacraft/worlds/saved_worlds.rs` | **new: move candidate** | +361 / −0 | — | `phase3-links` 289, `phase4-admission` 72 |
-| `crates/engine/src/chiacraft/worlds/travel.rs` | **new: move candidate** | +302 / −0 | — | `phase3-links` 302 |
-| `crates/engine/src/chiacraft/worlds/world_address.rs` | **new: move candidate** | +262 / −0 | — | `phase3-links` 262 |
-| `crates/engine/src/chiacraft/worlds/world_did.rs` | **new: move candidate** | +275 / −0 | — | `phase4-admission` 275 |
-| `crates/engine/src/client/camera.rs` |  | +48 / −1 | 7 | `fix-small` 43, `sync-port` 6 |
-| `crates/engine/src/client/cloud_shadow.rs` | **new: move candidate** | +93 / −0 | — | `hdr-world` 91, `upscalers-dlss` 2 |
-| `crates/engine/src/client/entity_render.rs` |  | +579 / −75 | 30 | `entities-animals` 326, `frame-perf` 121, `item-stacks-tools` 77, `sun-shadows` 43, `sync-port` 25, `held-item-scale` 20, `hud-chat-crosshair-outline` 9, `upscalers-dlss` 8, `movement-climb-glide-grapple` 7, `hdr-world` 5, `android` 3, `sky-events` 3, `survival-hooks` 3, `diagnostics` 2 |
-| `crates/engine/src/client/frame_look.rs` | **new: move candidate** | +90 / −0 | — | `frame-perf` 88, `upscalers-dlss` 2 |
-| `crates/engine/src/client/froxels.rs` | **new: move candidate** | +144 / −0 | — | `froxels-mist` 138, `upscalers-dlss` 6 |
-| `crates/engine/src/client/lod.rs` |  | +1007 / −111 | 41 | `lod-trees-crowns` 603, `lod-loading` 148, `lod-smooth-ground` 91, `biome-tints-season` 67, `lod-ported-f69243fd` 62, `test-mc-compare` 52, `lod-water` 25, `fix-small` 18, `lod-detail-setting` 18, `sun-shadows` 10, `lod-fade-end` 4, `continent-scale` 1 |
-| `crates/engine/src/client/looks.rs` |  | +14 / −1 | 5 | `survival-hooks` 15 |
-| `crates/engine/src/client/mesher.rs` |  | +70 / −20 | 15 | `test-mc-compare` 68, `canopy-light` 10, `lod-ported-f69243fd` 8, `holds-liquid` 4 |
-| `crates/engine/src/client/mod.rs` |  | +1170 / −44 | 91 | `sun-shadows` 356, `held-light-night` 114, `weather-clouds` 98, `upscalers-dlss` 94, `movement-climb-glide-grapple` 83, `rt-shadows-reflections` 62, `felling-lean` 46, `item-stacks-tools` 39, `wet-snowline` 39, `diagnostics` 31, `frame-perf` 30, `depth-water-shafts` 25, `entities-animals` 25, `path-tracing` 24, `fix-small` 23, `test-mc-compare` 17, `pack-options` 14, `sky-events` 13, `calm-pipelines` 12, `soft-clouds` 11, `froxels-mist` 9, `sound` 8, `phase4-admission` 8, `hdr-world` 7, `wind-life` 7, `sync-port` 7, `lod-fade-end` 5, `taa` 5, `biome-tints-season` 3, `day-rate` 3, `server-identity` 1 |
-| `crates/engine/src/client/models.rs` |  | +189 / −51 | 15 | `entities-animals` 149, `upscalers-dlss` 60, `sun-shadows` 43 |
-| `crates/engine/src/client/modui.rs` |  | +21 / −2 | 20 | `entities-animals` 15, `movement-climb-glide-grapple` 4, `ui-pixel-kit` 2, `fix-small` 1 |
-| `crates/engine/src/client/particles.rs` |  | +26 / −8 | 4 | `wind-life` 25, `fix-small` 6, `hdr-world` 2, `upscalers-dlss` 1 |
-| `crates/engine/src/client/receive.rs` |  | +58 / −3 | 30 | `felling-lean` 20, `movement-climb-glide-grapple` 15, `phase4-admission` 8, `diagnostics` 6, `sky-events` 5, `weather-clouds` 3, `day-rate` 2, `test-mc-compare` 1, `biome-tints-season` 1 |
-| `crates/engine/src/client/sky.rs` |  | +179 / −37 | 14 | `sun-shadows` 53, `test-mc-compare` 35, `soft-clouds` 34, `fix-small` 30, `weather-clouds` 21, `hdr-world` 13, `froxels-mist` 13, `frame-perf` 8, `plain-look` 6, `upscalers-dlss` 2 |
-| `crates/engine/src/client/soft_clouds.rs` | **new: move candidate** | +361 / −0 | — | `soft-clouds` 346, `upscalers-dlss` 8, `android` 7 |
-| `crates/engine/src/client/stack_look.rs` | **new: move candidate** | +131 / −0 | — | `item-stacks-tools` 131 |
-| `crates/engine/src/client/terrain.rs` |  | +34 / −12 | 7 | `test-mc-compare` 13, `frame-perf` 9 |
-| `crates/engine/src/client/terrain_gpu.rs` |  | +234 / −64 | 9 | `lod-trees-crowns` 186, `lod-loading` 28, `terrain-cpu-features` 25, `continent-scale` 4, `frame-perf` 3, `fix-small` 3, `lod-smooth-ground` 2 |
-| `crates/engine/src/client/textures.rs` |  | +177 / −10 | 3 | `item-stacks-tools` 87, `material-maps` 76, `frame-perf` 24 |
-| `crates/engine/src/client/weather.rs` |  | +13 / −2 | 3 | `weather-clouds` 12, `upscalers-dlss` 1, `hdr-world` 1 |
-| `crates/engine/src/client/wires.rs` |  | +2 / −1 | 3 | `hdr-world` 2, `upscalers-dlss` 1 |
-| `crates/engine/src/client/world.rs` |  | +133 / −14 | 13 | `biome-tints-season` 49, `weather-clouds` 36, `frame-perf` 18, `test-mc-compare` 15, `wind-life` 15, `lod-loading` 9, `lod-ported-f69243fd` 5 |
-| `crates/engine/src/client/world_render.rs` |  | +1405 / −124 | 21 | `android` 409, `sun-shadows` 276, `frame-perf` 179, `lod-fade-end` 142, `calm-pipelines` 104, `felling-lean` 84, `path-tracing` 83, `rt-shadows-reflections` 83, `fix-vulkan-sync` 40, `taa` 40, `upscalers-dlss` 24, `lod-smooth-ground` 16, `lod-far-look` 14, `biome-tints-season` 11, `test-mc-compare` 9, `diagnostics` 6, `material-maps` 6, `depth-water-shafts` 2, `hdr-world` 2, `holds-liquid` 1 |
-| `crates/engine/src/client/world_render/rt.rs` | **new: move candidate** | +928 / −0 | — | `rt-shadows-reflections` 601, `path-tracing` 327 |
-| `crates/engine/src/clipboard.rs` |  | +21 / −0 | 3 | `android` 21 |
-| `crates/engine/src/commands.rs` |  | +72 / −1 | 3 | `mac-paste` 73 |
-| `crates/engine/src/components.rs` |  | +7 / −0 | 15 | `item-stacks-tools` 3, `holds-liquid` 1, `movement-climb-glide-grapple` 1, `phase2-packages` 1, `held-item-scale` 1 |
-| `crates/engine/src/config.rs` |  | +383 / −6 | 28 | `fix-small` 146, `phase3-links` 57, `upscalers-dlss` 29, `run-settings` 27, `path-tracing` 17, `server-identity` 17, `phase4-admission` 13, `hdr-world` 12, `rt-shadows-reflections` 9, `render-scale-cache` 8, `phase5-finder` 8, `entity-ranges-ai-cost` 8, `taa` 6, `soft-clouds` 5, `test-mc-compare` 4, `lod-far-look` 4, `sun-shadows` 4, `net-path-log` 4, `froxels-mist` 3, `lod-detail-setting` 3, `frame-perf` 2, `video-presets` 2 |
-| `crates/engine/src/content.rs` |  | +305 / −13 | 76 | `holds-liquid` 43, `load-checks` 43, `phase6-sandbox` 40, `lod-trees-crowns` 38, `survival-hooks` 34, `phase3-links` 32, `phase2-packages` 23, `item-stacks-tools` 21, `sound` 15, `fix-small` 12, `continent-scale` 9, `movement-climb-glide-grapple` 5 |
-| `crates/engine/src/dedicated.rs` |  | +142 / −4 | 5 | `bots` 134, `server-identity` 7, `test-mc-compare` 2, `phase4-admission` 2 |
-| `crates/engine/src/denoise.rs` | **new: move candidate** | +465 / −0 | — | `path-tracing` 465 |
-| `crates/engine/src/diag.rs` |  | +220 / −11 | 3 | `diagnostics` 138, `lod-loading` 62, `bots` 17, `frame-perf` 8, `android` 5, `lod-trees-crowns` 1 |
-| `crates/engine/src/game_screens.rs` |  | +11 / −3 | 18 | `hud-chat-crosshair-outline` 14 |
-| `crates/engine/src/gpu_layout.rs` |  | +1013 / −18 | 38 | `rt-shadows-reflections` 400, `lod-smooth-ground` 135, `path-tracing` 112, `material-maps` 101, `lod-trees-crowns` 54, `upscalers-dlss` 27, `sun-shadows` 18, `calm-pipelines` 16, `wind-life` 16, `weather-clouds` 16, `hdr-world` 15, `soft-clouds` 15, `held-light-night` 14, `depth-water-shafts` 13, `lod-ported-f69243fd` 9, `frame-perf` 8, `froxels-mist` 8, `sky-events` 7, `taa` 6, `pack-options` 5, `canopy-light` 5, `test-mc-compare` 4, `lod-fade-end` 4, `wet-snowline` 3, `lod-loading` 3, `lod-far-look` 2, `lod-water` 2, `continent-scale` 1 |
-| `crates/engine/src/host.rs` |  | +349 / −14 | 67 | `entities-animals` 124, `weather-clouds` 55, `biome-tints-season` 46, `item-stacks-tools` 45, `diagnostics` 29, `sky-events` 20, `felling-lean` 14, `entity-ranges-ai-cost` 11, `day-rate` 9, `sound` 6, `phase6-sandbox` 4, `lod-trees-crowns` 2, `holds-liquid` 1, `movement-climb-glide-grapple` 1 |
-| `crates/engine/src/hud.rs` |  | +95 / −12 | 27 | `hud-chat-crosshair-outline` 57, `ui-pixel-kit` 26, `item-stacks-tools` 10, `android` 9, `movement-climb-glide-grapple` 5, `survival-hooks` 1 |
-| `crates/engine/src/input.rs` |  | +3 / −2 | 8 | `sync-port` 5 |
-| `crates/engine/src/lib.rs` |  | +59 / −7 | 18 | `frame-perf` 48, `android` 6, `survival-hooks` 5, `phase3-links` 4, `path-tracing` 1, `phase4-admission` 1 |
-| `crates/engine/src/log.rs` |  | +77 / −7 | 2 | `frame-perf` 77, `android` 7 |
-| `crates/engine/src/loot.rs` |  | +2 / −0 | 5 | `item-stacks-tools` 2, `phase2-packages` 2 |
-| `crates/engine/src/minecraft.rs` | deleted | +0 / −499 | 1 | `removed-mc-pack` 499 |
-| `crates/engine/src/model.rs` |  | +38 / −1 | 7 | `entities-animals` 40 |
-| `crates/engine/src/modloader.rs` |  | +341 / −35 | 12 | `phase2-packages` 323, `phase6-sandbox` 32, `phase3-links` 25, `android` 1 |
-| `crates/engine/src/net/codec.rs` |  | +1 / −1 | 11 | `phase4-admission` 1 |
-| `crates/engine/src/net/mod.rs` |  | +78 / −11 | 30 | `phase4-admission` 45, `phase3-links` 9, `felling-lean` 6, `weather-clouds` 6, `sky-events` 6, `test-mc-compare` 4, `biome-tints-season` 3, `phase2-packages` 2, `phase1-account` 2, `day-rate` 2, `sync-port` 2, `entities-animals` 1 |
-| `crates/engine/src/net/p2p.rs` |  | +1199 / −211 | 21 | `phase3-links` 609, `phase2-packages` 390, `phase4-admission` 245, `net-path-log` 103, `phase6-sandbox` 34, `phase1-account` 18, `bots` 9, `felling-lean` 3 |
-| `crates/engine/src/net/screens.rs` |  | +345 / −0 | 5 | `phase3-links` 244, `phase2-packages` 90, `phase6-sandbox` 5, `phase5-finder` 3, `phase4-admission` 3 |
-| `crates/engine/src/packs.rs` |  | +101 / −1 | 3 | `pack-options` 35, `calm-pipelines` 17, `depth-water-shafts` 15, `sun-shadows` 14, `path-tracing` 8, `frame-perf` 8, `plain-look` 3, `hdr-world` 1 |
-| `crates/engine/src/paths.rs` |  | +26 / −0 | 1 | `android` 26 |
-| `crates/engine/src/physics.rs` |  | +244 / −3 | 24 | `movement-climb-glide-grapple` 157, `fix-small` 90 |
-| `crates/engine/src/post.rs` |  | +1218 / −18 | 2 | `upscalers-dlss` 693, `hdr-world` 218, `frame-perf` 117, `depth-water-shafts` 93, `taa` 57, `render-scale-cache` 30, `path-tracing` 28 |
-| `crates/engine/src/registry.rs` |  | +125 / −16 | 81 | `fix-small` 44, `phase2-packages` 19, `entities-animals` 16, `wind-life` 14, `movement-climb-glide-grapple` 12, `sound` 11, `item-stacks-tools` 9, `entity-ranges-ai-cost` 9, `knockback-health` 4, `phase6-sandbox` 2, `lod-trees-crowns` 2 |
-| `crates/engine/src/saves.rs` |  | +238 / −22 | 13 | `phase2-packages` 136, `survival-hooks` 66, `test-mc-compare` 35, `phase3-links` 22, `theme-title-fonts` 3, `russian` 2 |
-| `crates/engine/src/screens.rs` |  | +92 / −13 | 30 | `theme-title-fonts` 38, `android` 25, `phase4-admission` 14, `phase1-account` 11, `phase3-links` 6, `ui-pixel-kit` 5, `gui-scale-small-windows` 3, `survival-hooks` 3, `phase5-finder` 1 |
-| `crates/engine/src/server/achievements.rs` | **new: move candidate** | +348 / −0 | — | `phase4-admission` 348 |
-| `crates/engine/src/server/actions.rs` |  | +126 / −30 | 39 | `phase4-admission` 148, `item-stacks-tools` 3, `movement-climb-glide-grapple` 3, `sync-port` 3, `entities-animals` 1 |
-| `crates/engine/src/server/admission.rs` | **new: move candidate** | +882 / −0 | — | `phase4-admission` 882 |
-| `crates/engine/src/server/area.rs` |  | +1 / −1 | 10 | `holds-liquid` 2 |
-| `crates/engine/src/server/builtin.rs` |  | +57 / −4 | 14 | `phase4-admission` 29, `fix-small` 16, `sync-port` 16 |
-| `crates/engine/src/server/dim.rs` |  | +241 / −26 | 77 | `entity-ranges-ai-cost` 92, `drops-at-feet` 35, `entities-animals` 25, `item-stacks-tools` 24, `sync-port` 17, `weather-clouds` 16, `sky-events` 13, `knockback-health` 11, `fix-small` 10, `lod-trees-crowns` 8, `holds-liquid` 6, `felling-lean` 5, `biome-tints-season` 5, `day-rate` 4, `fix-wide-paths` 4, `continent-scale` 1 |
-| `crates/engine/src/server/entity.rs` |  | +183 / −12 | 38 | `entities-animals` 177, `entity-ranges-ai-cost` 17 |
-| `crates/engine/src/server/extend.rs` |  | +12 / −0 | 17 | `movement-climb-glide-grapple` 11, `knockback-health` 1 |
-| `crates/engine/src/server/liquid.rs` |  | +2 / −0 | 13 | `holds-liquid` 3, `felling-lean` 2 |
-| `crates/engine/src/server/load.rs` |  | +28 / −24 | 10 | `phase3-links` 52 |
-| `crates/engine/src/server/menu.rs` |  | +3 / −0 | 19 | `fix-small` 3 |
-| `crates/engine/src/server/mod.rs` |  | +284 / −36 | 41 | `phase3-links` 177, `phase4-admission` 78, `android` 12, `test-mc-compare` 10, `bots` 9, `phase6-sandbox` 7, `weather-clouds` 7, `server-identity` 5, `phase1-account` 5, `sky-events` 4, `day-rate` 3, `diagnostics` 2, `biome-tints-season` 1 |
-| `crates/engine/src/server/path.rs` |  | +119 / −7 | 3 | `fix-wide-paths` 114, `sync-port` 12 |
-| `crates/engine/src/server/player_file.rs` |  | +141 / −14 | 10 | `phase4-admission` 81, `server-identity` 35, `phase3-links` 29, `test-mc-compare` 8, `day-rate` 2 |
-| `crates/engine/src/server/regions.rs` |  | +145 / −1 | 15 | `weather-clouds` 79, `day-rate` 31, `sky-events` 20, `biome-tints-season` 16 |
-| `crates/engine/src/server/riding.rs` |  | +8 / −4 | 12 | `sync-port` 10, `entities-animals` 2 |
-| `crates/engine/src/server/space.rs` |  | +5 / −0 | 8 | `felling-lean` 5 |
-| `crates/engine/src/server/sync.rs` |  | +130 / −13 | 17 | `entity-ranges-ai-cost` 112, `sky-events` 10, `felling-lean` 9, `weather-clouds` 6, `biome-tints-season` 4, `item-stacks-tools` 1, `day-rate` 1 |
-| `crates/engine/src/server/terrain.rs` |  | +307 / −27 | 7 | `terrain-cpu-features` 170, `lod-loading` 69, `lod-trees-crowns` 52, `biome-tints-season` 26, `phase2-packages` 16, `continent-scale` 13 |
-| `crates/engine/src/settings.rs` |  | +241 / −1 | 12 | `gui-scale-small-windows` 92, `upscalers-dlss` 37, `path-tracing` 19, `hdr-world` 19, `phase4-admission` 17, `render-scale-cache` 11, `froxels-mist` 10, `taa` 7, `android` 6, `frame-perf` 5, `soft-clouds` 5, `video-presets` 5, `phase5-finder` 4, `net-path-log` 4 |
-| `crates/engine/src/stack.rs` |  | +37 / −3 | 10 | `item-stacks-tools` 40 |
-| `crates/engine/src/touch.rs` | new (upstream has one too) | +332 / −0 | 7 | `android` 332 |
-| `crates/engine/src/ui/edit.rs` |  | +6 / −4 | 2 | `mac-paste` 10 |
-| `crates/engine/src/ui/font.rs` |  | +259 / −63 | 1 | `theme-title-fonts` 295, `ui-pixel-kit` 26 |
-| `crates/engine/src/ui/lang.rs` |  | +4 / −0 | 0 | `entities-animals` 4 |
-| `crates/engine/src/ui/mod.rs` |  | +67 / −7 | 18 | `ui-pixel-kit` 35, `load-checks` 19, `gui-scale-small-windows` 9, `movement-climb-glide-grapple` 8, `russian` 3 |
-| `crates/engine/src/ui/render.rs` |  | +316 / −53 | 16 | `ui-pixel-kit` 198, `movement-climb-glide-grapple` 89, `theme-title-fonts` 44, `item-stacks-tools` 21, `survival-hooks` 10, `fix-small` 5, `upscalers-dlss` 1 |
-| `crates/engine/src/ui/text.rs` |  | +41 / −4 | 5 | `ui-pixel-kit` 41, `entities-animals` 3, `theme-title-fonts` 1 |
-| `crates/noise/src/fixed.rs` |  | +115 / −0 | 0 | `continent-scale` 19 |
-| `crates/render/src/lib.rs` |  | +345 / −0 | 6 | `upscalers-dlss` 201, `rt-shadows-reflections` 80, `android` 36, `render-scale-cache` 17, `path-tracing` 11 |
-| `crates/render/src/shader.rs` |  | +24 / −1 | 0 | `rt-shadows-reflections` 25 |
-| `crates/sdk/src/ai.rs` |  | +19 / −2 | 5 | `fix-mob-moods` 21 |
-| `crates/sdk/src/camera.rs` |  | +5 / −2 | 6 | `sync-port` 7 |
-| `crates/sdk/src/client.rs` |  | +39 / −0 | 18 | `weather-clouds` 14, `movement-climb-glide-grapple` 8, `theme-title-fonts` 8, `item-stacks-tools` 5, `hud-chat-crosshair-outline` 4 |
-| `crates/sdk/src/component.rs` |  | +43 / −0 | 23 | `item-stacks-tools` 34, `sync-port` 5, `holds-liquid` 2, `movement-climb-glide-grapple` 1, `held-item-scale` 1 |
-| `crates/sdk/src/content.rs` |  | +33 / −1 | 79 | `sound` 11, `survival-hooks` 9, `item-stacks-tools` 5, `movement-climb-glide-grapple` 5, `holds-liquid` 2, `sync-port` 1 |
-| `crates/sdk/src/effects.rs` |  | +104 / −1 | 9 | `sound` 67, `wind-life` 38 |
-| `crates/sdk/src/extend.rs` |  | +21 / −0 | 30 | `movement-climb-glide-grapple` 20, `knockback-health` 1 |
-| `crates/sdk/src/game.rs` |  | +254 / −5 | 65 | `entities-animals` 99, `sync-port` 73, `item-stacks-tools` 57, `entity-ranges-ai-cost` 14, `sky-events` 12, `fix-small` 3 |
-| `crates/sdk/src/lib.rs` |  | +5 / −2 | 20 | `weather-clouds` 6, `entities-animals` 1 |
-| `crates/sdk/src/terrain.rs` |  | +111 / −3 | 12 | `lod-trees-crowns` 86, `terrain-cpu-features` 23, `biome-tints-season` 9, `continent-scale` 5 |
-| `crates/sdk/src/ui.rs` |  | +57 / −0 | 17 | `entities-animals` 20, `ui-pixel-kit` 17, `item-stacks-tools` 10, `movement-climb-glide-grapple` 10 |
-| `crates/sdk/src/world.rs` |  | +17 / −0 | 13 | `felling-lean` 9, `sync-port` 8 |
+**Merge** is what a sync does with the file (`notes/crew/weft-sync.sh` reads it): *take upstream's* when every row in it is *take upstream's* or *drop*; *keep in engine* when a row in it is kept (start from upstream's file, put those rows back); *move out* when the rest is to move (take upstream's, move our part out in the same branch).
+
+| File | | + / − | Upstream | Merge | Rows |
+|---|---|---|---|---|---|
+| `backends/vulkan/Cargo.toml` |  | +13 / −0 | 0 | keep in engine | `upscalers-dlss` 13 |
+| `backends/vulkan/build.rs` | **new: move candidate** | +24 / −0 | — | keep in engine | `upscalers-dlss` 24 |
+| `backends/vulkan/src/lib.rs` |  | +1768 / −287 | 11 | keep in engine | `android` 852, `upscalers-dlss` 377, `path-tracing` 228, `fix-vulkan-sync` 154, `rt-shadows-reflections` 138, `fix-vulkan-oom` 96, `diagnostics` 92, `render-scale-cache` 79, `fix-vulkan-lifetime` 61, `depth-water-shafts` 30 |
+| `backends/vulkan/src/ngx.rs` | **new: move candidate** | +838 / −0 | — | keep in engine | `upscalers-dlss` 838 |
+| `backends/vulkan/src/rt.rs` | **new: move candidate** | +591 / −0 | — | keep in engine | `rt-shadows-reflections` 591 |
+| `backends/vulkan/src/streamline.rs` | **new: move candidate** | +826 / −0 | — | keep in engine | `upscalers-dlss` 826 |
+| `backends/vulkan/src/upscale.rs` | **new: move candidate** | +147 / −0 | — | keep in engine | `upscalers-dlss` 147 |
+| `crates/abi/src/lib.rs` |  | +450 / −4 | 120 | keep in engine | `sound` 129, `entities-animals` 62, `item-stacks-tools` 44, `movement-climb-glide-grapple` 37, `lod-trees-crowns` 34, `wind-life` 25, `weather-clouds` 24, `biome-tints-season` 23, `sky-events` 21, `survival-hooks` 9, `wet-snowline` 7, `ui-pixel-kit` 6, `entity-ranges-ai-cost` 6, `holds-liquid` 5, `held-item-scale` 4, `froxels-mist` 3, `day-rate` 3, `knockback-health` 3, `felling-lean` 2, `held-light-night` 2, `continent-scale` 2 |
+| `crates/android/Cargo.toml` | new (upstream has its own crates/android) | +21 / −0 | 1 | take upstream's | `android` 21 |
+| `crates/android/src/lib.rs` | new (upstream has its own crates/android) | +237 / −0 | 4 | take upstream's | `android` 237 |
+| `crates/app/Cargo.toml` |  | +6 / −0 | 2 | keep in engine | `upscalers-dlss` 6 |
+| `crates/app/src/main.rs` |  | +55 / −7 | 7 | keep in engine | `phase6-sandbox` 27, `phase2-packages` 15, `frame-perf` 13, `android` 7, `fix-vulkan-sync` 1 |
+| `crates/engine/Cargo.toml` |  | +23 / −1 | 5 | keep in engine | `android` 11, `phase4-admission` 5, `test-mc-compare` 2, `phase3-links` 2, `phase1-account` 2, `phase2-packages` 1 |
+| `crates/engine/assets/lang/en_us.lang` |  | +296 / −6 | 46 | keep in engine | `phase4-admission` 155, `phase3-links` 53, `phase5-finder` 28, `phase1-account` 22, `phase2-packages` 15, `android` 10, `sound` 5, `survival-hooks` 5, `fix-small` 4, `phase6-sandbox` 2, `mac-paste` 1, `russian` 1 |
+| `crates/engine/assets/lang/fr_fr.lang` |  | +203 / −0 | 43 | keep in engine | `phase4-admission` 152, `phase5-finder` 27, `android` 10, `sound` 5, `survival-hooks` 5, `fix-small` 4 |
+| `crates/engine/assets/lang/ru_ru.lang` |  | +309 / −0 | 45 | keep in engine | `phase4-admission` 153, `russian` 103, `phase5-finder` 27, `android` 10, `sound` 5, `survival-hooks` 5, `fix-small` 4, `mac-paste` 1, `phase3-links` 1 |
+| `crates/engine/assets/minecraft.txt` | deleted | +0 / −19 | 1 | keep in engine | `removed-mc-pack` 19 |
+| `crates/engine/assets/shaders/common.wgsl` |  | +252 / −0 | 20 | keep in engine | `upscalers-dlss` 246, `frame-perf` 4, `depth-water-shafts` 2 |
+| `crates/engine/assets/shaders/denoise.wgsl` | **new: move candidate** | +552 / −0 | — | keep in engine | `path-tracing` 545, `upscalers-dlss` 7 |
+| `crates/engine/assets/shaders/model.wgsl` |  | +31 / −2 | 5 | keep in engine | `upscalers-dlss` 30, `taa` 3 |
+| `crates/engine/assets/shaders/occlusion.wgsl` |  | +58 / −16 | 3 | keep in engine | `frame-perf` 74 |
+| `crates/engine/assets/shaders/particle.wgsl` |  | +19 / −1 | 3 | keep in engine | `wind-life` 20 |
+| `crates/engine/assets/shaders/particle_sim.wgsl` |  | +180 / −5 | 0 | keep in engine | `wind-life` 185 |
+| `crates/engine/assets/shaders/post.wgsl` |  | +90 / −2 | 0 | keep in engine | `frame-perf` 58, `depth-water-shafts` 32, `upscalers-dlss` 4 |
+| `crates/engine/assets/shaders/rt_expand.wgsl` | **new: move candidate** | +83 / −0 | — | keep in engine | `rt-shadows-reflections` 83 |
+| `crates/engine/assets/shaders/sky.wgsl` |  | +13 / −1 | 10 | keep in engine | `plain-look` 10, `fix-small` 4 |
+| `crates/engine/assets/shaders/taa.wgsl` | **new: move candidate** | +273 / −0 | — | keep in engine | `upscalers-dlss` 201, `taa` 72 |
+| `crates/engine/assets/shaders/terrain.wgsl` |  | +198 / −46 | 8 | keep in engine | `lod-trees-crowns` 162, `terrain-cpu-features` 29, `lod-smooth-ground` 22, `lod-water` 8, `continent-scale` 2 |
+| `crates/engine/assets/shaders/ui.wgsl` |  | +26 / −6 | 1 | move out | `survival-hooks` 26, `theme-title-fonts` 6 |
+| `crates/engine/assets/shaders/upscale_guides.wgsl` | **new: move candidate** | +189 / −0 | — | keep in engine | `upscalers-dlss` 181, `path-tracing` 8 |
+| `crates/engine/assets/shaders/world.wgsl` |  | +237 / −37 | 30 | keep in engine | `plain-look` 131, `lod-ported-f69243fd` 60, `felling-lean` 23, `lod-water` 19, `test-mc-compare` 18, `canopy-light` 18, `lod-smooth-ground` 6 |
+| `crates/engine/assets/sounds/SOURCES.md` | **new: move candidate** | +10 / −0 | — | keep in engine | `sound` 10 |
+| `crates/engine/assets/sounds/item/pickup.ogg` | new (upstream has one too) | binary | 1 | take upstream's | `sound` |
+| `crates/engine/assets/sounds/ui/click.ogg` | new (upstream has one too) | binary | 1 | take upstream's | `sound` |
+| `crates/engine/assets/textures/block/destroy_0.png` |  | binary | 0 | move out | `cracks-32px` |
+| `crates/engine/assets/textures/block/destroy_1.png` |  | binary | 1 | move out | `cracks-32px` |
+| `crates/engine/assets/textures/block/destroy_2.png` |  | binary | 1 | move out | `cracks-32px` |
+| `crates/engine/assets/textures/block/destroy_3.png` |  | binary | 1 | move out | `cracks-32px` |
+| `crates/engine/assets/textures/block/destroy_4.png` |  | binary | 1 | move out | `cracks-32px` |
+| `crates/engine/assets/textures/block/destroy_5.png` |  | binary | 1 | move out | `cracks-32px` |
+| `crates/engine/assets/textures/block/destroy_6.png` |  | binary | 1 | move out | `cracks-32px` |
+| `crates/engine/assets/textures/block/destroy_7.png` |  | binary | 1 | move out | `cracks-32px` |
+| `crates/engine/assets/textures/block/destroy_8.png` |  | binary | 1 | move out | `cracks-32px` |
+| `crates/engine/assets/textures/block/destroy_9.png` |  | binary | 1 | move out | `cracks-32px` |
+| `crates/engine/assets/textures/entity/player.png` |  | binary | 2 | keep in engine | `entities-animals` |
+| `crates/engine/assets/textures/gui/button_secondary.png` | **new: move candidate** | binary | — | move out | `theme-title-fonts` |
+| `crates/engine/assets/textures/gui/button_secondary_disabled.png` | **new: move candidate** | binary | — | move out | `theme-title-fonts` |
+| `crates/engine/assets/textures/gui/button_secondary_hover.png` | **new: move candidate** | binary | — | move out | `theme-title-fonts` |
+| `crates/engine/assets/textures/gui/button_secondary_pressed.png` | **new: move candidate** | binary | — | move out | `theme-title-fonts` |
+| `crates/engine/assets/textures/gui/list_row.png` | **new: move candidate** | binary | — | move out | `theme-title-fonts` |
+| `crates/engine/assets/textures/gui/list_row_disabled.png` | **new: move candidate** | binary | — | move out | `theme-title-fonts` |
+| `crates/engine/assets/textures/gui/list_row_hover.png` | **new: move candidate** | binary | — | move out | `theme-title-fonts` |
+| `crates/engine/assets/textures/gui/list_row_pressed.png` | **new: move candidate** | binary | — | move out | `theme-title-fonts` |
+| `crates/engine/src/app.rs` |  | +1328 / −161 | 74 | keep in engine | `phase3-links` 405, `phase2-packages` 196, `upscalers-dlss` 190, `android` 147, `render-scale-cache` 97, `frame-perf` 53, `sound` 41, `phase5-finder` 37, `diagnostics` 36, `entities-animals` 32, `hud-chat-crosshair-outline` 29, `fix-vulkan-lifetime` 25, `item-stacks-tools` 25, `depth-water-shafts` 19, `ui-pixel-kit` 19, `phase4-admission` 17, `rt-shadows-reflections` 16, `phase1-account` 15, `theme-title-fonts` 14, `path-tracing` 12, `hdr-world` 12, `sun-shadows` 12, `gui-scale-small-windows` 12, `video-presets` 9, `server-identity` 7, `fix-small` 7, `taa` 4, `froxels-mist` 4, `test-mc-compare` 3, `soft-clouds` 3, `wind-life` 2, `movement-climb-glide-grapple` 1, `phase6-sandbox` 1, `removed-mc-pack` 1 |
+| `crates/engine/src/app/api.rs` |  | +121 / −3 | 11 | keep in engine | `sound` 78, `test-mc-compare` 25, `movement-climb-glide-grapple` 12, `item-stacks-tools` 4, `theme-title-fonts` 4 |
+| `crates/engine/src/assets.rs` |  | +202 / −16 | 4 | keep in engine | `material-maps` 88, `test-mc-compare` 72, `sky-events` 28, `phase2-packages` 19, `item-stacks-tools` 12 |
+| `crates/engine/src/audio.rs` |  | +746 / −76 | 6 | keep in engine | `sound` 822 |
+| `crates/engine/src/bench.rs` |  | +27 / −5 | 1 | keep in engine | `diagnostics` 32 |
+| `crates/engine/src/chiacraft/account_screen.rs` | **new: move candidate** | +204 / −0 | — | move out | `phase1-account` 197, `theme-title-fonts` 4, `phase4-admission` 3 |
+| `crates/engine/src/chiacraft/achievements.rs` | **new: move candidate** | +330 / −0 | — | move out | `phase4-admission` 330 |
+| `crates/engine/src/chiacraft/achievements_screen.rs` | **new: move candidate** | +120 / −0 | — | move out | `phase4-admission` 120 |
+| `crates/engine/src/chiacraft/bridge.rs` | **new: move candidate** | +200 / −0 | — | keep in engine | `phase3-links` 154, `phase4-admission` 16, `phase2-packages` 16, `phase6-sandbox` 10, `entities-animals` 4 |
+| `crates/engine/src/chiacraft/chain.rs` | **new: move candidate** | +137 / −0 | — | move out | `phase4-admission` 137 |
+| `crates/engine/src/chiacraft/did.rs` | **new: move candidate** | +177 / −0 | — | move out | `phase4-admission` 177 |
+| `crates/engine/src/chiacraft/mc_import.rs` | **new: move candidate** | +395 / −0 | — | take upstream's | `test-mc-compare` 395 |
+| `crates/engine/src/chiacraft/mod.rs` | **new: move candidate** | +47 / −0 | — | move out | `phase4-admission` 36, `survival-hooks` 10, `test-mc-compare` 1 |
+| `crates/engine/src/chiacraft/package_trust.rs` | **new: move candidate** | +135 / −0 | — | keep in engine | `phase2-packages` 135 |
+| `crates/engine/src/chiacraft/worlds/admission.rs` | **new: move candidate** | +1108 / −0 | — | move out | `phase4-admission` 1108 |
+| `crates/engine/src/chiacraft/worlds/admission_screen.rs` | **new: move candidate** | +419 / −0 | — | move out | `phase4-admission` 382, `phase5-finder` 37 |
+| `crates/engine/src/chiacraft/worlds/finder.rs` | **new: move candidate** | +283 / −0 | — | move out | `phase5-finder` 153, `phase4-admission` 130 |
+| `crates/engine/src/chiacraft/worlds/finder_screen.rs` | **new: move candidate** | +118 / −0 | — | move out | `phase5-finder` 107, `phase4-admission` 11 |
+| `crates/engine/src/chiacraft/worlds/friends.rs` | **new: move candidate** | +352 / −0 | — | move out | `phase3-links` 352 |
+| `crates/engine/src/chiacraft/worlds/links.rs` | **new: move candidate** | +744 / −0 | — | move out | `phase3-links` 744 |
+| `crates/engine/src/chiacraft/worlds/listing.rs` | **new: move candidate** | +274 / −0 | — | move out | `phase5-finder` 249, `phase4-admission` 25 |
+| `crates/engine/src/chiacraft/worlds/mod.rs` | **new: move candidate** | +15 / −0 | — | move out | `survival-hooks` 9, `phase5-finder` 3, `phase4-admission` 3 |
+| `crates/engine/src/chiacraft/worlds/saved_worlds.rs` | **new: move candidate** | +361 / −0 | — | move out | `phase3-links` 289, `phase4-admission` 72 |
+| `crates/engine/src/chiacraft/worlds/travel.rs` | **new: move candidate** | +302 / −0 | — | move out | `phase3-links` 302 |
+| `crates/engine/src/chiacraft/worlds/world_address.rs` | **new: move candidate** | +262 / −0 | — | move out | `phase3-links` 262 |
+| `crates/engine/src/chiacraft/worlds/world_did.rs` | **new: move candidate** | +275 / −0 | — | move out | `phase4-admission` 275 |
+| `crates/engine/src/client/camera.rs` |  | +48 / −1 | 7 | keep in engine | `fix-small` 43, `sync-port` 6 |
+| `crates/engine/src/client/cloud_shadow.rs` | **new: move candidate** | +93 / −0 | — | keep in engine | `hdr-world` 91, `upscalers-dlss` 2 |
+| `crates/engine/src/client/entity_render.rs` |  | +579 / −75 | 30 | keep in engine | `entities-animals` 326, `frame-perf` 121, `item-stacks-tools` 77, `sun-shadows` 43, `sync-port` 25, `held-item-scale` 20, `hud-chat-crosshair-outline` 9, `upscalers-dlss` 8, `movement-climb-glide-grapple` 7, `hdr-world` 5, `android` 3, `sky-events` 3, `survival-hooks` 3, `diagnostics` 2 |
+| `crates/engine/src/client/frame_look.rs` | **new: move candidate** | +90 / −0 | — | keep in engine | `frame-perf` 88, `upscalers-dlss` 2 |
+| `crates/engine/src/client/froxels.rs` | **new: move candidate** | +144 / −0 | — | keep in engine | `froxels-mist` 138, `upscalers-dlss` 6 |
+| `crates/engine/src/client/lod.rs` |  | +1007 / −111 | 41 | keep in engine | `lod-trees-crowns` 603, `lod-loading` 148, `lod-smooth-ground` 91, `biome-tints-season` 67, `lod-ported-f69243fd` 62, `test-mc-compare` 52, `lod-water` 25, `fix-small` 18, `lod-detail-setting` 18, `sun-shadows` 10, `lod-fade-end` 4, `continent-scale` 1 |
+| `crates/engine/src/client/looks.rs` |  | +14 / −1 | 5 | move out | `survival-hooks` 15 |
+| `crates/engine/src/client/mesher.rs` |  | +70 / −20 | 15 | keep in engine | `test-mc-compare` 68, `canopy-light` 10, `lod-ported-f69243fd` 8, `holds-liquid` 4 |
+| `crates/engine/src/client/mod.rs` |  | +1170 / −44 | 91 | keep in engine | `sun-shadows` 356, `held-light-night` 114, `weather-clouds` 98, `upscalers-dlss` 94, `movement-climb-glide-grapple` 83, `rt-shadows-reflections` 62, `felling-lean` 46, `item-stacks-tools` 39, `wet-snowline` 39, `diagnostics` 31, `frame-perf` 30, `depth-water-shafts` 25, `entities-animals` 25, `path-tracing` 24, `fix-small` 23, `test-mc-compare` 17, `pack-options` 14, `sky-events` 13, `calm-pipelines` 12, `soft-clouds` 11, `froxels-mist` 9, `sound` 8, `phase4-admission` 8, `hdr-world` 7, `wind-life` 7, `sync-port` 7, `lod-fade-end` 5, `taa` 5, `biome-tints-season` 3, `day-rate` 3, `server-identity` 1 |
+| `crates/engine/src/client/models.rs` |  | +189 / −51 | 15 | keep in engine | `entities-animals` 149, `upscalers-dlss` 60, `sun-shadows` 43 |
+| `crates/engine/src/client/modui.rs` |  | +21 / −2 | 20 | keep in engine | `entities-animals` 15, `movement-climb-glide-grapple` 4, `ui-pixel-kit` 2, `fix-small` 1 |
+| `crates/engine/src/client/particles.rs` |  | +26 / −8 | 4 | keep in engine | `wind-life` 25, `fix-small` 6, `hdr-world` 2, `upscalers-dlss` 1 |
+| `crates/engine/src/client/receive.rs` |  | +58 / −3 | 30 | keep in engine | `felling-lean` 20, `movement-climb-glide-grapple` 15, `phase4-admission` 8, `diagnostics` 6, `sky-events` 5, `weather-clouds` 3, `day-rate` 2, `test-mc-compare` 1, `biome-tints-season` 1 |
+| `crates/engine/src/client/sky.rs` |  | +179 / −37 | 14 | keep in engine | `sun-shadows` 53, `test-mc-compare` 35, `soft-clouds` 34, `fix-small` 30, `weather-clouds` 21, `hdr-world` 13, `froxels-mist` 13, `frame-perf` 8, `plain-look` 6, `upscalers-dlss` 2 |
+| `crates/engine/src/client/soft_clouds.rs` | **new: move candidate** | +361 / −0 | — | keep in engine | `soft-clouds` 346, `upscalers-dlss` 8, `android` 7 |
+| `crates/engine/src/client/stack_look.rs` | **new: move candidate** | +131 / −0 | — | keep in engine | `item-stacks-tools` 131 |
+| `crates/engine/src/client/terrain.rs` |  | +34 / −12 | 7 | keep in engine | `test-mc-compare` 13, `frame-perf` 9 |
+| `crates/engine/src/client/terrain_gpu.rs` |  | +234 / −64 | 9 | keep in engine | `lod-trees-crowns` 186, `lod-loading` 28, `terrain-cpu-features` 25, `continent-scale` 4, `frame-perf` 3, `fix-small` 3, `lod-smooth-ground` 2 |
+| `crates/engine/src/client/textures.rs` |  | +177 / −10 | 3 | keep in engine | `item-stacks-tools` 87, `material-maps` 76, `frame-perf` 24 |
+| `crates/engine/src/client/weather.rs` |  | +13 / −2 | 3 | keep in engine | `weather-clouds` 12, `upscalers-dlss` 1, `hdr-world` 1 |
+| `crates/engine/src/client/wires.rs` |  | +2 / −1 | 3 | keep in engine | `hdr-world` 2, `upscalers-dlss` 1 |
+| `crates/engine/src/client/world.rs` |  | +133 / −14 | 13 | keep in engine | `biome-tints-season` 49, `weather-clouds` 36, `frame-perf` 18, `test-mc-compare` 15, `wind-life` 15, `lod-loading` 9, `lod-ported-f69243fd` 5 |
+| `crates/engine/src/client/world_render.rs` |  | +1405 / −124 | 21 | keep in engine | `android` 409, `sun-shadows` 276, `frame-perf` 179, `lod-fade-end` 142, `calm-pipelines` 104, `felling-lean` 84, `path-tracing` 83, `rt-shadows-reflections` 83, `fix-vulkan-sync` 40, `taa` 40, `upscalers-dlss` 24, `lod-smooth-ground` 16, `lod-far-look` 14, `biome-tints-season` 11, `test-mc-compare` 9, `diagnostics` 6, `material-maps` 6, `depth-water-shafts` 2, `hdr-world` 2, `holds-liquid` 1 |
+| `crates/engine/src/client/world_render/rt.rs` | **new: move candidate** | +928 / −0 | — | keep in engine | `rt-shadows-reflections` 601, `path-tracing` 327 |
+| `crates/engine/src/clipboard.rs` |  | +21 / −0 | 3 | take upstream's | `android` 21 |
+| `crates/engine/src/commands.rs` |  | +72 / −1 | 3 | keep in engine | `mac-paste` 73 |
+| `crates/engine/src/components.rs` |  | +7 / −0 | 15 | keep in engine | `item-stacks-tools` 3, `holds-liquid` 1, `movement-climb-glide-grapple` 1, `phase2-packages` 1, `held-item-scale` 1 |
+| `crates/engine/src/config.rs` |  | +383 / −6 | 28 | keep in engine | `fix-small` 146, `phase3-links` 57, `upscalers-dlss` 29, `run-settings` 27, `path-tracing` 17, `server-identity` 17, `phase4-admission` 13, `hdr-world` 12, `rt-shadows-reflections` 9, `render-scale-cache` 8, `phase5-finder` 8, `entity-ranges-ai-cost` 8, `taa` 6, `soft-clouds` 5, `test-mc-compare` 4, `lod-far-look` 4, `sun-shadows` 4, `net-path-log` 4, `froxels-mist` 3, `lod-detail-setting` 3, `frame-perf` 2, `video-presets` 2 |
+| `crates/engine/src/content.rs` |  | +305 / −13 | 76 | keep in engine | `holds-liquid` 43, `load-checks` 43, `phase6-sandbox` 40, `lod-trees-crowns` 38, `survival-hooks` 34, `phase3-links` 32, `phase2-packages` 23, `item-stacks-tools` 21, `sound` 15, `fix-small` 12, `continent-scale` 9, `movement-climb-glide-grapple` 5 |
+| `crates/engine/src/dedicated.rs` |  | +142 / −4 | 5 | keep in engine | `bots` 134, `server-identity` 7, `test-mc-compare` 2, `phase4-admission` 2 |
+| `crates/engine/src/denoise.rs` | **new: move candidate** | +465 / −0 | — | keep in engine | `path-tracing` 465 |
+| `crates/engine/src/diag.rs` |  | +220 / −11 | 3 | keep in engine | `diagnostics` 138, `lod-loading` 62, `bots` 17, `frame-perf` 8, `android` 5, `lod-trees-crowns` 1 |
+| `crates/engine/src/game_screens.rs` |  | +11 / −3 | 18 | keep in engine | `hud-chat-crosshair-outline` 14 |
+| `crates/engine/src/gpu_layout.rs` |  | +1013 / −18 | 38 | keep in engine | `rt-shadows-reflections` 400, `lod-smooth-ground` 135, `path-tracing` 112, `material-maps` 101, `lod-trees-crowns` 54, `upscalers-dlss` 27, `sun-shadows` 18, `calm-pipelines` 16, `wind-life` 16, `weather-clouds` 16, `hdr-world` 15, `soft-clouds` 15, `held-light-night` 14, `depth-water-shafts` 13, `lod-ported-f69243fd` 9, `frame-perf` 8, `froxels-mist` 8, `sky-events` 7, `taa` 6, `pack-options` 5, `canopy-light` 5, `test-mc-compare` 4, `lod-fade-end` 4, `wet-snowline` 3, `lod-loading` 3, `lod-far-look` 2, `lod-water` 2, `continent-scale` 1 |
+| `crates/engine/src/host.rs` |  | +349 / −14 | 67 | keep in engine | `entities-animals` 124, `weather-clouds` 55, `biome-tints-season` 46, `item-stacks-tools` 45, `diagnostics` 29, `sky-events` 20, `felling-lean` 14, `entity-ranges-ai-cost` 11, `day-rate` 9, `sound` 6, `phase6-sandbox` 4, `lod-trees-crowns` 2, `holds-liquid` 1, `movement-climb-glide-grapple` 1 |
+| `crates/engine/src/hud.rs` |  | +95 / −12 | 27 | keep in engine | `hud-chat-crosshair-outline` 57, `ui-pixel-kit` 26, `item-stacks-tools` 10, `android` 9, `movement-climb-glide-grapple` 5, `survival-hooks` 1 |
+| `crates/engine/src/input.rs` |  | +3 / −2 | 8 | move out | `sync-port` 5 |
+| `crates/engine/src/lib.rs` |  | +59 / −7 | 18 | keep in engine | `frame-perf` 48, `android` 6, `survival-hooks` 5, `phase3-links` 4, `path-tracing` 1, `phase4-admission` 1 |
+| `crates/engine/src/log.rs` |  | +77 / −7 | 2 | keep in engine | `frame-perf` 77, `android` 7 |
+| `crates/engine/src/loot.rs` |  | +2 / −0 | 5 | keep in engine | `item-stacks-tools` 2, `phase2-packages` 2 |
+| `crates/engine/src/minecraft.rs` | deleted | +0 / −499 | 1 | keep in engine | `removed-mc-pack` 499 |
+| `crates/engine/src/model.rs` |  | +38 / −1 | 7 | keep in engine | `entities-animals` 40 |
+| `crates/engine/src/modloader.rs` |  | +341 / −35 | 12 | keep in engine | `phase2-packages` 323, `phase6-sandbox` 32, `phase3-links` 25, `android` 1 |
+| `crates/engine/src/net/codec.rs` |  | +1 / −1 | 11 | move out | `phase4-admission` 1 |
+| `crates/engine/src/net/mod.rs` |  | +78 / −11 | 30 | keep in engine | `phase4-admission` 45, `phase3-links` 9, `felling-lean` 6, `weather-clouds` 6, `sky-events` 6, `test-mc-compare` 4, `biome-tints-season` 3, `phase2-packages` 2, `phase1-account` 2, `day-rate` 2, `sync-port` 2, `entities-animals` 1 |
+| `crates/engine/src/net/p2p.rs` |  | +1199 / −211 | 21 | keep in engine | `phase3-links` 609, `phase2-packages` 390, `phase4-admission` 245, `net-path-log` 103, `phase6-sandbox` 34, `phase1-account` 18, `bots` 9, `felling-lean` 3 |
+| `crates/engine/src/net/screens.rs` |  | +345 / −0 | 5 | keep in engine | `phase3-links` 244, `phase2-packages` 90, `phase6-sandbox` 5, `phase5-finder` 3, `phase4-admission` 3 |
+| `crates/engine/src/packs.rs` |  | +101 / −1 | 3 | keep in engine | `pack-options` 35, `calm-pipelines` 17, `depth-water-shafts` 15, `sun-shadows` 14, `path-tracing` 8, `frame-perf` 8, `plain-look` 3, `hdr-world` 1 |
+| `crates/engine/src/paths.rs` |  | +26 / −0 | 1 | take upstream's | `android` 26 |
+| `crates/engine/src/physics.rs` |  | +244 / −3 | 24 | keep in engine | `movement-climb-glide-grapple` 157, `fix-small` 90 |
+| `crates/engine/src/post.rs` |  | +1218 / −18 | 2 | keep in engine | `upscalers-dlss` 693, `hdr-world` 218, `frame-perf` 117, `depth-water-shafts` 93, `taa` 57, `render-scale-cache` 30, `path-tracing` 28 |
+| `crates/engine/src/registry.rs` |  | +125 / −16 | 81 | keep in engine | `fix-small` 44, `phase2-packages` 19, `entities-animals` 16, `wind-life` 14, `movement-climb-glide-grapple` 12, `sound` 11, `item-stacks-tools` 9, `entity-ranges-ai-cost` 9, `knockback-health` 4, `phase6-sandbox` 2, `lod-trees-crowns` 2 |
+| `crates/engine/src/saves.rs` |  | +238 / −22 | 13 | keep in engine | `phase2-packages` 136, `survival-hooks` 66, `test-mc-compare` 35, `phase3-links` 22, `theme-title-fonts` 3, `russian` 2 |
+| `crates/engine/src/screens.rs` |  | +92 / −13 | 30 | keep in engine | `theme-title-fonts` 38, `android` 25, `phase4-admission` 14, `phase1-account` 11, `phase3-links` 6, `ui-pixel-kit` 5, `gui-scale-small-windows` 3, `survival-hooks` 3, `phase5-finder` 1 |
+| `crates/engine/src/server/achievements.rs` | **new: move candidate** | +348 / −0 | — | move out | `phase4-admission` 348 |
+| `crates/engine/src/server/actions.rs` |  | +126 / −30 | 39 | keep in engine | `phase4-admission` 148, `item-stacks-tools` 3, `movement-climb-glide-grapple` 3, `sync-port` 3, `entities-animals` 1 |
+| `crates/engine/src/server/admission.rs` | **new: move candidate** | +882 / −0 | — | move out | `phase4-admission` 882 |
+| `crates/engine/src/server/area.rs` |  | +1 / −1 | 10 | take upstream's | `holds-liquid` 2 |
+| `crates/engine/src/server/builtin.rs` |  | +57 / −4 | 14 | keep in engine | `phase4-admission` 29, `fix-small` 16, `sync-port` 16 |
+| `crates/engine/src/server/dim.rs` |  | +241 / −26 | 77 | keep in engine | `entity-ranges-ai-cost` 92, `drops-at-feet` 35, `entities-animals` 25, `item-stacks-tools` 24, `sync-port` 17, `weather-clouds` 16, `sky-events` 13, `knockback-health` 11, `fix-small` 10, `lod-trees-crowns` 8, `holds-liquid` 6, `felling-lean` 5, `biome-tints-season` 5, `day-rate` 4, `fix-wide-paths` 4, `continent-scale` 1 |
+| `crates/engine/src/server/entity.rs` |  | +183 / −12 | 38 | keep in engine | `entities-animals` 177, `entity-ranges-ai-cost` 17 |
+| `crates/engine/src/server/extend.rs` |  | +12 / −0 | 17 | keep in engine | `movement-climb-glide-grapple` 11, `knockback-health` 1 |
+| `crates/engine/src/server/liquid.rs` |  | +2 / −0 | 13 | keep in engine | `holds-liquid` 3, `felling-lean` 2 |
+| `crates/engine/src/server/load.rs` |  | +28 / −24 | 10 | move out | `phase3-links` 52 |
+| `crates/engine/src/server/menu.rs` |  | +3 / −0 | 19 | keep in engine | `fix-small` 3 |
+| `crates/engine/src/server/mod.rs` |  | +284 / −36 | 41 | keep in engine | `phase3-links` 177, `phase4-admission` 78, `android` 12, `test-mc-compare` 10, `bots` 9, `phase6-sandbox` 7, `weather-clouds` 7, `server-identity` 5, `phase1-account` 5, `sky-events` 4, `day-rate` 3, `diagnostics` 2, `biome-tints-season` 1 |
+| `crates/engine/src/server/path.rs` |  | +119 / −7 | 3 | take upstream's | `fix-wide-paths` 114, `sync-port` 12 |
+| `crates/engine/src/server/player_file.rs` |  | +141 / −14 | 10 | keep in engine | `phase4-admission` 81, `server-identity` 35, `phase3-links` 29, `test-mc-compare` 8, `day-rate` 2 |
+| `crates/engine/src/server/regions.rs` |  | +145 / −1 | 15 | keep in engine | `weather-clouds` 79, `day-rate` 31, `sky-events` 20, `biome-tints-season` 16 |
+| `crates/engine/src/server/riding.rs` |  | +8 / −4 | 12 | keep in engine | `sync-port` 10, `entities-animals` 2 |
+| `crates/engine/src/server/space.rs` |  | +5 / −0 | 8 | keep in engine | `felling-lean` 5 |
+| `crates/engine/src/server/sync.rs` |  | +130 / −13 | 17 | keep in engine | `entity-ranges-ai-cost` 112, `sky-events` 10, `felling-lean` 9, `weather-clouds` 6, `biome-tints-season` 4, `item-stacks-tools` 1, `day-rate` 1 |
+| `crates/engine/src/server/terrain.rs` |  | +307 / −27 | 7 | keep in engine | `terrain-cpu-features` 170, `lod-loading` 69, `lod-trees-crowns` 52, `biome-tints-season` 26, `phase2-packages` 16, `continent-scale` 13 |
+| `crates/engine/src/settings.rs` |  | +241 / −1 | 12 | keep in engine | `gui-scale-small-windows` 92, `upscalers-dlss` 37, `path-tracing` 19, `hdr-world` 19, `phase4-admission` 17, `render-scale-cache` 11, `froxels-mist` 10, `taa` 7, `android` 6, `frame-perf` 5, `soft-clouds` 5, `video-presets` 5, `phase5-finder` 4, `net-path-log` 4 |
+| `crates/engine/src/stack.rs` |  | +37 / −3 | 10 | keep in engine | `item-stacks-tools` 40 |
+| `crates/engine/src/touch.rs` | new (upstream has one too) | +332 / −0 | 7 | take upstream's | `android` 332 |
+| `crates/engine/src/ui/edit.rs` |  | +6 / −4 | 2 | keep in engine | `mac-paste` 10 |
+| `crates/engine/src/ui/font.rs` |  | +259 / −63 | 1 | keep in engine | `theme-title-fonts` 295, `ui-pixel-kit` 26 |
+| `crates/engine/src/ui/lang.rs` |  | +4 / −0 | 0 | keep in engine | `entities-animals` 4 |
+| `crates/engine/src/ui/mod.rs` |  | +67 / −7 | 18 | keep in engine | `ui-pixel-kit` 35, `load-checks` 19, `gui-scale-small-windows` 9, `movement-climb-glide-grapple` 8, `russian` 3 |
+| `crates/engine/src/ui/render.rs` |  | +316 / −53 | 16 | keep in engine | `ui-pixel-kit` 198, `movement-climb-glide-grapple` 89, `theme-title-fonts` 44, `item-stacks-tools` 21, `survival-hooks` 10, `fix-small` 5, `upscalers-dlss` 1 |
+| `crates/engine/src/ui/text.rs` |  | +41 / −4 | 5 | keep in engine | `ui-pixel-kit` 41, `entities-animals` 3, `theme-title-fonts` 1 |
+| `crates/noise/src/fixed.rs` |  | +115 / −0 | 0 | keep in engine | `continent-scale` 19 |
+| `crates/render/src/lib.rs` |  | +345 / −0 | 6 | keep in engine | `upscalers-dlss` 201, `rt-shadows-reflections` 80, `android` 36, `render-scale-cache` 17, `path-tracing` 11 |
+| `crates/render/src/shader.rs` |  | +24 / −1 | 0 | keep in engine | `rt-shadows-reflections` 25 |
+| `crates/sdk/src/ai.rs` |  | +19 / −2 | 5 | take upstream's | `fix-mob-moods` 21 |
+| `crates/sdk/src/camera.rs` |  | +5 / −2 | 6 | move out | `sync-port` 7 |
+| `crates/sdk/src/client.rs` |  | +39 / −0 | 18 | keep in engine | `weather-clouds` 14, `movement-climb-glide-grapple` 8, `theme-title-fonts` 8, `item-stacks-tools` 5, `hud-chat-crosshair-outline` 4 |
+| `crates/sdk/src/component.rs` |  | +43 / −0 | 23 | keep in engine | `item-stacks-tools` 34, `sync-port` 5, `holds-liquid` 2, `movement-climb-glide-grapple` 1, `held-item-scale` 1 |
+| `crates/sdk/src/content.rs` |  | +33 / −1 | 79 | keep in engine | `sound` 11, `survival-hooks` 9, `item-stacks-tools` 5, `movement-climb-glide-grapple` 5, `holds-liquid` 2, `sync-port` 1 |
+| `crates/sdk/src/effects.rs` |  | +104 / −1 | 9 | keep in engine | `sound` 67, `wind-life` 38 |
+| `crates/sdk/src/extend.rs` |  | +21 / −0 | 30 | keep in engine | `movement-climb-glide-grapple` 20, `knockback-health` 1 |
+| `crates/sdk/src/game.rs` |  | +254 / −5 | 65 | keep in engine | `entities-animals` 99, `sync-port` 73, `item-stacks-tools` 57, `entity-ranges-ai-cost` 14, `sky-events` 12, `fix-small` 3 |
+| `crates/sdk/src/lib.rs` |  | +5 / −2 | 20 | keep in engine | `weather-clouds` 6, `entities-animals` 1 |
+| `crates/sdk/src/terrain.rs` |  | +111 / −3 | 12 | keep in engine | `lod-trees-crowns` 86, `terrain-cpu-features` 23, `biome-tints-season` 9, `continent-scale` 5 |
+| `crates/sdk/src/ui.rs` |  | +57 / −0 | 17 | keep in engine | `entities-animals` 20, `ui-pixel-kit` 17, `item-stacks-tools` 10, `movement-climb-glide-grapple` 10 |
+| `crates/sdk/src/world.rs` |  | +17 / −0 | 13 | keep in engine | `felling-lean` 9, `sync-port` 8 |
+
+## 13. The trial merge's engine conflicts, file by file (2026-11-22)
+
+`git merge-tree HEAD upstream/master` (dev `1d5277f18`, upstream `cab2d5f72`) conflicts in 104 files under `crates/` and `backends/`. For each: what the merge does (as in section 12), the rows of ours to put back on upstream's file, and the rows to let go. Rows to let go name upstream's replacement in section 11. **Move out** files: the hooks they need aren't built yet, so in this merge resolve them as *keep in engine*; taking upstream's would delete phases 1-5. `notes/crew/weft-sync.sh --apply` takes upstream's side of the *take upstream's* files and lists the rest.
+
+| File | Merge | Put back on upstream's | Let go (upstream's or dropped) |
+|---|---|---|---|
+| `backends/vulkan/src/lib.rs` | keep in engine | `upscalers-dlss` 377, `path-tracing` 228, `fix-vulkan-sync` 154, `rt-shadows-reflections` 138, `fix-vulkan-oom` 96, `diagnostics` 92, `depth-water-shafts` 30 | `android` 852, `render-scale-cache` 79, `fix-vulkan-lifetime` 61 |
+| `crates/abi/src/lib.rs` | keep in engine | `sound` 129, `entities-animals` 62, `item-stacks-tools` 44, `movement-climb-glide-grapple` 37, `wind-life` 25, `biome-tints-season` 23, `sky-events` 21 (move out), `survival-hooks` 9 (move out), `wet-snowline` 7 (move out), `ui-pixel-kit` 6, `entity-ranges-ai-cost` 6, `held-item-scale` 4, `froxels-mist` 3, `day-rate` 3, `felling-lean` 2, `continent-scale` 2 | `lod-trees-crowns` 34, `weather-clouds` 24, `holds-liquid` 5, `knockback-health` 3, `held-light-night` 2 |
+| `crates/android/Cargo.toml` | take upstream's | — | `android` 21 |
+| `crates/android/src/lib.rs` | take upstream's | — | `android` 237 |
+| `crates/app/src/main.rs` | keep in engine | `phase6-sandbox` 27, `phase2-packages` 15, `frame-perf` 13, `fix-vulkan-sync` 1 | `android` 7 |
+| `crates/engine/Cargo.toml` | keep in engine | `phase4-admission` 5 (move out), `phase3-links` 2 (move out), `phase1-account` 2 (move out), `phase2-packages` 1 | `android` 11, `test-mc-compare` 2 |
+| `crates/engine/assets/lang/en_us.lang` | keep in engine | `phase4-admission` 155 (move out), `phase3-links` 53 (move out), `phase5-finder` 28 (move out), `phase1-account` 22 (move out), `phase2-packages` 15, `sound` 5, `survival-hooks` 5 (move out), `fix-small` 4, `phase6-sandbox` 2, `mac-paste` 1 | `android` 10, `russian` 1 |
+| `crates/engine/assets/lang/fr_fr.lang` | keep in engine | `phase4-admission` 152 (move out), `phase5-finder` 27 (move out), `sound` 5, `survival-hooks` 5 (move out), `fix-small` 4 | `android` 10 |
+| `crates/engine/assets/lang/ru_ru.lang` | keep in engine | `phase4-admission` 153 (move out), `phase5-finder` 27 (move out), `sound` 5, `survival-hooks` 5 (move out), `fix-small` 4, `mac-paste` 1, `phase3-links` 1 (move out) | `russian` 103, `android` 10 |
+| `crates/engine/assets/minecraft.txt` | keep in engine | `removed-mc-pack` 19 | — |
+| `crates/engine/assets/shaders/common.wgsl` | keep in engine | `upscalers-dlss` 246, `frame-perf` 4, `depth-water-shafts` 2 | — |
+| `crates/engine/assets/shaders/model.wgsl` | keep in engine | `upscalers-dlss` 30, `taa` 3 | — |
+| `crates/engine/assets/shaders/occlusion.wgsl` | keep in engine | `frame-perf` 74 | — |
+| `crates/engine/assets/shaders/sky.wgsl` | keep in engine | `plain-look` 10 (move out), `fix-small` 4 | — |
+| `crates/engine/assets/shaders/terrain.wgsl` | keep in engine | `terrain-cpu-features` 29 (move out), `continent-scale` 2 | `lod-trees-crowns` 162, `lod-smooth-ground` 22, `lod-water` 8 |
+| `crates/engine/assets/shaders/ui.wgsl` | move out | `survival-hooks` 26 (move out), `theme-title-fonts` 6 (move out) | — |
+| `crates/engine/assets/shaders/world.wgsl` | keep in engine | `plain-look` 131 (move out), `felling-lean` 23, `canopy-light` 18 | `lod-ported-f69243fd` 60, `lod-water` 19, `test-mc-compare` 18, `lod-smooth-ground` 6 |
+| `crates/engine/assets/sounds/item/pickup.ogg` | take upstream's | — | — |
+| `crates/engine/assets/sounds/ui/click.ogg` | take upstream's | — | — |
+| `crates/engine/assets/textures/block/destroy_1.png` | move out | — | — |
+| `crates/engine/assets/textures/block/destroy_2.png` | move out | — | — |
+| `crates/engine/assets/textures/block/destroy_3.png` | move out | — | — |
+| `crates/engine/assets/textures/block/destroy_4.png` | move out | — | — |
+| `crates/engine/assets/textures/block/destroy_5.png` | move out | — | — |
+| `crates/engine/assets/textures/block/destroy_6.png` | move out | — | — |
+| `crates/engine/assets/textures/block/destroy_7.png` | move out | — | — |
+| `crates/engine/assets/textures/block/destroy_8.png` | move out | — | — |
+| `crates/engine/assets/textures/block/destroy_9.png` | move out | — | — |
+| `crates/engine/assets/textures/entity/player.png` | keep in engine | — | — |
+| `crates/engine/src/app.rs` | keep in engine | `phase3-links` 405 (move out), `phase2-packages` 196, `upscalers-dlss` 190, `frame-perf` 53, `sound` 41, `phase5-finder` 37 (move out), `diagnostics` 36, `entities-animals` 32, `hud-chat-crosshair-outline` 29, `item-stacks-tools` 25, `depth-water-shafts` 19, `ui-pixel-kit` 19, `phase4-admission` 17 (move out), `rt-shadows-reflections` 16, `phase1-account` 15 (move out), `theme-title-fonts` 14 (move out), `path-tracing` 12, `hdr-world` 12, `sun-shadows` 12, `gui-scale-small-windows` 12, `server-identity` 7, `fix-small` 7, `taa` 4, `froxels-mist` 4, `wind-life` 2, `movement-climb-glide-grapple` 1, `phase6-sandbox` 1, `removed-mc-pack` 1 | `android` 147, `render-scale-cache` 97, `fix-vulkan-lifetime` 25, `video-presets` 9, `test-mc-compare` 3, `soft-clouds` 3 |
+| `crates/engine/src/app/api.rs` | keep in engine | `sound` 78, `movement-climb-glide-grapple` 12, `item-stacks-tools` 4, `theme-title-fonts` 4 (move out) | `test-mc-compare` 25 |
+| `crates/engine/src/assets.rs` | keep in engine | `material-maps` 88, `sky-events` 28 (move out), `phase2-packages` 19, `item-stacks-tools` 12 | `test-mc-compare` 72 |
+| `crates/engine/src/audio.rs` | keep in engine | `sound` 822 | — |
+| `crates/engine/src/bench.rs` | keep in engine | `diagnostics` 32 | — |
+| `crates/engine/src/client/entity_render.rs` | keep in engine | `entities-animals` 326, `frame-perf` 121, `item-stacks-tools` 77, `sun-shadows` 43, `sync-port` 25 (move out), `held-item-scale` 20, `hud-chat-crosshair-outline` 9, `upscalers-dlss` 8, `movement-climb-glide-grapple` 7, `hdr-world` 5, `sky-events` 3 (move out), `survival-hooks` 3 (move out), `diagnostics` 2 | `android` 3 |
+| `crates/engine/src/client/lod.rs` | keep in engine | `biome-tints-season` 67, `fix-small` 18, `sun-shadows` 10, `lod-fade-end` 4, `continent-scale` 1 | `lod-trees-crowns` 603, `lod-loading` 148, `lod-smooth-ground` 91, `lod-ported-f69243fd` 62, `test-mc-compare` 52, `lod-water` 25, `lod-detail-setting` 18 |
+| `crates/engine/src/client/looks.rs` | move out | `survival-hooks` 15 (move out) | — |
+| `crates/engine/src/client/mesher.rs` | keep in engine | `canopy-light` 10 | `test-mc-compare` 68, `lod-ported-f69243fd` 8, `holds-liquid` 4 |
+| `crates/engine/src/client/mod.rs` | keep in engine | `sun-shadows` 356, `upscalers-dlss` 94, `movement-climb-glide-grapple` 83, `rt-shadows-reflections` 62, `felling-lean` 46, `item-stacks-tools` 39, `wet-snowline` 39 (move out), `diagnostics` 31, `frame-perf` 30, `depth-water-shafts` 25, `entities-animals` 25, `path-tracing` 24, `fix-small` 23, `pack-options` 14, `sky-events` 13 (move out), `calm-pipelines` 12, `froxels-mist` 9, `sound` 8, `phase4-admission` 8 (move out), `hdr-world` 7, `wind-life` 7, `sync-port` 7 (move out), `lod-fade-end` 5, `taa` 5, `biome-tints-season` 3, `day-rate` 3, `server-identity` 1 | `held-light-night` 114, `weather-clouds` 98, `test-mc-compare` 17, `soft-clouds` 11 |
+| `crates/engine/src/client/models.rs` | keep in engine | `entities-animals` 149, `upscalers-dlss` 60, `sun-shadows` 43 | — |
+| `crates/engine/src/client/modui.rs` | keep in engine | `entities-animals` 15, `movement-climb-glide-grapple` 4, `ui-pixel-kit` 2, `fix-small` 1 | — |
+| `crates/engine/src/client/particles.rs` | keep in engine | `wind-life` 25, `fix-small` 6, `hdr-world` 2, `upscalers-dlss` 1 | — |
+| `crates/engine/src/client/receive.rs` | keep in engine | `felling-lean` 20, `movement-climb-glide-grapple` 15, `phase4-admission` 8 (move out), `diagnostics` 6, `sky-events` 5 (move out), `day-rate` 2, `biome-tints-season` 1 | `weather-clouds` 3, `test-mc-compare` 1 |
+| `crates/engine/src/client/sky.rs` | keep in engine | `sun-shadows` 53, `fix-small` 30, `hdr-world` 13, `froxels-mist` 13, `frame-perf` 8, `plain-look` 6 (move out), `upscalers-dlss` 2 | `test-mc-compare` 35, `soft-clouds` 34, `weather-clouds` 21 |
+| `crates/engine/src/client/terrain_gpu.rs` | keep in engine | `terrain-cpu-features` 25 (move out), `continent-scale` 4, `frame-perf` 3, `fix-small` 3 | `lod-trees-crowns` 186, `lod-loading` 28, `lod-smooth-ground` 2 |
+| `crates/engine/src/client/textures.rs` | keep in engine | `item-stacks-tools` 87, `material-maps` 76, `frame-perf` 24 | — |
+| `crates/engine/src/client/world.rs` | keep in engine | `biome-tints-season` 49, `frame-perf` 18, `wind-life` 15 | `weather-clouds` 36, `test-mc-compare` 15, `lod-loading` 9, `lod-ported-f69243fd` 5 |
+| `crates/engine/src/client/world_render.rs` | keep in engine | `sun-shadows` 276, `frame-perf` 179, `lod-fade-end` 142, `calm-pipelines` 104, `felling-lean` 84, `path-tracing` 83, `rt-shadows-reflections` 83, `fix-vulkan-sync` 40, `taa` 40, `upscalers-dlss` 24, `lod-far-look` 14, `biome-tints-season` 11, `diagnostics` 6, `material-maps` 6, `depth-water-shafts` 2, `hdr-world` 2 | `android` 409, `lod-smooth-ground` 16, `test-mc-compare` 9, `holds-liquid` 1 |
+| `crates/engine/src/clipboard.rs` | take upstream's | — | `android` 21 |
+| `crates/engine/src/commands.rs` | keep in engine | `mac-paste` 73 | — |
+| `crates/engine/src/components.rs` | keep in engine | `item-stacks-tools` 3, `movement-climb-glide-grapple` 1, `phase2-packages` 1, `held-item-scale` 1 | `holds-liquid` 1 |
+| `crates/engine/src/config.rs` | keep in engine | `fix-small` 146, `phase3-links` 57 (move out), `upscalers-dlss` 29, `run-settings` 27, `path-tracing` 17, `server-identity` 17, `phase4-admission` 13 (move out), `hdr-world` 12, `rt-shadows-reflections` 9, `phase5-finder` 8 (move out), `entity-ranges-ai-cost` 8, `taa` 6, `lod-far-look` 4, `sun-shadows` 4, `net-path-log` 4, `froxels-mist` 3, `frame-perf` 2 | `render-scale-cache` 8, `soft-clouds` 5, `test-mc-compare` 4, `lod-detail-setting` 3, `video-presets` 2 |
+| `crates/engine/src/content.rs` | keep in engine | `load-checks` 43, `phase6-sandbox` 40, `survival-hooks` 34 (move out), `phase3-links` 32 (move out), `phase2-packages` 23, `item-stacks-tools` 21, `sound` 15, `fix-small` 12, `continent-scale` 9, `movement-climb-glide-grapple` 5 | `holds-liquid` 43, `lod-trees-crowns` 38 |
+| `crates/engine/src/dedicated.rs` | keep in engine | `bots` 134, `server-identity` 7, `phase4-admission` 2 (move out) | `test-mc-compare` 2 |
+| `crates/engine/src/diag.rs` | keep in engine | `diagnostics` 138, `bots` 17, `frame-perf` 8 | `lod-loading` 62, `android` 5, `lod-trees-crowns` 1 |
+| `crates/engine/src/gpu_layout.rs` | keep in engine | `rt-shadows-reflections` 400, `path-tracing` 112, `material-maps` 101, `upscalers-dlss` 27, `sun-shadows` 18, `calm-pipelines` 16, `wind-life` 16, `hdr-world` 15, `depth-water-shafts` 13, `frame-perf` 8, `froxels-mist` 8, `sky-events` 7 (move out), `taa` 6, `pack-options` 5, `canopy-light` 5, `lod-fade-end` 4, `wet-snowline` 3 (move out), `lod-far-look` 2, `continent-scale` 1 | `lod-smooth-ground` 135, `lod-trees-crowns` 54, `weather-clouds` 16, `soft-clouds` 15, `held-light-night` 14, `lod-ported-f69243fd` 9, `test-mc-compare` 4, `lod-loading` 3, `lod-water` 2 |
+| `crates/engine/src/host.rs` | keep in engine | `entities-animals` 124, `biome-tints-season` 46, `item-stacks-tools` 45, `diagnostics` 29, `sky-events` 20 (move out), `felling-lean` 14, `entity-ranges-ai-cost` 11, `day-rate` 9, `sound` 6, `phase6-sandbox` 4, `movement-climb-glide-grapple` 1 | `weather-clouds` 55, `lod-trees-crowns` 2, `holds-liquid` 1 |
+| `crates/engine/src/hud.rs` | keep in engine | `hud-chat-crosshair-outline` 57, `ui-pixel-kit` 26, `item-stacks-tools` 10, `movement-climb-glide-grapple` 5, `survival-hooks` 1 (move out) | `android` 9 |
+| `crates/engine/src/input.rs` | move out | `sync-port` 5 (move out) | — |
+| `crates/engine/src/lib.rs` | keep in engine | `frame-perf` 48, `survival-hooks` 5 (move out), `phase3-links` 4 (move out), `path-tracing` 1, `phase4-admission` 1 (move out) | `android` 6 |
+| `crates/engine/src/log.rs` | keep in engine | `frame-perf` 77 | `android` 7 |
+| `crates/engine/src/loot.rs` | keep in engine | `item-stacks-tools` 2, `phase2-packages` 2 | — |
+| `crates/engine/src/minecraft.rs` | keep in engine | `removed-mc-pack` 499 | — |
+| `crates/engine/src/modloader.rs` | keep in engine | `phase2-packages` 323, `phase6-sandbox` 32, `phase3-links` 25 (move out) | `android` 1 |
+| `crates/engine/src/net/codec.rs` | move out | `phase4-admission` 1 (move out) | — |
+| `crates/engine/src/net/mod.rs` | keep in engine | `phase4-admission` 45 (move out), `phase3-links` 9 (move out), `felling-lean` 6, `sky-events` 6 (move out), `biome-tints-season` 3, `phase2-packages` 2, `phase1-account` 2 (move out), `day-rate` 2, `sync-port` 2 (move out), `entities-animals` 1 | `weather-clouds` 6, `test-mc-compare` 4 |
+| `crates/engine/src/net/p2p.rs` | keep in engine | `phase3-links` 609 (move out), `phase2-packages` 390, `phase4-admission` 245 (move out), `net-path-log` 103, `phase6-sandbox` 34, `phase1-account` 18 (move out), `bots` 9, `felling-lean` 3 | — |
+| `crates/engine/src/net/screens.rs` | keep in engine | `phase3-links` 244 (move out), `phase2-packages` 90, `phase6-sandbox` 5, `phase5-finder` 3 (move out), `phase4-admission` 3 (move out) | — |
+| `crates/engine/src/physics.rs` | keep in engine | `movement-climb-glide-grapple` 157, `fix-small` 90 | — |
+| `crates/engine/src/post.rs` | keep in engine | `upscalers-dlss` 693, `hdr-world` 218, `frame-perf` 117, `depth-water-shafts` 93, `taa` 57, `path-tracing` 28 | `render-scale-cache` 30 |
+| `crates/engine/src/registry.rs` | keep in engine | `fix-small` 44, `phase2-packages` 19, `entities-animals` 16, `wind-life` 14, `movement-climb-glide-grapple` 12, `sound` 11, `item-stacks-tools` 9, `entity-ranges-ai-cost` 9, `phase6-sandbox` 2 | `knockback-health` 4, `lod-trees-crowns` 2 |
+| `crates/engine/src/saves.rs` | keep in engine | `phase2-packages` 136, `survival-hooks` 66 (move out), `phase3-links` 22 (move out), `theme-title-fonts` 3 (move out) | `test-mc-compare` 35, `russian` 2 |
+| `crates/engine/src/screens.rs` | keep in engine | `theme-title-fonts` 38 (move out), `phase4-admission` 14 (move out), `phase1-account` 11 (move out), `phase3-links` 6 (move out), `ui-pixel-kit` 5, `gui-scale-small-windows` 3, `survival-hooks` 3 (move out), `phase5-finder` 1 (move out) | `android` 25 |
+| `crates/engine/src/server/actions.rs` | keep in engine | `phase4-admission` 148 (move out), `item-stacks-tools` 3, `movement-climb-glide-grapple` 3, `sync-port` 3 (move out), `entities-animals` 1 | — |
+| `crates/engine/src/server/builtin.rs` | keep in engine | `phase4-admission` 29 (move out), `fix-small` 16, `sync-port` 16 (move out) | — |
+| `crates/engine/src/server/dim.rs` | keep in engine | `entity-ranges-ai-cost` 92, `drops-at-feet` 35 (move out), `entities-animals` 25, `item-stacks-tools` 24, `sync-port` 17 (move out), `sky-events` 13 (move out), `fix-small` 10, `felling-lean` 5, `biome-tints-season` 5, `day-rate` 4, `continent-scale` 1 | `weather-clouds` 16, `knockback-health` 11, `lod-trees-crowns` 8, `holds-liquid` 6, `fix-wide-paths` 4 |
+| `crates/engine/src/server/entity.rs` | keep in engine | `entities-animals` 177, `entity-ranges-ai-cost` 17 | — |
+| `crates/engine/src/server/extend.rs` | keep in engine | `movement-climb-glide-grapple` 11 | `knockback-health` 1 |
+| `crates/engine/src/server/liquid.rs` | keep in engine | `felling-lean` 2 | `holds-liquid` 3 |
+| `crates/engine/src/server/load.rs` | move out | `phase3-links` 52 (move out) | — |
+| `crates/engine/src/server/mod.rs` | keep in engine | `phase3-links` 177 (move out), `phase4-admission` 78 (move out), `bots` 9, `phase6-sandbox` 7, `server-identity` 5, `phase1-account` 5 (move out), `sky-events` 4 (move out), `day-rate` 3, `diagnostics` 2, `biome-tints-season` 1 | `android` 12, `test-mc-compare` 10, `weather-clouds` 7 |
+| `crates/engine/src/server/path.rs` | take upstream's | `sync-port` 12 (move out) | `fix-wide-paths` 114 |
+| `crates/engine/src/server/player_file.rs` | keep in engine | `phase4-admission` 81 (move out), `server-identity` 35, `phase3-links` 29 (move out), `day-rate` 2 | `test-mc-compare` 8 |
+| `crates/engine/src/server/regions.rs` | keep in engine | `day-rate` 31, `sky-events` 20 (move out), `biome-tints-season` 16 | `weather-clouds` 79 |
+| `crates/engine/src/server/riding.rs` | keep in engine | `sync-port` 10 (move out), `entities-animals` 2 | — |
+| `crates/engine/src/server/space.rs` | keep in engine | `felling-lean` 5 | — |
+| `crates/engine/src/server/sync.rs` | keep in engine | `entity-ranges-ai-cost` 112, `sky-events` 10 (move out), `felling-lean` 9, `biome-tints-season` 4, `item-stacks-tools` 1, `day-rate` 1 | `weather-clouds` 6 |
+| `crates/engine/src/server/terrain.rs` | keep in engine | `terrain-cpu-features` 170 (move out), `biome-tints-season` 26, `phase2-packages` 16, `continent-scale` 13 | `lod-loading` 69, `lod-trees-crowns` 52 |
+| `crates/engine/src/settings.rs` | keep in engine | `gui-scale-small-windows` 92, `upscalers-dlss` 37, `path-tracing` 19, `hdr-world` 19, `phase4-admission` 17 (move out), `froxels-mist` 10, `taa` 7, `frame-perf` 5, `phase5-finder` 4 (move out), `net-path-log` 4 | `render-scale-cache` 11, `android` 6, `soft-clouds` 5, `video-presets` 5 |
+| `crates/engine/src/stack.rs` | keep in engine | `item-stacks-tools` 40 | — |
+| `crates/engine/src/touch.rs` | take upstream's | — | `android` 332 |
+| `crates/engine/src/ui/edit.rs` | keep in engine | `mac-paste` 10 | — |
+| `crates/engine/src/ui/mod.rs` | keep in engine | `ui-pixel-kit` 35, `load-checks` 19, `gui-scale-small-windows` 9, `movement-climb-glide-grapple` 8 | `russian` 3 |
+| `crates/engine/src/ui/render.rs` | keep in engine | `ui-pixel-kit` 198, `movement-climb-glide-grapple` 89, `theme-title-fonts` 44 (move out), `item-stacks-tools` 21, `survival-hooks` 10 (move out), `fix-small` 5, `upscalers-dlss` 1 | — |
+| `crates/render/src/lib.rs` | keep in engine | `upscalers-dlss` 201, `rt-shadows-reflections` 80, `path-tracing` 11 | `android` 36, `render-scale-cache` 17 |
+| `crates/sdk/src/ai.rs` | take upstream's | — | `fix-mob-moods` 21 |
+| `crates/sdk/src/client.rs` | keep in engine | `movement-climb-glide-grapple` 8, `theme-title-fonts` 8 (move out), `item-stacks-tools` 5, `hud-chat-crosshair-outline` 4 | `weather-clouds` 14 |
+| `crates/sdk/src/component.rs` | keep in engine | `item-stacks-tools` 34, `sync-port` 5 (move out), `movement-climb-glide-grapple` 1, `held-item-scale` 1 | `holds-liquid` 2 |
+| `crates/sdk/src/content.rs` | keep in engine | `sound` 11, `survival-hooks` 9 (move out), `item-stacks-tools` 5, `movement-climb-glide-grapple` 5, `sync-port` 1 (move out) | `holds-liquid` 2 |
+| `crates/sdk/src/effects.rs` | keep in engine | `sound` 67, `wind-life` 38 | — |
+| `crates/sdk/src/extend.rs` | keep in engine | `movement-climb-glide-grapple` 20 | `knockback-health` 1 |
+| `crates/sdk/src/game.rs` | keep in engine | `entities-animals` 99, `sync-port` 73 (move out), `item-stacks-tools` 57, `entity-ranges-ai-cost` 14, `sky-events` 12 (move out), `fix-small` 3 | — |
+| `crates/sdk/src/lib.rs` | keep in engine | `entities-animals` 1 | `weather-clouds` 6 |
+| `crates/sdk/src/terrain.rs` | keep in engine | `terrain-cpu-features` 23 (move out), `biome-tints-season` 9, `continent-scale` 5 | `lod-trees-crowns` 86 |
 
