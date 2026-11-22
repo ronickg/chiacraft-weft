@@ -15,6 +15,18 @@ use base_api::entities::COW;
 /// The mobs `vitals::mobs` gives numbers, by their row's name.
 static MOB_KINDS: [(&EntityKind, &str); 4] = [(&ZOMBIE, "zombie"), (&SPIDER, "spider"), (&SKELETON, "skeleton"), (&CREEPER, "creeper")];
 
+/// "player", or a mob's row name, for the night checks' log lines.
+fn fighter(w: &World, id: u64) -> Option<&'static str> {
+    if w.players_iter().any(|p| p == id) {
+        return Some("player");
+    }
+    let kind = w.entity(id)?.kind;
+    MOB_KINDS
+        .iter()
+        .find(|(k, _)| k.id() == kind)
+        .map(|(_, n)| *n)
+}
+
 /// A mob's numbers on the curve (`vitals::mobs`).
 fn curve(name: &str) -> vitals::combat::Stats {
     vitals::mobs::mob(name)
@@ -64,6 +76,43 @@ pub fn register(r: &mut Registry) {
                 .neutral(),
         ));
     r.entity_component(&FUSE, 0u32, 0);
+    // One line per hit between a player and a mob, and per death of either (night checks:
+    // `mods/testkit/scripts/night_survival.txt`).
+    r.on_event(&actions::HURT, |b| {
+        let w = b.world();
+        for h in b.iter() {
+            let (Some(target), Some(by)) = (fighter(&w, h.entity), fighter(&w, h.source)) else { continue };
+            if (target == "player") == (by == "player") {
+                continue;
+            }
+            let (health, max) = w
+                .entity(h.entity)
+                .map_or((0.0, 0.0), |e| (e.health, e.max_health));
+            weft_sdk::info!(
+                "mob_fight: {by} {} hit {target} {} for {:.2} (cause {}), health {health:.1}/{max:.1}",
+                h.source,
+                h.entity,
+                h.amount,
+                h.cause
+            );
+        }
+    });
+    r.on_event(&actions::DIE, |b| {
+        let w = b.world();
+        for d in b.iter() {
+            let who = if w.players_iter().any(|p| p == d.entity) {
+                Some("player")
+            } else {
+                MOB_KINDS
+                    .iter()
+                    .find(|(k, _)| k.id() == d.kind)
+                    .map(|(_, n)| *n)
+            };
+            if let Some(who) = who {
+                weft_sdk::info!("mob_fight: {who} {} died (cause {}, by {})", d.entity, d.cause, d.source);
+            }
+        }
+    });
     // Over-tier armour against them counts at most their size's cap (`base_api::chains::GEAR_COUNTS`).
     r.modify(&base_api::chains::GEAR_COUNTS, &phase::MULTIPLY, |m| {
         let q = *m.query();
