@@ -41,6 +41,7 @@
 //! until <condition> [within 30]  # waits for it, seconds; not in time stops the run
 //! op trace 0 4 0 9 6 9 40   # a testkit server operation (`/tk`), its answer into the log
 //! respawn             # back from the death screen (the server ignores it while alive)
+//! aim 8               # face the nearest living creature within 8 blocks (its middle), if any
 //! quit
 //! ```
 //!
@@ -121,6 +122,7 @@ const COMMANDS: &[&str] = &[
     "chatf",
     "op",
     "respawn",
+    "aim",
 ];
 /// Commands that mean nothing without an argument.
 const NEED_ARGS: &[&str] = &[
@@ -676,6 +678,7 @@ async fn run_lines(t: T, src: String) -> R {
                 }
             }
             "respawn" => t.c().respawn(),
+            "aim" => aim(&t, num(0, 8.0)),
             "quit" => return Ok(()),
             _ => t.fail(format!("unknown script line '{line}'")),
         }
@@ -688,6 +691,34 @@ async fn run_lines(t: T, src: String) -> R {
 /// Every entity within `r` blocks, one line each: where the server has it and where this client
 /// does (or that it doesn't), the client's block under its feet and light there. For "the server
 /// has it, the client draws nothing".
+/// Faces the nearest living creature within `r` the client knows (more than 1 health at most:
+/// not items, arrows or graves), at its middle: a scripted fighter's aim.
+fn aim(t: &T, r: f32) {
+    let me = t.state().pos;
+    let eye = me + weft_sdk::Vec3 { x: 0.0, y: 1.62, z: 0.0 };
+    let c = t.c();
+    let Some(at) = c
+        .entities()
+        .into_iter()
+        .filter_map(|id| c.entity(id))
+        .filter(|e| e.max_health > 1.0 && e.health > 0.0)
+        .map(|e| e.pos + weft_sdk::Vec3 { x: 0.0, y: e.size.height as f64 * 0.5, z: 0.0 })
+        .filter(|p| (*p - me).length_squared() <= (r as f64).powi(2))
+        .min_by(|a, b| {
+            (*a - me)
+                .length_squared()
+                .total_cmp(&(*b - me).length_squared())
+        })
+    else {
+        return;
+    };
+    let d = at - eye;
+    // Yaw 0 faces -z, 90 faces -x; a positive pitch looks up.
+    let yaw = (-d.x).atan2(-d.z).to_degrees();
+    let pitch = d.y.atan2((d.x * d.x + d.z * d.z).sqrt()).to_degrees();
+    c.set_look(yaw as f32, pitch as f32);
+}
+
 async fn entities(t: &T, r: f32) -> R {
     let me = t.state().pos;
     let near = t
