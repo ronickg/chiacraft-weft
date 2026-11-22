@@ -79,6 +79,31 @@ pub fn is_friend(account: &str) -> bool {
     with(|s| s.store.friends.iter().any(|f| f.account == account)).unwrap_or(false)
 }
 
+/// Whether the player with identity `identity` (hex) is on this player's Friends list.
+pub fn is_friend_identity(identity: &str) -> bool {
+    !identity.is_empty() && with(|s| s.store.friends.iter().any(|f| f.identity == identity)).unwrap_or(false)
+}
+
+/// Friends' worlds as known now (each friend is asked again when the last answer is old): the
+/// world's key and name, and the friend's account endpoint (where a link request for it goes).
+pub fn known_worlds() -> Vec<(String, String, String)> {
+    if let Some(settings) = crate::saved_worlds::settings() {
+        ask_all(&settings);
+    }
+    list()
+        .into_iter()
+        .filter_map(|f| match worlds_of(&f.account)? {
+            Ok(a) => Some((f, a)),
+            Err(_) => None,
+        })
+        .flat_map(|(f, a)| {
+            a.worlds
+                .into_iter()
+                .map(move |w| (w.key, w.name, f.account.clone()))
+        })
+        .collect()
+}
+
 /// Adds a friend: their account endpoint, the identity that vouches for it, and where you met.
 pub fn add(account: &str, identity: &str, met: &str) {
     with(|s| {

@@ -19,6 +19,10 @@
 //! note <a line from the asker>
 //! ```
 //!
+//! A link opens for travel only once both worlds have a portal bound to it: each world tells the
+//! other when it binds one (or no longer has one) with a note its key signs, `chiacraft link
+//! portal v1\nlink <id>\nby <world key>\nready <0|1>\ncreated <secs>`, sent like the rest.
+//!
 //! Its id is the BLAKE3 hash of that text. Ending a link is a tombstone, `chiacraft link revoke
 //! v1\nlink <id>\nby <world key>\ncreated <secs>`, signed by the world ending it; it can't be
 //! undone, and a link ended can't come back.
@@ -30,6 +34,7 @@ use serde::{Deserialize, Serialize};
 
 const SIGNED_LABEL: &str = "chiacraft link v1\n";
 const REVOKE_LABEL: &str = "chiacraft link revoke v1\n";
+const PORTAL_LABEL: &str = "chiacraft link portal v1\n";
 /// Requests waiting for an answer, at most; older ones go first when more come.
 const MAX_INCOMING: usize = 100;
 /// A request or answer older than this (or this far ahead) is refused; queued ones give up.
@@ -150,6 +155,22 @@ impl Revoke {
     }
 }
 
+/// A world saying it has (or no longer has) a portal bound to a link, signed by its key.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Portal {
+    pub link: String,
+    pub by: String,
+    pub ready: bool,
+    pub created: u64,
+    pub sig: String,
+}
+
+impl Portal {
+    fn signed(&self) -> Vec<u8> {
+        format!("{PORTAL_LABEL}link {}\nby {}\nready {}\ncreated {}", self.link, self.by, u8::from(self.ready), self.created).into_bytes()
+    }
+}
+
 /// What goes between account endpoints.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind")]
@@ -157,6 +178,7 @@ pub enum Message {
     Request(Request),
     Accept(Accept),
     Revoke(Revoke),
+    Portal(Portal),
 }
 
 /// A message waiting to be delivered: to an account endpoint (`inbox`), or, while that is not
@@ -188,6 +210,17 @@ pub struct Store {
     /// Invites used (their nonces): each is good once.
     #[serde(default)]
     pub invites_used: Vec<String>,
+    /// Ask before linking with friends' worlds too. Off: a request from a world whose owner is on
+    /// the Friends list (`friends`) is accepted without asking, as if allowed (portals link at a
+    /// touch; `notes/portals-easy-link.md`).
+    #[serde(default)]
+    pub friends_ask: bool,
+    /// Links this player's worlds have a portal bound to: (link id, world key).
+    #[serde(default)]
+    pub portals_here: Vec<(String, String)>,
+    /// What the other worlds said of their portals, the latest note per link and world.
+    #[serde(default)]
+    pub portals_far: Vec<Portal>,
 }
 
 struct State {
@@ -299,14 +332,28 @@ fn reply_address(account_key: &iroh::SecretKey) -> Result<(String, String), Stri
     Ok((me, vouch))
 }
 
-/// Asks the world at `address` to link with this player's world `from` (named `from_name`).
+/// Asks the world at `address` to link with this player's world `from` (named `from_name`); the
+/// link's id once accepted (known now: the hash of what was asked).
 pub fn request(
     account_key: &iroh::SecretKey,
     from: &crate::world_address::WorldIdentity,
     from_name: &str,
     address: &str,
     note: &str,
-) -> Result<(), String> {
+) -> Result<String, String> {
+    request_to(account_key, from, from_name, address, "", note)
+}
+
+/// Asks as `request` does, with the asked owner's account endpoint `inbox` when known (a friend's),
+/// so the request reaches them while the world itself is closed.
+fn request_to(
+    account_key: &iroh::SecretKey,
+    from: &crate::world_address::WorldIdentity,
+    from_name: &str,
+    address: &str,
+    inbox: &str,
+    note: &str,
+) -> Result<String, String> {
     let target = crate::world_address::parse(address).ok_or("that is not a world address")?;
     if target.key.parse::<iroh::PublicKey>().is_err() {
         return Err("that is not a world address".into());
@@ -327,7 +374,7 @@ pub fn request(
         reply_vouch,
         invite: target.invite.clone(),
     };
-    with(|s| {
+    let id = with(|s| {
         if s.store.links.iter().any(|l| {
             (l.body.from == request.body.from && l.body.to == request.body.to)
                 || (l.body.from == request.body.to && l.body.to == request.body.from)
@@ -340,16 +387,60 @@ pub fn request(
         s.store
             .outbox
             .retain(|q| !matches!(&q.message, Message::Request(r) if r.body.from == request.body.from && r.body.to == request.body.to));
-        queue(s, "", &target.key, address, Message::Request(request.clone()));
+        queue(s, inbox, &target.key, address, Message::Request(request.clone()));
+        let id = request.body.id();
         s.store
             .outgoing
             .push(Outgoing { request, to_name: target.name });
         save(s);
-        Ok(())
+        Ok(id)
     })
     .unwrap_or_else(|| Err("links are not ready".into()))?;
     crate::net::p2p::wake_outbox();
-    Ok(())
+    Ok(id)
+}
+
+/// Asks the world at `address` (its owner's inbox `inbox`, if known) to link with this player's
+/// world with key `from`, which needn't be open: for portals, where a visitor links one of their
+/// own worlds to the world they are in. The link's id.
+pub fn request_from(account_key: &iroh::SecretKey, from: &str, address: &str, inbox: &str, note: &str) -> Result<String, String> {
+    let saves = with(|s| s.saves.clone()).ok_or("links are not ready")?;
+    let (world, name) = my_world(&saves, from).ok_or("that world is not on this computer")?;
+    request_to(account_key, &world, &name, address, inbox, note)
+}
+
+/// This player's worlds that have keys: key and name.
+pub fn my_worlds() -> Vec<(String, String)> {
+    let Some(saves) = with(|s| s.saves.clone()) else { return Vec::new() };
+    crate::saves::list(&saves)
+        .into_iter()
+        .filter(|m| m.key_index.is_some())
+        .filter_map(|mut m| Some((crate::world_address::for_world(&mut m).ok()?.key(), m.name.clone())))
+        .collect()
+}
+
+/// The waiting request `id`, if one came in.
+pub fn incoming(id: &str) -> Option<Incoming> {
+    with(|s| {
+        s.store
+            .incoming
+            .iter()
+            .find(|i| i.request.body.id() == id)
+            .cloned()
+    })
+    .flatten()
+}
+
+/// Whether friends' requests are asked about too (`Store::friends_ask`).
+pub fn friends_ask() -> bool {
+    with(|s| s.store.friends_ask).unwrap_or(false)
+}
+
+pub fn set_friends_ask(ask: bool) {
+    with(|s| {
+        s.store.friends_ask = ask;
+        save(s);
+    });
 }
 
 /// Accepts waiting request `id` (a link id); `always` also accepts this owner from now on.
@@ -461,6 +552,7 @@ pub fn receive(peer: &str, message: Message) -> Result<(), String> {
             Message::Request(r) => receive_request(s, peer, r),
             Message::Accept(a) => receive_accept(s, peer, a),
             Message::Revoke(r) => receive_revoke(s, r),
+            Message::Portal(p) => receive_portal(s, p),
         };
         save(s);
         r
@@ -501,6 +593,10 @@ fn receive_request(s: &mut State, peer: &str, r: Request) -> Result<(), String> 
     };
     if s.store.allow.contains(&owner) {
         log::info!("link request from '{}' for '{to_name}': accepted (its owner is always accepted)", r.from_name);
+        return accept_request(s, &r, &owner);
+    }
+    if !s.store.friends_ask && crate::friends::is_friend_identity(&owner) {
+        log::info!("link request from '{}' for '{to_name}': accepted (its owner is a friend)", r.from_name);
         return accept_request(s, &r, &owner);
     }
     if !r.invite.is_empty() {
@@ -585,6 +681,88 @@ fn receive_revoke(s: &mut State, r: Revoke) -> Result<(), String> {
     s.store.links.remove(i);
     s.store.revoked.push(r.link);
     Ok(())
+}
+
+fn receive_portal(s: &mut State, p: Portal) -> Result<(), String> {
+    let Some(l) = s.store.links.iter().find(|l| l.id() == p.link) else { return Ok(()) };
+    if (p.by != l.body.from && p.by != l.body.to) || !verify(&p.by, &p.signed(), &p.sig) {
+        return Err("a portal note neither world signed".into());
+    }
+    if s.store
+        .portals_far
+        .iter()
+        .any(|x| x.link == p.link && x.by == p.by && x.created > p.created)
+    {
+        return Ok(());
+    }
+    log::info!("the world '{}' {} a portal for its link", &p.by[..12.min(p.by.len())], if p.ready { "has" } else { "no longer has" });
+    s.store
+        .portals_far
+        .retain(|x| !(x.link == p.link && x.by == p.by));
+    s.store.portals_far.push(p);
+    Ok(())
+}
+
+/// World `world` (this player's) has a portal bound to link `link` now, or no longer has one:
+/// remembered, and the other world is told (a note `world`'s key signs). Nothing is sent when
+/// nothing changed.
+pub fn set_portal_here(world: &crate::world_address::WorldIdentity, link: &str, here: bool) {
+    let key = world.key();
+    let changed = with(|s| {
+        let had = s
+            .store
+            .portals_here
+            .iter()
+            .any(|(l, w)| l == link && *w == key);
+        if had == here {
+            return false;
+        }
+        if here {
+            s.store.portals_here.push((link.to_string(), key.clone()));
+        } else {
+            s.store
+                .portals_here
+                .retain(|(l, w)| !(l == link && *w == key));
+        }
+        if let Some(l) = s.store.links.iter().find(|l| l.id() == link).cloned() {
+            let mut p =
+                Portal { link: link.to_string(), by: key.clone(), ready: here, created: crate::saves::now_secs(), sig: String::new() };
+            p.sig = hex(&world.secret.sign(&p.signed()).to_bytes());
+            let other = if l.body.from == key { &l.body.to } else { &l.body.from };
+            // Two worlds of this one player: the store above already says it.
+            if my_world(&s.saves, other).is_none() {
+                queue(s, &l.peer_inbox, other, "", Message::Portal(p));
+            }
+        }
+        save(s);
+        true
+    })
+    .unwrap_or(false);
+    if changed {
+        crate::net::p2p::wake_outbox();
+    }
+}
+
+/// For link `link` seen from world `world`: whether `world` has a portal bound to it, and whether
+/// the other world has (its note, or this player's own other world).
+pub fn portal_state(link: &str, world: &str) -> (bool, bool) {
+    with(|s| {
+        let here = |w: &str| {
+            s.store
+                .portals_here
+                .iter()
+                .any(|(l, x)| l == link && x == w)
+        };
+        let Some(l) = s.store.links.iter().find(|l| l.id() == link) else { return (false, false) };
+        let other = if l.body.from == world { &l.body.to } else { &l.body.from };
+        let far = here(other)
+            || s.store
+                .portals_far
+                .iter()
+                .any(|p| p.link == link && p.by == *other && p.ready);
+        (here(world), far)
+    })
+    .unwrap_or((false, false))
 }
 
 const INVITE_HEADER: &str = "chiacraft-invite-1";

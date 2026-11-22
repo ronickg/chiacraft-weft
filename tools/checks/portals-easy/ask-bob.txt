@@ -1,0 +1,52 @@
+# Linking at the portal, run A, the visitor's side: bob makes a world of his own, visits alice,
+# places a pad and links his world there; alice (not his friend) accepts. Then bob places his own
+# portal at home, and hosts: alice's doorway opens and she comes through.
+open pe-bob-home
+wait 3
+chat /tk fill 0 150 0 8 150 8 base:stone
+chat /tk set 5 151 4 portals:portal
+leave
+join pe-ticket.txt
+loaded
+wait 3
+mark pe-mark-bob-in
+await_file pe-mark-placed 300      # alice moved bob onto her platform and gave him a portal
+wait 2
+look 0 -45                         # the platform's top, about 1.6 blocks ahead
+press core:use                     # places the pad at 5 151 4
+wait 2
+look 0 -37
+press core:use                     # right-clicks it: the visitor's screen
+wait 2
+shot pe-bob-1-screen.png           # "Link one of your worlds here ..." and "Link 'pe-bob-home' here"
+tap_once portals:portal text:link 'pe-bob-home' here
+wait 3
+shot pe-bob-2-asked.png            # chat: "Asked to link 'pe-bob-home' here ..."
+mark pe-mark-bob-asked
+await_file pe-mark-accepted 300
+wait 2
+shot pe-bob-3-finish.png           # chat: "Linked here. Now place a portal in 'pe-bob-home' ..."
+leave
+open pe-bob-home
+wait 3
+shot pe-bob-4-reminder.png         # chat: "The link with 'pe-alice-1' needs a portal here ..."
+chat /tp bob 5.5 151 6.5
+wait 2
+look 0 -37
+press core:use                     # his own pad at 5 151 4
+wait 2
+shot pe-bob-5-new.png              # "pe-alice-1 (new: no portal here yet)" first
+tap_once portals:portal text:pe-alice-1
+wait 3
+mark pe-mark-bob-portal
+wait 25
+host pe-bob-ticket.txt
+mark pe-mark-bob-hosting
+await_file pe-mark-alice-arrived 300
+wait 3
+chat /tp bob 2.5 151 8.5
+look 30 -5
+wait 2
+shot pe-bob-6-alice-here.png       # alice standing by bob's portal, its doorway open
+mark pe-mark-bob-done
+quit
