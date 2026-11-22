@@ -4502,11 +4502,7 @@ fn turn_y(v: DVec3, yaw: f32) -> DVec3 {
 /// A shadow setting (`core:shadows`, `core:shadow_size`), or `default` where the engine's configs
 /// are not loaded.
 fn shadow_setting(name: &str, default: f64) -> f64 {
-    content()
-        .game
-        .config_names
-        .get(name)
-        .map_or(default, |&id| crate::config::get(id))
+    crate::config::by_name(name).map_or(default, crate::config::get)
 }
 /// The far cascade's reach and depth (blocks): hills a few hundred blocks off have shadows too.
 const FAR_REACH: f32 = 400.0;
@@ -4532,9 +4528,8 @@ const FAR_DEPTH: f32 = 1200.0;
 /// The values of the settings the shader pack reads (`Scene::options`).
 fn pack_options() -> [[f32; 4]; 12] {
     let mut out = [[0.0; 4]; 12];
-    let names = &content().game.config_names;
     for (i, name) in crate::packs::pack_options().iter().enumerate().take(48) {
-        if let Some(&id) = names.get(name.as_str()) {
+        if let Some(id) = crate::config::by_name(name) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }
     }

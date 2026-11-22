@@ -220,7 +220,7 @@ pub(crate) fn content_switched(old: &crate::content::Content, new: &crate::conte
     // What this run and a remote server set are kept by id: follow the names there too.
     let move_id = |id: u32| {
         let name = &old_defs.get(id as usize)?.name;
-        new.game.config_names.get(name).copied()
+        new.game.catalog.find(ek::CONFIG, name)
     };
     for list in [&OVERRIDES, &FROM_SERVER] {
         let mut l = list.lock().unwrap();

@@ -1763,19 +1763,8 @@ impl WorldRenderer {
                 // chiacraft, test only: bit 23 while leaves' smaller mips darken as Minecraft's
                 // (`core:mc_leaves`), so far tiles can take their opaque texels' colour back.
                 self.lod_half
-                    | (crate::content::content()
-                        .game
-                        .config_names
-                        .get("core:mc_leaves")
-                        .is_some_and(|&id| crate::config::get(id) != 0.0) as u32)
-                        << 23
-                    | (crate::content::content()
-                        .game
-                        .config_names
-                        .get("core:far_look")
-                        .map_or(7, |&id| crate::config::get(id) as u32)
-                        & 255)
-                        << 24,
+                    | (crate::config::by_name("core:mc_leaves").is_some_and(|id| crate::config::get(id) != 0.0) as u32) << 23
+                    | (crate::config::by_name("core:far_look").map_or(7, |id| crate::config::get(id) as u32) & 255) << 24,
             ],
         };
         let gbuf = self.globals[frame.slot];

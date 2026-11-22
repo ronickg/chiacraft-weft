@@ -104,13 +104,7 @@ pub(super) struct RtScene {
 
 /// `core:rt_shadows`, or off where the engine's configs are not loaded.
 pub fn rt_setting() -> bool {
-    let on = |name: &str| {
-        crate::content::content()
-            .game
-            .config_names
-            .get(name)
-            .is_some_and(|&id| crate::config::get(id) > 0.5)
-    };
+    let on = |name: &str| crate::config::by_name(name).is_some_and(|id| crate::config::get(id) > 0.5);
     on("core:rt_shadows") || on("core:rt_reflections") || on("core:path_traced")
 }
 
