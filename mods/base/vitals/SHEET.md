@@ -610,3 +610,14 @@ Dung pats: a grazer drops one every 100 mouthfuls where it stands on the ground,
 | 75 | 4199 | 126982 |
 | 99 | 6275 | 251114 |
 | 100 | 6367 | 257389 |
+
+## Hostile mobs
+
+Base's night mobs on the one curve (`vitals::mobs`), like the animals: a size class from a real body's mass, a role, and the start of their home age, tweaked within x0.75-x1.25 with a reason. Health and hit in engine points; armour cuts a hit by armour / (armour + 5 x hit).
+
+| mob | kg | size | role | level | health | armour | hit | every | tweaks |
+|---|---|---|---|---|---|---|---|---|---|
+| zombie | 70 | medium | hunter | 0 | 24.3 | 3.3 | 6.00 | 1.2 s |  |
+| spider | 40 | medium | hunter | 0 | 19.4 | 3.3 | 6.00 | 1.2 s | Health x0.8 (light and fast: a leg-span of 1.3 m on a small body) |
+| skeleton | 30 | medium | hunter | 0 | 19.4 | 3.3 | 4.80 | 1.2 s | Health x0.8 (bones only, it breaks easily); Hit x0.8 (it shoots from range, never in reach) |
+| creeper | 50 | medium | prey | 0 | 18.9 | 3.3 | 2.50 | 1.2 s |  |
