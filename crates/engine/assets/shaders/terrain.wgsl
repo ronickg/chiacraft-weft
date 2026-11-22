@@ -742,7 +742,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
     // The samples' tops in `outp` are read back below.
     storageBarrier();
     workgroupBarrier();
-    // Trees: every site whose crown may reach the samples, found as `dim::scatter_site` does
+    // Trees: every site whose crown may reach the samples, found as `features::grid_site` does
     // (standing on the nearest sample's ground, thinned where it stands), one of its biome's
     // sampled crowns (`crown`) laid over the samples it covers, its trunk in the one it stands in.
     // None on bare faces, which the shapes leave alone.
@@ -786,7 +786,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             if (gh < sea || biome >= nb) {
                 continue;
             }
-            // Only on its ground, as `dim::scatter_site`: the sample's top, which is stone where
+            // Only on its ground, as `features::grid_site`: the sample's top, which is stone where
             // caves opened it.
             if (ng > 0u) {
                 let top = i32(outp[(tile * LOD_SAMPLES + u32(sj) * LOD_SIDE + u32(si)) * LOD_WORDS] >> 16u);

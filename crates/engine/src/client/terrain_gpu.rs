@@ -151,22 +151,22 @@ fn steps(w: &mut Vec<i32>, e: &Expr, seed: u64) -> (i32, i32) {
 }
 
 /// `describe` for distant terrain, with what steep faces need (`d::FACE_FALL`) and the
-/// dimension's scattered things (trees) after it (`d::SCATTER_OFF` points there): per scatter
-/// its cell, reach, hash seed, biome count and thinning (`ScatterThin`: its mask's place and
-/// length, keep), the mask's steps, then per biome the chance as a threshold on the site's bits
-/// (`dim::scatter_site`'s test, exactly), whether the thinning applies there and the crowns its
-/// shape callback makes there (`crown_of`), each site drawn with one of them; then the ground it
-/// stands on (`ScatterDef::ground`) as state ranges (count, then first and count each), none for
-/// any.
+/// dimension's scattered things (trees) after it (`d::SCATTER_OFF` points there): its grid
+/// features drawn by a plan in the vegetation stage (`far_trees`). Per feature its spacing as the
+/// cell, reach, hash seed (`seed ^ salt`), biome count and thinning (`features::Thin`: its mask's
+/// place and length, keep), the mask's steps, then per biome the chance as a threshold on the
+/// start's bits (`features::grid_site`'s test, exactly; 0 where the feature's biomes leave it
+/// out), whether the thinning applies there and the crowns its plan makes there (`crown_of`),
+/// each site drawn with one of them; then the ground it stands on (`Fit::ground`) as state ranges
+/// (count, then first and count each), none for any.
 ///
-/// The crowns come from sample runs of the shape on real ground spread over the world: a run at
+/// The crowns come from sample runs of the plan on real ground spread over the world: a run at
 /// one spot only said what that spot allowed (a clearing, a rock face), for every site.
-// SYNC: upstream replaced the dimension's scatters (`DimensionDef::scatters`, `ScatterDef`,
-// `abi::ScatterArgs`) with features (`features::FeatureDef`: `Spread::Grid` with
-// `Chance::Density`, `Shape::Plan`). Until the far trees read them (grid spacing as the cell,
-// `reach[0]`, the density, sample runs of the plan callback through `crown_of`, our thinning) and
-// the sites' hash in `terrain.wgsl`'s `lod` is checked against `features`' grid starts, no
-// scatters are described: distant terrain has no far trees.
+///
+/// chiacraft: a far site is where `features::grid_site` puts the start (`grid_position` with the
+/// whole spacing as room, a plan having no footprint), so far and near trees stand on the same
+/// spots. What the far sites don't see: the `y` range, `max_slope`, and the higher-priority
+/// features that keep a start out (`start_at`'s separation, structures).
 pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize>)> {
     let (mut w, custom) = describe(c, dim, seed)?;
     let def = &c.dims[dim as usize];
@@ -176,30 +176,141 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
         .and_then(|t| t.faces)
         .map_or(i32::MAX, |f| f.fall);
     w[d::SCATTER_OFF as usize] = w.len() as i32;
-    w.push(0);
+    let trees: Vec<usize> = (0..def.features.len())
+        .filter(|&fi| far_trees(&def.features[fi]))
+        .collect();
+    w.push(trees.len() as i32);
+    let biomes = c.biomes.len().max(1);
+    // Where the sample runs stand: spread over some 20 km, on the ground there.
+    let spots: Vec<[i32; 3]> = (0..RUN_SPOTS as i32)
+        .filter_map(|k| {
+            let (x, z) = ((k * 2_741 + 113) % 20_011 - 10_000, (k * 7_919 + 457) % 20_021 - 10_000);
+            let col = def.column(seed, x, z)?;
+            (col.height != i32::MIN).then_some([x, col.height + 1, z])
+        })
+        .collect();
+    for &fi in &trees {
+        let f = &def.features[fi];
+        let crate::features::Spread::Grid { spacing, chance } = f.spread else { continue };
+        let key = seed ^ f.salt;
+        w.extend_from_slice(&[spacing, f.reach[0], key as u32 as i32, (key >> 32) as u32 as i32, biomes as i32]);
+        let head = w.len();
+        w.extend_from_slice(&[0, 0, 0]);
+        if let Some(t) = &f.thin {
+            let (start, len) = steps(&mut w, t.mask.expr(), seed);
+            (w[head], w[head + 1], w[head + 2]) = (start, len, t.keep as i32);
+        }
+        for b in 0..biomes as u32 {
+            let allowed = f.biome.as_ref().is_none_or(|set| crate::refs::has(set, b));
+            let density = if allowed { chance.in_biome(c, b) } else { 0.0 };
+            let threshold = (density as f64 * (1u64 << 53) as f64).ceil() as u64;
+            // Each run's crown, with its top for sorting.
+            let mut runs: Vec<(i32, [u32; 2])> = Vec::new();
+            for (k, &pos) in spots.iter().enumerate() {
+                if threshold == 0 || runs.len() >= RUNS {
+                    break;
+                }
+                let pos = IVec3::from_array(pos);
+                let transform = f.transforms.first().copied().unwrap_or_default();
+                let Some(start) = crate::features::make_start(c, def, dim, seed, fi, pos, b, weft_noise::mix(k as u64), transform) else {
+                    continue;
+                };
+                if let Some(run) = crown_of(&run_blocks(&start, pos)) {
+                    runs.push(run);
+                }
+            }
+            let thinned = f.thin.as_ref().is_some_and(|t| t.applies_in(c, b));
+            let mut entry = [0i32; words::SCATTER_BIOME as usize];
+            if !runs.is_empty() {
+                (entry[0], entry[1], entry[2]) = (threshold as u32 as i32, (threshold >> 32) as u32 as i32, thinned as i32);
+                // Crowns spread over the runs from the lowest to the tallest, so the sites keep the
+                // mix of sizes (a forest's few emergents among the rest), not one median tree.
+                runs.sort_by_key(|r| r.0);
+                let n = layout::lod::SHAPES as usize;
+                for i in 0..n {
+                    let run = runs[(2 * i + 1) * runs.len() / (2 * n)].1;
+                    entry[3 + 2 * i] = run[0] as i32;
+                    entry[4 + 2 * i] = run[1] as i32;
+                }
+            }
+            w.extend_from_slice(&entry);
+        }
+        let ground = f.fit.ground.map_or(Vec::new(), |m| state_runs(c, m));
+        w.push(ground.len() as i32);
+        for (first, count) in ground {
+            w.extend_from_slice(&[first as i32, count as i32]);
+        }
+    }
     Some((w, custom))
+}
+
+/// chiacraft: whether distant terrain draws a feature's starts as far trees: one on a grid drawn
+/// by a plan in the vegetation stage (`r.scatter(..).plan(..)`: trees, boulders, shrubs), as our
+/// scatters were. Structures and villages are not.
+fn far_trees(f: &crate::features::FeatureDef) -> bool {
+    matches!(f.spread, crate::features::Spread::Grid { .. })
+        && matches!(f.shape, crate::features::Shape::Plan(..))
+        && f.stage == weft_abi::stage::VEGETATION
+}
+
+/// chiacraft: what a sample start put, relative to where it stands (`crown_of`): its blocks and
+/// fills (a fill's cells, up to 4096); templates and vein cells, which trees don't use, are left
+/// out.
+fn run_blocks(start: &crate::features::Start, pos: IVec3) -> Vec<RunBlock> {
+    use crate::features::Put;
+    let mut out = Vec::new();
+    for p in &start.puts {
+        match p {
+            Put::Block { at, state, force } => out.push(RunBlock { offset: *at - pos, state: *state, force: *force as u32 }),
+            Put::Fill { lo, hi, state, .. } => {
+                for y in lo.y..=hi.y {
+                    for z in lo.z..=hi.z {
+                        for x in lo.x..=hi.x {
+                            if out.len() >= 4096 {
+                                return out;
+                            }
+                            out.push(RunBlock { offset: IVec3::new(x, y, z) - pos, state: *state, force: 1 });
+                        }
+                    }
+                }
+            }
+            Put::Cells(_) | Put::Piece(_) => {}
+        }
+    }
+    out
+}
+
+/// chiacraft: the states matcher `m` takes, as runs (first, count), for the far sites' ground test.
+fn state_runs(c: &Content, m: u32) -> Vec<(u32, u32)> {
+    let mut out: Vec<(u32, u32)> = Vec::new();
+    for s in 0..c.states.len() as u32 {
+        if !c.matchers.has(m, s) {
+            continue;
+        }
+        match out.last_mut() {
+            Some((first, count)) if *first + *count == s => *count += 1,
+            _ => out.push((s, 1)),
+        }
+    }
+    out
 }
 
 /// A block a sample run put (`crown_of`): where, relative to the site, which state, and whether
 /// it was forced over what was there.
-#[allow(dead_code)]
 struct RunBlock {
     offset: glam::IVec3,
     state: u32,
     force: u32,
 }
 
-/// Sample runs of a scatter's shape per biome for its crowns, and the spots tried for them.
-#[allow(dead_code)]
+/// Sample runs of a feature's plan per biome for its crowns, and the spots tried for them.
 const RUNS: usize = 16;
-#[allow(dead_code)]
 const RUN_SPOTS: usize = 48;
 
 /// What a run of a scatter's shape looks like from afar (`gpu_layout::terrain::crown`), and its
 /// top: its crown, of the block it puts most into air (a tree's leaves; else the one it forces
 /// most, a boulder's stone, as none at all was air, drawn violet), and the trunk under it. None
 /// when it put nothing.
-#[allow(dead_code)]
 fn crown_of(blocks: &[RunBlock]) -> Option<(i32, [u32; 2])> {
     use layout::crown as cr;
     let commonest = |forced: bool, keep: &dyn Fn(&RunBlock) -> bool| {

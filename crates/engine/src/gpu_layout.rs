@@ -195,13 +195,14 @@ pub mod terrain {
             /// A condition of a rule: the field, from, to.
             COND = 3,
             CAVE = 5,
-            /// Per scatter: cell, reach, hash seed (two words), biomes, its thinning mask's steps
-            /// (where they start and how many, `STEP` each) and keep. After it the mask's steps,
-            /// a `SCATTER_BIOME` per biome, then the ground it stands on (`ScatterDef::ground`) as
-            /// state ranges: how many, then first and count each (none: any).
+            /// Per far-tree feature (a grid feature's plan, `terrain_gpu::describe_lod`): spacing,
+            /// reach, hash seed (two words), biomes, its thinning mask's steps (where they start
+            /// and how many, `STEP` each) and keep. After it the mask's steps, a `SCATTER_BIOME`
+            /// per biome, then the ground it stands on (`features::Fit::ground`) as state ranges:
+            /// how many, then first and count each (none: any).
             SCATTER = 8,
-            /// Per scatter and biome: threshold (two words), thinned, then `lod::SHAPES` crowns
-            /// its shape callback made there, two words each (`crown`).
+            /// Per far-tree feature and biome: threshold (two words), thinned, then `lod::SHAPES`
+            /// crowns its plan made there, two words each (`crown`).
             SCATTER_BIOME = 3 + 2 * 8,
             /// Per CPU-made feature (`Feature::custom`) and cube: heights at the 256 columns and
             /// the 25 corners caves measure from, after the job's own words.
