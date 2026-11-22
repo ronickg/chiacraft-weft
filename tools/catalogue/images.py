@@ -292,7 +292,10 @@ def iso_cube(top, left, right, size=128, tint_top=None, tint_sides=None):
 
 # Shapes of a block by its id's ending, in block units.
 SHAPES = {"_vertical_slab": [(0, 0, 0, 1, 1, 0.5)], "_slab": [(0, 0, 0, 1, 0.5, 1)],
-          "_stairs": [(0, 0, 0, 1, 0.5, 1), (0, 0.5, 0, 1, 1, 0.5)]}
+          "_stairs": [(0, 0, 0, 1, 0.5, 1), (0, 0.5, 0, 1, 1, 0.5)],
+          # Upstream's (`shapes.rs`, the Weft sync of 11-22): a beam is a quarter block
+          # (1 x 1/2 x 1/2), an eighth half a block each way; drawn in the middle of the cell.
+          "_beam": [(0, 0, 0.25, 1, 0.5, 0.75)], "_eighth": [(0.25, 0, 0.25, 0.75, 0.5, 0.75)]}
 
 
 def shape_of(i):
