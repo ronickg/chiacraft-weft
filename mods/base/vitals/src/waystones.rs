@@ -123,6 +123,80 @@ pub const MAP_LEY: [u8; 3] = [0x6c, 0xc8, 0xf0];
 pub const MAP_WOKEN: [u8; 3] = [0x2c, 0x9c, 0xe0];
 pub const MAP_PLAYER: [u8; 3] = [0xb0, 0x30, 0x24];
 
+/// Creatures on the minimap and on the map round the player (Ronald 11-22: "show all mobs in
+/// certain area that are visible"): those within `MARK_RADIUS` blocks whose eyes the player's eyes
+/// can see (a ray through the blocks the client has, `clear_line`; hidden behind a hill or a wall,
+/// not shown), the nearest `MARK_MAX`, as dots of `MARK_DOT` pixels across. Looked for again at the
+/// minimap's repaint (`MINI_REPAINT_SECS`); setting `base:map_creatures`.
+pub const MARK_RADIUS: f64 = 48.0;
+pub const MARK_MAX: usize = 24;
+pub const MARK_DOT: i32 = 3;
+/// Steps of the sight ray (blocks): a block thinner than this between could be missed.
+pub const MARK_RAY_STEP: f64 = 0.5;
+/// The dots' colours: hostile mobs, wild animals (a neutral cream), the player's own tames; and
+/// the dark rim round each so it reads on any land.
+pub const MARK_HOSTILE: [u8; 3] = [0xd8, 0x28, 0x20];
+pub const MARK_WILD: [u8; 3] = [0xf4, 0xec, 0xd4];
+pub const MARK_TAME: [u8; 3] = [0x48, 0xc8, 0x58];
+pub const MARK_RIM: [u8; 3] = [0x24, 0x1c, 0x14];
+
+/// What a creature is on the map.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Mark {
+    Hostile,
+    Wild,
+    Tame,
+}
+
+impl Mark {
+    /// By its spawn category (`core:hostile`, `core:passive` ...; empty for what is no creature:
+    /// items, arrows, boats) and whether the player owns it. `None`: not marked.
+    pub fn of(category: &str, mine: bool) -> Option<Mark> {
+        if category.is_empty() {
+            return None;
+        }
+        Some(if mine {
+            Mark::Tame
+        } else if category == "core:hostile" {
+            Mark::Hostile
+        } else {
+            Mark::Wild
+        })
+    }
+
+    pub fn colour(self) -> [u8; 3] {
+        match self {
+            Mark::Hostile => MARK_HOSTILE,
+            Mark::Wild => MARK_WILD,
+            Mark::Tame => MARK_TAME,
+        }
+    }
+}
+
+/// Whether nothing `blocked` stands between `from` and `to` (the blocks the ray passes in steps of
+/// `MARK_RAY_STEP`, the end points' own blocks left out: the eyes are in air, and the creature's
+/// own block is where it stands).
+pub fn clear_line(from: [f64; 3], to: [f64; 3], mut blocked: impl FnMut([i32; 3]) -> bool) -> bool {
+    let d = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
+    let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+    let steps = (len / MARK_RAY_STEP).ceil() as i32;
+    let block = |p: [f64; 3]| p.map(|v| v.floor() as i32);
+    let (start, end) = (block(from), block(to));
+    let mut last = start;
+    for k in 1..steps {
+        let t = k as f64 / steps as f64;
+        let b = block([from[0] + d[0] * t, from[1] + d[1] * t, from[2] + d[2] * t]);
+        if b == last || b == start || b == end {
+            continue;
+        }
+        last = b;
+        if blocked(b) {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,5 +218,36 @@ mod tests {
             assert!(BIOME_COLOURS.iter().any(|e| e.0 == b), "{b}");
         }
         assert_ne!(biome_colour("desert"), biome_colour("plains"));
+    }
+
+    #[test]
+    fn creatures_are_marked_by_kind() {
+        assert_eq!(Mark::of("core:hostile", false), Some(Mark::Hostile));
+        assert_eq!(Mark::of("core:passive", false), Some(Mark::Wild));
+        assert_eq!(Mark::of("core:passive", true), Some(Mark::Tame));
+        assert_eq!(Mark::of("", false), None);
+        let c = [Mark::Hostile, Mark::Wild, Mark::Tame].map(Mark::colour);
+        assert!(c[0] != c[1] && c[1] != c[2] && c[0] != c[2]);
+        // The radius fits the minimap's widest zoom (its circle's radius in blocks) and the cap
+        // keeps the dots readable.
+        let widest = MINI_PX as f64 / 2.0 * *MINI_ZOOMS.last().unwrap() as f64;
+        assert!(MARK_RADIUS <= widest && MARK_RADIUS >= MINI_PX as f64 / 2.0 && (8..=64).contains(&MARK_MAX));
+    }
+
+    #[test]
+    fn sight_stops_at_walls_and_hills() {
+        let eye = [0.5, 65.6, 0.5];
+        // Open ground: nothing blocks.
+        assert!(clear_line(eye, [20.5, 65.6, 3.5], |_| false));
+        // A wall at x = 10 across the way.
+        let wall = |b: [i32; 3]| b[0] == 10 && (60..70).contains(&b[1]);
+        assert!(!clear_line(eye, [20.5, 65.6, 3.5], wall));
+        // Seen over it from higher up.
+        assert!(clear_line([0.5, 75.6, 0.5], [20.5, 75.6, 3.5], wall));
+        // A hill: ground up to 70 between x 5 and 15, the creature in the valley beyond.
+        let hill = |b: [i32; 3]| (5..15).contains(&b[0]) && b[1] < 70 || b[1] < 64;
+        assert!(!clear_line(eye, [25.5, 64.6, 0.5], hill));
+        // Its own block and the eyes' are never asked.
+        assert!(clear_line(eye, [3.5, 65.6, 0.5], |b| b == [3, 65, 0] || b == [0, 65, 0]));
     }
 }
