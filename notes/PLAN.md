@@ -281,9 +281,19 @@ The smallest version that works is phases 1-4.
         - A visitor never binds a portal, and can't ask about a bound one.
         - A wait binds only to a new link with the asker's own world.
         - At most 3 waiting asks per visitor and 16 per world.
-      - Nothing new is signed: invites, pre-allow and the two-key link records are reused.
-      - Left: marking the links no portal leads to yet, and option C (an owner arming a portal
-        for visitors with a short invite).
+      - Nothing new is trusted: invites, pre-allow and the two-key link records are reused.
+      - A portal in each world (Ronald, 11-22): a link opens for travel only once both worlds
+        have a portal bound to it. Each world tells the other, in a note its key signs (`links`:
+        `Portal`), when it binds or loses one.
+        - Until then the portal is a pad that says it waits, and nobody travels: there's no
+          fallback to a spawn.
+        - The visitor who linked is told to place theirs, links with no portal here come first
+          on the owner's screen, marked new, and owners hear once a run which links still need
+          one.
+      - The look (Ronald, 11-22): a pad flat on the ground. With both portals, a doorway 2
+        blocks tall stands over it: lit and moving while the other world answers its status
+        (every 8 s near players), dim and still while it's offline.
+      - Left: option C, an owner arming a portal for visitors with a short invite.
 4. **DIDs and achievements.** Player and world DIDs through sponsors; world ownership both ways;
    achievements signed by the world DID, anchored in batches, opt-in; profile view; admission
    rules (allow lists, probation, DID age, achievements); shared ban lists.

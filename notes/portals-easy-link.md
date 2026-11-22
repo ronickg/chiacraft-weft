@@ -38,6 +38,55 @@ either side can revoke it. What's new:
   - Accepting is still done by the inbox and its rules. The wait only says which portal the
     result belongs to.
 
+## A portal in each world (Ronald, 11-22)
+
+"the friend must also place a block in there world too in order to setup the lunk to where one
+joins". A link opens for travel only once both worlds have a portal bound to it. Each world's
+portal is where arrivals from the other world land.
+
+- **Pairing.** Both portals are paired by the link they share. That link is the record both world
+  keys signed, and each owner agreed to it.
+- **Telling the other world.** When a world binds a portal to the link, or loses it (it's unbound,
+  bound elsewhere, or broken), its game sends the other owner's inbox a short note its world key
+  signs:
+
+  ```text
+  chiacraft link portal v1
+  link <id>
+  by <world key>
+  ready <0|1>
+  created <secs>
+  ```
+
+  The note goes through the same outbox as requests, so it waits while the other game is closed.
+  Only the newest note per world counts.
+- **Until both exist**, the portal is only its pad. Its screen and chat say "Waiting for a portal
+  in 'B's world'". Walking onto it sends nobody, so no arrival ever falls back to a spawn.
+- **Finishing it.**
+  - In flows 1 and 2, B's game tells B: "Place a portal in 'B's world' and pick this link on it".
+  - When B next right-clicks a portal in their own world, that link comes first, marked "new".
+  - An owner entering their world hears, once per run, which links still need a portal there.
+  - Flow 3 finishes the same way: Bea places her portal at home.
+
+## The look (Ronald, 11-22)
+
+"looks like an portal that opens 2 blocks heght, so the poratl block is place flat in ground, and
+then when link is conencted portal shows, and also shows if the friedns server is open or not".
+
+- The portal block is a pad, set flat on the ground. It faces the player who places it.
+- The pad shows alone while the portal is unbound, or bound but waiting for the other world's
+  portal.
+- With both portals, a doorway 2 blocks tall stands over it. It's part of the pad's model, not
+  solid: you walk through it onto the pad. It has two states:
+  - **open:** lit and moving, while the other world answers its status (`chiacraft/status/1`),
+    asked by the host's game about every 8 seconds while players are within 12 blocks;
+  - **closed:** dim and still while it doesn't answer. The screen and chat say "'Bea's farm' is
+    offline", and walking in sends nobody.
+- It's our own design (`notes/STYLE.md`), drawn with the `blocky-model` and `game-art` skills: a
+  carved stone pad with a glowing inlay, posts and a lintel, and a violet sheet.
+- It's a block state (`state`: base, closed, open) the server sets on every block of the portal,
+  so all players see the same doorway.
+
 ## The flows
 
 ### 1. A places a portal; B, visiting A's world, activates it

@@ -1,5 +1,5 @@
 # Linking at the portal, run B (friends), the owner's side. Run beside friends-bob.txt from the
-# same folder; delete pe2-*.txt tickets and pe2-mark-* first (README.md).
+# same folder; delete pe2-*.txt and pe2-mark-* first (README.md).
 join pe2-bob-ticket.txt            # visit bob's world once, so it is in alice's list with its owner
 loaded
 wait 12                            # the list learns its owner and inbox from the world's status
@@ -14,19 +14,19 @@ chat /rule core:mob_spawning 0
 chat /tp alice 4.5 151 7.5
 wait 3
 chat /tk fill 0 150 0 8 150 8 base:stone
-chat /tk fill 4 151 2 4 152 2 portals:portal
-chat /tk fill 6 151 2 6 152 2 portals:portal
+chat /tk set 4 151 2 portals:portal
+chat /tk set 6 151 2 portals:portal
 host pe2-alice-ticket.txt
 await_file pe2-mark-bob-in 300
 chat /tp bob 4.5 151 4.5
 mark pe2-mark-ready
-await_file pe2-mark-bob-linked 300 # bob touched the portal at 4 151 2: linked at once (a friend)
+await_file pe2-mark-bob-linked 300 # bob touched the pad at 4 151 2: linked at once (a friend)
 wait 2
-shot pe2-alice-2-linked.png        # chat: "A portal here now leads to 'pe2-bob-home'..."
+shot pe2-alice-2-linked.png        # chat: "A portal here now leads to 'pe2-bob-home'..."; a pad, waiting
 # Flow 3: a friend's world nobody visited, asked from the owner's portal screen.
 chat /tp alice 6.5 151 4.5
 wait 2
-look 0 -20
+look 0 -37
 press core:use                     # the first opening asks bob's game for his worlds
 wait 2
 close
@@ -36,11 +36,21 @@ wait 2
 shot pe2-alice-3-friends.png       # "Or ask a friend's world:" and "Link with 'pe2-bob-other'"
 tap_once portals:portal text:link with 'pe2-bob-other'
 wait 8
-shot pe2-alice-4-bound.png         # chat: "Asked 'pe2-bob-other' to link ...", then "A portal here now leads to 'pe2-bob-other'..."
 press core:use
 wait 2
-shot pe2-alice-5-leads.png         # "This portal leads to 'pe2-bob-other'."
+shot pe2-alice-4-waiting.png       # "Waiting for a portal in 'pe2-bob-other'..." (nobody places one in this run)
 close
+mark pe2-mark-alice-asked
+await_file pe2-mark-bob-home-portal 300  # bob bound his home portal and hosts again
+wait 20
+chat /tp alice 4.5 151 6.5
+look 0 -10
+wait 2
+shot pe2-alice-5-open.png          # the doorway over the first pad, lit and moving
+look 0 0
+hold core:forward 3                # onto the pad: to pe2-bob-home
+wait 20
+shot pe2-alice-6-arrived.png       # in bob's world beside his portal
 mark pe2-mark-alice-done
 await_file pe2-mark-bob-done 300
 quit

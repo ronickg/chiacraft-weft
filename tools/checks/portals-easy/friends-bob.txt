@@ -1,8 +1,10 @@
 # Linking at the portal, run B, the visitor's side: bob has two worlds, hosts one, befriends
-# alice, and links his world at her portal with one touch; then walks through it home.
+# alice, links his world at her pad with one touch, then places his own portal at home.
 open pe2-bob-other
 wait 3
 open pe2-bob-home
+chat /tk fill 0 150 0 8 150 8 base:stone
+chat /tk set 5 151 4 portals:portal
 host pe2-bob-ticket.txt
 join pe2-alice-ticket.txt          # waits for alice's world; bob's own keeps running
 loaded
@@ -12,20 +14,31 @@ tap core:multiplayer id:befriend:pe2-alice-1
 wait 2
 close
 mark pe2-mark-bob-in
-await_file pe2-mark-ready 300      # alice moved bob in front of her portal at 4 151 2
+await_file pe2-mark-ready 300      # alice moved bob in front of her pad at 4 151 2
 wait 2
-look 0 -20
+look 0 -37
 press core:use
 wait 2
 shot pe2-bob-1-screen.png          # "Link 'pe2-bob-home' here" and "Link 'pe2-bob-other' here"
 tap_once portals:portal text:link 'pe2-bob-home' here
 wait 6
-shot pe2-bob-2-linked.png          # chat: "The portal now leads to 'pe2-bob-home'." (no answer needed)
+shot pe2-bob-2-linked.png          # chat: "Linked here. Now place a portal in 'pe2-bob-home' ..." (no answer needed)
 mark pe2-mark-bob-linked
+await_file pe2-mark-alice-asked 300
+wait 4                             # alice's ask for pe2-bob-other was accepted here without asking
+leave
+open pe2-bob-home
+chat /tp bob 5.5 151 6.5
+wait 2
+look 0 -37
+press core:use                     # his pad at 5 151 4
+wait 2
+shot pe2-bob-3-new.png             # both links, new ones first: pe2-alice-1 (for each of his worlds' lists)
+tap_once portals:portal text:pe2-alice-1
+wait 3
+host pe2-bob-ticket2.txt
+mark pe2-mark-bob-home-portal
 await_file pe2-mark-alice-done 300
-look 0 0
-hold core:forward 1.5              # into the portal (1.5 blocks ahead): home to pe2-bob-home
-wait 10
-shot pe2-bob-3-home.png            # bob in his own world
+wait 3
 mark pe2-mark-bob-done
 quit
