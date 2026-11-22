@@ -24,7 +24,7 @@ MAX_CONFIG = ("core:render_scale=1,core:shadows=2,core:shadow_size=4096,base:fx_
 
 
 def ssh(cmd, inp=None):
-    return subprocess.run(["ssh", "-o", "BatchMode=yes", PC, cmd], input=inp, text=True, capture_output=True)
+    return subprocess.run(["ssh", "-o", "BatchMode=yes", PC, "bash -c " + shlex.quote(cmd)], input=inp, text=True, capture_output=True)   # bash: the PC's login shell is zsh, which aborts a command whose glob matches nothing
 
 
 def has_fix(ref):
@@ -45,18 +45,34 @@ def check_script(path, newer=False):
             sys.exit(f"REJECTED {path}: line {i + 1}: a `shot` directly before a `bench` stalls a frame into the bench. Put `wait 1` between them.")
 
 
-def put_script(path, newer=False):
+def put_script(path, newer=False, sub=""):
+    """Upload a script as ~/looktest/<sub>t2q_<name> (multi copies live in ~/looktest/pt/, where ptmulti.sh reads them)."""
     check_script(path, newer)
     name = "t2q_" + os.path.basename(path)
-    r = ssh(f"cat > ~/looktest/{name}", open(path).read())
+    r = ssh(f"cat > ~/looktest/{sub}{name}", open(path).read())
     if r.returncode:
         sys.exit("script upload failed: " + r.stderr)
-    return f"/home/ronaldg/looktest/{name}"
+    return f"/home/ronaldg/looktest/{sub}{name}"
+
+
+def seed_packs(job):
+    """The runner fails a look whose --config names resource packs the seed dir lacks: copy each named pack (from any seed/*/resourcepacks/<name>) into
+    ~/looktest/seed/<id>/resourcepacks/ (a reflink copy; shader packs are seeded by the runner)."""
+    cfg = " ".join(str(e) for e in job.get("extra") or [])
+    names = []
+    for m in re.finditer(r"core:resource_packs=([A-Za-z0-9_,.-]+)", cfg):
+        names += [n for n in m.group(1).split(",") if n and n != "core"]   # the list ends where the next key (`core:...`) starts
+    jid = job["id"]
+    for n in dict.fromkeys(names):
+        r = ssh(f"d=~/looktest/seed/{jid}/resourcepacks; mkdir -p $d; [ -e $d/{n} ] || {{ src=$(ls -d ~/looktest/seed/*/resourcepacks/{n} 2>/dev/null | head -1); [ -n \"$src\" ] && cp -a --reflink=auto $src $d/ && echo seeded {n} || echo NO SOURCE FOR PACK {n}; }}")
+        print((r.stdout + r.stderr).strip())
 
 
 def drop(job):
     """Write the job file into pending/ (tmp name first, then a move, so the runner never reads half a file)."""
     jid = job["id"]
+    if job["kind"] in ("look", "bench"):
+        seed_packs(job)
     r = ssh(f"cd {Q}; ls pending/{jid}.json running/{jid}.json held/{jid}.json done/{jid}.done 2>/dev/null | head -1")
     if r.stdout.strip():
         sys.exit(f"id {jid} already exists ({r.stdout.strip()}): pick a new id")
@@ -178,7 +194,7 @@ elif cmd == "multi":
     copies = []
     for spec in a[4:]:
         n, _, s = spec.partition(":")
-        copies.append({"name": n, "script": os.path.basename(put_script(s, True))})
+        copies.append({"name": n, "script": os.path.basename(put_script(s, True, "pt/"))})
     tree = resolve_tree(tree)
     sw, sh = size.split("x")
     drop({"kind": "multi", "id": jid, "tree": tree, "world": world, "limit": limit, "copies": copies, "needs": needs or tree, "sw": int(sw), "sh": int(sh), "prefix": prefix or jid, "prio": prio})
