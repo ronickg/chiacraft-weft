@@ -24,8 +24,9 @@ Branch `claude/upstream-fixes-1122-e85f21`, merge commit 2dd1fdb62 (upstream mas
 - **Generation** of ores, structures and trees uses upstream's feature code, so our scatter-site code is gone.
   - **Scatter thinning has no home yet** (`FeatureBuilder::thin` is missing). Until it does: no forest clearings or stands, cherries all through their biome, no shrub thickets, and far forests may differ.
   - Deep cave fill has changed. Far trees may be off: they need a look.
-- **Waterlogging** (holds_liquid) is gone, as the ledger expected. Sea plants use upstream's waterlogging.
-- **Max health** is capped at 1024 again, which matters for bosses later.
+- **Waterlogging:** ours gave way to upstream's own (`.shares_cell_with("#water")`), and the mods are ported to it.
+- **Max health:** back to 100000 on top of upstream's code (Planner: bosses need it).
+- **Scatter thinning** comes back as a `thin` hook on upstream's feature builder (Planner).
 - **Climbing, gliding and ropes:**
   - Wall climbing has its own attribute, `core:wall_climb_speed`. `core:climb_speed` is now upstream's ladder speed.
   - The climb, glide and rope poses may not show yet.
