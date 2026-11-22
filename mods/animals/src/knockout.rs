@@ -65,14 +65,14 @@ const DART_SPEED: f64 = 30.0;
 pub fn init(r: &mut Registry) {
     r.entity_component(&KNOCKOUT, Knockout::default(), component_flags::SAVE | component_flags::SYNC_MENU | component_flags::SYNC_WATCHERS);
     for s in SPECIES.iter().filter(|s| s.taming == Method::Knockout) {
-        r.attach(s.kind, &KNOCKOUT);
+        r.edit(s.kind).attach(&KNOCKOUT);
     }
     r.item(&CLUB).max_stack(1).attack_damage(1.0).tab(&COMBAT);
     r.shaped(&CRAFTING, "club", 1, &["l", "s"], &[('l', "#logs"), ('s', "base:stick")]);
     r.item(&SEDATIVE).tab(&TOOLS);
     r.shapeless(&CRAFTING, "sedative", 2, &["base:spider_eye", "base:sugar", "base:wheat_seeds"], 0);
     r.item(&DART).tab(&COMBAT).on_use(|u| {
-        let (w, player) = (u.world(), u.player());
+        let (w, player) = (u.world(), u.entity());
         throw_dart(&w, player);
         if !w.outside_survival(player) {
             u.set_stack(StackData::shrink(u.stack(), 1));
@@ -104,7 +104,7 @@ pub fn init(r: &mut Registry) {
         .gravity(-0.25)
         .drag(0.92)
         .fullbright();
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
             hurt(&w, h);
@@ -371,7 +371,7 @@ fn throw_dart(w: &World, player: u64) {
         *s = player;
     }
     if w.entity(dart).is_some() {
-        w.entity_edit(dart)
+        w.entity_modify(dart)
             .velocity(dir.map(|d| d * DART_SPEED))
             .yaw(p.yaw);
     }
@@ -386,7 +386,7 @@ fn dart_flies(w: &World, id: u64, st: &EntityState) -> bool {
         .into_iter()
         .find(|&e| e != id && e != shooter && w.entity(e).is_some_and(|s| s.kind != st.kind));
     if let Some(target) = hit {
-        w.damage(target, 1.0, shooter, damage_cause::ATTACK);
+        w.damage(target, Damage::new(1.0, damage_cause::ATTACK).by(shooter));
         add_torpor(w, target, DART_TORPOR);
         w.despawn(id);
     } else if st.flags & entity_flags::BLOCKED != 0 || st.on_ground != 0 || st.age > 100 {

@@ -196,7 +196,7 @@ pub fn start(
         thudded: false,
         thudded_ground: false,
     });
-    w.play_sound(&CREAK, pivot, n::sound_volume(height as f32));
+    w.play_sound(&CREAK, Vec3::from(pivot), n::sound_volume(height as f32));
     true
 }
 
@@ -251,11 +251,11 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
     let crown = [f.foot[0], f.foot[1] + height as i32, f.foot[2]];
     if !f.rushed && t >= n::CREAK_TICKS as f32 {
         f.rushed = true;
-        w.play_sound(&RUSH, turn(center(crown), f.pivot, f.axis, deg), n::sound_volume(height));
+        w.play_sound(&RUSH, Vec3::from(turn(center(crown), f.pivot, f.axis, deg)), n::sound_volume(height));
     }
     if !f.thudded && t >= (n::CREAK_TICKS + f.fall) as f32 - n::THUD_EARLY_TICKS as f32 {
         f.thudded = true;
-        w.play_sound(&THUD, turn(center(crown), f.pivot, f.axis, 90.0), n::sound_volume(height));
+        w.play_sound(&THUD, Vec3::from(turn(center(crown), f.pivot, f.axis, 90.0)), n::sound_volume(height));
     }
     // Leaves break off as it goes: the share shed grows with the angle past SHED_FROM.
     let past = ((deg - n::SHED_FROM) / (90.0 - n::SHED_FROM)).clamp(0.0, 1.0);
@@ -266,7 +266,7 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
         let Some((p, state)) = f.leaves.pop() else { break };
         shed += 1;
         let local = [p[0] - f.foot[0], p[1] - f.foot[1], p[2] - f.foot[2]];
-        if let Some(b) = w.on_body(f.body) {
+        if let Some(b) = w.in_space(f.body) {
             b.set_block(local, 0);
         }
         leaf_off(w, f, p, state, deg, speed);
@@ -386,7 +386,7 @@ fn hurt(w: &World, f: &mut Fall, deg: f32) {
             );
         for id in ids {
             if id != f.body && f.hurt.insert(id) {
-                w.damage(id, harm, 0, damage_cause::CRUSH);
+                w.damage(id, Damage::new(harm, damage_cause::CRUSH));
             }
         }
     }

@@ -205,7 +205,7 @@ pub async fn shift_click_skips_grid(t: T) -> R {
     t.frames(2).await?;
     t.c().input_click(0, 0.0);
     t.secs(0.3).await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     let inv = t.op("inv me").await?;
     t.check(inv.contains("base:diamond:5"), format!("still in the inventory: '{inv}'"));
@@ -296,7 +296,7 @@ pub async fn chat_down_keeps_text(t: T) -> R {
     t.c().input_key("ArrowDown", 0.0);
     t.frames(3).await?;
     t.check_eq(t.c().focused_text(), "hello".to_string(), "the text is still there");
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await
 }
 

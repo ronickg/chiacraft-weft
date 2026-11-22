@@ -52,7 +52,7 @@ pub fn init(r: &mut Registry) {
     });
     r.packet(&PLACE, |p, [id, stat]| animal::place_point(&p.world(), id, p.player(), stat as usize));
     r.item(&SPYGLASS).max_stack(1).tab(&TOOLS).on_use(|u| {
-        let (w, player) = (u.world(), u.player());
+        let (w, player) = (u.world(), u.entity());
         match looked_at(&w, player, SPYGLASS_RANGE) {
             Some(id) => open(&w, player, id),
             None => false,
@@ -541,7 +541,7 @@ fn framed_close(ui: &mut Ui) {
             .size(7.0, 7.0)
             .pad(0.5)
             .tooltip("window.base.close_tip"),
-        |c| c.client().screen_close(),
+        |c| c.client().menu_close(),
     );
     ui.row(S::row().w(4.0), |_| {});
 }
@@ -1318,7 +1318,7 @@ fn command(cmd: &mut ServerCommand) {
             if let (Some(p), Some(_)) = (w.entity(player), w.entity(id)) {
                 let (sy, cy) = (p.yaw as f64).sin_cos();
                 let to = [p.pos.x - sy * 2.0, p.pos.y, p.pos.z - cy * 2.0];
-                w.entity_edit(id).pos(to);
+                w.entity_modify(id).pos(to);
                 w.navigate(id, to, 0.0);
             }
         }

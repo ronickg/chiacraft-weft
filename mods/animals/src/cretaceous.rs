@@ -10,7 +10,7 @@
 //! Getting there: a gateway (`gateway.rs`).
 
 use base_api::CLIMATE;
-use base_api::{CLOUDS, MOON, STARS, SUN};
+use base_api::sky_objects::{CLOUDS, MOON, STARS, SUN};
 use weft_sdk::terrain::BiomeRule;
 use weft_sdk::*;
 
@@ -54,17 +54,16 @@ pub fn init(r: &mut Registry) {
     r.block(&RED_SAND)
         .sound_group("base:block.sand")
         .hardness(0.5)
-        .mineable("shovel")
+        .mined_by("shovel", weft_sdk::abi::tool_tier::HAND)
         // Not `sand`: no cacti on it (they came 30 million years after).
         .tag("red_sand")
         .falling()
         .tab(&NATURAL);
     r.block(&RED_SANDSTONE)
         .sound_group("base:block.stone")
-        .textures("red_sandstone_top", "red_sandstone_side", "red_sandstone_bottom")
+        .texture("red_sandstone_side").top("red_sandstone_top").bottom("red_sandstone_bottom")
         .hardness(0.8)
-        .mineable("pickaxe")
-        .needs_tool_level(0)
+        .mined_by("pickaxe", 0)
         .tab(&BUILDING);
     for plant in [&FERN, &HORSETAIL] {
         r.block(plant)
@@ -91,9 +90,9 @@ pub fn init(r: &mut Registry) {
             for (b, side) in [(block, format!("{name}_side")), (upper, format!("{name}_upper_side"))] {
                 r.block(b)
                     .sound_group("base:block.gravel")
-                    .textures(&format!("{name}_top"), &side, &format!("{name}_top"))
+                    .texture(&side).top(&format!("{name}_top")).bottom(&format!("{name}_top"))
                     .hardness(0.9)
-                    .mineable("shovel")
+                    .mined_by("shovel", weft_sdk::abi::tool_tier::HAND)
                     .tab(&NATURAL);
             }
             r.loot(upper).pool(Pool::new().entry(Entry::item(p.block)));
@@ -103,9 +102,9 @@ pub fn init(r: &mut Registry) {
         if p.form == vitals::wild::Form::Log {
             r.block(block)
                 .sound_group("base:block.wood")
-                .textures(&format!("{name}_top"), name, &format!("{name}_top"))
+                .texture(name).top(&format!("{name}_top")).bottom(&format!("{name}_top"))
                 .hardness(1.0)
-                .mineable("axe")
+                .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
                 .tab(&NATURAL);
             continue;
         }
@@ -118,7 +117,7 @@ pub fn init(r: &mut Registry) {
         if let Some(seed) = p.gives {
             r.loot(block)
                 .pool(Pool::new().entry(Entry::item(p.block)))
-                .pool(Pool::new().when(Cond::Chance(0.5)).item(seed));
+                .pool(Pool::new().when(Cond::chance(0.5)).item(seed));
             r.item(Item::generated(seed.into()))
                 .places(block)
                 .tab(&NATURAL);
@@ -316,16 +315,16 @@ fn woods(r: &mut Registry) {
         };
         log.sound_group("base:block.wood")
             .hardness(2.0)
-            .mineable("axe")
+            .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
             .tag("logs")
             .tag(&format!("logs/{wood}"))
             .prop("axis", ["y", "x", "z"])
             // Lying after a felling, in alternating pieces (`felled`): chopped a piece at a time.
             .prop("felled", ["no", "a", "b"])
             .states(move |p, s| match p.get("axis") {
-                "y" => s.textures(&top, &side, &top),
-                "x" => s.faces([&top, &top, &side, &side, &side, &side]),
-                _ => s.faces([&side, &side, &side, &side, &top, &top]),
+                "y" => s.texture(&side).top(&top).bottom(&top),
+                "x" => s.west(&top).east(&top).bottom(&side).top(&side).north(&side).south(&side),
+                _ => s.west(&side).east(&side).bottom(&side).top(&side).north(&top).south(&top),
             })
             .placement(|p, props| {
                 props.set(
@@ -349,14 +348,14 @@ fn woods(r: &mut Registry) {
             .light_opacity(1)
             .tint(base_api::trees::leaf_tint(vitals::wild::turn(&format!("animals:{wood}_leaves"))))
             .tag("leaves")
-            .mineable("shears")
+            .mined_by("shears", weft_sdk::abi::tool_tier::HAND)
             .tab(&NATURAL);
         let plant: &'static str = Box::leak(format!("animals:{wood}_sapling").into_boxed_str());
         let has_sapling = vitals::plants::of(plant).is_some();
         let table = r.loot(leaves);
-        let table = if has_sapling { table.pool(Pool::new().when(Cond::Chance(0.05)).item(plant)) } else { table };
+        let table = if has_sapling { table.pool(Pool::new().when(Cond::chance(0.05)).item(plant)) } else { table };
         drop(match fruit {
-            Some(fruit) => table.pool(Pool::new().when(Cond::Chance(0.05)).item(fruit)),
+            Some(fruit) => table.pool(Pool::new().when(Cond::chance(0.05)).item(fruit)),
             None => table,
         });
         if let Some(fruit) = fruit {

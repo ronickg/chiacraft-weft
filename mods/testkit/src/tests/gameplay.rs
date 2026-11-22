@@ -1874,7 +1874,7 @@ fn max_health(t: &T) -> f32 {
 /// (`notes/SYSTEMS.md`).
 pub async fn every_food_has_nutrition(t: T) -> R {
     let missing: Vec<&str> = (0..u16::MAX as u32)
-        .filter(|&id| base_api::FOOD.on_item(id).is_some())
+        .filter(|&id| base_api::components::FOOD.on_item(id).is_some())
         .map(item_name)
         // The test mod's own foods (Weft's `testmod:apple`) are no part of the game's food table.
         .filter(|name| !name.is_empty() && !name.starts_with("testmod:") && vitals::food::find(name).is_none())

@@ -16,7 +16,7 @@ pub fn terrain(r: &mut Registry) {
     let t = coasts(t);
     let mut t = heights(t);
     // Giant sequoia groves, on the mountains' front slopes (`base_api::land::SEQUOIA_AREA`).
-    t = t.biome(
+    t = t.rule(
         BiomeRule::new("sequoia_grove")
             .height(SEA + l::SEQUOIA_RISE.0..=SEA + l::SEQUOIA_RISE.1)
             .field(l::SEQUOIA_FIELD, l::SEQUOIA_GROVE..),
@@ -34,7 +34,7 @@ pub fn terrain(r: &mut Registry) {
                 .height(..=SEA + l::OLD_GROWTH_TOP)
                 .field(l::OLD_GROWTH_FIELD, l::OLD_GROWTH_FROM..);
         }
-        t = t.biome(rule);
+        t = t.rule(rule);
     }
     finish(t);
 
@@ -61,7 +61,7 @@ pub fn terrain(r: &mut Registry) {
 /// drifts), then the features. Biomes shape the land through their climate, not their borders, so
 /// nothing seams: the cold flattens hills into tundra, deserts get dunes and mesas, rivers run
 /// where it's wet enough.
-fn land(t: TerrainBuilder<'_>, features: Vec<Feature>) -> TerrainBuilder<'_> {
+fn land(t: TerrainBuilder<'_>, features: Vec<Landform>) -> TerrainBuilder<'_> {
     let mut t = t
         .stone("stone")
         .base_height(SEA as f64)
@@ -71,7 +71,7 @@ fn land(t: TerrainBuilder<'_>, features: Vec<Feature>) -> TerrainBuilder<'_> {
         t = t.field(name, field);
     }
     for f in features {
-        t = t.feature(f);
+        t = t.landform(f);
     }
     t
 }
@@ -84,30 +84,30 @@ fn coasts(t: TerrainBuilder<'_>) -> TerrainBuilder<'_> {
     // and lies on its own bed (`RIVER_BEDS`).
     // Warm shallow seas first (`base_api::land::reef_part`): the reef's top 2 under the surface,
     // the lagoon's floor 3-5 under, in warm water near the coasts.
-    t.biome(
+    t.rule(
         BiomeRule::new("coral_reef")
             .height(SEA - 2..=SEA - 2)
             .temperature(l::REEF_WARM_RULE..)
             .continent(..l::REEF_COAST),
     )
-    .biome(
+    .rule(
         BiomeRule::new("lagoon")
             .height(SEA - l::REEF_LAGOON.1..=SEA - l::REEF_LAGOON.0)
             .temperature(l::REEF_WARM_RULE..)
             .continent(..l::REEF_COAST),
     )
-    .biome(
+    .rule(
         BiomeRule::new("ocean")
             .height(..=SEA - 2)
             .continent(..l::OCEAN_CONTINENT),
     )
-    .biome(
+    .rule(
         BiomeRule::new("snowy_plains")
             .named("snowy_coast")
             .height(..=SEA + 1)
             .continent(..l::BEACH_CONTINENT),
     )
-    .biome(
+    .rule(
         BiomeRule::new("beach")
             .height(..=SEA + 1)
             .continent(..l::BEACH_CONTINENT),
@@ -127,7 +127,7 @@ fn heights(mut t: TerrainBuilder<'_>) -> TerrainBuilder<'_> {
                 .surface("snow", "snow", l::SNOW_DEPTH - 1)
                 .bare_above(i32::MAX)
         };
-        t = t.biome(snow(format!("snow_{i}")).height(line..)).biome(
+        t = t.rule(snow(format!("snow_{i}")).height(line..)).rule(
             snow(format!("snow_{i}_drift"))
                 .height(line - l::SNOW_DRIFT..)
                 .field(l::SNOW_DRIFT_FIELD, l::SNOW_DRIFT_FROM..),
@@ -135,7 +135,7 @@ fn heights(mut t: TerrainBuilder<'_>) -> TerrainBuilder<'_> {
         low = below;
     }
     // A creek in the mountains lies on gravel.
-    t.biome(
+    t.rule(
         BiomeRule::new("mountains")
             .field(l::MOUNTAINS_FIELD, l::MOUNTAIN_BIOME..)
             .deep_top("gravel", SEA),
@@ -185,7 +185,7 @@ pub fn mc_forest_terrain(r: &mut Registry) {
         let rule = BiomeRule::new(biome)
             .named(&format!("mc_{biome}"))
             .deep_top(bed, SEA);
-        t = t.biome(if i + 1 < l::MC_MIX.len() { rule.field(l::MC_MIX_FIELD, low..cuts[i]) } else { rule });
+        t = t.rule(if i + 1 < l::MC_MIX.len() { rule.field(l::MC_MIX_FIELD, low..cuts[i]) } else { rule });
         low = cuts[i];
     }
     finish(t);

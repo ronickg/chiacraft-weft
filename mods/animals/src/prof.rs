@@ -153,7 +153,7 @@ pub fn init(r: &mut Registry) {
                     .filter_map(|id| Some((crate::dist2(w.entity(id)?.pos, me.pos), id)))
                     .min_by(|a, b| a.0.total_cmp(&b.0));
                 let Some((_, id)) = near else { return };
-                w.damage(id, 1e6, cmd.player(), damage_cause::ATTACK);
+                w.damage(id, Damage::new(1e6, damage_cause::ATTACK).by(cmd.player()));
                 format!("KILL {id}")
             }
             "fear" => {
@@ -251,7 +251,7 @@ pub fn init(r: &mut Registry) {
                 else {
                     return;
                 };
-                w.damage(prey, 1.0, hunter, damage_cause::ATTACK);
+                w.damage(prey, Damage::new(1.0, damage_cause::ATTACK).by(hunter));
                 format!("BITE {hunter} bites {prey}")
             }
             "off" => {

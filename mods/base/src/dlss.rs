@@ -11,7 +11,7 @@
 
 use weft_sdk::*;
 
-pub static SCREEN: Screen = Screen::named("video_dlss");
+pub static SCREEN: Menu = Menu::named("video_dlss");
 
 static NAME: TextConfig = TextConfig::named("core:gpu_dlss");
 /// What the upscaler runs, as bits: modes by number, models by their number.
@@ -87,7 +87,7 @@ fn row_costed(ui: &mut Ui, key: &'static str, shown: fn() -> (String, i64), step
         ui.button("video.base.less", S::default().size(12.0, 12.0).pad(0.5), move |c| {
             step(-1);
             if rebuild {
-                c.client().screen_open(&SCREEN);
+                c.client().menu_open(&SCREEN);
             }
         });
         ui.row(S::row().w(96.0).center(), move |ui| {
@@ -103,7 +103,7 @@ fn row_costed(ui: &mut Ui, key: &'static str, shown: fn() -> (String, i64), step
         ui.button("video.base.more", S::default().size(12.0, 12.0).pad(0.5), move |c| {
             step(1);
             if rebuild {
-                c.client().screen_open(&SCREEN);
+                c.client().menu_open(&SCREEN);
             }
         });
         match value {
@@ -212,16 +212,16 @@ fn dlss5_rows(ui: &mut Ui) {
 }
 
 pub fn register(r: &mut Registry) {
-    r.screen(&SCREEN, |ui| {
+    r.menu(&SCREEN).screen(|ui| {
         let tabs: [crate::window::Tab; 3] = [
             ("video.base.title", |c| {
-                c.client().screen_open(&crate::video::SCREEN);
+                c.client().menu_open(&crate::video::SCREEN);
             }),
             ("video.base.fantasy.title", |c| {
-                c.client().screen_open(&crate::video::FANTASY_SCREEN);
+                c.client().menu_open(&crate::video::FANTASY_SCREEN);
             }),
             ("video.base.extra.title", |c| {
-                c.client().screen_open(&crate::video::EXTRA_SCREEN);
+                c.client().menu_open(&crate::video::EXTRA_SCREEN);
             }),
         ];
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.dlss.title", &tabs, |ui| {

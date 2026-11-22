@@ -154,12 +154,24 @@ pub fn client_component(c: Client, name: &str) -> Option<Vec<u8>> {
 fn attach_component(r: &mut Registry, kind: &str, c: Comp) {
     let kind = EntityKind::generated(kind.to_string());
     match c {
-        Comp::B8(c) => r.attach(kind, c),
-        Comp::B16(c) => r.attach(kind, c),
-        Comp::B32(c) => r.attach(kind, c),
-        Comp::B64(c) => r.attach(kind, c),
-        Comp::B128(c) => r.attach(kind, c),
-        Comp::B256(c) => r.attach(kind, c),
+        Comp::B8(c) => {
+            r.edit(kind).attach(c);
+        }
+        Comp::B16(c) => {
+            r.edit(kind).attach(c);
+        }
+        Comp::B32(c) => {
+            r.edit(kind).attach(c);
+        }
+        Comp::B64(c) => {
+            r.edit(kind).attach(c);
+        }
+        Comp::B128(c) => {
+            r.edit(kind).attach(c);
+        }
+        Comp::B256(c) => {
+            r.edit(kind).attach(c);
+        }
     }
 }
 
@@ -539,7 +551,7 @@ pub fn register(r: &mut Registry, runs: &Arc<Runs>) -> Result<(), String> {
                     sandbox::Question::EnterDimension => actions::ENTER_DIMENSION.as_ref(),
                     sandbox::Question::NaturalSpawn => &question::NATURAL_SPAWN,
                 };
-                r.intercept(question, move |a| {
+                r.before_event(question, move |a| {
                     let w = a.world();
                     let q = query(a.query());
                     match runs.with(|inst| inst.question(|| Box::new(WorldGame::of(w, &runs)), cb, q)) {
@@ -552,7 +564,7 @@ pub fn register(r: &mut Registry, runs: &Arc<Runs>) -> Result<(), String> {
             Hook::Modify { chain: c, stage } => {
                 let chain = match c {
                     sandbox::Chain::Damage => &chain::DAMAGE,
-                    sandbox::Chain::AttackDamage => &chain::ATTACK_DAMAGE,
+                    sandbox::Chain::AttackDamage => &chain::MELEE,
                 };
                 r.modify(chain, stage, move |m| {
                     let w = m.world();
@@ -581,16 +593,16 @@ fn event(r: &mut Registry, e: sandbox::Event, cb: u32, runs: Arc<Runs>) {
     }
     let block = |c: &abi::BlockChange| EventValue::BlockChange(B { player: c.player, pos: t3(c.pos), state: c.state, item: c.item });
     match e {
-        sandbox::Event::BlockBroken => r.on(&actions::BREAK_BLOCK, move |b| run(&runs, b.world(), cb, b.iter().map(block).collect())),
-        sandbox::Event::BlockPlaced => r.on(&actions::PLACE_BLOCK, move |b| run(&runs, b.world(), cb, b.iter().map(block).collect())),
-        sandbox::Event::EntityDied => r.on(&actions::DIE, move |b| {
+        sandbox::Event::BlockBroken => r.on_event(&actions::BREAK_BLOCK, move |b| run(&runs, b.world(), cb, b.iter().map(block).collect())),
+        sandbox::Event::BlockPlaced => r.on_event(&actions::PLACE_BLOCK, move |b| run(&runs, b.world(), cb, b.iter().map(block).collect())),
+        sandbox::Event::EntityDied => r.on_event(&actions::DIE, move |b| {
             let batch = b
                 .iter()
                 .map(|d| EventValue::Death(D { entity: d.entity, killer: d.source, kind: d.kind, cause: d.cause, pos: f3(d.pos) }))
                 .collect();
             run(&runs, b.world(), cb, batch)
         }),
-        sandbox::Event::EntityHurt => r.on(&actions::HURT, move |b| {
+        sandbox::Event::EntityHurt => r.on_event(&actions::HURT, move |b| {
             let batch = b
                 .iter()
                 .map(|h| EventValue::Hurt(H { entity: h.entity, source: h.source, amount: h.amount, cause: h.cause }))
@@ -598,19 +610,19 @@ fn event(r: &mut Registry, e: sandbox::Event, cb: u32, runs: Arc<Runs>) {
             run(&runs, b.world(), cb, batch)
         }),
         sandbox::Event::PlayerJoined => {
-            r.on(&PLAYER_JOINED, move |b| run(&runs, b.world(), cb, b.iter().map(|p| EventValue::Player(p.player)).collect()))
+            r.on_event(&PLAYER_JOINED, move |b| run(&runs, b.world(), cb, b.iter().map(|p| EventValue::Player(p.player)).collect()))
         }
         sandbox::Event::PlayerRespawned => {
-            r.on(&PLAYER_RESPAWNED, move |b| run(&runs, b.world(), cb, b.iter().map(|p| EventValue::Player(p.player)).collect()))
+            r.on_event(&PLAYER_RESPAWNED, move |b| run(&runs, b.world(), cb, b.iter().map(|p| EventValue::Player(p.player)).collect()))
         }
-        sandbox::Event::ItemUsed => r.on(&actions::USE_ITEM, move |b| {
+        sandbox::Event::ItemUsed => r.on_event(&actions::USE_ITEM, move |b| {
             let batch = b
                 .iter()
                 .map(|u| EventValue::ItemUsed(U { player: u.player, stack: stack(u.stack), pos: t3(u.pos), on_block: u.has_target != 0 }))
                 .collect();
             run(&runs, b.world(), cb, batch)
         }),
-        sandbox::Event::ItemPickedUp => r.on(&actions::PICKUP_ITEM, move |b| {
+        sandbox::Event::ItemPickedUp => r.on_event(&actions::PICKUP_ITEM, move |b| {
             let batch = b
                 .iter()
                 .map(|p| EventValue::Pickup(P { player: p.player, stack: stack(p.stack) }))
@@ -855,14 +867,14 @@ impl Game for WorldGame {
     }
     fn teleport(&mut self, id: u64, pos: [f64; 3]) {
         if self.w.entity(id).is_some() {
-            drop(self.w.entity_edit(id).pos(pos).velocity([0.0; 3]));
+            drop(self.w.entity_modify(id).pos(pos).velocity([0.0; 3]));
         }
     }
     fn push(&mut self, id: u64, velocity: [f64; 3]) {
         self.w.push(id, velocity)
     }
     fn damage(&mut self, id: u64, amount: f32, source: u64, cause: u32) -> bool {
-        self.w.entity(id).is_some() && self.w.damage(id, amount, source, cause)
+        self.w.entity(id).is_some() && self.w.damage(id, Damage::new(amount, cause).by(source))
     }
     fn spawn(&mut self, kind: &str, pos: [f64; 3]) -> u64 {
         match find(abi::entry_kind::ENTITY, kind) {

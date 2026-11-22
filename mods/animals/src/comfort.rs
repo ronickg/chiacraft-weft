@@ -65,8 +65,8 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&BODY, Body::default(), component_flags::SAVE | component_flags::SYNC_MENU);
     r.entity_component(&SEEK, [0.0; 4], 0);
     for s in &SPECIES {
-        r.attach(s.kind, &BODY);
-        r.attach(s.kind, &SEEK);
+        r.edit(s.kind).attach(&BODY);
+        r.edit(s.kind).attach(&SEEK);
     }
 }
 
@@ -134,7 +134,7 @@ pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState, secs: f32) -> f3
         let loss = (e.modifiers().health_loss * max * d.harm * secs).min((st.health - max * TAME_FLOOR).max(0.0));
         if loss > 0.0 {
             let cause = if e == Effect::Freezing { &FREEZE } else { &HEAT };
-            w.damage(id, loss, 0, cause);
+            w.damage(id, Damage::new(loss, cause));
         }
     }
     d.digest

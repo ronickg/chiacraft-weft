@@ -66,7 +66,7 @@ pub fn register(
                 .texture(texture),
         );
     }
-    r.attach(kind, &REST);
+    r.edit(kind).attach(&REST);
     KINDS.lock().unwrap_or_else(|e| e.into_inner()).push((
         kind,
         settle,

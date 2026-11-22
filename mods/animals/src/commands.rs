@@ -103,15 +103,15 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&INVITE, Tribe::default(), component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
     r.entity_component(&FIGHT, [0u64; 4], 0);
     for s in &SPECIES {
-        r.attach(s.kind, &ORDERS);
-        r.attach(s.kind, &SHARED);
-        r.attach(s.kind, &OWNER_ID);
+        r.edit(s.kind).attach(&ORDERS);
+        r.edit(s.kind).attach(&SHARED);
+        r.edit(s.kind).attach(&OWNER_ID);
     }
     for c in [&TRIBE, &INVITE] {
-        r.attach(&PLAYER, c);
+        r.edit(&PLAYER).attach(c);
     }
-    r.attach(&PLAYER, &FIGHT);
-    r.on(&actions::HURT, |b| {
+    r.edit(&PLAYER).attach(&FIGHT);
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
             hurt(&w, h);
@@ -125,7 +125,7 @@ pub fn init(r: &mut Registry) {
     });
     for (i, (key, default)) in WHISTLES.iter().enumerate() {
         r.key(key, default)
-            .on_press_server(move |p| whistle(&p.world(), p.player(), i));
+            .on_server(move |w, p| whistle(w, p, i));
     }
     r.command("tribe", "[action:word(create,join,leave,info)] [name:text]", tribe_command)
         .permission(permission::EVERYONE);
@@ -359,7 +359,7 @@ pub fn act(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send + 
                 let d2 = dist2(p.pos, st.pos);
                 if d2 > 24.0 * 24.0 || (p.pos.y - st.pos.y).abs() > 12.0 {
                     // Far behind: there in a moment, beside the owner.
-                    w.entity_edit(id)
+                    w.entity_modify(id)
                         .pos([p.pos.x + 1.0, p.pos.y, p.pos.z + 1.0]);
                     return true;
                 }

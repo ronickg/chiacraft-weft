@@ -3,13 +3,9 @@ use weft_sdk::*;
 pub use base_api::items::*;
 
 // Ours: armour is our stack component (`base_api::ARMOR`, a piece built from parts carries its
-// points); upstream's armor attributes and `ARMOR_PIECE` tag are there for their code.
+// points); upstream's armor attributes and `ARMOR_PIECE` tag stay in base_api for their code.
+pub use base_api::components::{FLAMMABLE, FOOD, FUEL, Food};
 pub use base_api::{ARMOR, Armor};
-pub use base_api::{
-    attributes::ARMOR_TOUGHNESS,
-    components::{FLAMMABLE, FOOD, FUEL, Food},
-    tags::ARMOR_PIECE,
-};
 /// Tags of armor pieces, head to feet (every armour kind's items).
 pub const ARMOR_SLOTS: [&str; 4] = ["armor_head", "armor_chest", "armor_legs", "armor_feet"];
 

@@ -59,7 +59,7 @@ pub fn register(r: &mut Registry) {
         r.tag(&format!("crops/{name}"), &[name]);
     }
     r.tag("bread_grain", &crops::BREAD_GRAINS.map(short));
-    let s = &base_api::SMELTING;
+    let s = &base_api::recipes::SMELTING;
     r.shapeless(s, "baked_potato", 1, &["#crops/potato"], 200);
     r.shapeless(s, "roasted_corn", 1, &["#crops/corn"], 200);
     r.shapeless(s, "cooked_rice", 1, &["#crops/rice_seeds"], 200);
@@ -71,19 +71,19 @@ pub fn register(r: &mut Registry) {
     {
         r.block(b)
             .sound_group("wood")
-            .textures(top, side, top)
+            .texture(side).top(top).bottom(top)
             .hardness(1.0)
-            .mineable("axe")
+            .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
             .tab(&crate::tabs::NATURAL);
         r.loot(b)
             .pool(Pool::new().entry(Entry::item(slice).count(lo, hi)));
     }
-    let c = &base_api::CRAFTING;
+    let c = &base_api::recipes::CRAFTING;
     r.shapeless(c, "pumpkin_seeds", 2, &["pumpkin_slice"], 0);
     r.shapeless(c, "melon_seeds", 2, &["melon_slice"], 0);
 
     // Tall grass broken by a player gives now and then a seed of one of its biome's crops.
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter().filter(|e| e.player != 0 && TALL_GRASS.is(e.state)) {
             if w.outside_survival(e.player) || unit(w.random()) >= crops::WILD_SEED_CHANCE {
@@ -148,14 +148,14 @@ fn crop(r: &mut Registry, c: &'static Crop) {
         .pool(Pool::new().entry(Entry::item(short(c.seed))))
         .pool(
             Pool::new()
-                .when(Cond::BlockState(ripe_state))
+                .when(Cond::state(ripe_state))
                 .entry(Entry::item(short(c.gives)).count(c.count.0, c.count.1)),
         );
     if c.seed != c.gives {
         drop(
             loot.pool(
                 Pool::new()
-                    .when(Cond::BlockState(ripe_state))
+                    .when(Cond::state(ripe_state))
                     .entry(Entry::item(short(c.seed)).count(0, crops::EXTRA_SEEDS)),
             ),
         );
@@ -179,7 +179,7 @@ fn top(r: &mut Registry, c: &'static Crop, from: u32) {
             .plant()
             .needs_below(&format!("#{stalk}"))
             .no_item()
-            .on_broken(|w, b| {
+            .on_break(|w, b| {
                 if b.player == 0 {
                     return;
                 }

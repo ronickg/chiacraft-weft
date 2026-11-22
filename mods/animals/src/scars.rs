@@ -11,7 +11,7 @@ use crate::coats::{self, GENOME};
 use crate::species;
 
 pub fn init(r: &mut Registry) {
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
             hurt(&w, h);

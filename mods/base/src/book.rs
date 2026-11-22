@@ -60,12 +60,12 @@ const PARTS_TAB: &str = "parts";
 const PART_IDS: u32 = 1 << 20;
 
 /// The recipe with book number `id`.
-fn recipe_of(id: u32) -> Option<Recipe> {
-    if id >= PART_IDS { Recipe::at(&crate::parts::PART_RECIPES, id - PART_IDS) } else { Recipe::at(&CRAFTING, id) }
+fn recipe_of(id: u32) -> Option<RecipeView> {
+    if id >= PART_IDS { RecipeView::at(&crate::parts::PART_RECIPES, id - PART_IDS) } else { RecipeView::at(&CRAFTING, id) }
 }
 
 /// A recipe's book number.
-fn id_of(r: &Recipe) -> u32 {
+fn id_of(r: &RecipeView) -> u32 {
     if r.kind() == crate::parts::PART_RECIPES.name() { PART_IDS + r.index() } else { r.index() }
 }
 
@@ -90,7 +90,7 @@ struct Book {
 
 /// One recipe in the book: how many can be made now, and for a near miss (ingredients held,
 /// ingredients, an item still to find).
-type Entry = (Recipe, u32, Option<(u32, u32, u32)>);
+type Entry = (RecipeView, u32, Option<(u32, u32, u32)>);
 
 /// The bag as the open book last saw it (`client_frame` above).
 static BAG_SIG: Mutex<u64> = Mutex::new(0);
@@ -195,7 +195,7 @@ pub fn register(r: &mut Registry) {
 /// The recipes the book shows at `station`: crafting recipes not hidden; by hand also those too
 /// big for the 2 x 2, last, so it says they need a table (Ronald's first-day test: nothing said
 /// "you need a crafting table"; `table_only`).
-fn shown(station: Station) -> Vec<Recipe> {
+fn shown(station: Station) -> Vec<RecipeView> {
     let parts = if station == Station::Table { recipes(&crate::parts::PART_RECIPES) } else { Vec::new() };
     recipes(&CRAFTING)
         .into_iter()
@@ -211,13 +211,13 @@ fn name_of(item: u32) -> String {
 }
 
 /// Made only at a table, seen from `station`.
-fn table_only(station: Station, r: &Recipe) -> bool {
+fn table_only(station: Station, r: &RecipeView) -> bool {
     station == Station::Hands && !fits_hands(r)
 }
 
 /// The first ingredient `have` lacks for `r`: the item shown for it, how many more it takes, and
 /// whether any item of a tag would do.
-fn first_missing(r: &Recipe, have: &[(u32, u32)]) -> Option<(u32, u32, bool)> {
+fn first_missing(r: &RecipeView, have: &[(u32, u32)]) -> Option<(u32, u32, bool)> {
     let mut lines: Vec<(u32, u32, u32)> = Vec::new();
     for (n, input) in r.inputs().iter().enumerate() {
         if input.kind == abi::recipe_input_kind::EMPTY {
@@ -255,7 +255,7 @@ fn group_of(shown: u32) -> Option<String> {
 }
 
 /// Fits the inventory's 2 x 2: a shape at most 2 wide and 2 high, or 4 ingredients.
-fn fits_hands(r: &Recipe) -> bool {
+fn fits_hands(r: &RecipeView) -> bool {
     match r.shape() {
         Some((w, h)) => w <= 2 && h <= 2,
         None => r.inputs().len() <= 4,
@@ -263,7 +263,7 @@ fn fits_hands(r: &Recipe) -> bool {
 }
 
 /// The inputs that take something, as (input number, how many).
-fn needs(r: &Recipe) -> Vec<(u32, u32)> {
+fn needs(r: &RecipeView) -> Vec<(u32, u32)> {
     r.inputs()
         .iter()
         .enumerate()
@@ -274,7 +274,7 @@ fn needs(r: &Recipe) -> Vec<(u32, u32)> {
 
 /// How many times `r` can be made from `have` (item, count), up to `cap`: each input takes from
 /// the first item that fits it with enough left.
-fn times(r: &Recipe, have: &[(u32, u32)], cap: u32) -> u32 {
+fn times(r: &RecipeView, have: &[(u32, u32)], cap: u32) -> u32 {
     let needs = needs(r);
     if needs.is_empty() {
         return 0;
@@ -410,7 +410,7 @@ fn chest_totals(w: &World, player: u64, station: Station) -> Vec<(u32, u32)> {
 
 /// Makes `r` up to `count` times at `station` from the player's bag (and the chests by the
 /// table), giving each result to the bag or dropping it at the player's feet.
-fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u32 {
+fn craft(w: &World, player: u64, station: Station, r: &RecipeView, count: u32) -> u32 {
     if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) {
         return 0;
     }
@@ -493,14 +493,14 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
 }
 
 /// Seconds `r` takes a craft from the book, if it takes any.
-fn timed(r: &Recipe) -> Option<f32> {
+fn timed(r: &RecipeView) -> Option<f32> {
     let (out, _) = r.outputs().into_iter().next()?;
     crate::first::book_secs(out.item)
 }
 
 /// `count` of `r` asked for at `station`: added to the player's line (one more of the same recipe
 /// joins it; another replaces it), the first made in `secs`.
-fn queue(w: &World, player: u64, station: Station, r: &Recipe, count: u32, secs: f32) {
+fn queue(w: &World, player: u64, station: Station, r: &RecipeView, count: u32, secs: f32) {
     if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) {
         return;
     }
@@ -675,7 +675,7 @@ pub fn book(ui: &mut Ui, station: Station) {
             .map(|&(i, _)| i)
             .filter(|i| !before.contains(i))
             .collect();
-        let new = |r: &Recipe| {
+        let new = |r: &RecipeView| {
             !before.is_empty()
                 && r.inputs()
                     .iter()
@@ -841,7 +841,7 @@ pub fn book(ui: &mut Ui, station: Station) {
 }
 
 /// The picked recipe: its result, each ingredient with how many you have, and Craft.
-fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)]) {
+fn picked_recipe(ui: &mut Ui, station: Station, r: &RecipeView, have: &[(u32, u32)]) {
     let Some((out, _)) = r.outputs().into_iter().next() else { return };
     let can = times(r, have, MAX_BATCH);
     let index = id_of(r);

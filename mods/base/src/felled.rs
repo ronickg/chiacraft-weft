@@ -225,7 +225,7 @@ pub fn crush(w: &World, foot: [i32; 3], logs: &[[i32; 3]], d: [i32; 2]) -> usize
         let mid = [at[0] as f64 + 0.5, at[1] as f64 + 0.5, at[2] as f64 + 0.5];
         for id in in_box(w, mid, vitals::felling::HURT_REACH) {
             if hit.insert(id) {
-                w.damage(id, harm, 0, damage_cause::CRUSH);
+                w.damage(id, Damage::new(harm, damage_cause::CRUSH));
             }
         }
     }

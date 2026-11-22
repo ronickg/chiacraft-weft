@@ -216,10 +216,10 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&WARDEN, Warden::default(), component_flags::SAVE);
     r.entity_component(&SCALED, 0, 0);
     r.entity_component(&LUCK, [0; 16], component_flags::SAVE);
-    r.attach(&PLAYER, &LUCK);
+    r.edit(&PLAYER).attach(&LUCK);
     r.entity_component(&YOUNG_OWNER, [0; 64], component_flags::SAVE);
     // The damage step: the gear cap, its armour, the floor, and stagger from what spills over.
-    r.modify(&chain::DAMAGE, stage::MULTIPLY, |m| {
+    r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
         let q = *m.query();
         let w = m.world();
         if w.component(q.entity, &WARDEN).is_none() {
@@ -284,7 +284,7 @@ pub fn offering(def: &Def, w: &World, player: u64, at: [i32; 3]) -> Option<&'sta
     let name = name_of(abi::entry_kind::ITEM, held.item);
     let form = data(def).form_for(name);
     if form.is_none() {
-        w.hint(player, &format!("hint.animals.{}.offering", def.name), &[]);
+        w.hint(&format!("hint.animals.{}.offering", def.name), &[]).to(player);
         weft_sdk::info!("{} altar {at:?}: no offering in hand ({name})", def.name);
     }
     form
@@ -298,7 +298,7 @@ pub fn rise(def: &'static Def, w: &World, player: u64, at: [i32; 3], form: &Form
         .entities_near(mid, ONE_AT_A_TIME, Some(def.entity))
         .is_empty()
     {
-        w.hint(player, &format!("hint.animals.{}.awake", def.name), &[]);
+        w.hint(&format!("hint.animals.{}.awake", def.name), &[]).to(player);
         weft_sdk::info!("{} altar {at:?}: one is already awake near", def.name);
         return true;
     }
@@ -314,23 +314,16 @@ pub fn rise(def: &'static Def, w: &World, player: u64, at: [i32; 3], form: &Form
     }
     let b = data(def);
     let max = b.stats(form).health;
-    w.attribute_add_modifier(
-        id,
-        &attribute::MAX_HEALTH,
-        "animals:form",
-        attr_op::MULTIPLY_BASE,
-        (max / b.stats(&b.forms[0]).health) as f64 - 1.0,
-        0,
-    );
-    w.entity_edit(id).health(max);
+    w.attribute_add_modifier(id, "animals:form", &Modifier::percent(&attribute::MAX_HEALTH, (max / b.stats(&b.forms[0]).health) as f64 - 1.0), 0);
+    w.entity_modify(id).health(max);
     w.set_component(id, &WARDEN, Warden { form: form.age.tier() as u32, state: RISING, target: player, altar: at, ..Warden::default() });
     crate::anim::clear(w, id);
     w.action_play(id, "rise", false);
     burst(w, spot, def.dust.id(), 40, 1.5);
     for p in w.entities_near(spot, SIGHT, Some(&PLAYER)) {
-        w.title(p, &format!("title.animals.{}", def.name), &[])
+        w.title(&format!("title.animals.{}", def.name), &[]).to(p)
             .times(0.5, 3.0, 1.0);
-        w.subtitle(p, &format!("subtitle.animals.{}", def.name), &[])
+        w.subtitle(&format!("subtitle.animals.{}", def.name), &[]).to(p)
             .times(0.5, 3.0, 1.0);
     }
     weft_sdk::info!("{} {id}: summoned at {at:?} ({} form, {max:.0} health, {why})", def.name, form.age.name());
@@ -364,14 +357,7 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
         }
         w.set_component(id, &SCALED, 1);
         // A titan stands its ground (`core:knockback_resistance`).
-        w.attribute_add_modifier(
-            id,
-            &attribute::KNOCKBACK_RESISTANCE,
-            "animals:size",
-            attr_op::ADD,
-            bosses::SIZE.band().knockback as f64,
-            0,
-        );
+        w.attribute_add_modifier(id, "animals:size", &Modifier::add(&attribute::KNOCKBACK_RESISTANCE, bosses::SIZE.band().knockback as f64), 0);
     }
     for cd in c.cooldown.iter_mut() {
         *cd = cd.saturating_sub(e);
@@ -518,12 +504,7 @@ fn health_line(def: &Def, w: &World, id: u64, st: &EntityState, c: &Warden, fier
     let pct = (100.0 * st.health / st.max_health.max(1.0)).ceil() as i64;
     let title = format!("title.animals.{}", def.name);
     for p in w.entities_near(st.pos, SIGHT, Some(&PLAYER)) {
-        drop(w.show_at(
-            p,
-            &BAR,
-            "hud.animals.boss_health",
-            &[Arg::Key(&title), Arg::Int(st.health.ceil() as i64), Arg::Int(st.max_health.ceil() as i64), Arg::Int(pct), Arg::Key(state)],
-        ));
+        drop(w.show_at(&BAR, "hud.animals.boss_health", &[Arg::Key(&title), Arg::Int(st.health.ceil() as i64), Arg::Int(st.max_health.ceil() as i64), Arg::Int(pct), Arg::Key(state)]).to(p));
     }
 }
 
@@ -556,7 +537,7 @@ pub fn sees(w: &World, st: &EntityState, t: &EntityState) -> bool {
     let to = [t.pos.x, t.pos.y + t.size.height as f64 * 0.5, t.pos.z];
     let d = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
     let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
-    len < 1.0 || w.raycast(from, d.map(|v| v / len), len, false).is_none()
+    len < 1.0 || w.raycast(from, d.map(|v| v / len), len, Ray::blocks()).is_none()
 }
 
 /// The cosine of the angle between where it faces (`yaw`) and `to`.
@@ -567,7 +548,7 @@ pub fn facing(yaw: f32, to: [f64; 2]) -> f64 {
 }
 
 pub fn face(w: &World, id: u64, dir: [f32; 2]) {
-    drop(w.entity_edit(id).yaw((-dir[0]).atan2(-dir[1])));
+    drop(w.entity_modify(id).yaw((-dir[0]).atan2(-dir[1])));
 }
 
 pub fn stand(w: &World, id: u64, st: &EntityState) {
@@ -606,7 +587,7 @@ pub fn charge(
     ticks: u32,
     toss: f64,
 ) -> Step {
-    w.walk(id, c.dir, speed, false);
+    w.walk(id, Walk::toward(c.dir, speed));
     face(w, id, c.dir);
     let half = st.size.width as f64 / 2.0;
     let f = yaw_dir(st.yaw);
@@ -627,7 +608,7 @@ pub fn charge(
                 continue;
             }
             done.push(e);
-            w.damage(e, s.hit, id, damage_cause::ATTACK);
+            w.damage(e, Damage::new(s.hit, damage_cause::ATTACK).by(id));
             w.push(e, [f[0] as f64 * k, k * toss, f[1] as f64 * k]);
             weft_sdk::info!("{} {id}: {} hits {e} for {:.1}", def.name, a.name, s.hit);
         }
@@ -654,7 +635,7 @@ pub fn land(def: &Def, w: &World, id: u64, a: &Attack, hit: f32, hits: Vec<(u64,
         if e == id || spared(w, e) {
             continue;
         }
-        w.damage(e, hit, id, damage_cause::ATTACK);
+        w.damage(e, Damage::new(hit, damage_cause::ATTACK).by(id));
         w.push(e, push);
         weft_sdk::info!("{} {id}: {} hits {e} for {hit:.1}", def.name, a.name);
     }
@@ -699,7 +680,7 @@ fn hurt(def: &Def, w: &World, id: u64, other: u64, cause: u32, raw: f32) -> f32 
     let size = bosses::SIZE;
     let mut hit = raw * crate::armour::player_cap(w, other, cause, size, level);
     let capped = hit;
-    if DamageCause::flags_of(cause) & damage_flags::BYPASSES_ARMOR == 0 {
+    if !comps::damage_cause::BYPASSES_ARMOR.on_id(cause) {
         hit *= 1.0 - vitals::combat::armour_cut(b.stats(f).armour, hit);
     }
     let (took, over, _) = crate::armour::floor(w, id, size, st.max_health, hit);
@@ -724,7 +705,7 @@ fn hurt(def: &Def, w: &World, id: u64, other: u64, cause: u32, raw: f32) -> f32 
             }
             burst(w, at, def.bits.id(), 30, 1.5);
             for pl in w.entities_near(st.pos, SIGHT, Some(&PLAYER)) {
-                w.subtitle(pl, &format!("subtitle.animals.{}.{}", def.name, p.name), &[])
+                w.subtitle(&format!("subtitle.animals.{}.{}", def.name, p.name), &[]).to(pl)
                     .times(0.2, 2.0, 0.5);
             }
             weft_sdk::info!("{} {id}: its {} breaks", def.name, p.name);
@@ -848,7 +829,7 @@ fn young_interact(def: &Def, w: &World, id: u64, player: u64) -> bool {
                 .spread(0.5),
         );
     }
-    w.hint(player, &format!("hint.animals.{}.tamed", def.young_name), &[]);
+    w.hint(&format!("hint.animals.{}.tamed", def.young_name), &[]).to(player);
     weft_sdk::info!("{} young {id}: tamed by player {player}", def.name);
     true
 }
@@ -918,10 +899,10 @@ fn command(cmd: &mut ServerCommand) {
     match cmd.text("action").unwrap_or("state") {
         "hurt" => {
             let n = cmd.float("amount").unwrap_or(10.0) as f32;
-            w.damage(id, n, player, damage_cause::ATTACK);
+            w.damage(id, Damage::new(n, damage_cause::ATTACK).by(player));
         }
         "kill" => {
-            w.damage(id, 1.0e6, player, damage_cause::VOID);
+            w.damage(id, Damage::new(1.0e6, damage_cause::VOID).by(player));
         }
         _ => {}
     }

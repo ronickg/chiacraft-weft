@@ -124,7 +124,7 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&OWNER, [0u8; 64], component_flags::SAVE | component_flags::SYNC_MENU);
     // A young one bites as hard as its size: by the area of its jaws, the square of how far it has
     // grown (a hatchling raptor a fortieth of a grown one's mass killed a cat in a PC run).
-    r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
+    r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
         let (w, id) = (m.world(), m.query().entity);
         let Some(index) = w
             .component(id, &ANIMAL)
@@ -137,13 +137,13 @@ pub fn init(r: &mut Registry) {
         m.value *= (g * g).clamp(0.05, 1.0);
     });
     for s in &SPECIES {
-        r.attach(s.kind, &ANIMAL);
-        r.attach(s.kind, &APPLIED);
-        r.attach(s.kind, &SCALED);
-        r.attach(s.kind, &OWNER);
+        r.edit(s.kind).attach(&ANIMAL);
+        r.edit(s.kind).attach(&APPLIED);
+        r.edit(s.kind).attach(&SCALED);
+        r.edit(s.kind).attach(&OWNER);
     }
     // An animal hits as hard as its damage stat.
-    r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
+    r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
         if let Some(a) = m.world().component(m.query().entity, &ANIMAL) {
             m.value *= (a.factor(species::DAMAGE) * crate::comfort::condition(&a)) as f64;
         }
@@ -402,7 +402,7 @@ fn old_age(w: &World, id: u64, index: usize, a: &mut Animal, calls: u64) -> bool
     crate::breeding::count(&crate::breeding::OLD, index);
     weft_sdk::info!("animal {id} ({}) died of old age, {} days old", s.name, age / life::DAY);
     // Bypassing armor and leaving no scar: nothing hit it.
-    w.damage(id, 1e9, 0, damage_cause::VOID);
+    w.damage(id, Damage::new(1e9, damage_cause::VOID));
     true
 }
 
@@ -435,13 +435,13 @@ pub fn set_level(w: &World, id: u64, level: u32) {
 /// Max health and speed as the stats say; `heal` adds that much health on top (a new animal
 /// starts full).
 fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f32) {
-    w.attribute_add_modifier(id, &attribute::MAX_HEALTH, "animals:stats", attr_op::MULTIPLY_BASE, health as f64 - 1.0, 0);
-    w.attribute_add_modifier(id, &attribute::MOVEMENT_SPEED, "animals:stats", attr_op::MULTIPLY_BASE, speed as f64 - 1.0, 0);
+    w.attribute_add_modifier(id, "animals:stats", &Modifier::percent(&attribute::MAX_HEALTH, health as f64 - 1.0), 0);
+    w.attribute_add_modifier(id, "animals:stats", &Modifier::percent(&attribute::MOVEMENT_SPEED, speed as f64 - 1.0), 0);
     // Big creatures stand their ground: knockback resistance by size class (`vitals::combat`'s
     // bands: medium 0.3, large 0.7, huge and titan 1).
     if let Some(s) = w.component(id, &ANIMAL).and_then(|a| a.species()) {
         let resist = animals_core::danger::size(s).band().knockback;
-        w.attribute_add_modifier(id, &attribute::KNOCKBACK_RESISTANCE, "animals:size", attr_op::ADD, resist as f64, 0);
+        w.attribute_add_modifier(id, "animals:size", &Modifier::add(&attribute::KNOCKBACK_RESISTANCE, resist as f64), 0);
     }
     if let Some(p) = w.component_mut(id, &APPLIED) {
         *p = [health, speed];
@@ -450,7 +450,7 @@ fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f3
         && let Some(a) = w.component(id, &ANIMAL)
     {
         let max = a.stat(species::HEALTH) * crate::comfort::condition(&a);
-        w.entity_edit(id).health((st.health + heal).min(max));
+        w.entity_modify(id).health((st.health + heal).min(max));
     }
 }
 
@@ -464,7 +464,7 @@ fn hunger(w: &World, id: u64, a: &Animal, rate: f32, secs: f32) {
     if a.food == 0 && !tamed(w, id) {
         // A scavenger fasts instead (`needs::STARVES_SECS`).
         if let Some(st) = w.entity(id).filter(|_| !s.scavenges()) {
-            w.damage(id, st.max_health / STARVES_SECS * secs, 0, damage_cause::STARVE);
+            w.damage(id, Damage::new(st.max_health / STARVES_SECS * secs, damage_cause::STARVE));
         }
         return;
     }

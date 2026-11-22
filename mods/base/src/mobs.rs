@@ -288,8 +288,8 @@ fn blast(w: &World, id: u64, at: Vec3, radius: f64) {
     // liquids don't break at all.
     if w.liquid_in_cell(block_pos_of(at)).is_none() {
         w.fill(Shape::blast(at, radius, w.random()), 0)
-            .keep(Filter::unbreakable())
-            .keep(Filter::liquids());
+            .keep("#unbreakable")
+            .keep("#liquids");
     }
     w.spawn_particles(&Particle::named("core:poof"), at)
         .count(40)

@@ -46,10 +46,10 @@ pub fn register(r: &mut Registry) {
         .sound_group("wood")
         // Art's unlit tiles (11-04): the lit one's logs and stones, no flames; the side is drawn
         // for this 14 x 5 x 14 box, its logs in the bottom rows.
-        .textures("campfire_laid_top", "campfire_laid_side", "campfire_laid_side")
+        .texture("campfire_laid_side").top("campfire_laid_top").bottom("campfire_laid_side")
         .not_solid()
         .hardness(1.0)
-        .mineable("axe")
+        .mined_by("axe", weft_sdk::abi::tool_tier::HAND)
         .needs(Dir::Down, "")
         .model_box([1.0, 0.0, 1.0], [15.0, 5.0, 15.0])
         .item_texture("campfire_laid")
@@ -70,7 +70,7 @@ pub fn register(r: &mut Registry) {
             .tab(&crate::tabs::TOOLS);
     }
     // Where a drill is aimed when its hold begins: a fire bed, or the hold doesn't start.
-    r.intercept(&actions::USE_ITEM, |q| {
+    r.before_event(&actions::USE_ITEM, |q| {
         let player = q.entity();
         if player == 0
             || !f::DRILLS
@@ -107,7 +107,7 @@ pub fn register(r: &mut Registry) {
 /// A drill's hold done: an ember on the fire bed it was aimed at, or not.
 fn drill(u: &mut ItemUse, d: Drill) -> bool {
     let w = u.world();
-    let player = u.player();
+    let player = u.entity();
     let pos = {
         let mut drilling = DRILLING.lock().unwrap();
         let Some(i) = drilling.iter().position(|(p, _)| *p == player) else { return false };

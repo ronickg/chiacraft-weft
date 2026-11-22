@@ -80,7 +80,7 @@ static PLACED: std::sync::Mutex<Vec<(u32, BlockPos)>> = std::sync::Mutex::new(Ve
 /// Fired by `after` timers; counted.
 static RANG: Event<u64> = Event::named("rang");
 static RINGS: AtomicU32 = AtomicU32::new(0);
-/// A key whose presses reach the server (`on_press_server`); `/tk pings` counts them (`extend::key_to_server`).
+/// A key whose presses reach the server (`on_server`); `/tk pings` counts them (`extend::key_to_server`).
 static PING: Key = Key::named("ping");
 static PINGS: AtomicU32 = AtomicU32::new(0);
 /// Mobs walked by tests (`drive`): (entity, direction, ticks left).
@@ -366,7 +366,7 @@ fn usage() -> String {
 }
 
 pub fn register_ops(r: &mut Registry) {
-    r.key(&PING, "F10").on_press_server(|_| {
+    r.key(&PING, "F10").on_server(|_, _| {
         PINGS.fetch_add(1, Ordering::Relaxed);
     });
     r.command("tk", &usage(), |cmd| {
@@ -979,7 +979,7 @@ const OPS: &[(&str, &str, Run)] = &[
         let mut n = 0;
         for id in w.entities_near([me[0] as f64 + 0.5, me[1] as f64, me[2] as f64 + 0.5], r, None) {
             if id != player && w.entity(id).is_some() {
-                w.entity_edit(id).yaw(yaw);
+                w.entity_modify(id).yaw(yaw);
                 n += 1;
             }
         }

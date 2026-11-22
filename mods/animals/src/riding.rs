@@ -65,10 +65,10 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&FLIGHT, Flight::default(), 0);
     let mut saddles = Vec::new();
     for s in SPECIES.iter().filter(|s| s.seat > 0.0) {
-        r.attach(s.kind, &SADDLED);
-        r.attach(s.kind, &RIDDEN);
+        r.edit(s.kind).attach(&SADDLED);
+        r.edit(s.kind).attach(&RIDDEN);
         if s.flight > 0.0 {
-            r.attach(s.kind, &FLIGHT);
+            r.edit(s.kind).attach(&FLIGHT);
         }
         let name = format!("{}_saddle", s.kind_name());
         let saddle = Item::generated(name.clone());
@@ -84,7 +84,7 @@ pub fn init(r: &mut Registry) {
     let _ = SADDLES.set(saddles);
     // A flyer coming down under its rider lands; it doesn't fall. The engine counts a steered
     // mount's way down as a fall (it doesn't know it flies), and a wyvern hurt itself landing.
-    r.intercept(&actions::HURT, |q| {
+    r.before_event(&actions::HURT, |q| {
         let w = q.world();
         let id = q.entity();
         let flies = w
@@ -109,8 +109,18 @@ pub fn seat(index: usize) -> Seat {
 /// (`EntityBuilder::steering`): on the client, from the keys and the mount as it is.
 pub fn steering(index: usize) -> Steering {
     let flight = SPECIES[index].flight;
-    Steering::new(move |i, m| {
-        let sprint = i.sprint != 0 && i.forward > 0.0;
+    Steering::new(move |k, m| {
+        // The rider's keys, as the old mount input had them: -1..1 back to ahead, left to right.
+        let i = Ride {
+            forward: k.axis(&keys::FORWARD, &keys::BACK),
+            strafe: k.axis(&keys::RIGHT, &keys::LEFT),
+            up: k.held(&keys::JUMP) as u32,
+            down: k.held(&keys::SNEAK) as u32,
+            jump_held: k.state(&keys::JUMP).held_ticks,
+            yaw: k.yaw,
+            pitch: k.pitch,
+        };
+        let sprint = k.held(&keys::SPRINT) && i.forward > 0.0;
         let moving = i.forward != 0.0 || i.strafe != 0.0;
         // Walking: it faces where its rider looks (standing, the rider looks about freely).
         let on_foot = Steer {
@@ -275,4 +285,15 @@ fn end_ride(w: &World, id: u64) {
 /// is (`Species::seat`): its seat and steering.
 pub fn rideable(b: EntityBuilder<'_>, index: usize) -> EntityBuilder<'_> {
     if SPECIES[index].seat > 0.0 { b.seat(seat(index)).steering(steering(index)) } else { b }
+}
+
+/// A rider's keys this tick, as `steering` reads them.
+struct Ride {
+    forward: f32,
+    strafe: f32,
+    up: u32,
+    down: u32,
+    jump_held: u32,
+    yaw: f32,
+    pitch: f32,
 }

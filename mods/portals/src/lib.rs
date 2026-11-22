@@ -41,7 +41,7 @@ fn say(w: &World, player: u64, key: &str, arg: &str) {
     w.send(player, &SAY, &format!("{key}\t{arg}"));
 }
 
-static SCREEN: Screen = Screen::named("portal");
+static SCREEN: Menu = Menu::named("portal");
 
 // ------------------------------------------------------------------ the engine's bridge
 
@@ -87,7 +87,7 @@ fn init(r: &mut Registry) {
         });
     // The block's own block entity (`block_entity`, named like the block) holds the link.
     r.entity_component(&LINK, [0u8; 64], abi::component_flags::SAVE);
-    r.attach(&PORTAL_ENTITY, &LINK);
+    r.edit(&PORTAL_ENTITY).attach(&LINK);
 
     r.packet(&BIND, |p, text| bind(p, &text));
     r.world_tick(walk_in);
@@ -376,7 +376,7 @@ fn client(r: &mut Registry) {
             .map(|(id, name)| (id.to_string(), name.to_string()))
             .collect();
         *MENU.lock().unwrap() = Some(Menu { owner, pos, links });
-        c.screen_open(&SCREEN);
+        c.menu_open(&SCREEN);
     });
     // A line for the player goes through a command of the mod's own, whose reply the client
     // shows in its own language.
@@ -418,7 +418,7 @@ fn client(r: &mut Registry) {
             cmd.reply(key, &[Arg::Text(arg)]);
         }
     });
-    r.screen(&SCREEN, |ui| {
+    r.menu(&SCREEN).screen(|ui| {
         let menu = MENU.lock().unwrap();
         let Some(m) = menu.as_ref() else { return };
         ui.panel("panel", S::column().pad(8.0).gap(4.0).min_w(300.0), |ui| {
@@ -433,16 +433,16 @@ fn client(r: &mut Registry) {
                     let msg = format!("{}\t{id}", m.pos);
                     ui.button_args("portals.to", &[Arg::Text(name)], S::default().w(280.0), move |v| {
                         v.client().send(&BIND, &msg);
-                        v.client().screen_close();
+                        v.client().menu_close();
                     });
                 }
                 let msg = format!("{}\t", m.pos);
                 ui.button("portals.unbind", S::default().w(280.0), move |v| {
                     v.client().send(&BIND, &msg);
-                    v.client().screen_close();
+                    v.client().menu_close();
                 });
             }
-            ui.button("portals.close", S::default().w(280.0), |v| v.client().screen_close());
+            ui.button("portals.close", S::default().w(280.0), |v| v.client().menu_close());
         });
     });
 }

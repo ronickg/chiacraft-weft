@@ -175,10 +175,10 @@ fn block(r: &mut Registry, id: &str, d: &BlockDef, code: Option<&std::sync::Arc<
         b = b.sound_group(&sound_group(s));
     }
     if let Some(m) = &d.mineable {
-        b = b.mineable(m);
+        b = b.mined_by(m, weft_sdk::abi::tool_tier::HAND);
     }
     if let Some(l) = d.tool_level {
-        b = b.needs_tool_level(l);
+        b = b.set(&weft_sdk::HARVEST_LEVEL, l);
     }
     match &d.drops {
         Some(Drops::Name(n)) if n == "nothing" => b = b.drops_nothing(),

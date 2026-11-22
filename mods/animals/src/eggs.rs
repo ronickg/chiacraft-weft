@@ -161,7 +161,7 @@ pub fn init(r: &mut Registry) {
         let side = [[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1]][face as usize % 6];
         let w = u.world();
         w.spawn(&NEST, [(p[0] + side[0]) as f64 + 0.5, (p[1] + side[1]) as f64, (p[2] + side[2]) as f64 + 0.5]);
-        if !w.outside_survival(u.player()) {
+        if !w.outside_survival(u.entity()) {
             u.set_stack(StackData::shrink(u.stack(), 1));
         }
         true
@@ -555,7 +555,7 @@ fn spawn_egg(w: &World, at: [f64; 3], egg: &Egg, owner: Option<[u8; 64]>) -> u64
             Some((_, n)) if (n[0] - at[0]).hypot(n[2] - at[2]) > 0.05 => (-(n[0] - at[0])).atan2(-(n[2] - at[2])) as f32,
             _ => w.random_below(628) as f32 / 100.0,
         };
-        w.entity_edit(id).yaw(yaw);
+        w.entity_modify(id).yaw(yaw);
     }
 
     if let Some(e) = w.component_mut(id, &EGG) {
@@ -729,7 +729,7 @@ fn take(w: &World, id: u64, player: u64) {
 fn place(u: &mut ItemUse) -> bool {
     let Some((p, face)) = u.target_block().map(|(p, f)| (p.to_array(), f)) else { return false };
     let Some(e) = EGG.on_stack(&u.stack()) else { return false };
-    let (w, player) = (u.world(), u.player());
+    let (w, player) = (u.world(), u.entity());
     let side = [[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1]][face as usize % 6];
     let mut at = [(p[0] + side[0]) as f64 + 0.5, (p[1] + side[1]) as f64, (p[2] + side[2]) as f64 + 0.5];
     // Into a nest there.

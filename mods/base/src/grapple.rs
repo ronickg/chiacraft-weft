@@ -17,7 +17,7 @@ use weft_sdk::*;
 
 pub static HOOK: Item = Item::named("grappling_hook");
 
-/// Hanging on the rope (the engine's `pose_when::ROPE`): arms up on it, no bob.
+/// Hanging on the rope (the engine's `core:rope` condition): arms up on it, no bob.
 pub static HANG: Pose = Pose::named("hang");
 
 value! {
@@ -50,7 +50,7 @@ pub fn register(r: &mut Registry) {
         Rope { on: 0, throws: 0, anchor: [0.0; 3], miss: [0.0; 3] },
         component_flags::SYNC_OWNER | component_flags::SYNC_WATCHERS,
     );
-    r.attach(&PLAYER, &ROPE);
+    r.edit(&PLAYER).attach(&ROPE);
     let hook = grapple::IRON;
     r.item(&HOOK)
         .max_stack(1)
@@ -58,12 +58,12 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::TOOLS)
         .on_use(throw);
     // Three iron flukes on a shank, a cord of string.
-    r.shaped(&base_api::CRAFTING, "grappling_hook", 1, &["I I", "SIS", " S "], &[('I', "base:iron_ingot"), ('S', "#string")]);
+    r.shaped(&base_api::recipes::CRAFTING, "grappling_hook", 1, &["I I", "SIS", " S "], &[('I', "base:iron_ingot"), ('S', "#string")]);
     r.pose(&HANG)
         .action("hang")
-        .bob(false)
+        .no_bob()
         .priority(42)
-        .when(abi::pose_when::ROPE | abi::pose_when::NOT_FLYING);
+        .when(Cond::new("core:rope") & !Cond::flying());
     r.world_tick(tick);
     r.client_frame(draw);
 }
@@ -100,7 +100,7 @@ const FACES: [[f64; 3]; 6] = [[-1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0
 
 fn throw(u: &mut ItemUse) -> bool {
     let w = u.world();
-    let id = u.player();
+    let id = u.entity();
     if attached(id) {
         let st = w.entity(id);
         release(&w, id, st.as_ref(), "let go");
@@ -112,7 +112,7 @@ fn throw(u: &mut ItemUse) -> bool {
         return true;
     }
     let dir = look_dir(st.yaw, st.pitch);
-    let hit = w.raycast(st.eye(), dir, hook.reach as f64, false);
+    let hit = w.raycast(st.eye(), dir, hook.reach as f64, Ray::blocks());
     let holds = |state: u32| state_flags(state) & abi::block_flags::SOLID != 0 && GRIP.on_block(state).unwrap_or(1.0) > 0.0;
     if !w.outside_survival(id) {
         u.set_stack(u.stack().add_wear(1));
@@ -136,7 +136,7 @@ fn throw(u: &mut ItemUse) -> bool {
                 None => (h.pos, [n[0] * 0.52, n[1] * 0.52, n[2] * 0.52]),
             };
             let anchor = Vec3::new(at.x as f64 + 0.5 + n[0], at.y as f64 + 0.5 + n[1], at.z as f64 + 0.5 + n[2]);
-            let h = LookAt { pos: at, ..h };
+            let h = abi::RayHit { pos: at, ..h };
             let hands = st.pos.offset(0.0, HANDS, 0.0);
             let length = ((anchor - hands).length_squared().sqrt() + 0.3).min(hook.reach as f64 + 2.0);
             weft_sdk::info!(
@@ -175,7 +175,7 @@ fn say(w: &World, id: u64, anchor: Vec3, length: f64, reel: f32) {
         (&attribute::ROPE_LENGTH, length),
         (&attribute::ROPE_REEL, reel as f64),
     ] {
-        w.attribute_add_modifier(id, a, MOD, attr_op::ADD, v, HOLD);
+        w.attribute_add_modifier(id, MOD, &Modifier::add(a, v), HOLD);
     }
 }
 
@@ -269,7 +269,7 @@ static SEEN: Mutex<Option<Seen>> = Mutex::new(None);
 fn draw(c: &Client) {
     let st = c.state();
     let me = st.player;
-    let first = st.camera == cameras::FIRST_PERSON.camera_id();
+    let first = st.camera == cameras::FIRST_PERSON.id();
     let mut ids = c.entities();
     if !ids.contains(&me) {
         ids.push(me);

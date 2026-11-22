@@ -91,11 +91,10 @@ pub fn init(r: &mut Registry) {
     // The heights' offerings: their flowers, wool, and the dwarves' gold.
     r.shapeless(&CRAFTING, "mountain_offering", 1, &["base:edelweiss", "base:gentian", "base:wool", "base:gold_ingot"], 0);
     r.block(&ALTAR)
-        .textures("borkon_altar_top", "borkon_altar_side", "base:granite")
+        .texture("borkon_altar_side").top("borkon_altar_top").bottom("base:granite")
         .sound_group("base:block.stone")
         .hardness(4.0)
-        .mineable("pickaxe")
-        .needs_tool_level(1)
+        .mined_by("pickaxe", 1)
         .tab(&BUILDING)
         .on_use(|u| summon(&u.world(), u.player(), u.pos().to_array()));
     r.shaped(
@@ -112,13 +111,13 @@ pub fn init(r: &mut Registry) {
 fn summon(w: &World, player: u64, at: [i32; 3]) -> bool {
     let Some(form) = boss::offering(&DEF, w, player, at) else { return false };
     if at[1] < HEIGHT {
-        w.hint(player, "hint.animals.borkon.height", &[Arg::Int(at[1] as i64), Arg::Int(HEIGHT as i64)]);
+        w.hint("hint.animals.borkon.height", &[Arg::Int(at[1] as i64), Arg::Int(HEIGHT as i64)]).to(player);
         weft_sdk::info!("borkon altar {at:?}: at {} high, {HEIGHT} wanted", at[1]);
         return true;
     }
     let rock = rock_round(w, at);
     if rock < ROCK {
-        w.hint(player, "hint.animals.borkon.rock", &[Arg::Int(rock as i64), Arg::Int(ROCK as i64)]);
+        w.hint("hint.animals.borkon.rock", &[Arg::Int(rock as i64), Arg::Int(ROCK as i64)]).to(player);
         weft_sdk::info!("borkon altar {at:?}: {rock} stone round it, {ROCK} wanted");
         return true;
     }
@@ -229,7 +228,7 @@ fn leap(w: &World, id: u64, st: &EntityState, c: &Warden, a: &Attack, s: Strike)
         let to = [c.marks[0] as f64 - st.pos.x, c.marks[1] as f64 - st.pos.y, c.marks[2] as f64 - st.pos.z];
         let t = LEAP_SECS;
         let v = [to[0] / t, (to[1] + 0.5 * GRAVITY * t * t) / t, to[2] / t];
-        drop(w.entity_edit(id).velocity(v));
+        drop(w.entity_modify(id).velocity(v));
         weft_sdk::info!("borkon {id}: leaps {:.1} across, {:.1} up", (to[0] * to[0] + to[2] * to[2]).sqrt(), to[1]);
         return Step::Going;
     }
@@ -280,14 +279,7 @@ fn strike(w: &World, id: u64, st: &EntityState, c: &Warden, a: &Attack, hit: f32
                 for e in w.entities_near(at, FALL_RADIUS, None) {
                     if e != id && !hits.iter().any(|(h, _)| *h == e) && !boss::spared(w, e) {
                         hits.push((e, [0.0, -k, 0.0]));
-                        w.attribute_add_modifier(
-                            e,
-                            &attribute::MOVEMENT_SPEED,
-                            "animals:borkon_rubble",
-                            attr_op::MULTIPLY_BASE,
-                            FALL_SLOW,
-                            FALL_SLOW_TICKS,
-                        );
+                        w.attribute_add_modifier(e, "animals:borkon_rubble", &Modifier::percent(&attribute::MOVEMENT_SPEED, FALL_SLOW), FALL_SLOW_TICKS);
                     }
                 }
             }

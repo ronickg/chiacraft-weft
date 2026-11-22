@@ -6,7 +6,7 @@
 
 use weft_sdk::*;
 
-use base_api::CRAFTING;
+use base_api::recipes::CRAFTING;
 
 const C: &RecipeKind = &CRAFTING;
 
@@ -36,16 +36,14 @@ pub fn register(r: &mut Registry) {
             .sound_group("stone")
             .tag("has_shapes")
             .hardness(hardness)
-            .mineable("pickaxe")
-            .needs_tool_level(0)
+            .mined_by("pickaxe", 0)
             .tab(&crate::tabs::BUILDING);
     }
     r.block(Block::generated("polished_obsidian".to_string()))
         .immovable()
         .sound_group("stone")
         .hardness(50.0)
-        .mineable("pickaxe")
-        .needs_tool_level(tool_tier::DIAMOND)
+        .mined_by("pickaxe", tool_tier::DIAMOND)
         .tab(&crate::tabs::BUILDING);
     for m in GLAZES {
         r.block(Block::generated(format!("{m}_glazed_tiles")))
@@ -53,8 +51,7 @@ pub fn register(r: &mut Registry) {
             .tag(&format!("glazed_tiles/{m}"))
             .texture(&format!("glazed_tiles_{m}"))
             .hardness(1.4)
-            .mineable("pickaxe")
-            .needs_tool_level(0)
+            .mined_by("pickaxe", 0)
             .tab(&crate::tabs::COLORED);
     }
     // ---- metal
@@ -62,8 +59,7 @@ pub fn register(r: &mut Registry) {
     r.block(Block::generated("copper_block".to_string()))
         .sound_group("stone")
         .hardness(3.0)
-        .mineable("pickaxe")
-        .needs_tool_level(tool_tier::STONE)
+        .mined_by("pickaxe", tool_tier::STONE)
         // Packs `ingots/copper` nine to one and back (`recipes.rs`).
         .tag("ore_blocks/copper")
         .grows(vitals::weathering::VERDIGRIS_SECS, 0)
@@ -72,25 +68,23 @@ pub fn register(r: &mut Registry) {
     r.block(&VERDIGRIS_COPPER)
         .sound_group("stone")
         .hardness(3.0)
-        .mineable("pickaxe")
-        .needs_tool_level(tool_tier::STONE)
+        .mined_by("pickaxe", tool_tier::STONE)
         .drops("copper_block", 1)
         .tab(&crate::tabs::BUILDING);
     for name in ["bronze_plate", "steel_plate"] {
         r.block(Block::generated(name.to_string()))
             .sound_group("stone")
             .hardness(4.0)
-            .mineable("pickaxe")
-            .needs_tool_level(tool_tier::STONE)
+            .mined_by("pickaxe", tool_tier::STONE)
             .tab(&crate::tabs::BUILDING);
     }
     // ---- light: a warm lamp of frosted glass in a bronze frame
     r.block(Block::generated("bronze_lantern".to_string()))
         .sound_group("glass")
-        .textures("bronze_lantern_top", "bronze_lantern", "bronze_lantern_top")
+        .texture("bronze_lantern").top("bronze_lantern_top").bottom("bronze_lantern_top")
         .light_rgb(15, 12, 8)
         .hardness(1.0)
-        .mineable("pickaxe")
+        .mined_by("pickaxe", weft_sdk::abi::tool_tier::HAND)
         .tab(&crate::tabs::FUNCTIONAL);
 
     // ---- recipes

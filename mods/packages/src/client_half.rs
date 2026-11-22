@@ -20,7 +20,7 @@ type Named<T> = (String, &'static T);
 pub(crate) struct Half {
     pub(crate) inst: Shared,
     channels: Mutex<Vec<Named<Channel<Vec<u8>>>>>,
-    screens: Vec<(String, &'static Screen)>,
+    screens: Vec<(String, &'static Menu)>,
     /// A personal mod (slice 5): its own lines, worded here from its `assets/lang` (it is no
     /// content, so the game's language files don't have them), and no channels or components.
     pub(crate) personal: Option<crate::personal::Words>,
@@ -59,11 +59,11 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
     let shown = chiacraft_packages::identity::CLIENT_CODE;
     let wasm = std::fs::read(&path).map_err(|e| format!("{shown}: {e}"))?;
     let m = Arc::new(ClientMod::load(package, &wasm).map_err(|e| format!("{shown}: {e}"))?);
-    let screens: Vec<(String, &'static Screen)> = m
+    let screens: Vec<(String, &'static Menu)> = m
         .hooks()
         .iter()
         .filter_map(|h| match h {
-            ClientHook::Screen { name, .. } => Some((name.clone(), Screen::generated(name.clone()))),
+            ClientHook::Screen { name, .. } => Some((name.clone(), Menu::generated(name.clone()))),
             _ => None,
         })
         .collect();
@@ -87,8 +87,8 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
                     .iter()
                     .find(|(n, _)| n == name)
                     .map(|(_, s)| *s)
-                    .unwrap_or_else(|| Screen::generated(name.clone()));
-                let b = r.screen(screen, move |ui| build(ui, &h, cb));
+                    .unwrap_or_else(|| Menu::generated(name.clone()));
+                let b = r.menu(screen).screen(move |ui| build(ui, &h, cb));
                 if *pauses {
                     drop(b.pauses());
                 }
@@ -97,7 +97,7 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
                 // A key's binding is a setting: the engine carries settings over by name when
                 // the content switches (`config::content_switched`), so a package may add one.
                 r.key(Key::generated(name.clone()), default)
-                    .on_press_client(move |c| {
+                    .on_client(move |c| {
                         let g = game(*c, true, &h);
                         lock(&h).key(g, cb)
                     });
@@ -412,11 +412,11 @@ impl ClientGame for PlayerGame {
         if self.half.personal.is_some() {
             crate::personal::open_screen(self.c, &self.half, name);
         } else if let Some((_, s)) = self.half.screens.iter().find(|(n, _)| n == name) {
-            self.c.screen_open(s);
+            self.c.menu_open(s);
         }
     }
     fn close_screen(&mut self) {
-        self.c.screen_close();
+        self.c.menu_close();
     }
     fn show(&mut self, key: &str, args: &[WArg]) {
         let (key, args) = worded(&self.half, key, args);

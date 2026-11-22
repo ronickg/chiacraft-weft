@@ -146,20 +146,20 @@ pub fn register(r: &mut Registry) {
                 };
                 table = table.pool(match ripe {
                     Some(ripe) => Pool::new()
-                        .when(Cond::BlockState(ripe))
+                        .when(Cond::state(ripe))
                         .entry(Entry::item(gives).count(3, 3)),
                     None => Pool::new().entry(Entry::item(gives)),
                 });
             }
             if let Some(chance) = fibre {
-                table.pool(Pool::new().when(Cond::Chance(chance)).item("plant_fibre"));
+                table.pool(Pool::new().when(Cond::chance(chance)).item("plant_fibre"));
             }
         }
     }
     flowers(r);
     // A plant of the bed (eelgrass, kelp) is set only into water, where it goes in with the water
     // (`.shares_cell_with("#water")`), as the world grows it; never on dry ground.
-    r.intercept(&actions::PLACE_BLOCK, |a| {
+    r.before_event(&actions::PLACE_BLOCK, |a| {
         let name = block_name(a.state()).split('[').next().unwrap_or("");
         let bed = wild::of(name).is_some_and(|p| p.ground == Ground::Bed);
         if bed && !WATER.at(&a.world(), a.pos()) { Verdict::Deny } else { Verdict::Abstain }

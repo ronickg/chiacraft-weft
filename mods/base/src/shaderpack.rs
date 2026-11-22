@@ -124,7 +124,7 @@ pub fn register_shafts(r: &mut Registry) {
                 continue;
             }
             applied[k] = s;
-            let known = c.post_effect(name, s);
+            let known = c.post_effect(&Shader::named(name), s);
             weft_sdk::info!("screen effect {name} at {s}{}", if known { "" } else { " (no such effect)" });
         }
     });

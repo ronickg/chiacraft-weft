@@ -61,7 +61,7 @@ pub async fn packages(t: T) -> R {
         .await;
     t.check(made.is_ok(), "nine rubies craft a block of ruby (the package's shaped recipe)");
     t.shot("crafting").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
 
     // Mined with a pickaxe it drops itself (the default), which is picked up.
@@ -99,7 +99,7 @@ pub async fn package_pins(t: T) -> R {
     );
     std::fs::write(format!("{dir}/world.txt"), world).map_err(|e| e.to_string())?;
 
-    t.check(t.c().screen_open(&screens::WORLDS), "cannot open the world list");
+    t.check(t.c().menu_open(&screens::WORLDS), "cannot open the world list");
     t.screen("core:worlds").await?;
     t.frames(2).await?;
     // Select, then Play: either click can land while the list rebuilds and be lost, so the pair
@@ -118,7 +118,7 @@ pub async fn package_pins(t: T) -> R {
     t.shot("pins").await?;
     t.laid_out(&["text:gone 1.0", "text:gems: another version", "text:000000000000", "id:continue"]);
     t.check(t.c().ui_rect("text:base 26").is_none(), "a loaded mod is not listed");
-    t.c().screen_close();
+    t.c().menu_close();
     let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }

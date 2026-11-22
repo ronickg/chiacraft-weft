@@ -130,7 +130,7 @@ pub fn gems_of(sockets: u8, sets: &[Set]) -> GemsOf {
 pub fn give_back(w: &World, player: u64, sets: &[Set]) {
     for s in sets {
         if s.gem.cracks() && w.random().is_multiple_of(CRACK_ONE_IN as u64) {
-            w.chat(player, "gem.base.cracked", &[Arg::Key(s.gem.key)]);
+            w.chat("gem.base.cracked", &[Arg::Key(s.gem.key)]).to(player);
             continue;
         }
         let left = w.inventory(player).insert(stack_of(s));
@@ -151,7 +151,7 @@ pub fn register(r: &mut Registry) {
             .tab(&crate::tabs::INGREDIENTS);
         // Cut at a crafting table from the book's Parts tab (`book.rs`, `parts::finish`).
         r.shapeless(&crate::parts::PART_RECIPES, &g.item(), 1, &[&format!("#gem_stones/{}", g.id)], 0)
-            .value(&GEM_CUT, crafting::code(g.id));
+            .set(&GEM_CUT, crafting::code(g.id));
     }
     // Base's own found stones; another mod tags its own (the animals mod's amber).
     for (id, item) in [("diamond", "diamond"), ("peridot", "peridot"), ("tektite", "tektite")] {
@@ -160,7 +160,7 @@ pub fn register(r: &mut Registry) {
 }
 
 /// A cutting recipe's result: its gem, rolled with `w`'s randomness.
-pub fn finish(w: &World, r: &Recipe, out: ItemStack) -> Option<ItemStack> {
+pub fn finish(w: &World, r: &RecipeView, out: ItemStack) -> Option<ItemStack> {
     let gem = gem_of(r.value(&GEM_CUT)?)?;
     let set = cut(gem, || (w.random() >> 40) as f32 / (1u64 << 24) as f32);
     Some(out.with(&GEM, set.data))

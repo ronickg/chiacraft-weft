@@ -138,18 +138,18 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&FACTS, Facts::default(), 0);
     r.entity_component(&SENSES, Senses::default(), 0);
     for s in &SPECIES {
-        r.attach(s.kind, &FACTS);
-        r.attach(s.kind, &SENSES);
+        r.edit(s.kind).attach(&FACTS);
+        r.edit(s.kind).attach(&SENSES);
     }
     // What animals hear besides footsteps: a block broken, a fight.
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
             let p = c.pos;
             noise(&w, [p.x as f64 + 0.5, p.y as f64 + 0.5, p.z as f64 + 0.5], perception::BREAK_HEARD, c.player);
         }
     });
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
             if let Some(e) = w.entity(h.entity) {
@@ -282,7 +282,7 @@ pub fn clear(w: &World, from: Vec3, to: Vec3) -> bool {
     let mut t = 0.0;
     for _ in 0..4 {
         let at = from + dir * t;
-        let Some(hit) = w.raycast(at, dir, d - t, false) else { return true };
+        let Some(hit) = w.raycast(at, dir, d - t, Ray::blocks()) else { return true };
         if block_info(hit.state).is_some_and(|b| b.opaque()) {
             return false;
         }
@@ -634,7 +634,7 @@ pub fn face(w: &World, id: u64, st: &EntityState, at: [f32; 3]) {
     let (x, z) = (at[0] as f64 - st.pos.x, at[2] as f64 - st.pos.z);
     if x * x + z * z > 0.01 {
         // `yaw_dir`'s inverse: facing (x, z) is (-sin yaw, -cos yaw).
-        w.entity_edit(id).yaw((-x).atan2(-z) as f32);
+        w.entity_modify(id).yaw((-x).atan2(-z) as f32);
     }
 }
 
@@ -707,7 +707,7 @@ pub fn watch_goal(w: &World, id: u64, st: &EntityState) -> bool {
     }
     if (w.game_time() + id).is_multiple_of(40) {
         let turn = (w.random_below(240) as f32 - 120.0).to_radians();
-        w.entity_edit(id).yaw(st.yaw + turn);
+        w.entity_modify(id).yaw(st.yaw + turn);
     }
     crate::anim::hold(w, id, crate::anim::Act::Watch);
     true

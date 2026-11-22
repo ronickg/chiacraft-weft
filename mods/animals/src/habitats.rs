@@ -20,7 +20,7 @@ fn tag(biome: &str) -> String {
 /// The dimension species `s` lives in (`Species::cretaceous`): its spawn rules hold only there,
 /// though the overworld and the Cretaceous share their beaches and seas.
 pub fn world(s: &animals_core::species::Species) -> &'static str {
-    if s.cretaceous() { crate::cretaceous::CRETACEOUS.name() } else { base_api::OVERWORLD.name() }
+    if s.cretaceous() { crate::cretaceous::CRETACEOUS.name() } else { base_api::dimensions::OVERWORLD.name() }
 }
 
 pub fn init(r: &mut Registry) {

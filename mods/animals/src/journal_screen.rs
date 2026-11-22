@@ -16,7 +16,7 @@ use weft_sdk::*;
 
 use crate::journal::{Entry, NEW, entries};
 
-pub static SCREEN: Screen = Screen::named("journal");
+pub static SCREEN: Menu = Menu::named("journal");
 static KEY: Key = Key::named("journal");
 
 /// The page open: its place in `entries`' order.
@@ -39,9 +39,9 @@ const LABEL_W: f32 = 70.0;
 const JOIN_MAX: usize = 24;
 
 pub fn register(r: &mut Registry) {
-    r.key(&KEY, "I").on_press_client(|c| {
+    r.key(&KEY, "I").on_client(|c| {
         if c.screen().is_empty() {
-            c.screen_open(&SCREEN);
+            c.menu_open(&SCREEN);
         }
     });
     r.client_packet(&NEW, |_, id| {
@@ -61,12 +61,12 @@ pub fn register(r: &mut Registry) {
         c.draw_screen_text(0.5, TOLD_Y, "journal.animals.new", &[Arg::Key(name)], 0xffbe4500 | (alpha * 255.0) as u32, 1.0);
     });
     // A tab beside the inventory's own (Stats, Advancements), where base keeps a place for them.
-    r.screen_part(&Screen::named("base:inventory"), "tabs", 10, |ui| {
+    r.screen_part(&Menu::named("base:inventory"), "tabs", 10, |ui| {
         ui.button("journal.animals.tab", S::default().class("tab").h(13.0).pad(2.0), |c| {
-            c.client().screen_open(&SCREEN);
+            c.client().menu_open(&SCREEN);
         });
     });
-    r.screen(&SCREEN, screen);
+    r.menu(&SCREEN).screen(screen);
 }
 
 fn screen(ui: &mut Ui) {
@@ -95,7 +95,7 @@ fn framed(ui: &mut Ui, body: impl FnOnce(&mut Ui)) {
             });
             for (key, screen) in [("window.base.tab.stats", "base:stats"), ("window.base.tab.advancements", "base:advancements")] {
                 ui.button(key, S::default().class("tab").h(13.0).pad(2.0), move |c| {
-                    c.client().screen_open(&Screen::named(screen));
+                    c.client().menu_open(&Menu::named(screen));
                 });
             }
             ui.spacer();
@@ -106,7 +106,7 @@ fn framed(ui: &mut Ui, body: impl FnOnce(&mut Ui)) {
                     .size(7.0, 7.0)
                     .pad(0.5)
                     .tooltip("window.base.close_tip"),
-                |c| c.client().screen_close(),
+                |c| c.client().menu_close(),
             );
             ui.row(S::row().w(4.0), |_| {});
         });

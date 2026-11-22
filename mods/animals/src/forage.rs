@@ -59,15 +59,15 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&ITEM, 0u64, 0);
     r.entity_component(&PATCH, [0i32; 4], 0);
     for s in &SPECIES {
-        r.attach(s.kind, &FORAGE);
-        r.attach(s.kind, &ITEM);
-        r.attach(s.kind, &PATCH);
+        r.edit(s.kind).attach(&FORAGE);
+        r.edit(s.kind).attach(&ITEM);
+        r.edit(s.kind).attach(&PATCH);
     }
     // A place holds as many as it feeds (`notes/ECOLOGY.md`, part 7): plant eaters come as often
     // as their food grows there now, so fewer in a drought or a winter.
     // And none come past its room (`life::room_for`): the engine's spawner caps only all creatures
     // together, so packs were added where their kind already filled the place.
-    r.intercept(&question::NATURAL_SPAWN, |q| {
+    r.before_event(&question::NATURAL_SPAWN, |q| {
         let kind = q.query().other as u32;
         let Some(s) = SPECIES.iter().find(|s| s.kind.id() == kind) else {
             return Verdict::Abstain;

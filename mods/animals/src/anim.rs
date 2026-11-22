@@ -199,16 +199,16 @@ const CLIP_SECS: f32 = 0.8;
 pub fn init(r: &mut Registry) {
     r.entity_component(&HELD, [0u64; 4], 0);
     for s in &SPECIES {
-        r.attach(s.kind, &HELD);
+        r.edit(s.kind).attach(&HELD);
     }
     // The bosses (`boss.rs`) hold watch and stare too; their own AI plays the rest (`expire`).
     for k in [&crate::drenkaun::DRENKAUN, &crate::borkon::BORKON] {
-        r.attach(k, &HELD);
+        r.edit(k).attach(&HELD);
     }
     r.command("anim", "<clip:word> [mode:word(hold,once,clear,loop)]", command)
         .permission(permission::GAME_MASTER);
     // A flinch when hit, unless the blow kills it (the engine plays `death`).
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
             if h.amount > 0.0 && w.component(h.entity, &HELD).is_some() && w.entity(h.entity).is_some_and(|e| e.health > h.amount) {

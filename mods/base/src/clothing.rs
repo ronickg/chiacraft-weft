@@ -9,7 +9,7 @@ use vitals::clothing::{self, MATERIALS, PIECES};
 use vitals::temperature::PIECE_SHARE;
 use weft_sdk::*;
 
-pub use base_api::CRAFTING;
+pub use base_api::recipes::CRAFTING;
 
 /// A pelt, from furred wild animals.
 pub static FUR: Item = Item::named("fur");
@@ -100,17 +100,17 @@ static DRESSED: Component<u8> = Component::named("base:dressed");
 
 pub fn register(r: &mut Registry) {
     r.entity_component(&DRESSED, 0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
-    r.attach(&PLAYER, &DRESSED);
+    r.edit(&PLAYER).attach(&DRESSED);
     r.entity_component(&base_api::MILESTONES, 0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
-    r.attach(&PLAYER, &base_api::MILESTONES);
+    r.edit(&PLAYER).attach(&base_api::MILESTONES);
     r.entity_component(
         &base_api::GRAVE,
         base_api::Grave { x: 0, y: 0, z: 0, set: 0 },
         component_flags::SAVE | component_flags::KEEP_ON_RESPAWN | component_flags::SYNC_OWNER,
     );
-    r.attach(&PLAYER, &base_api::GRAVE);
+    r.edit(&PLAYER).attach(&base_api::GRAVE);
     // A new player arrives in plain clothes, once (Research round 3, B1).
-    r.on(&PLAYER_JOINED, |b| {
+    r.on_event(&PLAYER_JOINED, |b| {
         let w = b.world();
         for p in b.iter() {
             let Some(d) = w.component_mut(p.player, &DRESSED) else { continue };
@@ -122,11 +122,11 @@ pub fn register(r: &mut Registry) {
         }
     });
     r.entity_component(&KEPT, [0; 5], component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
-    r.attach(&PLAYER, &KEPT);
+    r.edit(&PLAYER).attach(&KEPT);
     // Back from the dead in what one wore: the tombstone leaves clothes and the cloak out (`set_aside`),
     // so a death costs no clothes and gives none (integration review: each death was a free set);
     // with nothing worn, the plain arrival set (Research round 4, H1).
-    r.on(&PLAYER_RESPAWNED, |b| {
+    r.on_event(&PLAYER_RESPAWNED, |b| {
         let w = b.world();
         for p in b.iter() {
             if w.outside_survival(p.player) {
@@ -153,7 +153,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::INGREDIENTS);
     r.item(&CLOTH)
         .tag("cloth")
-        .set(&base_api::FLAMMABLE, 30)
+        .set(&base_api::components::FLAMMABLE, 30)
         .tab(&crate::tabs::INGREDIENTS);
     // Fibre spun into string, string woven into linen (three to a cloth).
     r.shapeless(&CRAFTING, "string", 1, &vec!["#plant_fibre"; clothing::FIBRE_PER_STRING as usize], 0);

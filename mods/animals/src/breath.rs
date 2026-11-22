@@ -72,9 +72,9 @@ static POISON: Mutex<Option<HashMap<u64, (u64, u32)>>> = Mutex::new(None);
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&BREATH, Breath::default(), 0);
-    r.attach(&crate::wyvern::WYVERN, &BREATH);
+    r.edit(&crate::wyvern::WYVERN).attach(&BREATH);
     r.key(&KEY, "V")
-        .on_press_server(|p| ridden(&p.world(), p.player()));
+        .on_server(|w, p| ridden(w, p));
     // The streams: puffs that fly out of the mouth and fade (fire rising, frost and venom
     // sinking, sparks quick).
     r.particle(&FLAME)
@@ -171,7 +171,7 @@ pub fn behave(w: &World, id: u64, st: &EntityState) -> bool {
     };
     if breath.flying == 0 {
         // Rearing on the ground it turns to face where it will breathe, and stands.
-        w.entity_edit(id).yaw(yaw);
+        w.entity_modify(id).yaw(yaw);
         if w.navigating(id) {
             w.navigate(id, st.pos, 0.0);
         }
@@ -226,8 +226,8 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
     match kind {
         "frost" => {
             for &(e, _) in &hit {
-                w.damage(e, 2.5, source, damage_cause::GENERIC);
-                w.attribute_add_modifier(e, &attribute::MOVEMENT_SPEED, "animals:frost", attr_op::MULTIPLY_BASE, -0.6, 80);
+                w.damage(e, Damage::new(2.5, damage_cause::GENERIC).by(source));
+                w.attribute_add_modifier(e, "animals:frost", &Modifier::percent(&attribute::MOVEMENT_SPEED, -0.6), 80);
                 w.ignite(e, 0);
             }
         }
@@ -235,7 +235,7 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
             if t % 10 == 0
                 && let Some((first, p)) = target_in_cone(w, id, rider, mouth, dir)
             {
-                w.damage(first, 9.0, source, damage_cause::GENERIC);
+                w.damage(first, Damage::new(9.0, damage_cause::GENERIC).by(source));
                 w.ignite(first, 40);
                 // It arcs on to the two nearest beside it.
                 let mut from = p;
@@ -248,7 +248,7 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
                     if let Some(o) = w.entity(other) {
                         let at = [o.pos.x, o.pos.y + o.size.height as f64 * 0.5, o.pos.z];
                         bolt(w, from, at, t + 1);
-                        w.damage(other, 5.0, source, damage_cause::GENERIC);
+                        w.damage(other, Damage::new(5.0, damage_cause::GENERIC).by(source));
                         from = at;
                     }
                 }
@@ -258,7 +258,7 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
             let mut poison = POISON.lock().unwrap();
             let poison = poison.get_or_insert_with(HashMap::new);
             for &(e, _) in &hit {
-                w.damage(e, 2.0, source, damage_cause::GENERIC);
+                w.damage(e, Damage::new(2.0, damage_cause::GENERIC).by(source));
                 // A player is poisoned by their body (base's survival: longer, less with
                 // fortitude, a death put down to the poison); an animal here.
                 if w.players().contains(&e) {
@@ -270,7 +270,7 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
         }
         _ => {
             for &(e, _) in &hit {
-                w.damage(e, 3.5, source, damage_cause::FIRE);
+                w.damage(e, Damage::new(3.5, damage_cause::FIRE).by(source));
                 w.ignite(e, 120);
             }
         }
@@ -371,7 +371,7 @@ fn poison_tick(w: &World) {
             return *left > 0; // gone, or in another dimension: its time runs out all the same
         }
         if *left % 20 == 0 {
-            w.damage(victim, 1.5, *source, damage_cause::GENERIC);
+            w.damage(victim, Damage::new(1.5, damage_cause::GENERIC).by(*source));
             if let Some(s) = w.entity(victim) {
                 drop(
                     w.spawn_particles(&VENOM, [s.pos.x, s.pos.y + s.size.height as f64 * 0.7, s.pos.z])

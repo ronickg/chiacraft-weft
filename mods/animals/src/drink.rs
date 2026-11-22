@@ -37,8 +37,8 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&DRINK, [0.0; 4], 0);
     r.entity_component(&WATERS, [[0.0f32; 4]; 2], 0);
     for s in &SPECIES {
-        r.attach(s.kind, &DRINK);
-        r.attach(s.kind, &WATERS);
+        r.edit(s.kind).attach(&DRINK);
+        r.edit(s.kind).attach(&WATERS);
     }
 }
 
@@ -69,7 +69,7 @@ pub fn thirst(w: &World, id: u64, a: &Animal, st: &EntityState, rate: f32, secs:
         a.thirst = t;
     }
     if t >= 1.0 && !animal::tamed(w, id) {
-        w.damage(id, st.max_health / PARCHED_SECS * secs, 0, damage_cause::STARVE);
+        w.damage(id, Damage::new(st.max_health / PARCHED_SECS * secs, damage_cause::STARVE));
     }
 }
 

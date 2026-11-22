@@ -33,10 +33,10 @@ static LAST: Mutex<Option<Death>> = Mutex::new(None);
 pub fn register(r: &mut Registry) {
     r.entity_component(&GRACE, 0.0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN | component_flags::SYNC_OWNER);
     r.entity_component(&DROPPED, 0, component_flags::KEEP_ON_RESPAWN);
-    r.attach(&PLAYER, &DROPPED);
-    r.attach(&PLAYER, &GRACE);
+    r.edit(&PLAYER).attach(&DROPPED);
+    r.edit(&PLAYER).attach(&GRACE);
     // Back from the dead: monsters leave one be until the tombstone is reached.
-    r.on(&PLAYER_RESPAWNED, |b| {
+    r.on_event(&PLAYER_RESPAWNED, |b| {
         let w = b.world();
         for p in b.iter() {
             let has_grave = w.component(p.player, &GRAVE).is_some_and(|g| g.set != 0);
@@ -47,7 +47,7 @@ pub fn register(r: &mut Registry) {
     });
     // No creature hurts one in grace (monsters, their arrows, wild hunters); falls, fire and the
     // cold still do.
-    r.intercept(&actions::HURT, |q| {
+    r.before_event(&actions::HURT, |q| {
         let w = q.world();
         let source = q.query().other;
         let in_grace = w.component(q.entity(), &GRACE).is_some_and(|g| g > 0.0);
@@ -161,7 +161,7 @@ fn client(r: &mut Registry) {
         });
     });
     // The death screen, the engine's with what happened.
-    r.screen(&screens::DEATH, |ui| {
+    r.menu(&screens::DEATH).screen(|ui| {
         // The UI redo: a dark red-brown vignette (`death`), and in its middle a window with the
         // title, what happened, where the tombstone is, and the two ways on.
         ui.panel("death", S::column().center().stretch(), |ui| {

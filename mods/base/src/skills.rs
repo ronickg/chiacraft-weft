@@ -41,7 +41,7 @@ pub fn register(r: &mut Registry) {
         SkillWeb::default(),
         component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
-    r.attach(&PLAYER, &SKILL_WEB);
+    r.edit(&PLAYER).attach(&SKILL_WEB);
     gains(r);
     effects(r);
     r.packet(&TAKE, |p, id| take(&p.world(), p.player(), id as u16));
@@ -58,7 +58,7 @@ pub fn register(r: &mut Registry) {
             .tab(&crate::tabs::INGREDIENTS);
     }
     // Fallen stars: a pallasite broken may hold a stone (`vitals::sockets::SOURCES`).
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             if crate::stars::PALLASITE.is(e.state) && !w.outside_survival(e.player) {
@@ -71,13 +71,13 @@ pub fn register(r: &mut Registry) {
         .max_stack(16)
         .on_use(|u| {
             let w = u.world();
-            let Some(s) = w.component_mut(u.player(), &SKILL_WEB) else { return false };
+            let Some(s) = w.component_mut(u.entity(), &SKILL_WEB) else { return false };
             s.refunds = s.refunds.saturating_add(perks::REFUNDS_PER_ITEM);
             let left = s.refunds;
-            if !w.outside_survival(u.player()) {
+            if !w.outside_survival(u.entity()) {
                 u.set_stack(StackData::shrink(u.stack(), 1));
             }
-            w.hint(u.player(), "web.base.unlearn", &[Arg::Int(left as i64)]);
+            w.hint("web.base.unlearn", &[Arg::Int(left as i64)]).to(u.entity());
             true
         })
         .tab(&crate::tabs::INGREDIENTS);
@@ -120,7 +120,7 @@ fn take(w: &World, player: u64, id: u16) {
                 Refusal::NotNextTo => "web.base.not_next",
                 Refusal::Taken | Refusal::Unknown => return,
             };
-            w.hint(player, key, &[]);
+            w.hint(key, &[]).to(player);
         }
     }
 }
@@ -128,11 +128,11 @@ fn take(w: &World, player: u64, id: u16) {
 fn refund(w: &World, player: u64, id: u16) {
     let Some(s) = w.component_mut(player, &SKILL_WEB) else { return };
     if s.refunds == 0 {
-        w.hint(player, "web.base.no_refunds", &[]);
+        w.hint("web.base.no_refunds", &[]).to(player);
         return;
     }
     if !perks::can_refund(&s.taken, id) {
-        w.hint(player, "web.base.holds_others", &[]);
+        w.hint("web.base.holds_others", &[]).to(player);
         return;
     }
     perks::set(&mut s.taken, id, false);
@@ -226,7 +226,7 @@ fn tick(w: &World) {
             let xp: u64 = (from + 1..=level).map(skills::up_xp).sum();
             give_xp(w, id, xp);
             let key = format!("web.base.skill.{}", skills::SKILLS[i].id());
-            w.hint(id, "web.base.skill_up", &[Arg::Key(&key), Arg::Int(level as i64)]);
+            w.hint("web.base.skill_up", &[Arg::Key(&key), Arg::Int(level as i64)]).to(id);
         }
         refresh(w, id);
     }
@@ -239,7 +239,7 @@ fn refresh(w: &World, player: u64) {
         if x.abs() < 1e-6 {
             w.attribute_remove_modifier(player, attr, MODIFIER);
         } else {
-            w.attribute_add_modifier(player, attr, MODIFIER, attr_op::MULTIPLY_TOTAL, x, 0);
+            w.attribute_add_modifier(player, MODIFIER, &Modifier::mul(attr, 1.0 + x), 0);
         }
     }
 }
@@ -359,7 +359,7 @@ fn whole_and_chance(w: &World, x: f64) -> u32 {
 
 fn gains(r: &mut Registry) {
     // Mining, chopping and harvesting: by the block's hardness and level.
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             let name = block_name(e.state);
@@ -387,7 +387,7 @@ fn gains(r: &mut Registry) {
         }
     });
     // Building and sowing.
-    r.on(&actions::PLACE_BLOCK, |b| {
+    r.on_event(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             let name = block_name(e.state);
@@ -398,7 +398,7 @@ fn gains(r: &mut Registry) {
     });
     // Hitting (Melee near, Archery far) and taking hits (Defence), by the damage and the age of
     // what's held or worn.
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         let players = w.players();
         for h in b.iter() {
@@ -424,7 +424,7 @@ fn gains(r: &mut Registry) {
         }
     });
     // Smelting: the smith at the furnace.
-    r.on(&base_api::SMELTED, |b| {
+    r.on_event(&base_api::events::SMELTED, |b| {
         let w = b.world();
         for e in b.iter() {
             if let Some(p) = tender(&w, e.furnace) {
@@ -458,43 +458,43 @@ pub fn discovered(w: &World, player: u64, dimension: bool) {
 
 fn effects(r: &mut Registry) {
     // Melee damage: a player's blows (and a keystone's cost).
-    r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
+    r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
         let (w, q) = (m.world(), *m.query());
         if w.players().contains(&q.entity) {
             m.value *= times(&w, q.entity, Family::MeleeDamage) as f64;
         }
     });
     // Defence: what creatures' hits do to a player, divided.
-    r.modify(&chain::DAMAGE, stage::MULTIPLY, |m| {
+    r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
         let (w, q) = (m.world(), *m.query());
         if crate::player::armor_applies(q.cause) && w.players().contains(&q.entity) {
             m.value /= times(&w, q.entity, Family::Defence) as f64;
         }
     });
-    r.modify(&TAMING_SPEED, stage::MULTIPLY, |m| {
+    r.modify(&TAMING_SPEED, &phase::MULTIPLY, |m| {
         let (w, q) = (m.world(), *m.query());
         if q.other != 0 {
             m.value *= times(&w, q.other, Family::TamingSpeed) as f64;
         }
     });
-    r.modify(&HUNGER_PACE, stage::MULTIPLY, |m| {
+    r.modify(&HUNGER_PACE, &phase::MULTIPLY, |m| {
         let (w, q) = (m.world(), *m.query());
         m.value /= times(&w, q.entity, Family::Hunger) as f64;
     });
-    r.modify(&MAX_HEALTH, stage::MULTIPLY, |m| {
+    r.modify(&MAX_HEALTH, &phase::MULTIPLY, |m| {
         let (w, q) = (m.world(), *m.query());
         m.value *= times(&w, q.entity, Family::Health) as f64;
     });
-    r.modify(&MAX_STAMINA, stage::MULTIPLY, |m| {
+    r.modify(&MAX_STAMINA, &phase::MULTIPLY, |m| {
         let (w, q) = (m.world(), *m.query());
         m.value *= times(&w, q.entity, Family::Stamina) as f64;
     });
     // Harvest and cooking: the bonus over 1 is the chance of one more.
-    r.modify(&HARVEST_EXTRA, stage::ADD, |m| {
+    r.modify(&HARVEST_EXTRA, &phase::ADD, |m| {
         let (w, q) = (m.world(), *m.query());
         m.value += times(&w, q.entity, Family::Harvest) as f64 - 1.0;
     });
-    r.modify(&COOK_EXTRA, stage::ADD, |m| {
+    r.modify(&COOK_EXTRA, &phase::ADD, |m| {
         let (w, q) = (m.world(), *m.query());
         m.value += times(&w, q.entity, Family::Cooking) as f64 - 1.0;
     });

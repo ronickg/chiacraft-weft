@@ -111,7 +111,7 @@ pub fn register(r: &mut Registry) {
         Skills { xp: [0; 6] },
         component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
-    r.attach(&PLAYER, &SKILLS);
+    r.edit(&PLAYER).attach(&SKILLS);
     // What the held part or tool is made of and has been through, and the player's crafts.
     r.command("inspect", "", |cmd| {
         let (w, player) = (cmd.world(), cmd.player());
@@ -167,7 +167,8 @@ pub fn register(r: &mut Registry) {
             .attack_speed(vitals::gear::spread(k.id).map_or(1.0, |s| s.speed))
             .tab(if matches!(k.id, "sword" | "spear" | "knife" | "bow") { &crate::tabs::COMBAT } else { &crate::tabs::TOOLS });
         let b = match tool {
-            Some(t) => b.tool(t),
+            // No level of its own: an assembled stack carries its tool level.
+            Some(t) => b.tag(&format!("tools/{t}")).handheld(),
             None => b,
         };
         // Vanilla: weapons wear by one per hit, tools (made for blocks) by two.
@@ -266,7 +267,7 @@ pub fn register(r: &mut Registry) {
             let from = log.as_deref().unwrap_or(from);
             let inputs: Vec<&str> = (0..units(s.id)).map(|_| from).collect();
             r.shapeless(&PART_RECIPES, &format!("part_{}", s.id), 1, &inputs, 0)
-                .value(&PART_MATERIAL, code(m.id));
+                .set(&PART_MATERIAL, code(m.id));
         }
     }
 }
@@ -292,7 +293,7 @@ fn points(material: &str, skill: u32) -> grades::Points {
 
 /// A part recipe's result, made by `player`: its material from the recipe, its grade rolled with
 /// `u` (0..1) by their skill in its craft, which the making then raises.
-pub fn finish(w: &World, player: u64, r: &Recipe, out: ItemStack, u: f32) -> ItemStack {
+pub fn finish(w: &World, player: u64, r: &RecipeView, out: ItemStack, u: f32) -> ItemStack {
     // A gem cut from its stone: rolled now.
     if let Some(gem) = crate::gems::finish(w, r, out) {
         return gem;
@@ -319,7 +320,7 @@ fn drawn_part(stack: ItemStack, material: &str) -> ItemStack {
 }
 
 /// The skill a part recipe uses, as (its name's key, the local player's level), for the book.
-pub fn skill_of(view: &ClientView, r: &Recipe) -> Option<(&'static str, u32)> {
+pub fn skill_of(view: &ClientView, r: &RecipeView) -> Option<(&'static str, u32)> {
     let m = material_of(r.value(&PART_MATERIAL)?)?;
     let i = crafting::skills::index(m.making);
     let xp = view.component(&SKILLS).map_or(0, |s| s.xp[i]);
@@ -327,7 +328,7 @@ pub fn skill_of(view: &ClientView, r: &Recipe) -> Option<(&'static str, u32)> {
 }
 
 /// A part recipe's material's name key.
-pub fn material_key(r: &Recipe) -> Option<&'static str> {
+pub fn material_key(r: &RecipeView) -> Option<&'static str> {
     material_of(r.value(&PART_MATERIAL)?).map(|m| m.key)
 }
 

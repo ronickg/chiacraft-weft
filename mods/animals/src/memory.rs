@@ -267,11 +267,11 @@ fn species_of(w: &World, id: u64) -> Option<usize> {
 pub fn init(r: &mut Registry) {
     r.entity_component(&MEMORIES, Memories::default(), component_flags::SAVE);
     for s in &SPECIES {
-        r.attach(s.kind, &MEMORIES);
+        r.edit(s.kind).attach(&MEMORIES);
     }
     // A hurt: fear where it happened; a player who hurt an animal is remembered, and its kind
     // there thinks worse of him.
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
             let Some(e) = w.entity(h.entity) else { continue };
@@ -284,7 +284,7 @@ pub fn init(r: &mut Registry) {
         }
     });
     // A death: fear where it fell; a player's kill, its kind there fears him.
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             let Some(index) = SPECIES.iter().position(|s| s.kind.id() == d.kind) else { continue };

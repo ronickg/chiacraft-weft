@@ -86,7 +86,7 @@ const GIFT_TICKS: (u32, u32) = (6000, 12000);
 pub fn init(r: &mut Registry) {
     r.entity_component(&SIGNATURE, Signature::default(), 0);
     for s in &SPECIES {
-        r.attach(s.kind, &SIGNATURE);
+        r.edit(s.kind).attach(&SIGNATURE);
     }
     r.sound(&BARK)
         .files(&["chihuahua/bark1", "chihuahua/bark2", "chihuahua/bark3"])

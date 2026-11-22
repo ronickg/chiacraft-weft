@@ -20,7 +20,7 @@ const HOWL_ONE_IN: u32 = 30;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&HOWLED, 0u64, 0);
-    r.attach(&crate::wolf::WOLF, &HOWLED);
+    r.edit(&crate::wolf::WOLF).attach(&HOWLED);
     for s in &crate::species::SPECIES {
         let Some(v) = voices::of(s.name) else { continue };
         let Some(f) = voices::family(v.family) else {

@@ -78,10 +78,10 @@ pub fn init(r: &mut Registry) {
     // The forest's offerings: what an old wood gives.
     r.shapeless(&CRAFTING, "forest_offering", 1, &["base:acorn", "base:mushroom_red", "base:berries", "base:moss_block"], 0);
     r.block(&ALTAR)
-        .textures("drenkaun_altar_top", "drenkaun_altar_side", "base:mossy_cobblestone")
+        .texture("drenkaun_altar_side").top("drenkaun_altar_top").bottom("base:mossy_cobblestone")
         .sound_group("base:block.stone")
         .hardness(3.0)
-        .mineable("pickaxe")
+        .mined_by("pickaxe", weft_sdk::abi::tool_tier::HAND)
         .tab(&BUILDING)
         .on_use(|u| summon(&u.world(), u.player(), u.pos().to_array()));
     r.shaped(
@@ -99,7 +99,7 @@ fn summon(w: &World, player: u64, at: [i32; 3]) -> bool {
     let Some(form) = boss::offering(&DEF, w, player, at) else { return false };
     let trees = logs_round(w, at);
     if trees < TREES {
-        w.hint(player, "hint.animals.drenkaun.trees", &[Arg::Int(trees as i64), Arg::Int(TREES as i64)]);
+        w.hint("hint.animals.drenkaun.trees", &[Arg::Int(trees as i64), Arg::Int(TREES as i64)]).to(player);
         weft_sdk::info!("drenkaun altar {at:?}: {trees} logs round it, {TREES} wanted");
         return true;
     }
@@ -225,14 +225,7 @@ fn strike(w: &World, id: u64, st: &EntityState, c: &Warden, a: &Attack, hit: f32
                 for e in w.entities_near(at, ROOT_RADIUS, None) {
                     if e != id && !hits.iter().any(|(h, _)| *h == e) && !boss::spared(w, e) {
                         hits.push((e, [0.0, k, 0.0]));
-                        w.attribute_add_modifier(
-                            e,
-                            &attribute::MOVEMENT_SPEED,
-                            "animals:warden_roots",
-                            attr_op::MULTIPLY_BASE,
-                            ROOT_SLOW,
-                            ROOT_TICKS,
-                        );
+                        w.attribute_add_modifier(e, "animals:warden_roots", &Modifier::percent(&attribute::MOVEMENT_SPEED, ROOT_SLOW), ROOT_TICKS);
                     }
                 }
             }

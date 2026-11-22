@@ -56,8 +56,8 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&TAMING, FRESH, component_flags::SAVE | component_flags::SYNC_MENU | component_flags::SYNC_WATCHERS);
     r.entity_component(&FROM, 0u64, 0);
     for s in &SPECIES {
-        r.attach(s.kind, &TAMING);
-        r.attach(s.kind, &FROM);
+        r.edit(s.kind).attach(&TAMING);
+        r.edit(s.kind).attach(&FROM);
     }
     // Kibble (`notes/ANIMALS.md`, "Kibble"): an egg, meat or a plant, wheat for fiber, and water;
     // every species takes it, and it tames fastest. Tiers by egg and cooking in a pot come with

@@ -110,10 +110,10 @@ fn swim(w: &World, id: u64, st: &EntityState, index: usize) -> bool {
         // Flapping about, a hop now and then (maybe back into the water), suffocating slowly.
         if w.random_below(20) == 0 {
             let a = random(w) * std::f64::consts::TAU;
-            w.walk(id, [a.cos() as f32, a.sin() as f32], 0.6, true);
+            w.walk(id, Walk::toward([a.cos() as f32, a.sin() as f32], 0.6).jump());
         }
         if (w.game_time() + id) % 40 == 0 {
-            w.damage(id, 1.0, 0, damage_cause::SUFFOCATE);
+            w.damage(id, Damage::new(1.0, damage_cause::SUFFOCATE));
         }
         set(w, id, s);
         return true;

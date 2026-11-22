@@ -42,8 +42,7 @@ pub fn register(r: &mut Registry) {
         r.block(block)
             .sound_group("stone")
             .hardness(3.0)
-            .mineable("pickaxe")
-            .needs_tool_level(tool_tier::STONE)
+            .mined_by("pickaxe", tool_tier::STONE)
             .drops(&format!("raw_{metal}"), 1)
             .tag("ores")
             .tag(&format!("ores/{metal}"))
@@ -70,9 +69,9 @@ pub fn ores(r: &mut Registry) {
         let o = r
             .ore(block)
             .y(i32::MIN, max_y)
-            .veins(veins)
+            .per_cube(veins)
             .vein_size(size)
-            .replace("#stone_ore_replaceables");
+            .replaces("#stone_ore_replaceables");
         // A biome tag is written `#cold`.
         drop(if biome.is_empty() { o } else { o.biome(&format!("#{biome}")) });
     }
