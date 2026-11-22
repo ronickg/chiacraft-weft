@@ -265,6 +265,35 @@ The smallest version that works is phases 1-4.
    owner's identity signs; saved entries follow it when the old address stops answering). Left:
    arrival spots in dimensions other than the spawn's (the SDK has no dimension id), carrying
    links over to a world's new address.
+   6. *Linking at the portal* (built 2026-11-22, not yet run between two games;
+      `notes/portals-easy-link.md`, option B): a link made in the world, in one gesture.
+      - A visitor right-clicks an unbound portal and picks one of their own worlds. Their own game
+        signs the request, only on that click and only toward the world it joined, and sends it
+        to the owner's inbox.
+      - The owner's portal screen also lists friends' worlds to ask.
+      - A friend's request is accepted without asking: an identity on the Friends list counts as
+        pre-allowed. It's a switch per game, on by default (`/portalfriends on|off`). Strangers
+        still wait for the owner: Accept, Always, Decline or Block at the portal, or on the Links
+        screen (rule 2).
+      - The portal waits for the link's id, the hash of the request, and binds when the link is
+        made.
+      - Guards:
+        - A visitor never binds a portal, and can't ask about a bound one.
+        - A wait binds only to a new link with the asker's own world.
+        - At most 3 waiting asks per visitor and 16 per world.
+      - Nothing new is trusted: invites, pre-allow and the two-key link records are reused.
+      - A portal in each world (Ronald, 11-22): a link opens for travel only once both worlds
+        have a portal bound to it. Each world tells the other, in a note its key signs (`links`:
+        `Portal`), when it binds or loses one.
+        - Until then the portal is a pad that says it waits, and nobody travels: there's no
+          fallback to a spawn.
+        - The visitor who linked is told to place theirs, links with no portal here come first
+          on the owner's screen, marked new, and owners hear once a run which links still need
+          one.
+      - The look (Ronald, 11-22): a pad flat on the ground. With both portals, a doorway 2
+        blocks tall stands over it: lit and moving while the other world answers its status
+        (every 8 s near players), dim and still while it's offline.
+      - Left: option C, an owner arming a portal for visitors with a short invite.
 4. **DIDs and achievements.** Player and world DIDs through sponsors; world ownership both ways;
    achievements signed by the world DID, anchored in batches, opt-in; profile view; admission
    rules (allow lists, probation, DID age, achievements); shared ban lists.

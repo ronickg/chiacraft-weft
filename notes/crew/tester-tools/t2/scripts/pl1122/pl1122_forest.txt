@@ -1,0 +1,38 @@
+# bliss_env preset: like-for-like stage 2 spot (Tester 2, 11-22, pl1122 'before' set on dev).
+chat /tk mode spectator
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /season spring 8
+chat /time set 6000
+chat /tk mode spectator
+key F1
+chat /rule base:mc_leaf_colours on
+chat /tp -378.5 70.7 1000.5
+wait 10
+loaded
+wait 20
+look -120 15
+wait 2
+chat /air 0.0 1 0 mist
+wait 12
+chat /time set 2000
+wait 1
+chat /tick freeze
+wait 10
+shot forest_h08.png
+chat /tick unfreeze
+chat /time set 6000
+wait 1
+chat /tick freeze
+wait 10
+shot forest_h12.png
+chat /tick unfreeze
+chat /time set 12000
+wait 1
+chat /tick freeze
+wait 10
+shot forest_h18.png
+chat /tick unfreeze
+quit

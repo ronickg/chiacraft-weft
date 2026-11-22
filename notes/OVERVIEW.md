@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 85 · ◧ partly built: 67 · □ not built yet: 10 · ◌ planned for later: 6
+■ built and seen working: 86 · ◧ partly built: 67 · □ not built yet: 10 · ◌ planned for later: 6
 
 ## Core next
 
@@ -86,7 +86,7 @@ Code: `crates/packages`, `mods/packages`, `crates/engine/src/chiacraft/package_t
 
 ## Linked worlds
 
-Worlds with their own addresses, linked by both owners, with portals between them. 6 of 8 parts built.
+Worlds with their own addresses, linked by both owners, with portals between them. 7 of 9 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -95,6 +95,7 @@ Worlds with their own addresses, linked by both owners, with portals between the
 | ■ | Link requests and invites | Code: `crates/engine/src/chiacraft/worlds/links.rs`. |
 | ■ | Portal blocks and travel | Code: `crates/engine/src/chiacraft/worlds/travel.rs`, `mods/portals`. |
 | ■ | Friends | Code: `crates/engine/src/chiacraft/worlds/friends.rs`. |
+| ■ | Linking at the portal | notes/portals-easy-link.md, option B (2026-11-22): a visitor right-clicks an unbound portal and links one of their own worlds there (their own game signs the request, toward the world it joined, on their click); the owner's portal screen lists friends' worlds to ask; friends' requests are accepted without asking (a switch per game, on by default: links.json friends_ask, /portalfriends); strangers' asks wait for the owner's Accept / Always / Decline at the portal; the portal waits for the link id and binds when the link is made (mods/portals waits.txt). A link opens for travel only with a portal bound in each world (a signed note tells the other world; Ronald 11-22); until then the portal is a pad that says it waits, the visitor is told to place theirs, new links come first on the owner's screen. The look: a pad on the ground, a 2-block doorway over it once both portals exist, lit and moving while the other world is open, dim and still while offline (its status every 8 s). Seen working between two games on the PC (2026-11-22, tools/checks/portals-easy, runs pl1122_askA3 and friendsB3): a stranger's ask waits for Accept, a friend links at once, the pad waits for both worlds, the doorway dim offline and lit open, the walk-through both runs. Not judged yet: the doorway's motion (the runs weren't recorded). Later: option C (the owner arms a portal) and a dedicated server's inbox. Code: `mods/portals/src/lib.rs`, `crates/engine/src/chiacraft/bridge.rs`, `crates/engine/src/chiacraft/worlds/links.rs`, `crates/engine/src/chiacraft/worlds/friends.rs`. Docs: `notes/portals-easy-link.md`. |
 | ◧ | Leftovers | Arrivals in other dimensions; links carried to a world's new address. |
 | ■ | Admission rules and bans | Phase 4 slices 1-3 built and seen working between two games on the PC (2026-11-04, tools/checks/admission): per world admission.json (open or allow list only, the allow list by login key, identity or DID; probation for newcomers: no building, no containers, for N hours of play, liftable) and bans.json (by login key, identity and DID, timed or for good; banned players are sent away), checked at every join; refusals in the player's language; /ban, /tempban, /unban, /bans, /allow, /probation, /banlist and the owner's "Who May Come In" screen; the status answer shows the rules before joining. Shared ban lists: signed by their maintainer's identity, served by any world holding one (chiacraft/bans/1), followed by a world's address (its owner's list), fetched daily. DID rules (/didrule: DID required, DID age, checked on chain at the join) seen working on testnet11; bans are checked at the hello too. Code: `crates/engine/src/chiacraft/worlds/admission.rs`, `crates/engine/src/server/admission.rs`, `crates/engine/src/chiacraft/worlds/admission_screen.rs`. Docs: `tools/checks/admission/README.md`. |
 | ◧ | Finding worlds | Phase 5. Built: listing a world with a DID on chain (a 0.0001 TXCH deposit, testnet11 only, delisting returns it) and Find Worlds from Multiplayer (listings read by hint, checked both ways, each world asked its status, Join). Not yet seen in a game (tools/checks/finder). Next: details from the world, curated lists (ours offered, never followed by default), ranking. Not now: Nostr, DIG. Code: `crates/wallet/src/chain/listing.rs`, `crates/engine/src/chiacraft/worlds/listing.rs`, `crates/engine/src/chiacraft/worlds/finder.rs`. Docs: `reports/Finding worlds.md`. |

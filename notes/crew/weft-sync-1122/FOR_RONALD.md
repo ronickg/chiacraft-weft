@@ -61,3 +61,15 @@ Branch `claude/upstream-fixes-1122-e85f21`, merge commit 2dd1fdb62 (upstream mas
 - the protocol is 25: upstream's 24 plus our day rate and shape scale
 
 Helper reports, file by file: the session scratchpad's `sync/*.md`. They will be copied to `notes/crew/weft-sync-1122/` before the branch is ready.
+
+## Upstream content kept for now (Planner, 11-22): open questions
+All 71 of upstream's new items and blocks are tagged in `mods/base/progression` (one block, "kept until Ronald's call"); the four new foods have vitals rows.
+1. **Nothing grows the new plants:** upstream's plants, berry bushes and forest mushrooms (raspberry, snowberry, toadstool, dryad's saddle included) aren't placed by our worldgen, so for now they're creative only. Should our worldgen place them?
+2. **No shears:** several upstream blocks need `#tools/shears` to drop themselves (bush leaves, inula, verbascum, lavender, sheared grasses).
+3. **Wheels can't be made:** their recipe takes dyed wool, and we make none. `vehicles.rs` builds with `base:blue_wool`, which isn't registered.
+4. **No clay balls:** our clay drops clay, so the clay ball has no source.
+5. **Potions:** there's no brewing, so they're creative only.
+6. **Grab tool:** it has no recipe. The rotor and assembler do (`redstone.rs`).
+7. **Shield:** in the Iron Age, because its recipe needs iron. Should it be an early armour piece, or built from parts?
+8. **Snowberry:** upstream made it poisonous; ours gives a chance of sickness instead.
+9. Upstream's names for vanilla tools, armour and wool we never register (47 lang keys) were taken out.

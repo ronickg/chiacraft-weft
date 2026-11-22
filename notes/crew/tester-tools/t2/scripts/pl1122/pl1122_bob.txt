@@ -1,0 +1,27 @@
+# pl1122 two-player join, visitor side. Starts after pl1122_alice.txt has written pl1122-ticket.txt.
+join pl1122-ticket.txt
+loaded
+wait 3
+shot pl1122_b01_joined.png
+mark pl1122-mark-bob-in
+chat hi alice
+await_file pl1122-mark-chest 300
+chat /tk menu base:chest ~3 ~0 ~2
+wait 1.5
+shot pl1122_b02_chest.png
+key Escape
+chat the chest has bread
+wait 2
+mark pl1122-mark-bob-chat
+shot pl1122_b03_chat.png
+wait 2
+leave
+wait 4
+mark pl1122-mark-bob-left
+join pl1122-ticket.txt
+loaded
+wait 3
+shot pl1122_b04_back.png
+mark pl1122-mark-bob-back
+wait 6
+quit
