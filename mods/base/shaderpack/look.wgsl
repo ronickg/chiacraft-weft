@@ -90,6 +90,19 @@ const OPT_LEAF_SUN: u32 = 30u;
 const OPT_LEAF_HOLES: u32 = 31u;
 // The light through leaves (`base:look_leaf_light`, read raw: 0 none, 1 on).
 const OPT_LEAF_LIGHT: u32 = 32u;
+// A debug view (`base:look_debug`, read raw): 0 the picture, 1 the sun's light alone, 2 the sky's
+// alone, both on white (no texture or tint), haze and curve as usual: Bliss's DEBUG_VIEW
+// debug_DIRECT / debug_INDIRECT (composite1.fsh:1347-1354), to compare the light pixel by pixel.
+const OPT_DEBUG: u32 = 33u;
+
+// The surface's light from the sun and in all, before its tint (`light_on`, `surface_light`), for
+// the debug view.
+var<private> LIGHT_SUN: vec3<f32> = vec3(0.0);
+var<private> LIGHT_ALL: vec3<f32> = vec3(0.0);
+
+fn look_debug() -> u32 {
+    return u32(round(fantasy_opt(OPT_DEBUG)));
+}
 
 // The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
 fn foliage_test() -> vec3<f32> {
@@ -1114,7 +1127,9 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // full strength (sunflecks), though the leaves cut the sky light there to 0.6-0.8.
     let c_open = min(canopy(), 1.0);
     let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), light.x);
-    c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
+    let sun_part = p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
+    c += sun_part;
+    LIGHT_SUN = sun_part;
     // The ground round a lightning strike, lit by it (the HDR world). A held torch's light where it
     // is brighter than the placed lights there (no doubling). Neither in a calm scene (`CALM`).
     var held = vec3(0.0);
@@ -1128,6 +1143,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
+    LIGHT_ALL = c;
     return c;
 }
 

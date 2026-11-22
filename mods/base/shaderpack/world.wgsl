@@ -530,7 +530,10 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
         if k_sun != 1.0 && in.kind.z == 0u {
             let c_open = min(canopy(), 1.0);
             let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
-            light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
+            let extra = palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
+            light += paint * extra;
+            LIGHT_SUN += extra;
+            LIGHT_ALL += extra;
         }
         // A leaf cube's light through it is `leaf_sss`'s (`shade_soft_lit`), from its colour, and
         // only with the leaf light on; off, none, as Ronald's Bliss (no SSS). With `leaf_through`'s
@@ -653,6 +656,11 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         }
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
+    }
+    // The debug view: the sun's or the sky's light alone, on white (`look_debug`).
+    let debug = look_debug();
+    if debug != 0u {
+        return vec4(select(LIGHT_ALL - LIGHT_SUN, LIGHT_SUN, debug == 1u), lit.a);
     }
     // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
     // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
