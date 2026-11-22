@@ -2,20 +2,26 @@
 """The crew gallery's catalogue: every item, block, part, gem, plant and creature of the game at a
 commit, with its picture and what the sources know of it, as one filterable page.
 
-    python3 tools/catalogue/build.py                 # dev's tip
+    python3 tools/catalogue/build.py                 # dev's tip, for the crew gallery
     python3 tools/catalogue/build.py --rev <commit>  # any commit
+    python3 tools/catalogue/build.py --rev HEAD --out site   # a static site (GitHub Pages)
 
 It reads the sources at that commit (exported with `git archive`, so the checkout it runs from
 does not matter): the lang files, `mods/base/progression` (rules, recipes and its sheet), the
 vitals, crafting and species sheets, the textures and the box models. The registry the game
 itself lists (creative tabs, each block's face textures) comes from the newest `/tk dump`
 (`~/Coding/chiacraft-archive/images/catalogue/registry/<commit>.json`, made by a PC run of
-`tester-tools/t2/t2_catalogue_dump.txt`, fetched with `--fetch-dump <job>`); things the dump
+`notes/crew/tester-tools/t2/scripts/t2_catalogue_dump.txt`, fetched with `--fetch-dump <job>`); things the dump
 hasn't seen still show, from the sources alone. Never runs the game.
 
 Writes the pictures to `~/Coding/chiacraft-archive/images/catalogue/<commit>/` and the page to
 `notes/crew/gallery/catalogue/index.html` in the main checkout (the gallery serves it at
-/catalogue).
+/catalogue). With `--out <dir>` it writes a folder that stands alone instead: `<dir>/index.html`
+and its pictures under `<dir>/img/`, linked relatively, nothing else read or written outside the
+repository (the registry: the newest committed snapshot in `tools/catalogue/registry/`). The
+GitHub Pages workflow (`.github/workflows/catalogue.yml`) builds it so. Only the game's own files
+are read (`PATHS`: the mods, the engine's textures and lang, the box-model renderer), never
+`reports/` or resource packs.
 """
 
 import argparse
@@ -41,12 +47,18 @@ import images as I  # noqa: E402
 import mobs  # noqa: E402
 import sources as S  # noqa: E402
 
-REPO = os.path.expanduser("~/Coding/chiacraft-weft")
+# The repository this script is in (a worktree shares the main checkout's commits).
+REPO = subprocess.run(["git", "-C", HERE, "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip() \
+    or os.path.expanduser("~/Coding/chiacraft-weft")
+MAIN = os.path.expanduser("~/Coding/chiacraft-weft")
 ARCHIVE = os.path.expanduser("~/Coding/chiacraft-archive/images")
-OUT_PAGE = os.path.join(REPO, "notes/crew/gallery/catalogue/index.html")
+OUT_PAGE = os.path.join(MAIN, "notes/crew/gallery/catalogue/index.html")
+SNAPSHOTS = os.path.join(HERE, "registry")
 PC = "ronaldg@192.168.1.13"
 
 PATHS = ["mods", "crates/engine/assets/lang", "crates/engine/assets/textures", ".claude/skills/blocky-model/scripts"]
+# Read when the commit has it (`git archive` fails on a path a commit lacks).
+OPTIONAL = ["notes/crew/systems-map/systems.json"]
 SKIP = ("/sounds/", "/music/", "/target/", "/source/")
 
 AGES = ["Stone Age", "Bronze Age", "Iron Age", "Age of Steam", "Age of Lightning", "Age of the Future", "Age of Stars"]
@@ -65,7 +77,8 @@ def export(rev):
     commit = subprocess.check_output(["git", "-C", REPO, "rev-parse", "--short=8", rev], text=True).strip()
     full = subprocess.check_output(["git", "-C", REPO, "rev-parse", rev], text=True).strip()
     tmp = tempfile.mkdtemp(prefix="catalogue_")
-    data = subprocess.run(["git", "-C", REPO, "archive", "--format=tar", full, "--"] + PATHS, capture_output=True, check=True).stdout
+    have = [p for p in OPTIONAL if subprocess.run(["git", "-C", REPO, "cat-file", "-e", f"{full}:{p}"], capture_output=True).returncode == 0]
+    data = subprocess.run(["git", "-C", REPO, "archive", "--format=tar", full, "--"] + PATHS + have, capture_output=True, check=True).stdout
     with tarfile.open(fileobj=io.BytesIO(data)) as t:
         members = [m for m in t.getmembers() if not any(s in "/" + m.name for s in SKIP) and not m.name.startswith("/") and ".." not in m.name]
         t.extractall(tmp, members=members, filter="data")
@@ -87,13 +100,21 @@ def art_dates(full):
     return dates
 
 
-def newest_registry(commit):
-    d = os.path.join(ARCHIVE, "catalogue", "registry")
-    exact = os.path.join(d, f"{commit}.json")
-    if os.path.exists(exact):
-        return exact
-    files = sorted(glob.glob(os.path.join(d, "*.json")), key=os.path.getmtime)
-    return files[-1] if files else None
+def newest_registry(commit, archive=True):
+    """The dump made at `commit`, else the newest: the archive's (`--fetch-dump`), then the
+    snapshot committed in `tools/catalogue/registry/` (its newest by the commit time it names)."""
+    dirs = ([os.path.join(ARCHIVE, "catalogue", "registry")] if archive else []) + [SNAPSHOTS]
+    for d in dirs:
+        exact = os.path.join(d, f"{commit}.json")
+        if os.path.exists(exact):
+            return exact
+    for d in dirs:
+        files = sorted(glob.glob(os.path.join(d, "*.json")), key=os.path.getmtime)
+        if d == SNAPSHOTS:
+            files = sorted(files, key=lambda f: json.load(open(f)).get("_made", {}).get("time", 0))
+        if files:
+            return files[-1]
+    return None
 
 
 def title_case(i):
@@ -101,8 +122,10 @@ def title_case(i):
 
 
 class Builder:
-    def __init__(self, root, commit, outdir, registry):
+    def __init__(self, root, commit, outdir, registry, prefix=None):
         self.root, self.commit, self.outdir = root, commit, outdir
+        # Pictures' URLs: the gallery's (`/img/catalogue/<commit>/`), or relative (a site).
+        self.prefix = prefix if prefix is not None else f"/img/catalogue/{commit}/"
         self.tex = I.Textures(root)
         self.L = S.lang(root)
         self.rules = S.rules(root)
@@ -120,6 +143,8 @@ class Builder:
         self.kinds, self.shapes = kinds, shapes
         self.looks = I.Looks(looks, kinds, shapes, maps, metals)
         self.overrides = S.texture_overrides(root)
+        self.src_blocks = S.block_defs(root)
+        self.eggs = S.egg_looks(root)
         self.reg = json.load(open(registry)) if registry else {"items": [], "blocks": [], "entities": []}
         self.reg_items = {i["id"]: i for i in self.reg["items"]}
         self.reg_blocks = {b["id"]: b for b in self.reg["blocks"]}
@@ -172,7 +197,7 @@ class Builder:
         if not os.path.exists(p):
             I.save(a, p)
             self.made += 1
-        return f"/img/catalogue/{self.commit}/{rel}"
+        return self.prefix + rel
 
     def icon_of(self, i):
         """(picture, how) of item or block `i` without parts: its item texture, a code-named one,
@@ -186,8 +211,33 @@ class Builder:
         a = self.tex.get(f"{ns}:item/{n}")
         if a is not None:
             return a, "item"
-        b = self.reg_blocks.get(i)
-        if b:
+        # An egg: its species' look (`animals_core::eggs`), the icon the game gives the item.
+        if ns == "animals" and n.endswith("_egg"):
+            look = self.egg_look(n[:-len("_egg")])
+            a = self.tex.get(f"animals:item/egg_{look}") if look else None
+            if a is not None:
+                return a, "item"
+        # The block as the game's registry lists it, else as its `r.block(..)` chain in the sources says.
+        # The registry knows each state's faces and the tints, but not a box model's boxes, a crop's
+        # grown stage or which state rests: the sources' look wins there.
+        reg, src = self.reg_blocks.get(i), S.block_def(self.src_blocks, i)
+        b = reg or src
+        if reg and src:
+            if "crop" in src:
+                b = src
+            elif src.get("boxes"):
+                b = dict(src, comps=sorted(set(src["comps"]) | set(reg.get("comps", []))))
+            elif any(re.search(r"_(lit|on|powered|active)$", t or "") for t in reg["textures"]):
+                b = dict(reg, textures=src["textures"])
+        if b and "crop" in b:
+            # A crop: its last stage.
+            stages = glob.glob(f"{self.root}/mods/{ns}/assets/textures/block/{b['crop']}_stage_*.png")
+            if stages:
+                last = max(stages, key=lambda p: int(re.search(r"_stage_(\d+)\.png$", p).group(1)))
+                a = self.tex.get(f"{ns}:block/{os.path.basename(last)[:-4]}")
+                if a is not None:
+                    return a, "flat"
+        elif b:
             a, how = I.block_icon(b, self.tex)
             if a is not None:
                 return a, how
@@ -220,6 +270,13 @@ class Builder:
             if t is not None:
                 return I.iso_cube(t, sd if sd is not None else t, sd if sd is not None else t), "cube"
         return None, None
+
+    def egg_look(self, kind):
+        """The egg look of the species whose entity is `kind` (`velociraptor_osmolskae` is species
+        `osmolskae`)."""
+        if kind in self.eggs:
+            return self.eggs[kind]
+        return next((l for sp, l in self.eggs.items() if kind.endswith("_" + sp)), None)
 
     def tab_of(self, i):
         it = self.reg_items.get(i)
@@ -695,15 +752,18 @@ class Builder:
 
     # ------------------------------------------------------------ features
 
-    SYSTEMS = os.path.join(REPO, "notes/crew/systems-map/systems.json")
+    SYSTEMS = "notes/crew/systems-map/systems.json"
 
     def feature_entries(self):
-        """A card per system of Planner's map (`notes/crew/systems-map/systems.json`), with
-        `features.json`'s how-to, its sheet tables and the things it links to."""
-        if not os.path.exists(self.SYSTEMS):
+        """A card per system of Planner's map (`notes/crew/systems-map/systems.json`, in the tree
+        exported or the main checkout's; a site only the tree's), with `features.json`'s how-to,
+        its sheet tables and the things it links to."""
+        p = next((x for x in [os.path.join(self.root, self.SYSTEMS)] + ([] if self.site else [os.path.join(MAIN, self.SYSTEMS)])
+                  if os.path.exists(x)), None)
+        if not p:
             log("no systems map: no features")
             return
-        sysmap = json.load(open(self.SYSTEMS))
+        sysmap = json.load(open(p))
         groups = {g["id"]: g["name"] for g in sysmap.get("groups", [])}
         extra = json.load(open(os.path.join(HERE, "features.json")))
         sheets = {"survival": f"{self.root}/mods/base/vitals/SHEET.md", "crafting": f"{self.root}/mods/base/crafting/SHEET.md",
@@ -764,7 +824,7 @@ class Builder:
             rel = f"models/{key}_{view}.png"
             p = os.path.join(self.outdir, rel)
             if os.path.exists(p):
-                out.append(f"/img/catalogue/{self.commit}/{rel}")
+                out.append(self.prefix + rel)
                 continue
             spec, pose = I.geo_to_spec(geo, anim)
             try:
@@ -853,7 +913,7 @@ class Builder:
         data = {"commit": self.commit, "subject": subj, "built": time.strftime("%Y-%m-%d %H:%M"),
                 "gui": getattr(self, "gui_urls", {}), "stations": self.STATION_NAMES, "web": getattr(self, "web", None),
                 "ages": AGES, "entries": self.entries,
-                "registry": os.path.basename(self.registry) if self.registry else ""}
+                "registry": os.path.basename(self.registry) if self.registry else "", "site": self.prefix == "img/"}
         js = json.dumps(data, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
         return tpl.replace("/*DATA*/null", js)
 
@@ -864,8 +924,12 @@ def main():
     ap.add_argument("--registry", help="a /tk dump JSON (default: the newest in the archive)")
     ap.add_argument("--page", default=OUT_PAGE)
     ap.add_argument("--fresh", action="store_true", help="redraw every picture")
+    ap.add_argument("--out", metavar="DIR", help="write a static site instead: DIR/index.html and DIR/img/ (relative links); "
+                    "reads nothing outside the repository")
     ap.add_argument("--fetch-dump", metavar="JOB", help="first copy the registry a PC job's `/tk dump` wrote "
-                    "(t2q.py look JOB @dev ~/Coding/chiacraft-archive/tester-tools/t2/t2_catalogue_dump.txt <world>)")
+                    "(t2q.py look JOB @dev notes/crew/tester-tools/t2/scripts/t2_catalogue_dump.txt <world> --fresh)")
+    ap.add_argument("--dump-commit", help="with --fetch-dump: the commit the job ran (default: --rev's)")
+    ap.add_argument("--strict", action="store_true", help="fail when an entry has no picture")
     a = ap.parse_args()
     if a.fetch_dump:
         d = os.path.join(ARCHIVE, "catalogue", "registry")
@@ -873,16 +937,28 @@ def main():
         dst = os.path.join(d, f"{a.fetch_dump}.json")
         subprocess.run(["scp", "-q", f"{PC}:looktest/t2_{a.fetch_dump}/registry.json", dst], check=True)
         log(f"registry {dst}")
+        # The snapshot the site builds with (commit it): named by the commit the job ran.
+        reg = json.load(open(dst))
+        ran = (a.dump_commit or subprocess.check_output(["git", "-C", REPO, "rev-parse", "--short=8", a.rev], text=True).strip())
+        reg["_made"] = {"commit": ran, "job": a.fetch_dump, "time": int(time.time())}
+        os.makedirs(SNAPSHOTS, exist_ok=True)
+        for old in glob.glob(os.path.join(SNAPSHOTS, "*.json")):
+            os.remove(old)
+        with open(os.path.join(SNAPSHOTS, f"{ran}.json"), "w") as f:
+            json.dump(reg, f, separators=(",", ":"))
+        log(f"snapshot {SNAPSHOTS}/{ran}.json (commit it)")
     t0 = time.time()
     root, commit, subj, full = export(a.rev)
     try:
-        outdir = os.path.join(ARCHIVE, "catalogue", commit)
-        if a.fresh and os.path.isdir(outdir):
+        site = a.out is not None
+        outdir = os.path.join(a.out, "img") if site else os.path.join(ARCHIVE, "catalogue", commit)
+        if (a.fresh or site) and os.path.isdir(outdir):
             shutil.rmtree(outdir)
         os.makedirs(outdir, exist_ok=True)
-        reg = a.registry or newest_registry(commit)
+        reg = a.registry or newest_registry(commit, archive=not site)
         log(f"commit {commit} ({subj[:60]}), registry {reg}")
-        b = Builder(root, commit, outdir, reg)
+        b = Builder(root, commit, outdir, reg, prefix="img/" if site else None)
+        b.site = site
         b.registry = reg
         b.dates = art_dates(full)
         b.item_entries()
@@ -898,15 +974,19 @@ def main():
         b.attach_screens()
         b.gui()
         html = b.page(subj)
-        os.makedirs(os.path.dirname(a.page), exist_ok=True)
-        with open(a.page, "w") as f:
+        page = os.path.join(a.out, "index.html") if site else a.page
+        os.makedirs(os.path.dirname(os.path.abspath(page)), exist_ok=True)
+        with open(page, "w") as f:
             f.write(html)
-        shutil.copyfile(a.page, os.path.join(outdir, "index.html"))
+        if not site:
+            shutil.copyfile(page, os.path.join(outdir, "index.html"))
         with open(os.path.join(outdir, "data.json"), "w") as f:
             json.dump(b.entries, f, indent=0, ensure_ascii=False)
         no_pic = [e["id"] for e in b.entries if not e.get("img")]
         log(f"{len(b.entries)} entries, {b.made} pictures drawn, {len(no_pic)} without a picture: {' '.join(no_pic)}")
-        log(f"page {a.page}, pictures {outdir}, {time.time() - t0:.0f} s")
+        log(f"page {page}, pictures {outdir}, {time.time() - t0:.0f} s")
+        if site and no_pic and a.strict:
+            sys.exit(f"{len(no_pic)} entries without a picture")
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
