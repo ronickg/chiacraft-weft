@@ -114,4 +114,8 @@ With our pack on, upstream's atmosphere pass and lightning bolts don't run, beca
 - **UI (10):** icon_put_away, icon_sort, music_play/pause/stop, music_track rows, slot_fuel and slot_trash hints.
 
 Left as upstream's because the game never loads them: `block/stained_glass/`, `clover_top/`, `clover_bottom/`, `fern.png`, `lamp_white`, `rotor_front`, `rotor_back`; `gui/heart_hardcore_*`, `heart_poisoned_*`, `heart_withered_*` (12) and `food_hunger_*` (3), since our HUD draws only the armour and air rows. Redraw them if they come into use.
+Second pass after the in-game look (11-22): the berried raspberry and snowberry bushes (bigger berries in loose clusters on our plain raspberry leaves, three random variants each in the folder form) and the three wheel faces (tread, sidewall, hub with spokes), from `notes/art/weft-redraw/touchup.py`.
 Every try and sheet: `~/Coding/chiacraft-archive/images/art-weft-content/2026-11-22/`.
+
+## Missing-texture warnings after the sync (fixed 11-22)
+17 blocks named no picture of their own (`base:block/<name>` missing at load): the ten tree branches, piston, sticky piston and their heads, floater, observer and bed. Their faces all come from their states' models, which have art; only the block-level picture (particles, fallback) fell back to the block's name. Each now names one of its own faces (`.texture(...)` in `blocks.rs`, `redstone.rs`, `beds.rs`). No drawing was missing.
