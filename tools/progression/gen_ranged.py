@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Writes mods/testkit/scripts/ranged.txt: bows on the curve (vitals::gear::arrow_hit), in the
-floors' pit (floors.txt F0): the player on the rim shoots down at what's in it.
+floors' pit (floors.txt F0): the player on a pillar behind it shoots down at what's in it.
 
 R0  a Sound yew bow, full draws, at a level-0 utahraptor: `floor:` lines hit about 7.6 (15.2 in
     the head), the 10 s floor still holds, stagger breaks.
@@ -10,6 +10,7 @@ R3  the yew bow, full draws, at a zombie: `mob_fight: player ... hit zombie ... 
 """
 from pathlib import Path
 
+AT = "0.5 203 -4.5"
 OUT = Path(__file__).resolve().parents[2] / "mods/testkit/scripts/ranged.txt"
 lines: list[str] = []
 o = lines.append
@@ -28,12 +29,16 @@ o("loaded")
 o("chat /tk fill -6 196 -5 6 199 7 stone")
 o("chat /tk fill -1 197 0 1 199 2 core:air")
 o("chat /tk fill -6 200 -5 6 206 7 core:air")
-o("chat /tp 0.5 200 -0.5")
+# A roof, so a zombie doesn't burn (ranged1's zombie lost its 6 to the sun).
+o("chat /tk fill -6 207 -5 6 207 7 stone")
+# The shooter on a pillar 6 blocks back and 3 up: out of reach, so holding use draws the bow
+# rather than touching the animal, and the arrow clears the pit's rim.
+o("chat /tk fill 0 200 -5 0 202 -5 stone")
+o(f"chat /tp {AT}")
 o("wait 1")
 o("loaded")
 o("chat /tk mode survival")
-o("chat /tp 0.5 200 -0.5")
-o("chat /tk give base:arrow 64")
+o(f"chat /tp {AT}")
 
 
 def pen(name: str, bow: str, spawn: str, level: bool, draw: float, shots: int) -> None:
@@ -43,20 +48,22 @@ def pen(name: str, bow: str, spawn: str, level: bool, draw: float, shots: int) -
     o("chat /kill @e[type=base:arrow]")
     o("wait 1")
     o(f"chat /gear bow {bow} slot=0")
+    # After the bow: given first, the arrows filled slot 0 and the bow replaced them (ranged1).
+    o("chat /tk give base:arrow 32")
     o("chat /tk heal")
     o(f"chat /tk spawn {spawn} 0 197 1")
     o("wait 1")
     if level:
         # `/animal` acts on the animal looked at.
-        o("aim 8")
+        o("aim 12")
         o("chat /animal level 0")
     o("wait 0.5")
     o(f"where {name}_start")
     o("entities 10")
     o(f"shot ranged_{name}_start.png")
     for i in range(1, shots + 1):
-        o("chat /tp 0.5 200 -0.5")
-        o("aim 8")
+        o(f"chat /tp {AT}")
+        o("aim 12")
         o(f"hold core:use {draw}")
         o("wait 0.3")
         if i % 6 == 0:
