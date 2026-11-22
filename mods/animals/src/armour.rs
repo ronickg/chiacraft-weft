@@ -168,11 +168,12 @@ fn staggered(w: &World, id: u64, s: &animals_core::species::Species, st: &Entity
     while (c[3] as u32) < reached {
         c[3] += 1.0;
         let ctx = LootCtx { by_player: true, ..LootCtx::default() };
-        if let Some(one) = w
+        let one = w
             .roll_loot(&EntityKind::named(s.name), &ctx)
             .into_iter()
-            .find(|x| !x.is_empty())
-        {
+            .find(|x| !x.is_empty());
+        let dropped = one.as_ref().map_or_else(|| "nothing".to_string(), |x| weft_sdk::item_name(x.item).to_string());
+        if let Some(one) = one {
             w.spawn_item(at, ItemStack::new(one.item, 1));
         }
         for p in w.entities_near(st.pos, 24.0, Some(&PLAYER)) {
@@ -180,7 +181,7 @@ fn staggered(w: &World, id: u64, s: &animals_core::species::Species, st: &Entity
                 .to(p)
                 .times(0.2, 1.5, 0.5);
         }
-        weft_sdk::info!("stagger: {} {id} break {} at {total:.1}/{max:.1}", s.name, c[3]);
+        weft_sdk::info!("stagger: {} {id} break {} at {total:.1}/{max:.1}, dropped {dropped}", s.name, c[3]);
     }
     // Knockdowns: every `KNOCK_AT` of its health, not while down or resting from the last.
     c[0] += gain as f64;
