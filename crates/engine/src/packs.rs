@@ -98,7 +98,8 @@ pub fn merge_effects() -> bool {
 /// The `pack.cfg` the options were read from, when it was written, and the names in it.
 type OptionsRead = Option<(PathBuf, Option<std::time::SystemTime>, Vec<String>)>;
 
-/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 48):
+/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 64, past
+/// which they are dropped with an error):
 /// their values reach every pack shader as `scene.options` (`Client::scene`), in that order, so a
 /// pack's look can be tuned in the game's settings and swept with `--config` without editing
 /// shaders. Read again when the file changes.
@@ -124,8 +125,11 @@ pub fn pack_options() -> Vec<String> {
                 .collect::<Vec<_>>()
         })
         .filter(|n| !n.is_empty())
-        .take(48)
         .collect();
+    if names.len() > 64 {
+        log::error!("shader pack: {} options, only the first 64 reach the shaders", names.len());
+    }
+    let names: Vec<String> = names.into_iter().take(64).collect();
     *CACHE.write().unwrap() = Some((dir, stamp, names.clone()));
     names
 }
