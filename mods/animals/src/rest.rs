@@ -95,9 +95,15 @@ pub fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     let Some((how, looks)) = kind_of(w, id) else { return false };
     let Some(c) = w.component_mut(id, &REST) else { return false };
     let chance = crate::routines::rest_chance(how.chance, crate::routines::activity_of(w, id));
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(chance) == 0 {
+    // In step with its pack's or herd's leader (`group::rest_in_step`), else now and then by itself.
+    let step = crate::group::rest_in_step(w, id, c.rest > 0);
+    let free = c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id);
+    if free && (step == Some(true) || (step.is_none() && w.random_below(chance) == 0)) {
         c.rest = how.ticks.0 + w.random_below(how.ticks.1);
         c.rested = 0;
+    }
+    if step == Some(false) {
+        c.rest = 0;
     }
     let resting = c.rest > 0;
     if resting {
