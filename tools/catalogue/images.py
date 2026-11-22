@@ -111,6 +111,7 @@ class Looks:
 
     def __init__(self, looks, kinds, shapes, part_maps, metals):
         self.looks, self.kinds, self.shapes, self.part_maps, self.metals = looks, kinds, shapes, part_maps, metals
+        self.shells_drawn, self.drawn_shapes = [], {}
 
     @staticmethod
     def art_name(m):
@@ -141,13 +142,28 @@ class Looks:
     def first_shape(self, kind, slot):
         return next((s for s, k, sl in self.shapes if k == kind and sl == slot), None)
 
+    # `looks::shell_family`: how a shell is built, and so drawn.
+    FAMILY = {"leather": "leather", "rawhide": "leather", "bone": "bone", "antler": "bone", "diamond": "diamond"}
+
     def part_look(self, shape, m):
+        """`looks::part_look` (art redo v3): a loose head or blade's own drawing
+        (`parts/loose/<shape>/<art>`), a shell drawn for its material (`parts/armour/<shell>/<art>`),
+        else its family's map painted with the material's ramp."""
+        kind_slot = next(((k, sl) for s, k, sl in self.shapes if s == shape), None)
+        if kind_slot:
+            l = self.looks.get(kind_slot[0])
+            if l and any(x["painted"] and x["regions"][0] == kind_slot[1] for x in l["layers"]):
+                return f"base:parts/loose/{self.drawn_shapes.get(shape, shape)}/{self.drawn(kind_slot[0], m)}"
         if shape not in self.part_maps:
             return None
         buckle = ""
         if shape == "straps":
             buckle = f",base:ramps/{m}" if m in self.metals else ",base:ramps/wrought_iron"
-        return f"base:parts/armour/{shape}@base:ramps/{m}{buckle}"
+        if shape.endswith("_shell") and self.art_name(m) in self.shells_drawn:
+            return f"base:parts/armour/{shape}/{self.art_name(m)}"
+        fam = self.FAMILY.get(m, "plate")
+        drawn = "cap_shell" if (fam, shape) == ("leather", "helmet_shell") else (f"bone_{shape}" if fam == "bone" and shape.endswith("_shell") else shape)
+        return f"base:parts/armour/{drawn}@base:ramps/{m}{buckle}"
 
     def text(self, kind, parts):
         """`look_text`: `parts` {slot: (shape, material)}."""
@@ -267,6 +283,10 @@ def block_icon(block, tex):
     imgs = [tex.get(x) if x else None for x in t]
     tint, top_only = tint_of(block)
     end, boxes = shape_of(block["id"])
+    if block.get("boxes") and imgs[3] is not None:
+        # Boxes the sources give (a snow layer, a button, loose stones): drawn where they sit.
+        side = lambda k: imgs[k] if imgs[k] is not None else imgs[3]
+        return iso_boxes(block["boxes"], imgs[3], side(5), side(1), tint_top=tint, tint_sides=None if top_only else tint), "cube"
     if boxes and imgs[3] is not None:
         return iso_boxes(boxes, imgs[3], imgs[5] if imgs[5] is not None else imgs[3], imgs[1] if imgs[1] is not None else imgs[3]), "cube"
     if block["model"] == "Boxes" and imgs[3] is not None and imgs[5] is not None and t[3] != t[5]:

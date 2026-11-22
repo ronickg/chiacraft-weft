@@ -106,7 +106,7 @@ details.more summary{cursor:pointer;color:var(--acc);font-size:13px;margin:4px 0
 }
 </style>
 <header>
-  <div class="top"><b>Catalogue</b><a href="/">← crew gallery</a><span class="meta" id="meta"></span></div>
+  <div class="top"><b>Catalogue</b><a href="/" id="home">← crew gallery</a><span class="meta" id="meta"></span></div>
   <div class="searchrow">
     <input id="q" type="search" placeholder="Search names, ids, notes, biomes…" autocomplete="off">
     <select id="sort" aria-label="Sort"><option value="group">by group</option><option value="name">by name</option><option value="age">by age</option><option value="mod">by mod</option></select>
@@ -143,6 +143,7 @@ let showExtra = false;
 const $ = s=>document.querySelector(s);
 const esc = s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 E.forEach(e=>{e._text=[e.name,e.id,e.kind,e.group,e.note,e.desc,e.tab,e.age,e.path,e.sci,(e.biomes||[]).join(" "),e.diet,e.role,(e.made||[]).join(" ")].join(" ").toLowerCase()});
+if(DATA.site) $("#home").remove();
 $("#meta").textContent = `${E.length} things · dev ${DATA.commit} · ${DATA.subject.slice(0,90)}${DATA.subject.length>90?"…":""} · built ${DATA.built}`;
 
 function readHash(){
