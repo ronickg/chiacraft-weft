@@ -584,12 +584,55 @@ def block_defs(root):
     The game's own registry (`/tk dump`) wins where there is one; this needs no game."""
     out = {}
     for ns in MODS:
-        files = glob.glob(f"{root}/mods/{ns}/src/**/*.rs", recursive=True)
-        texdir = f"{root}/mods/{ns}/assets/textures/block"
-        is_tex = lambda n: os.path.exists(f"{root}/mods/{_tex_name(ns, n).split(':')[0]}/assets/textures/{_tex_name(ns, n).split(':')[1]}.png")
-        for f in files:
-            t = strip_comments(open(f, encoding="utf-8").read())
-            statics = dict(re.findall(r'static (\w+): Block = Block::named\("([\w:]+)"\)', t))
+        files = sorted(glob.glob(f"{root}/mods/{ns}/**/*.rs", recursive=True))
+        def is_tex(n):
+            tns, path = _tex_name(ns, n.split("@", 1)[0]).split(":", 1)
+            f = f"{root}/mods/{tns}/assets/textures/{path}"
+            return os.path.exists(f + ".png") or (os.path.isdir(f) and any(re.fullmatch(r"\d+\.png", x) for x in os.listdir(f)))
+        # The whole mod's statics (its `api` crate too) and `use .. {X as Y}` aliases, and its
+        # helper functions (`fn wood_block(r, handle, wood) { r.block(handle)...texture(format!(..)) }`).
+        texts = [strip_comments(open(f, encoding="utf-8").read()) for f in files]
+        statics = {}
+        for t in texts:
+            statics.update(re.findall(r'static (\w+): Block = Block::named\("([\w:]+)"\)', t))
+        for t in texts:
+            for a0, a1 in re.findall(r"\b([A-Z][A-Z0-9_]+) as ([A-Z][A-Z0-9_]+)\b", t):
+                if a0 in statics:
+                    statics.setdefault(a1, statics[a0])
+        fns = {}
+        for t in texts:
+            for m in re.finditer(r"\bfn (\w+)\(([^)]*)\)[^{]*\{", t):
+                body_end = stmt_end(t, m.end())
+                fns.setdefault(m.group(1), ([x.split(":")[0].strip() for x in m.group(2).split(",") if x.strip()], t[m.end():body_end]))
+
+        def expand(name, args):
+            """A helper call's `r.block(param)` statement with its arguments put in, or None."""
+            if name not in fns:
+                return None
+            params, body = fns[name]
+            if len(params) != len(args) or "r.block(" not in body.replace(" ", ""):
+                return None
+            vals = dict(zip(params, [x.strip() for x in args]))
+            bm = re.search(r"\br\s*\.\s*block\(\s*(\w+)\s*\)", body)
+            if not bm or bm.group(1) not in vals:
+                return None
+            stmt = body[bm.start():stmt_end(body, bm.start())]
+            stmt = stmt.replace(bm.group(0), f"r.block({vals[bm.group(1)]})", 1)
+
+            def lit(m):
+                text = m.group(1)
+                for p, v in vals.items():
+                    if v.startswith('"'):
+                        text = text.replace("{" + p + "}", v.strip('"'))
+                return '"' + text + '"' if "{" not in text else m.group(0)
+            return re.sub(r'&?format!\(\s*"([^"]*)"\s*\)', lit, stmt) + ";"
+
+        for t in list(texts):
+            for m in re.finditer(r"\b(?!block\b|machine\b|item\b)(\w+)\(\s*r\s*,", t):
+                e = expand(m.group(1), split_top(t[m.end() - 2 + 1:stmt_end(t, m.end() - 1)].strip()))
+                if e:
+                    texts.append(e)
+        for t in texts:
             heads = [(m, "block") for m in re.finditer(r"\br\s*\.\s*(?:block|machine)\(\s*", t)]
             heads += [(m, "helper") for m in re.finditer(r"\b(?!block\b|machine\b|item\b)(\w+)\(\s*r\s*,\s*", t)]
             for m, how in heads:
@@ -627,24 +670,53 @@ def block_defs(root):
                     d["model"], d["boxes"] = "Boxes", bx
                     out.setdefault(f"{ns}:{key}" if not key.startswith("re:") else key, d)
                     continue
-                for c in re.finditer(r"\.(texture|textures|faces)\(", stmt):
+                # The face presets in the order said (the SDK's `pick`: the last one said wins),
+                # `.layer(..)` over the faces picked last, `.tint_kind(..)` / `.tint(..)` on their
+                # top layer: faces -X +X -Y +Y -Z +Z, each a list of layers `name@kind`.
+                faces = [[] for _ in range(6)]
+                picked = []
+                PICKS = {"texture": range(6), "top": [3], "bottom": [2], "ends": [2, 3], "sides": [0, 1, 4, 5],
+                         "front": [4], "back": [5], "north": [4], "south": [5], "west": [0], "east": [1]}
+                for c in re.finditer(r"\.(texture|textures|faces|top|bottom|ends|sides|front|back|north|south|west|east|layer|tint_kind|tint)\(", stmt):
                     body = stmt[c.end():stmt_end(stmt, c.end())]
-                    names = [fill(x) for x in re.findall(r'"([\w/:{}]+)"', body) if "{" in x or is_tex(x)]
+                    what = c.group(1)
+                    if what in ("tint", "tint_kind"):
+                        k = re.search(r"tints::(\w+)", body)
+                        if k and picked:
+                            for i in picked:
+                                if faces[i] and "@" not in faces[i][-1]:
+                                    faces[i][-1] += "@" + k.group(1).lower()
+                        elif k:
+                            d["comps"].append("tint")
+                        continue
+                    names = [fill(x) for x in re.findall(r'"([\w/:{}#@ ]+)"', body)]
+                    names = [x.split()[0] for x in names if x.split() and ("{" in x or is_tex(x.split()[0].split("#")[0]))]
                     if not names:
                         continue
-                    if c.group(1) == "texture":
-                        # A state's choice (`if lit { "x_lit" } else { "x" }`): the resting one, as the item shows.
-                        rest = [x for x in names if not re.search(r"_(lit|on|powered|active)$", x)] or names
-                        d["textures"] = [_tex_name(ns, rest[0])] * 6
-                    elif c.group(1) == "textures" and len(names) >= 3:
+                    if what == "textures" and len(names) >= 3:
                         tp, sd, bt = (_tex_name(ns, x) for x in names[:3])
-                        d["textures"] = [sd, sd, bt, tp, sd, sd]
-                    elif c.group(1) == "faces":
+                        faces = [[sd], [sd], [bt], [tp], [sd], [sd]]
+                        picked = list(range(6))
+                    elif what == "faces":
                         rep = re.search(r'\[\s*"([\w/:]+)"\s*;\s*6\s*\]', body)
                         fs = [rep.group(1)] * 6 if rep else names[:6]
                         if len(fs) == 6:
-                            d["textures"] = [_tex_name(ns, x) for x in fs]
-                    break
+                            faces = [[_tex_name(ns, x)] for x in fs]
+                            picked = list(range(6))
+                    elif what == "layer":
+                        for i in picked:
+                            faces[i].append(_tex_name(ns, names[0].split("#")[0]))
+                    else:
+                        # A state's choice (`if lit { "x_lit" } else { "x" }`): the resting one, as the item shows.
+                        rest = [x for x in names if not re.search(r"_(lit|on|powered|active)$", x)] or names
+                        picked = list(PICKS[what])
+                        for i in picked:
+                            faces[i] = [_tex_name(ns, rest[0].split("#")[0])]
+                if all(faces):
+                    d["textures"] = ["+".join(f) for f in faces]
+                elif any(faces):
+                    first = next(f for f in faces if f)
+                    d["textures"] = ["+".join(f or first) for f in faces]
                 for c in re.finditer(r"\.model_box(?:_faces)?\(", stmt):
                     body = stmt[c.end():stmt_end(stmt, c.end())]
                     d["boxes"] += _boxes(body)[:1]
@@ -656,8 +728,6 @@ def block_defs(root):
                     d["model"] = "Boxes"
                 if re.search(r"\.plant\(\)", stmt):
                     d["model"] = "Plant"
-                if re.search(r"\.tint(_kind)?\(", stmt):
-                    d["comps"].append("tint")
                 if re.search(r"\.tint_top\(", stmt):
                     d["comps"] += ["tint", "tint_faces"]
                 if d["textures"][0] is None:
@@ -712,3 +782,42 @@ def drawn_parts(root):
             for p in strings(pats):
                 mapping[p] = to
     return shells, mapping
+
+
+def cylinders(root):
+    """Blocks drawn as a cylinder of box strips (`.cylinder(..)` in a loop over
+    `(block, radius, half_length, ..)`, upstream's wheels in `vehicles.rs`): {id: dump-like block
+    with its strips and hubs as boxes, fitted into one block}."""
+    out = {}
+    for f in glob.glob(f"{root}/mods/*/src/**/*.rs", recursive=True):
+        t = strip_comments(open(f, encoding="utf-8").read())
+        if ".cylinder(" not in t:
+            continue
+        ns = f.split("/mods/")[1].split("/")[0]
+        statics = {}
+        for g in glob.glob(f"{root}/mods/{ns}/**/*.rs", recursive=True):
+            statics.update(re.findall(r'static (\w+): Block = Block::named\("([\w:]+)"\)', open(g, encoding="utf-8").read()))
+        faces = re.search(r'let tread = "(\w+)";\s*let side = "(\w+)";', t)
+        hub = re.search(r'\[\("(\w+)", UV_FROM_BOX\); 6\]', t)
+        if not faces:
+            continue
+        for st, radius, half in re.findall(r"\(&(\w+),\s*([\d.]+)(?:f32)?,\s*([\d.]+)(?:f32)?,", t):
+            if st not in statics:
+                continue
+            r, hl = float(radius), float(half)
+            boxes = []
+            for j in range(16):
+                y0, y1 = 2 * r * (j / 16 - 0.5), 2 * r * ((j + 1) / 16 - 0.5)
+                mid = (y0 + y1) / 2
+                x = (r * r - mid * mid) ** 0.5
+                boxes.append((8 - x, 8 + y0, 9 - hl, 8 + x, 8 + y1, 7 + hl))
+            h = r * 0.33
+            boxes += [(8 - h, 8 - h, 7 + hl, 8 + h, 8 + h, 8 + hl)]
+            lo = min(min(b[:3]) for b in boxes)
+            hi = max(max(b[3:]) for b in boxes)
+            fit = lambda v: (v - lo) / (hi - lo)
+            tread, side = (_tex_name(ns, x) for x in faces.groups())
+            out[statics[st] if ":" in statics[st] else f"{ns}:{statics[st]}"] = {
+                "model": "Boxes", "comps": [], "boxes": [tuple(fit(v) for v in b) for b in boxes],
+                "textures": [tread, tread, tread, tread, side, side]}
+    return out
