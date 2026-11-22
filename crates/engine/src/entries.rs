@@ -402,6 +402,8 @@ impl Catalog {
 }
 
 impl Tables {
+    // chiacraft: clippy denies `|_| ()` as an Ord key; one key for all is meant (upstream's).
+    #[allow(clippy::unit_return_expecting_ord)]
     pub fn bake<D>(
         &mut self,
         raw: Vec<RawEntry>,
