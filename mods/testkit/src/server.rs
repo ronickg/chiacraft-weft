@@ -825,6 +825,23 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(String::new())
     }),
     ("slot", "@owner <index:int>", |w, cmd, _, _| Ok(stack_text(w.inventory(owner(w, cmd)?).get(int(cmd, "index")?)))),
+    // Into the hand: the player's own stack of `item` swapped into the selected hotbar slot, as a
+    // player would drag it there (nothing made). Scripts can't know where a pickup landed.
+    ("hand", "@owner <item:item>", |w, cmd, _, _| {
+        let o = owner(w, cmd)?;
+        let want = id(cmd, "item")?;
+        let inv = w.inventory(o);
+        let sel = inv.group("hotbar").slot(w.selected_slot(o));
+        if inv.get(sel).item != want {
+            let i = (0..inv.len())
+                .find(|&i| inv.get(i).item == want)
+                .ok_or("none in the bag")?;
+            let (held, other) = (inv.get(sel), inv.get(i));
+            inv.set(sel, other);
+            inv.set(i, held);
+        }
+        Ok(stack_text(inv.get(sel)))
+    }),
     ("put", "@owner <index:int> <item:item> [count:int]", |w, cmd, _, _| {
         let o = owner(w, cmd)?;
         w.inventory(o)

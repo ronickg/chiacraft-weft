@@ -1,0 +1,326 @@
+# First day after the 11-22 Weft sync (First hours): the whole way in, by real actions on a
+# flat pad at the spawn, in survival. A rock off the ground, a flake struck from flint, an axe head
+# knapped on the screen, sticks from fallen branches, fibre cut from grass with the flake, string,
+# the axe, a bow drill and a fire bed from the book, the bed lit by the drill, a tree felled with
+# the axe; then a hoe (the one shortcut: /gear) tills, wheat is sown and harvested ripe.
+# Setup is creative (/tk fill, /tk set put things on the ground), every item after it is picked up
+# or made. /tk hand moves a stack the player has into the hand (scripts can't know pickup slots).
+# Read: every `/tk inv me` reply (the bag after each step), the `/tk get` replies, run.log lines
+# "first: strike", "knapping:", "felling", "died" (there should be none), and the shots.
+# Expect: base:rock, then base:sharp_flake (80% a strike, three strikes), base:part_felling_axe_head
+# after the screen, base:stick x6+, base:plant_fibre ~18, base:string x5, base:axe, base:bow_drill,
+# base:fire_bed; the bed at ~ ~ ~-1 turning into a campfire (70% a try, three tries); the oak's
+# logs counted before and after the felling; farmland, wheat[age=0], then wheat and seed back.
+# A fresh world name each run (a reused one keeps its bag). Yaw 0 faces -z; negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /tk mode creative
+chat /tk fill ~-8 ~-2 ~-8 ~8 ~-1 ~8 base:grass
+chat /tk fill ~-8 ~ ~-8 ~8 ~7 ~8 core:air
+# The oak behind the player (+z): leaves first, then the trunk through them.
+chat /tk fill ~-2 ~3 ~0 ~2 ~5 ~4 base:oak_leaves
+chat /tk fill ~ ~ ~2 ~ ~4 ~2 base:oak_log
+wait 2
+chat /tk count ~-8 ~ ~-8 ~8 ~8 ~8 base:oak_log
+chat /tk mode survival
+until mode survival within 10
+wait 1
+look 0 -60
+shot fd_start.png
+# 1. A rock off the ground.
+chat /tk set ~ ~ ~-1 base:loose_rock
+wait 0.5
+hold core:attack 0.5
+wait 1.5
+chat /tk inv me
+until chat base:rock within 5
+# 2. Flakes: the rock struck on a flint nodule, three times.
+chat /tk set ~ ~ ~-1 base:loose_flint
+chat /tk hand me base:rock
+wait 0.5
+hold core:use 0.3
+wait 1
+hold core:use 0.3
+wait 1
+hold core:use 0.3
+wait 1
+wait 1
+chat /tk inv me
+shot fd_flakes.png
+until chat base:sharp_flake within 5
+# 3. The axe head on the knapping screen: sneaking, the rock on a fresh nodule.
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+chat /tk set ~ ~ ~-1 base:loose_flint
+chat /tk hand me base:rock
+wait 0.5
+hold core:sneak 2 nowait
+wait 0.3
+hold core:use 0.3
+until screen base:knapping within 5
+wait 1
+shot fd_knap_open.png
+tap base:knapping class:knap_stone
+until screen none within 5
+chat /tk inv me
+until chat base:part_felling_axe_head within 5
+# 4. Sticks from six fallen branches.
+chat /tk set ~ ~ ~-1 base:fallen_branch
+wait 0.4
+hold core:attack 0.4
+wait 1
+chat /tk set ~ ~ ~-1 base:fallen_branch
+wait 0.4
+hold core:attack 0.4
+wait 1
+chat /tk set ~ ~ ~-1 base:fallen_branch
+wait 0.4
+hold core:attack 0.4
+wait 1
+chat /tk set ~ ~ ~-1 base:fallen_branch
+wait 0.4
+hold core:attack 0.4
+wait 1
+chat /tk set ~ ~ ~-1 base:fallen_branch
+wait 0.4
+hold core:attack 0.4
+wait 1
+chat /tk set ~ ~ ~-1 base:fallen_branch
+wait 0.4
+hold core:attack 0.4
+wait 1
+chat /tk inv me
+until chat base:stick within 5
+# 5. Fibre: 36 tufts of tall grass cut with the flake (50% each, 12.5% by hand).
+chat /tk hand me base:sharp_flake
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+wait 1
+chat /tk inv me
+shot fd_fibre.png
+until chat base:plant_fibre within 5
+# 6. The book (the inventory's 2x2): five string, the axe, a bow drill, fire beds.
+press core:inventory
+until screen core:menu within 10
+wait 1
+tap_once core:menu icon:base:string
+tap_once core:menu text:craft 5
+wait 1
+tap_once core:menu icon:base:axe
+wait 1
+shot fd_book_axe.png
+tap_once core:menu text:max (
+wait 1
+tap_once core:menu icon:base:bow_drill
+tap_once core:menu text:max (
+wait 1
+tap_once core:menu icon:base:fire_bed
+tap_once core:menu text:max (
+wait 1
+shot fd_book_done.png
+key Escape
+until screen none within 10
+chat /tk inv me
+until chat base:axe within 5
+until chat base:bow_drill within 5
+# 7. The first fire: the bed put down ahead, the bow drill held on it (6 s), up to three tries.
+chat /tk hand me base:fire_bed
+look 0 -60
+wait 0.5
+hold core:use 0.2
+wait 1
+chat /tk get ~ ~ ~-1
+chat /tk hand me base:bow_drill
+hold core:use 7
+wait 1
+chat /tk get ~ ~ ~-1
+hold core:use 7
+wait 1
+chat /tk get ~ ~ ~-1
+hold core:use 7
+wait 1
+chat /tk get ~ ~ ~-1
+shot fd_fire.png
+# 8. The axe on the oak's foot behind (+z): it falls away from the player.
+look 180 -29
+chat /tk hand me base:axe
+wait 0.5
+shot fd_tree.png
+hold core:attack 25
+wait 8
+shot fd_felled.png
+chat /tk count ~-8 ~ ~-8 ~8 ~8 ~8 base:oak_log
+chat /tk inv me
+where felled
+# 9. Farming: a hoe (the shortcut), farmland, wheat sown, ripened, harvested.
+look 0 -60
+chat /tk fill ~ ~ ~-1 ~ ~1 ~-1 core:air
+chat /gear hoe
+wait 1
+chat /tk hand me base:hoe
+hold core:use 0.2
+wait 1
+chat /tk get ~ ~-1 ~-1
+chat /tk give base:wheat_seeds 2
+wait 0.5
+chat /tk hand me base:wheat_seeds
+hold core:use 0.2
+wait 1
+chat /tk get ~ ~ ~-1
+chat /growth
+shot fd_sown.png
+chat /tk setprop ~ ~ ~-1 age 7
+wait 1
+chat /tk get ~ ~ ~-1
+shot fd_ripe.png
+chat /tk hand me base:hoe
+hold core:attack 0.5
+wait 1.5
+chat /tk get ~ ~-1 ~-1
+chat /tk inv me
+shot fd_end.png
+expect alive
+quit
