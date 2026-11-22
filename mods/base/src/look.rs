@@ -63,12 +63,15 @@ pub static LOOK_EVENING_MIST: Config<f32> = Config::named("look_evening_mist");
 /// The HDR world's bloom by day added on top, as Bliss's (+35% at the centre, +12% in the corners at
 /// noon): 0 mixed in as made, 1 all the way.
 pub static LOOK_BLOOM_ADD: Config<f32> = Config::named("look_bloom_add");
+/// A test switch for like-for-like compares: 1 takes the high cirrus out of the sky (with soft
+/// clouds and cloud shadows off and a blank clouds texture, no cloud at all). 0 as made.
+pub static LOOK_CIRRUS_OFF: Config<f32> = Config::named("look_cirrus_off");
 
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -114,4 +117,5 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_SPLIT_WARM).float(0.7, 0.0, 1.0);
     r.config(&LOOK_EVENING_MIST).float(0.0, 0.0, 1.0);
     r.config(&LOOK_BLOOM_ADD).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_CIRRUS_OFF).float(0.0, 0.0, 1.0);
 }

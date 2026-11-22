@@ -114,6 +114,11 @@ const OPT_EVENING_MIST: u32 = 37u;
 // The HDR world's bloom by day added on top as Bliss's (`base:look_bloom_add`, read raw: 0 as made,
 // mixed in keeping the light's sum; 1 all the way).
 const OPT_BLOOM_ADD: u32 = 38u;
+// A test switch for like-for-like compares (`base:look_cirrus_off`, read raw: 0 as made, 1 no high
+// cirrus): with `core:soft_clouds` 0, `core:cloud_shadows` 0 and a blank clouds texture (mcclear)
+// the sky then has no cloud at all, as Bliss's with VOLUMETRIC_CLOUDS off (Ronald, 11-22: "removing
+// clouds could help with bliss vs ours").
+const OPT_CIRRUS_OFF: u32 = 39u;
 
 // How much of the mist lies as the evening's (`OPT_EVENING_MIST`): half with the sun about 25° up
 // in the west (17:00), all from about 12° (18:00), into the dusk.
