@@ -61,8 +61,10 @@ class Textures:
                 if a is None:
                     continue
                 a = a.astype(float)
-                if kind in TINTS:
-                    a[..., :3] *= np.array(TINTS[kind]) / 255.0
+                kind = kind.split(":")[-1]
+                if kind:
+                    # Our own leaf kinds (`evergreen`, `yellow_leaves`) are the biome's foliage.
+                    a[..., :3] *= np.array(TINTS.get(kind, TINTS["foliage"])) / 255.0
                 if out is None:
                     out = a
                 elif a.shape == out.shape:
@@ -319,7 +321,8 @@ def block_icon(block, tex):
     the rest."""
     t = block["textures"]
     imgs = [tex.get(x) if x else None for x in t]
-    tint, top_only = tint_of(block)
+    # A face named `name@kind` carries its own tint (`Textures.get`).
+    tint, top_only = tint_of(block) if not any("@" in (x or "") for x in t) else (None, False)
     end, boxes = shape_of(block["id"])
     if block.get("boxes") and imgs[3] is not None:
         # Boxes the sources give (a snow layer, a button, loose stones): drawn where they sit.

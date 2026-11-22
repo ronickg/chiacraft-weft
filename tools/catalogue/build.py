@@ -151,6 +151,9 @@ class Builder:
         self.reg = json.load(open(registry)) if registry else {"items": [], "blocks": [], "entities": []}
         self.reg_items = {i["id"]: i for i in self.reg["items"]}
         self.reg_blocks = {b["id"]: b for b in self.reg["blocks"]}
+        # Upstream's registry names nearly every model Boxes (cubes and plants alike).
+        models = [b.get("model") for b in self.reg["blocks"]]
+        self.all_boxes = bool(models) and models.count("Boxes") > 0.9 * len(models)
         self.entries = []
         self.made = 0
         self.mat_from = self._materials_from()
@@ -224,6 +227,14 @@ class Builder:
         # The registry knows each state's faces and the tints, but not a box model's boxes, a crop's
         # grown stage or which state rests: the sources' look wins there.
         reg, src = self.reg_blocks.get(i), S.block_def(self.src_blocks, i)
+        if reg and reg.get("model") == "Boxes" and "solid" in reg and self.all_boxes:
+            # Upstream's registry (since the Weft sync of 11-22) calls every model Boxes: a solid
+            # block or one outside the cutout layer (water, lava) is drawn as a cube, the rest
+            # (plants, torches, ladders) flat, a door flat.
+            cube = (reg["solid"] or reg.get("layer") != "Cutout") and not n.endswith("_door")
+            reg = dict(reg, model="Cube" if cube else "Cross")
+            if src and src.get("model") == "Plant":
+                reg["model"] = "Cross"
         b = reg or src
         if reg and src:
             if "crop" in src:
@@ -479,7 +490,8 @@ class Builder:
                 continue
             ids.setdefault(i, "item")
         for i, b in self.reg_blocks.items():
-            if b.get("item") and not i.startswith(("core:", "testkit:")):
+            # `unknown`: upstream's stand-in for a block a world names but the game lacks.
+            if b.get("item") and not i.startswith(("core:", "testkit:")) and i.split(":")[1] != "unknown":
                 ids.setdefault(i, "block")
         self.ids = ids
         log(f"{len(ids)} items and blocks")
