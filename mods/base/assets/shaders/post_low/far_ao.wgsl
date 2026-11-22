@@ -132,6 +132,15 @@ fn far_ao(p: PostPixel, turn_in: f32) -> f32 {
         }
     }
     var ao = 1.0 - clamp(closed / f32(FAR_AO_SAMPLES) * FAR_AO_STRENGTH, 0.0, 0.8);
+    // Or as strong as Bliss's (`base:look_ao_power`, the shader pack's option 41, read raw: 0 as
+    // made): what is left open to the sky raised to that power (Bliss's SSAO^6 on the sky light,
+    // `composite1.fsh:1180-1188`), so a gap half closed in goes near black. Its crown interiors, the
+    // ground between crowns and the shaded sides went navy-black where ours stayed lit (controlled
+    // frames, 11-22: noon shade 0 19 65 against ours 15 32 67).
+    let power = scene.options[10][1];
+    if power > 0.0 {
+        ao = pow(clamp(1.0 - closed / f32(FAR_AO_SAMPLES), 0.0, 1.0), power);
+    }
     // The sky's light only: a face the sun reaches keeps most of its light (the sun's), by day.
     let sun = scene.sun;
     let day = smoothstep(0.0, 0.15, sun.y);

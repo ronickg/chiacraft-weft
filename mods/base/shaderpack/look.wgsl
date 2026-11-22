@@ -124,6 +124,9 @@ const OPT_CIRRUS_OFF: u32 = 39u;
 // bloom (controlled frames, 11-22: with bloom and auto exposure off its noon shade is 0 19 65,
 // ours 24 46 79).
 const OPT_GLARE: u32 = 40u;
+// The far shade from the sky as strong as Bliss's (`base:look_ao_power`, read raw by
+// `post_low/far_ao.wgsl` as option 41: 0 as made).
+const OPT_AO_POWER: u32 = 41u;
 
 // How much of the mist lies as the evening's (`OPT_EVENING_MIST`): half with the sun about 25° up
 // in the west (17:00), all from about 12° (18:00), into the dusk.
