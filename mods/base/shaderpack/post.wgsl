@@ -237,6 +237,9 @@ fn fs_exposure(in: VOut) -> @location(0) vec4<f32> {
 // and clamped: never more than a fifth brighter at night outdoors (nights stay dark), so a torch
 // still matters.
 const EXPOSURE_REF: f32 = 0.35;
+fn exposure_abs() -> f32 {
+    return clamp(fantasy_opt(OPT_EXPOSURE_ABS), 0.0, 1.0);
+}
 fn auto_exposure(mean: f32) -> f32 {
     let target_at = 0.18 / log2(2.5 * max(mean, 1e-5) + 1.045);
     let ref_at = 0.18 / log2(2.5 * EXPOSURE_REF + 1.045);
@@ -248,7 +251,10 @@ fn auto_exposure(mean: f32) -> f32 {
     // against Bliss's 71/71/73 (dev 41/49/55); the vista's land 84/97/96 (dev 87/100/100, Bliss
     // 85/109/98). Only with the sun up: night and the 05:00 blue hour keep half the curve.
     let day_e = smoothstep(0.0, 0.15, scene.sun.y) * select(0.0, 1.0, open_sky());
-    let k = pow(target_at / ref_at, mix(0.5, 1.0, day_e)) * mix(1.0, 0.83, day_e);
+    var k = pow(target_at / ref_at, mix(0.5, 1.0, day_e)) * mix(1.0, 0.83, day_e);
+    // Or by day Bliss's curve in its own units (`base:look_exposure_abs`): our light x41.
+    let abs_k = (log2(2.5 * EXPOSURE_REF * 41.0 + 1.045)) / log2(2.5 * max(mean, 1e-5) * 41.0 + 1.045);
+    k = mix(k, abs_k, day_e * exposure_abs());
     let night = smoothstep(0.0, -0.15, scene.sun.y) * select(1.0, 0.0, !open_sky());
     // Under rain the view is darker and stays so (a storm's mood; brought up, its mist went milky):
     // no brighter than as made, in a storm a little darker.
@@ -416,7 +422,15 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         // Not in rain: its mist taking the glow too turned a storm's land to milk (the storm sheet,
         // 11-05), where Bliss's stays dark and readable.
         let fog = mist_over(uv, pass_) * (1.0 - 0.85 * rain_amount());
-        col = mix(col, glow, clamp((BLOOM_MIX * (1.0 + air * (1.0 - rain_amount())) + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
+        // Or by day added on top, as Bliss's (`base:look_bloom_add`, read raw: 0 as made, 1 all the
+        // way): the glow x 0.5 E^0.2 (0.23 at its noon exposure) x (1.5 - 2 r^2), so +35% at the
+        // centre and +12% in the corners (`composite11.fsh:99, 141, 154`; Research's code read,
+        // 11-22). The mist's share stays mixed.
+        let add = clamp(fantasy_opt(OPT_BLOOM_ADD), 0.0, 1.0) * smoothstep(0.0, 0.15, scene.sun.y);
+        let kept = BLOOM_MIX * (1.0 + air * (1.0 - rain_amount())) * (1.0 - add);
+        col = mix(col, glow, clamp((kept + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
+        let r2 = dot(uv - vec2(0.5), uv - vec2(0.5));
+        col += glow * 0.234 * (1.5 - 2.0 * r2) * add * fantasy_opt(OPT_BLOOM);
     }
     // Veiling glare: a little of the sky's light over the whole picture, as a lens and the eye
     // scatter it, so the darkest shade is a dim sky blue, not black. In Bliss's own world (imported)
@@ -436,7 +450,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         }
     }
     let p = palette();
-    col += (p.zenith * 0.4 + p.horizon * 0.6) * GLARE_HDR * lens * smoothstep(-0.05, 0.2, scene.sun.y) * (1.0 - rain_amount());
+    col += (p.zenith * 0.4 + p.horizon * 0.6) * GLARE_HDR * max(fantasy_opt(OPT_GLARE), 0.0) * lens * smoothstep(-0.05, 0.2, scene.sun.y) * (1.0 - rain_amount());
     if pass_.exposure != 0u {
         let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
         if e == e && e > 0.0 {
@@ -452,7 +466,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
             let d = max(textureLoad(textures[pass_.depth], px, 0).r, 1e-7);
             let wp = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
             let near = 1.0 - smoothstep(300.0, 900.0, length(wp.xyz / wp.w));
-            col *= mix(1.0, land, (1.0 - rain_amount()) * select(1.0, 0.0, sky_px) * near);
+            col *= mix(1.0, land, (1.0 - rain_amount()) * select(1.0, 0.0, sky_px) * near * (1.0 - exposure_abs()));
             // Evening twilight, the sun just under the horizon in the west: the land lit up against the
             // sky, as Bliss's evening (its own world at 19:00: land 86 against a sky of 138, ours 60
             // against 162; a stronger exposure lifted both, tw1). Its morning at the same depth stays

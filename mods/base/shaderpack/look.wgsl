@@ -90,6 +90,84 @@ const OPT_LEAF_SUN: u32 = 30u;
 const OPT_LEAF_HOLES: u32 = 31u;
 // The light through leaves (`base:look_leaf_light`, read raw: 0 none, 1 on).
 const OPT_LEAF_LIGHT: u32 = 32u;
+// A debug view (`base:look_debug`, read raw): 0 the picture, 1 the sun's light alone, 2 the sky's
+// alone, both on white (no texture or tint), haze and curve as usual: Bliss's DEBUG_VIEW
+// debug_DIRECT / debug_INDIRECT (composite1.fsh:1347-1354), to compare the light pixel by pixel.
+const OPT_DEBUG: u32 = 33u;
+// The HDR world's sky light by day in the upper sky's own hue, as Bliss's ambient (its sky averaged
+// between the horizon and the zenith, normalised: `deferred.vsh:121-151`), `base:look_sky_hue` read
+// raw: 0 the palette's fill as made, 1 all the way to the sky's hue.
+const OPT_SKY_HUE: u32 = 34u;
+// The HDR world's exposure by day in Bliss's own units (`base:look_exposure_abs`, read raw: 0 as
+// made, 1 all the way): its curve fed our light x41 (our light is in units about 41x smaller than
+// Bliss's, sun luma 1.77 against 72.7: Research's code read, 11-22), so its slope is Bliss's gentle
+// one; without our 0.83 and the near land's dim. Still 1 at an average sunlit view.
+const OPT_EXPOSURE_ABS: u32 = 35u;
+// The HDR world's warmth on sunlit foliage (`base:look_split_warm`, read raw: 0.7 as made, 0
+// none). With the 4300 K sun it counts the warmth twice (Bliss has no such grade).
+const OPT_SPLIT_WARM: u32 = 36u;
+// The HDR world's evening mist (`base:look_evening_mist`, read raw: 0 as made, 1 all the way): with
+// the sun low in the west the mist lies as Bliss's evening fog does (`overworld_fog.glsl:16-35`,
+// Ronald's 0.18 uniform + 0.09 cloudy), densest at the low land and halving every 6.7 blocks up, no
+// sharp-topped layer: the 18:00 warm veil over the land (Research's code read, 11-22).
+const OPT_EVENING_MIST: u32 = 37u;
+// The HDR world's bloom by day added on top as Bliss's (`base:look_bloom_add`, read raw: 0 as made,
+// mixed in keeping the light's sum; 1 all the way).
+const OPT_BLOOM_ADD: u32 = 38u;
+// A test switch for like-for-like compares (`base:look_cirrus_off`, read raw: 0 as made, 1 no high
+// cirrus): with `core:soft_clouds` 0, `core:cloud_shadows` 0 and a blank clouds texture (mcclear)
+// the sky then has no cloud at all, as Bliss's with VOLUMETRIC_CLOUDS off (Ronald, 11-22: "removing
+// clouds could help with bliss vs ours").
+const OPT_CIRRUS_OFF: u32 = 39u;
+// The HDR world's veiling glare, a share of the sky's light over the whole picture
+// (`base:look_glare`, read raw: 1 as made, 0 none). Bliss has none: its shade's lift is its added
+// bloom (controlled frames, 11-22: with bloom and auto exposure off its noon shade is 0 19 65,
+// ours 24 46 79).
+const OPT_GLARE: u32 = 40u;
+// The far shade from the sky as strong as Bliss's (`base:look_ao_power`, read raw by
+// `post_low/far_ao.wgsl` as option 41: 0 as made).
+const OPT_AO_POWER: u32 = 41u;
+// Water as Bliss's (lookstage2, 11-22: Bliss's lakes dark navy with a smooth shore, ours light blue
+// with cream foam and blotches). Absorption by depth (`base:look_water_absorb`): 0 as made, 1 Bliss's
+// per-colour coefficients (water and dirt), floored dark; more is stronger.
+const OPT_WATER_ABSORB: u32 = 42u;
+// The foam at the shore and over the shallows (`base:look_water_foam`): 1 as made, 0 none (Bliss's).
+const OPT_WATER_FOAM: u32 = 43u;
+// The mirror (`base:look_water_mirror`): 0 as made; 1 Bliss's Fresnel (fifth power from 0.02), the
+// sky mirrored where the ripples point it, no extra share at a slant.
+const OPT_WATER_MIRROR: u32 = 44u;
+// The evening's blue hour as Bliss's (`base:look_twilight`): 0 as made; above 0 the sky goes a deep,
+// saturated blue from sunset to about 10° under, and the land is lit by that sky at this many times
+// its light (Bliss's bliss_tw, 11-22: land 5 23 78 at 19:00, 0 10 75 at 19:30, dark at 20:00, where
+// ours was grey-black, 10 13 21, at 19:00).
+const OPT_TWILIGHT: u32 = 45u;
+// How bright the water's own body is, near and far (`base:look_water_body`): 1 as made, less darker.
+// Looking down at a lake the mirror is a few percent; the rest is the body's light, which kept our
+// open water a light blue (lsL, 11-22: 102 123 133 against Bliss's dark navy 68 93 125).
+const OPT_WATER_BODY: u32 = 46u;
+fn water_body() -> f32 {
+    let b = fantasy_opt(OPT_WATER_BODY);
+    return select(1.0, b, b >= 0.0);
+}
+
+// How much of the mist lies as the evening's (`OPT_EVENING_MIST`): none with the sun 25° up in the
+// west (17:00), a little at 12° (18:00), all with it on the horizon, into the dusk. (It began at 32°
+// up and drowned the 17:00 land in orange, where Bliss's shows its golden layer only at sunset:
+// lsG_ev against bliss_ctl, 11-22.)
+fn evening_mist() -> f32 {
+    let west = smoothstep(0.1, -0.1, scene.sun.x);
+    let low = 1.0 - smoothstep(0.03, 0.3, scene.sun.y);
+    return clamp(fantasy_opt(OPT_EVENING_MIST), 0.0, 1.0) * west * low * smoothstep(-0.2, -0.05, scene.sun.y);
+}
+
+// The surface's light from the sun and in all, before its tint (`light_on`, `surface_light`), for
+// the debug view.
+var<private> LIGHT_SUN: vec3<f32> = vec3(0.0);
+var<private> LIGHT_ALL: vec3<f32> = vec3(0.0);
+
+fn look_debug() -> u32 {
+    return u32(round(fantasy_opt(OPT_DEBUG)));
+}
 
 // The colour a grass or leaf tint is multiplied by for the foliage test: 1 as made.
 fn foliage_test() -> vec3<f32> {
@@ -209,6 +287,17 @@ fn palette_now() -> Palette {
         let day = smoothstep(-0.05, 0.05, scene.sun.y);
         p.sun = mix(p.sun, hue * (luma(p.sun) / max(luma(hue), 1e-4)), day);
     }
+    // The sky's light in the upper sky's hue (`base:look_sky_hue`): our fill, a pale near-white blue
+    // (white tops lit by the sky alone 192 195 204 where Bliss's are 163 186 210), diluted the
+    // 4300 K sun on leaf tops and kept them green (the debug view, lsA_d2 against Bliss's
+    // debug_INDIRECT, 11-22). By day only; its brightness kept.
+    let sky_hue = clamp(fantasy_opt(OPT_SKY_HUE), 0.0, 1.0);
+    if scene.frame.x > 0.5 && sky_hue > 0.0 {
+        let day_h = smoothstep(0.0, 0.12, scene.sun.y);
+        let upper = p.zenith * 0.65 + p.horizon * 0.35;
+        let hue = upper * (luma(p.ambient) / max(luma(upper), 1e-4));
+        p.ambient = mix(p.ambient, hue, day_h * sky_hue);
+    }
     // In the HDR world the twilight's light grows as the sun nears the horizon, as real twilight's
     // does (about tenfold over its last few degrees): the dusk key held one level from 8 degrees
     // under to 1, so 05:00 was as dark as 04:00 (land sRGB 25 24 30 where Bliss's is 32 70 125,
@@ -219,6 +308,22 @@ fn palette_now() -> Palette {
         let morning = smoothstep(-0.05, 0.05, scene.sun.x);
         let twilight = smoothstep(-0.3, -0.14, scene.sun.y) * (1.0 - smoothstep(-0.02, 0.06, scene.sun.y)) * morning;
         p.ambient *= mix(1.0, mix(0.7, TWILIGHT_RISE, smoothstep(-0.16, -0.02, scene.sun.y)), twilight);
+    }
+    // The evening's blue hour (`OPT_TWILIGHT`): from the sun 7° up to 10° under, fading out by 17°
+    // under; the sky's own colour pushed to a deep blue (its brightness kept), and the light in the
+    // shade that blue sky's, at the setting's strength.
+    let blue_k = max(fantasy_opt(OPT_TWILIGHT), 0.0);
+    if blue_k > 0.0 {
+        let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
+        let tw = smoothstep(-0.3, -0.17, scene.sun.y) * (1.0 - smoothstep(0.02, 0.12, scene.sun.y)) * evening * (1.0 - rain_amount());
+        let deep = vec3(0.08, 0.3, 1.0);
+        p.zenith = mix(p.zenith, deep * (luma(p.zenith) / luma(deep)), tw * 0.7);
+        p.horizon = mix(p.horizon, mix(p.horizon, deep * (luma(p.horizon) / luma(deep)), 0.5), tw);
+        let sky = p.zenith * 0.65 + p.horizon * 0.35;
+        // The land lit by it only once the sun is down: from 4° up it turned the 18:30 land a
+        // bright green (lsO_tw2: 125 136 88 at 4, where Bliss's is already dim, 35 36 69).
+        let down = 1.0 - smoothstep(-0.04, 0.0, scene.sun.y);
+        p.ambient = mix(p.ambient, sky * blue_k, tw * down);
     }
     return p;
 }
@@ -1114,7 +1219,9 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // full strength (sunflecks), though the leaves cut the sky light there to 0.6-0.8.
     let c_open = min(canopy(), 1.0);
     let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), light.x);
-    c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
+    let sun_part = p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
+    c += sun_part;
+    LIGHT_SUN = sun_part;
     // The ground round a lightning strike, lit by it (the HDR world). A held torch's light where it
     // is brighter than the placed lights there (no doubling). Neither in a calm scene (`CALM`).
     var held = vec3(0.0);
@@ -1128,6 +1235,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
+    LIGHT_ALL = c;
     return c;
 }
 
@@ -1299,6 +1407,13 @@ fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
         // ridges stand out of, the banks only varying it inside (a soft fall with height read as a
         // thin even veil with no top: the MC comparison's natural-mist sheets, 11-05). Storms' dust
         // and snow keep the old shape.
+        // The evening's: Bliss's height fall (2^(-0.15 (y - 53)), floored 8 blocks under it), its
+        // cloudy part as the banks; about 0.008 a block at sea level with `/air` 0.3.
+        let ev = evening_mist() * (1.0 - s);
+        var even = 0.0;
+        if ev > 0.0 {
+            even = f * open * 0.075 * exp2(-0.15 * (max(p.y, 45.0) - 53.0)) * (0.67 + smoothstep(0.25, 0.75, banks));
+        }
         if s < 0.5 {
             // The top heaves with the banks, up to 5 blocks either way, so it is a lumpy sea that
             // crowns break through, not a flat sheet (a level top laid straight stripes along
@@ -1316,9 +1431,9 @@ fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
             // edges soft (hard-edged blobs on the crowns, the same sheet).
             let wisp = exp(-max(p.y - floor, 0.0) / 5.0) * smoothstep(0.4, 0.9, smoothstep(0.25, 0.75, banks))
                 * (1.0 - smoothstep(0.2, 0.5, scene.sun.y)) * (1.0 - layer) * (1.0 - smoothstep(top + 25.0, top + 45.0, p.y));
-            return f * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11;
+            return mix(f * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11, even, ev);
         }
-        return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11;
+        return mix(f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11, even, ev);
     }
     return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
 }
@@ -1937,6 +2052,21 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             add += gold * luma(p.horizon) * phase * grey * low * 0.6;
             out += add * day_air * fade;
         }
+        // The blue hour's air (`OPT_TWILIGHT`): after sunset Bliss's land is a deep blue to the
+        // near ground (19:00 land 5 23 78, far 47 72 164; bliss_tw, 11-22), its own light near
+        // gone and the air between lit by the blue sky. Ours lit the land by that sky and it went
+        // grey-green, 22 36 40 (lsO_tw2), not blue. So the air adds the twilight sky's colour,
+        // blue first, filled in over the first few hundred blocks, at the setting's strength.
+        let blue_k = max(fantasy_opt(OPT_TWILIGHT), 0.0);
+        if blue_k > 0.0 {
+            let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
+            let tw = smoothstep(-0.3, -0.17, scene.sun.y) * (1.0 - smoothstep(-0.02, 0.1, scene.sun.y)) * evening * (1.0 - rain_amount());
+            if tw > 0.0 {
+                let fill = vec3(1.0) - exp(-vec3(1.5e-3, 3.0e-3, 6.0e-3) * min(dist, 600.0));
+                let sky_up = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
+                out += sky_up * fill * tw * blue_k;
+            }
+        }
     }
     var extra = vec3(0.0);
     if !CALM {
@@ -2036,8 +2166,10 @@ fn lottes(x: vec3<f32>) -> vec3<f32> {
 const HEJL_TOE: f32 = 0.25;
 
 // The HDR world's daytime warmth on sunlit foliage (`finish_picture`): how far it goes toward a
-// leaf-top yellow.
-const SPLIT_WARM: f32 = 0.7;
+// leaf-top yellow (`base:look_split_warm`, 0.7 by default).
+fn split_warm() -> f32 {
+    return clamp(fantasy_opt(OPT_SPLIT_WARM), 0.0, 1.0);
+}
 // 1 where the picture's pixel is land, 0 sky or cloud (set by `hdr_light` before `finish_picture`).
 var<private> LAND_PIXEL: f32 = 1.0;
 
@@ -2221,7 +2353,7 @@ fn finish_picture(c_in: vec3<f32>) -> vec3<f32> {
         // Green leading red as well: terracotta, sand and cream stone have more green than blue too,
         // and went pale yellow (our mesa's red bands, the nave's orange floor).
         let leafy_px = smoothstep(0.0, 0.08, (t.g - t.b) / max(l, 1e-4) * 0.5) * smoothstep(0.0, 0.04, (t.g - t.r) / max(l, 1e-4));
-        let hi = smoothstep(0.06, 0.3, l) * k * SPLIT_WARM * LAND_PIXEL * leafy_px;
+        let hi = smoothstep(0.06, 0.3, l) * k * split_warm() * LAND_PIXEL * leafy_px;
         let was_green = t.g > t.r;
         var warm = mix(t, vec3(l) * vec3(1.35, 1.08, 0.45), hi);
         if was_green {

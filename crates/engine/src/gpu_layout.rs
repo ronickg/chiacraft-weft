@@ -630,7 +630,7 @@ wgsl_types! {
     f32 => "f32", 4, 4, u32 => "u32", 4, 4, i32 => "i32", 4, 4,
     [f32; 2] => "vec2<f32>", 8, 8, [f32; 3] => "vec3<f32>", 16, 12, [f32; 4] => "vec4<f32>", 16, 16,
     [u32; 4] => "vec4<u32>", 16, 16, [i32; 4] => "vec4<i32>", 16, 16,
-    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96, [[f32; 4]; 8] => "array<vec4<f32>, 8>", 16, 128, [[f32; 4]; 12] => "array<vec4<f32>, 12>", 16, 192,
+    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96, [[f32; 4]; 8] => "array<vec4<f32>, 8>", 16, 128, [[f32; 4]; 12] => "array<vec4<f32>, 12>", 16, 192, [[f32; 4]; 16] => "array<vec4<f32>, 16>", 16, 256,
     GpuSky => "Sky", 16, core::mem::size_of::<GpuSky>(),
 }
 
@@ -730,10 +730,11 @@ gpu_struct! {
         /// when full, only by day when new), w the light it gives: its phase times how high it
         /// stands, 0 below the horizon. For packs' night light and moon shadows.
         pub moon: [f32; 4],
-        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 48
-        /// at most (16 before chiacraft's fantasy settings, 32 until its leaf light), four to a row
-        /// in that order (`packs::pack_options`); 0 for one not found.
-        pub options: [[f32; 4]; 12],
+        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 64
+        /// at most (16 before chiacraft's fantasy settings, 32 until its leaf light, 48 until its
+        /// Bliss-match settings), four to a row in that order (`packs::pack_options`); 0 for one
+        /// not found.
+        pub options: [[f32; 4]; 16],
         /// The light the player holds (a torch, a lantern), for packs' dynamic light: xyz where it
         /// is (camera relative, by the hand), w unused.
         pub hand: [f32; 4],
