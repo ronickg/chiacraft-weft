@@ -7,6 +7,15 @@ screen's look by UI redo) and seen in PC runs (11-05). The research behind it is
 
 **As built, where it differs from the proposal below:**
 - The fire bed is three sticks and a fibre (the 2 × 2 holds four).
+- **The bone lands** (11-22; `CONTENT.md` decision 4): in the snowy plains, the savanna and the
+  swamp (`vitals::first::BONE_LANDS`, no stone at the surface there) no rocks or flint lie on
+  the ground, old bones do (`BONE`, about four within 24 blocks); the snowy plains had nothing
+  loose at all before. A bone (or a rock) struck on old bones splits off a bone splinter (60%,
+  three a bone): a cutter like the flake, 25 uses. Sneaking, the same knapping screen knaps a
+  bone head, graded lower than flint (`BONE_HEAD_MATERIAL_POINTS` 16 to flint's 24); it hafts as
+  flint's does, the axe felling to bone's tier. A knife is a splinter on a stick too. The hint
+  `knap_bone` shows with a bone and no flint. The book makes heads from memory from flint only.
+  Art to come: the old bones' block and the splinter's icon (both the bone item's for now).
 - The knapping screen opens by sneaking and striking a flint nodule on the ground with a rock. It
   knaps an axe head (8 squares away), a pick head (13) or a shovel blade (8). A click inside the
   outline breaks the nodule into a flake. No knife blade: a knife is a flake on a stick.

@@ -17,6 +17,9 @@ pub enum Ground {
     Flint,
     /// A fallen branch: sticks.
     Branch,
+    /// Old bones (the bone lands' own, where no stone lies: `BONE_LANDS`): a hammer and a core,
+    /// splinters and bone heads knapped from them.
+    Bone,
 }
 
 impl Ground {
@@ -26,6 +29,7 @@ impl Ground {
             Ground::Rock => "loose_rock",
             Ground::Flint => "loose_flint",
             Ground::Branch => "fallen_branch",
+            Ground::Bone => "loose_bone",
         }
     }
 }
@@ -39,6 +43,15 @@ pub const BRANCH: f32 = 0.02;
 pub const BRANCH_OPEN: f32 = 0.001;
 /// Steep ground and shores (scree, river banks, beaches) have this many times the rocks and flint.
 pub const STONY: f32 = 3.0;
+/// Where no stone lies on the ground (`notes/CONTENT.md`, decision 4 and "Where the materials
+/// are": Utqiaġvik's tundra, the llanos, the Pantanal have their rock deep under permafrost,
+/// clay and silt): old bones lie there instead of rocks and flint, the way in of people who
+/// made their first tools of bone and antler, as the Arctic's and the plains' did.
+pub const BONE_LANDS: [&str; 3] = ["base:snowy_plains", "base:savanna", "base:swamp"];
+/// The share of open columns there with old bones: a caribou or bison's remains, shed antler.
+/// Enough that a place has about four within `SPAWN_LOOK` (a hammer, two cores and one spare;
+/// `bone_lands_have_enough`).
+pub const BONE: f32 = 0.005;
 /// Within this many blocks of the world's spawn the ground has `NEAR_SPAWN_TIMES` as much of
 /// everything, so the first minutes always have it at hand (`spawn_has_enough`).
 pub const NEAR_SPAWN: i32 = 32;
@@ -54,10 +67,14 @@ pub const OPEN_SHARE: f32 = 0.5;
 
 /// The chance a column of open ground has `g`: `stony` on steep ground or a shore, `crown` under
 /// a tree's crown, `from_spawn` its distance from the world's spawn in blocks.
-pub fn ground_chance(g: Ground, stony: bool, crown: bool, from_spawn: f32) -> f32 {
+/// In the bone lands (`bony`) there are no rocks or flint, and bones instead.
+pub fn ground_chance(g: Ground, stony: bool, crown: bool, bony: bool, from_spawn: f32) -> f32 {
     let base = match g {
+        Ground::Rock | Ground::Flint if bony => 0.0,
+        Ground::Bone if !bony => 0.0,
         Ground::Rock => ROCK * if stony { STONY } else { 1.0 },
         Ground::Flint => FLINT * if stony { STONY } else { 1.0 },
+        Ground::Bone => BONE,
         Ground::Branch => {
             if crown {
                 BRANCH
@@ -69,16 +86,16 @@ pub fn ground_chance(g: Ground, stony: bool, crown: bool, from_spawn: f32) -> f3
     base * if from_spawn <= NEAR_SPAWN as f32 { NEAR_SPAWN_TIMES } else { 1.0 }
 }
 
-/// The most the three chances add up to anywhere (stony, under a crown, by the spawn): worldgen
-/// looks no further when its roll is over it.
+/// The most the chances add up to anywhere (stony, under a crown, by the spawn; the bone lands
+/// have less): worldgen looks no further when its roll is over it.
 pub const MOST: f32 = 0.125;
 
 /// Which of the ground's things a column gets for a roll `u` (0..1), if any: rock first, then
-/// flint, then a branch, each its own share of the roll.
-pub fn ground_at(u: f32, stony: bool, crown: bool, from_spawn: f32) -> Option<Ground> {
+/// flint, then a branch, then bones, each its own share of the roll.
+pub fn ground_at(u: f32, stony: bool, crown: bool, bony: bool, from_spawn: f32) -> Option<Ground> {
     let mut at = 0.0;
-    for g in [Ground::Rock, Ground::Flint, Ground::Branch] {
-        at += ground_chance(g, stony, crown, from_spawn);
+    for g in [Ground::Rock, Ground::Flint, Ground::Branch, Ground::Bone] {
+        at += ground_chance(g, stony, crown, bony, from_spawn);
         if u < at {
             return Some(g);
         }
@@ -143,7 +160,12 @@ pub const STRIKE_SECS: f32 = 1.5;
 /// poorly.
 pub const FLAKE_FROM_FLINT: f32 = 0.8;
 pub const FLAKE_FROM_ROCK: f32 = 0.25;
-/// Flakes a nodule or rock gives before it is used up.
+/// A bone struck on a bone on the ground: a splinter this often (a long bone breaks along a spiral
+/// with a sharp edge, but less surely than flint flakes).
+pub const SPLINTER_FROM_BONE: f32 = 0.6;
+/// A bone splinter's uses before it's blunt: bone wears faster than a flint edge.
+pub const SPLINTER_USES: u32 = 25;
+/// Flakes (or splinters) a nodule, rock or bone gives before it is used up.
 pub const FLAKES_PER_STONE: u32 = 3;
 /// Knapping a head (sneaking while striking a flint nodule opens the knapping screen): a 5 × 5
 /// nodule, each square outside the head's outline struck away with a click; a click inside the
@@ -211,6 +233,8 @@ pub const HAND_PART_GRADE: u32 = 3;
 /// Grade points for a hand-knapped head: flint's material share, the hands-on work (rising with the
 /// knapping skill, as from the book), no station.
 pub const HEAD_MATERIAL_POINTS: u32 = 24;
+/// The same for a head knapped from bone: a duller, softer edge than flint's.
+pub const BONE_HEAD_MATERIAL_POINTS: u32 = 16;
 
 /// The first fire (Ronald, 11-05: "Fire bed + bow drill"): a fire bed of sticks and tinder (fibre)
 /// put on the ground, lit by holding a drill on it. Friction fire, for real: a bow drill gives an
@@ -270,33 +294,56 @@ mod tests {
         let area = std::f32::consts::PI * (SPAWN_LOOK * SPAWN_LOOK) as f32 * OPEN_SHARE;
         for (g, least) in SPAWN_LEAST {
             // A plains spawn: open ground, few crowns (branches by the open chance).
-            let expect = area * ground_chance(g, false, false, 0.0);
+            let expect = area * ground_chance(g, false, false, false, 0.0);
             assert!(expect >= least, "{g:?}: {expect:.1} expected within {SPAWN_LOOK}, want {least}");
         }
         // Flint stays rarer than rock everywhere, and far from the spawn the ground is thinner.
-        assert!(ground_chance(Ground::Flint, true, false, 500.0) < ground_chance(Ground::Rock, true, false, 500.0));
-        assert!(ground_chance(Ground::Rock, false, false, 500.0) < ground_chance(Ground::Rock, false, false, 0.0));
+        assert!(ground_chance(Ground::Flint, true, false, false, 500.0) < ground_chance(Ground::Rock, true, false, false, 500.0));
+        assert!(ground_chance(Ground::Rock, false, false, false, 500.0) < ground_chance(Ground::Rock, false, false, false, 0.0));
+    }
+
+    /// A place in the bone lands, far from the spawn, has bones enough for the way in (a hammer
+    /// and two to knap: a splinter and a head) and branches for the haft and the fire, and no
+    /// rocks or flint; elsewhere no bones.
+    #[test]
+    fn bone_lands_have_enough() {
+        let area = std::f32::consts::PI * (SPAWN_LOOK * SPAWN_LOOK) as f32 * OPEN_SHARE;
+        let bones = area * ground_chance(Ground::Bone, false, false, true, 500.0);
+        assert!(bones >= 3.0, "{bones:.1} bones expected within {SPAWN_LOOK}");
+        let branches = area * ground_chance(Ground::Branch, false, false, true, 500.0);
+        assert!(branches >= 0.4, "{branches:.1} open branches");
+        for g in [Ground::Rock, Ground::Flint] {
+            assert_eq!(ground_chance(g, true, true, true, 0.0), 0.0);
+        }
+        assert_eq!(ground_chance(Ground::Bone, true, true, false, 0.0), 0.0);
+        assert_eq!(BONE_LANDS.len(), 3);
     }
 
     #[test]
     fn most_covers_every_case() {
         for stony in [false, true] {
             for crown in [false, true] {
-                let sum: f32 = [Ground::Rock, Ground::Flint, Ground::Branch]
-                    .iter()
-                    .map(|&g| ground_chance(g, stony, crown, 0.0))
-                    .sum();
-                assert!(sum <= MOST, "{sum}");
+                for bony in [false, true] {
+                    let sum: f32 = [Ground::Rock, Ground::Flint, Ground::Branch, Ground::Bone]
+                        .iter()
+                        .map(|&g| ground_chance(g, stony, crown, bony, 0.0))
+                        .sum();
+                    assert!(sum <= MOST, "{sum}");
+                }
             }
         }
     }
 
     #[test]
     fn rolls_split_in_order() {
-        let r = ground_chance(Ground::Rock, false, true, 900.0);
-        assert_eq!(ground_at(0.0, false, true, 900.0), Some(Ground::Rock));
-        assert_eq!(ground_at(r + 1e-6, false, true, 900.0), Some(Ground::Flint));
-        assert_eq!(ground_at(0.99, false, true, 900.0), None);
+        let r = ground_chance(Ground::Rock, false, true, false, 900.0);
+        assert_eq!(ground_at(0.0, false, true, false, 900.0), Some(Ground::Rock));
+        assert_eq!(ground_at(r + 1e-6, false, true, false, 900.0), Some(Ground::Flint));
+        assert_eq!(ground_at(0.99, false, true, false, 900.0), None);
+        // In the bone lands the roll goes to the branch first, then bones.
+        let b = ground_chance(Ground::Branch, false, true, true, 900.0);
+        assert_eq!(ground_at(0.0, false, true, true, 900.0), Some(Ground::Branch));
+        assert_eq!(ground_at(b + 1e-6, false, true, true, 900.0), Some(Ground::Bone));
     }
 
     #[test]

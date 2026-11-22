@@ -106,9 +106,12 @@ const RECIPES_LIST: &[Recipe] = &[
     b("base:flint", 1.0, &[("base:loose_flint", 1.0)], Needs::Hand, 12.0),
     b("base:tektite", 2.0, &[("base:loose_tektite", 1.0)], Needs::Hand, 600.0),
     b("base:stick", 2.0, &[("base:fallen_branch", 1.0)], Needs::Hand, 6.0),
+    // the bone lands' way in (vitals::first::BONE_LANDS)
+    b("base:bone", 1.0, &[("base:loose_bone", 1.0)], Needs::Hand, 10.0),
     b("base:plant_fibre", 1.0, &[("base:tall_grass", 1.0)], CUTTER, 1.0),
     b("base:oak_bark", 1.0, &[("base:oak_log", 1.0)], AXE, 5.0),
     c("base:sharp_flake", 1.0, &[("base:flint", 1.0)], Hand),
+    c("base:bone_splinter", 1.0, &[("base:bone", 1.0)], Hand),
     c("base:part_felling_axe_head", 1.0, &[("base:flint", 1.0)], Hand),
     c("base:part_pick_head", 1.0, &[("base:flint", 2.0)], Hand),
     c("base:part_shovel_blade", 1.0, &[("base:flint", 2.0)], Hand),
@@ -116,6 +119,7 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:pickaxe", 1.0, &[("base:part_pick_head", 1.0), ("#stick", 1.0), ("#string", 2.0)], Hand),
     c("base:shovel", 1.0, &[("base:part_shovel_blade", 1.0), ("#stick", 1.0), ("#string", 2.0)], Hand),
     c("base:knife", 1.0, &[("base:sharp_flake", 1.0), ("#stick", 1.0), ("#string", 1.0)], Hand),
+    c("base:knife", 1.0, &[("base:bone_splinter", 1.0), ("#stick", 1.0), ("#string", 1.0)], Hand),
     c("base:fire_bed", 1.0, &[("base:plant_fibre", 1.0), ("#stick", 3.0)], Hand),
     c("base:bow_drill", 1.0, &[("#stick", 2.0), ("#string", 1.0)], Hand),
     c("base:hand_drill", 1.0, &[("#stick", 2.0)], Hand),
@@ -448,6 +452,7 @@ pub const TOOLS: &[(&str, &str, u32)] = &[
     ("base:diamond", "pickaxe", 400),
     ("base:shovel", "shovel", 100),
     ("base:sharp_flake", "cutter", 0),
+    ("base:bone_splinter", "cutter", 0),
     ("base:knife", "cutter", 0),
 ];
 

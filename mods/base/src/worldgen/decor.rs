@@ -98,14 +98,16 @@ pub(super) fn decorate(g: &mut Gen) {
                 .max()
                 .unwrap_or(0);
             // The loose things lie on open soil, sand and gravel, thicker on steep ground and gravel
-            // and round the spawn; fallen branches under the crowns (`vitals::first`).
+            // and round the spawn; fallen branches under the crowns; old bones instead of rocks
+            // and flint in the bone lands, the frozen north among them (`vitals::first`).
+            let bony = ground_u < vitals::first::MOST && vitals::first::BONE_LANDS.contains(&name_of(abi::entry_kind::BIOME, b));
             if ground_u < vitals::first::MOST
-                && !FROZEN.on_biome(b)
+                && (bony || !FROZEN.on_biome(b))
                 && (PLANT_SOIL.on_block(below) || SAND_TAG.on_block(below) || GRAVEL.is(below))
             {
                 let stony = fall >= 2 || GRAVEL.is(below);
                 let from_spawn = (((wx - spawn[0]) as f32).powi(2) + ((wz - spawn[2]) as f32).powi(2)).sqrt();
-                if let Some(thing) = vitals::first::ground_at(ground_u, stony, under_crown(g, x, y, z), from_spawn) {
+                if let Some(thing) = vitals::first::ground_at(ground_u, stony, under_crown(g, x, y, z), bony, from_spawn) {
                     if y >= 1 && fall >= 3 && PLANT_SOIL.on_block(below) {
                         g.set(x, y - 1, z, GRAVEL.id());
                     }

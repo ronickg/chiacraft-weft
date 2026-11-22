@@ -209,12 +209,12 @@ pub const RULES: &[Rule] = &[
     ),
     n(&["base:campfire"], 0, Shared, Technical, Not, "a laid campfire, lit"),
     n(
-        &["base:loose_rock", "base:loose_flint", "base:loose_tektite", "base:fallen_branch"],
+        &["base:loose_rock", "base:loose_flint", "base:loose_tektite", "base:fallen_branch", "base:loose_bone"],
         0,
         Shared,
         Ground,
         Not,
-        "picked up as a rock, flint, tektite or sticks",
+        "picked up as a rock, flint, tektite, sticks or a bone",
     ),
     n(&["base:coal_ore", "base:banded_clay_coal_ore"], 0, Shared, Ground, Not, "breaks into coal"),
     n(
@@ -313,7 +313,7 @@ pub const RULES: &[Rule] = &[
     r(&["base:*_leaves", "animals:*_leaves", "base:*_sapling", "animals:*_sapling", "base:sapling"], 0, Shared, Wood, World(Hand, 0.1)),
     r(&["base:oak_bark"], 0, Shared, Material, Made),
     // ---- the first tools and fire (vitals::first)
-    r(&["base:rock", "base:flint", "base:tektite", "base:stick", "base:plant_fibre", "base:sharp_flake"], 0, Shared, Material, Made),
+    r(&["base:rock", "base:flint", "base:tektite", "base:stick", "base:plant_fibre", "base:sharp_flake", "base:bone_splinter"], 0, Shared, Material, Made),
     r(&["base:bow_drill", "base:hand_drill", "base:fire_bed", "base:campfire_laid"], 0, Shared, Station, Made),
     // the ley lines (ley.rs, `vitals::ley`): the magic path's first step, and the ancients' stone
     n(&["base:dowsing_rod"], 0, Magic, Tool, Made, "senses the ley lines: the Stone Age's magic route"),

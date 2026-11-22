@@ -41,11 +41,11 @@ chat /tk set ~ ~ ~-1 base:loose_flint
 chat /tk hand me base:rock
 wait 0.5
 hold core:use 0.3
-wait 1
+wait 1.7
 hold core:use 0.3
-wait 1
+wait 1.7
 hold core:use 0.3
-wait 1
+wait 1.7
 wait 1
 chat /tk inv me
 shot fd_flakes.png

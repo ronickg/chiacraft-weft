@@ -1,0 +1,214 @@
+# The bone lands' way in (First hours, 11-22; vitals::first::BONE_LANDS). Seed 1, a fresh world.
+# Part 1, worldgen: a census of the loose things within 24 blocks at the plains spawn and at a spot
+# in each bone land (land_find on seed 1): snowy plains (384, -384), savanna (-192, 256), swamp
+# (192, 256). Expect at the spawn rocks, flint, branches and no bones; in the bone lands bones
+# (about 4 or more on open ground) and no rocks or flint.
+# Part 2, the way in, by real actions in survival on a pad in the snowy plains: a bone off the
+# ground, a bone struck on old bones for a splinter (60% a strike, three strikes), a bone axe head
+# knapped on the screen (sneaking), branches, grass cut with the splinter, string and the axe from
+# the book. Read every /tk census, /tk inv me reply, run.log lines "first: strike" (bone true),
+# "knapping: ... freed a bone felling_axe_head", "hints:" and "died" (there should be none), and
+# the shots. Yaw 0 faces -z; a negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /tk mode spectator
+look 0 -60
+chat /tk census 24 base:loose_bone,base:loose_rock,base:loose_flint,base:fallen_branch
+shot bw_spawn.png
+chat /tp 384 71 -384
+wait 2
+loaded
+idle
+chat /tk census 24 base:loose_bone,base:loose_rock,base:loose_flint,base:fallen_branch
+where snowy
+shot bw_snowy.png
+chat /tp -192 68 256
+wait 2
+loaded
+idle
+chat /tk census 24 base:loose_bone,base:loose_rock,base:loose_flint,base:fallen_branch
+where savanna
+shot bw_savanna.png
+chat /tp 192 69 256
+wait 2
+loaded
+idle
+chat /tk census 24 base:loose_bone,base:loose_rock,base:loose_flint,base:fallen_branch
+where swamp
+shot bw_swamp.png
+# Part 2: the snowy plains, a pad at its spot.
+chat /tp 384 80 -384
+wait 2
+loaded
+idle
+chat /tk mode creative
+chat /tk top 384 -384
+chat /tp 384 71 -384
+wait 1
+chat /tk fill ~-6 ~-2 ~-6 ~6 ~-1 ~6 base:snowy_grass
+chat /tk fill ~-6 ~ ~-6 ~6 ~5 ~6 core:air
+wait 1
+chat /tk mode survival
+until mode survival within 10
+wait 1
+look 0 -60
+# 1. A bone off the ground.
+chat /tk set ~ ~ ~-1 base:loose_bone
+wait 0.5
+hold core:attack 0.5
+wait 1.5
+chat /tk inv me
+until chat base:bone within 5
+# 2. Splinters: the bone struck on old bones, three times.
+chat /tk set ~ ~ ~-1 base:loose_bone
+chat /tk hand me base:bone
+wait 0.5
+hold core:use 0.3
+wait 1.7
+hold core:use 0.3
+wait 1.7
+hold core:use 0.3
+wait 1.7
+chat /tk inv me
+shot bw_splinters.png
+until chat base:bone_splinter within 5
+# 3. A bone axe head on the knapping screen.
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+chat /tk set ~ ~ ~-1 base:loose_bone
+chat /tk hand me base:bone
+wait 0.5
+hold core:sneak 2 nowait
+wait 0.3
+hold core:use 0.3
+until screen base:knapping within 5
+wait 1
+shot bw_knap_open.png
+tap base:knapping class:knap_stone
+until screen none within 5
+chat /tk inv me
+until chat base:part_felling_axe_head within 5
+# 4. Sticks from four fallen branches.
+chat /tk set ~ ~ ~-1 base:fallen_branch
+wait 0.4
+hold core:attack 0.4
+wait 1
+chat /tk set ~ ~ ~-1 base:fallen_branch
+wait 0.4
+hold core:attack 0.4
+wait 1
+chat /tk set ~ ~ ~-1 base:fallen_branch
+wait 0.4
+hold core:attack 0.4
+wait 1
+chat /tk set ~ ~ ~-1 base:fallen_branch
+wait 0.4
+hold core:attack 0.4
+wait 1
+# 5. Fibre: 20 tufts of tall grass cut with the splinter.
+chat /tk hand me base:bone_splinter
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+chat /tk set ~ ~ ~-1 base:tall_grass
+wait 0.3
+hold core:attack 0.3
+wait 0.6
+wait 1
+chat /tk inv me
+until chat base:plant_fibre within 5
+# 6. The book: string, then the bone axe.
+press core:inventory
+until screen core:menu within 10
+wait 1
+tap_once core:menu icon:base:string
+tap_once core:menu text:max (
+wait 1
+tap_once core:menu icon:base:axe
+wait 1
+shot bw_book_axe.png
+tap_once core:menu text:max (
+wait 1
+key Escape
+until screen none within 10
+chat /tk inv me
+until chat base:axe within 5
+chat /tk hand me base:axe
+wait 0.5
+shot bw_axe.png
+expect alive
+quit

@@ -151,7 +151,8 @@ pub fn register(r: &mut Registry) {
         .tag("leather")
         .tab(&crate::tabs::INGREDIENTS);
     // paper (from sugar cane) and books (paper and leather) make bookshelves
-    for name in ["bone", "string", "sugar", "gunpowder", "feather", "arrow", "egg", "paper", "book"] {
+    // The bone is `first.rs`'s (a hammer and a core in the bone lands).
+    for name in ["string", "sugar", "gunpowder", "feather", "arrow", "egg", "paper", "book"] {
         r.item(Item::generated(name.into()))
             .tag(name)
             .tab(&crate::tabs::INGREDIENTS);

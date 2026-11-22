@@ -13,7 +13,7 @@ use crafting::{code, grades, skills};
 use vitals::first::{self as f, KNAPPED};
 use weft_sdk::*;
 
-use crate::first::{LOOSE_FLINT, SHARP_FLAKE};
+use crate::first::{BONE_SPLINTER, LOOSE_BONE, LOOSE_FLINT, SHARP_FLAKE};
 use crate::parts::{PART, PartOf, SKILLS};
 
 value! {
@@ -145,8 +145,10 @@ fn hit(w: &World, player: u64, v: u32) {
     let near = w
         .entity(player)
         .is_some_and(|e| (e.pos - at).length_squared() <= REACH * REACH);
+    // What's knapped: a flint nodule, or a bone (the bone lands' way in).
+    let bone = LOOSE_BONE.is(w.block(pos));
     // The nodule gone (picked up, broken) or left behind: the screen closes.
-    if !near || !LOOSE_FLINT.is(w.block(pos)) {
+    if !near || !(LOOSE_FLINT.is(w.block(pos)) || bone) {
         nodules.remove(i);
         w.send(player, &CLOSE, &0);
         return;
@@ -168,7 +170,7 @@ fn hit(w: &World, player: u64, v: u32) {
     if head.keeps(square) {
         // Struck inside the outline: the nodule breaks, a flake is all that's left.
         w.set_block(pos, 0);
-        w.spawn_item(at, ItemStack::new(SHARP_FLAKE.id(), 1));
+        w.spawn_item(at, ItemStack::new(if bone { BONE_SPLINTER.id() } else { SHARP_FLAKE.id() }, 1));
         w.play_sound(&CRACK, at, 1.0);
         nodules.remove(i);
         k.broken = square as u32 + 1;
@@ -180,7 +182,9 @@ fn hit(w: &World, player: u64, v: u32) {
     w.play_sound(&STRIKE, at, 1.0);
     if k.removed & head.away() == head.away() {
         w.set_block(pos, 0);
-        let made = knapped_head(w, player, head.shape, true, Some(unit(w)));
+        let material = if bone { "bone" } else { "flint" };
+        let made = knapped_head(w, player, head.shape, material, true, Some(unit(w)));
+        weft_sdk::info!("knapping: {player} freed a {material} {}", head.shape);
         crate::skills::made(w, player, &made, 1);
         let left = w.inventory(player).insert(made);
         if !left.is_empty() {
@@ -201,16 +205,18 @@ fn unit(w: &World) -> f32 {
     (w.random() >> 40) as f32 / (1u64 << 24) as f32
 }
 
-/// A flint head of part shape `shape` made by `player`: its grade from flint, their knapping skill
-/// and no station; work by hand scores `BY_HAND_BONUS` over work from memory (the book). With a
-/// roll, luck and the skill's rise as any made part; without (a grid's preview), neither.
-pub fn knapped_head(w: &World, player: u64, shape: &str, by_hand: bool, roll: Option<f32>) -> ItemStack {
+/// A head of part shape `shape` knapped from `material` (flint, or bone) by `player`: its grade
+/// from the material, their knapping skill and no station; work by hand scores `BY_HAND_BONUS`
+/// over work from memory (the book). With a roll, luck and the skill's rise as any made part;
+/// without (a grid's preview), neither.
+pub fn knapped_head(w: &World, player: u64, shape: &str, material: &str, by_hand: bool, roll: Option<f32>) -> ItemStack {
     let craft = skills::index(crafting::materials::Making::Knap);
     let xp = w.component(player, &SKILLS).map_or(0, |s| s.xp[craft]);
     let memory = grades::work_from_memory(skills::level(xp));
     let work = if by_hand { (memory + f::BY_HAND_BONUS).min(grades::WORK_MAX) } else { memory };
     // 0.5 is no luck either way (`grades::LUCK`).
-    let grade = grades::roll(grades::Points { material: f::HEAD_MATERIAL_POINTS, work, station: 0 }, roll.unwrap_or(0.5));
+    let points = if material == "bone" { f::BONE_HEAD_MATERIAL_POINTS } else { f::HEAD_MATERIAL_POINTS };
+    let grade = grades::roll(grades::Points { material: points, work, station: 0 }, roll.unwrap_or(0.5));
     if roll.is_some()
         && let Some(s) = w.component_mut(player, &SKILLS)
     {
@@ -218,7 +224,7 @@ pub fn knapped_head(w: &World, player: u64, shape: &str, by_hand: bool, roll: Op
     }
     let made_day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
     ItemStack::new(Item::generated(format!("part_{shape}")).id(), 1)
-        .with(&PART, PartOf { material: code("flint"), grade: grade as u32, worn: 0, made_day, repairs: 0 })
+        .with(&PART, PartOf { material: code(material), grade: grade as u32, worn: 0, made_day, repairs: 0 })
 }
 
 /// The screen (kit 2, UI redo): the heads to pick as categories, the nodule in a well, a line on how.
