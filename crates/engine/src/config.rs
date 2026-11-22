@@ -660,6 +660,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:pt_dn_steps", ck::INT, 4.0, 1.0, 5.0, 1.0),
         // Its debug views (checks only): 0 none, 1-6 (`denoise.wgsl` `dn_debug_view`).
         number("core:pt_dn_debug", ck::INT, 0.0, 0.0, 6.0, 1.0),
+        // chiacraft: our soft clouds (`client::soft_clouds`), on unless a look test turns them off
+        // (stage 1/2 like-for-like shots; kept until the A/B against upstream's clouds).
+        number("core:soft_clouds", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // The soft clouds' shadow on the land (with the HDR world; `client::cloud_shadow`).
         number("core:cloud_shadows", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.

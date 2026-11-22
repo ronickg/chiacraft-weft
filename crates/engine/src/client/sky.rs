@@ -44,7 +44,13 @@ pub fn rgb(c: u32) -> Vec3 {
 
 /// Where on its orbit it is, in turns.
 pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
-    let moved = if s.orbit.is_infinite() {
+    // chiacraft, test only: `--mc-moon` keeps a body on its own orbit (base's moon, a turn every
+    // 8/7 days) turning with the day instead, at its phase: the moon opposite the sun all month, as
+    // Minecraft's, so like-for-like shots of an evening aren't skewed by our gibbous moon high in
+    // the sky (Planner, 11-06).
+    static MC_MOON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let mc_moon = *MC_MOON.get_or_init(|| crate::app::api::launch_options().contains_key("mc-moon"));
+    let moved = if s.orbit.is_infinite() || (mc_moon && s.orbit > 0.0) {
         d.day_turn(time)
     } else if s.orbit == 0.0 {
         0.0
@@ -56,7 +62,16 @@ pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
 
 /// Its frame in the world at `turn`: x toward it, y along its way, z out of the orbit's plane.
 pub(super) fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
-    Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(s.tilt) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
+    Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(tilt_of(s)) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
+}
+
+/// chiacraft: its path's lean, `app::api::sun_tilt` when a run sets one, none under the test flag
+/// `--mc-days` (`app::api::mc_days`).
+fn tilt_of(s: &SkyDef) -> f32 {
+    if let Some(t) = crate::app::api::sun_tilt() {
+        return t;
+    }
+    if crate::app::api::mc_days() { 0.0 } else { s.tilt }
 }
 
 /// How far around the sunset of a body is at `height` (the sine of its elevation): how much it
@@ -878,10 +893,17 @@ impl Sky {
                     self.cloud_shade = [[ids[0] as f32 + 1.0, size as f32, low, cover * 0.6 + thunder * 0.35], uv];
                     // Past all the terrain there is, distant terrain too, for packs' clouds
                     // (`extra.w`); the cost doesn't depend on it.
-                    let reach = (setting("core:view_distance") * 16.0)
-                        .max(super::lod::Lod::distance() as f64)
-                        .max(1365.0)
-                        * 1.5;
+                    // chiacraft, test only: `--mc-clouds` ends them as vanilla's do, a little past the
+                    // view distance where its fog closes (Bliss's instance at 32 chunks: they stop
+                    // about 600 blocks out and leave a clear pale band over the horizon; 11-06).
+                    let reach = if crate::app::api::launch_options().contains_key("mc-clouds") {
+                        setting("core:view_distance") * 16.0 * 1.2
+                    } else {
+                        (setting("core:view_distance") * 16.0)
+                            .max(super::lod::Lod::distance() as f64)
+                            .max(1365.0)
+                            * 1.5
+                    };
                     (
                         // axes[1].x: the soft clouds' trace target, bindless index + 1 (0: none),
                         // for `fs_cloud_resolve`.

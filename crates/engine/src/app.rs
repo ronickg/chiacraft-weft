@@ -3194,10 +3194,8 @@ fn update_game(r: &mut Running, dt: f64, frame_start: Instant) {
             .entity_render
             .set_show_avatars(crate::settings::show_avatars());
         g.client.render.occlusion.on = crate::settings::occlusion_culling();
-        // SYNC: the `core:soft_clouds` setting was let go with this sync (ledger, section 12), the
-        // soft clouds not yet (they wait for an A/B against upstream's volumetric clouds): on, as
-        // the setting's default was.
-        g.client.sky.soft_wanted = true;
+        // chiacraft: our soft clouds, until the A/B against upstream's volumetric clouds.
+        g.client.sky.soft_wanted = crate::settings::soft_clouds();
         r.post.use_low = crate::settings::post_low();
         r.post.use_taa = crate::settings::aa();
         r.post.taa_blend = crate::settings::taa_blend();

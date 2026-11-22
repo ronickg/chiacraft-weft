@@ -175,6 +175,16 @@ impl Client {
         }
         let day = d.daylight(self.world.time);
         let height = (d.day_turn(self.smooth_time()) * std::f64::consts::TAU).sin() as f32;
+        // chiacraft, test only: with `--mc-days` the lightmap gets vanilla's daylight
+        // (`getSkyDarken`: the sun's height doubled plus 0.2, then 0.8 of it over a floor of 0.2),
+        // which the lightmap (`common.wgsl`, 26.1's) was made for; ours adds 0.5, so by 06:00 and
+        // 18:00 vanilla's land had dimmed to 0.73 of noon and ours to 0.95.
+        let lightmap_day = if crate::app::api::mc_days() && d.sky_light && d.daylight.is_empty() {
+            let g = ((d.day_turn(self.world.time as f64) * std::f64::consts::TAU).sin() * 2.0 + 0.2).clamp(0.0, 1.0) as f32;
+            g * 0.8 + 0.2
+        } else {
+            day
+        };
         let cloud_day = if d.sky_light { (height * 2.0 + 0.5).clamp(0.0, 1.0) } else { 1.0 };
         let ambient_level = d.ambient as f32 / 15.0;
         let ambient = (ambient_level / (4.0 - 3.0 * ambient_level)).max(0.04);
@@ -197,7 +207,7 @@ impl Client {
                 .to_array(),
             fog_start: view_distance * 0.6,
             fog_end: view_distance,
-            daylight: day,
+            daylight: lightmap_day,
             ambient,
             sunlight: 1.0,
             sky_opacity: 1.0,
@@ -215,7 +225,7 @@ impl Client {
 
         let mut weather = Layer::new("core:weather".into());
         weather.priority = -900;
-        weather.values.daylight = day * (1.0 - self.look.darkness);
+        weather.values.daylight = lightmap_day * (1.0 - self.look.darkness);
         weather.values.sky_gray = self.look.sky_gray;
         weather.values.fog_gray = self.look.fog_gray;
         weather.values.sky_cover = self.look.sky_cover;

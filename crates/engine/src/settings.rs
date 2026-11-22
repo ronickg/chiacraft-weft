@@ -201,6 +201,10 @@ pub fn renderer() -> String {
         .map(|d| d.show(config::get(id)))
         .unwrap_or_default()
 }
+/// chiacraft: our soft clouds (`core:soft_clouds`).
+pub fn soft_clouds() -> bool {
+    number("core:soft_clouds") != 0.0
+}
 pub fn fov() -> f32 {
     number("core:fov") as f32
 }
