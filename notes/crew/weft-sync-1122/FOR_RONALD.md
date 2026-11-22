@@ -103,3 +103,19 @@ Upstream keeps a texture's rules in `block/<name>/<name>.ctm` beside its tiles, 
 
 ## Our shader pack and upstream's new sky passes (11-22)
 With our pack on, upstream's atmosphere pass and lightning bolts don't run, because the pack has no `vs_atmosphere`, `fs_atmosphere` or `fs_lightning`. The engine treats them as optional, so nothing breaks; the bolts and the atmosphere just don't show. Upstream's face layers (grass-side overlays) draw with our `fs_translucent`. Bringing them into the pack is his call, after the look A/B.
+
+## Upstream's new art redrawn in our style (11-22, approved "Yes, approve them")
+157 of the 187 pictures the sync added are ours now, same names, sizes doubled to our 32 a block where upstream's were 16 (models read UVs in block units, so they map the same). **At the next sync, keep ours** for all of these ("our art: keep ours"):
+- **Potions:** `item/potion_*` (24) and `glass_bottle`. One flask, the liquid in each effect's colour from `effects.rs`. One shape for all, as upstream has; a shape per effect would be new flasks drawn and a different base picked per potion in `notes/art/weft-redraw/potions.py`, nothing else changes.
+- **Items (17):** assembly_tool, grab_tool, clay_ball, iron/gold/diamond shears, the plant and mushroom items (chanterelle, porcini, toadstool, dryad's saddle and its cooked one, inula, verbascum, lavender, raspberry, snowberry, reeds). The **shield** model's texture `item/shield.png`, painted in its geo layout from our oak, iron and gold.
+- **Effect icons:** `mob_effect/*` (24), now 48 px like our own status icons, each in its potion's colour.
+- **Plants:** short grass, tall grass, bluegrass, the four forest mushrooms (in upstream's variant folders, `.ctm` kept), tulips (6), inula, verbascum, lavender (top, bottom and the 32 x 64 whole), bush stem, raspberry and snowberry leaves, moss (our moss block's top), the three hollow logs' insides. Made with `notes/blocks/batches/weft_plants.tsv`, `weft_tulips.py`, `weft_plants_post.py`.
+- **Machine faces (36):** assembler, rotor hold, floater hold, guide case and rail, helm, thruster, wheel, music player (and record), woodcutter. Upstream's picture doubled and drawn in our materials by `notes/blocks/weft_machines.py`; rerun it after a material tile changes.
+- **UI (10):** icon_put_away, icon_sort, music_play/pause/stop, music_track rows, slot_fuel and slot_trash hints.
+
+Left as upstream's because the game never loads them: `block/stained_glass/`, `clover_top/`, `clover_bottom/`, `fern.png`, `lamp_white`, `rotor_front`, `rotor_back`; `gui/heart_hardcore_*`, `heart_poisoned_*`, `heart_withered_*` (12) and `food_hunger_*` (3), since our HUD draws only the armour and air rows. Redraw them if they come into use.
+Second pass after the in-game look (11-22): the berried raspberry and snowberry bushes (bigger berries in loose clusters on our plain raspberry leaves, three random variants each in the folder form) and the three wheel faces (tread, sidewall, hub with spokes), from `notes/art/weft-redraw/touchup.py`.
+Every try and sheet: `~/Coding/chiacraft-archive/images/art-weft-content/2026-11-22/`.
+
+## Missing-texture warnings after the sync (fixed 11-22)
+17 blocks named no picture of their own (`base:block/<name>` missing at load): the ten tree branches, piston, sticky piston and their heads, floater, observer and bed. Their faces all come from their states' models, which have art; only the block-level picture (particles, fallback) fell back to the block's name. Each now names one of its own faces (`.texture(...)` in `blocks.rs`, `redstone.rs`, `beds.rs`). No drawing was missing.

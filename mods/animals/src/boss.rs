@@ -228,6 +228,15 @@ pub fn init(r: &mut Registry) {
         let Some(def) = def_of(&w, q.entity) else { return };
         m.value = hurt(def, &w, q.entity, q.other, q.cause, m.value as f32) as f64;
     });
+    // Over-tier armour against a boss counts at most the titan's cap over its form's level
+    // (`base_api::chains::GEAR_COUNTS`), as a weapon does in `hurt`.
+    r.modify(&base_api::chains::GEAR_COUNTS, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        let w = m.world();
+        let (Some(def), Some(c)) = (def_of(&w, q.other), w.component(q.other, &WARDEN)) else { return };
+        let level = data(def).level(form_of(def, &c));
+        m.value *= vitals::combat::cap_share(bosses::SIZE, q.amount as f32, level) as f64;
+    });
     r.text_place(&BAR)
         .at(0.5, 0.0, 0.0, 30.0)
         .scale(1.2)

@@ -1313,6 +1313,8 @@ fn branch(r: &mut Registry, wood: &str) {
     let sides = ["n", "s", "e", "w", "u", "d"];
     let mut b = r
         .block(Block::generated(name))
+        // Its faces come from the states; this is its particles' and fallback picture.
+        .texture(&bark)
         .sound_group("wood")
         .hardness(0.8)
         .mined_by("axe", tool_tier::HAND)

@@ -104,6 +104,21 @@ pub fn species() -> Vec<String> {
             same_age(size, d.role, d.area_level(level), them, s.name, &mut out);
         }
     }
+    // Base's hostile mobs, on the same curve (`vitals::mobs`); armour pays off against them.
+    for m in vitals::mobs::MOBS {
+        same_age(m.size(), m.role, m.level(), m.stats(), m.name, &mut out);
+        let hits = vitals::mobs::armoured_hits(m);
+        // Only for mobs priced against a fresh player: priced against the reference (option B)
+        // they take the band's hits from it by design.
+        if vitals::mobs::MEETS == vitals::mobs::Meets::Fresh && hits < vitals::mobs::ARMOURED_HITS {
+            out.push(format!(
+                "{}: the {} reference in its armour goes down in {hits:.1} of its hits, under {}",
+                m.name,
+                m.home.name(),
+                vitals::mobs::ARMOURED_HITS
+            ));
+        }
+    }
     out
 }
 
@@ -117,6 +132,13 @@ pub fn tweaks() -> Vec<String> {
         for (stat, t) in d.tweaks {
             if !t.ok() {
                 out.push(format!("{}'s {} tweak ×{} (\"{}\") is out of bounds or gives no reason", d.species, stat.name(), t.x, t.why));
+            }
+        }
+    }
+    for m in vitals::mobs::MOBS {
+        for (stat, t) in m.tweaks {
+            if !t.ok() {
+                out.push(format!("{}'s {stat:?} tweak ×{} (\"{}\") is out of bounds or gives no reason", m.name, t.x, t.why));
             }
         }
     }
@@ -189,6 +211,64 @@ pub fn gem_ceiling() -> Vec<String> {
             {
                 if g.mult * m > vitals::curve::GRADE_CEILING + 1e-4 {
                     out.push(format!("{} at grade {}: stat {i} x{:.2}", k.id, g.n, g.mult * m));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Most of a fight a creature may spend knocked down (`vitals::combat::KNOCK_*`).
+pub const DOWN_SHARE: f32 = 1.0 / 3.0;
+
+/// Stagger on every size that has a floor, at every age's levels: a same-age fight reaches every
+/// break, and knockdowns (their rest between) keep it down at most `DOWN_SHARE` of a fight, same
+/// age or over-tier at grade 4 and at the ceiling.
+pub fn stagger() -> Vec<String> {
+    let mut out = Vec::new();
+    for size in SIZES.into_iter().filter(|&s| combat::staggers(s)) {
+        for role in ROLES {
+            for age in AGES {
+                for depth in [0, 5, 9] {
+                    let level = age.start() + depth as f32;
+                    let them = combat::derive(size, role, level);
+                    let h = them.health;
+                    let mut fights = vec![("same-age".to_string(), combat::fight(Player { level, times: 1.0 }, size, level, them))];
+                    for gear in AGES.iter().filter(|a| a.tier() > age.tier()) {
+                        for times in [1.0, GRADE_CEILING] {
+                            fights.push((
+                                format!("{} gear ×{times}", gear.name()),
+                                combat::fight(Player { level: gear.reference(), times }, size, level, them),
+                            ));
+                        }
+                    }
+                    for (i, (who, f)) in fights.iter().enumerate() {
+                        // What it would have lost without the floor, over the fight: the overflow.
+                        let over = h * (f.ttk / f.raw.max(1e-6) - 1.0).max(0.0);
+                        let stagger = combat::stagger_gain(h, over);
+                        if i == 0 && combat::breaks_at(stagger, h) < combat::BREAKS.len() {
+                            out.push(format!(
+                                "a {} {} (level {level:.0}): a same-age fight gathers {:.0}% of its health in stagger, short of its last break",
+                                size.name(),
+                                role.name(),
+                                100.0 * stagger / h
+                            ));
+                        }
+                        let knocks = (stagger / (combat::KNOCK_AT * h)).floor();
+                        let room = 1.0
+                            + ((f.ttk - combat::KNOCK_SECS) / (combat::KNOCK_SECS + combat::KNOCK_REST))
+                                .max(0.0)
+                                .floor();
+                        let down = knocks.min(room) * combat::KNOCK_SECS;
+                        if down > DOWN_SHARE * f.ttk {
+                            out.push(format!(
+                                "a {} {} (level {level:.0}), {who}: down {down:.0} s of a {:.1} s fight",
+                                size.name(),
+                                role.name(),
+                                f.ttk
+                            ));
+                        }
+                    }
                 }
             }
         }

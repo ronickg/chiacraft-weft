@@ -11,7 +11,7 @@ fn check(name: &str) {
 
 #[test]
 fn every_check_runs() {
-    assert_eq!(progression::checks().len(), 12);
+    assert_eq!(progression::checks().len(), 13);
 }
 
 #[test]
@@ -72,4 +72,9 @@ fn tweaks() {
 #[test]
 fn gem_ceiling() {
     check("grade and gems at most +60% over a plain item");
+}
+
+#[test]
+fn stagger() {
+    check("stagger: same-age fights break every part, knockdowns at most a third of a fight");
 }

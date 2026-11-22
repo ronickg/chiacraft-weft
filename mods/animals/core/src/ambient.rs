@@ -69,7 +69,9 @@ pub struct Life {
 pub const SPRITES: [&str; 5] = ["ambient_eagle", "ambient_vulture", "ambient_gull", "ambient_owl", "ambient_fish"];
 
 fn lives(s: &Species, biome: &str) -> bool {
-    s.habitats.iter().any(|&(b, share)| b == biome && share > 0.0)
+    s.habitats
+        .iter()
+        .any(|&(b, share)| b == biome && share > 0.0)
 }
 
 fn sprite(model: &str) -> u8 {
@@ -80,7 +82,10 @@ fn sprite(model: &str) -> u8 {
         "fish" => "ambient_fish",
         _ => "ambient_eagle",
     };
-    SPRITES.iter().position(|&s| s == name).map_or(0, |i| i as u8 + 1)
+    SPRITES
+        .iter()
+        .position(|&s| s == name)
+        .map_or(0, |i| i as u8 + 1)
 }
 
 /// The ambient life of `biome`, from the species that live there.
@@ -91,9 +96,7 @@ pub fn life_in(biome: &str) -> Life {
             .find(|s| names.contains(&s.name) && lives(s, biome))
             .map_or(0, |s| sprite(s.model))
     };
-    let fish = SPECIES
-        .iter()
-        .any(|s| s.in_water() && lives(s, biome));
+    let fish = SPECIES.iter().any(|s| s.in_water() && lives(s, biome));
     Life { soar: first(SOARING), coast: first(COASTAL), owl: first(NIGHT), fish: if fish { sprite("fish") } else { 0 } }
 }
 

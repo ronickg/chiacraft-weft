@@ -15,8 +15,8 @@ chat /tp 0.5 200 2.5
 wait 1
 loaded
 chat /tk mode survival
-chat /tk attr_mod me core:max_health testkit:hp 0 300 0
-chat /tk attr_mod me core:entity_reach testkit:reach 0 2 0
+chat /tk attr_mod me core:max_health testkit:hp core:add 300 0
+chat /tk attr_mod me core:entity_reach testkit:reach core:add 2 0
 chat /tk put me 0 animals:mountain_offering 8
 chat /gear sword bronze slot=1
 chat /gear sword diamond slot=2

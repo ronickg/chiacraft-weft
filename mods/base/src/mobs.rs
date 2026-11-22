@@ -12,6 +12,28 @@ pub static CREEPER: EntityKind = EntityKind::named("creeper");
 
 use base_api::entities::COW;
 
+/// The mobs `vitals::mobs` gives numbers, by their row's name.
+static MOB_KINDS: [(&EntityKind, &str); 4] = [(&ZOMBIE, "zombie"), (&SPIDER, "spider"), (&SKELETON, "skeleton"), (&CREEPER, "creeper")];
+
+/// "player", or a mob's row name, for the night checks' log lines.
+fn fighter(w: &World, id: u64) -> Option<&'static str> {
+    if w.players_iter().any(|p| p == id) {
+        return Some("player");
+    }
+    let kind = w.entity(id)?.kind;
+    MOB_KINDS
+        .iter()
+        .find(|(k, _)| k.id() == kind)
+        .map(|(_, n)| *n)
+}
+
+/// A mob's numbers on the curve (`vitals::mobs`).
+fn curve(name: &str) -> vitals::combat::Stats {
+    vitals::mobs::mob(name)
+        .map(|m| m.stats())
+        .expect("a row in vitals::mobs")
+}
+
 pub fn register(r: &mut Registry) {
     // The engine's player kind, drawn as the same humanoid as the zombie.
     r.set_model(&PLAYER, humanoid(false));
@@ -27,11 +49,13 @@ pub fn register(r: &mut Registry) {
         .sound("hurt")
         .sound("death")
         .size(0.6, 1.95)
-        .max_health(20.0)
+        .max_health(curve("zombie").health)
         .walk_speed(2.6)
         .hostile()
         .burns_in_sun()
-        .attack_damage(3.0)
+        .attack_damage(curve("zombie").hit)
+        // Its band's seconds between hits (`vitals::combat::Band::interval`).
+        .attack_speed(1.0 / curve("zombie").interval)
         .reach(1.3)
         .goals(hostile(ai::Goals::new().aggressive(35.0)));
     r.entity(&SPIDER)
@@ -41,10 +65,12 @@ pub fn register(r: &mut Registry) {
         .sound("hurt")
         .sound("death")
         .size(1.3, 0.9)
-        .max_health(16.0)
+        .max_health(curve("spider").health)
         .walk_speed(3.6)
         .hostile()
-        .attack_damage(2.0)
+        .attack_damage(curve("spider").hit)
+        // Its band's seconds between hits (`vitals::combat::Band::interval`).
+        .attack_speed(1.0 / curve("spider").interval)
         // Vanilla's reach goes by a mob's width: a body this wide stops further off.
         .reach(2.4)
         // In daylight it only fights back.
@@ -54,6 +80,88 @@ pub fn register(r: &mut Registry) {
                 .neutral(),
         ));
     r.entity_component(&FUSE, 0u32, 0);
+    // A skeleton's arrow hits for its row's hit (`vitals::mobs`), not by its speed: set first, so
+    // armour and the rest still apply.
+    r.modify(&chain::DAMAGE, &phase::BASE, |m| {
+        let q = *m.query();
+        if q.cause != damage_cause::PROJECTILE {
+            return;
+        }
+        if m.world()
+            .entity(q.other)
+            .is_some_and(|e| e.kind == SKELETON.id())
+        {
+            // In the head, half as much again, as every arrow (`PROJECTILE_DAMAGE` above).
+            let head = if q.part == hitbox_part::HEAD { 2.0 } else { 1.0 };
+            m.value = curve("skeleton").hit as f64 * head;
+        }
+    });
+    // One line per hit between a player and a mob, and per death of either (night checks:
+    // `mods/testkit/scripts/night_survival.txt`).
+    r.on_event(&actions::HURT, |b| {
+        let w = b.world();
+        for h in b.iter() {
+            let (Some(target), Some(by)) = (fighter(&w, h.entity), fighter(&w, h.source)) else { continue };
+            if (target == "player") == (by == "player") {
+                continue;
+            }
+            let (health, max) = w
+                .entity(h.entity)
+                .map_or((0.0, 0.0), |e| (e.health, e.max_health));
+            weft_sdk::info!(
+                "mob_fight: {by} {} hit {target} {} for {:.2} (cause {}), health {health:.1}/{max:.1}",
+                h.source,
+                h.entity,
+                h.amount,
+                h.cause
+            );
+        }
+    });
+    r.on_event(&actions::DIE, |b| {
+        let w = b.world();
+        for d in b.iter() {
+            let who = if w.players_iter().any(|p| p == d.entity) {
+                Some("player")
+            } else {
+                MOB_KINDS
+                    .iter()
+                    .find(|(k, _)| k.id() == d.kind)
+                    .map(|(_, n)| *n)
+            };
+            if let Some(who) = who {
+                weft_sdk::info!("mob_fight: {who} {} died (cause {}, by {})", d.entity, d.cause, d.source);
+            }
+        }
+    });
+    // Over-tier armour against them counts at most their size's cap (`base_api::chains::GEAR_COUNTS`).
+    r.modify(&base_api::chains::GEAR_COUNTS, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        let Some(kind) = m.world().entity(q.other).map(|e| e.kind) else { return };
+        let Some(mob) = MOB_KINDS
+            .iter()
+            .find(|(k, _)| k.id() == kind)
+            .and_then(|(_, n)| vitals::mobs::mob(n))
+        else {
+            return;
+        };
+        m.value *= vitals::combat::cap_share(mob.size(), q.amount as f32, mob.level()) as f64;
+    });
+    // Their armour (`vitals::mobs`), through the same formula as the player's and the animals'.
+    r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        if !crate::player::armor_applies(q.cause) {
+            return;
+        }
+        let Some(kind) = m.world().entity(q.entity).map(|e| e.kind) else { return };
+        let Some(mob) = MOB_KINDS
+            .iter()
+            .find(|(k, _)| k.id() == kind)
+            .and_then(|(_, n)| vitals::mobs::mob(n))
+        else {
+            return;
+        };
+        m.value *= 1.0 - vitals::combat::armour_cut(mob.stats().armour, m.value as f32) as f64;
+    });
     // Ours: the creeper stays (upstream removed it; our blood moon sends creepers, `events.rs`).
     // Its look: `models/creeper.geo.json` (vanilla's layout, 64 x 32) and `textures/entity/creeper.png`.
     r.entity(&CREEPER)
@@ -61,7 +169,7 @@ pub fn register(r: &mut Registry) {
         .sound("death")
         .tag("hostile")
         .size(0.6, 1.7)
-        .max_health(20.0)
+        .max_health(curve("creeper").health)
         .walk_speed(2.5)
         .hostile()
         .attach(&FUSE)
@@ -76,7 +184,7 @@ pub fn register(r: &mut Registry) {
         .tag("immune_effect/base:regeneration")
         .equipment()
         .size(0.6, 1.99)
-        .max_health(20.0)
+        .max_health(curve("skeleton").health)
         .walk_speed(2.5)
         .hostile()
         .burns_in_sun()

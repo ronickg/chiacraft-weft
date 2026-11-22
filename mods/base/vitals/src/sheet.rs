@@ -36,6 +36,7 @@ pub fn markdown() -> String {
     soil_table(&mut w);
     difficulties(&mut w);
     level_table(&mut w);
+    mob_table(&mut w);
     w
 }
 
@@ -686,5 +687,43 @@ fn level_table(w: &mut String) {
     let _ = writeln!(w, "## Levels\n\n| level | XP to the next | XP from level 1 |\n|---|---|---|");
     for l in [1, 2, 5, 10, 25, 50, 75, 99, 100] {
         let _ = writeln!(w, "| {l} | {} | {} |", levels::to_next(l), levels::total_to(l));
+    }
+}
+
+fn mob_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "\n## Hostile mobs\n\nBase's night mobs on the one curve (`vitals::mobs`), like the animals: a size class from a real body's mass, a role, and the start of their home age, tweaked within x{}-x{} with a reason. Health and hit in engine points; armour cuts a hit by armour / (armour + {} x hit). Their hits are priced against {} (`vitals::mobs::MEETS`): their size's hits to down that player, times their role's hit. The last column is the hits that down the home age's reference in its armour (at least {}).\n\n| mob | kg | size | role | level | health | armour | hit | every | armoured hits | tweaks |\n|---|---|---|---|---|---|---|---|---|---|---|",
+        crate::curve::TWEAK_RANGE.0,
+        crate::curve::TWEAK_RANGE.1,
+        crate::combat::ARMOUR_K,
+        match crate::mobs::MEETS {
+            crate::mobs::Meets::Fresh => "a fresh player (base health, no armour)",
+            crate::mobs::Meets::Reference => "the age's reference player",
+        },
+        crate::mobs::ARMOURED_HITS,
+    );
+    for m in crate::mobs::MOBS {
+        let s = m.stats();
+        let tweaks: Vec<String> = m
+            .tweaks
+            .iter()
+            .map(|(st, t)| format!("{st:?} x{} ({})", t.x, t.why))
+            .collect();
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {} | {:.0} | {:.1} | {:.1} | {:.2} | {:.1} s | {:.1} | {} |",
+            m.name,
+            m.mass,
+            m.size().name(),
+            m.role.name(),
+            m.level(),
+            s.health,
+            s.armour,
+            s.hit,
+            s.interval,
+            crate::mobs::armoured_hits(m),
+            tweaks.join("; "),
+        );
     }
 }
