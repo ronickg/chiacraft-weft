@@ -59,7 +59,7 @@ pub fn init(r: &mut Registry) {
                         .with(Need::Comfort, crate::comfort::seek)
                         .with(Need::Drink, crate::drink::drink)
                         .with(Need::Eat, crate::forage::eat)
-                        .with(Need::Wander, ai::wander(0.35, 6.0)),
+                        .with(Need::Wander, crate::group::or_follow(0.35, ai::wander(0.35, 6.0))),
                 ), // slow and calm
         )
         .on_hurt(|w, h| {

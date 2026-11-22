@@ -53,6 +53,7 @@ mod fish;
 mod forage;
 mod fox;
 mod gateway;
+mod group;
 mod gull;
 mod habitats;
 mod hare;
@@ -173,6 +174,7 @@ fn init(r: &mut Registry) {
     senses::init(r);
     memory::init(r);
     choose::init(r);
+    group::init(r);
     screen::init(r);
     taming::init(r);
     commands::init(r);
