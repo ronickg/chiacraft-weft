@@ -10,6 +10,7 @@
 //! With `TESTKIT_CI=1` (CI's software Vulkan) what `ci-skip.txt` names is left out, by name.
 //! Without those options the mod only registers its message channels.
 
+mod compare;
 mod generation;
 mod runner;
 mod script;
@@ -31,6 +32,15 @@ static PLAN: OnceLock<(Option<String>, Option<String>)> = OnceLock::new();
 fn init(r: &mut Registry) {
     server::register(r);
     r.key(&runner::PROBE, "F9");
+    // Compare mode (`compare.rs`): every control of a like-for-like look shot in one switch.
+    r.config(&compare::COMPARE_MODE).bool(false);
+    r.client_command("compare", "<state:word(on,off)> [overrides:text]", |cmd| {
+        let on = cmd.text("state") == Some("on");
+        let overrides = cmd.text("overrides").unwrap_or("").to_string();
+        let said = compare::apply(&cmd.client(), on, &overrides);
+        weft_sdk::info!("{said}");
+        cmd.reply("command.testkit.compare", &[Arg::Text(&said)]);
+    });
     // A branch of an engine command, handled by this mod (on the client, like /gizmo).
     r.client_command_branch("gizmo", "probe <n:int>", |cmd| {
         let n = cmd.int("n").unwrap_or(0);

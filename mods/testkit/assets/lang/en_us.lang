@@ -10,3 +10,4 @@ testkit.rich_label = {block:base:diamond_block} {item:base:coal} {mono}12{/mono}
 testkit.screen_text = screen text from a frame hook
 testkit.ok = ok {0}
 testkit.err = err {0}
+command.testkit.compare = {0}
