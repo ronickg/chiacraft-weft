@@ -38,6 +38,13 @@ struct Active {
 }
 
 impl Environment {
+    /// The layers in effect and how much (chiacraft, the `scene` debug log).
+    pub(crate) fn active_layers(&self) -> Vec<(String, f32)> {
+        let mut all: Vec<_> = self.active.iter().map(|(k, a)| (k.clone(), (a.weight * 100.0).round() / 100.0)).collect();
+        all.sort_by(|a, b| a.0.cmp(&b.0));
+        all
+    }
+
     fn layers(&mut self, c: &Content, kind: usize, id: u32) -> Arc<Vec<Layer>> {
         self.cached
             .entry((kind, id))
