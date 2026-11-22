@@ -31,8 +31,9 @@ const SETTINGS: &[(&str, f64)] = &[
     ("core:fov", 70.0),
 ];
 
-/// What the settings were before compare mode, and whether it hid the HUD.
-static BEFORE: Mutex<Option<(Vec<(&'static str, f64)>, bool)>> = Mutex::new(None);
+/// The settings as they were before compare mode, and whether it hid the HUD.
+type Saved = (Vec<(&'static str, f64)>, bool);
+static BEFORE: Mutex<Option<Saved>> = Mutex::new(None);
 
 fn set(name: &str, v: f64) {
     let name: &'static str = Box::leak(name.to_string().into_boxed_str());
