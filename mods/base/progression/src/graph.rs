@@ -739,6 +739,106 @@ pub fn keys(g: &Solved) -> Vec<String> {
 }
 
 /// The routes each age's key has, by path, for the sheet: `None` where a path has none yet.
+/// The cheapest thing that meets `needs` (`Needs::Hand`: none).
+fn tool_for(g: &Solved, needs: Needs) -> Option<&'static str> {
+    match needs {
+        Needs::Hand => None,
+        n => tools_for(n)
+            .filter(|t| g.reachable(t))
+            .min_by(|a, b| g.cost_of(a).unwrap_or(f32::MAX).total_cmp(&g.cost_of(b).unwrap_or(f32::MAX))),
+    }
+}
+
+/// The cheapest id a name (an id or a `#group`) stands for.
+fn cheapest_member(g: &Solved, name: &str) -> Option<String> {
+    members(&g.ids, name)
+        .into_iter()
+        .filter(|m| g.cost.contains_key(m.as_str()))
+        .min_by(|a, b| g.cost[a.as_str()].total_cmp(&g.cost[b.as_str()]))
+        .cloned()
+}
+
+/// What a route's `items` cost together, from scratch: each item at its cheapest cost (what it
+/// uses up), plus each tool and station needed anywhere on the way there once (kept, not used up),
+/// and those tools and stations.
+pub fn route_cost(g: &Solved, items: &[&str]) -> (Em, Vec<String>) {
+    let all = recipes();
+    let mut seen: Vec<String> = Vec::new();
+    let mut kept: Vec<String> = Vec::new();
+    let mut todo: Vec<String> = items.iter().map(|s| s.to_string()).collect();
+    while let Some(id) = todo.pop() {
+        if seen.contains(&id) {
+            continue;
+        }
+        seen.push(id.clone());
+        let mut needs_tool = |t: Option<&str>, todo: &mut Vec<String>| {
+            if let Some(t) = t
+                && !items.contains(&t)
+                && !kept.iter().any(|k| k == t)
+            {
+                kept.push(t.to_string());
+                todo.push(t.to_string());
+            }
+        };
+        if let Some(&i) = g.by.get(&id) {
+            let r = all[i];
+            let station = r
+                .at
+                .stations()
+                .into_iter()
+                .filter(|s| g.reachable(s))
+                .min_by(|a, b| g.cost_of(a).unwrap_or(f32::MAX).total_cmp(&g.cost_of(b).unwrap_or(f32::MAX)));
+            needs_tool(station, &mut todo);
+            if let At::Break(n) = r.at {
+                needs_tool(tool_for(g, n), &mut todo);
+            }
+            for &(name, _) in r.ins {
+                if let Some(m) = cheapest_member(g, name) {
+                    todo.push(m);
+                }
+            }
+        } else if let Some(Get::World(n, _)) = content::rule(&id).map(|r| r.get) {
+            needs_tool(tool_for(g, n), &mut todo);
+        }
+    }
+    let used: Em = items.iter().filter_map(|i| g.cost_of(i)).sum();
+    let tools: Em = kept.iter().filter_map(|t| g.cost_of(t)).sum();
+    (used + tools, kept)
+}
+
+/// Each declared route of each key with its cost (`route_cost`), and how far it is over the cheapest
+/// route of its age (1: the cheapest).
+pub fn parity(g: &Solved) -> Vec<(Age, Path, Em, f32)> {
+    let mut out = Vec::new();
+    for k in KEYS {
+        let costs: Vec<(Path, Em)> = k
+            .routes
+            .iter()
+            .map(|(p, items)| (*p, route_cost(g, items).0))
+            .collect();
+        let low = costs.iter().map(|c| c.1).fold(f32::MAX, f32::min).max(1e-6);
+        out.extend(costs.into_iter().map(|(p, em)| (k.age, p, em, em / low)));
+    }
+    out
+}
+
+/// Path parity (`reports/Balance model.md`, 5.3): each age's key by each route costs at most
+/// `vitals::curve::PARITY` more than its cheapest route.
+pub fn path_parity(g: &Solved) -> Vec<String> {
+    parity(g)
+        .into_iter()
+        .filter(|&(_, _, _, over)| over > 1.0 + vitals::curve::PARITY)
+        .map(|(a, p, em, over)| {
+            format!(
+                "{}'s key by the {} route costs {em:.0} EM, ×{over:.2} its cheapest route (at most ×{:.2})",
+                a.name(),
+                p.name(),
+                1.0 + vitals::curve::PARITY
+            )
+        })
+        .collect()
+}
+
 pub fn routes(age: Age) -> Vec<(Path, Option<&'static [&'static str]>)> {
     let key = KEYS.iter().find(|k| k.age == age);
     ROUTES

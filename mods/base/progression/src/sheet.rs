@@ -31,7 +31,7 @@ pub fn markdown() -> String {
     bosses(&mut w);
     loot_table(&mut w, &g);
     web_prices(&mut w);
-    keys(&mut w);
+    keys(&mut w, &g);
     tags(&mut w, &g);
     materials(&mut w);
     w
@@ -376,7 +376,7 @@ fn web_prices(w: &mut String) {
     );
 }
 
-fn keys(w: &mut String) {
+fn keys(w: &mut String, g: &graph::Solved) {
     w.push_str("## Age keys by path\n\nMoving to the next age takes a key, one thing from each gate (materials and tools, a biome boss, knowledge, infrastructure), by a route for each path. What exists so far:\n\n| age | tech | magic | beasts | not built yet |\n|---|---|---|---|---|\n");
     for a in AGES {
         let routes = graph::routes(a);
@@ -397,6 +397,34 @@ fn keys(w: &mut String) {
             cell(curve::Path::Tech),
             cell(curve::Path::Magic),
             cell(curve::Path::Beasts)
+        );
+    }
+    let _ = writeln!(
+        w,
+        "\nWhat each route costs from scratch (`graph::route_cost`): its items at their cheapest, plus every tool and station on the way once. Path parity: a route at most ×{:.2} its age's cheapest. Own: without what every route of the age takes (its boss part), what tells the paths apart.\n\n| age | path | EM | × cheapest | own EM | tools and stations |\n|---|---|---|---|---|---|",
+        1.0 + curve::PARITY
+    );
+    for (a, p, em, over) in graph::parity(g) {
+        let items = graph::routes(a)
+            .into_iter()
+            .find(|(q, _)| *q == p)
+            .and_then(|(_, r)| r)
+            .unwrap_or(&[]);
+        let kept = graph::route_cost(g, items).1;
+        let shared: Vec<&str> = items
+            .iter()
+            .copied()
+            .filter(|i| graph::routes(a).iter().all(|(_, r)| r.is_some_and(|r| r.contains(i))))
+            .collect();
+        let shared_em: f32 = shared.iter().filter_map(|i| g.cost_of(i)).sum();
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {over:.2} | {} | {} |",
+            a.name(),
+            p.name(),
+            em_text(em),
+            em_text(em - shared_em),
+            kept.iter().map(|k| short(k)).collect::<Vec<_>>().join(", ")
         );
     }
     w.push('\n');
@@ -520,6 +548,10 @@ fn loot_table(w: &mut String, g: &graph::Solved) {
 
 fn short(id: &str) -> &str {
     id.strip_prefix("base:").unwrap_or(id)
+}
+
+fn em_text(c: f32) -> String {
+    em(c)
 }
 
 fn em(c: f32) -> String {
