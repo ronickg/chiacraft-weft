@@ -257,6 +257,15 @@ fn weapons(w: &mut String) {
             .fold((0.0, 0.0), |t, x| (t.0 + x.0, t.1 + x.1));
         let _ = writeln!(w, " {a:.0} / {:.0} |", combat::REF_HEALTH + v);
     }
+    let _ = writeln!(
+        w,
+        "\nBows and arrows (`vitals::gear::arrow_hit`): an arrow's head sets its item level (a plain one is flint-tipped, level {:.0}); the bow is its times (its stave's spring, grade and gems; a Sound yew bow ×1). A full draw takes {} s and hits by its speed: less drawn, less; in the head ×2. Its level counts against a big creature at most the size's cap over it, as a blade's.\n\n| age | arrow level | hit at full draw |\n|---|---|---|",
+        vitals::gear::ARROW_LEVEL,
+        vitals::gear::FULL_DRAW_SECS
+    );
+    for age in AGES {
+        let _ = writeln!(w, "| {} | {:.0} | {:.1} |", age.name(), age.reference(), vitals::gear::arrow_hit(age.reference(), 1.0));
+    }
     w.push('\n');
 }
 

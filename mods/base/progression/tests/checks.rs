@@ -11,7 +11,7 @@ fn check(name: &str) {
 
 #[test]
 fn every_check_runs() {
-    assert_eq!(progression::checks().len(), 13);
+    assert_eq!(progression::checks().len(), 14);
 }
 
 #[test]
@@ -77,4 +77,9 @@ fn gem_ceiling() {
 #[test]
 fn stagger() {
     check("stagger: same-age fights break every part, knockdowns at most a third of a fight");
+}
+
+#[test]
+fn ranged() {
+    check("bows on the curve: full draw a shot a second, a reference bow's arrows the reference's damage");
 }
