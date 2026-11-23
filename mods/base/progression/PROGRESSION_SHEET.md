@@ -19,6 +19,7 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | tweaks inside ×0.75-×1.25 with a reason | passes |
 | grade and gems at most +60% over a plain item | passes |
 | stagger: same-age fights break every part, knockdowns at most a third of a fight | passes |
+| bows on the curve: full draw a shot a second, a reference bow's arrows the reference's damage | passes |
 
 ## The ages
 
@@ -233,6 +234,18 @@ One hit's damage (engine points) by material:
 | diamond | Age of Steam | 35 | 19.4 | 31.1 | 25.9 | 10.9 | 13.0 | 12.4 | 4.7 | 130 / 104 |
 | peridot | Iron Age | 28 | 14.0 | 22.4 | 18.6 | 7.8 | 9.3 | 8.9 | 3.4 | 93 / 75 |
 | amber | Stone Age | 4 | 4.5 | 7.2 | 6.0 | 2.5 | 3.0 | 2.9 | 1.1 | 30 / 24 |
+
+Bows and arrows (`vitals::gear::arrow_hit`): an arrow's head sets its item level (a plain one is flint-tipped, level 5); the bow is its times (its stave's spring, grade and gems; a Sound yew bow ×1). A full draw takes 1 s and hits by its speed: less drawn, less; in the head ×2. Its level counts against a big creature at most the size's cap over it, as a blade's.
+
+| age | arrow level | hit at full draw |
+|---|---|---|
+| Stone Age | 5 | 7.6 |
+| Bronze Age | 15 | 12.1 |
+| Iron Age | 25 | 19.4 |
+| Age of Steam | 35 | 31.1 |
+| Age of Lightning | 45 | 49.7 |
+| Age of the Future | 55 | 79.6 |
+| Age of Stars | 65 | 127.3 |
 
 ## Tames by saddle
 

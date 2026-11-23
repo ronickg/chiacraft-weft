@@ -95,8 +95,9 @@ fn work() -> Shared {
     w
 }
 
-/// A tile's colours: each `TILE_PX_BLOCKS` square's biome or water, lit from the north-west by
-/// the slope.
+/// A tile's colours: what tops each `TILE_PX_BLOCKS` square (`land::top`: grass, sand, snow, a
+/// rock face, water) tinted by its biome (`vitals::waystones::ground_colour`), lit from the
+/// north-west by the slope.
 fn tile_colours(seed: u64, tx: i32, tz: i32) -> Colours {
     let f = l::fields(seed);
     let mut out: Colours = Box::new([[0; 3]; TPX * TPX]);
@@ -105,10 +106,8 @@ fn tile_colours(seed: u64, tx: i32, tz: i32) -> Colours {
     for pz in 0..TPX {
         for px in 0..TPX {
             let (x, z) = (tx * n::TILE + px as i32 * step, tz * n::TILE + pz as i32 * step);
-            let h = h_at(x, z);
-            let biome = l::overworld_biome(&f, x * 16, z * 16);
-            let sea = matches!(biome, "ocean" | "coral_reef" | "lagoon");
-            let c = if h < base_api::SEA && !sea { n::WATER } else { n::biome_colour(biome) };
+            let (h, biome, top) = l::top(&f, x, z);
+            let c = n::ground_colour(top.name(), biome);
             let shade = if h < base_api::SEA { 0 } else { ((h - h_at(x - step, z - step)) * 7).clamp(-28, 28) };
             out[pz * TPX + px] = c.map(|v| (v as i32 + shade).clamp(0, 255) as u8);
         }
@@ -611,9 +610,38 @@ fn picture(c: &Client, seed: u64, side: usize, centre: (i32, i32), zoom: i32, ed
             }
         }
     }
-    // The creatures the player sees: a dot each, rimmed dark, under the arrow.
-    for &(x, z, mark) in marks {
-        let (px, pz) = place_in(side as f32, centre, zoom, x, z);
+    // The creatures the player sees: a dot each, rimmed dark. One the arrow would cover (a tame
+    // at heel) is moved out to just past the arrow's tip, the way it lies from the player (Planner
+    // 11-22, run mm1122_b: the tame wolf hid under the arrow).
+    let me_px = me.map(|st| place_in(side as f32, centre, zoom, st.pos.x.floor() as i32, st.pos.z.floor() as i32));
+    // Tames last, over the others; a dot moved out turns round the arrow until it is clear of
+    // those already placed (a tame and a zombie in one line from the player met at one spot and
+    // the zombie's covered the tame's: run mm1122_c).
+    let mut order: Vec<&(i32, i32, n::Mark)> = marks.iter().collect();
+    order.sort_by_key(|m| m.2 == n::Mark::Tame);
+    let mut placed: Vec<(f32, f32)> = Vec::new();
+    let apart = (n::MARK_DOT + 2) as f32;
+    for &&(x, z, mark) in &order {
+        let (mut px, mut pz) = place_in(side as f32, centre, zoom, x, z);
+        if let Some((ax, az)) = me_px {
+            let (dx, dz) = (px - ax, pz - az);
+            let d = dx.hypot(dz);
+            if d < n::MARK_CLEAR {
+                // Straight on the player: to the right of the arrow.
+                let a0 = if d < 0.5 { 0.0 } else { dz.atan2(dx) };
+                let step = (apart / n::MARK_CLEAR).asin() * 1.2;
+                let free = (0..24)
+                    .map(|k| a0 + step * ((k + 1) / 2) as f32 * if k % 2 == 0 { 1.0 } else { -1.0 })
+                    .map(|a| (ax + a.cos() * n::MARK_CLEAR, az + a.sin() * n::MARK_CLEAR))
+                    .find(|&(qx, qz)| {
+                        placed
+                            .iter()
+                            .all(|&(ox, oz)| (qx - ox).hypot(qz - oz) >= apart)
+                    });
+                (px, pz) = free.unwrap_or((ax + a0.cos() * n::MARK_CLEAR, az + a0.sin() * n::MARK_CLEAR));
+            }
+        }
+        placed.push((px, pz));
         let (px, pz) = (px.floor() as i32, pz.floor() as i32);
         let (fill, rim) = (n::MARK_DOT / 2, n::MARK_DOT / 2 + 1);
         for dz in -rim..=rim {

@@ -52,6 +52,9 @@ pub static PARTS: Component<Parts> = Component::named("base:parts");
 /// The material a part recipe makes its part of (a recipe value).
 pub static PART_MATERIAL: Component<u32> = Component::named("base:part_material");
 pub static PART_RECIPES: RecipeKind = RecipeKind::named("base:parts");
+/// A bow's power (its kind's damage × its stave's spring, grade and gems): what its arrows read
+/// (`mobs::shoot_bow`), kept off `ATTACK_DAMAGE` so a bow swung hits like a stick, not a sword.
+pub static BOW_POWER: Component<f32> = Component::named("base:bow_power");
 
 /// The item of a part shape: `base:part_<shape>`.
 fn part_item(shape: &str) -> &'static Item {
@@ -135,6 +138,7 @@ pub fn register(r: &mut Registry) {
     // A built item's own item level and warmth, over its kind item's (the caps read the level:
     // `animals::armour`; Survival the warmth).
     r.stack_component(&base_api::ITEM_LEVEL, 0);
+    r.stack_component(&BOW_POWER, 0);
     r.stack_component(&base_api::WARMTH, 0);
     // A built piece's armour in the tooltip's and the HUD's points (`ARMOUR_PER_POINT`).
     r.stack_component(&crate::items::ARMOR, 0);
@@ -433,12 +437,15 @@ fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats, gems: &[
         .find(|(part, _)| part.slot == kind.working())
         .and_then(|(part, _)| vitals::gear::material(part.material))
         .map_or(0.0, |m| m.level());
+    let damage = stats.damage * mult[Stat::Damage as usize];
     let stack = ItemStack::new(Item::generated(kind.id.to_string()).id(), 1)
         .with(&PARTS, p)
         .with(&DURABILITY, uses)
         .with(&MINING_SPEED, stats.stat * mult[Stat::Speed as usize])
-        .with(&TOOL_LEVEL, stats.harvest)
-        .with(&ATTACK_DAMAGE, stats.damage * mult[Stat::Damage as usize])
+        .with(&TOOL_LEVEL, stats.harvest);
+    // A bow's damage is its arrows'; swung, it's a stick.
+    let stack = if kind.use_ == Use::Shoot { stack.with(&BOW_POWER, damage) } else { stack.with(&ATTACK_DAMAGE, damage) };
+    let stack = stack
         .with(&base_api::ITEM_LEVEL, level)
         .with(&crate::gems::GEMS_ON, crate::gems::gems_of(sockets, &set));
     // Drawn from its parts (the engine's `core:look`), its gems set on it.

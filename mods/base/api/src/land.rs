@@ -1905,6 +1905,65 @@ pub fn sea_sand(f: &Fields, ox: i32, oz: i32, heights: &[i32; 256]) -> [bool; 25
     out
 }
 
+/// What tops a column, as the overworld's rules make it (for maps and previews; the engine's own
+/// terrain is the truth): water under the sea's level, snow (`snowy`), a bare rock face where the
+/// ground falls steeply (`rock_set`, `RockSet::bare_from`), or the biome's ground block
+/// (`surface_of`, frayed at the borders, `fray`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Top {
+    Water,
+    Snow,
+    Rock(RockSet),
+    /// The ground block's bare name: `grass`, `sand`, `podzol`, `snowy_grass`...
+    Ground(&'static str),
+}
+
+impl Top {
+    /// Its name for the map's colours (`vitals::waystones::GROUND_COLOURS`): `water`, `snow`,
+    /// `rock:<set>` or the ground block's.
+    pub fn name(self) -> &'static str {
+        match self {
+            Top::Water => "water",
+            Top::Snow => "snow",
+            Top::Rock(RockSet::Strata) => "rock:strata",
+            Top::Rock(RockSet::Slate) => "rock:slate",
+            Top::Rock(RockSet::Granite) => "rock:granite",
+            Top::Rock(RockSet::Limestone) => "rock:limestone",
+            Top::Rock(RockSet::Karst) => "rock:karst",
+            Top::Ground(g) => g,
+        }
+    }
+}
+
+/// Column (`x`, `z`) (blocks): its ground's height (blocks), biome and top. The fall to its lowest
+/// neighbour is read from the four columns round it.
+pub fn top(f: &Fields, x: i32, z: i32) -> (i32, &'static str, Top) {
+    let h_at = |x: i32, z: i32| height(f, x * 16, z * 16) >> 4;
+    let h = h_at(x, z);
+    let (qx, qz) = (x * 16, z * 16);
+    let biome = biome_at(f, qx, qz, h);
+    if h < SEA {
+        return (h, biome, Top::Water);
+    }
+    let fall = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        .iter()
+        .map(|&(dx, dz)| h - h_at(x + dx, z + dz))
+        .max()
+        .unwrap_or(0);
+    let ground = fray(f, qx, qz, h).map_or(surface_of(biome).0, |g| g.0);
+    let rocks = rock_set(f, qx, qz, h, ground == "sand");
+    let snow = snowy(f, qx, qz, h);
+    // Snow slides off from `SNOW_FALL`, before the soil does (base's `bare`).
+    let top = if fall >= rocks.bare_from() || snow && fall >= SNOW_FALL {
+        Top::Rock(rocks)
+    } else if snow {
+        Top::Snow
+    } else {
+        Top::Ground(ground)
+    };
+    (h, biome, top)
+}
+
 /// The overworld biome the rules in `mods/base/src/land.rs` pick at (`x`, `z`) (Q4), by name, in
 /// their order: for the map preview and the checks here (the engine's own pick is the truth).
 pub fn overworld_biome(f: &Fields, x: i32, z: i32) -> &'static str {
