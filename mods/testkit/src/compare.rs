@@ -97,7 +97,11 @@ pub fn apply(c: &Client, on: bool, overrides: &str) -> String {
     ] {
         c.say(&line);
     }
-    format!("compare mode on ({} settings, mist {mist}, wind {wind}){}", values.len(), if overrides.is_empty() { String::new() } else { format!(": {overrides}") })
+    format!(
+        "compare mode on ({} settings, mist {mist}, wind {wind}){}",
+        values.len(),
+        if overrides.is_empty() { String::new() } else { format!(": {overrides}") }
+    )
 }
 
 /// The game ticks of hour `h` (06:00 is 0).

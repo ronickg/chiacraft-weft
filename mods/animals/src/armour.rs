@@ -14,7 +14,7 @@
 //!    a second (10, 45 and 120 s), from everything together (`vitals::combat::floor_take`). What
 //!    spills over, and half of what it took, is its stagger (`vitals::combat::stagger_gain`).
 //! 4. **Stagger** (Ronald 11-22, option B, as the bosses have it): at 20 % and 40 % of its health
-//!    a break drops one more of its own loot; every 25 % it is knocked down for 3 s (lying as it
+//!    a break drops a part of its own (`animals_core::parts`: a claw, a scute) or one more of its loot; every 25 % it is knocked down for 3 s (lying as it
 //!    rests, its goals held, hits on it weak-point hits), and stands at least 12 s before the next.
 
 use weft_sdk::*;
@@ -30,7 +30,15 @@ pub static FLOOR: Component<[f64; 3]> = Component::named("animal_floor");
 /// tick it can be knocked down again, and the breaks it has had (not saved).
 pub static STAGGER: Component<[f64; 4]> = Component::named("animal_stagger");
 
+/// The parts a large animal's breaks drop (`animals_core::parts`; their icons from the art
+/// session).
+static CLAW: Item = Item::named("claw");
+static SCUTE: Item = Item::named("scute");
+static INGREDIENTS: CreativeTab = CreativeTab::named("base:ingredients");
+
 pub fn init(r: &mut Registry) {
+    r.item(&CLAW).tab(&INGREDIENTS);
+    r.item(&SCUTE).tab(&INGREDIENTS);
     r.entity_component(&FLOOR, [f64::NAN, 0.0, 0.0], 0);
     r.entity_component(&STAGGER, [0.0; 4], 0);
     for s in crate::species::SPECIES.iter() {
@@ -45,6 +53,18 @@ pub fn init(r: &mut Registry) {
             m.value *= vitals::combat::cap_share(size, q.amount as f32, level) as f64;
         }
     });
+    // A tame's blows: its owner's web (the Taming and Conjuring regions' tame damage, a
+    // beastmaster's keystone), as a player's melee damage is theirs. Its saddle and the size's cap
+    // still bound what counts (`player_cap`).
+    r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
+        let (w, q) = (m.world(), *m.query());
+        if !crate::animal::tamed(&w, q.entity) {
+            return;
+        }
+        if let Some(owner) = crate::commands::owner(&w, q.entity) {
+            m.value *= base_api::skills::times(&w, owner, base_api::skills::Family::TameDamage) as f64;
+        }
+    });
     r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
         let q = *m.query();
         let w = m.world();
@@ -53,7 +73,7 @@ pub fn init(r: &mut Registry) {
         let size = danger::size(s);
         let level = danger::danger(s.name).map_or(0.0, |d| d.area_level(a.level().min(danger::LEVELS.1)));
         let raw = m.value as f32;
-        let by_player = q.cause == damage_cause::ATTACK && w.players_iter().any(|p| p == q.other);
+        let by_player = (q.cause == damage_cause::ATTACK || q.cause == damage_cause::PROJECTILE) && w.players_iter().any(|p| p == q.other);
         // 1. A player's weapon, capped by the animal's size.
         let mut hit = raw * player_cap(&w, q.other, q.cause, size, level);
         let capped = hit;
@@ -167,20 +187,29 @@ fn staggered(w: &World, id: u64, s: &animals_core::species::Species, st: &Entity
     let reached = vitals::combat::breaks_at(total, max) as u32;
     while (c[3] as u32) < reached {
         c[3] += 1.0;
-        let ctx = LootCtx { by_player: true, ..LootCtx::default() };
-        if let Some(one) = w
-            .roll_loot(&EntityKind::named(s.name), &ctx)
-            .into_iter()
-            .find(|x| !x.is_empty())
-        {
-            w.spawn_item(at, ItemStack::new(one.item, 1));
+        // A part of its own (`animals_core::parts`), else one of its loot.
+        let one = match animals_core::parts::break_drop(s.name, c[3] as u32) {
+            Some((item, lo, hi)) => Some(ItemStack::new(Item::generated(item.to_string()).id(), lo + w.random_below(hi - lo + 1))),
+            None => {
+                let ctx = LootCtx { by_player: true, ..LootCtx::default() };
+                w.roll_loot(&EntityKind::named(s.name), &ctx)
+                    .into_iter()
+                    .find(|x| !x.is_empty())
+                    .map(|x| ItemStack::new(x.item, 1))
+            }
+        };
+        let dropped = one
+            .as_ref()
+            .map_or_else(|| "nothing".to_string(), |x| format!("{} {}", x.count, weft_sdk::item_name(x.item)));
+        if let Some(one) = one {
+            w.spawn_item(at, one);
         }
         for p in w.entities_near(st.pos, 24.0, Some(&PLAYER)) {
             w.subtitle("subtitle.animals.stagger_break", &[])
                 .to(p)
                 .times(0.2, 1.5, 0.5);
         }
-        weft_sdk::info!("stagger: {} {id} break {} at {total:.1}/{max:.1}", s.name, c[3]);
+        weft_sdk::info!("stagger: {} {id} break {} at {total:.1}/{max:.1}, dropped {dropped}", s.name, c[3]);
     }
     // Knockdowns: every `KNOCK_AT` of its health, not while down or resting from the last.
     c[0] += gain as f64;

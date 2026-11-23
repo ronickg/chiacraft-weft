@@ -629,6 +629,14 @@ pub const RULES: &[Rule] = &[
     ),
     // ---- the animals mod: taming, riding, eggs, the gateway
     r(&["animals:*_egg", "animals:carcass"], 0, Beasts, Beast, Drop(4.0)),
+    n(
+        &["animals:claw", "animals:scute"],
+        0,
+        Beasts,
+        Material,
+        Drop(10.0),
+        "a large animal's stagger breaks (animals_core::parts): a fight with a Utahraptor or an ankylosaur",
+    ),
     r(
         &[
             "animals:club",

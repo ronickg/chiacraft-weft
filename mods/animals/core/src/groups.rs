@@ -28,6 +28,52 @@ const _: () = assert!(SLOT_FAR + FOLLOW_FROM * 2.0 <= 16.0);
 /// Fewest of its kind near (itself among them) for a group to keep together.
 pub const GROUP: u16 = 2;
 
+/// Doing as its leader does (slice 2): a member whose leader is drinking drinks too from this much
+/// of its water left, one whose leader grazes eats from this much of its food (instead of
+/// `needs::THIRSTY` and `HUNGRY`, or the dusk drink's `routines::DRINKS_AT`). Herd animals
+/// graze, drink and rest in step (Rook and Penning 1991 on grazing synchrony; red deer in
+/// Clutton-Brock, Guinness and Albon 1982): the group moves on together instead of one at a time.
+pub const JOIN_DRINK: f32 = 0.9;
+pub const JOIN_EAT: f32 = 0.85;
+/// Resting in step (slice 3): a member whose leader lies down lies down too, on average this many
+/// ticks after (one chance in this many a tick: about 5 s), and one lying while its leader is up
+/// and about gets up, about 3 s after. Red deer in a group lie down and rise nearly together
+/// (Clutton-Brock, Guinness and Albon 1982; synchrony in grazers, Rook and Penning 1991), so a
+/// herd rests as one and moves on as one.
+pub const JOIN_REST_IN: u32 = 100;
+pub const JOIN_UP_IN: u32 = 60;
+// Within a few seconds at 20 ticks a second, and up quicker than down.
+const _: () = assert!(JOIN_REST_IN <= 200 && JOIN_UP_IN <= JOIN_REST_IN);
+
+/// How pressing joining is, at least, once it is under those (the band's score for drinking or
+/// eating): above a midday rest (`needs::REST` plus `routines::SLEEPY` for a twilight animal at its
+/// lowest, held at `KEEP_AT`), so a resting member gets up to go with its herd, under a night's
+/// sleep. ai1122_drink1: at the drink's own score (about 0.35) the herd lay on while its leader
+/// drank.
+pub const JOIN_PULL: f32 = 0.85;
+const MIDDAY_REST: f32 = (crate::needs::REST + crate::routines::SLEEPY * (1.0 - 0.35)) * crate::needs::KEEP_AT;
+const NIGHT_SLEEP: f32 = (crate::needs::REST + crate::routines::SLEEPY) * crate::needs::KEEP_AT;
+const _: () = assert!(JOIN_PULL > MIDDAY_REST && JOIN_PULL < NIGHT_SLEEP);
+
+// Joining starts before it would on its own (and before the dusk drink), and stops where it would.
+const _: () = assert!(
+    JOIN_DRINK > crate::routines::DRINKS_AT
+        && JOIN_DRINK > crate::needs::THIRSTY
+        && JOIN_DRINK < crate::needs::SLAKED
+        && JOIN_EAT > crate::needs::HUNGRY
+        && JOIN_EAT < crate::needs::FULL
+);
+
+/// Migration's first step: one that finds no water within its look round (`drink.rs`, 16 blocks)
+/// goes to the nearest water it or a wild one of its kind near remembers drinking at, up to this
+/// many blocks off; its herd goes with it (a member keeps to its place round its leader, and
+/// drinks with it). Herds of the dry seasons walk tens of kilometres to the water they know
+/// (wildebeest and zebra in the Serengeti, red deer to their summer and winter ranges): here a few
+/// chunks, the reach of what one herd shares.
+pub const WATER_TREK: f32 = 96.0;
+// Further than it looks or goes back on its own (`drink.rs` LOOK 16, RECALL 32).
+const _: () = assert!(WATER_TREK > 32.0);
+
 /// The ring's radius for a group of `kin`.
 pub fn ring(kin: u16) -> f32 {
     (SLOT_NEAR + SLOT_PER * (kin.max(1) as f32).sqrt()).min(SLOT_FAR)
@@ -74,6 +120,16 @@ mod tests {
             seen[(a / std::f32::consts::TAU * 8.0) as usize % 8] = true;
         }
         assert!(seen.iter().filter(|&&s| s).count() >= 5);
+    }
+
+    #[test]
+    fn members_join_before_they_would_alone() {
+        use crate::needs::{THIRSTY, hunger_score_from, thirst_score_from};
+        // At 85% water a member drinks with its leader, and not on its own; full, it doesn't.
+        assert!(thirst_score_from(0.85, JOIN_DRINK, false) > 0.0);
+        assert_eq!(thirst_score_from(0.85, THIRSTY, false), 0.0);
+        assert_eq!(thirst_score_from(0.95, JOIN_DRINK, false), 0.0);
+        assert!(hunger_score_from(0.8, JOIN_EAT, false) > 0.0);
     }
 
     #[test]

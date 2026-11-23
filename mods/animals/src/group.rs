@@ -80,6 +80,35 @@ fn stuck(w: &World, id: u64, st: &EntityState) -> bool {
     true
 }
 
+/// What `id`'s leader is doing of its needs (`choose::doing`), if `id` is a wild member of a
+/// group that isn't its leader (slice 2: it drinks and grazes when its leader does).
+pub fn leader_doing(w: &World, id: u64) -> Option<u8> {
+    let s = w.component(id, &SENSES)?;
+    if s.kin < GROUP || s.leader == 0 || s.leader == id || crate::animal::tamed(w, id) {
+        return None;
+    }
+    w.entity(s.leader).filter(|e| e.health > 0.0)?;
+    Some(crate::choose::doing(w, s.leader))
+}
+
+/// Resting in step (slice 3): `Some(true)` when a member should lie down now (its leader rests),
+/// `Some(false)` when it should get up now (lying while its leader is up and about); None: as it
+/// likes. `resting`: whether it rests now.
+pub fn rest_in_step(w: &World, id: u64, resting: bool) -> Option<bool> {
+    let lead = leader_doing(w, id)?;
+    let rests = lead == crate::choose::Need::Rest as u8;
+    if !resting && rests && w.random_below(groups::JOIN_REST_IN) == 0 {
+        weft_sdk::info!("animal {id} lies down with its leader");
+        return Some(true);
+    }
+    // Up and about: a need of its own under way (not idle, which a resting one's next rest may be).
+    if resting && !rests && lead != 0 && w.random_below(groups::JOIN_UP_IN) == 0 {
+        weft_sdk::info!("animal {id} gets up with its leader");
+        return Some(false);
+    }
+    None
+}
+
 /// For a wild member of a group that isn't its leader: whether it walks to its place now. None:
 /// it wanders on its own (alone, the leader, tame, or its leader gone until its next look).
 fn follow(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {

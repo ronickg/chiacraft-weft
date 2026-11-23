@@ -141,6 +141,7 @@ pub fn init(r: &mut Registry) {
         r.edit(s.kind).attach(&APPLIED);
         r.edit(s.kind).attach(&SCALED);
         r.edit(s.kind).attach(&OWNER);
+        r.edit(s.kind).attach(&base_api::TAME_OF);
     }
     // An animal hits as hard as its damage stat.
     r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
@@ -153,6 +154,32 @@ pub fn init(r: &mut Registry) {
 /// Whether `id` is tamed.
 pub fn tamed(w: &World, id: u64) -> bool {
     w.component(id, &OWNER).is_some_and(|k| k[0] != 0)
+}
+
+/// Keeps `id`'s `base_api::TAME_OF` (its owner's player entity while they're in the world, 0
+/// otherwise), which watchers' clients read to mark their own tames on the map. Its owner's key
+/// against each player's, the keys asked once per player.
+pub fn mark_owner(w: &World, id: u64) {
+    static KEYS: std::sync::Mutex<Vec<(u64, String)>> = std::sync::Mutex::new(Vec::new());
+    let want = match w.component(id, &OWNER) {
+        Some(k) if k[0] != 0 => {
+            let mut keys = KEYS.lock().unwrap_or_else(|e| e.into_inner());
+            w.players().into_iter().find(|&p| {
+                if !keys.iter().any(|(q, _)| *q == p) {
+                    keys.push((p, crate::player_key(p)));
+                }
+                keys.iter()
+                    .any(|(q, key)| *q == p && key.len() == 64 && key.as_bytes() == k)
+            })
+        }
+        _ => None,
+    }
+    .unwrap_or(0);
+    if w.component(id, &base_api::TAME_OF)
+        .is_some_and(|v| v != want)
+    {
+        w.set_component(id, &base_api::TAME_OF, want);
+    }
 }
 
 /// Whether `player` (by key) owns `id`.
@@ -192,6 +219,9 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return false;
         }
         let a = *a;
+        if slow {
+            mark_owner(w, id);
+        }
         crate::senses::refresh(w, id, index, st.kind);
         // Its size, from its genes and sex, and how far it has grown (the engine forgets it on
         // loading: set it again).
