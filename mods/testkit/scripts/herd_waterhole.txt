@@ -15,9 +15,11 @@ idle
 chat /rule core:mob_spawning 0
 chat /air 0 0 0
 chat /tk time 486000
-# Spectator first, so every `~` below (fills and counts) is taken from the same place
-# (ai1123_waterhole3: counts after the switch read 0 water and 0 mud beside a full pond).
-chat /tk mode spectator
+# Creative, not spectator, and set before the fills so every `~` below is taken from the same
+# place: the snow's visits that dry the rim go round `w.players()`, the engine's visible players,
+# which leave spectators out (ai1123_waterhole4: 103 visits before the switch, none after), and
+# counts after a later switch read 0 water and 0 mud beside a full pond (ai1123_waterhole3).
+chat /tk mode creative
 wait 2
 where
 chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
