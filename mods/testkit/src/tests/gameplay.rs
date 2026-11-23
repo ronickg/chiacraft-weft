@@ -204,8 +204,10 @@ pub async fn armor(t: T) -> R {
     let zombie = t
         .op(&format!("spawn zombie {}", at(add(f, [1, 0, 1]))))
         .await?;
-    let full = super::max_health(&t);
-    t.until("hit by the zombie", Duration::from_secs(15), |t| t.state().health < full - 0.5)
+    // From the health now, not the most: base's survival health starts under its maximum (its
+    // stomach), so "under the most" was true before any hit (17.5 of 64.7, a 0.6 hit).
+    let full = t.state().health;
+    t.until("hit by the zombie", Duration::from_secs(15), |t| t.state().health < full - 0.3)
         .await?;
     t.secs(0.5).await?;
     let mut worn = 0;
@@ -1918,6 +1920,16 @@ pub async fn food(t: T) -> R {
         .await?;
     t.until("in the stomach", Duration::from_secs(5), |t| in_stomach(t, "base:cooked_beef") > beef + 10.0)
         .await?;
+    // Testmod's food_heal is on its own apple (base's beef heals by the stomach, slowly): one
+    // eaten now heals two through the `item_used` event.
+    let _ = before;
+    t.op("put me 1 testmod:apple 1").await?;
+    t.c().select_slot(1);
+    t.secs(0.3).await?;
+    let before = t.state().health;
+    t.hold("core:use", 2.5);
+    t.until("the apple eaten", Duration::from_secs(5), |t| t.c().inventory_slot(1).is_empty())
+        .await?;
     t.until("healed", Duration::from_secs(3), |t| t.state().health >= before + 2.0)
         .await?;
     let after = t.state().health;
@@ -2981,8 +2993,9 @@ pub async fn clothes_and_stew(t: T) -> R {
 /// the seasonal tints read (`Vitals::date`) is day 49 of the year, winter by the calendar's
 /// seasons (Tester 2 11-04: after `/time set` in creative it stayed on its old day).
 pub async fn calendar_follows_time(t: T) -> R {
-    // In a world: run first in a process, it asked a server there was none of yet.
-    t.flat().await?;
+    // In a world with seasons (the overworld; the flatlands have no calendar, their date 0):
+    // run first in a process, it asked a server there was none of yet.
+    t.world(1).await?;
     let mode = |t: T, m: &'static str| async move { t.op(&format!("mode {m}")).await };
     mode(t.clone(), "creative").await?;
     let day: u64 = 48;
