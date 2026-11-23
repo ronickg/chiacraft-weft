@@ -616,7 +616,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 /// The Extra quality tab's rows (`EXTRA_SCREEN`): the newer features, each a setting of its own,
 /// outside Low to Ultra so no preset changes the look by them; Max sets them all (`max_extras`).
 /// Traced shadows, reflections and the path tracing denoiser only where the GPU can trace rays (the last rows, from `RT_ROW`).
-const EXTRA_ROWS: [Row; 14] = [
+const EXTRA_ROWS: [Row; 15] = [
     Row { key: "hdr", values: &[0.0, 1.0], get: || HDR_WORLD.get() as u8 as f64, set: |v| HDR_WORLD.set(v > 0.0), shown: off_on },
     Row {
         key: "aa",
@@ -678,6 +678,15 @@ const EXTRA_ROWS: [Row; 14] = [
         set: |v| crate::look::LOOK_LEAF_LIGHT.set(if v > 0.0 { 1.0 } else { 0.0 }),
         shown: off_on,
     },
+    // The look fitted to Ronald's Bliss (stage 2, 11-23): its knobs all at once, off as made.
+    // Before the rows only a GPU that traces rays shows, so every machine has it.
+    Row {
+        key: "bliss_match",
+        values: &[0.0, 1.0],
+        get: || crate::look::LOOK_BLISS.get() as u8 as f64,
+        set: |v| crate::look::set_bliss_match(v > 0.0),
+        shown: off_on,
+    },
     Row {
         key: "rt_shadows",
         // Ultra: soft edges from more rays a pixel (with TAA), about three times the cost.
@@ -708,7 +717,7 @@ const EXTRA_ROWS: [Row; 14] = [
 ];
 /// The first of the rows only a GPU that traces rays shows (traced shadows, reflections, then the
 /// path tracer's denoiser).
-const RT_ROW: usize = 10;
+const RT_ROW: usize = 11;
 
 /// An extra row a step on: Max becomes Custom (the Low to Ultra presets leave these rows as they are).
 fn step_extra(i: usize, dir: i32) {
