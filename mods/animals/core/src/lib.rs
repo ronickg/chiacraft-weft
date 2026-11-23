@@ -22,6 +22,7 @@ pub mod meat;
 pub mod memory;
 pub mod needs;
 pub mod nests;
+pub mod parts;
 pub mod perception;
 pub mod roles;
 pub mod routines;

@@ -14,7 +14,7 @@
 //!    a second (10, 45 and 120 s), from everything together (`vitals::combat::floor_take`). What
 //!    spills over, and half of what it took, is its stagger (`vitals::combat::stagger_gain`).
 //! 4. **Stagger** (Ronald 11-22, option B, as the bosses have it): at 20 % and 40 % of its health
-//!    a break drops one more of its own loot; every 25 % it is knocked down for 3 s (lying as it
+//!    a break drops a part of its own (`animals_core::parts`: a claw, a scute) or one more of its loot; every 25 % it is knocked down for 3 s (lying as it
 //!    rests, its goals held, hits on it weak-point hits), and stands at least 12 s before the next.
 
 use weft_sdk::*;
@@ -30,7 +30,15 @@ pub static FLOOR: Component<[f64; 3]> = Component::named("animal_floor");
 /// tick it can be knocked down again, and the breaks it has had (not saved).
 pub static STAGGER: Component<[f64; 4]> = Component::named("animal_stagger");
 
+/// The parts a large animal's breaks drop (`animals_core::parts`; their icons from the art
+/// session).
+static CLAW: Item = Item::named("claw");
+static SCUTE: Item = Item::named("scute");
+static INGREDIENTS: CreativeTab = CreativeTab::named("base:ingredients");
+
 pub fn init(r: &mut Registry) {
+    r.item(&CLAW).tab(&INGREDIENTS);
+    r.item(&SCUTE).tab(&INGREDIENTS);
     r.entity_component(&FLOOR, [f64::NAN, 0.0, 0.0], 0);
     r.entity_component(&STAGGER, [0.0; 4], 0);
     for s in crate::species::SPECIES.iter() {
@@ -167,16 +175,22 @@ fn staggered(w: &World, id: u64, s: &animals_core::species::Species, st: &Entity
     let reached = vitals::combat::breaks_at(total, max) as u32;
     while (c[3] as u32) < reached {
         c[3] += 1.0;
-        let ctx = LootCtx { by_player: true, ..LootCtx::default() };
-        let one = w
-            .roll_loot(&EntityKind::named(s.name), &ctx)
-            .into_iter()
-            .find(|x| !x.is_empty());
+        // A part of its own (`animals_core::parts`), else one of its loot.
+        let one = match animals_core::parts::break_drop(s.name, c[3] as u32) {
+            Some((item, lo, hi)) => Some(ItemStack::new(Item::generated(item.to_string()).id(), lo + w.random_below(hi - lo + 1))),
+            None => {
+                let ctx = LootCtx { by_player: true, ..LootCtx::default() };
+                w.roll_loot(&EntityKind::named(s.name), &ctx)
+                    .into_iter()
+                    .find(|x| !x.is_empty())
+                    .map(|x| ItemStack::new(x.item, 1))
+            }
+        };
         let dropped = one
             .as_ref()
-            .map_or_else(|| "nothing".to_string(), |x| weft_sdk::item_name(x.item).to_string());
+            .map_or_else(|| "nothing".to_string(), |x| format!("{} {}", x.count, weft_sdk::item_name(x.item)));
         if let Some(one) = one {
-            w.spawn_item(at, ItemStack::new(one.item, 1));
+            w.spawn_item(at, one);
         }
         for p in w.entities_near(st.pos, 24.0, Some(&PLAYER)) {
             w.subtitle("subtitle.animals.stagger_break", &[])
