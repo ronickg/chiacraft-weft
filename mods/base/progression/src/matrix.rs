@@ -296,7 +296,10 @@ pub fn ranged() -> Vec<String> {
     if (ARROW_LEVEL - Age::Stone.reference()).abs() > 1e-4 {
         out.push(format!("a plain arrow is item level {ARROW_LEVEL}, not the Stone Age's reference {}", Age::Stone.reference()));
     }
-    let best = crafting::materials::SPRING.iter().map(|s| s.1).fold(0.0_f32, f32::max);
+    let best = crafting::materials::SPRING
+        .iter()
+        .map(|s| s.1)
+        .fold(0.0_f32, f32::max);
     if (best - 1.0).abs() > 1e-4 {
         out.push(format!("the springiest stave is ×{best}, not the reference bow's ×1"));
     }
