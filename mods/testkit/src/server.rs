@@ -1205,7 +1205,11 @@ const OPS: &[(&str, &str, Run)] = &[
     ("rang", "", |_, _, _, _| {
         let k = RANG_KINDS.load(Ordering::Relaxed);
         let names = ["player", "dim", "block", "body"];
-        Ok((0..4).filter(|i| k & (1 << i) != 0).map(|i| names[i]).collect::<Vec<_>>().join(" "))
+        Ok((0..4)
+            .filter(|i| k & (1 << i) != 0)
+            .map(|i| names[i])
+            .collect::<Vec<_>>()
+            .join(" "))
     }),
     ("edited", "", |w, _, player, _| {
         let i = EDITED.id();

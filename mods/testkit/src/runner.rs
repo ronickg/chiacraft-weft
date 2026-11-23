@@ -430,7 +430,10 @@ impl T {
         let Some(bottom) = slots.iter().map(|(_, r)| r.y).reduce(f32::max) else {
             return format!("slot:{}", 36 + i);
         };
-        let mut row: Vec<&(u32, Rect)> = slots.iter().filter(|(_, r)| (r.y - bottom).abs() < 0.001).collect();
+        let mut row: Vec<&(u32, Rect)> = slots
+            .iter()
+            .filter(|(_, r)| (r.y - bottom).abs() < 0.001)
+            .collect();
         row.sort_by(|a, b| a.1.x.total_cmp(&b.1.x));
         format!("slot:{}", row.get(i as usize).map_or(36 + i, |(n, _)| *n))
     }
@@ -700,7 +703,11 @@ impl<F: FnMut(&T) -> bool + Unpin> Future for Wait<F> {
         } else if script_clock() > me.deadline {
             // What the screen showed when it gave up (`timeout_<what>.png`): a wait that times
             // out usually has no shot of its own, and the run is on another machine.
-            let file: String = me.what.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+            let file: String = me
+                .what
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                .collect();
             let path = format!("{}/test-shots/{}/timeout_{file}.png", me.t.c().run_dir(), me.t.name());
             me.shot = Some((me.t.c().screenshot(&path), script_clock() + Duration::from_secs(5)));
             Poll::Pending
