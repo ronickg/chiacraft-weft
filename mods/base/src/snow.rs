@@ -6,7 +6,8 @@
 //! while there is less snow than it and the air is above freezing (`air::SNOW_MELT_SECS`, `air::melt_chance`: a growth step, so land away from
 //! players melts too and catches up when it loads). Far land shows the cover in the shader
 //! pack's dusting (`snow_on`). Still water freezes the same way (`air::freeze_chance`): its open top
-//! turns to ice in the cold, and ice on water thaws in the warmth. The cover is blended over the biomes round a column (`cover_at`).
+//! turns to ice in the cold, and ice on water thaws in the warmth. A pond's rim dries in its dry
+//! season on the same visits (`waterholes`). The cover is blended over the biomes round a column (`cover_at`).
 
 use vitals::air;
 use weft_sdk::*;
@@ -134,7 +135,14 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     if state == WATER.id() {
         if w.sky_light(above) >= 15 && freezes(w, pos) {
             w.set_block(pos, LAKE_ICE.id());
+        } else if w.sky_light(above) >= 15 {
+            // A pond's rim dries in its dry season (`waterholes`).
+            crate::waterholes::visit_water(w, pos);
         }
+        return;
+    }
+    if crate::waterholes::CRUST.is(state) {
+        crate::waterholes::visit_crust(w, pos);
         return;
     }
     if LAKE_ICE.is(state) && melts(w, pos) {

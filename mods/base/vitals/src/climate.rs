@@ -247,6 +247,39 @@ pub fn dry_season(rain: [f32; 4], season: Option<usize>) -> bool {
     season.is_some_and(|s| wettest > 0.0 && rain[s % 4] <= wettest * DRY_OF_WETTEST)
 }
 
+/// Waterholes shrink in the dry season (`notes/ECOLOGY.md`, "Later"; `base`'s `waterholes.rs`):
+/// a pond's still water, a block deep, dries from its edges into a crust of cracked mud in its
+/// biome's dry season (`dry_season`), and fills back once the season is over. The llanos'
+/// lagoons and the Pantanal's bays shrink to pools by the end of the dry months, and the herds
+/// crowd round what is left (Mourão et al. 2000 on the Pantanal's dry-season waterholes). Never
+/// the sea's (these biomes' water is the sea, whatever their seasons).
+pub const NEVER_DRIES: [&str; 4] = ["base:ocean", "base:beach", "base:coral_reef", "base:lagoon"];
+/// An edge block of a waterhole dries in this many game days on average in the dry season (on
+/// visits near players, `air::snow_visit_secs`): a pond seven across shrinks to its last pool in
+/// about a week of the season's two.
+pub const SHRINK_DAYS: f32 = 2.0;
+/// A dried block fills back in this many seconds on average once its season is no longer dry,
+/// also away from players (a growth step: caught up when its land loads).
+pub const REFILL_SECS: f32 = 600.0;
+
+/// Whether still water in `biome` (rain `rain`) shrinks now, in `season` (0 spring; None: no
+/// seasons there).
+pub fn waterholes_shrink(biome: &str, rain: [f32; 4], season: Option<usize>) -> bool {
+    !NEVER_DRIES.contains(&biome) && dry_season(rain, season)
+}
+
+/// The chance a visit (every `visit_secs` on average) dries an edge block (`SHRINK_DAYS`).
+pub fn shrink_chance(visit_secs: f32) -> f32 {
+    (visit_secs / (SHRINK_DAYS * crate::DAY_SECS)).clamp(0.0, 1.0)
+}
+
+/// Whether a block of water with `water` of its four sides water and `land` of them dry ground
+/// is an edge that dries: on the shore, and still part of the pool (two sides or more water), so
+/// a pond shrinks from its rim to a last pool of a block or two, which stays.
+pub fn edge_dries(water: u8, land: u8) -> bool {
+    land >= 1 && water >= 2
+}
+
 /// A rain spell's hours: a rainy day's rain falls in one spell of 2 to 8 hours, as most of a real
 /// rainy day's does.
 pub const SPELL_HOURS: (f32, f32) = (2.0, 8.0);
@@ -293,6 +326,22 @@ fn unit(r: u64) -> f32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn waterholes_shrink_to_a_last_pool() {
+        let rain = |b: &str| of(b).unwrap().rain;
+        assert!(waterholes_shrink("base:savanna", rain("base:savanna"), Some(3)));
+        assert!(!waterholes_shrink("base:savanna", rain("base:savanna"), Some(1)));
+        // A beach's dry summer leaves the sea alone.
+        assert!(dry_season(rain("base:beach"), Some(1)) && !waterholes_shrink("base:beach", rain("base:beach"), Some(1)));
+        // Rim blocks dry; a pool's last block or the tip of a strip doesn't.
+        assert!(edge_dries(3, 1) && edge_dries(2, 2));
+        assert!(!edge_dries(1, 3) && !edge_dries(0, 4) && !edge_dries(4, 0));
+        // An edge block dries in about SHRINK_DAYS of visits.
+        let v = crate::air::snow_visit_secs();
+        let days = v / shrink_chance(v) / crate::DAY_SECS;
+        assert!((days - SHRINK_DAYS).abs() < 0.01);
+    }
+
     #[test]
     fn dry_seasons_are_the_places_own() {
         let rain = |b: &str| of(b).unwrap().rain;
