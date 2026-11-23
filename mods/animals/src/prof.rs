@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead,recall)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead,recall,wetter)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -188,6 +188,22 @@ pub fn init(r: &mut Registry) {
                     }
                 }
                 format!("{n} members remember water at {:.1} {:.0} {:.1}", p[0], p[1], p[2])
+            }
+            "wetter" => {
+                // Testing the dry season's migration (`migrate`): everywhere is in its dry season
+                // but ground `value` blocks north of the player (-z), wet within 16 blocks of it;
+                // 0: the real climate again. Leaders near look round at their next wander.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(80.0);
+                let at = (v > 0.0).then_some([me.pos.x, me.pos.z - v, 16.0]);
+                crate::migrate::set_wetter(at);
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    crate::migrate::look_now(&w, id);
+                }
+                match at {
+                    Some([x, z, _]) => format!("dry everywhere but round {x:.0} {z:.0}"),
+                    None => "the real climate".to_string(),
+                }
             }
             "kill" => {
                 // The player kills the wild animal nearest him (a hunter's kill: fear there, and

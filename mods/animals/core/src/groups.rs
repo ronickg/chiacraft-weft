@@ -74,6 +74,49 @@ pub const WATER_TREK: f32 = 96.0;
 // Further than it looks or goes back on its own (`drink.rs` LOOK 16, RECALL 32).
 const _: () = assert!(WATER_TREK > 32.0);
 
+/// The dry season's migration (slice 5; `notes/ECOLOGY.md`, "Later": herds move towards wetter
+/// ground in the dry season). A grazing herd's leader in its place's dry season
+/// (`vitals::climate::dry_season`) looks this often (ticks: a game minute) at the rain of the
+/// places round it, `MIGRATE_DIRS` ways at each of `MIGRATE_RINGS` blocks, and leads its herd
+/// to the wettest that rains on `MIGRATE_GAIN` more of its days than here, a leg of `MIGRATE_LEG`
+/// blocks at a time, until it is within `MIGRATE_ARRIVED` of it, the season here turns, or
+/// `MIGRATE_GIVE_UP` ticks have gone. Wildebeest and zebra follow the rains round the Serengeti
+/// (Boone, Thirgood and Hopcraft 2006, *Ecology* 87), the llanos' deer and capybara crowd to the
+/// rivers and the last pools in the dry months: here over a few chunks.
+pub const MIGRATE_EVERY: u64 = 1200;
+pub const MIGRATE_RINGS: [f32; 2] = [48.0, 96.0];
+pub const MIGRATE_DIRS: u32 = 8;
+pub const MIGRATE_GAIN: f32 = 0.15;
+pub const MIGRATE_LEG: f32 = 24.0;
+pub const MIGRATE_ARRIVED: f32 = 12.0;
+pub const MIGRATE_GIVE_UP: u64 = 6000;
+// A leg is a walk the pathfinder takes in one go, and it gets there before giving up (6000
+// ticks: five minutes; 96 blocks at a deer's walk of about 2 blocks a second is under a minute).
+const _: () = assert!(MIGRATE_LEG <= 32.0 && MIGRATE_ARRIVED < MIGRATE_RINGS[0] && MIGRATE_GIVE_UP >= 20 * 120);
+
+/// The places a leader at `(x, z)` looks at, nearest ring first.
+pub fn migrate_looks(x: f32, z: f32) -> impl Iterator<Item = [f32; 2]> {
+    MIGRATE_RINGS.into_iter().flat_map(move |r| {
+        (0..MIGRATE_DIRS).map(move |i| {
+            let a = i as f32 / MIGRATE_DIRS as f32 * std::f32::consts::TAU;
+            [x + a.cos() * r, z + a.sin() * r]
+        })
+    })
+}
+
+/// Where a herd goes from a place where it rains on `here` of the season's days: the wettest of
+/// `places` (where, and its share) that is `MIGRATE_GAIN` wetter, the nearer first among equals;
+/// None: nowhere is worth the walk.
+pub fn wetter(here: f32, places: impl IntoIterator<Item = ([f32; 2], f32)>) -> Option<[f32; 2]> {
+    let mut best: Option<([f32; 2], f32)> = None;
+    for (p, rain) in places {
+        if rain >= here + MIGRATE_GAIN && best.is_none_or(|(_, b)| rain > b) {
+            best = Some((p, rain));
+        }
+    }
+    best.map(|(p, _)| p)
+}
+
 /// The ring's radius for a group of `kin`.
 pub fn ring(kin: u16) -> f32 {
     (SLOT_NEAR + SLOT_PER * (kin.max(1) as f32).sqrt()).min(SLOT_FAR)
@@ -130,6 +173,17 @@ mod tests {
         assert_eq!(thirst_score_from(0.85, THIRSTY, false), 0.0);
         assert_eq!(thirst_score_from(0.95, JOIN_DRINK, false), 0.0);
         assert!(hunger_score_from(0.8, JOIN_EAT, false) > 0.0);
+    }
+
+    #[test]
+    fn herds_go_only_where_it_is_wetter_enough() {
+        let looks: Vec<_> = migrate_looks(0.0, 0.0).collect();
+        assert_eq!(looks.len(), (MIGRATE_DIRS as usize) * MIGRATE_RINGS.len());
+        // The llanos' winter (0.11) against the forest's (0.41): it goes; against the plains' (0.14): not.
+        assert_eq!(wetter(0.11, [([48.0, 0.0], 0.14)]), None);
+        assert_eq!(wetter(0.11, [([48.0, 0.0], 0.14), ([0.0, 96.0], 0.41)]), Some([0.0, 96.0]));
+        // Equally wet: the nearer (looked at first).
+        assert_eq!(wetter(0.1, [([48.0, 0.0], 0.4), ([96.0, 0.0], 0.4)]), Some([48.0, 0.0]));
     }
 
     #[test]

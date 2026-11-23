@@ -41,10 +41,12 @@ pub fn or_follow(speed: f32, wander: impl Goal) -> impl Goal {
         if stuck(w, id, st) {
             return false;
         }
-        match follow(w, id, st, speed) {
-            Some(acted) => acted,
-            None => wander.run(w, id, st),
+        // A member keeps to its place; a herd's leader in the dry season leads it to wetter ground
+        // (`migrate`); else it wanders.
+        if let Some(acted) = follow(w, id, st, speed).or_else(|| crate::migrate::lead(w, id, st, speed)) {
+            return acted;
         }
+        wander.run(w, id, st)
     }
 }
 
