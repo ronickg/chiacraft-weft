@@ -17,6 +17,10 @@ pub enum Role {
     Lining,
 }
 
+/// Seconds a chopping tool's hit takes a raised shield down for (vanilla's axe, and Weft's
+/// `comp::DISABLE_BLOCKING` on its own axes).
+pub const CHOP_DISABLES_BLOCKING: f32 = 5.0;
+
 /// What a kind's working part is for, and so its main stat.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Use {

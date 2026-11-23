@@ -214,6 +214,7 @@ item.base.gunpowder = Порох
 item.base.spider_eye = Паучий глаз
 item.base.paper = Бумага
 entity.base.zombie = Зомби
+entity.base.creeper = Крипер
 entity.base.spider = Паук
 entity.base.pig = Свинья
 entity.base.cow = Корова

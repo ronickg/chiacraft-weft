@@ -90,6 +90,8 @@ pub fn register(r: &mut Registry) {
         .opens(&CHEST_MENU);
     r.menu(&CHEST_MENU)
         .group("chest", Slots::chest(3).holder())
+        // Its screen (ours, not the default one) draws the player's slots: the menu must have them.
+        .player_inventory()
         .screen(|ui| {
             crate::window::window(ui, S::column().pad(7.0).gap(4.0), &[], |ui| {
                 ui.group("chest");

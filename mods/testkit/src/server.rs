@@ -80,6 +80,8 @@ static PLACED: std::sync::Mutex<Vec<(u32, BlockPos)>> = std::sync::Mutex::new(Ve
 /// Fired by `after` timers; counted.
 static RANG: Event<u64> = Event::named("rang");
 static RINGS: AtomicU32 = AtomicU32::new(0);
+/// Which holders' timers rang (`after`'s kinds, a bit each: player, dim, block, body cell).
+static RANG_KINDS: AtomicU32 = AtomicU32::new(0);
 /// A key whose presses reach the server (`on_server`); `/tk pings` counts them (`extend::key_to_server`).
 static PING: Key = Key::named("ping");
 static PINGS: AtomicU32 = AtomicU32::new(0);
@@ -292,6 +294,9 @@ pub fn register(r: &mut Registry) {
     r.before_event(&actions::USE_ITEM, |_| if NO_USE.get() { Verdict::Deny } else { Verdict::Abstain });
     r.on_event(&RANG, |b| {
         RINGS.fetch_add(b.len() as u32, Ordering::Relaxed);
+        for v in b.iter() {
+            RANG_KINDS.fetch_or(1u32 << (*v).min(31) as u32, Ordering::Relaxed);
+        }
     });
     r.on_event(&FEATURE_PLACED, |b| {
         PLACED
@@ -1177,15 +1182,16 @@ const OPS: &[(&str, &str, Run)] = &[
     // ones that fired.
     ("after", "<ticks:int> [on:word] [body:int]", |w, cmd, player, me| {
         let body = int::<u64>(cmd, "body").ok();
-        let on = match cmd.text("on") {
-            Some("dim") => Holder::NONE,
-            Some("block") if body.is_some() => Holder::from([0, 1, 0]),
-            Some("block") => Holder::from([me[0], me[1] - 1, me[2]]),
-            _ => Holder::entity(player),
+        // The timer carries its kind (0 player, 1 dimension, 2 terrain cell, 3 body cell): `rang`.
+        let (on, kind) = match cmd.text("on") {
+            Some("dim") => (Holder::NONE, 1),
+            Some("block") if body.is_some() => (Holder::from([0, 1, 0]), 3),
+            Some("block") => (Holder::from([me[0], me[1] - 1, me[2]]), 2),
+            _ => (Holder::entity(player), 0),
         };
         w.in_space(body.unwrap_or(0))
             .ok_or("no space")?
-            .timer(on, int(cmd, "ticks")?, &RANG, player);
+            .timer(on, int(cmd, "ticks")?, &RANG, kind);
         Ok(String::new())
     }),
     ("assemble_one", "<pos:pos>", |w, cmd, player, _| {
@@ -1195,6 +1201,12 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(w.assembly_select(player, None, true).to_string())
     }),
     ("rings", "", |_, _, _, _| Ok(RINGS.load(Ordering::Relaxed).to_string())),
+    // Which kinds of timer have rung: "player dim block body".
+    ("rang", "", |_, _, _, _| {
+        let k = RANG_KINDS.load(Ordering::Relaxed);
+        let names = ["player", "dim", "block", "body"];
+        Ok((0..4).filter(|i| k & (1 << i) != 0).map(|i| names[i]).collect::<Vec<_>>().join(" "))
+    }),
     ("edited", "", |w, _, player, _| {
         let i = EDITED.id();
         let b = EDITED_BIOME.id();
@@ -1490,12 +1502,15 @@ const OPS: &[(&str, &str, Run)] = &[
             .collect::<Vec<_>>()
             .join(" "))
     }),
-    ("break", "<pos:pos> [tool:word]", |w, cmd, player, _| {
+    // `at_block`: the loot falls where the block was, not at the player's feet (Weft drops a
+    // player's mining at their feet since the 11-22 sync).
+    ("break", "<pos:pos> [tool:word] [drop:word(at_block)]", |w, cmd, player, _| {
         let tool = match cmd.text("tool") {
             Some(t) => tool_stack(w, player, t)?,
             None => ItemStack::EMPTY,
         };
-        Ok((w.break_block(pos(cmd, "pos")?, tool, player, true) as u32).to_string())
+        let by = if cmd.text("drop").is_some() { 0 } else { player };
+        Ok((w.break_block(pos(cmd, "pos")?, tool, by, true) as u32).to_string())
     }),
     // A melee hit's damage with what `item` makes of the player having fallen `fall` blocks.
     ("attack_damage", "<item:item> <fall:float>", |w, cmd, player, _| {
