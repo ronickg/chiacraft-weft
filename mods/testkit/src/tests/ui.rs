@@ -140,10 +140,16 @@ pub async fn hud_editor(t: T) -> R {
     // wide buttons 6 apart; a unit is a twentieth of a button's height). A close only cancelled
     // the question, and the editor stayed open.
     let Rect { x, y, w, h } = t.c().ui_rect("text:Cancel").ok_or("no reset question")?;
-    let unit = t.c().ui_rect("id:hud_reset_all").ok_or("no Reset all button")?.h / 20.0;
+    let unit = t
+        .c()
+        .ui_rect("id:hud_reset_all")
+        .ok_or("no Reset all button")?
+        .h
+        / 20.0;
     let shot = t.shot("reset_question").await?;
     let aspect = shot.w as f32 / shot.h.max(1) as f32;
-    t.c().input_cursor(x + w / 2.0 - 90.0 * unit / aspect, y + h / 2.0);
+    t.c()
+        .input_cursor(x + w / 2.0 - 90.0 * unit / aspect, y + h / 2.0);
     t.frames(3).await?;
     t.c().input_click(0, 0.0);
     t.secs(0.3).await?;
