@@ -16,6 +16,20 @@ pub const NIGHT_FIND_MINUTES: f32 = 0.5;
 /// Minutes to walk to what fell and take it, a kill.
 pub const HANDLING_MINUTES: f32 = 0.25;
 
+/// Minutes of work a hide or a fur takes before it's used (scraping, tanning or curing, drying), on
+/// top of its share of the kill (Planner 11-23, for Ronald: option A made hides and fur about ten
+/// times cheaper and the Stone Age's kit 18 % of its budget; this brings it back near the old
+/// 30-40 %). 0 drops it.
+pub const PELT_MINUTES: f32 = 2.0;
+
+/// What `PELT_MINUTES` counts for.
+pub const PELTS: &[&str] = &["base:hide", "base:fur"];
+
+/// Handling minutes for one piece of `item` (0 for all but pelts).
+pub fn handling(item: &str) -> f32 {
+    if PELTS.contains(&item) { PELT_MINUTES } else { 0.0 }
+}
+
 /// How far a kill's rate (EM earned a minute) may sit from 1: ±30 %, the balance model's band for
 /// an activity's value per hour.
 pub const BAND: f32 = 0.3;
