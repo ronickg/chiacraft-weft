@@ -297,20 +297,15 @@ pub fn register(r: &mut Registry) {
         .passive()
         .goals(passive());
     // Vanilla amounts; meat comes out cooked when the animal burns.
-    r.loot(&ZOMBIE)
-        .pool(Pool::new().items("rotten_flesh", 0, 2));
-    r.loot(&SPIDER)
-        .pool(Pool::new().items("string", 0, 2))
-        .pool(
-            Pool::new()
-                .when(Cond::killed_by_player())
-                .when(Cond::chance(0.33))
-                .item("spider_eye"),
-        );
-    r.loot(&CREEPER).pool(Pool::new().items("gunpowder", 0, 2));
-    r.loot(&SKELETON)
-        .pool(Pool::new().items("arrow", 0, 2))
-        .pool(Pool::new().items("bone", 0, 2));
+    // The hostile ones' from `vitals::mobs::LOOT` (the loot check prices them); a chance roll only
+    // when a player killed it.
+    for (kind, mob) in [(&ZOMBIE, "zombie"), (&SPIDER, "spider"), (&CREEPER, "creeper"), (&SKELETON, "skeleton")] {
+        let mut table = r.loot(kind);
+        for &(_, item, lo, hi, chance) in vitals::mobs::LOOT.iter().filter(|l| l.0 == mob) {
+            let pool = Pool::new().items(item, lo, hi);
+            table = table.pool(if chance < 1.0 { pool.when(Cond::killed_by_player()).when(Cond::chance(chance)) } else { pool });
+        }
+    }
     r.loot(&SHEEP).pool(Pool::new().item("wool")).pool(
         Pool::new().entry(
             Entry::item("mutton")

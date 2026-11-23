@@ -11,7 +11,7 @@ fn check(name: &str) {
 
 #[test]
 fn every_check_runs() {
-    assert_eq!(progression::checks().len(), 15);
+    assert_eq!(progression::checks().len(), 16);
 }
 
 #[test]
@@ -87,4 +87,9 @@ fn ranged() {
 #[test]
 fn saddles() {
     check("saddles lift tames by their fitting, as the tame model does, tooltip in step");
+}
+
+#[test]
+fn loot_per_hour() {
+    check("loot per hour: kill drops priced from their cheapest kill, no kill paying over its time (+30 %, +50 % more for what fights back)");
 }
