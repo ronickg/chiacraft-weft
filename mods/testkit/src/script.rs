@@ -27,6 +27,7 @@
 //! leave               # leave the world for the title screen
 //! tap screen query    # once `screen` is open, clicks the element `query` (`id:x`, `text:x`) until it closes or the element goes
 //! tap_once screen query  # the same, one click (a text field, a button that stays)
+//! tap_beside screen query 2.46  # one click that far right of the element, in its own widths (a row's button: rows have no ids)
 //! screen core:multiplayer  # opens a screen by name (an engine screen or a mod's)
 //! mark path           # writes the file (a signal to another copy's await_file)
 //! await_file path 120 # until the file exists, at most 120 s
@@ -105,6 +106,7 @@ const COMMANDS: &[&str] = &[
     "leave",
     "tap",
     "tap_once",
+    "tap_beside",
     "origin",
     "where",
     "entities",
@@ -146,6 +148,7 @@ const NEED_ARGS: &[&str] = &[
     "open",
     "tap",
     "tap_once",
+    "tap_beside",
     "via",
     "expect",
     "until",
@@ -604,6 +607,27 @@ async fn run_lines(t: T, src: String) -> R {
                     .await?;
                 t.frames(15).await?;
                 t.click_ui(query, 0);
+                t.frames(15).await?;
+            }
+            // One click beside an element, `k` of its own widths from its left edge, across its
+            // middle: a settings row's ‹ › buttons, which carry no id of their own, from its label.
+            "tap_beside" => {
+                let mut w = rest.split_whitespace();
+                let screen = w.next().ok_or("tap_beside: a screen, an element and a width")?.to_string();
+                let k: f32 = rest.rsplit(' ').next().and_then(|v| v.parse().ok()).ok_or("tap_beside: a width last")?;
+                let query = rest[screen.len()..rest.len() - rest.rsplit(' ').next().unwrap_or("").len()].trim().to_string();
+                let name = screen.clone();
+                t.until(&format!("screen {screen}"), Duration::from_secs(60), move |t| t.c().screen() == name)
+                    .await?;
+                t.frames(15).await?;
+                match t.c().ui_rect(&query) {
+                    Some(r) => {
+                        t.c().input_cursor(r.x + r.w * k, r.y + r.h / 2.0);
+                        t.frames(2).await?;
+                        t.c().input_click(0, 0.0);
+                    }
+                    None => t.fail(format!("no UI element {query} on {screen}")),
+                }
                 t.frames(15).await?;
             }
             "screen" => {
