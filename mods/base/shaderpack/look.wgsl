@@ -2131,9 +2131,10 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
             // From sunset: begun with the sun 6° up, the 18:30 land went a grey-blue (lsR_tw 0.5: 87 83 88
             // where Bliss's is dim and warm, 35 36 69).
-            // From about 7° up, half by 4° (18:30), as the sky's blue: with the sun dimmed there the
-            // land is Bliss's blue haze over dark ground, 35 38 74 (ours 66 60 60 from sunset, lsY_tw).
-            let tw = twilight_window() * (1.0 - smoothstep(0.02, 0.12, scene.sun.y)) * evening * (1.0 - rain_amount());
+            // From about 6° up, under a third by 4° (18:30): with the sun dimmed there the land is
+            // Bliss's blue haze over dark ground, 35 38 74. From sunset ours stayed warm, 66 60 60
+            // (lsY_tw); half by 4° overshot, 69 88 143 (lsZ_tw2).
+            let tw = twilight_window() * (1.0 - smoothstep(0.0, 0.1, scene.sun.y)) * evening * (1.0 - rain_amount());
             if tw > 0.0 {
                 let fill = vec3(1.0) - exp(-vec3(1.5e-3, 3.0e-3, 6.0e-3) * min(dist, 600.0));
                 let sky_up = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
