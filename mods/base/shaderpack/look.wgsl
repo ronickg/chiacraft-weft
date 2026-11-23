@@ -857,7 +857,10 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // The far land toward the sun takes it through the haze, which reads this colour.
         let wide_k = max(fantasy_opt(OPT_SUN_GLOW), 0.0);
         if wide_k > 0.0 {
-            let wide = (pow(m, 3.0) * 0.7 + pow(m, 12.0) * 0.3) * (0.3 + 0.7 * low) * (1.0 - rain_amount());
+            // Gone by noon (Bliss's noon sky by the sun 112 149 203; with a third of it left ours went
+            // 113 -> 126 red, lsW_air2), full under about 27° up (sun.y 0.45), where 08:00 stands.
+            let not_high = 1.0 - smoothstep(0.45, 0.8, scene.sun.y);
+            let wide = (pow(m, 3.0) * 0.7 + pow(m, 12.0) * 0.3) * not_high * (1.0 - rain_amount());
             c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.5 * wide_k;
         }
     }
