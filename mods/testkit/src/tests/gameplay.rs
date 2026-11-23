@@ -165,8 +165,9 @@ pub async fn armor(t: T) -> R {
     t.until("armor worn", Duration::from_secs(5), |t| (36..40).all(|s| !t.c().inventory_slot(s).is_empty()))
         .await?;
     // Sweep from the dirt to the shield with Shift held.
-    let dirt = t.c().ui_rect("slot:41").ok_or("no dirt slot")?;
-    let shield = t.c().ui_rect("slot:40").ok_or("no shield slot")?;
+    // Hotbar 5 and 4 (Weft's menu numbers them 41 and 40; base's has more slots before).
+    let dirt = t.c().ui_rect(&t.hotbar(5)).ok_or("no dirt slot")?;
+    let shield = t.c().ui_rect(&t.hotbar(4)).ok_or("no shield slot")?;
     t.c()
         .input_cursor(dirt.x + dirt.w / 2.0, dirt.y + dirt.h / 2.0);
     t.c().input_key("ShiftLeft", 1.0);
@@ -1886,6 +1887,8 @@ pub async fn every_food_has_nutrition(t: T) -> R {
 /// Food: eating puts it in the stomach (the vitals), and another mod's component on the base
 /// game's food plus the engine's `item_used` event heals (the owner's example).
 pub async fn food(t: T) -> R {
+    // In a world: run first in a process, it was at the title screen, with no one to feed.
+    t.flat().await?;
     // Fed some first (an apple, a loaf and a steak): with protein in it, max health is over what a
     // fall leaves, so the healing shows.
     t.cmd("/feed 60").await?;
@@ -2005,7 +2008,8 @@ pub async fn own_names(t: T) -> R {
     t.cmd("/gear axe flint slot=8").await?;
     t.c().select_slot(8);
     t.frames(2).await?;
-    t.op(&format!("break {} held", at(chest))).await?;
+    // At the block: a player's mining drops at their feet now (Weft), and the teleport left it.
+    t.op(&format!("break {} held at_block", at(chest))).await?;
     t.c()
         .teleport([chest[0] as f64 + 0.5, chest[1] as f64, chest[2] as f64 + 0.5]);
     let back = t
@@ -2972,6 +2976,8 @@ pub async fn clothes_and_stew(t: T) -> R {
 /// the seasonal tints read (`Vitals::date`) is day 49 of the year, winter by the calendar's
 /// seasons (Tester 2 11-04: after `/time set` in creative it stayed on its old day).
 pub async fn calendar_follows_time(t: T) -> R {
+    // In a world: run first in a process, it asked a server there was none of yet.
+    t.flat().await?;
     let mode = |t: T, m: &'static str| async move { t.op(&format!("mode {m}")).await };
     mode(t.clone(), "creative").await?;
     let day: u64 = 48;

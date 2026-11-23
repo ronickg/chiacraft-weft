@@ -256,8 +256,14 @@ pub async fn inventory_crafting(t: T) -> R {
         .await
         .map_err(|e| {
             let c = t.c();
+            // Where the log went: every slot of the menu holding something.
+            let filled: Vec<String> = (0..c.menu().map_or(0, |m| m.slots))
+                .filter(|&i| !c.menu_slot(i).is_empty())
+                .map(|i| format!("{i}:{}x{}", c.menu_slot(i).item, c.menu_slot(i).count))
+                .collect();
+            let at = c.ui_rect("slot:0");
             format!(
-                "{e} (cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})",
+                "{e} (filled {filled:?}, slot:0 at {at:?}, cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})",
                 c.cursor_stack(),
                 c.menu_slot(0),
                 c.menu_slot(1),
