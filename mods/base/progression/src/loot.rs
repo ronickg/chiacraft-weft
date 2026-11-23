@@ -35,7 +35,12 @@ pub struct Kill {
 impl Kill {
     /// Its time: finding, the fight, taking its drops, and working its pelts (`vitals::loot::handling`).
     pub fn minutes(&self) -> f32 {
-        self.hunt_minutes() + self.drops.iter().map(|(id, n)| loot::handling(id) * n).sum::<f32>()
+        self.hunt_minutes()
+            + self
+                .drops
+                .iter()
+                .map(|(id, n)| loot::handling(id) * n)
+                .sum::<f32>()
     }
 
     /// Its time without working its pelts: what its drops share.
@@ -158,7 +163,9 @@ pub fn cheapest(item: &str) -> Option<String> {
     kills()
         .into_iter()
         .filter_map(|k| {
-            let p = loot::shares(k.hunt_minutes(), &k.drops).find(|d| d.0 == item)?.1;
+            let p = loot::shares(k.hunt_minutes(), &k.drops)
+                .find(|d| d.0 == item)?
+                .1;
             Some((k.who.clone(), p))
         })
         .min_by(|a, b| a.1.total_cmp(&b.1))
