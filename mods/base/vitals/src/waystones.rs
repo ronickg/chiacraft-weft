@@ -124,7 +124,9 @@ pub fn biome_colour(biome: &str) -> [u8; 3] {
 pub const GROUND_COLOURS: [(&str, [u8; 3]); 11] = [
     ("grass", [0x6e, 0xa0, 0x48]),
     ("snowy_grass", [0xc8, 0xd8, 0xc0]),
-    ("podzol", [0x6c, 0x64, 0x3c]),
+    // The conifers' floor: an olive near the woods' grass, so the patches it frays into at the
+    // taiga's border read as a soft texture, not a brown film (PC run mm1122_c).
+    ("podzol", [0x62, 0x70, 0x42]),
     ("sand", [0xe0, 0xcc, 0x8c]),
     ("gravel", [0x8a, 0x86, 0x80]),
     ("snow", [0xf0, 0xf2, 0xf4]),

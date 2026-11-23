@@ -614,17 +614,30 @@ fn picture(c: &Client, seed: u64, side: usize, centre: (i32, i32), zoom: i32, ed
     // at heel) is moved out to just past the arrow's tip, the way it lies from the player (Planner
     // 11-22, run mm1122_b: the tame wolf hid under the arrow).
     let me_px = me.map(|st| place_in(side as f32, centre, zoom, st.pos.x.floor() as i32, st.pos.z.floor() as i32));
-    for &(x, z, mark) in marks {
+    // Tames last, over the others; a dot moved out turns round the arrow until it is clear of
+    // those already placed (a tame and a zombie in one line from the player met at one spot and
+    // the zombie's covered the tame's: run mm1122_c).
+    let mut order: Vec<&(i32, i32, n::Mark)> = marks.iter().collect();
+    order.sort_by_key(|m| m.2 == n::Mark::Tame);
+    let mut placed: Vec<(f32, f32)> = Vec::new();
+    let apart = (n::MARK_DOT + 2) as f32;
+    for &&(x, z, mark) in &order {
         let (mut px, mut pz) = place_in(side as f32, centre, zoom, x, z);
         if let Some((ax, az)) = me_px {
             let (dx, dz) = (px - ax, pz - az);
             let d = dx.hypot(dz);
             if d < n::MARK_CLEAR {
                 // Straight on the player: to the right of the arrow.
-                let (ux, uz) = if d < 0.5 { (1.0, 0.0) } else { (dx / d, dz / d) };
-                (px, pz) = (ax + ux * n::MARK_CLEAR, az + uz * n::MARK_CLEAR);
+                let a0 = if d < 0.5 { 0.0 } else { dz.atan2(dx) };
+                let step = (apart / n::MARK_CLEAR).asin() * 1.2;
+                let free = (0..24)
+                    .map(|k| a0 + step * ((k + 1) / 2) as f32 * if k % 2 == 0 { 1.0 } else { -1.0 })
+                    .map(|a| (ax + a.cos() * n::MARK_CLEAR, az + a.sin() * n::MARK_CLEAR))
+                    .find(|&(qx, qz)| placed.iter().all(|&(ox, oz)| (qx - ox).hypot(qz - oz) >= apart));
+                (px, pz) = free.unwrap_or((ax + a0.cos() * n::MARK_CLEAR, az + a0.sin() * n::MARK_CLEAR));
             }
         }
+        placed.push((px, pz));
         let (px, pz) = (px.floor() as i32, pz.floor() as i32);
         let (fill, rim) = (n::MARK_DOT / 2, n::MARK_DOT / 2 + 1);
         for dz in -rim..=rim {
