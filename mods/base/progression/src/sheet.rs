@@ -495,10 +495,11 @@ fn tags(w: &mut String, g: &graph::Solved) {
 fn loot_table(w: &mut String, g: &graph::Solved) {
     let _ = writeln!(
         w,
-        "## Loot per hour\n\nEvery kill priced in effort minutes (`crate::loot`, `vitals::loot`): its drops at their cheapest cost in the graph, against its time, which is finding one ({} min for a common animal, longer as its spawn chance is smaller, shared by a pack that comes at you together; {} min for a mob at night), the fight at its home age (grade 4) and {} min to take what it leaves. A fair rate is about 1 EM a minute, within ±{:.0} % (up to +{:.0} % more for what fights back). Wild ones at level 0; a big one's breaks counted. Drops that kills give are priced from their cheapest kill (Planner 11-23, option A: its minutes shared among its drops by their old hand prices, `vitals::loot::KILL_DROPS`), so that kill pays 1 and the rest less: \"poor\" is only a poor way to spend time, \"over\" fails the check.\n\n| kill | age | role | find (min) | kills | fight (s) | drops | loot (EM) | minutes | EM a minute | band |\n|---|---|---|---|---|---|---|---|---|---|---|",
+        "## Loot per hour\n\nEvery kill priced in effort minutes (`crate::loot`, `vitals::loot`): its drops at their cheapest cost in the graph, against its time, which is finding one ({} min for a common animal, longer as its spawn chance is smaller, shared by a pack that comes at you together; {} min for a mob at night), the fight at its home age (grade 4), {} min to take what it leaves and {} min to work each hide or fur (scraping, tanning, drying: `vitals::loot::PELT_MINUTES`, added to their price). A fair rate is about 1 EM a minute, within ±{:.0} % (up to +{:.0} % more for what fights back). Wild ones at level 0; a big one's breaks counted. Drops that kills give are priced from their cheapest kill (Planner 11-23, option A: its minutes shared among its drops by their old hand prices, `vitals::loot::KILL_DROPS`), so that kill pays 1 and the rest less: \"poor\" is only a poor way to spend time, \"over\" fails the check.\n\n| kill | age | role | find (min) | kills | fight (s) | drops | loot (EM) | minutes | EM a minute | band |\n|---|---|---|---|---|---|---|---|---|---|---|",
         vitals::loot::COMMON_FIND_MINUTES,
         vitals::loot::NIGHT_FIND_MINUTES,
         vitals::loot::HANDLING_MINUTES,
+        vitals::loot::PELT_MINUTES,
         vitals::loot::BAND * 100.0,
         vitals::loot::RISK_PREMIUM * 100.0
     );
