@@ -363,7 +363,11 @@ pub async fn creative_inventory(t: T) -> R {
     t.screen("core:menu").await?;
     t.shot("tab").await?;
     let stone = id("base:bricks");
-    // Settled first: a click in the frame the cursor moved missed the palette here.
+    // Found by searching: the palette scrolls, and base's bricks are below its first rows (the
+    // click landed outside the grid's view).
+    t.click_settled("id:creative_search", 0).await?;
+    t.c().input_type("bricks");
+    t.frames(4).await?;
     if t.c().ui_rect(&format!("item:{stone}")).is_some() {
         t.click_settled(&format!("item:{stone}"), 0).await?;
         t.until("bricks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == stone)

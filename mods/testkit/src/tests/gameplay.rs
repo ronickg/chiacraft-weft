@@ -176,8 +176,13 @@ pub async fn armor(t: T) -> R {
     t.frames(2).await?;
     t.c()
         .input_cursor(shield.x + shield.w / 2.0, shield.y + shield.h / 2.0);
-    t.until("shield in the other hand", Duration::from_secs(3), |t| t.c().inventory_slot(40).item == item("base:shield"))
+    // The other hand comes after base's clothes and cloak (Weft's is 40): wherever the shield
+    // went among the equipment.
+    let shield = item("base:shield");
+    let off_hand = |t: &T| (36..64u32).find(|&s| t.c().inventory_slot(s).item == shield);
+    t.until("shield in the other hand", Duration::from_secs(3), |t| off_hand(t).is_some())
         .await?;
+    let off_hand = off_hand(&t).unwrap_or(40);
     t.check_eq(t.slot("me", 9).await?.1, 3, "ordinary items go to main storage");
     // The player's inventory by group name: four equipment slots, all filled; the hotbar empty.
     // Armor's four, the clothes' four and the cloak; the arrival clothes on, no cloak.
@@ -190,7 +195,7 @@ pub async fn armor(t: T) -> R {
     t.c().menu_sort(None);
     t.until("main stacks joined", Duration::from_secs(3), |t| t.c().inventory_slot(9).count == 8)
         .await?;
-    t.check_eq(t.slot("me", 40).await?.0, "base:shield".into(), "sorting keeps the shield equipped");
+    t.check_eq(t.slot("me", off_hand).await?.0, "base:shield".into(), "sorting keeps the shield equipped");
     t.check_eq(t.slot("me", 0).await?.0, "base:cobblestone".into(), "sorting main storage skips the hotbar");
     t.shot("worn").await?;
     t.c().menu_close();

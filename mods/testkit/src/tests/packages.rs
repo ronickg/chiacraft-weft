@@ -53,8 +53,7 @@ pub async fn packages(t: T) -> R {
     t.until("rubies on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == ruby)
         .await?;
     for slot in 0..9 {
-        t.click_ui(&format!("slot:{slot}"), 1);
-        t.frames(2).await?;
+        t.click_settled(&format!("slot:{slot}"), 1).await?;
     }
     let block_item = item("gems:ruby_block");
     let made = t
