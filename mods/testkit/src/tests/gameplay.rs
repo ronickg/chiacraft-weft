@@ -1920,16 +1920,7 @@ pub async fn food(t: T) -> R {
         .await?;
     t.until("in the stomach", Duration::from_secs(5), |t| in_stomach(t, "base:cooked_beef") > beef + 10.0)
         .await?;
-    // Testmod's food_heal is on its own apple (base's beef heals by the stomach, slowly): one
-    // eaten now heals two through the `item_used` event.
-    let _ = before;
-    t.op("put me 1 testmod:apple 1").await?;
-    t.c().select_slot(1);
-    t.secs(0.3).await?;
-    let before = t.state().health;
-    t.hold("core:use", 2.5);
-    t.until("the apple eaten", Duration::from_secs(5), |t| t.c().inventory_slot(1).is_empty())
-        .await?;
+    // Testmod puts its food_heal on base's beef too: the `item_used` event heals two.
     t.until("healed", Duration::from_secs(3), |t| t.state().health >= before + 2.0)
         .await?;
     let after = t.state().health;
