@@ -135,7 +135,7 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     if state == WATER.id() {
         if w.sky_light(above) >= 15 && freezes(w, pos) {
             w.set_block(pos, LAKE_ICE.id());
-        } else if w.sky_light(above) >= 15 {
+        } else {
             // A pond's rim dries in its dry season (`waterholes`).
             crate::waterholes::visit_water(w, pos);
         }

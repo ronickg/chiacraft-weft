@@ -10,6 +10,7 @@
 //! near players; refilling is the crust's own growth step, also away from players.
 
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
 
 use vitals::{air, climate};
 use weft_sdk::*;
@@ -25,7 +26,37 @@ pub static CRUST: Block = Block::named("dried_mud");
 /// `Some(false)` none does (the crust fills back), and how many times faster; None: the climate.
 static FORCE: Mutex<(Option<bool>, f32)> = Mutex::new((None, 1.0));
 
+/// Testing: what the visits found while `/waterholes` is forced, logged every `REPORT` ticks:
+/// water visited, dried; not dried for the roll, a floor of water or air, not an edge, the season;
+/// crusts visited, filled.
+static SEEN: [AtomicU32; 8] = [const { AtomicU32::new(0) }; 8];
+const REPORT: u64 = 400;
+
+fn seen(i: usize) {
+    SEEN[i].fetch_add(1, Relaxed);
+}
+
+/// Testing: the visits' counts since the last, logged while `/waterholes` is forced.
+fn report(w: &World) {
+    if FORCE.lock().unwrap().0.is_none() || !w.game_time().is_multiple_of(REPORT) {
+        return;
+    }
+    let n: Vec<u32> = SEEN.iter().map(|c| c.swap(0, Relaxed)).collect();
+    weft_sdk::info!(
+        "waterholes: {} water visits, {} dried (not: {} roll, {} floor, {} edge, {} season); {} crust visits, {} filled",
+        n[0],
+        n[1],
+        n[2],
+        n[3],
+        n[4],
+        n[5],
+        n[6],
+        n[7]
+    );
+}
+
 pub fn register(r: &mut Registry) {
+    r.world_tick(report);
     r.block(&CRUST)
         .states(|_, s| s.model_box([0.0, 0.0, 0.0], [16.0, 2.0, 16.0]).not_solid())
         .texture("dried_mud")
@@ -73,30 +104,36 @@ fn shrinks(w: &World, pos: [i32; 3]) -> bool {
 /// A snow visit (`snow::column`) to open still water at `pos`: an edge block of a pond a block
 /// deep dries in its dry season.
 pub fn visit_water(w: &World, pos: [i32; 3]) {
+    seen(0);
     let speed = FORCE.lock().unwrap().1;
     let chance = (climate::shrink_chance(air::snow_visit_secs()) * speed).min(1.0);
     if (w.random_below(1 << 16) as f32) >= chance * (1 << 16) as f32 {
+        seen(2);
         return;
     }
     let [x, y, z] = pos;
     // A block deep: the floor under it is ground.
     if w.block_loaded([x, y - 1, z])
-        .is_none_or(|b| b == 0 || b == WATER.id())
+        .is_none_or(|b| b == 0 || WATER.is(b))
     {
+        seen(3);
         return;
     }
     let (mut water, mut land) = (0u8, 0u8);
     for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
         match w.block_loaded([x + dx, y, z + dz]) {
             None => return,
-            Some(b) if b == WATER.id() => water += 1,
-            // Flowing water, ice, plants in it: the pool goes on there.
-            Some(b) if state_flags(b) & abi::block_flags::LIQUID != 0 => water += 1,
-            Some(b) if b == 0 || CRUST.is(b) || state_flags(b) & abi::block_flags::REPLACEABLE != 0 => land += 1,
+            // Water, flowing or still, and other liquids: the pool goes on there.
+            Some(b) if WATER.is(b) || state_flags(b) & abi::block_flags::LIQUID != 0 => water += 1,
             Some(_) => land += 1,
         }
     }
-    if climate::edge_dries(water, land) && shrinks(w, pos) {
+    if !climate::edge_dries(water, land) {
+        seen(4);
+    } else if !shrinks(w, pos) {
+        seen(5);
+    } else {
+        seen(1);
         w.set_block(pos, CRUST.id());
     }
 }
@@ -104,9 +141,11 @@ pub fn visit_water(w: &World, pos: [i32; 3]) {
 /// A snow visit to a crust at `pos`: it fills back sooner near players when the season has
 /// turned (`speed` times its growth step's rate, for testing).
 pub fn visit_crust(w: &World, pos: [i32; 3]) {
+    seen(6);
     let speed = FORCE.lock().unwrap().1;
     let chance = (air::snow_visit_secs() / climate::REFILL_SECS * speed).min(1.0);
     if (w.random_below(1 << 16) as f32) < chance * (1 << 16) as f32 && !shrinks(w, pos) {
+        seen(7);
         w.set_block(pos, WATER.id());
     }
 }
