@@ -58,8 +58,9 @@ def pen(name: str, bow: str, spawn: str, level: bool, draw: float, shots: int) -
         # `/animal` acts on the animal looked at.
         o("aim 12")
         o("chat /animal level 0")
-        # Grown, so every pen's raptor is the same size (ranged2's were 103, 75 and 46 health).
-        o("chat /animal age 2000")
+        # Grown, so every pen's raptor is the same size (ranged2's were 103, 75 and 46 health): 30
+        # days, past its 12.3 to grow up and far from its 153-day life (ranged3's 2000 killed them).
+        o("chat /animal age 30")
     o("wait 0.5")
     o(f"where {name}_start")
     o("entities 10")

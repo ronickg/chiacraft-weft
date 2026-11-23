@@ -31,7 +31,7 @@ chat /tk spawn animals:utahraptor 0 197 1
 wait 1
 aim 12
 chat /animal level 0
-chat /animal age 2000
+chat /animal age 30
 wait 0.5
 where R0_yew_full_start
 entities 10
@@ -127,7 +127,7 @@ chat /tk spawn animals:utahraptor 0 197 1
 wait 1
 aim 12
 chat /animal level 0
-chat /animal age 2000
+chat /animal age 30
 wait 0.5
 where R1_spruce_full_start
 entities 10
@@ -171,7 +171,7 @@ chat /tk spawn animals:utahraptor 0 197 1
 wait 1
 aim 12
 chat /animal level 0
-chat /animal age 2000
+chat /animal age 30
 wait 0.5
 where R2_yew_half_start
 entities 10
