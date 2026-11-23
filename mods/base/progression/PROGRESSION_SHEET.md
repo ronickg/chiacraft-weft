@@ -30,7 +30,7 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 549 | 158 | 48 | 33 % | 216 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 550 | 159 | 48 | 33 % | 217 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 52 | 35 | 150 | 52 % | 143 EM |
 | 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 58 | 28 | 61 | 16 % | 270 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 38 | 32 | 94 | 22 % | 328 EM |
@@ -290,7 +290,6 @@ Every kill priced in effort minutes (`crate::loot`, `vitals::loot`): its drops a
 | gastonia | Stone Age | tank | 1.5 | 1.0 | 25.3 | 9.5 animals:carcass, 3.0 animals:scute | 2.2 | 2.2 | 1.00 | ok |
 | pinacosaurus | Stone Age | tank | 1.5 | 1.0 | 25.3 | 9.5 animals:carcass, 3.0 animals:scute | 2.2 | 2.2 | 1.00 | ok |
 | zombie | Stone Age | hunter | 0.5 | 1.0 | 3.5 | 1.0 rotten_flesh | 0.81 | 0.8 | 1.00 | ok |
-| skeleton | Stone Age | hunter | 0.5 | 1.0 | 2.8 | 1.0 arrow, 1.0 bone | 0.80 | 0.8 | 1.00 | ok |
 | creeper | Stone Age | prey | 0.5 | 1.0 | 2.7 | 1.0 gunpowder | 0.80 | 0.8 | 1.00 | ok |
 | reindeer | Stone Age | grazer | 1.5 | 1.0 | 3.9 | 3.5 animals:venison, 2.5 fur | 6.7 | 6.8 | 0.98 | ok |
 | white_tailed_deer | Stone Age | prey | 1.5 | 1.0 | 2.7 | 3.5 animals:venison, 1.5 hide | 4.4 | 4.8 | 0.92 | ok |
@@ -303,6 +302,7 @@ Every kill priced in effort minutes (`crate::loot`, `vitals::loot`): its drops a
 | red_fox | Stone Age | hunter | 1.5 | 2.5 | 0.7 | 1.5 animals:carcass, 1.0 fur | 2.4 | 2.9 | 0.83 | ok |
 | grey_wolf | Stone Age | hunter | 3.7 | 2.5 | 3.5 | 2.5 animals:carcass, 2.0 fur | 4.7 | 5.8 | 0.81 | ok |
 | red_deer | Stone Age | prey | 3.7 | 1.0 | 15.7 | 4.5 animals:venison, 2.0 hide | 5.8 | 8.3 | 0.71 | ok |
+| skeleton | Stone Age | hunter | 0.5 | 1.0 | 2.8 | 1.0 arrow, 1.0 bone | 0.52 | 0.8 | 0.66 | poor |
 | jaguar | Stone Age | apex | 3.7 | 1.0 | 5.0 | 3.5 animals:carcass, 2.5 fur | 5.9 | 9.1 | 0.65 | poor |
 | capybara | Stone Age | prey | 1.5 | 1.0 | 2.7 | 2.5 animals:carcass, 1.0 hide | 2.5 | 3.8 | 0.65 | poor |
 | spider | Stone Age | hunter | 0.5 | 1.0 | 2.8 | 1.0 string, 0.3 spider_eye | 0.40 | 0.8 | 0.50 | poor |
@@ -351,7 +351,7 @@ What kills drop, priced from their cheapest kill; the weight is the old hand pri
 | fur | 2.0 | 2.2 | arctic_fox |
 | feather | 2.0 | 0.19 | utahraptor |
 | bone | 2.0 | 0.40 | skeleton |
-| arrow | 2.0 | 0.40 | skeleton |
+| arrow | 2.0 | 0.13 | skeleton |
 | gunpowder | 2.0 | 0.80 | creeper |
 | spider_eye | 2.0 | 0.96 | spider |
 | rotten_flesh | 2.0 | 0.81 | zombie |
@@ -389,16 +389,16 @@ What each route costs from scratch (`graph::route_cost`): its items at their che
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (549)
+### Stone Age (550)
 
-**tech** (45)
+**tech** (46)
 
 - material: gem_amber (2.0), gem_tektite (5.1)
-- tool: arrow (0.40), axe (0.48), bow (0.48), glider (8.2), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
+- tool: arrow (0.13), axe (0.48), bow (0.48), glider (8.2), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
 - armour: boots (0.70), chestplate (0.70), helmet (0.70), leggings (0.70)
 - station: furnace (1.2)
 - building: slate_tiles (0.16)
-- part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_boot_shell (0.22), part_bowstring (0.22), part_chest_shell (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_helmet_shell (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_leg_shell (0.22), part_lining (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22), part_straps (0.22)
+- part: part_arrowhead (0.22), part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_boot_shell (0.22), part_bowstring (0.22), part_chest_shell (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_helmet_shell (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_leg_shell (0.22), part_lining (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22), part_straps (0.22)
 
 **magic** (4)
 
@@ -449,7 +449,7 @@ Notes:
 - base:helmet, base:chestplate, base:leggings, base:boots: built from a shell, fastening and lining: its shell sets its real age; a leather-look shell (leather, rawhide, bone)
 - base:part_*: a part's material sets its real age (`MATERIALS`)
 - base:gem_tektite, base:gem_amber: cut gems: a boost in a tool's, weapon's or armour's socket
-- base:arrow: dropped by skeletons; no recipe yet
+- base:arrow: dropped by skeletons, or fletched from an arrowhead part, a stick and a feather (its head's material its age)
 - base:furnace: the Stone Age key's infrastructure: what it makes is the Bronze Age's
 - base:cooking_pot, base:stew: a clay pot (Ronald, 11-07: "move them to fit")
 - animals:claw, animals:scute: a large animal's stagger breaks (animals_core::parts): a fight with a Utahraptor or an ankylosaur
