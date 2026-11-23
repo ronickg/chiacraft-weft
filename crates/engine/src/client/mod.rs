@@ -3774,7 +3774,7 @@ impl Client {
             rain_cover: [0.0; 4],
             lightning_start,
             lightning_end,
-            weather: [self.wind.x, self.wind.y, self.fog, self.thunder()],
+            weather: [self.wind.x, self.wind.y, self.fog.max(evening_mist_floor(self.sun())), self.thunder()],
             eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, self.moon_light()],
             ground: [self.snow_cover, self.snowing, self.dust, self.aurora],
             behind: self.behind,
@@ -4491,6 +4491,25 @@ fn smoothstep(a: f32, b: f32, x: f32) -> f32 {
 /// Frames the far map waits before drawing in terrain that changed (about a sixth of a second).
 const FAR_TERRAIN_WAIT: u32 = 10;
 const FAR_DEPTH: f32 = 1200.0;
+
+/// The mist the pack's evening layer brings with it (chiacraft, `base:look_evening_mist`, 0 as made
+/// and then none): as much as `/air` 0.3 with the sun low in the west, as Bliss's evening fog has
+/// its own amount whatever the weather. Only what the shaders see (`Scene::weather`); the air's own
+/// mist, and play, are untouched. Without it the layer drew nothing on a clear evening (lsAD_mist).
+/// The same window as the pack's `evening_mist`.
+fn evening_mist_floor(sun: [f32; 4]) -> f32 {
+    let Some(id) = crate::config::by_name("base:look_evening_mist") else { return 0.0 };
+    let k = (crate::config::get(id) as f32).clamp(0.0, 1.0);
+    if k <= 0.0 {
+        return 0.0;
+    }
+    let ss = |a: f32, b: f32, x: f32| {
+        let t = ((x - a) / (b - a)).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    };
+    let (x, y) = (sun[0], sun[1]);
+    0.3 * k * ss(0.1, -0.1, x) * (1.0 - ss(0.03, 0.3, y)) * ss(-0.2, -0.05, y)
+}
 
 /// The values of the settings the shader pack reads (`Scene::options`).
 fn pack_options() -> [[f32; 4]; 16] {
