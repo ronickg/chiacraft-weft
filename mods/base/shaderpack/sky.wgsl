@@ -773,7 +773,7 @@ fn star_look(star: u32, uv: vec2<f32>, dir: vec3<f32>) -> vec4<f32> {
     let shape = 1.0;
     let speed = 2.0 + 3.0 * unit(star * 9u + 7u);
     let twinkle = 1.0 - (0.08 + 0.2 * (1.0 - clamp(dir.y, 0.0, 1.0))) * (0.5 + 0.5 * sin(scene.params.w * speed + unit(star * 9u + 8u) * 40.0));
-    let dark = smoothstep(0.05, -0.18, scene.sun.y);
+    let dark = night_sky_dark(0.05, -0.18);
     let needs = 1.0 - (0.25 + 0.75 * bright);
     let shows = smoothstep(needs, needs + 0.15, dark);
     return vec4(tint, shape * (1.0 + 1.6 * bright) * twinkle * shows);
@@ -782,7 +782,7 @@ fn star_look(star: u32, uv: vec2<f32>, dir: vec3<f32>) -> vec4<f32> {
 // The Milky Way: a faint band across the night, fixed among the stars (it turns with the sky, as the
 // sun does), mottled, with dark lanes along its middle; washed out by a bright moon and haze low down.
 fn milky_way(dir: vec3<f32>) -> vec3<f32> {
-    let dark = smoothstep(-0.08, -0.25, scene.sun.y);
+    let dark = night_sky_dark(-0.08, -0.25);
     if dark <= 0.0 || dir.y <= 0.0 {
         return vec3(0.0);
     }
@@ -870,7 +870,7 @@ fn meteors(dir: vec3<f32>) -> vec3<f32> {
 
 // Pixel streaks across the night sky: `rate` the share of slots that hold one (0..1), on clock `t`.
 fn streaks(dir: vec3<f32>, rate: f32, t: f32) -> vec3<f32> {
-    let dark = smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount());
+    let dark = night_sky_dark(-0.1, -0.25) * (1.0 - rain_amount());
     if dark <= 0.0 || dir.y <= 0.05 {
         return vec3(0.0);
     }

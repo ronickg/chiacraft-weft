@@ -94,6 +94,41 @@ pub static LOOK_SUN_GLOW: Config<f32> = Config::named("look_sun_glow");
 /// The low sky away from the evening sun a clear blue: 0 as made, 1 as Bliss's.
 pub static LOOK_EVENING_AWAY: Config<f32> = Config::named("look_evening_away");
 
+/// "Bliss match" (Video, Extra): the look's knobs as fitted to Ronald's Bliss at the like-for-like
+/// vista (stage 2, 11-22/23: the lsN to lsAA sweeps against bliss_ctl, crew notes
+/// bliss-features-missing-1122.md), all switched together; off puts each back as made. Each knob
+/// keeps its own setting, so one can still be moved after.
+pub static LOOK_BLISS: Config<bool> = Config::named("look_bliss");
+/// Each knob, its value in the Bliss match, and as made.
+pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 13] = [
+    // The shade: no glare lift, less fill, the sky light occluded as Bliss's (lsN_ao3).
+    (&LOOK_GLARE, 0.0, 1.0),
+    (&LOOK_FILL, 0.7, 1.0),
+    (&LOOK_AO_POWER, 4.0, 0.0),
+    // The evening's blue hour (lsZ_tw2, lsAA_tw3).
+    (&LOOK_TWILIGHT, 0.5, 0.0),
+    // Water: absorbed by depth, no foam, Bliss's mirror, a darker body (lsP_water).
+    (&LOOK_WATER_ABSORB, 1.0, 0.0),
+    (&LOOK_WATER_FOAM, 0.0, 1.0),
+    (&LOOK_WATER_MIRROR, 1.0, 0.0),
+    (&LOOK_WATER_BODY, 0.35, 1.0),
+    // The air with the sun low: the near air's blue, the far haze keeping the sky's colour, the
+    // sun's wide glare, the evening sky blue away from the sun (lsS_mix, lsX_air3, lsW_air2).
+    (&LOOK_LOW_AIR, 0.75, 0.0),
+    (&LOOK_HAZE, 1.6, 1.6),
+    (&LOOK_HAZE_SUN, 0.0, 1.0),
+    (&LOOK_SUN_GLOW, 1.0, 0.0),
+    (&LOOK_EVENING_AWAY, 1.0, 0.0),
+];
+
+/// Switches the Bliss match on (every knob to its fitted value) or off (every knob as made).
+pub fn set_bliss_match(on: bool) {
+    for (knob, bliss, made) in BLISS_MATCH.iter() {
+        knob.set(if on { *bliss } else { *made });
+    }
+    LOOK_BLISS.set(on);
+}
+
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
@@ -156,4 +191,5 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_HAZE_SUN).float(1.0, 0.0, 1.0);
     r.config(&LOOK_SUN_GLOW).float(0.0, 0.0, 4.0);
     r.config(&LOOK_EVENING_AWAY).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_BLISS).bool(false);
 }
