@@ -118,6 +118,61 @@ pub fn biome_colour(biome: &str) -> [u8; 3] {
     [mix(c[0], PARCHMENT[0]), mix(c[1], PARCHMENT[1]), mix(c[2], PARCHMENT[2])]
 }
 
+/// What tops the ground (`base_api::land::top`) by name, its colour on the map (Ronald 11-22: "what
+/// is that gray area? Isn't it supposed to be green?": grassy mountains read as grey stone when the
+/// map went by the biome). Rock faces by their rocks (`rock:<set>`).
+pub const GROUND_COLOURS: [(&str, [u8; 3]); 11] = [
+    ("grass", [0x6e, 0xa0, 0x48]),
+    ("snowy_grass", [0xc8, 0xd8, 0xc0]),
+    // The conifers' floor: a darker grass green (about 20 under the plains' in each channel), so the
+    // patches it frays into at the taiga's border read as soft texture (runs mm1122_c, _d).
+    ("podzol", [0x66, 0x92, 0x46]),
+    ("sand", [0xe0, 0xcc, 0x8c]),
+    ("gravel", [0x8a, 0x86, 0x80]),
+    ("snow", [0xf0, 0xf2, 0xf4]),
+    ("rock:strata", [0xb4, 0x6c, 0x44]),
+    ("rock:slate", [0x5c, 0x60, 0x66]),
+    ("rock:granite", [0x9a, 0x86, 0x7e]),
+    ("rock:limestone", [0xb4, 0xb0, 0xa0]),
+    ("rock:karst", [0xa4, 0xa4, 0x96]),
+];
+/// Grass takes a tint by its biome (the woods darker, the savanna dry, the heights alpine), this
+/// share of it over `GROUND_COLOURS`' grass; a biome not listed keeps the plain grass.
+pub const GRASS_TINTS: [(&str, [u8; 3]); 10] = [
+    ("plains", [0x8c, 0xb4, 0x58]),
+    ("forest", [0x4e, 0x84, 0x3c]),
+    ("old_growth_forest", [0x36, 0x68, 0x30]),
+    ("tropical_forest", [0x34, 0x7c, 0x40]),
+    ("birch_forest", [0x80, 0xa8, 0x5c]),
+    ("taiga", [0x58, 0x7a, 0x50]),
+    ("swamp", [0x64, 0x74, 0x44]),
+    ("savanna", [0xb0, 0xa8, 0x58]),
+    ("mountains", [0x7a, 0x98, 0x5e]),
+    ("sequoia_grove", [0x4a, 0x78, 0x40]),
+];
+pub const GRASS_TINT: f32 = 0.6;
+
+/// The map's colour of a column whose top is `top` (a `GROUND_COLOURS` name, or `water`) in
+/// `biome`: the seas by their biome's colour, other water `WATER`, grass tinted by the biome, the
+/// rest by the ground alone; laid on the parchment like the biomes' (`PARCHMENT_UNDER`).
+pub fn ground_colour(top: &str, biome: &str) -> [u8; 3] {
+    let b = biome.trim_start_matches("base:");
+    if top == "water" {
+        return if matches!(b, "ocean" | "coral_reef" | "lagoon") { biome_colour(b) } else { WATER };
+    }
+    let own = |name: &str| GROUND_COLOURS.iter().find(|e| e.0 == name).map(|e| e.1);
+    let grass = own("grass").unwrap();
+    let c = match (top, GRASS_TINTS.iter().find(|e| e.0 == b)) {
+        ("grass", Some(t)) => mix(grass, t.1, GRASS_TINT),
+        _ => own(top).unwrap_or(grass),
+    };
+    mix(c, PARCHMENT, PARCHMENT_UNDER)
+}
+
+fn mix(a: [u8; 3], b: [u8; 3], share_b: f32) -> [u8; 3] {
+    [0, 1, 2].map(|k| (a[k] as f32 * (1.0 - share_b) + b[k] as f32 * share_b).round() as u8)
+}
+
 /// The ley lines on the map (with the rod held or ley sight), the woken waystones, the player.
 pub const MAP_LEY: [u8; 3] = [0x6c, 0xc8, 0xf0];
 pub const MAP_WOKEN: [u8; 3] = [0x2c, 0x9c, 0xe0];
@@ -131,6 +186,9 @@ pub const MAP_PLAYER: [u8; 3] = [0xb0, 0x30, 0x24];
 pub const MARK_RADIUS: f64 = 48.0;
 pub const MARK_MAX: usize = 24;
 pub const MARK_DOT: i32 = 3;
+/// A dot nearer the player's arrow than this (pixels from its middle: the arrow reaches 5.5) is
+/// moved out to it, so the arrow never hides one.
+pub const MARK_CLEAR: f32 = 8.0;
 /// Steps of the sight ray (blocks): a block thinner than this between could be missed.
 pub const MARK_RAY_STEP: f64 = 0.5;
 /// The dots' colours: hostile mobs, wild animals (a neutral cream), the player's own tames; and
@@ -219,6 +277,28 @@ mod tests {
             assert!(BIOME_COLOURS.iter().any(|e| e.0 == b), "{b}");
         }
         assert_ne!(biome_colour("desert"), biome_colour("plains"));
+    }
+
+    #[test]
+    fn the_ground_shows_what_tops_it() {
+        let green = |c: [u8; 3]| c[1] > c[0] && c[1] > c[2];
+        // Grass is green in every biome, the mountains' included (they read grey stone before).
+        for b in ["mountains", "plains", "taiga", "swamp", "savanna", "old_growth_forest", "desert", "base:forest"] {
+            assert!(green(ground_colour("grass", b)), "{b}: {:?}", ground_colour("grass", b));
+        }
+        assert_ne!(ground_colour("grass", "forest"), ground_colour("grass", "plains"));
+        // Snow white, a granite face grey, sand pale, the sea blue.
+        let s = ground_colour("snow", "mountains");
+        assert!(s.iter().all(|&v| v > 0xd0));
+        let g = ground_colour("rock:granite", "mountains");
+        assert!(!green(g) && g.iter().max().unwrap() - g.iter().min().unwrap() < 0x30);
+        let sea = ground_colour("water", "ocean");
+        assert!(sea[2] > sea[0] && ground_colour("water", "plains") == WATER);
+        assert!(ground_colour("sand", "desert")[0] > 0xd0);
+        // Every ground block the land tops a column with has a colour.
+        for top in ["grass", "snowy_grass", "podzol", "sand", "snow", "rock:strata", "rock:slate", "rock:granite", "rock:limestone", "rock:karst"] {
+            assert!(GROUND_COLOURS.iter().any(|e| e.0 == top), "{top}");
+        }
     }
 
     #[test]
