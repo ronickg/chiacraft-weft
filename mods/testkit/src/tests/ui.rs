@@ -136,6 +136,17 @@ pub async fn hud_editor(t: T) -> R {
     t.frames(3).await?;
     t.check(t.click_ui("text:Reset all", 0), "reset all");
     t.secs(0.3).await?;
+    // Weft asks first now: the question's own Reset all, 90 units left of its Cancel (two 84
+    // wide buttons 6 apart; a unit is a twentieth of a button's height). A close only cancelled
+    // the question, and the editor stayed open.
+    let Rect { x, y, w, h } = t.c().ui_rect("text:Cancel").ok_or("no reset question")?;
+    let unit = t.c().ui_rect("id:hud_reset_all").ok_or("no Reset all button")?.h / 20.0;
+    let shot = t.shot("reset_question").await?;
+    let aspect = shot.w as f32 / shot.h.max(1) as f32;
+    t.c().input_cursor(x + w / 2.0 - 90.0 * unit / aspect, y + h / 2.0);
+    t.frames(3).await?;
+    t.c().input_click(0, 0.0);
+    t.secs(0.3).await?;
     t.c().menu_close();
     t.no_screen().await?;
     t.frames(3).await?;
@@ -256,8 +267,14 @@ pub async fn inventory_crafting(t: T) -> R {
         .await
         .map_err(|e| {
             let c = t.c();
+            // Where the log went: every slot of the menu holding something.
+            let filled: Vec<String> = (0..c.menu().map_or(0, |m| m.slots))
+                .filter(|&i| !c.menu_slot(i).is_empty())
+                .map(|i| format!("{i}:{}x{}", c.menu_slot(i).item, c.menu_slot(i).count))
+                .collect();
+            let at = c.ui_rect("slot:0");
             format!(
-                "{e} (cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})",
+                "{e} (filled {filled:?}, slot:0 at {at:?}, cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})",
                 c.cursor_stack(),
                 c.menu_slot(0),
                 c.menu_slot(1),
@@ -357,7 +374,11 @@ pub async fn creative_inventory(t: T) -> R {
     t.screen("core:menu").await?;
     t.shot("tab").await?;
     let stone = id("base:bricks");
-    // Settled first: a click in the frame the cursor moved missed the palette here.
+    // Found by searching: the palette scrolls, and base's bricks are below its first rows (the
+    // click landed outside the grid's view).
+    t.click_settled("id:creative_search", 0).await?;
+    t.c().input_type("bricks");
+    t.frames(4).await?;
     if t.c().ui_rect(&format!("item:{stone}")).is_some() {
         t.click_settled(&format!("item:{stone}"), 0).await?;
         t.until("bricks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == stone)

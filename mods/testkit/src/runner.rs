@@ -442,6 +442,10 @@ impl T {
     /// cursor and presses in one frame, which may land on what the cursor was over before: with a
     /// stack held, a right click meant for a grid cell then goes back onto the slot it was taken from.
     pub async fn click_settled(&self, query: &str, button: u32) -> R {
+        // A scripted click holds its button at least 0.05 s: one still down from the last click
+        // (a stack just picked up) sweeps the cells the cursor moves over, and the first right
+        // click into a grid went back to where the stack came from.
+        self.secs(0.08).await?;
         let Some(Rect { x, y, w, h }) = self.c().ui_rect(query) else {
             return Err(format!("no UI element {query} on {}", self.0.borrow().screen));
         };

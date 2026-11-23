@@ -165,8 +165,9 @@ pub async fn armor(t: T) -> R {
     t.until("armor worn", Duration::from_secs(5), |t| (36..40).all(|s| !t.c().inventory_slot(s).is_empty()))
         .await?;
     // Sweep from the dirt to the shield with Shift held.
-    let dirt = t.c().ui_rect("slot:41").ok_or("no dirt slot")?;
-    let shield = t.c().ui_rect("slot:40").ok_or("no shield slot")?;
+    // Hotbar 5 and 4 (Weft's menu numbers them 41 and 40; base's has more slots before).
+    let dirt = t.c().ui_rect(&t.hotbar(5)).ok_or("no dirt slot")?;
+    let shield = t.c().ui_rect(&t.hotbar(4)).ok_or("no shield slot")?;
     t.c()
         .input_cursor(dirt.x + dirt.w / 2.0, dirt.y + dirt.h / 2.0);
     t.c().input_key("ShiftLeft", 1.0);
@@ -175,8 +176,13 @@ pub async fn armor(t: T) -> R {
     t.frames(2).await?;
     t.c()
         .input_cursor(shield.x + shield.w / 2.0, shield.y + shield.h / 2.0);
-    t.until("shield in the other hand", Duration::from_secs(3), |t| t.c().inventory_slot(40).item == item("base:shield"))
+    // The other hand comes after base's clothes and cloak (Weft's is 40): wherever the shield
+    // went among the equipment.
+    let shield = item("base:shield");
+    let off_hand = |t: &T| (36..64u32).find(|&s| t.c().inventory_slot(s).item == shield);
+    t.until("shield in the other hand", Duration::from_secs(3), |t| off_hand(t).is_some())
         .await?;
+    let off_hand = off_hand(&t).unwrap_or(40);
     t.check_eq(t.slot("me", 9).await?.1, 3, "ordinary items go to main storage");
     // The player's inventory by group name: four equipment slots, all filled; the hotbar empty.
     // Armor's four, the clothes' four and the cloak; the arrival clothes on, no cloak.
@@ -189,7 +195,7 @@ pub async fn armor(t: T) -> R {
     t.c().menu_sort(None);
     t.until("main stacks joined", Duration::from_secs(3), |t| t.c().inventory_slot(9).count == 8)
         .await?;
-    t.check_eq(t.slot("me", 40).await?.0, "base:shield".into(), "sorting keeps the shield equipped");
+    t.check_eq(t.slot("me", off_hand).await?.0, "base:shield".into(), "sorting keeps the shield equipped");
     t.check_eq(t.slot("me", 0).await?.0, "base:cobblestone".into(), "sorting main storage skips the hotbar");
     t.shot("worn").await?;
     t.c().menu_close();
@@ -198,8 +204,10 @@ pub async fn armor(t: T) -> R {
     let zombie = t
         .op(&format!("spawn zombie {}", at(add(f, [1, 0, 1]))))
         .await?;
-    let full = super::max_health(&t);
-    t.until("hit by the zombie", Duration::from_secs(15), |t| t.state().health < full - 0.5)
+    // From the health now, not the most: base's survival health starts under its maximum (its
+    // stomach), so "under the most" was true before any hit (17.5 of 64.7, a 0.6 hit).
+    let full = t.state().health;
+    t.until("hit by the zombie", Duration::from_secs(15), |t| t.state().health < full - 0.3)
         .await?;
     t.secs(0.5).await?;
     let mut worn = 0;
@@ -1886,6 +1894,8 @@ pub async fn every_food_has_nutrition(t: T) -> R {
 /// Food: eating puts it in the stomach (the vitals), and another mod's component on the base
 /// game's food plus the engine's `item_used` event heals (the owner's example).
 pub async fn food(t: T) -> R {
+    // In a world: run first in a process, it was at the title screen, with no one to feed.
+    t.flat().await?;
     // Fed some first (an apple, a loaf and a steak): with protein in it, max health is over what a
     // fall leaves, so the healing shows.
     t.cmd("/feed 60").await?;
@@ -1910,6 +1920,7 @@ pub async fn food(t: T) -> R {
         .await?;
     t.until("in the stomach", Duration::from_secs(5), |t| in_stomach(t, "base:cooked_beef") > beef + 10.0)
         .await?;
+    // Testmod puts its food_heal on base's beef too: the `item_used` event heals two.
     t.until("healed", Duration::from_secs(3), |t| t.state().health >= before + 2.0)
         .await?;
     let after = t.state().health;
@@ -2005,7 +2016,8 @@ pub async fn own_names(t: T) -> R {
     t.cmd("/gear axe flint slot=8").await?;
     t.c().select_slot(8);
     t.frames(2).await?;
-    t.op(&format!("break {} held", at(chest))).await?;
+    // At the block: a player's mining drops at their feet now (Weft), and the teleport left it.
+    t.op(&format!("break {} held at_block", at(chest))).await?;
     t.c()
         .teleport([chest[0] as f64 + 0.5, chest[1] as f64, chest[2] as f64 + 0.5]);
     let back = t
@@ -2972,6 +2984,9 @@ pub async fn clothes_and_stew(t: T) -> R {
 /// the seasonal tints read (`Vitals::date`) is day 49 of the year, winter by the calendar's
 /// seasons (Tester 2 11-04: after `/time set` in creative it stayed on its old day).
 pub async fn calendar_follows_time(t: T) -> R {
+    // In a world with seasons (the overworld; the flatlands have no calendar, their date 0):
+    // run first in a process, it asked a server there was none of yet.
+    t.world(1).await?;
     let mode = |t: T, m: &'static str| async move { t.op(&format!("mode {m}")).await };
     mode(t.clone(), "creative").await?;
     let day: u64 = 48;
