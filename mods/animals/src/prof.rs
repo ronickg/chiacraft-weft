@@ -282,7 +282,7 @@ pub fn init(r: &mut Registry) {
                                 .map(|f| f.persona().map(|v| format!("{v:.2}")).join("/"))
                                 .unwrap_or_default(),
                             crate::routines::activity_of(&w, id),
-                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate"]
+                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
                                 .get(crate::choose::doing(&w, id) as usize)
                                 .unwrap_or(&"?"),
                             // Its walk, for a check that wandering moves it.

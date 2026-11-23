@@ -79,7 +79,7 @@ const _: () = assert!(WATER_TREK > 32.0);
 /// (`vitals::climate::dry_season`) looks this often (ticks: a game minute) at the rain of the
 /// places round it, `MIGRATE_DIRS` ways at each of `MIGRATE_RINGS` blocks, and leads its herd
 /// to the wettest that rains on `MIGRATE_GAIN` more of its days than here, a leg of `MIGRATE_LEG`
-/// blocks at a time, until it is within `MIGRATE_ARRIVED` of it, the season here turns, or
+/// blocks at a time (waiting for its herd, `MIGRATE_WAIT`), until it is within `MIGRATE_ARRIVED` of it, the season here turns, or
 /// `MIGRATE_GIVE_UP` ticks have gone. Wildebeest and zebra follow the rains round the Serengeti
 /// (Boone, Thirgood and Hopcraft 2006, *Ecology* 87), the llanos' deer and capybara crowd to the
 /// rivers and the last pools in the dry months: here over a few chunks.
@@ -87,12 +87,20 @@ pub const MIGRATE_EVERY: u64 = 1200;
 pub const MIGRATE_RINGS: [f32; 2] = [48.0, 96.0];
 pub const MIGRATE_DIRS: u32 = 8;
 pub const MIGRATE_GAIN: f32 = 0.15;
-pub const MIGRATE_LEG: f32 = 24.0;
+pub const MIGRATE_LEG: f32 = 12.0;
 pub const MIGRATE_ARRIVED: f32 = 12.0;
 pub const MIGRATE_GIVE_UP: u64 = 6000;
-// A leg is a walk the pathfinder takes in one go, and it gets there before giving up (6000
-// ticks: five minutes; 96 blocks at a deer's walk of about 2 blocks a second is under a minute).
-const _: () = assert!(MIGRATE_LEG <= 32.0 && MIGRATE_ARRIVED < MIGRATE_RINGS[0] && MIGRATE_GIVE_UP >= 20 * 120);
+/// The leader waits before its next leg while its herd's middle (`senses::Senses::kin_mid`,
+/// itself among them) is more than this many blocks behind it; and the herd goes on as pressingly
+/// as it joins its leader to drink (`JOIN_PULL`: above a daytime rest, under a night's sleep).
+/// ai1123_migrate1: going on only from the wander, the herd lay down at mid morning, and the
+/// leader walked off alone (24-block legs, no waiting) out of its members' 16 blocks.
+pub const MIGRATE_WAIT: f32 = 4.0;
+pub const MIGRATE_PULL: f32 = JOIN_PULL;
+// A leg ends inside the distance its members count it within (`senses::KIN` 16, less the ring),
+// and it gets there before giving up (6000 ticks: five minutes; 96 blocks at a deer's walk with
+// its waits is two or three).
+const _: () = assert!(MIGRATE_LEG + SLOT_FAR / 2.0 <= 16.0 && MIGRATE_ARRIVED < MIGRATE_RINGS[0] && MIGRATE_GIVE_UP >= 20 * 120);
 
 /// The places a leader at `(x, z)` looks at, nearest ring first.
 pub fn migrate_looks(x: f32, z: f32) -> impl Iterator<Item = [f32; 2]> {

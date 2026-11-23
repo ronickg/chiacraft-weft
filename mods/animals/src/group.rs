@@ -113,7 +113,7 @@ pub fn rest_in_step(w: &World, id: u64, resting: bool) -> Option<bool> {
 
 /// For a wild member of a group that isn't its leader: whether it walks to its place now. None:
 /// it wanders on its own (alone, the leader, tame, or its leader gone until its next look).
-fn follow(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {
+pub fn follow(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {
     let s = w.component(id, &SENSES)?;
     if s.kin < GROUP || s.leader == 0 || s.leader == id || crate::animal::tamed(w, id) {
         return None;

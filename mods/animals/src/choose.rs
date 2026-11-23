@@ -38,7 +38,12 @@ pub enum Need {
     Watch,
     /// A curious one coming to look at a player standing still (`senses::investigate`).
     Investigate,
+    /// A herd on the dry season's migration, its leader and its members (`migrate::goal`).
+    Migrate,
 }
+
+/// How many needs there are, and so scores (index `Need as usize`, 0 unused).
+const NEEDS: usize = Need::Migrate as usize + 1;
 
 /// The need whose goal took the turn last tick (0: none; not saved).
 static DOING: Component<u8> = Component::named("animal_doing");
@@ -72,8 +77,8 @@ impl Band {
 }
 
 /// How pressing each need is for `id` now, by need (index `Need as usize`).
-fn scores(w: &World, id: u64, doing: u8) -> [f32; 10] {
-    let mut s = [0.0f32; 10];
+fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
+    let mut s = [0.0f32; NEEDS];
     let at = |n: Need| doing == n as u8;
     let mut active = 1.0;
     if let Some(a) = w.component(id, &ANIMAL) {
@@ -114,6 +119,11 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; 10] {
     s[Need::Wander as usize] = WANDER;
     s[Need::Watch as usize] = animals_core::roles::WATCH;
     s[Need::Investigate as usize] = animals_core::roles::INVESTIGATE;
+    // A herd on the move, its leader and those whose leader is on it, goes on above a daytime rest
+    // (`groups::MIGRATE_PULL`).
+    if crate::migrate::migrating(w, id) || crate::group::leader_doing(w, id) == Some(Need::Migrate as u8) {
+        s[Need::Migrate as usize] = animals_core::groups::MIGRATE_PULL;
+    }
     // Staying put outranks what would move it, and nothing else.
     s[Need::Hold as usize] = s[Need::Comfort as usize]
         .max(s[Need::Drink as usize])
@@ -130,7 +140,7 @@ impl Goal for Band {
         let doing = w.component(id, &DOING).unwrap_or(0);
         let s = scores(w, id, doing);
         // Most pressing first; a tie keeps the list's order.
-        let mut order: [usize; 10] = std::array::from_fn(|i| i);
+        let mut order: [usize; NEEDS] = std::array::from_fn(|i| i);
         let order = &mut order[..self.goals.len()];
         order.sort_by(|&a, &b| s[self.goals[b].0 as usize].total_cmp(&s[self.goals[a].0 as usize]));
         let mut took = 0u8;

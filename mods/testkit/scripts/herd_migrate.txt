@@ -1,15 +1,17 @@
 # The dry season's migration (creature AI step 9, slice 5, `migrate.rs`): a grazing herd's leader
 # in its place's dry season looks round (48 and 96 blocks, 8 ways) and leads its herd to ground
-# where it rains on 15 % more of the days, 24 blocks a leg; the members keep their places round
-# it. Biomes can't be set here, so `/animalprof wetter 80` makes every place dry (rain on 10 % of
+# where it rains on 15 % more of the days, 12 blocks a leg, waiting for its herd; the members go
+# along (the band's migrate need, above a daytime rest). Biomes can't be set here, so `/animalprof wetter 80` makes every place dry (rain on 10 % of
 # days) but the ground 80 blocks north (-z), wet (70 %) within 16 blocks of that point. A herd of
 # red deer on a long dry pad, fed and watered so nothing else takes them off. 07:00, when deer are
 # up and about (a twilight animal rests a lot at noon).
 # PASS: "animal <leader> leads its herd out of the dry season: from ... toward <x> <z> (70%)" with
-# a z about 80 less than the pad's middle, then "arrives" or "is out of the dry" for it; the
-# ANIMAL_SENSES rows at the end place the herd (leader and members, one "lead") 65-95 blocks off,
-# and herd_migrate_3.png shows them at the pad's north end. FAIL: no "leads its herd" line, or a
-# leader that arrives with its members still on the pad's south end (rows 0-30 blocks off).
+# a z 80-96 less than the pad's middle, "leads its herd on: N blocks to go" lines counting down,
+# then "arrives" or "is out of the dry"; the senses rows show the members "doing migrate" with the
+# leader on its way, and the last rows (before the camera moves) place the herd, one "lead", 65-95
+# blocks off; herd_migrate_4.png (taken from 70 blocks north) shows them round the camera's
+# view. FAIL: no "leads" line, members resting while the leader goes on, or a herd split in two
+# "lead"s with half left on the pad's south end (ai1123_migrate1, before the fix).
 loaded
 idle
 chat /rule core:mob_spawning 0
@@ -43,9 +45,26 @@ chat /animalprof food 1.0
 chat /animalprof water 1.0
 chat /animalprof senses
 wait 30
+chat /animalprof food 1.0
+chat /animalprof water 1.0
 chat /animalprof senses
 look 0 -10
 wait 1
 shot herd_migrate_3.png
+wait 30
+chat /animalprof food 1.0
+chat /animalprof water 1.0
+chat /animalprof senses
+wait 30
+chat /animalprof food 1.0
+chat /animalprof water 1.0
+chat /animalprof senses
+wait 30
+chat /animalprof senses
+chat /tp ~ ~12 ~-70
+wait 3
+look 0 -40
+wait 1
+shot herd_migrate_4.png
 chat /animalprof wetter 0
 quit

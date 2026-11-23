@@ -59,6 +59,26 @@ fn rain_at(w: &World, x: f64, y: f64, z: f64) -> Option<(f32, bool)> {
     Some((vitals::climate::rain_share(c.rain, Some(season)), vitals::climate::dry_season(c.rain, Some(season))))
 }
 
+/// Whether `id` is leading its herd on a migration now.
+pub fn migrating(w: &World, id: u64) -> bool {
+    w.component(id, &MIGRATE).is_some_and(|m| !m[0].is_nan())
+}
+
+/// The needs band's goal (`choose::Need::Migrate`): a leader on a migration walks it on, a member
+/// whose leader is on one keeps to its place round it (and so goes along).
+pub fn goal(speed: f32) -> impl weft_sdk::ai::Goal {
+    move |w: &World, id: u64, st: &EntityState| {
+        if migrating(w, id) {
+            return lead(w, id, st, speed).is_some();
+        }
+        if crate::group::leader_doing(w, id) == Some(crate::choose::Need::Migrate as u8) {
+            crate::group::follow(w, id, st, speed);
+            return true;
+        }
+        false
+    }
+}
+
 /// Whether `id` is a wild grazing herd's leader (a plant eater that lives in groups, with kin).
 fn leads_a_herd(w: &World, id: u64) -> bool {
     let Some(s) = w.component(id, &SENSES) else { return false };
@@ -104,6 +124,14 @@ pub fn lead(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {
         if w.navigating(id) {
             return Some(true);
         }
+        // Its herd catches up before the next leg (itself among their middle).
+        if let Some(k) = w.component(id, &SENSES).filter(|k| k.kin >= GROUP) {
+            let behind = ((k.kin_mid[0] as f64 - x).powi(2) + (k.kin_mid[2] as f64 - z).powi(2)).sqrt();
+            if behind > groups::MIGRATE_WAIT as f64 {
+                return Some(true);
+            }
+        }
+        weft_sdk::info!("animal {id} leads its herd on: {d:.0} blocks to go, from {x:.0} {z:.0}");
         // The next leg: up to `MIGRATE_LEG` blocks on, at the ground there.
         let step = (MIGRATE_LEG as f64).min(d) / d;
         let (tx, tz) = (x + dx * step, z + dz * step);
