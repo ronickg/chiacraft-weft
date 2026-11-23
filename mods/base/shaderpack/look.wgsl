@@ -145,6 +145,24 @@ const OPT_TWILIGHT: u32 = 45u;
 // Looking down at a lake the mirror is a few percent; the rest is the body's light, which kept our
 // open water a light blue (lsL, 11-22: 102 123 133 against Bliss's dark navy 68 93 125).
 const OPT_WATER_BODY: u32 = 46u;
+// The blue near air's share with the sun low (`base:look_low_air`): 0 as made (a fifth), up to 1
+// (all of it, as with the sun high), for Bliss's blue shade at 08:00 and 18:00.
+const OPT_LOW_AIR: u32 = 47u;
+// How much of the low sun's colour the far haze takes (`base:look_haze_sun`): 1 as made, 0 none.
+// Bliss's far air at the like-for-like vista stays a cool white-blue with the sun low (lsT_haze,
+// 11-22: 08:00 far band 151 155 168, ours 151 133 102; 18:00 122 123 150 against 143 143 125). The
+// share was tuned on Bliss's own world (11-05/06), where its 08:00 far land read warm.
+const OPT_HAZE_SUN: u32 = 48u;
+fn haze_sun() -> f32 {
+    let h = fantasy_opt(OPT_HAZE_SUN);
+    return select(1.0, h, h >= 0.0);
+}
+// A wide glow round the sun in the air (`base:look_sun_glow`): 0 as made (none), more brighter.
+// Bliss's 08:00 sun stands in a white glare some 40° across that washes the sky and the far land
+// toward it (lsT_haze, 11-22); ours is a tight disc and a small gold halo.
+const OPT_SUN_GLOW: u32 = 49u;
+// The low sky away from the evening sun a clear blue (`base:look_evening_away`): 0 as made, 1 Bliss's.
+const OPT_EVENING_AWAY: u32 = 50u;
 fn water_body() -> f32 {
     let b = fantasy_opt(OPT_WATER_BODY);
     return select(1.0, b, b >= 0.0);
@@ -808,6 +826,18 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let low_morning = smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.45, 0.7, scene.sun.y));
         let aw = away * low_morning;
         c = mix(c, blue, k * mix(0.6, 0.85, aw)) * (1.0 - mix(0.4, 0.15, aw) * k);
+        // The evening's side away from the sun (`OPT_EVENING_AWAY`): Bliss's sky low in the east at
+        // 18:00 is a clear blue, 90 129 186 two to five degrees up, where ours stayed a grey-cream,
+        // 143 145 151, and the far land hazed into it (lsV_air, 11-23). A deep blue at a little under
+        // the sky's brightness, over the low sky (to about 20° up), most straight away from the sun.
+        let eve_k = max(fantasy_opt(OPT_EVENING_AWAY), 0.0);
+        if eve_k > 0.0 {
+            let evening = (1.0 - smoothstep(-0.05, 0.05, scene.sun.x)) * (1.0 - smoothstep(0.3, 0.55, scene.sun.y)) * day;
+            let low_sky = 1.0 - smoothstep(0.0, 0.35, dir.y);
+            let deep = vec3(0.48, 0.69, 1.0);
+            let e = clamp(smoothstep(0.3, -0.5, mu) * evening * low_sky * eve_k, 0.0, 1.0);
+            c = mix(c, deep * (luma(c) * 0.85 / luma(deep)), e);
+        }
     }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
@@ -822,6 +852,17 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // curve's shoulder (08:00 sky saturation 23 against Bliss's 43, warmth +15 against +36).
         let gold = vec3(1.0, 0.72, 0.4) * luma(p.sun) * 1.4;
         c += mix(p.sun, gold, 0.6 * (1.0 - smoothstep(0.6, 0.9, scene.sun.y))) * mie * 0.34;
+        // The wide glow (`OPT_SUN_GLOW`), near white (forward Mie scattering by haze and droplets
+        // keeps most of the light's colour, the eye sees it whitish), the more so with the sun low.
+        // The far land toward the sun takes it through the haze, which reads this colour.
+        let wide_k = max(fantasy_opt(OPT_SUN_GLOW), 0.0);
+        if wide_k > 0.0 {
+            // Gone by noon (Bliss's noon sky by the sun 112 149 203; with a third of it left ours went
+            // 113 -> 126 red, lsW_air2), full under about 27° up (sun.y 0.45), where 08:00 stands.
+            let not_high = 1.0 - smoothstep(0.45, 0.8, scene.sun.y);
+            let wide = (pow(m, 3.0) * 0.7 + pow(m, 12.0) * 0.3) * not_high * (1.0 - rain_amount());
+            c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.5 * wide_k;
+        }
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
@@ -1984,7 +2025,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         // land warmth -19, ours +46, a warm strip under the band's grey; toward it, at the forest
         // vista, warm, +27). Taking it alike every way gave that seam (rt-sun-shadows, Shader).
         let toward_sun = mix(0.25, 1.0, smoothstep(-0.3, 0.6, mu));
-        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air * mix(1.0, 0.35, dusk) * toward_sun) * (1.0 - 0.05 * noon * hdr_air);
+        toward = mix(toward, luma(toward) * sun_tint, mix(0.6, 0.9, morning * far_off) * low_sun * hdr_air * haze_sun() * mix(1.0, 0.35, dusk) * toward_sun) * (1.0 - 0.05 * noon * hdr_air);
         v = mix(v, vec3((v.r + v.g + v.b) / 3.0), mix(0.35, 0.5, noon) * hdr_air);
     }
     let mixed = mix(pale, toward, v);
@@ -2035,7 +2076,11 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             let low = 1.0 - smoothstep(0.03, 0.3, scene.sun.y);
             let near = vec3(1.0) - exp(-vec3(4.9e-5, 1.0e-4, 3.5e-4) * min(dist, 250.0));
             let blue_sky = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
-            var add = blue_sky * near * mix(0.2, 1.0, high);
+            // With the sun low a fifth of it as made; `base:look_low_air` sets that share (Bliss's
+            // 08:00 and 18:00 shade is blue, 9 26 58 and 28 35 58, ours green 11 16 22 and 41 47 30:
+            // its near air keeps the sky's blue with the sun low, as it is lit by the whole sky).
+            let low_k = fantasy_opt(OPT_LOW_AIR);
+            var add = blue_sky * near * mix(select(0.2, low_k, low_k > 0.0), 1.0, high);
             // With the sun low the air takes the sun's own colour through its phase, as Bliss's
             // clear air does (overworld_fog.glsl:256-268: sun x shadow x (Rayleigh phase x its
             // coefficient + Mie phase x its one), plus the averaged sky): gold all round, brightest
@@ -2060,7 +2105,9 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         let blue_k = max(fantasy_opt(OPT_TWILIGHT), 0.0);
         if blue_k > 0.0 {
             let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
-            let tw = smoothstep(-0.3, -0.17, scene.sun.y) * (1.0 - smoothstep(-0.02, 0.1, scene.sun.y)) * evening * (1.0 - rain_amount());
+            // From sunset: begun with the sun 6° up, the 18:30 land went a grey-blue (lsR_tw 0.5: 87 83 88
+            // where Bliss's is dim and warm, 35 36 69).
+            let tw = smoothstep(-0.3, -0.17, scene.sun.y) * (1.0 - smoothstep(-0.04, 0.0, scene.sun.y)) * evening * (1.0 - rain_amount());
             if tw > 0.0 {
                 let fill = vec3(1.0) - exp(-vec3(1.5e-3, 3.0e-3, 6.0e-3) * min(dist, 600.0));
                 let sky_up = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
