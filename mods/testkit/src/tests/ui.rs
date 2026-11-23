@@ -945,6 +945,8 @@ pub async fn inventory_hotkeys(t: T) -> R {
 /// in the second slot, and a right click clears it.
 pub async fn rebind(t: T) -> R {
     t.flat().await?;
+    // H: K, Weft's, opens base's skills (`mods/base/src/web.rs`), and the screen it opened
+    // stopped the walks.
     // `keys`: (key, seconds held, seconds before the next one).
     let bind = async |keys: &[(&str, f32, f32)]| -> R {
         t.c().menu_open(&screens::CONTROLS);
@@ -976,14 +978,14 @@ pub async fn rebind(t: T) -> R {
     t.c().menu_close();
     t.no_screen().await?;
     let k = {
-        bind(&[("KeyK", 0.0, 0.0)]).await?;
-        walked(&["KeyK"]).await?
+        bind(&[("KeyH", 0.0, 0.0)]).await?;
+        walked(&["KeyH"]).await?
     };
     let (alone, chord) = {
-        bind(&[("ControlLeft", 0.5, 0.1), ("KeyK", 0.0, 0.5)]).await?;
-        t.check(t.c().ui_rect("text:Ctrl+K").is_some(), "the entry shows Ctrl+K");
+        bind(&[("ControlLeft", 0.5, 0.1), ("KeyH", 0.0, 0.5)]).await?;
+        t.check(t.c().ui_rect("text:Ctrl+H").is_some(), "the entry shows Ctrl+H");
         t.shot("chord").await?;
-        (walked(&["KeyK"]).await?, walked(&["ControlLeft", "KeyK"]).await?)
+        (walked(&["KeyH"]).await?, walked(&["ControlLeft", "KeyH"]).await?)
     };
     let shift = {
         bind(&[("ShiftRight", 0.1, 0.3)]).await?;
@@ -1002,8 +1004,8 @@ pub async fn rebind(t: T) -> R {
     t.check(t.c().ui_rect("text:J*2").is_none(), "a right click clears it");
     t.c().menu_close();
     t.no_screen().await?;
-    t.check(k > 1.0, format!("K walks after rebinding forward to it (moved {k:.2})"));
-    t.check(alone < 0.2 && chord > 1.0, format!("bound to Ctrl+K, K alone moved {alone:.2} and Ctrl+K {chord:.2}"));
+    t.check(k > 1.0, format!("H walks after rebinding forward to it (moved {k:.2})"));
+    t.check(alone < 0.2 && chord > 1.0, format!("bound to Ctrl+H, H alone moved {alone:.2} and Ctrl+H {chord:.2}"));
     t.check(shift > 1.0, format!("a right Shift let go of alone is the key (moved {shift:.2})"));
     Ok(())
 }

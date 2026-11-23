@@ -420,22 +420,19 @@ impl T {
         Err(format!("clicking {query} never opened {screen}"))
     }
 
-    /// The UI query of hotbar slot `i` in the open menu: a menu's last nine slots are the hotbar
-    /// (the player's inventory comes last), so its number follows whatever the menu has before
-    /// it (the inventory's clothing slots moved it from 36 to 40), except the other hand's slot, numbered after it.
+    /// The UI query of hotbar slot `i` in the open menu: the bottom row of slots, left to right
+    /// (the player's inventory comes last in every menu). Found by place, not number: slots
+    /// numbered after the hotbar (the other hand's, base's trash) moved it before.
     pub fn hotbar(&self, i: u32) -> String {
-        let rect = |n: u32| self.c().ui_rect(&format!("slot:{n}"));
-        let mut last = (0..512u32).rev().find(|&n| rect(n).is_some());
-        // Weft numbers the other hand's slot last, past the hotbar: when the highest slot isn't
-        // in the row of the one before it, it is that, and the hotbar ends one earlier.
-        if let Some(l) = last.filter(|&l| l > 9) {
-            if let (Some(a), Some(b)) = (rect(l), rect(l - 1)) {
-                if (a.y - b.y).abs() > 0.001 {
-                    last = Some(l - 1);
-                }
-            }
-        }
-        format!("slot:{}", last.map_or(36 + i, |l| l.saturating_sub(8) + i))
+        let slots: Vec<(u32, Rect)> = (0..512u32)
+            .filter_map(|n| self.c().ui_rect(&format!("slot:{n}")).map(|r| (n, r)))
+            .collect();
+        let Some(bottom) = slots.iter().map(|(_, r)| r.y).reduce(f32::max) else {
+            return format!("slot:{}", 36 + i);
+        };
+        let mut row: Vec<&(u32, Rect)> = slots.iter().filter(|(_, r)| (r.y - bottom).abs() < 0.001).collect();
+        row.sort_by(|a, b| a.1.x.total_cmp(&b.1.x));
+        format!("slot:{}", row.get(i as usize).map_or(36 + i, |(n, _)| *n))
     }
 
     /// Clicks a UI element after the cursor has rested on it for two frames. `click_ui` moves the
