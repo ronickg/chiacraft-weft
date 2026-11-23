@@ -744,8 +744,10 @@ pub async fn ctm_any_model(t: T) -> R {
     let base_model = format!("{pack}/base/models/block/grass.json");
     std::fs::create_dir_all(std::path::Path::new(&base_model).parent().unwrap()).map_err(|e| e.to_string())?;
     std::fs::write(&base_model, whole(r#""north":{},"south":{},"east":{},"west":{},"up":{},"down":{}"#)).map_err(|e| e.to_string())?;
-    write("textures/block/varied.ctm", "method = vertical\ntiles = colors/red colors/green colors/blue colors/yellow\n")?;
-    write("textures/block/varied_cube.ctm", "method = random\ntiles = shapes/thin <default>\nhides_neighbors = false\n")?;
+    // A texture's rules sit in its own folder (`textures/<name>/<last>.ctm`, Weft 310cf6d88;
+    // this test still wrote the old flat path there: a Weft bug).
+    write("textures/block/varied/varied.ctm", "method = vertical\ntiles = colors/red colors/green colors/blue colors/yellow\n")?;
+    write("textures/block/varied_cube/varied_cube.ctm", "method = random\ntiles = shapes/thin <default>\nhides_neighbors = false\n")?;
     let face = r##"{"texture":"#unwrap","uv":[0.25,0.25,1.25,1.25]}"##;
     write(
         "models/block/shapes/thin.json",

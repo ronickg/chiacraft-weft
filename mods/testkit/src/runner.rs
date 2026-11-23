@@ -690,6 +690,11 @@ impl<F: FnMut(&T) -> bool + Unpin> Future for Wait<F> {
         if (me.f)(&me.t) {
             Poll::Ready(Ok(()))
         } else if script_clock() > me.deadline {
+            // What the screen showed when it gave up (`timeout_<what>.png`): a wait that times
+            // out usually has no shot of its own, and the run is on another machine.
+            let file: String = me.what.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+            let path = format!("{}/test-shots/{}/timeout_{file}.png", me.t.c().run_dir(), me.t.name());
+            me.t.c().screenshot(&path);
             Poll::Ready(Err(format!("timed out waiting for {}", me.what)))
         } else {
             Poll::Pending

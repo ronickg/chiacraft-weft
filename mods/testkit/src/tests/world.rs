@@ -906,7 +906,8 @@ pub async fn persistence(t: T) -> R {
         }
         t.secs(0.25).await?;
     }
-    t.check_eq(now, rings + 4, "timers on the player, dimension, terrain cell and body cell survived the reload");
+    let rang = t.op("rang").await?;
+    t.check(now == rings + 4, format!("timers on the player, dimension, terrain cell and body cell survived the reload: {} of 4 ({rang})", now - rings));
     let rule = t.cmd("/rule testkit:count_marks").await?;
     t.check(rule.contains("true"), format!("the world's setting after reload: {rule}"));
     t.cmd("/rule testkit:count_marks 0").await?;
