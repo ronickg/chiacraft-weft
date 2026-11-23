@@ -20,6 +20,7 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | grade and gems at most +60% over a plain item | passes |
 | stagger: same-age fights break every part, knockdowns at most a third of a fight | passes |
 | bows on the curve: full draw a shot a second, a reference bow's arrows the reference's damage | passes |
+| saddles lift tames by their fitting, as the tame model does, tooltip in step | passes |
 
 ## The ages
 

@@ -139,6 +139,7 @@ pub fn register(r: &mut Registry) {
     // `animals::armour`; Survival the warmth).
     r.stack_component(&base_api::ITEM_LEVEL, 0);
     r.stack_component(&BOW_POWER, 0);
+    r.stack_component(&base_api::SADDLE_FIT, 0);
     r.stack_component(&base_api::WARMTH, 0);
     // A built piece's armour in the tooltip's and the HUD's points (`ARMOUR_PER_POINT`).
     r.stack_component(&crate::items::ARMOR, 0);
@@ -215,6 +216,13 @@ pub fn register(r: &mut Registry) {
                 .map_or(ItemStack::EMPTY, |g| {
                     crate::gems::stack_of(&crate::gems::cut(g, || (w.random() >> 40) as f32 / (1u64 << 24) as f32))
                 })
+        } else if kind == "saddle" {
+            // `/gear saddle <species> [fitting]`: that species' saddle (the animals mod's), fitted.
+            names
+                .first()
+                .and_then(|sp| Item::lookup(&format!("animals:{sp}_saddle")))
+                .zip(vitals::gear::saddle_fit_of(names.get(1).copied().unwrap_or("leather")))
+                .map_or(ItemStack::EMPTY, |(item, fit)| base_api::saddle_stack(item, fit))
         } else if kind == "part" {
             names
                 .first()
@@ -935,12 +943,36 @@ pub fn on_change(m: &MenuCtx) {
     // A tool from its parts, else a repair (a worn part or tool and a unit of its material), else
     // gems set in a built item, else a built item's gems taken out.
     let built = assembled(&stacks);
-    let made = [built, repaired(&stacks), socketed(&stacks)]
+    let made = [built, repaired(&stacks), socketed(&stacks), fitted(&stacks)]
         .into_iter()
         .find(|s| !s.is_empty())
         .or_else(|| unsocketed(&stacks).map(|u| u.0))
         .unwrap_or(ItemStack::EMPTY);
     out.set(0, made);
+}
+
+/// A saddle (an item tagged `saddle`) and one fitting or fastening part of a material in
+/// `vitals::gear::SADDLE_FITTINGS` in the assembly slots: the saddle fitted with it, its item
+/// level the fitting's (Planner 11-23, option A). Empty when they aren't that.
+pub fn fitted(stacks: &[ItemStack]) -> ItemStack {
+    let full: Vec<&ItemStack> = stacks.iter().filter(|s| !s.is_empty()).collect();
+    let [a, b] = full[..] else { return ItemStack::EMPTY };
+    for (saddle, part) in [(a, b), (b, a)] {
+        if !item_has_tag(saddle.item, base_api::SADDLE_TAG) {
+            continue;
+        }
+        let fits = shape_id(part.item).is_some_and(|id| SHAPES.iter().any(|s| s.id == id && matches!(s.slot, "fitting" | "fastening")));
+        let Some(fit) = PART
+            .on_stack_own(part)
+            .filter(|_| fits)
+            .and_then(|p| material_of(p.material))
+            .and_then(|m| vitals::gear::saddle_fit_of(m.id))
+        else {
+            continue;
+        };
+        return base_api::saddle_stack(saddle.item, fit);
+    }
+    ItemStack::EMPTY
 }
 
 /// Something was taken: true if it was the assembled tool (its parts are used up), so the grid's

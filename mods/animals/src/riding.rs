@@ -19,7 +19,8 @@ use weft_sdk::*;
 use crate::animal::ANIMAL;
 use crate::species::SPECIES;
 
-/// A tame's saddle (1: saddled), saved.
+/// A tame's saddle, saved: 0 none, else 1 + its fitting (`vitals::gear::SADDLE_FITTINGS`' index;
+/// 1 a plain leather one).
 pub static SADDLED: Component<u32> = Component::named("saddled");
 /// Being ridden (1), to tidy up once the rider is gone (not saved).
 static RIDDEN: Component<u32> = Component::named("ridden");
@@ -72,7 +73,8 @@ pub fn init(r: &mut Registry) {
         }
         let name = format!("{}_saddle", s.kind_name());
         let saddle = Item::generated(name.clone());
-        r.item(saddle).max_stack(1).tab(&TOOLS);
+        // Tagged so base's assembly row fits it (`base_api::SADDLE_TAG`).
+        r.item(saddle).max_stack(1).tab(&TOOLS).tag(base_api::SADDLE_TAG);
         if s.seat > 3.0 {
             // A saddle for a dragon-sized back: more leather, an iron frame.
             r.shaped(&CRAFTING, &name, 1, &["lll", "lil", "s s"], &[('l', "base:leather"), ('i', "base:iron_ingot"), ('s', "base:string")]);
@@ -82,6 +84,30 @@ pub fn init(r: &mut Registry) {
         saddles.push((s.kind_name(), saddle));
     }
     let _ = SADDLES.set(saddles);
+    // One line per hit by a tame, for the saddle check (`scripts/saddle.txt`): what its saddle
+    // lifts it by and what it did (the target's kind is in the `entities` lines by its id).
+    r.on_event(&actions::HURT, |b| {
+        let w = b.world();
+        for h in b.iter() {
+            if !crate::animal::tamed(&w, h.source) {
+                continue;
+            }
+            let Some(s) = w.component(h.source, &ANIMAL).and_then(|a| a.species()) else { continue };
+            let fit = w.component(h.source, &SADDLED).unwrap_or(0);
+            let (health, max) = w
+                .entity(h.entity)
+                .map_or((0.0, 0.0), |e| (e.health, e.max_health));
+            let me = w.entity(h.source).map_or(0.0, |e| e.max_health);
+            weft_sdk::info!(
+                "tame_fight: {} {} (saddle {fit}, lift ×{:.2}, max health {me:.1}) hit {} for {:.2}, health {health:.1}/{max:.1}",
+                s.name,
+                h.source,
+                lift(&w, h.source),
+                h.entity,
+                h.amount
+            );
+        }
+    });
     // A flyer coming down under its rider lands; it doesn't fall. The engine counts a steered
     // mount's way down as a fall (it doesn't know it flies), and a wyvern hurt itself landing.
     r.before_event(&actions::HURT, |q| {
@@ -167,8 +193,10 @@ pub fn unsaddle(w: &World, id: u64) {
     if let Some(s) = w.component_mut(id, &SADDLED)
         && *s != 0
     {
+        let fit = *s - 1;
         *s = 0;
-        w.spawn_item([st.pos.x, st.pos.y + 0.5, st.pos.z], ItemStack::new(saddle, 1));
+        // As it went on: its fitting and level with it.
+        w.spawn_item([st.pos.x, st.pos.y + 0.5, st.pos.z], base_api::saddle_stack(saddle, fit));
     }
 }
 
@@ -181,14 +209,35 @@ pub fn interact(w: &World, id: u64, player: u64) -> bool {
     }
     let held = w.inventory(player).get(w.selected_slot(player));
     let saddled = w.component(id, &SADDLED).is_some_and(|s| s != 0);
+    // Another of its saddles on a saddled one: swapped, the old one back to the player (a better
+    // fitting goes on without letting it go).
+    if saddled && held.item == saddle {
+        let fit = base_api::saddle_fit(&held);
+        let Some(old) = w.component(id, &SADDLED).map(|s| s - 1) else { return false };
+        crate::taming::take_one(w, player);
+        if let Some(s) = w.component_mut(id, &SADDLED) {
+            *s = fit + 1;
+        }
+        let back = base_api::saddle_stack(saddle, old);
+        let left = w.inventory(player).insert(back);
+        if !left.is_empty()
+            && let Some(p) = w.entity(player)
+        {
+            w.spawn_item([p.pos.x, p.pos.y + 0.5, p.pos.z], left);
+        }
+        weft_sdk::info!("saddle: {id} swapped fitting {old} for {fit}, lift now ×{:.2}", lift(w, id));
+        return true;
+    }
     if !saddled {
         if held.item != saddle {
             return false;
         }
+        let fit = base_api::saddle_fit(&held);
         crate::taming::take_one(w, player);
         if let Some(s) = w.component_mut(id, &SADDLED) {
-            *s = 1;
+            *s = fit + 1;
         }
+        weft_sdk::info!("saddle: {id} saddled, fitting {fit}, lift ×{:.2}", lift(w, id));
         return true;
     }
     if !held.is_empty() || rider_of(w, id).is_some() {
@@ -296,4 +345,20 @@ struct Ride {
     jump_held: u32,
     yaw: f32,
     pitch: f32,
+}
+
+/// The item level of `id`'s saddle (`vitals::gear::saddle_level`), if it wears one.
+pub fn saddle_level(w: &World, id: u64) -> Option<f32> {
+    w.component(id, &SADDLED)
+        .filter(|&s| s != 0)
+        .map(|s| vitals::gear::saddle_level(s - 1))
+}
+
+/// What `id`'s saddle does for it (`vitals::gear::saddle_lift`): its health, hit and armour
+/// times this. 1 for a wild one, an unsaddled one, or one already past its saddle.
+pub fn lift(w: &World, id: u64) -> f32 {
+    match (crate::armour::own_level(w, id), saddle_level(w, id)) {
+        (Some(own), Some(saddle)) => vitals::gear::saddle_lift(saddle, own),
+        _ => 1.0,
+    }
 }
