@@ -233,6 +233,20 @@ pub fn rain_share(rain: [f32; 4], season: Option<usize>) -> f32 {
     }
 }
 
+/// A season is a place's dry season when it rains on at most this share of the days its wettest
+/// season does: the llanos' winter (11 % of days against the summer's 70 %), the Pantanal's
+/// (7 % against 33 %), the Cedar Mountain floodplain's winter and spring, a Mediterranean summer;
+/// not a prairie winter (14 % against 27 %) or anywhere it rains much the same all year. Herds
+/// leave a place in its dry season for wetter ground (`animals_core::groups`, migration).
+pub const DRY_OF_WETTEST: f32 = 0.4;
+
+/// Whether `season` (0 spring) is a dry season for a place with `rain` (`DRY_OF_WETTEST`); never
+/// in a dimension without seasons, or where it never rains.
+pub fn dry_season(rain: [f32; 4], season: Option<usize>) -> bool {
+    let wettest = rain.iter().copied().fold(0.0f32, f32::max);
+    season.is_some_and(|s| wettest > 0.0 && rain[s % 4] <= wettest * DRY_OF_WETTEST)
+}
+
 /// A rain spell's hours: a rainy day's rain falls in one spell of 2 to 8 hours, as most of a real
 /// rainy day's does.
 pub const SPELL_HOURS: (f32, f32) = (2.0, 8.0);
@@ -279,6 +293,21 @@ fn unit(r: u64) -> f32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn dry_seasons_are_the_places_own() {
+        let rain = |b: &str| of(b).unwrap().rain;
+        // The llanos and the Pantanal are dry in winter, wet in summer.
+        assert!(dry_season(rain("base:savanna"), Some(3)) && !dry_season(rain("base:savanna"), Some(1)));
+        assert!(dry_season(rain("base:swamp"), Some(3)));
+        assert!(dry_season(rain("animals:floodplain"), Some(0)));
+        // A prairie winter and a German forest's year aren't.
+        assert!(!dry_season(rain("base:plains"), Some(3)));
+        assert!((0..4).all(|s| !dry_season(rain("base:forest"), Some(s))));
+        // No seasons, no rain: no dry season.
+        assert!(!dry_season(rain("base:savanna"), None));
+        assert!(!dry_season([0.0; 4], Some(1)));
+    }
+
     use super::*;
 
     /// Over many years a biome rains on about its share of each season's days.
