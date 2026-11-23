@@ -162,7 +162,10 @@ pub fn saddle_fitting(fit: u32) -> Option<&'static str> {
 
 /// The index of `material` as a saddle's fitting.
 pub fn saddle_fit_of(material: &str) -> Option<u32> {
-    SADDLE_FITTINGS.iter().position(|m| *m == material).map(|i| i as u32)
+    SADDLE_FITTINGS
+        .iter()
+        .position(|m| *m == material)
+        .map(|i| i as u32)
 }
 
 /// A saddle's item level: its fitting's, never under a plain one's.

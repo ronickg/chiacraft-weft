@@ -74,7 +74,10 @@ pub fn init(r: &mut Registry) {
         let name = format!("{}_saddle", s.kind_name());
         let saddle = Item::generated(name.clone());
         // Tagged so base's assembly row fits it (`base_api::SADDLE_TAG`).
-        r.item(saddle).max_stack(1).tab(&TOOLS).tag(base_api::SADDLE_TAG);
+        r.item(saddle)
+            .max_stack(1)
+            .tab(&TOOLS)
+            .tag(base_api::SADDLE_TAG);
         if s.seat > 3.0 {
             // A saddle for a dragon-sized back: more leather, an iron frame.
             r.shaped(&CRAFTING, &name, 1, &["lll", "lil", "s s"], &[('l', "base:leather"), ('i', "base:iron_ingot"), ('s', "base:string")]);

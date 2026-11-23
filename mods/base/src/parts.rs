@@ -969,7 +969,11 @@ pub fn fitted(stacks: &[ItemStack]) -> ItemStack {
         if !item_has_tag(saddle.item, base_api::SADDLE_TAG) {
             continue;
         }
-        let fits = shape_id(part.item).is_some_and(|id| SHAPES.iter().any(|s| s.id == id && matches!(s.slot, "fitting" | "fastening")));
+        let fits = shape_id(part.item).is_some_and(|id| {
+            SHAPES
+                .iter()
+                .any(|s| s.id == id && matches!(s.slot, "fitting" | "fastening"))
+        });
         let Some(fit) = PART
             .on_stack_own(part)
             .filter(|_| fits)
