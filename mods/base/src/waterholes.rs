@@ -18,7 +18,8 @@ use weft_sdk::*;
 use crate::blocks::WATER;
 use base_api::CLIMATE;
 
-/// Dried pond bed: a thin crust of cracked mud where the water stood, walked over. It remembers
+/// Dried pond bed: a thin crust of cracked mud where the water stood, stepped onto (solid, so the
+/// water beside it can't flow back in). It remembers
 /// the water: it fills back when its season is no longer dry.
 pub static CRUST: Block = Block::named("dried_mud");
 
@@ -58,7 +59,13 @@ fn report(w: &World) {
 pub fn register(r: &mut Registry) {
     r.world_tick(report);
     r.block(&CRUST)
-        .states(|_, s| s.model_box([0.0, 0.0, 0.0], [16.0, 2.0, 16.0]).not_solid())
+        // Solid, though thin: water renews itself into any room with two sources beside it (the
+        // engine's `renewable`, as vanilla's infinite water), which filled every dried block back
+        // at once while it was not solid (ai1123_waterhole5: 30-40 dried a window, none stayed).
+        .states(|_, s| {
+            s.model_box([0.0, 0.0, 0.0], [16.0, 2.0, 16.0])
+                .hitbox([0.0, 0.0, 0.0], [16.0, 2.0, 16.0])
+        })
         .texture("dried_mud")
         .sound_group("gravel")
         .hardness(0.2)
