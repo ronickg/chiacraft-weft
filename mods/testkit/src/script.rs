@@ -635,14 +635,7 @@ async fn run_lines(t: T, src: String) -> R {
                 if !t.c().menu_open(screen) {
                     t.fail(format!("no screen {rest}"));
                 }
-                // A mod's menu shows as `core:menu` (the engine's screen for every mod menu), not
-                // by its own name: waiting for its name stopped the run (Bliss match's tap, 11-23).
-                let want = rest.to_string();
-                t.until(&format!("screen {rest}"), Duration::from_secs(60), move |t| {
-                    let now = t.c().screen();
-                    (now == want || now == "core:menu") && t.flag(cf::SCREEN_READY)
-                })
-                .await?;
+                t.screen(rest).await?;
             }
             "mark" => {
                 if let Err(e) = std::fs::write(rest, "1") {
