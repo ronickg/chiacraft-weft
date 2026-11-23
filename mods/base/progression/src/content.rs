@@ -484,15 +484,7 @@ pub const RULES: &[Rule] = &[
     n(&["base:salt", "base:salted_meat"], 2, Shared, Food, Made, "salt is boiled from a water bucket (iron)"),
     // ---- materials of hunting, farming and sewing
     r(
-        &[
-            "base:hide",
-            "base:fur",
-            "base:bone",
-            "base:feather",
-            "base:gunpowder",
-            "base:spider_eye",
-            "base:rotten_flesh",
-        ],
+        &["base:hide", "base:fur", "base:bone", "base:feather", "base:gunpowder", "base:spider_eye", "base:rotten_flesh"],
         0,
         Shared,
         Material,
@@ -519,13 +511,7 @@ pub const RULES: &[Rule] = &[
     ),
     r(&["base:fur_*", "base:hide_*", "base:wool_*", "base:linen_*", "base:rain_cape"], 0, Shared, Clothing, Made),
     // ---- food
-    r(
-        &["base:beef", "base:porkchop", "base:chicken", "base:mutton"],
-        0,
-        Shared,
-        Food,
-        Drop(3.0),
-    ),
+    r(&["base:beef", "base:porkchop", "base:chicken", "base:mutton"], 0, Shared, Food, Drop(3.0)),
     r(&["animals:venison", "animals:hare", "animals:trout", "animals:pacu"], 0, Shared, Food, Kill),
     r(
         &[

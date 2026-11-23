@@ -473,7 +473,11 @@ fn loot_table(w: &mut String, g: &graph::Solved) {
     let mut kills = crate::loot::kills();
     kills.sort_by(|a, b| b.rate(g).total_cmp(&a.rate(g)));
     for k in &kills {
-        let drops: Vec<String> = k.drops.iter().map(|(id, n)| format!("{n:.1} {}", short(id))).collect();
+        let drops: Vec<String> = k
+            .drops
+            .iter()
+            .map(|(id, n)| format!("{n:.1} {}", short(id)))
+            .collect();
         let (lo, hi) = vitals::loot::band(k.fights_back());
         let r = k.rate(g);
         let mark = if k.drops.is_empty() {

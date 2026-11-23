@@ -303,7 +303,12 @@ pub fn register(r: &mut Registry) {
         let mut table = r.loot(kind);
         for &(_, item, lo, hi, chance) in vitals::mobs::LOOT.iter().filter(|l| l.0 == mob) {
             let pool = Pool::new().items(item, lo, hi);
-            table = table.pool(if chance < 1.0 { pool.when(Cond::killed_by_player()).when(Cond::chance(chance)) } else { pool });
+            table = table.pool(if chance < 1.0 {
+                pool.when(Cond::killed_by_player())
+                    .when(Cond::chance(chance))
+            } else {
+                pool
+            });
         }
     }
     r.loot(&SHEEP).pool(Pool::new().item("wool")).pool(

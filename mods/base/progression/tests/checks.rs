@@ -91,5 +91,7 @@ fn saddles() {
 
 #[test]
 fn loot_per_hour() {
-    check("loot per hour: kill drops priced from their cheapest kill, no kill paying over its time (+30 %, +50 % more for what fights back)");
+    check(
+        "loot per hour: kill drops priced from their cheapest kill, no kill paying over its time (+30 %, +50 % more for what fights back)",
+    );
 }
