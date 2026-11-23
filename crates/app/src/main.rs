@@ -101,6 +101,8 @@ fn main() {
     let mut owner: Option<String> = None;
     // Options the engine does not know go to mods (`--test furnace`, `--script x.txt`).
     let mut extra: Vec<(String, String)> = Vec::new();
+    // `--mods` and `--packages` as given, for the processes `--jobs` starts.
+    let mut folders: Vec<(&'static str, PathBuf)> = Vec::new();
     let mut args = std::env::args().skip(1).peekable();
     let command = args
         .next_if(|a| !a.starts_with('-'))
@@ -118,8 +120,16 @@ fn main() {
                 return;
             }
             "--run-dir" => chosen_run = Some(PathBuf::from(value())),
-            "--mods" => opts.mod_dirs.push(PathBuf::from(value())),
-            "--packages" => opts.package_dirs.push(PathBuf::from(value())),
+            "--mods" => {
+                let dir = PathBuf::from(value());
+                folders.push(("--mods", dir.clone()));
+                opts.mod_dirs.push(dir);
+            }
+            "--packages" => {
+                let dir = PathBuf::from(value());
+                folders.push(("--packages", dir.clone()));
+                opts.package_dirs.push(dir);
+            }
             "--off" => opts.mods_off.extend(
                 value()
                     .split(',')
@@ -200,7 +210,7 @@ fn main() {
     (opts.run_dir, opts.cache_dir) = (dirs.data, dirs.cache);
     paths::set_config(dirs.config);
     opts.automated = extra.iter().any(|(k, _)| k == "script" || k == "test");
-    if let Some(code) = test_jobs(&extra, &opts.run_dir) {
+    if let Some(code) = test_jobs(&extra, &folders, &opts.run_dir) {
         exit(code);
     }
     let testing = extra.iter().any(|(k, _)| k == "test");
@@ -301,7 +311,7 @@ fn exit(code: i32) -> ! {
 /// `--test all` runs in several processes at once, each with its own run folder (`--jobs N`, 1 for
 /// one after the other, also what naming tests does unless asked). Each takes every Nth test
 /// (`testkit`, `--test-shard`); what they leave is put together as a single run would have it.
-fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i32> {
+fn test_jobs(extra: &[(String, String)], folders: &[(&str, PathBuf)], run_dir: &std::path::Path) -> Option<i32> {
     let option = |name: &str| {
         extra
             .iter()
@@ -334,6 +344,10 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
             .arg(dir)
             .stdout(log)
             .stderr(std::process::Stdio::null());
+        // The extra mods and packages too: the packages test found no package without them.
+        for (flag, dir) in folders {
+            c.arg(flag).arg(dir);
+        }
         for (k, v) in extra.iter().filter(|(k, _)| k != "test" && k != "jobs") {
             c.arg(format!("--{k}"));
             if !v.is_empty() {

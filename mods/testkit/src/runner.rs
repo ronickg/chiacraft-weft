@@ -212,7 +212,7 @@ impl T {
 
     /// Waits until `f` holds, failing after `timeout`.
     pub fn until<F: FnMut(&T) -> bool + Unpin>(&self, what: &str, timeout: Duration, f: F) -> Wait<F> {
-        Wait { t: self.clone(), f, deadline: script_clock() + timeout, what: what.to_string() }
+        Wait { t: self.clone(), f, deadline: script_clock() + timeout, what: what.to_string(), shot: None }
     }
 
     pub fn frames(&self, n: u64) -> Wait<impl FnMut(&T) -> bool + Unpin> {
@@ -681,12 +681,23 @@ pub struct Wait<F> {
     f: F,
     deadline: Duration,
     what: String,
+    /// The timeout's screenshot and when to stop waiting for it.
+    shot: Option<(u64, Duration)>,
 }
 
 impl<F: FnMut(&T) -> bool + Unpin> Future for Wait<F> {
     type Output = R;
     fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<R> {
         let me = &mut *self;
+        if let Some((id, until)) = me.shot {
+            // Fail only once the shot is taken: the test leaves its world right after, and a
+            // shot taken then showed the title screen.
+            if client::image_pixels(id).is_none() && script_clock() < until {
+                return Poll::Pending;
+            }
+            client::image_unload(id);
+            return Poll::Ready(Err(format!("timed out waiting for {}", me.what)));
+        }
         if (me.f)(&me.t) {
             Poll::Ready(Ok(()))
         } else if script_clock() > me.deadline {
@@ -694,8 +705,8 @@ impl<F: FnMut(&T) -> bool + Unpin> Future for Wait<F> {
             // out usually has no shot of its own, and the run is on another machine.
             let file: String = me.what.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
             let path = format!("{}/test-shots/{}/timeout_{file}.png", me.t.c().run_dir(), me.t.name());
-            me.t.c().screenshot(&path);
-            Poll::Ready(Err(format!("timed out waiting for {}", me.what)))
+            me.shot = Some((me.t.c().screenshot(&path), script_clock() + Duration::from_secs(5)));
+            Poll::Pending
         } else {
             Poll::Pending
         }

@@ -187,7 +187,9 @@ pub async fn held_water_piston(t: T) -> R {
     let pushed = parts(&t, add(f, [5, -1, -4])).await?;
     t.check(pushed.contains(&SLAB.to_string()), format!("pushed into water, the slab is there: {pushed:?}"));
     let head = parts(&t, add(f, [4, -1, -4])).await?;
-    t.check(head.iter().any(|p| p.contains("piston_head")), format!("the head out: {head:?}"));
+    // Out, the head is the piston's own block reaching into the next cell (base's pistons).
+    let out = |p: &String| p.contains("piston_head") || (p.contains("piston[") && p.contains("power=on"));
+    t.check(head.iter().any(out), format!("the head out: {head:?}"));
     let weed_gone = parts(&t, add(f, [5, -1, -8])).await?;
     t.check(!weed_gone.contains(&WEED.to_string()), format!("the weed broke, not moved: {weed_gone:?}"));
     for z in [-4, -8] {

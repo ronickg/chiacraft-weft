@@ -4236,9 +4236,11 @@ impl Dim {
 
     pub fn timer_at(&mut self, space_id: u64, p: IVec3, delay: u32, event: u32, data: &[u8]) {
         let at = self.time + delay.max(1) as u64;
-        self.space_mut(space_id)
-            .scheduled
-            .push(Reverse((at, p.to_array(), event, data.into())));
+        let space = self.space_mut(space_id);
+        space.scheduled.push(Reverse((at, p.to_array(), event, data.into())));
+        // Saved with its cube: a cube saved before and untouched since is not saved again, and
+        // its timer was lost on a reload (Weft bug).
+        space.modified.insert(cube_of(p));
     }
 
     /// Someone here would see a gizmo of `group` (empty: anyone).
