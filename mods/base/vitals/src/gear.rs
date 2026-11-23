@@ -121,6 +121,29 @@ pub fn weapon(kind: &str, level: f32) -> Option<(f32, f32)> {
     Some((dps / s.speed, s.speed))
 }
 
+// ------------------------------------------------------------------ bows and arrows
+
+/// A plain arrow's item level: flint-tipped, the Stone Age's reference. An arrow's head sets its
+/// level (an arrowhead part's material will, when arrows are built from parts); the bow is its
+/// times, as a blade's grade is: its stave's spring, its grade and its gems (`crafting::combine`).
+pub const ARROW_LEVEL: f32 = REFERENCE_DEPTH;
+
+/// A drawn bow's power after `secs` held, 0 to 1 (vanilla's draw: full at one second, under 0.1
+/// it doesn't shoot). An arrow flies at its power times full speed and hits by its speed.
+pub fn draw_power(secs: f32) -> f32 {
+    ((secs * secs + secs * 2.0) / 3.0).min(1.0)
+}
+
+/// Seconds to a full draw: one shot a second, the bow's speed in `SPREADS`.
+pub const FULL_DRAW_SECS: f32 = 1.0;
+
+/// An arrow's hit at full draw: the bow's spread at the arrow's item level, times the bow's own
+/// times (1 for a Sound yew or Osage bow). Less drawn, it hits by its speed (`draw_power`); in the
+/// head, twice (a bow's critical hit, kept from vanilla).
+pub fn arrow_hit(arrow_level: f32, bow_times: f32) -> f32 {
+    weapon("bow", arrow_level).map_or(0.0, |(hit, _)| hit) * bow_times
+}
+
 /// A weapon or tool of `kind` made of `material`.
 pub fn weapon_of(kind: &str, of: &str) -> Option<(f32, f32)> {
     weapon(kind, material(of)?.level())

@@ -1,0 +1,247 @@
+# Bows on the curve (vitals::gear::arrow_hit), written by tools/progression/gen_ranged.py.
+# Read run.log: `floor:` lines (utahraptor) and `mob_fight:` lines (zombie), `stagger:` breaks.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /tk attr_mod me core:max_health testkit:hp core:add 200 0
+chat /tk mode spectator
+chat /tp 0.5 205 -0.5
+wait 2
+loaded
+chat /tk fill -6 196 -5 6 199 7 stone
+chat /tk fill -1 197 0 1 199 2 core:air
+chat /tk fill -6 200 -5 6 208 7 core:air
+chat /tk fill -6 209 -5 6 209 7 stone
+chat /tk fill 0 200 -2 0 205 -2 stone
+chat /tp 0.5 206 -1.5
+wait 1
+loaded
+chat /tk mode survival
+chat /tp 0.5 206 -1.5
+# ---- R0_yew_full: yew bow, 1.2 s draws, at animals:utahraptor
+chat /kill @e[type=animals:utahraptor]
+chat /kill @e[type=base:zombie]
+chat /kill @e[type=base:arrow]
+wait 1
+chat /gear bow yew slot=0
+chat /tk give base:arrow 32
+chat /tk heal
+chat /tk spawn animals:utahraptor 0 197 1
+wait 1
+aim 12
+chat /animal level 0
+chat /animal age 30
+wait 0.5
+where R0_yew_full_start
+entities 10
+shot ranged_R0_yew_full_start.png
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+shot ranged_R0_yew_full_end.png
+# ---- R1_spruce_full: spruce bow, 1.2 s draws, at animals:utahraptor
+chat /kill @e[type=animals:utahraptor]
+chat /kill @e[type=base:zombie]
+chat /kill @e[type=base:arrow]
+wait 1
+chat /gear bow spruce slot=0
+chat /tk give base:arrow 32
+chat /tk heal
+chat /tk spawn animals:utahraptor 0 197 1
+wait 1
+aim 12
+chat /animal level 0
+chat /animal age 30
+wait 0.5
+where R1_spruce_full_start
+entities 10
+shot ranged_R1_spruce_full_start.png
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+shot ranged_R1_spruce_full_end.png
+# ---- R2_yew_half: yew bow, 0.4 s draws, at animals:utahraptor
+chat /kill @e[type=animals:utahraptor]
+chat /kill @e[type=base:zombie]
+chat /kill @e[type=base:arrow]
+wait 1
+chat /gear bow yew slot=0
+chat /tk give base:arrow 32
+chat /tk heal
+chat /tk spawn animals:utahraptor 0 197 1
+wait 1
+aim 12
+chat /animal level 0
+chat /animal age 30
+wait 0.5
+where R2_yew_half_start
+entities 10
+shot ranged_R2_yew_half_start.png
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 0.4
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 0.4
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 0.4
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 0.4
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 0.4
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 0.4
+wait 0.3
+chat /tk heal
+entities 10
+shot ranged_R2_yew_half_end.png
+# ---- R3_yew_zombie: yew bow, 1.2 s draws, at base:zombie
+chat /kill @e[type=animals:utahraptor]
+chat /kill @e[type=base:zombie]
+chat /kill @e[type=base:arrow]
+wait 1
+chat /gear bow yew slot=0
+chat /tk give base:arrow 32
+chat /tk heal
+chat /tk spawn base:zombie 0 197 1
+wait 1
+wait 0.5
+where R3_yew_zombie_start
+entities 10
+shot ranged_R3_yew_zombie_start.png
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+shot ranged_R3_yew_zombie_end.png
+quit

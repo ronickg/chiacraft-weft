@@ -275,3 +275,41 @@ pub fn stagger() -> Vec<String> {
     }
     out
 }
+
+/// Bows on the curve (`vitals::gear`, "bows and arrows"): a full draw takes the bow's spread's
+/// seconds, a plain arrow sits at the Stone Age's reference, the best stave's spring is the
+/// reference bow's (a Sound yew bow has times 1), and a reference bow's arrows at every age deal
+/// the reference's damage a second, as its sword does.
+pub fn ranged() -> Vec<String> {
+    use vitals::gear::{ARROW_LEVEL, FULL_DRAW_SECS, arrow_hit, draw_power, spread};
+    let mut out = Vec::new();
+    let Some(bow) = spread("bow") else {
+        return vec!["no bow spread in `vitals::gear::SPREADS`".into()];
+    };
+    if (bow.speed * FULL_DRAW_SECS - 1.0).abs() > 1e-4 || (draw_power(FULL_DRAW_SECS) - 1.0).abs() > 1e-4 {
+        out.push(format!(
+            "a full draw takes {FULL_DRAW_SECS} s (power {:.2}), but the bow's spread shoots {} a second",
+            draw_power(FULL_DRAW_SECS),
+            bow.speed
+        ));
+    }
+    if (ARROW_LEVEL - Age::Stone.reference()).abs() > 1e-4 {
+        out.push(format!("a plain arrow is item level {ARROW_LEVEL}, not the Stone Age's reference {}", Age::Stone.reference()));
+    }
+    let best = crafting::materials::SPRING
+        .iter()
+        .map(|s| s.1)
+        .fold(0.0_f32, f32::max);
+    if (best - 1.0).abs() > 1e-4 {
+        out.push(format!("the springiest stave is ×{best}, not the reference bow's ×1"));
+    }
+    for age in AGES {
+        let p = Player::of(age);
+        let dps = arrow_hit(age.reference(), 1.0) / FULL_DRAW_SECS;
+        let want = p.hit() * combat::REF_RATE * bow.share;
+        if (dps / want - 1.0).abs() > 0.01 {
+            out.push(format!("{}: the reference bow's arrows deal {dps:.2} a second, not the reference's {want:.2}", age.name()));
+        }
+    }
+    out
+}
