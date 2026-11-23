@@ -83,8 +83,9 @@ const AGAIN: i32 = 2;
 const RECALL: f64 = 2.0 * LOOK as f64;
 
 /// The nearest place to `pos` where it can stand on dry ground beside open water: at a place it
-/// drank from before within `RECALL` blocks if that is still a shore, else within `LOOK` blocks.
-fn find_water(w: &World, id: u64, pos: [f64; 3], driven: bool) -> Option<[f64; 3]> {
+/// drank from before within `RECALL` blocks if that is still a shore, else within `LOOK` blocks,
+/// else the nearest one it or its kind near remember within `groups::WATER_TREK` (`trek`).
+fn find_water(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3], driven: bool) -> Option<[f64; 3]> {
     let mut known = w.component(id, &WATERS).unwrap_or_default();
     let near = |k: &[f32; 4]| k[3] != 0.0 && (k[0] as f64 - pos[0]).powi(2) + (k[2] as f64 - pos[2]).powi(2) <= RECALL * RECALL;
     let mut order: Vec<&[f32; 4]> = known.iter().filter(|k| near(k)).collect();
@@ -94,7 +95,10 @@ fn find_water(w: &World, id: u64, pos: [f64; 3], driven: bool) -> Option<[f64; 3
     let again = order
         .into_iter()
         .find_map(|k| nearest_water(w, [k[0], k[1], k[2]].map(|v| v.floor() as i32), AGAIN, pos));
-    let found = again.or_else(|| nearest_water(w, pos.map(|v| v.floor() as i32), LOOK, pos))?;
+    let found = match again.or_else(|| nearest_water(w, pos.map(|v| v.floor() as i32), LOOK, pos)) {
+        Some(f) => f,
+        None => trek(w, id, kind, pos, &known)?,
+    };
     // A waterhole where its kind was killed it keeps off unless thirst drives it (`memory`).
     if !driven && crate::memory::fear_at(w, found) >= animals_core::memory::AVOID {
         weft_sdk::debug!("animal {id} keeps off feared water at {found:?}");
@@ -108,6 +112,51 @@ fn find_water(w: &World, id: u64, pos: [f64; 3], driven: bool) -> Option<[f64; 3
         }
     }
     Some(found)
+}
+
+/// Nothing near: the nearest water that it (`known`) or a wild one of its kind within
+/// `senses::KIN` remembers drinking at, up to `groups::WATER_TREK` blocks off, if it is still a
+/// shore. Its herd goes with it (`group.rs`). Looked for only when nothing is near, at most every
+/// `NOTHING` ticks.
+fn trek(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3], known: &[[f32; 4]; 2]) -> Option<[f64; 3]> {
+    let mut places: Vec<([f64; 3], u64)> = known
+        .iter()
+        .filter(|k| k[3] != 0.0)
+        .map(|k| ([k[0], k[1], k[2]].map(f64::from), id))
+        .collect();
+    for o in w.entities_near(pos, crate::senses::KIN, Some(kind)) {
+        if o == id || crate::animal::tamed(w, o) {
+            continue;
+        }
+        let theirs = w.component(o, &WATERS).unwrap_or_default();
+        places.extend(
+            theirs
+                .iter()
+                .filter(|k| k[3] != 0.0)
+                .map(|k| ([k[0], k[1], k[2]].map(f64::from), o)),
+        );
+    }
+    let far = animals_core::groups::WATER_TREK as f64;
+    places.retain(|(p, _)| crate::dist2(*p, pos) <= far * far);
+    places.sort_by(|a, b| crate::dist2(a.0, pos).total_cmp(&crate::dist2(b.0, pos)));
+    places.into_iter().find_map(|(p, from)| {
+        let found = nearest_water(w, p.map(|v| v.floor() as i32), AGAIN, pos)?;
+        weft_sdk::info!(
+            "animal {id} treks to water its herd remembers at {:.0} {:.0} {:.0} ({:.0} blocks, remembered by {from})",
+            found[0],
+            found[1],
+            found[2],
+            crate::dist2(found, pos).sqrt()
+        );
+        Some(found)
+    })
+}
+
+/// Testing (`/animalprof recall`): `id` remembers drinking at `p`.
+pub fn remember(w: &World, id: u64, p: [f64; 3]) {
+    if let Some(c) = w.component_mut(id, &WATERS) {
+        *c = [[p[0] as f32, p[1] as f32, p[2] as f32, 1.0], [0.0; 4]];
+    }
 }
 
 /// The nearest place to `pos` within `r` blocks of `p` where it can stand on dry ground beside
@@ -217,7 +266,7 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         return spot.is_some();
     }
     let driven = needs::thirst_score(water, true) >= animals_core::memory::DRIVEN;
-    match find_water(w, id, st.pos.to_array(), driven) {
+    match find_water(w, id, s.kind, st.pos.to_array(), driven) {
         Some(p) => {
             weft_sdk::debug!("{} {id} is thirsty (water {:.0}%): to water at {p:?}", s.name, water * 100.0);
             w.navigate(id, p, 1.0);

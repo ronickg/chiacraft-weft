@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead,recall)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -169,6 +169,25 @@ pub fn init(r: &mut Registry) {
                     }
                 }
                 format!("leaders {} at {:.0}% water", led.join(" "), v * 100.0)
+            }
+            "recall" => {
+                // Every wild member within 96 blocks that isn't its group's leader remembers water
+                // `value` blocks north of the player (-z), on his level less one: the leaders know
+                // it only from their herd (`drink::trek`).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(50.0);
+                let p = [me.pos.x.floor() + 0.5, me.pos.y.floor() - 1.0, me.pos.z.floor() + 0.5 - v];
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    let member = w
+                        .component(id, &crate::senses::SENSES)
+                        .is_some_and(|s| s.kin >= animals_core::groups::GROUP && s.leader != 0 && s.leader != id);
+                    if member {
+                        crate::drink::remember(&w, id, p);
+                        n += 1;
+                    }
+                }
+                format!("{n} members remember water at {:.1} {:.0} {:.1}", p[0], p[1], p[2])
             }
             "kill" => {
                 // The player kills the wild animal nearest him (a hunter's kill: fear there, and
