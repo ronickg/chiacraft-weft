@@ -1278,6 +1278,7 @@ recipes.all = Все рецепты
 command.base.inspect.part = {0}: {1}, {2}, сделано в день {3}, чинилось {4}×, износ {5}
 command.base.inspect.tool = {0}: {1}, собрано из {2} деталей
 command.base.inspect.tool_part =   {0}: {1}, {2}, сделано в день {3}, чинилось {4}×
+command.base.inspect.arrow = {0} ×{1}: наконечник — {2}, уровень предмета {3}
 command.base.inspect.plain = Не собрано из деталей
 command.base.inspect.gems =   Камни: {0} из {1} гнёзд
 command.base.inspect.gem =     {0}, уровень предмета {1}: +{2}% всего

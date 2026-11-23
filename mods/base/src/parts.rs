@@ -1141,6 +1141,14 @@ fn inspect(w: &World, player: u64, mut reply: impl FnMut(&str, &[Arg])) {
                 .sum();
             reply("command.base.inspect.gem", &[Arg::Key(g.gem.key), Arg::Int(g.data.level as i64), Arg::Int(pct)]);
         }
+    } else if let Some(h) = base_api::ARROW_HEAD.on_stack(&held).filter(|h| *h > 0) {
+        // Arrows (`fletched`): their head and the item level they hit with (a testkit script reads it).
+        let m = vitals::gear::ARROWHEADS
+            .get(h as usize - 1)
+            .and_then(|m| crafting::materials::material(m))
+            .map_or("", |m| m.key);
+        let level = base_api::ITEM_LEVEL.on_stack(&held).unwrap_or(0.0).round();
+        reply("command.base.inspect.arrow", &[Arg::Item(held.item), Arg::Int(held.count as i64), Arg::Key(m), Arg::Int(level as i64)]);
     } else {
         reply("command.base.inspect.plain", &[]);
     }

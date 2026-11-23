@@ -1286,6 +1286,7 @@ recipes.all = All recipes
 command.base.inspect.part = {0}: {1}, {2}, made on day {3}, repaired {4}×, worn {5}
 command.base.inspect.tool = {0}: {1}, built from {2} parts
 command.base.inspect.tool_part =   {0}: {1}, {2}, made on day {3}, repaired {4}×
+command.base.inspect.arrow = {1} {0}: {2} head, item level {3}
 command.base.inspect.plain = Not built from parts
 command.base.inspect.gems =   Gems: {0} of {1} sockets
 command.base.inspect.gem =     {0}, item level {1}: +{2}% in all
