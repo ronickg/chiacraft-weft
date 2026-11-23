@@ -569,6 +569,7 @@ pub fn solve() -> Solved {
     let ids = content::universe();
     let mut g = Solved { ids: ids.clone(), cost: HashMap::new(), by: HashMap::new() };
     let all = recipes();
+    let kill_prices = crate::loot::prices();
     let outs: Vec<Vec<String>> = all
         .iter()
         .map(|r| members(&ids, r.out).into_iter().cloned().collect())
@@ -589,6 +590,11 @@ pub fn solve() -> Solved {
             match content::rule(id).map(|r| r.get) {
                 Some(Get::World(needs, em)) if g.can(needs) => relax(&mut g, id, em, None),
                 Some(Get::Drop(em)) => relax(&mut g, id, em, None),
+                Some(Get::Kill) => {
+                    if let Some(&em) = kill_prices.get(id.as_str()) {
+                        relax(&mut g, id, em, None)
+                    }
+                }
                 _ => {}
             }
         }

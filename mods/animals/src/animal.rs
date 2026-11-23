@@ -143,10 +143,11 @@ pub fn init(r: &mut Registry) {
         r.edit(s.kind).attach(&OWNER);
         r.edit(s.kind).attach(&base_api::TAME_OF);
     }
-    // An animal hits as hard as its damage stat.
+    // An animal hits as hard as its damage stat, a saddled tame as its saddle lifts it.
     r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
-        if let Some(a) = m.world().component(m.query().entity, &ANIMAL) {
-            m.value *= (a.factor(species::DAMAGE) * crate::comfort::condition(&a)) as f64;
+        let (w, id) = (m.world(), m.query().entity);
+        if let Some(a) = w.component(id, &ANIMAL) {
+            m.value *= (a.factor(species::DAMAGE) * crate::comfort::condition(&a) * crate::riding::lift(&w, id)) as f64;
         }
     });
 }
@@ -445,7 +446,10 @@ pub fn age_days(a: &Animal) -> Option<(f64, f64, u8)> {
 
 /// Max health and speed as its stats, its condition and (cold-blooded) the air say.
 fn factors(w: &World, id: u64, a: &Animal) -> (f32, f32) {
-    (a.factor(species::HEALTH) * crate::comfort::condition(a), a.factor(species::SPEED) * crate::comfort::speed(w, id))
+    (
+        a.factor(species::HEALTH) * crate::comfort::condition(a) * crate::riding::lift(w, id),
+        a.factor(species::SPEED) * crate::comfort::speed(w, id),
+    )
 }
 
 /// Sets a wild one's level to `level` (its points spread evenly over the stats), at full health:

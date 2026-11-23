@@ -83,7 +83,7 @@ pub fn init(r: &mut Registry) {
         }
         // 2. Armour.
         if !comps::damage_cause::BYPASSES_ARMOR.on_id(q.cause) {
-            hit *= 1.0 - vitals::combat::armour_cut(armour(&a), hit);
+            hit *= 1.0 - vitals::combat::armour_cut(armour(&a) * crate::riding::lift(&w, q.entity), hit);
         }
         // 3. The floor (not for what ends a life outright: the void, `/kill`).
         if q.cause != damage_cause::VOID
@@ -152,8 +152,15 @@ pub fn floor(w: &World, entity: u64, size: vitals::combat::Size, max_health: f32
 }
 
 /// The area level a tame fights at: its wild level's (`danger::Danger::area_level`), its tamed
-/// points left out (they're its grade). None for a wild one or anything not an animal.
+/// points left out (they're its grade), or its saddle's if that's higher (`riding::saddle_level`,
+/// capped as a player's gear is). None for a wild one or anything not an animal.
 pub fn tame_level(w: &World, id: u64) -> Option<f32> {
+    let own = own_level(w, id)?;
+    Some(crate::riding::saddle_level(w, id).map_or(own, |s| own.max(s)))
+}
+
+/// A tame's own area level, without its saddle. None for a wild one or anything not an animal.
+pub fn own_level(w: &World, id: u64) -> Option<f32> {
     if !crate::animal::tamed(w, id) {
         return None;
     }
