@@ -59,6 +59,12 @@ impl Rarity {
             Rarity::Legendary => 0.0006,
         }
     }
+    /// Minutes a player takes to find one (a group of them) where it lives: a common one's
+    /// (`vitals::loot::COMMON_FIND_MINUTES`), as much longer as its spawn chance is smaller. The
+    /// loot check (`mods/base/progression`) prices a kill's time with it.
+    pub fn find_minutes(self) -> f32 {
+        vitals::loot::COMMON_FIND_MINUTES * Rarity::Common.spawn_chance() / self.spawn_chance()
+    }
     pub fn name(self) -> &'static str {
         match self {
             Rarity::Common => "common",

@@ -2174,7 +2174,8 @@ pub async fn hoe_tills(t: T) -> R {
     let soil = add(t.feet(), [2, -1, 0]);
     let stone = add(t.feet(), [-2, -1, 0]);
     t.set(stone, "stone").await?;
-    t.op("put me 0 wood_hoe 1").await?;
+    // Ours are assembled from parts (`/gear`); any hoe tills.
+    t.op("put me 0 hoe 1").await?;
     t.c().select_slot(0);
     for p in [soil, stone] {
         t.look_at(p);
@@ -2182,7 +2183,9 @@ pub async fn hoe_tills(t: T) -> R {
         t.press("core:use");
         t.secs(0.3).await?;
     }
-    t.check_eq(t.block(soil).await?, "base:farmland".to_string(), "the grass tilled");
+    // Ours carries how worn the soil is (`base:farmland[worn=0]`).
+    let tilled = t.block(soil).await?;
+    t.check(tilled.starts_with("base:farmland"), format!("the grass tilled: {tilled}"));
     t.check_eq(t.block(stone).await?, "base:stone".to_string(), "stone left as it is");
     Ok(())
 }
@@ -2378,7 +2381,8 @@ pub async fn projectiles(t: T) -> R {
 /// let go, an arrow taken from the inventory.
 pub async fn bow_and_keys(t: T) -> R {
     t.flat().await?;
-    t.op("put me 0 base:bow 1").await?;
+    // Ours is built from parts (`/gear`): a bare `base:bow` carries no durability of its own.
+    t.cmd("/gear bow slot=0").await?;
     t.op("put me 1 base:arrow 5").await?;
     t.c().select_slot(0);
     t.frames(2).await?;
@@ -2403,13 +2407,15 @@ pub async fn bow_and_keys(t: T) -> R {
     t.check_eq(t.c().inventory_slot(0).wear(), 1, "the bow wore by one");
     let f = t.feet();
     let at = super::add(f, [0, 0, -2]);
+    // Something with no use of its own (our animals answer a use: feeding, a lead), so the
+    // interaction goes unhandled.
     let cow: u64 = t
-        .op(&format!("spawn base:cow {} {} {}", at[0], at[1], at[2]))
+        .op(&format!("spawn core:player {} {} {}", at[0], at[1], at[2]))
         .await?
         .parse()
-        .map_err(|_| "bad cow id")?;
+        .map_err(|_| "bad dummy id")?;
     t.look_at(at);
-    t.until("aimed at the cow", Duration::from_secs(5), |t| t.c().target().is_some_and(|target| target.entity == cow))
+    t.until("aimed at the dummy", Duration::from_secs(5), |t| t.c().target().is_some_and(|target| target.entity == cow))
         .await?;
     t.hold("core:use", 1.2);
     t.secs(1.6).await?;

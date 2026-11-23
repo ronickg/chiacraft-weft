@@ -11,6 +11,7 @@
 
 pub mod content;
 pub mod graph;
+pub mod loot;
 pub mod matrix;
 pub mod sheet;
 
@@ -23,6 +24,7 @@ pub fn checks() -> Vec<(&'static str, Vec<String>)> {
         ("everything reachable from the start", graph::reach(&g)),
         ("nothing at tier N needs anything above N", graph::tiers(&g)),
         ("each age's key by each declared route", graph::keys(&g)),
+        ("path parity: each age's key by each route within ×1.15 of its cheapest, in EM", graph::path_parity(&g)),
         ("every tool-part material tagged, made from its tier or below", graph::materials(&g)),
         ("each age's making inside its budget", graph::budget(&g)),
         ("every size and role inside its bands, floors hold", matrix::sizes()),
@@ -32,5 +34,10 @@ pub fn checks() -> Vec<(&'static str, Vec<String>)> {
         ("grade and gems at most +60% over a plain item", matrix::gem_ceiling()),
         ("stagger: same-age fights break every part, knockdowns at most a third of a fight", matrix::stagger()),
         ("bows on the curve: full draw a shot a second, a reference bow's arrows the reference's damage", matrix::ranged()),
+        ("saddles lift tames by their fitting, as the tame model does, tooltip in step", matrix::saddles()),
+        (
+            "loot per hour: kill drops priced from their cheapest kill, no kill paying over its time (+30 %, +50 % more for what fights back)",
+            loot::check(&g),
+        ),
     ]
 }

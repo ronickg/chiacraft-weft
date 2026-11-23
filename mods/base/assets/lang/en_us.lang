@@ -150,6 +150,7 @@ block.base.oak_planks = Oak Planks
 block.base.birch_planks = Birch Planks
 block.base.spruce_planks = Spruce Planks
 block.base.oak_leaves = Oak Leaves
+block.base.bush_leaves = Bush Leaves
 block.base.birch_leaves = Birch Leaves
 block.base.spruce_leaves = Spruce Leaves
 block.base.water = Water
@@ -265,6 +266,7 @@ item.base.gunpowder = Gunpowder
 item.base.spider_eye = Spider Eye
 item.base.paper = Paper
 entity.base.zombie = Zombie
+entity.base.creeper = Creeper
 entity.base.spider = Spider
 entity.base.pig = Pig
 entity.base.cow = Cow
@@ -1883,3 +1885,13 @@ block.base.tulip_yellow = Yellow Tulip
 block.base.inula = Inula
 block.base.verbascum = Verbascum
 block.base.lavender = Lavender
+# Ages by name (vitals::curve::AGES), for lines that name one.
+age.base.stone = Stone Age
+age.base.bronze = Bronze Age
+age.base.iron = Iron Age
+age.base.steam = Age of Steam
+age.base.lightning = Age of Lightning
+age.base.future = Age of the Future
+age.base.stars = Age of Stars
+# A saddle's fitting (vitals::gear::SADDLE_FITTINGS, in its order; levels from vitals::gear::saddle_level).
+tagged.base.saddle_fit = {#c6a383}{if:value==0}{lang:material.base.leather} fittings · {lang:age.base.stone} · item level 5{/if}{if:value==1}{lang:material.base.copper} fittings · {lang:age.base.bronze} · item level 12{/if}{if:value==2}{lang:material.base.bronze} fittings · {lang:age.base.bronze} · item level 16{/if}{if:value==3}{lang:material.base.meteoric_iron} fittings · {lang:age.base.bronze} · item level 18{/if}{if:value==4}{lang:material.base.wrought_iron} fittings · {lang:age.base.iron} · item level 23{/if}{if:value==5}{lang:material.base.steel} fittings · {lang:age.base.iron} · item level 27{/if}{if:value==6}{lang:material.base.star_steel} fittings · {lang:age.base.iron} · item level 29{/if}{/}

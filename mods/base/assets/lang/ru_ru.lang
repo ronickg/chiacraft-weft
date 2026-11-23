@@ -214,6 +214,7 @@ item.base.gunpowder = Порох
 item.base.spider_eye = Паучий глаз
 item.base.paper = Бумага
 entity.base.zombie = Зомби
+entity.base.creeper = Крипер
 entity.base.spider = Паук
 entity.base.pig = Свинья
 entity.base.cow = Корова
@@ -1877,3 +1878,13 @@ block.base.tulip_yellow = Жёлтый тюльпан
 block.base.inula = Девясил
 block.base.verbascum = Коровяк
 block.base.lavender = Лаванда
+# Ages by name (vitals::curve::AGES), for lines that name one.
+age.base.stone = Каменный век
+age.base.bronze = Бронзовый век
+age.base.iron = Железный век
+age.base.steam = Век пара
+age.base.lightning = Век молнии
+age.base.future = Век будущего
+age.base.stars = Век звёзд
+# A saddle's fitting (vitals::gear::SADDLE_FITTINGS, in its order; levels from vitals::gear::saddle_level).
+tagged.base.saddle_fit = {#c6a383}{if:value==0}Оковка: {lang:material.base.leather} · {lang:age.base.stone} · уровень предмета 5{/if}{if:value==1}Оковка: {lang:material.base.copper} · {lang:age.base.bronze} · уровень предмета 12{/if}{if:value==2}Оковка: {lang:material.base.bronze} · {lang:age.base.bronze} · уровень предмета 16{/if}{if:value==3}Оковка: {lang:material.base.meteoric_iron} · {lang:age.base.bronze} · уровень предмета 18{/if}{if:value==4}Оковка: {lang:material.base.wrought_iron} · {lang:age.base.iron} · уровень предмета 23{/if}{if:value==5}Оковка: {lang:material.base.steel} · {lang:age.base.iron} · уровень предмета 27{/if}{if:value==6}Оковка: {lang:material.base.star_steel} · {lang:age.base.iron} · уровень предмета 29{/if}{/}

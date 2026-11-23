@@ -212,7 +212,7 @@ impl T {
 
     /// Waits until `f` holds, failing after `timeout`.
     pub fn until<F: FnMut(&T) -> bool + Unpin>(&self, what: &str, timeout: Duration, f: F) -> Wait<F> {
-        Wait { t: self.clone(), f, deadline: script_clock() + timeout, what: what.to_string() }
+        Wait { t: self.clone(), f, deadline: script_clock() + timeout, what: what.to_string(), shot: None }
     }
 
     pub fn frames(&self, n: u64) -> Wait<impl FnMut(&T) -> bool + Unpin> {
@@ -420,22 +420,22 @@ impl T {
         Err(format!("clicking {query} never opened {screen}"))
     }
 
-    /// The UI query of hotbar slot `i` in the open menu: a menu's last nine slots are the hotbar
-    /// (the player's inventory comes last), so its number follows whatever the menu has before
-    /// it (the inventory's clothing slots moved it from 36 to 40), except the other hand's slot, numbered after it.
+    /// The UI query of hotbar slot `i` in the open menu: the bottom row of slots, left to right
+    /// (the player's inventory comes last in every menu). Found by place, not number: slots
+    /// numbered after the hotbar (the other hand's, base's trash) moved it before.
     pub fn hotbar(&self, i: u32) -> String {
-        let rect = |n: u32| self.c().ui_rect(&format!("slot:{n}"));
-        let mut last = (0..512u32).rev().find(|&n| rect(n).is_some());
-        // Weft numbers the other hand's slot last, past the hotbar: when the highest slot isn't
-        // in the row of the one before it, it is that, and the hotbar ends one earlier.
-        if let Some(l) = last.filter(|&l| l > 9) {
-            if let (Some(a), Some(b)) = (rect(l), rect(l - 1)) {
-                if (a.y - b.y).abs() > 0.001 {
-                    last = Some(l - 1);
-                }
-            }
-        }
-        format!("slot:{}", last.map_or(36 + i, |l| l.saturating_sub(8) + i))
+        let slots: Vec<(u32, Rect)> = (0..512u32)
+            .filter_map(|n| self.c().ui_rect(&format!("slot:{n}")).map(|r| (n, r)))
+            .collect();
+        let Some(bottom) = slots.iter().map(|(_, r)| r.y).reduce(f32::max) else {
+            return format!("slot:{}", 36 + i);
+        };
+        let mut row: Vec<&(u32, Rect)> = slots
+            .iter()
+            .filter(|(_, r)| (r.y - bottom).abs() < 0.001)
+            .collect();
+        row.sort_by(|a, b| a.1.x.total_cmp(&b.1.x));
+        format!("slot:{}", row.get(i as usize).map_or(36 + i, |(n, _)| *n))
     }
 
     /// Clicks a UI element after the cursor has rested on it for two frames. `click_ui` moves the
@@ -681,16 +681,36 @@ pub struct Wait<F> {
     f: F,
     deadline: Duration,
     what: String,
+    /// The timeout's screenshot and when to stop waiting for it.
+    shot: Option<(u64, Duration)>,
 }
 
 impl<F: FnMut(&T) -> bool + Unpin> Future for Wait<F> {
     type Output = R;
     fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<R> {
         let me = &mut *self;
+        if let Some((id, until)) = me.shot {
+            // Fail only once the shot is taken: the test leaves its world right after, and a
+            // shot taken then showed the title screen.
+            if client::image_pixels(id).is_none() && script_clock() < until {
+                return Poll::Pending;
+            }
+            client::image_unload(id);
+            return Poll::Ready(Err(format!("timed out waiting for {}", me.what)));
+        }
         if (me.f)(&me.t) {
             Poll::Ready(Ok(()))
         } else if script_clock() > me.deadline {
-            Poll::Ready(Err(format!("timed out waiting for {}", me.what)))
+            // What the screen showed when it gave up (`timeout_<what>.png`): a wait that times
+            // out usually has no shot of its own, and the run is on another machine.
+            let file: String = me
+                .what
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                .collect();
+            let path = format!("{}/test-shots/{}/timeout_{file}.png", me.t.c().run_dir(), me.t.name());
+            me.shot = Some((me.t.c().screenshot(&path), script_clock() + Duration::from_secs(5)));
+            Poll::Pending
         } else {
             Poll::Pending
         }

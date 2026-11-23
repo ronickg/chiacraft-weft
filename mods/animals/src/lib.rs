@@ -67,6 +67,7 @@ mod kryptobaatar;
 mod lizard;
 mod meat;
 mod memory;
+mod migrate;
 mod mouse;
 mod owl;
 mod prof;
@@ -175,6 +176,7 @@ fn init(r: &mut Registry) {
     memory::init(r);
     choose::init(r);
     group::init(r);
+    migrate::init(r);
     screen::init(r);
     taming::init(r);
     commands::init(r);

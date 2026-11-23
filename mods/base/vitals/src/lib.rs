@@ -35,6 +35,7 @@ pub mod impact;
 pub mod layers;
 pub mod levels;
 pub mod ley;
+pub mod loot;
 pub mod meals;
 pub mod mobs;
 pub mod perks;

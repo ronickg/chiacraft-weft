@@ -29,8 +29,9 @@ pub fn markdown() -> String {
     weapons(&mut w);
     tames(&mut w);
     bosses(&mut w);
+    loot_table(&mut w, &g);
     web_prices(&mut w);
-    keys(&mut w);
+    keys(&mut w, &g);
     tags(&mut w, &g);
     materials(&mut w);
     w
@@ -375,7 +376,7 @@ fn web_prices(w: &mut String) {
     );
 }
 
-fn keys(w: &mut String) {
+fn keys(w: &mut String, g: &graph::Solved) {
     w.push_str("## Age keys by path\n\nMoving to the next age takes a key, one thing from each gate (materials and tools, a biome boss, knowledge, infrastructure), by a route for each path. What exists so far:\n\n| age | tech | magic | beasts | not built yet |\n|---|---|---|---|---|\n");
     for a in AGES {
         let routes = graph::routes(a);
@@ -396,6 +397,38 @@ fn keys(w: &mut String) {
             cell(curve::Path::Tech),
             cell(curve::Path::Magic),
             cell(curve::Path::Beasts)
+        );
+    }
+    let _ = writeln!(
+        w,
+        "\nWhat each route costs from scratch (`graph::route_cost`): its items at their cheapest, plus every tool and station on the way once. Path parity: a route at most ×{:.2} its age's cheapest. Own: without what every route of the age takes (its boss part), what tells the paths apart.\n\n| age | path | EM | × cheapest | own EM | tools and stations |\n|---|---|---|---|---|---|",
+        1.0 + curve::PARITY
+    );
+    for (a, p, em, over) in graph::parity(g) {
+        let items = graph::routes(a)
+            .into_iter()
+            .find(|(q, _)| *q == p)
+            .and_then(|(_, r)| r)
+            .unwrap_or(&[]);
+        let kept = graph::route_cost(g, items).1;
+        let shared: Vec<&str> = items
+            .iter()
+            .copied()
+            .filter(|i| {
+                graph::routes(a)
+                    .iter()
+                    .all(|(_, r)| r.is_some_and(|r| r.contains(i)))
+            })
+            .collect();
+        let shared_em: f32 = shared.iter().filter_map(|i| g.cost_of(i)).sum();
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {over:.2} | {} | {} |",
+            a.name(),
+            p.name(),
+            em_text(em),
+            em_text(em - shared_em),
+            kept.iter().map(|k| short(k)).collect::<Vec<_>>().join(", ")
         );
     }
     w.push('\n');
@@ -459,8 +492,70 @@ fn tags(w: &mut String, g: &graph::Solved) {
     }
 }
 
+fn loot_table(w: &mut String, g: &graph::Solved) {
+    let _ = writeln!(
+        w,
+        "## Loot per hour\n\nEvery kill priced in effort minutes (`crate::loot`, `vitals::loot`): its drops at their cheapest cost in the graph, against its time, which is finding one ({} min for a common animal, longer as its spawn chance is smaller, shared by a pack that comes at you together; {} min for a mob at night), the fight at its home age (grade 4) and {} min to take what it leaves. A fair rate is about 1 EM a minute, within ±{:.0} % (up to +{:.0} % more for what fights back). Wild ones at level 0; a big one's breaks counted. Drops that kills give are priced from their cheapest kill (Planner 11-23, option A: its minutes shared among its drops by their old hand prices, `vitals::loot::KILL_DROPS`), so that kill pays 1 and the rest less: \"poor\" is only a poor way to spend time, \"over\" fails the check.\n\n| kill | age | role | find (min) | kills | fight (s) | drops | loot (EM) | minutes | EM a minute | band |\n|---|---|---|---|---|---|---|---|---|---|---|",
+        vitals::loot::COMMON_FIND_MINUTES,
+        vitals::loot::NIGHT_FIND_MINUTES,
+        vitals::loot::HANDLING_MINUTES,
+        vitals::loot::BAND * 100.0,
+        vitals::loot::RISK_PREMIUM * 100.0
+    );
+    let mut kills = crate::loot::kills();
+    kills.sort_by(|a, b| b.rate(g).total_cmp(&a.rate(g)));
+    for k in &kills {
+        let drops: Vec<String> = k
+            .drops
+            .iter()
+            .map(|(id, n)| format!("{n:.1} {}", short(id)))
+            .collect();
+        let (lo, hi) = vitals::loot::band(k.fights_back());
+        let r = k.rate(g);
+        let mark = if k.drops.is_empty() {
+            "no loot"
+        } else if (lo..=hi).contains(&r) {
+            "ok"
+        } else if r < lo {
+            "poor"
+        } else {
+            "over"
+        };
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {:.1} | {:.1} | {:.1} | {} | {} | {:.1} | {:.2} | {mark} |",
+            k.who,
+            k.age.name(),
+            k.role.name(),
+            k.find,
+            k.kills,
+            k.fight_secs,
+            if drops.is_empty() { "-".to_string() } else { drops.join(", ") },
+            em(k.value(g)),
+            k.minutes(),
+            r
+        );
+    }
+    w.push_str("\nWhat kills drop, priced from their cheapest kill; the weight is the old hand price (option B, to come back to):\n\n| drop | weight (old EM) | EM now | cheapest from |\n|---|---|---|---|\n");
+    for &(id, weight) in vitals::loot::KILL_DROPS {
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {} |",
+            short(id),
+            em(weight),
+            g.cost_of(id).map_or("-".to_string(), em),
+            crate::loot::cheapest(id).unwrap_or_else(|| "-".to_string())
+        );
+    }
+    w.push('\n');
+}
+
 fn short(id: &str) -> &str {
     id.strip_prefix("base:").unwrap_or(id)
+}
+
+fn em_text(c: f32) -> String {
+    em(c)
 }
 
 fn em(c: f32) -> String {

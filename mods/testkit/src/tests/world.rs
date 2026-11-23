@@ -169,7 +169,12 @@ pub async fn edits(t: T) -> R {
     let gear = Menu::lookup("testkit:gear").unwrap_or(u32::MAX);
     t.until("the edited menu open", Duration::from_secs(5), |t| t.c().menu().is_some_and(|m| m.kind == gear))
         .await?;
-    t.check_eq(t.c().menu().map(|m| m.slots), Some(43), "the slots of a menu an edit added a group to");
+    // (Weft's four pieces make 43; a game's own equipment slots, chiacraft's clothing, count too.)
+    let worn = t
+        .c()
+        .displayed(t.c().player(), DisplaySource::Equipment)
+        .len() as u32;
+    t.check_eq(t.c().menu().map(|m| m.slots), Some(36 + 2 + worn + 1), "the slots of a menu an edit added a group to");
     t.c().menu_close();
     t.no_screen().await
 }
@@ -904,7 +909,11 @@ pub async fn persistence(t: T) -> R {
         }
         t.secs(0.25).await?;
     }
-    t.check_eq(now, rings + 4, "timers on the player, dimension, terrain cell and body cell survived the reload");
+    let rang = t.op("rang").await?;
+    t.check(
+        now == rings + 4,
+        format!("timers on the player, dimension, terrain cell and body cell survived the reload: {} of 4 ({rang})", now - rings),
+    );
     let rule = t.cmd("/rule testkit:count_marks").await?;
     t.check(rule.contains("true"), format!("the world's setting after reload: {rule}"));
     t.cmd("/rule testkit:count_marks 0").await?;
