@@ -146,11 +146,12 @@ fn twilight_window() -> f32 {
     return smoothstep(-0.42, -0.26, scene.sun.y);
 }
 // How far under the horizon the sun must be before the night sky's stars show (`dark` from 0 to
-// 1): with `OPT_TWILIGHT` on, Bliss's, none until about 13° under and all by 23° (none in its 20:00
-// sky, the sun 16° under; ours from 19:00, 3° under). `day_from`, `night_at` as made.
+// 1): with `OPT_TWILIGHT` on, Bliss's, none until about 16° under and all by 27° (none in its 20:00
+// sky, the sun 16° under; ours from 19:00, 3° under; from 13° under a third were still out at 20:00,
+// lsY_tw). `day_from`, `night_at` as made.
 fn night_sky_dark(day_from: f32, night_at: f32) -> f32 {
     if fantasy_opt(OPT_TWILIGHT) > 0.0 {
-        return smoothstep(-0.22, -0.4, scene.sun.y);
+        return smoothstep(-0.28, -0.45, scene.sun.y);
     }
     return smoothstep(day_from, night_at, scene.sun.y);
 }
@@ -350,8 +351,10 @@ fn palette_now() -> Palette {
         // navy (sky 0 3 113, land 0 0 21), where ours had gone grey night (it ended at 17° under).
         let tw = twilight_window() * (1.0 - smoothstep(0.02, 0.12, scene.sun.y)) * evening * (1.0 - rain_amount());
         let deep = vec3(0.08, 0.3, 1.0);
-        p.zenith = mix(p.zenith, deep * (luma(p.zenith) / luma(deep)), tw * 0.7);
-        p.horizon = mix(p.horizon, mix(p.horizon, deep * (luma(p.horizon) / luma(deep)), 0.5), tw);
+        // Nearly all of it (Bliss's 20:00 sky is a pure navy, 0 4 114; at seven tenths ours kept a
+        // grey in it, 36 56 106, lsY_tw).
+        p.zenith = mix(p.zenith, deep * (luma(p.zenith) / luma(deep)), tw * 0.95);
+        p.horizon = mix(p.horizon, mix(p.horizon, deep * (luma(p.horizon) / luma(deep)), 0.8), tw);
         let sky = p.zenith * 0.65 + p.horizon * 0.35;
         // The land lit by it only once the sun is down: from 4° up it turned the 18:30 land a
         // bright green (lsO_tw2: 125 136 88 at 4, where Bliss's is already dim, 35 36 69).
@@ -360,7 +363,9 @@ fn palette_now() -> Palette {
         // The evening sun dims over its last 10° (the long path through the air): Bliss's 18:30
         // land, the sun 4° up, is already dim and blue-lit, 35 36 69, where ours stood in its full
         // light, 69 61 44 (lsS_mix after f3cfb0f84). At 4° up about two fifths, none off by 10°.
-        p.sun *= mix(1.0, smoothstep(-0.02, 0.18, scene.sun.y), evening * (1.0 - rain_amount()));
+        // (From 2° under, two fifths at 18:30 took the land only 70 62 48 -> 66 60 60, lsY_tw: now a
+        // quarter.)
+        p.sun *= mix(1.0, smoothstep(0.0, 0.2, scene.sun.y), evening * (1.0 - rain_amount()));
     }
     return p;
 }
@@ -2126,7 +2131,9 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
             // From sunset: begun with the sun 6° up, the 18:30 land went a grey-blue (lsR_tw 0.5: 87 83 88
             // where Bliss's is dim and warm, 35 36 69).
-            let tw = twilight_window() * (1.0 - smoothstep(-0.04, 0.0, scene.sun.y)) * evening * (1.0 - rain_amount());
+            // From about 7° up, half by 4° (18:30), as the sky's blue: with the sun dimmed there the
+            // land is Bliss's blue haze over dark ground, 35 38 74 (ours 66 60 60 from sunset, lsY_tw).
+            let tw = twilight_window() * (1.0 - smoothstep(0.02, 0.12, scene.sun.y)) * evening * (1.0 - rain_amount());
             if tw > 0.0 {
                 let fill = vec3(1.0) - exp(-vec3(1.5e-3, 3.0e-3, 6.0e-3) * min(dist, 600.0));
                 let sky_up = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
