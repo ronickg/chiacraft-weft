@@ -1,0 +1,131 @@
+# The map (M) and the round minimap (HUD, top right), seen in the game (map_minimap.txt, 11-22).
+# Part 1: a long flight over the land at the world's spawn (creative, flying, sprinting: the server
+# marks the tiles round the player every second wherever they are, so the minimap fills along the
+# way), the minimap shot at each of its zooms (N), a waystone woken, the full map at two zooms and
+# a pan. Part 2: creatures on both, on a platform high in the sky: a tame (green), a zombie in
+# sight (red), a cow and a deer in sight (pale), a zombie behind a stone wall and a sheep past
+# the radius (neither shown); then the setting off (no dots).
+# Never /tick freeze before the flight: the atlas only fills while the world ticks.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /weather clear
+chat /tk mode creative
+wait 2
+# A minimap right after arriving (the atlas fills within a few seconds).
+shot mm_01_arrived.png
+wait 6
+shot mm_02_settled.png
+# Up and away: fly, rise clear of the hills, then north, west and south (yaw 0 faces -z).
+chat /tk edit_me 0 0 1 0
+look 0 -15
+hold core:jump 5
+hold core:sprint 16 nowait
+hold core:forward 16
+shot mm_03_flew_north.png
+look 90 -15
+hold core:jump 2
+hold core:sprint 12 nowait
+hold core:forward 12
+shot mm_04_flew_west.png
+look 180 -15
+hold core:sprint 12 nowait
+hold core:forward 12
+wait 3
+# The minimap at each zoom: it starts at 2 blocks a pixel; N steps 4, then 1, then 2 again.
+shot mm_05_zoom2.png
+key KeyN
+wait 1
+shot mm_06_zoom4.png
+key KeyN
+wait 1
+shot mm_07_zoom1.png
+key KeyN
+wait 1
+# A waystone: stood by the nearest sleeping one and woken (game masters' commands).
+chat /waystone goto
+wait 4
+loaded
+chat /waystone wake
+wait 4
+shot mm_08_waystone_woken.png
+# The full map: opens at 2 blocks a pixel; Z zooms out, D pans east, C centres, X zooms in.
+key KeyM
+wait 2
+shot mm_09_map_zoom2.png
+key KeyZ
+wait 1
+key KeyZ
+wait 1.5
+shot mm_10_map_zoom8.png
+key KeyD
+wait 0.5
+key KeyD
+wait 1.5
+shot mm_11_map_panned.png
+key KeyC
+wait 0.5
+key KeyX
+wait 0.5
+key KeyX
+wait 0.5
+key KeyX
+wait 1.5
+shot mm_12_map_zoom1.png
+key Escape
+wait 1
+# Part 2: creatures. A platform in the sky over the spawn's land.
+chat /tp 0.5 206 0.5
+wait 2
+loaded
+chat /tk fill -45 198 -45 45 198 45 stone
+chat /tk fill -45 199 -45 45 199 45 base:grass
+chat /tk fill -45 200 -45 45 214 45 core:air
+# A stone wall west of the player, a zombie behind it.
+chat /tk fill -10 200 -4 -10 207 8 stone
+chat /tp 0.5 200 0.5
+wait 2
+loaded
+# The tame first: a wolf beside the player, tamed (its owner's mark reaches the client within a second).
+chat /tk spawn animals:grey_wolf 2 200 -3
+wait 1
+look 0 -30
+chat /animal tame
+wait 3
+chat /tk spawn base:zombie 8 200 -12
+chat /tk spawn base:zombie -16 200 2
+chat /tk spawn base:cow -4 200 -14
+chat /tk spawn animals:red_deer 14 200 6
+chat /tk spawn base:sheep 40 200 -40
+wait 1
+# Wild animals run at once and zombies burn by day: freeze them where they stand.
+chat /tick freeze
+wait 1.5
+look 0 -10
+wait 1
+shot mm_13_creatures_zoom2.png
+key KeyN
+wait 1
+shot mm_14_creatures_zoom4.png
+key KeyN
+wait 1
+shot mm_15_creatures_zoom1.png
+key KeyN
+wait 1
+key KeyM
+wait 2
+key KeyX
+wait 1.5
+shot mm_16_map_creatures.png
+key Escape
+wait 1
+# The setting off: no dots.
+set_config base:map_creatures 0
+wait 1.5
+shot mm_17_creatures_off.png
+set_config base:map_creatures 1
+chat /tick unfreeze
+wait 1
+where
+quit
