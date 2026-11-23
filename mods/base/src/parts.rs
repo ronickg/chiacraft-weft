@@ -700,7 +700,9 @@ fn unsocketed(stacks: &[ItemStack]) -> Option<(ItemStack, Vec<crate::gems::Set>)
 }
 
 /// What a part of `kind`'s slot `slot` usually is when nothing names it (`/gear`):
-/// an oak haft or grip, a leather wrap, a wrought-iron wedge, leather straps, a wool lining.
+/// an oak haft or grip, a leather wrap, a wrought-iron wedge, leather straps, a wool lining; a
+/// flint blade or head, a yew stave for a bow (flint can't be one: a bare `/gear bow` made nothing,
+/// testkit's `bow_and_keys`).
 fn usual(kind: &Kind, role: Role, working: &str) -> &'static str {
     let metal = material_of(code(working))
         .is_some_and(|m| m.works == crafting::materials::Works::Metal || m.works == crafting::materials::Works::Gem);
@@ -714,6 +716,7 @@ fn usual(kind: &Kind, role: Role, working: &str) -> &'static str {
         Role::Extra if metal => "wrought_iron",
         Role::Extra => "oak",
         Role::Lining => "wool",
+        Role::Working if kind.id == "bow" => "yew",
         Role::Working => "flint",
     }
 }
@@ -723,7 +726,7 @@ fn usual(kind: &Kind, role: Role, working: &str) -> &'static str {
 /// don't make one.
 pub fn made_of(kind_id: &str, materials: &[&str], grade: u8, day: u32) -> ItemStack {
     let Some(kind) = crafting::kinds::kind(kind_id) else { return ItemStack::EMPTY };
-    let working = materials.first().copied().unwrap_or("flint");
+    let working = materials.first().copied().unwrap_or_else(|| usual(kind, Role::Working, ""));
     let mut parts = Vec::new();
     for (i, slot) in kind.slots.iter().enumerate() {
         let name = materials
