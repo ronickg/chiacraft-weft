@@ -177,6 +177,11 @@ fn haze_sun() -> f32 {
 const OPT_SUN_GLOW: u32 = 49u;
 // The low sky away from the evening sun a clear blue (`base:look_evening_away`): 0 as made, 1 Bliss's.
 const OPT_EVENING_AWAY: u32 = 50u;
+// The mist with the sun low in the west lit in the light's own colours (`base:look_mist_tint`): 0 as
+// made (the low sun's gold in the sunlit mist and the sky's light in it), 1 Bliss's: its fog takes
+// the sun's colour and the sky's as they are (`overworld_fog.glsl`: light colour times phase, plus
+// the ambient), so its evening layer reads pale pink-lavender where ours went orange (lsG_ev, 11-22).
+const OPT_MIST_TINT: u32 = 51u;
 fn water_body() -> f32 {
     let b = fantasy_opt(OPT_WATER_BODY);
     return select(1.0, b, b >= 0.0);
@@ -1547,7 +1552,11 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // hour's colour alone the 07:30 shafts in a rainforest's mist read grey-white (canopy sheet).
     // Dimmer too: thick mist lit at the sun's full strength toward it clipped to white, and white
     // shows no colour (the dawn check's 07:30 mist, luma p50 170, saturation 0.03).
-    let warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
+    var warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
+    // In the evening, as Bliss's, no gold of its own (`OPT_MIST_TINT`): the sun's colour is already
+    // its sunset colour.
+    let plain = clamp(fantasy_opt(OPT_MIST_TINT), 0.0, 1.0) * (1.0 - smoothstep(-0.05, 0.05, scene.sun.x));
+    warm *= 1.0 - plain;
     // With the sun up and low, the sky's light in the mist goes gold too (sunlight scattered all
     // round in it): lit by the sky's cool fill, a dawn mist read pale pink-white where Bliss's is
     // gold (the Look session's checkpoint, 11-05). None before sunrise: the blue hour keeps its blue.

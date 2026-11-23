@@ -93,6 +93,9 @@ pub static LOOK_HAZE_SUN: Config<f32> = Config::named("look_haze_sun");
 pub static LOOK_SUN_GLOW: Config<f32> = Config::named("look_sun_glow");
 /// The low sky away from the evening sun a clear blue: 0 as made, 1 as Bliss's.
 pub static LOOK_EVENING_AWAY: Config<f32> = Config::named("look_evening_away");
+/// The evening mist lit in the light's own colours (0 as made: the low sun's gold in it, 1 Bliss's:
+/// the sun's and the sky's own colour, a pale pink-lavender layer; lsG_ev's 18:00 land went orange).
+pub static LOOK_MIST_TINT: Config<f32> = Config::named("look_mist_tint");
 
 /// "Bliss match" (Video, Extra): the look's knobs as fitted to Ronald's Bliss at the like-for-like
 /// vista (stage 2, 11-22/23: the lsN to lsAA sweeps against bliss_ctl, crew notes
@@ -133,7 +136,7 @@ pub fn set_bliss_match(on: bool) {
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away, base:look_mist_tint";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -191,5 +194,6 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_HAZE_SUN).float(1.0, 0.0, 1.0);
     r.config(&LOOK_SUN_GLOW).float(0.0, 0.0, 4.0);
     r.config(&LOOK_EVENING_AWAY).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_MIST_TINT).float(0.0, 0.0, 1.0);
     r.config(&LOOK_BLISS).bool(false);
 }
