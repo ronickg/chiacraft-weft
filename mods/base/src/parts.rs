@@ -726,7 +726,10 @@ fn usual(kind: &Kind, role: Role, working: &str) -> &'static str {
 /// don't make one.
 pub fn made_of(kind_id: &str, materials: &[&str], grade: u8, day: u32) -> ItemStack {
     let Some(kind) = crafting::kinds::kind(kind_id) else { return ItemStack::EMPTY };
-    let working = materials.first().copied().unwrap_or_else(|| usual(kind, Role::Working, ""));
+    let working = materials
+        .first()
+        .copied()
+        .unwrap_or_else(|| usual(kind, Role::Working, ""));
     let mut parts = Vec::new();
     for (i, slot) in kind.slots.iter().enumerate() {
         let name = materials
