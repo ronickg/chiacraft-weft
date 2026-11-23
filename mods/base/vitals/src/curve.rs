@@ -166,6 +166,10 @@ pub enum Path {
 
 pub const PATHS: [Path; 4] = [Path::Tech, Path::Magic, Path::Beasts, Path::Shared];
 /// The three an age's key needs a route by.
+/// Path parity (`reports/Balance model.md`, 5.3): an age's key by one route costs at most this much
+/// more effort than by its cheapest.
+pub const PARITY: f32 = 0.15;
+
 pub const ROUTES: [Path; 3] = [Path::Tech, Path::Magic, Path::Beasts];
 
 impl Path {

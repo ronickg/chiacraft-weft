@@ -11,6 +11,7 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | everything reachable from the start | passes |
 | nothing at tier N needs anything above N | passes |
 | each age's key by each declared route | passes |
+| path parity: each age's key by each route within ×1.15 of its cheapest, in EM | passes |
 | every tool-part material tagged, made from its tier or below | passes |
 | each age's making inside its budget | passes |
 | every size and role inside its bands, floors hold | passes |
@@ -372,6 +373,17 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 | Age of Lightning | - | - | - | all of it |
 | Age of the Future | - | - | - | all of it |
 | Age of Stars | - | - | - | all of it |
+
+What each route costs from scratch (`graph::route_cost`): its items at their cheapest, plus every tool and station on the way once. Path parity: a route at most ×1.15 its age's cheapest. Own: without what every route of the age takes (its boss part), what tells the paths apart.
+
+| age | path | EM | × cheapest | own EM | tools and stations |
+|---|---|---|---|---|---|
+| Stone Age | tech | 48 | 1.01 | 2.9 | crafting_table, axe, sharp_flake |
+| Stone Age | beasts | 47 | 1.00 | 2.3 | crafting_table, axe, sharp_flake |
+| Stone Age | magic | 50 | 1.07 | 5.5 | sharp_flake |
+| Bronze Age | tech | 60 | 1.00 | 0.00 |  |
+| Bronze Age | beasts | 60 | 1.00 | 0.00 |  |
+| Bronze Age | magic | 60 | 1.00 | 0.00 |  |
 
 ## What exists, by age and path
 
