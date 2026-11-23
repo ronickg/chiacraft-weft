@@ -743,9 +743,11 @@ pub fn keys(g: &Solved) -> Vec<String> {
 fn tool_for(g: &Solved, needs: Needs) -> Option<&'static str> {
     match needs {
         Needs::Hand => None,
-        n => tools_for(n)
-            .filter(|t| g.reachable(t))
-            .min_by(|a, b| g.cost_of(a).unwrap_or(f32::MAX).total_cmp(&g.cost_of(b).unwrap_or(f32::MAX))),
+        n => tools_for(n).filter(|t| g.reachable(t)).min_by(|a, b| {
+            g.cost_of(a)
+                .unwrap_or(f32::MAX)
+                .total_cmp(&g.cost_of(b).unwrap_or(f32::MAX))
+        }),
     }
 }
 
@@ -782,12 +784,15 @@ pub fn route_cost(g: &Solved, items: &[&str]) -> (Em, Vec<String>) {
         };
         if let Some(&i) = g.by.get(&id) {
             let r = all[i];
-            let station = r
-                .at
-                .stations()
-                .into_iter()
-                .filter(|s| g.reachable(s))
-                .min_by(|a, b| g.cost_of(a).unwrap_or(f32::MAX).total_cmp(&g.cost_of(b).unwrap_or(f32::MAX)));
+            let station =
+                r.at.stations()
+                    .into_iter()
+                    .filter(|s| g.reachable(s))
+                    .min_by(|a, b| {
+                        g.cost_of(a)
+                            .unwrap_or(f32::MAX)
+                            .total_cmp(&g.cost_of(b).unwrap_or(f32::MAX))
+                    });
             needs_tool(station, &mut todo);
             if let At::Break(n) = r.at {
                 needs_tool(tool_for(g, n), &mut todo);

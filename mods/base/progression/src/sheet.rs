@@ -414,7 +414,11 @@ fn keys(w: &mut String, g: &graph::Solved) {
         let shared: Vec<&str> = items
             .iter()
             .copied()
-            .filter(|i| graph::routes(a).iter().all(|(_, r)| r.is_some_and(|r| r.contains(i))))
+            .filter(|i| {
+                graph::routes(a)
+                    .iter()
+                    .all(|(_, r)| r.is_some_and(|r| r.contains(i)))
+            })
             .collect();
         let shared_em: f32 = shared.iter().filter_map(|i| g.cost_of(i)).sum();
         let _ = writeln!(
