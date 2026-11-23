@@ -161,6 +161,8 @@ fn haze_sun() -> f32 {
 // Bliss's 08:00 sun stands in a white glare some 40° across that washes the sky and the far land
 // toward it (lsT_haze, 11-22); ours is a tight disc and a small gold halo.
 const OPT_SUN_GLOW: u32 = 49u;
+// The low sky away from the evening sun a clear blue (`base:look_evening_away`): 0 as made, 1 Bliss's.
+const OPT_EVENING_AWAY: u32 = 50u;
 fn water_body() -> f32 {
     let b = fantasy_opt(OPT_WATER_BODY);
     return select(1.0, b, b >= 0.0);
@@ -824,6 +826,18 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let low_morning = smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.45, 0.7, scene.sun.y));
         let aw = away * low_morning;
         c = mix(c, blue, k * mix(0.6, 0.85, aw)) * (1.0 - mix(0.4, 0.15, aw) * k);
+        // The evening's side away from the sun (`OPT_EVENING_AWAY`): Bliss's sky low in the east at
+        // 18:00 is a clear blue, 90 129 186 two to five degrees up, where ours stayed a grey-cream,
+        // 143 145 151, and the far land hazed into it (lsV_air, 11-23). A deep blue at a little under
+        // the sky's brightness, over the low sky (to about 20° up), most straight away from the sun.
+        let eve_k = max(fantasy_opt(OPT_EVENING_AWAY), 0.0);
+        if eve_k > 0.0 {
+            let evening = (1.0 - smoothstep(-0.05, 0.05, scene.sun.x)) * (1.0 - smoothstep(0.3, 0.55, scene.sun.y)) * day;
+            let low_sky = 1.0 - smoothstep(0.0, 0.35, dir.y);
+            let deep = vec3(0.48, 0.69, 1.0);
+            let e = clamp(smoothstep(0.3, -0.5, mu) * evening * low_sky * eve_k, 0.0, 1.0);
+            c = mix(c, deep * (luma(c) * 0.85 / luma(deep)), e);
+        }
     }
     c += sun_glow(dir, p);
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
@@ -844,7 +858,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let wide_k = max(fantasy_opt(OPT_SUN_GLOW), 0.0);
         if wide_k > 0.0 {
             let wide = (pow(m, 3.0) * 0.7 + pow(m, 12.0) * 0.3) * (0.3 + 0.7 * low) * (1.0 - rain_amount());
-            c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.12 * wide_k;
+            c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.5 * wide_k;
         }
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
