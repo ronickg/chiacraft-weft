@@ -10,7 +10,7 @@ R3  the yew bow, full draws, at a zombie: `mob_fight: player ... hit zombie ... 
 """
 from pathlib import Path
 
-AT = "0.5 203 -4.5"
+AT = "0.5 206 -1.5"
 OUT = Path(__file__).resolve().parents[2] / "mods/testkit/scripts/ranged.txt"
 lines: list[str] = []
 o = lines.append
@@ -28,12 +28,13 @@ o("wait 2")
 o("loaded")
 o("chat /tk fill -6 196 -5 6 199 7 stone")
 o("chat /tk fill -1 197 0 1 199 2 core:air")
-o("chat /tk fill -6 200 -5 6 206 7 core:air")
+o("chat /tk fill -6 200 -5 6 208 7 core:air")
 # A roof, so a zombie doesn't burn (ranged1's zombie lost its 6 to the sun).
-o("chat /tk fill -6 207 -5 6 207 7 stone")
-# The shooter on a pillar 6 blocks back and 3 up: out of reach, so holding use draws the bow
-# rather than touching the animal, and the arrow clears the pit's rim.
-o("chat /tk fill 0 200 -5 0 202 -5 stone")
+o("chat /tk fill -6 209 -5 6 209 7 stone")
+# The shooter on a pillar just behind the pit, 6 up: out of reach (about 9 blocks to the target), so
+# holding use draws the bow rather than touching the animal, and steep enough that the line to the
+# target clears the pit's rim (ranged2, from 6 back and 3 up, hit the rim's top short of the hole).
+o("chat /tk fill 0 200 -2 0 205 -2 stone")
 o(f"chat /tp {AT}")
 o("wait 1")
 o("loaded")
@@ -57,6 +58,8 @@ def pen(name: str, bow: str, spawn: str, level: bool, draw: float, shots: int) -
         # `/animal` acts on the animal looked at.
         o("aim 12")
         o("chat /animal level 0")
+        # Grown, so every pen's raptor is the same size (ranged2's were 103, 75 and 46 health).
+        o("chat /animal age 2000")
     o("wait 0.5")
     o(f"where {name}_start")
     o("entities 10")

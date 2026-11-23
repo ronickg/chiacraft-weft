@@ -11,14 +11,14 @@ wait 2
 loaded
 chat /tk fill -6 196 -5 6 199 7 stone
 chat /tk fill -1 197 0 1 199 2 core:air
-chat /tk fill -6 200 -5 6 206 7 core:air
-chat /tk fill -6 207 -5 6 207 7 stone
-chat /tk fill 0 200 -5 0 202 -5 stone
-chat /tp 0.5 203 -4.5
+chat /tk fill -6 200 -5 6 208 7 core:air
+chat /tk fill -6 209 -5 6 209 7 stone
+chat /tk fill 0 200 -2 0 205 -2 stone
+chat /tp 0.5 206 -1.5
 wait 1
 loaded
 chat /tk mode survival
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 # ---- R0_yew_full: yew bow, 1.2 s draws, at animals:utahraptor
 chat /kill @e[type=animals:utahraptor]
 chat /kill @e[type=base:zombie]
@@ -31,83 +31,84 @@ chat /tk spawn animals:utahraptor 0 197 1
 wait 1
 aim 12
 chat /animal level 0
+chat /animal age 2000
 wait 0.5
 where R0_yew_full_start
 entities 10
 shot ranged_R0_yew_full_start.png
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
-aim 12
-hold core:use 1.2
-wait 0.3
-chat /tk heal
-entities 10
-chat /tp 0.5 203 -4.5
-aim 12
-hold core:use 1.2
-wait 0.3
-chat /tp 0.5 203 -4.5
-aim 12
-hold core:use 1.2
-wait 0.3
-chat /tp 0.5 203 -4.5
-aim 12
-hold core:use 1.2
-wait 0.3
-chat /tp 0.5 203 -4.5
-aim 12
-hold core:use 1.2
-wait 0.3
-chat /tp 0.5 203 -4.5
-aim 12
-hold core:use 1.2
-wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
 chat /tk heal
 entities 10
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
@@ -126,31 +127,32 @@ chat /tk spawn animals:utahraptor 0 197 1
 wait 1
 aim 12
 chat /animal level 0
+chat /animal age 2000
 wait 0.5
 where R1_spruce_full_start
 entities 10
 shot ranged_R1_spruce_full_start.png
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
@@ -169,31 +171,32 @@ chat /tk spawn animals:utahraptor 0 197 1
 wait 1
 aim 12
 chat /animal level 0
+chat /animal age 2000
 wait 0.5
 where R2_yew_half_start
 entities 10
 shot ranged_R2_yew_half_start.png
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 0.4
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 0.4
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 0.4
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 0.4
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 0.4
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 0.4
 wait 0.3
@@ -214,27 +217,27 @@ wait 0.5
 where R3_yew_zombie_start
 entities 10
 shot ranged_R3_yew_zombie_start.png
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
-chat /tp 0.5 203 -4.5
+chat /tp 0.5 206 -1.5
 aim 12
 hold core:use 1.2
 wait 0.3
