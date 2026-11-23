@@ -33,7 +33,18 @@ pub struct Kill {
 }
 
 impl Kill {
+    /// Its time: finding, the fight, taking its drops, and working its pelts (`vitals::loot::handling`).
     pub fn minutes(&self) -> f32 {
+        self.hunt_minutes()
+            + self
+                .drops
+                .iter()
+                .map(|(id, n)| loot::handling(id) * n)
+                .sum::<f32>()
+    }
+
+    /// Its time without working its pelts: what its drops share.
+    pub fn hunt_minutes(&self) -> f32 {
         loot::kill_minutes(self.find, self.kills, self.fight_secs)
     }
 
@@ -138,7 +149,8 @@ pub fn kills() -> Vec<Kill> {
 pub fn prices() -> HashMap<String, Em> {
     let mut out: HashMap<String, Em> = HashMap::new();
     for k in kills() {
-        for (id, p) in loot::shares(k.minutes(), &k.drops) {
+        for (id, p) in loot::shares(k.hunt_minutes(), &k.drops) {
+            let p = p + loot::handling(id);
             let e = out.entry(id.to_string()).or_insert(p);
             *e = e.min(p);
         }
@@ -151,7 +163,9 @@ pub fn cheapest(item: &str) -> Option<String> {
     kills()
         .into_iter()
         .filter_map(|k| {
-            let p = loot::shares(k.minutes(), &k.drops).find(|d| d.0 == item)?.1;
+            let p = loot::shares(k.hunt_minutes(), &k.drops)
+                .find(|d| d.0 == item)?
+                .1;
             Some((k.who.clone(), p))
         })
         .min_by(|a, b| a.1.total_cmp(&b.1))
