@@ -357,7 +357,9 @@ pub async fn creative_inventory(t: T) -> R {
     t.screen("core:menu").await?;
     t.shot("tab").await?;
     let stone = id("base:bricks");
-    if t.click_ui(&format!("item:{stone}"), 0) {
+    // Settled first: a click in the frame the cursor moved missed the palette here.
+    if t.c().ui_rect(&format!("item:{stone}")).is_some() {
+        t.click_settled(&format!("item:{stone}"), 0).await?;
         t.until("bricks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == stone)
             .await?;
         t.click_ui(&t.hotbar(0), 0);
