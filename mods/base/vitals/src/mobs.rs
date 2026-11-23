@@ -69,6 +69,18 @@ pub const MOBS: &[Mob] = &[
     m("creeper", 50.0, Role::Prey),
 ];
 
+/// What each drops when it dies (vanilla's amounts): mob, item (`base:<item>`), fewest, most, the
+/// chance of the roll (a spider's eye only when a player killed it). `mods/base/src/mobs.rs`
+/// builds their loot tables from these; the loot check prices them.
+pub const LOOT: &[(&str, &str, u32, u32, f32)] = &[
+    ("zombie", "rotten_flesh", 0, 2, 1.0),
+    ("spider", "string", 0, 2, 1.0),
+    ("spider", "spider_eye", 1, 1, 0.33),
+    ("creeper", "gunpowder", 0, 2, 1.0),
+    ("skeleton", "arrow", 0, 2, 1.0),
+    ("skeleton", "bone", 0, 2, 1.0),
+];
+
 /// A mob's row.
 pub fn mob(name: &str) -> Option<&'static Mob> {
     MOBS.iter().find(|m| m.name == name)
