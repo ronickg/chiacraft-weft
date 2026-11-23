@@ -188,14 +188,15 @@ pub async fn broken_shader_pack(t: T) -> R {
     let dir = format!("{}/shaderpacks/testkit_sepia", t.c().run_dir());
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let world = include_str!("../../../../crates/engine/assets/shaders/world.wgsl");
-    let ending = "    return vec4(mix(lit.rgb, scene.fog_color.rgb, fog), lit.a);";
+    // (Ours fogs as vanilla and Distant Horizons do: `fogged` and `plain_fog`, chiacraft stage 1.)
+    let ending = "    return vec4(fogged(lit.rgb, plain_fog(in.dist)), lit.a);";
     t.check(world.contains(ending), "the world shader still ends its shading like this");
     // Packs are copies of it, from whenever they were made: four words a texture since Weft
     // 26.11.2 (chiacraft's pack world.wgsl reads it so too).
     t.check(world.contains("tex_info[name * 4u]"), "the texture table still reads as packs read it");
     let sepia = world.replace(
         ending,
-        "    let y = dot(mix(lit.rgb, scene.fog_color.rgb, fog), vec3(0.3, 0.59, 0.11));
+        "    let y = dot(fogged(lit.rgb, plain_fog(in.dist)), vec3(0.3, 0.59, 0.11));
     return vec4(vec3(y * 1.2, y, y * 0.75), lit.a);",
     );
     std::fs::write(format!("{dir}/world.wgsl"), sepia).map_err(|e| e.to_string())?;
@@ -358,7 +359,19 @@ pub async fn rich_text(t: T) -> R {
 pub async fn sky(t: T) -> R {
     t.world(5).await?;
     t.op("mode creative").await?;
-    t.c().set_look(0.0, 89.0);
+    // A clear sky: no rain clouds, no mist (base's `/air`) over the sunset.
+    t.cmd("/weather clear").await?;
+    t.cmd("/air 0").await?;
+    // Base's sun and moon go round a path leaned 35° to the south (`mods/base/src/lib.rs`): noon
+    // stands 55° up, not overhead. The look toward a body `turn` round that path (0 rising in the
+    // east, a quarter at its height); yaw 0 faces -z (north).
+    let toward = |turn: f64| {
+        let (a, lean) = (turn * std::f64::consts::TAU, 35f64.to_radians());
+        let (x, y, z) = (a.cos(), a.sin() * lean.cos(), a.sin() * lean.sin());
+        ((-x).atan2(-z).to_degrees() as f32, y.asin().to_degrees() as f32)
+    };
+    let (yaw, pitch) = toward(0.25);
+    t.c().set_look(yaw, pitch);
     // Without the GUI: a popup's letters (a level up) would count as stars.
     t.press("core:hide_hud");
     t.frames(4).await?;
@@ -366,7 +379,7 @@ pub async fn sky(t: T) -> R {
     t.op("time 6000").await?;
     t.secs(0.6).await?;
     let noon = t.shot("noon").await?;
-    t.probe("the sun overhead", noon.share(0.45, 0.40, 0.55, 0.57, bright), noon.share(0.45, 0.40, 0.55, 0.57, bright) > 0.5);
+    t.probe("the sun at its height", noon.share(0.45, 0.40, 0.55, 0.57, bright), noon.share(0.45, 0.40, 0.55, 0.57, bright) > 0.5);
     // A star is a speck: bright with sky a little way off on every side, which a cloud isn't.
     let specks = |shot: &crate::runner::Shot| {
         let (sx, sy) = (1.0 / 1600.0, 1.0 / 900.0);
@@ -382,11 +395,15 @@ pub async fn sky(t: T) -> R {
         n
     };
     t.check_eq(specks(&noon), 0, "no stars by day");
+    // The moon lags the day: a turn every 8/7 days, full (opposite the sun) on day 0. At day 0's
+    // midnight it is (18000 / 27429 + 0.5) round: a little past rising, high in the south-east.
     t.op("time 18000").await?;
+    let (yaw, pitch) = toward((18000.0 / (24000.0 * 8.0 / 7.0) + 0.5f64).rem_euclid(1.0));
+    t.c().set_look(yaw, pitch);
     t.secs(0.6).await?;
     let night = t.shot("midnight").await?;
     let moon = night.share(0.45, 0.42, 0.55, 0.56, |c| c.iter().all(|&v| v > 150));
-    t.probe("the moon overhead", moon, moon > 0.4);
+    t.probe("the moon where its path puts it", moon, moon > 0.4);
     let stars = night.share(0.0, 0.0, 1.0, 0.3, |c| c.iter().all(|&v| v > 60));
     t.probe("stars at night", stars, stars > 0.0005);
     // Looking at the sunset and away from it, at the equinox: the day's length follows the
@@ -540,7 +557,7 @@ pub async fn attack_indicator(t: T) -> R {
     t.cmd("/gear sword wrought_iron slot=0").await?;
     t.c().select_slot(0);
     // A swing that hits nothing spends the charge; looking down, nothing bright is behind the bar.
-    t.op("attr_mod me core:block_reach no_reach 0 -10 0")
+    t.op("attr_mod me core:block_reach no_reach core:add -10 0")
         .await?;
     t.c().set_look(0.0, -40.0);
     t.secs(1.0).await?;

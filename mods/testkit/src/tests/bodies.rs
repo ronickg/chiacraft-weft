@@ -567,10 +567,17 @@ pub async fn skiff_blocks(t: T) -> R {
         targets.insert((s.target, s.target_body));
     }
     t.check(targets.len() == 1, format!("one block looked at while riding ({targets:?})"));
+    // It turns round every 3 seconds, so a second's start and end can lie close together: the
+    // span it covers in that second (at least 3 blocks either way) shows it flying.
     let (a, sa) = (pos_of(&t, &format!("{id}")).await?, t.op(&sb([0, 1, -1])).await?);
-    t.secs(1.0).await?;
-    let b = pos_of(&t, &format!("{id}")).await?;
-    t.check((b[0] - a[0]).abs() > 2.0 && sa == t.op(&sb([0, 1, -1])).await?, "it flies on with the stone on it");
+    let (mut lo, mut hi) = (a[0], a[0]);
+    for _ in 0..5 {
+        t.secs(0.2).await?;
+        let x = pos_of(&t, &format!("{id}")).await?[0];
+        (lo, hi) = (lo.min(x), hi.max(x));
+    }
+    t.check(hi - lo > 2.0, format!("it flies on: {:.1} blocks in a second", hi - lo));
+    t.check(sa == t.op(&sb([0, 1, -1])).await?, "with the stone on it");
     // A mod's write, then the player breaks the stone.
     t.check_eq(t.op(&format!("{} base:cobblestone", sb([1, 1, 1]))).await?, "1".to_string(), "a mod sets a block of it");
     t.check_eq(t.op(&sb([1, 1, 1])).await?, "base:cobblestone".to_string(), "and reads it back");
