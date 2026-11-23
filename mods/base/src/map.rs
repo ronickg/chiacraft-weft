@@ -633,7 +633,11 @@ fn picture(c: &Client, seed: u64, side: usize, centre: (i32, i32), zoom: i32, ed
                 let free = (0..24)
                     .map(|k| a0 + step * ((k + 1) / 2) as f32 * if k % 2 == 0 { 1.0 } else { -1.0 })
                     .map(|a| (ax + a.cos() * n::MARK_CLEAR, az + a.sin() * n::MARK_CLEAR))
-                    .find(|&(qx, qz)| placed.iter().all(|&(ox, oz)| (qx - ox).hypot(qz - oz) >= apart));
+                    .find(|&(qx, qz)| {
+                        placed
+                            .iter()
+                            .all(|&(ox, oz)| (qx - ox).hypot(qz - oz) >= apart)
+                    });
                 (px, pz) = free.unwrap_or((ax + a0.cos() * n::MARK_CLEAR, az + a0.sin() * n::MARK_CLEAR));
             }
         }

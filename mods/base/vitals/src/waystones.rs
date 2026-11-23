@@ -296,7 +296,9 @@ mod tests {
         assert!(sea[2] > sea[0] && ground_colour("water", "plains") == WATER);
         assert!(ground_colour("sand", "desert")[0] > 0xd0);
         // Every ground block the land tops a column with has a colour.
-        for top in ["grass", "snowy_grass", "podzol", "sand", "snow", "rock:strata", "rock:slate", "rock:granite", "rock:limestone", "rock:karst"] {
+        for top in
+            ["grass", "snowy_grass", "podzol", "sand", "snow", "rock:strata", "rock:slate", "rock:granite", "rock:limestone", "rock:karst"]
+        {
             assert!(GROUND_COLOURS.iter().any(|e| e.0 == top), "{top}");
         }
     }
