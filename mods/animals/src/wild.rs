@@ -98,6 +98,7 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
                             .with(Need::Comfort, crate::comfort::seek)
                             .with(Need::Drink, crate::drink::drink)
                             .with(Need::Eat, crate::forage::eat)
+                            .with(Need::Migrate, crate::migrate::goal(body.wander))
                             .with(Need::Wander, crate::group::or_follow(body.wander, ai::wander(body.wander, 8.0))),
                     ),
             )
