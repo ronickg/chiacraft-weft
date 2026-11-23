@@ -613,9 +613,18 @@ async fn run_lines(t: T, src: String) -> R {
             // middle: a settings row's ‹ › buttons, which carry no id of their own, from its label.
             "tap_beside" => {
                 let mut w = rest.split_whitespace();
-                let screen = w.next().ok_or("tap_beside: a screen, an element and a width")?.to_string();
-                let k: f32 = rest.rsplit(' ').next().and_then(|v| v.parse().ok()).ok_or("tap_beside: a width last")?;
-                let query = rest[screen.len()..rest.len() - rest.rsplit(' ').next().unwrap_or("").len()].trim().to_string();
+                let screen = w
+                    .next()
+                    .ok_or("tap_beside: a screen, an element and a width")?
+                    .to_string();
+                let k: f32 = rest
+                    .rsplit(' ')
+                    .next()
+                    .and_then(|v| v.parse().ok())
+                    .ok_or("tap_beside: a width last")?;
+                let query = rest[screen.len()..rest.len() - rest.rsplit(' ').next().unwrap_or("").len()]
+                    .trim()
+                    .to_string();
                 let name = screen.clone();
                 t.until(&format!("screen {screen}"), Duration::from_secs(60), move |t| t.c().screen() == name)
                     .await?;
