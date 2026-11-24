@@ -334,7 +334,7 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     // Walking a way out of where it is stuck (`stuck`).
-    if crate::stuck::going(w, id) {
+    if crate::stuck::going(w, id, st) {
         return true;
     }
     let now = w.game_time() as f64;

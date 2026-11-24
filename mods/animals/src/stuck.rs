@@ -56,8 +56,22 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
     walks
 }
 
-/// Whether `id` walks a leg out now: its need's goal keeps the turn while it does.
-pub fn going(w: &World, id: u64) -> bool {
-    w.component(id, &STUCK)
-        .is_some_and(|k| k[3] != 0.0 && (w.game_time() as f64) < k[3] && w.navigating(id))
+/// Whether `id` walks a leg out now: its need's goal keeps the turn while it does. A leg that
+/// ended where it began is the next short walk at once, so a pit, where every leg ends at once,
+/// comes to the leap in seconds, not a give-up's wait apart (ai1124_pit2: three in 50 s, no leap).
+pub fn going(w: &World, id: u64, st: &EntityState) -> bool {
+    let Some(k) = w.component(id, &STUCK) else { return false };
+    if k[3] == 0.0 {
+        return false;
+    }
+    // Walking its leg; or it leapt, and waits the leg's time out before it tries again (a leap a
+    // tick would add up while it is in the air).
+    if (w.game_time() as f64) < k[3] && (w.navigating(id) || k[2] as u8 >= LEAP_AFTER) {
+        return true;
+    }
+    let near = (k[0] - st.pos.x).powi(2) + (k[1] - st.pos.z).powi(2) <= STUCK_NEAR * STUCK_NEAR;
+    if let Some(c) = w.component_mut(id, &STUCK) {
+        c[3] = 0.0;
+    }
+    near && short(w, id, st)
 }

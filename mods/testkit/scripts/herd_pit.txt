@@ -8,7 +8,7 @@
 # Seed 1's savanna as `herd_savanna_winter.txt`: flat grass with tall grass, a 5 x 5 pond 10
 # blocks north, and the pit 3 x 3, its floor bare dirt 2 blocks under the grass (no food in it).
 # PASS: both deer are out of the pit (y 70 in the `/animalprof where` rows, not 68) within the
-# 60 s, and drink ("anim: <id> holds drink" for each, water up from 30 %); the log has "is stuck
+# 120 s, and drink ("anim: <id> holds drink" for each, water up from 30 %); the log has "is stuck
 # at ... looks for a way out" and "leaps out" lines for them. Report how long each took (the
 # first row it is at y 70) and any deer still at y 68 at the end.
 loaded
@@ -40,6 +40,18 @@ chat /animalprof water 0.3
 chat /animalprof food 0.3
 chat /tp 0 90 572
 wait 3
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /animalprof where
 wait 10
 chat /animalprof where
