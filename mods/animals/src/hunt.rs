@@ -34,6 +34,8 @@ static STOOD: Component<u64> = Component::named("animal_stood");
 /// Until when it walks a prowl's leg (`prowl`; not saved).
 static PROWL: Component<u64> = Component::named("animal_prowl");
 /// The pack's leader it follows as they prowl (0: none), and its legs so far (`prowl`; not saved).
+/// The prey it last gave up on (`hunt_`): a kill of it a moment later is still its pack's meal.
+static LAST: Component<u64> = Component::named("animal_last_prey");
 static FOLLOW: Component<[u64; 2]> = Component::named("animal_follow");
 /// A kill site it went to and found nothing at (x, z), and till when it leaves it (`hunt_`; not
 /// saved).
@@ -59,6 +61,7 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&STOOD, 0u64, 0);
     r.entity_component(&PROWL, 0u64, 0);
     r.entity_component(&FOLLOW, [0u64; 2], 0);
+    r.entity_component(&LAST, 0u64, 0);
     r.entity_component(&SITE, [0.0; 3], 0);
     for s in &SPECIES {
         r.edit(s.kind).attach(&HUNT);
@@ -67,6 +70,7 @@ pub fn init(r: &mut Registry) {
         r.edit(s.kind).attach(&STOOD);
         r.edit(s.kind).attach(&PROWL);
         r.edit(s.kind).attach(&FOLLOW);
+        r.edit(s.kind).attach(&LAST);
         r.edit(s.kind).attach(&SITE);
     }
     // A kill feeds the hunter that made it and its pack near (`needs::KILL_SHARED`), the prey's
@@ -107,7 +111,7 @@ pub fn init(r: &mut Registry) {
                         !eaters.contains(&o)
                             && w.entity(o).is_some_and(|e| Some(e.kind) == kind)
                             && !animal::tamed(&w, o)
-                            && w.component(o, &HUNT).is_some_and(|h| h[0] == d.entity)
+                            && (w.component(o, &HUNT).is_some_and(|h| h[0] == d.entity) || w.component(o, &LAST) == Some(d.entity))
                     })
                     .collect();
                 eaters.extend(on_it);
@@ -247,6 +251,10 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
             return true;
         }
         weft_sdk::info!("{} {id} gives up on {} ({})", s.name, h[0], if alive { "too long" } else { "gone" });
+        // Its prey's death reaches it before the kill is eaten (`actions::DIE`): wolvesDays1f's
+        // leader gave its deer up as gone, 20 blocks off, missed its share and took a second
+        // deer at once.
+        w.component_mut(id, &LAST).map(|c| *c = h[0]);
         h = [0, 0, now + LOOK_EVERY, 0];
         w.component_mut(id, &CHARGING).map(|c| *c = 0);
     }
