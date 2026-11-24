@@ -16,6 +16,11 @@ pub const MEAL: f32 = 0.1;
 /// food, and stops when this full.
 pub const HUNGRY: f32 = 0.6;
 pub const FULL: f32 = 0.95;
+/// A wild hunter sets off to hunt under this share of its food (a fierce one sooner,
+/// `roles::FIERCE_HUNGER`): a wolf that has gorged at a kill goes days before it hunts again (a
+/// wolf pack takes a deer about every 3-5 days). Hunting at `HUNGRY`, a pack of three killed a
+/// deer every 1.5 days and took a herd of six in a week (ai1124_wolvesDays1e).
+pub const HUNTS_AT: f32 = 0.4;
 
 /// The share of natural spawns that still come where nothing grows this season (`forage.rs`):
 /// animals live through a winter or a drought, fewer and thinner.
@@ -27,6 +32,13 @@ pub fn fills(own: f32, kg: f32) -> f32 {
         return 0.0;
     }
     (kg / (own * MEAL)).min(1.0)
+}
+
+/// Blocks from its killer within which a pack's hungry members eat of a kill too (a wolf pack
+/// feeds together at a carcass; `senses::KIN`'s reach), and each one's share of its `kg`.
+pub const KILL_SHARED: f64 = 16.0;
+pub fn share(kg: f32, eaters: usize) -> f32 {
+    kg / eaters.max(1) as f32
 }
 
 /// Share of its food a wild one has when it arrives where nothing it eats grows this season (a
@@ -386,18 +398,44 @@ pub const FLEE_DROP: i32 = 1;
 const _: () = assert!(HEAL_AFTER > 1.0);
 const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WAY_OUT_WAYS);
 
-/// Healing: an animal neither hungry nor thirsty (its food at `HUNGRY` of its most or more, its
-/// water at `THIRSTY` or more) and unhurt for `HEAL_AFTER` seconds heals its whole health in
-/// `HEAL_DAYS` game days. Without it a deer bitten to half by a wolf or a fall stayed at half for
-/// good, and the next blow killed it.
+/// A hungry hunter with no prey in sight and no kill site to go to prowls: a leg of this many
+/// blocks a new way at a time, looking as it goes (`hunt::prowl`), each leg at most `PROWL_SECS`.
+/// Without it a jaguar 24 blocks from a resting herd sat a whole run where it arrived, starving,
+/// and never saw them (ai1124_jaguar1): a big cat or a wolf pack ranges kilometres a day for prey.
+pub const PROWL_LEG: f64 = 16.0;
+pub const PROWL_SECS: f32 = 15.0;
+/// Blocks a pack's member keeps within of its leader as they prowl, how much faster than a walk
+/// it closes up, and how far off it loses it (it prowls alone).
+pub const PACK_FOLLOW: f64 = 4.0;
+pub const PACK_CATCH_UP: f32 = 1.3;
+pub const PACK_LOSE: f64 = 48.0;
+/// Every other prowl's leg heads for the water a hunter knows while it is further than this.
+pub const PROWL_WATER: f64 = 8.0;
+/// Seconds a hunter leaves a kill site it went to and found no prey at.
+pub const SITE_AGAIN_SECS: f32 = 120.0;
+/// Its kind near (itself among them) from which a pack hunter rallies the others to its hunt.
+pub const RALLY_PACK: u32 = 2;
+
+/// Healing: an animal watered (its water at `THIRSTY` or more) and unhurt for `HEAL_AFTER`
+/// seconds heals its whole health in `HEAL_DAYS` game days while fed (its food at `HUNGRY` of its
+/// most or more), slower as it grows thin, not at all at `HEAL_THIN` (as thin as a wild one
+/// arrives where nothing grows, `ARRIVES_FED`): a thin animal heals too, only slower. Without it a
+/// deer bitten to half by a wolf or a fall stayed at half for good, and the next blow killed it;
+/// with only the fed healing, a winter's deer grazing between 55 and 95 % healed part of the time.
 pub const HEAL_DAYS: f32 = 1.0;
 pub const HEAL_AFTER: f32 = 10.0;
+pub const HEAL_THIN: f32 = ARRIVES_FED;
+const _: () = assert!(HEAL_THIN < HUNGRY);
 
-/// Whether an animal at `fed` (its share of its food) and `water` (its share of its water), last
-/// hurt `since` seconds ago, heals. A starving or parched one is hurt every second
-/// (`starves_secs`, `PARCHED_SECS`) and empty besides, so it never heals what it loses.
-pub fn heals(fed: f32, water: f32, since: f32) -> bool {
-    fed >= HUNGRY && water >= THIRSTY && since >= HEAL_AFTER
+/// The share of its full healing (`heal_per_sec`) an animal at `fed` (its share of its food) and
+/// `water` (its share of its water), last hurt `since` seconds ago, heals at. A starving or
+/// parched one is hurt every second (`starves_secs`, `PARCHED_SECS`) and empty besides, so it
+/// never heals what it loses.
+pub fn heal_share(fed: f32, water: f32, since: f32) -> f32 {
+    if water < THIRSTY || since < HEAL_AFTER {
+        return 0.0;
+    }
+    ((fed - HEAL_THIN) / (HUNGRY - HEAL_THIN)).clamp(0.0, 1.0)
 }
 
 /// Health a second an animal of `max` health heals.
@@ -428,17 +466,42 @@ mod leaping {
 }
 
 #[cfg(test)]
+mod kills {
+    use super::*;
+
+    /// A hunter hunts later than a grazer grazes, and still heals some while it waits.
+    #[test]
+    fn hunts_when_lean() {
+        assert!(HUNTS_AT < HUNGRY && HUNTS_AT > HEAL_THIN);
+    }
+
+    /// A deer shared by a pack of three fills each wolf (a wolf eats up to a fifth of its mass at
+    /// a kill), so the pack is fed together and hungry again together (ai1124_wolvesDays1b).
+    #[test]
+    fn a_deer_feeds_a_pack_of_three() {
+        assert_eq!(share(60.0, 3), 20.0);
+        assert_eq!(share(60.0, 0), 60.0);
+        assert!(fills(40.0, share(50.0, 3)) >= 1.0);
+    }
+}
+
+#[cfg(test)]
 mod healing {
     use super::*;
 
     #[test]
-    fn a_fed_unhurt_animal_heals_in_a_day_and_a_hungry_one_does_not() {
+    fn a_fed_unhurt_animal_heals_in_a_day_a_thin_one_slower() {
         // Half its health back in half a day, the whole in a day.
         let max = 20.0;
         assert!((heal_per_sec(max) * vitals::DAY_SECS * HEAL_DAYS - max).abs() < 1e-3);
-        assert!(heals(FULL, 1.0, HEAL_AFTER));
-        assert!(!heals(FULL, 1.0, HEAL_AFTER - 1.0), "just hurt");
-        assert!(!heals(HUNGRY - 0.01, 1.0, 60.0), "hungry");
-        assert!(!heals(FULL, THIRSTY - 0.01, 60.0), "thirsty");
+        assert_eq!(heal_share(FULL, 1.0, HEAL_AFTER), 1.0);
+        assert_eq!(heal_share(HUNGRY, 1.0, 60.0), 1.0);
+        assert_eq!(heal_share(FULL, 1.0, HEAL_AFTER - 1.0), 0.0, "just hurt");
+        assert_eq!(heal_share(FULL, THIRSTY - 0.01, 60.0), 0.0, "thirsty");
+        // Thin, slower; at `HEAL_THIN` and under, not at all.
+        let half = heal_share((HUNGRY + HEAL_THIN) / 2.0, 1.0, 60.0);
+        assert!((half - 0.5).abs() < 1e-4, "{half}");
+        assert_eq!(heal_share(HEAL_THIN, 1.0, 60.0), 0.0);
+        assert_eq!(heal_share(0.0, 1.0, 60.0), 0.0);
     }
 }
