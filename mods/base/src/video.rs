@@ -71,19 +71,38 @@ fn waiting(key: &str) -> bool {
     }
 }
 
+/// What the render scale row's Auto (0) is on a window of `window` pixels: 0.67 on a big
+/// high-density screen (5 million pixels or more, the line `detect` draws for a Retina MacBook),
+/// 1 elsewhere. The engine never gets the 0 itself: since the 11-22 sync it clamps the render
+/// scale to 0.25 and up, and a 0 drew the world at a quarter of the pixels (Ronald's M3 Max,
+/// 1028x629 of a 4112x2516 window, Planner 11-24).
+fn auto_render_scale(window: [u32; 2]) -> f32 {
+    if window[0] as u64 * window[1] as u64 >= 5_000_000 { 0.67 } else { 1.0 }
+}
+
 /// The values waiting go to the engine, while no world is open (render targets made afresh then,
-/// with no frame of a world in flight).
+/// with no frame of a world in flight). Auto goes as the scale it stands for, and a 0 an earlier
+/// game wrote is put right the same way.
 fn take_waiting(c: &Client) {
-    if c.state().flags & abi::client_flags::IN_WORLD != 0 {
+    let state = c.state();
+    if state.flags & abi::client_flags::IN_WORLD != 0 || state.window[0] == 0 || state.window[1] == 0 {
         return;
     }
+    let auto = auto_render_scale(state.window);
     let scale = RENDER_SCALE_NEXT.get();
     if scale >= 0.0 {
+        if scale == 0.0 {
+            weft_sdk::info!("video: render scale Auto is {auto} on this {}x{} window", state.window[0], state.window[1]);
+        }
+        let scale = if scale == 0.0 { auto } else { scale };
         if (scale - RENDER_SCALE.get()).abs() > 1e-3 {
             weft_sdk::info!("video: render scale {scale} from the last game");
             RENDER_SCALE.set(scale);
         }
         RENDER_SCALE_NEXT.set(-1.0);
+    } else if RENDER_SCALE.get() < 0.25 {
+        weft_sdk::info!("video: render scale {} was Auto's 0: now {auto}", RENDER_SCALE.get());
+        RENDER_SCALE.set(auto);
     }
     let size = SHADOW_SIZE_NEXT.get();
     if size > 0 {
@@ -304,7 +323,8 @@ const PRESET_ROWS: usize = 12;
 const ROWS: [Row; 13] = [
     Row {
         key: "render_scale",
-        // 0 is Auto (Distant terrain's render pass: 0.67 on a high-density screen, 1 elsewhere).
+        // 0 is Auto: 0.67 on a big high-density screen, 1 elsewhere (`auto_render_scale`), written
+        // as that number at the next start.
         values: &[0.0, 0.5, 0.6, 0.67, 0.75, 0.85, 1.0],
         get: render_scale,
         set: |v| RENDER_SCALE_NEXT.set(v as f32),
