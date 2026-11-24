@@ -411,7 +411,7 @@ fn chest_totals(w: &World, player: u64, station: Station) -> Vec<(u32, u32)> {
 /// Makes `r` up to `count` times at `station` from the player's bag (and the chests by the
 /// table), giving each result to the bag or dropping it at the player's feet.
 fn craft(w: &World, player: u64, station: Station, r: &RecipeView, count: u32) -> u32 {
-    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) {
+    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) || crate::ruins::recipe_locked(w, player, r) {
         return 0;
     }
     let Some(src) = sources(w, player, station) else { return 0 };
@@ -501,7 +501,7 @@ fn timed(r: &RecipeView) -> Option<f32> {
 /// `count` of `r` asked for at `station`: added to the player's line (one more of the same recipe
 /// joins it; another replaces it), the first made in `secs`.
 fn queue(w: &World, player: u64, station: Station, r: &RecipeView, count: u32, secs: f32) {
-    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) {
+    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) || crate::ruins::recipe_locked(w, player, r) {
         return;
     }
     let each = (secs * vitals::TICKS as f32).round().max(1.0) as u64;
@@ -646,7 +646,12 @@ pub fn book(ui: &mut Ui, station: Station) {
         // A knapped head from memory waits for one made by hand (`first.rs`).
         .filter(|r| creative || !crate::first::locked(r, &touched))
         .filter_map(|r| {
-            let n = if table_only(station, &r) { 0 } else { times(&r, &have, MAX_BATCH) };
+            // A blueprint not yet read: shown, never makeable (`ruins.rs`).
+            let blueprint = r
+                .outputs()
+                .first()
+                .is_some_and(|(o, _)| crate::ruins::craft_locked_here(&ui.view(), o.item).is_some());
+            let n = if table_only(station, &r) || blueprint { 0 } else { times(&r, &have, MAX_BATCH) };
             if creative || n > 0 || crate::discovery::starter(&r) {
                 return Some((r, n, None));
             }
@@ -785,7 +790,9 @@ pub fn book(ui: &mut Ui, station: Station) {
                         let lack = first_missing(r, &have);
                         let s = S::default().size(18.0, 18.0).class(class);
                         let name = name_of(out.item);
-                        let s = if *n > 0 {
+                        let s = if let Some(b) = crate::ruins::craft_locked_here(&ui.view(), out.item) {
+                            s.tooltip_args("crafting.book.blueprint", &[Arg::Name(&name), Arg::Name(&crate::ruins::name_of(b))])
+                        } else if *n > 0 {
                             s.tooltip_args("crafting.book.can", &[Arg::Name(&name)])
                         } else if table_only(station, r) {
                             s.tooltip_args("crafting.book.needs_table_tip", &[Arg::Name(&name)])

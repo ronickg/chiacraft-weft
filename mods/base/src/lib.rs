@@ -52,6 +52,7 @@ mod plants3d_files;
 mod player;
 mod recipes;
 mod redstone;
+mod ruins;
 mod seasons;
 mod shaderpack;
 mod showcase;
@@ -171,6 +172,7 @@ fn init(r: &mut Registry) {
     wind_life::register(r);
     ley::register(r);
     waystones::register(r);
+    ruins::register(r);
     map::register(r);
     felling::register(r);
     fall::register(r);
