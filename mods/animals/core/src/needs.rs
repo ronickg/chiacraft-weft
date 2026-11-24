@@ -394,6 +394,8 @@ pub const PROWL_LEG: f64 = 16.0;
 pub const PROWL_SECS: f32 = 15.0;
 /// Blocks a pack's member keeps within of its leader as they prowl.
 pub const PACK_FOLLOW: f64 = 4.0;
+/// Seconds a hunter leaves a kill site it went to and found no prey at.
+pub const SITE_AGAIN_SECS: f32 = 120.0;
 
 /// Healing: an animal watered (its water at `THIRSTY` or more) and unhurt for `HEAL_AFTER`
 /// seconds heals its whole health in `HEAL_DAYS` game days while fed (its food at `HUNGRY` of its

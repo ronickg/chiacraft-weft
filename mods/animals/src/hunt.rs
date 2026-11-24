@@ -33,6 +33,9 @@ static CHARGING: Component<u64> = Component::named("animal_charging");
 static STOOD: Component<u64> = Component::named("animal_stood");
 /// Until when it walks a prowl's leg (`prowl`; not saved).
 static PROWL: Component<u64> = Component::named("animal_prowl");
+/// A kill site it went to and found nothing at (x, z), and till when it leaves it (`hunt_`; not
+/// saved).
+static SITE: Component<[f64; 3]> = Component::named("animal_site");
 
 /// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
 /// a dust storm close both in (`base_api::sight`).
@@ -53,12 +56,14 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&CHARGING, 0u64, 0);
     r.entity_component(&STOOD, 0u64, 0);
     r.entity_component(&PROWL, 0u64, 0);
+    r.entity_component(&SITE, [0.0; 3], 0);
     for s in &SPECIES {
         r.edit(s.kind).attach(&HUNT);
         r.edit(s.kind).attach(&WARY);
         r.edit(s.kind).attach(&CHARGING);
         r.edit(s.kind).attach(&STOOD);
         r.edit(s.kind).attach(&PROWL);
+        r.edit(s.kind).attach(&SITE);
     }
     // A kill feeds the hunter that made it, by the prey's mass against its own.
     r.on_event(&actions::DIE, |b| {
@@ -173,12 +178,16 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     let now = w.game_time();
     let knockout = w.component(id, &crate::knockout::KNOCKOUT).is_some();
     if h[0] != 0 {
-        let alive = w
-            .entity(h[0])
-            .is_some_and(|e| e.health > 0.0 && dist2(e.pos, st.pos) < (LOOK * 1.5).powi(2));
         // A pack runs its prey down: they take turns at the front, faster than one alone could
         // keep up, and keep at it twice as long (a wolf pack's chase of an elk lasts minutes).
         let pack = h[3] == 1;
+        // A pack's member keeps on prey as far as its pack reaches past its own look: joined
+        // from 16 blocks behind its leader, two wolves gave up "gone" within a second at 31
+        // blocks (ai1124_wolves1c).
+        let keep = LOOK * 1.5 + if pack { PACK_RANGE } else { 0.0 };
+        let alive = w
+            .entity(h[0])
+            .is_some_and(|e| e.health > 0.0 && dist2(e.pos, st.pos) < keep * keep);
         // A fierce one keeps at it longer (`roles::FIERCE_CHASE`).
         let give_up = ((if pack { 2 * GIVE_UP } else { GIVE_UP }) as f32 * (1.0 + animals_core::roles::FIERCE_CHASE * fierce)) as u64;
         if alive && now < h[1] + give_up {
@@ -233,8 +242,20 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     let Some((t, kg)) = prey else {
         w.component_mut(id, &HUNT).map(|c| *c = h);
         // No prey in sight: it goes where kills were (`memory::haunt`), where prey come and die.
-        if let Some(site) = crate::memory::haunt(w, st.pos.to_array())
-            && dist2(site, st.pos) > 16.0
+        // A site it has just been to and found nothing at it leaves for `needs::SITE_AGAIN_SECS`
+        // (a wolf went between one and a prowl's leg 12 times in 150 s, ai1124_wolves1c).
+        let site = crate::memory::haunt(w, st.pos.to_array()).filter(|site| {
+            let checked = w
+                .component(id, &SITE)
+                .is_some_and(|c| now < c[2] as u64 && (c[0] - site[0]).powi(2) + (c[1] - site[2]).powi(2) < 9.0);
+            if !checked && dist2(*site, st.pos) <= 16.0 {
+                w.component_mut(id, &SITE)
+                    .map(|c| *c = [site[0], site[2], (now + (animals_core::needs::SITE_AGAIN_SECS * 20.0) as u64) as f64]);
+                return false;
+            }
+            !checked
+        });
+        if let Some(site) = site
             && !w.navigating(id)
         {
             // Walked as a prowl's leg, keeping the turn: it went every 3 s and its rest took the
