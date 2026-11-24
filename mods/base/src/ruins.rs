@@ -105,7 +105,8 @@ pub fn register(r: &mut Registry) {
             return Verdict::Abstain;
         }
         if p != 0 {
-            w.hint("hint.base.ward.refuses", &[Arg::Name(&format!("block:{}", block_name(state)))]).to(p);
+            w.hint("hint.base.ward.refuses", &[Arg::Name(&format!("block:{}", block_name(state)))])
+                .to(p);
         }
         Verdict::Deny
     });
@@ -529,7 +530,10 @@ fn command(cmd: &mut ServerCommand) {
         Some("check") if master => {
             // The nearest ruin of a kind as it stands, against what its decoration builds: each
             // block it puts (not the soft clearing), by block, how many are there (a run's proof).
-            let k = which.as_deref().and_then(|id| n::KINDS.iter().position(|k| k.id == id)).unwrap_or(0);
+            let k = which
+                .as_deref()
+                .and_then(|id| n::KINDS.iter().position(|k| k.id == id))
+                .unwrap_or(0);
             let Some(ruin) = n::nearest(seed, spawn, k, x, z, 2) else {
                 cmd.reply("command.base.ruin.none", &[Arg::Key(&format!("ruin.base.{}", n::KINDS[k].id))]);
                 return;
