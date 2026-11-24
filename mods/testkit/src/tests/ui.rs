@@ -394,17 +394,19 @@ pub async fn creative_inventory(t: T) -> R {
         t.click_ui(&t.hotbar(0), 0);
         t.until("bricks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(0).item == stone)
             .await?;
-        // A number key over an entry: a stack of it in that hotbar slot.
-        let Rect { x, y, w, h } = t
-            .c()
-            .ui_rect(&format!("item:{stone}"))
-            .ok_or("no bricks entry")?;
-        t.c().input_cursor(x + w / 2.0, y + h / 2.0);
-        t.frames(3).await?;
+        // A number key over an entry: a stack of it in that hotbar slot. The entry is read once it
+        // has a size: the palette lays out again after the hotbar click, and read in between it
+        // was all zeros (under --jobs 2 the pointer went to 0 0, hovering nothing).
+        let entry = format!("item:{stone}");
+        let mut got = false;
         // Pressed again until it lands (a second press gives the same stack): under load a press
         // was let go before the screen read it.
-        let mut got = false;
         for _ in 0..4 {
+            t.until("the bricks entry laid out", Duration::from_secs(5), |t| t.c().ui_rect(&entry).is_some_and(|r| r.w > 0.0))
+                .await?;
+            let Rect { x, y, w, h } = t.c().ui_rect(&entry).ok_or("no bricks entry")?;
+            t.c().input_cursor(x + w / 2.0, y + h / 2.0);
+            t.frames(3).await?;
             t.press("core:hotbar5");
             got = t
                 .until("bricks by the number key", Duration::from_secs(2), |t| t.c().inventory_slot(4).count == 64)
