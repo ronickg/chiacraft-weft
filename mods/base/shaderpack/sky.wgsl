@@ -1007,7 +1007,10 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
             c *= 1.0 - s.uv.x * smoothstep(0.0, 0.08, -dir.y);
         }
         // The fog on the land hides the horizon and fades upward.
-        c = fog_through(c, dir * 220.0, 1.0);
+        // With `OPT_HORIZON_LIFT` the haze only lightens the sky, as Bliss's brightens to the horizon:
+        // lit dimmer than the sky away from the sun, it drew a grey band above the land.
+        let hazed = fog_through(c, dir * 220.0, 1.0);
+        c = mix(hazed, max(hazed, c), clamp(fantasy_opt(OPT_HORIZON_LIFT), 0.0, 1.0));
         // A held torch's glow in the mist goes on over the sky (`haze_lit` gives it the land's).
         c += held_in_fog(dir * 48.0, 1.0);
         return vec4(display(c), 1.0);

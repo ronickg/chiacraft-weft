@@ -208,6 +208,8 @@ const OPT_MIST_DAWN_TINT: u32 = 56u;
 // domes with shaded sides, as Bliss's 06:00-07:00 mist does, where ours lay as a flat sheet
 // (lsAO_mistnat).
 const OPT_MIST_DOMES: u32 = 57u;
+// The sky's haze never darker than the sky behind it (`LOOK_HORIZON_LIFT`).
+const OPT_HORIZON_LIFT: u32 = 58u;
 // With `OPT_MIST_DOMES` at 1: how much higher the layer's top lies (blocks) and how much denser it is.
 const MIST_DEEP: f32 = 0.0;
 // Bliss's banks (`OPT_MIST_DOMES`): the noise's part made banks, their foot over the sea, their fall
