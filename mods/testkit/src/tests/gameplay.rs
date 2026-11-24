@@ -170,9 +170,11 @@ pub async fn armor(t: T) -> R {
     let shield = t.c().ui_rect(&t.hotbar(4)).ok_or("no shield slot")?;
     t.c()
         .input_cursor(dirt.x + dirt.w / 2.0, dirt.y + dirt.h / 2.0);
-    t.c().input_key("ShiftLeft", 1.0);
+    // Held for seconds: a CI frame (software Vulkan) can take a good part of one, and a 0.5 s
+    // click had let go before the cursor reached the shield.
+    t.c().input_key("ShiftLeft", 3.0);
     t.frames(2).await?;
-    t.c().input_click(0, 0.5);
+    t.c().input_click(0, 2.0);
     t.frames(2).await?;
     t.c()
         .input_cursor(shield.x + shield.w / 2.0, shield.y + shield.h / 2.0);
@@ -182,6 +184,8 @@ pub async fn armor(t: T) -> R {
     let off_hand = |t: &T| (36..64u32).find(|&s| t.c().inventory_slot(s).item == shield);
     t.until("shield in the other hand", Duration::from_secs(3), |t| off_hand(t).is_some())
         .await?;
+    // Both let go before the next step.
+    t.secs(3.0).await?;
     let off_hand = off_hand(&t).unwrap_or(40);
     t.check_eq(t.slot("me", 9).await?.1, 3, "ordinary items go to main storage");
     // The player's inventory by group name: four equipment slots, all filled; the hotbar empty.

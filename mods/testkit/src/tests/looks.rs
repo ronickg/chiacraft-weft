@@ -362,6 +362,12 @@ pub async fn sky(t: T) -> R {
     // A clear sky: no rain clouds, no mist (base's `/air`) over the sunset.
     t.cmd("/weather clear").await?;
     t.cmd("/air 0").await?;
+    // No clouds: one over the sun or the sunset hides what is checked (a cloud fog ending at 0).
+    t.c().environment(
+        &Environment::new("test_sky")
+            .priority(100)
+            .cloud_fog(0.0, 0.0),
+    );
     // Base's sun and moon go round a path leaned 35° to the south (`mods/base/src/lib.rs`): noon
     // stands 55° up, not overhead. The look toward a body `turn` round that path (0 rising in the
     // east, a quarter at its height); yaw 0 faces -z (north).
@@ -403,23 +409,36 @@ pub async fn sky(t: T) -> R {
     t.secs(0.6).await?;
     let night = t.shot("midnight").await?;
     let moon = night.share(0.45, 0.42, 0.55, 0.56, |c| c.iter().all(|&v| v > 150));
-    t.probe("the moon where its path puts it", moon, moon > 0.4);
+    // Our moon (`moon_phases`) has dark seas: about a third of it is bright.
+    t.probe("the moon where its path puts it", moon, moon > 0.2);
     let stars = night.share(0.0, 0.0, 1.0, 0.3, |c| c.iter().all(|&v| v > 60));
     t.probe("stars at night", stars, stars > 0.0005);
     // Looking at the sunset and away from it, at the equinox: the day's length follows the
     // seasons, and a new world starts in late winter, when the sun has set long before 12400.
     // `time` keeps the day, so this is day 7 at 12100, just as its 12 hour day ends.
-    t.op("time 180100").await?;
-    t.c().set_look(90.0, 8.0);
-    t.secs(0.6).await?;
-    let west = t.shot("sunset").await?;
+    // Our sun still stood 15° up at 12100 (Tester 2, 11-24): on toward its setting, a quarter
+    // hour at a time, until the west warms.
     let warm = |c: probe::C| c[0] > 170 && c[0] as i32 > c[2] as i32 + 50;
+    t.c().set_look(90.0, 8.0);
+    let mut west = None;
+    for step in 0..12 {
+        t.op(&format!("time {}", 180100 + step * 250)).await?;
+        t.secs(0.6).await?;
+        let shot = t.shot("sunset").await?;
+        let found = shot.share(0.0, 0.3, 1.0, 0.5, warm) > 0.05;
+        west = Some(shot);
+        if found {
+            break;
+        }
+    }
+    let west = west.ok_or("no sunset shot")?;
     t.c().set_look(-90.0, 8.0);
     t.secs(0.6).await?;
     let east = t.shot("sunset_back").await?;
     let (w, e) = (west.share(0.0, 0.3, 1.0, 0.5, warm), east.share(0.0, 0.3, 1.0, 0.5, warm));
     t.note(format!("warm sky: toward the sunset {w:.3}, away {e:.3}"));
     t.check(w > e + 0.02, format!("a sunset on its side: {w:.3}, away {e:.3}"));
+    t.c().clear_environment("test_sky");
     t.press("core:hide_hud");
     Ok(())
 }

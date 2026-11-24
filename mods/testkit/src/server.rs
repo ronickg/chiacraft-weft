@@ -1326,6 +1326,11 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(w.entity(id)
             .map_or("none".into(), |e| format!("{}", e.health)))
     }),
+    ("gametime", "", |w, _, _, _| {
+        // Ticks the game has run: what redstone and other timers count, which a slow CI frame's
+        // script clock can fall behind.
+        Ok(w.game_time().to_string())
+    }),
     ("time", "<ticks:int>", |w, cmd, _, _| {
         w.set_day_time(int(cmd, "ticks")?);
         Ok(String::new())
