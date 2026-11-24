@@ -413,6 +413,15 @@ def build():
     put("button_quit", st["item"], gb, tail)
     put("button", st["item"], gb, sel + tail)
 
+    # Select World's cards (Planner 11-24: a nine-slice part, not a stretched button): the
+    # buttons' copper rim round a flat dark face, so the picture and name read on it; hovered and
+    # selected (the engine's pressed state) the rim warms with the gold inner line, no orange face.
+    card = banded(rim, (7, 7, rim.shape[1] - 7, 33), brown(34, 34, 34), brown(34)[0], brown(34)[0], 4, [8, 8, 8])
+    put("world_card", drop(card, 4, 4), (16, 16, 16, 16), "outset = 2\nmiddle = tile\n")
+    put("world_card_hover", drop(warm_rim(card), 4, 4), (16, 16, 16, 16), "outset = 2\nmiddle = tile\n")
+    chosen = banded(rim, (7, 7, rim.shape[1] - 7, 33), brown(46, 46, 46), brown(46)[0], brown(46)[0], 4, [8, 8, 8])
+    put("world_card_pressed", drop(warm_rim(chosen), 4, 4), (16, 16, 16, 16), "outset = 2\nmiddle = tile\n")
+
     # The slider's track: the buttons' copper rim round a sunken banded face (the bands darker
     # going up, the highlight row at the bottom), 20 GUI like the settings' sliders; no shadow.
     track = banded(rim, (7, 7, rim.shape[1] - 7, 33), brown(24, 28, 32), brown(18)[0], brown(44)[0], 3, [8, 8, 8])
