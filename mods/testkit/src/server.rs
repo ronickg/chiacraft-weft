@@ -1106,6 +1106,20 @@ const OPS: &[(&str, &str, Run)] = &[
         }
         Err("not found".into())
     }),
+    ("debug_at", "<block:block>", |_, cmd, _, _| {
+        // Where the debug world (`core:debug_blocks`) puts a block's first state: every state but
+        // air, in id order, on a square grid two blocks apart at y 1. Our states fill a grid far
+        // wider than any search around its corner.
+        let want = block_of(id(cmd, "block")?);
+        let n = (1..)
+            .take_while(|&s| !name_of(ek::BLOCK, s).is_empty())
+            .count() as u32;
+        let side = (n as f64).sqrt().ceil() as u32;
+        let s = (1..=n)
+            .find(|&s| block_of(s) == want)
+            .ok_or("no such block state")?;
+        Ok(format!("{} 1 {}", (s - 1) % side * 2, (s - 1) / side * 2))
+    }),
     ("census", "<r:int> <blocks:word>", |w, cmd, _, me| {
         // How many of each block (`a,b`) lie within `r` of the player.
         let r: i32 = int(cmd, "r")?;
@@ -1311,6 +1325,11 @@ const OPS: &[(&str, &str, Run)] = &[
         let id = cmd.int("id").map_or(player, |i| i as u64);
         Ok(w.entity(id)
             .map_or("none".into(), |e| format!("{}", e.health)))
+    }),
+    ("gametime", "", |w, _, _, _| {
+        // Ticks the game has run: what redstone and other timers count, which a slow CI frame's
+        // script clock can fall behind.
+        Ok(w.game_time().to_string())
     }),
     ("time", "<ticks:int>", |w, cmd, _, _| {
         w.set_day_time(int(cmd, "ticks")?);

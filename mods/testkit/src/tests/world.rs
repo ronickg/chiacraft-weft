@@ -1032,12 +1032,18 @@ pub async fn dimensions(t: T) -> R {
     t.cmd("/dim core:debug_blocks").await?;
     t.secs(0.5).await?;
     t.loaded().await?;
-    let at = t.op("find 160 base:water").await?;
+    // Where the grid puts water (ours is hundreds of blocks wide), and there to look.
+    let at = t.op("debug_at base:water").await?;
     let w: Vec<i32> = at
         .split_whitespace()
         .filter_map(|v| v.parse().ok())
         .collect();
     let [x, y, z] = w[..] else { return Err(format!("no water among the debug blocks: {at}")) };
+    t.cmd(&format!("/tp {} {} {}", x as f64 + 0.5, y + 2, z as f64 + 3.5))
+        .await?;
+    t.loaded().await?;
+    let there = t.block([x, y, z]).await?;
+    t.check(there.starts_with("base:water"), format!("water where the grid puts it: {there}"));
     t.secs(1.0).await?;
     t.check_eq(t.block([x + 1, y, z]).await?, "core:air".to_string(), "debug water does not flow");
     t.cmd(&format!("/setblock {} {y} {z} base:stone", x + 1))
@@ -1068,7 +1074,7 @@ pub async fn dimensions(t: T) -> R {
         .collect();
     t.check(spawned.is_empty(), format!("nothing spawns among the debug blocks: {spawned:?}"));
     // Lava is drawn solid: blocks behind ice do not show through it.
-    let at = t.op("find 200 base:lava").await?;
+    let at = t.op("debug_at base:lava").await?;
     let l: Vec<i32> = at
         .split_whitespace()
         .filter_map(|v| v.parse().ok())

@@ -239,6 +239,15 @@ pub const MINE_POWER: f32 = 0.75;
 pub const REF_HARVEST: f32 = 100.0;
 pub const HARVEST_PER_LEVEL: f32 = 10.0;
 
+/// What breaking iron ore takes: a pickaxe of this harvest or better, bronze's (`harvest` at
+/// bronze's level: copper's 170 doesn't, meteoric iron's 230 does). Ronald, 11-23 ("A: bronze
+/// pickaxe"): with a stone pickaxe iron skipped the Bronze Age (`progression`'s materials gate).
+/// Base's iron ores are `mined_by` it.
+pub const IRON_ORE_HARVEST: u32 = 210;
+
+/// The material whose pickaxe first breaks iron ore (`IRON_ORE_HARVEST` is its harvest).
+pub const IRON_ORE_PICK: &str = "bronze";
+
 /// Uses of a Sound working part at item level `level`.
 pub fn tool_uses(level: f32) -> f32 {
     REF_USES * g(level).powf(USES_POWER)
@@ -312,6 +321,9 @@ mod tests {
         assert!(harvest(material("steel").unwrap().level()) >= 300);
         assert!(harvest(material("diamond").unwrap().level()) > harvest(material("steel").unwrap().level()));
         assert!(harvest(material("bone").unwrap().level()) < 100 && harvest(material("oak").unwrap().level()) < 100);
+        // Iron ore takes bronze's pickaxe, not copper's.
+        assert_eq!(harvest(material(IRON_ORE_PICK).unwrap().level()), IRON_ORE_HARVEST);
+        assert!(harvest(material("copper").unwrap().level()) < IRON_ORE_HARVEST);
         assert!((tool_uses(flint) - 75.0).abs() < 2.0 && (mining_speed(flint) - 3.0).abs() < 0.05);
         assert!(tool_uses(35.0) > tool_uses(25.0) && mining_speed(35.0) > mining_speed(25.0));
     }

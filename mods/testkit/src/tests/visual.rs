@@ -290,9 +290,14 @@ pub async fn liquid_layers(t: T) -> R {
     let pool = t.shot("pool").await?;
     let water = around(&t, &pool, [f[0] as f64, f[1] as f64 - 0.1, f[2] as f64 - 4.5], 0.03, probe::blue);
     t.probe("the pool is drawn blue", water, water > 0.5);
-    let lava = around(&t, &pool, [f[0] as f64 + 4.0, f[1] as f64 - 0.1, f[2] as f64 - 5.0], 0.02, probe::orange);
-    t.probe("the lava pit is drawn orange", lava, lava > 0.5);
-    // Over the pool, looking down at the pig under the water.
+    // Our lava is red, orange and yellow with deep red troughs, not one orange: any warm color.
+    let warm = |c: probe::C| c[0] > 100 && c[0] as i32 > c[1] as i32 + 30 && c[2] < 110;
+    let lava = around(&t, &pool, [f[0] as f64 + 4.0, f[1] as f64 - 0.1, f[2] as f64 - 5.0], 0.02, warm);
+    t.probe("the lava pit is drawn lava-colored", lava, lava > 0.5);
+    // Over the pool, looking down at the pig under the water. Hanging there: in survival the
+    // player drops into the pool within the 20 frames on CI (software Vulkan, slow frames) and
+    // the shot is from inside the water.
+    t.op("mode spectator").await?;
     t.c().set_look(0.0, -70.0);
     t.cmd(&format!("/tp {} {} {}", f[0] as f64 - 0.5, f[1], f[2] as f64 - 4.0))
         .await?;
@@ -307,8 +312,9 @@ pub async fn liquid_layers(t: T) -> R {
     t.c().set_look(270.0, -55.0);
     t.frames(20).await?;
     let pit = t.shot("outline_lava").await?;
-    let v = pit.share(0.3, 0.3, 0.7, 0.7, probe::orange);
+    let v = pit.share(0.3, 0.3, 0.7, 0.7, warm);
     t.probe("looking into the lava pit", v, v > 0.6);
+    t.op("mode survival").await?;
     Ok(())
 }
 

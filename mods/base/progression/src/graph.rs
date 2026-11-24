@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use vitals::curve::{AGES, Age, Em, Path, ROUTES};
 
-use crate::content::{self, AXE, CUTTER, Get, Needs, PICK, PICK_IRON, PICK_STEEL, PICK_STONE};
+use crate::content::{self, AXE, CUTTER, Get, Needs, PICK, PICK_BRONZE, PICK_IRON, PICK_STEEL, PICK_STONE};
 
 /// Where a recipe is made.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -251,7 +251,7 @@ const RECIPES_LIST: &[Recipe] = &[
     s("base:bricks", &[("base:clay", 1.0)], Furnace),
     // ores and the sky (blocks.rs, meteors.rs, stars.rs)
     b("base:coal", 1.0, &[("base:coal_ore", 1.0)], PICK, 30.0),
-    b("base:raw_iron", 1.0, &[("base:iron_ore", 1.0)], PICK_STONE, 60.0),
+    b("base:raw_iron", 1.0, &[("base:iron_ore", 1.0)], PICK_BRONZE, 60.0),
     // Copper is common where it is; tin about thirty times rarer: a long search.
     b("base:raw_copper", 1.0, &[("base:copper_ore", 1.0)], PICK_STONE, 90.0),
     b("base:raw_tin", 1.0, &[("base:tin_ore", 1.0)], PICK_STONE, 300.0),
@@ -487,7 +487,8 @@ pub struct Key {
     pub missing: &'static [&'static str],
 }
 
-/// The keys so far: the Stone Age's, and the Bronze Age's boss part (11-05).
+/// The keys so far: the Stone Age's, the Bronze Age's boss part (11-05) and materials gate, and the
+/// Iron Age's materials gate (11-23).
 pub const KEYS: &[Key] = &[
     Key {
         age: Age::Stone,
@@ -498,18 +499,31 @@ pub const KEYS: &[Key] = &[
         ],
         missing: &["knowledge: a ruin's blueprint or lore page"],
     },
-    // The Bronze Age's key: only its boss part is built (Borkon's Summit Stone, by every route).
+    // The Bronze Age's key: its boss part (Borkon's Summit Stone) and its materials gate, a
+    // bronze pickaxe (`base:bronze_ingot` stands for its head), which iron ore takes
+    // (`vitals::gear::IRON_ORE_HARVEST`, 11-23), by every route.
     Key {
         age: Age::Bronze,
         routes: &[
-            (Path::Tech, &["animals:summit_stone"]),
-            (Path::Beasts, &["animals:summit_stone"]),
-            (Path::Magic, &["animals:summit_stone"]),
+            (Path::Tech, &["base:bronze_ingot", "animals:summit_stone"]),
+            (Path::Beasts, &["base:bronze_ingot", "animals:summit_stone"]),
+            (Path::Magic, &["base:bronze_ingot", "animals:summit_stone"]),
+        ],
+        missing: &["knowledge: a ruin's blueprint or lore page", "infrastructure: a working setup from the Bronze Age"],
+    },
+    // The Iron Age's key: only its materials gate, a steel pickaxe (diamond ore and obsidian take
+    // harvest 300) from the forge that makes steel, by every route.
+    Key {
+        age: Age::Iron,
+        routes: &[
+            (Path::Tech, &["base:steel_ingot", "base:forge"]),
+            (Path::Beasts, &["base:steel_ingot", "base:forge"]),
+            (Path::Magic, &["base:steel_ingot", "base:forge"]),
         ],
         missing: &[
-            "materials and tools: the Bronze Age's own",
+            "a biome boss: no Iron Age form has an offering yet",
             "knowledge: a ruin's blueprint or lore page",
-            "infrastructure: a working setup from the Bronze Age",
+            "infrastructure: past the forge, a working setup from the Iron Age",
         ],
     },
 ];
@@ -741,16 +755,22 @@ pub fn keys(g: &Solved) -> Vec<String> {
 }
 
 /// The routes each age's key has, by path, for the sheet: `None` where a path has none yet.
-/// The cheapest thing that meets `needs` (`Needs::Hand`: none).
-fn tool_for(g: &Solved, needs: Needs) -> Option<&'static str> {
-    match needs {
-        Needs::Hand => None,
-        n => tools_for(n).filter(|t| g.reachable(t)).min_by(|a, b| {
-            g.cost_of(a)
-                .unwrap_or(f32::MAX)
-                .total_cmp(&g.cost_of(b).unwrap_or(f32::MAX))
-        }),
-    }
+/// The cheapest thing that meets `needs` (`Needs::Hand`: none), for breaking or gathering `what`:
+/// one of an age before `what`'s if there is one, as a player has the tool before what it opens
+/// (an iron ingot meets iron ore's pickaxe too, but isn't had before iron).
+fn tool_for(g: &Solved, needs: Needs, what: &str) -> Option<&'static str> {
+    let cost = |t: &&str| g.cost_of(t).unwrap_or(f32::MAX);
+    let below = content::tier(what).unwrap_or(u8::MAX);
+    let ok: Vec<&'static str> = match needs {
+        Needs::Hand => return None,
+        n => tools_for(n).filter(|t| g.reachable(t)).collect(),
+    };
+    let earlier = ok
+        .iter()
+        .copied()
+        .filter(|t| content::tier(t).is_some_and(|x| x < below))
+        .min_by(|a, b| cost(a).total_cmp(&cost(b)));
+    earlier.or_else(|| ok.into_iter().min_by(|a, b| cost(a).total_cmp(&cost(b))))
 }
 
 /// The cheapest id a name (an id or a `#group`) stands for.
@@ -806,7 +826,7 @@ pub fn route_walk(g: &Solved, items: &[&str]) -> (Vec<String>, Vec<String>) {
                     });
             needs_tool(station, &mut todo);
             if let At::Break(n) = r.at {
-                needs_tool(tool_for(g, n), &mut todo);
+                needs_tool(tool_for(g, n, &id), &mut todo);
             }
             for &(name, _) in r.ins {
                 if let Some(m) = cheapest_member(g, name) {
@@ -814,7 +834,7 @@ pub fn route_walk(g: &Solved, items: &[&str]) -> (Vec<String>, Vec<String>) {
                 }
             }
         } else if let Some(Get::World(n, _)) = content::rule(&id).map(|r| r.get) {
-            needs_tool(tool_for(g, n), &mut todo);
+            needs_tool(tool_for(g, n, &id), &mut todo);
         }
     }
     (seen, kept)
@@ -855,10 +875,8 @@ pub fn path_parity(g: &Solved) -> Vec<String> {
 
 /// Gate skips waiting on a decision, by root: a material whose cheapest way goes through one of
 /// these (or is one) is listed but doesn't fail the check. Each goes once its fix is in.
-pub const KNOWN_SKIPS: &[(&str, &str)] = &[(
-    "base:raw_iron",
-    "iron ore breaks with a stone pickaxe and smelts in the Stone Age furnace; Ronald to choose A (a bronze pickaxe for iron ore) or B (a bloomery that takes bronze), Planner 11-23",
-)];
+/// None now: iron, the first (11-23), takes a bronze pickaxe since Ronald's "A: bronze pickaxe".
+pub const KNOWN_SKIPS: &[(&str, &str)] = &[];
 
 /// A material of tier `tier` and how it stands at the gate (`age_gates`).
 pub struct Gate {

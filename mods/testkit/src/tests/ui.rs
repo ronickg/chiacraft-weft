@@ -102,12 +102,14 @@ pub async fn hud_editor(t: T) -> R {
     let Rect { x, y, w, h } = rect(&t, "core:hotbar").ok_or("no hotbar in the editor")?;
     t.c().input_cursor(x + w / 2.0, y + h / 2.0);
     t.frames(3).await?;
-    t.c().input_click(0, 0.4);
+    // Held for seconds: a CI frame (software Vulkan) can take a good part of one, and a 0.4 s
+    // press had let go before the cursor moved. Dropped once it lets go.
+    t.c().input_click(0, 2.0);
     t.frames(3).await?;
     t.c().input_cursor(0.25, 0.2);
     t.frames(4).await?;
     t.shot("dragging").await?;
-    t.secs(0.5).await?;
+    t.secs(2.0).await?;
     let moved = rect(&t, "core:hotbar").ok_or("no hotbar after the drag")?;
     t.check(
         (moved.x + moved.w / 2.0 - 0.25).abs() < 0.02 && (moved.y + moved.h / 2.0 - 0.2).abs() < 0.02,
