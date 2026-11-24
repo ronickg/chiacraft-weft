@@ -396,6 +396,8 @@ pub const PROWL_SECS: f32 = 15.0;
 pub const PACK_FOLLOW: f64 = 4.0;
 /// Seconds a hunter leaves a kill site it went to and found no prey at.
 pub const SITE_AGAIN_SECS: f32 = 120.0;
+/// Its kind near (itself among them) from which a pack hunter rallies the others to its hunt.
+pub const RALLY_PACK: u32 = 2;
 
 /// Healing: an animal watered (its water at `THIRSTY` or more) and unhurt for `HEAL_AFTER`
 /// seconds heals its whole health in `HEAL_DAYS` game days while fed (its food at `HUNGRY` of its

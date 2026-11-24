@@ -275,7 +275,10 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     // A pack hunts what it finds together, prey it could take alone too (wolves run deer down
     // as a pack): in ai1124_wolves1b each of three wolves took its own deer alone while the
     // others lay by.
-    if pack >= species::PACK {
+    // Two are enough to run prey down together (a pair of wolves hunts deer); bigger prey takes
+    // the full pack (`Species::takes_with`). Three wolves spread 9 blocks apart counted two and
+    // never rallied (ai1124_wolves1d).
+    if pack >= animals_core::needs::RALLY_PACK {
         rally(w, id, st, t, now);
     }
     h = [t, now, now + LOOK_EVERY, (pack >= species::PACK) as u64];
@@ -302,9 +305,15 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
     }
     // A pack prowls together: one not its leader keeps up with it (each on its own legs, the
     // pack spread over the savanna and never counted three to hunt as one, ai1124_wolves1b).
-    // Only a leader that prowls itself: a fed one lying by its kill would hold the hungry back.
-    let prowling = |l: u64| w.component(l, &PROWL).is_some_and(|p| now < p);
-    if let Some(l) = leader.filter(|&l| prowling(l)).and_then(|l| w.entity(l)) {
+    // Only a leader that is hungry too (prowling or about to): a fed one lying by its kill would
+    // hold the hungry back. Waiting for its leader's first leg, each of three wolves set off its
+    // own way (ai1124_wolves1d).
+    let hungry = |l: u64| {
+        w.component(l, &PROWL).is_some_and(|p| now < p)
+            || w.component(l, &ANIMAL)
+                .is_some_and(|a| (a.food as f32) < a.stat(species::FOOD) * HUNGRY)
+    };
+    if let Some(l) = leader.filter(|&l| hungry(l)).and_then(|l| w.entity(l)) {
         if dist2(l.pos, st.pos) > PACK_FOLLOW * PACK_FOLLOW {
             w.navigate(id, l.pos.to_array(), 1.0);
             w.component_mut(id, &PROWL)
