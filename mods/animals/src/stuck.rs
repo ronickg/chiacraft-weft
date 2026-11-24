@@ -75,12 +75,18 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
             Some(Way::Walk(to)) => Some(to),
             _ => None,
         };
-        if leap_on.is_some() || n >= LEAP_AFTER || up.is_none() {
-            // Up the way's leap, else at ground it can land on, up to `LEAP_MOST` above, else
-            // straight up along its way.
-            let (lx, ly, lz) = leap_on
-                .or_else(|| landing(w, st))
-                .unwrap_or((dx, LEAP_MOST as f64, dz));
+        // Up the way's leap, else at ground it can land on, up to `LEAP_MOST` above with open air
+        // between. Never a leap at nothing: in a shaft a deer leapt at its walls and fell back
+        // sixty times in 25 game seconds, and the falls killed it (ai1124_savanna15e).
+        let aimed = if leap_on.is_some() || n >= LEAP_AFTER || up.is_none() { leap_on.or_else(|| landing(w, st)) } else { None };
+        if aimed.is_none() && (n >= LEAP_AFTER || up.is_none()) {
+            // Nothing to leap at: it stays, its need's goal letting the band move on.
+            if let Some(c) = w.component_mut(id, &STUCK) {
+                *c = k;
+            }
+            return false;
+        }
+        if let Some((lx, ly, lz)) = aimed {
             // Straight up; across once over the ledge (`going`, `needs::LEAP_OVER`).
             let v = animals_core::needs::leap(0.0, ly, 0.0);
             if let Some(c) = w.component_mut(id, &LEAP_TO) {
@@ -169,15 +175,21 @@ pub fn going(w: &World, id: u64, st: &EntityState) -> bool {
 /// The nearest ground it can leap onto: higher than its feet by at most `LEAP_MOST`, within
 /// `LEAP_REACH` blocks; how far off (x, up, z).
 fn landing(w: &World, st: &EntityState) -> Option<(f64, f64, f64)> {
-    let feet = st.pos.y.floor() as i32;
+    let feet = (st.pos.y + 0.05).floor() as i32;
     let (fx, fz) = (st.pos.x.floor() as i32, st.pos.z.floor() as i32);
+    let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
+    // Room over it to rise, and open air over the landing up to the height it rises to.
+    let top = feet + LEAP_MOST + 2;
+    if (feet + 2..=top).any(|y| solid([fx, y, fz])) {
+        return None;
+    }
     let mut best: Option<(f64, f64, f64, f64)> = None;
     for dx in -LEAP_REACH..=LEAP_REACH {
         for dz in -LEAP_REACH..=LEAP_REACH {
             let (bx, bz) = (fx + dx, fz + dz);
             // `ground` looks from 3 above the height it is given down: its highest is the feet's limit.
             let Some(g) = crate::comfort::ground(w, bx, feet + LEAP_MOST - 3, bz) else { continue };
-            if g <= feet || g - feet > LEAP_MOST {
+            if g <= feet || g - feet > LEAP_MOST || (g..=top).any(|y| solid([bx, y, bz])) {
                 continue;
             }
             let (ox, oz) = (bx as f64 + 0.5 - st.pos.x, bz as f64 + 0.5 - st.pos.z);
