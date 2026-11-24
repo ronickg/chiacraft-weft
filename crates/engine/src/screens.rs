@@ -207,112 +207,159 @@ impl Screen for Profile {
     }
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
-        frame(ui, cx, "profile.title", |ui| {
-            ui.panel(
-                "panel",
-                Style {
-                    max_h: (cx.size.y - 64.0).max(100.0),
-                    ..Style::default()
-                        .pad(8.0)
-                        .gap(8.0)
-                        .w(340.0_f32.min(cx.size.x - 24.0))
-                        .stretch()
-                },
-                |ui| {
-                    ui.container(Style::default().gap(8.0).stretch().scroll(), |ui| {
-                        ui.container(Style::row().gap(12.0).stretch(), |ui| {
-                            ui.add(Kind::Custom { tag: crate::client::modui::TAG_ENTITY, data: 0 }, Style::default().size(94.0, 120.0));
-                            ui.container(Style::default().grow().gap(5.0).stretch(), |ui| {
-                                label(ui, cx, "profile.name", &[], "default");
-                                let input = ui.add(
-                                    Kind::Input {
-                                        value: crate::settings::name(),
-                                        caret: crate::settings::name().chars().count(),
-                                        max: 16,
-                                        on_change: Some(Rc::new(|_: &mut Ctx, v: &str| crate::settings::set_text("name", v))),
-                                        area: None,
-                                    },
-                                    Style::default().h(20.0).stretch(),
-                                );
-                                ui.set_id(input, "profile_name");
-                                let dir = cx.settings.run_dir.join("skins");
-                                let b = icon_button(ui, cx, "button", "icon_folder", "profile.change_skin", &[], 120.0, move |_| {
-                                    crate::packs::open_folder(&dir);
-                                });
-                                ui.set_id(b, "change_skin");
-                                ui.nodes[b].tooltip = Some(cx.t("profile.skin_hint", &[]));
-                                label(ui, cx, "config.core.skin_model", &[], "default");
-                                ui.container(Style::row().stretch(), |ui| {
-                                    for (slim, key) in [(false, "classic"), (true, "slim")] {
-                                        let b = button(ui, cx, &format!("config.core.skin_model.{key}"), &[], 0.0, move |_| {
-                                            crate::settings::set("skin_model", slim as u32 as f64);
-                                        });
-                                        ui.nodes[b].style.grow = 1.0;
-                                        ui.nodes[b].style.w = crate::ui::Len::Px(0.0);
-                                        if let Kind::Button { selected_bind, .. } = &mut ui.nodes[b].kind {
-                                            *selected_bind = Some(Box::new(move |_| crate::settings::slim_skin() == slim));
-                                        }
-                                        ui.nodes[b].tooltip = Some(cx.t("config.core.skin_model.tooltip", &[]));
-                                        ui.set_id(b, &format!("skin_{key}"));
+        // Style 1: the menu window holds it all (no inner frame), labels at 2x like the buttons,
+        // a label 2 over its field and 8 to the next group, fields 22 tall (`UI Style Guide.md`).
+        let framed = cx.look.texture("menu_panel", "").is_some();
+        let (pair, group, field_h) = if framed { (2.0, 8.0, 22.0) } else { (5.0, 5.0, 20.0) };
+        window(ui, cx, "profile.title", 6.0, |ui| {
+            let mut outer = Style::default()
+                .gap(8.0)
+                .w(340.0_f32.min(cx.size.x - 24.0))
+                .stretch();
+            outer.max_h = (cx.size.y - 64.0).max(100.0);
+            // In the window, under its heading: the screen less the window's margins, rails and
+            // heading.
+            let outer = if framed {
+                let mut o = outer
+                    .w((380.0 + crate::ui::Scrollbar::ROOM).min(cx.size.x - 64.0))
+                    .min_h(60.0);
+                o.max_h = (cx.size.y - 104.0).max(100.0);
+                o
+            } else {
+                outer.pad(8.0)
+            };
+            ui.with(Kind::Container { class: (!framed).then(|| "panel".to_string()) }, outer, |ui| {
+                ui.container(Style::default().gap(group).stretch().scroll(), |ui| {
+                    ui.container(Style::row().gap(12.0).stretch(), |ui| {
+                        ui.add(Kind::Custom { tag: crate::client::modui::TAG_ENTITY, data: 0 }, Style::default().size(94.0, 120.0));
+                        ui.container(Style::default().grow().gap(pair).stretch(), |ui| {
+                            let t = label(ui, cx, "profile.name", &[], "default");
+                            field_label(ui, cx, t);
+                            let input = ui.add(
+                                Kind::Input {
+                                    value: crate::settings::name(),
+                                    caret: crate::settings::name().chars().count(),
+                                    max: 16,
+                                    on_change: Some(Rc::new(|_: &mut Ctx, v: &str| crate::settings::set_text("name", v))),
+                                    area: None,
+                                },
+                                Style::default().h(field_h).stretch(),
+                            );
+                            ui.set_id(input, "profile_name");
+                            if framed {
+                                // To the next group: 8 in all, two pair gaps and this.
+                                ui.container(Style::default().h(group - 2.0 * pair), |_| {});
+                            }
+                            let dir = cx.settings.run_dir.join("skins");
+                            let b = icon_button(ui, cx, "button", "icon_folder", "profile.change_skin", &[], 120.0, move |_| {
+                                crate::packs::open_folder(&dir);
+                            });
+                            ui.set_id(b, "change_skin");
+                            ui.nodes[b].tooltip = Some(cx.t("profile.skin_hint", &[]));
+                            if framed {
+                                // To the next group: 8 in all, two pair gaps and this.
+                                ui.container(Style::default().h(group - 2.0 * pair), |_| {});
+                            }
+                            let t = label(ui, cx, "config.core.skin_model", &[], "default");
+                            field_label(ui, cx, t);
+                            ui.container(Style::row().gap(if framed { 4.0 } else { 0.0 }).stretch(), |ui| {
+                                for (slim, key) in [(false, "classic"), (true, "slim")] {
+                                    let b = button(ui, cx, &format!("config.core.skin_model.{key}"), &[], 0.0, move |_| {
+                                        crate::settings::set("skin_model", slim as u32 as f64);
+                                    });
+                                    ui.nodes[b].style.grow = 1.0;
+                                    ui.nodes[b].style.w = crate::ui::Len::Px(0.0);
+                                    if let Kind::Button { selected_bind, .. } = &mut ui.nodes[b].kind {
+                                        *selected_bind = Some(Box::new(move |_| crate::settings::slim_skin() == slim));
                                     }
-                                });
+                                    ui.nodes[b].tooltip = Some(cx.t("config.core.skin_model.tooltip", &[]));
+                                    ui.set_id(b, &format!("skin_{key}"));
+                                }
                             });
                         });
-                        label(ui, cx, "profile.visibility", &[], "default");
-                        for (name, key) in [("first_person_model", "profile.first_person"), ("show_avatars", "profile.other_models")] {
-                            let id = crate::config::by_name(&format!("core:{name}")).unwrap();
-                            let b = ui.button(
-                                "",
-                                Style::row().min_h(20.0).gap(8.0),
-                                Rc::new(move |_| {
-                                    crate::config::set(id, 1.0 - crate::config::get(id));
-                                }),
-                                |ui| {
-                                    let label = label(ui, cx, key, &[], "default");
-                                    ui.nodes[label].style.grow = 1.0;
-                                    ui.panel("button", Style::default().size(17.0, 17.0).center(), |ui| {
-                                        ui.text_bound(
-                                            "default",
-                                            Box::new(move |_| {
-                                                let led = text::Msg::template(if crate::config::get(id) != 0.0 {
-                                                    "{img:core:led_on 7x7}"
-                                                } else {
-                                                    "{img:core:led_off 7x7}"
-                                                });
-                                                (led.key, led.args)
-                                            }),
-                                        );
-                                    });
-                                },
-                            );
-                            ui.set_id(b, name);
-                            crate::mods_screen::separator(ui);
+                    });
+                    let t = label(ui, cx, "profile.visibility", &[], "default");
+                    field_label(ui, cx, t);
+                    for (name, key) in [("first_person_model", "profile.first_person"), ("show_avatars", "profile.other_models")] {
+                        let id = crate::config::by_name(&format!("core:{name}")).unwrap();
+                        let b = ui.button(
+                            "",
+                            Style::row().min_h(20.0).gap(8.0),
+                            Rc::new(move |_| {
+                                crate::config::set(id, 1.0 - crate::config::get(id));
+                            }),
+                            |ui| {
+                                let label = label(ui, cx, key, &[], "default");
+                                field_label(ui, cx, label);
+                                ui.nodes[label].style.grow = 1.0;
+                                ui.nodes[label].style.w = crate::ui::Len::Px(0.0);
+                                ui.panel("button", Style::default().size(17.0, 17.0).center(), |ui| {
+                                    ui.text_bound(
+                                        "default",
+                                        Box::new(move |_| {
+                                            let led = text::Msg::template(if crate::config::get(id) != 0.0 {
+                                                "{img:core:led_on 7x7}"
+                                            } else {
+                                                "{img:core:led_off 7x7}"
+                                            });
+                                            (led.key, led.args)
+                                        }),
+                                    );
+                                });
+                            },
+                        );
+                        ui.set_id(b, name);
+                        crate::mods_screen::separator(ui);
+                    }
+                    config_rows(ui, cx, "core:profile", &["core:skin_model", "core:first_person_model", "core:show_avatars"]);
+                    // The key worlds know the player by, from the account's 24 words (chiacraft):
+                    // shown and copied here, the account and its words below.
+                    let key = crate::net::p2p::player_key(&cx.settings.run_dir);
+                    let t = label(ui, cx, "profile.key", &[], "default");
+                    field_label(ui, cx, t);
+                    ui.text(text::plain(if key.is_empty() { "-" } else { &key }), "dim");
+                    // Style 1: the three account buttons as two even rows across the window
+                    // (a ragged stack of 120 and 160 wide ones before).
+                    let row = if framed { Style::row().gap(6.0).stretch() } else { Style::default().gap(group) };
+                    let even = |ui: &mut Ui, b: NodeId| {
+                        if framed {
+                            ui.nodes[b].style.grow = 1.0;
+                            ui.nodes[b].style.w = crate::ui::Len::Px(0.0);
                         }
-                        config_rows(ui, cx, "core:profile", &["core:skin_model", "core:first_person_model", "core:show_avatars"]);
-                        // The key worlds know the player by, from the account's 24 words (chiacraft):
-                        // shown and copied here, the account and its words below.
-                        let key = crate::net::p2p::player_key(&cx.settings.run_dir);
-                        label(ui, cx, "profile.key", &[], "default");
-                        ui.text(text::plain(if key.is_empty() { "-" } else { &key }), "dim");
-                        button(ui, cx, "profile.copy", &[], 120.0, move |_| {
+                    };
+                    ui.container(row, |ui| {
+                        let b = button(ui, cx, "profile.copy", &[], 120.0, move |_| {
                             crate::clipboard::set(&key);
                         });
-                        if chiacraft_account::current().is_some_and(|s| s.needs_backup()) {
-                            label(ui, cx, "profile.account_backup", &[], "dim");
-                        }
-                        button(ui, cx, "profile.account", &[], 160.0, |c| c.requests.push(Request::Screen("core:account".into())));
-                        // What worlds signed for this account (chiacraft, phase 4).
-                        let n = crate::chiacraft::achievements::load().credentials.len();
-                        let id = button(ui, cx, "profile.achievements", &[Arg::Int(n as i64)], 160.0, |c| {
-                            c.requests.push(Request::Screen("core:achievements".into()))
-                        });
-                        ui.set_id(id, "achievements");
+                        even(ui, b);
+                        let b = button(ui, cx, "profile.account", &[], 160.0, |c| c.requests.push(Request::Screen("core:account".into())));
+                        even(ui, b);
                     });
+                    if chiacraft_account::current().is_some_and(|s| s.needs_backup()) {
+                        label(ui, cx, "profile.account_backup", &[], "dim");
+                    }
+                    // What worlds signed for this account (chiacraft, phase 4).
+                    let n = crate::chiacraft::achievements::load().credentials.len();
+                    let id = button(ui, cx, "profile.achievements", &[Arg::Int(n as i64)], 160.0, |c| {
+                        c.requests.push(Request::Screen("core:achievements".into()))
+                    });
+                    if framed {
+                        ui.nodes[id].style = ui.nodes[id].style.self_align(crate::ui::Align::Stretch);
+                    }
+                    ui.set_id(id, "achievements");
+                });
+                if framed {
+                    // Done under it all, centred like every menu window's (a group below).
+                    ui.container(Style::default().h(0.0), |_| {});
+                    ui.container(Style::row().justify(Justify::Center).stretch(), |ui| {
+                        back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+                    });
+                } else {
                     ui.container(Style::row().justify(Justify::End), |ui| {
                         back_button(ui, cx, "menu.done", &[], 80.0, |c| c.requests.push(Request::Close));
                     });
-                },
-            );
+                }
+            });
         });
     }
 }
@@ -459,9 +506,15 @@ pub fn icon_button(
         if let Some(texture) = icon {
             ui.add(Kind::Image { texture, color: 0xFFFFFFFF }, Style::default().w(9.0).h(9.0).at(-1.0, 6.0, [0.0, 0.5]));
         }
-        let t = ui.text(spans, "button");
-        if let Some(t) = ui.text_mut(t) {
-            t.wrap = false;
+        // A plain button's label as every menu button's (style 1: 2x where it fits, Planner 11-24).
+        let label = if class == "button" { button_text(cx) } else { "button" };
+        let t = ui.text(spans, label);
+        if label == "button" {
+            if let Some(t) = ui.text_mut(t) {
+                t.wrap = false;
+            }
+        } else {
+            big_label(ui, t, label);
         }
     })
 }
@@ -641,6 +694,36 @@ pub fn field_label(ui: &mut Ui, cx: &BuildCx, t: NodeId) {
         text.fit = 2.0;
     }
     ui.nodes[t].style = ui.nodes[t].style.self_align(crate::ui::Align::Stretch);
+}
+
+/// A list that fills the room left in Weft's `frame` (`h(0).grow()`), in a style 1 window instead
+/// as tall as what it holds: the window has no height to share out, and a scrolling list in it
+/// gives way when the window would pass the screen (as Settings' list).
+pub fn window_list(mut style: Style, framed: bool) -> Style {
+    if framed {
+        style.h = crate::ui::Len::Auto;
+        style.grow = 0.0;
+    }
+    style
+}
+
+/// A group's room in a style 1 window: the window's own gap plus this makes 12 between groups
+/// (Done under a list), against 6 inside one (`UI Style Guide.md`, "Spacing"). Nothing in Weft's.
+pub fn group_gap(ui: &mut Ui, cx: &BuildCx) {
+    if cx.look.texture("menu_panel", "").is_some() {
+        ui.container(Style::default().h(0.0), |_| {});
+    }
+}
+
+/// A heading line inside a style 1 window (the language now in use, a list's name): 2x like the
+/// labels, centred, one line.
+pub fn line_2x(ui: &mut Ui, cx: &BuildCx, t: NodeId) {
+    field_label(ui, cx, t);
+    if cx.look.has_text("menu_button")
+        && let Some(text) = ui.text_mut(t)
+    {
+        text.center = true;
+    }
 }
 
 // ---------------------------------------------------------------- title
@@ -854,7 +937,9 @@ impl Screen for ModSettings {
             .filter(|ns| *ns != "core")
             .collect();
         namespaces.dedup();
-        frame(ui, cx, "settings.mods", |ui| {
+        // Style 1: the menu window, its mods a column of menu buttons 6 apart and Done a group
+        // apart below (`UI Style Guide.md`, "Spacing").
+        window(ui, cx, "settings.mods", 6.0, |ui| {
             if namespaces.is_empty() {
                 label(ui, cx, "settings.mods.none", &[], "dim");
             }
@@ -866,7 +951,8 @@ impl Screen for ModSettings {
                         .push(Request::Open(Box::new(ConfigScreen { shown: Shown::Mod(ns.clone()) })))
                 });
             }
-            back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            group_gap(ui, cx);
+            back_button(ui, cx, "menu.done", &[], 220.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -917,6 +1003,10 @@ fn settings_links(cx: &BuildCx) -> Vec<(&'static str, &'static str)> {
     }
     v
 }
+
+/// How wide a slider's label written on it may be (style 1): the settings list's row less the
+/// knob's width either side.
+const SLIDER_LABEL_W: f32 = 300.0;
 
 /// A setting's row: a toggle or a choice as a button, a number as a label over a slider; locked
 /// (shown, not changed) when the server has its say or the world's rules are fixed.
@@ -992,19 +1082,23 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
             }
             b
         }
+        // Style 1 writes the label at 2x on the slider itself, as Minecraft and Valheim do: a row
+        // as tall as a button, so Sound's six fit at 720p (Planner 11-24: the last one was cut in
+        // half by the scroll edge). A locked one keeps the label alone.
         _ => ui.container(Style::default().gap(2.0).stretch(), |ui| {
+            let inside = cx.look.has_text("menu_button") && !locked;
             // Where a slider applied when let go is being dragged to, shown
             // meanwhile.
             let dragged: Rc<std::cell::Cell<Option<f64>>> = Rc::default();
             let (k, d2, show, shown) = (key.clone(), d.clone(), show.clone(), dragged.clone());
-            let t = ui.text_bound(
-                "default",
-                Box::new(move |_: &Ctx| {
-                    let v = shown.get().unwrap_or_else(|| crate::config::get(id));
-                    ("settings.config_value".into(), vec![Arg::Key(k.clone()), show(&d2, &k, v)])
-                }),
-            );
-            field_label(ui, cx, t);
+            let value = move |_: &Ctx| {
+                let v = shown.get().unwrap_or_else(|| crate::config::get(id));
+                ("settings.config_value".into(), vec![Arg::Key(k.clone()), show(&d2, &k, v)])
+            };
+            if !inside {
+                let t = ui.text_bound("default", Box::new(value.clone()));
+                field_label(ui, cx, t);
+            }
             if !locked {
                 let range = (d.max - d.min).max(1e-9);
                 let unit = if d.kind == weft_abi::config_kind::INT { 1.0 } else { range / 100.0 };
@@ -1051,6 +1145,15 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                 slider.steps = steps;
                 slider.step_value = step_value;
                 ui.add(Kind::Slider(slider), Style::default().h(20.0).stretch());
+                if inside {
+                    // Placed over the track, centred, in a fixed width (a placed node is as wide
+                    // as it measures, and 2x needs the room): drawn after it, so over the knob.
+                    let t = ui.text_bound(button_text(cx), Box::new(value));
+                    big_label(ui, t, button_text(cx));
+                    ui.nodes[t].style = Style::default()
+                        .w(SLIDER_LABEL_W)
+                        .at_from([0.5, 0.5], 0.0, 0.0, [0.5, 0.5]);
+                }
             }
         }),
     };
@@ -1210,9 +1313,19 @@ impl Screen for LanguageScreen {
             .iter()
             .find(|l| l.0 == cx.lang.code)
             .map_or(cx.lang.code.clone(), |l| l.1.clone());
-        frame(ui, cx, "settings.language", |ui| {
-            label(ui, cx, "settings.language.current", &[Arg::Text(current)], "default");
-            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(240.0), |ui| {
+        // Style 1: the menu window, the language in use on a 2x line, the languages as menu
+        // buttons 6 apart with no frame of their own (scrolling when there are many), Done a
+        // group apart.
+        let framed = cx.look.texture("menu_panel", "").is_some();
+        let class = button_text(cx);
+        window(ui, cx, "settings.language", 6.0, |ui| {
+            let t = label(ui, cx, "settings.language.current", &[Arg::Text(current)], "default");
+            line_2x(ui, cx, t);
+            let list = Style::default()
+                .stretch()
+                .w(if framed { 240.0 + crate::ui::Scrollbar::ROOM } else { 240.0 });
+            let list = if framed { list.gap(6.0).min_h(26.0).scroll() } else { list.pad(8.0).gap(4.0) };
+            ui.with(Kind::Container { class: (!framed).then(|| "panel".to_string()) }, list, |ui| {
                 for (code, name) in cx.languages {
                     let code = code.clone();
                     let selected = code == cx.lang.code;
@@ -1223,7 +1336,8 @@ impl Screen for LanguageScreen {
                             crate::settings::set_text("language", &code);
                         }),
                         |ui| {
-                            ui.text(text::plain(name), "button");
+                            let t = ui.text(text::plain(name), class);
+                            big_label(ui, t, class);
                         },
                     );
                     if let Kind::Button { selected: sel, .. } = &mut ui.nodes[b].kind {
@@ -1231,7 +1345,8 @@ impl Screen for LanguageScreen {
                     }
                 }
             });
-            back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            group_gap(ui, cx);
+            back_button(ui, cx, "menu.done", &[], 240.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -1363,55 +1478,60 @@ impl Screen for Controls {
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         let conflicts = cx.input.conflicts();
         let waiting = self.waiting.clone();
-        frame(ui, cx, "controls.title", |ui| {
-            let list = ui.panel(
-                "panel",
-                Style::default()
-                    .pad(8.0)
-                    .gap(3.0)
-                    .stretch()
-                    .w(420.0)
-                    .h(0.0)
-                    .grow()
-                    .min_h(60.0)
-                    .scroll(),
-                |ui| {
-                    config_rows(ui, cx, "core:controls", &[]);
-                    for b in &cx.input.binds {
-                        let name = text::Name::Key(b.action.clone());
-                        let clash: Vec<String> = conflicts
-                            .iter()
-                            .filter_map(|(x, y)| {
-                                if *x == b.action {
-                                    Some(y.clone())
-                                } else if *y == b.action {
-                                    Some(x.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        ui.container(Style::row().gap(6.0).self_align(crate::ui::Align::Stretch), |ui| {
-                            let n = ui.text(name.spans(cx.lang, Some(cx.input)), "default");
-                            ui.nodes[n].style.grow = 1.0;
-                            if !clash.is_empty() {
-                                let names: Vec<String> = clash
-                                    .iter()
-                                    .map(|c| text::Name::Key(c.clone()).text(cx.lang))
-                                    .collect();
-                                ui.text(cx.t("controls.conflict", &[Arg::Text(names.join(", "))]), "default");
+        // Style 1: the menu window with the list straight on it (no frame of its own, a
+        // scrollbar's room at its right), the actions' names at 2x like their keys, 4 between
+        // rows; Reset and Done a group below.
+        let framed = cx.look.texture("menu_panel", "").is_some();
+        window(ui, cx, "controls.title", 6.0, |ui| {
+            let style = Style::default()
+                .stretch()
+                .w(if framed { 420.0 + crate::ui::Scrollbar::ROOM } else { 420.0 })
+                .h(0.0)
+                .grow()
+                .min_h(60.0)
+                .scroll();
+            let style = window_list(style, framed);
+            let style = if framed { style.gap(4.0) } else { style.pad(8.0).gap(3.0) };
+            let list = ui.with(Kind::Container { class: (!framed).then(|| "panel".to_string()) }, style, |ui| {
+                config_rows(ui, cx, "core:controls", &[]);
+                for b in &cx.input.binds {
+                    let name = text::Name::Key(b.action.clone());
+                    let clash: Vec<String> = conflicts
+                        .iter()
+                        .filter_map(|(x, y)| {
+                            if *x == b.action {
+                                Some(y.clone())
+                            } else if *y == b.action {
+                                Some(x.clone())
+                            } else {
+                                None
                             }
-                            for slot in 0..crate::input::SLOTS {
-                                bind_cell(ui, cx, &b.action, slot, b.keys[slot], waiting.as_ref());
-                            }
-                        });
-                    }
-                },
-            );
+                        })
+                        .collect();
+                    ui.container(Style::row().gap(6.0).self_align(crate::ui::Align::Stretch), |ui| {
+                        let n = ui.text(name.spans(cx.lang, Some(cx.input)), "default");
+                        field_label(ui, cx, n);
+                        ui.nodes[n].style.grow = 1.0;
+                        ui.nodes[n].style.w = crate::ui::Len::Px(0.0);
+                        if !clash.is_empty() {
+                            let names: Vec<String> = clash
+                                .iter()
+                                .map(|c| text::Name::Key(c.clone()).text(cx.lang))
+                                .collect();
+                            ui.text(cx.t("controls.conflict", &[Arg::Text(names.join(", "))]), "default");
+                        }
+                        for slot in 0..crate::input::SLOTS {
+                            bind_cell(ui, cx, &b.action, slot, b.keys[slot], waiting.as_ref());
+                        }
+                    });
+                }
+            });
             ui.set_id(list, "controls");
+            group_gap(ui, cx);
             ui.container(Style::row().gap(6.0), |ui| {
-                button(ui, cx, "controls.reset", &[], 120.0, |c| c.requests.push(Request::ResetBinds));
-                back_button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
+                let w = if framed { 150.0 } else { 120.0 };
+                button(ui, cx, "controls.reset", &[], w, |c| c.requests.push(Request::ResetBinds));
+                back_button(ui, cx, "menu.done", &[], w, |c| c.requests.push(Request::Close));
             });
         });
     }
@@ -1432,7 +1552,10 @@ fn bind_cell(ui: &mut Ui, cx: &BuildCx, action: &str, slot: usize, binding: Opti
             c.requests.push(Request::Rebuild);
         }),
         |ui| {
-            ui.text(text::plain(&shown), "button");
+            // A key's name at 2x where it fits the cell (style 1), else 1x.
+            let class = button_text(cx);
+            let t = ui.text(text::plain(&shown), class);
+            big_label(ui, t, class);
         },
     );
     if let Kind::Button { selected, .. } = &mut ui.nodes[cell].kind {
