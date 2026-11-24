@@ -18,7 +18,7 @@ wait 2
 # compare mode: one switch (testkit compare.rs), with the clouds up as in Bliss's clear sky (its
 # gold cumulus make much of the dawn's shafts; Planner on lv6, 11-24) and the mist pinned, so the
 # banks have air to lie in (compare's own pin is none: lv6's first shots had no banks).
-compare on clouds=1 mist=0.1
+compare on clouds=1 mist=0.05
 set_config base:look_glare 0
 set_config base:look_fill 0.7
 set_config base:look_ao_power 4
