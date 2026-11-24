@@ -342,6 +342,7 @@ pub unsafe extern "C" fn client_input(c: *mut abi::ClientCtx, op: u32, text: Str
             ci::CURSOR => {
                 let (w, h) = r.gpu.surface_size();
                 r.input.cursor = Vec2::new(x * w as f32, y * h as f32);
+                eprintln!("DIAG cursor set {x} {y} -> {:?} surface {w}x{h}", r.input.cursor);
             }
             ci::SCROLL => r.input.wheel(x),
             ci::TYPE => r.input.typed.push_str(text),
