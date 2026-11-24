@@ -290,12 +290,15 @@ const SUN_GLOW_CREAM: vec3<f32> = vec3(1.0, 0.9, 0.8);
 const SUN_GLOW_CREAM_K: f32 = 1.0;
 // Away from it the sky in these at its own brightness: from the first cosine (none) to the second
 // (full, lavender), blue beyond; how much.
-const SKY_AWAY: vec3<f32> = vec3(0.999, 0.6, 1.0);
+const SKY_AWAY: vec3<f32> = vec3(0.9995, 0.85, 1.0);
 // Where its lavender turns blue (cosines: none, full).
-const SKY_AWAY_TURN: vec2<f32> = vec2(0.95, 0.45);
+const SKY_AWAY_TURN: vec2<f32> = vec2(0.985, 0.7);
 const SKY_AWAY_LAVENDER: vec3<f32> = vec3(0.92, 0.86, 1.02);
 const SKY_AWAY_DARK: f32 = 0.85;
-const SKY_AWAY_BLUE: vec3<f32> = vec3(0.5, 0.68, 1.0);
+const SKY_AWAY_BLUE: vec3<f32> = vec3(0.48, 0.6, 1.0);
+// The horizon band's blue (`sky_color`) where Bliss's low morning sky is seen: less green (Bliss's far
+// blue hue about 218, ours 203 with the band's own blue, lv16).
+const SKY_BAND_BLUE_SEEN: vec3<f32> = vec3(0.64, 0.78, 1.25);
 const SUN_BAND: vec3<f32> = vec3(10.0, 9.0, 8.0);
 // How much of the sky's wide round sun glow (`OPT_SUN_GLOW`) goes with Bliss's sun low in the morning.
 const SUN_BAND_ROUND: f32 = 0.67;
@@ -1043,7 +1046,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let k = band * day;
         // A clear blue, not a grey (H2: grey-tinted it reached Bliss's brightness, 160-172 against
         // 154-173, but stayed pale and from 16:00 warm, saturation 5-48 against 39-83; PC shhb1).
-        let blue = vec3(luma(c)) * vec3(0.74, 0.92, 1.2);
+        let blue = vec3(luma(c)) * mix(vec3(0.74, 0.92, 1.2), SKY_BAND_BLUE_SEEN, seen);
         // On mornings with the sun low, looking away from it, lighter and bluer: at spot C 08:00
         // (facing away) the band read 172 / warmth -13 where Bliss's is 183 / -31, and the far lake,
         // nearly all a mirror of it, went flat grey (Far view's find). Toward the sun as it was (the

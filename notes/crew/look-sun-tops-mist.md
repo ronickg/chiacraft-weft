@@ -160,15 +160,21 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
   bright: at x 440 of 960 ours 206 194 185, Bliss's 202 184 185; further out ours still greener
   (green 143-150 against 128-130 at the right edge), a little teal, and its turn faster than Bliss's.
 
-## Open
+### The sweep (lv17)
 
-- The 06 vista sky's blue a little teal (green high) and its turn still quicker than Bliss's.
-- A faint arc high on the right of the 06 vista (lv14 k and lv15 b).
-- The faint ring at 06 low; the streaks in the far haze at 06 low.
+- Away from the sun the lavender starts earlier and gentler (`SKY_AWAY` 0.85, `SKY_AWAY_TURN`
+  0.985-0.7), the blue less green (`SKY_AWAY_BLUE` 0.48 0.6 1.0), and the horizon band's own blue,
+  where the sky is seen, bluer (`SKY_BAND_BLUE_SEEN`). 06 vista far sky hue 203 to 215 (Bliss about
+  218); at y 40, x 920: 103 137 186 (Bliss 95 128 191). No teal left; the edge from cream to blue
+  softer than lv16's. Land saturation 0.46, 06 low and 18:00 unchanged.
+
+## Open (follow-ups after the merge, Planner 11-24)
+
+- The 06 vista: no lavender between the cream and the blue as in Bliss (cream, then grey, then blue),
+  and that turn's edge still a soft diagonal, quicker than Bliss's.
+- The faint ring at 06 low (a saturation bump about 100 px out; the golden palette's horizon hue).
+- The streaks in the far haze at 06 low (in lv13 too, older than the sky change).
 - 07 low darks a little deep (p5 76 against Bliss's 101); 06 low as it is (Planner).
 - Bliss's large gold-white glow round the low sun, bleeding into the mist below: not in the sky
   (the land covers it); it wants the banks' or the land haze's light toward the sun, or the bloom.
-- The 06 vista's sky still tan-grey between the sun and the blue, and its land 0.40 saturation.
 - Dawn clouds saturated yellow; 19:00 night curve; midday greens; horizon band.
-- Before ready: merge dev, niced `cargo check --workspace --all-targets`, keep the ENGINE_CHANGES
-  row, bench the banks at Max on the final candidate.
