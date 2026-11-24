@@ -213,18 +213,30 @@ pub async fn entity_modify(t: T) -> R {
     let near = t
         .op(&format!("spawn base:pig {} {} {}", f[0] + 1, f[1], f[2] - 3))
         .await?;
+    // Held still until the hit, and measured away from the one hit: spawned pigs wander off at
+    // once, the same way each run, and read along x alone the push came out at 0.12 of 1.14.
+    t.op(&format!("drive {hit} 0 0 8")).await?;
+    t.op(&format!("drive {near} 0 0 8")).await?;
     t.secs(0.5).await?;
-    let x = |s: String| {
-        s.split_whitespace()
-            .nth(1)
-            .and_then(|v| v.parse::<f64>().ok())
-            .unwrap_or(f64::NAN)
+    let xz = |s: String| {
+        let v: Vec<f64> = s
+            .split_whitespace()
+            .skip(1)
+            .take(3)
+            .map(|v| v.parse::<f64>().unwrap_or(f64::NAN))
+            .collect();
+        (v.first().copied().unwrap_or(f64::NAN), v.get(2).copied().unwrap_or(f64::NAN))
     };
-    let before = x(t.op(&format!("entity {near}")).await?);
+    let target = xz(t.op(&format!("entity {hit}")).await?);
+    let before = xz(t.op(&format!("entity {near}")).await?);
     t.op(&format!("hit_falling {hit} 5")).await?;
     t.secs(0.5).await?;
-    let after = x(t.op(&format!("entity {near}")).await?);
-    t.probe("the pig beside is thrown back", (after - before) as f32, after - before > 0.8);
+    let after = xz(t.op(&format!("entity {near}")).await?);
+    let (dx, dz) = (before.0 - target.0, before.1 - target.1);
+    let d = (dx * dx + dz * dz).sqrt().max(0.1);
+    let away = ((after.0 - before.0) * dx + (after.1 - before.1) * dz) / d;
+    t.note(format!("{d:.2} apart at the hit"));
+    t.probe("the pig beside is thrown back", away as f32, away > 0.8);
     Ok(())
 }
 
