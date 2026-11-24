@@ -13,6 +13,10 @@
 //! back on), `bloom=2`, `clouds=1` (all the clouds back), `mist=0.3` (pinned mist), `mist=natural`
 //! (the air as the game makes it, unpinned), `wind=1`, or
 //! any setting by its full name (`base:look_leaf_sun=3`).
+//!
+//! Against Bliss, compare with `bloom=1`: Bliss's shots have its bloom, and with ours off the
+//! pack's bloomy fog (the mist blurred toward the bloom, `post.wgsl`) never runs, so mist and the
+//! low sun's glare read sharp and wrong (lv10, 11-24: every mist sheet before it had no bloom).
 
 use std::sync::Mutex;
 use weft_sdk::{Client, Config};

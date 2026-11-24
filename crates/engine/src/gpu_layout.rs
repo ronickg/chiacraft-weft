@@ -850,6 +850,13 @@ gpu_struct! {
         pub lightning_start: [[f32; 4]; 3],
         /// Channel ends relative to the camera, with w set for ground strikes.
         pub lightning_end: [[f32; 4]; 3],
+        // chiacraft's, after upstream's.
+        /// The ground's height about the camera (`client::ground_map`, `core:ground_map`): x its
+        /// picture's bindless index + 1 (0: none), y the blocks a texel covers, zw the picture's
+        /// corner x and z from the camera (blocks). Each texel: rg the top of the ground under the
+        /// open sky (leaves left out) + 2048 as 16 bits, high byte first; b 1 over a liquid; a 1
+        /// where known.
+        pub ground_map: [f32; 4],
     }
 }
 

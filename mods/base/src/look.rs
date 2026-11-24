@@ -47,7 +47,10 @@ pub static LOOK_LEAF_HOLES: Config<f32> = Config::named("look_leaf_holes");
 /// default and in the Bliss comparisons: Ronald's Bliss (SSS type 3, no LabPBR pack) has none.
 pub static LOOK_LEAF_LIGHT: Config<f32> = Config::named("look_leaf_light");
 /// A debug view for matching the light against Bliss's (its debug_DIRECT / debug_INDIRECT): 0 the
-/// picture, 1 the sun's light alone, 2 the sky's alone, on white.
+/// picture, 1 the sun's light alone, 2 the sky's alone, on white; with the mist's banks on
+/// (`look_mist_domes`), 3 the light they scatter alone, on black, 4 how much they hide (grey),
+/// 5 where along their march the sun reaches them (red the shadow map's light, green the clouds',
+/// blue how much mist).
 pub static LOOK_DEBUG: Config<f32> = Config::named("look_debug");
 /// The HDR world's sky light by day in the upper sky's own hue, as Bliss's: 0 the palette's fill as
 /// made, 1 all the way.
@@ -113,6 +116,30 @@ pub static LOOK_MIST_DAWN_TINT: Config<f32> = Config::named("look_mist_dawn_tint
 /// The mist's banks as lumps that stand up out of the layer: 0 as made (a top heaving 5 blocks
 /// either way), 1 Bliss's domes (20 either way, a softer top).
 pub static LOOK_MIST_DOMES: Config<f32> = Config::named("look_mist_domes");
+/// The horizon's haze never darker than the sky behind it (0 as made, 1 as Bliss's, whose sky
+/// brightens to the horizon): in the HDR world the mist away from the sun is lit dimmer than the sky,
+/// and over the far sky it drew a grey band above the land (lv2's horizon_lv2, 11-24).
+pub static LOOK_HORIZON_LIFT: Config<f32> = Config::named("look_horizon_lift");
+/// The low sun's disc near white with a wide soft glow, as Bliss's (0 as made, 1 Bliss's): ours went
+/// through the HDR curve as a small saturated yellow-green blob at 06:00 (Planner's look notes, 11-24).
+pub static LOOK_SUN_DISC: Config<f32> = Config::named("look_sun_disc");
+/// The dawn before sunrise as Bliss's (0 as made, 1 Bliss's): with the sun under the horizon, the sky
+/// a deep blue with a thin pink line where it will rise, and no disc, glow or glare of the sun yet.
+/// Ours at 05:00 (the sun 3.5° down) was a bright pink-lavender sky with the sun's white glow on the
+/// horizon, the land under it pale (lv6, 11-24: sky 159 148 180 against Bliss's 59 104 204).
+/// Mornings only: the evening's sky stays as fitted.
+pub static LOOK_DAWN_SKY: Config<f32> = Config::named("look_dawn_sky");
+/// The mist banks' density, sunlight and shade (`look_mist_domes`), each times its own: 0 (or 1) as
+/// made. For tuning them live against Bliss (lv8, 11-24).
+pub static LOOK_BANK_DENSE: Config<f32> = Config::named("look_bank_dense");
+pub static LOOK_BANK_SUN: Config<f32> = Config::named("look_bank_sun");
+pub static LOOK_BANK_SHADE: Config<f32> = Config::named("look_bank_shade");
+/// The engine's map of the ground's height (`client::ground_map`), which the banks lie on: on with
+/// them (`register`'s frame hook keeps it so, however the banks were set).
+static GROUND_MAP: Config<bool> = Config::named("core:ground_map");
+/// The mist clock: a dawn mist every morning whatever the air (the engine's `evening_mist_floor`),
+/// 0 as made (only the air's own), 1 our dampest dawn mist, up to 3.
+pub static LOOK_MIST_CLOCK: Config<f32> = Config::named("look_mist_clock");
 
 /// "Bliss match" (Video, Extra): the look's knobs as fitted to Ronald's Bliss at the like-for-like
 /// vista (stage 2, 11-22/23: the lsN to lsAA sweeps against bliss_ctl, crew notes
@@ -120,7 +147,7 @@ pub static LOOK_MIST_DOMES: Config<f32> = Config::named("look_mist_domes");
 /// keeps its own setting, so one can still be moved after.
 pub static LOOK_BLISS: Config<bool> = Config::named("look_bliss");
 /// Each knob, its value in the Bliss match, and as made.
-pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 17] = [
+pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 18] = [
     // The shade: no glare lift, less fill, the sky light occluded as Bliss's (lsN_ao3).
     (&LOOK_GLARE, 0.0, 1.0),
     (&LOOK_FILL, 0.7, 1.0),
@@ -148,6 +175,9 @@ pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 17] = [
     // 82 84 107, ours as made cream 186 159 130), 18:30 near land 37 38 73 (Bliss 35 37 70);
     // 08:00 the same, 19:00 outside the golden hours (lsAR_glow2).
     (&LOOK_GLOW_FILL, 0.0, 1.0),
+    // The low sun a near-white disc with a wide glow (lv5, 11-24). The mist's banks
+    // (look_mist_domes) join once 18:00 and 19:00 with them on are checked (Planner, 11-24).
+    (&LOOK_SUN_DISC, 1.0, 0.0),
 ];
 
 /// Switches the Bliss match on (every knob to its fitted value) or off (every knob as made).
@@ -162,7 +192,7 @@ pub fn set_bliss_match(on: bool) {
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away, base:look_mist_tint, base:look_low_sun_keep, base:look_evening_shade, base:look_air_fade, base:look_glow_fill, base:look_mist_dawn_tint, base:look_mist_domes";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away, base:look_mist_tint, base:look_low_sun_keep, base:look_evening_shade, base:look_air_fade, base:look_glow_fill, base:look_mist_dawn_tint, base:look_mist_domes, base:look_horizon_lift, base:look_sun_disc, base:look_dawn_sky, base:look_bank_dense, base:look_bank_sun, base:look_bank_shade";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -202,7 +232,7 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_LEAF_SUN).float(1.0, 0.5, 4.0);
     r.config(&LOOK_LEAF_HOLES).float(1.0, 0.0, 1.0);
     r.config(&LOOK_LEAF_LIGHT).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_DEBUG).float(0.0, 0.0, 2.0);
+    r.config(&LOOK_DEBUG).float(0.0, 0.0, 5.0);
     r.config(&LOOK_SKY_HUE).float(0.0, 0.0, 1.0);
     r.config(&LOOK_EXPOSURE_ABS).float(0.0, 0.0, 1.0);
     r.config(&LOOK_SPLIT_WARM).float(0.7, 0.0, 1.0);
@@ -227,5 +257,18 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_GLOW_FILL).float(1.0, 0.0, 1.0);
     r.config(&LOOK_MIST_DAWN_TINT).float(0.0, 0.0, 1.0);
     r.config(&LOOK_MIST_DOMES).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_HORIZON_LIFT).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_SUN_DISC).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_DAWN_SKY).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_BANK_DENSE).float(0.0, 0.0, 5.0);
+    r.config(&LOOK_BANK_SUN).float(0.0, 0.0, 5.0);
+    r.config(&LOOK_BANK_SHADE).float(0.0, 0.0, 10.0);
+    r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0);
     r.config(&LOOK_BLISS).bool(false);
+    r.client_frame(|_| {
+        let want = LOOK_MIST_DOMES.get() > 0.0;
+        if GROUND_MAP.get() != want {
+            GROUND_MAP.set(want);
+        }
+    });
 }

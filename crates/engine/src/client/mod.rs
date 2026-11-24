@@ -8,6 +8,7 @@ pub mod frame_look;
 pub mod froxels;
 pub mod gizmo;
 pub mod glow;
+pub mod ground_map;
 mod lightning;
 pub mod lod;
 pub mod looks;
@@ -754,6 +755,8 @@ pub struct Client {
     shadow_index: u32,
     /// The far cascade: map, light, scene buffers and bindless index, as the near one's.
     shadow_far_map: Option<weft_render::TextureId>,
+    /// The ground's height about the camera for packs (`core:ground_map`, chiacraft's mist).
+    ground_map: ground_map::GroundMap,
     shadow_far: (glam::Mat4, bool),
     shadow_far_bufs: Vec<BufferId>,
     shadow_far_index: u32,
@@ -1230,6 +1233,7 @@ impl Client {
             shadow: (glam::Mat4::IDENTITY, false),
             shadow_index: 0,
             shadow_far_map: None,
+            ground_map: Default::default(),
             shadow_far: (glam::Mat4::IDENTITY, false),
             shadow_far_bufs: Vec::new(),
             shadow_far_index: 0,
@@ -3557,6 +3561,7 @@ impl Client {
         if let Some(t) = self.shadow_far_map.take() {
             gpu.destroy_texture(t);
         }
+        self.ground_map.destroy(gpu);
         self.shadow_far_drawn = None;
         for b in self.shadow_far_bufs.drain(..) {
             gpu.destroy_buffer(b);
@@ -3784,6 +3789,7 @@ impl Client {
             cloud_cache: [0; 4],
             atmosphere_cache: [0; 4],
             rain_cover: [0.0; 4],
+            ground_map: self.ground_map.scene,
             lightning_start,
             lightning_end,
             weather: [self.wind.x, self.wind.y, self.fog.max(evening_mist_floor(self.sun())), self.thunder()],
@@ -4237,6 +4243,9 @@ impl Client {
         // Ray tracing's scene (`core:rt_shadows`): this frame's builds and its TLAS, before the
         // world's draws that bind it (`app` switched the world shader before this, `rt_switch`).
         self.render.rt_frame(gpu, early, frame.slot, &cam);
+        // The ground's height for the pack (chiacraft's mist banks), before the scene reads it.
+        self.ground_map
+            .frame(gpu, crate::settings::ground_map(), cam.pos, &self.world);
         let mut scene = self.scene(&cam, frame);
         (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
@@ -4510,9 +4519,9 @@ const FAR_DEPTH: f32 = 1200.0;
 /// mist, and play, are untouched. Without it the layer drew nothing on a clear evening (lsAD_mist).
 /// The same window as the pack's `evening_mist`.
 fn evening_mist_floor(sun: [f32; 4]) -> f32 {
-    let Some(id) = crate::config::by_name("base:look_evening_mist") else { return 0.0 };
-    let k = (crate::config::get(id) as f32).clamp(0.0, 3.0);
-    if k <= 0.0 {
+    let get = |name: &str| crate::config::by_name(name).map_or(0.0, |id| (crate::config::get(id) as f32).clamp(0.0, 3.0));
+    let (k, dawn) = (get("base:look_evening_mist"), get("base:look_mist_clock"));
+    if k <= 0.0 && dawn <= 0.0 {
         return 0.0;
     }
     let ss = |a: f32, b: f32, x: f32| {
@@ -4520,7 +4529,12 @@ fn evening_mist_floor(sun: [f32; 4]) -> f32 {
         t * t * (3.0 - 2.0 * t)
     };
     let (x, y) = (sun[0], sun[1]);
-    0.3 * k * ss(0.1, -0.1, x) * (1.0 - ss(0.03, 0.3, y)) * ss(-0.2, -0.05, y)
+    // The mist clock (`base:look_mist_clock`): a dawn mist every morning, whatever the air, from the
+    // sun 14° under the horizon to burnt off by 25° up, 0.1 at 1 (our dampest dawn mist), as
+    // Bliss's morning mist comes by the clock. The pack does not take it out of the air's mist
+    // (`air_mist`), so it lies as the dawn mist does.
+    let morning = 0.1 * dawn * ss(-0.1, 0.1, x) * ss(-0.25, -0.1, y) * (1.0 - ss(0.2, 0.42, y));
+    0.3 * k * ss(0.1, -0.1, x) * (1.0 - ss(0.03, 0.3, y)) * ss(-0.2, -0.05, y) + morning
 }
 
 /// The values of the settings the shader pack reads (`Scene::options`).

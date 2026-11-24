@@ -15,8 +15,12 @@ loaded
 wait 20
 look -120 -12
 wait 2
-# compare mode: one switch (testkit compare.rs)
-compare on
+# compare mode: one switch (testkit compare.rs), with the clouds up as in Bliss's clear sky (its
+# gold cumulus make much of the dawn's shafts; Planner on lv6, 11-24) and the mist pinned, so the
+# banks have air to lie in (compare's own pin is none: lv6's first shots had no banks).
+# The mist's compare with the clouds off (Planner, 11-24 lv9: Bliss's refs have a clear sky over the
+# land, a controlled test); one clouds-on shot per sheet with `compare on clouds=1 mist=0.05`.
+compare on clouds=0 mist=0.02 bloom=1
 set_config base:look_glare 0
 set_config base:look_fill 0.7
 set_config base:look_ao_power 4
@@ -34,6 +38,14 @@ set_config base:look_bliss true
 set_config base:look_low_sun_keep 0.6
 set_config base:look_evening_shade 0.5
 set_config base:look_air_fade 0.5
+# Bliss match's last two: `look_bliss true` by set_config does not set its knobs (only the menu's
+# switch does), and these were missing, so the sun disc was off in fresh games (lv12).
+set_config base:look_glow_fill 0
+set_config base:look_sun_disc 1
+# The dawn mist under test (lv14: a fresh game has them off, as made; earlier games had them set by
+# hand): the banks and their dawn tint.
+set_config base:look_mist_domes 1
+set_config base:look_mist_dawn_tint 1
 hour 18
 shot live_start.png
 live /home/ronaldg/looktest/live/lv1/cmd.txt 20

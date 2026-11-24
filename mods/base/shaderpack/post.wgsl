@@ -329,6 +329,21 @@ fn taa_motion_px(px: vec2<i32>, size: vec2<i32>) -> f32 {
     return textureLoad(t, at, 0).g;
 }
 
+// What the mist banks' bloomy fog takes of the glow where they hide all (Bliss's 1.25 x 0.75).
+const BANK_BLOOMY: f32 = 0.94;
+// The point the pixel at `uv` shows, camera relative: on the sky (depth 0), the march's far end.
+fn view_rel(uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
+    let size = vec2<i32>(textureDimensions(textures[pass_.depth]));
+    let at = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
+    let d = textureLoad(textures[pass_.depth], at, 0).r;
+    let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, max(d, 1e-7), 1.0);
+    let rel = w.xyz / w.w;
+    if d <= 1e-7 {
+        return normalize(rel) * MIST_MARCH_FAR;
+    }
+    return rel;
+}
+
 // How much of the view at `uv` the mist covers (0 none to 1), from the mist volume (`froxels`) at
 // the world's depth there; 0 without the volume.
 fn mist_over(uv: vec2<f32>, pass_: Pass) -> f32 {
@@ -399,7 +414,15 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         // the band between the clouds' far end and the land went deep blue, and the clouds' cut
         // edge along the far land's outline showed (mc_forest noon, gr5).
         let wv = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 1.0, 1.0);
-        let up = smoothstep(0.03, 0.3, normalize(wv.xyz / wv.w).y);
+        let view_dir = normalize(wv.xyz / wv.w);
+        // With Bliss's sun (`OPT_SUN_DISC`) none of it toward the sun (gone within about 25°): a
+        // low sun's glow, warm, pale on the horizon where this is off and boosted just above it,
+        // stood as a saturated yellow-orange arc over the sun at 06:00 (lv11; with the mist, haze
+        // and banks off still there).
+        // Only with the sun low (gone by about 25° up): at noon it left the sky round the sun grey.
+        let toward_sun = smoothstep(0.6, 0.9, dot(view_dir, normalize(scene.sun.xyz))) * clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0)
+            * (1.0 - smoothstep(0.25, 0.45, scene.sun.y));
+        let up = smoothstep(0.03, 0.3, view_dir.y) * (1.0 - toward_sun);
         // Most in the morning, less at noon: with the clouds counted as sky the noon blue between
         // them went to saturation 75 against Bliss's 48 and the clouds' shaded bellies steel blue,
         // while 08:00's stayed 35 against 45 (skf).
@@ -429,6 +452,10 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         let add = clamp(fantasy_opt(OPT_BLOOM_ADD), 0.0, 1.0) * smoothstep(0.0, 0.15, scene.sun.y);
         let kept = BLOOM_MIX * (1.0 + air * (1.0 - rain_amount())) * (1.0 - add);
         col = mix(col, glow, clamp((kept + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
+        // The mist banks' share too (`bank_hidden`), as Bliss's bloomy fog takes its fog's (its
+        // BLOOMY_FOG 1.25 x 0.75: up to 0.94 of the glow where the mist hides all).
+        let banked = bank_hidden(view_rel(uv, pass_)) * (1.0 - 0.85 * rain_amount());
+        col = mix(col, glow, clamp(banked * BANK_BLOOMY * fantasy_opt(OPT_BLOOM), 0.0, 0.95));
         let r2 = dot(uv - vec2(0.5), uv - vec2(0.5));
         col += glow * 0.234 * (1.5 - 2.0 * r2) * add * fantasy_opt(OPT_BLOOM);
     }
