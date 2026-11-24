@@ -315,9 +315,10 @@ fn split_control(ui: &mut Ui, cx: &BuildCx, width: f32, key: &str, on: bool, scr
                 let t = ui.text(cx.t(key, &[]), "button");
                 ui.nodes[t].style = Style::default().at_from([0.5, 0.5], -(LED + GAP) * 0.5, 0.0, [0.5, 0.5]);
                 ui.text_mut(t).unwrap().wrap = false;
+                // The settings cog at one of its pixels a UI pixel (16 pixels: 8 GUI), whole pixels.
                 if let Some(texture) = cx.look.texture("menu_settings", "") {
                     let style = Style::default()
-                        .size(9.0, 9.0)
+                        .size(8.0, 8.0)
                         .at_from([1.0, 0.5], -LED * 0.5, 0.0, [0.5, 0.5]);
                     ui.add(Kind::Image { texture, color: 0xFFFFFFFF }, style);
                 }

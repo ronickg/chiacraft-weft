@@ -113,6 +113,13 @@ Ronald found the title menu "cheap" and picked style 1 of six generated directio
   - window frame 10 px (5 GUI), corner plates about 16 px (a thinner design drawn at the same pixel, never the big frame scaled down);
   - button rim 7 px (outline, bronze band, bevel step, inner line) with 4 px 45° chamfered corners; buttons 40 px tall (20 GUI).
 - Before installing, lay the cut parts out the way the screen does and set them beside the mock at the same width; if they don't read as the same style, they aren't done.
+- **What made it read rich** (round 3, 11-24, measured in `reports/UI craft.md`; Ronald: "better but something still looks worse off"):
+  - Title labels at 2x with a 1-font-pixel dark outline and a shadow; title buttons 26 GUI tall with 7 between, the panel 188 x ~260. The title's icons are drawn at 2x with the labels (16 x 16, `size = 16 16` in their `.gui`): an icon pixel is a font pixel of the 2x label beside it. Frames and rims stay at 1x.
+  - Faces in banded value steps: one highlight row, 3-4 bands darkening downward, one dark row, and grain of single pixels one step off at most 1 in 12. Never dither or noise over a large face (it reads as static). Cut the title's buttons at their own height so the bands never stretch.
+  - Hover and selected: the deep orange face `#d57302` to `#994802` in 4 bands, a 1 px `#ffd54a` inner rim, and a glow of stepped rings 1 GUI each (alpha about 200, 125, 55). At rest a hard shadow 2 GUI straight down; pressed, the face 1 GUI lower with no shadow.
+  - The panel's inside darker and cooler than the button faces (`#2a2228` to `#161214` in stepped rings toward the frame), with a 2 GUI shadow from the top and left frame; frame wood darkened toward L 23-60 with broken lengthwise grain.
+  - Title corner plates about 48 px, sitting 3 px past the frame, with a strong 3 px bevel and a big bolt (Planner 11-24: "twice ours").
+- **Menu screens are a little see-through.** Out of a world (the title and every menu opened from it: worlds, settings, mods), window insides are about 85% opaque (alpha 217), so the title's world shows behind them; the frame, buttons, text and shadows stay fully opaque. In a world, windows keep their 91% (alpha 232). The engine draws `panel` as `menu_window` out of a world; the title's own frame is `menu_panel`. Ronald, 11-24: "better yes i guess we should make it also a little transparent in the menu screen". Judge it over a world shot, never on a flat colour.
 
 ### Yellow and gold only for state, never at rest (Ronald, 2026-11-04)
 

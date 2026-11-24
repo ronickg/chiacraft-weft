@@ -1,5 +1,6 @@
 # Style 1, the title screen (UI redo, 11-24): the menu at rest, with the cursor on two rows, and in Russian
-# when run with --config core:language=ru_ru. Compare against the mock in the UI guide.
+# when run with --config core:language=ru_ru. Compare against the mock in the UI guide. Then two menus opened
+# from the title (their windows see-through over the title's world, 11-24).
 loaded
 idle
 leave
@@ -7,10 +8,20 @@ wait 2
 cursor 0.95 0.95
 wait 0.5
 shot t_01_title.png
-cursor 0.15 0.42
+cursor 0.15 0.32
 wait 0.5
 shot t_02_hover_a.png
-cursor 0.15 0.55
+cursor 0.15 0.42
 wait 0.5
 shot t_03_hover_b.png
+screen core:worlds
+wait 1.5
+shot t_04_worlds.png
+key Escape
+wait 1
+screen core:settings
+wait 1.5
+shot t_05_settings.png
+key Escape
+wait 1
 quit
