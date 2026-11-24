@@ -567,6 +567,37 @@ pub fn frame(ui: &mut Ui, cx: &BuildCx, key: &str, f: impl FnOnce(&mut Ui)) {
     });
 }
 
+/// A menu window in style 1 (chiacraft, Planner 11-24): the title's framed panel (`menu_panel`,
+/// corner plates, see-through) centred on the screen, its heading inside at 3x in the title
+/// colour (2x or 1x where that is too wide), 4 GUI more under it, then what `f` adds, `gap` apart.
+/// No taller than the screen: a scrolling list in it gives way. Without `menu_panel` in the look,
+/// Weft's `frame`. Returns whether it drew the panel (the caller's own inner panels then go).
+pub fn window(ui: &mut Ui, cx: &BuildCx, key: &str, gap: f32, f: impl FnOnce(&mut Ui)) -> bool {
+    if cx.look.texture("menu_panel", "").is_none() {
+        frame(ui, cx, key, f);
+        return false;
+    }
+    let bg = if cx.in_game { "overlay" } else { "background" };
+    ui.root_style(Style::default().stretch());
+    ui.panel(bg, Style::default().grow().center().pad(12.0), |ui| {
+        let mut style = Style::default().center().gap(gap);
+        style.pad = [16.0, 14.0, 16.0, 18.0];
+        style.max_h = (cx.size.y - 24.0).max(80.0);
+        ui.panel("menu_panel", style, |ui| {
+            let t = label(ui, cx, key, &[], "title");
+            if let Some(text) = ui.text_mut(t) {
+                text.wrap = false;
+                text.center = true;
+                text.fit = 3.0;
+            }
+            ui.nodes[t].style = ui.nodes[t].style.self_align(crate::ui::Align::Stretch);
+            ui.add(Kind::Container { class: None }, Style::default().h(4.0));
+            f(ui);
+        });
+    });
+    true
+}
+
 // ---------------------------------------------------------------- title
 
 pub struct Title;
@@ -714,34 +745,12 @@ impl Screen for Pause {
         true
     }
 
-    /// In a look with the title's panel (`menu_panel`, style 1) the buttons sit in it under the
-    /// title, see-through like the menus (chiacraft, Planner 11-24: they floated over the world);
-    /// else as Weft draws them.
+    /// In style 1 the buttons sit in the title's panel under the heading (`window`; chiacraft,
+    /// Planner 11-24: they floated over the world); else as Weft draws them.
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
-        if cx.look.texture("menu_panel", "").is_none() {
-            frame(ui, cx, "menu.paused", |ui| pause_buttons(ui, cx));
-            return;
-        }
-        let bg = if cx.in_game { "overlay" } else { "background" };
-        ui.root_style(Style::default().stretch());
-        ui.panel(bg, Style::default().grow().center(), |ui| {
-            // 8 GUI between the buttons: their parts reach 2 past the box each side (`outset`),
-            // so 4 show between them (Planner 11-24: they touched).
-            let mut style = Style::default().center().gap(8.0);
-            style.pad = [16.0, 14.0, 16.0, 18.0];
-            ui.panel("menu_panel", style, |ui| {
-                // The title at 3x where it fits the buttons' width (whole steps, one pixel grid),
-                // with 4 more under it.
-                let t = label(ui, cx, "menu.paused", &[], "title");
-                if let Some(t) = ui.text_mut(t) {
-                    t.wrap = false;
-                    let chars = cx.lang.get("menu.paused").chars().count().max(1) as f32;
-                    t.scale = (200.0 / (chars * 6.0)).floor().clamp(2.0, 3.0);
-                }
-                ui.add(Kind::Container { class: None }, Style::default().h(4.0));
-                pause_buttons(ui, cx);
-            });
-        });
+        // 8 GUI between the buttons: their parts reach 2 past the box each side (`outset`), so 4
+        // show between them (Planner 11-24: they touched).
+        window(ui, cx, "menu.paused", 8.0, |ui| pause_buttons(ui, cx));
     }
 }
 
@@ -1062,12 +1071,14 @@ impl Screen for ConfigScreen {
         };
         // Rules a world was made with locked stay as they are while it is played.
         let rules_locked = matches!(shown, Shown::World) && cx.in_game && crate::config::get(c.game.rules_locked) != 0.0;
-        frame(ui, cx, title, |ui| {
+        let framed = cx.look.texture("menu_panel", "").is_some();
+        window(ui, cx, title, 6.0, |ui| {
             if let Shown::Mod(ns) = shown {
                 label(ui, cx, "settings.mods.of", &[Arg::Name(text::Name::Mod(ns.to_string()))], "default");
             }
-            let list = ui.panel(
-                "panel",
+            // In style 1's window the list needs no frame of its own.
+            let list = ui.with(
+                Kind::Container { class: (!framed).then(|| "panel".to_string()) },
                 // As tall as what it holds, up to the room there is (then it scrolls: a scrolling
                 // node gives way when the column is too tall), so a short page leaves no empty
                 // half (chiacraft, Planner 11-24).

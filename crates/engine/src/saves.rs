@@ -1109,8 +1109,12 @@ impl Screen for CreateWorld {
     }
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
-        frame(ui, cx, "world.create", |ui| {
-            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(260.0), |ui| {
+        // Style 1: in the titled window; the name and seed need no frame of their own there.
+        let framed = cx.look.texture("menu_panel", "").is_some();
+        crate::screens::window(ui, cx, "world.create", 6.0, |ui| {
+            let fields = Kind::Container { class: (!framed).then(|| "panel".to_string()) };
+            let pad = if framed { 0.0 } else { 8.0 };
+            ui.with(fields, Style::default().pad(pad).gap(4.0).stretch().w(260.0), |ui| {
                 label(ui, cx, "world.name", &[], "default");
                 // The default name in the player's language (chiacraft; it was "New World" in every one).
                 let name = ui.add(Kind::input(cx.lang.get("world.default_name"), 32), Style::default().h(18.0).stretch());

@@ -249,9 +249,10 @@ pub struct TextNode {
     /// Fixed-width glyphs, so changing numbers do not move the text after them.
     pub mono: bool,
     pub scale: f32,
-    /// A larger scale the text takes when its box has room for it, else 1 (chiacraft, style 1:
-    /// button labels at 2x, the title's look, without widening a narrow button): measured 1x wide
-    /// and `fit` tall, and centred in its box. 0 for none.
+    /// A larger scale the text takes when its box has room for it, else the largest whole scale
+    /// below that fits, 1 at least (chiacraft, style 1: button labels at 2x and window headings at
+    /// 3x, without widening a narrow box): measured 1x wide and `fit` tall, and centred in its
+    /// box. 0 for none.
     pub fit: f32,
     pub color: Option<u32>,
     pub center: bool,
@@ -950,11 +951,13 @@ impl Ui {
         if let Kind::Text(t) = &mut self.nodes[id].kind
             && t.fit > 0.0
         {
-            let big = t.layout.width * t.fit * unit <= inner.w + 0.5;
-            t.scale = if big { t.fit } else { 1.0 };
-            if !big {
-                lower = (t.layout.height * (t.fit - 1.0) / 2.0).round() * unit;
+            // The largest whole scale from `fit` down that fits, 1 at least.
+            let mut s = t.fit;
+            while s > 1.0 && t.layout.width * s * unit > inner.w + 0.5 {
+                s = (s - 1.0).max(1.0);
             }
+            t.scale = s;
+            lower = (t.layout.height * (t.fit - s) / 2.0).round() * unit;
         }
         self.nodes[id].rect.y += lower;
         if let Kind::Text(t) = &mut self.nodes[id].kind {
