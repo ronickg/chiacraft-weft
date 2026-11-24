@@ -105,13 +105,12 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
   07 low 76/169/231 (101/174/234); vistas as before (06: 52/129/220 against 59/131/213). 18:00
   went 24/65/125 (Bliss 34/65/115) from `look_glow_fill 0`, now set by the live script, not from this.
 
+## Open
 
-
-- Why Bliss's thick mist still varies broadly (thick, yet bright and dark in large patches) where
-  ours goes even when thick: Planner's line-by-line read of our lighting and compositing against
-  Bliss's GetVolumetricFog is running.
-- The ring round the sun through mist at 06 (yellow-green-pink): maybe hue shift at the curve's
-  shoulder.
+- 07 low darks now a little deep (p5 76 against Bliss's 101): the fade's far end may want shortening.
+- Bliss's large gold-white glow on the horizon round the sun, bleeding into the mist below: check
+  against the peak cap of 1.2; maybe a horizon-only glow.
+- The faint lavender arc at 07 low.
 - Dawn clouds saturated yellow; 19:00 night curve; midday greens; horizon band.
 - Before ready: merge dev, niced `cargo check --workspace --all-targets`, keep the ENGINE_CHANGES
   row, bench the banks at Max on the final candidate.
