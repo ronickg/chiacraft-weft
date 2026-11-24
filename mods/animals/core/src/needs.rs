@@ -386,6 +386,13 @@ pub const FLEE_DROP: i32 = 1;
 const _: () = assert!(HEAL_AFTER > 1.0);
 const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WAY_OUT_WAYS);
 
+/// A hungry hunter with no prey in sight and no kill site to go to prowls: a leg of this many
+/// blocks a new way at a time, looking as it goes (`hunt::prowl`), each leg at most `PROWL_SECS`.
+/// Without it a jaguar 24 blocks from a resting herd sat a whole run where it arrived, starving,
+/// and never saw them (ai1124_jaguar1): a big cat or a wolf pack ranges kilometres a day for prey.
+pub const PROWL_LEG: f64 = 16.0;
+pub const PROWL_SECS: f32 = 15.0;
+
 /// Healing: an animal watered (its water at `THIRSTY` or more) and unhurt for `HEAL_AFTER`
 /// seconds heals its whole health in `HEAL_DAYS` game days while fed (its food at `HUNGRY` of its
 /// most or more), slower as it grows thin, not at all at `HEAL_THIN` (as thin as a wild one

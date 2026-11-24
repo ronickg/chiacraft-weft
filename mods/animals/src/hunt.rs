@@ -31,6 +31,8 @@ static WARY: Component<u64> = Component::named("animal_wary");
 static CHARGING: Component<u64> = Component::named("animal_charging");
 /// When it last stood its ground (`stands_ground`; not saved): a stand that begins is shown by a rear.
 static STOOD: Component<u64> = Component::named("animal_stood");
+/// Until when it walks a prowl's leg (`prowl`; not saved).
+static PROWL: Component<u64> = Component::named("animal_prowl");
 
 /// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
 /// a dust storm close both in (`base_api::sight`).
@@ -50,11 +52,13 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&WARY, 0u64, 0);
     r.entity_component(&CHARGING, 0u64, 0);
     r.entity_component(&STOOD, 0u64, 0);
+    r.entity_component(&PROWL, 0u64, 0);
     for s in &SPECIES {
         r.edit(s.kind).attach(&HUNT);
         r.edit(s.kind).attach(&WARY);
         r.edit(s.kind).attach(&CHARGING);
         r.edit(s.kind).attach(&STOOD);
+        r.edit(s.kind).attach(&PROWL);
     }
     // A kill feeds the hunter that made it, by the prey's mass against its own.
     r.on_event(&actions::DIE, |b| {
@@ -200,7 +204,8 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     }
     if now < h[2] {
         w.component_mut(id, &HUNT).map(|c| *c = h);
-        return false;
+        // On a prowl's leg it keeps the turn, looking again at `LOOK_EVERY`.
+        return w.component(id, &PROWL).is_some_and(|p| now < p) && w.navigating(id);
     }
     h[2] = now + LOOK_EVERY;
     // Out of its hours it rests rather than hunts, unless hunger presses (`routines::HUNTS_FROM`).
@@ -234,9 +239,12 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         {
             weft_sdk::info!("{} {id} goes to a kill site at {:.0} {:.0}", s.name, site[0], site[2]);
             w.navigate(id, site, 1.0);
+            return false;
         }
-        return false;
+        // Nor any kill site: it prowls for prey (`prowl`).
+        return prowl(w, id, st, s, now);
     };
+    w.component_mut(id, &PROWL).map(|p| *p = 0);
     weft_sdk::info!("{} {id} hunts {} ({kg:.1} kg, a pack of {pack})", s.name, t);
     if pack >= species::PACK && !s.takes(own, kg) {
         rally(w, id, st, t, now);
@@ -251,6 +259,33 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     crate::commands::fight(w, id, st, t);
+    true
+}
+
+/// A hungry hunter with nothing in sight and no kill site: it walks a leg of
+/// `needs::PROWL_LEG` blocks a new way, onto ground its paths reach, and keeps the turn while it
+/// walks it (`needs::PROWL_SECS` at most), looking for prey at each `LOOK_EVERY`. True while it
+/// prowls.
+fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64) -> bool {
+    use animals_core::needs::{FLEE_DROP, PROWL_LEG, PROWL_SECS};
+    if w.component(id, &PROWL).is_some_and(|p| now < p) && w.navigating(id) {
+        return true;
+    }
+    let y = st.pos.y.floor() as i32;
+    let start = w.random_below(8);
+    let leg = (0..8).find_map(|k| {
+        let a = (start + k) as f64 * std::f64::consts::TAU / 8.0;
+        let (x, z) = (st.pos.x + a.cos() * PROWL_LEG, st.pos.z + a.sin() * PROWL_LEG);
+        let g = (y - (FLEE_DROP + 2)..=y + 1)
+            .rev()
+            .find(|&g| crate::comfort::ground(w, x.floor() as i32, g, z.floor() as i32) == Some(g))?;
+        Some([x, g as f64, z])
+    });
+    let Some(to) = leg else { return false };
+    weft_sdk::info!("{} {id} prowls for prey toward {:.0} {:.0} {:.0}", s.name, to[0], to[1], to[2]);
+    w.navigate(id, to, 1.0);
+    w.component_mut(id, &PROWL)
+        .map(|p| *p = now + (PROWL_SECS * 20.0) as u64);
     true
 }
 
