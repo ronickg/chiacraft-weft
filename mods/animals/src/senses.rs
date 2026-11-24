@@ -264,7 +264,7 @@ pub fn sense(w: &World, id: u64, st: &EntityState, watch: impl Fn(f32) -> f64) -
     s
 }
 
-/// Whether a hungry hunter `s` wants prey now (`hunt::hunt` hunts under `needs::HUNGRY` and keeps
+/// Whether a hungry hunter `s` wants prey now (`hunt::hunt` hunts under `needs::HUNTS_AT` and keeps
 /// on to `needs::FULL`).
 fn hunting(w: &World, id: u64, s: &Species, tamed: bool) -> bool {
     !tamed
