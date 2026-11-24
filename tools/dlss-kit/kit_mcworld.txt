@@ -9,7 +9,7 @@ chat /time set 6000
 chat /tk mode spectator
 key F1
 set_config core:vsync 0
-set_config core:fps_cap 0
+set_config core:fps_limit 0
 chat /tp 165.5 200 168.5
 wait 10
 loaded
