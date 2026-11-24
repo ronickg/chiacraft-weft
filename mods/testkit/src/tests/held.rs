@@ -247,16 +247,19 @@ pub async fn held_water_swim(t: T) -> R {
     t.hold("core:sprint", 4.0);
     t.hold("core:forward", 4.0);
     t.secs(0.5).await?;
-    let mut swum = 0;
-    for _ in 0..120 {
+    // 2.5 s inside the 4 s hold by the script clock, not 120 frames: on CI (software Vulkan) those
+    // outlast the hold.
+    let (end, mut frames, mut swum) = (crate::runner::script_clock() + std::time::Duration::from_secs_f32(2.5), 0, 0);
+    while crate::runner::script_clock() < end {
         t.frames(1).await?;
+        frames += 1;
         swum += t
             .c()
             .view()
             .player_state()
             .is_some_and(|m| m.pose == abi::pose::SWIM) as u32;
     }
-    t.check(swum > 20, format!("swam through the weed for {swum} frames"));
+    t.check(swum >= 3 && swum * 3 > frames, format!("swam through the weed for {swum} of {frames} frames"));
     t.secs(4.0).await?;
     let moved = (s.z - t.state().pos.z).abs();
     t.check(moved > 3.0, format!("got somewhere through it: {moved:.1} blocks"));

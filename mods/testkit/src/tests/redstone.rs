@@ -926,8 +926,10 @@ pub async fn redstone_floater(t: T) -> R {
         }
     }
     t.check(own.is_some(), "it is a platform on its way");
-    t.check(seen_lit, "the lamp is on it");
     t.secs(4.0).await?;
+    // On CI the whole trip can fall between two looks: then the lamp landed with it.
+    let lamp_landed = t.block(at(9, 1)).await?.contains("lamp");
+    t.check(seen_lit || lamp_landed, "the lamp is on it");
     t.check(t.block(at(9, 0)).await?.contains("slime"), format!("at the wall it landed: {}", t.block(at(9, 0)).await?));
     t.check(t.block(at(7, 0)).await?.contains("floater"), "the floater with it");
     t.check(t.block(at(8, 1)).await?.contains("stone"), "and the block on the slime");
@@ -984,12 +986,14 @@ pub async fn redstone_floater(t: T) -> R {
         }
     }
     t.check(floater.is_some(), "the floater is on it");
+    // Where it is now: on CI it moved on between the looks, and a fixed span missed the slime.
+    let near_x = along(t.clone(), id.clone()).await?.floor() as i32 - f[0];
     t.op(&format!("sblock {id} {} 0 0 core:air", floater.unwrap_or(0)))
         .await?;
     t.secs(1.0).await?;
     t.check(t.op(&format!("entity {id}")).await.is_err(), "it landed");
     let mut landed = Vec::new();
-    for x in 1..30 {
+    for x in (near_x - 2).max(1)..near_x + 20 {
         if t.block(add(f, [x, y + 12, z])).await?.contains("slime") {
             landed.push(x);
         }
@@ -1095,9 +1099,9 @@ pub async fn body_walking(t: T) -> R {
     };
     let (b, p) = (pos(t.clone(), id.to_string()).await?, pos(t.clone(), pig.clone()).await?);
     let start_z = p[2] - b[2];
-    // Somewhere on the deck.
-    t.op(&format!("navigate {pig} {} {} {}", p[0].floor(), p[1].floor(), p[2].floor() as i32 + 2))
-        .await?;
+    // Somewhere on the deck: two blocks on from where it stands when the order arrives (the deck
+    // flies at 6 a second; a point read a round trip before was off it on CI).
+    t.op(&format!("navigate_by {pig} 0 0 2")).await?;
     t.secs(3.0).await?;
     let (b, p) = (pos(t.clone(), id.to_string()).await?, pos(t.clone(), pig.clone()).await?);
     t.check(p[1] > b[1] + 0.5, format!("it is still on the deck: {p:?} on {b:?}"));
@@ -2100,34 +2104,28 @@ pub async fn redstone_on_a_structure(t: T) -> R {
         .await?;
     t.op(&format!("structureset {id} -1 2 0 base:piston[facing=east]"))
         .await?;
+    // Watched on the client each frame: the piston's body lives a few ticks, and server ops one
+    // a frame (5 fps on CI) missed it.
+    let moving = EntityKind::lookup("core:moving_blocks").ok_or("no moving blocks kind")?;
+    if t.c().entity(uid).is_none() {
+        let near = t.op(&format!("near {} {} {} 40", f[0] + 4, f[1] + 2, f[2] - 4)).await?;
+        return Err(format!("the lift is gone before the piston moved (CI: 'entity 4'): {near}"));
+    }
     let (mut seen, mut carried) = (false, false);
-    let at = |t: T, id: String| async move {
-        let line = t.op(&format!("entity {id}")).await?;
-        let v: Vec<f64> = line
-            .split_whitespace()
-            .skip(1)
-            .take(3)
-            .filter_map(|s| s.parse().ok())
-            .collect();
-        Ok::<_, String>(v)
-    };
-    let lift = at(t.clone(), id.clone()).await?;
     t.op(&format!("structureset {id} -1 3 0 base:redstone_block"))
         .await?;
-    for _ in 0..8 {
-        let list = t
-            .op(&format!("near {} {} {} 8", lift[0].floor(), lift[1].floor(), lift[2].floor()))
-            .await?;
-        if let Some(m) = list
-            .split_whitespace()
-            .find(|e| e.ends_with("core:moving_blocks"))
-            .and_then(|e| e.split(':').next())
-        {
-            seen = true;
-            let (l, b) = (at(t.clone(), id.clone()).await?, at(t.clone(), m.to_string()).await?);
-            carried |= b.len() == 3 && (b[1] - l[1] - 2.0).abs() < 0.3;
+    t.until("the piston's body at the structure's height", Duration::from_secs(5), |t| {
+        let Some(lift) = t.c().entity(uid) else { return false };
+        for e in t.c().entities() {
+            if let Some(b) = t.c().entity(e).filter(|b| b.kind == moving) {
+                seen = true;
+                carried |= (b.pos.y - lift.pos.y - 2.0).abs() < 0.3;
+            }
         }
-    }
+        carried
+    })
+    .await
+    .ok();
     t.check(seen, "what the piston moves is a body of the region, not lost inside the structure");
     t.check(carried, "at the height of the structure it is on");
     settle(&t).await?;
