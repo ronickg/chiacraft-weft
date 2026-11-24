@@ -29,6 +29,8 @@ const LOOK_UP: i32 = 2;
 /// Ticks: walking before it looks again, and waiting when no water is near.
 const WALK: f64 = 200.0;
 const NOTHING: f64 = 400.0;
+/// Seconds between its looks round for water it isn't after yet (`notice`).
+const NOTICE_SECS: u64 = 30;
 /// Share of its water a second of rain on it, or of standing in water, gives.
 const RAIN: f32 = 0.005;
 const WADING: f32 = 0.05;
@@ -62,6 +64,9 @@ fn lasts(w: &World, id: u64, a: &Animal) -> Option<f32> {
 /// loses health (dead in `PARCHED_SECS` at full health).
 pub fn thirst(w: &World, id: u64, a: &Animal, st: &EntityState, rate: f32, secs: f32) {
     let Some(lasts) = lasts(w, id, a) else { return };
+    if (w.game_time() / 20 + id).is_multiple_of(NOTICE_SECS) && !animal::tamed(w, id) {
+        notice(w, id, st.pos.to_array());
+    }
     let eye = [st.pos.x, st.pos.y + st.size.eye as f64, st.pos.z].map(|v| v.floor() as i32);
     let rained = w.sky_light(eye) >= 15 && w.raining_at(eye);
     let mut t = a.thirst + rate / lasts * secs;
@@ -104,7 +109,7 @@ fn find_water(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3], driven: bool
         .find_map(|k| nearest_water(w, [k[0], k[1], k[2]].map(|v| v.floor() as i32), AGAIN, pos));
     let found = match again.or_else(|| nearest_water(w, pos.map(|v| v.floor() as i32), LOOK, pos)) {
         Some(f) => f,
-        None => trek(w, id, kind, pos, &known)?,
+        None => trek(w, id, kind, pos)?,
     };
     // A waterhole where its kind was killed it keeps off unless thirst drives it (`memory`).
     if !driven && crate::memory::fear_at(w, found) >= animals_core::memory::AVOID {
@@ -125,24 +130,8 @@ fn find_water(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3], driven: bool
 /// `senses::KIN` remembers drinking at, up to `groups::WATER_TREK` blocks off, if it is still a
 /// shore. Its herd goes with it (`group.rs`). Looked for only when nothing is near, at most every
 /// `NOTHING` ticks.
-fn trek(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3], known: &[[f32; 4]; 2]) -> Option<[f64; 3]> {
-    let mut places: Vec<([f64; 3], u64)> = known
-        .iter()
-        .filter(|k| k[3] != 0.0)
-        .map(|k| ([k[0], k[1], k[2]].map(f64::from), id))
-        .collect();
-    for o in w.entities_near(pos, crate::senses::KIN, Some(kind)) {
-        if o == id || crate::animal::tamed(w, o) {
-            continue;
-        }
-        let theirs = w.component(o, &WATERS).unwrap_or_default();
-        places.extend(
-            theirs
-                .iter()
-                .filter(|k| k[3] != 0.0)
-                .map(|k| ([k[0], k[1], k[2]].map(f64::from), o)),
-        );
-    }
+fn trek(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3]) -> Option<[f64; 3]> {
+    let mut places = herd_waters(w, id, kind, pos);
     let far = animals_core::groups::WATER_TREK as f64;
     places.retain(|(p, _)| crate::dist2(*p, pos) <= far * far);
     places.sort_by(|a, b| crate::dist2(a.0, pos).total_cmp(&crate::dist2(b.0, pos)));
@@ -158,6 +147,91 @@ fn trek(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3], known: &[[f32; 4];
         Some(found)
     })
 }
+
+/// Water `id` sees in passing (within `LOOK` blocks) it remembers, as if it had drunk there,
+/// when it knows none within `RECALL` already: a wild one knows the water in its range before it
+/// is thirsty (ai1124_graze2: the deer grazed away from the pool they were spawned beside before
+/// they ever drank, and never found it again).
+fn notice(w: &World, id: u64, pos: [f64; 3]) {
+    let mut known = w.component(id, &WATERS).unwrap_or_default();
+    if known
+        .iter()
+        .any(|k| k[3] != 0.0 && (k[0] as f64 - pos[0]).powi(2) + (k[2] as f64 - pos[2]).powi(2) <= RECALL * RECALL)
+    {
+        return;
+    }
+    let Some(found) = nearest_water(w, pos.map(|v| v.floor() as i32), LOOK, pos) else { return };
+    known = [[found[0] as f32, found[1] as f32, found[2] as f32, 1.0], known[0]];
+    if let Some(c) = w.component_mut(id, &WATERS) {
+        *c = known;
+    }
+    weft_sdk::debug!("animal {id} notes water at {found:?}");
+}
+
+/// The places with water `id` and the wild ones of its kind within `senses::KIN` of `pos`
+/// remember (with who remembers each).
+fn herd_waters(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3]) -> Vec<([f64; 3], u64)> {
+    let mut places: Vec<([f64; 3], u64)> = Vec::new();
+    for o in std::iter::once(id).chain(
+        w.entities_near(pos, crate::senses::KIN, Some(kind))
+            .into_iter()
+            .filter(|&o| o != id),
+    ) {
+        if o != id && crate::animal::tamed(w, o) {
+            continue;
+        }
+        let theirs = w.component(o, &WATERS).unwrap_or_default();
+        places.extend(
+            theirs
+                .iter()
+                .filter(|k| k[3] != 0.0)
+                .map(|k| ([k[0], k[1], k[2]].map(f64::from), o)),
+        );
+    }
+    places
+}
+
+/// How far (x and z) the water nearest `at` that `id`'s herd knows lies from it; None: they know
+/// none.
+pub fn herd_water_from(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3], at: [f64; 2]) -> Option<f64> {
+    herd_waters(w, id, kind, pos)
+        .into_iter()
+        .map(|(p, _)| ((p[0] - at[0]).powi(2) + (p[2] - at[1]).powi(2)).sqrt())
+        .min_by(f64::total_cmp)
+}
+
+/// Its range (`groups::WATER_RANGE`), in place of a wander: a wild drinker further than that from
+/// the nearest water it or its herd knows walks back toward it, a leg at a time. None: it is
+/// within it, knows no water, or doesn't drink (it wanders).
+pub fn home(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {
+    let a = w.component(id, &ANIMAL)?;
+    let s = a.species()?;
+    if animal::tamed(w, id) || !s.hungry_in_the_wild() || lasts(w, id, &a).is_none() {
+        return None;
+    }
+    let pos = st.pos.to_array();
+    let (p, _) = herd_waters(w, id, s.kind, pos)
+        .into_iter()
+        .min_by(|a, b| crate::dist2(a.0, pos).total_cmp(&crate::dist2(b.0, pos)))?;
+    let d = ((p[0] - pos[0]).powi(2) + (p[2] - pos[2]).powi(2)).sqrt();
+    let range = animals_core::groups::WATER_RANGE as f64;
+    if d <= range {
+        return None;
+    }
+    if w.navigating(id) {
+        return Some(true);
+    }
+    // A leg back toward it, ending well inside its range.
+    let step = (d - range / 2.0).min(LEG) / d;
+    let (tx, tz) = (pos[0] + (p[0] - pos[0]) * step, pos[2] + (p[2] - pos[2]) * step);
+    let y = crate::comfort::ground(w, tx.floor() as i32, st.pos.y.floor() as i32, tz.floor() as i32).map_or(st.pos.y, f64::from);
+    weft_sdk::info!("animal {id} turns back toward water it knows at {:.0} {:.0} ({d:.0} blocks)", p[0], p[2]);
+    w.navigate(id, [tx, y, tz], speed);
+    Some(true)
+}
+
+/// Blocks a leg back toward its range goes at most (`home`).
+const LEG: f64 = 12.0;
 
 /// Testing (`/animalprof recall`): `id` remembers drinking at `p`.
 pub fn remember(w: &World, id: u64, p: [f64; 3]) {

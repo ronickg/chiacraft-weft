@@ -74,6 +74,17 @@ pub const WATER_TREK: f32 = 96.0;
 // Further than it looks or goes back on its own (`drink.rs` LOOK 16, RECALL 32).
 const _: () = assert!(WATER_TREK > 32.0);
 
+/// A wild drinker keeps within this many blocks of the nearest water it knows (`drink::home`):
+/// wandering further, it turns back toward it; and a herd's leader leads it only to ground this
+/// near water its herd knows (`migrate.rs`). Grazers that drink stay within reach of water in
+/// the dry season (zebra and wildebeest within a day's walk of it, Redfern et al. 2003, *Ecology*
+/// 84; savanna elephants and buffalo the same) and the dry-season migrations follow the rivers;
+/// half the trek here, so a thirsty one is always within its trek of what it knows.
+/// Without it a winter savanna's deer grazed and wandered 130-145 blocks from the only pool and
+/// died parched (ai1124_graze2).
+pub const WATER_RANGE: f32 = 48.0;
+const _: () = assert!(2.0 * WATER_RANGE <= WATER_TREK && WATER_RANGE >= MIGRATE_RINGS[0]);
+
 /// The dry season's migration (slice 5; `notes/ECOLOGY.md`, "Later": herds move towards wetter
 /// ground in the dry season). A grazing herd's leader in its place's dry season
 /// (`vitals::climate::dry_season`) looks this often (ticks: a game minute) at the rain of the
