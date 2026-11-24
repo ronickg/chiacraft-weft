@@ -1738,6 +1738,9 @@ command.base.ruin.knows = blueprints known: {0}
 command.base.ruin.no_blueprint = no blueprint {0} (crucible, ironwork, forge, all)
 command.base.ruin.pillar = pillar at {0} {1} {2}: {3} high (built {4})
 command.base.ruin.pillars = pillars standing: {0} of {1} (floor at y {2}: {3})
+hint.base.ward.refuses = The {0} holds: a stronger pickaxe would break it.
+command.base.ruin.check_line = {0}: {1} of {2}
+command.base.ruin.check = check {0}: {3} ({1} {2})
 # Waystones and the map (waystones.rs, map.rs; vitals::waystones)
 key.base.map = Map
 map.base.title = Map

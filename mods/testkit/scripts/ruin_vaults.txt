@@ -1,0 +1,179 @@
+# The knowledge gate's Bronze and Iron ruins (vitals::ruins, ruins.rs): the sealed vault (sealed
+# stone, ward 170) and the deep vault (warded stone, ward 210, a spiral stair down its shaft), each
+# seen whole in spectator and checked block by block, then opened in survival: a pickaxe below the
+# ward is refused (the block stays), one at the ward breaks it (copper 170, bronze 210), and the
+# pedestal inside gives its blueprint (ironwork, forge), both read at the end. One copy, a fresh world.
+# Passes when every `until` meets. Read in run.log and the shots:
+# - "check sealed vault: whole (x z)" and "check deep vault: whole (x z)", each after its lines
+#   "<block>: n of n" (sealed_stone, ley_stone, the pedestal, air inside; warded_stone, the stair);
+# - vault_above.png / vault_side.png and deep_above.png / deep_side.png: from 12 above and 15 out;
+#   deep_shaft.png: down the shaft, the stair turning round its centre pillar;
+# - vault_refused.png / deep_refused.png: the roof block in front of the player still there after the low
+#   pickaxe (and its hint "The ... holds" on screen); vault_open.png / deep_open.png: the hole;
+# - vault_pedestal.png / deep_pedestal.png: inside, the pedestal; the /tk inv lines show
+#   the blueprints (the broken stone falls into the vault, out of reach);
+# - "blueprints known: ironwork forge" at the end.
+loaded
+idle
+chat /ruin forget all
+until chat blueprints known: - within 10
+chat /ruin
+until chat nearest within 10
+# 1. Both vaults seen whole, in spectator (absolute places from /ruin goto), and checked.
+chat /tk mode spectator
+until mode spectator within 10
+chat /ruin goto vault above
+until chat beside the sealed vault within 20
+wait 3
+loaded
+idle
+look 0 -60
+wait 2
+shot vault_above.png
+chat /ruin goto vault side
+wait 3
+loaded
+idle
+look 0 -5
+wait 2
+shot vault_side.png
+chat /ruin check vault
+until chat check sealed vault: whole within 10
+chat /ruin goto deep above
+until chat beside the deep vault within 20
+wait 3
+loaded
+idle
+look 0 -60
+wait 2
+shot deep_above.png
+chat /ruin goto deep side
+wait 3
+loaded
+idle
+look 0 -5
+wait 2
+shot deep_side.png
+chat /ruin goto deep shaft
+wait 3
+loaded
+idle
+look 0 -85
+wait 2
+shot deep_shaft.png
+chat /ruin check deep
+until chat check deep vault: whole within 10
+# 2. The sealed vault in survival: on its roof, aiming at the roof block one north of the feet
+# (digging straight down dropped the player in and on through the floor: pl1124_vaults1).
+chat /tk mode survival
+until mode survival within 10
+chat /ruin goto vault roof
+wait 3
+loaded
+idle
+until block ~ ~-1 ~-1 base:sealed_stone within 10
+look 0 -60
+# A flint pickaxe (harvest 100): refused, the roof stays.
+chat /gear pickaxe flint slot=0
+wait 1
+hold core:attack 8
+wait 1
+until block ~ ~-1 ~-1 base:sealed_stone within 3
+shot vault_refused.png
+# A copper one (170, the ward): it breaks, and drops its stone.
+chat /gear pickaxe copper slot=0
+wait 1
+hold core:attack 10
+until block ~ ~-1 ~-1 core:air within 5
+wait 2
+shot vault_open.png
+chat /tk inv me
+wait 1
+# 3. Inside, facing the pedestal: the ironwork blueprint.
+chat /ruin goto vault inside
+wait 3
+loaded
+idle
+look 0 -30
+wait 1
+shot vault_pedestal.png
+# The hotbar after the pickaxe emptied (a count of 0 is empty; core:air is no item) (the broken stone picked up), so the blueprint lands in slot 1.
+chat /tk put me 1 base:stick 0
+chat /tk put me 2 base:stick 0
+chat /tk put me 3 base:stick 0
+chat /tk put me 4 base:stick 0
+chat /tk put me 5 base:stick 0
+chat /tk put me 6 base:stick 0
+chat /tk put me 7 base:stick 0
+chat /tk put me 8 base:stick 0
+wait 1
+press core:use
+wait 1
+chat /tk inv me
+chat /tk slot me 1
+until chat base:blueprint_ironwork 1 within 5
+# 4. The deep vault in survival: in its shaft, on the room's roof, aiming one north the same way.
+chat /ruin goto deep roof
+until chat beside the deep vault within 20
+wait 3
+loaded
+idle
+until block ~ ~-1 ~-1 base:warded_stone within 10
+look 0 -60
+# Flint (100) and copper (170): both refused.
+chat /gear pickaxe flint slot=0
+wait 1
+hold core:attack 8
+wait 1
+until block ~ ~-1 ~-1 base:warded_stone within 3
+chat /gear pickaxe copper slot=0
+wait 1
+hold core:attack 8
+wait 1
+until block ~ ~-1 ~-1 base:warded_stone within 3
+shot deep_refused.png
+# Bronze (210, the ward): it breaks.
+chat /gear pickaxe bronze slot=0
+wait 1
+hold core:attack 12
+until block ~ ~-1 ~-1 core:air within 5
+wait 2
+shot deep_open.png
+chat /tk inv me
+wait 1
+# 5. Inside, facing the pedestal: the forge blueprint.
+chat /ruin goto deep inside
+wait 3
+loaded
+idle
+look 0 -30
+wait 1
+shot deep_pedestal.png
+# Slot 2 on emptied, so the forge blueprint lands there.
+chat /tk put me 2 base:stick 0
+chat /tk put me 3 base:stick 0
+chat /tk put me 4 base:stick 0
+chat /tk put me 5 base:stick 0
+chat /tk put me 6 base:stick 0
+chat /tk put me 7 base:stick 0
+chat /tk put me 8 base:stick 0
+wait 1
+press core:use
+wait 1
+chat /tk inv me
+chat /tk slot me 2
+until chat base:blueprint_forge 1 within 5
+# 6. Read both (hotbar slots 1 and 2, keys 2 and 3; slot 0 is the pickaxe), looking up, away
+# from the pedestal (pl1124_vaults2: the broken stone took slots 1 and 3, so key 3 read ironwork).
+look 0 60
+key 2
+wait 1
+press core:use
+wait 1
+key 3
+wait 1
+press core:use
+wait 1
+chat /ruin
+until chat blueprints known: ironwork forge within 10
+quit

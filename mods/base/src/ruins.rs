@@ -37,6 +37,7 @@ pub static WARDED_STONE: Block = Block::named("warded_stone");
 /// The ancients' lectern in every ruin: gives each player the ruin's blueprint once.
 pub static PEDESTAL: Block = Block::named("ruin_pedestal");
 static MOSSY_COBBLESTONE: Block = Block::named("mossy_cobblestone");
+static PICKAXES: Tag = Tag::named("tools/pickaxe");
 
 fn item_of(b: &Blueprint) -> &'static Item {
     match b.id {
@@ -82,6 +83,32 @@ pub fn register(r: &mut Registry) {
         .top("ruin_pedestal_top")
         .bottom("ley_stone_top")
         .tab(&crate::tabs::BUILDING);
+    // A ward refuses a pickaxe below its harvest: mining doesn't start (a block too hard for a
+    // tool otherwise still breaks, dropping nothing, which would open the vault).
+    r.before_event(&actions::BREAK_BLOCK, |q| {
+        let state = q.state();
+        let need = if SEALED_STONE.is(state) {
+            n::WARD_BRONZE
+        } else if WARDED_STONE.is(state) {
+            n::WARD_IRON
+        } else {
+            return Verdict::Abstain;
+        };
+        let w = q.world();
+        let p = q.entity();
+        if p != 0 && w.creative(p) {
+            return Verdict::Abstain;
+        }
+        let tool = if p == 0 { ItemStack::EMPTY } else { w.inventory(p).group("hotbar").get(w.selected_slot(p)) };
+        let level = if PICKAXES.on_item(tool.item) { TOOL_LEVEL.on_stack(&tool).unwrap_or(0) } else { 0 };
+        if level >= need {
+            return Verdict::Abstain;
+        }
+        if p != 0 {
+            w.hint("hint.base.ward.refuses", &[Arg::Name(&format!("block:{}", block_name(state)))]).to(p);
+        }
+        Verdict::Deny
+    });
     r.decoration(ruins).dimension(&crate::OVERWORLD);
     r.command("ruin", "[what:word] [which:word] [how:word]", command);
 }
@@ -223,6 +250,9 @@ fn pedestal_used(u: &mut Use) -> bool {
 
 // ------------------------------------------------------------------ building them
 
+/// The deep vault's spiral stair: the ring cells round the shaft's pillar, a step one lower each.
+const STAIR: [(i32, i32); 8] = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)];
+
 /// A ruin's own noise at (`dx`, `dz`) from its centre.
 fn noise(ruin: &Ruin, dx: i32, dz: i32) -> u32 {
     let mut v = ((ruin.x + dx) as u32 as u64) ^ (((ruin.z + dz) as u32 as u64) << 32) ^ ruin.key() as u64;
@@ -346,11 +376,10 @@ fn ruin_blocks(ruin: &Ruin, ground: &dyn Fn(i32, i32) -> i32) -> Vec<([i32; 3], 
                     }
                 }
             }
-            const RING: [(i32, i32); 8] = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)];
             let mut k = 0;
             let mut y = gy;
             while y > roof + 1 {
-                let (dx, dz) = RING[k % 8];
+                let (dx, dz) = STAIR[k % 8];
                 out.push(([x + dx, y, z + dz], stone, false));
                 k += 1;
                 y -= 1;
@@ -453,8 +482,30 @@ fn command(cmd: &mut ServerCommand) {
             // For look shots in spectator (11-24, Planner).
             let how = cmd.text("how").map(str::to_string);
             let centre = base_api::land::height(&f, ruin.x * 16, ruin.z * 16) >> 4;
+            let floor = centre - ruin.kind().depth;
             let (dx, dz, up) = match how.as_deref() {
                 Some("above") => (0, 6, Some(centre + 12)),
+                // Inside a vault, two south of its pedestal (yaw 0 faces it).
+                Some("inside") if !ring => (0, 2, Some(floor + 1)),
+                // On a vault's roof with roof one north of it (`look 0 -60` aims at that one, so
+                // breaking it doesn't drop the player in): one south of the sealed vault's middle;
+                // the deep vault's in its shaft, a side cell pair clear of the stair's last two
+                // steps (head room; pl1124_vaults1: digging straight down fell through the floor).
+                Some("roof") if !ring => {
+                    if ruin.kind().id == "deep" {
+                        let last = (centre - (floor + 4) - 2).max(0) as usize;
+                        let steps = [STAIR[last % 8], STAIR[(last + 7) % 8]];
+                        let (cx, cz) = [(-1, 1), (-1, 0), (1, 1), (1, 0)]
+                            .into_iter()
+                            .find(|&(cx, cz)| !steps.contains(&(cx, cz)) && !steps.contains(&(cx, cz - 1)))
+                            .unwrap_or((-1, 1));
+                        (cx, cz, Some(floor + 5))
+                    } else {
+                        (0, 1, Some(centre + 1))
+                    }
+                }
+                // Over the deep vault's shaft, to look down its stair.
+                Some("shaft") if !ring => (1, 1, Some(centre + 3)),
                 Some("side") => {
                     let there = base_api::land::height(&f, ruin.x * 16, (ruin.z + 15) * 16) >> 4;
                     (0, 15, Some(there.max(centre) + 1))
@@ -473,6 +524,45 @@ fn command(cmd: &mut ServerCommand) {
             cmd.reply(
                 "command.base.ruin.goto",
                 &[Arg::Key(&format!("ruin.base.{}", ruin.kind().id)), Arg::Int(ruin.x as i64), Arg::Int(ruin.z as i64)],
+            );
+        }
+        Some("check") if master => {
+            // The nearest ruin of a kind as it stands, against what its decoration builds: each
+            // block it puts (not the soft clearing), by block, how many are there (a run's proof).
+            let k = which.as_deref().and_then(|id| n::KINDS.iter().position(|k| k.id == id)).unwrap_or(0);
+            let Some(ruin) = n::nearest(seed, spawn, k, x, z, 2) else {
+                cmd.reply("command.base.ruin.none", &[Arg::Key(&format!("ruin.base.{}", n::KINDS[k].id))]);
+                return;
+            };
+            let f = base_api::land::fields(seed);
+            let ground = |gx: i32, gz: i32| base_api::land::height(&f, gx * 16, gz * 16) >> 4;
+            let mut planned: std::collections::BTreeMap<[i32; 3], u32> = std::collections::BTreeMap::new();
+            for (p3, b, soft) in ruin_blocks(&ruin, &ground) {
+                if !soft {
+                    planned.insert(p3, b);
+                }
+            }
+            let mut by: std::collections::BTreeMap<String, (i64, i64)> = std::collections::BTreeMap::new();
+            for (p3, b) in &planned {
+                let here = w.block(*p3);
+                let name = if *b == 0 { "air".to_string() } else { block_name(*b).to_string() };
+                let ok = here == *b || block_of(here) == block_of(*b);
+                let e = by.entry(name).or_insert((0, 0));
+                e.0 += ok as i64;
+                e.1 += 1;
+            }
+            let all_ok = by.values().all(|(a, b)| a == b);
+            for (name, (a, b)) in &by {
+                cmd.reply("command.base.ruin.check_line", &[Arg::Text(name), Arg::Int(*a), Arg::Int(*b)]);
+            }
+            cmd.reply(
+                "command.base.ruin.check",
+                &[
+                    Arg::Key(&format!("ruin.base.{}", ruin.kind().id)),
+                    Arg::Int(ruin.x as i64),
+                    Arg::Int(ruin.z as i64),
+                    Arg::Text(if all_ok { "whole" } else { "broken" }),
+                ],
             );
         }
         Some("pillars") if master => {
