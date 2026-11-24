@@ -1,0 +1,92 @@
+# Hunters and a herd (`notes/ECOLOGY.md`, part 6, never yet run against a herd): a hungry jaguar
+# (the savanna's deer hunter, an ambusher, alone) and six white-tailed deer on seed 1's savanna,
+# flattened as `herd_shaft.txt`, the pond 10 blocks north. The deer fed and watered (90 %), the
+# jaguar at 30 % food (under `routines::HUNTS_ANYWAY`: it hunts at any hour), 24 blocks off.
+# Report from the log (`--log mod:animals=debug`): the jaguar's hunts (whom it chases, how long,
+# given up or a kill, what the kill fed it), the deer's flights ("runs", alarms) and where they go,
+# any deer bitten and its health after (the where rows show health/max: does it climb back while
+# fed?), deaths by cause, and whether the herd comes back to the pond and grazes after. The shot
+# is at the end.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+chat /tk fill -4 70 528 4 70 536 core:air
+chat /tk fill -2 68 530 2 68 534 base:dirt
+chat /tk fill -2 69 530 2 69 534 base:water
+wait 2
+chat /tk spawn animals:white_tailed_deer 0 70 546
+chat /tk spawn animals:white_tailed_deer 2 70 547
+chat /tk spawn animals:white_tailed_deer -2 70 547
+chat /tk spawn animals:white_tailed_deer 1 70 549
+chat /tk spawn animals:white_tailed_deer -1 70 550
+chat /tk spawn animals:white_tailed_deer 3 70 550
+wait 2
+chat /tk spawn animals:jaguar 18 70 530
+wait 1
+chat /anim log
+chat /animalprof water 0.9
+chat /animalprof food 0.9
+chat /animalprof hunters 0.3
+chat /tp 0 95 575
+wait 2
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+chat /animalprof senses
+look 0 -35
+wait 1
+shot herd_jaguar_1.png
+quit

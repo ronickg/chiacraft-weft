@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -137,6 +137,22 @@ pub fn init(r: &mut Registry) {
                     }
                 }
                 format!("{n} animals at {:.0}% water", v * 100.0)
+            }
+            "hunters" => {
+                // Every wild hunter within 96 blocks has this share of its food (its prey left as
+                // they are), for runs that watch a hunt.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(0.3).clamp(0.0, 1.0) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if let Some(a) = w.component_mut(id, &crate::animal::ANIMAL)
+                        && a.species().is_some_and(|s| s.hunts())
+                    {
+                        a.food = (a.stat(crate::species::FOOD) * v) as u16;
+                        n += 1;
+                    }
+                }
+                format!("{n} hunters at {:.0}% food", v * 100.0)
             }
             "wound" => {
                 // Every wild animal within 96 blocks down to this share of its health (a blow with
@@ -277,7 +293,7 @@ pub fn init(r: &mut Registry) {
                         let a = w.component(id, &crate::animal::ANIMAL).filter(|a| a.species != 0)?;
                         let e = w.entity(id)?;
                         Some(format!(
-                            "{id} {} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}",
+                            "{id} {} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}/{:.0}",
                             a.species()?.name,
                             e.pos.x,
                             e.pos.y,
@@ -287,7 +303,8 @@ pub fn init(r: &mut Registry) {
                                 .unwrap_or(&"?"),
                             a.food as f32 / a.stat(crate::species::FOOD).max(1.0) * 100.0,
                             (1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0,
-                            e.health
+                            e.health,
+                            e.max_health
                         ))
                     })
                     .collect();
