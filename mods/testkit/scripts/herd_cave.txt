@@ -1,0 +1,62 @@
+# Deer in the cave under seed 1's savanna pond find their way out to the water (`stuck.rs`): the
+# spot where graze10's deer 4 stood 9 samples, 10 blocks under the ground and 16 from the pond,
+# and died of thirst (every walk to the water ended where it began, and it lay down again). The
+# pond and its rim as in `herd_savanna_graze.txt`, in summer (no drying), at 5 times the pace so
+# the legs out have time (`/tick rate 100`); water at 60 % so they are thirsty but have a game
+# day and more.
+# PASS: both deer leave 1 60 528 ("is stuck at ... looks for a way out" lines for them), reach the
+# pond and drink ("anim: <id> holds drink" for each; water above 90 % in the last `/animalprof
+# where` rows) within the run, and neither dies. Report each deer's track (the where rows), how
+# long it took to reach water, its "is stuck" and "leaps out" lines, and any deer still under y 66
+# at the end.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /tk fill ~-4 ~ ~-10 ~4 ~6 ~-2 core:air
+chat /tk fill ~-4 ~-1 ~-10 ~4 ~-1 ~-2 base:grass
+chat /tk fill ~-2 ~-2 ~-8 ~2 ~-2 ~-4 base:dirt
+chat /tk fill ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+wait 3
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count 0 60 527 2 61 529 core:air
+chat /tk spawn animals:white_tailed_deer 1 60 528
+chat /tk spawn animals:white_tailed_deer 1 60 528
+wait 2
+chat /anim log
+chat /animalprof water 0.6
+chat /animalprof food 1
+chat /tp 0 90 572
+wait 3
+chat /tick rate 100
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+chat /animalprof senses
+chat /tick rate 20
+quit
