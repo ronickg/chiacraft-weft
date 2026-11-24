@@ -187,7 +187,11 @@ fn install(c: &Client) {
     if let Some(pack) = weft_sdk::client::launch_option("shader-pack").filter(|p| p != ID && is_ours(p)) {
         let var = Path::new(&c.run_dir()).join("shaderpacks").join(&pack);
         if !var.join("world.wgsl").exists() && std::fs::create_dir_all(&var).is_ok() {
-            for name in FILES.iter().map(|(n, _)| *n).chain(std::iter::once("pack.cfg")) {
+            for name in FILES
+                .iter()
+                .map(|(n, _)| *n)
+                .chain(std::iter::once("pack.cfg"))
+            {
                 if let Err(e) = std::fs::copy(dir.join(name), var.join(name)) {
                     weft_sdk::warn!("shader pack {pack}: {name}: {e}");
                 }
