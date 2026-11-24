@@ -108,7 +108,7 @@ wait 0.5
 shot b3_17_new_address.png
 key Escape
 wait 1
-tap core:worlds text:Delete
+tap core:worlds id:delete_world
 wait 1.5
 cursor 0.02 0.02
 wait 0.5

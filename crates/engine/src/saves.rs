@@ -902,6 +902,7 @@ impl Screen for WorldSelect {
                 if let Kind::Button { enabled, .. } = &mut ui.nodes[del].kind {
                     *enabled = selected.is_some();
                 }
+                ui.set_id(del, "delete_world");
                 // The selected world's cheats, changed where it is chosen.
                 let sel = selected.and_then(|i| worlds.get(i)).cloned();
                 let on = sel.as_ref().is_some_and(|w| w.cheats);
