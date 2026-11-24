@@ -661,7 +661,9 @@ impl App {
         let (mut gpu, renderer) = gpu.ok_or_else(|| failed.join("; "))?;
 
         let mut roots: Vec<(String, PathBuf)> = vec![("core".into(), core_assets)];
-        roots.extend(mods.iter().map(|m| (m.id.clone(), m.assets.clone())));
+        // The content's mods, data packages among them (chiacraft): the code mods alone left a
+        // package's lang and textures out until the content was built again.
+        roots.extend(content().mods.iter().map(|m| (m.id.clone(), m.assets.clone())));
         let packs_now = (crate::settings::resource_packs(), crate::settings::shader_pack());
         let packs = crate::packs::enabled(&self.opts.run_dir, &crate::settings::resource_packs());
         crate::packs::set_shader_pack(
