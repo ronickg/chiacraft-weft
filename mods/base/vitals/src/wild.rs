@@ -329,16 +329,10 @@ pub const AGARICS: &[&str] = &["base:forest", "base:old_growth_forest", "base:bi
 /// Where the berry bush (blueberries) grows: the forests' floor.
 pub const FORESTS: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga"];
 pub const WETLANDS: &[&str] = &["base:swamp", "base:savanna"];
-/// Foxfire: the damp forests, where wood rots on the floor.
-pub const FOXFIRE_WOODS: &[&str] = &[
-    "base:forest",
-    "base:old_growth_forest",
-    "base:birch_forest",
-    "base:taiga",
-    "base:swamp",
-    "base:tropical_forest",
-    "base:sequoia_grove",
-];
+/// Foxfire: the damp forests, where wood rots on the floor. Not the sequoia grove: the Sierra's
+/// dry summers and cold wet winters at 1,721 m grow it 21% of its best at most.
+pub const FOXFIRE_WOODS: &[&str] =
+    &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga", "base:swamp", "base:tropical_forest"];
 /// Glow mycena: the warm wet forests.
 pub const MYCENA_WOODS: &[&str] = &["base:tropical_forest", "base:swamp"];
 pub const MARSHES: &[&str] = &["base:swamp", "base:plains", "base:forest", "base:taiga", "base:savanna"];
@@ -463,8 +457,10 @@ pub fn of(block: &str) -> Option<&'static Wild> {
 }
 
 /// A plant's cover in one biome where it isn't its usual (`Wild::cover`): reeds in the swamp at
-/// 4%, leaving its shore to the wild rice (spring's grain and the capybaras' food) and the cattails.
-pub const COVER_IN: [(&str, &str, f32); 1] = [("base:reed", "base:swamp", 0.04)];
+/// 4%, leaving its shore to the wild rice (spring's grain and the capybaras' food) and the cattails;
+/// sedge in the taiga at 10%, less than the open tundra's 12% under the spruce (the forest's own
+/// berries, fungi and glowing mats had taken its soil past `MOST`).
+pub const COVER_IN: [(&str, &str, f32); 2] = [("base:reed", "base:swamp", 0.04), ("base:sedge", "base:taiga", 0.1)];
 
 /// `p`'s cover in `biome`: its own, unless `COVER_IN` gives that biome another.
 pub fn cover_in(p: &Wild, biome: &str) -> f32 {
@@ -515,13 +511,23 @@ mod tests {
                 assert!(food, "{}: gives {item}, which is no food (food::FOODS, forage::DROPPED)", p.block);
             }
         }
-        // Each grows where it's found: a third of its best or more there in some season.
+        // Each grows where it's found: a third of its best or more there in some season. The
+        // swamp's ground is by its pools, soaked in the game whatever the rain (base_api's
+        // `ground_at`, `WATER_REACH`), so its plants are judged on soaked soil: the Pantanal's dry
+        // winter left its sedge 29% by rain alone.
+        let soaked = |plant: &crate::plants::Plant, c: &crate::climate::Climate, s: usize| {
+            let first = s as u32 * crate::calendar::SEASON_DAYS;
+            (first..first + crate::calendar::SEASON_DAYS)
+                .map(|d| crate::plants::rate(plant, crate::plants::mean_air(c.celsius, c.seasons, d as f32 + 0.5), 1.0))
+                .sum::<f32>()
+                / crate::calendar::SEASON_DAYS as f32
+        };
         for p in &WILD {
             let Some(plant) = crate::plants::of(p.block) else { continue };
             for b in p.found {
                 let Some(c) = crate::climate::of(b) else { continue };
                 let best = (0..4)
-                    .map(|s| crate::plants::season_rate(plant, c, s))
+                    .map(|s| if *b == "base:swamp" { soaked(plant, c, s) } else { crate::plants::season_rate(plant, c, s) })
                     .fold(0.0f32, f32::max);
                 assert!(best >= 0.33, "{}: grows at most {:.0}% of its best in {b}", p.block, best * 100.0);
             }

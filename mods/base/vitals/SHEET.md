@@ -73,7 +73,7 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
 | base:toadstool | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
-| base:cooked_dryads_saddle | fungi | 75 | 8 | 2 | 4 | 0 | 2 | 68 | 4 min | 2 + 2 | hot when cooked |
+| base:cooked_dryads_saddle | fungi | 75 | 8 | 2 | 2 | 0 | 2 | 68 | 4 min | 2 + 2 | hot when cooked |
 | animals:venison | meat | 200 | 20 | 44 | 0 | 5 | 0 | 147 | 27 min | 2 + 2 | raw |
 | animals:cooked_venison | meat | 150 | 15 | 45 | 0 | 5 | 0 | 98 | 24 min | 4 + 4 | hot when cooked |
 | animals:hare | meat | 150 | 15 | 33 | 0 | 3 | 0 | 109 | 20 min | 2 + 2 | raw |
@@ -383,7 +383,7 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 
 | block | grows | ground | gives | cover | found in |
 |---|---|---|---|---|---|
-| base:sedge | Tuft | Soil | - | 12.0% | snowy_plains, taiga, swamp |
+| base:sedge | Tuft | Soil | - | 12.0% | snowy_plains, taiga (10.0%), swamp |
 | base:cottongrass | Tuft | Soil | - | 8.0% | snowy_plains, taiga |
 | base:reindeer_lichen | Tuft | Soil | - | 5.0% | snowy_plains, taiga, mountains |
 | base:clover | Tuft | Soil | - | 3.0% | plains, forest, birch_forest, mountains |
@@ -399,7 +399,7 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:mushroom_brown | Spreads | Soil | base:mushroom_brown | 0.6% | forest, old_growth_forest, birch_forest, taiga, mountains |
 | base:mushroom_red | Spreads | Soil | base:mushroom_red | 0.3% | forest, old_growth_forest, birch_forest, taiga |
 | base:water_hyacinth | Spreads | Water | - | 8.0% | swamp, savanna |
-| base:foxfire | Spreads | Soil | - | 0.4% | forest, old_growth_forest, birch_forest, taiga, swamp, tropical_forest, sequoia_grove |
+| base:foxfire | Spreads | Soil | - | 0.4% | forest, old_growth_forest, birch_forest, taiga, swamp, tropical_forest |
 | base:glow_mycena | Spreads | Soil | - | 0.3% | tropical_forest, swamp |
 | base:goblins_gold | Spreads | Soil | - | 0.2% | forest, old_growth_forest, birch_forest, taiga |
 | base:cattail | Still | Shore | base:cattail_root | 15.0% | swamp, plains, forest, taiga, savanna |
