@@ -390,7 +390,12 @@ fn ruins(g: &mut Gen) {
         // pillars stand on their own columns, which on a slope lie well above or below the
         // centre's (11-24, pl1123_ruin1: a ring on a hillside showed no pillars).
         let gy = ground(ruin.x, ruin.z);
-        let low = heights.values().copied().min().unwrap_or(gy).min(gy - ruin.kind().depth);
+        let low = heights
+            .values()
+            .copied()
+            .min()
+            .unwrap_or(gy)
+            .min(gy - ruin.kind().depth);
         let high = heights.values().copied().max().unwrap_or(gy).max(gy);
         if low - 2 > oy + 15 || high + 6 < oy {
             continue;
@@ -483,15 +488,19 @@ fn command(cmd: &mut ServerCommand) {
             let pillars = ring_pillars(&ruin);
             for &(dx, dz, tall) in &pillars {
                 let (px, pz) = (ruin.x + dx, ruin.z + dz);
-                let high = (1..=6).take_while(|&y| {
-                    let b = w.block([px, gy + y, pz]);
-                    crate::ley::LEY_STONE.is(b) || MOSSY_COBBLESTONE.is(b)
-                })
-                .count() as i64;
+                let high = (1..=6)
+                    .take_while(|&y| {
+                        let b = w.block([px, gy + y, pz]);
+                        crate::ley::LEY_STONE.is(b) || MOSSY_COBBLESTONE.is(b)
+                    })
+                    .count() as i64;
                 if high == tall as i64 {
                     standing += 1;
                 }
-                cmd.reply("command.base.ruin.pillar", &[Arg::Int(px as i64), Arg::Int((gy + 1) as i64), Arg::Int(pz as i64), Arg::Int(high), Arg::Int(tall as i64)]);
+                cmd.reply(
+                    "command.base.ruin.pillar",
+                    &[Arg::Int(px as i64), Arg::Int((gy + 1) as i64), Arg::Int(pz as i64), Arg::Int(high), Arg::Int(tall as i64)],
+                );
             }
             let floor = w.block([ruin.x, gy, ruin.z]);
             cmd.reply(
