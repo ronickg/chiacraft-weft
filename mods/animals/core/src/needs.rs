@@ -249,6 +249,19 @@ pub const WANDER: f32 = 0.01;
 /// What it is doing already counts this much more (Blumberg's hysteresis: it doesn't flicker
 /// between two needs near the same).
 pub const KEEP_AT: f32 = 1.2;
+/// A rest gives way to a need that drives it (`memory::DRIVEN`, thirst or hunger): it scores at
+/// most this share of that need, under it even while resting (`KEEP_AT`). A sleepy night's rest
+/// (`REST` + `routines::SLEEPY`, held at `KEEP_AT`: 0.96) outscored thirst until a deer was all
+/// but dry: one lay a whole game day 33 blocks from water while its water fell from 69 % to 8 %,
+/// and died parched (ai1124_savanna8).
+pub const REST_YIELDS: f32 = 0.75;
+const _: () = assert!(REST_YIELDS * KEEP_AT < 1.0);
+
+/// A rest that scores `rest` against the most pressing of thirst and hunger, `pressing`: as it
+/// is, or under `pressing` once that drives it (`REST_YIELDS`).
+pub fn rest_under(rest: f32, pressing: f32) -> f32 {
+    if pressing >= crate::memory::DRIVEN { rest.min(pressing * REST_YIELDS) } else { rest }
+}
 
 /// How pressing hunger is at `fed` (its share of its food): 0 when fed (`HUNGRY` or more and not
 /// eating already), `EAT_FLOOR` just under, 1 empty.
@@ -296,5 +309,15 @@ mod choosing {
         // Fed and watered, neither asks for the turn; a meal under way keeps going.
         assert_eq!(hunger_score(0.8, false), 0.0);
         assert!(hunger_score(0.8, true) > 0.0);
+    }
+
+    #[test]
+    fn a_sleepy_rest_gives_way_to_real_thirst() {
+        let night = REST + crate::routines::SLEEPY;
+        // Mild thirst waits for the morning; real thirst gets up, even from a rest under way.
+        assert_eq!(rest_under(night, thirst_score(0.4, false)), night);
+        let parched = thirst_score(0.1, false);
+        assert!(rest_under(night, parched) * KEEP_AT < parched);
+        assert!(rest_under(night, hunger_score(0.05, false)) * KEEP_AT < hunger_score(0.05, false));
     }
 }

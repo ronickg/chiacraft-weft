@@ -115,7 +115,9 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
         _ => 0.0,
     };
     s[Need::Love as usize] = LOVE;
-    s[Need::Rest as usize] = REST + animals_core::routines::SLEEPY * (1.0 - active);
+    // A sleepy rest still gives way to thirst or hunger that drives it (`needs::rest_under`).
+    s[Need::Rest as usize] =
+        needs::rest_under(REST + animals_core::routines::SLEEPY * (1.0 - active), s[Need::Drink as usize].max(s[Need::Eat as usize]));
     s[Need::Wander as usize] = WANDER;
     s[Need::Watch as usize] = animals_core::roles::WATCH;
     s[Need::Investigate as usize] = animals_core::roles::INVESTIGATE;

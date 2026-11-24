@@ -352,6 +352,17 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         w.component_mut(id, &DRINK).map(|c| *c = d);
         return true;
     }
+    if spot.is_some() && now < d[3] && !w.navigating(id) {
+        // Its walk ended short of the water: it can't get there from here. It gives the place up
+        // for a while and lets foraging and wandering move it on (ai1124_savanna8: a deer in a
+        // cave two blocks under the pool stood 'drinking' below it for most of a game day, the
+        // same shore spot picked again each time its walk ran out, and died parched).
+        weft_sdk::debug!("animal {id} can't reach the water at {spot:?}: looks elsewhere");
+        if let Some(c) = w.component_mut(id, &DRINK) {
+            *c = [f64::NAN, 0.0, 0.0, now + NOTHING];
+        }
+        return false;
+    }
     if now < d[3] {
         // Walking to it; or no water near, foraging and wandering on.
         return spot.is_some();
