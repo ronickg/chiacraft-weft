@@ -304,6 +304,7 @@ command.base.rain.dry = no rain here today; it rains on {0}% of this season's da
 command.base.waterholes.dry = waterholes shrink everywhere, {0}x
 command.base.waterholes.wet = waterholes fill everywhere, {0}x
 command.base.waterholes.real = waterholes by the climate
+command.base.waterholes.watch = waterholes by the climate, their visits logged
 command.base.air.now = air here {4} °C, fog {0}%, wind {1} m/s blowing toward {2}°; fog on {3}% of this season's days here
 command.base.air.set = fog {0}% and wind {1} m/s everywhere for ten minutes
 season.base.spring = spring

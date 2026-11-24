@@ -1,0 +1,113 @@
+# A savanna's winter, as the climate has it (no `/waterholes dry` forcing): the savanna's dry
+# season is its winter (`vitals::climate::dry_season`; the llanos' rain), so a pond's still water,
+# a block deep, dries from its corners into `base:dried_mud` (`base`'s waterholes.rs) at its real
+# pace, a corner block in about a game day (`climate::SHRINK_DAYS`), and the savanna's
+# white-tailed deer drink at what is left on their own: at dawn and dusk from 80 % of their water
+# (`routines::DRINKS_AT`), nothing set low. Spring fills it back (`climate::REFILL_SECS`).
+# Seed 1's savanna at x 0 z 544 (`land_find -- 1 savanna`). The game runs at 30 times its pace
+# (`/tick rate 600`: a game day in 40 s) so ten winter days pass in about 7 minutes; `/time query`
+# after each sample says which day it reached (winter: its day modulo 56 is 42-55, the days
+# counted from 0; if the PC can't hold 600 ticks a second, fewer). `/rain` says how often it rains
+# here this season (winter low, spring high).
+# `/waterholes watch` logs what the drying visits find every 400 ticks, under the real climate:
+# "N water visits, M dried (not: ... edge, S season)": S must stay 0 all winter (the place is in
+# its dry season) and be counted in spring.
+# PASS: the `/time query` days stay in winter (42-55 of the 56-day year) until `/season spring`; the 5 x 5 pond's water count falls from 25 over the
+# winter samples (water + mud = 25, water never 0), toward a last block or two by day 10;
+# "anim: <id> holds drink" lines from the deer at dawn or dusk through the winter, and at the end
+# some of them at the last pool (herd_savanna_winter_2.png: a small pool in cracked mud); in
+# spring the water climbs back to 25 and mud to 0 (herd_savanna_winter_3.png). Report also how
+# many days the samples reached (the real pace held) and any deer that left to drink elsewhere.
+loaded
+idle
+# Creative, not spectator: the drying visits go round visible players, which leave spectators out.
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season winter 1
+chat /time set 0
+chat /rain
+chat /time query
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-2 ~-2 ~-8 ~2 ~-2 ~-4 base:dirt
+chat /tk fill ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+wait 3
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+look 0 -55
+wait 1
+shot herd_savanna_winter_1.png
+chat /tk ring animals:white_tailed_deer 5 10 14
+wait 2
+chat /anim log
+chat /waterholes watch
+chat /tick rate 600
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /animalprof senses
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /animalprof senses
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+# The shot at a dusk drink: back to the game's pace, the day's dusk (18:00).
+chat /tick rate 20
+chat /time set 12000
+wait 20
+chat /animalprof senses
+look 0 -55
+wait 1
+shot herd_savanna_winter_2.png
+chat /season spring 1
+chat /rain
+chat /tick rate 600
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+wait 40
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tick rate 20
+look 0 -55
+wait 1
+shot herd_savanna_winter_3.png
+where
+chat /waterholes real
+quit
