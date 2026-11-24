@@ -120,7 +120,7 @@ pub static LOOK_MIST_DOMES: Config<f32> = Config::named("look_mist_domes");
 /// keeps its own setting, so one can still be moved after.
 pub static LOOK_BLISS: Config<bool> = Config::named("look_bliss");
 /// Each knob, its value in the Bliss match, and as made.
-pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 16] = [
+pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 17] = [
     // The shade: no glare lift, less fill, the sky light occluded as Bliss's (lsN_ao3).
     (&LOOK_GLARE, 0.0, 1.0),
     (&LOOK_FILL, 0.7, 1.0),
@@ -144,6 +144,10 @@ pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 16] = [
     (&LOOK_EVENING_SHADE, 0.5, 1.0),
     // The added airs half gone by 18:30, as Bliss's land dims (lsAM_airfade: 1 lost the shade's blue).
     (&LOOK_AIR_FADE, 0.5, 0.0),
+    // The shade lit by the sky alone, no golden fill: 18:00 shade light lavender 113 102 118 (Bliss
+    // 82 84 107, ours as made cream 186 159 130), 18:30 near land 37 38 73 (Bliss 35 37 70);
+    // 08:00 the same, 19:00 outside the golden hours (lsAR_glow2).
+    (&LOOK_GLOW_FILL, 0.0, 1.0),
 ];
 
 /// Switches the Bliss match on (every knob to its fitted value) or off (every knob as made).
