@@ -401,9 +401,20 @@ pub async fn creative_inventory(t: T) -> R {
             .ok_or("no bricks entry")?;
         t.c().input_cursor(x + w / 2.0, y + h / 2.0);
         t.frames(3).await?;
-        t.press("core:hotbar5");
-        t.until("bricks by the number key", Duration::from_secs(5), |t| t.c().inventory_slot(4).count == 64)
-            .await?;
+        // Pressed again until it lands (a second press gives the same stack): under load a press
+        // was let go before the screen read it.
+        let mut got = false;
+        for _ in 0..4 {
+            t.press("core:hotbar5");
+            got = t
+                .until("bricks by the number key", Duration::from_secs(2), |t| t.c().inventory_slot(4).count == 64)
+                .await
+                .is_ok();
+            if got {
+                break;
+            }
+        }
+        t.check(got, "bricks by the number key");
     }
     t.c().menu_close();
     t.no_screen().await?;

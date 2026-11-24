@@ -307,15 +307,16 @@ pub async fn models(t: T) -> R {
     let ground = |f: &[u8]| f[f.len() / 4 / 3 * 4..].to_vec();
     // Two grabs 0.3 s apart the same (the idle, a 3 s loop, never is). The bow starts a round
     // trip after the press: on CI that was over a second, and 1.5 s on it still moved.
-    let (mut held, mut a) = (false, t.grab().await?);
+    // Near nothing rather than nothing: under load (--jobs 2) no two grabs in 8 s were the same.
+    let (mut least, mut a) = (f64::MAX, t.grab().await?);
     let end = crate::runner::script_clock() + Duration::from_secs(8);
-    while !held && crate::runner::script_clock() < end {
+    while least > 0.0001 && crate::runner::script_clock() < end {
         t.secs(0.3).await?;
         let b = t.grab().await?;
-        held = T::differ(&ground(&a), &ground(&b)) == 0.0;
+        least = least.min(T::differ(&ground(&a), &ground(&b)));
         a = b;
     }
-    t.check(held, "the bow holds its last frame");
+    t.check(least <= 0.0001, format!("the bow holds its last frame: {least:.5}"));
     t.shot("idol_bow").await?;
     // A mod has it play one action as another for a while.
     t.op(&format!("action {idol}")).await?;

@@ -1322,6 +1322,8 @@ pub async fn block_shapes(t: T) -> R {
         t.c().select_slot(0);
         t.c()
             .teleport(centre(floor, over[0], 1.0 + height, over[1]));
+        // Asked in the air: standing on the ground, flight ends at once (as one lands).
+        t.c().set_flying(true);
         t.secs(0.4).await?;
         if height > 0.0 {
             t.check(t.flag(client::client_flags::FLYING), format!("{name}: flying"));
@@ -1533,12 +1535,11 @@ pub async fn surface_placement(t: T) -> R {
     let f = t.feet();
     let cell = [f[0], (f[1] + 15).div_euclid(16) * 16 - 1, f[2] - 3];
     let point = |x, y, z| [f64::from(cell[0]) + x, f64::from(cell[1]) + y, f64::from(cell[2]) + z];
-    t.c().set_flying(true);
-    t.until("flying", Duration::from_secs(5), |t| t.flag(client::client_flags::FLYING))
-        .await?;
     t.press("core:placement_mode");
     t.frames(2).await?;
     t.c().teleport(point(0.5, 0.0, 3.2));
+    // Asked in the air: standing on the ground, flight ends at once (as one lands).
+    t.c().set_flying(true);
     t.set(cell, "base:oak_planks_vertical_slab[facing=south]")
         .await?;
     t.op("put me 0 base:ladder 8").await?;
@@ -1583,9 +1584,6 @@ pub async fn surface_placement(t: T) -> R {
     // Two wires at half height connect to full-height ports. A line at floor level beside
     // the raised line cannot pick up its power.
     t.op("mode creative").await?;
-    t.c().set_flying(true);
-    t.until("flying", Duration::from_secs(5), |t| t.flag(client::client_flags::FLYING))
-        .await?;
     let wire = add(cell, [4, 0, 0]);
     for x in 0..3 {
         let at = add(wire, [x, 0, 0]);
@@ -1593,6 +1591,7 @@ pub async fn surface_placement(t: T) -> R {
         t.op("put me 0 base:redstone 8").await?;
         let p = |dx: f64, dy: f64, dz: f64| [f64::from(at[0]) + dx, f64::from(at[1]) + dy, f64::from(at[2]) + dz];
         t.c().teleport(p(0.5, 2.0, 2.2));
+        t.c().set_flying(true);
         t.secs(0.2).await?;
         aim(&t, p(0.5, 0.5, 0.5));
         t.frames(4).await?;
