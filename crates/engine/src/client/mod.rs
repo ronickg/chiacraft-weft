@@ -4498,9 +4498,9 @@ const FAR_DEPTH: f32 = 1200.0;
 /// mist, and play, are untouched. Without it the layer drew nothing on a clear evening (lsAD_mist).
 /// The same window as the pack's `evening_mist`.
 fn evening_mist_floor(sun: [f32; 4]) -> f32 {
-    let Some(id) = crate::config::by_name("base:look_evening_mist") else { return 0.0 };
-    let k = (crate::config::get(id) as f32).clamp(0.0, 3.0);
-    if k <= 0.0 {
+    let get = |name: &str| crate::config::by_name(name).map_or(0.0, |id| (crate::config::get(id) as f32).clamp(0.0, 3.0));
+    let (k, dawn) = (get("base:look_evening_mist"), get("base:look_mist_clock"));
+    if k <= 0.0 && dawn <= 0.0 {
         return 0.0;
     }
     let ss = |a: f32, b: f32, x: f32| {
@@ -4508,7 +4508,12 @@ fn evening_mist_floor(sun: [f32; 4]) -> f32 {
         t * t * (3.0 - 2.0 * t)
     };
     let (x, y) = (sun[0], sun[1]);
-    0.3 * k * ss(0.1, -0.1, x) * (1.0 - ss(0.03, 0.3, y)) * ss(-0.2, -0.05, y)
+    // The mist clock (`base:look_mist_clock`): a dawn mist every morning, whatever the air, from the
+    // sun 14° under the horizon to burnt off by 25° up, 0.1 at 1 (our dampest dawn mist), as
+    // Bliss's morning mist comes by the clock. The pack does not take it out of the air's mist
+    // (`air_mist`), so it lies as the dawn mist does.
+    let morning = 0.1 * dawn * ss(-0.1, 0.1, x) * ss(-0.25, -0.1, y) * (1.0 - ss(0.2, 0.42, y));
+    0.3 * k * ss(0.1, -0.1, x) * (1.0 - ss(0.03, 0.3, y)) * ss(-0.2, -0.05, y) + morning
 }
 
 /// The values of the settings the shader pack reads (`Scene::options`).
