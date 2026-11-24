@@ -1,5 +1,5 @@
 scaling = nine_slice
-border = 8 16.5 8 17
-size = 56 34
-outset = 4
+border = 9 17.5 9 18
+size = 58 36
+outset = 5
 middle = tile

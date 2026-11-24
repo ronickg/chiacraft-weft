@@ -43,7 +43,7 @@ FRAMES_OLD = os.path.join(ARC, "parts", "frames_try3_chosen.png")  # the slots
 ARC2 = os.path.expanduser("~/Coding/chiacraft-archive/images/ui-redo/2026-11-24")
 DOOR = os.path.join(ARC2, "parts", "door_try2.png")  # Quit's door (10 image px a pixel)
 PENCIL = os.path.join(ARC2, "parts", "pencil_try1.png")  # the editor square (before icons16)
-ICONS = os.path.join(ARC2, "parts", "icons16_try1.png")  # the title's six icons, 16 x 16, 10 px a pixel
+ICONS = os.path.join(ARC2, "parts", "icons16_try3.png")  # the title's six icons, 16 x 16, 10 px a pixel, solid (Planner 11-24: fuller)
 CORNERS = os.path.join(ARC2, "parts", "corners_try3.png")  # the title frame's four plates, 48 x 48
 SEE = 217  # menu screens' insides: about 85% opaque, the world shows through (Ronald, 11-24)
 GUI = os.path.join(ROOT, "mods", "base", "assets", "textures", "gui")
@@ -230,6 +230,28 @@ def taller(a, h):
     return np.concatenate([a[:mid], np.repeat(a[mid:mid + 1], extra, 0), a[mid:]], 0)
 
 
+def copper(a, depth=7):
+    """A button's rim in copper all round (Planner 11-24: every button in the mock has a bright
+    copper rim with chamfered corners; ours was dark brown below and right): by each pixel's
+    depth from the outline, a lit ramp on the top and left sides and a darker copper ramp on the
+    bottom and right, split along the chamfers' diagonals. The outline and the inner dark line
+    stay."""
+    from scipy.ndimage import distance_transform_cdt
+    a = a.copy()
+    h, w = a.shape[:2]
+    d = distance_transform_cdt(np.pad(a[..., 3] > 0, 1), metric="chessboard")[1:-1, 1:-1]
+    lit = ["#a85a28", "#f2b25e", "#d88a44", "#b06a32", "#8a4e28"]
+    dark = ["#8a4420", "#c27434", "#a85e2a", "#8e4e24", "#6e3c1e"]
+    for y in range(h):
+        for x in range(w):
+            k = d[y, x] - 2  # 1 is the outline; depths 2..depth-1 are the rim
+            if a[y, x, 3] == 0 or k < 0 or k >= len(lit) or d[y, x] >= depth:
+                continue
+            top_left = min(y, x) <= min(h - 1 - y, w - 1 - x)
+            a[y, x, :3] = hexc((lit if top_left else dark)[k])
+    return a
+
+
 def margin(a, n, dy=0):
     """The part in an `n`-pixel clear margin, moved `dy` pixels down inside it (a pressed button)."""
     h, w = a.shape[:2]
@@ -375,7 +397,7 @@ def build():
     for k, a in raw.items():
         a[~mask] = 0
         raw[k] = even(a, bb, rows=False)
-    rim = raw[""]  # the secondary's bronze rim; its face is repainted
+    rim = even(copper(raw[""]), bb, rows=False)  # the secondary's rim, copper all round (columns evened again: the chamfers shade the first ones)
     face0 = rim[20, 48, :3].astype(float)  # the brown face, L 44
 
     def brown(*ls):
@@ -438,11 +460,12 @@ def build():
     put("button_quit", st["item"], gb, tail)
     put("button", st["main"], gb, sel + tail)
     # The title's buttons (`menu_main`, `menu_item`), cut at their height, 26 GUI (52 pixels): 4
-    # bands of 9, never stretched; an 8-pixel margin (`outset = 4`) for a glow of three rings 1 GUI
-    # each. The borders leave a one-row middle (the second band's last row).
-    st = states(52, [9, 9, 9, 9], 8, (200, 125, 55), seed=1)
-    gb = (16, 33, 16, 34)
-    tail = "outset = 4\nmiddle = tile\n"
+    # bands of 9, never stretched; a 10-pixel margin (`outset = 5`) for a glow of five rings 1 GUI
+    # each, fading out (the mock's halo spills 4-6 GUI; the buttons are 7 apart). The borders leave
+    # a one-row middle (the second band's last row).
+    st = states(52, [9, 9, 9, 9], 10, (205, 150, 100, 60, 28), seed=1)
+    gb = (18, 35, 18, 36)
+    tail = "outset = 5\nmiddle = tile\n"
     for k in ("_hover", "_pressed", "_disabled"):
         put("menu_main" + k, st[k], gb, tail)
         put("menu_item" + k, st[k], gb, tail)
