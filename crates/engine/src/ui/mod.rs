@@ -92,6 +92,10 @@ pub struct Style {
     /// Its scroll bar goes just past its right edge, taking nothing from what it holds.
     pub bar_outside: bool,
     pub bar_thin: bool,
+    /// A scrolling column stops only where a row starts, so its top row is never cut in half under
+    /// what is above it (chiacraft style 1, Planner 11-24): a wheel step goes on to the next row
+    /// start, and the end may leave less than a row empty below the last.
+    pub snap_rows: bool,
     /// A plain color behind the node, RGBA.
     pub fill: Option<u32>,
     /// Placed at a point instead of in the flow: (x, y) in GUI pixels from the parent's inner
@@ -120,6 +124,7 @@ impl Default for Style {
             scroll: false,
             bar_outside: false,
             bar_thin: false,
+            snap_rows: false,
             fill: None,
             at: None,
             at_from: [0.0; 2],
@@ -191,6 +196,11 @@ impl Style {
     }
     pub fn scroll(mut self) -> Self {
         self.scroll = true;
+        self
+    }
+    /// Whether a scrolling column stops at whole rows (`Style::snap_rows`).
+    pub fn snap_rows(mut self, on: bool) -> Self {
+        self.snap_rows = on;
         self
     }
     /// `scroll` with the bar just past the right edge (in the gap beside it).
@@ -1071,6 +1081,17 @@ impl Ui {
             *v = v.min(max);
             scrolled = *v;
             past_end = max - scrolled;
+            if style.snap_rows && !style.row && style.justify == Justify::Start && scrolled > 0.0 {
+                // On to the first row starting at or past the offset.
+                let mut start = 0.0;
+                for s in &sizes {
+                    if start >= scrolled - 0.01 {
+                        break;
+                    }
+                    start += s[1] + style.gap;
+                }
+                scrolled = start;
+            }
             free = free.max(0.0);
             let bar_width = if style.bar_thin { 5.0 } else { Scrollbar::HANDLE[0] };
             let bar_room = bar_width + Scrollbar::ROOM - Scrollbar::HANDLE[0];
@@ -1082,7 +1103,7 @@ impl Ui {
                     cross_size -= bar_room;
                     Rect { x: inner.x + inner.w - bar_width, y: inner.y, w: bar_width, h: inner.h }
                 };
-                let offset = if style.justify == Justify::End { max - scrolled } else { scrolled };
+                let offset = if style.justify == Justify::End { max - scrolled } else { scrolled.min(max) };
                 self.nodes[id].scrollbar = Some(Scrollbar { track, offset, max });
             }
         }

@@ -206,6 +206,7 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
             scroll: flag(abi::ui_flags::SCROLL),
             bar_outside: false,
             bar_thin: flag(abi::ui_flags::THIN_SCROLLBAR),
+            snap_rows: false,
             fill: None,
             max_h: f32::INFINITY,
             // Placed at a point of the parent (`UiNode::at`); a point that isn't finite is none.

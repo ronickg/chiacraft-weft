@@ -58,7 +58,7 @@ impl Screen for Admission {
                     }
                     // Who may come in, and what newcomers may do.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
-                        label(ui, cx, "admission.screen.who", &[], "default");
+                        crate::screens::heading(ui, cx, "admission.screen.who");
                         let only = rules.only_listed;
                         let id = button(ui, cx, "admission.screen.only_listed", &[on_off(only)], 260.0, move |c| {
                             run(c, if only { "/allow everyone" } else { "/allow only" }.into())
@@ -119,7 +119,7 @@ impl Screen for Admission {
                     // The world's DID (phase 4): named by the owner's DID, naming it back.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
                         use crate::chiacraft::worlds::world_did;
-                        label(ui, cx, "world_did.title", &[], "default");
+                        crate::screens::heading(ui, cx, "world_did.title");
                         let held = dir.as_deref().and_then(world_did::load);
                         match &held {
                             Some(d) => {
@@ -162,7 +162,7 @@ impl Screen for Admission {
                     // Finding this world (phase 5): listed on chain, a deposit locked.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
                         use crate::chiacraft::worlds::listing;
-                        label(ui, cx, "listing.title", &[], "default");
+                        crate::screens::heading(ui, cx, "listing.title");
                         let listed = dir.as_deref().and_then(listing::load);
                         let deposit = listing::txch(crate::settings::listing_deposit());
                         match &listed {
@@ -198,7 +198,7 @@ impl Screen for Admission {
                     });
                     // Players here now, and anyone else by name, key or DID.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
-                        label(ui, cx, "admission.screen.players", &[], "default");
+                        crate::screens::heading(ui, cx, "admission.screen.players");
                         let me = crate::settings::name();
                         let here: Vec<String> = cx
                             .client
@@ -256,7 +256,7 @@ impl Screen for Admission {
                     });
                     // The bans.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
-                        label(ui, cx, "admission.screen.bans", &[], "default");
+                        crate::screens::heading(ui, cx, "admission.screen.bans");
                         let active: Vec<_> = bans.bans.iter().filter(|b| b.active(now)).collect();
                         if active.is_empty() {
                             label(ui, cx, "admission.no_bans", &[], "dim");
@@ -295,7 +295,7 @@ impl Screen for Admission {
                     });
                     // The allow list.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
-                        label(ui, cx, "admission.screen.allow_list", &[], "default");
+                        crate::screens::heading(ui, cx, "admission.screen.allow_list");
                         if rules.allow.is_empty() {
                             label(ui, cx, "admission.screen.empty", &[], "dim");
                         }
@@ -320,7 +320,7 @@ impl Screen for Admission {
                     });
                     // Ban lists: followed, and this world's own for others.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
-                        label(ui, cx, "admission.screen.lists", &[], "default");
+                        crate::screens::heading(ui, cx, "admission.screen.lists");
                         if rules.lists.is_empty() {
                             label(ui, cx, "admission.no_lists", &[], "dim");
                         }

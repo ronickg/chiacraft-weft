@@ -1,0 +1,118 @@
+# Style 1, batch 3 (UI redo, 11-24): the last menus on Weft's frame. In a world: Multiplayer (host),
+# Links (ask), Admission, HUD options, touch buttons; then from the title: Multiplayer, Links,
+# Friends, Finder, Account, Achievements, and from Select World the delete and new-address
+# questions (Escape answers no). Also the scrolled lists' top rows (whole rows since batch 3).
+# Run once on dev (before) and once on the branch (after); contact sheets pair them by file name.
+loaded
+idle
+wait 2
+cursor 0.02 0.02
+screen core:multiplayer
+wait 1.5
+shot b3_01_multiplayer_world.png
+tap core:multiplayer links
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot b3_02_links_world.png
+key Escape
+wait 1
+key Escape
+wait 1
+screen core:admission
+wait 1.5
+shot b3_03_admission.png
+key Escape
+wait 1
+screen core:debug_options
+wait 1.5
+shot b3_04_hud_options.png
+cursor 0.5 0.5
+scroll -2
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot b3_05_hud_options_scrolled.png
+key Escape
+wait 1
+screen core:touch_buttons
+wait 1.5
+shot b3_06_touch_buttons.png
+key Escape
+wait 1
+screen core:controls
+wait 1.5
+cursor 0.5 0.5
+scroll -3
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot b3_07_controls_scrolled.png
+key Escape
+wait 1
+leave
+wait 2
+cursor 0.02 0.02
+screen core:multiplayer
+wait 1.5
+shot b3_10_multiplayer.png
+tap core:multiplayer links
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot b3_11_links.png
+key Escape
+wait 1
+tap core:multiplayer friends
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot b3_12_friends.png
+key Escape
+wait 1
+key Escape
+wait 1
+screen core:finder
+wait 3
+shot b3_13_finder.png
+key Escape
+wait 1
+screen core:account
+wait 1.5
+shot b3_14_account.png
+key Escape
+wait 1
+screen core:achievements
+wait 1.5
+shot b3_15_achievements.png
+key Escape
+wait 1
+screen core:profile
+wait 1.5
+cursor 0.5 0.5
+scroll -2
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot b3_16_profile_scrolled.png
+key Escape
+wait 1
+screen core:worlds
+wait 1.5
+tap_once core:worlds world:0
+wait 1
+tap core:worlds new_address
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot b3_17_new_address.png
+key Escape
+wait 1
+tap core:worlds text:Delete
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot b3_18_delete_world.png
+key Escape
+wait 1
+quit
