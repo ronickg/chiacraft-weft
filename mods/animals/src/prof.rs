@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead,recall,wetter,where)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -275,6 +275,45 @@ pub fn init(r: &mut Registry) {
                     })
                     .collect();
                 format!("ANIMAL_WHERE {}", rows.join(" | "))
+            }
+            "cave" => {
+                // Every wild animal within `value` blocks (32 by default): the blocks round it,
+                // 17 x 17 a layer from 3 under its feet to 14 over ('#' solid, '~' water, '.' open;
+                // rows north to south, x west to east, its own column 'A'), and what its way-up
+                // search finds (`stuck::way_out`), for a cave or a pit a script can't see into.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let r = cmd.float("value").unwrap_or(32.0);
+                let mut n = 0;
+                for id in w.entities_near(me.pos, r, None) {
+                    if w.component(id, &crate::animal::ANIMAL).is_none_or(|a| a.species == 0) {
+                        continue;
+                    }
+                    let Some(e) = w.entity(id) else { continue };
+                    n += 1;
+                    let (fx, fy, fz) = (e.pos.x.floor() as i32, (e.pos.y + 0.05).floor() as i32, e.pos.z.floor() as i32);
+                    weft_sdk::info!("ANIMAL_CAVE {id} at {fx} {fy} {fz}: {}", crate::stuck::way_out_report(&w, id, &e));
+                    for y in fy - 3..=fy + 14 {
+                        let rows: Vec<String> = (fz - 8..=fz + 8)
+                            .map(|z| {
+                                (fx - 8..=fx + 8)
+                                    .map(|x| {
+                                        if x == fx && z == fz && y == fy {
+                                            'A'
+                                        } else if w.block_flags([x, y, z]) & abi::block_flags::SOLID != 0 {
+                                            '#'
+                                        } else if w.in_liquid([x as f64 + 0.5, y as f64 + 0.5, z as f64 + 0.5]) {
+                                            '~'
+                                        } else {
+                                            '.'
+                                        }
+                                    })
+                                    .collect()
+                            })
+                            .collect();
+                        weft_sdk::info!("ANIMAL_CAVE {id} y {y}: {}", rows.join("/"));
+                    }
+                }
+                format!("ANIMAL_CAVE {n} animals")
             }
             "senses" => {
                 // What the animals nearest the player have noticed: awareness of hunters and of
