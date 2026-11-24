@@ -1594,9 +1594,10 @@ fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
             // part only), clear air between, standing tall with a soft fall from a little over the
             // sea up (its banks by exp(-0.05 (y - 73)) on a noise over 0.6). The layer lay as an even
             // sand-coloured sheet on the crowns, a veil when thinner (the live sheets, 07:00).
-            let bank = smoothstep(MIST_BANK_EDGE.x, MIST_BANK_EDGE.y, banks);
-            let tall = exp(-max(p.y - (SEA_LEVEL + MIST_BANK_BASE), 0.0) / MIST_BANK_FALL);
-            let bliss = f_air * open * mix(1.0, burn, 0.5) * (bank * tall * MIST_BANK_DENSE + 0.012 * high * 0.11);
+            // The banks themselves are walked per pixel (`bank_march`); the volume keeps the thin
+            // haze up high. (Sampled at each pixel's own surface in the volume's last stretch, they
+            // lay as paint on the land, edged by the crowns: the live debug sheet.)
+            let bliss = f_air * open * 0.012 * high * 0.11;
             return mix(mix(made, bliss, domes), even, ev);
         }
         return mix(f_air * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11, even, ev);
@@ -1717,7 +1718,7 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         return c;
     }
     if scene.froxels.x > 0.5 {
-        return froxel_fog(c, rel, sky);
+        return froxel_fog(bank_march(c, rel), rel, sky);
     }
     // The whole view: walked only to 220 blocks, the fog lying on the land ended 220 blocks out, a
     // flat pale disc seen from high up (the world playtester, y 250 over snow, 11-04).
@@ -1766,6 +1767,65 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         gained += through * (1.0 - kept) * (mix(shaded_sky, light.sky, lit) + light.sun * lit);
         through *= kept;
         last = at;
+    }
+    return c * through + gained;
+}
+
+// Bliss's banks (`OPT_MIST_DOMES`), walked per pixel through the height they stand in: 10 steps,
+// jittered (TAA blends them), each with its own noise and sun shadow, so a bank stands free in the
+// air, lit on its sunny side, dark in the crowns' shade, with clear air between banks. Bliss walks
+// its fog the same way, 8 steps a pixel (`overworld_fog.glsl`, method only); ours in the volume's
+// coarse cells could not hold a bank's edge or a tree's shadow.
+const MIST_MARCH_FAR: f32 = 1500.0;
+fn bank_density(p: vec3<f32>) -> f32 {
+    let bank = smoothstep(MIST_BANK_EDGE.x, MIST_BANK_EDGE.y, fog_banks(p));
+    let tall = exp(-max(p.y - (SEA_LEVEL + MIST_BANK_BASE), 0.0) / MIST_BANK_FALL);
+    // Thinner as the sun climbs, gone by about 40° up.
+    let burn = 1.0 - smoothstep(0.3, 0.65, scene.sun.y);
+    return air_mist() * bank * tall * MIST_BANK_DENSE * burn * smoothstep(SEA_LEVEL - 6.0, SEA_LEVEL, p.y);
+}
+fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
+    if deep <= 0.0 || scene.frame.x < 0.5 || storm() > 0.5 || air_mist() <= 0.0 {
+        return c;
+    }
+    let dist = length(rel);
+    let dir = rel / max(dist, 1e-4);
+    let eye = scene.eye.xyz;
+    let lo = SEA_LEVEL - 6.0;
+    let hi = SEA_LEVEL + MIST_BANK_BASE + 3.0 * MIST_BANK_FALL;
+    var t0 = 0.0;
+    var t1 = min(dist, MIST_MARCH_FAR);
+    if abs(dir.y) > 1e-4 {
+        let ta = (lo - eye.y) / dir.y;
+        let tb = (hi - eye.y) / dir.y;
+        t0 = max(t0, min(ta, tb));
+        t1 = min(t1, max(ta, tb));
+    } else if eye.y < lo || eye.y > hi {
+        return c;
+    }
+    if t1 <= t0 {
+        return c;
+    }
+    let clip = scene.view_proj * vec4(rel, 1.0);
+    let px = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * vec2(2048.0, 1152.0)) + 5.588238 * scene.frame.w;
+    let jitter = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715)))) - 0.5;
+    let light = fog_light(dir);
+    let n = 10u;
+    let step = (t1 - t0) / f32(n);
+    var through = 1.0;
+    var gained = vec3(0.0);
+    for (var i = 0u; i < n; i++) {
+        let t = t0 + (f32(i) + 0.5 + 0.8 * jitter) * step;
+        let d = bank_density(eye + dir * t) * deep;
+        if d <= 0.0 {
+            continue;
+        }
+        let lit = sun_reaches(dir * t);
+        let shade = mix(1.0, MIST_DEEP_SHADE, 1.0 - lit);
+        let kept = exp(-d * step);
+        gained += through * (1.0 - kept) * (light.sky * mix(shade, 1.0, lit) + light.sun * lit + mist_bounce(d, lit) * shade);
+        through *= kept;
     }
     return c * through + gained;
 }
