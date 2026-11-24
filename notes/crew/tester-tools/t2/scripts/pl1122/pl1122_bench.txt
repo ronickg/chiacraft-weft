@@ -7,7 +7,7 @@ chat /rule core:mob_spawning 0
 chat /tk mode spectator
 chat /weather clear 99999
 set_config core:vsync 0
-set_config core:fps_cap 0
+set_config core:fps_limit 0
 # --- ground, noon
 chat /time set 6000
 chat /tp -689 120 -122
