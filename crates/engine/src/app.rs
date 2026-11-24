@@ -1935,27 +1935,6 @@ impl Running {
             return;
         }
         let hovered = ui.hit(cursor);
-        // DIAG creative_inventory under --jobs 2 (temporary).
-        if crate::config::automated() && crate::input::HOTBAR.into_iter().any(|a| self.input.pressed(a)) {
-            eprintln!(
-                "DIAG hotbar press: cursor {:?} (gui {:?}) surface {:?} scale {:?} hovered {:?} focused {:?} screen {} nodes {}",
-                self.input.cursor,
-                cursor,
-                self.gpu.surface_size(),
-                scale,
-                hovered.map(|h| match ui.nodes[h].kind {
-                    Kind::Custom { tag, data } => format!("{h} custom {tag} {data}"),
-                    Kind::Input { .. } => format!("{h} input"),
-                    _ => format!("{h} other"),
-                }),
-                ui.focused.map(|f| match ui.nodes[f].kind {
-                    Kind::Input { .. } => format!("{f} input"),
-                    _ => format!("{f} other"),
-                }),
-                menu_screen,
-                ui.nodes.len()
-            );
-        }
         if hovered != ui.hovered {
             ui.hovered = hovered;
             self.quads_dirty = true;
