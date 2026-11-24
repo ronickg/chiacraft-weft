@@ -189,6 +189,20 @@ const OPT_LOW_SUN_KEEP: u32 = 52u;
 // The light in the shade with the evening sun under about 12° (`base:look_evening_shade`): 1 as
 // made, less darker. Bliss's 18:30 shade is half ours (22 32 73 against 51 65 121, lsAH_mist).
 const OPT_EVENING_SHADE: u32 = 53u;
+// The air added over the land fading with the evening sun from 10° to 3° up (`base:look_air_fade`):
+// 0 as made, 1 all of it gone by 3° and back from sunset, where the blue hour's air takes over.
+// Bliss's 18:30 land is dim (mean 38 41 80) where our near and twilight airs kept the 18:00
+// sky's strength (72 68 85 with the sun kept, lsAL_lowsun3).
+const OPT_AIR_FADE: u32 = 54u;
+fn evening_air_fade() -> f32 {
+    let k = clamp(fantasy_opt(OPT_AIR_FADE), 0.0, 1.0);
+    if k <= 0.0 {
+        return 1.0;
+    }
+    let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
+    let w = (1.0 - smoothstep(0.05, 0.17, scene.sun.y)) * smoothstep(-0.03, 0.0, scene.sun.y);
+    return 1.0 - k * w * evening;
+}
 fn water_body() -> f32 {
     let b = fantasy_opt(OPT_WATER_BODY);
     return select(1.0, b, b >= 0.0);
@@ -2162,7 +2176,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             let gold = p.sun / max(luma(p.sun), 1e-4);
             let grey = 1.0 - exp(-2.5e-4 * min(dist, 250.0));
             add += gold * luma(p.horizon) * phase * grey * low * 0.6;
-            out += add * day_air * fade;
+            out += add * day_air * fade * evening_air_fade();
         }
         // The blue hour's air (`OPT_TWILIGHT`): after sunset Bliss's land is a deep blue to the
         // near ground (19:00 land 5 23 78, far 47 72 164; bliss_tw, 11-22), its own light near
@@ -2181,7 +2195,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             if tw > 0.0 {
                 let fill = vec3(1.0) - exp(-vec3(1.5e-3, 3.0e-3, 6.0e-3) * min(dist, 600.0));
                 let sky_up = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
-                out += sky_up * fill * tw * blue_k;
+                out += sky_up * fill * tw * blue_k * evening_air_fade();
             }
         }
     }
