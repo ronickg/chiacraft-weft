@@ -835,10 +835,13 @@ pub async fn ctm_any_model(t: T) -> R {
         "textures/block/varied/varied.ctm",
         "method = vertical\ntiles = testkit:block/colors/red testkit:block/colors/green testkit:block/colors/blue testkit:block/colors/yellow\n",
     )?;
-    write(
-        "textures/block/varied_cube/varied_cube.ctm",
-        "method = random\ntiles = testkit:block/shapes/thin <default>\nhides_neighbors = false\n",
-    )?;
+    // `<default>` is gone (Weft 5cb6b2304): it named a missing file, and a folder's tile 0 is now
+    // the plain picture, so the cube had the magenta checker. The pack carries the cube's own
+    // picture as `0`, listed first.
+    let plain = format!("{pack}/testkit/textures/block/varied_cube/0.png");
+    std::fs::create_dir_all(std::path::Path::new(&plain).parent().unwrap()).map_err(|e| e.to_string())?;
+    std::fs::write(&plain, include_bytes!("../../assets/textures/block/varied_cube.png")).map_err(|e| e.to_string())?;
+    write("textures/block/varied_cube/varied_cube.ctm", "method = random\ntiles = 0 testkit:block/shapes/thin\nhides_neighbors = false\n")?;
     let face = r##"{"texture":"#unwrap","uv":[0.25,0.25,1.25,1.25]}"##;
     write(
         "models/block/shapes/thin.json",

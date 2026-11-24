@@ -3606,7 +3606,10 @@ impl Client {
         // falls comes once it is more than half there, over FALLS_SECS, and stops first. Both
         // went from nothing to all in five seconds, the moment the spell began (Ronald, 11-06:
         // "it like change in 2 seconds from clear to rain").
-        self.gloom += (share - self.gloom).clamp(-dt / GLOOM_SECS, dt / GLOOM_SECS);
+        // Under `--test`, upstream's five seconds: its checks wait for the weather's look, and
+        // ninety took minutes at CI's frame rates (the client counts a quarter second a frame).
+        let gather = if crate::app::api::launch_options().contains_key("test") { 5.0 } else { GLOOM_SECS };
+        self.gloom += (share - self.gloom).clamp(-dt / gather, dt / gather);
         let none = weft_abi::WeatherLook::default();
         let to = weather.look;
         let sky = |clear: f32, rain: f32| clear + (rain - clear) * self.gloom;
