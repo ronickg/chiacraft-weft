@@ -602,7 +602,7 @@ fn players(
 }
 
 /// Where to run from `from`: `dist` blocks away along the way most nearly straight away from it
-/// that has ground to stand on half way and at the end (no drop of more than 3, no water), trying
+/// that has ground to stand on half way and at the end (no drop of more than `needs::FLEE_DROP`, so it can step back up; no water), trying
 /// ways turned up to 110° off; straight away when none has.
 pub fn escape(w: &World, st: &EntityState, from: [f64; 3], dist: f64, herd: Option<[f64; 3]>) -> [f64; 3] {
     let (mut x, mut z) = (st.pos.x - from[0], st.pos.z - from[2]);
@@ -627,7 +627,7 @@ pub fn escape(w: &World, st: &EntityState, from: [f64; 3], dist: f64, herd: Opti
             let (px, pz) = (st.pos.x + a.cos() * step, st.pos.z + a.sin() * step);
             let (bx, bz) = (px.floor() as i32, pz.floor() as i32);
             match crate::comfort::ground(w, bx, y, bz) {
-                Some(g) if y - g <= 3 && !crate::comfort::WATER.at(w, [bx, g, bz]) => {
+                Some(g) if y - g <= animals_core::needs::FLEE_DROP && !crate::comfort::WATER.at(w, [bx, g, bz]) => {
                     y = g;
                     at = Some([px, g as f64, pz]);
                 }
