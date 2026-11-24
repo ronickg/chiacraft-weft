@@ -191,17 +191,25 @@ fn water_body() -> f32 {
 // west (17:00), a little at 12° (18:00), all with it on the horizon, into the dusk. (It began at 32°
 // up and drowned the 17:00 land in orange, where Bliss's shows its golden layer only at sunset:
 // lsG_ev against bliss_ctl, 11-22.)
-fn evening_mist() -> f32 {
+fn evening_window() -> f32 {
     let west = smoothstep(0.1, -0.1, scene.sun.x);
     let low = 1.0 - smoothstep(0.03, 0.3, scene.sun.y);
-    return clamp(fantasy_opt(OPT_EVENING_MIST), 0.0, 1.0) * west * low * smoothstep(-0.2, -0.05, scene.sun.y);
+    return west * low * smoothstep(-0.2, -0.05, scene.sun.y);
+}
+fn evening_mist() -> f32 {
+    return clamp(fantasy_opt(OPT_EVENING_MIST), 0.0, 1.0) * evening_window();
+}
+// The mist the evening layer has of its own (the client's `evening_mist_floor`, the same sum): 0.3
+// at 1, thicker past it up to 3 (at 1 it was a faint grey veil next to Bliss's, lsAH_mist).
+fn evening_floor() -> f32 {
+    return 0.3 * clamp(fantasy_opt(OPT_EVENING_MIST), 0.0, 3.0) * evening_window();
 }
 
 // The air's own mist (`scene.weather.z` less the evening layer's floor, `evening_mist_floor` in the
 // client): what every mist but the evening layer's, the haze and the grade go by, so the evening
 // layer brings no dawn mist, haze or grey with it (lsAF_mist03).
 fn air_mist() -> f32 {
-    return max(scene.weather.z - 0.3 * evening_mist(), 0.0);
+    return max(scene.weather.z - evening_floor(), 0.0);
 }
 
 // The surface's light from the sun and in all, before its tint (`light_on`, `surface_light`), for
@@ -1574,8 +1582,9 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // In the HDR world the sun's forward glow carries the mist's light toward it, and away from it
     // the mist is dim, the sky's light alone (Bliss's mist across the sun is a blue-grey that lets
     // the land through, not a bright veil).
+    // With the evening's tint (`OPT_MIST_TINT`) the sky's light at full, as Bliss's fog takes it.
     if scene.frame.x > 0.5 {
-        sky_part *= 0.55;
+        sky_part *= mix(0.55, 1.0, plain);
     }
     // In the HDR world the sunlit mist a deeper gold (Bliss's dawn mist, saturation 181 against our 99).
     let gold = select(MIST_GOLD * 0.65, vec3(1.0, 0.58, 0.2) * 0.7, scene.frame.x > 0.5);
