@@ -65,6 +65,7 @@ mod target_info;
 mod vehicles;
 mod video;
 mod video_costs;
+mod waterholes;
 mod waystones;
 mod weather;
 mod weather_sound;
@@ -161,6 +162,7 @@ fn init(r: &mut Registry) {
     worldgen::register(r);
     weather::register(r);
     snow::register(r);
+    waterholes::register(r);
     weather_sound::register(r);
     seasons::register(r);
     growth::register(r);

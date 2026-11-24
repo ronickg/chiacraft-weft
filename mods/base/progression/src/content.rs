@@ -271,6 +271,7 @@ pub const RULES: &[Rule] = &[
             "base:moss_block",
             "base:snow",
             "base:snow_layer",
+            "base:dried_mud",
             "base:leaf_litter",
             "base:deep_leaf_litter",
             "animals:red_sand",
