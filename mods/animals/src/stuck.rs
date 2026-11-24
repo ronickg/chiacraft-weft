@@ -61,9 +61,20 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
         // to is higher, and a leg along its level gets it nowhere the search hasn't seen) it leaps
         // at once (ai1124_pit5d: four legs in the pit before each leap, 25 s to 60 s).
         let up = way_up(w, st);
-        if n >= LEAP_AFTER || up.is_none() {
-            // At ground it can land on, up to `LEAP_MOST` above, else straight up along its way.
-            let (lx, ly, lz) = landing(w, st).unwrap_or((dx, LEAP_MOST as f64, dz));
+        let leap_on = match up {
+            Some(Way::Leap(off)) => Some(off),
+            _ => None,
+        };
+        let walk_to = match up {
+            Some(Way::Walk(to)) => Some(to),
+            _ => None,
+        };
+        if leap_on.is_some() || n >= LEAP_AFTER || up.is_none() {
+            // Up the way's leap, else at ground it can land on, up to `LEAP_MOST` above, else
+            // straight up along its way.
+            let (lx, ly, lz) = leap_on
+                .or_else(|| landing(w, st))
+                .unwrap_or((dx, LEAP_MOST as f64, dz));
             let v = animals_core::needs::leap(lx, ly, lz);
             weft_sdk::info!("animal {id} is stuck at {x:.0} {:.0} {z:.0}: leaps out ({lx:.1} {ly:.0} {lz:.1} off)", st.pos.y);
             if w.navigating(id) {
@@ -78,14 +89,14 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
             }
             return true;
         }
-        let to = up.unwrap_or([x + dx * WAY_OUT_LEG, st.pos.y, z + dz * WAY_OUT_LEG]);
+        let to = walk_to.unwrap_or([x + dx * WAY_OUT_LEG, st.pos.y, z + dz * WAY_OUT_LEG]);
         weft_sdk::info!(
             "animal {id} is stuck at {x:.0} {:.0} {z:.0} ({n} walks ended there): looks for a way out toward {:.0} {:.0} {:.0}{}",
             st.pos.y,
             to[0],
             to[1],
             to[2],
-            if up.is_some() { " (up)" } else { "" }
+            if walk_to.is_some() { " (up)" } else { "" }
         );
         w.navigate(id, to, 1.0);
         k[3] = (now + (WAY_OUT_SECS * 20.0) as u64) as f64;
@@ -154,18 +165,28 @@ fn landing(w: &World, st: &EntityState) -> Option<(f64, f64, f64)> {
     best.map(|(x, y, z, _)| (x, y, z))
 }
 
-/// The way up out of where it is (`needs::WAY_UP_*`): a search of the ground it can walk from its
-/// feet, stepping up one or dropping at most `FLEE_DROP` + 2, for the highest place, and the
-/// place `WAY_OUT_LEG` steps along the way there (its centre, at its feet). None when nothing it
-/// can walk to is higher than its feet: a pit, for the leap.
-fn way_up(w: &World, st: &EntityState) -> Option<[f64; 3]> {
+/// The first stretch of the way up: a walk to a place (its centre, at its feet), or a leap from
+/// where it stands (how far off, x, up, z).
+#[derive(Clone, Copy)]
+enum Way {
+    Walk([f64; 3]),
+    Leap((f64, f64, f64)),
+}
+
+/// The way up out of where it is (`needs::WAY_UP_*`): a search of the ground it can get to from
+/// its feet, walking (up one, down at most `FLEE_DROP` + 2) and leaping (up to `LEAP_MOST`, to the
+/// next column, with room overhead), for the highest place. Its first stretch: a walk of up to
+/// `WAY_OUT_LEG` steps, ending where the first leap begins; or that leap, when it begins where it
+/// stands. None when nothing it can get to is higher than its feet.
+fn way_up(w: &World, st: &EntityState) -> Option<Way> {
     use std::collections::{HashMap, VecDeque};
     let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
     let stand = |p: [i32; 3]| solid([p[0], p[1] - 1, p[2]]) && !solid(p) && !solid([p[0], p[1] + 1, p[2]]);
-    let start = [st.pos.x.floor() as i32, st.pos.y.floor() as i32, st.pos.z.floor() as i32];
-    let mut from: HashMap<[i32; 3], [i32; 3]> = HashMap::new();
+    let start = [st.pos.x.floor() as i32, (st.pos.y + 0.05).floor() as i32, st.pos.z.floor() as i32];
+    // Each place, the one it was reached from, and whether by a leap.
+    let mut from: HashMap<[i32; 3], ([i32; 3], bool)> = HashMap::new();
     let mut queue = VecDeque::from([start]);
-    from.insert(start, start);
+    from.insert(start, (start, false));
     let mut best = start;
     while let Some(p) = queue.pop_front() {
         if from.len() > WAY_UP_CELLS {
@@ -174,16 +195,31 @@ fn way_up(w: &World, st: &EntityState) -> Option<[f64; 3]> {
         if p[1] > best[1] {
             best = p;
         }
+        // Room over it to jump one, or to leap (its body clears `LEAP_MOST` plus its height).
+        let room = |h: i32| (2..=h).all(|d| !solid([p[0], p[1] + d, p[2]]));
+        let (hop, leap) = (room(2), room(LEAP_MOST + 2));
         for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
             let (nx, nz) = (p[0] + dx, p[2] + dz);
             if (nx - start[0]).abs() > WAY_UP_REACH || (nz - start[2]).abs() > WAY_UP_REACH {
                 continue;
             }
+            let mut reach = |n: [i32; 3], by_leap: bool| {
+                if let std::collections::hash_map::Entry::Vacant(e) = from.entry(n) {
+                    e.insert((p, by_leap));
+                    queue.push_back(n);
+                }
+            };
+            // A leap onto a ledge higher than a step, with room over the landing.
+            if let Some(dy) = (2..=LEAP_MOST).rev().find(|&dy| {
+                let n = [nx, p[1] + dy, nz];
+                leap && stand(n) && !solid([nx, n[1] + 2, nz])
+            }) {
+                reach([nx, p[1] + dy, nz], true);
+            }
             // Up one with room overhead to jump, along, or down as far as it may drop.
-            let up = !solid([p[0], p[1] + 2, p[2]]);
             for dy in (-(FLEE_DROP + 2)..=1).rev() {
                 let n = [nx, p[1] + dy, nz];
-                if dy == 1 && !up {
+                if dy == 1 && !hop {
                     continue;
                 }
                 // Down: the column it falls through is open.
@@ -191,10 +227,7 @@ fn way_up(w: &World, st: &EntityState) -> Option<[f64; 3]> {
                     break;
                 }
                 if stand(n) {
-                    if let std::collections::hash_map::Entry::Vacant(e) = from.entry(n) {
-                        e.insert(p);
-                        queue.push_back(n);
-                    }
+                    reach(n, false);
                     break;
                 }
             }
@@ -203,15 +236,27 @@ fn way_up(w: &World, st: &EntityState) -> Option<[f64; 3]> {
     if best[1] <= start[1] {
         return None;
     }
-    // Back from the highest to its feet, then `WAY_OUT_LEG` steps out along it.
+    // Back from the highest to its feet, then each place and whether it is left by a leap.
     let mut way = vec![best];
-    while let Some(&p) = from.get(way.last().unwrap()) {
-        if p == *way.last().unwrap() {
-            break;
-        }
-        way.push(p);
+    while let Some(&(q, _)) = from
+        .get(way.last().unwrap())
+        .filter(|(q, _)| q != way.last().unwrap())
+    {
+        way.push(q);
     }
     way.reverse();
-    let at = way[(WAY_OUT_LEG as usize).min(way.len() - 1)];
-    Some([at[0] as f64 + 0.5, at[1] as f64, at[2] as f64 + 0.5])
+    let out: Vec<([i32; 3], bool)> = (0..way.len())
+        .map(|i| (way[i], i + 1 < way.len() && from[&way[i + 1]].1))
+        .collect();
+    let centre = |c: [i32; 3]| [c[0] as f64 + 0.5, c[1] as f64, c[2] as f64 + 0.5];
+    if out[0].1 {
+        let to = centre(out[1].0);
+        return Some(Way::Leap((to[0] - st.pos.x, to[1] - st.pos.y, to[2] - st.pos.z)));
+    }
+    let end = out
+        .iter()
+        .take(WAY_OUT_LEG as usize + 1)
+        .position(|c| c.1)
+        .unwrap_or((WAY_OUT_LEG as usize).min(out.len() - 1));
+    Some(Way::Walk(centre(out[end].0)))
 }
