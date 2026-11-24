@@ -73,7 +73,7 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
 | base:toadstool | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
-| base:cooked_dryads_saddle | fungi | 75 | 8 | 2 | 4 | 0 | 2 | 68 | 4 min | 2 + 2 | hot when cooked |
+| base:cooked_dryads_saddle | fungi | 75 | 8 | 2 | 2 | 0 | 2 | 68 | 4 min | 2 + 2 | hot when cooked |
 | animals:venison | meat | 200 | 20 | 44 | 0 | 5 | 0 | 147 | 27 min | 2 + 2 | raw |
 | animals:cooked_venison | meat | 150 | 15 | 45 | 0 | 5 | 0 | 98 | 24 min | 4 + 4 | hot when cooked |
 | animals:hare | meat | 150 | 15 | 33 | 0 | 3 | 0 | 109 | 20 min | 2 + 2 | raw |
@@ -318,7 +318,7 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:sapling | oak | 5, 18-28, 38 | Moderate | hardy | - | the game's | plains (su au), forest (su), old_growth_forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:grazed_grass | prairie grass | 5, 15-30, 40 | Moderate | hardy | 18 | 7 | plains (su au), forest (su au), old_growth_forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:dung_pat | a cow pat (dung beetles, fungi) | 5, 20-30, 42 | Moderate | hardy | 45 | 14 | plains (su au), forest (su), old_growth_forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
-| base:sedge | sedges | -1, 8-22, 32 | Moderate | hardy | 18 | 7 | plains (sp su au), forest (sp su au), old_growth_forest (su au), birch_forest (su au), taiga (su), snowy_plains (su), savanna (au), tropical_forest (au), mountains (su au), ocean (sp su au wi), coral_reef (au), lagoon (au), beach (au wi), floodplain (au), fern_forest (su au), crags (su au wi) |
+| base:sedge | sedges | -1, 8-30, 38 | Moderate | hardy | 18 | 7 | plains (sp su au), forest (sp su au), old_growth_forest (su au), birch_forest (su au), taiga (su), snowy_plains (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su au), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au wi) |
 | base:cottongrass | cottongrass (Eriophorum) | -2, 6-16, 25 | Moderate | hardy | 18 | 7 | plains (sp au), forest (sp su au wi), old_growth_forest (sp su au), birch_forest (su au), taiga (su), snowy_plains (su), mountains (sp su au), sequoia_grove (wi), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
 | base:reindeer_lichen | reindeer lichen (Cladonia) | 0, 5-15, 25 | Dry | hardy | 3650 | 301 | plains (sp au), forest (sp su au), old_growth_forest (sp su au), birch_forest (sp su au), taiga (su au), snowy_plains (su), mountains (sp su au), sequoia_grove (sp su au wi), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (au wi), fern_forest (sp su au), crags (sp au wi) |
 | base:dune_grass | American beachgrass (Ammophila breviligulata) | 5, 18-26, 35 | Dry | hardy | 30 | 10 | plains (sp su au), forest (su au), old_growth_forest (su), birch_forest (su), taiga (su), desert (sp au wi), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), coral_reef (sp su au wi), lagoon (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au wi), fern_forest (su au), crags (sp su au) |
@@ -384,7 +384,7 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | block | grows | ground | gives | cover | found in |
 |---|---|---|---|---|---|
 | base:sedge | Tuft | Soil | - | 12.0% | snowy_plains, taiga, swamp |
-| base:cottongrass | Tuft | Soil | - | 8.0% | snowy_plains, taiga |
+| base:cottongrass | Tuft | Soil | - | 8.0% | snowy_plains, taiga (6.0%) |
 | base:reindeer_lichen | Tuft | Soil | - | 5.0% | snowy_plains, taiga, mountains |
 | base:clover | Tuft | Soil | - | 3.0% | plains, forest, birch_forest, mountains |
 | base:berry_bush | Bush | Soil | base:berries | 0.4% | forest, old_growth_forest, birch_forest, taiga |
@@ -399,7 +399,7 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:mushroom_brown | Spreads | Soil | base:mushroom_brown | 0.6% | forest, old_growth_forest, birch_forest, taiga, mountains |
 | base:mushroom_red | Spreads | Soil | base:mushroom_red | 0.3% | forest, old_growth_forest, birch_forest, taiga |
 | base:water_hyacinth | Spreads | Water | - | 8.0% | swamp, savanna |
-| base:foxfire | Spreads | Soil | - | 0.4% | forest, old_growth_forest, birch_forest, taiga, swamp, tropical_forest, sequoia_grove |
+| base:foxfire | Spreads | Soil | - | 0.4% | forest, old_growth_forest, birch_forest, taiga, swamp, tropical_forest |
 | base:glow_mycena | Spreads | Soil | - | 0.3% | tropical_forest, swamp |
 | base:goblins_gold | Spreads | Soil | - | 0.2% | forest, old_growth_forest, birch_forest, taiga |
 | base:cattail | Still | Shore | base:cattail_root | 15.0% | swamp, plains, forest, taiga, savanna |
