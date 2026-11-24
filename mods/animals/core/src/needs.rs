@@ -321,3 +321,36 @@ mod choosing {
         assert!(rest_under(night, hunger_score(0.05, false)) * KEEP_AT < hunger_score(0.05, false));
     }
 }
+
+// ------------------------------------------------------------------ stuck, and the way out
+
+// An animal whose walks to food or water end where they began is stuck: in a cave under the
+// water it wants (the path can't find the way round that far), or a pit deeper than it steps
+// up. Each walk that ended short gave the place up and handed the turn to a rest, so it lay down,
+// got up and lay down again on one block till it died (ai1124_graze9, graze10). It looks for a
+// way out: legs along its own level, a different way each time; and from a pit those can't leave,
+// it leaps, as a deer clears a fence of 2.4 m.
+
+/// Walks ended short within `STUCK_NEAR` blocks of where the first did before it looks for a way
+/// out, and those before it leaps.
+pub const STUCK_AFTER: u8 = 2;
+pub const LEAP_AFTER: u8 = 6;
+pub const STUCK_NEAR: f64 = 2.0;
+/// A leg out: blocks along its own level, the ways (of 8, turned on each try), and the game
+/// seconds it has to walk it.
+pub const WAY_OUT_LEG: f64 = 12.0;
+pub const WAY_OUT_WAYS: u8 = 8;
+pub const WAY_OUT_SECS: f32 = 10.0;
+/// A leap's height in blocks (a walker's jump clears 1.25), and its push sideways, blocks a
+/// second.
+pub const LEAP_BLOCKS: f64 = 2.3;
+pub const LEAP_SIDE: f64 = 3.0;
+/// The steepest drop a running animal takes (`senses::escape`): it can step back up one, not two.
+pub const FLEE_DROP: i32 = 1;
+const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WAY_OUT_WAYS);
+
+/// The push up, blocks a second, that lifts a walker `blocks` high (a walker's jump, 0.42 blocks
+/// a tick, lifts 1.25: the height goes as the square of the speed).
+pub fn leap_up(blocks: f64) -> f64 {
+    0.42 * 20.0 * (blocks / 1.25).sqrt()
+}

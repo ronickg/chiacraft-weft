@@ -323,6 +323,10 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
         }
         return false;
     }
+    // Walking a way out of where it is stuck (`stuck`).
+    if crate::stuck::going(w, id) {
+        return true;
+    }
     let now = w.game_time() as f64;
     // Going to food on the ground, or eating it.
     let item = w.component(id, &ITEM).unwrap_or(0);
@@ -401,7 +405,8 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
         w.component_mut(id, &PATCH).map(|k| *k = [0; 4]);
         w.component_mut(id, &FORAGE)
             .map(|c| *c = [f64::NAN, 0.0, 0.0, now + NOTHING]);
-        return false;
+        // Ended short where the last did too: it is stuck, and looks for a way out (`stuck`).
+        return crate::stuck::short(w, id, st);
     }
     if let Some((t, p)) = ground_food(w, s, st.pos.to_array(), ITEM_LOOK) {
         w.navigate(id, p, 1.0);

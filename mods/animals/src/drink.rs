@@ -333,6 +333,10 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         }
         return false;
     }
+    // Walking a way out of where it is stuck (`stuck`).
+    if crate::stuck::going(w, id) {
+        return true;
+    }
     let now = w.game_time() as f64;
     let spot = (!d[0].is_nan() && d[3] != 0.0).then(|| [d[0], d[1], d[2]]);
     let there = st.in_liquid != 0
@@ -370,7 +374,8 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         if let Some(c) = w.component_mut(id, &DRINK) {
             *c = [f64::NAN, 0.0, 0.0, now + NOTHING];
         }
-        return false;
+        // Ended short where the last did too: it is stuck, and looks for a way out (`stuck`).
+        return crate::stuck::short(w, id, st);
     }
     if now < d[3] {
         // Walking to it; or no water near, foraging and wandering on.
