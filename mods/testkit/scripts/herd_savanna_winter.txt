@@ -18,6 +18,13 @@
 # some of them at the last pool (herd_savanna_winter_2.png: a small pool in cracked mud); in
 # spring the water climbs back to 25 and mud to 0 (herd_savanna_winter_3.png). Report also how
 # many days the samples reached (the real pace held) and any deer that left to drink elsewhere.
+# ai1124_savanna1 (d4e13de5b): the climate held (days 42-52, rain 11 % then 40 %, water 25 -> 1,
+# refilled), but the deer starved by day 45 without a drink: the flattening had cleared every
+# plant 20-30 blocks round, a deer looks 8 blocks for food, and they died in the bare patch or
+# far off looking. So the flat ground gets its tall grass back (all but the pond's rim), and
+# `/animalprof food 1` tops their food up at each sample (their water is left alone: the run is
+# about their drinking; whether a herd keeps itself fed through a dry season is another run).
+# The shots are at noon (`/time set 6000`): a winter's 06:00 and 18:00 are dark.
 loaded
 idle
 # Creative, not spectator: the drying visits go round visible players, which leave spectators out.
@@ -27,11 +34,13 @@ wait 4
 idle
 where
 chat /season winter 1
-chat /time set 0
+chat /time set 6000
 chat /rain
 chat /time query
 chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
 chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+chat /tk fill ~-4 ~ ~-10 ~4 ~ ~-2 core:air
 chat /tk fill ~-2 ~-2 ~-8 ~2 ~-2 ~-4 base:dirt
 chat /tk fill ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 wait 3
@@ -41,6 +50,7 @@ wait 1
 shot herd_savanna_winter_1.png
 chat /tk ring animals:white_tailed_deer 5 10 14
 wait 2
+chat /animalprof food 1
 chat /anim log
 chat /waterholes watch
 chat /tick rate 600
@@ -48,23 +58,12 @@ wait 40
 chat /time query
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /animalprof food 1
 wait 40
 chat /time query
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
-wait 40
-chat /time query
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
-chat /animalprof senses
-wait 40
-chat /time query
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
-wait 40
-chat /time query
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /animalprof food 1
 wait 40
 chat /time query
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
@@ -74,21 +73,39 @@ wait 40
 chat /time query
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /animalprof food 1
 wait 40
 chat /time query
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /animalprof food 1
 wait 40
 chat /time query
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /animalprof senses
 wait 40
 chat /time query
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
-# The shot at a dusk drink: back to the game's pace, the day's dusk (18:00).
+chat /animalprof food 1
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /animalprof food 1
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /animalprof food 1
+wait 40
+chat /time query
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+# The shot at noon (a winter's dusk is dark): back to the game's pace.
 chat /tick rate 20
-chat /time set 12000
+chat /time set 6000
 wait 20
 chat /animalprof senses
 look 0 -55
@@ -105,6 +122,8 @@ wait 40
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /tick rate 20
+chat /time set 6000
+wait 2
 look 0 -55
 wait 1
 shot herd_savanna_winter_3.png
