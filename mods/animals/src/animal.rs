@@ -202,6 +202,7 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         let new = a.species == 0;
         if new {
             first_roll(w, id, index, a, st.pos.to_array());
+            crate::drink::arrive(w, id, a, st.pos.to_array());
         }
         let away = if a.seen == 0 { 0 } else { life::age(w.game_time(), a.seen) };
         a.seen = life::birth(w.game_time(), 0);
@@ -355,7 +356,7 @@ fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
 
 /// The share of wild ones met in their breeding season that are young.
 const YOUNG_PERCENT: u32 = 25;
-use animals_core::needs::{ARRIVES_FED, STARVES_SECS};
+use animals_core::needs::ARRIVES_FED;
 
 /// Its area was away (unloaded) for `away` ticks, and life went on there (`notes/ANIMALS.md`,
 /// "Time away"): its timers run out (a mother due gives birth now), it has aged (by the world's
@@ -494,12 +495,12 @@ fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f3
 /// from the world (`forage.rs`). A wild one with an empty stomach starves.
 fn hunger(w: &World, id: u64, a: &Animal, rate: f32, secs: f32) {
     let Some(s) = a.species() else { return };
-    // A wild one with nothing left starves to death in a game day (a tame suffers, never dies:
-    // its condition falls instead).
+    // A wild one with nothing left lives on its reserves, then starves to death
+    // (`needs::starves_secs`, by its mass; a tame suffers, never dies: its condition falls instead).
     if a.food == 0 && !tamed(w, id) {
-        // A scavenger fasts instead (`needs::STARVES_SECS`).
+        // A scavenger fasts instead (`needs::FAST_DAYS`).
         if let Some(st) = w.entity(id).filter(|_| !s.scavenges()) {
-            w.damage(id, Damage::new(st.max_health / STARVES_SECS * secs, damage_cause::STARVE));
+            w.damage(id, Damage::new(st.max_health / animals_core::needs::starves_secs(s) * secs, damage_cause::STARVE));
         }
         return;
     }

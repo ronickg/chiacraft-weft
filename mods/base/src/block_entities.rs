@@ -50,6 +50,8 @@ pub fn register(r: &mut Registry) {
         )
         .group("output", Slots::single().output().holder())
         .recipes(&crate::recipes::SMELTING)
+        // Raw ore a blueprint not yet read teaches to smelt goes back (`ruins.rs`).
+        .on_change(crate::ruins::furnace_changed)
         .player_inventory()
         .screen(|ui| {
             crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {

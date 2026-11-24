@@ -608,6 +608,11 @@ pub async fn attack_indicator(t: T) -> R {
     t.check(rest.share(x0, y0, x1, y1, fill) < 0.01, "nothing under the crosshair when charged");
     let center = rest.share(0.497, 0.494, 0.503, 0.506, |c| c.iter().all(|&v| v > 150));
     t.probe("the crosshair in the middle of the window", center, center > 0.1);
+    // A tenth of its speed (about 6 s to charge): on CI the second shot came 0.75 s after the press,
+    // past the sword's 0.6 s (0.087, then 0.000). Set after the charged shot: long idle stays charged.
+    t.op("attr_mod me core:attack_speed slow_swing core:add -0.9 0")
+        .await?;
+    t.frames(3).await?;
     t.press("core:attack");
     t.secs(0.15).await?;
     let early = t.shot("charging").await?.share(x0, y0, x1, y1, fill);
@@ -616,8 +621,14 @@ pub async fn attack_indicator(t: T) -> R {
     t.note(format!("indicator filled: {early:.3}, later {later:.3}"));
     t.check(later > 0.02, format!("the indicator shows while charging: {later:.3}"));
     t.check(later > early, format!("and fills: {early:.3}, then {later:.3}"));
-    t.secs(0.6).await?;
-    t.check(t.shot("charged_again").await?.share(x0, y0, x1, y1, fill) < 0.01, "and is gone once charged");
+    let end = crate::runner::script_clock() + Duration::from_secs(12);
+    let mut gone = false;
+    while !gone && crate::runner::script_clock() < end {
+        t.secs(0.5).await?;
+        gone = t.shot("charged_again").await?.share(x0, y0, x1, y1, fill) < 0.01;
+    }
+    t.check(gone, "and is gone once charged");
+    t.op("attr_rm me core:attack_speed slow_swing").await?;
     t.op("attr_rm me core:block_reach no_reach").await?;
     Ok(())
 }
@@ -678,14 +689,17 @@ pub async fn block_dust_scatters(t: T) -> R {
     t.secs(0.3).await?;
     // Darker than the sky and any cloud.
     let piece = |c: probe::C| c.iter().all(|&v| v < 170);
-    let sides = |s: &crate::runner::Shot| [s.share(0.30, 0.3, 0.42, 0.7, piece), s.share(0.58, 0.3, 0.70, 0.7, piece)];
+    // Wide: at 3.6 blocks a second they leave a narrow strip within half a second, and fall.
+    // Clear of the HUD at the edges and the chat line at the bottom.
+    let sides = |s: &crate::runner::Shot| [s.share(0.12, 0.22, 0.42, 0.82, piece), s.share(0.58, 0.22, 0.88, 0.82, piece)];
     let before = sides(&t.shot("before").await?);
-    t.op(&format!("break {} {} {}", b[0], b[1], b[2])).await?;
-    t.until("the block gone on the client", Duration::from_secs(2), |t| t.c().block(b) == Some(0))
+    // Not waiting for the op's answer: it came a CI frame or two after the block change and its
+    // dust, and pieces live 0.2 to 1 s of frame time (none left in any shot).
+    t.c()
+        .run_command(&format!("/tk break {} {} {}", b[0], b[1], b[2]));
+    t.until("the block gone on the client", Duration::from_secs(5), |t| t.c().block(b) == Some(0))
         .await?;
-    // The most seen each frame for a quarter second: on CI a frame or two outlived the pieces
-    // (half a second to a second), and one shot 0.25 s on found none.
-    let end = crate::runner::script_clock() + Duration::from_secs_f32(0.25);
+    let end = crate::runner::script_clock() + Duration::from_secs_f32(0.6);
     let mut after = [0f32; 2];
     let shot = loop {
         let shot = t.shot("after").await?;
@@ -821,10 +835,13 @@ pub async fn ctm_any_model(t: T) -> R {
         "textures/block/varied/varied.ctm",
         "method = vertical\ntiles = testkit:block/colors/red testkit:block/colors/green testkit:block/colors/blue testkit:block/colors/yellow\n",
     )?;
-    write(
-        "textures/block/varied_cube/varied_cube.ctm",
-        "method = random\ntiles = testkit:block/shapes/thin <default>\nhides_neighbors = false\n",
-    )?;
+    // `<default>` is gone (Weft 5cb6b2304): it named a missing file, and a folder's tile 0 is now
+    // the plain picture, so the cube had the magenta checker. The pack carries the cube's own
+    // picture as `0`, listed first.
+    let plain = format!("{pack}/testkit/textures/block/varied_cube/0.png");
+    std::fs::create_dir_all(std::path::Path::new(&plain).parent().unwrap()).map_err(|e| e.to_string())?;
+    std::fs::write(&plain, include_bytes!("../../assets/textures/block/varied_cube.png")).map_err(|e| e.to_string())?;
+    write("textures/block/varied_cube/varied_cube.ctm", "method = random\ntiles = 0 testkit:block/shapes/thin\nhides_neighbors = false\n")?;
     let face = r##"{"texture":"#unwrap","uv":[0.25,0.25,1.25,1.25]}"##;
     write(
         "models/block/shapes/thin.json",

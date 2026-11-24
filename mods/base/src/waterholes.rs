@@ -27,7 +27,10 @@ pub static CRUST: Block = Block::named("dried_mud");
 /// `Some(false)` none does (the crust fills back), and how many times faster; None: the climate.
 static FORCE: Mutex<(Option<bool>, f32)> = Mutex::new((None, 1.0));
 
-/// Testing: what the visits found while `/waterholes` is forced, logged every `REPORT` ticks:
+/// Testing (`/waterholes watch`): the climate's own seasons, with the visits' counts logged.
+static WATCH: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Testing: what the visits found while `/waterholes` is forced or watched, logged every `REPORT` ticks:
 /// water visited, dried; not dried for the roll, a floor of water or air, not an edge, the season;
 /// crusts visited, filled.
 static SEEN: [AtomicU32; 8] = [const { AtomicU32::new(0) }; 8];
@@ -37,9 +40,9 @@ fn seen(i: usize) {
     SEEN[i].fetch_add(1, Relaxed);
 }
 
-/// Testing: the visits' counts since the last, logged while `/waterholes` is forced.
+/// Testing: the visits' counts since the last, logged while `/waterholes` is forced or watched.
 fn report(w: &World) {
-    if FORCE.lock().unwrap().0.is_none() || !w.game_time().is_multiple_of(REPORT) {
+    if (FORCE.lock().unwrap().0.is_none() && !WATCH.load(Relaxed)) || !w.game_time().is_multiple_of(REPORT) {
         return;
     }
     let n: Vec<u32> = SEEN.iter().map(|c| c.swap(0, Relaxed)).collect();
@@ -80,18 +83,22 @@ pub fn register(r: &mut Registry) {
                 w.set_block(pos, WATER.id());
             }
         });
-    r.command("waterholes", "<what:word(dry,wet,real)> [speed:float]", |cmd| {
+    r.command("waterholes", "<what:word(dry,wet,real,watch)> [speed:float]", |cmd| {
         let force = match cmd.text("what").unwrap_or("real") {
             "dry" => Some(true),
             "wet" => Some(false),
             _ => None,
         };
-        let speed = cmd.float("speed").unwrap_or(1.0).max(1.0) as f32;
+        let watch = cmd.text("what") == Some("watch");
+        WATCH.store(watch, Relaxed);
+        // Watching is the real climate at its real pace.
+        let speed = if watch { 1.0 } else { cmd.float("speed").unwrap_or(1.0).max(1.0) as f32 };
         *FORCE.lock().unwrap() = (force, speed);
         let n = Arg::Int(speed.round() as i64);
         match force {
             Some(true) => cmd.reply("command.base.waterholes.dry", &[n]),
             Some(false) => cmd.reply("command.base.waterholes.wet", &[n]),
+            None if watch => cmd.reply("command.base.waterholes.watch", &[]),
             None => cmd.reply("command.base.waterholes.real", &[]),
         }
     });

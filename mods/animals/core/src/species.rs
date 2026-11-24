@@ -404,7 +404,7 @@ impl Species {
     }
     /// Whether it lives on the dead: half its diet or more carrion (the vulture). It gets hungry in
     /// the wild, smells carrion from afar (`needs::SCENT`), takes a carcass's meat as carrion and
-    /// rotten flesh without harm, and never starves in the wild (`needs::STARVES_SECS`).
+    /// rotten flesh without harm, and never starves in the wild (`needs::FAST_DAYS`).
     pub fn scavenges(&self) -> bool {
         self.eats
             .iter()

@@ -491,17 +491,21 @@ pub struct Key {
     pub missing: &'static [&'static str],
 }
 
-/// The keys so far: the Stone Age's, the Bronze Age's boss part (11-05) and materials gate, and the
-/// Iron Age's materials gate (11-23).
+/// The keys so far: the Stone Age's, the Bronze Age's boss part (11-05) and materials gate, the
+/// Iron Age's materials gate and boss part (11-23), and each key's knowledge, its age's ruin's
+/// blueprint (`vitals::ruins`, 11-23).
 pub const KEYS: &[Key] = &[
     Key {
         age: Age::Stone,
         routes: &[
-            (Path::Tech, &["base:pickaxe", "base:furnace", "animals:warden_heartseed"]),
-            (Path::Beasts, &["animals:club", "animals:tranquilizer_dart", "animals:nest", "animals:warden_heartseed"]),
-            (Path::Magic, &["base:dowsing_rod", "animals:warden_heartseed"]),
+            (Path::Tech, &["base:pickaxe", "base:furnace", "animals:warden_heartseed", "base:blueprint_crucible"]),
+            (
+                Path::Beasts,
+                &["animals:club", "animals:tranquilizer_dart", "animals:nest", "animals:warden_heartseed", "base:blueprint_crucible"],
+            ),
+            (Path::Magic, &["base:dowsing_rod", "animals:warden_heartseed", "base:blueprint_crucible"]),
         ],
-        missing: &["knowledge: a ruin's blueprint or lore page"],
+        missing: &[],
     },
     // The Bronze Age's key: its boss part (Borkon's Summit Stone) and its materials gate, a
     // bronze pickaxe (`base:bronze_ingot` stands for its head), which iron ore takes
@@ -509,11 +513,11 @@ pub const KEYS: &[Key] = &[
     Key {
         age: Age::Bronze,
         routes: &[
-            (Path::Tech, &["base:bronze_ingot", "animals:summit_stone"]),
-            (Path::Beasts, &["base:bronze_ingot", "animals:summit_stone"]),
-            (Path::Magic, &["base:bronze_ingot", "animals:summit_stone"]),
+            (Path::Tech, &["base:bronze_ingot", "animals:summit_stone", "base:blueprint_ironwork"]),
+            (Path::Beasts, &["base:bronze_ingot", "animals:summit_stone", "base:blueprint_ironwork"]),
+            (Path::Magic, &["base:bronze_ingot", "animals:summit_stone", "base:blueprint_ironwork"]),
         ],
-        missing: &["knowledge: a ruin's blueprint or lore page", "infrastructure: a working setup from the Bronze Age"],
+        missing: &["infrastructure: a working setup from the Bronze Age"],
     },
     // The Iron Age's key: its materials gate, a steel pickaxe (diamond ore and obsidian take
     // harvest 300) from the forge that makes steel, and (11-23) either boss's Iron form part, by
@@ -521,11 +525,11 @@ pub const KEYS: &[Key] = &[
     Key {
         age: Age::Iron,
         routes: &[
-            (Path::Tech, &["base:steel_ingot", "base:forge", "#iron_boss_part"]),
-            (Path::Beasts, &["base:steel_ingot", "base:forge", "#iron_boss_part"]),
-            (Path::Magic, &["base:steel_ingot", "base:forge", "#iron_boss_part"]),
+            (Path::Tech, &["base:steel_ingot", "base:forge", "#iron_boss_part", "base:blueprint_forge"]),
+            (Path::Beasts, &["base:steel_ingot", "base:forge", "#iron_boss_part", "base:blueprint_forge"]),
+            (Path::Magic, &["base:steel_ingot", "base:forge", "#iron_boss_part", "base:blueprint_forge"]),
         ],
-        missing: &["knowledge: a ruin's blueprint or lore page", "infrastructure: past the forge, a working setup from the Iron Age"],
+        missing: &["infrastructure: past the forge, a working setup from the Iron Age"],
     },
 ];
 
@@ -949,6 +953,103 @@ pub fn age_gates(g: &Solved) -> Vec<String> {
     for (root, _) in KNOWN_SKIPS {
         if !gates.iter().any(|x| x.known == Some(*root)) {
             out.push(format!("{root} is a known skip, but nothing skips through it now: take it off `graph::KNOWN_SKIPS`"));
+        }
+    }
+    out
+}
+
+/// The knowledge gate (`vitals::ruins`): each key's every route takes its age's blueprint, found in
+/// its age's ruins and teaching something of its age or later that the graph makes; the first
+/// Stone ruin within `SPAWN_REACH` of spawn on every seed tried.
+pub fn knowledge(g: &Solved) -> Vec<String> {
+    use vitals::ruins as r;
+    let mut out = Vec::new();
+    for key in KEYS {
+        let age = key.age as u8;
+        let Some(b) = r::BLUEPRINTS.iter().find(|b| b.age == age) else {
+            out.push(format!("the {:?} key has no blueprint in `vitals::ruins::BLUEPRINTS`", key.age));
+            continue;
+        };
+        let item = b.item();
+        for (path, items) in key.routes {
+            if !items.contains(&item.as_str()) {
+                out.push(format!("the {:?} key's {:?} route doesn't take {item}", key.age, path));
+            }
+        }
+        if key.missing.iter().any(|m| m.starts_with("knowledge")) {
+            out.push(format!("the {:?} key still lists its knowledge as missing", key.age));
+        }
+    }
+    for b in r::BLUEPRINTS {
+        let item = b.item();
+        match content::tier(&item) {
+            None => out.push(format!("{item} has no tag")),
+            Some(t) if t != b.age => out.push(format!("{item} is tier {t}, but its ruins are age {}", b.age)),
+            _ => {}
+        }
+        if !g.cost.contains_key(&item) {
+            out.push(format!("{item} is unreachable"));
+        }
+        match r::kind_of_age(b.age) {
+            None => out.push(format!("{item}: no ruin holds age {}", b.age)),
+            Some(k) => {
+                if content::rule(&item).is_some_and(|rule| rule.get != content::Get::Drop(k.find_em)) {
+                    out.push(format!("{item} isn't priced at its ruin's finding ({} EM)", k.find_em));
+                }
+                // Its ward wants the age's own pickaxe: one of its age breaks it, none before.
+                let best = |up_to: u8, below: bool| {
+                    TOOLS
+                        .iter()
+                        .filter(|t| t.1 == "pickaxe")
+                        .filter(|t| content::tier(t.0).is_some_and(|x| if below { x < up_to } else { x <= up_to }))
+                        .map(|t| t.2)
+                        .max()
+                        .unwrap_or(0)
+                };
+                // Past the Stone Age no flint pickaxe opens a vault, and each vault wants more than
+                // the one before (the Iron vault a bronze pickaxe where the Bronze one a copper).
+                if k.age > 0 && k.ward <= best(0, false) {
+                    out.push(format!("the {} ruin's ward ({}) breaks with a Stone Age pickaxe", k.id, k.ward));
+                }
+                if let Some(before) = r::kind_of_age(k.age.wrapping_sub(1)).filter(|_| k.age > 0)
+                    && k.ward <= before.ward
+                {
+                    out.push(format!("the {} ruin's ward ({}) is no harder than the {} ruin's ({})", k.id, k.ward, before.id, before.ward));
+                }
+                if k.ward > best(k.age, false) {
+                    out.push(format!("the {} ruin's ward ({}) takes a pickaxe past age {}", k.id, k.ward, k.age));
+                }
+            }
+        }
+        for &what in b.crafts.iter().chain(b.smelts) {
+            match content::tier(what) {
+                None => out.push(format!("{item} teaches {what}, which has no tag")),
+                Some(t) if t < b.age => out.push(format!("{item} (age {}) teaches {what} of tier {t}: found too late", b.age)),
+                _ => {}
+            }
+        }
+        for &what in b.crafts {
+            if !recipes().iter().any(|rc| rc.out == what) {
+                out.push(format!("{item} teaches crafting {what}, which no recipe makes"));
+            }
+        }
+        for &what in b.smelts {
+            if !recipes()
+                .iter()
+                .any(|rc| rc.at == Furnace && rc.ins.iter().any(|i| i.0 == what))
+            {
+                out.push(format!("{item} teaches smelting {what}, which no furnace recipe takes"));
+            }
+        }
+    }
+    // The first ruin near spawn on a few seeds and spawns (the real spawns: base_api's tests).
+    for seed in 1..=6u64 {
+        for spawn in [[0, 0], [2048, -1536], [-4000, 900]] {
+            let ruin = r::spawn_ruin(seed, spawn, &|_, _| true);
+            let d = (((ruin.x - spawn[0]) as f64).powi(2) + ((ruin.z - spawn[1]) as f64).powi(2)).sqrt();
+            if d > r::SPAWN_REACH {
+                out.push(format!("seed {seed}, spawn {spawn:?}: the first Stone ruin is {d:.0} blocks off (over {})", r::SPAWN_REACH));
+            }
         }
     }
     out

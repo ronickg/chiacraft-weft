@@ -105,6 +105,8 @@ pub const AXE: Needs = Needs::Tool("axe", 0);
 pub const PICK: Needs = Needs::Tool("pickaxe", 0);
 pub const PICK_STONE: Needs = Needs::Tool("pickaxe", 100);
 /// Iron ore's: a bronze pickaxe or better (`vitals::gear::IRON_ORE_HARVEST`).
+/// A copper pickaxe: the Bronze vaults' sealed stone (`vitals::ruins::WARD_BRONZE`).
+pub const PICK_COPPER: Needs = Needs::Tool("pickaxe", vitals::ruins::WARD_BRONZE);
 pub const PICK_BRONZE: Needs = Needs::Tool("pickaxe", vitals::gear::IRON_ORE_HARVEST);
 pub const PICK_IRON: Needs = Needs::Tool("pickaxe", 200);
 pub const PICK_STEEL: Needs = Needs::Tool("pickaxe", 300);
@@ -327,6 +329,50 @@ pub const RULES: &[Rule] = &[
     n(&["base:dowsing_rod"], 0, Magic, Tool, Made, "senses the ley lines: the Stone Age's magic route"),
     n(&["base:ley_stone"], 0, Magic, Building, World(PICK, 3.0), "the ancients' carved stone round the waystones, some 600 blocks apart"),
     n(&["base:waystone"], 0, Magic, Technical, Not, "a sleeping waystone on a great ley crossing: not carried off, woken later"),
+    // ---- the ancients' ruins and their blueprints (vitals::ruins, ruins.rs): the knowledge gate.
+    // A blueprint is found, priced at its ruin's finding and way in (`Kind::find_em`); the vaults'
+    // shells take the age's pickaxe
+    n(
+        &["base:blueprint_crucible"],
+        0,
+        Shared,
+        Part,
+        Drop(vitals::ruins::KINDS[0].find_em),
+        "a Stone ruin's blueprint (an open ring on a ley line, one within 300 blocks of spawn): teaches the crucible, the Stone Age key's knowledge",
+    ),
+    n(
+        &["base:blueprint_ironwork"],
+        1,
+        Shared,
+        Part,
+        Drop(vitals::ruins::KINDS[1].find_em),
+        "a Bronze vault's blueprint (sealed stone, a copper pickaxe): teaches smelting raw iron, the Bronze Age key's knowledge",
+    ),
+    n(
+        &["base:blueprint_forge"],
+        2,
+        Shared,
+        Part,
+        Drop(vitals::ruins::KINDS[2].find_em),
+        "a deep Iron vault's blueprint (warded stone, a bronze pickaxe): teaches the forge, the Iron Age key's knowledge",
+    ),
+    n(
+        &["base:sealed_stone"],
+        1,
+        Shared,
+        Building,
+        World(PICK_COPPER, 0.5),
+        "the Bronze vaults' shell: a copper pickaxe breaks it (vitals::ruins::WARD_BRONZE)",
+    ),
+    n(
+        &["base:warded_stone"],
+        2,
+        Shared,
+        Building,
+        World(PICK_BRONZE, 0.5),
+        "the Iron vaults' shell: a bronze pickaxe breaks it (vitals::ruins::WARD_IRON)",
+    ),
+    n(&["base:ruin_pedestal"], 0, Shared, Technical, Not, "a ruin's pedestal: gives each player its blueprint once, not carried off"),
     // glider.rs: leather on a frame of sticks (`vitals::glide::HIDE`).
     r(&["base:glider"], 0, Tech, Tool, Made),
     // ---- tools, weapons and armour: all built from parts (Ronald, 11-05)

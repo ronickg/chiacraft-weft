@@ -285,6 +285,9 @@ pub async fn liquid_layers(t: T) -> R {
         .await?;
     t.op(&format!("spawn pig {} {} {}", f[0], f[1] - 3, f[2] - 5))
         .await?;
+    // Time stands still from here: the pig swims about, and on CI the shot over the pool came 15 s
+    // after the spawn with the pig at the window's lower edge, out of the box (violet 0.0029).
+    t.cmd("/tick freeze").await?;
     t.c().set_look(0.0, -40.0);
     t.frames(30).await?;
     let pool = t.shot("pool").await?;
@@ -314,6 +317,7 @@ pub async fn liquid_layers(t: T) -> R {
     let pit = t.shot("outline_lava").await?;
     let v = pit.share(0.3, 0.3, 0.7, 0.7, warm);
     t.probe("looking into the lava pit", v, v > 0.6);
+    t.cmd("/tick unfreeze").await?;
     t.op("mode survival").await?;
     Ok(())
 }

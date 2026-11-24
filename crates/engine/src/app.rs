@@ -452,7 +452,7 @@ pub(crate) struct Running {
     /// Image id the pending screenshot is stored under for mods.
     shot_image: Option<u64>,
     /// Keys mods hold down, released at the given time.
-    mod_held: Vec<(Key, Instant)>,
+    mod_held: Vec<(Key, Instant, u64)>,
     /// What mods draw this frame (`Host::client_draw`).
     mod_gizmos: Vec<crate::net::GizmoShape>,
     /// Sounds of the UI and of mods' client code, played after this frame's world sounds.
@@ -2828,7 +2828,9 @@ impl ApplicationHandler for App {
                     MouseScrollDelta::PixelDelta(p) => (p.y / 40.0) as f32,
                 });
             }
-            WindowEvent::CursorMoved { position, .. } => {
+            // Scripted and test runs place the cursor themselves: the desktop's pointer passing
+            // over the window (two `--jobs` windows side by side) moved it off what they hover.
+            WindowEvent::CursorMoved { position, .. } if !self.opts.automated => {
                 r.input.cursor = Vec2::new(position.x as f32, position.y as f32);
             }
             WindowEvent::RedrawRequested => {

@@ -92,6 +92,9 @@ value! {
         pub heading: f32,
         pub wind: f32,
         pub sight_at: u64,
+        /// When its stare at the player it half noticed began (0: not staring;
+        /// `perception::STARE_SECS`).
+        pub stared: u64,
     }
 }
 
@@ -148,6 +151,13 @@ pub fn init(r: &mut Registry) {
     r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
+            // By a player only: a plant broken off by the engine as one grazes beside it (a
+            // double plant's other half, one left on bare dirt) says `player: 0`, and the grazer
+            // heard its own meal and bolted (ai1124_graze9: 9 of 13 alarm calls within 1.5 s of
+            // the caller starting to graze; one ran into a pit two blocks deep and starved).
+            if c.player == 0 {
+                continue;
+            }
             let p = c.pos;
             noise(&w, [p.x as f64 + 0.5, p.y as f64 + 0.5, p.z as f64 + 0.5], perception::BREAK_HEARD, c.player);
         }
@@ -155,6 +165,12 @@ pub fn init(r: &mut Registry) {
     r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
+            // Its own body's hurts (starving, thirst, the cold, the heat: `comfort::bodily`) are
+            // no fight: a parched deer's every tick of thirst set it and its kin running and
+            // calling the alarm (ai1124_savanna10: 241 alarms, none with a hunter or a player).
+            if crate::comfort::bodily(h.cause) {
+                continue;
+            }
             if let Some(e) = w.entity(h.entity) {
                 noise(&w, e.pos.to_array(), perception::FIGHT_HEARD, h.source);
             }
@@ -572,6 +588,9 @@ fn players(
         sensed = Some((Sensed { gain: g, ..Default::default() }, q, e.pos));
     }
     out.fright = aware_after(out.fright, sensed.map(|b| b.0), secs);
+    if out.fright < perception::STARE {
+        out.stared = 0;
+    }
     match sensed {
         Some((_, q, pos)) => {
             out.player = q;
@@ -630,6 +649,17 @@ pub fn escape(w: &World, st: &EntityState, from: [f64; 3], dist: f64, herd: Opti
 pub fn stare(w: &World, id: u64, st: &EntityState, at: [f32; 3]) {
     face(w, id, st, at);
     crate::anim::hold(w, id, crate::anim::Act::Stare);
+}
+
+/// Whether it still stares at the player it half noticed: from when its awareness rose past
+/// `perception::STARE`, for `perception::STARE_SECS`.
+pub fn staring(w: &World, id: u64) -> bool {
+    let now = w.game_time();
+    let Some(s) = w.component_mut(id, &SENSES) else { return false };
+    if s.stared == 0 {
+        s.stared = now.max(1);
+    }
+    now.saturating_sub(s.stared) < (perception::STARE_SECS * 20.0) as u64
 }
 
 /// It stops and turns to face `at`.
