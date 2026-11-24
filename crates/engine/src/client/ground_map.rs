@@ -28,6 +28,9 @@ const CUBES: i32 = (SIDE * CELL / 16) as i32;
 const ROWS_A_FRAME: i32 = 2;
 /// How far the camera may move from the map's middle before it is rebuilt about it (cubes).
 const RECENTRE: i32 = 4;
+/// Cubes scanned over and under the camera's.
+const SCAN_OVER: i32 = 12;
+const SCAN_UNDER: i32 = 24;
 /// Added to heights so they stay positive in 16 bits.
 const OFFSET: i32 = 2048;
 
@@ -92,7 +95,7 @@ impl GroundMap {
         }
         let edge = self.building.map_or(wanted, |b| b.1);
         let to = (self.next + ROWS_A_FRAME).min(CUBES);
-        self.build_rows(world, edge, self.next, to);
+        self.build_rows(world, edge, centre.y, self.next, to);
         self.next = to;
         if to >= CUBES {
             gpu.write_texture(texture.0, 0, &self.texels);
@@ -108,11 +111,15 @@ impl GroundMap {
         };
     }
 
-    /// Rebuilds the rows of cubes `from..to` (along z) of the map at `edge`.
-    fn build_rows(&mut self, world: &ClientWorld, edge: IVec3, from: i32, to: i32) {
+    /// Rebuilds the rows of cubes `from..to` (along z) of the map at `edge`, the camera in cube
+    /// row `eye`.
+    fn build_rows(&mut self, world: &ClientWorld, edge: IVec3, eye: i32, from: i32, to: i32) {
         let content = content();
         let dim = &content.dims[world.dim as usize];
-        let (lo, hi) = (dim.min_cube_y, dim.max_cube_y);
+        // From 192 blocks over the camera to 384 under it, within the dimension's: a dimension
+        // without bounds has them at i32::MIN and MAX, and walking them every column froze the game
+        // (lv3, 11-24). Ground higher up reads as that top; mist inside the rock is never seen.
+        let (lo, hi) = (dim.min_cube_y.max(eye.saturating_sub(SCAN_UNDER)), dim.max_cube_y.min(eye.saturating_add(SCAN_OVER)));
         let flags = |state: u32| content.states[state as usize].flags;
         use weft_abi::block_flags::{LIQUID, OPAQUE};
         const ACROSS: usize = 16 / CELL;
