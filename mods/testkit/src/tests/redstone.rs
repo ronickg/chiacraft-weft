@@ -2221,16 +2221,28 @@ pub async fn redstone_clock(t: T) -> R {
     for (x, zz) in [(5, z), (5, z + 1), (5, z + 2), (4, z + 2), (3, z + 2), (2, z + 2), (1, z + 2), (1, z + 1), (1, z)] {
         t.set(add(f, [x, 0, zz]), &wire(&[DOWN])).await?;
     }
-    t.secs(2.5).await?;
-    let mut flips = 0;
-    let mut was = on(&t, quick);
-    for _ in 0..60 {
+    // Burnt out it keeps still for 160 game ticks (`signal.rs` BURN_TIME), then flips again: still
+    // for 40 ticks in a row, where a running clock flips every few. In game ticks: on CI a frame
+    // takes longer than the script clock counts, and 2.5 script seconds let it recover.
+    let ticks = |s: String| {
+        s.trim()
+            .parse::<u64>()
+            .map_err(|e| format!("gametime {s}: {e}"))
+    };
+    let start = ticks(t.op("gametime").await?)?;
+    let (mut was, mut since, mut still) = (on(&t, quick), start, 0);
+    loop {
         t.secs(0.02).await?;
-        let now = on(&t, quick);
-        flips += (now != was) as u32;
-        was = now;
+        let now = ticks(t.op("gametime").await?)?;
+        if on(&t, quick) != was {
+            (was, since) = (!was, now);
+        }
+        still = still.max(now - since);
+        if still >= 40 || now - start > 400 {
+            break;
+        }
     }
-    t.check(flips <= 1, format!("a burnt out torch keeps still: {flips} flips"));
+    t.check(still >= 40, format!("a burnt out torch keeps still: {still} ticks at most"));
     Ok(())
 }
 

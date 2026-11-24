@@ -112,7 +112,13 @@ fn id(name: &str) -> u32 {
     config::by_name(name).unwrap_or(u32::MAX)
 }
 
+/// No setting before the content is frozen (unit tests, early startup): 0, as an unknown one.
+/// Ours read settings where upstream's read none (`max_gui_scale`: touch controls), and
+/// `config::by_name` and `config::get` ask the frozen content.
 fn number(name: &str) -> f64 {
+    if crate::content::try_content().is_none() {
+        return 0.0;
+    }
     config::get(id(name))
 }
 
