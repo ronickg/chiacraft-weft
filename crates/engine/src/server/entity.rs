@@ -1120,6 +1120,12 @@ pub fn track_fall(fall: &mut f32, dy: f64, on_ground: bool, safe: bool) -> Optio
         return None;
     }
     if on_ground {
+        // The move that lands counts too: a client sends one a frame, and at a few frames a
+        // second its last was a fifth of the fall (12 blocks counted as 9). Only while falling
+        // already, so a step down a slope stays no fall.
+        if *fall > 0.0 && dy < 0.0 {
+            *fall += (-dy) as f32;
+        }
         return Some(std::mem::take(fall)).filter(|&f| f > 0.0);
     }
     if dy < 0.0 {

@@ -202,16 +202,20 @@ impl Running {
         self.input.key_up(k);
         self.input.key_down(k);
         let until = Instant::now() + Duration::from_secs_f32(secs.max(0.05));
-        self.mod_held.retain(|(h, _)| *h != k);
-        self.mod_held.push((k, until));
+        self.mod_held.retain(|(h, _, _)| *h != k);
+        // Down through the next frame's start at least: a mod whose frame hook runs before the
+        // one that pressed it (base's `on_client` keys, by the edge of held) sees it then. Let go
+        // by time alone, a frame longer than the hold (CI, software Vulkan) never showed it them.
+        self.mod_held.push((k, until, self.frame_no + 1));
     }
 
     /// Releases keys mods held down once their time is up.
     pub(super) fn release_mod_keys(&mut self) {
         let now = Instant::now();
+        let frame = self.frame_no;
         let input = &mut self.input;
-        self.mod_held.retain(|(k, at)| {
-            if now >= *at {
+        self.mod_held.retain(|(k, at, through)| {
+            if now >= *at && frame > *through {
                 input.key_up(*k);
                 false
             } else {

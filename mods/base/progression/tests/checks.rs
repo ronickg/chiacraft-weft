@@ -11,7 +11,7 @@ fn check(name: &str) {
 
 #[test]
 fn every_check_runs() {
-    assert_eq!(progression::checks().len(), 17);
+    assert_eq!(progression::checks().len(), 19);
 }
 
 #[test]
@@ -99,4 +99,14 @@ fn loot_per_hour() {
 #[test]
 fn path_parity() {
     check("path parity: each age's key by each route within ×1.15 of its cheapest, in EM");
+}
+
+#[test]
+fn materials_gate() {
+    check("each age's materials need the age before (its tools, stations or materials): no age skipped");
+}
+
+#[test]
+fn knowledge_gate() {
+    check("knowledge: each key's blueprint from its age's ruins, the first Stone ruin near spawn");
 }

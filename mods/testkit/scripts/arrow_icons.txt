@@ -1,0 +1,39 @@
+# Arrows and arrowheads drawn per material (looks.rs, 11-23): a hotbar of arrows (flint, obsidian,
+# bone, bronze, iron, steel, star steel, diamond, chert) and the bag with each arrowhead part, then
+# the inventory open. No `look ... no texture` or `missing texture` lines in run.log.
+loaded
+idle
+chat /tk mode survival
+until mode survival within 10
+chat /gear arrow flint 16 slot=0
+chat /gear arrow obsidian 16 slot=1
+chat /gear arrow bone 16 slot=2
+chat /gear arrow bronze 16 slot=3
+chat /gear arrow wrought_iron 16 slot=4
+chat /gear arrow steel 16 slot=5
+chat /gear arrow star_steel 16 slot=6
+chat /gear arrow diamond 16 slot=7
+chat /gear arrow chert 16 slot=8
+chat /gear part arrowhead flint slot=9
+chat /gear part arrowhead chert slot=10
+chat /gear part arrowhead obsidian slot=11
+chat /gear part arrowhead tektite slot=12
+chat /gear part arrowhead bone slot=13
+chat /gear part arrowhead antler slot=14
+chat /gear part arrowhead copper slot=15
+chat /gear part arrowhead bronze slot=16
+chat /gear part arrowhead meteoric_iron slot=17
+chat /gear part arrowhead wrought_iron slot=18
+chat /gear part arrowhead steel slot=19
+chat /gear part arrowhead star_steel slot=20
+chat /gear part arrowhead diamond slot=21
+wait 1
+look 0 -30
+shot arrow_icons_hotbar.png
+press core:inventory
+until screen core:menu within 10
+wait 1
+shot arrow_icons_inventory.png
+key Escape
+until screen none within 10
+quit
