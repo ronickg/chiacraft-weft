@@ -1320,9 +1320,6 @@ pub async fn block_shapes(t: T) -> R {
     for (name, over, height) in [("flying over", [0.5, 0.5], 3.0), ("off to a side", [1.5, 0.5], 1.0), ("next to it", [0.5, 1.4], 0.0)] {
         t.op("put me 0 base:sandstone_slab 16").await?;
         t.c().select_slot(0);
-        // Asked here, not after the mode: since the 11-22 sync flight comes with creative's
-        // attributes a tick after the mode, and the mode's own news turned the first ask off.
-        t.c().set_flying(true);
         t.c()
             .teleport(centre(floor, over[0], 1.0 + height, over[1]));
         t.secs(0.4).await?;
@@ -1536,9 +1533,6 @@ pub async fn surface_placement(t: T) -> R {
     let f = t.feet();
     let cell = [f[0], (f[1] + 15).div_euclid(16) * 16 - 1, f[2] - 3];
     let point = |x, y, z| [f64::from(cell[0]) + x, f64::from(cell[1]) + y, f64::from(cell[2]) + z];
-    // The mode arriving resets flight (since the sync): fly once it is here.
-    t.until("creative on the client", Duration::from_secs(5), |t| t.state().mode == 1)
-        .await?;
     t.c().set_flying(true);
     t.until("flying", Duration::from_secs(5), |t| t.flag(client::client_flags::FLYING))
         .await?;
@@ -1589,8 +1583,6 @@ pub async fn surface_placement(t: T) -> R {
     // Two wires at half height connect to full-height ports. A line at floor level beside
     // the raised line cannot pick up its power.
     t.op("mode creative").await?;
-    t.until("creative on the client", Duration::from_secs(5), |t| t.state().mode == 1)
-        .await?;
     t.c().set_flying(true);
     t.until("flying", Duration::from_secs(5), |t| t.flag(client::client_flags::FLYING))
         .await?;
