@@ -110,19 +110,27 @@ pub fn register(r: &mut Registry) {
         .group("output", Slots::single().output().holder())
         .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0).stretch(), &[], |ui| {
-                ui.row(S::row().gap(8.0), |ui| {
-                    ui.spacer();
-                    ui.group("input");
-                    ui.recipe_arrow_bind(|c| {
-                        c.menu_component(&ROASTING)
-                            .map_or(0.0, |s| ratio(s.cook, s.cook_max))
+            crate::window::window(
+                ui,
+                S::column()
+                    .pad(crate::window::WINDOW_PAD)
+                    .gap(4.0)
+                    .stretch(),
+                &[],
+                |ui| {
+                    ui.row(S::row().gap(8.0), |ui| {
+                        ui.spacer();
+                        ui.group("input");
+                        ui.recipe_arrow_bind(|c| {
+                            c.menu_component(&ROASTING)
+                                .map_or(0.0, |s| ratio(s.cook, s.cook_max))
+                        });
+                        ui.group("output");
+                        ui.spacer();
                     });
-                    ui.group("output");
-                    ui.spacer();
-                });
-                ui.player_inventory(true);
-            });
+                    ui.player_inventory(true);
+                },
+            );
         });
 
     r.entity_component(&COOKING, Cooking { burn: 0, burn_max: 0, cook: 0, cooking: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
@@ -152,27 +160,35 @@ pub fn register(r: &mut Registry) {
         .group("output", Slots::single().output().holder())
         .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0).stretch(), &[], |ui| {
-                ui.row(S::row().gap(8.0), |ui| {
-                    ui.spacer();
-                    ui.group("ingredients");
-                    ui.column(S::column().gap(2.0), |ui| {
-                        ui.group("bowl");
-                        ui.progress_bind_dir("flame", S::default().size(14.0, 14.0), abi::ui_dir::UP, |c| {
-                            c.menu_component(&COOKING)
-                                .map_or(0.0, |s| ratio(s.burn, s.burn_max))
+            crate::window::window(
+                ui,
+                S::column()
+                    .pad(crate::window::WINDOW_PAD)
+                    .gap(4.0)
+                    .stretch(),
+                &[],
+                |ui| {
+                    ui.row(S::row().gap(8.0), |ui| {
+                        ui.spacer();
+                        ui.group("ingredients");
+                        ui.column(S::column().gap(2.0), |ui| {
+                            ui.group("bowl");
+                            ui.progress_bind_dir("flame", S::default().size(14.0, 14.0), abi::ui_dir::UP, |c| {
+                                c.menu_component(&COOKING)
+                                    .map_or(0.0, |s| ratio(s.burn, s.burn_max))
+                            });
+                            ui.group("fuel");
                         });
-                        ui.group("fuel");
+                        ui.recipe_arrow_bind(|c| {
+                            c.menu_component(&COOKING)
+                                .map_or(0.0, |s| ratio(s.cook, meals::COOK_TICKS))
+                        });
+                        ui.group("output");
+                        ui.spacer();
                     });
-                    ui.recipe_arrow_bind(|c| {
-                        c.menu_component(&COOKING)
-                            .map_or(0.0, |s| ratio(s.cook, meals::COOK_TICKS))
-                    });
-                    ui.group("output");
-                    ui.spacer();
-                });
-                ui.player_inventory(true);
-            });
+                    ui.player_inventory(true);
+                },
+            );
         });
 
     r.block(&DRYING_RACK)
@@ -192,20 +208,28 @@ pub fn register(r: &mut Registry) {
         .group("rack", Slots::row(4).accepts("#food").holder())
         .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0).stretch(), &[], |ui| {
-                ui.row(S::row().gap(8.0), |ui| {
-                    ui.spacer();
-                    ui.column(S::column().gap(2.0), |ui| {
-                        ui.group("rack");
-                        ui.progress_bind("attack_bar", S::default().size(72.0, 4.0), |c| {
-                            c.menu_component(&DRYING)
-                                .map_or(0.0, |s| *s.done.iter().max().unwrap_or(&0) as f32 / 1000.0)
+            crate::window::window(
+                ui,
+                S::column()
+                    .pad(crate::window::WINDOW_PAD)
+                    .gap(4.0)
+                    .stretch(),
+                &[],
+                |ui| {
+                    ui.row(S::row().gap(8.0), |ui| {
+                        ui.spacer();
+                        ui.column(S::column().gap(2.0), |ui| {
+                            ui.group("rack");
+                            ui.progress_bind("attack_bar", S::default().size(72.0, 4.0), |c| {
+                                c.menu_component(&DRYING)
+                                    .map_or(0.0, |s| *s.done.iter().max().unwrap_or(&0) as f32 / 1000.0)
+                            });
                         });
+                        ui.spacer();
                     });
-                    ui.spacer();
-                });
-                ui.player_inventory(true);
-            });
+                    ui.player_inventory(true);
+                },
+            );
         });
 }
 

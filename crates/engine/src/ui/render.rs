@@ -612,7 +612,9 @@ impl UiRenderer {
                 .and_then(|(line, k, v)| crate::kv::number(name, line, k, v))
         });
         self.outset.insert(name.to_string(), outset.unwrap_or(0.0));
-        let tiled = gui.as_deref().is_some_and(|src| crate::kv::get(src, "middle").is_some_and(|v| v.trim() == "tile"));
+        let tiled = gui
+            .as_deref()
+            .is_some_and(|src| crate::kv::get(src, "middle").is_some_and(|v| v.trim() == "tile"));
         self.tiled.insert(name.to_string(), tiled);
         let s = gui.map(|src| parse_gui(&src, pixels));
         self.slicing.insert(name.to_string(), s);
@@ -1517,7 +1519,9 @@ impl UiRenderer {
                         .map(|s| (s & !0xFF) | (s & 0xFF) * (default & 0xFF) / 255)
                 };
                 // An outline when the class names one (`color.<class>_outline`), faded like the shadow.
-                let outline = look.outline(class).map(|s| (s & !0xFF) | (s & 0xFF) * (default & 0xFF) / 255);
+                let outline = look
+                    .outline(class)
+                    .map(|s| (s & !0xFF) | (s & 0xFF) * (default & 0xFF) / 255);
                 let x = if t.center { r.x + (r.w - t.layout.width * px) / 2.0 } else { r.x };
                 self.load_images(gpu, assets, &t.layout);
                 self.glyph_run_outlined(&t.layout.items, x, r.y, px, default, shadow, outline, icons);

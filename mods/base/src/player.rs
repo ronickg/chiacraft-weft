@@ -279,17 +279,25 @@ pub fn register(r: &mut Registry) {
         .screen(|ui| {
             // The recipe book beside it: every recipe, from the bag and the chests near the table.
             ui.row(S::row().gap(4.0), |ui| {
-                crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0).stretch(), &[], |ui| {
-                    ui.row(S::row().gap(8.0), |ui| {
-                        ui.spacer();
-                        ui.group("grid");
-                        ui.recipe_arrow();
-                        ui.group("result");
-                        ui.spacer();
-                    });
-                    crate::parts::ui(ui);
-                    ui.player_inventory(true);
-                });
+                crate::window::window(
+                    ui,
+                    S::column()
+                        .pad(crate::window::WINDOW_PAD)
+                        .gap(4.0)
+                        .stretch(),
+                    &[],
+                    |ui| {
+                        ui.row(S::row().gap(8.0), |ui| {
+                            ui.spacer();
+                            ui.group("grid");
+                            ui.recipe_arrow();
+                            ui.group("result");
+                            ui.spacer();
+                        });
+                        crate::parts::ui(ui);
+                        ui.player_inventory(true);
+                    },
+                );
                 crate::book::book(ui, crate::book::Station::Table);
             });
         });

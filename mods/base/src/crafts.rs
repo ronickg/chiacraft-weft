@@ -160,21 +160,29 @@ fn station(
     m.group("output", Slots::single().output().holder())
         .player_inventory()
         .screen(move |ui| {
-            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0).stretch(), &[], |ui| {
-                ui.row(S::row().gap(8.0), |ui| {
-                    ui.spacer();
-                    ui.column(S::column().gap(2.0), |ui| {
-                        ui.group("input");
-                        if c.with.is_some() {
-                            ui.group("with");
-                        }
+            crate::window::window(
+                ui,
+                S::column()
+                    .pad(crate::window::WINDOW_PAD)
+                    .gap(4.0)
+                    .stretch(),
+                &[],
+                |ui| {
+                    ui.row(S::row().gap(8.0), |ui| {
+                        ui.spacer();
+                        ui.column(S::column().gap(2.0), |ui| {
+                            ui.group("input");
+                            if c.with.is_some() {
+                                ui.group("with");
+                            }
+                        });
+                        ui.recipe_arrow_bind(|c| c.menu_component(&WAITING).map_or(0.0, |w| w.done));
+                        ui.group("output");
+                        ui.spacer();
                     });
-                    ui.recipe_arrow_bind(|c| c.menu_component(&WAITING).map_or(0.0, |w| w.done));
-                    ui.group("output");
-                    ui.spacer();
-                });
-                ui.player_inventory(true);
-            });
+                    ui.player_inventory(true);
+                },
+            );
         });
 }
 

@@ -60,9 +60,7 @@ fn framed(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], family: bool, bo
             // (stats, advancements) its own, the same picture (the bare `close` frame read as a
             // stray square beside the tabs, Planner 11-24).
             if title.is_some() {
-                ui.icon_button("base:gui/icon_close", 8.0, 8.0, S::default().tooltip("window.base.close_tip"), |c| {
-                    c.client().menu_close()
-                });
+                ui.icon_button("base:gui/icon_close", 8.0, 8.0, S::default().tooltip("window.base.close_tip"), |c| c.client().menu_close());
                 ui.row(S::row().w(4.0), |_| {});
             }
         });
