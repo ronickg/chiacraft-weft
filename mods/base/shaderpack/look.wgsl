@@ -213,9 +213,9 @@ const MIST_DEEP: f32 = 0.0;
 // Bliss's banks (`OPT_MIST_DOMES`): the noise's part made banks, their foot over the sea, their fall
 // with height (blocks), their density per block at `/air` 1.
 const MIST_BANK_EDGE: vec2<f32> = vec2(0.42, 0.66);
-const MIST_BANK_BASE: f32 = 6.0;
-const MIST_BANK_FALL: f32 = 8.0;
-const MIST_BANK_DENSE: f32 = 0.25;
+const MIST_BANK_BASE: f32 = 10.0;
+const MIST_BANK_FALL: f32 = 3.0;
+const MIST_BANK_DENSE: f32 = 0.4;
 const MIST_DEEP_DENSE: f32 = 1.2;
 // With it, how much light the mist in the sun's shade keeps (Bliss's in shade is dark, the shafts
 // show): of the bounce, and of the sky's.
@@ -1778,8 +1778,13 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
 // coarse cells could not hold a bank's edge or a tree's shadow.
 const MIST_MARCH_FAR: f32 = 1500.0;
 fn bank_density(p: vec3<f32>) -> f32 {
-    let bank = smoothstep(MIST_BANK_EDGE.x, MIST_BANK_EDGE.y, fog_banks(p));
-    let tall = exp(-max(p.y - (SEA_LEVEL + MIST_BANK_BASE), 0.0) / MIST_BANK_FALL);
+    let b = fog_banks(p);
+    let bank = smoothstep(MIST_BANK_EDGE.x, MIST_BANK_EDGE.y, b);
+    // A soft lid under the crowns, as Bliss's: full up to about 10 blocks over the sea, gone a few
+    // blocks higher, the lid rising and sinking with the banks. With an open fall above it the mist
+    // lay over the crowns, all in the sun, and the canopy's shade never reached it (lv2, 11-24).
+    let top = SEA_LEVEL + MIST_BANK_BASE + (b - 0.5) * 8.0;
+    let tall = 1.0 - smoothstep(top - MIST_BANK_FALL, top + MIST_BANK_FALL, p.y);
     // Thinner as the sun climbs, gone by about 40° up.
     let burn = 1.0 - smoothstep(0.3, 0.65, scene.sun.y);
     return air_mist() * bank * tall * MIST_BANK_DENSE * burn * smoothstep(SEA_LEVEL - 6.0, SEA_LEVEL, p.y);
@@ -1793,7 +1798,7 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let dir = rel / max(dist, 1e-4);
     let eye = scene.eye.xyz;
     let lo = SEA_LEVEL - 6.0;
-    let hi = SEA_LEVEL + MIST_BANK_BASE + 2.0 * MIST_BANK_FALL;
+    let hi = SEA_LEVEL + MIST_BANK_BASE + MIST_BANK_FALL + 4.0;
     var t0 = 0.0;
     var t1 = min(dist, MIST_MARCH_FAR);
     if abs(dir.y) > 1e-4 {
