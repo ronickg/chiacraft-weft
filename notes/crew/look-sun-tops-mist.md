@@ -51,6 +51,11 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
   2.35 e^-6x, a broad tail 0.76 e^-1.19x (x = 1 - cos): about 12.5 / 3.4 / 1.7 at 0 / 14 / 30 deg
   before the cap.
 - haze_lit: with the banks on, no glow lobe and no mist grey over land (a second even wash).
+- Compare mode pins `core:bloom 0` (testkit compare.rs), so every sheet before lv10 c had no bloom,
+  and the bloomy fog never ran; Bliss's refs have its bloom. The live script now says `bloom=1`.
+- lv10 c (bloom on), against lv9 k: fine detail 06 vista 13.0 (19 before, Bliss 5.7), 07 vista 13.9
+  (19.4, Bliss 9.3), 06 low 5.8 (10.5, Bliss 6.6), 07 low 5.8 (10.7, Bliss 6.7). Low views match in
+  fineness now; their darks are still light (p5 108 against Bliss's 66) and the near crowns of the vista read through.
 - Not done yet: sky pixels march the banks only 220 blocks (sky.wgsl), Bliss to the render distance.
 
 ## Open
