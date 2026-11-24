@@ -236,15 +236,15 @@ const MIST_DEEP: f32 = 0.0;
 // on the ground but a level sea of mist at one height, that the hills and crowns rise out of. The
 // domes followed the land and covered every crown, and read as paint on it (Planner on lv8).
 // The sea's full height over sea level, and how fast it thins above it (per block, exp).
-const MIST_SEA_LEVEL: f32 = 26.0;
-const MIST_SEA_FALL: f32 = 0.12;
+const MIST_SEA_LEVEL: f32 = 18.0;
+const MIST_SEA_FALL: f32 = 0.05;
 // Its density per block at `/air` 1 (Bliss's morning, about 0.45 a block where full, at `/air` 0.05).
-const MIST_SEA_DENSE: f32 = 12.0;
+const MIST_SEA_DENSE: f32 = 1.0;
 // Its shape: a broad noise (cells this wide and tall, blocks) cut at a threshold (from, to: none
 // below, full above), so banks with clear air between them, not an even veil; and a fine noise
 // (cells this wide and tall) that eats their edges (`MIST_ERODE.z`, how much), shifted by the shape
 // so the rims break up differently from bank to bank.
-const MIST_SHAPE: vec4<f32> = vec4(36.0, 18.0, 0.35, 0.75);
+const MIST_SHAPE: vec4<f32> = vec4(36.0, 18.0, 0.5, 0.75);
 const MIST_ERODE: vec3<f32> = vec3(1.5, 3.0, 0.4);
 // Its light from the sun (Bliss's fog: no shade of its own, the land's and the clouds' shadow at each
 // step): a sharp peak toward the sun and a broad forward tail, about 12 toward it, a quarter across,
