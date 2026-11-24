@@ -5,7 +5,7 @@
 # the join, "shader pack: none chosen, chiacraft on". Shots: the world with the pack drawn, the
 # Video screen (the presets, feature rows, player rows), Medium, Medium flipped to Custom by one
 # feature row's ›, then the Developer tab (after /developer_menu on): the parts, then the knobs;
-# last, Mod Settings and base's page there (no look knob on it).
+# last, Mod Settings and base's page there, top and end (no look knob on it).
 loaded
 idle
 wait 8
@@ -17,12 +17,21 @@ wait 1.5
 cursor 0.02 0.02
 wait 0.5
 shot fs_02_video.png
+cursor 0.4 0.75
+scroll -12
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot fs_02b_video_end.png
+cursor 0.4 0.75
+scroll 12
+wait 1
 tap_once base:video text:Medium
 wait 1
 cursor 0.02 0.02
 wait 0.5
 shot fs_03_medium.png
-tap_beside base:video text:Reflections 1.96
+tap_beside base:video text:Reflections 2.47
 wait 1
 cursor 0.02 0.02
 wait 0.5
@@ -56,6 +65,12 @@ wait 1.5
 cursor 0.02 0.02
 wait 0.5
 shot fs_08_mod_settings_base.png
+cursor 0.5 0.5
+scroll -40
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot fs_09_mod_settings_base_end.png
 key Escape
 wait 1
 quit

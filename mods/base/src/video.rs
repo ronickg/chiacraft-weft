@@ -461,18 +461,25 @@ pub(crate) fn feature_parts(key: &str, step: usize) -> Option<Vec<(&'static str,
     )
 }
 
-/// Feature `f`'s step now: the highest whose parts all hold its values, or -1 (Custom: a part
-/// moved on the Developer screen).
+/// Whether feature `f`'s parts all hold step `s`'s values.
+fn feature_at(f: usize, s: usize) -> bool {
+    feature_parts(FEATURES[f].key, s)
+        .unwrap_or_default()
+        .iter()
+        .all(|&(k, v)| ((part(k).get)() - v).abs() < 1e-3)
+}
+
+/// Feature `f`'s step now, as its row names it: the preset's own step when the quality is a
+/// preset and the parts still hold it (steps can share values: High's reflections are Max's), else
+/// the lowest step they hold, or -1 (Custom: a part moved on the Developer screen).
 fn feature_now(f: usize) -> f64 {
-    let key = FEATURES[f].key;
+    if let Some(s) = usize::try_from(QUALITY.get()).ok().and_then(preset_step)
+        && feature_at(f, s)
+    {
+        return s as f64;
+    }
     (0..STEP_NAMES.len())
-        .rev()
-        .find(|&s| {
-            feature_parts(key, s)
-                .unwrap_or_default()
-                .iter()
-                .all(|&(k, v)| ((part(k).get)() - v).abs() < 1e-3)
-        })
+        .find(|&s| feature_at(f, s))
         .map_or(-1.0, |s| s as f64)
 }
 
@@ -542,8 +549,24 @@ fn step(i: usize, dir: i32) {
 }
 
 /// One feature a step on or back: the quality becomes Custom.
+/// It skips the steps that would change nothing (High's reflections are Max's) and goes round
+/// like the other rows.
 fn step_feature(i: usize, dir: i32) {
-    step_row(&FEATURE_ROWS[i], dir);
+    let n = STEP_NAMES.len() as i32;
+    let now = feature_now(i);
+    let from = if now >= 0.0 {
+        now as i32
+    } else if dir > 0 {
+        -1
+    } else {
+        n
+    };
+    if let Some(s) = (1..=n)
+        .map(|k| (from + dir * k).rem_euclid(n) as usize)
+        .find(|&s| !feature_at(i, s))
+    {
+        feature_set(i, s as f64);
+    }
     QUALITY.set(4);
 }
 
@@ -1173,13 +1196,16 @@ pub fn register(r: &mut Registry) {
                 });
                 ui.button("video.base.detect", S::default().h(12.0).pad(2.0), |c| apply_detected(c.client().state().window));
             });
-            // Each feature's quality, Low to Ultra (what a preset sets), then the player's own rows.
-            for i in 0..FEATURE_ROWS.len() {
-                row_ui(ui, &FEATURE_ROWS, i, step_feature);
-            }
-            for i in 0..ROWS.len() {
-                row_ui(ui, &ROWS, i, step);
-            }
+            // Each feature's quality, Low to Ultra (what a preset sets), then the player's own rows,
+            // scrolled: they don't fit a 720p window at 2x.
+            ui.column(S::column().gap(3.0).h(196.0).scroll(), |ui| {
+                for i in 0..FEATURE_ROWS.len() {
+                    row_ui(ui, &FEATURE_ROWS, i, step_feature);
+                }
+                for i in 0..ROWS.len() {
+                    row_ui(ui, &ROWS, i, step);
+                }
+            });
         });
     });
     // The Developer screen: shown only with `base:developer_menu` on (its tab, `tabs`); a menu

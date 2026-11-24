@@ -977,6 +977,7 @@ video.base.value.medium = Средне
 video.base.value.high = Высоко
 video.base.value.max = Максимум
 video.base.value.custom = Своё
+config.base.developer_menu = Экран разработчика (настройка вида)
 video.base.developer.title = Разработчик
 video.base.developer.off = Экран разработчика выключен (base:developer_menu или /developer_menu on)
 video.base.developer.parts = Каждая часть отдельно (их задают качества пресета)

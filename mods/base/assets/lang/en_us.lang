@@ -985,6 +985,7 @@ video.base.value.medium = Medium
 video.base.value.high = High
 video.base.value.max = Max
 video.base.value.custom = Custom
+config.base.developer_menu = Developer screen (the look's tuning)
 video.base.developer.title = Developer
 video.base.developer.off = The Developer screen is off (base:developer_menu, or /developer_menu on)
 video.base.developer.parts = Each part on its own (a preset's features set these)
