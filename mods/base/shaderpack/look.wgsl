@@ -182,6 +182,13 @@ const OPT_EVENING_AWAY: u32 = 50u;
 // the sun's colour and the sky's as they are (`overworld_fog.glsl`: light colour times phase, plus
 // the ambient), so its evening layer reads pale pink-lavender where ours went orange (lsG_ev, 11-22).
 const OPT_MIST_TINT: u32 = 51u;
+// How much of the evening sun's light the blue hour's dimming keeps (`base:look_low_sun_keep`): 0 as
+// made (a quarter at 4° up), 1 all of it. Bliss's 18:30 tops stand in its red sun (106 74 81) where
+// ours were lit lavender by the sky (144 142 164, lsAH_mist).
+const OPT_LOW_SUN_KEEP: u32 = 52u;
+// The light in the shade with the evening sun under about 12° (`base:look_evening_shade`): 1 as
+// made, less darker. Bliss's 18:30 shade is half ours (22 32 73 against 51 65 121, lsAH_mist).
+const OPT_EVENING_SHADE: u32 = 53u;
 fn water_body() -> f32 {
     let b = fantasy_opt(OPT_WATER_BODY);
     return select(1.0, b, b >= 0.0);
@@ -385,7 +392,16 @@ fn palette_now() -> Palette {
         // light, 69 61 44 (lsS_mix after f3cfb0f84). At 4° up about two fifths, none off by 10°.
         // (From 2° under, two fifths at 18:30 took the land only 70 62 48 -> 66 60 60, lsY_tw: now a
         // quarter.)
-        p.sun *= mix(1.0, smoothstep(0.0, 0.2, scene.sun.y), evening * (1.0 - rain_amount()));
+        let keep = clamp(fantasy_opt(OPT_LOW_SUN_KEEP), 0.0, 1.0);
+        p.sun *= mix(1.0, mix(smoothstep(0.0, 0.2, scene.sun.y), 1.0, keep), evening * (1.0 - rain_amount()));
+    }
+    // The evening's shade darker with the sun low (`OPT_EVENING_SHADE`): from 12° up to the horizon,
+    // gone again by 2° under, where the blue hour's sky lights it.
+    let shade_k = fantasy_opt(OPT_EVENING_SHADE);
+    if scene.frame.x > 0.5 && shade_k >= 0.0 {
+        let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
+        let low = (1.0 - smoothstep(0.1, 0.22, scene.sun.y)) * smoothstep(-0.04, 0.02, scene.sun.y);
+        p.ambient *= mix(1.0, shade_k, low * evening * (1.0 - rain_amount()));
     }
     return p;
 }
