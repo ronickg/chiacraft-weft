@@ -418,7 +418,29 @@ const SUN_CONE: f32 = 0.012;
 // On, +11 ms Ultra at 1080p).
 const RT_REACH: f32 = 256.0;
 
+// Past the shadows' reach (`OPT_SHADOW_REACH`, Bliss's shadow distance in the Bliss match): open
+// to the sky (sky light 14 or more, as under one layer of leaves) in full sun, under cover none,
+// faded in over the reach's last fifth, as Bliss's map fades into its lightmap mask. No map or ray
+// is asked out there.
+fn sky_sun_mask(in: VOut) -> f32 {
+    return smoothstep(0.86, 0.94, in.light.x) * cloud_shadow(in.rel);
+}
+
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
+    let reach = fantasy_opt(OPT_SHADOW_REACH);
+    if reach > 0.0 {
+        let past = smoothstep(reach * 0.8, reach + 16.0, in.dist);
+        if past >= 1.0 {
+            return sky_sun_mask(in);
+        }
+        if past > 0.0 {
+            return mix(sun_shadow_near(in, n), sky_sun_mask(in), past);
+        }
+    }
+    return sun_shadow_near(in, n);
+}
+
+fn sun_shadow_near(in: VOut, n: vec3<f32>) -> f32 {
     // Traced (`core:rt_shadows`, a GPU with ray queries): one ray toward the light through the
     // cubes and the distant terrain, by the leaves' holes, so no texels and no acne; still never
     // deep under cover. Its colour through stained glass is kept for later (`rt_sun`'s rgb); here
