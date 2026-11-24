@@ -349,7 +349,7 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
             // Its walk ended short of it, as of a patch below: it gives it up and, ended short where
             // the last did too, looks for a way out. Without it a deer in a pit walked at seeds on
             // its rim for ever, found the same each time (ai1124_pit4b: 140 s "eating", no move).
-            if !w.navigating(id) {
+            if crate::stuck::ended_short(w, id, st) {
                 weft_sdk::debug!("animal {id} can't reach the food on the ground at {:?}: looks elsewhere", e.pos);
                 if let Some(i) = w.component_mut(id, &ITEM) {
                     *i = 0;
@@ -409,7 +409,7 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     } else if now < f[3] {
         // Walking to it; or nothing near, wandering on.
         return target.is_some();
-    } else if target.is_some() && !w.navigating(id) {
+    } else if target.is_some() && crate::stuck::ended_short(w, id, st) {
         // Its walk ended short of the food: it can't get there. It gives that patch up and lets
         // its wander take it elsewhere, not walking at it again and again (graze5: a deer stood
         // "eating" a game day at one spot while its food went from 55 % to 4 % and its thirst
@@ -423,6 +423,7 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     }
     if let Some((t, p)) = ground_food(w, s, st.pos.to_array(), ITEM_LOOK) {
         w.navigate(id, p, 1.0);
+        crate::stuck::sets_off(w, id, st);
         w.component_mut(id, &ITEM).map(|i| *i = t);
         w.component_mut(id, &FORAGE)
             .map(|c| *c = [p[0], p[1], p[2], now + WALK]);
@@ -434,6 +435,7 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     {
         Some(p) => {
             w.navigate(id, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0);
+            crate::stuck::sets_off(w, id, st);
             f = [p[0] as f64, p[1] as f64, p[2] as f64, now + WALK];
         }
         None => f = [f64::NAN, 0.0, 0.0, now + NOTHING],

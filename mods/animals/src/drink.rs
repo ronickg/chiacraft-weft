@@ -381,11 +381,21 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         // Walking to it; or no water near, foraging and wandering on.
         return spot.is_some();
     }
+    // Its walk's time is up short of the water and it got nowhere (`stuck::ended_short`: herd
+    // mates jostling keep the engine walking one that can't get there): as one ended short.
+    if spot.is_some() && crate::stuck::ended_short(w, id, st) {
+        weft_sdk::debug!("animal {id} got nowhere toward the water at {spot:?}: looks elsewhere");
+        if let Some(c) = w.component_mut(id, &DRINK) {
+            *c = [f64::NAN, 0.0, 0.0, now + NOTHING];
+        }
+        return crate::stuck::short(w, id, st);
+    }
     let driven = needs::thirst_score(water, true) >= animals_core::memory::DRIVEN;
     match find_water(w, id, s.kind, st.pos.to_array(), driven) {
         Some(p) => {
             weft_sdk::debug!("{} {id} is thirsty (water {:.0}%): to water at {p:?}", s.name, water * 100.0);
             w.navigate(id, p, 1.0);
+            crate::stuck::sets_off(w, id, st);
             d = [p[0], p[1], p[2], now + WALK];
         }
         None => d = [f64::NAN, 0.0, 0.0, now + NOTHING],

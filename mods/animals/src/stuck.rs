@@ -3,18 +3,40 @@
 //! `STUCK_AFTER` it walks legs out along its own level, a different way each time, and from
 //! `LEAP_AFTER` it leaps. Its need's goal carries the walk while it lasts (`going`).
 
-use animals_core::needs::{LEAP_AFTER, LEAP_MOST, LEAP_REACH, STUCK_AFTER, STUCK_NEAR, WAY_OUT_LEG, WAY_OUT_SECS, WAY_OUT_WAYS};
+use animals_core::needs::{
+    LEAP_AFTER, LEAP_MOST, LEAP_REACH, STUCK_AFTER, STUCK_NEAR, WALK_MOVED, WAY_OUT_LEG, WAY_OUT_SECS, WAY_OUT_WAYS,
+};
 use weft_sdk::*;
 
 /// Where the first of its short walks ended (x, z), how many there have been, until when (game
 /// ticks) it walks a leg out or waits after a leap (0: none), and the height it was at.
 static STUCK: Component<[f64; 5]> = Component::named("animal_stuck");
 
+/// Where its walk to food or water set off (x, z).
+static SET_OFF: Component<[f64; 2]> = Component::named("animal_set_off");
+
 pub fn init(r: &mut Registry) {
     r.entity_component(&STUCK, [0.0; 5], 0);
+    r.entity_component(&SET_OFF, [0.0; 2], 0);
     for s in crate::species::SPECIES.iter() {
         r.edit(s.kind).attach(&STUCK);
+        r.edit(s.kind).attach(&SET_OFF);
     }
+}
+
+/// `id` sets off on a walk to food or water (`ended_short` judges it).
+pub fn sets_off(w: &World, id: u64, st: &EntityState) {
+    if let Some(c) = w.component_mut(id, &SET_OFF) {
+        *c = [st.pos.x, st.pos.z];
+    }
+}
+
+/// Whether its walk to food or water has failed: the engine stopped walking it, or it is less
+/// than `WALK_MOVED` from where it set off (`needs::WALK_MOVED`).
+pub fn ended_short(w: &World, id: u64, st: &EntityState) -> bool {
+    !w.navigating(id)
+        || w.component(id, &SET_OFF)
+            .is_some_and(|o| (o[0] - st.pos.x).powi(2) + (o[1] - st.pos.z).powi(2) < WALK_MOVED * WALK_MOVED)
 }
 
 /// A walk of `id`'s to food or water ended short of it: counted, and from `STUCK_AFTER` within

@@ -336,6 +336,11 @@ mod choosing {
 pub const STUCK_AFTER: u8 = 2;
 pub const LEAP_AFTER: u8 = 6;
 pub const STUCK_NEAR: f64 = 4.0;
+/// A walk to food or water whose time is up (`forage::WALK`, `drink::WALK`) has failed if it
+/// moved less than this from where it set off, whether or not the engine still walks it: herd
+/// mates jostling in a pit kept each other 'moving', so the engine's own stuck check (no move for
+/// 2 s) never ended their walks and none was ever counted (ai1124_pit4b, cave2).
+pub const WALK_MOVED: f64 = 2.0;
 /// A leg out: blocks along its own level, the ways (of 8, turned on each try), and the game
 /// seconds it has to walk it.
 pub const WAY_OUT_LEG: f64 = 12.0;
