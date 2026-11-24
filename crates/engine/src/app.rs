@@ -3876,9 +3876,9 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
         let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
-        // `core:rt_shadows` changed: the world shader composed again, tracing or not, before
-        // anything of this frame is drawn with it.
-        if g.client.rt_switch(&mut *r.gpu) {
+        // `core:rt_shadows` or `core:ground_map` changed: the world shader composed again, tracing
+        // or not, with the ground map or not, before anything of this frame is drawn with it.
+        if g.client.rt_switch(&mut *r.gpu) || g.client.render.ground_switch() {
             g.client
                 .render
                 .reload_shaders(&mut *r.gpu, &r.textures, &r.assets);

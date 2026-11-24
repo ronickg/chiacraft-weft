@@ -1579,6 +1579,10 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(MAT_AT);
         s.push_str(if RT_PRELUDE.load(std::sync::atomic::Ordering::Relaxed) { RT_SUN } else { RT_SUN_OFF });
     }
+    // The ground map (`core:ground_map`) in the world shader only while it is on, so a pack can
+    // leave out what reads it (chiacraft's mist banks); the other shaders always have it.
+    let ground = shader != "world.wgsl" || GROUND_PRELUDE.load(std::sync::atomic::Ordering::Relaxed);
+    s.push_str(if ground { GROUND_MAP_ON } else { GROUND_MAP_OFF });
     s.push_str(CALM_OFF);
     s.push_str(DRY_OFF);
     s.push_str(common);
@@ -1595,6 +1599,17 @@ pub fn prelude(shader: &str, common: &str) -> String {
 }
 
 static RT_PRELUDE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static GROUND_PRELUDE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+/// Whether the world shader composed next has the ground map (`core:ground_map`): `GROUND_MAP_ON`
+/// true, or false so a pack's code behind it is left out of the world's pipelines. Code a uniform
+/// branch skips still weighs on the shader: chiacraft's mist banks, off, cost the world pass about
+/// 0.14 ms at Max on the PC (lst_am_nobanks, 11-24).
+pub fn set_ground_prelude(on: bool) {
+    GROUND_PRELUDE.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+pub const GROUND_MAP_ON: &str = "const GROUND_MAP_ON: bool = true;\n";
+pub const GROUND_MAP_OFF: &str = "const GROUND_MAP_ON: bool = false;\n";
 
 /// Whether the world shader composed next traces its sun shadows (`core:rt_shadows` on a GPU
 /// with ray queries): its prelude then has the scene's bindings and `rt_sun` traces; without, the

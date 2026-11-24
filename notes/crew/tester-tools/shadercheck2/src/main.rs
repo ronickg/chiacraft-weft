@@ -34,6 +34,9 @@ fn main() {
     for (f, hooks) in files.iter() {
         let src = with(f, f);
         check(f, src.clone(), hooks);
+        if *f == "world.wgsl" {
+            check("world.wgsl (no ground map)", src.replacen(g::GROUND_MAP_ON, g::GROUND_MAP_OFF, 1), hooks);
+        }
         if src.contains("CALM") {
             let calm = src.replacen(g::CALM_OFF, g::CALM_ON, 1);
             check(&format!("{f} (calm)"), calm.clone(), hooks);

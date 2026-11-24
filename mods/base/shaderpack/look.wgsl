@@ -2054,6 +2054,9 @@ fn bank_phase(mu: f32) -> f32 {
 // the mist volume, near nothing over the banks, and the crowns stayed sharp (lv9: fine detail under
 // the dawn mist 17.9 against Bliss's 5.8; Planner's read). 0 with the banks off.
 fn bank_hidden(rel: vec3<f32>) -> f32 {
+    if !GROUND_MAP_ON {
+        return 0.0;
+    }
     let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
     if deep <= 0.0 || scene.frame.x < 0.5 || storm() > 0.5 || air_mist() <= 0.0 {
         return 0.0;
@@ -2089,6 +2092,11 @@ fn bank_hidden(rel: vec3<f32>) -> f32 {
     return 1.0 - exp(-depth);
 }
 fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    // Left out of the world's pipelines while the ground map is off (`GROUND_MAP_ON`, the engine's
+    // `set_ground_prelude`): skipped by the uniform below, it still cost the world pass 0.14 ms (lst_am, 11-24).
+    if !GROUND_MAP_ON {
+        return c;
+    }
     let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
     if deep <= 0.0 || scene.frame.x < 0.5 || storm() > 0.5 || air_mist() <= 0.0 {
         return c;
