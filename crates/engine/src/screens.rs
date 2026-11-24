@@ -420,6 +420,87 @@ pub fn icon_button(
     })
 }
 
+/// The title menu's buttons (chiacraft, style 1, 11-24): this tall, their labels at twice the font.
+const TITLE_BUTTON: f32 = 28.0;
+
+/// A GUI texture's size in GUI pixels, one of its pixels a UI pixel (half a GUI pixel), so an
+/// icon drawn at it keeps the one pixel grid of the font and the frames.
+fn texture_gui_size(cx: &BuildCx, texture: &str) -> Option<[f32; 2]> {
+    cx.assets
+        .read(texture, "textures", "png")
+        .and_then(|b| crate::assets::decode_png(&b))
+        .map(|i| [i.width as f32 / 2.0, i.height as f32 / 2.0])
+}
+
+/// A title menu button: `TITLE_BUTTON` tall, the icon (if the look has it) at its own pixels at
+/// the left edge, the label at twice the font in the middle of the room right of the icon (as in
+/// style 1's mock: a long label clears the icon).
+#[allow(clippy::too_many_arguments)]
+fn title_button(
+    ui: &mut Ui,
+    cx: &BuildCx,
+    class: &str,
+    icon: &str,
+    key: &str,
+    args: &[Arg],
+    width: f32,
+    action: impl Fn(&mut Ctx) + 'static,
+) -> NodeId {
+    let spans = cx.t(key, args);
+    let icon = cx.look.texture(icon, "").map(|t| {
+        let size = texture_gui_size(cx, &t).unwrap_or([9.0, 9.0]);
+        (t, size)
+    });
+    let mut style = Style::default()
+        .min_w(width)
+        .min_h(TITLE_BUTTON)
+        .pad_xy(8.0, 4.0);
+    if let Some((_, size)) = &icon {
+        style.pad[0] = style_left(*size);
+    }
+    ui.button(class, style, Rc::new(action), |ui| {
+        if let Some((texture, size)) = icon {
+            ui.add(
+                Kind::Image { texture, color: 0xFFFFFFFF },
+                Style::default()
+                    .w(size[0])
+                    .h(size[1])
+                    .at_from([0.0, 0.5], 7.0 - style_left(size), 0.0, [0.0, 0.5]),
+            );
+        }
+        // Its own text class: style 1's labels are outlined and shadowed (`color.menu_button*`).
+        let t = ui.text(spans, "menu_button");
+        if let Some(t) = ui.text_mut(t) {
+            t.wrap = false;
+            t.scale = 2.0;
+        }
+    })
+}
+
+/// A title button's left padding with an icon `size` wide: the icon 7 GUI pixels in, the label's
+/// room 4 past it (`at` counts from the padding, so the icon goes back by it).
+fn style_left(size: [f32; 2]) -> f32 {
+    8.0 + size[0] + 4.0
+}
+
+/// The title's small square buttons (profile, editor): `TITLE_SQUARE` a side, one picture at
+/// `size` GUI pixels in the middle.
+const TITLE_SQUARE: f32 = 24.0;
+
+fn title_square(ui: &mut Ui, picture: Option<String>, size: [f32; 2], action: impl Fn(&mut Ctx) + 'static) -> NodeId {
+    ui.button("button_secondary", Style::default().w(TITLE_SQUARE).h(TITLE_SQUARE), Rc::new(action), |ui| {
+        if let Some(texture) = picture {
+            ui.add(
+                Kind::Image { texture, color: 0xFFFFFFFF },
+                Style::default()
+                    .w(size[0])
+                    .h(size[1])
+                    .at_from([0.5, 0.5], 0.0, 0.0, [0.5, 0.5]),
+            );
+        }
+    })
+}
+
 /// The face (8x8, hat layer over it) of the player's own skin, else of the player kind's: a GUI
 /// texture name `UiRenderer::texture` makes from the file.
 pub fn face_texture(cx: &BuildCx) -> String {
@@ -475,7 +556,9 @@ impl Screen for Title {
                 |ui| {
                     // The title's own heavier frame (`menu_panel`) when the look has one, else the windows' `panel`.
                     let frame = if cx.look.texture("menu_panel", "").is_some() { "menu_panel" } else { "panel" };
-                    ui.panel(frame, Style::default().w(188.0).pad(16.0).gap(4.0), |ui| {
+                    // Style 1's proportions (11-24): the buttons 78% of the panel's width, taller
+                    // than wide overall.
+                    ui.panel(frame, Style::default().w(200.0).pad(22.0).gap(8.0), |ui| {
                         // The `logo` texture across the bar: whole multiples of its pixels while it fits.
                         if let Some(logo) = cx.look.texture("logo", "") {
                             let size = cx
@@ -486,80 +569,71 @@ impl Screen for Title {
                             let k = if size[0] <= 156.0 { (156.0 / size[0]).floor() } else { 156.0 / size[0] };
                             ui.add(Kind::Image { texture: logo, color: 0xFFFFFFFF }, Style::default().w(size[0] * k).h(size[1] * k));
                         }
-                        ui.add(Kind::Container { class: None }, Style::default().h(8.0));
+                        ui.add(Kind::Container { class: None }, Style::default().h(2.0));
                         // The first way in is the main button, the rest `button_secondary` (the engine's own
-                        // is a copy of its button; base's is the dark one).
-                        icon_button(ui, cx, "button", "menu_singleplayer", "menu.singleplayer", &[], 156.0, |c| open(c, "core:worlds"));
-                        // The profile is a square beside Multiplayer: the face of the player's skin.
-                        ui.container(Style::row().gap(4.0).stretch(), |ui| {
-                            let mp = icon_button(ui, cx, "button_secondary", "menu_multiplayer", "menu.multiplayer", &[], 132.0, |c| {
-                                open(c, "core:multiplayer")
-                            });
-                            ui.nodes[mp].style.grow = 1.0;
-                            // The player's face from their skin, or with no skin yet the Singleplayer
-                            // figure (the face of a skin that isn't there was a blank square: Tester's
-                            // audit, 11-04).
-                            let skin = cx.settings.run_dir.join("skins").join("skin.png");
-                            let face = if skin.exists() { Some(face_texture(cx)) } else { cx.look.texture("menu_singleplayer", "") };
-                            let p = ui.button(
-                                "button_secondary",
-                                Style::default().w(20.0).h(20.0),
-                                Rc::new(|c: &mut Ctx| open(c, "core:profile")),
-                                |ui| {
-                                    if let Some(face) = face {
-                                        ui.add(
-                                            Kind::Image { texture: face, color: 0xFFFFFFFF },
-                                            Style::default().w(8.0).h(8.0).at(6.0, 6.0, [0.0, 0.0]),
-                                        );
-                                    }
-                                },
-                            );
-                            ui.nodes[p].tooltip = Some(cx.t("menu.profile", &[]));
-                            ui.set_id(p, "profile");
+                        // is a copy of its button; base's is the dark one). Style 1 (11-24): every button
+                        // the panel's width, `TITLE_BUTTON` tall, labels at twice the font, icons at their
+                        // own pixels; the profile and the editor are small squares at the bottom.
+                        title_button(ui, cx, "button", "menu_singleplayer", "menu.singleplayer", &[], 156.0, |c| open(c, "core:worlds"));
+                        title_button(ui, cx, "button_secondary", "menu_multiplayer", "menu.multiplayer", &[], 156.0, |c| {
+                            open(c, "core:multiplayer")
                         });
                         // After the first play session, until the words are written down (chiacraft).
                         if chiacraft_account::current().is_some_and(|s| s.wants_backup()) {
                             button(ui, cx, "menu.write_words", &[], 156.0, |c| open(c, "core:account"));
                         }
-                        // The editor is a square beside Mods (chiacraft: both secondary buttons).
-                        ui.container(Style::row().gap(4.0).stretch(), |ui| {
-                            let mods = icon_button(
-                                ui,
-                                cx,
-                                "button_secondary",
-                                "menu_mods",
-                                "menu.mods",
-                                &[Arg::Int(cx.mods as i64)],
-                                132.0,
-                                |c| open(c, "core:mods"),
-                            );
-                            ui.nodes[mods].style.grow = 1.0;
-                            let icon = cx.look.texture("menu_editor", "");
-                            let e = ui.button(
-                                "button_secondary",
-                                Style::default().w(20.0).h(20.0),
-                                Rc::new(|c: &mut Ctx| open(c, "core:editor")),
-                                |ui| {
-                                    if let Some(texture) = icon {
-                                        ui.add(
-                                            Kind::Image { texture, color: 0xFFFFFFFF },
-                                            Style::default().w(9.0).h(9.0).at(5.5, 5.5, [0.0, 0.0]),
-                                        );
-                                    }
-                                },
-                            );
-                            ui.nodes[e].tooltip = Some(cx.t("menu.editor", &[]));
-                            ui.set_id(e, "editor");
+                        title_button(ui, cx, "button_secondary", "menu_mods", "menu.mods", &[Arg::Int(cx.mods as i64)], 156.0, |c| {
+                            open(c, "core:mods")
                         });
-                        icon_button(ui, cx, "button_secondary", "menu_settings", "menu.settings", &[], 156.0, |c| open(c, "core:settings"));
+                        title_button(ui, cx, "button_secondary", "menu_settings", "menu.settings", &[], 156.0, |c| {
+                            open(c, "core:settings")
+                        });
                         parts(ui, cx, "core:title", "buttons");
-                        ui.add(Kind::Container { class: None }, Style::default().h(6.0));
-                        let quit = button(ui, cx, "menu.quit", &[], 156.0, |c| c.requests.push(Request::Quit));
-                        if let Kind::Button { class, .. } = &mut ui.nodes[quit].kind {
-                            *class = "button_quit".into();
-                        }
-                        ui.add(Kind::Container { class: None }, Style::default().h(6.0));
-                        label(ui, cx, "menu.version", &[Arg::Text(env!("CARGO_PKG_VERSION").into()), Arg::Int(cx.mods as i64)], "dim");
+                        // Quit: the secondary's look (no red Quit), with its door.
+                        title_button(ui, cx, "button_quit", "menu_quit", "menu.quit", &[], 156.0, |c| c.requests.push(Request::Quit));
+                        // The bottom row: the version, then the profile (the face of the player's
+                        // skin) and the editor as small squares.
+                        ui.container(
+                            Style::row()
+                                .gap(4.0)
+                                .stretch()
+                                .align(crate::ui::Align::Center),
+                            |ui| {
+                                let v = label(
+                                    ui,
+                                    cx,
+                                    "menu.version",
+                                    &[Arg::Text(env!("CARGO_PKG_VERSION").into()), Arg::Int(cx.mods as i64)],
+                                    "dim",
+                                );
+                                ui.nodes[v].style.grow = 1.0;
+                                // The player's face from their skin, or with no skin yet the Singleplayer
+                                // figure (the face of a skin that isn't there was a blank square: Tester's
+                                // audit, 11-04).
+                                let skin = cx.settings.run_dir.join("skins").join("skin.png");
+                                let (face, size) = if skin.exists() {
+                                    (Some(face_texture(cx)), [16.0, 16.0])
+                                } else {
+                                    let t = cx.look.texture("menu_singleplayer", "");
+                                    let size = t
+                                        .as_deref()
+                                        .and_then(|t| texture_gui_size(cx, t))
+                                        .unwrap_or([9.0, 9.0]);
+                                    (t, size)
+                                };
+                                let p = title_square(ui, face, size, |c: &mut Ctx| open(c, "core:profile"));
+                                ui.nodes[p].tooltip = Some(cx.t("menu.profile", &[]));
+                                ui.set_id(p, "profile");
+                                let icon = cx.look.texture("menu_editor", "");
+                                let size = icon
+                                    .as_deref()
+                                    .and_then(|t| texture_gui_size(cx, t))
+                                    .unwrap_or([9.0, 9.0]);
+                                let e = title_square(ui, icon, size, |c: &mut Ctx| open(c, "core:editor"));
+                                ui.nodes[e].tooltip = Some(cx.t("menu.editor", &[]));
+                                ui.set_id(e, "editor");
+                            },
+                        );
                     });
                 },
             );

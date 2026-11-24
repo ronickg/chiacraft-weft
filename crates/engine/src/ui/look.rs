@@ -6,8 +6,8 @@
 //! black checkerboard, like a missing block texture.
 //!
 //! Text colors are translations: `color.<class>` (and `color.<class>_hover`, `_disabled`, `_dim`,
-//! `_shadow`, `none` for no shadow) holding `{#rrggbb}`, falling back to `color.default`. They
-//! merge like every translation, so a pack changes a color with one line.
+//! `_shadow`, `none` for no shadow, `_outline` for an outline) holding `{#rrggbb}`, falling back to
+//! `color.default`. They merge like every translation, so a pack changes a color with one line.
 
 use std::cell::RefCell;
 
@@ -94,6 +94,11 @@ impl Look {
         own.or_else(|| self.color(class))
             .or_else(|| self.color("default"))
             .unwrap_or(0xFFFFFFFF)
+    }
+
+    /// Its text's outline (`color.<class>_outline`), `None` unless the class names one.
+    pub fn outline(&self, class: &str) -> Option<u32> {
+        self.color(&format!("{class}_outline"))
     }
 
     /// Its text's shadow, `None` for none.

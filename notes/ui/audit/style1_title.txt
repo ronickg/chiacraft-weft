@@ -1,0 +1,16 @@
+# Style 1, the title screen (UI redo, 11-24): the menu at rest, with the cursor on two rows, and in Russian
+# when run with --config core:language=ru_ru. Compare against the mock in the UI guide.
+loaded
+idle
+leave
+wait 2
+cursor 0.95 0.95
+wait 0.5
+shot t_01_title.png
+cursor 0.15 0.42
+wait 0.5
+shot t_02_hover_a.png
+cursor 0.15 0.55
+wait 0.5
+shot t_03_hover_b.png
+quit

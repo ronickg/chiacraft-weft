@@ -263,6 +263,9 @@ pub struct UiRenderer {
     /// drawn for (`outset` in its `.gui`: shadows, frames drawn around the content).
     slicing: FxHashMap<String, Option<Slicing>>,
     outset: FxHashMap<String, f32>,
+    /// Nine-slice textures whose edges and middle repeat at their own pixels instead of
+    /// stretching (`middle = tile`: chiacraft, 11-24, faces with grain or noise keep their grid).
+    tiled: FxHashMap<String, bool>,
     /// Bare textures already warned about (`check_bare`).
     warned_bare: std::collections::HashSet<String>,
     owned: Vec<TextureId>,
@@ -333,6 +336,7 @@ impl UiRenderer {
             strips: FxHashMap::default(),
             slicing: FxHashMap::default(),
             outset: FxHashMap::default(),
+            tiled: FxHashMap::default(),
             warned_bare: Default::default(),
             owned: Vec::new(),
             dynamic: FxHashMap::default(),
@@ -476,6 +480,7 @@ impl UiRenderer {
         // How textures slice comes with them: a pack's `.gui` must not outlive the pack.
         self.slicing.clear();
         self.outset.clear();
+        self.tiled.clear();
         self.anims.clear();
     }
 
@@ -607,6 +612,8 @@ impl UiRenderer {
                 .and_then(|(line, k, v)| crate::kv::number(name, line, k, v))
         });
         self.outset.insert(name.to_string(), outset.unwrap_or(0.0));
+        let tiled = gui.as_deref().is_some_and(|src| crate::kv::get(src, "middle").is_some_and(|v| v.trim() == "tile"));
+        self.tiled.insert(name.to_string(), tiled);
         let s = gui.map(|src| parse_gui(&src, pixels));
         self.slicing.insert(name.to_string(), s);
         s
@@ -646,6 +653,9 @@ impl UiRenderer {
             self.check_bare(name, r, pixels);
         }
         match slicing {
+            Slicing::Nine { size, border } if self.tiled.get(name).copied().unwrap_or(false) => {
+                self.nine_tiled(r, tex.0, size, border, scale, color)
+            }
             Slicing::Nine { size, border } => self.nine_sliced(r, tex.0, size, border, scale, color),
             Slicing::Tile { size, turn } => self.tile(r, tex, size[0] * scale, turn, color),
             Slicing::Stretch => self.image(r, tex.0, [0.0, 0.0, 1.0, 1.0], color),
@@ -724,7 +734,12 @@ impl UiRenderer {
         }
         match slicing {
             Slicing::Nine { size, border } => {
-                self.nine_sliced(r, tex.0, if size == [0.0; 2] { pixels } else { size }, border, scale, color)
+                let size = if size == [0.0; 2] { pixels } else { size };
+                if self.tiled.get(name).copied().unwrap_or(false) {
+                    self.nine_tiled(r, tex.0, size, border, scale, color)
+                } else {
+                    self.nine_sliced(r, tex.0, size, border, scale, color)
+                }
             }
             Slicing::Tile { size, turn } => self.tile(r, tex, size[0] * scale, turn, color),
             Slicing::Stretch => self.image(r, tex.0, [0.0, 0.0, 1.0, 1.0], color),
@@ -780,6 +795,46 @@ impl UiRenderer {
                 let rr = Rect { x: xs[i], y: ys[j], w: xs[i + 1] - xs[i], h: ys[j + 1] - ys[j] };
                 if rr.w > 0.0 && rr.h > 0.0 {
                     self.image(rr, idx, [us[i], vs[j], us[i + 1], vs[j + 1]], color);
+                }
+            }
+        }
+    }
+
+    /// `nine_sliced`, but the edges and middle repeat at their own size (whole pieces from the
+    /// top left, the last one cut) instead of stretching: grain, noise and dither keep one pixel
+    /// grid at any size (`middle = tile` in the `.gui`).
+    pub fn nine_tiled(&mut self, r: Rect, idx: u32, size: [f32; 2], border: [f32; 4], scale: f32, color: u32) {
+        let [l, t, rr, b] = border.map(|v| v * scale);
+        let (l, rr) = (l.min(r.w / 2.0), rr.min(r.w / 2.0));
+        let (t, b) = (t.min(r.h / 2.0), b.min(r.h / 2.0));
+        let xs = [r.x, r.x + l, r.x + r.w - rr, r.x + r.w];
+        let ys = [r.y, r.y + t, r.y + r.h - b, r.y + r.h];
+        let us = [0.0, border[0] / size[0], 1.0 - border[2] / size[0], 1.0];
+        let vs = [0.0, border[1] / size[1], 1.0 - border[3] / size[1], 1.0];
+        // One repeat of the middle, in physical pixels.
+        let step = [(size[0] - border[0] - border[2]) * scale, (size[1] - border[1] - border[3]) * scale];
+        for j in 0..3 {
+            for i in 0..3 {
+                let piece = Rect { x: xs[i], y: ys[j], w: xs[i + 1] - xs[i], h: ys[j + 1] - ys[j] };
+                if piece.w <= 0.0 || piece.h <= 0.0 {
+                    continue;
+                }
+                let uv = [us[i], vs[j], us[i + 1], vs[j + 1]];
+                // Corners as drawn; along a stretching axis, whole repeats then the last one cut.
+                let sw = if i == 1 && step[0] > 0.5 { step[0] } else { piece.w };
+                let sh = if j == 1 && step[1] > 0.5 { step[1] } else { piece.h };
+                let mut y = piece.y;
+                while y < piece.y + piece.h - 0.01 {
+                    let h = sh.min(piece.y + piece.h - y);
+                    let v1 = uv[1] + (uv[3] - uv[1]) * (h / sh);
+                    let mut x = piece.x;
+                    while x < piece.x + piece.w - 0.01 {
+                        let w = sw.min(piece.x + piece.w - x);
+                        let u1 = uv[0] + (uv[2] - uv[0]) * (w / sw);
+                        self.image(Rect { x, y, w, h }, idx, [uv[0], uv[1], u1, v1], color);
+                        x += sw;
+                    }
+                    y += sh;
                 }
             }
         }
@@ -861,13 +916,40 @@ impl UiRenderer {
         shadow: Option<u32>,
         icons: &mut Vec<(f32, f32, f32, u32)>,
     ) {
-        for pass in [true, false] {
-            if pass && shadow.is_none() {
-                continue;
+        self.glyph_run_outlined(items, x, y, px, default_color, shadow, None, icons);
+    }
+
+    /// `glyph_run` with an outline (chiacraft, 11-24: style 1's labels): the glyphs drawn first
+    /// one font pixel off in all eight directions in `outline`, the shadow one more pixel down.
+    #[allow(clippy::too_many_arguments)]
+    pub fn glyph_run_outlined(
+        &mut self,
+        items: &[Placed],
+        x: f32,
+        y: f32,
+        px: f32,
+        default_color: u32,
+        shadow: Option<u32>,
+        outline: Option<u32>,
+        icons: &mut Vec<(f32, f32, f32, u32)>,
+    ) {
+        let u = px * self.font.pixel;
+        // (x offset, y offset, the color of an underlay pass) in drawing order, the text last.
+        let mut passes: Vec<(f32, f32, Option<u32>)> = Vec::new();
+        // The shadow is one font pixel straight down (the UI guide's rule): down and right,
+        // it made every label's visible group lean right by half a pixel. Under an outline it
+        // sits one pixel below the outline.
+        if let Some(s) = shadow {
+            passes.push((0.0, if outline.is_some() { 2.0 * u } else { u }, Some(s)));
+        }
+        if let Some(o) = outline {
+            for (dx, dy) in [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0), (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                passes.push((dx * u, dy * u, Some(o)));
             }
-            // The shadow is one font pixel straight down (the UI guide's rule): down and right,
-            // it made every label's visible group lean right by half a pixel.
-            let off = if pass { px * self.font.pixel } else { 0.0 };
+        }
+        passes.push((0.0, 0.0, None));
+        for (ox, off, under) in passes {
+            let pass = under.is_some();
             for (index, it) in items.iter().enumerate() {
                 match *it {
                     Placed::Glyph { x: gx, y: gy, ch, color, fx } => {
@@ -878,11 +960,14 @@ impl UiRenderer {
                         let g = self.font.glyph(ch);
                         let uv = self.font.uv(g);
                         let w = g.width * px;
-                        let c = if pass { shadow.unwrap() } else { color.map_or(default_color, |c| c << 8 | (default_color & 0xFF)) };
+                        let c = match under {
+                            Some(c) => c,
+                            None => color.map_or(default_color, |c| c << 8 | (default_color & 0xFF)),
+                        };
                         // Whole physical pixels: centered text starts mid-pixel, and nearest sampling
                         // at texel borders would drop or double glyph columns.
                         self.quads.push(Quad {
-                            p0: [(x + (gx + g.bearing) * px).round(), (y + (gy + self.font.top) * px + off).round()],
+                            p0: [(x + (gx + g.bearing) * px + ox).round(), (y + (gy + self.font.top) * px + off).round()],
                             u: [w, 0.0],
                             v: [0.0, self.font.height * px],
                             uv,
@@ -1428,9 +1513,11 @@ impl UiRenderer {
                     look.shadow(class)
                         .map(|s| (s & !0xFF) | (s & 0xFF) * (default & 0xFF) / 255)
                 };
+                // An outline when the class names one (`color.<class>_outline`), faded like the shadow.
+                let outline = look.outline(class).map(|s| (s & !0xFF) | (s & 0xFF) * (default & 0xFF) / 255);
                 let x = if t.center { r.x + (r.w - t.layout.width * px) / 2.0 } else { r.x };
                 self.load_images(gpu, assets, &t.layout);
-                self.glyph_run(&t.layout.items, x, r.y, px, default, shadow, icons);
+                self.glyph_run_outlined(&t.layout.items, x, r.y, px, default, shadow, outline, icons);
             }
             Kind::Image { texture, color } => {
                 if let Some((idx, _, _)) = self.texture(gpu, assets, texture) {

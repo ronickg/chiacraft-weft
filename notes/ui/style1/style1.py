@@ -40,6 +40,9 @@ FRAMES = os.path.join(ARC, "parts", "grid_frames_try1.png")
 TABS = os.path.join(ARC, "parts", "grid_tabs_try1.png")
 SMALL = os.path.join(ARC, "parts", "grid_small_try2.png")
 FRAMES_OLD = os.path.join(ARC, "parts", "frames_try3_chosen.png")  # the slots
+ARC2 = os.path.expanduser("~/Coding/chiacraft-archive/images/ui-redo/2026-11-24")
+DOOR = os.path.join(ARC2, "parts", "door_try2.png")  # Quit's door (10 image px a pixel)
+PENCIL = os.path.join(ARC2, "parts", "pencil_try1.png")  # the editor square
 GUI = os.path.join(ROOT, "mods", "base", "assets", "textures", "gui")
 K = 5  # image pixels per UI pixel
 
@@ -61,15 +64,15 @@ def cut(path, box):
     return out
 
 
-def grab(path, near, size, slack=60):
+def grab(path, near, size, slack=60, k=K):
     """A part of `size` pixels drawn near `near` (x, y): found by its outline (the non-background
     box around `near`), then sampled at the pitch its drawn width gives (the sheets drift a little
     off 5 image px a pixel)."""
     a = np.array(Image.open(path).convert("RGBA"))
     bg = sheet.background(a)
     x0, y0 = max(near[0] - slack, 0), max(near[1] - slack, 0)
-    x1 = min(near[0] + size[0] * K + slack, a.shape[1])
-    y1 = min(near[1] + size[1] * K + slack, a.shape[0])
+    x1 = min(near[0] + size[0] * k + slack, a.shape[1])
+    y1 = min(near[1] + size[1] * k + slack, a.shape[0])
     fg = ~bg[y0:y1, x0:x1]
     ys, xs = np.nonzero(fg)
     bx, by = x0 + xs.min(), y0 + ys.min()
@@ -98,6 +101,83 @@ def even(a, border, rows=True):
         a[t:h - b, :] = a[mid_y:mid_y + 1, :]
     if l or r:
         a[:, l:w - r] = a[:, mid_x:mid_x + 1]
+    return a
+
+
+BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) / 16.0
+
+
+def textured(a, box, seed, light=0.07, dark=0.10, noise=0.03, top=0.22, bottom=0.78):
+    """A face made less flat (Ronald, 11-24: "something still looks worse off"; the mock's faces
+    have a gradient, a lit top row, a dark bottom row and faint noise): inside `box` (x0, y0, x1,
+    y1), lighter at the top and darker at the bottom in ordered-dither steps of 4%, the top row
+    lit toward cream, the bottom row darkened, and every pixel nudged by +-`noise` (a fixed
+    pattern, so every state of a part shares it)."""
+    x0, y0, x1, y1 = box
+    a = a.copy()
+    rng = np.random.default_rng(seed)
+    h = y1 - y0
+    rgb = a[..., :3].astype(float)
+    for y in range(y0, y1):
+        t = (y - y0) / max(h - 1, 1)
+        f = 1.0 + light - (light + dark) * t
+        for x in range(x0, x1):
+            if a[y, x, 3] == 0:
+                continue
+            q = np.floor((f - 1.0) / 0.04 + BAYER[y % 4, x % 4]) * 0.04 + 1.0
+            q *= 1.0 + rng.choice([-noise, 0.0, 0.0, noise])
+            rgb[y, x] *= q
+    rgb[y0, x0:x1] = rgb[y0, x0:x1] * (1 - top) + np.array([255, 240, 200]) * top
+    rgb[y1 - 1, x0:x1] *= bottom
+    a[..., :3] = np.clip(rgb, 0, 255).astype(np.uint8)
+    return a
+
+
+def shadowed(a, n=4, dy=3, alpha=120, rgb=(20, 10, 5)):
+    """The part on a drop shadow `dy` pixels below it (the mock's buttons sit on one), in an
+    `n`-pixel margin like the hover's glow, so every state keeps one footprint (`outset`)."""
+    h, w = a.shape[:2]
+    out = np.zeros((h + 2 * n, w + 2 * n, 4), np.uint8)
+    mask = np.zeros(out.shape[:2], bool)
+    mask[n + dy:n + dy + h, n:n + w] = a[..., 3] > 0
+    out[mask, :3] = rgb
+    out[mask, 3] = alpha
+    part = np.zeros_like(out)
+    part[n:n + h, n:n + w] = a
+    over = part[..., 3] > 0
+    out[over] = part[over]
+    return out
+
+
+def glow(a, n=4, rgb=(255, 196, 42), alphas=(150, 90, 45, 20)):
+    """A hover's glow: `n` pixels of gold around the part's outline, fading out (the mock's
+    hovered button glows). The part grows by `n` on every side; its `.gui` says `outset`."""
+    from scipy.ndimage import binary_dilation
+    h, w = a.shape[:2]
+    out = np.zeros((h + 2 * n, w + 2 * n, 4), np.uint8)
+    out[n:n + h, n:n + w] = a
+    inside = out[..., 3] > 0
+    done = inside.copy()
+    cross = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], bool)
+    for i in range(n):
+        grown = binary_dilation(done, structure=np.ones((3, 3), bool) if i % 2 == 0 else cross)
+        ring = grown & ~done
+        out[ring, :3] = rgb
+        out[ring, 3] = alphas[i]
+        done = grown
+    return out
+
+
+def thicken(a, at, n):
+    """The frame `n` pixels thicker on every side: row `at` (and its mirror, and the same column
+    and its mirror) repeated, inside the oak's grain where the plates are plain."""
+    for _ in range(n):
+        a = np.concatenate([a[:at + 1], a[at:at + 1], a[at + 1:]], 0)
+        b = a.shape[0] - 1 - at
+        a = np.concatenate([a[:b], a[b:b + 1], a[b:]], 0)
+        a = np.concatenate([a[:, :at + 1], a[:, at:at + 1], a[:, at + 1:]], 1)
+        b = a.shape[1] - 1 - at
+        a = np.concatenate([a[:, :b], a[:, b:b + 1], a[:, b:]], 1)
     return a
 
 
@@ -130,10 +210,6 @@ def build():
         a[~mask] = 0
         raw[k] = even(a, bb, rows=False)
     extra = "selected_offset = 0.5\n"
-    for k, a in raw.items():
-        parts["button_secondary" + k] = (a, gui("nine_slice", bb, a.shape[1::-1], extra))
-        if k != "_disabled":
-            parts["button_quit" + k] = (a, gui("nine_slice", bb, a.shape[1::-1]))
     # The main button at rest: the hover's orange face a step darker, inside the secondary's rim.
     main = raw["_hover"].copy()
     main[..., :3] = (main[..., :3].astype(float) * 0.88).astype(np.uint8)
@@ -142,27 +218,58 @@ def build():
     ring[:7, :] = ring[-7:, :] = True
     ring[:, :7] = ring[:, -7:] = True
     main[ring] = raw[""][ring]
-    parts["button"] = (main, gui("nine_slice", bb, main.shape[1::-1], extra))
+    raw["main"] = main
+    # Faces with a dithered gradient, lit top row, dark bottom row and noise (one pattern).
+    face = (7, 7, w - 7, h - 7)
+    for k in raw:
+        raw[k] = textured(raw[k], face, seed=1)
+    # Every state in a 4-pixel margin (`outset = 2`): a shadow 3 pixels down at rest, 1 pressed,
+    # faint disabled; the hovers glow instead. The middle repeats (`middle = tile`), so the
+    # noise keeps its pixels at any width.
+    gb = tuple(v + 4 for v in bb)
+    tail = "outset = 2\nmiddle = tile\n"
+
+    def put(name, a, ex):
+        parts[name] = (a, gui("nine_slice", gb, a.shape[1::-1], ex + tail))
+    look = {
+        "": shadowed(raw[""]),
+        "_hover": glow(raw["_hover"]),
+        "_pressed": shadowed(raw["_pressed"], dy=1),
+        "_disabled": shadowed(raw["_disabled"], alpha=60),
+    }
+    for k, a in look.items():
+        put("button_secondary" + k, a, extra)
+        if k != "_disabled":
+            put("button_quit" + k, a, "")
+    put("button", shadowed(raw["main"]), extra)
     for k in ("_hover", "_pressed", "_disabled"):
-        parts["button" + k] = (raw[k], gui("nine_slice", bb, raw[k].shape[1::-1], extra))
+        put("button" + k, look[k], extra)
 
     # Frames: the title's 96 x 96 (18-pixel oak, 28-pixel bronze plates) and the windows' 64 x 64
     # (10-pixel oak, 16-pixel plates), drawn at the same pixel; pulled from orange toward bronze
     # (the guide's "too yellow" rule); insides a little see-through.
-    def frame(near, size, cap, rim):
+    def frame(near, size, cap, rim, grow=0, at=0):
         f = tone(take(FRAMES, f"frame{size}", near, (size, size)))
         f = even(f, (cap, cap, cap, cap))
+        if grow:
+            f = thicken(f, at, grow)
+            size, cap, rim = size + 2 * grow, cap + grow, rim + grow
         inside = np.zeros(f.shape[:2], bool)
         inside[rim:-rim, rim:-rim] = True
         c = f[size // 2, size // 2, :3].astype(int)
         flat = inside & (np.abs(f[..., :3].astype(int) - c).sum(-1) < 12)
+        # Faint noise on the inside (no gradient: the middle repeats).
+        noisy = textured(f, (0, 0, size, size), seed=2, light=0.0, dark=0.0, top=0.0, bottom=1.0)
+        f[flat] = noisy[flat]
         f[flat, 3] = 232
         return f
-    big = frame((80, 80), 96, 28, 18)
-    parts["menu_panel"] = (big, gui("nine_slice", (28,) * 4, (96, 96)))
+    # The title's frame two pixels thicker than drawn (20 pixels, 10 GUI, the mock's at the same
+    # width; plates 30): its row 5 (and column 5, and their mirrors: plain oak and plate, clear of the rivets) repeated.
+    big = frame((80, 80), 96, 28, 18, grow=2, at=5)
+    parts["menu_panel"] = (big, gui("nine_slice", (30,) * 4, big.shape[1::-1], "middle = tile\n"))
     small = frame((760, 80), 64, 16, 10)
     for name in ("panel", "news"):
-        parts[name] = (small, gui("nine_slice", (16,) * 4, (64, 64)))
+        parts[name] = (small, gui("nine_slice", (16,) * 4, (64, 64), "middle = tile\n"))
     div = even(tone(take(FRAMES, "divider", (760, 600), (96, 6))), (6, 0, 6, 0))
     parts["divider"] = (div, gui("nine_slice", (6, 0, 6, 0), (96, 6)))
 
@@ -192,6 +299,10 @@ def build():
         if not name.startswith("scrollbar_handle"):  # the handle's grip line stays as drawn
             a = even(a, (bd,) * 4)
         parts[name] = (a, gui("nine_slice", (bd,) * 4, size))
+
+    # The title's icons: one icon pixel a UI pixel, like the others (no .gui: drawn at their size).
+    parts["menu_quit"] = (grab(DOOR, (660, 380), (20, 26), k=10)[0], None)
+    parts["menu_editor"] = (grab(PENCIL, (660, 380), (20, 20), k=10)[0], None)
 
     # Slots stay the earlier cut (an 18-GUI slot has room for a 2-GUI rim only).
     slot = even(cut(FRAMES_OLD, (660, 100, 180, 180)), (4, 4, 4, 4))
@@ -224,7 +335,8 @@ def main():
                 if os.path.exists(f) and not os.path.exists(os.path.join(keep, os.path.basename(f))):
                     shutil.copy(f, keep)
         Image.fromarray(px).save(png)
-        open(gf, "w").write(g)
+        if g is not None:
+            open(gf, "w").write(g)
 
 
 if __name__ == "__main__":
