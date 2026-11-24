@@ -136,40 +136,6 @@ def textured(a, box, seed, light=0.07, dark=0.10, noise=0.03, top=0.22, bottom=0
     return a
 
 
-def shadowed(a, n=4, dy=3, alpha=120, rgb=(20, 10, 5)):
-    """The part on a drop shadow `dy` pixels below it (the mock's buttons sit on one), in an
-    `n`-pixel margin like the hover's glow, so every state keeps one footprint (`outset`)."""
-    h, w = a.shape[:2]
-    out = np.zeros((h + 2 * n, w + 2 * n, 4), np.uint8)
-    mask = np.zeros(out.shape[:2], bool)
-    mask[n + dy:n + dy + h, n:n + w] = a[..., 3] > 0
-    out[mask, :3] = rgb
-    out[mask, 3] = alpha
-    part = np.zeros_like(out)
-    part[n:n + h, n:n + w] = a
-    over = part[..., 3] > 0
-    out[over] = part[over]
-    return out
-
-
-def glow(a, n=4, rgb=(255, 196, 42), alphas=(150, 90, 45, 20)):
-    """A hover's glow: `n` pixels of gold around the part's outline, fading out (the mock's
-    hovered button glows). The part grows by `n` on every side; its `.gui` says `outset`."""
-    from scipy.ndimage import binary_dilation
-    h, w = a.shape[:2]
-    out = np.zeros((h + 2 * n, w + 2 * n, 4), np.uint8)
-    out[n:n + h, n:n + w] = a
-    inside = out[..., 3] > 0
-    done = inside.copy()
-    cross = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], bool)
-    for i in range(n):
-        grown = binary_dilation(done, structure=np.ones((3, 3), bool) if i % 2 == 0 else cross)
-        ring = grown & ~done
-        out[ring, :3] = rgb
-        out[ring, 3] = alphas[i]
-        done = grown
-    return out
-
 
 def thicken(a, at, n):
     """The frame `n` pixels thicker on every side: row `at` (and its mirror, and the same column
@@ -272,22 +238,6 @@ def drop(a, n, dy, alpha=150, rgb=(20, 10, 5)):
     return out
 
 
-def rings(a, n, rgb, alphas, width=2):
-    """A glow of stepped rings, each `width` pixels, around the part (no blur: it stays on the
-    grid), in an `n`-pixel margin."""
-    from scipy.ndimage import binary_dilation
-    out = margin(a, n)
-    done = out[..., 3] > 0
-    for al in alphas:
-        grown = done
-        for _ in range(width):
-            grown = binary_dilation(grown, structure=np.ones((3, 3), bool))
-        ring = grown & ~done
-        out[ring, :3] = rgb
-        out[ring, 3] = al
-        done = grown
-    return out
-
 
 def title_panel(big):
     """The title's frame (`reports/UI craft.md` changes 5, 6, 9, 14; Planner 11-24: corner plates
@@ -387,9 +337,9 @@ def build():
 
     # Buttons (`reports/UI craft.md` changes 3, 4, 6, 12): the cut's rim (7 pixels, 4-pixel
     # chamfers) around faces repainted in banded value steps, a highlight row on top and a dark
-    # row at the bottom, faint grain one step off. At rest a hard shadow 2 GUI straight down;
-    # hover (and the title's selected) the mock's deep orange with a bright yellow inner rim and a
-    # glow of stepped rings; pressed the face 1 GUI lower with no shadow and no highlight.
+    # row at the bottom, faint grain one step off. At rest and hovered a hard shadow 2 GUI straight
+    # down; hover (and the title's selected) the mock's deep orange with a bright yellow inner
+    # line, no halo; pressed the face 1 GUI lower with no shadow and no highlight.
     at = {"": (150, 200), "_hover": (850, 200), "_pressed": (150, 560), "_disabled": (850, 560)}
     raw = {k: take(BUTTONS, "button" + k, xy, (96, 40)) for k, xy in at.items()}
     mask = raw[""][..., 3] > 0
@@ -419,7 +369,7 @@ def build():
             a[ring & (a[..., 3] > 0), :3] = hexc(col)
         return a
 
-    def states(h, heights, n, glow_alphas, seed):
+    def states(h, heights, n, seed):
         """Every state of a button `h` pixels tall (its face `heights` bands), in an `n`-pixel margin."""
         base = taller(rim, h) if h != rim.shape[0] else rim
         w = base.shape[1]
@@ -437,7 +387,8 @@ def build():
         dy = 4  # 2 GUI
         return {
             "item": drop(item, n, dy), "main": drop(main, n, dy),
-            "_hover": rings(hover, n, (255, 150, 30), glow_alphas),
+            # No halo (Ronald, 11-24: "looks good except the weird glow haha"): the face says it.
+            "_hover": drop(hover, n, dy),
             "_pressed": margin(pressed, n, dy=2),
             "_disabled": drop(gray, n, dy, alpha=70),
         }
@@ -447,8 +398,8 @@ def build():
     sel = "selected_offset = 0.5\n"
     # The windows' buttons, 20 GUI (40 pixels): 3 bands of 8; the top and bottom borders take the
     # highlight and the first and last bands, so a taller button only adds more of the middle band.
-    # A 4-pixel margin (`outset = 2`): the shadow and a two-ring glow.
-    st = states(40, [8, 8, 8], 4, (170, 75), seed=1)
+    # A 4-pixel margin (`outset = 2`) for the shadow.
+    st = states(40, [8, 8, 8], 4, seed=1)
     gb = (12, 20, 12, 20)
     tail = "outset = 2\nmiddle = tile\n"
     for k in ("_hover", "_pressed", "_disabled"):
@@ -460,12 +411,11 @@ def build():
     put("button_quit", st["item"], gb, tail)
     put("button", st["main"], gb, sel + tail)
     # The title's buttons (`menu_main`, `menu_item`), cut at their height, 26 GUI (52 pixels): 4
-    # bands of 9, never stretched; a 10-pixel margin (`outset = 5`) for a glow of five rings 1 GUI
-    # each, fading out (the mock's halo spills 4-6 GUI; the buttons are 7 apart). The borders leave
-    # a one-row middle (the second band's last row).
-    st = states(52, [9, 9, 9, 9], 10, (205, 150, 100, 60, 28), seed=1)
-    gb = (18, 35, 18, 36)
-    tail = "outset = 5\nmiddle = tile\n"
+    # bands of 9, never stretched; a 4-pixel margin (`outset = 2`) for the shadow. The borders
+    # leave a one-row middle (the second band's last row).
+    st = states(52, [9, 9, 9, 9], 4, seed=1)
+    gb = (12, 29, 12, 30)
+    tail = "outset = 2\nmiddle = tile\n"
     for k in ("_hover", "_pressed", "_disabled"):
         put("menu_main" + k, st[k], gb, tail)
         put("menu_item" + k, st[k], gb, tail)
