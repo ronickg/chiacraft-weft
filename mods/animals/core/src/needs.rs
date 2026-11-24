@@ -377,6 +377,10 @@ pub const LEAP_TRIES: u8 = 3;
 /// is 9, a shaft's foot 3). Only then does a stuck animal look for a way out and leap
 /// (`stuck::enclosed`); on open ground it gives the place up and wanders on.
 pub const TRAP_CELLS: usize = 48;
+/// Game ticks its drink or eat goal may go unrun before a walk it had set off on counts as cut
+/// short by another goal, not by the ground (`stuck::ran`): goals run every tick while they have
+/// the turn.
+pub const RAN_GAP: f64 = 10.0;
 /// The steepest drop a running animal takes (`senses::escape`): it can step back up one, not two.
 pub const FLEE_DROP: i32 = 1;
 const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WAY_OUT_WAYS);
