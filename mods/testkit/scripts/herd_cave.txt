@@ -2,8 +2,9 @@
 # spot where graze10's deer 4 stood 9 samples, 10 blocks under the ground and 16 from the pond,
 # and died of thirst (every walk to the water ended where it began, and it lay down again). The
 # pond and its rim as in `herd_savanna_graze.txt`, in summer (no drying), at 5 times the pace so
-# the legs out have time (`/tick rate 100`); water at 60 % so they are thirsty but have a game
-# day and more.
+# the legs out have time (`/tick rate 100`); water at 15 %, past `memory::DRIVEN`, so thirst drives
+# them to look (at 60 % they stood still to the end, never having seen the pond 9 blocks above:
+# cave2). A game day parched kills: the run is about a third of one after they are dry.
 # PASS: both deer leave 1 60 528 ("is stuck at ... looks for a way out" lines for them), reach the
 # pond and drink ("anim: <id> holds drink" for each; water above 90 % in the last `/animalprof
 # where` rows) within the run, and neither dies. Report each deer's track (the where rows), how
@@ -29,7 +30,7 @@ chat /tk spawn animals:white_tailed_deer 1 60 528
 chat /tk spawn animals:white_tailed_deer 1 60 528
 wait 2
 chat /anim log
-chat /animalprof water 0.6
+chat /animalprof water 0.15
 chat /animalprof food 1
 chat /tp 0 90 572
 wait 3

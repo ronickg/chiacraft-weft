@@ -426,6 +426,10 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
         None => f = [f64::NAN, 0.0, 0.0, now + NOTHING],
     }
     w.component_mut(id, &FORAGE).map(|c| *c = f);
+    // Driven by hunger and finding no food: it looks for some, as one stuck does (`stuck`).
+    if f[0].is_nan() && animals_core::needs::hunger_score(full, false) >= animals_core::memory::DRIVEN {
+        return crate::stuck::short(w, id, st);
+    }
     !f[0].is_nan()
 }
 

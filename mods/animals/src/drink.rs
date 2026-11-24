@@ -391,5 +391,11 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         None => d = [f64::NAN, 0.0, 0.0, now + NOTHING],
     }
     w.component_mut(id, &DRINK).map(|c| *c = d);
+    // Driven by thirst and knowing no water it can find: it looks for some, as one stuck does
+    // (`stuck`): deer in the cave under a pond, 9 blocks below it and never having seen it, stood
+    // doing nothing while their water fell from 60 % to 17 % (ai1124_cave2).
+    if d[0].is_nan() && driven {
+        return crate::stuck::short(w, id, st);
+    }
     !d[0].is_nan()
 }
