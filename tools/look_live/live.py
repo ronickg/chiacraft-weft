@@ -10,15 +10,17 @@ command file. This drives it from the Mac over ssh. It never starts a game: Test
         composes this worktree's shader pack (mods/base/shaderpack, with look.wgsl and MIST_TOP in
         front of each file, as mods/base/src/shaderpack.rs writes it), copies it to the PC and
         reloads it in the game (`reload_pack`)
-  live.py sheet <run id> <out.jpg> <hour>:<shot.png> ... [--set normal|twilight|indirect|direct]
+  live.py sheet <out.jpg> <hour>:<shot.png> ... [--set normal|twilight|indirect|direct]
         fetches the shots from the run's folder and puts each beside Bliss's at that hour
         (18.5 is 18:30), with each picture's region means (sky, far, near, all)
   live.py out
         the command file's results so far
+  live.py log
+        the end of the game's run.log
 
-Paths on the PC (agreed with Tester 2): command file ~/looktest/live/cmd.txt, results
-cmd.txt.out beside it, the composed pack in ~/looktest/live/pack/, shots in the run's own
-folder ~/looktest/t2_<run id>/ (the runner's --shot-dir).
+Paths on the PC (Tester 2's layout, 11-23): ~/looktest/live/<name>/ (LIVE_NAME, lv1 by default)
+holds cmd.txt, the results cmd.txt.out, shots/ (the game's --shot-dir), run.log and status.txt
+(Tester 2's), and pack/ (the composed pack). A `stop` file there ends the live step too.
 """
 import os
 import re
@@ -28,7 +30,10 @@ import sys
 import time
 
 PC = "ronaldg@192.168.1.13"
-LIVE = "/home/ronaldg/looktest/live"
+# The live game's folder (Tester 2's layout): cmd.txt, cmd.txt.out, shots/ (its --shot-dir),
+# run.log, status.txt, pack/ (ours). LIVE_NAME picks it, lv1 by default.
+NAME = os.environ.get("LIVE_NAME", "lv1")
+LIVE = f"/home/ronaldg/looktest/live/{NAME}"
 CMD = f"{LIVE}/cmd.txt"
 OUT = f"{CMD}.out"
 PACK = f"{LIVE}/pack"
@@ -114,12 +119,12 @@ def means(img):
     return {"sky": band(0, 0.25), "far": band(0.45, 0.6), "near": band(0.75, 1.0), "all": band(0, 1.0)}
 
 
-def sheet(run, out, pairs, which):
+def sheet(out, pairs, which):
     from PIL import Image, ImageDraw
-    local = os.path.expanduser(f"~/Coding/chiacraft-archive/images/tester-2/{time.strftime('%Y-%m-%d')}/runs/t2_{run}")
+    local = os.path.expanduser(f"~/Coding/chiacraft-archive/images/tester-2/{time.strftime('%Y-%m-%d')}/live/{NAME}")
     os.makedirs(local, exist_ok=True)
     names = [p.split(":", 1)[1] for p in pairs]
-    subprocess.run(["rsync", "-a", "-e", "ssh -o BatchMode=yes"] + [f"{PC}:looktest/t2_{run}/{n}" for n in names] + [local + "/"], check=True)
+    subprocess.run(["rsync", "-a", "-e", "ssh -o BatchMode=yes"] + [f"{PC}:looktest/live/{NAME}/shots/{n}" for n in names] + [local + "/"], check=True)
     W, H, T = 800, 450, 34
     rows = []
     for p in pairs:
@@ -157,13 +162,15 @@ def main():
         pack()
     elif a[0] == "out":
         print(ssh(f"cat {OUT} 2>/dev/null"), end="")
+    elif a[0] == "log":
+        print(ssh(f"tail -n 40 {LIVE}/run.log 2>/dev/null"), end="")
     elif a[0] == "sheet":
         which = "normal"
         if "--set" in a:
             i = a.index("--set")
             which = a[i + 1]
             a = a[:i] + a[i + 2:]
-        sheet(a[1], a[2], a[3:], which)
+        sheet(a[1], a[2:], which)
     else:
         sys.exit(__doc__)
 

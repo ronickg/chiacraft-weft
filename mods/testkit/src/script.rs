@@ -44,7 +44,7 @@
 //! respawn             # back from the death screen (the server ignores it while alive)
 //! aim 8               # face the nearest living creature within 8 blocks (its middle), if any
 //! live cmd.txt 20     # runs each line later appended to cmd.txt as a step (results in cmd.txt.out),
-//!                     # until a `quit` line or 20 minutes with no new line; then the next step
+//!                     # until a `quit` line, a `stop` file beside it or 20 minutes with no new line
 //! reload_pack dir     # copies dir's .wgsl and pack.cfg into the shader pack in use (only a variant,
 //!                     # `chiacraft_<x>`, never chiacraft itself) and reloads it
 //! quit
@@ -787,6 +787,11 @@ async fn live(t: &T, file: &str, mins: f32) -> R {
         t.secs(0.5).await?;
         if last.elapsed() > idle {
             say("idle: no new line, live mode ends");
+            return Ok(());
+        }
+        // A `stop` file beside the command file ends it too (Tester 2's way to stop a live game).
+        if std::path::Path::new(file).with_file_name("stop").exists() {
+            say("stop: the stop file is there, live mode ends");
             return Ok(());
         }
         let Ok(text) = std::fs::read(file) else { continue };
