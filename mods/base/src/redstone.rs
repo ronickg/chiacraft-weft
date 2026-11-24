@@ -502,7 +502,7 @@ pub fn register(r: &mut Registry) {
         // Its screen (ours, not the default one) draws the player's slots: the menu must have them.
         .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0), &[], |ui| {
+            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0), &[], |ui| {
                 ui.group("dispenser");
                 ui.player_inventory(true);
             });

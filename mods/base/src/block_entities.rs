@@ -54,26 +54,34 @@ pub fn register(r: &mut Registry) {
         .on_change(crate::ruins::furnace_changed)
         .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
-                ui.row(S::row().gap(8.0), |ui| {
-                    ui.spacer();
-                    ui.column(S::column().gap(2.0), |ui| {
-                        ui.group("input");
-                        ui.progress_bind_dir("flame", S::default().size(14.0, 14.0), abi::ui_dir::UP, |c| {
-                            c.menu_component(&SMELTING)
-                                .map_or(0.0, |s| ratio(s.burn, s.burn_max))
+            crate::window::window(
+                ui,
+                S::column()
+                    .pad(crate::window::WINDOW_PAD)
+                    .gap(4.0)
+                    .stretch(),
+                &[],
+                |ui| {
+                    ui.row(S::row().gap(8.0), |ui| {
+                        ui.spacer();
+                        ui.column(S::column().gap(2.0), |ui| {
+                            ui.group("input");
+                            ui.progress_bind_dir("flame", S::default().size(14.0, 14.0), abi::ui_dir::UP, |c| {
+                                c.menu_component(&SMELTING)
+                                    .map_or(0.0, |s| ratio(s.burn, s.burn_max))
+                            });
+                            ui.group("fuel");
                         });
-                        ui.group("fuel");
+                        ui.recipe_arrow_bind(|c| {
+                            c.menu_component(&SMELTING)
+                                .map_or(0.0, |s| ratio(s.cook, s.cook_max))
+                        });
+                        ui.group("output");
+                        ui.spacer();
                     });
-                    ui.recipe_arrow_bind(|c| {
-                        c.menu_component(&SMELTING)
-                            .map_or(0.0, |s| ratio(s.cook, s.cook_max))
-                    });
-                    ui.group("output");
-                    ui.spacer();
-                });
-                ui.player_inventory(true);
-            });
+                    ui.player_inventory(true);
+                },
+            );
         });
 
     r.block(&CHEST)
@@ -95,7 +103,7 @@ pub fn register(r: &mut Registry) {
         // Its screen (ours, not the default one) draws the player's slots: the menu must have them.
         .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0), &[], |ui| {
+            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0), &[], |ui| {
                 ui.group("chest");
                 ui.player_inventory(true);
             });

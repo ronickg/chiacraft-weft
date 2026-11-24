@@ -198,7 +198,7 @@ fn page(ui: &mut Ui, e: &Entry) {
                 }
             });
         });
-        ui.panel("divider", S::row().h(1.0).stretch(), |_| {});
+        ui.panel("divider", S::row().h(3.0).stretch(), |_| {});
         // The survival facts, the ones not learned yet saying how to learn them.
         ui.column(S::column().gap(2.0).h(96.0).scroll(), |ui| {
             for (f, known) in e

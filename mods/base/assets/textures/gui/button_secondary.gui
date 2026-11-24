@@ -1,4 +1,6 @@
 scaling = nine_slice
-border = 1.5
+border = 6 10 6 10
+size = 52 24
 selected_offset = 0.5
-size = 32 10
+outset = 2
+middle = tile

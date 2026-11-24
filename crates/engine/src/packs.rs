@@ -17,7 +17,7 @@ use crate::assets::Assets;
 use weft_render::{Shader, ShaderError};
 
 use crate::app::{Ctx, Request};
-use crate::screens::{BuildCx, Screen, back_button, button, frame, label};
+use crate::screens::{BuildCx, Screen, back_button, button, field_label, group_gap, label, window, window_list};
 use crate::ui::{Justify, Kind, Style, Ui};
 
 pub struct PackInfo {
@@ -265,7 +265,11 @@ pub(crate) fn open_path(path: &Path) {
 }
 
 fn pack_text(ui: &mut Ui, cx: &BuildCx, info: &PackInfo, name_class: &str) {
-    ui.text(cx.rich(&info.name), name_class);
+    let t = ui.text(cx.rich(&info.name), name_class);
+    // The name at 2x like the window's labels where it fits (style 1), what it is under it at 1x.
+    if list_class(cx).1 {
+        field_label(ui, cx, t);
+    }
     if !info.description.is_empty() {
         ui.text(cx.rich(&info.description), "dim");
     }
@@ -361,12 +365,21 @@ impl Screen for ResourcePacks {
         let missing =
             |id: &str| PackInfo { id: id.to_string(), name: id.to_string(), description: cx.lang.get("packs.missing").to_string() };
         let dragging = self.dragging.as_deref();
-        frame(ui, cx, "settings.resource_packs", |ui| {
-            ui.container(Style::row().gap(8.0).grow().h(0.0).stretch(), |ui| {
-                ui.container(Style::default().gap(4.0).w(260.0).stretch(), |ui| {
-                    label(ui, cx, "packs.available", &[], "default");
+        // Style 1: the menu window, each list in a sunken well under its 2x heading (2 apart), the
+        // two 12 apart, the buttons a group below (`UI Style Guide.md`, "Spacing").
+        let (list, framed) = list_class(cx);
+        let (column_gap, head_gap) = if framed { (12.0, 2.0) } else { (8.0, 4.0) };
+        window(ui, cx, "settings.resource_packs", 6.0, |ui| {
+            // In style 1 the lists are a fixed height, what the screen leaves under the heading
+            // and over the buttons (nothing to grow into in a window).
+            let lists = Style::row().gap(column_gap).grow().h(0.0).stretch();
+            let lists = if framed { lists.h((cx.size.y - 150.0).clamp(80.0, 260.0)) } else { lists };
+            ui.container(window_list(lists, false), |ui| {
+                ui.container(Style::default().gap(head_gap).w(260.0).stretch(), |ui| {
+                    let t = label(ui, cx, "packs.available", &[], "default");
+                    field_label(ui, cx, t);
                     let panel = ui.panel(
-                        "panel",
+                        list,
                         Style::default()
                             .pad(6.0)
                             .gap(4.0)
@@ -386,10 +399,11 @@ impl Screen for ResourcePacks {
                     );
                     ui.set_id(panel, "packs_available");
                 });
-                ui.container(Style::default().gap(4.0).w(260.0).stretch(), |ui| {
-                    label(ui, cx, "packs.selected", &[], "default");
+                ui.container(Style::default().gap(head_gap).w(260.0).stretch(), |ui| {
+                    let t = label(ui, cx, "packs.selected", &[], "default");
+                    field_label(ui, cx, t);
                     let panel = ui.panel(
-                        "panel",
+                        list,
                         Style::default()
                             .pad(6.0)
                             .gap(4.0)
@@ -407,9 +421,10 @@ impl Screen for ResourcePacks {
                     ui.set_id(panel, "packs_selected");
                 });
             });
+            group_gap(ui, cx);
             ui.container(Style::row().gap(6.0).justify(Justify::Center), |ui| {
-                button(ui, cx, "packs.open_folder", &[], 140.0, move |_| open_folder(&dir));
-                back_button(ui, cx, "menu.done", &[], 140.0, |c| c.requests.push(Request::Close));
+                button(ui, cx, "packs.open_folder", &[], 160.0, move |_| open_folder(&dir));
+                back_button(ui, cx, "menu.done", &[], 160.0, |c| c.requests.push(Request::Close));
             });
         });
         if let Some(id) = dragging {
@@ -439,49 +454,68 @@ impl Screen for ShaderPacks {
         let dir = shader_dir(&cx.settings.run_dir);
         let all = list(&dir);
         let current = crate::settings::shader_pack();
-        frame(ui, cx, "settings.shader_packs", |ui| {
-            ui.panel(
-                "panel",
-                Style::default()
-                    .pad(8.0)
-                    .gap(4.0)
-                    .w(320.0)
-                    .h(0.0)
-                    .grow()
-                    .min_h(60.0)
-                    .scroll()
-                    .stretch(),
-                |ui| {
-                    let choices = std::iter::once((None, cx.t("packs.shaders_off", &[]), String::new())).chain(
-                        all.iter()
-                            .map(|p| (Some(p.id.clone()), cx.rich(&p.name), p.description.clone())),
-                    );
-                    for (id, name, description) in choices {
-                        let selected = id == current;
-                        let b = ui.button(
-                            "button",
-                            Style::default().min_h(20.0).pad_xy(6.0, 4.0).stretch(),
-                            Rc::new(move |c: &mut Ctx| {
-                                crate::settings::set_text("shader_pack", id.as_deref().unwrap_or(""));
-                                c.requests.push(Request::Rebuild);
-                            }),
-                            |ui| {
-                                ui.text(name, "button");
-                                if !description.is_empty() {
-                                    ui.text(cx.rich(&description), "button");
+        // Style 1: the menu window, the packs as 2x menu buttons in a sunken well, the buttons a
+        // group below.
+        let (list, framed) = list_class(cx);
+        let class = if framed { "menu_button" } else { "button" };
+        window(ui, cx, "settings.shader_packs", 6.0, |ui| {
+            let style = Style::default()
+                .pad(if framed { 6.0 } else { 8.0 })
+                .gap(4.0)
+                .w(320.0)
+                .h(0.0)
+                .grow()
+                .min_h(60.0)
+                .scroll()
+                .stretch();
+            ui.panel(list, window_list(style, framed), |ui| {
+                let choices = std::iter::once((None, cx.t("packs.shaders_off", &[]), String::new())).chain(
+                    all.iter()
+                        .map(|p| (Some(p.id.clone()), cx.rich(&p.name), p.description.clone())),
+                );
+                for (id, name, description) in choices {
+                    let selected = id == current;
+                    let b = ui.button(
+                        "button",
+                        Style::default().min_h(20.0).pad_xy(6.0, 4.0).stretch(),
+                        Rc::new(move |c: &mut Ctx| {
+                            crate::settings::set_text("shader_pack", id.as_deref().unwrap_or(""));
+                            c.requests.push(Request::Rebuild);
+                        }),
+                        |ui| {
+                            // The pack's name at 2x (style 1), what it is under it at 1x.
+                            let t = ui.text(name, class);
+                            if framed {
+                                if let Some(t) = ui.text_mut(t) {
+                                    t.wrap = false;
+                                    t.fit = 2.0;
+                                    t.center = true;
                                 }
-                            },
-                        );
-                        if let Kind::Button { selected: sel, .. } = &mut ui.nodes[b].kind {
-                            *sel = selected;
-                        }
+                                // Across the button, or 2x has no room to fit in.
+                                ui.nodes[t].style = ui.nodes[t].style.self_align(crate::ui::Align::Stretch);
+                            }
+                            if !description.is_empty() {
+                                ui.text(cx.rich(&description), "button");
+                            }
+                        },
+                    );
+                    if let Kind::Button { selected: sel, .. } = &mut ui.nodes[b].kind {
+                        *sel = selected;
                     }
-                },
-            );
+                }
+            });
+            group_gap(ui, cx);
             ui.container(Style::row().gap(6.0).justify(Justify::Center), |ui| {
-                button(ui, cx, "packs.open_folder", &[], 140.0, move |_| open_folder(&dir));
-                back_button(ui, cx, "menu.done", &[], 140.0, |c| c.requests.push(Request::Close));
+                button(ui, cx, "packs.open_folder", &[], 160.0, move |_| open_folder(&dir));
+                back_button(ui, cx, "menu.done", &[], 160.0, |c| c.requests.push(Request::Close));
             });
         });
     }
+}
+
+/// A pack list's frame: style 1's sunken `well` in its menu window, else Weft's `panel`; and
+/// whether it is style 1.
+fn list_class(cx: &BuildCx) -> (&'static str, bool) {
+    let framed = cx.look.texture("menu_panel", "").is_some() && cx.look.texture("well", "").is_some();
+    (if framed { "well" } else { "panel" }, framed)
 }

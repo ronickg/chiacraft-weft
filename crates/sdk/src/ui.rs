@@ -506,7 +506,13 @@ impl Ui {
     /// What mods add to place `area` of a screen or HUD element (`Registry::screen_part`). A screen of your own
     /// that replaces an engine one (`core:title`) keeps other mods' buttons by building its places.
     pub fn screen_parts(&mut self, screen: &str, area: &str) {
-        let mut n = node(k::SCREEN_PARTS, S::default());
+        self.screen_parts_in(screen, area, S::default())
+    }
+
+    /// `screen_parts` laid out by `s`: `S::row()` for a row of tabs (chiacraft: other mods' tabs
+    /// stacked in a column beside the inventory's own, a row too high, Planner 11-24).
+    pub fn screen_parts_in(&mut self, screen: &str, area: &str, s: S) {
+        let mut n = node(k::SCREEN_PARTS, s);
         n.class = Str::new(screen);
         n.text = Str::new(area);
         self.leaf(n)

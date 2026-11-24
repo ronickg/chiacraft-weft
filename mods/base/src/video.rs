@@ -39,7 +39,8 @@ static SHADOW_SIZE: Config<i32> = Config::named("core:shadow_size");
 static VIEW: Config<i32> = Config::named("core:view_distance");
 static LOD: Config<i32> = Config::named("core:lod_distance");
 static VSYNC: Config<bool> = Config::named("core:vsync");
-static FPS_CAP: Config<i32> = Config::named("core:fps_cap");
+/// Upstream's frame limit (0 off, 0 to 500 in steps of 5), which replaced our `core:fps_cap` at the 11-22 sync.
+static FPS_LIMIT: Config<i32> = Config::named("core:fps_limit");
 /// What render scale and shadow detail will be at the next start (-1 and 0: as they are now).
 static RENDER_SCALE_NEXT: Config<f32> = Config::named("render_scale_next");
 static SHADOW_SIZE_NEXT: Config<i32> = Config::named("shadow_size_next");
@@ -352,9 +353,9 @@ const ROWS: [Row; 13] = [
     },
     Row {
         key: "fps_cap",
-        values: &[0.0, 30.0, 60.0, 90.0, 120.0, 144.0],
-        get: || FPS_CAP.get() as f64,
-        set: |v| FPS_CAP.set(v as i32),
+        values: &[0.0, 30.0, 60.0, 90.0, 120.0, 165.0, 240.0],
+        get: || FPS_LIMIT.get() as f64,
+        set: |v| FPS_LIMIT.set(v as i32),
         shown: |v| if v == 0.0 { word("unlimited") } else { number(v) },
     },
     Row {

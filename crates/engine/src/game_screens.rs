@@ -232,10 +232,17 @@ impl Screen for MenuScreen {
                         let corner = [(def.name.as_str(), "corner"), (MENUS, "corner")];
                         if first < ui.nodes.len() {
                             ui.open_existing(first);
+                            // In from the corner by the look's `corner` (`panel.gui`, GUI pixels):
+                            // style 1's icons sat on the frame's corner plate (Planner 11-24).
+                            let inset = cx
+                                .look
+                                .sidecar("panel", "corner")
+                                .and_then(|v| v.trim().parse::<f32>().ok())
+                                .unwrap_or(0.0);
                             ui.container(
                                 Style::row()
                                     .gap(1.0)
-                                    .at_from([1.0, 0.0], 0.0, 0.0, [1.0, 0.0]),
+                                    .at_from([1.0, 0.0], -inset, inset, [1.0, 0.0]),
                                 |ui| {
                                     for (screen, area) in corner {
                                         crate::client::modui::parts(ui, cx.lang, Some(cx.input), cx.client, screen, area);
