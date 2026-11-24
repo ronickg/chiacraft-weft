@@ -543,17 +543,29 @@ pub async fn text_on_screen(t: T) -> R {
         ["before".to_string(), "two".to_string(), "after".to_string()],
         "a line replaced where it stands",
     );
-    t.c().hint("short", &[]).times(0.0, 0.2, 0.0);
-    t.frames(2).await?;
-    t.check(seen(&t, "text:short").is_some(), "the client's own hint");
-    t.secs(0.4).await?;
-    t.check(seen(&t, "text:short").is_none(), "times are kept");
+    // Own times against the place's (a hint 3 s, a chat line 10 s), by script time: the HUD fades
+    // by real time, and on CI (software Vulkan) a frame can take up to a second, past 0.2 s.
+    t.c().hint("own_hint", &[]).times(0.0, 10.0, 0.0);
+    let shown = t
+        .until("the hint", Duration::from_secs(3), |t| t.c().ui_rect("text:own_hint").is_some())
+        .await
+        .is_ok();
+    t.check(shown, "the client's own hint");
+    t.secs(4.0).await?;
+    t.frames(1).await?;
+    t.check(seen(&t, "text:own_hint").is_some(), "times are kept (past a hint's 3 s)");
 
-    t.c().chat("short_line", &[]).times(0.0, 0.2, 0.0);
-    t.frames(2).await?;
-    t.check(seen(&t, "text:short_line").is_some(), "a line with its own times");
-    t.secs(0.4).await?;
-    t.check(seen(&t, "text:short_line").is_none(), "the HUD follows a chat line's times");
+    t.c().chat("own_line", &[]).times(0.0, 3.0, 0.0);
+    let shown = t
+        .until("the line", Duration::from_secs(3), |t| t.c().ui_rect("text:own_line").is_some())
+        .await
+        .is_ok();
+    t.check(shown, "a line with its own times");
+    let gone = t
+        .until("the line to go", Duration::from_secs(5), |t| t.c().ui_rect("text:own_line").is_none())
+        .await
+        .is_ok();
+    t.check(gone, "the HUD follows a chat line's times (gone before the chat's 10 s)");
 
     t.cmd("/tellraw @a {#55ff55}green").await?;
     t.check_eq(line(&t, 0), "green".to_string(), "/tellraw formats");

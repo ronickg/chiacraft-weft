@@ -120,8 +120,14 @@ pub(crate) fn same_conditions(c: &Client) {
     // Tests look at what the hands hold, in the view.
     static FIRST_PERSON_MODEL: Config<bool> = Config::named("core:first_person_model");
     static AUTO_JUMP: Config<bool> = Config::named("core:auto_jump");
+    // Base's hints (the first 20 s into a world) put a dark box under the crosshair: on CI tests
+    // run past 20 s and it counted as pieces, black ones and a changing picture.
+    static HINTS: Config<bool> = Config::named("base:hints");
     let scripted = PLAN.get().is_some_and(|p| p.1.is_some());
     if !scripted {
+        if HINTS.get() {
+            HINTS.set(false);
+        }
         if FIRST_PERSON_MODEL.get() {
             FIRST_PERSON_MODEL.set(false);
         }

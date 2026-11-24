@@ -507,6 +507,16 @@ pub async fn model_bones(t: T) -> R {
     // Past its hold easing in.
     t.op("put me 0 testmod:greatsword").await?;
     t.secs(0.5).await?;
+    // Still from one frame to the next: on CI half a second was a frame or two, the tip still
+    // rising (5.67, then 6.25).
+    let mut last = at("tip");
+    t.until("the sword held still", Duration::from_secs(10), move |t| {
+        let now = t.c().bone_position(me, "tip");
+        let still = matches!((last, now), (Some(a), Some(b)) if (a - b).length_squared() < 1e-4);
+        last = now;
+        still
+    })
+    .await?;
     let tip = at("tip").ok_or("the sword's tip")?;
     for _ in 0..6 {
         t.c().bone_turn(me, "blade", [90.0, 0.0, 0.0]);
@@ -524,8 +534,14 @@ pub async fn model_bones(t: T) -> R {
     t.secs(1.0).await?;
     t.check(at("fruit").is_some(), "an apple in hand is its model");
     t.c().input_key("Digit2", 0.0);
+    let from = crate::runner::script_clock();
     t.frames(3).await?;
-    t.check(at("fruit").is_some(), "the apple going down is still its model");
+    // It goes down in about 0.11 s (0.4 a tick): slower frames (CI) are past it at once.
+    if crate::runner::script_clock() - from < Duration::from_millis(100) {
+        t.check(at("fruit").is_some(), "the apple going down is still its model");
+    } else {
+        t.note("frames slower than the apple going down: not seen");
+    }
     t.secs(1.0).await?;
     t.check(at("fruit").is_none(), "and then it is gone");
     Ok(())
@@ -844,18 +860,32 @@ pub async fn fall_damage(t: T) -> R {
     t.until("full health", Duration::from_secs(5), |t| super::full(t, t.state().health))
         .await?;
     let full = super::max_health(&t);
+    // Standing on a block 12 up, then the block taken away: the server sees the fall's top. A bare
+    // teleport let a slow frame (CI) fall blocks before the server's first move, its start.
+    let ledge = add(t.feet(), [0, 11, 0]);
+    t.set(ledge, "stone").await?;
+    t.until("the ledge on the client", Duration::from_secs(2), |t| t.c().block(ledge).is_some_and(|s| s != 0))
+        .await?;
     let s = t.state();
     t.c().teleport([s.pos.x, s.pos.y + 12.0, s.pos.z]);
+    t.until("on the ledge", Duration::from_secs(10), |t| t.flag(client::client_flags::ON_GROUND) && t.state().pos.y > s.pos.y + 11.5)
+        .await?;
+    t.secs(0.5).await?;
+    t.set(ledge, "air").await?;
     t.until("falling", Duration::from_secs(5), |t| !t.flag(client::client_flags::ON_GROUND))
         .await?;
     t.until("landed", Duration::from_secs(10), |t| t.flag(client::client_flags::ON_GROUND))
         .await?;
-    // The lowest it gets: full and saturated it heals fast, a point in half a second.
-    let mut hp = f32::MAX;
-    let start = std::time::Instant::now();
-    while start.elapsed() < Duration::from_millis(500) {
-        hp = hp.min(t.state().health);
+    // The lowest it gets: full and saturated it heals fast, a point in half a second. From the
+    // hurt coming back, by the script clock (half a real second was one CI frame).
+    t.until("hurt", Duration::from_secs(5), |t| t.state().health < full - 0.5)
+        .await
+        .ok();
+    let mut hp = t.state().health;
+    let end = crate::runner::script_clock() + Duration::from_millis(500);
+    while crate::runner::script_clock() < end {
         t.frames(1).await?;
+        hp = hp.min(t.state().health);
     }
     // Vanilla takes 9 for 12 blocks (11 of its 20 left); the survival vitals' max is lower.
     let lost = full - hp;
@@ -1117,13 +1147,23 @@ pub async fn drop_and_pickup(t: T) -> R {
     t.hold("core:forward", 1.0);
     // The client lets the taken item fly to the player for three ticks before it goes.
     let mut flying = false;
+    let (mut last, mut steps) = (crate::runner::script_clock(), [Duration::ZERO; 2]);
     t.until("picked up again", Duration::from_secs(6), |t| {
+        let now = crate::runner::script_clock();
+        steps = [steps[1], now - last];
+        last = now;
         let got = t.c().inventory_slot(0).count == 10;
         flying |= got && item.is_some_and(|id| t.c().entity(id).is_some());
         got
     })
     .await?;
-    t.check(flying, "the taken item was still on its way when it reached the inventory");
+    // A frame longer than the flight (0.15 s: CI's software renderer) starts and ends it at once.
+    let slow = steps[0].max(steps[1]);
+    if flying || slow < Duration::from_millis(150) {
+        t.check(flying, "the taken item was still on its way when it reached the inventory");
+    } else {
+        t.note(format!("frames of {:.2} s, longer than the flight: not seen", slow.as_secs_f32()));
+    }
     t.secs(0.3).await?;
     t.check(item.is_none_or(|id| t.c().entity(id).is_none()), "the taken item is gone");
     Ok(())
@@ -1280,9 +1320,15 @@ pub async fn block_shapes(t: T) -> R {
     for (name, over, height) in [("flying over", [0.5, 0.5], 3.0), ("off to a side", [1.5, 0.5], 1.0), ("next to it", [0.5, 1.4], 0.0)] {
         t.op("put me 0 base:sandstone_slab 16").await?;
         t.c().select_slot(0);
+        // Asked here, not after the mode: since the 11-22 sync flight comes with creative's
+        // attributes a tick after the mode, and the mode's own news turned the first ask off.
+        t.c().set_flying(true);
         t.c()
             .teleport(centre(floor, over[0], 1.0 + height, over[1]));
         t.secs(0.4).await?;
+        if height > 0.0 {
+            t.check(t.flag(client::client_flags::FLYING), format!("{name}: flying"));
+        }
         aim(&t, centre(floor, 0.5, 1.0, 0.45));
         t.frames(4).await?;
         t.press("core:use");
@@ -1490,7 +1536,12 @@ pub async fn surface_placement(t: T) -> R {
     let f = t.feet();
     let cell = [f[0], (f[1] + 15).div_euclid(16) * 16 - 1, f[2] - 3];
     let point = |x, y, z| [f64::from(cell[0]) + x, f64::from(cell[1]) + y, f64::from(cell[2]) + z];
+    // The mode arriving resets flight (since the sync): fly once it is here.
+    t.until("creative on the client", Duration::from_secs(5), |t| t.state().mode == 1)
+        .await?;
     t.c().set_flying(true);
+    t.until("flying", Duration::from_secs(5), |t| t.flag(client::client_flags::FLYING))
+        .await?;
     t.press("core:placement_mode");
     t.frames(2).await?;
     t.c().teleport(point(0.5, 0.0, 3.2));
@@ -1538,7 +1589,11 @@ pub async fn surface_placement(t: T) -> R {
     // Two wires at half height connect to full-height ports. A line at floor level beside
     // the raised line cannot pick up its power.
     t.op("mode creative").await?;
+    t.until("creative on the client", Duration::from_secs(5), |t| t.state().mode == 1)
+        .await?;
     t.c().set_flying(true);
+    t.until("flying", Duration::from_secs(5), |t| t.flag(client::client_flags::FLYING))
+        .await?;
     let wire = add(cell, [4, 0, 0]);
     for x in 0..3 {
         let at = add(wire, [x, 0, 0]);
@@ -2353,12 +2408,45 @@ pub async fn projectiles(t: T) -> R {
     // Shot up at a block a tick it slows as vanilla's arrow does: half a second on, some seven
     // blocks higher.
     let (ux, uz) = (f[0] as f64 - 4.5, f[2] as f64 + 0.5);
-    let up = t
-        .op(&format!("shoot base:arrow {ux} {y} {uz} 0 20 0"))
+    // Two ops sent in one frame are answered in one tick: what it says, and at which game tick.
+    // On CI half a script second was 19 ticks, and the arrow 12.33 blocks up as it should be then.
+    let same_tick = async |t: &T, a: &str, b: &str| -> Result<(String, String), String> {
+        let ids = [a, b].map(|s| t.c().run_command(&format!("/tk {s}")));
+        let mut got: [Option<String>; 2] = [None, None];
+        t.until("two server answers", Duration::from_secs(10), |t| {
+            for i in 0..2 {
+                if got[i].is_none() {
+                    got[i] = t.c().command_reply(ids[i]);
+                }
+            }
+            got.iter().all(Option::is_some)
+        })
         .await?;
+        let ok = |s: Option<String>| {
+            let s = s.unwrap_or_default();
+            s.strip_prefix("ok").map(|r| r.trim().to_string()).ok_or(s)
+        };
+        let [x, y] = got;
+        Ok((ok(x)?, ok(y)?))
+    };
+    let (t0, up) = same_tick(&t, "gametime", &format!("shoot base:arrow {ux} {y} {uz} 0 20 0")).await?;
     t.secs(0.5).await?;
-    let height = num(&t.op(&format!("entity {up}")).await?, 2) - y;
-    t.check((4.0..11.0).contains(&height), format!("an arrow shot up climbs and slows: {height:.2} blocks"));
+    let (t1, seen) = same_tick(&t, "gametime", &format!("entity {up}")).await?;
+    let ticks = t1
+        .parse::<u64>()
+        .unwrap_or(0)
+        .saturating_sub(t0.parse().unwrap_or(0));
+    let height = num(&seen, 2) - y;
+    // Its way tick by tick: drag 0.99, gravity 0.625 of flatlands' 0.05 a tick.
+    let (mut want, mut v) = (0.0, 1.0);
+    for _ in 0..ticks {
+        want += v;
+        v = v * 0.99 - 0.05 * 0.625;
+    }
+    t.check(
+        ticks >= 5 && (height - want).abs() < 1.1,
+        format!("an arrow shot up climbs and slows: {height:.2} blocks in {ticks} ticks, its way {want:.2}"),
+    );
 
     // Its block taken away, the stuck one falls.
     t.fill(add(f, [4, 0, -6]), add(f, [4, 2, -6]), "air")
@@ -2748,9 +2836,13 @@ pub async fn toast_with_the_gui(t: T) -> R {
     // screen's painted sky are yellow there, so not by its colour any more).
     let toast = |s: &crate::runner::Shot| s.share(0.80, 0.10, 0.99, 0.16, |c| crate::runner::lum(c.map(f32::from)) < 45.0 && c[0] >= c[2]);
     t.flat().await?;
+    // What is dark there with no toast: on CI the example packages are loaded, and bell's HUD
+    // panel stands right there under the clock.
+    t.c().set_look(0.0, -40.0);
+    t.frames(3).await?;
+    let before = toast(&t.shot("before").await?);
     t.op("put me 0 iron_ingot 1").await?;
     t.op("put me 1 gold_ingot 1").await?;
-    t.c().set_look(0.0, -40.0);
     t.secs(1.5).await?;
     let shown = toast(&t.shot("shown").await?);
     t.check(shown > 0.0005, format!("the toast shows: {shown}"));
@@ -2783,7 +2875,7 @@ pub async fn toast_with_the_gui(t: T) -> R {
     t.c().set_look(0.0, -40.0);
     t.frames(3).await?;
     let again = toast(&t.shot("again").await?);
-    t.check(again < 0.0001, format!("none from the world before: {again}"));
+    t.check(again < before + 0.0001, format!("none from the world before: {again} (no toast: {before})"));
     Ok(())
 }
 
