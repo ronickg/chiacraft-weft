@@ -428,10 +428,11 @@ const FEATURES: [Feature; 6] = [
     },
     // The far shade from the sky between far crowns and at the foot of far steps.
     Feature { key: "shade_quality", parts: &["far_ao"], steps: [&[1.0], &[1.0], &[2.0], &[2.0], &[2.0]] },
-    // Bloom: its glow's levels, four (1) or six (2), as the presets had them.
-    Feature { key: "bloom_quality", parts: &["bloom_levels"], steps: [&[2.0], &[2.0], &[2.0], &[2.0], &[2.0]] },
-    // The screen effects' half-size parts (1) or every effect at full size (0, Ultra's).
-    Feature { key: "effect_quality", parts: &["effect_detail"], steps: [&[1.0], &[1.0], &[1.0], &[1.0], &[0.0]] },
+    // Bloom: its glow's levels, four (1) or six (2) (Look, 11-24).
+    Feature { key: "bloom_quality", parts: &["bloom_levels"], steps: [&[1.0], &[1.0], &[1.0], &[2.0], &[2.0]] },
+    // The screen effects' half-size parts (1) or every effect at full size (0): a cost row, which
+    // the benches may move (Look, 11-24).
+    Feature { key: "effect_quality", parts: &["effect_detail"], steps: [&[1.0], &[1.0], &[0.0], &[0.0], &[0.0]] },
 ];
 
 /// Whether this GPU runs a part: the traced ones only where it traces rays, never on a phone.

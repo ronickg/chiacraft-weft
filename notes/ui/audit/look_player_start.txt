@@ -4,7 +4,8 @@
 # with `shader_pack =` empty (and the old `.offered` marker) is a later start. Either way, after
 # the join, "shader pack: none chosen, chiacraft on". Shots: the world with the pack drawn, the
 # Video screen (the presets, feature rows, player rows), Medium, Medium flipped to Custom by one
-# feature row's ›, then the Developer tab (after /developer_menu on): the parts, then the knobs.
+# feature row's ›, then the Developer tab (after /developer_menu on): the parts, then the knobs;
+# last, Mod Settings and base's page there (no look knob on it).
 loaded
 idle
 wait 8
@@ -41,6 +42,20 @@ wait 1
 cursor 0.02 0.02
 wait 0.5
 shot fs_06_developer_knobs.png
+key Escape
+wait 1
+key Escape
+wait 1
+screen core:mod_settings
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot fs_07_mod_settings.png
+tap_once core:mod_settings text:Weft
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot fs_08_mod_settings_base.png
 key Escape
 wait 1
 quit
