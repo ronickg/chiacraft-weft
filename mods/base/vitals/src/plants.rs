@@ -111,8 +111,10 @@ pub const PLANTS: [Plant; 58] = [
     // decades to recover). The research's warmths are estimates; the tundra's own plants are
     // set to grow from about freezing, as arctic plants do, so its five-degree summer grows them.
     // Sedges are wetland plants, but they stand on the open ground here, not at the water's edge:
-    // rain waters them, so a dry season rests them as it does grass.
-    p("base:sedge", "sedges", (-1.0, 8.0, 22.0, 32.0), Water::Moderate, 18.0, ANY, HARDY),
+    // rain waters them, so a dry season rests them as it does grass. The swamp's are the
+    // Pantanal's (Cyperus, Eleocharis: sedges grow from the tundra to the tropics), at their best
+    // through its 22-28 °C year, so the warm end reaches 30 °C before slowing.
+    p("base:sedge", "sedges", (-1.0, 8.0, 30.0, 38.0), Water::Moderate, 18.0, ANY, HARDY),
     p("base:cottongrass", "cottongrass (Eriophorum)", (-2.0, 6.0, 16.0, 25.0), Water::Moderate, 18.0, ANY, HARDY),
     p("base:reindeer_lichen", "reindeer lichen (Cladonia)", (0.0, 5.0, 15.0, 25.0), Water::Dry, 3650.0, ANY, HARDY),
     // American beachgrass, the dunes' builder, grazed down grows back in about a month, from
