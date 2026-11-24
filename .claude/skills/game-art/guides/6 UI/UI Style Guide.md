@@ -102,6 +102,49 @@ Decided by Ronald (2026-11-04): **always attach `Voxel Fantasy Survival UI Suite
 
 What a first round missed against his sheet, so say it in every frame prompt: thick bronze frames with a double line (an outer and an inner bronze line with a dark groove between), bevelled corner blocks with a rivet; slots lighter and warmer than the panel; title tabs in orange with an icon; a soft gold glow around the hovered part.
 
+### Style 1: the carved oak panel (Ronald's pick, 2026-11-23)
+
+Ronald found the title menu "cheap" and picked style 1 of six generated directions (`~/Coding/chiacraft-archive/images/ui-redo/2026-11-23/menu_styles_sheet_v2.jpg`): the menu in a framed panel with an oak frame, bronze corner caps with rivets, a dark charcoal inside that lets the painting show faintly, bevelled plates with a bronze rim, orange with a gold rim on hover. He looked at six variants of it (1a-1f) and kept the original. It is the style for the whole game: the shared parts come first, and every screen follows from them.
+
+- The parts were generated with Codex from a close-up of the chosen screen (attach it first; the first round without it came out flat), on an exact grid of 5 image pixels a UI pixel, and cut exactly by `notes/ui/style1/style1.py`, which writes `button*`, `button_secondary*`, `button_quit*` (the secondary's look: no red Quit), `panel`, `news`, `slot`, `slot_highlight` and `divider`.
+- These parts replace kit 2's: don't re-run `kit2/install.py` over them. Kit 2 still draws the parts style 1 hasn't reached yet (tabs, wells, tooltips, the HUD).
+- **Chunkiness comes from rim pixels, never from bigger pixels.** The first style 1 cut asked for a 3 px button rim and a 10 px frame. Next to the mock it came out thin and flat: hairline rims, dot-sized caps, no visible bevel or chamfer. The tempting fix, scaling parts to 1.5 or 2 GUI per pixel, breaks the one pixel grid: a UI pixel is half a GUI pixel, the same as the font's and the 32 px items' pixels. Ronald: "we had intially got the ui drawing kidna well and cosntistnt whats the issue here?" (11-24); the consistency is what he liked. Treat the mock as a shape reference and draw its thickness with more pixels on our grid. Minimums, in UI px:
+  - title frame 18 px thick (9 GUI), bronze corner plates about 28 px;
+  - window frame 10 px (5 GUI), corner plates about 16 px (a thinner design drawn at the same pixel, never the big frame scaled down);
+  - button rim 7 px (outline, bronze band, bevel step, inner line) with 4 px 45° chamfered corners; buttons 40 px tall (20 GUI).
+- Before installing, lay the cut parts out the way the screen does and set them beside the mock at the same width; if they don't read as the same style, they aren't done.
+- **What made it read rich** (round 3, 11-24, measured in `reports/UI craft.md`; Ronald: "better but something still looks worse off"):
+  - Title labels at 2x with a 1-font-pixel dark outline and a shadow; title buttons 26 GUI tall with 7 between, the panel 188 x ~260. The title's icons are drawn at 2x with the labels (16 x 16, `size = 16 16` in their `.gui`): an icon pixel is a font pixel of the 2x label beside it. Frames and rims stay at 1x.
+  - Faces in banded value steps: one highlight row, 3-4 bands darkening downward, one dark row, and grain of single pixels one step off at most 1 in 12. Never dither or noise over a large face (it reads as static). Cut the title's buttons at their own height so the bands never stretch.
+  - Every button's rim copper all round (Planner 11-24: a dark brown rim below made them heavy and flat): a lit copper ramp on the top and left, a darker copper ramp on the bottom and right, split along the chamfers.
+  - Hover and selected: the deep orange face `#d57302` to `#994802` in 4 bands and a 2 px orange-gold and `#ffd54a` inner line, on the same 2 GUI shadow as at rest. The face colour alone says it is selected. At rest a hard shadow 2 GUI straight down; pressed, the face 1 GUI lower with no shadow.
+  - **No stepped glow halos** around buttons or other parts (Ronald, 11-24, on rings spilling 5 GUI: "looks good except the weird glow haha"). At most a 1 GUI bright outer line. This replaces the soft gold glow the older lines of this guide ask for: in style 1, state shows in the face, the inner line and the rim, never in a halo outside the part.
+  - **Every button rests brown; orange is state.** The dark-brown banded face with its copper rim at rest, on the title and on every other screen; the deep orange face only hovered or selected (Planner 11-24 on the batch 1 sheet: orange at rest "makes every button look selected"). At most one primary action per screen may rest orange.
+  - **Every menu button's label is the title's**: 2x, outlined, shadowed (`menu_button`), wherever the button has room; a narrow button keeps 1x rather than growing. Sliders take the button's copper rim round a sunken banded track, with a bronze knob.
+  - Icons fill their 16 px cell as solid cream silhouettes (thick parts 3 px or more, no thin inner lines): drawn at 2x they stand as tall as the label's capitals and half again.
+  - The panel's inside darker and cooler than the button faces (`#2a2228` to `#161214` in stepped rings toward the frame), with a 2 GUI shadow from the top and left frame; frame wood darkened toward L 23-60 with broken lengthwise grain.
+  - Title corner plates about 48 px, sitting 3 px past the frame, with a strong 3 px bevel and a big bolt (Planner 11-24: "twice ours").
+- **Menu screens are a little see-through.** Out of a world (the title and every menu opened from it: worlds, settings, mods), window insides are about 92% opaque (alpha 235), so the title's world shows faintly behind them; the frame, buttons, text and shadows stay fully opaque. In a world, windows keep their 91% (alpha 232). The engine draws `panel` as `menu_window` out of a world; the title's own frame is `menu_panel`. Ronald, 11-24: "better yes i guess we should make it also a little transparent in the menu screen". The first cut, 85% (217), was busy over the title's art (Planner's review, 11-24); the references are opaque or nearly (Hytale opaque, Valheim about 85% but over a dimmed world, Vintage Story 80% and muddy over a busy one). Judge it over a world shot, never on a flat colour.
+
+### Spacing and type scale (Ronald, 2026-11-24)
+
+Ronald, on the batch 1 sheet: "UI looks pretty good, but ... shouldn't there be some more like padding and stuff? ... compare to like other UIs like Valheim, etc. And yeah, it's like those things should all be fixed". Measured against the references (Minecraft's GUI constants, Vintage Story's `GuiStyle`, Hytale's `Common.ui`, Terraria's `UIPanel`; Valheim by eye), in GUI pixels at our grid, where a 1x capital is 4.5 GUI (9 font pixels) and a 2x one 9:
+
+| | References | Ours |
+|---|---|---|
+| Rail to content | Minecraft about 4 (slots), Terraria 12, Vintage Story 20 at a 16 px font, Hytale 16-17 at 15-17 px | **10 in menu windows, 7.5 in slot windows** (about 1 to 1.7 capitals). The rail is part of the frame: measure from its inner edge, not the box. `menu_panel`'s rail is 10, so `WINDOW_PAD` is 20 (`screens.rs`); a window's rail is 4.5, so base's `WINDOW_PAD` is 12 (`window.rs`). |
+| Balance | | The same margin at the sides and the bottom as above the heading: a window with room under its title and none under its last button reads top-heavy. |
+| Stacked buttons | Minecraft 4 (24 pitch), Hytale 8-10 on 44 tall | **6-8 in menus** (buttons 24 tall with 2x labels), **2-4 in game windows**; **8-12 between groups** (a label and its field are one group: 2 between them, 8 to the next). |
+| Heading to content | Minecraft 4 (inventory) to 20 (screen titles), Hytale 8-17 | **about 8**: the window's gap under the heading, no spacer. |
+| Button height : capital | Minecraft 2.9, Hytale 3.6, Vintage Story 2.7 | **menu buttons 24 for a 9 capital (2.7)**, title buttons 26; **game-window buttons 16 for 4.5 (3.5)**, chips and tabs 13. |
+| Fields | Minecraft 20 tall, text 4 in | **22 tall with 2x text 6 in** in menu windows (`Ui::input_scale`); 18 with 1x text 4 in elsewhere. |
+| Type scale | Minecraft one size (+2x titles), Hytale one big title over a 13-17 cluster, Vintage Story 6 steps of 1.2x | **Three steps, whole scales only:** title 3x (menu window headings), label 2x (menu buttons and the labels over fields and sliders; game windows' headings such as Crafting and Recipes), body 1x (game windows' lines, chips, tabs and buttons; descriptions, hints, the version line). **A label is the size of the buttons beside it**: never 1x over a field in a window of 2x buttons. Where 2x doesn't fit, shorten the words first (Russian: Макет интерфейса), widen the button second; the engine drops to 1x only as the last resort. |
+| Tabs | Minecraft's creative tabs and Hytale's TopTabs sit on the top edge, tucked behind it | On the window's top edge in **one row**, their bottom 1.5 under the rail; other mods' tabs in the same row (`screen_parts_in(.., S::row())`). |
+| Corner icons | | Inside the margin, in the heading's row (`corner = 12` in `panel.gui`), never on the corner plate. |
+| Chips | | In even columns, each as wide as its column (the recipe book: 2 across the grid), never rows of different lengths. |
+
+Check a screen against this before a sheet: measure the rail-to-content margin on all four sides, the gaps between groups, and every text's scale against its neighbours.
+
 ### Yellow and gold only for state, never at rest (Ronald, 2026-11-04)
 
 Round 2 of the parts was "too yellow everywhere". The rule:

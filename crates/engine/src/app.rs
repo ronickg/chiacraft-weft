@@ -997,7 +997,19 @@ impl Running {
 
     /// A screen's tree, with a fallback close icon when it has no control to leave it.
     fn build_screen(&self, s: &mut dyn Screen, ui: &mut Ui, depth: usize) {
-        s.build(ui, &self.build_cx());
+        let cx = self.build_cx();
+        s.build(ui, &cx);
+        // chiacraft (style 1, 11-24): out of a world, windows draw as `menu_window` when the look
+        // has one (its inside see-through over the title's world; in a world they stay `panel`).
+        if !cx.in_game && cx.look.texture("menu_window", "").is_some() {
+            for node in ui.nodes.iter_mut() {
+                if let Kind::Container { class: Some(class) } = &mut node.kind
+                    && class == "panel"
+                {
+                    *class = "menu_window".into();
+                }
+            }
+        }
         scroll_when_taller(ui);
         if s.escape_closes() && !ui.has_close && (depth > 1 || self.game.is_some()) {
             ui.container(Style::default().at_from([1.0, 0.0], -4.0, 4.0, [1.0, 0.0]), |ui| screens::close_button(ui, 16.0));
@@ -3876,9 +3888,9 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
         let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
-        // `core:rt_shadows` changed: the world shader composed again, tracing or not, before
-        // anything of this frame is drawn with it.
-        if g.client.rt_switch(&mut *r.gpu) {
+        // `core:rt_shadows` or `core:ground_map` changed: the world shader composed again, tracing
+        // or not, with the ground map or not, before anything of this frame is drawn with it.
+        if g.client.rt_switch(&mut *r.gpu) || g.client.render.ground_switch() {
             g.client
                 .render
                 .reload_shaders(&mut *r.gpu, &r.textures, &r.assets);

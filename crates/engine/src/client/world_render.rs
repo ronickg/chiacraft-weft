@@ -525,6 +525,8 @@ pub struct WorldRenderer {
     pt_light_image: Option<(TextureId, (u32, u32))>,
     /// The setting changed: the app composes the world shader again (`reload_shaders`).
     pub rt_reload: bool,
+    /// Whether the world shader was composed with the ground map (`gpu_layout::set_ground_prelude`).
+    ground_compiled: bool,
     /// Distant terrain quads drawn, before the occlusion test.
     pub lod_drawn: u64,
 }
@@ -587,6 +589,8 @@ impl WorldRenderer {
         let rt_pack = crate::packs::pack_uses("world.wgsl", "rt_sun");
         let mut rt_compiled = rt_expand.is_some() && rt::rt_setting() && rt_pack;
         crate::gpu_layout::set_rt_prelude(rt_compiled);
+        let ground_compiled = crate::settings::ground_map();
+        crate::gpu_layout::set_ground_prelude(ground_compiled);
         let made = world_shader(assets)
             .map_err(|e| e.0)
             .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, s, slots)));
@@ -711,6 +715,7 @@ impl WorldRenderer {
             pt_images: None,
             pt_light_image: None,
             rt_reload: false,
+            ground_compiled,
             calm_sets: [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)],
             calm_level: 0,
             lod_drawn: 0,
@@ -1237,6 +1242,12 @@ impl WorldRenderer {
         }
     }
 
+    /// `core:ground_map` turned on or off since the world shader was composed (`reload_shaders`
+    /// composes it again with or without it).
+    pub fn ground_switch(&self) -> bool {
+        crate::settings::ground_map() != self.ground_compiled
+    }
+
     /// Recompiles the world shader; keeps the old pipelines when the new source has errors.
     pub fn reload_shaders(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, assets: &crate::assets::Assets) {
         self.occlusion.reload(gpu, assets);
@@ -1245,6 +1256,8 @@ impl WorldRenderer {
         let rt = self.rt_wanted && self.rt.is_some() && self.rt_pack;
         crate::gpu_layout::set_rt_prelude(rt);
         self.rt_reload = false;
+        self.ground_compiled = crate::settings::ground_map();
+        crate::gpu_layout::set_ground_prelude(self.ground_compiled);
         match world_shader(assets)
             .map_err(|e| e.0)
             .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, slots)))

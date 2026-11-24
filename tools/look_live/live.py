@@ -102,7 +102,7 @@ def pack():
     for name, text in files.items():
         ssh(f"cat > {PACK}/{name}", text)
     print(f"{len(files)} files to {PACK}")
-    send([f"reload_pack {PACK}", "wait 2"], wait=120)
+    send([f"reload_pack {PACK}", "wait 2"], wait=400)
 
 
 def ref_for(hour, which):

@@ -249,6 +249,11 @@ pub struct TextNode {
     /// Fixed-width glyphs, so changing numbers do not move the text after them.
     pub mono: bool,
     pub scale: f32,
+    /// A larger scale the text takes when its box has room for it, else the largest whole scale
+    /// below that fits, 1 at least (chiacraft, style 1: button labels at 2x and window headings at
+    /// 3x, without widening a narrow box): measured 1x wide and `fit` tall, and centred in its
+    /// box. 0 for none.
+    pub fit: f32,
     pub color: Option<u32>,
     pub center: bool,
     /// Class for the default color (`ui::look`).
@@ -398,6 +403,9 @@ pub struct Ui {
     pub size: Vec2,
     /// GUI pixels per font pixel, chosen by the caller so glyphs land on whole physical pixels.
     pub text_unit: f32,
+    /// Font pixels per text unit in its one-line inputs (chiacraft: style 1's menu windows set 2,
+    /// so a field's text is the size of the labels and buttons round it; Planner 11-24).
+    pub input_scale: f32,
     /// When it opened (`shaders::clock`), for `open` animations.
     pub shown: f32,
 }
@@ -586,6 +594,7 @@ impl Ui {
             dragging: None,
             size: Vec2::ZERO,
             text_unit: 0.5,
+            input_scale: 1.0,
             shown: crate::shaders::clock(),
         }
     }
@@ -755,6 +764,7 @@ impl Ui {
                 wrap: true,
                 mono: false,
                 scale: 1.0,
+                fit: 0.0,
                 color: None,
                 center: false,
                 class: class.to_string(),
@@ -774,6 +784,7 @@ impl Ui {
                 wrap: true,
                 mono: false,
                 scale: 1.0,
+                fit: 0.0,
                 color: None,
                 center: false,
                 class: class.to_string(),
@@ -867,7 +878,11 @@ impl Ui {
         let content = if let Kind::Text(t) = &mut self.nodes[id].kind {
             let max = if t.wrap { Some(inner_avail[0].max(8.0) / (t.scale * unit)) } else { None };
             t.layout = text::layout_with(&t.spans, font, max, t.line.unwrap_or(font.line_height), t.mono);
-            [t.layout.width * t.scale * unit, t.layout.height * t.scale * unit]
+            if t.fit > 0.0 {
+                [t.layout.width * unit, t.layout.height * t.fit * unit]
+            } else {
+                [t.layout.width * t.scale * unit, t.layout.height * t.scale * unit]
+            }
         } else {
             match &self.nodes[id].kind {
                 Kind::Item { .. } => [16.0, 16.0],
@@ -934,6 +949,21 @@ impl Ui {
             h: (rect.h - style.pad[1] - style.pad[3]).max(0.0),
         };
         let unit = self.text_unit;
+        // A text with a `fit` scale: that scale when the box has room, else 1x, moved down to
+        // the middle of the `fit`-tall room it was measured for.
+        let mut lower = 0.0;
+        if let Kind::Text(t) = &mut self.nodes[id].kind
+            && t.fit > 0.0
+        {
+            // The largest whole scale from `fit` down that fits, 1 at least.
+            let mut s = t.fit;
+            while s > 1.0 && t.layout.width * s * unit > inner.w + 0.5 {
+                s = (s - 1.0).max(1.0);
+            }
+            t.scale = s;
+            lower = (t.layout.height * (t.fit - s) / 2.0).round() * unit;
+        }
+        self.nodes[id].rect.y += lower;
         if let Kind::Text(t) = &mut self.nodes[id].kind {
             // Final fit: wrap to the box we actually got, or shrink if wrapping is off.
             if t.layout.width * t.scale * unit > inner.w + 0.5 {

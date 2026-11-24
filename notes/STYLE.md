@@ -142,8 +142,9 @@ draws them.
 | Small icons | `icon_close`, `icon_cycle`, `icon_settings`, LEDs | 16x16, 6x6 |
 | Title bar grip, background behind screens | `titlebar_grip`, `background`, `overlay` | 16x6, tiled |
 
-**Main menu**: `logo`, menu icons (`menu_singleplayer`, `menu_multiplayer`, `menu_settings`,
-`menu_mods`, 9x9), the news panel, the background.
+**Main menu**: `logo`, menu icons (`menu_singleplayer`, `menu_multiplayer`, `menu_mods`,
+`menu_settings`, `menu_quit`, `menu_editor`: 16x16, drawn at 2x beside the 2x labels; style 1,
+11-24), the news panel, the background.
 
 **The animals' own** (later, to match): the animal screen (stats, wild and tamed points, bond,
 food), taming bars and bubbles, the spyglass view, the breeding and egg readouts.

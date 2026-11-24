@@ -866,9 +866,13 @@ impl Screen for WorldSelect {
         let selected = worlds
             .iter()
             .position(|w| self.selected.as_ref() == Some(&w.dir));
+        // Style 1 (chiacraft, Planner 11-24): the bar is a framed window inset from the edges (a
+        // `panel`, drawn see-through as `menu_window` out of a world), not the edge strip.
+        let framed = cx.look.texture("menu_window", "").is_some();
+        let (bar, inset) = if framed { ("panel", 8.0) } else { ("sidebar", 0.0) };
         ui.root_style(Style::default().stretch());
-        ui.panel("background", Style::row().grow().stretch(), |ui| {
-            ui.panel("sidebar", Style::default().w(180.0).pad(12.0).gap(4.0).stretch(), |ui| {
+        ui.panel("background", Style::row().grow().stretch().pad(inset), |ui| {
+            ui.panel(bar, Style::default().w(180.0).pad(12.0).gap(4.0).stretch(), |ui| {
                 // As wide as the bar, whatever the language says.
                 let t = label(ui, cx, "world.select", &[], "title");
                 if let Some(t) = ui.text_mut(t) {
@@ -934,7 +938,7 @@ impl Screen for WorldSelect {
                 back_button(ui, cx, "menu.back", &[], 156.0, |c| c.requests.push(Request::Close));
             });
             // As many pictures to a row as fit.
-            let free = cx.size.x - 180.0 - 2.0 * 12.0;
+            let free = cx.size.x - 180.0 - 2.0 * 12.0 - 2.0 * inset;
             let columns = (((free + TILE_GAP) / (TILE_W + TILE_GAP)).floor() as usize).max(1);
             let list = ui.container(
                 Style::default()
@@ -1008,8 +1012,10 @@ fn list_index(c: &Ctx, w: &WorldMeta) -> usize {
 /// click, played with two.
 fn tile(ui: &mut Ui, cx: &BuildCx, w: &WorldMeta, i: usize, selected: bool) {
     let dir = w.dir.clone();
+    // Its own part where the look has one (style 1's card: a frame, not a stretched button).
+    let class = if cx.look.texture("world_card", "").is_some() { "world_card" } else { "button" };
     let b = ui.button(
-        "button",
+        class,
         Style::default().w(TILE_W).pad(4.0).gap(2.0),
         Rc::new(move |c: &mut Ctx| {
             if let Some(s) = c.screen::<WorldSelect>() {
@@ -1103,21 +1109,35 @@ impl Screen for CreateWorld {
     }
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
-        frame(ui, cx, "world.create", |ui| {
-            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(260.0), |ui| {
-                label(ui, cx, "world.name", &[], "default");
-                // The default name in the player's language (chiacraft; it was "New World" in every one).
-                let name = ui.add(Kind::input(cx.lang.get("world.default_name"), 32), Style::default().h(18.0).stretch());
-                ui.set_id(name, "name");
-                label(ui, cx, "world.seed", &[], "default");
-                let seed = ui.add(Kind::input("", 32), Style::default().h(18.0).stretch());
-                ui.set_id(seed, "seed");
+        // Style 1: in the titled window; the name and seed need no frame of their own there.
+        let framed = cx.look.texture("menu_panel", "").is_some();
+        crate::screens::window(ui, cx, "world.create", 6.0, |ui| {
+            let fields = Kind::Container { class: (!framed).then(|| "panel".to_string()) };
+            let pad = if framed { 0.0 } else { 8.0 };
+            // Style 1 (the spacing in `UI Style Guide.md`): fields 22 tall for their 2x text, a
+            // label 2 over its field, 8 between the pairs.
+            let (field_h, pair_gap, gap) = if framed { (22.0, 2.0, 8.0) } else { (18.0, 4.0, 4.0) };
+            ui.with(fields, Style::default().pad(pad).gap(gap).stretch().w(260.0), |ui| {
+                ui.container(Style::default().gap(pair_gap).stretch(), |ui| {
+                    let t = label(ui, cx, "world.name", &[], "default");
+                    crate::screens::field_label(ui, cx, t);
+                    // The default name in the player's language (chiacraft; it was "New World" in every one).
+                    let name = ui.add(Kind::input(cx.lang.get("world.default_name"), 32), Style::default().h(field_h).stretch());
+                    ui.set_id(name, "name");
+                });
+                ui.container(Style::default().gap(pair_gap).stretch(), |ui| {
+                    let t = label(ui, cx, "world.seed", &[], "default");
+                    crate::screens::field_label(ui, cx, t);
+                    let seed = ui.add(Kind::input("", 32), Style::default().h(field_h).stretch());
+                    ui.set_id(seed, "seed");
+                });
             });
             // Every game mode, then hardcore: survival with one life and no cheats.
             let modes = crate::world::GameMode::all().count();
             let (mode, shown, cheats) = (self.mode.clone(), self.mode.clone(), self.cheats.clone());
             bound_button(
                 ui,
+                cx,
                 260.0,
                 move || ("world.game_mode".into(), vec![Arg::Key(mode_key(shown.get(), modes))]),
                 move |_| {
@@ -1129,11 +1149,12 @@ impl Screen for CreateWorld {
                 },
             );
             let (cheats, shown) = (self.cheats.clone(), self.cheats.clone());
-            bound_button(ui, 260.0, move || ("world.cheats".into(), vec![on_off(shown.get())]), move |_| cheats.set(!cheats.get()));
+            bound_button(ui, cx, 260.0, move || ("world.cheats".into(), vec![on_off(shown.get())]), move |_| cheats.set(!cheats.get()));
             button(ui, cx, "world.rules", &[], 260.0, |c| c.requests.push(Request::Screen("core:world_rules".into())));
             ui.container(Style::row().gap(6.0), |ui| {
                 let (mode, cheats) = (self.mode.clone(), self.cheats.clone());
-                let create_button = button(ui, cx, "world.create", &[], 120.0, move |c| {
+                // Create wider than Cancel, so its label has room at 2x (chiacraft, style 1).
+                let create_button = button(ui, cx, "world.create", &[], 150.0, move |c| {
                     let name = c.input_text("name").unwrap_or_default();
                     let seed = parse_seed(&c.input_text("seed").unwrap_or_default());
                     let name = if name.trim().is_empty() { "World".to_string() } else { name.trim().to_string() };
@@ -1151,7 +1172,7 @@ impl Screen for CreateWorld {
                     c.requests.push(Request::StartWorldAnyway(meta));
                 });
                 ui.set_id(create_button, "create");
-                back_button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.cancel", &[], 104.0, |c| c.requests.push(Request::Close));
             });
         });
     }
