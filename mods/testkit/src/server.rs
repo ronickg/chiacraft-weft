@@ -9,6 +9,8 @@ use weft_sdk::*;
 
 /// How many of each event arrived since `events reset`, in `EVENT_NAMES` order.
 static COUNTS: [AtomicU32; 8] = [const { AtomicU32::new(0) }; 8];
+/// The most a fall did since `fell reset` (f32 bits), as the server dealt it.
+static FELL: AtomicU32 = AtomicU32::new(0);
 const EVENT_NAMES: [&str; 8] =
     ["block_broken", "block_placed", "item_picked_up", "entity_died", "entity_hurt", "player_joined", "item_used", "smelted"];
 
@@ -340,6 +342,11 @@ pub fn register(r: &mut Registry) {
     r.on_event(&actions::PICKUP_ITEM, |b| count(2, b.len()));
     r.on_event(&actions::DIE, |b| count(3, b.len()));
     r.on_event(&actions::HURT, |b| count(4, b.len()));
+    r.on_event(&actions::HURT, |b| {
+        for h in b.iter().filter(|h| h.cause == abi::damage_cause::FALL) {
+            FELL.fetch_max(h.amount.max(0.0).to_bits(), Ordering::Relaxed);
+        }
+    });
     r.on_event(&PLAYER_JOINED, |b| count(5, b.len()));
     r.on_event(&actions::USE_ITEM, |b| count(6, b.len()));
     r.on_event(&SMELTED, |b| count(7, b.len()));
@@ -1188,6 +1195,15 @@ const OPS: &[(&str, &str, Run)] = &[
         let p = pos(cmd, "to")?;
         Ok((w.navigate(owner(w, cmd)?, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0) as u32).to_string())
     }),
+    ("navigate_by", "@owner <dx:int> <dy:int> <dz:int>", |w, cmd, _, _| {
+        // `navigate` to where the walker stands now plus a step, read here in the same tick: on a
+        // flying deck, a point read a round trip earlier had moved off it (CI's slow frames).
+        let id = owner(w, cmd)?;
+        let p = w.entity(id).ok_or("no such entity")?.pos;
+        let (dx, dy, dz) = (int::<i32>(cmd, "dx")?, int::<i32>(cmd, "dy")?, int::<i32>(cmd, "dz")?);
+        let to = [p.x.floor() + dx as f64 + 0.5, p.y.floor() + dy as f64, p.z.floor() + dz as f64 + 0.5];
+        Ok((w.navigate(id, to, 1.0) as u32).to_string())
+    }),
     ("structure", "<name:word> <r:int>", |w, cmd, _, me| {
         Ok(w.structure_near(word(cmd, "name")?, me, int(cmd, "r")?)
             .map_or("none".into(), |a| format!("{} {} {}", a.x, a.y, a.z)))
@@ -1471,6 +1487,12 @@ const OPS: &[(&str, &str, Run)] = &[
                 .on_stack_own(&s)
                 .map_or("none".into(), |v| v.to_string())),
         }
+    }),
+    ("fell", " | reset", |_, cmd, _, _| {
+        if cmd.given("reset") {
+            FELL.store(0, Ordering::Relaxed);
+        }
+        Ok(f32::from_bits(FELL.load(Ordering::Relaxed)).to_string())
     }),
     ("events", " | reset", |_, cmd, _, _| {
         if cmd.given("reset") {
