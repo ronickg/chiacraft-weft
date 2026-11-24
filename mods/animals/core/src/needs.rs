@@ -392,8 +392,13 @@ const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WA
 /// and never saw them (ai1124_jaguar1): a big cat or a wolf pack ranges kilometres a day for prey.
 pub const PROWL_LEG: f64 = 16.0;
 pub const PROWL_SECS: f32 = 15.0;
-/// Blocks a pack's member keeps within of its leader as they prowl.
+/// Blocks a pack's member keeps within of its leader as they prowl, how much faster than a walk
+/// it closes up, and how far off it loses it (it prowls alone).
 pub const PACK_FOLLOW: f64 = 4.0;
+pub const PACK_CATCH_UP: f32 = 1.3;
+pub const PACK_LOSE: f64 = 48.0;
+/// Every other prowl's leg heads for the water a hunter knows while it is further than this.
+pub const PROWL_WATER: f64 = 8.0;
 /// Seconds a hunter leaves a kill site it went to and found no prey at.
 pub const SITE_AGAIN_SECS: f32 = 120.0;
 /// Its kind near (itself among them) from which a pack hunter rallies the others to its hunt.

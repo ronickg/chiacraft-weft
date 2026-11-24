@@ -33,6 +33,8 @@ static CHARGING: Component<u64> = Component::named("animal_charging");
 static STOOD: Component<u64> = Component::named("animal_stood");
 /// Until when it walks a prowl's leg (`prowl`; not saved).
 static PROWL: Component<u64> = Component::named("animal_prowl");
+/// The pack's leader it follows as they prowl (0: none), and its legs so far (`prowl`; not saved).
+static FOLLOW: Component<[u64; 2]> = Component::named("animal_follow");
 /// A kill site it went to and found nothing at (x, z), and till when it leaves it (`hunt_`; not
 /// saved).
 static SITE: Component<[f64; 3]> = Component::named("animal_site");
@@ -56,6 +58,7 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&CHARGING, 0u64, 0);
     r.entity_component(&STOOD, 0u64, 0);
     r.entity_component(&PROWL, 0u64, 0);
+    r.entity_component(&FOLLOW, [0u64; 2], 0);
     r.entity_component(&SITE, [0.0; 3], 0);
     for s in &SPECIES {
         r.edit(s.kind).attach(&HUNT);
@@ -63,6 +66,7 @@ pub fn init(r: &mut Registry) {
         r.edit(s.kind).attach(&CHARGING);
         r.edit(s.kind).attach(&STOOD);
         r.edit(s.kind).attach(&PROWL);
+        r.edit(s.kind).attach(&FOLLOW);
         r.edit(s.kind).attach(&SITE);
     }
     // A kill feeds the hunter that made it, by the prey's mass against its own.
@@ -213,8 +217,15 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     }
     if now < h[2] {
         w.component_mut(id, &HUNT).map(|c| *c = h);
-        // On a prowl's leg it keeps the turn, looking again at `LOOK_EVERY`.
-        return w.component(id, &PROWL).is_some_and(|p| now < p) && w.navigating(id);
+        // On a prowl's leg it keeps the turn, looking again at `LOOK_EVERY`; one following its
+        // leader keeps up with it every tick.
+        if !w.component(id, &PROWL).is_some_and(|p| now < p) {
+            return false;
+        }
+        if let Some(l) = w.component(id, &FOLLOW).map(|f| f[0]).filter(|&l| l != 0) {
+            return keep_up(w, id, st, l);
+        }
+        return w.navigating(id);
     }
     h[2] = now + LOOK_EVERY;
     // Out of its hours it rests rather than hunts, unless hunger presses (`routines::HUNTS_FROM`).
@@ -267,10 +278,18 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
             return true;
         }
         // Nor any kill site: it prowls for prey (`prowl`), a pack behind its leader.
-        let leader = (s.pack_prey().is_some() && seen.leader != id && seen.leader != 0).then_some(seen.leader);
+        // The leader it follows already, even out of its kin's reach (`KIN`): fallen 16 blocks
+        // behind, a wolf counted itself its own leader and went its own way (ai1124_wolves1e).
+        let following = w.component(id, &FOLLOW).map_or(0, |f| f[0]);
+        let leader = if following != 0 {
+            Some(following)
+        } else {
+            (s.pack_prey().is_some() && seen.leader != id && seen.leader != 0).then_some(seen.leader)
+        };
         return prowl(w, id, st, s, now, leader);
     };
     w.component_mut(id, &PROWL).map(|p| *p = 0);
+    w.component_mut(id, &FOLLOW).map(|f| *f = [0; 2]);
     weft_sdk::info!("{} {id} hunts {} ({kg:.1} kg, a pack of {pack})", s.name, t);
     // A pack hunts what it finds together, prey it could take alone too (wolves run deer down
     // as a pack): in ai1124_wolves1b each of three wolves took its own deer alone while the
@@ -281,7 +300,7 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     if pack >= animals_core::needs::RALLY_PACK {
         rally(w, id, st, t, now);
     }
-    h = [t, now, now + LOOK_EVERY, (pack >= species::PACK) as u64];
+    h = [t, now, now + LOOK_EVERY, (pack >= animals_core::needs::RALLY_PACK) as u64];
     w.component_mut(id, &HUNT).map(|c| *c = h);
     if knockout {
         if stalks_first(w, id, st, s, t, pack >= species::PACK, now) {
@@ -295,14 +314,13 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
 }
 
 /// A hungry hunter with nothing in sight and no kill site: it walks a leg of
-/// `needs::PROWL_LEG` blocks a new way, onto ground its paths reach, and keeps the turn while it
-/// walks it (`needs::PROWL_SECS` at most), looking for prey at each `LOOK_EVERY`. True while it
-/// prowls. A pack's other members follow its leader (`needs::PACK_FOLLOW`).
+/// `needs::PROWL_LEG` blocks, onto ground its paths reach, and keeps the turn while it walks it
+/// (`needs::PROWL_SECS` at most), looking for prey at each `LOOK_EVERY`. Every other leg heads
+/// for the water it knows, where prey come to drink (`needs::PROWL_WATER`); the others a new way.
+/// A pack's other members follow its leader (`keep_up`). True while it prowls.
 fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Option<u64>) -> bool {
-    use animals_core::needs::{FLEE_DROP, PACK_FOLLOW, PROWL_LEG, PROWL_SECS};
-    if w.component(id, &PROWL).is_some_and(|p| now < p) && w.navigating(id) {
-        return true;
-    }
+    use animals_core::needs::{FLEE_DROP, PROWL_LEG, PROWL_SECS, PROWL_WATER};
+    let until = now + (PROWL_SECS * 20.0) as u64;
     // A pack prowls together: one not its leader keeps up with it (each on its own legs, the
     // pack spread over the savanna and never counted three to hunt as one, ai1124_wolves1b).
     // Only a leader that is hungry too (prowling or about to): a fed one lying by its kill would
@@ -313,29 +331,77 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
             || w.component(l, &ANIMAL)
                 .is_some_and(|a| (a.food as f32) < a.stat(species::FOOD) * HUNGRY)
     };
-    if let Some(l) = leader.filter(|&l| hungry(l)).and_then(|l| w.entity(l)) {
-        if dist2(l.pos, st.pos) > PACK_FOLLOW * PACK_FOLLOW {
-            w.navigate(id, l.pos.to_array(), 1.0);
-            w.component_mut(id, &PROWL)
-                .map(|p| *p = now + (PROWL_SECS * 20.0) as u64);
-        }
+    if let Some(l) = leader.filter(|&l| hungry(l)) {
+        w.component_mut(id, &FOLLOW).map(|f| f[0] = l);
+        w.component_mut(id, &PROWL).map(|p| *p = until);
+        return keep_up(w, id, st, l);
+    }
+    w.component_mut(id, &FOLLOW).map(|f| f[0] = 0);
+    if w.component(id, &PROWL).is_some_and(|p| now < p) && w.navigating(id) {
         return true;
     }
+    let legs = w.component(id, &FOLLOW).map_or(0, |f| f[1]);
+    w.component_mut(id, &FOLLOW).map(|f| f[1] = legs + 1);
     let y = st.pos.y.floor() as i32;
-    let start = w.random_below(8);
-    let leg = (0..8).find_map(|k| {
-        let a = (start + k) as f64 * std::f64::consts::TAU / 8.0;
-        let (x, z) = (st.pos.x + a.cos() * PROWL_LEG, st.pos.z + a.sin() * PROWL_LEG);
-        let g = (y - (FLEE_DROP + 2)..=y + 1)
+    let ground = |x: f64, z: f64| {
+        (y - (FLEE_DROP + 2)..=y + 1)
             .rev()
-            .find(|&g| crate::comfort::ground(w, x.floor() as i32, g, z.floor() as i32) == Some(g))?;
-        Some([x, g as f64, z])
+            .find(|&g| crate::comfort::ground(w, x.floor() as i32, g, z.floor() as i32) == Some(g))
+    };
+    // Prey drink: every other leg toward the water it knows, while it is further than
+    // `PROWL_WATER` (in wolves1e a pack's random legs took 100 s to find a herd 24 blocks off by
+    // the pond).
+    let pos = st.pos.to_array();
+    let water = (legs % 2 == 0)
+        .then(|| crate::drink::known_water(w, id, pos))
+        .flatten()
+        .filter(|p| ((p[0] - pos[0]).powi(2) + (p[2] - pos[2]).powi(2)).sqrt() > PROWL_WATER)
+        .and_then(|p| {
+            let d = ((p[0] - pos[0]).powi(2) + (p[2] - pos[2]).powi(2)).sqrt();
+            let k = (PROWL_LEG / d).min(1.0);
+            let (x, z) = (pos[0] + (p[0] - pos[0]) * k, pos[2] + (p[2] - pos[2]) * k);
+            Some([x, ground(x, z)? as f64, z])
+        });
+    let start = w.random_below(8);
+    let leg = water.or_else(|| {
+        (0..8).find_map(|k| {
+            let a = (start + k) as f64 * std::f64::consts::TAU / 8.0;
+            let (x, z) = (st.pos.x + a.cos() * PROWL_LEG, st.pos.z + a.sin() * PROWL_LEG);
+            Some([x, ground(x, z)? as f64, z])
+        })
     });
     let Some(to) = leg else { return false };
-    weft_sdk::info!("{} {id} prowls for prey toward {:.0} {:.0} {:.0}", s.name, to[0], to[1], to[2]);
+    weft_sdk::info!(
+        "{} {id} prowls for prey toward {:.0} {:.0} {:.0}{}",
+        s.name,
+        to[0],
+        to[1],
+        to[2],
+        if water.is_some() { " (water)" } else { "" }
+    );
     w.navigate(id, to, 1.0);
-    w.component_mut(id, &PROWL)
-        .map(|p| *p = now + (PROWL_SECS * 20.0) as u64);
+    w.component_mut(id, &PROWL).map(|p| *p = until);
+    true
+}
+
+/// A pack's member keeps within `needs::PACK_FOLLOW` of the leader it follows as they prowl, at
+/// a share faster than a walk to close up (`needs::PACK_CATCH_UP`). True while it follows; false
+/// once its leader is gone, fed or past `needs::PACK_LOSE` (it prowls on its own).
+fn keep_up(w: &World, id: u64, st: &EntityState, leader: u64) -> bool {
+    use animals_core::needs::{PACK_CATCH_UP, PACK_FOLLOW, PACK_LOSE};
+    let fed = w
+        .component(leader, &ANIMAL)
+        .is_some_and(|a| a.food as f32 >= a.stat(species::FOOD) * FULL);
+    let Some(l) = w
+        .entity(leader)
+        .filter(|l| l.health > 0.0 && !fed && dist2(l.pos, st.pos) < PACK_LOSE * PACK_LOSE)
+    else {
+        w.component_mut(id, &FOLLOW).map(|f| f[0] = 0);
+        return false;
+    };
+    if dist2(l.pos, st.pos) > PACK_FOLLOW * PACK_FOLLOW {
+        w.navigate(id, l.pos.to_array(), PACK_CATCH_UP);
+    }
     true
 }
 

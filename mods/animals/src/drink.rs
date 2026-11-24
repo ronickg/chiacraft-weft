@@ -216,6 +216,19 @@ pub fn herd_water_from(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3], at:
         .min_by(f64::total_cmp)
 }
 
+/// The nearest water `id` or its herd knows from `pos` (`hunt::prowl`: prey come to drink).
+pub fn known_water(w: &World, id: u64, pos: [f64; 3]) -> Option<[f64; 3]> {
+    let kind = w.entity(id)?.kind;
+    let kind = crate::species::SPECIES
+        .iter()
+        .find(|s| s.kind.id() == kind)?
+        .kind;
+    herd_waters(w, id, kind, pos)
+        .into_iter()
+        .map(|(p, _)| p)
+        .min_by(|a, b| crate::dist2(*a, pos).total_cmp(&crate::dist2(*b, pos)))
+}
+
 /// Its range (`groups::WATER_RANGE`), in place of a wander: a wild drinker further than that from
 /// the nearest water it or its herd knows walks back toward it, a leg at a time. None: it is
 /// within it, knows no water, or doesn't drink (it wanders).
