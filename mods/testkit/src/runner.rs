@@ -250,7 +250,10 @@ impl T {
     pub async fn open_screen(&self, name: &str, open: impl Fn(&T)) -> R {
         let shown = |t: &T| t.0.borrow().screen == name && t.flag(cf::SCREEN_READY);
         for _ in 0..4 {
-            open(self);
+            // Not again once it is up: a retry presses a toggle, and closed it.
+            if self.0.borrow().screen != name {
+                open(self);
+            }
             let end = script_clock() + Duration::from_secs(3);
             while script_clock() < end {
                 self.frames(1).await?;

@@ -323,6 +323,10 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
         }
         return false;
     }
+    // Walking a way out of where it is stuck (`stuck`).
+    if crate::stuck::going(w, id, st) {
+        return true;
+    }
     let now = w.game_time() as f64;
     // Going to food on the ground, or eating it.
     let item = w.component(id, &ITEM).unwrap_or(0);
@@ -341,6 +345,19 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
             }
             if now < f[3] {
                 return true; // walking to it
+            }
+            // Its walk ended short of it, as of a patch below: it gives it up and, ended short where
+            // the last did too, looks for a way out. Without it a deer in a pit walked at seeds on
+            // its rim for ever, found the same each time (ai1124_pit4b: 140 s "eating", no move).
+            if crate::stuck::ended_short(w, id, st) {
+                weft_sdk::debug!("animal {id} can't reach the food on the ground at {:?}: looks elsewhere", e.pos);
+                if let Some(i) = w.component_mut(id, &ITEM) {
+                    *i = 0;
+                }
+                if let Some(c) = w.component_mut(id, &FORAGE) {
+                    *c = [f64::NAN, 0.0, 0.0, now + NOTHING];
+                }
+                return crate::stuck::short(w, id, st);
             }
         }
         // Gone (eaten, taken) or out of reach still: it looks again.
@@ -390,11 +407,24 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
             return true;
         }
     } else if now < f[3] {
-        // Walking to it; or nothing near, wandering on.
-        return target.is_some();
+        // Walking to it; or nothing near, wandering on: driven, it searches (`stuck::search`).
+        return target.is_some()
+            || (animals_core::needs::hunger_score(full, false) >= animals_core::memory::DRIVEN && crate::stuck::search(w, id, st, false));
+    } else if target.is_some() && crate::stuck::ended_short(w, id, st) {
+        // Its walk ended short of the food: it can't get there. It gives that patch up and lets
+        // its wander take it elsewhere, not walking at it again and again (graze5: a deer stood
+        // "eating" a game day at one spot while its food went from 55 % to 4 % and its thirst
+        // past saving).
+        weft_sdk::debug!("animal {id} can't reach the food at {target:?}: looks elsewhere");
+        w.component_mut(id, &PATCH).map(|k| *k = [0; 4]);
+        w.component_mut(id, &FORAGE)
+            .map(|c| *c = [f64::NAN, 0.0, 0.0, now + NOTHING]);
+        // Ended short where the last did too: it is stuck, and looks for a way out (`stuck`).
+        return crate::stuck::short(w, id, st);
     }
     if let Some((t, p)) = ground_food(w, s, st.pos.to_array(), ITEM_LOOK) {
         w.navigate(id, p, 1.0);
+        crate::stuck::sets_off(w, id, st, p);
         w.component_mut(id, &ITEM).map(|i| *i = t);
         w.component_mut(id, &FORAGE)
             .map(|c| *c = [p[0], p[1], p[2], now + WALK]);
@@ -405,12 +435,18 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
         .flatten()
     {
         Some(p) => {
-            w.navigate(id, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0);
+            let to = [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5];
+            w.navigate(id, to, 1.0);
+            crate::stuck::sets_off(w, id, st, to);
             f = [p[0] as f64, p[1] as f64, p[2] as f64, now + WALK];
         }
         None => f = [f64::NAN, 0.0, 0.0, now + NOTHING],
     }
     w.component_mut(id, &FORAGE).map(|c| *c = f);
+    // Driven by hunger and finding no food: it searches for some (`stuck::search`).
+    if f[0].is_nan() && animals_core::needs::hunger_score(full, false) >= animals_core::memory::DRIVEN {
+        return crate::stuck::search(w, id, st, false);
+    }
     !f[0].is_nan()
 }
 

@@ -508,8 +508,9 @@ pub async fn model_bones(t: T) -> R {
     t.op("put me 0 testmod:greatsword").await?;
     t.secs(0.5).await?;
     // Still from one frame to the next: on CI half a second was a frame or two, the tip still
-    // rising (5.67, then 6.25).
-    let mut last = at("tip");
+    // rising (5.67, then 6.25). Not read before the wait: its first check runs in this same
+    // frame, and compared a value with itself.
+    let mut last = None::<weft_sdk::abi::Vec3>;
     t.until("the sword held still", Duration::from_secs(10), move |t| {
         let now = t.c().bone_position(me, "tip");
         let still = matches!((last, now), (Some(a), Some(b)) if (a - b).length_squared() < 1e-4);
@@ -871,25 +872,21 @@ pub async fn fall_damage(t: T) -> R {
     t.until("on the ledge", Duration::from_secs(10), |t| t.flag(client::client_flags::ON_GROUND) && t.state().pos.y > s.pos.y + 11.5)
         .await?;
     t.secs(0.5).await?;
+    t.op("fell reset").await?;
     t.set(ledge, "air").await?;
     t.until("falling", Duration::from_secs(5), |t| !t.flag(client::client_flags::ON_GROUND))
         .await?;
     t.until("landed", Duration::from_secs(10), |t| t.flag(client::client_flags::ON_GROUND))
         .await?;
-    // The lowest it gets: full and saturated it heals fast, a point in half a second. From the
-    // hurt coming back, by the script clock (half a real second was one CI frame).
-    t.until("hurt", Duration::from_secs(5), |t| t.state().health < full - 0.5)
-        .await
-        .ok();
-    let mut hp = t.state().health;
-    let end = crate::runner::script_clock() + Duration::from_millis(500);
-    while crate::runner::script_clock() < end {
-        t.frames(1).await?;
-        hp = hp.min(t.state().health);
+    // What the server dealt, as it dealt it: the client's health comes a round trip later, and full
+    // and saturated the player heals a point in half a second (CI: 6.1 of the 9 left to see).
+    let mut lost = 0.0f32;
+    let end = crate::runner::script_clock() + Duration::from_secs(5);
+    while lost <= 0.0 && crate::runner::script_clock() < end {
+        lost = t.op("fell").await?.parse().unwrap_or(0.0);
     }
-    // Vanilla takes 9 for 12 blocks (11 of its 20 left); the survival vitals' max is lower.
-    let lost = full - hp;
-    t.check((7.0..=10.0).contains(&lost), format!("health lost in a 12 block fall: {lost} (from {full} to {hp}), vanilla 9"));
+    t.note(format!("the client sees {:.2} of {full:.2}", t.state().health));
+    t.check((7.0..=10.0).contains(&lost), format!("health lost in a 12 block fall: {lost}, vanilla 9"));
     Ok(())
 }
 
@@ -1042,6 +1039,9 @@ pub async fn mob_physics(t: T) -> R {
         let id = t
             .op(&format!("spawn base:pig {} {} {}", at[0], at[1], at[2] + 1))
             .await?;
+        // Its own walking held to nothing: on CI the push came seconds after the spawn, the pig
+        // was already walking off by itself, and that ate the slide on ice (1.32 grass, 1.26 ice).
+        t.op(&format!("drive {id} 0 0 200")).await?;
         t.secs(0.5).await?;
         let x0: f64 = t
             .op(&format!("entity {id}"))
@@ -2206,8 +2206,10 @@ pub async fn inventory_tools(t: T) -> R {
     t.screen("core:menu").await?;
     t.op(&format!("put {at} 2 stick 2")).await?;
     t.op("put me 0 stick 11").await?;
-    t.c().input_key("ShiftLeft", 0.3);
-    t.frames(2).await?;
+    // Held well past the click: on CI two frames outlasted a 0.3 s hold, and the plain click
+    // that came took the sticks onto the cursor (the timeout shot).
+    t.c().input_key("ShiftLeft", 2.0);
+    t.frames(1).await?;
     t.click_ui("slot:34", 0);
     t.until("sticks transferred", Duration::from_secs(3), |t| t.c().menu_slot(2).count == 5)
         .await?;
@@ -2455,7 +2457,8 @@ pub async fn projectiles(t: T) -> R {
         .op(&format!("shoot base:arrow {lane} {} {z} 0 0 -40", y + 0.3))
         .await?;
     t.secs(1.5).await?;
-    let (a, c) = (t.op(&format!("entity {in_cow}")).await?, t.op(&format!("entity {cow}")).await?);
+    // Both in one tick: read a round trip apart, the cow running from the hit had gone 1.77 blocks on (CI).
+    let (a, c) = same_tick(&t, &format!("entity {in_cow}"), &format!("entity {cow}")).await?;
     let near = (num(&a, 1) - num(&c, 1)).hypot(num(&a, 3) - num(&c, 3));
     t.check(near < 1.2, format!("the arrow stays in the cow: {near:.2} blocks off ({a} / {c})"));
 

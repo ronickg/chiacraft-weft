@@ -105,6 +105,12 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
         if lead == Some(Need::Drink as u8) && 1.0 - a.thirst < animals_core::groups::JOIN_DRINK {
             s[Need::Drink as usize] = s[Need::Drink as usize].max(animals_core::groups::JOIN_PULL);
         }
+        // Grazing with its herd doesn't pull it from water it is driven to: thirst past
+        // `memory::DRIVEN` goes first (ai1124_pit8: a deer whose leader grazed ate 80 s at the
+        // pond, 1-4 blocks from it, as its water fell 13 to 9 %, `JOIN_PULL` 0.85 over its thirst): it scores its own hunger.
+        if lead == Some(Need::Eat as u8) && s[Need::Drink as usize] >= animals_core::memory::DRIVEN {
+            s[Need::Eat as usize] = needs::hunger_score(fed, at(Need::Eat));
+        }
     }
     s[Need::Comfort as usize] = match w
         .component(id, &BODY)
@@ -115,21 +121,31 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
         _ => 0.0,
     };
     s[Need::Love as usize] = LOVE;
-    s[Need::Rest as usize] = REST + animals_core::routines::SLEEPY * (1.0 - active);
+    // A sleepy rest still gives way to thirst or hunger that drives it (`needs::rest_under`).
+    s[Need::Rest as usize] =
+        needs::rest_under(REST + animals_core::routines::SLEEPY * (1.0 - active), s[Need::Drink as usize].max(s[Need::Eat as usize]));
     s[Need::Wander as usize] = WANDER;
     s[Need::Watch as usize] = animals_core::roles::WATCH;
     s[Need::Investigate as usize] = animals_core::roles::INVESTIGATE;
     // A herd on the move, its leader and those whose leader is on it, goes on above a daytime rest
-    // (`groups::MIGRATE_PULL`).
+    // (`groups::MIGRATE_PULL`), but a thirsty one drinks first (`groups::migrate_pull`).
     if crate::migrate::migrating(w, id) || crate::group::leader_doing(w, id) == Some(Need::Migrate as u8) {
-        s[Need::Migrate as usize] = animals_core::groups::MIGRATE_PULL;
+        s[Need::Migrate as usize] = animals_core::groups::migrate_pull(s[Need::Drink as usize]);
     }
     // Staying put outranks what would move it, and nothing else.
     s[Need::Hold as usize] = s[Need::Comfort as usize]
         .max(s[Need::Drink as usize])
         .max(s[Need::Eat as usize])
         + WANDER;
-    if let Some(v) = s.get_mut(doing as usize).filter(|_| doing != 0) {
+    // A meal held on gives way to thirst past `memory::DRIVEN`: grazing is a mouthful in ten
+    // seconds, a drink fills it in a few, and thirst kills first (ai1124_pit6b: a deer out of a
+    // pit at 16 % food and 13 % water grazed 90 s six blocks from the pond, its water falling to
+    // 9 %, the meal's `KEEP_AT` above its thirst till it was nearly dry).
+    let thirst_breaks_in = doing == Need::Eat as u8 && s[Need::Drink as usize] >= animals_core::memory::DRIVEN;
+    if let Some(v) = s
+        .get_mut(doing as usize)
+        .filter(|_| doing != 0 && !thirst_breaks_in)
+    {
         *v *= KEEP_AT;
     }
     s

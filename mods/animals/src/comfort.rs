@@ -19,6 +19,14 @@ use crate::species::{self, SPECIES};
 static FREEZE: DamageCause = DamageCause::named("base:freeze");
 static HEAT: DamageCause = DamageCause::named("base:heat");
 
+/// Whether damage of `cause` comes from its own body (starving, thirst, the cold, the heat), not
+/// from anything round it: it doesn't make it run (`taming::hurt`) or fear the place
+/// (`memory`). A parched deer hurt by its thirst at the pool's edge fled from it again and again
+/// and marked the pool as feared, and died 130 blocks off (ai1124_savanna6).
+pub fn bodily(cause: u32) -> bool {
+    cause == damage_cause::STARVE || cause == crate::drink::THIRST.id() || cause == FREEZE.id() || cause == HEAT.id()
+}
+
 value! {
     #[derive(Default)]
     /// How its body is (once a second), sent to whoever has its screen open.

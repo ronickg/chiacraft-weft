@@ -103,7 +103,7 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
                     ),
             )
             .on_hurt(|w, h| {
-                crate::taming::hurt(w, h.entity, h.source);
+                crate::taming::hurt(w, h.entity, h.source, h.cause);
                 wake(w, h.entity);
             });
     }

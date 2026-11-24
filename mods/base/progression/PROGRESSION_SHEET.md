@@ -12,6 +12,7 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | nothing at tier N needs anything above N | passes |
 | each age's key by each declared route | passes |
 | path parity: each age's key by each route within ×1.15 of its cheapest, in EM | passes |
+| knowledge: each key's blueprint from its age's ruins, the first Stone ruin near spawn | passes |
 | each age's materials need the age before (its tools, stations or materials): no age skipped | passes |
 | every tool-part material tagged, made from its tier or below | passes |
 | each age's making inside its budget | passes |
@@ -31,9 +32,9 @@ Power grows ×1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier �
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 551 | 159 | 48 | 33 % | 217 EM |
-| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 49 | 35 | 150 | 52 % | 143 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 65 | 30 | 95 | 25 % | 312 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 553 | 159 | 48 | 33 % | 217 EM |
+| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 51 | 35 | 150 | 52 % | 143 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 67 | 30 | 95 | 25 % | 312 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 38 | 32 | 94 | 22 % | 328 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -367,9 +368,9 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 
 | age | tech | magic | beasts | not built yet |
 |---|---|---|---|---|
-| Stone Age | base:pickaxe, base:furnace, animals:warden_heartseed | base:dowsing_rod, animals:warden_heartseed | animals:club, animals:tranquilizer_dart, animals:nest, animals:warden_heartseed | knowledge: a ruin's blueprint or lore page |
-| Bronze Age | base:bronze_ingot, animals:summit_stone | base:bronze_ingot, animals:summit_stone | base:bronze_ingot, animals:summit_stone | knowledge: a ruin's blueprint or lore page; infrastructure: a working setup from the Bronze Age |
-| Iron Age | base:steel_ingot, base:forge, #iron_boss_part | base:steel_ingot, base:forge, #iron_boss_part | base:steel_ingot, base:forge, #iron_boss_part | knowledge: a ruin's blueprint or lore page; infrastructure: past the forge, a working setup from the Iron Age |
+| Stone Age | base:pickaxe, base:furnace, animals:warden_heartseed, base:blueprint_crucible | base:dowsing_rod, animals:warden_heartseed, base:blueprint_crucible | animals:club, animals:tranquilizer_dart, animals:nest, animals:warden_heartseed, base:blueprint_crucible |  |
+| Bronze Age | base:bronze_ingot, animals:summit_stone, base:blueprint_ironwork | base:bronze_ingot, animals:summit_stone, base:blueprint_ironwork | base:bronze_ingot, animals:summit_stone, base:blueprint_ironwork | infrastructure: a working setup from the Bronze Age |
+| Iron Age | base:steel_ingot, base:forge, #iron_boss_part, base:blueprint_forge | base:steel_ingot, base:forge, #iron_boss_part, base:blueprint_forge | base:steel_ingot, base:forge, #iron_boss_part, base:blueprint_forge | infrastructure: past the forge, a working setup from the Iron Age |
 | Age of Steam | - | - | - | all of it |
 | Age of Lightning | - | - | - | all of it |
 | Age of the Future | - | - | - | all of it |
@@ -379,15 +380,15 @@ What each route costs from scratch (`graph::route_cost`): its items at their che
 
 | age | path | EM | × cheapest | own EM | tools and stations |
 |---|---|---|---|---|---|
-| Stone Age | tech | 48 | 1.01 | 2.9 | crafting_table, axe, sharp_flake |
-| Stone Age | beasts | 47 | 1.00 | 2.3 | crafting_table, axe, sharp_flake |
-| Stone Age | magic | 50 | 1.07 | 5.5 | sharp_flake |
-| Bronze Age | tech | 74 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
-| Bronze Age | beasts | 74 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
-| Bronze Age | magic | 74 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
-| Iron Age | tech | 102 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
-| Iron Age | beasts | 102 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
-| Iron Age | magic | 102 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
+| Stone Age | tech | 60 | 1.01 | 2.9 | crafting_table, axe, sharp_flake |
+| Stone Age | beasts | 59 | 1.00 | 2.3 | crafting_table, axe, sharp_flake |
+| Stone Age | magic | 62 | 1.05 | 5.5 | sharp_flake |
+| Bronze Age | tech | 104 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
+| Bronze Age | beasts | 104 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
+| Bronze Age | magic | 104 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
+| Iron Age | tech | 147 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
+| Iron Age | beasts | 147 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
+| Iron Age | magic | 147 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
 
 ## The materials gate
 
@@ -426,11 +427,21 @@ Known skips:
 
 - none (iron, the first, takes a bronze pickaxe since 11-23)
 
+## The knowledge gate
+
+An age's key needs its age's blueprint, found in its age's ruins on the ley lines (`vitals::ruins`, `graph::knowledge`): a pedestal gives each player one, and until it is read the grid, the book and the furnace refuse what it teaches. One Stone ring always stands within 300 blocks of the world's spawn.
+
+| blueprint | age | ruin | its grid (blocks), chance | ward (harvest) | teaches | finding (EM) |
+|---|---|---|---|---|---|---|
+| base:blueprint_crucible | Stone Age | ring (0 deep) | 384, 70 % | open | crafting base:crucible | 12 |
+| base:blueprint_ironwork | Bronze Age | vault (4 deep) | 768, 75 % | 170 | smelting base:raw_iron | 30 |
+| base:blueprint_forge | Iron Age | deep (22 deep) | 1024, 80 % | 210 | crafting base:forge | 45 |
+
 ## What exists, by age and path
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (551)
+### Stone Age (553)
 
 **tech** (46)
 
@@ -455,7 +466,7 @@ Every named item and block, by its tag (`content::RULES`). EM is the cheapest wa
 - beast: animals:amber (2.0), animals:amber_block (8.1), animals:brown_trout_egg (4.0), animals:carcass (0.13), animals:cedarosaurus_egg (4.0), animals:citipati_egg (4.0), animals:club (0.40), animals:confuciusornis_egg (4.0), animals:crocodyliform_egg (4.0), animals:gastonia_egg (4.0), animals:gobipteryx_egg (4.0), animals:golden_eagle_egg (4.0), animals:great_horned_owl_egg (4.0), animals:herring_gull_egg (4.0), animals:house_sparrow_egg (4.0), animals:iguanodont_egg (4.0), animals:kibble (0.62), animals:lungfish_egg (4.0), animals:lycoptera_egg (4.0), animals:nest (0.45), animals:pacu_egg (4.0), animals:pinacosaurus_egg (4.0), animals:priscagama_egg (4.0), animals:protoceratops_egg (4.0), animals:psittacosaurus_egg (4.0), animals:raptor_egg (4.0), animals:raven_egg (4.0), animals:savanna_hawk_egg (4.0), animals:sedative (0.73), animals:snow_bunting_egg (4.0), animals:snowy_owl_egg (4.0), animals:spectacled_caiman_egg (4.0), animals:tranquilizer_dart (0.31), animals:turkey_vulture_egg (4.0), animals:utahraptor_egg (4.0), animals:utahraptor_saddle (8.1), animals:velociraptor_osmolskae_egg (4.0), animals:wyvern_egg (4.0), animals:yacare_caiman_egg (4.0)
 - technical: animals:gateway (-), animals:termite_mound_upper (-)
 
-**shared** (456)
+**shared** (458)
 
 - ground: animals:red_sand (0.10), animals:red_sandstone (0.15), banded_clay (0.15), banded_clay_coal_ore (-), brain_coral_block (0.15), clay (0.10), coal_ore (-), coarse_dirt (0.10), cobblestone (0.15), coral_rubble (0.15), cream_sandstone (0.15), deep_leaf_litter (0.10), dirt (0.10), dried_mud (0.10), fallen_branch (-), glacier_ice (0.15), granite (0.15), grass (0.10), gravel (0.10), ice (0.15), impact_glass (0.10), lake_ice (0.15), leaf_litter (0.10), limestone (0.15), loose_flint (-), loose_rock (-), loose_tektite (-), moss_block (0.10), mossy_cobblestone (0.15), ochre_sandstone (0.15), podzol (0.10), porites_coral_block (0.15), red_sandstone (0.15), sand (0.10), sandstone (0.15), slate (0.15), snow (0.10), snow_layer (0.10), snowy_grass (0.10), staghorn_coral_block (0.15), suevite (0.15), weathered_limestone (0.15)
 - wood: animals:araucaria_leaves (0.10), animals:araucaria_log (0.30), animals:araucaria_sapling (0.10), animals:ginkgo_leaves (0.10), animals:ginkgo_log (0.30), animals:ginkgo_sapling (0.10), animals:rotten_log (0.30), animals:scale_conifer_leaves (0.10), animals:scale_conifer_log (0.30), animals:scale_conifer_sapling (0.10), animals:swamp_cypress_leaves (0.10), animals:swamp_cypress_log (0.30), animals:swamp_cypress_sapling (0.10), animals:tempskya_leaves (0.10), animals:tempskya_log (0.30), acacia_branch (0.20), acacia_leaves (0.10), acacia_log (0.30), acacia_planks (0.09), acuri_palm_leaves (0.10), acuri_palm_log (0.30), acuri_palm_planks (0.09), acuri_palm_sapling (0.10), andiroba_branch (0.20), andiroba_leaves (0.10), andiroba_log (0.30), andiroba_planks (0.09), andiroba_sapling (0.10), birch_branch (0.20), birch_leaves (0.10), birch_log (0.30), birch_log_hollow (0.31), birch_planks (0.09), birch_wood (0.31), brazil_nut_branch (0.20), brazil_nut_buttress (0.30), brazil_nut_leaves (0.10), brazil_nut_log (0.30), brazil_nut_planks (0.09), brazil_nut_sapling (0.10), bush_leaves (0.10), cacao_leaves (0.10), cacao_log (0.30), cacao_planks (0.09), cacao_sapling (0.10), cherry_branch (0.20), cherry_leaves (0.10), cherry_log (0.30), cherry_planks (0.09), cherry_sapling (0.10), creosote_leaves (0.10), dogwood_branch (0.20), dogwood_leaves (0.10), dogwood_log (0.30), ipe_branch (0.20), ipe_leaves (0.10), ipe_log (0.30), ipe_planks (0.09), ipe_sapling (0.10), juniper_leaves (0.10), matamata_branch (0.20), matamata_leaves (0.10), matamata_log (0.30), matamata_planks (0.09), matamata_sapling (0.10), mesquite_branch (0.20), mesquite_leaves (0.10), mesquite_log (0.30), mesquite_planks (0.09), mesquite_sapling (0.10), moriche_palm_leaves (0.10), moriche_palm_log (0.30), moriche_palm_planks (0.09), moriche_palm_sapling (0.10), mossy_sequoia_log (0.30), oak_branch (0.20), oak_leaves (0.10), oak_log (0.30), oak_log_hollow (0.31), oak_planks (0.09), oak_wood (0.31), sapling (0.10), sequoia_leaves (0.10), sequoia_log (0.30), sequoia_planks (0.09), sequoia_sapling (0.10), spruce_leaves (0.10), spruce_log (0.30), spruce_log_hollow (0.31), spruce_planks (0.09), spruce_wood (0.31), stripped_acacia_log (0.30), stripped_acuri_palm_log (0.30), stripped_andiroba_log (0.30), stripped_birch_log (0.30), stripped_brazil_nut_log (0.30), stripped_cacao_log (0.30), stripped_cherry_log (0.30), stripped_dogwood_log (0.30), stripped_ipe_log (0.30), stripped_matamata_log (0.30), stripped_mesquite_log (0.30), stripped_moriche_palm_log (0.30), stripped_oak_log (0.30), stripped_sequoia_log (0.30), stripped_spruce_log (0.30), willow_leaves (0.10)
@@ -467,8 +478,8 @@ Every named item and block, by its tag (`content::RULES`). EM is the cheapest wa
 - station: animals:drenkaun_altar (1.9), bow_drill (0.23), campfire_laid (0.75), charcoal_clamp (1.1), compost_bin (0.66), cooking_pot (0.75), drying_rack (0.30), fire_bed (0.22), hand_drill (0.15), stew (0.80), tanning_frame (0.58), tanning_pit (0.66)
 - building: bed (1.5), bookshelf (11), chest (0.75), crafting_table (0.40), hay_bale (1.9), ladder (0.13), oak_door (0.19), wool (0.38)
 - light: torch (0.11)
-- part: animals:warden_heartseed (45)
-- technical: campfire (-), farmland (-), grazed_grass (-), lava (-), maize_top (-), melon_stem (-), millet_top (-), paddy_rice (-), pumpkin_stem (-), sorghum_top (-), tombstone (-), water (-), packages:unknown (-), portals:portal (-)
+- part: animals:warden_heartseed (45), blueprint_crucible (12)
+- technical: campfire (-), farmland (-), grazed_grass (-), lava (-), maize_top (-), melon_stem (-), millet_top (-), paddy_rice (-), pumpkin_stem (-), ruin_pedestal (-), sorghum_top (-), tombstone (-), water (-), packages:unknown (-), portals:portal (-)
 
 Notes:
 - base:short_grass, base:tall_tallgrass, base:bluegrass, base:tulip_*, base:inula, base:verbascum, base:lavender, base:moss, base:bush_stem, base:raspberry_leaves, base:snowberry_leaves, base:porcini_mushroom, base:chanterelle_mushroom, base:toadstool_mushroom, base:dryads_saddle_mushroom: upstream's grasses, flowers, moss, berry bushes and forest mushrooms: no worldgen of ours grows them yet
@@ -486,6 +497,8 @@ Notes:
 - base:dowsing_rod: senses the ley lines: the Stone Age's magic route
 - base:ley_stone: the ancients' carved stone round the waystones, some 600 blocks apart
 - base:waystone: a sleeping waystone on a great ley crossing: not carried off, woken later
+- base:blueprint_crucible: a Stone ruin's blueprint (an open ring on a ley line, one within 300 blocks of spawn): teaches the crucible, the Stone Age key's knowledge
+- base:ruin_pedestal: a ruin's pedestal: gives each player its blueprint once, not carried off
 - base:axe, base:pickaxe, base:shovel, base:hoe, base:knife, base:spear, base:sword, base:bow: built from parts: its parts' materials set its real age (`MATERIALS`)
 - base:helmet, base:chestplate, base:leggings, base:boots: built from a shell, fastening and lining: its shell sets its real age; a leather-look shell (leather, rawhide, bone)
 - base:part_*: a part's material sets its real age (`MATERIALS`)
@@ -500,7 +513,7 @@ Notes:
 - animals:warden_antler, animals:warden_bark: Drenkaun's part breaks and loot
 - animals:kibble: an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: "move them to fit")
 
-### Bronze Age (49)
+### Bronze Age (51)
 
 **tech** (43)
 
@@ -515,16 +528,19 @@ Notes:
 
 - sky: pallasite (20)
 
-**shared** (5)
+**shared** (7)
 
 - material: animals:borkon_horn (20), animals:height_fleece (20), animals:mountain_offering (3.8)
 - station: animals:borkon_altar (5.1)
-- part: animals:summit_stone (60)
+- building: sealed_stone (0.50)
+- part: animals:summit_stone (60), blueprint_ironwork (30)
 
 Notes:
 - base:copper_ore, base:tin_ore: breaks into raw copper or raw tin (a stone pickaxe): copper in cold, dry and beach land, tin on beaches and in mountains (`metals.rs`)
 - base:meteorite, base:gold_ore, base:granite_gold_ore: breaks into meteoric iron or raw gold (a stone pickaxe)
 - base:pallasite: a stony-iron meteorite's olivine, found where one fell
+- base:blueprint_ironwork: a Bronze vault's blueprint (sealed stone, a copper pickaxe): teaches smelting raw iron, the Bronze Age key's knowledge
+- base:sealed_stone: the Bronze vaults' shell: a copper pickaxe breaks it (vitals::ruins::WARD_BRONZE)
 - base:helmet_scale, base:chestplate_scale, base:leggings_scale, base:boots_scale: a bronze or copper shell's worn look: no copper or bronze in the game yet (only `/gear`)
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
 - base:raw_gold, base:gold_ingot, base:gold_block: cast and soft: the Bronze Age's (Ronald, 11-07: "move them to fit")
@@ -534,7 +550,7 @@ Notes:
 - animals:summit_stone: Borkon's loot, certain by the third kill: the Bronze Age key's boss part
 - animals:borkon_horn, animals:height_fleece: Borkon's part breaks and loot
 
-### Iron Age (65)
+### Iron Age (67)
 
 **tech** (25)
 
@@ -556,12 +572,13 @@ Notes:
 
 - beast: animals:wyvern_saddle (15)
 
-**shared** (7)
+**shared** (9)
 
 - food: salt (3.9), salted_meat (4.3)
 - material: animals:heartwood_offering (17), animals:peak_offering (25)
 - tool: animals:spyglass (2.6)
-- part: animals:summit_lodestone (80), animals:warden_heartwood (80)
+- building: warded_stone (0.50)
+- part: animals:summit_lodestone (80), animals:warden_heartwood (80), blueprint_forge (45)
 
 Notes:
 - base:shield: upstream's shield: planks round an iron boss, so the Iron Age's (whole, not built from parts)
@@ -570,6 +587,8 @@ Notes:
 - base:potion_*, base:glass_bottle: upstream's potions and their bottle: no brewing yet, only creative or commands
 - base:iron_ore, base:granite_iron_ore, base:red_sandstone_iron_ore: breaks into raw iron (a bronze pickaxe: `vitals::gear::IRON_ORE_HARVEST`, Ronald 11-23)
 - base:redstone_ore, base:star_steel_ore: breaks into its ore (an iron pickaxe)
+- base:blueprint_forge: a deep Iron vault's blueprint (warded stone, a bronze pickaxe): teaches the forge, the Iron Age key's knowledge
+- base:warded_stone: the Iron vaults' shell: a bronze pickaxe breaks it (vitals::ruins::WARD_IRON)
 - base:helmet_mail, base:chestplate_mail, base:leggings_mail, base:boots_mail: the same armour with an iron or steel shell, an item of its own only for its worn look (`parts::ARMOUR_LOOKS`)
 - base:star_lantern: a starheart in iron
 - base:unlearning_stone: a peridot ground with tektites: gives back perk web nodes (vitals::perks)

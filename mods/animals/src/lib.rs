@@ -87,6 +87,7 @@ mod signatures;
 mod small_bird;
 mod species;
 mod store;
+mod stuck;
 mod taming;
 mod utahraptor;
 mod voices;
@@ -170,6 +171,7 @@ fn init(r: &mut Registry) {
     comfort::init(r);
     forage::init(r);
     drink::init(r);
+    stuck::init(r);
     hunt::init(r);
     anim::init(r);
     senses::init(r);

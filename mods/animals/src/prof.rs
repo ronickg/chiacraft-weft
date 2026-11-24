@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead,recall,wetter)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -248,6 +248,73 @@ pub fn init(r: &mut Registry) {
                 crate::senses::WIND_TEST.store(v.to_bits(), Relaxed);
                 format!("animals' wind toward {v}")
             }
+            "where" => {
+                // Every wild animal within `value` blocks (256 by default): where it is, what it is
+                // doing, its food, water and health, for runs that follow a herd's wanderings.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let r = cmd.float("value").unwrap_or(256.0);
+                let rows: Vec<String> = w
+                    .entities_near(me.pos, r, None)
+                    .into_iter()
+                    .filter_map(|id| {
+                        let a = w.component(id, &crate::animal::ANIMAL).filter(|a| a.species != 0)?;
+                        let e = w.entity(id)?;
+                        Some(format!(
+                            "{id} {} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}",
+                            a.species()?.name,
+                            e.pos.x,
+                            e.pos.y,
+                            e.pos.z,
+                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
+                                .get(crate::choose::doing(&w, id) as usize)
+                                .unwrap_or(&"?"),
+                            a.food as f32 / a.stat(crate::species::FOOD).max(1.0) * 100.0,
+                            (1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0,
+                            e.health
+                        ))
+                    })
+                    .collect();
+                format!("ANIMAL_WHERE {}", rows.join(" | "))
+            }
+            "cave" => {
+                // Every wild animal within `value` blocks (32 by default): the blocks round it,
+                // 17 x 17 a layer from 3 under its feet to 14 over ('#' solid, '~' water, '.' open;
+                // rows north to south, x west to east, its own column 'A'), and what its way-up
+                // search finds (`stuck::way_out`), for a cave or a pit a script can't see into.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let r = cmd.float("value").unwrap_or(32.0);
+                let mut n = 0;
+                for id in w.entities_near(me.pos, r, None) {
+                    if w.component(id, &crate::animal::ANIMAL).is_none_or(|a| a.species == 0) {
+                        continue;
+                    }
+                    let Some(e) = w.entity(id) else { continue };
+                    n += 1;
+                    let (fx, fy, fz) = (e.pos.x.floor() as i32, (e.pos.y + 0.05).floor() as i32, e.pos.z.floor() as i32);
+                    weft_sdk::info!("ANIMAL_CAVE {id} at {fx} {fy} {fz}: {}", crate::stuck::way_out_report(&w, id, &e));
+                    for y in fy - 3..=fy + 14 {
+                        let rows: Vec<String> = (fz - 8..=fz + 8)
+                            .map(|z| {
+                                (fx - 8..=fx + 8)
+                                    .map(|x| {
+                                        if x == fx && z == fz && y == fy {
+                                            'A'
+                                        } else if w.block_flags([x, y, z]) & abi::block_flags::SOLID != 0 {
+                                            '#'
+                                        } else if w.in_liquid([x as f64 + 0.5, y as f64 + 0.5, z as f64 + 0.5]) {
+                                            '~'
+                                        } else {
+                                            '.'
+                                        }
+                                    })
+                                    .collect()
+                            })
+                            .collect();
+                        weft_sdk::info!("ANIMAL_CAVE {id} y {y}: {}", rows.join("/"));
+                    }
+                }
+                format!("ANIMAL_CAVE {n} animals")
+            }
             "senses" => {
                 // What the animals nearest the player have noticed: awareness of hunters and of
                 // players, by whom.
@@ -267,7 +334,7 @@ pub fn init(r: &mut Registry) {
                         let e = w.entity(id)?;
                         let kind = name_of(abi::entry_kind::ENTITY, e.kind);
                         Some(format!(
-                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {} lead {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}, nav {} moved {:.3} ground {} pose {} using {}",
+                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {} lead {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}, nav {} moved {:.3} ground {} pose {} using {}, food {} water {} health {:.0}",
                             d2.sqrt(),
                             s.player,
                             s.fright,
@@ -290,7 +357,13 @@ pub fn init(r: &mut Registry) {
                             e.moved,
                             e.on_ground,
                             e.pose,
-                            e.using
+                            e.using,
+                            // Its stomach and water, for the self-feeding checks.
+                            w.component(id, &crate::animal::ANIMAL)
+                                .map_or("-".into(), |a| format!("{:.0}%", a.food as f32 / a.stat(crate::species::FOOD).max(1.0) * 100.0)),
+                            w.component(id, &crate::animal::ANIMAL)
+                                .map_or("-".into(), |a| format!("{:.0}%", (1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0)),
+                            e.health
                         ))
                     })
                     .collect();
