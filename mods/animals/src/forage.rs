@@ -346,6 +346,19 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
             if now < f[3] {
                 return true; // walking to it
             }
+            // Its walk ended short of it, as of a patch below: it gives it up and, ended short where
+            // the last did too, looks for a way out. Without it a deer in a pit walked at seeds on
+            // its rim for ever, found the same each time (ai1124_pit4b: 140 s "eating", no move).
+            if !w.navigating(id) {
+                weft_sdk::debug!("animal {id} can't reach the food on the ground at {:?}: looks elsewhere", e.pos);
+                if let Some(i) = w.component_mut(id, &ITEM) {
+                    *i = 0;
+                }
+                if let Some(c) = w.component_mut(id, &FORAGE) {
+                    *c = [f64::NAN, 0.0, 0.0, now + NOTHING];
+                }
+                return crate::stuck::short(w, id, st);
+            }
         }
         // Gone (eaten, taken) or out of reach still: it looks again.
         w.component_mut(id, &ITEM).map(|i| *i = 0);
