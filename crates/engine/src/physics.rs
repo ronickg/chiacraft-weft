@@ -1892,6 +1892,7 @@ pub fn walk(
                 || (0..=ctl.drop_guard.ceil() as i32 + 1).any(|k| block.liquid(c, at - IVec3::Y * k).is_some())
         };
         let shrink = |v: f64| if v.abs() < 0.05 { 0.0 } else { v - 0.05 * v.signum() };
+        let wanted = (vel.x, vel.z);
         while vel.x != 0.0 && !ground(vel.x, 0.0) {
             vel.x = shrink(vel.x);
         }
@@ -1901,6 +1902,9 @@ pub fn walk(
         while vel.x != 0.0 && vel.z != 0.0 && !ground(vel.x, vel.z) {
             vel.x = shrink(vel.x);
             vel.z = shrink(vel.z);
+        }
+        if (vel.x, vel.z) != wanted {
+            log::debug!(target: "drop_guard", "entity {skip} at {:.2} {:.2} {:.2} held back: {:.3} {:.3} to {:.3} {:.3}", pos.x, pos.y, pos.z, wanted.0, wanted.1, vel.x, vel.z);
         }
     }
     let before = *pos;
