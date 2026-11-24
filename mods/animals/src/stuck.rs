@@ -4,8 +4,8 @@
 //! `LEAP_AFTER` it leaps. Its need's goal carries the walk while it lasts (`going`).
 
 use animals_core::needs::{
-    FLEE_DROP, LEAP_AFTER, LEAP_MOST, LEAP_OVER, LEAP_REACH, STUCK_AFTER, STUCK_NEAR, WALK_MOVED, WAY_CLOSER, WAY_OUT_LEG, WAY_OUT_SECS,
-    WAY_OUT_WAYS, WAY_UP_CELLS, WAY_UP_REACH,
+    FLEE_DROP, LEAP_AFTER, LEAP_MOST, LEAP_OVER, LEAP_REACH, LEAP_TRIES, STUCK_AFTER, STUCK_NEAR, WALK_MOVED, WAY_CLOSER, WAY_OUT_LEG,
+    WAY_OUT_SECS, WAY_OUT_WAYS, WAY_UP_CELLS, WAY_UP_REACH,
 };
 use weft_sdk::*;
 
@@ -87,6 +87,9 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
         // between. Never a leap at nothing: in a shaft a deer leapt at its walls and fell back
         // sixty times in 25 game seconds, and the falls killed it (ai1124_savanna15e).
         let aimed = if leap_on.is_some() || n >= LEAP_AFTER || up.is_none() { leap_on.or_else(|| landing(w, st)) } else { None };
+        // At most `LEAP_TRIES` leaps from one stuck place that leave it there (ai1124_savanna17: a
+        // deer leapt 70 times, 0.33 s apart, at the pond's rim it could step onto).
+        let aimed = aimed.filter(|_| n < LEAP_AFTER + LEAP_TRIES);
         if aimed.is_none() && (n >= LEAP_AFTER || up.is_none()) {
             // Nothing to leap at: it stays, its need's goal letting the band move on.
             if let Some(c) = w.component_mut(id, &STUCK) {
@@ -197,7 +200,8 @@ fn landing(w: &World, st: &EntityState) -> Option<(f64, f64, f64)> {
             let (bx, bz) = (fx + dx, fz + dz);
             // `ground` looks from 3 above the height it is given down: its highest is the feet's limit.
             let Some(g) = crate::comfort::ground(w, bx, feet + LEAP_MOST - 3, bz) else { continue };
-            if g <= feet || g - feet > LEAP_MOST || (g..=top).any(|y| solid([bx, y, bz])) {
+            // Higher than a step (one up it walks), at most `LEAP_MOST`, open over it.
+            if g < feet + 2 || g - feet > LEAP_MOST || (g..=top).any(|y| solid([bx, y, bz])) {
                 continue;
             }
             let (ox, oz) = (bx as f64 + 0.5 - st.pos.x, bz as f64 + 0.5 - st.pos.z);

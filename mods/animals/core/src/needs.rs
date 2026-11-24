@@ -370,6 +370,9 @@ pub const LEAP_DRAG: f64 = 1.15;
 /// drag (vanilla's, keeping 0.91 of it a tick) stopped it short and against the wall it rose
 /// along, and it fell back in (ai1124_pit5e: twenty leaps 1 across and 2 up, none out).
 pub const LEAP_OVER: f64 = 7.0;
+/// Leaps from one stuck place that leave it there before it stops leaping (till it is somewhere
+/// else): a deer on level ground leapt 70 times at a rim it could step onto (ai1124_savanna17).
+pub const LEAP_TRIES: u8 = 3;
 /// The steepest drop a running animal takes (`senses::escape`): it can step back up one, not two.
 pub const FLEE_DROP: i32 = 1;
 const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WAY_OUT_WAYS);
