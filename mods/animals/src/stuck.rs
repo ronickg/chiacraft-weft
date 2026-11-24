@@ -21,12 +21,18 @@ static LEAP_TO: Component<[f64; 5]> = Component::named("animal_leap_to");
 /// kept as the goal of its way out: `way_out`), with 1 once it has walked to one.
 static SET_OFF: Component<[f64; 6]> = Component::named("animal_set_off");
 
+/// A search for water or food it knows none of (`search`): until when (game ticks) it walks the
+/// leg, the way of 8 it walked, and when it set off.
+static SEARCH: Component<[f64; 3]> = Component::named("animal_search");
+
 pub fn init(r: &mut Registry) {
     r.entity_component(&STUCK, [0.0; 5], 0);
+    r.entity_component(&SEARCH, [0.0; 3], 0);
     r.entity_component(&SET_OFF, [0.0; 6], 0);
     r.entity_component(&LEAP_TO, [0.0; 5], 0);
     for s in crate::species::SPECIES.iter() {
         r.edit(s.kind).attach(&STUCK);
+        r.edit(s.kind).attach(&SEARCH);
         r.edit(s.kind).attach(&SET_OFF);
         r.edit(s.kind).attach(&LEAP_TO);
     }
@@ -217,6 +223,57 @@ fn landing(w: &World, st: &EntityState) -> Option<(f64, f64, f64)> {
         }
     }
     best.map(|(x, y, z, _)| (x, y, z))
+}
+
+/// Driven by thirst or hunger and knowing none it can find: shut in, it looks for a way out
+/// (`short`); else it walks a leg of `WAY_OUT_LEG` to search, for water the way whose ground is
+/// lowest (water lies low; not back the way it came), for food a way turned on each leg. True while
+/// it walks one (its need's goal keeps the turn).
+pub fn search(w: &World, id: u64, st: &EntityState, water: bool) -> bool {
+    if enclosed(w, st) {
+        return short(w, id, st);
+    }
+    let Some(s) = w.component(id, &SEARCH) else { return false };
+    let now = w.game_time() as f64;
+    if now < s[0] && w.navigating(id) {
+        return true;
+    }
+    // A leg that ended at once: the next a second on, not every tick.
+    if now < s[2] + 20.0 {
+        return false;
+    }
+    let last = s[1] as usize % 8;
+    let way = |i: usize| {
+        let a = i as f64 * std::f64::consts::TAU / 8.0;
+        (a.cos(), a.sin())
+    };
+    let at = |i: usize| {
+        let (dx, dz) = way(i);
+        let (x, z) = ((st.pos.x + dx * WAY_OUT_LEG).floor() as i32, (st.pos.z + dz * WAY_OUT_LEG).floor() as i32);
+        let y = st.pos.y.floor() as i32;
+        // The ground there, from 8 over its feet down to 24 under.
+        (y - 24..=y + 8)
+            .rev()
+            .find(|&g| crate::comfort::ground(w, x, g, z) == Some(g))
+    };
+    let pick = if water {
+        (0..8)
+            .filter(|&i| i != (last + 4) % 8)
+            .filter_map(|i| Some((i, at(i)?)))
+            .min_by_key(|&(i, g)| (g, (i + 8 - last) % 8))
+            .map(|(i, _)| i)
+    } else {
+        Some((last + 3) % 8)
+    };
+    let Some(i) = pick else { return false };
+    let (dx, dz) = way(i);
+    let to = [st.pos.x + dx * WAY_OUT_LEG, at(i).map_or(st.pos.y, f64::from), st.pos.z + dz * WAY_OUT_LEG];
+    weft_sdk::info!("animal {id} searches for {} toward {:.0} {:.0} {:.0}", if water { "water" } else { "food" }, to[0], to[1], to[2]);
+    w.navigate(id, to, 1.0);
+    if let Some(c) = w.component_mut(id, &SEARCH) {
+        *c = [now + (WAY_OUT_SECS * 20.0) as f64, i as f64, now];
+    }
+    true
 }
 
 /// Whether the ground `st` can walk to from its feet (up one, down at most `FLEE_DROP` + 2) is

@@ -407,8 +407,9 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
             return true;
         }
     } else if now < f[3] {
-        // Walking to it; or nothing near, wandering on.
-        return target.is_some();
+        // Walking to it; or nothing near, wandering on: driven, it searches (`stuck::search`).
+        return target.is_some()
+            || (animals_core::needs::hunger_score(full, false) >= animals_core::memory::DRIVEN && crate::stuck::search(w, id, st, false));
     } else if target.is_some() && crate::stuck::ended_short(w, id, st) {
         // Its walk ended short of the food: it can't get there. It gives that patch up and lets
         // its wander take it elsewhere, not walking at it again and again (graze5: a deer stood
@@ -442,9 +443,9 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
         None => f = [f64::NAN, 0.0, 0.0, now + NOTHING],
     }
     w.component_mut(id, &FORAGE).map(|c| *c = f);
-    // Driven by hunger and finding no food: it looks for some, as one stuck does (`stuck`).
+    // Driven by hunger and finding no food: it searches for some (`stuck::search`).
     if f[0].is_nan() && animals_core::needs::hunger_score(full, false) >= animals_core::memory::DRIVEN {
-        return crate::stuck::short(w, id, st);
+        return crate::stuck::search(w, id, st, false);
     }
     !f[0].is_nan()
 }

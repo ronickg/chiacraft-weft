@@ -377,9 +377,11 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         // Ended short where the last did too: it is stuck, and looks for a way out (`stuck`).
         return crate::stuck::short(w, id, st);
     }
+    let driven = needs::thirst_score(water, true) >= animals_core::memory::DRIVEN;
     if now < d[3] {
-        // Walking to it; or no water near, foraging and wandering on.
-        return spot.is_some();
+        // Walking to it; or no water near, foraging and wandering on: driven, it searches for some
+        // (`stuck::search`).
+        return spot.is_some() || (driven && crate::stuck::search(w, id, st, true));
     }
     // Its walk's time is up short of the water and it got nowhere (`stuck::ended_short`: herd
     // mates jostling keep the engine walking one that can't get there): as one ended short.
@@ -390,7 +392,6 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         }
         return crate::stuck::short(w, id, st);
     }
-    let driven = needs::thirst_score(water, true) >= animals_core::memory::DRIVEN;
     match find_water(w, id, s.kind, st.pos.to_array(), driven) {
         Some(p) => {
             weft_sdk::debug!("{} {id} is thirsty (water {:.0}%): to water at {p:?}", s.name, water * 100.0);
@@ -401,11 +402,12 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         None => d = [f64::NAN, 0.0, 0.0, now + NOTHING],
     }
     w.component_mut(id, &DRINK).map(|c| *c = d);
-    // Driven by thirst and knowing no water it can find: it looks for some, as one stuck does
-    // (`stuck`): deer in the cave under a pond, 9 blocks below it and never having seen it, stood
-    // doing nothing while their water fell from 60 % to 17 % (ai1124_cave2).
+    // Driven by thirst and knowing no water it can find: it searches for some, downhill, or shut in
+    // looks for a way out (`stuck::search`): deer in the cave under a pond, never having seen it,
+    // stood doing nothing as their water fell from 60 % to 17 % (ai1124_cave2), and a deer on a
+    // dune 24 blocks from the pond stared at the player till it died of thirst (graze15).
     if d[0].is_nan() && driven {
-        return crate::stuck::short(w, id, st);
+        return crate::stuck::search(w, id, st, true);
     }
     !d[0].is_nan()
 }
