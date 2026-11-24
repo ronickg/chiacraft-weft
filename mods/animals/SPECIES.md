@@ -2843,8 +2843,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | leaves 40%, seeds 25%, fruit 10%, meat 15%, insects 10% |
 | hunts | 0.0%-5% of its mass alone (0.04-4 kg); at home: kryptobaatar, gobipteryx |
 | a meal that fills it | 9 kg |
-| room by its prey | red_dunes 1, scrubland 1 (as many as 30% of their young a year feed, at most its crowd) |
-| drinks | 100% of its 5.681 L a day; a drink lasts 24 min, thirsty after 12 |
+| room by its prey | red_dunes 2, scrubland 2 (as many as 30% of their young a year feed, at most its crowd) |
+| drinks | 40% of its 5.681 L a day; a drink lasts 59 min, thirsty after 30 |
 | its food grows at home (spring/summer/autumn/winter) | red_dunes 40/40/40/40%, scrubland 40/40/40/40% |
 | feedings to tame at level 0 | 0 (3x at level 200) |
 | scared by a walking player within | 12 blocks (twice that running) |
