@@ -1210,8 +1210,16 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             // what the screen's white could hold here), so the bloom spreads a wide glare round it
             // as Bliss's low sun has, and the curve keeps the disc itself white-gold.
             let hot = select(1.0, 16.0, scene.frame.x > 0.5);
-            rgb = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g) * (disc * mix(3.0, 1.5, g) * hot + halo);
-            shape = smoothstep(0.0, 0.004, disc + halo);
+            // With `OPT_SUN_DISC` as Bliss's: the disc near white at any height (a sun bright enough
+            // to glare reads white; only its glow takes the low sun's gold) and the glow twice as
+            // wide. Deep orange at 16 times the screen's white, ours clipped to a yellow-green blob.
+            let soft = clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0);
+            let wide = exp(-r * 3.0) * (1.0 - smoothstep(0.7, 1.0, r)) * 0.9;
+            let glow = mix(halo, wide, soft);
+            let core = mix(mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g), mix(vec3(1.0, 0.97, 0.92), vec3(1.0, 0.86, 0.68), g), soft);
+            let ring = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g);
+            rgb = core * disc * mix(3.0, 1.5, g) * hot + ring * glow;
+            shape = smoothstep(0.0, 0.004, disc + glow);
         }
         // A blood moon: copper, then a deep red disc, dimmer in totality.
         if is_moon && blood_moon() > 0.0 {

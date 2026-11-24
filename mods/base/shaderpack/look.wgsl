@@ -210,6 +210,8 @@ const OPT_MIST_DAWN_TINT: u32 = 56u;
 const OPT_MIST_DOMES: u32 = 57u;
 // The sky's haze never darker than the sky behind it (`LOOK_HORIZON_LIFT`).
 const OPT_HORIZON_LIFT: u32 = 58u;
+// The low sun's disc near white with a wide glow (`LOOK_SUN_DISC`).
+const OPT_SUN_DISC: u32 = 59u;
 // With `OPT_MIST_DOMES` at 1: how much higher the layer's top lies (blocks) and how much denser it is.
 const MIST_DEEP: f32 = 0.0;
 // Bliss's banks (`OPT_MIST_DOMES`): their foot over the sea where the ground is not mapped, their fall
@@ -223,7 +225,7 @@ const MIST_BANK_DENSE: f32 = 0.9;
 const MIST_DEEP_DENSE: f32 = 1.2;
 // With it, how much light the mist in the sun's shade keeps (Bliss's in shade is dark, the shafts
 // show): of the bounce, and of the sky's.
-const MIST_DEEP_SHADE: f32 = 0.35;
+const MIST_DEEP_SHADE: f32 = 0.2;
 fn evening_air_fade() -> f32 {
     let k = clamp(fantasy_opt(OPT_AIR_FADE), 0.0, 1.0);
     if k <= 0.0 {
