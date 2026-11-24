@@ -128,6 +128,42 @@ pub fn weapon(kind: &str, level: f32) -> Option<(f32, f32)> {
 /// times, as a blade's grade is: its stave's spring, its grade and its gems (`crafting::combine`).
 pub const ARROW_LEVEL: f32 = REFERENCE_DEPTH;
 
+/// What an arrow's head can be, in order (an arrow keeps its place here plus one; 0 is a plain
+/// flint one): every material that makes an arrow's head (`crafting`'s working materials;
+/// progression's ranged check holds them equal). Its item level is its material's.
+pub const ARROWHEADS: &[&str] = &[
+    "flint",
+    "chert",
+    "obsidian",
+    "tektite",
+    "bone",
+    "antler",
+    "copper",
+    "bronze",
+    "meteoric_iron",
+    "wrought_iron",
+    "steel",
+    "star_steel",
+    "diamond",
+];
+
+/// An arrowhead's place in `ARROWHEADS`.
+pub fn arrowhead_of(material: &str) -> Option<u32> {
+    ARROWHEADS
+        .iter()
+        .position(|m| *m == material)
+        .map(|i| i as u32)
+}
+
+/// The item level of an arrow headed with `ARROWHEADS[head]`: its material's (a plain one
+/// `ARROW_LEVEL`).
+pub fn arrow_level(head: u32) -> f32 {
+    ARROWHEADS
+        .get(head as usize)
+        .and_then(|m| material(m))
+        .map_or(ARROW_LEVEL, |m| m.level())
+}
+
 /// A drawn bow's power after `secs` held, 0 to 1 (vanilla's draw: full at one second, under 0.1
 /// it doesn't shoot). An arrow flies at its power times full speed and hits by its speed.
 pub fn draw_power(secs: f32) -> f32 {

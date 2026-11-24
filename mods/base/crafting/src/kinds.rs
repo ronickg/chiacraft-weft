@@ -94,6 +94,10 @@ pub const KINDS: &[Kind] = &[
         slots: &[s("stave", Role::Working), s("grip", Role::Holding), s("string", Role::Fitting)],
         damage: 6.0,
     },
+    // An arrow: only its head is a part (its material sets the arrow's item level,
+    // `vitals::gear::arrow_level`); a stick and a feather make the rest, four at a time at the
+    // assembly row (`base`'s `parts::fletched`). Never built as a tool.
+    Kind { id: "arrow", key: "kind.base.arrow", use_: Use::Shoot, slots: &[s("head", Role::Working)], damage: 0.0 },
     // Armour, head to feet (`materials::ARMOUR`, `vitals::gear::SLOT_SHARE`).
     Kind { id: "helmet", key: "kind.base.helmet", use_: Use::Guard, slots: ARMOUR, damage: 0.0 },
     Kind { id: "chestplate", key: "kind.base.chestplate", use_: Use::Guard, slots: ARMOUR, damage: 0.0 },
@@ -179,6 +183,8 @@ pub const SHAPES: &[Shape] = &[
     sh("short_stave", "bow", "stave", 280.0, (1.0, 1.15, 0.85, 0.0)),
     sh("grip", "bow", "grip", 40.0, (1.0, 1.0, 1.0, 0.0)),
     sh("bowstring", "bow", "string", 2.0, (1.0, 1.0, 1.0, 0.0)),
+    // An arrowhead: a few grams of flint, bone or metal.
+    sh("arrowhead", "arrow", "head", 2.0, (1.0, 1.0, 1.0, 0.0)),
     // Armour: a shell of its slot's size (a metal coat about 1.2 litres of iron, 9 kg; a leather
     // one under a kilogram), straps or rivets, and a lining (cloth's own density).
     sh("helmet_shell", "helmet", "shell", 300.0, (1.0, 1.0, 1.0, 0.0)),

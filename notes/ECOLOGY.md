@@ -681,7 +681,7 @@ and cactus.**
 - **Not yet:**
   - **Unloaded areas:** a wild animal's hunger and thirst don't run while its area is unloaded.
   - **Remembered water:** an animal finds water only within 16 blocks; a herd doesn't know its
-    waterholes (part of migration, later).
+    waterholes (built 11-22: a herd treks to water its kin remember, `drink::trek`).
 
 
 - **Hunger:** wild animals get the food meter tames have, using it up at the species' rate.
@@ -884,9 +884,9 @@ and cactus.**
 
 ## Later, once the loop runs
 
-- **Migration:** herds move towards wetter biomes in the dry season. The comfort goal's "seek a
+- **Migration:** herds move towards wetter biomes in the dry season. Built (11-23): the animals mod's `migrate.rs`, see `notes/ANIMALS.md`, slices 4-5. The comfort goal's "seek a
   place", with water and food as the target.
-- **Waterholes:** they shrink in the dry season, so animals gather at the rest.
+- **Waterholes:** they shrink in the dry season, so animals gather at the rest. Built (11-23): a pond's still water a block deep recedes from its corners to `base:dried_mud` in its biome's dry season, down to a last block, and fills back after (`waterholes.rs`, `vitals::climate::waterholes_shrink`).
 - **The seasons' look:** grass by soil water, autumn leaves and winter snow.
 - **Wildfire:** dry grass in the dry season burns and grows back greener.
 - **Allen's and Gloger's rules:** see Animals.

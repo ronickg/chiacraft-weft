@@ -826,7 +826,7 @@ fn aurora(dir: vec3<f32>) -> vec3<f32> {
     // An aurora storm (a sky event) reaches further and burns brighter; where it reaches comes with
     // the biomes' aurora shares the base mod widens for it.
     let storm = sky_event(4.0);
-    let strength = max(scene.ground.w, storm * 0.6) * mix(1.0, 2.2, storm) * smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount()) * (1.0 - scene.weather.z);
+    let strength = max(scene.ground.w, storm * 0.6) * mix(1.0, 2.2, storm) * smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount()) * (1.0 - air_mist());
     if strength <= 0.0 || dir.y <= 0.02 {
         return vec3(0.0);
     }

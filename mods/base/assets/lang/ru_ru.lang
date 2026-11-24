@@ -65,6 +65,7 @@ block.base.snow = Снег
 block.base.snow_layer = Слой снега
 block.base.ice = Лёд
 block.base.lake_ice = Озёрный лёд
+block.base.dried_mud = Высохший ил
 block.base.brain_coral_block = Блок мозгового коралла
 block.base.staghorn_coral_block = Блок оленерогого коралла
 block.base.porites_coral_block = Блок коралла поритес
@@ -241,6 +242,9 @@ command.base.litter = на земле в пределах {0} блоков: {1}
 command.base.fireflies = светлячков здесь сейчас: {0}% от числа в настройке ({1}; воздух {2} °C, средняя за день {3} °C, почва влажная на {4}%; {5} ч, закат в {6} ч) — у вас {7}%
 command.base.windleaf = над вами сорвался лист
 command.base.rain.dry = сегодня здесь без дождя; здесь дождь идёт в {0}% дней этого сезона
+command.base.waterholes.dry = водоёмы мелеют везде, {0}x
+command.base.waterholes.wet = водоёмы наполняются везде, {0}x
+command.base.waterholes.real = водоёмы по климату
 command.base.air.now = воздух здесь {4} °C, туман {0}%, ветер {1} м/с дует на {2}°; туман здесь в {3}% дней этого сезона
 command.base.air.set = туман {0}% и ветер {1} м/с везде на десять минут
 season.base.spring = весна
@@ -1278,6 +1282,7 @@ recipes.all = Все рецепты
 command.base.inspect.part = {0}: {1}, {2}, сделано в день {3}, чинилось {4}×, износ {5}
 command.base.inspect.tool = {0}: {1}, собрано из {2} деталей
 command.base.inspect.tool_part =   {0}: {1}, {2}, сделано в день {3}, чинилось {4}×
+command.base.inspect.arrow = {0} ×{1}: наконечник — {2}, уровень предмета {3}
 command.base.inspect.plain = Не собрано из деталей
 command.base.inspect.gems =   Камни: {0} из {1} гнёзд
 command.base.inspect.gem =     {0}, уровень предмета {1}: +{2}% всего
@@ -1888,3 +1893,5 @@ age.base.future = Век будущего
 age.base.stars = Век звёзд
 # A saddle's fitting (vitals::gear::SADDLE_FITTINGS, in its order; levels from vitals::gear::saddle_level).
 tagged.base.saddle_fit = {#c6a383}{if:value==0}Оковка: {lang:material.base.leather} · {lang:age.base.stone} · уровень предмета 5{/if}{if:value==1}Оковка: {lang:material.base.copper} · {lang:age.base.bronze} · уровень предмета 12{/if}{if:value==2}Оковка: {lang:material.base.bronze} · {lang:age.base.bronze} · уровень предмета 16{/if}{if:value==3}Оковка: {lang:material.base.meteoric_iron} · {lang:age.base.bronze} · уровень предмета 18{/if}{if:value==4}Оковка: {lang:material.base.wrought_iron} · {lang:age.base.iron} · уровень предмета 23{/if}{if:value==5}Оковка: {lang:material.base.steel} · {lang:age.base.iron} · уровень предмета 27{/if}{if:value==6}Оковка: {lang:material.base.star_steel} · {lang:age.base.iron} · уровень предмета 29{/if}{/}
+item.base.part_arrowhead = Наконечник стрелы
+tagged.base.arrow_head = {#c6a383}{if:value==1}Наконечник: {lang:material.base.flint} · {lang:age.base.stone} · уровень предмета 5{/if}{if:value==2}Наконечник: {lang:material.base.chert} · {lang:age.base.stone} · уровень предмета 5{/if}{if:value==3}Наконечник: {lang:material.base.obsidian} · {lang:age.base.stone} · уровень предмета 6{/if}{if:value==4}Наконечник: {lang:material.base.tektite} · {lang:age.base.stone} · уровень предмета 6{/if}{if:value==5}Наконечник: {lang:material.base.bone} · {lang:age.base.stone} · уровень предмета 3{/if}{if:value==6}Наконечник: {lang:material.base.antler} · {lang:age.base.stone} · уровень предмета 3{/if}{if:value==7}Наконечник: {lang:material.base.copper} · {lang:age.base.bronze} · уровень предмета 12{/if}{if:value==8}Наконечник: {lang:material.base.bronze} · {lang:age.base.bronze} · уровень предмета 16{/if}{if:value==9}Наконечник: {lang:material.base.meteoric_iron} · {lang:age.base.bronze} · уровень предмета 18{/if}{if:value==10}Наконечник: {lang:material.base.wrought_iron} · {lang:age.base.iron} · уровень предмета 23{/if}{if:value==11}Наконечник: {lang:material.base.steel} · {lang:age.base.iron} · уровень предмета 27{/if}{if:value==12}Наконечник: {lang:material.base.star_steel} · {lang:age.base.iron} · уровень предмета 29{/if}{if:value==13}Наконечник: {lang:material.base.diamond} · {lang:age.base.steam} · уровень предмета 35{/if}

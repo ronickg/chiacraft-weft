@@ -114,6 +114,7 @@ block.base.snow = Snow
 block.base.snow_layer = Snow layer
 block.base.ice = Ice
 block.base.lake_ice = Lake ice
+block.base.dried_mud = Dried mud
 block.base.brain_coral_block = Brain Coral Block
 block.base.staghorn_coral_block = Staghorn Coral Block
 block.base.porites_coral_block = Porites Coral Block
@@ -300,6 +301,9 @@ command.base.litter = on the ground within {0} blocks: {1}
 command.base.fireflies = fireflies here now: {0}% of the setting's count ({1}; the air {2} °C, today's mean {3} °C, the ground {4}% wet; {5} h, sunset {6} h) — on you {7}%
 command.base.windleaf = a leaf lets go above you
 command.base.rain.dry = no rain here today; it rains on {0}% of this season's days here
+command.base.waterholes.dry = waterholes shrink everywhere, {0}x
+command.base.waterholes.wet = waterholes fill everywhere, {0}x
+command.base.waterholes.real = waterholes by the climate
 command.base.air.now = air here {4} °C, fog {0}%, wind {1} m/s blowing toward {2}°; fog on {3}% of this season's days here
 command.base.air.set = fog {0}% and wind {1} m/s everywhere for ten minutes
 season.base.spring = spring
@@ -1286,6 +1290,7 @@ recipes.all = All recipes
 command.base.inspect.part = {0}: {1}, {2}, made on day {3}, repaired {4}×, worn {5}
 command.base.inspect.tool = {0}: {1}, built from {2} parts
 command.base.inspect.tool_part =   {0}: {1}, {2}, made on day {3}, repaired {4}×
+command.base.inspect.arrow = {1} {0}: {2} head, item level {3}
 command.base.inspect.plain = Not built from parts
 command.base.inspect.gems =   Gems: {0} of {1} sockets
 command.base.inspect.gem =     {0}, item level {1}: +{2}% in all
@@ -1895,3 +1900,5 @@ age.base.future = Age of the Future
 age.base.stars = Age of Stars
 # A saddle's fitting (vitals::gear::SADDLE_FITTINGS, in its order; levels from vitals::gear::saddle_level).
 tagged.base.saddle_fit = {#c6a383}{if:value==0}{lang:material.base.leather} fittings · {lang:age.base.stone} · item level 5{/if}{if:value==1}{lang:material.base.copper} fittings · {lang:age.base.bronze} · item level 12{/if}{if:value==2}{lang:material.base.bronze} fittings · {lang:age.base.bronze} · item level 16{/if}{if:value==3}{lang:material.base.meteoric_iron} fittings · {lang:age.base.bronze} · item level 18{/if}{if:value==4}{lang:material.base.wrought_iron} fittings · {lang:age.base.iron} · item level 23{/if}{if:value==5}{lang:material.base.steel} fittings · {lang:age.base.iron} · item level 27{/if}{if:value==6}{lang:material.base.star_steel} fittings · {lang:age.base.iron} · item level 29{/if}{/}
+item.base.part_arrowhead = Arrowhead
+tagged.base.arrow_head = {#c6a383}{if:value==1}{lang:material.base.flint} head · {lang:age.base.stone} · item level 5{/if}{if:value==2}{lang:material.base.chert} head · {lang:age.base.stone} · item level 5{/if}{if:value==3}{lang:material.base.obsidian} head · {lang:age.base.stone} · item level 6{/if}{if:value==4}{lang:material.base.tektite} head · {lang:age.base.stone} · item level 6{/if}{if:value==5}{lang:material.base.bone} head · {lang:age.base.stone} · item level 3{/if}{if:value==6}{lang:material.base.antler} head · {lang:age.base.stone} · item level 3{/if}{if:value==7}{lang:material.base.copper} head · {lang:age.base.bronze} · item level 12{/if}{if:value==8}{lang:material.base.bronze} head · {lang:age.base.bronze} · item level 16{/if}{if:value==9}{lang:material.base.meteoric_iron} head · {lang:age.base.bronze} · item level 18{/if}{if:value==10}{lang:material.base.wrought_iron} head · {lang:age.base.iron} · item level 23{/if}{if:value==11}{lang:material.base.steel} head · {lang:age.base.iron} · item level 27{/if}{if:value==12}{lang:material.base.star_steel} head · {lang:age.base.iron} · item level 29{/if}{if:value==13}{lang:material.base.diamond} head · {lang:age.base.steam} · item level 35{/if}
