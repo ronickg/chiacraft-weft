@@ -44,7 +44,7 @@ static SITE: Component<[f64; 3]> = Component::named("animal_site");
 pub(crate) const LOOK: f64 = 16.0;
 const WATCH: f64 = 10.0;
 /// It hunts under this share of its food, until this full (as foraging, `needs`).
-use animals_core::needs::{FULL, HUNGRY};
+use animals_core::needs::{FULL, HUNTS_AT};
 /// Ticks: a chase it gives up, between looks, and a flight.
 const GIVE_UP: u64 = 600;
 const LOOK_EVERY: u64 = 60;
@@ -207,7 +207,7 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     let full = a.food as f32 / a.stat(species::FOOD).max(1.0);
     // A fierce one hunts sooner (`roles::FIERCE_HUNGER`), a timid one later.
     let fierce = crate::senses::facts(w, id).map_or(0.0, |f| animals_core::roles::lean(f.persona()[2]));
-    let hungry = (HUNGRY + animals_core::roles::FIERCE_HUNGER * fierce).min(FULL - 0.05);
+    let hungry = (HUNTS_AT + animals_core::roles::FIERCE_HUNGER * fierce).min(FULL - 0.05);
     if animal::tamed(w, id) || full >= FULL || (h[0] == 0 && full >= hungry) {
         if h[0] != 0 {
             w.component_mut(id, &HUNT).map(|h| *h = [0; 4]);
@@ -378,7 +378,7 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
     let hungry = |l: u64| {
         w.component(l, &PROWL).is_some_and(|p| now < p)
             || w.component(l, &ANIMAL)
-                .is_some_and(|a| (a.food as f32) < a.stat(species::FOOD) * HUNGRY)
+                .is_some_and(|a| (a.food as f32) < a.stat(species::FOOD) * HUNTS_AT)
     };
     if let Some(l) = leader.filter(|&l| hungry(l)) {
         w.component_mut(id, &FOLLOW).map(|f| f[0] = l);

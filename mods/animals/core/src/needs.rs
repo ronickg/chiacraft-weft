@@ -16,6 +16,11 @@ pub const MEAL: f32 = 0.1;
 /// food, and stops when this full.
 pub const HUNGRY: f32 = 0.6;
 pub const FULL: f32 = 0.95;
+/// A wild hunter sets off to hunt under this share of its food (a fierce one sooner,
+/// `roles::FIERCE_HUNGER`): a wolf that has gorged at a kill goes days before it hunts again (a
+/// wolf pack takes a deer about every 3-5 days). Hunting at `HUNGRY`, a pack of three killed a
+/// deer every 1.5 days and took a herd of six in a week (ai1124_wolvesDays1e).
+pub const HUNTS_AT: f32 = 0.4;
 
 /// The share of natural spawns that still come where nothing grows this season (`forage.rs`):
 /// animals live through a winter or a drought, fewer and thinner.
@@ -463,6 +468,12 @@ mod leaping {
 #[cfg(test)]
 mod kills {
     use super::*;
+
+    /// A hunter hunts later than a grazer grazes, and still heals some while it waits.
+    #[test]
+    fn hunts_when_lean() {
+        assert!(HUNTS_AT < HUNGRY && HUNTS_AT > HEAL_THIN);
+    }
 
     /// A deer shared by a pack of three fills each wolf (a wolf eats up to a fifth of its mass at
     /// a kill), so the pack is fed together and hungry again together (ai1124_wolvesDays1b).
