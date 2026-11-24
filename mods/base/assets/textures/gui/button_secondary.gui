@@ -4,3 +4,5 @@ size = 52 24
 selected_offset = 0.5
 outset = 2
 middle = tile
+# How far the drawn frame comes into the box (GUI px): text keeps clear of it (ui::audit).
+inset = 3

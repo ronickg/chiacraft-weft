@@ -5,6 +5,7 @@
 //! and multiplied by the GUI scale when drawn. Text never overflows its box: it wraps, or shrinks
 //! when wrapping is off.
 
+pub mod audit;
 pub mod edit;
 pub mod font;
 pub mod lang;

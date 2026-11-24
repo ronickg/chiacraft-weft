@@ -29,6 +29,7 @@
 //! tap_once screen query  # the same, one click (a text field, a button that stays)
 //! tap_beside screen query 2.46  # one click that far right of the element, in its own widths (a row's button: rows have no ids)
 //! screen core:multiplayer  # opens a screen by name (an engine screen or a mod's)
+//! peek base:forge     # opens a screen, lets it lay out, closes it; one that won't open is noted, not a stop (the text-fit sweep, `fit_gen.py`)
 //! mark path           # writes the file (a signal to another copy's await_file)
 //! await_file path 120 # until the file exists, at most 120 s
 //! origin              # later via points are relative to where the player stands now
@@ -123,6 +124,7 @@ const COMMANDS: &[&str] = &[
     "quit",
     "await_ui",
     "screen",
+    "peek",
     "type_file",
     "close",
     "mark",
@@ -159,6 +161,7 @@ const NEED_ARGS: &[&str] = &[
     "expect",
     "until",
     "live",
+    "peek",
 ];
 
 /// Every problem the script has before it runs: unknown commands, missing arguments, conditions
@@ -645,6 +648,27 @@ async fn run_lines(t: T, src: String) -> R {
                     None => t.fail(format!("no UI element {query} on {screen}")),
                 }
                 t.frames(15).await?;
+            }
+            // Open, laid out (twice: bound texts fill in), closed; never a stop (the text-fit
+            // sweep opens screens that may want a block or a creature behind them).
+            "peek" => {
+                let name = rest.to_string();
+                if !t.c().menu_open(weft_sdk::Menu::generated(name.clone())) {
+                    t.note(format!("peek: no screen {name}"));
+                } else {
+                    let end = t.state().frame + 240;
+                    let want = name.clone();
+                    t.until(&format!("peek {name}"), Duration::from_secs(30), move |t| {
+                        t.c().screen() == want || t.state().frame >= end
+                    })
+                    .await?;
+                    if t.c().screen() != name {
+                        t.note(format!("peek: {name} did not open"));
+                    }
+                    t.frames(20).await?;
+                    t.c().input_key("Escape", 0.0);
+                    t.frames(10).await?;
+                }
             }
             "screen" => {
                 let screen = weft_sdk::Menu::generated(rest.to_string());
