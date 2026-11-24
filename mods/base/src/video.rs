@@ -1098,33 +1098,33 @@ fn after_restart(window: [u32; 2]) -> Option<f64> {
 
 pub fn register(r: &mut Registry) {
     crate::developer::register(r);
-    r.config(&QUALITY).int(-1, -1, 6);
+    crate::developer::video(r.config(&QUALITY).int(-1, -1, 6));
     crate::developer::page(r.config(&PRESET_LAST).int(-1, -1, 6));
-    r.config(&FX_REFLECT).int(2, 0, 2);
+    crate::developer::video(r.config(&FX_REFLECT).int(2, 0, 2));
     // Low by default, as every look part (Ronald 11-24: on by default; 11-05 had contact shadows off).
-    r.config(&FX_CONTACT).int(1, 0, 2);
-    r.config(&FX_FAR_AO).int(1, 0, 2);
+    crate::developer::video(r.config(&FX_CONTACT).int(1, 0, 2));
+    crate::developer::video(r.config(&FX_FAR_AO).int(1, 0, 2));
     // Cheap (Tester 2's PC bench, 11-04: +0.04 ms of effects at 1280x720): low until a preset
     // says otherwise; off on the Low preset until the Mac's Retina numbers are in.
-    r.config(&FX_VOLUME).int(1, 0, 2);
-    r.config(&FX_SHAFTS).int(1, 0, 2);
-    r.config(&DEFAULTS).int(0, 0, 9);
-    r.config(&FX_BLOOM).int(1, 0, 2);
+    crate::developer::video(r.config(&FX_VOLUME).int(1, 0, 2));
+    crate::developer::video(r.config(&FX_SHAFTS).int(1, 0, 2));
+    crate::developer::video(r.config(&DEFAULTS).int(0, 0, 9));
+    crate::developer::video(r.config(&FX_BLOOM).int(1, 0, 2));
     // Fantasy: Subtle's values by default (Research round 17; the master defaults to Subtle).
-    r.config(&FANTASY).int(1, 0, 3);
-    r.config(&FX_FIREFLIES).int(1, 0, 2);
-    r.config(&FX_WIND_LIFE).int(1, 0, 3);
-    r.config(&FX_MOTES).int(1, 0, 1);
-    r.config(&LOOK_STORYBOOK).float(0.4, 0.0, 1.0);
-    r.config(&FX_NIGHT_SKY).int(1, 0, 2);
-    r.config(&FX_SHOOTING_STARS).int(1, 0, 1);
-    r.config(&MOON_SIZE).float(1.0, 1.0, 2.0);
-    r.config(&FX_GLOW).float(1.0, 0.0, 1.5);
-    r.config(&FX_BIOME_AIR).float(0.6, 0.0, 1.0);
-    r.config(&FX_SKY_EVENTS).int(2, 0, 2);
-    r.config(&FX_SPARKLE).int(1, 0, 1);
-    r.config(&DETECTED).int(-1, -1, 5);
-    r.config(&DETECTED_HALF).bool(false);
+    crate::developer::video(r.config(&FANTASY).int(1, 0, 3));
+    crate::developer::video(r.config(&FX_FIREFLIES).int(1, 0, 2));
+    crate::developer::video(r.config(&FX_WIND_LIFE).int(1, 0, 3));
+    crate::developer::video(r.config(&FX_MOTES).int(1, 0, 1));
+    crate::developer::video(r.config(&LOOK_STORYBOOK).float(0.4, 0.0, 1.0));
+    crate::developer::video(r.config(&FX_NIGHT_SKY).int(1, 0, 2));
+    crate::developer::video(r.config(&FX_SHOOTING_STARS).int(1, 0, 1));
+    crate::developer::video(r.config(&MOON_SIZE).float(1.0, 1.0, 2.0));
+    crate::developer::video(r.config(&FX_GLOW).float(1.0, 0.0, 1.5));
+    crate::developer::video(r.config(&FX_BIOME_AIR).float(0.6, 0.0, 1.0));
+    crate::developer::video(r.config(&FX_SKY_EVENTS).int(2, 0, 2));
+    crate::developer::video(r.config(&FX_SPARKLE).int(1, 0, 1));
+    crate::developer::video(r.config(&DETECTED).int(-1, -1, 5));
+    crate::developer::video(r.config(&DETECTED_HALF).bool(false));
     r.config(&RENDER_SCALE_NEXT).float(-1.0, -1.0, 1.0);
     r.config(&SHADOW_SIZE_NEXT).int(0, 0, 4096);
     r.client_frame(|_| new_defaults());

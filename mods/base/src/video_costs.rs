@@ -471,7 +471,7 @@ pub fn top_line(ui: &mut Ui, screen: &'static Menu, rows: fn() -> Vec<Measured>,
 
 pub fn register(r: &mut Registry, all: fn(Tab) -> Vec<Measured>) {
     r.text_config(&COSTS, "");
-    r.config(&OFFERED).bool(false);
+    crate::developer::video(r.config(&OFFERED).bool(false));
     r.client_frame(frame);
     // For a script or a curious player: `/videocosts video|extra|fantasy|dlss|all`, the
     // costs in the log (`video cost: <key> <value> <ms>`).

@@ -15,6 +15,8 @@
 //! - `cut by panel`: a widget sticking out of the framed widget it is in.
 //! - `cut by list`: a widget wider than the scrolling list it is in (lists scroll up and down only).
 //! - `off screen`: a widget past the screen's edge.
+//! - `raw key shown`: a text that reads as a translation key (`config.base.quality`): its name is
+//!   missing in every language.
 //! - `siblings overlap`: two widgets laid out side by side (or one under the other) that meet.
 //! - `text over text`, `text over widget`: a text's ink on another text, or on something drawn
 //!   that doesn't hold it (a slider's knob, a picture, an item, another button's frame).
@@ -75,6 +77,10 @@ pub fn check(ui: &Ui, size: [f32; 2], inset: &mut dyn FnMut(&str) -> [f32; 4]) -
                 }
                 if (t.scale - t.scale.round()).abs() > 0.01 || t.scale < 1.0 {
                     out.push(Fault { what: "uneven scale", path: path(ui, &parent, id), text: words.clone(), by: t.scale });
+                }
+                // A translation key drawn as it is: a missing name (`config.base.quality`).
+                if looks_like_key(&words) {
+                    out.push(Fault { what: "raw key shown", path: path(ui, &parent, id), text: words.clone(), by: 0.0 });
                 }
                 // Wrapped lines, or a one-line text its box made wrap, taller than the box.
                 if h > r.h + SLACK {
@@ -235,6 +241,17 @@ fn frame_class(k: &Kind) -> Option<&str> {
 }
 
 /// The words a widget shows or holds (its first text, for a button or panel).
+/// Whether drawn words look like a translation key rather than text: `a.b.c` (two dots or more,
+/// each part lowercase letters, digits, `_` or `:`, no spaces), as a missing key shows. Numbers
+/// (`1.0.2`) and words ending a sentence don't match.
+fn looks_like_key(words: &str) -> bool {
+    let w = words.trim();
+    let parts: Vec<&str> = w.split('.').collect();
+    parts.len() >= 3
+        && parts.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == ':'))
+        && w.chars().any(|c| c.is_ascii_lowercase())
+}
+
 fn words_of(ui: &Ui, id: usize) -> String {
     let mut stack = vec![id];
     while let Some(i) = stack.pop() {

@@ -20,6 +20,13 @@ pub fn page(b: ConfigBuilder<'_>) -> ConfigBuilder<'_> {
     b.set_text(&PAGE, "base:developer")
 }
 
+/// Puts one of the Video screens' settings on their own page (`base:video_screen`, which no
+/// settings screen lists): the Video screens set them through their own rows, so Mod Settings
+/// leaves them out (Planner 11-24: Mod Settings showed `config.base.quality` as a slider).
+pub fn video(b: ConfigBuilder<'_>) -> ConfigBuilder<'_> {
+    b.set_text(&PAGE, "base:video_screen")
+}
+
 /// The knobs, their settings' names and ranges as `look.rs` registers them (change both together).
 /// Not the ones a feature's row sets (leaf holes, mist banks, shadow reach: `video.rs`' parts).
 pub static KNOBS: [(&Config<f32>, &str, f32, f32); 54] = {
