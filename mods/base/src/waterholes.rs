@@ -1,7 +1,7 @@
 //! Waterholes that shrink in the dry season (`notes/ECOLOGY.md`, "Later"; `vitals::climate`,
 //! `waterholes_shrink`): a pond's open still water, a block deep, dries from its rim into a crust
-//! of cracked mud (`CRUST`) in its biome's dry season, an edge block in about
-//! `climate::SHRINK_DAYS`, down to a last pool of a block or two (`climate::edge_dries`), and fills
+//! of cracked mud (`CRUST`) in its biome's dry season, a corner block in about
+//! `climate::SHRINK_DAYS`, receding from its corners down to one last block (`climate::edge_dries`), and fills
 //! back once the season is over (`climate::REFILL_SECS`). The herds crowd round what is left: a
 //! drinker's remembered shore that dried is no shore, so it looks for the nearest water again, and
 //! with none near treks to what its herd remembers (the animals mod's `drink.rs`).
@@ -108,7 +108,7 @@ fn shrinks(w: &World, pos: [i32; 3]) -> bool {
     climate::waterholes_shrink(name_of(abi::entry_kind::BIOME, biome), c.rain, season)
 }
 
-/// A snow visit (`snow::column`) to open still water at `pos`: an edge block of a pond a block
+/// A snow visit (`snow::column`) to open still water at `pos`: a corner block of a pond a block
 /// deep dries in its dry season.
 pub fn visit_water(w: &World, pos: [i32; 3]) {
     seen(0);
@@ -126,16 +126,17 @@ pub fn visit_water(w: &World, pos: [i32; 3]) {
         seen(3);
         return;
     }
-    let (mut water, mut land) = (0u8, 0u8);
-    for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-        match w.block_loaded([x + dx, y, z + dz]) {
-            None => return,
-            // Water, flowing or still, and other liquids: the pool goes on there.
-            Some(b) if WATER.is(b) || state_flags(b) & abi::block_flags::LIQUID != 0 => water += 1,
-            Some(_) => land += 1,
-        }
+    // Water, flowing or still, and other liquids: the pool goes on there.
+    let is_water = |p: [i32; 3]| {
+        w.block_loaded(p)
+            .map(|b| WATER.is(b) || state_flags(b) & abi::block_flags::LIQUID != 0)
+    };
+    let mut sides = [false; 4];
+    for (i, (dx, dz)) in [(1, 0), (-1, 0), (0, 1), (0, -1)].into_iter().enumerate() {
+        let Some(b) = is_water([x + dx, y, z + dz]) else { return };
+        sides[i] = b;
     }
-    if !climate::edge_dries(water, land) {
+    if !climate::edge_dries(sides, |dx, dz| is_water([x + dx, y, z + dz]).unwrap_or(false)) {
         seen(4);
     } else if !shrinks(w, pos) {
         seen(5);

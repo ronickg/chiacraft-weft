@@ -1,15 +1,17 @@
 # Waterholes shrink in the dry season (`base`'s waterholes.rs, `vitals::climate::waterholes_shrink`):
-# a pond's still water, a block deep, dries from its rim into `base:dried_mud` (on the snow's
-# visits to columns near the player) down to a last pool of a block or two, and fills back when
-# the season turns; thirsty deer then crowd round what is left. Biomes can't be set here, so
+# a pond's still water, a block deep, dries into `base:dried_mud` (on the snow's visits to columns
+# near the player), receding from its corners down to one last block, and fills back when the
+# season turns; thirsty deer then crowd round what is left. Biomes can't be set here, so
 # `/waterholes dry 100` makes every place's still water shrink as in a dry season, 100 times as
-# fast (an edge block dries on its first visit, about every 27 s); `wet 100` fills it back. Summer
-# noon, so the pond doesn't freeze.
+# fast (a corner block dries on its first visit, about every 27 s); `wet 100` fills it back. Summer
+# noon, so the pond doesn't freeze. The pond is right in front of the player (3-9 blocks north),
+# looked down on steeply.
 # Every 20 s while forced, a "waterholes: N water visits, M dried (not: ...)" line says what the
-# visits found. PASS: the `count` replies for water in the pond fall from 49 toward 1-4 and those for
-# base:dried_mud rise to match (never all 49 dried: the last pool stays); herd_waterhole_2.png shows
-# a small pool in a ring of cracked mud with deer at it ("anim: <id> holds drink" lines after the
-# water is set low); after `wet 100` water counts climb back to 49, mud to 0 (herd_waterhole_3.png).
+# visits found. PASS: the `count` replies for water in the pond fall from 49 to 1 (or near it by
+# the last dry count) and base:dried_mud rises to match (water + mud = 49; never 0 water: the last
+# block stays); herd_waterhole_2.png shows a small pool in a bed of cracked mud with deer at it
+# ("anim: <id> holds drink" after the water is set low); after `wet 100` water climbs back to 49
+# and mud to 0 (herd_waterhole_3.png). ai1123_waterhole6, before corners-only: stopped at 17.
 loaded
 idle
 chat /rule core:mob_spawning 0
@@ -24,43 +26,52 @@ wait 2
 where
 chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
 chat /tk fill ~-20 ~ ~-30 ~20 ~4 ~10 core:air
-chat /tk fill ~-3 ~-2 ~-17 ~3 ~-2 ~-11 base:dirt
-chat /tk fill ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:water
+chat /tk fill ~-3 ~-2 ~-9 ~3 ~-2 ~-3 base:dirt
+chat /tk fill ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
 wait 3
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:water
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
 where
-look 0 -35
+look 0 -55
 wait 1
 shot herd_waterhole_1.png
 chat /waterholes dry 100
 wait 40
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:water
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:dried_mud
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:dried_mud
 wait 40
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:water
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:dried_mud
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:dried_mud
 wait 40
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:water
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:dried_mud
-chat /tk ring animals:red_deer 6 5 8
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:dried_mud
+wait 40
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:dried_mud
+wait 40
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:dried_mud
+chat /tk ring animals:red_deer 6 8 12
 wait 4
 chat /anim log
 chat /animalprof food 1.0
 chat /animalprof water 0.3
 wait 20
 chat /animalprof senses
-look 0 -35
+look 0 -55
 wait 1
 shot herd_waterhole_2.png
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:water
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
 chat /waterholes wet 100
 wait 40
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:water
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:dried_mud
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:dried_mud
 wait 40
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:water
-chat /tk count ~-3 ~-1 ~-17 ~3 ~-1 ~-11 base:dried_mud
-look 0 -35
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:dried_mud
+wait 40
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:water
+chat /tk count ~-3 ~-1 ~-9 ~3 ~-1 ~-3 base:dried_mud
+look 0 -55
 wait 1
 shot herd_waterhole_3.png
 where
