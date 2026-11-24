@@ -1220,6 +1220,9 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             let ring = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g);
             rgb = core * disc * mix(3.0, 1.5, g) * hot + ring * glow;
             shape = smoothstep(0.0, 0.004, disc + glow);
+            // Before sunrise (`OPT_DAWN_SKY`) none of it under the horizon: from a high eye the land's
+            // edge lies a few degrees down, and the sun 3.5° under the horizon showed over it.
+            shape *= 1.0 - dawn_sky() * (1.0 - smoothstep(-0.012, 0.004, dir.y));
         }
         // A blood moon: copper, then a deep red disc, dimmer in totality.
         if is_moon && blood_moon() > 0.0 {

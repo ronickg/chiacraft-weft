@@ -657,9 +657,10 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
     }
-    // The debug view: the sun's or the sky's light alone, on white (`look_debug`).
+    // The debug view: the sun's or the sky's light alone, on white (`look_debug` 1 and 2; 3 to 5 are
+    // the mist banks', `bank_march`).
     let debug = look_debug();
-    if debug != 0u {
+    if debug == 1u || debug == 2u {
         return vec4(select(LIGHT_ALL - LIGHT_SUN, LIGHT_SUN, debug == 1u), lit.a);
     }
     // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
