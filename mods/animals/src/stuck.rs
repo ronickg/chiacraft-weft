@@ -4,7 +4,7 @@
 //! `LEAP_AFTER` it leaps. Its need's goal carries the walk while it lasts (`going`).
 
 use animals_core::needs::{
-    FLEE_DROP, LEAP_AFTER, LEAP_MOST, LEAP_REACH, STUCK_AFTER, STUCK_NEAR, WALK_MOVED, WAY_OUT_LEG, WAY_OUT_SECS, WAY_OUT_WAYS,
+    FLEE_DROP, LEAP_AFTER, LEAP_MOST, LEAP_OVER, LEAP_REACH, STUCK_AFTER, STUCK_NEAR, WALK_MOVED, WAY_OUT_LEG, WAY_OUT_SECS, WAY_OUT_WAYS,
     WAY_UP_CELLS, WAY_UP_REACH,
 };
 use weft_sdk::*;
@@ -13,15 +13,21 @@ use weft_sdk::*;
 /// ticks) it walks a leg out or waits after a leap (0: none), and the height it was at.
 static STUCK: Component<[f64; 5]> = Component::named("animal_stuck");
 
+/// Where a leap of its lands (x, y, z), whether it is on its way up (1) or across (2) (0: none),
+/// and when it leapt (game ticks).
+static LEAP_TO: Component<[f64; 5]> = Component::named("animal_leap_to");
+
 /// Where its walk to food or water set off (x, z).
 static SET_OFF: Component<[f64; 2]> = Component::named("animal_set_off");
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&STUCK, [0.0; 5], 0);
     r.entity_component(&SET_OFF, [0.0; 2], 0);
+    r.entity_component(&LEAP_TO, [0.0; 5], 0);
     for s in crate::species::SPECIES.iter() {
         r.edit(s.kind).attach(&STUCK);
         r.edit(s.kind).attach(&SET_OFF);
+        r.edit(s.kind).attach(&LEAP_TO);
     }
 }
 
@@ -75,7 +81,11 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
             let (lx, ly, lz) = leap_on
                 .or_else(|| landing(w, st))
                 .unwrap_or((dx, LEAP_MOST as f64, dz));
-            let v = animals_core::needs::leap(lx, ly, lz);
+            // Straight up; across once over the ledge (`going`, `needs::LEAP_OVER`).
+            let v = animals_core::needs::leap(0.0, ly, 0.0);
+            if let Some(c) = w.component_mut(id, &LEAP_TO) {
+                *c = [st.pos.x + lx, st.pos.y + ly, st.pos.z + lz, 1.0, now as f64];
+            }
             weft_sdk::info!("animal {id} is stuck at {x:.0} {:.0} {z:.0}: leaps out ({lx:.1} {ly:.0} {lz:.1} off)", st.pos.y);
             if w.navigating(id) {
                 w.navigate(id, st.pos, 0.0);
@@ -125,6 +135,21 @@ pub fn going(w: &World, id: u64, st: &EntityState) -> bool {
     let floor = [st.pos.x.floor() as i32, (st.pos.y - 0.05).floor() as i32, st.pos.z.floor() as i32];
     let high = !airborne && w.block_flags(floor) & abi::block_flags::SOLID != 0 && st.pos.y > k[4] + 1.0;
     let out = !near || high;
+    if let Some(l) = w.component(id, &LEAP_TO).filter(|l| l[3] != 0.0) {
+        // Back on the ground (not still at its take-off, before the push has lifted it).
+        if !airborne && w.game_time() as f64 > l[4] + 4.0 {
+            if let Some(c) = w.component_mut(id, &LEAP_TO) {
+                c[3] = 0.0;
+            }
+        } else if l[3] == 1.0 && st.pos.y >= l[1] + 0.1 {
+            // Over the ledge: across onto it.
+            let (dx, dz) = (l[0] - st.pos.x, l[2] - st.pos.z);
+            w.push(id, [(dx * LEAP_OVER) as f32, 0.0, (dz * LEAP_OVER) as f32]);
+            if let Some(c) = w.component_mut(id, &LEAP_TO) {
+                c[3] = 2.0;
+            }
+        }
+    }
     if airborne && !out {
         return true;
     }

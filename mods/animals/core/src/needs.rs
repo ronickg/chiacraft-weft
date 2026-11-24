@@ -363,6 +363,11 @@ pub const LEAP_REACH: i32 = 3;
 pub const LEAP_CLEAR: f64 = 0.7;
 pub const GRAVITY: f64 = 32.0;
 pub const LEAP_DRAG: f64 = 1.15;
+/// A leap goes straight up and across only once its feet are over the ledge (`stuck::going`), at
+/// this many blocks a second for each block still to go: pushed across from the start, the air's
+/// drag (vanilla's, keeping 0.91 of it a tick) stopped it short and against the wall it rose
+/// along, and it fell back in (ai1124_pit5e: twenty leaps 1 across and 2 up, none out).
+pub const LEAP_OVER: f64 = 7.0;
 /// The steepest drop a running animal takes (`senses::escape`): it can step back up one, not two.
 pub const FLEE_DROP: i32 = 1;
 const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WAY_OUT_WAYS);
