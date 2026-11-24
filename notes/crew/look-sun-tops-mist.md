@@ -81,6 +81,21 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
 - Low-view darks still p5 109 against Bliss's 69: `look_bank_shade` 0.25 moved them 1 level, so
   not the banks' sky light; the banks' sunlight and the bloomy fog near the eye are next to check.
 
+### Low-view darks (lv12, open)
+
+- What lifts them (06 low, p5; Bliss 66): base 109, bloom off 107, banks' sun off 46, banks off 48,
+  banks at 0.4 density 89. So the banks' sunlit mist over the near crowns, not the bloom.
+- Every global fix costs the vista, which matches Bliss on the same ground (06 vista median 127-129
+  against 131, saturation 0.47 against 0.48): banks' sun 0.35 took the low view to p5 79 / median
+  139 (Bliss 66 / 122) but the vista to 101 and 0.38; a fall of 0.15 a block above the top
+  (from 0.05) took the low to 86 and the vista to 104 and 0.39. More march steps near the eye
+  (spread 40, not 11) changed nothing: debug 5 shows that near mist lit by the map and the clouds.
+- Bliss's low reference may not be the same ground: it has a forest hill rising close on the
+  right, ours a lake on the left and no near tree. To check before tuning to it.
+- `look_bliss true` by set_config does not set Bliss match's knobs; `look_sun_disc` and
+  `look_glow_fill` were missing from the live script, so fresh games had the sun disc off
+  (lv10 start; lv11 had it on only from a toggle). Both now in `live.txt`.
+
 ## Open
 
 - Why Bliss's thick mist still varies broadly (thick, yet bright and dark in large patches) where

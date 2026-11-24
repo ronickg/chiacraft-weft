@@ -38,6 +38,10 @@ set_config base:look_bliss true
 set_config base:look_low_sun_keep 0.6
 set_config base:look_evening_shade 0.5
 set_config base:look_air_fade 0.5
+# Bliss match's last two: `look_bliss true` by set_config does not set its knobs (only the menu's
+# switch does), and these were missing, so the sun disc was off in fresh games (lv12).
+set_config base:look_glow_fill 0
+set_config base:look_sun_disc 1
 hour 18
 shot live_start.png
 live /home/ronaldg/looktest/live/lv1/cmd.txt 20
