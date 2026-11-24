@@ -220,7 +220,10 @@ pub async fn entity_modify(t: T) -> R {
     let tick = |t: T| async move { Ok::<u64, String>(t.op("gametime").await?.parse().unwrap_or(0)) };
     let held = tick(t.clone()).await?;
     t.op(&format!("drive {hit} 0 0 10")).await?;
-    t.op(&format!("drive {near} 0 0 10")).await?;
+    // The pig beside stays held through the measure: as a player standing still, so the push
+    // carries it as it would one, and its herd's pull (it walked back to the other pig in 5 of 8
+    // runs, peaking at 0.45 or 0.65) isn't measured.
+    t.op(&format!("drive {near} 0 0 60")).await?;
     while tick(t.clone()).await? < held + 12 {
         t.frames(1).await?;
     }
