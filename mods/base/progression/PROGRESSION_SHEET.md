@@ -33,7 +33,7 @@ Power grows ×1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier �
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 551 | 159 | 48 | 33 % | 217 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 49 | 35 | 150 | 52 % | 143 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 61 | 28 | 61 | 16 % | 270 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 65 | 30 | 95 | 25 % | 312 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 38 | 32 | 94 | 22 % | 328 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -268,17 +268,17 @@ Each boss is a titan at its form's age (`animals_core::bosses`): its numbers fro
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | drenkaun | Stone Age | animals:forest_offering | 5 | 912 | 31.0 | 28.3 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 | 156 s / 1.5 | 156 s / 1.5 |
 | drenkaun | Bronze Age | - | 15 | 1459 | 49.7 | 45.3 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 | 156 s / 1.5 |
-| drenkaun | Iron Age | - | 25 | 2334 | 79.5 | 72.4 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 |
+| drenkaun | Iron Age | animals:heartwood_offering | 25 | 2334 | 79.5 | 72.4 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 |
 | drenkaun | Age of Steam | - | 35 | 3734 | 127.2 | 115.9 | 2141 s / 0.2 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 |
 
-drenkaun: a titan apex; attacks charge (×0.75 hit, 1.2 s tell), sweep (×0.50 hit, 0.8 s tell), stomp (×0.40 hit, 0.9 s tell), roots (×0.25 hit, 1.4 s tell); parts left_antler at 10 %, right_antler at 20 %, crown at 30 %; knocked down by 8 % of its health in stagger; loot animals:warden_heartseed 35 % (certain by kill 3), animals:warden_antler 60 % (certain by kill 2), animals:warden_bark 100 %, leather 100 %, bone 100 %; its young animals:drenkaun_calf (30 %, certain by kill 4).
+drenkaun: a titan apex; attacks charge (×0.75 hit, 1.2 s tell), sweep (×0.50 hit, 0.8 s tell), stomp (×0.40 hit, 0.9 s tell), roots (×0.25 hit, 1.4 s tell); parts left_antler at 10 %, right_antler at 20 %, crown at 30 %; knocked down by 8 % of its health in stagger; loot animals:warden_heartseed 35 % (certain by kill 3), animals:warden_antler 60 % (certain by kill 2), animals:warden_bark 100 %, leather 100 %, bone 100 %, animals:warden_heartwood 35 % (certain by kill 3); its young animals:drenkaun_calf (30 %, certain by kill 4).
 
 | borkon | Bronze Age | animals:mountain_offering | 15 | 1459 | 49.7 | 45.3 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 | 156 s / 1.5 |
-| borkon | Iron Age | - | 25 | 2334 | 79.5 | 72.4 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 |
+| borkon | Iron Age | animals:peak_offering | 25 | 2334 | 79.5 | 72.4 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 | 156 s / 1.5 |
 | borkon | Age of Steam | - | 35 | 3734 | 127.2 | 115.9 | 2141 s / 0.2 | 952 s / 0.4 | 444 s / 0.6 | 218 s / 1.1 | 156 s / 1.5 |
 | borkon | Age of Lightning | - | 45 | 5975 | 203.5 | 185.4 | 3936 s / 0.1 | 2141 s / 0.2 | 952 s / 0.4 | 444 s / 0.6 | 156 s / 1.5 |
 
-borkon: a titan apex; attacks charge (×0.75 hit, 1.4 s tell), toss (×0.55 hit, 0.9 s tell), rockfall (×0.35 hit, 1.6 s tell), leap (×0.50 hit, 1.0 s tell); parts left_horn at 10 %, right_horn at 20 %, fleece at 30 %; knocked down by 8 % of its health in stagger; loot animals:summit_stone 35 % (certain by kill 3), animals:borkon_horn 60 % (certain by kill 2), animals:height_fleece 100 %, wool 100 %, raw_gold 100 %, bone 100 %; its young animals:borkon_kid (30 %, certain by kill 4).
+borkon: a titan apex; attacks charge (×0.75 hit, 1.4 s tell), toss (×0.55 hit, 0.9 s tell), rockfall (×0.35 hit, 1.6 s tell), leap (×0.50 hit, 1.0 s tell); parts left_horn at 10 %, right_horn at 20 %, fleece at 30 %; knocked down by 8 % of its health in stagger; loot animals:summit_stone 35 % (certain by kill 3), animals:borkon_horn 60 % (certain by kill 2), animals:height_fleece 100 %, wool 100 %, raw_gold 100 %, bone 100 %, animals:summit_lodestone 35 % (certain by kill 3); its young animals:borkon_kid (30 %, certain by kill 4).
 
 ## Loot per hour
 
@@ -369,7 +369,7 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 |---|---|---|---|---|
 | Stone Age | base:pickaxe, base:furnace, animals:warden_heartseed | base:dowsing_rod, animals:warden_heartseed | animals:club, animals:tranquilizer_dart, animals:nest, animals:warden_heartseed | knowledge: a ruin's blueprint or lore page |
 | Bronze Age | base:bronze_ingot, animals:summit_stone | base:bronze_ingot, animals:summit_stone | base:bronze_ingot, animals:summit_stone | knowledge: a ruin's blueprint or lore page; infrastructure: a working setup from the Bronze Age |
-| Iron Age | base:steel_ingot, base:forge | base:steel_ingot, base:forge | base:steel_ingot, base:forge | a biome boss: no Iron Age form has an offering yet; knowledge: a ruin's blueprint or lore page; infrastructure: past the forge, a working setup from the Iron Age |
+| Iron Age | base:steel_ingot, base:forge, #iron_boss_part | base:steel_ingot, base:forge, #iron_boss_part | base:steel_ingot, base:forge, #iron_boss_part | knowledge: a ruin's blueprint or lore page; infrastructure: past the forge, a working setup from the Iron Age |
 | Age of Steam | - | - | - | all of it |
 | Age of Lightning | - | - | - | all of it |
 | Age of the Future | - | - | - | all of it |
@@ -385,9 +385,9 @@ What each route costs from scratch (`graph::route_cost`): its items at their che
 | Bronze Age | tech | 74 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
 | Bronze Age | beasts | 74 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
 | Bronze Age | magic | 74 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
-| Iron Age | tech | 22 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
-| Iron Age | beasts | 22 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
-| Iron Age | magic | 22 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
+| Iron Age | tech | 102 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
+| Iron Age | beasts | 102 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
+| Iron Age | magic | 102 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
 
 ## The materials gate
 
@@ -395,7 +395,9 @@ An age's key needs the age before's tools or stations (`graph::age_gates`): each
 
 | material | age | through the age before | otherwise up to | skips |
 |---|---|---|---|---|
+| animals:heartwood_offering | Iron Age | base:bronze_ingot | Bronze Age | - |
 | animals:mountain_offering | Bronze Age | base:pickaxe | Stone Age | - |
+| animals:peak_offering | Iron Age | animals:height_fleece | Bronze Age | - |
 | base:bronze_ingot | Bronze Age | base:pickaxe | Stone Age | - |
 | base:bucket | Iron Age | base:bronze_ingot | Bronze Age | - |
 | base:copper_ingot | Bronze Age | base:pickaxe | Stone Age | - |
@@ -532,7 +534,7 @@ Notes:
 - animals:summit_stone: Borkon's loot, certain by the third kill: the Bronze Age key's boss part
 - animals:borkon_horn, animals:height_fleece: Borkon's part breaks and loot
 
-### Iron Age (61)
+### Iron Age (65)
 
 **tech** (25)
 
@@ -554,10 +556,12 @@ Notes:
 
 - beast: animals:wyvern_saddle (15)
 
-**shared** (3)
+**shared** (7)
 
 - food: salt (3.9), salted_meat (4.3)
+- material: animals:heartwood_offering (17), animals:peak_offering (25)
 - tool: animals:spyglass (2.6)
+- part: animals:summit_lodestone (80), animals:warden_heartwood (80)
 
 Notes:
 - base:shield: upstream's shield: planks round an iron boss, so the Iron Age's (whole, not built from parts)
@@ -571,6 +575,8 @@ Notes:
 - base:unlearning_stone: a peridot ground with tektites: gives back perk web nodes (vitals::perks)
 - base:maunduk, base:aruduk, base:remaru, base:emakaun: stones for the web's sockets (vitals::sockets), found, never made: in pallasite today; bosses, ley nodes, ruins and rare animals add theirs (an earlier tier then)
 - base:salt, base:salted_meat: salt is boiled from a water bucket (iron)
+- animals:heartwood_offering, animals:peak_offering: an Iron form's offering: the boss's first offering, an iron ingot and its own bark or fleece
+- animals:warden_heartwood, animals:summit_lodestone: an Iron form's loot, certain by the third kill: the Iron Age key's boss part (either boss's, `#iron_boss_part`)
 - animals:wyvern_saddle: a dragon-sized saddle has an iron frame
 
 ### Age of Steam (38)

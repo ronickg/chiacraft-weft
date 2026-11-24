@@ -100,17 +100,28 @@ const fn loot(item: &'static str, count: (u32, u32), chance: f32, certain_by: u3
     Loot { item, count, chance, certain_by, from: Age::Stone }
 }
 
+/// A loot line only its forms from `from` on drop. Kept after the lines every form drops, so each
+/// line's bad-luck count keeps its place (`boss.rs`' luck is by line).
+const fn loot_from(item: &'static str, count: (u32, u32), chance: f32, certain_by: u32, from: Age) -> Loot {
+    Loot { item, count, chance, certain_by, from }
+}
+
+/// A key's boss part: as each age's first, 35 %, certain by the third kill.
+const KEY_PART_CHANCE: f32 = 0.35;
+const KEY_PART_CERTAIN_BY: u32 = 3;
+
 pub static BOSSES: [Boss; 2] = [
     Boss {
         name: "drenkaun",
         role: Role::Apex,
         home: "forests",
         tweaks: &[(Stat::Health, Tweak::new(0.8, "a boss is fought in windows: its tells, knockdowns and the misses add the time back"))],
-        // Only the Stone form is playable; the later ones wait for their ages' offerings.
+        // The Stone form and (11-23) the Iron form are playable; the others wait for their ages'
+        // offerings. The Iron one is the forest offering again, bound with iron and its own bark.
         forms: &[
             form(Age::Stone, Some("animals:forest_offering"), 5),
             form(Age::Bronze, None, 5),
-            form(Age::Iron, None, 5),
+            form(Age::Iron, Some("animals:heartwood_offering"), 5),
             form(Age::Steam, None, 5),
         ],
         attacks: &[
@@ -139,6 +150,8 @@ pub static BOSSES: [Boss; 2] = [
             loot("animals:warden_bark", (2, 4), 1.0, 0),
             loot("base:leather", (6, 10), 1.0, 0),
             loot("base:bone", (4, 8), 1.0, 0),
+            // The Iron Age key's boss part, from its Iron form (either boss's will do).
+            loot_from("animals:warden_heartwood", (1, 1), KEY_PART_CHANCE, KEY_PART_CERTAIN_BY, Age::Iron),
         ],
         young: loot("animals:drenkaun_calf", (1, 1), 0.3, 4),
         knockdown: 0.08,
@@ -156,7 +169,8 @@ pub static BOSSES: [Boss; 2] = [
         tweaks: &[(Stat::Health, Tweak::new(0.8, "a boss is fought in windows: its tells, knockdowns and the misses add the time back"))],
         forms: &[
             form(Age::Bronze, Some("animals:mountain_offering"), 5),
-            form(Age::Iron, None, 5),
+            // The Iron form (11-23): the mountain offering again, bound with iron and its fleece.
+            form(Age::Iron, Some("animals:peak_offering"), 5),
             form(Age::Steam, None, 5),
             form(Age::Lightning, None, 5),
         ],
@@ -186,6 +200,8 @@ pub static BOSSES: [Boss; 2] = [
             loot("base:wool", (6, 10), 1.0, 0),
             loot("base:raw_gold", (2, 4), 1.0, 0),
             loot("base:bone", (4, 8), 1.0, 0),
+            // The Iron Age key's boss part, from its Iron form (either boss's will do).
+            loot_from("animals:summit_lodestone", (1, 1), KEY_PART_CHANCE, KEY_PART_CERTAIN_BY, Age::Iron),
         ],
         young: loot("animals:borkon_kid", (1, 1), 0.3, 4),
         knockdown: 0.08,
@@ -335,6 +351,30 @@ mod tests {
     }
 
     #[test]
+    fn iron_forms_are_called_and_drop_the_iron_key_part() {
+        for b in &BOSSES {
+            let f = b.form(Age::Iron);
+            assert_eq!(f.age, Age::Iron, "{}", b.name);
+            let offering = f
+                .offering
+                .unwrap_or_else(|| panic!("{}: no Iron offering", b.name));
+            assert_eq!(b.form_for(offering).map(|x| x.age), Some(Age::Iron));
+            // The key part only from the Iron form, after every line all forms drop.
+            let last = b.loot.last().unwrap();
+            assert_eq!(last.from, Age::Iron, "{}", b.name);
+            assert!(
+                b.loot_for(b.forms.first().unwrap())
+                    .all(|l| l.from != Age::Iron)
+            );
+            assert!(
+                b.loot[..b.loot.len() - 1]
+                    .iter()
+                    .all(|l| l.from == Age::Stone)
+            );
+        }
+    }
+
+    #[test]
     fn parts_break_inside_one_fight() {
         let b = boss("drenkaun").unwrap();
         // A same-age fight gathers `STAGGER_SHARE` of its health in stagger: every part breaks.
@@ -343,7 +383,7 @@ mod tests {
         for p in b.parts {
             assert!(p.weakens.is_none_or(|a| b.attack(a).is_some()), "{}", p.name);
         }
-        // Only the Stone form has an offering yet; every later age has its form as data.
+        // Its first form is the Stone Age's; later ones have an offering as their age's is built.
         assert!(b.forms[0].offering.is_some() && b.forms[0].age == Age::Stone);
         assert!(b.forms.windows(2).all(|w| w[0].age < w[1].age));
         assert!(b.stats(b.form(Age::Iron)).health > b.stats(b.form(Age::Stone)).health * 2.0);
