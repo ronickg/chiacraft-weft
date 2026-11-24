@@ -1,5 +1,6 @@
 # Style 1, batch 1 (UI redo, 11-24): the menus. The pause screen and settings from a world, then the
-# title and its menus, each opened by name; the inventory and Select World for the shared parts.
+# title and its menus, each opened by name; the inventory (crafting and recipes) and Select World for
+# the shared parts; Create World, World Rules and Mods last.
 # Run once on dev (before) and once on the branch (after); contact sheets pair them by file name.
 loaded
 idle
@@ -81,6 +82,21 @@ wait 1
 screen core:worlds
 wait 1.5
 shot b1_31_worlds.png
+key Escape
+wait 1
+screen core:create_world
+wait 1.5
+shot b1_32_create_world.png
+key Escape
+wait 1
+screen core:world_rules
+wait 1.5
+shot b1_33_world_rules.png
+key Escape
+wait 1
+screen core:mods
+wait 2
+shot b1_34_mods.png
 key Escape
 wait 1
 quit

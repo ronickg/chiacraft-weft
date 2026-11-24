@@ -165,6 +165,31 @@ pub fn parts(ui: &mut Ui, cx: &BuildCx, screen: &str, area: &str) {
     });
 }
 
+/// A menu screen's mods' parts, their plain buttons labelled like the screen's own (style 1: the
+/// title's labels at 2x on every menu button, the pause menu's Advancements too; chiacraft 11-24).
+pub fn menu_parts(ui: &mut Ui, cx: &BuildCx, screen: &str, area: &str) {
+    let from = ui.nodes.len();
+    parts(ui, cx, screen, area);
+    let class = button_text(cx);
+    if class == "button" {
+        return;
+    }
+    for b in from..ui.nodes.len() {
+        if !matches!(&ui.nodes[b].kind, Kind::Button { class, .. } if class == "button") {
+            continue;
+        }
+        for t in ui.nodes[b].children.clone() {
+            let plain = matches!(&ui.nodes[t].kind, Kind::Text(n) if n.class == "default" || n.class == "button");
+            if plain {
+                if let Kind::Text(n) = &mut ui.nodes[t].kind {
+                    n.class = class.to_string();
+                }
+                big_label(ui, t, class);
+            }
+        }
+    }
+}
+
 /// A mod's name as players see it: `mod.<id>.name` from the language files, else its id.
 pub fn mod_name(lang: &Lang, id: &str) -> Vec<text::Span> {
     text::Name::Mod(id.to_string()).spans(lang, None)
@@ -766,7 +791,7 @@ fn pause_buttons(ui: &mut Ui, cx: &BuildCx) {
         button(ui, cx, "menu.admission", &[], 200.0, |c| open(c, "core:admission"));
     }
     button(ui, cx, "menu.settings", &[], 200.0, |c| open(c, "core:settings"));
-    parts(ui, cx, "core:pause", "buttons");
+    menu_parts(ui, cx, "core:pause", "buttons");
     button(ui, cx, "menu.save_quit", &[], 200.0, |c| c.requests.push(Request::LeaveWorld));
 }
 
@@ -1086,7 +1111,7 @@ impl Screen for ConfigScreen {
                     .pad(8.0)
                     .gap(6.0)
                     .stretch()
-                    .w(320.0)
+                    .w(if framed { 320.0 + crate::ui::Scrollbar::ROOM } else { 320.0 })
                     .min_h(40.0)
                     .scroll(),
                 |ui| {
@@ -1106,14 +1131,18 @@ impl Screen for ConfigScreen {
                             return;
                         }
                         for pair in settings_links(cx).chunks(2) {
-                            ui.container(Style::row().gap(6.0).stretch(), |ui| {
+                            // Centred in style 1's list, which is wider by a scrollbar's room
+                            // that a short page doesn't use.
+                            let row = Style::row().gap(6.0).stretch();
+                            let row = if framed { row.justify(crate::ui::Justify::Center) } else { row };
+                            ui.container(row, |ui| {
                                 for &(key, screen) in pair {
                                     let width = if pair.len() == 1 { 300.0 } else { 147.0 };
                                     button(ui, cx, key, &[], width, move |c| open(c, screen));
                                 }
                             });
                         }
-                        parts(ui, cx, "core:settings", "buttons");
+                        menu_parts(ui, cx, "core:settings", "buttons");
                     };
                     for (id, d) in listed {
                         if d.order >= LINKS_AT {
