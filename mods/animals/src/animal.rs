@@ -202,6 +202,7 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         let new = a.species == 0;
         if new {
             first_roll(w, id, index, a, st.pos.to_array());
+            crate::drink::arrive(w, id, a, st.pos.to_array());
         }
         let away = if a.seen == 0 { 0 } else { life::age(w.game_time(), a.seen) };
         a.seen = life::birth(w.game_time(), 0);

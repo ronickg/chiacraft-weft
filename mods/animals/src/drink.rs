@@ -155,6 +155,15 @@ fn trek(w: &World, id: u64, kind: &EntityKind, pos: [f64; 3]) -> Option<[f64; 3]
     })
 }
 
+/// A wild drinker new to the world notes the water near where it starts (`notice`), as it would
+/// know its home range's: deer spawned 10-14 blocks from a pool went off before their first
+/// 30-second look and never knew it (ai1124_graze7: one died parched 83 blocks off).
+pub fn arrive(w: &World, id: u64, a: &Animal, pos: [f64; 3]) {
+    if !animal::tamed(w, id) && lasts(w, id, a).is_some() {
+        notice(w, id, pos);
+    }
+}
+
 /// Water `id` sees in passing (within `LOOK` blocks) it remembers, as if it had drunk there,
 /// when it knows none within `RECALL` already: a wild one knows the water in its range before it
 /// is thirsty (ai1124_graze2: the deer grazed away from the pool they were spawned beside before

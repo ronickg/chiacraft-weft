@@ -152,7 +152,10 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                 // player standing still by the only pool froze the herd that came to drink there,
                 // and it drifted off and died parched (ai1124_graze3: deer at 5 % water staring 10
                 // blocks from the water).
-                if seen.fright >= animals_core::perception::STARE && !driven(w, id) {
+                // And it stares only a while (`perception::STARE_SECS`, `senses::staring`): a
+                // player standing still is only smelled, which never makes it bolt, and a deer
+                // stood staring at one a whole game day (ai1124_graze7).
+                if seen.fright >= animals_core::perception::STARE && !driven(w, id) && crate::senses::staring(w, id) {
                     crate::senses::stare(w, id, st, seen.player_pos);
                     return true;
                 }

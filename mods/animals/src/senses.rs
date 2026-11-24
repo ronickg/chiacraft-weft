@@ -92,6 +92,9 @@ value! {
         pub heading: f32,
         pub wind: f32,
         pub sight_at: u64,
+        /// When its stare at the player it half noticed began (0: not staring;
+        /// `perception::STARE_SECS`).
+        pub stared: u64,
     }
 }
 
@@ -572,6 +575,9 @@ fn players(
         sensed = Some((Sensed { gain: g, ..Default::default() }, q, e.pos));
     }
     out.fright = aware_after(out.fright, sensed.map(|b| b.0), secs);
+    if out.fright < perception::STARE {
+        out.stared = 0;
+    }
     match sensed {
         Some((_, q, pos)) => {
             out.player = q;
@@ -630,6 +636,17 @@ pub fn escape(w: &World, st: &EntityState, from: [f64; 3], dist: f64, herd: Opti
 pub fn stare(w: &World, id: u64, st: &EntityState, at: [f32; 3]) {
     face(w, id, st, at);
     crate::anim::hold(w, id, crate::anim::Act::Stare);
+}
+
+/// Whether it still stares at the player it half noticed: from when its awareness rose past
+/// `perception::STARE`, for `perception::STARE_SECS`.
+pub fn staring(w: &World, id: u64) -> bool {
+    let now = w.game_time();
+    let Some(s) = w.component_mut(id, &SENSES) else { return false };
+    if s.stared == 0 {
+        s.stared = now.max(1);
+    }
+    now.saturating_sub(s.stared) < (perception::STARE_SECS * 20.0) as u64
 }
 
 /// It stops and turns to face `at`.
