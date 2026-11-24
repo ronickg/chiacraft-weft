@@ -425,7 +425,8 @@ async fn loot_tables(t: &T) -> R {
     Ok(())
 }
 
-/// Harvest levels: iron ore needs a stone pickaxe; tiers are numbers, so the test mod's steel
+/// Harvest levels: iron ore needs a bronze pickaxe (`vitals::gear::IRON_ORE_HARVEST`, Ronald 11-23:
+/// copper's 170 is short); tiers are numbers, so the test mod's steel
 /// pickaxe (250) mines its reinforced stone (250) and what iron (200) does, not obsidian (300).
 /// Base's pickaxes are built from parts (`/gear`, held): a bone head harvests 80, ground stone 100,
 /// bronze 210 (`vitals::gear::harvest`). Broken with the loot at the block: a player's mining
@@ -436,7 +437,9 @@ async fn tool_tiers(t: &T, o: [i32; 3]) -> R {
         ("stone", "stick", false),
         ("stone", "pickaxe bone", true),
         ("iron_ore", "pickaxe bone", false),
-        ("iron_ore", "pickaxe stone", true),
+        ("iron_ore", "pickaxe stone", false),
+        ("iron_ore", "pickaxe copper", false),
+        ("iron_ore", "pickaxe bronze", true),
         ("diamond_ore", "pickaxe stone", false),
         ("testmod:reinforced_stone", "pickaxe bronze", false),
         ("testmod:reinforced_stone", "testmod:steel_pickaxe", true),
@@ -446,7 +449,7 @@ async fn tool_tiers(t: &T, o: [i32; 3]) -> R {
     .into_iter()
     .enumerate()
     {
-        let p = add(o, [i as i32 * 2 - 8, 0, 0]);
+        let p = add(o, [i as i32 * 2 - 12, 0, 0]);
         t.set(p, block).await?;
         if tool.contains(' ') {
             t.cmd(&format!("/gear {tool} slot=0")).await?;
@@ -459,7 +462,7 @@ async fn tool_tiers(t: &T, o: [i32; 3]) -> R {
         t.frames(5).await?;
         drops += gets as usize;
         t.check_eq(
-            count_at(t, "core:item", o, 10.0).await?,
+            count_at(t, "core:item", o, 12.5).await?,
             drops,
             &format!("{tool} on {block}: {}", if gets { "drops" } else { "nothing" }),
         );
