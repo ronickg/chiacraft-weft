@@ -140,6 +140,7 @@ pub fn register(r: &mut Registry) {
     r.stack_component(&base_api::ITEM_LEVEL, 0);
     r.stack_component(&BOW_POWER, 0);
     r.stack_component(&base_api::SADDLE_FIT, 0);
+    r.stack_component(&base_api::ARROW_HEAD, 0);
     r.stack_component(&base_api::WARMTH, 0);
     // A built piece's armour in the tooltip's and the HUD's points (`ARMOUR_PER_POINT`).
     r.stack_component(&crate::items::ARMOR, 0);
@@ -157,7 +158,11 @@ pub fn register(r: &mut Registry) {
     for k in KINDS.iter().filter(|k| k.use_ == Use::Guard) {
         register_armour(r, k);
     }
-    for k in KINDS.iter().filter(|k| k.use_ != Use::Guard) {
+    // An arrow is no tool: its head is a part, the arrows `base:arrow` (`fletched`).
+    for k in KINDS
+        .iter()
+        .filter(|k| k.use_ != Use::Guard && k.id != "arrow")
+    {
         let tool = match k.id {
             "axe" | "pickaxe" | "shovel" | "hoe" | "sword" => Some(k.id),
             _ => None,
@@ -225,6 +230,10 @@ pub fn register(r: &mut Registry) {
                 .and_then(|sp| Item::lookup(&format!("animals:{sp}_saddle")))
                 .zip(vitals::gear::saddle_fit_of(names.get(1).copied().unwrap_or("leather")))
                 .map_or(ItemStack::EMPTY, |(item, fit)| base_api::saddle_stack(item, fit))
+        } else if kind == "arrow" {
+            // `/gear arrow [head] [count]`: arrows headed with that material (flint by default).
+            let count = names.get(1).and_then(|n| n.parse().ok()).unwrap_or(16);
+            arrows(names.first().copied().unwrap_or("flint"), count)
         } else if kind == "part" {
             names
                 .first()
@@ -634,6 +643,10 @@ fn built(kind: &Kind, parts: &[(Part, PartOf)]) -> ItemStack {
 /// `kind` from `parts` with `gems` set in it (as many as it has sockets).
 fn built_with(kind: &Kind, parts: &[(Part, PartOf)], gems: &[crate::gems::Set]) -> ItemStack {
     let plain: Vec<Part> = parts.iter().map(|p| p.0).collect();
+    // A lone arrowhead builds nothing: arrows are fletched (`fletched`).
+    if kind.id == "arrow" {
+        return ItemStack::EMPTY;
+    }
     if kind.use_ == Use::Guard {
         return armour(kind.id, &plain).map_or(ItemStack::EMPTY, |a| armour_stack(kind, parts, &a, gems));
     }
@@ -951,7 +964,7 @@ pub fn on_change(m: &MenuCtx) {
     // A tool from its parts, else a repair (a worn part or tool and a unit of its material), else
     // gems set in a built item, else a built item's gems taken out.
     let built = assembled(&stacks);
-    let made = [built, repaired(&stacks), socketed(&stacks), fitted(&stacks)]
+    let made = [built, repaired(&stacks), socketed(&stacks), fitted(&stacks), fletched(&stacks)]
         .into_iter()
         .find(|s| !s.is_empty())
         .or_else(|| unsocketed(&stacks).map(|u| u.0))
@@ -985,6 +998,39 @@ pub fn fitted(stacks: &[ItemStack]) -> ItemStack {
         return base_api::saddle_stack(saddle.item, fit);
     }
     ItemStack::EMPTY
+}
+
+/// How many arrows an arrowhead, a stick and a feather make (vanilla's four).
+pub const ARROWS_MADE: u32 = 4;
+
+/// `count` arrows headed with `material` (`vitals::gear::ARROWHEADS`), drawn in it; empty if it
+/// makes no arrowhead.
+pub fn arrows(material: &str, count: u32) -> ItemStack {
+    let Some(head) = vitals::gear::arrowhead_of(material) else { return ItemStack::EMPTY };
+    with_look(base_api::arrow_stack(head, count), Some(crafting::looks::arrow_look(material).as_str()))
+}
+
+/// An arrowhead part, a stick and a feather in the assembly slots (any order): four arrows of
+/// the head's material, its item level theirs (Planner 11-23, arrows of other heads). Empty when
+/// they aren't that.
+pub fn fletched(stacks: &[ItemStack]) -> ItemStack {
+    let full: Vec<&ItemStack> = stacks.iter().filter(|s| !s.is_empty()).collect();
+    if full.len() != 3 {
+        return ItemStack::EMPTY;
+    }
+    let head = full
+        .iter()
+        .find(|s| shape_id(s.item) == Some("arrowhead"))
+        .and_then(|s| PART.on_stack_own(s))
+        .and_then(|p| material_of(p.material));
+    let stick = full
+        .iter()
+        .any(|s| item_name(s.item) == "base:stick" || item_has_tag(s.item, "stick"));
+    let feather = full.iter().any(|s| item_name(s.item) == "base:feather");
+    match head {
+        Some(m) if stick && feather => arrows(m.id, ARROWS_MADE),
+        _ => ItemStack::EMPTY,
+    }
 }
 
 /// Something was taken: true if it was the assembled tool (its parts are used up), so the grid's
@@ -1095,6 +1141,14 @@ fn inspect(w: &World, player: u64, mut reply: impl FnMut(&str, &[Arg])) {
                 .sum();
             reply("command.base.inspect.gem", &[Arg::Key(g.gem.key), Arg::Int(g.data.level as i64), Arg::Int(pct)]);
         }
+    } else if let Some(h) = base_api::ARROW_HEAD.on_stack(&held).filter(|h| *h > 0) {
+        // Arrows (`fletched`): their head and the item level they hit with (a testkit script reads it).
+        let m = vitals::gear::ARROWHEADS
+            .get(h as usize - 1)
+            .and_then(|m| crafting::materials::material(m))
+            .map_or("", |m| m.key);
+        let level = base_api::ITEM_LEVEL.on_stack(&held).unwrap_or(0.0).round();
+        reply("command.base.inspect.arrow", &[Arg::Item(held.item), Arg::Int(held.count as i64), Arg::Key(m), Arg::Int(level as i64)]);
     } else {
         reply("command.base.inspect.plain", &[]);
     }

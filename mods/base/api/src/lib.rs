@@ -742,6 +742,19 @@ pub fn saddle_fit(stack: &ItemStack) -> u32 {
     SADDLE_FIT.on_stack(stack).unwrap_or(0)
 }
 
+/// An arrow's head: its place in `vitals::gear::ARROWHEADS` plus one (none or 0: a plain
+/// flint-tipped arrow). Base's assembly row makes them (`parts::fletched`); a bow reads the arrow's
+/// `ITEM_LEVEL`.
+pub static ARROW_HEAD: Component<u32> = Component::named("base:arrow_head");
+
+/// `count` arrows headed with `vitals::gear::ARROWHEADS[head]`: the head and its item level on
+/// them (base's `parts` adds the look).
+pub fn arrow_stack(head: u32, count: u32) -> ItemStack {
+    ItemStack::new(items::ARROW.id(), count)
+        .with(&ARROW_HEAD, head + 1)
+        .with(&ITEM_LEVEL, vitals::gear::arrow_level(head))
+}
+
 /// Clothes' slots, head to feet, worn under armor (`vitals::clothing`); armor's are in `slots`.
 pub static HAT: EquipmentSlot = EquipmentSlot::named("base:hat");
 pub static COAT: EquipmentSlot = EquipmentSlot::named("base:coat");

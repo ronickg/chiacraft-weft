@@ -351,6 +351,20 @@ pub fn gem_look(kind: &str, i: usize, gem: &str) -> Option<String> {
     Some(format!("base:parts/gem/set@{}+{x},{y}", ramp(&format!("gem_{gem}"))))
 }
 
+/// The ramp an arrowhead of `material` is painted with: chert as flint (no ramp of its own).
+pub fn arrow_ramp(material: &str) -> &str {
+    match material {
+        "chert" => "flint",
+        m => art_name(m),
+    }
+}
+
+/// An arrow with a head of `material`: its shaft and fletching as drawn, its head's map in the
+/// material's ramp (`base:parts/arrow/`, cut from the plain arrow's icon).
+pub fn arrow_look(material: &str) -> String {
+    format!("base:parts/arrow/body;base:parts/arrow/head@{}", ramp(arrow_ramp(material)))
+}
+
 /// Part shapes drawn from one shade map painted with their material's ramp, as a loose part and
 /// (a shell) as the built piece (`base:parts/armour/<shape>`, made from the approved icons): armour's
 /// shells, straps (their buckles a second region: the straps' own metal, else wrought iron) and
@@ -366,6 +380,10 @@ pub const PART_MAPS: [&str; 6] = ["helmet_shell", "chest_shell", "leg_shell", "b
 /// blade's own drawing, a drawn shell, or a map painted with its ramp; None for a part drawn by its
 /// plain icon.
 pub fn part_look(shape: &str, material: &str) -> Option<String> {
+    // An arrowhead: one shade map in its material's ramp, until it has drawings of its own.
+    if shape == "arrowhead" {
+        return Some(format!("base:parts/arrow/arrowhead@{}", ramp(arrow_ramp(material))));
+    }
     // A loose head or blade: its drawing in its material, centred (`parts/loose/`, art redo v3).
     if let Some(sh) = crate::kinds::SHAPES.iter().find(|s| s.id == shape)
         && let Some(l) = look(sh.kind)
