@@ -287,11 +287,13 @@ pub async fn held_water_mesh(t: T) -> R {
     t.c().set_look(0.0, -45.0);
     t.frames(30).await?;
     let above = t.shot("held_above").await?;
+    // One row in from the near edge: further out the weed's box sat under base's target-info
+    // tooltip at the top centre (Weft 9973eb6c9), all of it brown, 0.0000 on every run.
     let y = f[1] as f64 - 0.12;
     let (water, weed, slab) = (
-        around(&t, &above, [f[0] as f64 - 2.5, y, f[2] as f64 - 6.5], 0.02, probe::blue),
-        around(&t, &above, [f[0] as f64 + 0.5, y, f[2] as f64 - 6.5], 0.02, probe::blue),
-        around(&t, &above, [f[0] as f64 + 3.5, y, f[2] as f64 - 6.5], 0.02, probe::blue),
+        around(&t, &above, [f[0] as f64 - 2.5, y, f[2] as f64 - 4.5], 0.02, probe::blue),
+        around(&t, &above, [f[0] as f64 + 0.5, y, f[2] as f64 - 4.5], 0.02, probe::blue),
+        around(&t, &above, [f[0] as f64 + 3.5, y, f[2] as f64 - 4.5], 0.02, probe::blue),
     );
     t.probe("plain water drawn blue from above", water, water > 0.4);
     t.probe("over the weed too", weed, weed > 0.4);
