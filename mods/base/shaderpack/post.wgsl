@@ -474,7 +474,18 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         let banked = bank_hidden(view_rel(uv, pass_)) * (1.0 - 0.85 * rain_amount());
         col = mix(col, glow, clamp(banked * BANK_BLOOMY * fantasy_opt(OPT_BLOOM), 0.0, 0.95));
         let r2 = dot(uv - vec2(0.5), uv - vec2(0.5));
-        col += glow * 0.234 * (1.5 - 2.0 * r2) * add * fantasy_opt(OPT_BLOOM);
+        // Bliss's E^0.2 follows its eye: a dark view it brings up gets more of the glow too (its
+        // sunlit ravine's shade warm with the dirt's glow, 46 38 32 on the ceiling, where ours with
+        // the noon vista's 0.234 stayed a blue grey, 61 71 92: PC lkhue1, 11-24). Ours relative to
+        // the noon vista, where the exposure is about 1.
+        var eye = 1.0;
+        if pass_.exposure != 0u {
+            let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
+            if e == e && e > 0.0 {
+                eye = pow(pow(auto_exposure(e), fantasy_opt(OPT_AUTO_EXPOSURE)), 0.2);
+            }
+        }
+        col += glow * 0.234 * eye * (1.5 - 2.0 * r2) * add * fantasy_opt(OPT_BLOOM);
     }
     // Veiling glare: a little of the sky's light over the whole picture, as a lens and the eye
     // scatter it, so the darkest shade is a dim sky blue, not black. In Bliss's own world (imported)
