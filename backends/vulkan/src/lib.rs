@@ -2457,6 +2457,7 @@ impl Backend for VulkanBackend {
             .map_or(4, |n| n.get())
             .clamp(1, 16);
         let next = std::sync::atomic::AtomicUsize::new(0);
+        let took = std::sync::Mutex::new(Vec::new());
         let (device, cache) = (&self.device, self.pipeline_cache);
         std::thread::scope(|scope| {
             for _ in 0..threads.min(prepared.len()) {
@@ -2465,7 +2466,10 @@ impl Backend for VulkanBackend {
                         let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         let Some(p) = prepared.get(i) else { break };
                         // The pipeline goes: what stays is the driver's compiled code in the cache.
-                        match unsafe { build_pipeline(device, cache, p) } {
+                        let one = std::time::Instant::now();
+                        let built = unsafe { build_pipeline(device, cache, p) };
+                        took.lock().unwrap().push((one.elapsed().as_secs_f32(), i));
+                        match built {
                             Ok(raw) => unsafe { device.destroy_pipeline(raw, None) },
                             Err(e) => log::warn!("warming a pipeline: {e:?}"),
                         }
@@ -2473,6 +2477,26 @@ impl Backend for VulkanBackend {
                 });
             }
         });
+        if !descs.is_empty() {
+            self.cache_dirty = true;
+            let mut took = took.into_inner().unwrap();
+            took.sort_by(|a, b| b.0.total_cmp(&a.0));
+            let slowest: Vec<String> = took
+                .iter()
+                .take(5)
+                .map(|&(t, i)| {
+                    let p = &prepared[i];
+                    format!("{}/{} {t:.1} s", p.vs_name.to_string_lossy(), p.fs.map_or("-".into(), |_| p.fs_name.to_string_lossy()))
+                })
+                .collect();
+            log::info!(
+                "warmed {} pipelines in {:.1} s on {threads} threads ({:.1} s of compiling; slowest {})",
+                descs.len(),
+                started.elapsed().as_secs_f32(),
+                took.iter().map(|t| t.0).sum::<f32>(),
+                slowest.join(", ")
+            );
+        }
         for p in prepared {
             unsafe {
                 p.destroy_modules(&self.device);
@@ -2480,10 +2504,6 @@ impl Backend for VulkanBackend {
                 self.device
                     .destroy_descriptor_set_layout(p.set_layout, None);
             }
-        }
-        if !descs.is_empty() {
-            self.cache_dirty = true;
-            log::info!("warmed {} pipelines in {:.1} s", descs.len(), started.elapsed().as_secs_f32());
         }
     }
 
