@@ -151,6 +151,13 @@ pub fn init(r: &mut Registry) {
     r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
+            // By a player only: a plant broken off by the engine as one grazes beside it (a
+            // double plant's other half, one left on bare dirt) says `player: 0`, and the grazer
+            // heard its own meal and bolted (ai1124_graze9: 9 of 13 alarm calls within 1.5 s of
+            // the caller starting to graze; one ran into a pit two blocks deep and starved).
+            if c.player == 0 {
+                continue;
+            }
             let p = c.pos;
             noise(&w, [p.x as f64 + 0.5, p.y as f64 + 0.5, p.z as f64 + 0.5], perception::BREAK_HEARD, c.player);
         }
