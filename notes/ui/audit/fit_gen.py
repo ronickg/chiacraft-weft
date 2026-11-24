@@ -6,12 +6,12 @@ check (`--ui-audit`, engine `ui::audit`). Run it with `-- --ui-audit` at each wi
 In a world: the screens a name opens, the key screens (inventory, recipes, stats, advancements),
 Multiplayer's Links and Friends. Then from the title: the title itself, Select World with its
 delete and new-address questions, Create World, Multiplayer. The engine caps the GUI scale at what
-the window holds, so 4x at 720p is checked as that cap.
+the window holds, so 6x at 720p is checked as that cap.
 """
 import pathlib
 
-LANGS = ["en_us", "ru_ru", "fr_fr"]
-SCALES = [0, 1, 2, 3, 4]  # 0: auto
+LANGS = ["en_us", "ru_ru", "fr_fr", "en_xa"]  # en_xa: the pseudo-locale (+40%, accented, bracketed)
+SCALES = [0, 2, 4, 6]  # 0: auto; the engine takes even scales (settings.rs), capped by the window
 
 # Opened by name in a world (core:loading, core:death, core:editor and the test mods' left out:
 # a loading screen with nothing loading, a death that kills, the world editor's own tool).

@@ -5,15 +5,19 @@
 //! every language and GUI scale; `notes/ui/audit/fit_report.py` turns run.log into the list.
 //!
 //! The faults:
-//! - `squeezed`: a text that doesn't wrap, made smaller than 1x to fit (a step down from a `fit`
-//!   scale to 1x is allowed).
-//! - `lines past box`: wrapped lines taller than the box they are in.
+//! - `uneven scale`: a text drawn at a scale that isn't whole (a step down from a `fit` scale to
+//!   1x is allowed; the layout no longer squeezes, so this would be a widget setting its own).
+//! - `lines past box`: lines taller than the box they are in: wrapped text, or one-line text its
+//!   box was too narrow for (the layout wraps it rather than squeeze it).
 //! - `on frame`: a text reaching into its button's or panel's frame: within `inset` of the frame's
 //!   left or right edge (its `.gui`: how far the drawn frame comes into the box) plus one GUI
 //!   pixel, or past its top or bottom.
 //! - `cut by panel`: a widget sticking out of the framed widget it is in.
 //! - `cut by list`: a widget wider than the scrolling list it is in (lists scroll up and down only).
 //! - `off screen`: a widget past the screen's edge.
+//! - `siblings overlap`: two widgets laid out side by side (or one under the other) that meet.
+//! - `text over text`, `text over widget`: a text's ink on another text, or on something drawn
+//!   that doesn't hold it (a slider's knob, a picture, an item, another button's frame).
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -69,10 +73,11 @@ pub fn check(ui: &Ui, size: [f32; 2], inset: &mut dyn FnMut(&str) -> [f32; 4]) -
                 if t.spans.is_empty() || w <= 0.0 {
                     continue;
                 }
-                if !t.wrap && t.scale < 1.0 - 0.01 {
-                    out.push(Fault { what: "squeezed", path: path(ui, &parent, id), text: words.clone(), by: t.scale });
+                if (t.scale - t.scale.round()).abs() > 0.01 || t.scale < 1.0 {
+                    out.push(Fault { what: "uneven scale", path: path(ui, &parent, id), text: words.clone(), by: t.scale });
                 }
-                if t.wrap && h > r.h + SLACK {
+                // Wrapped lines, or a one-line text its box made wrap, taller than the box.
+                if h > r.h + SLACK {
                     out.push(Fault { what: "lines past box", path: path(ui, &parent, id), text: words.clone(), by: h - r.h });
                 }
                 let x = if t.center { r.x + (r.w - w) / 2.0 } else { r.x };
@@ -123,7 +128,93 @@ pub fn check(ui: &Ui, size: [f32; 2], inset: &mut dyn FnMut(&str) -> [f32; 4]) -
             out.push(Fault { what: "cut by panel", path: path(ui, &parent, id), text: words, by });
         }
     }
+    overlaps(ui, &parent, &mut out);
     out
+}
+
+/// What a widget draws, where it can be seen: a text's ink, else its rect for the kinds that
+/// draw (frames, sliders, pictures, items, bars, fields); none for a plain layout box.
+fn drawn(ui: &Ui, id: usize) -> Option<(Rect, &'static str)> {
+    let n = &ui.nodes[id];
+    let r = n.rect;
+    let (rect, what) = match &n.kind {
+        Kind::Text(t) => {
+            let unit = ui.text_unit;
+            let w = t.layout.width * t.scale * unit;
+            if t.spans.is_empty() || w <= 0.0 {
+                return None;
+            }
+            let x = if t.center { r.x + (r.w - w) / 2.0 } else { r.x };
+            (Rect { x, y: r.y, w, h: (t.layout.height * t.scale * unit).min(r.h.max(1.0)) }, "text")
+        }
+        Kind::Slider(_) => (r, "slider"),
+        Kind::Image { .. } | Kind::BoundImage { .. } => (r, "image"),
+        Kind::Item { .. } => (r, "item"),
+        Kind::Icons { .. } => (r, "icons"),
+        Kind::Progress { .. } => (r, "bar"),
+        Kind::Input { .. } => (r, "field"),
+        Kind::Custom { .. } => (r, "slot"),
+        Kind::Button { class, .. } if !class.is_empty() => (r, "button"),
+        Kind::Container { class: Some(c) } if !c.is_empty() => (r, "panel"),
+        _ => return None,
+    };
+    let seen = match n.clip {
+        Some(c) => rect.intersect(c),
+        None => rect,
+    };
+    (seen.w > 0.0 && seen.h > 0.0).then_some((seen, what))
+}
+
+/// Overlaps: two flow siblings on each other, and a text over another text or over anything
+/// drawn that doesn't hold it (a knob, a picture, another button's frame).
+fn overlaps(ui: &Ui, parent: &[usize], out: &mut Vec<Fault>) {
+    let hit = |a: Rect, b: Rect| {
+        let i = a.intersect(b);
+        (i.w > SLACK && i.h > SLACK).then_some(i.w.min(i.h))
+    };
+    // Siblings laid out side by side or one under another never meet.
+    for n in &ui.nodes {
+        let flow: Vec<usize> = n.children.iter().copied().filter(|&c| ui.nodes[c].style.at.is_none()).collect();
+        for (i, &a) in flow.iter().enumerate() {
+            for &b in &flow[i + 1..] {
+                let (ra, rb) = (ui.nodes[a].rect, ui.nodes[b].rect);
+                if ra.w <= 0.0 || rb.w <= 0.0 || ra.h <= 0.0 || rb.h <= 0.0 {
+                    continue;
+                }
+                if let Some(by) = hit(ra, rb) {
+                    let text = format!("{} / {}", words_of(ui, a), words_of(ui, b));
+                    out.push(Fault { what: "siblings overlap", path: path(ui, parent, a), text, by });
+                }
+            }
+        }
+    }
+    let all: Vec<(usize, Rect, &'static str)> = (0..ui.nodes.len()).filter_map(|i| drawn(ui, i).map(|(r, w)| (i, r, w))).collect();
+    let holds = |a: usize, b: usize| {
+        // whether `a` is above `b` in the tree
+        let mut i = b;
+        while i != usize::MAX {
+            if i == a {
+                return true;
+            }
+            i = parent[i];
+        }
+        false
+    };
+    for &(t, tr, tw) in &all {
+        if tw != "text" {
+            continue;
+        }
+        for &(o, or, ow) in &all {
+            if o == t || holds(o, t) || (ow == "text" && o < t) {
+                continue;
+            }
+            if let Some(by) = hit(tr, or) {
+                let what = if ow == "text" { "text over text" } else { "text over widget" };
+                let text = format!("{} / {ow} {}", words_of(ui, t), words_of(ui, o));
+                out.push(Fault { what, path: path(ui, parent, t), text, by });
+            }
+        }
+    }
 }
 
 /// How far `r` reaches past `outer` on its worst side (0 or less: inside).

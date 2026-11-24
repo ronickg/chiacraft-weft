@@ -916,7 +916,12 @@ impl Ui {
 
     fn measure(&mut self, id: NodeId, avail: [f32; 2], font: &font::Font) -> [f32; 2] {
         let style = self.nodes[id].style;
-        let fixed_w = Self::resolve(style.w, avail[0]);
+        // A fixed width is a column's (`layout`): as wide as the widest need among the widgets
+        // given that width.
+        let fixed_w = match style.w {
+            Len::Px(v) => Some(v.max(self.columns.get(&v.to_bits()).copied().unwrap_or(0.0))),
+            l => Self::resolve(l, avail[0]),
+        };
         let fixed_h = Self::resolve(style.h, avail[1]);
         let pad_w = style.pad[0] + style.pad[2];
         let pad_h = style.pad[1] + style.pad[3];
@@ -971,21 +976,16 @@ impl Ui {
                 }
             }
         };
-        // A one-line text or a button: its fixed width is a column's (`layout`), the least it
-        // takes (heights stay: a 2x label is measured 2x tall, and small buttons take 1x).
-        let kind = &self.nodes[id].kind;
-        let column = matches!(kind, Kind::Button { .. }) || matches!(kind, Kind::Text(t) if !t.wrap);
-        let fixed_w = match (style.w, column) {
-            (Len::Px(v), true) => {
-                let need = content[0] + pad_w;
-                let e = self.needs.entry(v.to_bits()).or_insert(0.0);
-                *e = e.max(need);
-                Some(v.max(self.columns.get(&v.to_bits()).copied().unwrap_or(0.0)))
-            }
-            _ => fixed_w,
-        };
+        // Content is the floor: a fixed width is the least a widget takes, never less than its
+        // words (a whole line, or the longest word of wrapping text) and what it holds, with its
+        // padding. Heights stay as built (a 2x label is measured 2x tall; small buttons take 1x).
+        let floor = content[0] + pad_w;
+        if let Len::Px(v) = style.w {
+            let e = self.needs.entry(v.to_bits()).or_insert(0.0);
+            *e = e.max(floor);
+        }
         let w = fixed_w
-            .unwrap_or(content[0] + pad_w)
+            .map_or(floor, |f| f.max(floor))
             .max(style.min[0])
             .min(style.max_w);
         // What scrolls up and down needs no more height than it gets: a row holding a long list
@@ -1026,18 +1026,16 @@ impl Ui {
         }
         self.nodes[id].rect.y += lower;
         if let Kind::Text(t) = &mut self.nodes[id].kind {
-            // Final fit: wrap to the box we actually got, or shrink if wrapping is off.
+            // Final fit: wrap to the box we actually got. Never a smaller scale (uneven pixels, and
+            // not the UI's one size): one-line text the box can't hold wraps too, said once per
+            // text so a check run lists every box too narrow for its words (`ui::audit` finds the
+            // lines then running past their box).
             if t.layout.width * t.scale * unit > inner.w + 0.5 {
-                if t.wrap {
-                    t.layout =
-                        text::layout_with(&t.spans, font, Some(inner.w / (t.scale * unit)), t.line.unwrap_or(font.line_height), t.mono);
-                } else if t.layout.width > 0.0 {
-                    t.scale = (inner.w / (t.layout.width * unit)).max(0.25);
-                    // Squeezed text is smaller than the UI's one size (UI guide: one font, one
-                    // size): said once per text, so a check run lists every box too narrow for its
-                    // words in that language (the Russian pass, 11-04).
-                    squeezed(&text::plain_text(&t.spans), t.scale, inner.w);
+                if !t.wrap && t.layout.width > 0.0 {
+                    squeezed(&text::plain_text(&t.spans), inner.w / (t.layout.width * t.scale * unit), inner.w);
                 }
+                t.layout =
+                    text::layout_with(&t.spans, font, Some(inner.w / (t.scale * unit)), t.line.unwrap_or(font.line_height), t.mono);
             }
             return;
         }
@@ -1106,9 +1104,11 @@ impl Ui {
                 free += take;
             }
         } else if free < 0.0 && style.row {
-            // Too wide: squeeze wrapping text children, they re-measure with less width.
+            // Too wide: wrapping text children give way, re-measured with less width but never
+            // below their longest word; one-line text keeps its line. What still doesn't fit
+            // starts at the row's start (centred, it would leave the screen on the left).
             let texts: Vec<usize> = (0..children.len())
-                .filter(|&i| matches!(self.nodes[children[i]].kind, Kind::Text(_)))
+                .filter(|&i| matches!(&self.nodes[children[i]].kind, Kind::Text(t) if t.wrap))
                 .collect();
             if !texts.is_empty() {
                 let take = -free / texts.len() as f32;
@@ -1116,10 +1116,12 @@ impl Ui {
                     let c = children[i];
                     let nw = (sizes[i][0] - take).max(16.0);
                     let m = self.measure(c, [nw, cross_size], font);
-                    sizes[i] = [nw, m[1]];
+                    let w = m[0].min(sizes[i][0]);
+                    free += sizes[i][0] - w;
+                    sizes[i] = [w, m[1]];
                 }
-                free = 0.0;
             }
+            free = free.max(0.0);
         }
         let mut scrolled = 0.0;
         let mut past_end = 0.0;
@@ -1256,7 +1258,7 @@ fn squeezed(text: &str, scale: f32, width: f32) {
     SAID.with(|s| {
         // per text and box: the same words can be too wide for one box and fit another
         if s.borrow_mut().insert(format!("{text}\u{0}{width:.1}")) {
-            log::warn!("ui: \"{text}\" squeezed to {:.0}% to fit {width:.1} GUI px", scale * 100.0);
+            log::warn!("ui: \"{text}\" wrapped: {:.0}% of its line fits {width:.1} GUI px", scale * 100.0);
         }
     });
 }

@@ -88,87 +88,6 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 1
-wait 1
-# en_us at 1
-peek core:pause
-peek core:settings
-peek core:video
-peek core:accessibility
-peek core:chat_settings
-peek core:sound
-peek core:language
-peek core:controls
-peek core:mod_settings
-peek core:world_rules
-peek core:resource_packs
-peek core:shader_packs
-peek core:hud_editor
-peek core:touch_buttons
-peek core:debug_options
-peek core:tags
-peek core:mods
-peek core:disabled_mods
-peek core:profile
-peek core:account
-peek core:finder
-peek core:achievements
-peek core:admission
-peek core:multiplayer
-peek core:chat
-peek base:video
-peek base:video_fantasy
-peek base:video_dlss
-peek base:video_developer
-peek base:map
-peek base:stats
-peek base:web
-peek base:knapping
-peek base:campfire
-peek base:charcoal_clamp
-peek base:cooking_pot
-peek base:crucible
-peek base:drying_rack
-peek base:forge
-peek base:tanning_frame
-peek base:tanning_pit
-peek base:tombstone
-peek animals:journal
-peek animals:scout
-peek animals:animal
-peek animals:animal_family
-peek animals:animal_genes
-peek animals:look
-peek packages:personal
-peek portals:portal
-key KeyE
-wait 0.6
-key Escape
-wait 0.3
-key KeyR
-wait 0.6
-key Escape
-wait 0.3
-key KeyP
-wait 0.6
-key Escape
-wait 0.3
-key KeyL
-wait 0.6
-key Escape
-wait 0.3
-screen core:multiplayer
-wait 0.6
-tap core:multiplayer id:links
-wait 0.8
-key Escape
-wait 0.3
-tap core:multiplayer id:friends
-wait 0.8
-key Escape
-wait 0.3
-key Escape
-wait 0.3
 set_config core:gui_scale 2
 wait 1
 # en_us at 2
@@ -250,9 +169,9 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 3
+set_config core:gui_scale 4
 wait 1
-# en_us at 3
+# en_us at 4
 peek core:pause
 peek core:settings
 peek core:video
@@ -331,9 +250,9 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 4
+set_config core:gui_scale 6
 wait 1
-# en_us at 4
+# en_us at 6
 peek core:pause
 peek core:settings
 peek core:video
@@ -495,87 +414,6 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 1
-wait 1
-# ru_ru at 1
-peek core:pause
-peek core:settings
-peek core:video
-peek core:accessibility
-peek core:chat_settings
-peek core:sound
-peek core:language
-peek core:controls
-peek core:mod_settings
-peek core:world_rules
-peek core:resource_packs
-peek core:shader_packs
-peek core:hud_editor
-peek core:touch_buttons
-peek core:debug_options
-peek core:tags
-peek core:mods
-peek core:disabled_mods
-peek core:profile
-peek core:account
-peek core:finder
-peek core:achievements
-peek core:admission
-peek core:multiplayer
-peek core:chat
-peek base:video
-peek base:video_fantasy
-peek base:video_dlss
-peek base:video_developer
-peek base:map
-peek base:stats
-peek base:web
-peek base:knapping
-peek base:campfire
-peek base:charcoal_clamp
-peek base:cooking_pot
-peek base:crucible
-peek base:drying_rack
-peek base:forge
-peek base:tanning_frame
-peek base:tanning_pit
-peek base:tombstone
-peek animals:journal
-peek animals:scout
-peek animals:animal
-peek animals:animal_family
-peek animals:animal_genes
-peek animals:look
-peek packages:personal
-peek portals:portal
-key KeyE
-wait 0.6
-key Escape
-wait 0.3
-key KeyR
-wait 0.6
-key Escape
-wait 0.3
-key KeyP
-wait 0.6
-key Escape
-wait 0.3
-key KeyL
-wait 0.6
-key Escape
-wait 0.3
-screen core:multiplayer
-wait 0.6
-tap core:multiplayer id:links
-wait 0.8
-key Escape
-wait 0.3
-tap core:multiplayer id:friends
-wait 0.8
-key Escape
-wait 0.3
-key Escape
-wait 0.3
 set_config core:gui_scale 2
 wait 1
 # ru_ru at 2
@@ -657,9 +495,9 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 3
+set_config core:gui_scale 4
 wait 1
-# ru_ru at 3
+# ru_ru at 4
 peek core:pause
 peek core:settings
 peek core:video
@@ -738,9 +576,9 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 4
+set_config core:gui_scale 6
 wait 1
-# ru_ru at 4
+# ru_ru at 6
 peek core:pause
 peek core:settings
 peek core:video
@@ -902,171 +740,9 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 1
-wait 1
-# fr_fr at 1
-peek core:pause
-peek core:settings
-peek core:video
-peek core:accessibility
-peek core:chat_settings
-peek core:sound
-peek core:language
-peek core:controls
-peek core:mod_settings
-peek core:world_rules
-peek core:resource_packs
-peek core:shader_packs
-peek core:hud_editor
-peek core:touch_buttons
-peek core:debug_options
-peek core:tags
-peek core:mods
-peek core:disabled_mods
-peek core:profile
-peek core:account
-peek core:finder
-peek core:achievements
-peek core:admission
-peek core:multiplayer
-peek core:chat
-peek base:video
-peek base:video_fantasy
-peek base:video_dlss
-peek base:video_developer
-peek base:map
-peek base:stats
-peek base:web
-peek base:knapping
-peek base:campfire
-peek base:charcoal_clamp
-peek base:cooking_pot
-peek base:crucible
-peek base:drying_rack
-peek base:forge
-peek base:tanning_frame
-peek base:tanning_pit
-peek base:tombstone
-peek animals:journal
-peek animals:scout
-peek animals:animal
-peek animals:animal_family
-peek animals:animal_genes
-peek animals:look
-peek packages:personal
-peek portals:portal
-key KeyE
-wait 0.6
-key Escape
-wait 0.3
-key KeyR
-wait 0.6
-key Escape
-wait 0.3
-key KeyP
-wait 0.6
-key Escape
-wait 0.3
-key KeyL
-wait 0.6
-key Escape
-wait 0.3
-screen core:multiplayer
-wait 0.6
-tap core:multiplayer id:links
-wait 0.8
-key Escape
-wait 0.3
-tap core:multiplayer id:friends
-wait 0.8
-key Escape
-wait 0.3
-key Escape
-wait 0.3
 set_config core:gui_scale 2
 wait 1
 # fr_fr at 2
-peek core:pause
-peek core:settings
-peek core:video
-peek core:accessibility
-peek core:chat_settings
-peek core:sound
-peek core:language
-peek core:controls
-peek core:mod_settings
-peek core:world_rules
-peek core:resource_packs
-peek core:shader_packs
-peek core:hud_editor
-peek core:touch_buttons
-peek core:debug_options
-peek core:tags
-peek core:mods
-peek core:disabled_mods
-peek core:profile
-peek core:account
-peek core:finder
-peek core:achievements
-peek core:admission
-peek core:multiplayer
-peek core:chat
-peek base:video
-peek base:video_fantasy
-peek base:video_dlss
-peek base:video_developer
-peek base:map
-peek base:stats
-peek base:web
-peek base:knapping
-peek base:campfire
-peek base:charcoal_clamp
-peek base:cooking_pot
-peek base:crucible
-peek base:drying_rack
-peek base:forge
-peek base:tanning_frame
-peek base:tanning_pit
-peek base:tombstone
-peek animals:journal
-peek animals:scout
-peek animals:animal
-peek animals:animal_family
-peek animals:animal_genes
-peek animals:look
-peek packages:personal
-peek portals:portal
-key KeyE
-wait 0.6
-key Escape
-wait 0.3
-key KeyR
-wait 0.6
-key Escape
-wait 0.3
-key KeyP
-wait 0.6
-key Escape
-wait 0.3
-key KeyL
-wait 0.6
-key Escape
-wait 0.3
-screen core:multiplayer
-wait 0.6
-tap core:multiplayer id:links
-wait 0.8
-key Escape
-wait 0.3
-tap core:multiplayer id:friends
-wait 0.8
-key Escape
-wait 0.3
-key Escape
-wait 0.3
-set_config core:gui_scale 3
-wait 1
-# fr_fr at 3
 peek core:pause
 peek core:settings
 peek core:video
@@ -1226,6 +902,413 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
+set_config core:gui_scale 6
+wait 1
+# fr_fr at 6
+peek core:pause
+peek core:settings
+peek core:video
+peek core:accessibility
+peek core:chat_settings
+peek core:sound
+peek core:language
+peek core:controls
+peek core:mod_settings
+peek core:world_rules
+peek core:resource_packs
+peek core:shader_packs
+peek core:hud_editor
+peek core:touch_buttons
+peek core:debug_options
+peek core:tags
+peek core:mods
+peek core:disabled_mods
+peek core:profile
+peek core:account
+peek core:finder
+peek core:achievements
+peek core:admission
+peek core:multiplayer
+peek core:chat
+peek base:video
+peek base:video_fantasy
+peek base:video_dlss
+peek base:video_developer
+peek base:map
+peek base:stats
+peek base:web
+peek base:knapping
+peek base:campfire
+peek base:charcoal_clamp
+peek base:cooking_pot
+peek base:crucible
+peek base:drying_rack
+peek base:forge
+peek base:tanning_frame
+peek base:tanning_pit
+peek base:tombstone
+peek animals:journal
+peek animals:scout
+peek animals:animal
+peek animals:animal_family
+peek animals:animal_genes
+peek animals:look
+peek packages:personal
+peek portals:portal
+key KeyE
+wait 0.6
+key Escape
+wait 0.3
+key KeyR
+wait 0.6
+key Escape
+wait 0.3
+key KeyP
+wait 0.6
+key Escape
+wait 0.3
+key KeyL
+wait 0.6
+key Escape
+wait 0.3
+screen core:multiplayer
+wait 0.6
+tap core:multiplayer id:links
+wait 0.8
+key Escape
+wait 0.3
+tap core:multiplayer id:friends
+wait 0.8
+key Escape
+wait 0.3
+key Escape
+wait 0.3
+set_config core:language en_xa
+wait 1.5
+set_config core:gui_scale 0
+wait 1
+# en_xa at auto
+peek core:pause
+peek core:settings
+peek core:video
+peek core:accessibility
+peek core:chat_settings
+peek core:sound
+peek core:language
+peek core:controls
+peek core:mod_settings
+peek core:world_rules
+peek core:resource_packs
+peek core:shader_packs
+peek core:hud_editor
+peek core:touch_buttons
+peek core:debug_options
+peek core:tags
+peek core:mods
+peek core:disabled_mods
+peek core:profile
+peek core:account
+peek core:finder
+peek core:achievements
+peek core:admission
+peek core:multiplayer
+peek core:chat
+peek base:video
+peek base:video_fantasy
+peek base:video_dlss
+peek base:video_developer
+peek base:map
+peek base:stats
+peek base:web
+peek base:knapping
+peek base:campfire
+peek base:charcoal_clamp
+peek base:cooking_pot
+peek base:crucible
+peek base:drying_rack
+peek base:forge
+peek base:tanning_frame
+peek base:tanning_pit
+peek base:tombstone
+peek animals:journal
+peek animals:scout
+peek animals:animal
+peek animals:animal_family
+peek animals:animal_genes
+peek animals:look
+peek packages:personal
+peek portals:portal
+key KeyE
+wait 0.6
+key Escape
+wait 0.3
+key KeyR
+wait 0.6
+key Escape
+wait 0.3
+key KeyP
+wait 0.6
+key Escape
+wait 0.3
+key KeyL
+wait 0.6
+key Escape
+wait 0.3
+screen core:multiplayer
+wait 0.6
+tap core:multiplayer id:links
+wait 0.8
+key Escape
+wait 0.3
+tap core:multiplayer id:friends
+wait 0.8
+key Escape
+wait 0.3
+key Escape
+wait 0.3
+set_config core:gui_scale 2
+wait 1
+# en_xa at 2
+peek core:pause
+peek core:settings
+peek core:video
+peek core:accessibility
+peek core:chat_settings
+peek core:sound
+peek core:language
+peek core:controls
+peek core:mod_settings
+peek core:world_rules
+peek core:resource_packs
+peek core:shader_packs
+peek core:hud_editor
+peek core:touch_buttons
+peek core:debug_options
+peek core:tags
+peek core:mods
+peek core:disabled_mods
+peek core:profile
+peek core:account
+peek core:finder
+peek core:achievements
+peek core:admission
+peek core:multiplayer
+peek core:chat
+peek base:video
+peek base:video_fantasy
+peek base:video_dlss
+peek base:video_developer
+peek base:map
+peek base:stats
+peek base:web
+peek base:knapping
+peek base:campfire
+peek base:charcoal_clamp
+peek base:cooking_pot
+peek base:crucible
+peek base:drying_rack
+peek base:forge
+peek base:tanning_frame
+peek base:tanning_pit
+peek base:tombstone
+peek animals:journal
+peek animals:scout
+peek animals:animal
+peek animals:animal_family
+peek animals:animal_genes
+peek animals:look
+peek packages:personal
+peek portals:portal
+key KeyE
+wait 0.6
+key Escape
+wait 0.3
+key KeyR
+wait 0.6
+key Escape
+wait 0.3
+key KeyP
+wait 0.6
+key Escape
+wait 0.3
+key KeyL
+wait 0.6
+key Escape
+wait 0.3
+screen core:multiplayer
+wait 0.6
+tap core:multiplayer id:links
+wait 0.8
+key Escape
+wait 0.3
+tap core:multiplayer id:friends
+wait 0.8
+key Escape
+wait 0.3
+key Escape
+wait 0.3
+set_config core:gui_scale 4
+wait 1
+# en_xa at 4
+peek core:pause
+peek core:settings
+peek core:video
+peek core:accessibility
+peek core:chat_settings
+peek core:sound
+peek core:language
+peek core:controls
+peek core:mod_settings
+peek core:world_rules
+peek core:resource_packs
+peek core:shader_packs
+peek core:hud_editor
+peek core:touch_buttons
+peek core:debug_options
+peek core:tags
+peek core:mods
+peek core:disabled_mods
+peek core:profile
+peek core:account
+peek core:finder
+peek core:achievements
+peek core:admission
+peek core:multiplayer
+peek core:chat
+peek base:video
+peek base:video_fantasy
+peek base:video_dlss
+peek base:video_developer
+peek base:map
+peek base:stats
+peek base:web
+peek base:knapping
+peek base:campfire
+peek base:charcoal_clamp
+peek base:cooking_pot
+peek base:crucible
+peek base:drying_rack
+peek base:forge
+peek base:tanning_frame
+peek base:tanning_pit
+peek base:tombstone
+peek animals:journal
+peek animals:scout
+peek animals:animal
+peek animals:animal_family
+peek animals:animal_genes
+peek animals:look
+peek packages:personal
+peek portals:portal
+key KeyE
+wait 0.6
+key Escape
+wait 0.3
+key KeyR
+wait 0.6
+key Escape
+wait 0.3
+key KeyP
+wait 0.6
+key Escape
+wait 0.3
+key KeyL
+wait 0.6
+key Escape
+wait 0.3
+screen core:multiplayer
+wait 0.6
+tap core:multiplayer id:links
+wait 0.8
+key Escape
+wait 0.3
+tap core:multiplayer id:friends
+wait 0.8
+key Escape
+wait 0.3
+key Escape
+wait 0.3
+set_config core:gui_scale 6
+wait 1
+# en_xa at 6
+peek core:pause
+peek core:settings
+peek core:video
+peek core:accessibility
+peek core:chat_settings
+peek core:sound
+peek core:language
+peek core:controls
+peek core:mod_settings
+peek core:world_rules
+peek core:resource_packs
+peek core:shader_packs
+peek core:hud_editor
+peek core:touch_buttons
+peek core:debug_options
+peek core:tags
+peek core:mods
+peek core:disabled_mods
+peek core:profile
+peek core:account
+peek core:finder
+peek core:achievements
+peek core:admission
+peek core:multiplayer
+peek core:chat
+peek base:video
+peek base:video_fantasy
+peek base:video_dlss
+peek base:video_developer
+peek base:map
+peek base:stats
+peek base:web
+peek base:knapping
+peek base:campfire
+peek base:charcoal_clamp
+peek base:cooking_pot
+peek base:crucible
+peek base:drying_rack
+peek base:forge
+peek base:tanning_frame
+peek base:tanning_pit
+peek base:tombstone
+peek animals:journal
+peek animals:scout
+peek animals:animal
+peek animals:animal_family
+peek animals:animal_genes
+peek animals:look
+peek packages:personal
+peek portals:portal
+key KeyE
+wait 0.6
+key Escape
+wait 0.3
+key KeyR
+wait 0.6
+key Escape
+wait 0.3
+key KeyP
+wait 0.6
+key Escape
+wait 0.3
+key KeyL
+wait 0.6
+key Escape
+wait 0.3
+screen core:multiplayer
+wait 0.6
+tap core:multiplayer id:links
+wait 0.8
+key Escape
+wait 0.3
+tap core:multiplayer id:friends
+wait 0.8
+key Escape
+wait 0.3
+key Escape
+wait 0.3
 leave
 wait 3
 set_config core:language en_us
@@ -1233,26 +1316,6 @@ wait 1.5
 set_config core:gui_scale 0
 wait 1
 # title: en_us at auto
-peek core:worlds
-peek core:create_world
-peek core:multiplayer
-screen core:worlds
-wait 0.6
-tap_once core:worlds id:world:0
-wait 0.6
-tap core:worlds id:new_address
-wait 0.6
-key Escape
-wait 0.3
-tap core:worlds id:delete_world
-wait 0.6
-key Escape
-wait 0.3
-key Escape
-wait 0.3
-set_config core:gui_scale 1
-wait 1
-# title: en_us at 1
 peek core:worlds
 peek core:create_world
 peek core:multiplayer
@@ -1290,9 +1353,9 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 3
+set_config core:gui_scale 4
 wait 1
-# title: en_us at 3
+# title: en_us at 4
 peek core:worlds
 peek core:create_world
 peek core:multiplayer
@@ -1310,9 +1373,9 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 4
+set_config core:gui_scale 6
 wait 1
-# title: en_us at 4
+# title: en_us at 6
 peek core:worlds
 peek core:create_world
 peek core:multiplayer
@@ -1352,26 +1415,6 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 1
-wait 1
-# title: ru_ru at 1
-peek core:worlds
-peek core:create_world
-peek core:multiplayer
-screen core:worlds
-wait 0.6
-tap_once core:worlds id:world:0
-wait 0.6
-tap core:worlds id:new_address
-wait 0.6
-key Escape
-wait 0.3
-tap core:worlds id:delete_world
-wait 0.6
-key Escape
-wait 0.3
-key Escape
-wait 0.3
 set_config core:gui_scale 2
 wait 1
 # title: ru_ru at 2
@@ -1392,9 +1435,9 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 3
+set_config core:gui_scale 4
 wait 1
-# title: ru_ru at 3
+# title: ru_ru at 4
 peek core:worlds
 peek core:create_world
 peek core:multiplayer
@@ -1412,9 +1455,9 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 4
+set_config core:gui_scale 6
 wait 1
-# title: ru_ru at 4
+# title: ru_ru at 6
 peek core:worlds
 peek core:create_world
 peek core:multiplayer
@@ -1454,26 +1497,6 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 1
-wait 1
-# title: fr_fr at 1
-peek core:worlds
-peek core:create_world
-peek core:multiplayer
-screen core:worlds
-wait 0.6
-tap_once core:worlds id:world:0
-wait 0.6
-tap core:worlds id:new_address
-wait 0.6
-key Escape
-wait 0.3
-tap core:worlds id:delete_world
-wait 0.6
-key Escape
-wait 0.3
-key Escape
-wait 0.3
 set_config core:gui_scale 2
 wait 1
 # title: fr_fr at 2
@@ -1494,9 +1517,71 @@ key Escape
 wait 0.3
 key Escape
 wait 0.3
-set_config core:gui_scale 3
+set_config core:gui_scale 4
 wait 1
-# title: fr_fr at 3
+# title: fr_fr at 4
+peek core:worlds
+peek core:create_world
+peek core:multiplayer
+screen core:worlds
+wait 0.6
+tap_once core:worlds id:world:0
+wait 0.6
+tap core:worlds id:new_address
+wait 0.6
+key Escape
+wait 0.3
+tap core:worlds id:delete_world
+wait 0.6
+key Escape
+wait 0.3
+key Escape
+wait 0.3
+set_config core:gui_scale 6
+wait 1
+# title: fr_fr at 6
+peek core:worlds
+peek core:create_world
+peek core:multiplayer
+screen core:worlds
+wait 0.6
+tap_once core:worlds id:world:0
+wait 0.6
+tap core:worlds id:new_address
+wait 0.6
+key Escape
+wait 0.3
+tap core:worlds id:delete_world
+wait 0.6
+key Escape
+wait 0.3
+key Escape
+wait 0.3
+set_config core:language en_xa
+wait 1.5
+set_config core:gui_scale 0
+wait 1
+# title: en_xa at auto
+peek core:worlds
+peek core:create_world
+peek core:multiplayer
+screen core:worlds
+wait 0.6
+tap_once core:worlds id:world:0
+wait 0.6
+tap core:worlds id:new_address
+wait 0.6
+key Escape
+wait 0.3
+tap core:worlds id:delete_world
+wait 0.6
+key Escape
+wait 0.3
+key Escape
+wait 0.3
+set_config core:gui_scale 2
+wait 1
+# title: en_xa at 2
 peek core:worlds
 peek core:create_world
 peek core:multiplayer
@@ -1516,7 +1601,27 @@ key Escape
 wait 0.3
 set_config core:gui_scale 4
 wait 1
-# title: fr_fr at 4
+# title: en_xa at 4
+peek core:worlds
+peek core:create_world
+peek core:multiplayer
+screen core:worlds
+wait 0.6
+tap_once core:worlds id:world:0
+wait 0.6
+tap core:worlds id:new_address
+wait 0.6
+key Escape
+wait 0.3
+tap core:worlds id:delete_world
+wait 0.6
+key Escape
+wait 0.3
+key Escape
+wait 0.3
+set_config core:gui_scale 6
+wait 1
+# title: en_xa at 6
 peek core:worlds
 peek core:create_world
 peek core:multiplayer

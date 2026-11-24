@@ -30,7 +30,7 @@ def main(argv):
             if m:
                 screen, what, wpath, text, by, lang, scale, window = m.groups()
                 f = faults[(screen, what, wpath, text)]
-                f["by"] = max(f["by"], abs(float(by)) if what != "squeezed" else 1 - float(by))
+                f["by"] = max(f["by"], abs(float(by)))
                 f["where"].add((lang, float(scale), window))
                 continue
             n = NOTE.search(line)
@@ -47,7 +47,7 @@ def main(argv):
             langs = sorted({w[0] for w in f["where"]})
             scales = sorted({w[1] for w in f["where"]})
             wins = sorted({w[2] for w in f["where"]}, key=lambda x: int(x.split("x")[0]))
-            by = f"{f['by'] * 100:.0f}% smaller" if what == "squeezed" else f"{f['by']:.1f} px"
+            by = f"at {f['by']:.2f}x" if what == "uneven scale" else f"{f['by']:.1f} px"
             out.append(
                 f"- **{what}** \"{text[:60]}\" ({by}) `{wpath[-90:]}` | {', '.join(langs)} | scale "
                 f"{', '.join(f'{x:g}' for x in scales)} | {', '.join(wins)}"

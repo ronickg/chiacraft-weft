@@ -1067,9 +1067,10 @@ fn settings_links(cx: &BuildCx) -> Vec<(&'static str, &'static str)> {
     v
 }
 
-/// How wide a slider's label written on it may be (style 1): the settings list's row less the
-/// knob's width either side.
-const SLIDER_LABEL_W: f32 = 300.0;
+/// Style 1's slider rows: the name's and the value's least widths, columns that grow to the
+/// widest in the list (`Ui::layout`).
+const SLIDER_NAME_W: f32 = 96.0;
+const SLIDER_VALUE_W: f32 = 36.0;
 
 /// A setting's row: a toggle or a choice as a button, a number as a label over a slider; locked
 /// (shown, not changed) when the server has its say or the world's rules are fixed.
@@ -1163,59 +1164,70 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                 field_label(ui, cx, t);
             }
             if !locked {
-                let range = (d.max - d.min).max(1e-9);
-                let unit = if d.kind == weft_abi::config_kind::INT { 1.0 } else { range / 100.0 };
-                let steps = d.steps(unit);
-                let definition = d.clone();
-                let at = move |f: f32| {
-                    if definition.logarithmic {
-                        definition.slider_value(f)
+                let add_slider = move |ui: &mut Ui, style: Style| {
+                    let range = (d.max - d.min).max(1e-9);
+                    let unit = if d.kind == weft_abi::config_kind::INT { 1.0 } else { range / 100.0 };
+                    let steps = d.steps(unit);
+                    let definition = d.clone();
+                    let at = move |f: f32| {
+                        if definition.logarithmic {
+                            definition.slider_value(f)
+                        } else {
+                            let n = steps.max(1) as f64;
+                            definition.min + (f as f64 * n).round() / n * range
+                        }
+                    };
+                    let apply = d.clone();
+                    let set: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| crate::config::set(id, apply.slider_value(f)));
+                    let (on_change, on_release) = if d.flags & crate::tag_bits::config::ON_RELEASE != 0 {
+                        let (show, done) = (dragged.clone(), dragged.clone());
+                        let preview = at.clone();
+                        let shown: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| show.set(Some(preview(f))));
+                        let apply: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| {
+                            done.set(None);
+                            crate::config::set(id, at(f));
+                        });
+                        (shown, Some(apply))
                     } else {
-                        let n = steps.max(1) as f64;
-                        definition.min + (f as f64 * n).round() / n * range
-                    }
-                };
-                let apply = d.clone();
-                let set: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| crate::config::set(id, apply.slider_value(f)));
-                let (on_change, on_release) = if d.flags & crate::tag_bits::config::ON_RELEASE != 0 {
-                    let (show, done) = (dragged.clone(), dragged.clone());
-                    let preview = at.clone();
-                    let shown: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| show.set(Some(preview(f))));
-                    let apply: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| {
-                        done.set(None);
-                        crate::config::set(id, at(f));
+                        (set, None)
+                    };
+                    let step = d.clone();
+                    let step_value = d.logarithmic.then(|| {
+                        Box::new(move |fraction: f32, by: f32| {
+                            let value = step.fit(step.slider_value(fraction) + by as f64 * step.slider_step());
+                            step.slider_position(value)
+                        }) as Box<dyn Fn(f32, f32) -> f32>
                     });
-                    (shown, Some(apply))
-                } else {
-                    (set, None)
+                    let definition = d.clone();
+                    let thumb = crate::ui::slider::Thumb { value: 0.0, change: Some(on_change), release: on_release };
+                    let mut slider = crate::ui::slider::Slider::new(vec![thumb]);
+                    slider.binding = Some((
+                        vec![0.0],
+                        Box::new(move |_, values| {
+                            values[0] = definition.slider_position(crate::config::get(id));
+                        }),
+                    ));
+                    slider.steps = steps;
+                    slider.step_value = step_value;
+                    ui.add(Kind::Slider(slider), style);
                 };
-                let step = d.clone();
-                let step_value = d.logarithmic.then(|| {
-                    Box::new(move |fraction: f32, by: f32| {
-                        let value = step.fit(step.slider_value(fraction) + by as f64 * step.slider_step());
-                        step.slider_position(value)
-                    }) as Box<dyn Fn(f32, f32) -> f32>
-                });
-                let definition = d.clone();
-                let thumb = crate::ui::slider::Thumb { value: 0.0, change: Some(on_change), release: on_release };
-                let mut slider = crate::ui::slider::Slider::new(vec![thumb]);
-                slider.binding = Some((
-                    vec![0.0],
-                    Box::new(move |_, values| {
-                        values[0] = definition.slider_position(crate::config::get(id));
-                    }),
-                ));
-                slider.steps = steps;
-                slider.step_value = step_value;
-                ui.add(Kind::Slider(slider), Style::default().h(20.0).stretch());
                 if inside {
-                    // Placed over the track, centred, in a fixed width (a placed node is as wide
-                    // as it measures, and 2x needs the room): drawn after it, so over the knob.
-                    let t = ui.text_bound(button_text(cx), Box::new(value));
-                    big_label(ui, t, button_text(cx));
-                    ui.nodes[t].style = Style::default()
-                        .w(SLIDER_LABEL_W)
-                        .at_from([0.5, 0.5], 0.0, 0.0, [0.5, 0.5]);
+                    // Style 1: three cells, the setting's name | the slider | its value, so the
+                    // knob never reaches the words (Ronald 11-24, a knob over "Quality: 4"). Names
+                    // and values are columns (`Ui::layout`): as wide as the widest in the list.
+                    let class = button_text(cx);
+                    ui.container(Style::row().gap(6.0).center().stretch(), |ui| {
+                        let k2 = key.clone();
+                        let name = ui.text_bound(class, Box::new(move |_: &Ctx| ("mods.plain".into(), vec![Arg::Key(k2.clone())])));
+                        big_label(ui, name, class);
+                        ui.nodes[name].style = ui.nodes[name].style.w(SLIDER_NAME_W);
+                        add_slider(ui, Style::default().h(20.0).grow());
+                        let v = ui.text_bound(class, Box::new(move |c: &Ctx| ("mods.plain".into(), vec![value(c).1[1].clone()])));
+                        big_label(ui, v, class);
+                        ui.nodes[v].style = ui.nodes[v].style.w(SLIDER_VALUE_W);
+                    });
+                } else {
+                    add_slider(ui, Style::default().h(20.0).stretch());
                 }
             }
         }),
