@@ -3519,6 +3519,19 @@ fn layout_uis(r: &mut Running, scale: f32) -> f32 {
         for (ui, size) in uis {
             if ui.dirty || ui.size != size || ui.text_unit != text_unit {
                 ui.text_unit = text_unit;
+                let look = &r.look;
+                ui.keep_off_frames(&mut |class| {
+                    let v: Vec<f32> = look
+                        .sidecar(class, "inset")?
+                        .split_whitespace()
+                        .filter_map(|x| x.parse().ok())
+                        .collect();
+                    match v.as_slice() {
+                        [a] => Some([*a; 4]),
+                        [l, t, r, b] => Some([*l, *t, *r, *b]),
+                        _ => None,
+                    }
+                });
                 ui.layout(size, &r.ui.font);
                 ui.dirty = false;
                 r.quads_dirty = true;

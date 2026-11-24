@@ -419,6 +419,9 @@ pub struct Ui {
     pub input_scale: f32,
     /// When it opened (`shaders::clock`), for `open` animations.
     pub shown: f32,
+    /// Fixed widths that grow as one column (`layout`): by the width's bits, the widest need.
+    columns: rustc_hash::FxHashMap<u32, f32>,
+    needs: rustc_hash::FxHashMap<u32, f32>,
 }
 
 impl Default for Ui {
@@ -607,6 +610,8 @@ impl Ui {
             text_unit: 0.5,
             input_scale: 1.0,
             shown: crate::shaders::clock(),
+            columns: Default::default(),
+            needs: Default::default(),
         }
     }
 
@@ -844,11 +849,43 @@ impl Ui {
 
     // ------------------------------------------------------------ layout
 
+    /// Lays the tree out in `size`. Text-bearing widgets size to their words (chiacraft 11-24,
+    /// Ronald: "It should be fairly simple to have it correct everywhere"): a button's fixed width
+    /// is its least, and every one-line text or button given the same fixed width is
+    /// a column that grows as one to its widest words (a label column, its spacers, a row of
+    /// preset buttons), so no words are squeezed while there is room.
     pub fn layout(&mut self, size: Vec2, font: &font::Font) {
         self.size = size;
+        self.columns.clear();
+        self.needs.clear();
         self.measure(0, [size.x, size.y], font);
+        let grown: rustc_hash::FxHashMap<u32, f32> = self
+            .needs
+            .drain()
+            .filter(|&(bits, need)| need > f32::from_bits(bits) + 0.01)
+            .collect();
+        if !grown.is_empty() {
+            self.columns = grown;
+            self.measure(0, [size.x, size.y], font);
+        }
         self.arrange(0, Rect { x: 0.0, y: 0.0, w: size.x, h: size.y }, font);
         self.assign_clips(0, None);
+    }
+
+    /// Framed widgets keep their words off their frame: at least `inset` (how far the frame's
+    /// picture comes into the box, its `.gui`) and a GUI pixel on the left and right as padding.
+    pub fn keep_off_frames(&mut self, inset: &mut dyn FnMut(&str) -> Option<[f32; 4]>) {
+        for n in &mut self.nodes {
+            let class = match &n.kind {
+                Kind::Button { class, .. } if !class.is_empty() => class.as_str(),
+                Kind::Container { class: Some(c) } if !c.is_empty() => c.as_str(),
+                _ => continue,
+            };
+            if let Some([l, _, r, _]) = inset(class) {
+                n.style.pad[0] = n.style.pad[0].max(l + 1.0);
+                n.style.pad[2] = n.style.pad[2].max(r + 1.0);
+            }
+        }
     }
 
     fn assign_clips(&mut self, id: NodeId, clip: Option<Rect>) {
@@ -933,6 +970,19 @@ impl Ui {
                     if style.row { [main, cross] } else { [cross, main] }
                 }
             }
+        };
+        // A one-line text or a button: its fixed width is a column's (`layout`), the least it
+        // takes (heights stay: a 2x label is measured 2x tall, and small buttons take 1x).
+        let kind = &self.nodes[id].kind;
+        let column = matches!(kind, Kind::Button { .. }) || matches!(kind, Kind::Text(t) if !t.wrap);
+        let fixed_w = match (style.w, column) {
+            (Len::Px(v), true) => {
+                let need = content[0] + pad_w;
+                let e = self.needs.entry(v.to_bits()).or_insert(0.0);
+                *e = e.max(need);
+                Some(v.max(self.columns.get(&v.to_bits()).copied().unwrap_or(0.0)))
+            }
+            _ => fixed_w,
         };
         let w = fixed_w
             .unwrap_or(content[0] + pad_w)

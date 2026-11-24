@@ -9,7 +9,8 @@
 //!   scale to 1x is allowed).
 //! - `lines past box`: wrapped lines taller than the box they are in.
 //! - `on frame`: a text reaching into its button's or panel's frame: within `inset` of the frame's
-//!   edge (its `.gui`: how far the drawn frame comes into the box) plus one GUI pixel.
+//!   left or right edge (its `.gui`: how far the drawn frame comes into the box) plus one GUI
+//!   pixel, or past its top or bottom.
 //! - `cut by panel`: a widget sticking out of the framed widget it is in.
 //! - `cut by list`: a widget wider than the scrolling list it is in (lists scroll up and down only).
 //! - `off screen`: a widget past the screen's edge.
@@ -101,18 +102,15 @@ pub fn check(ui: &Ui, size: [f32; 2], inset: &mut dyn FnMut(&str) -> [f32; 4]) -
         // Its own scroll, or one between: the list scrolls, its rows may pass up and down.
         let scrolled = n.clip.is_some() && n.clip != f.clip;
         if matches!(n.kind, Kind::Text(_)) {
-            let [l, t, rr, b] = inset(class);
-            let room = Rect {
-                x: f.rect.x + l + MARGIN,
-                y: f.rect.y + t,
-                w: f.rect.w - l - rr - 2.0 * MARGIN,
-                h: f.rect.h - t - b,
-            };
+            let [l, _, rr, _] = inset(class);
+            // Across: off the frame's picture by a pixel. Up and down the line box is taller than
+            // the ink, so only past the box itself counts.
+            let room = Rect { x: f.rect.x + l + MARGIN, y: f.rect.y, w: f.rect.w - l - rr - 2.0 * MARGIN, h: f.rect.h };
             let mut by = (room.x - ink.x).max(ink.x + ink.w - (room.x + room.w));
             if !scrolled {
                 by = by.max((room.y - ink.y).max(ink.y + ink.h - (room.y + room.h)));
             }
-            if by > SLACK && (l + rr + t + b) > 0.0 {
+            if by > SLACK && (l + rr) > 0.0 {
                 out.push(Fault { what: "on frame", path: path(ui, &parent, id), text: words.clone(), by });
                 continue;
             }
