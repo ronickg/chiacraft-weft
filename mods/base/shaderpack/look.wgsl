@@ -213,9 +213,9 @@ const MIST_DEEP: f32 = 0.0;
 // Bliss's banks (`OPT_MIST_DOMES`): the noise's part made banks, their foot over the sea, their fall
 // with height (blocks), their density per block at `/air` 1.
 const MIST_BANK_EDGE: vec2<f32> = vec2(0.42, 0.66);
-const MIST_BANK_BASE: f32 = 18.0;
-const MIST_BANK_FALL: f32 = 24.0;
-const MIST_BANK_DENSE: f32 = 0.5;
+const MIST_BANK_BASE: f32 = 6.0;
+const MIST_BANK_FALL: f32 = 8.0;
+const MIST_BANK_DENSE: f32 = 0.25;
 const MIST_DEEP_DENSE: f32 = 1.2;
 // With it, how much light the mist in the sun's shade keeps (Bliss's in shade is dark, the shafts
 // show): of the bounce, and of the sky's.
@@ -1793,7 +1793,7 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let dir = rel / max(dist, 1e-4);
     let eye = scene.eye.xyz;
     let lo = SEA_LEVEL - 6.0;
-    let hi = SEA_LEVEL + MIST_BANK_BASE + 3.0 * MIST_BANK_FALL;
+    let hi = SEA_LEVEL + MIST_BANK_BASE + 2.0 * MIST_BANK_FALL;
     var t0 = 0.0;
     var t1 = min(dist, MIST_MARCH_FAR);
     if abs(dir.y) > 1e-4 {
@@ -1811,7 +1811,10 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let px = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * vec2(2048.0, 1152.0)) + 5.588238 * scene.frame.w;
     let jitter = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715)))) - 0.5;
     let light = fog_light(dir);
-    let n = 10u;
+    // In the crowns' shade the mist takes the open sky's cool light (Bliss's shafts are blue-grey), not
+    // the warm glow of the sky toward the sun.
+    let cool = palette().ambient * 0.75 * look_opt(OPT_FOG, 1.0) * MIST_DEEP_SHADE;
+    let n = 16u;
     let step = (t1 - t0) / f32(n);
     var through = 1.0;
     var gained = vec3(0.0);
@@ -1828,9 +1831,8 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let lit = sun_reaches(dir * t);
         reach += lit;
         misty += 1.0;
-        let shade = mix(1.0, MIST_DEEP_SHADE, 1.0 - lit);
         let kept = exp(-d * step);
-        gained += through * (1.0 - kept) * (light.sky * mix(shade, 1.0, lit) + light.sun * lit + mist_bounce(d, lit) * shade);
+        gained += through * (1.0 - kept) * (mix(cool, light.sky, lit) + light.sun * lit + mist_bounce(d, lit) * lit);
         through *= kept;
     }
     if look_debug() == 2u {
