@@ -213,18 +213,45 @@ pub async fn entity_modify(t: T) -> R {
     let near = t
         .op(&format!("spawn base:pig {} {} {}", f[0] + 1, f[1], f[2] - 3))
         .await?;
-    t.secs(0.5).await?;
-    let x = |s: String| {
-        s.split_whitespace()
-            .nth(1)
-            .and_then(|v| v.parse::<f64>().ok())
-            .unwrap_or(f64::NAN)
+    // Held still until the hit, and measured away from the one hit: spawned pigs wander off at
+    // once, the same way each run, and read along x alone the push came out at 0.12 of 1.14. The
+    // hit comes by game ticks, just after the hold ends (by the script clock it fell before or
+    // after), and the push is its farthest in the half second after, sampled each frame.
+    let tick = |t: T| async move { Ok::<u64, String>(t.op("gametime").await?.parse().unwrap_or(0)) };
+    let held = tick(t.clone()).await?;
+    t.op(&format!("drive {hit} 0 0 10")).await?;
+    // The pig beside stays held through the measure: as a player standing still, so the push
+    // carries it as it would one, and its herd's pull (it walked back to the other pig in 5 of 8
+    // runs, peaking at 0.45 or 0.65) isn't measured.
+    t.op(&format!("drive {near} 0 0 60")).await?;
+    while tick(t.clone()).await? < held + 12 {
+        t.frames(1).await?;
+    }
+    let xz = |s: String| {
+        let v: Vec<f64> = s
+            .split_whitespace()
+            .skip(1)
+            .take(3)
+            .map(|v| v.parse::<f64>().unwrap_or(f64::NAN))
+            .collect();
+        (v.first().copied().unwrap_or(f64::NAN), v.get(2).copied().unwrap_or(f64::NAN))
     };
-    let before = x(t.op(&format!("entity {near}")).await?);
+    let target = xz(t.op(&format!("entity {hit}")).await?);
+    let before = xz(t.op(&format!("entity {near}")).await?);
+    let (dx, dz) = (before.0 - target.0, before.1 - target.1);
+    let d = (dx * dx + dz * dz).sqrt().max(0.1);
     t.op(&format!("hit_falling {hit} 5")).await?;
-    t.secs(0.5).await?;
-    let after = x(t.op(&format!("entity {near}")).await?);
-    t.probe("the pig beside is thrown back", (after - before) as f32, after - before > 0.8);
+    let (mut away, mut seen) = (f64::NEG_INFINITY, Vec::new());
+    let end = crate::runner::script_clock() + Duration::from_secs_f32(0.5);
+    while crate::runner::script_clock() < end {
+        let now = xz(t.op(&format!("entity {near}")).await?);
+        let a = ((now.0 - before.0) * dx + (now.1 - before.1) * dz) / d;
+        seen.push(format!("{a:.2}"));
+        away = away.max(a);
+        t.frames(1).await?;
+    }
+    t.note(format!("{d:.2} apart at the hit; away each frame: {}", seen.join(" ")));
+    t.probe("the pig beside is thrown back", away as f32, away > 0.8);
     Ok(())
 }
 
