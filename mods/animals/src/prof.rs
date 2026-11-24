@@ -267,7 +267,7 @@ pub fn init(r: &mut Registry) {
                         let e = w.entity(id)?;
                         let kind = name_of(abi::entry_kind::ENTITY, e.kind);
                         Some(format!(
-                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {} lead {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}, nav {} moved {:.3} ground {} pose {} using {}",
+                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {} lead {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}, nav {} moved {:.3} ground {} pose {} using {}, food {} water {} health {:.0}",
                             d2.sqrt(),
                             s.player,
                             s.fright,
@@ -290,7 +290,13 @@ pub fn init(r: &mut Registry) {
                             e.moved,
                             e.on_ground,
                             e.pose,
-                            e.using
+                            e.using,
+                            // Its stomach and water, for the self-feeding checks.
+                            w.component(id, &crate::animal::ANIMAL)
+                                .map_or("-".into(), |a| format!("{:.0}%", a.food as f32 / a.stat(crate::species::FOOD).max(1.0) * 100.0)),
+                            w.component(id, &crate::animal::ANIMAL)
+                                .map_or("-".into(), |a| format!("{:.0}%", (1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0)),
+                            e.health
                         ))
                     })
                     .collect();

@@ -280,3 +280,5 @@ built, it gets its row below and its arrows above.
 | Every meat is a species and a food | `animals/core/src/meat.rs` | a meat row for a species that isn't there, or a meat with no raw or cooked `FOODS` row |
 | Species balance | `animals/core/src/balance.rs` | species numbers against their facts |
 | The sheets are up to date | `vitals/tests/sheet.rs`, `animals/core/tests/sheet.rs` | a sheet not regenerated after a change |
+| Herds drink at a drying pond (a game run) | `testkit/scripts/herd_savanna_winter.txt` (Tester runs it) | a savanna's winter not drying a pond to its last block, spring not filling it, or the deer not drinking at what is left on their own |
+| A herd feeds itself through a dry season (a game run) | `testkit/scripts/herd_savanna_graze.txt` (Tester runs it; `/animalprof senses` shows each animal's food, water and health) | wild grazers starving on their home ground in its poor season: grass too poor or too slow to grow back, or fasting too short |
