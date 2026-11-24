@@ -504,7 +504,14 @@ pub fn icon_button(
     let icon = cx.look.texture(icon, "");
     ui.button(class, Style::default().min_w(width).min_h(20.0).pad_xy(6.0, 4.0), Rc::new(action), |ui| {
         if let Some(texture) = icon {
-            ui.add(Kind::Image { texture, color: 0xFFFFFFFF }, Style::default().w(9.0).h(9.0).at(-1.0, 6.0, [0.0, 0.5]));
+            // Halfway down the button, whatever height its label makes it.
+            ui.add(
+                Kind::Image { texture, color: 0xFFFFFFFF },
+                Style::default()
+                    .w(9.0)
+                    .h(9.0)
+                    .at_from([0.0, 0.5], -1.0, 0.0, [0.0, 0.5]),
+            );
         }
         // A plain button's label as every menu button's (style 1: 2x where it fits, Planner 11-24).
         let label = if class == "button" { button_text(cx) } else { "button" };
@@ -705,6 +712,11 @@ pub fn window_list(mut style: Style, framed: bool) -> Style {
         style.grow = 0.0;
     }
     style
+}
+
+/// Whether menus draw style 1's window (`menu_panel` in the look).
+pub fn framed_menu(cx: &BuildCx) -> bool {
+    cx.look.texture("menu_panel", "").is_some()
 }
 
 /// A group's room in a style 1 window: the window's own gap plus this makes 12 between groups
@@ -1485,7 +1497,7 @@ impl Screen for Controls {
         window(ui, cx, "controls.title", 6.0, |ui| {
             let style = Style::default()
                 .stretch()
-                .w(if framed { 420.0 + crate::ui::Scrollbar::ROOM } else { 420.0 })
+                .w(if framed { 440.0 + crate::ui::Scrollbar::ROOM } else { 420.0 })
                 .h(0.0)
                 .grow()
                 .min_h(60.0)
@@ -1544,7 +1556,11 @@ fn bind_cell(ui: &mut Ui, cx: &BuildCx, action: &str, slot: usize, binding: Opti
     let a = action.to_string();
     let cell = ui.button(
         if toggled { "bind_toggle" } else { "button" },
-        Style::default().w(90.0).h(20.0).pad_xy(4.0, 0.0),
+        // Style 1: wide enough for "Middle Button" at 2x.
+        Style::default()
+            .w(if framed_menu(cx) { 110.0 } else { 90.0 })
+            .h(20.0)
+            .pad_xy(4.0, 0.0),
         Rc::new(move |c: &mut Ctx| {
             if let Some(s) = c.screen::<Controls>() {
                 (s.waiting, s.first, s.modifier) = (Some((a.clone(), slot)), None, None);

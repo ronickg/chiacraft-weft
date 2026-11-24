@@ -265,7 +265,11 @@ pub(crate) fn open_path(path: &Path) {
 }
 
 fn pack_text(ui: &mut Ui, cx: &BuildCx, info: &PackInfo, name_class: &str) {
-    ui.text(cx.rich(&info.name), name_class);
+    let t = ui.text(cx.rich(&info.name), name_class);
+    // The name at 2x like the window's labels where it fits (style 1), what it is under it at 1x.
+    if list_class(cx).1 {
+        field_label(ui, cx, t);
+    }
     if !info.description.is_empty() {
         ui.text(cx.rich(&info.description), "dim");
     }
@@ -481,9 +485,14 @@ impl Screen for ShaderPacks {
                         |ui| {
                             // The pack's name at 2x (style 1), what it is under it at 1x.
                             let t = ui.text(name, class);
-                            if framed && let Some(t) = ui.text_mut(t) {
-                                t.wrap = false;
-                                t.fit = 2.0;
+                            if framed {
+                                if let Some(t) = ui.text_mut(t) {
+                                    t.wrap = false;
+                                    t.fit = 2.0;
+                                    t.center = true;
+                                }
+                                // Across the button, or 2x has no room to fit in.
+                                ui.nodes[t].style = ui.nodes[t].style.self_align(crate::ui::Align::Stretch);
                             }
                             if !description.is_empty() {
                                 ui.text(cx.rich(&description), "button");
