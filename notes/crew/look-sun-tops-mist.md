@@ -146,9 +146,23 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
 - The streaks low in the haze at the horizon (06 low): in lv13 too, so older than the sky change.
 - Live game: the third pack reload in a row took about 90 s (lv14, lv15), the others a few seconds.
 
+### Land saturation (lv16)
+
+- Planner's lead: the shaded crowns had gone blue-grey, not just paler. The land is lit by the sky
+  through the path tracer's skylight and the haze, which read `sky_color`; lv14-15's lavender and
+  blue away from the sun, the narrower cream and the brighter horizon band lit it bluer.
+- Now Bliss's low morning sky colours only where the sky is seen (`sky_seen`: the sky, the clouds'
+  handover to it, water's mirror); the light and the haze keep the old warm sky. 06 vista land
+  saturation 0.36 to 0.46 (lv13 0.47, Bliss 0.48), tones as lv13's. The haze's half-strength glow
+  changed nothing (0.416 both); the band and the darkening were the rest (0.416 to 0.461).
+- The sweep: the peach band to about 2-14° (`SUN_GOLD`), the dawn cream's lobe cos^48, the broad Mie
+  lobe 0.4 and the wide glow a tenth where the sky is seen, the lavender bluer, the blue 0.85 as
+  bright: at x 440 of 960 ours 206 194 185, Bliss's 202 184 185; further out ours still greener
+  (green 143-150 against 128-130 at the right edge), a little teal, and its turn faster than Bliss's.
+
 ## Open
 
-- 06 vista land saturation 0.36 against Bliss's 0.48: find what took it from 0.47 (lv13) to 0.40 (lv14), then the glow's share.
+- The 06 vista sky's blue a little teal (green high) and its turn still quicker than Bliss's.
 - A faint arc high on the right of the 06 vista (lv14 k and lv15 b).
 - The faint ring at 06 low; the streaks in the far haze at 06 low.
 - 07 low darks a little deep (p5 76 against Bliss's 101); 06 low as it is (Planner).

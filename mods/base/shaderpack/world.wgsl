@@ -1132,7 +1132,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // our lake's water 0.45 mean brightness against Bliss's 0.62).
     // (Tipped down by less now, 0.85 of the ripple's lift where it was half: halved, it mirrored the
     // palest band of the sky everywhere, where Bliss's open water mirrors a deeper blue.)
+    // (The sky as seen: `sky_seen`.)
+    sky_seen = 1.0;
     var refl = sky_color(normalize(vec3(r.x, max(r.y * water_sky_lift(), 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    sky_seen = 0.0;
     // Traced (`scene.rt.w`): the shore, the trees and what is under a roof, off the screen too, out to
     // the near land; the far water keeps the sky's guess.
     if scene.rt.w > 0.5 && in.dist < 256.0 {
@@ -1625,7 +1628,9 @@ fn far_water_lit(in: VOut) -> vec3<f32> {
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, clouds, 1.0, in.pos, in.rel);
     let deep = WATER_DEEP * lit * water_body();
     let r = reflect(-v, n);
+    sky_seen = 1.0;
     let refl = sky_color(normalize(vec3(r.x, max(r.y * water_sky_lift(), 0.02), r.z)));
+    sky_seen = 0.0;
     let l = light_dir();
     let hv = normalize(l + v + vec3(0.0, 1e-4, 0.0));
     let nh = max(dot(n, hv), 0.0);
