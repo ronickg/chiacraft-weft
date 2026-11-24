@@ -37,7 +37,7 @@ const WADING: f32 = 0.05;
 
 /// Death by thirst (`thirst`): its own cause, so a run's log tells a parched animal from a starved
 /// one (ai1124_savanna3's "starve" deaths were thirst).
-static THIRST: DamageCause = DamageCause::named("thirst");
+pub(crate) static THIRST: DamageCause = DamageCause::named("thirst");
 
 pub fn init(r: &mut Registry) {
     r.damage_cause(&THIRST)

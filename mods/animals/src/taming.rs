@@ -308,10 +308,15 @@ fn flee(w: &World, id: u64, st: &EntityState) {
     w.navigate(id, to, 1.6);
 }
 
-/// It was hurt by `source` (0: nothing, a fall, the cold): a taming under way loses effectiveness,
+/// It was hurt by `source` (0: nothing, a fall, a fire), not by its own body (`comfort::bodily`):
+/// a taming under way loses effectiveness,
 /// and it runs off, from what hurt it (a deer a wolf bit runs from the wolf, not from the player
 /// who happens to be nearest).
-pub fn hurt(w: &World, id: u64, source: u64) {
+pub fn hurt(w: &World, id: u64, source: u64, cause: u32) {
+    // Its own body's hurts (`comfort::bodily`: starving, thirst) send it nowhere.
+    if crate::comfort::bodily(cause) {
+        return;
+    }
     let passive = w
         .component(id, &ANIMAL)
         .and_then(|a| a.species())
