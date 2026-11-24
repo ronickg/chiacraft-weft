@@ -244,7 +244,7 @@ const MIST_SEA_FALL: f32 = 0.05;
 const MIST_SEA_RISE: f32 = 12.0;
 const MIST_SEA_EVEN: vec3<f32> = vec3(0.2, 0.15, -10.0);
 // Its density per block at `/air` 1 (Bliss's morning, about 0.45 a block where full, at `/air` 0.05).
-const MIST_SEA_DENSE: f32 = 2.5;
+const MIST_SEA_DENSE: f32 = 1.5;
 // Its shape: a broad noise (cells this wide and tall, blocks) cut at a threshold (from, to: none
 // below, full above), so banks with clear air between them, not an even veil; and a fine noise
 // (cells this wide and tall) that eats their edges (`MIST_ERODE.z`, how much), shifted by the shape
@@ -255,7 +255,11 @@ const MIST_ERODE: vec3<f32> = vec3(1.5, 3.0, 0.4);
 // step): a sharp peak toward the sun and a broad forward tail, about 12 toward it, a quarter across,
 // a fifteenth away (peak, its sharpness, tail, its fall), so the mist's sunny side toward a low sun
 // glows and away from it the sky's light alone shows.
-const MIST_SEA_PHASE: vec4<f32> = vec4(11.7, 30.0, 0.77, 1.2);
+const MIST_SEA_PHASE: vec4<f32> = vec4(9.4, 87.0, 2.35, 6.0);
+// The broad tail of it (share, fall): with only a sharp peak and a tail, the 15-40° round the sun,
+// most of the vista, got half Bliss's sun against the sky (its fog: about 12.5 at the sun, 3.4 at
+// 14°, 1.7 at 30°, a quarter across, 0.07 away; Planner's read of overworld_fog.glsl:54-71, 123).
+const MIST_SEA_TAIL: vec2<f32> = vec2(0.76, 1.19);
 // The sun's light in it: how much of the low sun's orange goes to cream, how bright, and the most the
 // forward peak may give (Bliss's sunlit tops are cream and brighter than the land; ours took the
 // dawn sun's orange and read as sand, and from inside the mist the uncapped peak blew the sky
@@ -1918,9 +1922,52 @@ fn soft_cap(x: f32, cap: f32) -> f32 {
     return cap * (1.0 - exp(-x / cap));
 }
 // The banks' sunlight by the angle from the sun (`MIST_SEA_PHASE`).
+// Only the sharp peak (within a few degrees of the sun) is eased to the cap (`MIST_SEA_CREAM.z`).
 fn bank_phase(mu: f32) -> f32 {
     let off = 1.0 - mu;
-    return MIST_SEA_PHASE.x * exp(-MIST_SEA_PHASE.y * off) + MIST_SEA_PHASE.z * exp(-MIST_SEA_PHASE.w * off);
+    return soft_cap(MIST_SEA_PHASE.x * exp(-MIST_SEA_PHASE.y * off), MIST_SEA_CREAM.z)
+        + MIST_SEA_PHASE.z * exp(-MIST_SEA_PHASE.w * off) + MIST_SEA_TAIL.x * exp(-MIST_SEA_TAIL.y * off);
+}
+// How much of what lies `rel` away (camera relative) the banks hide, 0..1, walked as `bank_march`
+// walks them (its steps, without the light), for the bloomy fog in `post.wgsl`: Bliss blends the
+// picture toward its wide bloom by the fog's 1 - transmittance (`composite11.fsh:143-154`, method
+// only), which melts the crowns' texture under the mist and keeps the broad patches; ours read only
+// the mist volume, near nothing over the banks, and the crowns stayed sharp (lv9: fine detail under
+// the dawn mist 17.9 against Bliss's 5.8; Planner's read). 0 with the banks off.
+fn bank_hidden(rel: vec3<f32>) -> f32 {
+    let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
+    if deep <= 0.0 || scene.frame.x < 0.5 || storm() > 0.5 || air_mist() <= 0.0 {
+        return 0.0;
+    }
+    let dist = length(rel);
+    let dir = rel / max(dist, 1e-4);
+    let eye = scene.eye.xyz;
+    let lo = SEA_LEVEL - 20.0;
+    let hi = SEA_LEVEL + MIST_SEA_LEVEL + 60.0;
+    var t0 = 0.0;
+    var t1 = min(dist, MIST_MARCH_FAR);
+    if abs(dir.y) > 1e-4 {
+        let ta = (lo - eye.y) / dir.y;
+        let tb = (hi - eye.y) / dir.y;
+        t0 = max(t0, min(ta, tb));
+        t1 = min(t1, max(ta, tb));
+    } else if eye.y < lo || eye.y > hi {
+        return 0.0;
+    }
+    if t1 <= t0 {
+        return 0.0;
+    }
+    let n = 8u;
+    let e = 11.0;
+    let span = t1 - t0;
+    var depth = 0.0;
+    for (var i = 0u; i < n; i++) {
+        let u = (f32(i) + 0.5) / f32(n);
+        let t = t0 + span * (pow(e, u) - 1.0) / (e - 1.0);
+        let step = span * pow(e, u) * log(e) / (f32(n) * (e - 1.0));
+        depth += bank_density(eye + dir * t, dir * t) * deep * step;
+    }
+    return 1.0 - exp(-depth);
 }
 fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
@@ -1952,7 +1999,7 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let k = 0.75 * look_opt(OPT_FOG, 1.0);
     // The sun's light, cream (`MIST_SEA_CREAM`), by the phase; the sky's, brighter looking up.
     let cream = mix(p.sun, vec3(luma(p.sun)) * vec3(1.0, 0.92, 0.78), MIST_SEA_CREAM.x) * MIST_SEA_CREAM.y;
-    let sun_in = cream * light_strength() * soft_cap(bank_phase(dot(dir, light_dir())), MIST_SEA_CREAM.z) * k
+    let sun_in = cream * light_strength() * bank_phase(dot(dir, light_dir())) * k
         * look_opt(OPT_BANK_SUN, 1.0);
     let sky_in = p.ambient * (1.0 + MIST_SEA_SKY.x * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), MIST_SEA_SKY.y))
         * MIST_SEA_SKY.z * k * look_opt(OPT_BANK_SHADE, 1.0);
@@ -2363,7 +2410,11 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let g = 0.7;
     let lobe = min((1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566, 0.9);
     let near_end = 1.0 - edge;
-    var lit = color + p.glow * light_strength() * lobe * mix(0.25, 0.7, golden()) * (1.0 - rain) * near_end;
+    // With the banks on (`OPT_MIST_DOMES`) none of this lobe over the land, nor the mist's grey below:
+    // a second even wash over the banks, where Bliss's air only adds its own light (Planner's read,
+    // overworld_fog.glsl:266).
+    let banks_on = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0) * select(0.0, 1.0, scene.frame.x > 0.5);
+    var lit = color + p.glow * light_strength() * lobe * mix(0.25, 0.7, golden()) * (1.0 - rain) * near_end * (1.0 - banks_on);
     lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
     // Rain's mist is as dark as the rain's sky, darker in a thunderstorm: lit as a clear day's
     // air, a storm's mist was pale under a dark sky.
@@ -2376,7 +2427,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // In rain everything takes a little grey-blue wash, near too.
     // (Clear air takes less of its colour: a fifth of the veil, a tenth at most, as far biome colours
     // under Bliss stay saturated, a snowfield white and a forest green; rain's grey as before.)
-    let grey = mix(clamp(veil.b * 0.2, 0.0, 0.1), clamp(veil.b * 0.6, 0.0, 0.3), max(rain, air_mist()));
+    let grey = mix(clamp(veil.b * 0.2, 0.0, 0.1), clamp(veil.b * 0.6, 0.0, 0.3), max(rain, air_mist() * (1.0 - banks_on)));
     let pale = mix(mix(c, vec3(luma(c)), grey), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
     // Haze keeps the land's colour (Ronald, 11-05, on the glass slabs: "Haze keeps land colour"):
     // in clear air the veil stops at four fifths, the land veils toward a tenth under the sky's

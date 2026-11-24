@@ -40,6 +40,19 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
     32: the banks' in-scatter covers the crowns, which are near black with the mist off.
 - Tooling: `compare on clouds=1` in a running game does not bring the clouds back after clouds=0.
 
+## lv10 try (Planner's line-by-line read, points 1, 3, 4)
+
+- Bloomy fog over the banks: `bank_hidden` (look.wgsl) walks the banks' density only and gives
+  1 - transmittance; post blends toward the bloom by 0.94 times that (`BANK_BLOOMY`, Bliss's
+  1.25 x 0.75), capped at 0.95, scaled by `look_bloom`. Before, post's bloomy fog read only the
+  froxel mist, near nothing over the banks.
+- Banks thinned to 1.5 (from 2.5) so the crowns survive as broad darks under the blur.
+- Phase shaped like Bliss's fog phase x 5: sharp peak 9.4 e^-87x (only it eased to the cap of 3),
+  2.35 e^-6x, a broad tail 0.76 e^-1.19x (x = 1 - cos): about 12.5 / 3.4 / 1.7 at 0 / 14 / 30 deg
+  before the cap.
+- haze_lit: with the banks on, no glow lobe and no mist grey over land (a second even wash).
+- Not done yet: sky pixels march the banks only 220 blocks (sky.wgsl), Bliss to the render distance.
+
 ## Open
 
 - Why Bliss's thick mist still varies broadly (thick, yet bright and dark in large patches) where
