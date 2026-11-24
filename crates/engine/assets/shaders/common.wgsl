@@ -188,11 +188,22 @@ fn cloud_flash_end(start: vec3<f32>, end: vec4<f32>) -> vec3<f32> {
     return mix(start, end.xyz, select(1.0, 0.25, end.w > 0.0));
 }
 
+// Flash `i` of the scene, read with constant indices only. A dynamic index into an array member of the
+// by-value `view` makes naga copy the whole array to a local, and SPIRV-Cross (MoltenVK) writes that copy
+// as `spvUnsafeArray<float4, 3> = float4[3]`, which Metal rejects: no world opened on macOS (Weft bug).
+fn flash_start(view: Scene, i: u32) -> vec4<f32> {
+    return select(select(view.lightning_start[2], view.lightning_start[1], i == 1u), view.lightning_start[0], i == 0u);
+}
+
+fn flash_end(view: Scene, i: u32) -> vec4<f32> {
+    return select(select(view.lightning_end[2], view.lightning_end[1], i == 1u), view.lightning_end[0], i == 0u);
+}
+
 fn cloud_flashes_on_ray(view: Scene, dir: vec3<f32>, near: f32, far: f32) -> u32 {
     var mask = 0u;
-    for (var i = 0u; i < 3u && view.lightning_start[i].w > 0.0; i++) {
-        let start = view.lightning_start[i].xyz;
-        let end = cloud_flash_end(start, view.lightning_end[i]);
+    for (var i = 0u; i < 3u && flash_start(view, i).w > 0.0; i++) {
+        let start = flash_start(view, i).xyz;
+        let end = cloud_flash_end(start, flash_end(view, i));
         let center = (start + end) * 0.5;
         let radius = CLOUD_FLASH_RADIUS + length(end - start) * 0.5;
         let to_ray = center - dir * clamp(dot(center, dir), near, far);
@@ -207,8 +218,8 @@ fn lightning_cloud(view: Scene, pos: vec3<f32>, radiance: vec3<f32>, flashes: u3
     var brightness = 0.0;
     for (var mask = flashes; mask != 0u; mask &= mask - 1u) {
         let i = firstTrailingBit(mask);
-        let start = view.lightning_start[i];
-        let span = cloud_flash_end(start.xyz, view.lightning_end[i]) - start.xyz;
+        let start = flash_start(view, i);
+        let span = cloud_flash_end(start.xyz, flash_end(view, i)) - start.xyz;
         let rel = pos - start.xyz;
         let along = clamp(dot(rel, span) / max(dot(span, span), 1.0), 0.0, 1.0);
         let distance = length(rel - span * along);
@@ -223,11 +234,11 @@ fn lightning_ground(view: Scene, pos: vec3<f32>, sky_light: f32) -> vec3<f32> {
         return vec3(0.0);
     }
     var brightness = 0.0;
-    for (var i = 0u; i < 3u && view.lightning_start[i].w > 0.0; i++) {
-        let end = view.lightning_end[i];
+    for (var i = 0u; i < 3u && flash_start(view, i).w > 0.0; i++) {
+        let end = flash_end(view, i);
         if end.w > 0.0 {
             let glow = max(1.0 - distance(end.xyz, pos) / 116.0, 0.0);
-            brightness += view.lightning_start[i].w * glow * glow;
+            brightness += flash_start(view, i).w * glow * glow;
         }
     }
     return vec3(0.61, 0.70, 0.86) * brightness * smoothstep(0.38, 0.94, sky_light);
