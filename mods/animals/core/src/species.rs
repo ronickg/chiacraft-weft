@@ -456,7 +456,10 @@ impl Species {
         if !self.hunts() {
             return stocked;
         }
-        hunter_room_cached(self.name, biome).map_or(stocked, |room| room.clamp(1, stocked))
+        // An omnivore that forages (Citipati) eats more plants where prey is short: its prey's
+        // room never leaves it under a pair.
+        let least = if self.forages_wild() { 2 } else { 1 };
+        hunter_room_cached(self.name, biome).map_or(stocked, |room| room.clamp(least, stocked))
     }
     /// Its crowd in `biome` by the biome's stocking alone (a plant eater's; others' as they are).
     pub fn stocked_in(&self, biome: &str) -> u32 {

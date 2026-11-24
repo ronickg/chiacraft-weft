@@ -16,7 +16,7 @@ use crate::species::Active;
 pub fn activity(active: Active, hour: f32) -> f32 {
     let h = hour.rem_euclid(24.0);
     // 1 at noon, 0 at midnight, smoothly.
-    let day = (0.5 - 0.5 * ((h - 12.0) / 12.0 * std::f32::consts::PI).cos()).clamp(0.0, 1.0);
+    let day = (0.5 + 0.5 * ((h - 12.0) / 12.0 * std::f32::consts::PI).cos()).clamp(0.0, 1.0);
     // 1 at dawn and dusk, falling off over two hours either side.
     let twilight = [6.0f32, 18.0]
         .iter()
