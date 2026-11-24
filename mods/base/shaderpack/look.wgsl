@@ -236,10 +236,15 @@ const MIST_DEEP: f32 = 0.0;
 // on the ground but a level sea of mist at one height, that the hills and crowns rise out of. The
 // domes followed the land and covered every crown, and read as paint on it (Planner on lv8).
 // The sea's full height over sea level, and how fast it thins above it (per block, exp).
-const MIST_SEA_LEVEL: f32 = 18.0;
+const MIST_SEA_LEVEL: f32 = 10.0;
 const MIST_SEA_FALL: f32 = 0.05;
+// How much higher the thickest cores stand (blocks), and the even part under them: its share, its
+// fall per block (exp2) and where it starts over the sea (Bliss's uniform fog: about a fifth of its
+// banks, halving every 7 blocks).
+const MIST_SEA_RISE: f32 = 12.0;
+const MIST_SEA_EVEN: vec3<f32> = vec3(0.2, 0.15, -10.0);
 // Its density per block at `/air` 1 (Bliss's morning, about 0.45 a block where full, at `/air` 0.05).
-const MIST_SEA_DENSE: f32 = 1.0;
+const MIST_SEA_DENSE: f32 = 2.5;
 // Its shape: a broad noise (cells this wide and tall, blocks) cut at a threshold (from, to: none
 // below, full above), so banks with clear air between them, not an even veil; and a fine noise
 // (cells this wide and tall) that eats their edges (`MIST_ERODE.z`, how much), shifted by the shape
@@ -1002,7 +1007,12 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     // haze over the land toward the sun takes it too (it reads this colour).
     if scene.frame.x > 0.5 {
         let m = max(mu, 0.0);
-        let mie = (pow(m, 8.0) * 0.45 + pow(m, 64.0) * 2.2) * (0.35 + 0.65 * low) * (1.0 - rain_amount());
+        // With Bliss's sun (`OPT_SUN_DISC`) the tight lobe dimmer and a middle one added: at 2.2 it lay
+        // bright out to about 12° and gone by 20°, and through the curve read as a flat disc a third of
+        // the frame wide round the low sun (lv9's low views); Bliss's glow falls off smoothly.
+        let soft = clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0);
+        let mie = (pow(m, 8.0) * 0.45 + pow(m, 64.0) * mix(2.2, 0.7, soft) + pow(m, 20.0) * 0.5 * soft)
+            * (0.35 + 0.65 * low) * (1.0 - rain_amount());
         // In a gold of the sun's own brightness (Mie scattering keeps the low sun's colour), and a
         // third weaker: in the sun's pale mid-morning colour the glow went cream-white through the
         // curve's shoulder (08:00 sky saturation 23 against Bliss's 43, warmth +15 against +36).
@@ -1887,15 +1897,25 @@ fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
     let q = p - vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * 0.6;
     let shape = noise3(q / MIST_SHAPE.xyx);
     let cut = clamp((shape - MIST_SHAPE.z) / max(MIST_SHAPE.w - MIST_SHAPE.z, 1e-3), 0.0, 1.0);
+    // A thin even part under the billows, thinning fast with height (`MIST_SEA_EVEN`), as Bliss's
+    // uniform fog beside its cloudy one; the billows alone carry the shape.
+    let burn = (1.0 - smoothstep(0.3, 0.65, scene.sun.y)) * mix(MIST_BANK_EVENING, 1.0, smoothstep(-0.1, 0.1, scene.sun.x));
+    let k = air_mist() * MIST_SEA_DENSE * look_opt(OPT_BANK_DENSE, 1.0) * burn;
+    let even = MIST_SEA_EVEN.x * exp2(-MIST_SEA_EVEN.y * max(p.y - (SEA_LEVEL + MIST_SEA_EVEN.z), 0.0));
     if cut <= 0.0 {
-        return 0.0;
+        return k * even;
     }
     let erode = noise3(q / MIST_ERODE.xyx - vec3(cut * 7.3));
     let banks = max(cut - erode * MIST_ERODE.z, 0.0);
-    let fall = exp(-MIST_SEA_FALL * max(p.y - (SEA_LEVEL + MIST_SEA_LEVEL), 0.0));
-    // Thinner as the sun climbs, gone by about 40° up; in the evening a little only.
-    let burn = (1.0 - smoothstep(0.3, 0.65, scene.sun.y)) * mix(MIST_BANK_EVENING, 1.0, smoothstep(-0.1, 0.1, scene.sun.x));
-    return air_mist() * MIST_SEA_DENSE * look_opt(OPT_BANK_DENSE, 1.0) * banks * fall * burn;
+    // The thick cores stand taller (`MIST_SEA_RISE`), so the billows have tops of their own over the
+    // canopy, not one level skin on the low forests' crowns (lv9).
+    let fall = exp(-MIST_SEA_FALL * max(p.y - (SEA_LEVEL + MIST_SEA_LEVEL + cut * MIST_SEA_RISE), 0.0));
+    return k * (banks * fall + even);
+}
+// `x` eased toward `cap` instead of clipped at it: clipped, the forward peak lay flat out to where
+// it fell under the cap and drew a hard-edged disc a third of the frame wide round the sun (lv9).
+fn soft_cap(x: f32, cap: f32) -> f32 {
+    return cap * (1.0 - exp(-x / cap));
 }
 // The banks' sunlight by the angle from the sun (`MIST_SEA_PHASE`).
 fn bank_phase(mu: f32) -> f32 {
@@ -1932,7 +1952,7 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let k = 0.75 * look_opt(OPT_FOG, 1.0);
     // The sun's light, cream (`MIST_SEA_CREAM`), by the phase; the sky's, brighter looking up.
     let cream = mix(p.sun, vec3(luma(p.sun)) * vec3(1.0, 0.92, 0.78), MIST_SEA_CREAM.x) * MIST_SEA_CREAM.y;
-    let sun_in = cream * light_strength() * min(bank_phase(dot(dir, light_dir())), MIST_SEA_CREAM.z) * k
+    let sun_in = cream * light_strength() * soft_cap(bank_phase(dot(dir, light_dir())), MIST_SEA_CREAM.z) * k
         * look_opt(OPT_BANK_SUN, 1.0);
     let sky_in = p.ambient * (1.0 + MIST_SEA_SKY.x * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), MIST_SEA_SKY.y))
         * MIST_SEA_SKY.z * k * look_opt(OPT_BANK_SHADE, 1.0);

@@ -20,7 +20,7 @@ wait 2
 # banks have air to lie in (compare's own pin is none: lv6's first shots had no banks).
 # The mist's compare with the clouds off (Planner, 11-24 lv9: Bliss's refs have a clear sky over the
 # land, a controlled test); one clouds-on shot per sheet with `compare on clouds=1 mist=0.05`.
-compare on clouds=0 mist=0.05
+compare on clouds=0 mist=0.02
 set_config base:look_glare 0
 set_config base:look_fill 0.7
 set_config base:look_ao_power 4
