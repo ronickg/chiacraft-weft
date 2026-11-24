@@ -111,7 +111,7 @@ pub static LOOK_AIR_FADE: Config<f32> = Config::named("look_air_fade");
 /// keeps its own setting, so one can still be moved after.
 pub static LOOK_BLISS: Config<bool> = Config::named("look_bliss");
 /// Each knob, its value in the Bliss match, and as made.
-pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 15] = [
+pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 16] = [
     // The shade: no glare lift, less fill, the sky light occluded as Bliss's (lsN_ao3).
     (&LOOK_GLARE, 0.0, 1.0),
     (&LOOK_FILL, 0.7, 1.0),
@@ -133,6 +133,8 @@ pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 15] = [
     // The evening sun kept red on the tops at 18:30, the shade under it darker (lsAL_lowsun3).
     (&LOOK_LOW_SUN_KEEP, 0.6, 0.0),
     (&LOOK_EVENING_SHADE, 0.5, 1.0),
+    // The added airs half gone by 18:30, as Bliss's land dims (lsAM_airfade: 1 lost the shade's blue).
+    (&LOOK_AIR_FADE, 0.5, 0.0),
 ];
 
 /// Switches the Bliss match on (every knob to its fitted value) or off (every knob as made).
