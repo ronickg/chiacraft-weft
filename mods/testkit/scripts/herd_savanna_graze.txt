@@ -47,6 +47,13 @@ wait 2
 chat /animalprof senses
 chat /anim log
 chat /waterholes watch
+# The player stands back 32 blocks south (within the drying visits' 40, `air::SNOW_REACH`): beside
+# the pool he scared the drinkers off it (savanna6: 6 bolts and 18 alarms there, fright 0.80 on
+# every deer that came to drink). Back at the pool only for the noon shots. Counts by fixed
+# places from here (seed 1: the pool at x -2..2, y 69, z 536..540).
+chat /tp 0 90 572
+wait 3
+where
 chat /tick rate 600
 wait 10
 chat /animalprof where
@@ -58,7 +65,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -69,7 +76,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -80,7 +87,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -91,7 +98,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -102,7 +109,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -113,7 +120,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -124,7 +131,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -135,7 +142,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -146,7 +153,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -157,7 +164,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -168,7 +175,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -179,7 +186,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -190,7 +197,7 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count -2 69 536 2 69 540 base:water
 wait 10
 chat /animalprof where
 wait 10
@@ -201,11 +208,13 @@ wait 10
 chat /time query
 chat /animalprof where
 chat /animalprof senses
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-20 ~ ~-30 ~20 ~2 ~10 base:tall_grass
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -20 70 514 20 72 554 base:tall_grass
 chat /tick rate 20
 chat /time set 6000
 wait 3
+chat /tp 0 70 544
+wait 2
 look 0 -20
 wait 1
 shot herd_savanna_graze_2.png

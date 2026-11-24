@@ -56,6 +56,13 @@ wait 2
 chat /animalprof food 1
 chat /anim log
 chat /waterholes watch
+# The player stands back 32 blocks south (within the drying visits' 40, `air::SNOW_REACH`): beside
+# the pool he scared the drinkers off it (savanna6: 6 bolts and 18 alarms there, fright 0.80 on
+# every deer that came to drink). Back at the pool only for the noon shots. Counts by fixed
+# places from here (seed 1: the pool at x -2..2, y 69, z 536..540).
+chat /tp 0 90 572
+wait 3
+where
 chat /tick rate 600
 wait 10
 chat /animalprof where
@@ -66,8 +73,8 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 chat /animalprof food 1
 wait 10
 chat /animalprof where
@@ -78,8 +85,8 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 chat /animalprof food 1
 wait 10
 chat /animalprof where
@@ -90,8 +97,8 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 chat /animalprof senses
 wait 10
 chat /animalprof where
@@ -102,8 +109,8 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 chat /animalprof food 1
 wait 10
 chat /animalprof where
@@ -114,8 +121,8 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 chat /animalprof food 1
 wait 10
 chat /animalprof where
@@ -126,8 +133,8 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 chat /animalprof senses
 wait 10
 chat /animalprof where
@@ -138,8 +145,8 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 chat /animalprof food 1
 wait 10
 chat /animalprof where
@@ -150,8 +157,8 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 chat /animalprof food 1
 wait 10
 chat /animalprof where
@@ -162,8 +169,8 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 chat /animalprof food 1
 wait 10
 chat /animalprof where
@@ -174,16 +181,20 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 # The shot at noon (a winter's dusk is dark): back to the game's pace.
 chat /tick rate 20
 chat /time set 6000
 wait 20
 chat /animalprof senses
+chat /tp 0 70 544
+wait 2
 look 0 -20
 wait 1
 shot herd_savanna_winter_2.png
+chat /tp 0 90 572
+wait 2
 chat /season spring 1
 chat /rain
 chat /tick rate 600
@@ -196,8 +207,8 @@ chat /animalprof where
 wait 10
 chat /time query
 chat /animalprof where
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 wait 10
 chat /animalprof where
 wait 10
@@ -205,10 +216,12 @@ chat /animalprof where
 wait 10
 chat /animalprof where
 wait 10
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
 chat /tick rate 20
 chat /time set 6000
+wait 2
+chat /tp 0 70 544
 wait 2
 look 0 -20
 wait 1
