@@ -10,9 +10,14 @@ fn open_sky() -> bool {
     return !(scene.sun.x == 0.0 && scene.sun.z == 0.0);
 }
 
-// With the eye in a liquid the engine's fog no longer starts at 0.6 of its end.
+// With the eye in a liquid the engine's fog is the liquid's: water's starts behind the eye (-8),
+// lava's ends within a block (`base` blocks.rs). Not "the fog no longer starts at 0.6 of its end":
+// since 11-20 the engine's rain mist starts at 0.12 of its 110-170 blocks too, and every rain drew
+// as under water, the whole frame teal (the condition matrix, 11-24). A scene with no fog at all
+// (start and end 0) is in none, as with the old test: with `end < 8` alone the live game froze on
+// the reload (lv18, 11-24).
 fn in_liquid() -> bool {
-    return abs(scene.params.x - 0.6 * scene.params.y) > 0.5;
+    return scene.params.x < 0.0 || (scene.params.y > 0.0 && scene.params.y < 8.0);
 }
 
 // How hard it rains, 0..1 (the engine puts it beside the fog's color).
