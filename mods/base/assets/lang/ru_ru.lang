@@ -1729,6 +1729,8 @@ command.base.ruin.none = рядом нет: {0}
 command.base.ruin.goto = рядом с: {0} в {1} {2}
 command.base.ruin.knows = известные чертежи: {0}
 command.base.ruin.no_blueprint = нет чертежа {0} (crucible, ironwork, forge, all)
+command.base.ruin.pillar = колонна в {0} {1} {2}: высота {3} (построена {4})
+command.base.ruin.pillars = колонн стоит: {0} из {1} (пол на y {2}: {3})
 # Путевые камни и карта (waystones.rs, map.rs; vitals::waystones)
 key.base.map = Карта
 map.base.title = Карта

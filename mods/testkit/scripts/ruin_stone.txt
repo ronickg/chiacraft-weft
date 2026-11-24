@@ -3,8 +3,10 @@
 # the blueprint is read. One copy, a fresh world.
 # Passes when every `until` meets. Read in run.log and the shots:
 # - "nearest Stone ring ..." under 300 blocks from spawn (the first /ruin line);
-# - ruin_ring.png, ruin_ring_side.png, ruin_ring_back.png: ley stone pillars 2-4 high (the
-#   broken ones moss-topped) on the edge of a level floor, the pedestal in front; ruin_pedestal.png: the pedestal close;
+# - ruin_above.png (12 above, looking down) and ruin_side.png (15 out): eight ley stone pillars
+#   2-4 high (the broken ones moss-topped) round the edge of a level floor, the pedestal in the
+#   middle; "pillars standing: 8 of 8" and a "pillar at x y z: n high (built n)" line for each;
+#   ruin_pedestal.png: the pedestal close;
 # - the second pedestal use gives nothing: "/tk slot me 1" is "- 0 0" and the /tk inv line holds
 #   one blueprint_crucible;
 # - ruin_locked.png: the crucible's bricks and coal in the grid, the result slot EMPTY;
@@ -15,27 +17,38 @@ chat /ruin forget all
 until chat blueprints known within 10
 chat /ruin
 until chat nearest within 10
-chat /tk mode survival
-until mode survival within 10
-# 1. The ring: stand on its floor two blocks south of the pedestal, facing it.
-chat /ruin goto ring
+# 1. The ring seen whole, in spectator (absolute places from /ruin goto): from 12 above, then
+# from 15 out at eye height; and its pillars as they stand in the world, block by block.
+chat /tk mode spectator
+until mode spectator within 10
+chat /ruin goto ring above
 until chat beside the within 20
 wait 3
 loaded
 idle
+look 0 -60
+wait 2
+shot ruin_above.png
+chat /ruin goto ring side
+wait 3
+loaded
+idle
 look 0 -5
-wait 1
-shot ruin_ring.png
-look 60 -5
-wait 1
-shot ruin_ring_side.png
-look 180 -10
-wait 1
-shot ruin_ring_back.png
+wait 2
+shot ruin_side.png
+chat /ruin pillars
+until chat pillars standing: 8 of 8 within 10
+# 2. On its floor, two blocks south of the pedestal, facing it, in survival.
+chat /ruin goto ring
+wait 3
+chat /tk mode survival
+until mode survival within 10
+loaded
+idle
 look 0 -35
 wait 1
 shot ruin_pedestal.png
-# 2. The pedestal gives the blueprint (into hotbar slot 0), then only once.
+# 3. The pedestal gives the blueprint (into hotbar slot 0), then only once.
 # (Its words are hints, not chat: wait on the bag.)
 press core:use
 wait 1
@@ -47,7 +60,7 @@ chat /tk slot me 1
 until chat - 0 0 within 5
 chat /tk inv me
 wait 1
-# 3. A crafting table in front (between the player and the pedestal), the crucible's pieces in hotbar slots 1-8 (menu slots 44-51).
+# 4. A crafting table in front (between the player and the pedestal), the crucible's pieces in hotbar slots 1-8 (menu slots 44-51).
 chat /tk set ~ ~ ~-1 base:crafting_table
 until block ~ ~ ~-1 base:crafting_table within 10
 chat /tk put me 1 base:bricks 1
@@ -85,7 +98,7 @@ wait 1
 shot ruin_locked.png
 key Escape
 until screen none within 10
-# 4. Read the blueprint (slot 0, looking up, away from the pedestal and the table).
+# 5. Read the blueprint (slot 0, looking up, away from the pedestal and the table).
 key 1
 look 0 60
 wait 1
@@ -93,7 +106,7 @@ press core:use
 wait 1
 chat /ruin
 until chat blueprints known: crucible within 10
-# 5. The same grid again: now a crucible.
+# 6. The same grid again: now a crucible.
 chat /tk put me 1 base:bricks 1
 chat /tk put me 2 base:bricks 1
 chat /tk put me 3 base:bricks 1

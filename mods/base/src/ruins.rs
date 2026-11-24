@@ -83,7 +83,7 @@ pub fn register(r: &mut Registry) {
         .bottom("ley_stone_top")
         .tab(&crate::tabs::BUILDING);
     r.decoration(ruins).dimension(&crate::OVERWORLD);
-    r.command("ruin", "[what:word] [which:word]", command);
+    r.command("ruin", "[what:word] [which:word] [how:word]", command);
 }
 
 // ------------------------------------------------------------------ knowing
@@ -223,6 +223,24 @@ fn pedestal_used(u: &mut Use) -> bool {
 
 // ------------------------------------------------------------------ building them
 
+/// A ruin's own noise at (`dx`, `dz`) from its centre.
+fn noise(ruin: &Ruin, dx: i32, dz: i32) -> u32 {
+    let mut v = ((ruin.x + dx) as u32 as u64) ^ (((ruin.z + dz) as u32 as u64) << 32) ^ ruin.key() as u64;
+    v = v.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    (v >> 40) as u32
+}
+
+/// A ring's eight pillars on its floor's edge: (dx, dz from the centre, how high: 2, broken, to 4).
+fn ring_pillars(ruin: &Ruin) -> Vec<(i32, i32, i32)> {
+    (0..8)
+        .map(|k| {
+            let a = k as f64 / 8.0 * std::f64::consts::TAU;
+            let (dx, dz) = ((4.0 * a.cos()).round() as i32, (4.0 * a.sin()).round() as i32);
+            (dx, dz, 2 + (noise(ruin, dx, dz) % 3) as i32)
+        })
+        .collect()
+}
+
 /// The blocks of `ruin`: (position, block, whether it replaces only what isn't solid). `ground(x,
 /// z)` is a column's top block.
 fn ruin_blocks(ruin: &Ruin, ground: &dyn Fn(i32, i32) -> i32) -> Vec<([i32; 3], u32, bool)> {
@@ -231,11 +249,7 @@ fn ruin_blocks(ruin: &Ruin, ground: &dyn Fn(i32, i32) -> i32) -> Vec<([i32; 3], 
     let stone = crate::ley::LEY_STONE.id();
     let moss = MOSSY_COBBLESTONE.id();
     let mut out: Vec<([i32; 3], u32, bool)> = Vec::new();
-    let h = |dx: i32, dz: i32| {
-        let mut v = ((x + dx) as u32 as u64) ^ (((z + dz) as u32 as u64) << 32) ^ ruin.key() as u64;
-        v = v.wrapping_mul(0x9E37_79B9_7F4A_7C15);
-        (v >> 40) as u32
-    };
+    let h = |dx: i32, dz: i32| noise(ruin, dx, dz);
     // A box from `a` to `b` (inclusive): its shell in `wall`, its inside air.
     let room = |out: &mut Vec<([i32; 3], u32, bool)>, a: [i32; 3], b: [i32; 3], wall: u32| {
         for y in a[1]..=b[1] {
@@ -271,12 +285,9 @@ fn ruin_blocks(ruin: &Ruin, ground: &dyn Fn(i32, i32) -> i32) -> Vec<([i32; 3], 
                     }
                 }
             }
-            for k in 0..8 {
-                let a = k as f64 / 8.0 * std::f64::consts::TAU;
-                let (dx, dz) = ((4.0 * a.cos()).round() as i32, (4.0 * a.sin()).round() as i32);
-                let tall = 2 + h(dx, dz) % 3; // 2 (broken) to 4 high
-                for y in 1..=tall as i32 {
-                    out.push(([x + dx, gy + y, z + dz], if y == tall as i32 && tall < 4 { moss } else { stone }, false));
+            for (dx, dz, tall) in ring_pillars(ruin) {
+                for y in 1..=tall {
+                    out.push(([x + dx, gy + y, z + dz], if y == tall && tall < 4 { moss } else { stone }, false));
                 }
             }
             out.push(([x, gy + 1, z], PEDESTAL.id(), false));
@@ -432,10 +443,24 @@ fn command(cmd: &mut ServerCommand) {
                 (_, 2) => (0, 6),
                 _ => (-6, 0),
             };
+            // `above`: 12 over its floor, 6 south (look 0 -60 to see it whole); `side`: 15 south at
+            // eye height over the floor or the ground there, whichever is higher (look 0 -5).
+            // For look shots in spectator (11-24, Planner).
+            let how = cmd.text("how").map(str::to_string);
+            let centre = base_api::land::height(&f, ruin.x * 16, ruin.z * 16) >> 4;
+            let (dx, dz, up) = match how.as_deref() {
+                Some("above") => (0, 6, Some(centre + 12)),
+                Some("side") => {
+                    let there = base_api::land::height(&f, ruin.x * 16, (ruin.z + 15) * 16) >> 4;
+                    (0, 15, Some(there.max(centre) + 1))
+                }
+                _ => (dx, dz, None),
+            };
             let (gx, gz) = (ruin.x + dx, ruin.z + dz);
             let (hx, hz) = if ring { (ruin.x, ruin.z) } else { (gx, gz) };
             let y = (base_api::land::height(&f, hx * 16, hz * 16) >> 4) + if ring { 1 } else { 2 };
             let y = if ring { y } else { y.max(base_api::SEA + 2) };
+            let y = up.unwrap_or(y);
             w.entity_modify(p)
                 .pos([gx as f64 + 0.5, y as f64, gz as f64 + 0.5])
                 .velocity([0.0, 0.0, 0.0])
@@ -443,6 +468,35 @@ fn command(cmd: &mut ServerCommand) {
             cmd.reply(
                 "command.base.ruin.goto",
                 &[Arg::Key(&format!("ruin.base.{}", ruin.kind().id)), Arg::Int(ruin.x as i64), Arg::Int(ruin.z as i64)],
+            );
+        }
+        Some("pillars") if master => {
+            // The nearest ring's pillars as they stand in the world: each column over the floor,
+            // counted up while it is ley stone or moss (a run's proof beside its shots).
+            let Some(ruin) = n::nearest(seed, spawn, 0, x, z, 2) else {
+                cmd.reply("command.base.ruin.none", &[Arg::Key("ruin.base.ring")]);
+                return;
+            };
+            let f = base_api::land::fields(seed);
+            let gy = base_api::land::height(&f, ruin.x * 16, ruin.z * 16) >> 4;
+            let mut standing = 0;
+            let pillars = ring_pillars(&ruin);
+            for &(dx, dz, tall) in &pillars {
+                let (px, pz) = (ruin.x + dx, ruin.z + dz);
+                let high = (1..=6).take_while(|&y| {
+                    let b = w.block([px, gy + y, pz]);
+                    crate::ley::LEY_STONE.is(b) || MOSSY_COBBLESTONE.is(b)
+                })
+                .count() as i64;
+                if high == tall as i64 {
+                    standing += 1;
+                }
+                cmd.reply("command.base.ruin.pillar", &[Arg::Int(px as i64), Arg::Int((gy + 1) as i64), Arg::Int(pz as i64), Arg::Int(high), Arg::Int(tall as i64)]);
+            }
+            let floor = w.block([ruin.x, gy, ruin.z]);
+            cmd.reply(
+                "command.base.ruin.pillars",
+                &[Arg::Int(standing), Arg::Int(pillars.len() as i64), Arg::Int(gy as i64), Arg::Text(block_name(floor))],
             );
         }
         Some(what @ ("learn" | "forget")) if master => {

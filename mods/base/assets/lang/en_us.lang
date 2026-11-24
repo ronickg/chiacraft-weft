@@ -1736,6 +1736,8 @@ command.base.ruin.none = no {0} near
 command.base.ruin.goto = beside the {0} at {1} {2}
 command.base.ruin.knows = blueprints known: {0}
 command.base.ruin.no_blueprint = no blueprint {0} (crucible, ironwork, forge, all)
+command.base.ruin.pillar = pillar at {0} {1} {2}: {3} high (built {4})
+command.base.ruin.pillars = pillars standing: {0} of {1} (floor at y {2}: {3})
 # Waystones and the map (waystones.rs, map.rs; vitals::waystones)
 key.base.map = Map
 map.base.title = Map
