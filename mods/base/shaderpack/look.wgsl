@@ -194,6 +194,10 @@ const OPT_EVENING_SHADE: u32 = 53u;
 // Bliss's 18:30 land is dim (mean 38 41 80) where our near and twilight airs kept the 18:00
 // sky's strength (72 68 85 with the sun kept, lsAL_lowsun3).
 const OPT_AIR_FADE: u32 = 54u;
+// The golden hour's warm fill from the sky round the low sun (`base:look_glow_fill`): 1 as made, 0
+// none. Bliss's shade light is the averaged sky alone (deferred.vsh:118-152), lavender-grey at 18:00
+// (86 87 112 on white); ours with this fill went cream, 185 159 133 (lsAN_dbg18).
+const OPT_GLOW_FILL: u32 = 55u;
 fn evening_air_fade() -> f32 {
     let k = clamp(fantasy_opt(OPT_AIR_FADE), 0.0, 1.0);
     if k <= 0.0 {
@@ -1327,7 +1331,8 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     let l = light_dir();
     let side = normalize(vec3(l.x, 0.0, l.z) + vec3(1e-4, 0.0, 0.0));
     let toward = clamp(dot(n, side) * 0.5 + 0.5, 0.0, 1.0);
-    c += p.glow * golden() * 0.35 * mix(0.3, 1.1, toward) * sky * hemi * ao * leaves;
+    let glow_k = fantasy_opt(OPT_GLOW_FILL);
+    c += p.glow * golden() * 0.35 * select(1.0, glow_k, glow_k >= 0.0) * mix(0.3, 1.1, toward) * sky * hemi * ao * leaves;
     // Direct light only where the sky reaches (it keeps caves out of reach of the traced shadow's
     // gaps), and without corner shading: corners are dark where little sky gets in.
     // Under a forest's canopy the sun comes through the gaps the shadow map shows at nearly its
