@@ -208,6 +208,18 @@ const OPT_MIST_DAWN_TINT: u32 = 56u;
 // domes with shaded sides, as Bliss's 06:00-07:00 mist does, where ours lay as a flat sheet
 // (lsAO_mistnat).
 const OPT_MIST_DOMES: u32 = 57u;
+// With `OPT_MIST_DOMES` at 1: how much higher the layer's top lies (blocks) and how much denser it is.
+const MIST_DEEP: f32 = 0.0;
+// Bliss's banks (`OPT_MIST_DOMES`): the noise's part made banks, their foot over the sea, their fall
+// with height (blocks), their density per block at `/air` 1.
+const MIST_BANK_EDGE: vec2<f32> = vec2(0.42, 0.66);
+const MIST_BANK_BASE: f32 = 18.0;
+const MIST_BANK_FALL: f32 = 24.0;
+const MIST_BANK_DENSE: f32 = 0.5;
+const MIST_DEEP_DENSE: f32 = 1.2;
+// With it, how much light the mist in the sun's shade keeps (Bliss's in shade is dark, the shafts
+// show): of the bounce, and of the sky's.
+const MIST_DEEP_SHADE: f32 = 0.35;
 fn evening_air_fade() -> f32 {
     let k = clamp(fantasy_opt(OPT_AIR_FADE), 0.0, 1.0);
     if k <= 0.0 {
@@ -1487,7 +1499,12 @@ fn fog_banks_at(p: vec3<f32>, floor: f32) -> f32 {
     let low = exp(-max(h - 3.0, 0.0) / mix(7.0 + 12.0 * min(canopy(), 1.0), 40.0, s));
     let open = smoothstep(-24.0, -10.0, h);
     let near_floor = scene.frame.x > 0.5 && p.y - floor < 14.0 && p.y < SEA_LEVEL + MIST_TOP + 50.0;
-    if low * open > 0.02 || near_floor {
+    // Bliss's banks (`OPT_MIST_DOMES`) stand free in the air, not only by what the ray ends on: the
+    // noise all through their height. (With the constant away from the ground they lay as a coat on
+    // the crowns, edged by them: the live sheet's banks try.)
+    let banks_free = scene.frame.x > 0.5 && fantasy_opt(OPT_MIST_DOMES) > 0.0 && s < 0.5
+        && p.y < SEA_LEVEL + MIST_BANK_BASE + 4.0 * MIST_BANK_FALL;
+    if low * open > 0.02 || near_floor || banks_free {
         return fog_banks(p);
     }
     return 0.3;
@@ -1553,7 +1570,10 @@ fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
             // With `OPT_MIST_DOMES` the heave up to 20 blocks either way, on the broad banks, and the
             // top softer, so they stand as domes the sun lights on one side.
             let domes = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
-            let top = SEA_LEVEL + MIST_TOP + (b - 0.45) * mix(10.0, 40.0, domes);
+            // and the layer deeper, its top over the canopy (MIST_DEEP blocks up at 1), as Bliss's
+            // banks reach 30 blocks over its fog line: ours, a few blocks over the land, tinted the
+            // ground orange instead of hiding it (lsAS_mistdawn2, Ronald: "10 x better" in Bliss).
+            let top = SEA_LEVEL + MIST_TOP + MIST_DEEP * domes + (b - 0.45) * mix(10.0, 40.0, domes);
             // The top a little softer (6 blocks of fade, not 5.5: the pancakes along the river
             // had cut edges, try 2's sheet).
             let layer = 1.0 - smoothstep(top - mix(5.0, 10.0, domes), top + mix(2.5, 4.0, domes), p.y);
@@ -1565,8 +1585,19 @@ fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
             // eye, and wisps there drew a dark orange band along the horizon (try 3's sheet). Their
             // edges soft (hard-edged blobs on the crowns, the same sheet).
             let wisp = exp(-max(p.y - floor, 0.0) / 5.0) * smoothstep(0.4, 0.9, smoothstep(0.25, 0.75, banks))
-                * (1.0 - smoothstep(0.2, 0.5, scene.sun.y)) * (1.0 - layer) * (1.0 - smoothstep(top + 25.0, top + 45.0, p.y));
-            return mix(f_air * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11, even, ev);
+                * (1.0 - smoothstep(0.2, 0.5, scene.sun.y)) * (1.0 - layer) * (1.0 - smoothstep(top + 25.0, top + 45.0, p.y))
+                // None with the deep layer: the wisps lie on whatever the ray ends on, a coat of
+                // mist on every crown (the live sheet's 07:00, ours sand-coloured tops).
+                * (1.0 - domes);
+            let made = f_air * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11;
+            // With `OPT_MIST_DOMES` Bliss's shape instead: sparse banks, dense inside (the noise's top
+            // part only), clear air between, standing tall with a soft fall from a little over the
+            // sea up (its banks by exp(-0.05 (y - 73)) on a noise over 0.6). The layer lay as an even
+            // sand-coloured sheet on the crowns, a veil when thinner (the live sheets, 07:00).
+            let bank = smoothstep(MIST_BANK_EDGE.x, MIST_BANK_EDGE.y, banks);
+            let tall = exp(-max(p.y - (SEA_LEVEL + MIST_BANK_BASE), 0.0) / MIST_BANK_FALL);
+            let bliss = f_air * open * mix(1.0, burn, 0.5) * (bank * tall * MIST_BANK_DENSE + 0.012 * high * 0.11);
+            return mix(mix(made, bliss, domes), even, ev);
         }
         return mix(f_air * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11, even, ev);
     }
@@ -1791,14 +1822,39 @@ fn froxel_fog(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let dir = rel / max(length(rel), 1e-4);
     let flo = fog_floor(rel);
     let banks = fog_banks_at(scene.eye.xyz + dir * (0.5 * (a0 + dist)), flo);
+    // With the deep layer (`OPT_MIST_DOMES`) this last stretch, where the layer on the land lies, is
+    // lit per pixel, each tap with its own shadow: a slice 400 blocks out is 80 deep and a cell an
+    // eighth of the screen, so the crowns' shadows in the mist averaged away and it lay evenly lit,
+    // a sheet of sand (the live sheet's 07:00), where Bliss's, walked per pixel, has their shafts.
+    let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
+    let stretch = max(dist - a0, 0.0) / 4.0;
     var depth = 0.0;
-    for (var i = 0; i < 4; i++) {
-        depth += fog_density_with(scene.eye.xyz + dir * mix(a0, dist, (f32(i) + 0.5) / 4.0), flo, banks);
+    var own = vec3(0.0);
+    var passed = 1.0;
+    var light = FogLight(vec3(0.0), vec3(0.0), vec3(0.0));
+    if deep > 0.0 {
+        light = fog_light(dir);
     }
-    let kept = exp(-depth * max(dist - a0, 0.0) / 4.0);
+    for (var i = 0; i < 4; i++) {
+        let t = mix(a0, dist, (f32(i) + 0.5) / 4.0);
+        let d = fog_density_with(scene.eye.xyz + dir * t, flo, banks);
+        depth += d;
+        if deep > 0.0 && d > 0.0 {
+            let lit = sun_reaches(dir * t);
+            let shade = mix(1.0, MIST_DEEP_SHADE, 1.0 - lit);
+            let kept_i = exp(-d * stretch);
+            own += passed * (1.0 - kept_i) * (mix(light.sky * shade, light.sky, lit) + light.sun * lit + mist_bounce(d, lit) * shade);
+            passed *= kept_i;
+        }
+    }
+    let kept = exp(-depth * stretch);
     let left = before.a * kept;
-    let gained = before.rgb + before.a * (1.0 - kept) * froxel_light_at(uv, min(k, i32(FROXEL_SLICES) - 1));
-    let through = pow(max(left, 1e-6), sky);
+    let cell_light = froxel_light_at(uv, min(k, i32(FROXEL_SLICES) - 1));
+    let own_light = select(cell_light * (1.0 - kept), own, deep > 0.0);
+    let gained = before.rgb + before.a * mix(cell_light * (1.0 - kept), own_light, deep);
+    // The deep layer's banks stand in the open air: not thinned by the surface's own sky light, which
+    // edged them by the crowns.
+    let through = pow(max(left, 1e-6), mix(sky, 1.0, deep));
     return c * through + gained * (1.0 - through) / max(1.0 - left, 1e-4);
 }
 
@@ -1873,7 +1929,11 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     if scene.frame.z > 0.5 && scene.frame.z < 6.0 {
         lit = lit * 0.5 + (sun_reaches(dir * (at - span * 0.4)) + sun_reaches(dir * (at - span * 0.1)) + sun_reaches(dir * (at + span * 0.4))) / 6.0;
     }
-    return vec4(mix(shaded_sky, light.sky, lit) + light.sun * lit + mist_bounce(d, lit) + lightning_glow_at(dir * at) * 0.6, d);
+    // With the deep layer (`OPT_MIST_DOMES`) the shade darker: the bounce all round less, the sky's
+    // light in it less, so shafts and the hollows under the crowns show.
+    let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
+    let shade = mix(1.0, MIST_DEEP_SHADE, deep * (1.0 - lit));
+    return vec4(mix(shaded_sky * shade, light.sky, lit) + light.sun * lit + mist_bounce(d, lit) * shade + lightning_glow_at(dir * at) * 0.6, d);
 }
 
 // Sunlight scattered many times in a dense mist (the HDR world): a thick bank glows all round like
