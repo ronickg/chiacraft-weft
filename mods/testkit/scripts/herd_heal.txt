@@ -3,8 +3,8 @@
 # in a game day of 1200 s). Seed 1's savanna as `herd_pit.txt`: flat grass, the pond 10 blocks
 # north. Two groups: four deer fed and watered (90 %), and, later, the same deer at 20 % water.
 # Report: each deer's health in the `/animalprof where` rows. In the first 120 s after the wound
-# (to 50 %) each should rise about 10 % of its most a minute (from about half to about 70 % in
-# 2 min, the 10 s after the wound aside); after `water 0.2` it should hold still till they've drunk
+# (to 50 %) each should rise about 5 % of its most a minute (from about half to about 60 % in
+# 2 min, the 10 s after the wound aside; the rows show points, rounded); after `water 0.2` it should hold still till they've drunk
 # back over 50 %. Any deer whose health falls, or that dies, and its last lines.
 loaded
 idle
