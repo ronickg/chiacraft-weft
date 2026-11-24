@@ -131,7 +131,15 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
         .max(s[Need::Drink as usize])
         .max(s[Need::Eat as usize])
         + WANDER;
-    if let Some(v) = s.get_mut(doing as usize).filter(|_| doing != 0) {
+    // A meal held on gives way to thirst past `memory::DRIVEN`: grazing is a mouthful in ten
+    // seconds, a drink fills it in a few, and thirst kills first (ai1124_pit6b: a deer out of a
+    // pit at 16 % food and 13 % water grazed 90 s six blocks from the pond, its water falling to
+    // 9 %, the meal's `KEEP_AT` above its thirst till it was nearly dry).
+    let thirst_breaks_in = doing == Need::Eat as u8 && s[Need::Drink as usize] >= animals_core::memory::DRIVEN;
+    if let Some(v) = s
+        .get_mut(doing as usize)
+        .filter(|_| doing != 0 && !thirst_breaks_in)
+    {
         *v *= KEEP_AT;
     }
     s
