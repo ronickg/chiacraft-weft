@@ -942,6 +942,8 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
         ck::BOOL | ck::CHOICE => {
             let (key2, d2, show) = (key.clone(), d.clone(), show.clone());
             let (kind, count) = (d.kind, d.choices.len().max(1) as f64);
+            // Labelled like every menu button (style 1: 2x where it fits; World Rules' rows).
+            let class = button_text(cx);
             let b = ui.button(
                 "button",
                 Style::default().min_h(20.0).pad_xy(6.0, 4.0).stretch(),
@@ -952,12 +954,13 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                 }),
                 |ui| {
                     let (k, d3, show) = (key2.clone(), d2.clone(), show.clone());
-                    ui.text_bound(
-                        "button",
+                    let t = ui.text_bound(
+                        class,
                         Box::new(move |_: &Ctx| {
                             ("settings.config_value".into(), vec![Arg::Key(k.clone()), show(&d3, &k, crate::config::get(id))])
                         }),
                     );
+                    big_label(ui, t, class);
                 },
             );
             if let Kind::Button { enabled, .. } = &mut ui.nodes[b].kind {
