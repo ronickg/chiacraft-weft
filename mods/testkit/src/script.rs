@@ -775,7 +775,11 @@ async fn live(t: &T, file: &str, mins: f32) -> R {
     let out_path = format!("{file}.out");
     let say = |msg: &str| {
         weft_sdk::info!("live: {msg}");
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&out_path) {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&out_path)
+        {
             let _ = writeln!(f, "{msg}");
         }
     };
@@ -837,9 +841,14 @@ fn reload_pack(t: &T, dir: &str) -> Result<String, String> {
     if !pack.starts_with("chiacraft_") {
         return Err(format!("reload_pack: the pack in use is '{pack}', not a variant (run with --shader-pack chiacraft_live)"));
     }
-    let to = std::path::Path::new(&t.c().run_dir()).join("shaderpacks").join(&pack);
+    let to = std::path::Path::new(&t.c().run_dir())
+        .join("shaderpacks")
+        .join(&pack);
     let mut n = 0;
-    for e in std::fs::read_dir(dir).map_err(|e| format!("reload_pack: {dir}: {e}"))?.flatten() {
+    for e in std::fs::read_dir(dir)
+        .map_err(|e| format!("reload_pack: {dir}: {e}"))?
+        .flatten()
+    {
         let p = e.path();
         let name = e.file_name().to_string_lossy().into_owned();
         if name.ends_with(".wgsl") || name == "pack.cfg" {

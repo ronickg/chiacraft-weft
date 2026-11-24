@@ -93,7 +93,11 @@ pub fn apply(c: &Client, on: bool, overrides: &str) -> String {
         set(n, *v);
     }
     let air = if natural { None } else { Some(format!("/air {mist} {wind} 0 mist")) };
-    for line in ["/rule core:mob_spawning 0".to_string(), "/weather clear 99999".to_string()].into_iter().chain(air).chain(["/tick freeze".to_string()]) {
+    for line in ["/rule core:mob_spawning 0".to_string(), "/weather clear 99999".to_string()]
+        .into_iter()
+        .chain(air)
+        .chain(["/tick freeze".to_string()])
+    {
         c.say(&line);
     }
     format!(
