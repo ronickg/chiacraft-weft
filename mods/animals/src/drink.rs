@@ -333,6 +333,10 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         }
         return false;
     }
+    // Walking a way out of where it is stuck (`stuck`).
+    if crate::stuck::going(w, id, st) {
+        return true;
+    }
     let now = w.game_time() as f64;
     let spot = (!d[0].is_nan() && d[3] != 0.0).then(|| [d[0], d[1], d[2]]);
     let there = st.in_liquid != 0
@@ -370,21 +374,40 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         if let Some(c) = w.component_mut(id, &DRINK) {
             *c = [f64::NAN, 0.0, 0.0, now + NOTHING];
         }
-        return false;
-    }
-    if now < d[3] {
-        // Walking to it; or no water near, foraging and wandering on.
-        return spot.is_some();
+        // Ended short where the last did too: it is stuck, and looks for a way out (`stuck`).
+        return crate::stuck::short(w, id, st);
     }
     let driven = needs::thirst_score(water, true) >= animals_core::memory::DRIVEN;
+    if now < d[3] {
+        // Walking to it; or no water near, foraging and wandering on: driven, it searches for some
+        // (`stuck::search`).
+        return spot.is_some() || (driven && crate::stuck::search(w, id, st, true));
+    }
+    // Its walk's time is up short of the water and it got nowhere (`stuck::ended_short`: herd
+    // mates jostling keep the engine walking one that can't get there): as one ended short.
+    if spot.is_some() && crate::stuck::ended_short(w, id, st) {
+        weft_sdk::debug!("animal {id} got nowhere toward the water at {spot:?}: looks elsewhere");
+        if let Some(c) = w.component_mut(id, &DRINK) {
+            *c = [f64::NAN, 0.0, 0.0, now + NOTHING];
+        }
+        return crate::stuck::short(w, id, st);
+    }
     match find_water(w, id, s.kind, st.pos.to_array(), driven) {
         Some(p) => {
             weft_sdk::debug!("{} {id} is thirsty (water {:.0}%): to water at {p:?}", s.name, water * 100.0);
             w.navigate(id, p, 1.0);
+            crate::stuck::sets_off(w, id, st, p);
             d = [p[0], p[1], p[2], now + WALK];
         }
         None => d = [f64::NAN, 0.0, 0.0, now + NOTHING],
     }
     w.component_mut(id, &DRINK).map(|c| *c = d);
+    // Driven by thirst and knowing no water it can find: it searches for some, downhill, or shut in
+    // looks for a way out (`stuck::search`): deer in the cave under a pond, never having seen it,
+    // stood doing nothing as their water fell from 60 % to 17 % (ai1124_cave2), and a deer on a
+    // dune 24 blocks from the pond stared at the player till it died of thirst (graze15).
+    if d[0].is_nan() && driven {
+        return crate::stuck::search(w, id, st, true);
+    }
     !d[0].is_nan()
 }

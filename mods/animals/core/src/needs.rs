@@ -321,3 +321,84 @@ mod choosing {
         assert!(rest_under(night, hunger_score(0.05, false)) * KEEP_AT < hunger_score(0.05, false));
     }
 }
+
+// ------------------------------------------------------------------ stuck, and the way out
+
+// An animal whose walks to food or water end where they began is stuck: in a cave under the
+// water it wants (the path can't find the way round that far), or a pit deeper than it steps
+// up. Each walk that ended short gave the place up and handed the turn to a rest, so it lay down,
+// got up and lay down again on one block till it died (ai1124_graze9, graze10). It looks for a
+// way out: legs along its own level, a different way each time; and from a pit those can't leave,
+// it leaps, as a deer clears a fence of 2.4 m.
+
+/// Walks ended short within `STUCK_NEAR` blocks of where the first did before it looks for a way
+/// out, and those before it leaps.
+pub const STUCK_AFTER: u8 = 2;
+pub const LEAP_AFTER: u8 = 6;
+pub const STUCK_NEAR: f64 = 4.0;
+/// A walk to food or water whose time is up (`forage::WALK`, `drink::WALK`) has failed if it
+/// moved less than this from where it set off, whether or not the engine still walks it: herd
+/// mates jostling in a pit kept each other 'moving', so the engine's own stuck check (no move for
+/// 2 s) never ended their walks and none was ever counted (ai1124_pit4b, cave2).
+pub const WALK_MOVED: f64 = 2.0;
+/// A leg out: blocks along its own level, the ways (of 8, turned on each try), and the game
+/// seconds it has to walk it.
+pub const WAY_OUT_LEG: f64 = 12.0;
+pub const WAY_OUT_WAYS: u8 = 8;
+pub const WAY_OUT_SECS: f32 = 10.0;
+/// The way out: before a leg along its level, a stuck animal searches the ground it can walk or
+/// leap to from where it stands (stepping up one, dropping at most `FLEE_DROP` + 2), up to
+/// `WAY_UP_CELLS` places within `WAY_UP_REACH` blocks, for the place nearest the food or water it
+/// couldn't reach (with none known, the highest), and walks `WAY_OUT_LEG` steps of that way. The engine's paths search 600 places toward the goal and stop at the nearest, so from a
+/// cave under a pond the best they find is under the pond (ai1124_cave3b: deer 10 blocks under
+/// it walked legs along the cave floor and leapt for 160 s, and died of thirst there).
+pub const WAY_UP_CELLS: usize = 4000;
+pub const WAY_UP_REACH: i32 = 40;
+/// A way out toward food or water it couldn't reach must end this many blocks nearer to it.
+pub const WAY_CLOSER: f64 = 2.0;
+/// A leap: onto ground at most `LEAP_MOST` blocks above its feet (a walker's jump clears 1.25; a
+/// deer clears a fence of 2.4 m) and `LEAP_REACH` off, over the edge by `LEAP_CLEAR`; the
+/// world's pull (the engine's dimension gravity, blocks a second squared) and a share more for
+/// the air's drag. With no such ground near it leaps `LEAP_MOST` up along the way it tried.
+pub const LEAP_MOST: i32 = 2;
+pub const LEAP_REACH: i32 = 3;
+pub const LEAP_CLEAR: f64 = 0.7;
+pub const GRAVITY: f64 = 32.0;
+pub const LEAP_DRAG: f64 = 1.15;
+/// A leap goes straight up and across only once its feet are over the ledge (`stuck::going`), at
+/// this many blocks a second for each block still to go: pushed across from the start, the air's
+/// drag (vanilla's, keeping 0.91 of it a tick) stopped it short and against the wall it rose
+/// along, and it fell back in (ai1124_pit5e: twenty leaps 1 across and 2 up, none out).
+pub const LEAP_OVER: f64 = 7.0;
+/// Leaps from one stuck place that leave it there before it stops leaping (till it is somewhere
+/// else): a deer on level ground leapt 70 times at a rim it could step onto (ai1124_savanna17).
+pub const LEAP_TRIES: u8 = 3;
+/// Shut in: the ground it can walk to from where it stands is fewer places than this (a pit 3 x 3
+/// is 9, a shaft's foot 3). Only then does a stuck animal look for a way out and leap
+/// (`stuck::enclosed`); on open ground it gives the place up and wanders on.
+pub const TRAP_CELLS: usize = 48;
+/// The steepest drop a running animal takes (`senses::escape`): it can step back up one, not two.
+pub const FLEE_DROP: i32 = 1;
+const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WAY_OUT_WAYS);
+
+/// The push (blocks a second) of a leap that lands `dx, dz` off and `dy` up: up fast enough to
+/// clear the edge by `LEAP_CLEAR`, and across in the time it is in the air.
+pub fn leap(dx: f64, dy: f64, dz: f64) -> [f64; 3] {
+    let rise = dy.max(0.0) + LEAP_CLEAR;
+    let up = (2.0 * GRAVITY * rise).sqrt();
+    let air = up / GRAVITY + (2.0 * LEAP_CLEAR / GRAVITY).sqrt();
+    [dx / air * LEAP_DRAG, up * LEAP_DRAG, dz / air * LEAP_DRAG]
+}
+
+#[cfg(test)]
+mod leaping {
+    use super::*;
+
+    #[test]
+    fn a_leap_out_of_a_pit_clears_its_rim() {
+        // Out of a pit 2 deep, 1.5 blocks to the rim: up past 2.7 blocks, as a deer's fence.
+        let [x, up, _] = leap(1.5, 2.0, 0.0);
+        assert!(up * up / (2.0 * GRAVITY) > 2.0 + LEAP_CLEAR);
+        assert!(x > 0.0 && x < up);
+    }
+}
