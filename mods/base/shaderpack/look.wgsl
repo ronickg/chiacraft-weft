@@ -269,6 +269,13 @@ const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.8, 1.2);
 // within the first cosine, gone by the second (about 14° and 32°), in this gold; and the glow along
 // the horizon round it: how tightly round the sun across (a power of the cosine), how fast it fades
 // above and below the horizon (per unit of dir.y), how bright.
+// The banks' sunlight fades in with distance from the eye, none to the first, full from the second
+// (blocks). From inside the mist, looking toward a low sun, the lit mist in front of the near
+// crowns covered them all (06:00 low view, at Bliss's own spot and camera: darkest 5 % at 109
+// against Bliss's 66; 46 with the banks' sun off), where Bliss's near crowns stand dark out of the
+// mist with shafts between. Every overall cut took the vista, seen from 120 blocks over the banks,
+// darker and greyer than Bliss's (lv12); this leaves it alone.
+const MIST_NEAR_SUN: vec2<f32> = vec2(24.0, 120.0);
 const SUN_GOLD: vec2<f32> = vec2(0.7, 0.95);
 const SUN_GOLD_TINT: vec3<f32> = vec3(1.0, 0.88, 0.74);
 const SUN_BAND: vec3<f32> = vec3(6.0, 9.0, 1.0);
@@ -2074,7 +2081,9 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let lit = land * clouds;
         let kept = exp(-d * step);
         shaft += through * (1.0 - kept) * vec2(land, clouds);
-        gained += through * (1.0 - kept) * (sky_in + sun_in * lit);
+        // The sun's share fading in from the eye (`MIST_NEAR_SUN`).
+        let near_sun = smoothstep(MIST_NEAR_SUN.x, MIST_NEAR_SUN.y, t);
+        gained += through * (1.0 - kept) * (sky_in + sun_in * lit * near_sun);
         through *= kept;
     }
     if look_debug() == 3u {

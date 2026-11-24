@@ -96,7 +96,16 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
   `look_glow_fill` were missing from the live script, so fresh games had the sun disc off
   (lv10 start; lv11 had it on only from a toggle). Both now in `live.txt`.
 
-## Open
+- lv13: the low camera matches Bliss's sunup refs (same spot, facing +x, our pitch +6 = MC -6:
+  horizons at pitch 0 both mid-frame; our /tp puts the eye at the height given, 1.6 blocks made no
+  visible difference). The near forest is the same ground.
+- Fix (Planner's call: local to the near mist, the vista kept): the banks' sunlight fades in from
+  the eye, none to 24 blocks, full from 120 (`MIST_NEAR_SUN`). lv13 b against Bliss
+  (`lv13/luma_spread_b.txt`): 06 low p5/50/95 56/128/210 (Bliss 66/122/199, before 106/184/227);
+  07 low 76/169/231 (101/174/234); vistas as before (06: 52/129/220 against 59/131/213). 18:00
+  went 24/65/125 (Bliss 34/65/115) from `look_glow_fill 0`, now set by the live script, not from this.
+
+
 
 - Why Bliss's thick mist still varies broadly (thick, yet bright and dark in large patches) where
   ours goes even when thick: Planner's line-by-line read of our lighting and compositing against
