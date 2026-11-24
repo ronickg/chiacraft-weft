@@ -1009,6 +1009,9 @@ pub async fn rebind(t: T) -> R {
         .await?;
         t.frames(2).await?;
         t.click_ui("id:bind:core:forward:0", 0);
+        // A click acts when the button comes up, a frame or two on: by the script clock alone a CI
+        // frame (over 0.2 s) let the Escape below land first, nothing waiting, and it closed Controls.
+        t.frames(3).await?;
         t.secs(0.2).await?;
         for &(key, held, after) in keys {
             t.c().input_key(key, held);
@@ -1049,6 +1052,7 @@ pub async fn rebind(t: T) -> R {
     };
     bind(&[("KeyW", 0.0, 0.0)]).await?;
     t.click_ui("id:bind:core:forward:1", 0);
+    t.frames(3).await?;
     t.secs(0.2).await?;
     t.c().input_key("KeyJ", 0.05);
     t.secs(0.1).await?;
