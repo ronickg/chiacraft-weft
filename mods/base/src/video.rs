@@ -127,8 +127,8 @@ static RT_SHADOWS: Config<i32> = Config::named("core:rt_shadows");
 static RT_REFLECTIONS: Config<bool> = Config::named("core:rt_reflections");
 /// The path tracer's denoiser (`core:pt_denoiser`): 0 raw, 1 ours.
 static PT_DENOISER: Config<i32> = Config::named("core:pt_denoiser");
-/// The newer quality settings, each a row on the Extra quality tab (`EXTRA_ROWS`) and all at their
-/// most in the Max preset: the HDR world and temporal anti-aliasing (read at start), the mist as a
+/// The newer quality settings, parts of the features' rows or rows of their own on the Developer
+/// screen (`PARTS`): the HDR world and temporal anti-aliasing (read at start), the mist as a
 /// volume, the soft clouds' shadow, the bloom's levels, the far shadow map's reach, the screen
 /// effects' half-size parts (off: every effect at full size), the leaves' see-through holes.
 static HDR_WORLD: Config<bool> = Config::named("core:hdr_world");
@@ -222,68 +222,80 @@ struct Row {
     shown: fn(f64) -> (String, i64),
 }
 
-/// The presets, Low to Ultra, per row (in `ROWS` order). Contact shadows on at Ultra only and
-/// light shafts low below it (Ronald, 11-05, on the speed Researcher's Mac numbers: contact
-/// shadows cost ~2.2 ms under trees, full shafts ~1.1-1.5 ms more than low).
-const PRESETS: [[f64; 12]; 4] = [
-    // scale shadows size  reflect contact volume shafts bloom view lod   vsync cap
-    [0.5, 0.0, 1024.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 64.0, 1.0, 60.0],
-    [0.67, 1.0, 1024.0, 1.0, 0.0, 1.0, 1.0, 1.0, 8.0, 128.0, 1.0, 60.0],
-    [0.0, 2.0, 2048.0, 2.0, 0.0, 2.0, 1.0, 1.0, 12.0, 192.0, 1.0, 0.0],
-    [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 2.0, 1.0, 16.0, 256.0, 1.0, 0.0],
+/// The presets (Ronald, 11-24: "The normal user is more like setting how, low, high, max, ultra",
+/// and "all those things need their own quality setting as well"): each sets the player's rows
+/// (`ROWS`: render scale, view, distant terrain, vsync, frame cap) and every feature's quality row
+/// (`FEATURES`) to its step. Low, Medium, High and Max here, then Phone and Ultra (`PHONE`,
+/// `ULTRA`); 4 is Custom. The look is always on: no feature's lowest step is off (Look's table,
+/// `notes/STYLE.md` "The look is always on").
+const PRESETS: [[f64; 5]; 4] = [
+    // scale view lod   vsync cap
+    [0.5, 6.0, 64.0, 1.0, 60.0],
+    [0.67, 8.0, 128.0, 1.0, 60.0],
+    [0.0, 12.0, 192.0, 1.0, 0.0],
+    [1.0, 16.0, 256.0, 1.0, 0.0],
 ];
-const PRESET_NAMES: [&str; 4] = ["low", "medium", "high", "ultra"];
+const PRESET_NAMES: [&str; 4] = ["low", "medium", "high", "max"];
 
 /// The Phone preset (`QUALITY` 5; Ronald, 11-06: "Yes, make the preset"), offered on a phone and
-/// chosen only by the player, from his Pixel 10's sweep (notes/ANDROID.md): Low's view, distant
-/// terrain and no sun shadows (the vista 17 -> 23 fps, the forest 18 -> 27 against Medium at half
-/// scale), with Medium's screen effects kept: on the phone they cost about 2 ms.
+/// chosen only by the player, from his Pixel 10's sweep (notes/ANDROID.md): Low's view and distant
+/// terrain, and every feature at Low.
 const PHONE: usize = 5;
-const PHONE_PRESET: [f64; 12] = [0.5, 0.0, 1024.0, 1.0, 0.0, 1.0, 1.0, 1.0, 6.0, 64.0, 1.0, 60.0];
+const PHONE_PRESET: [f64; 5] = [0.5, 6.0, 64.0, 1.0, 60.0];
 
-/// The Max preset (`QUALITY` 6; Ronald, 11-06: "I want to test with always sort of the maximum
-/// settings on because that's sort of our benchmark"): every row at its most (Ultra's, a view of
-/// 32 chunks, Bliss's, and distant terrain to 512), then every extra row too (`max_extras`), as far
-/// as the GPU can: traced shadows only where it traces rays, temporal anti-aliasing from the
-/// camera alone on a phone. Never picked for the player. The PC queue's `--preset max`
-/// (tester-tools/t2/t2q.py `PRESETS`) is the same list: change both together.
-const MAX: usize = 6;
-const MAX_PRESET: [f64; 12] = [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 2.0, 1.0, 32.0, 512.0, 1.0, 0.0];
+/// The Ultra preset (`QUALITY` 6; called Max until 11-24, when Max became the step under it):
+/// every feature at its top, traced where the GPU traces rays, a view of 32 chunks and distant
+/// terrain to 512, then the extras (`ultra_extras`). Allowed past the Mac's budget: the PC benches
+/// it (Ronald, 11-06: "I want to test with always sort of the maximum settings on because that's
+/// sort of our benchmark"). The PC queue's `--preset max` (tester-tools/t2/t2q.py) is this list
+/// under its old name: change both together.
+const ULTRA: usize = 6;
+const ULTRA_PRESET: [f64; 5] = [1.0, 32.0, 512.0, 1.0, 0.0];
 
-/// Preset `q`'s values, Low to Ultra, Phone and Max.
-fn preset(q: usize) -> Option<&'static [f64; 12]> {
+/// Preset `q`'s player rows.
+fn preset(q: usize) -> Option<&'static [f64; 5]> {
     match q {
         PHONE => Some(&PHONE_PRESET),
-        MAX => Some(&MAX_PRESET),
+        ULTRA => Some(&ULTRA_PRESET),
         _ => PRESETS.get(q),
     }
 }
 
-/// The extra rows at their most, as far as this GPU goes (`MAX`), and the fantasy rows that cost
-/// (wind life ultra, soft clouds).
-fn max_extras() {
+/// Preset `q`'s step on every feature's row: Low 0 to Ultra 4, Phone as Low.
+fn preset_step(q: usize) -> Option<usize> {
+    match q {
+        0..=3 => Some(q),
+        PHONE => Some(0),
+        ULTRA => Some(4),
+        _ => None,
+    }
+}
+
+/// The look's parts no row steps, on in every preset: the HDR world, soft clouds and their
+/// shadows, the mist banks (their ground map follows them, `look.rs`; their low march isn't built
+/// yet, so every preset runs them in full, STYLE.md) and the leaves' holes. The pack itself is
+/// turned on at every start that has none chosen (`shaderpack::install`).
+fn look_on() {
     HDR_WORLD.set(true);
-    // Temporal anti-aliasing with the motion image; from the camera alone on a phone, whose tiled
-    // GPU the motion image cost a third of its world pass (Android, Pixel 10, 11-06). (DLAA in its
-    // place where DLSS is, once it lands.)
-    AA.set(if on_phone() { 2 } else { 1 });
-    FROXELS.set(2);
+    SOFT_CLOUDS.set(true);
     CLOUD_SHADOWS.set(true);
-    BLOOM_LEVELS.set(2);
+    crate::look::LOOK_MIST_DOMES.set(1.0);
+    crate::look::LOOK_LEAF_HOLES.set(1.0);
+}
+
+/// What Ultra adds past the features' top steps, as far as this GPU goes: anti-aliasing, the far
+/// shadows' auto reach, the path tracer's denoiser, wind life at ultra, DLAA.
+fn ultra_extras() {
+    // Temporal anti-aliasing with the motion image; from the camera alone on a phone, whose tiled
+    // GPU the motion image cost a third of its world pass (Android, Pixel 10, 11-06).
+    AA.set(if on_phone() { 2 } else { 1 });
     // Auto: 2000 blocks with the HDR world (Far view's, at no measurable cost); further only
     // spreads the far map's texels thinner.
     SHADOW_FAR.set(0);
-    POST_LOW.set(false);
-    crate::look::LOOK_LEAF_HOLES.set(1.0);
-    // (Far detail stays at 4 in Max: 12 cost +0.33 ms for a small gain, Planner 11-06.)
-    // Ultra (soft edges from more rays, with TAA) where the GPU traces rays.
-    RT_SHADOWS.set(if GPU_RAY_QUERY.get() && !on_phone() { 2 } else { 0 });
-    RT_REFLECTIONS.set(GPU_RAY_QUERY.get() && !on_phone());
+    // (Far detail stays at 4: 12 cost +0.33 ms for a small gain, Planner 11-06.)
     // Ours wherever DLSS Ray Reconstruction doesn't denoise the path tracer's light.
     PT_DENOISER.set(1);
-    FX_FAR_AO.set(2);
     FX_WIND_LIFE.set(3);
-    SOFT_CLOUDS.set(true);
     // DLAA (DLSS at the screen's own size) where the renderer has it, with its newest model (M,
     // 13) and Ray Reconstruction where that runs (windows-dlss5, 11-06): the engine then skips its
     // own gathering for the frame. Elsewhere TAA as above.
@@ -298,8 +310,8 @@ fn max_extras() {
 fn preset_name(q: i32) -> Option<&'static str> {
     if q == PHONE as i32 {
         Some("phone")
-    } else if q == MAX as i32 {
-        Some("max")
+    } else if q == ULTRA as i32 {
+        Some("ultra")
     } else {
         usize::try_from(q)
             .ok()
@@ -315,12 +327,12 @@ fn number(v: f64) -> (String, i64) {
     (String::new(), v.round() as i64)
 }
 
-/// The rows the presets set (`PRESETS`, `PHONE_PRESET`): the first 12 of `ROWS`. The upscaler after
-/// them is the player's own choice, opt-in (Ronald, 11-06), so no preset changes it and it never
-/// makes the quality Custom.
-const PRESET_ROWS: usize = 12;
+/// The player's rows the presets set (`PRESETS`): the first 5 of `ROWS`. Anti-aliasing and the
+/// upscaler after them are the player's own choice (Ronald, 11-06: the upscaler opt-in), so no
+/// preset but Ultra changes them and they never make the quality Custom.
+const PRESET_ROWS: usize = 5;
 
-const ROWS: [Row; 13] = [
+const ROWS: [Row; 7] = [
     Row {
         key: "render_scale",
         // 0 is Auto: 0.67 on a big high-density screen, 1 elsewhere (`auto_render_scale`), written
@@ -329,26 +341,6 @@ const ROWS: [Row; 13] = [
         get: render_scale,
         set: |v| RENDER_SCALE_NEXT.set(v as f32),
         shown: |v| if v == 0.0 { word("auto") } else { ("percent".into(), (v * 100.0).round() as i64) },
-    },
-    Row {
-        key: "shadows",
-        values: &[0.0, 1.0, 2.0],
-        get: || SHADOWS.get() as f64,
-        set: |v| SHADOWS.set(v as i32),
-        shown: |v| word(["off", "near", "near_far"][v as usize % 3]),
-    },
-    Row { key: "shadow_size", values: &[1024.0, 2048.0, 4096.0], get: shadow_size, set: |v| SHADOW_SIZE_NEXT.set(v as i32), shown: number },
-    Row { key: "reflect", values: &[0.0, 1.0, 2.0], get: || FX_REFLECT.get() as f64, set: |v| FX_REFLECT.set(v as i32), shown: off_low_on },
-    Row { key: "contact", values: &[0.0, 1.0, 2.0], get: || FX_CONTACT.get() as f64, set: |v| FX_CONTACT.set(v as i32), shown: off_low_on },
-    Row { key: "volume", values: &[0.0, 1.0, 2.0], get: || FX_VOLUME.get() as f64, set: |v| FX_VOLUME.set(v as i32), shown: off_low_on },
-    Row { key: "shafts", values: &[0.0, 1.0, 2.0], get: || FX_SHAFTS.get() as f64, set: |v| FX_SHAFTS.set(v as i32), shown: off_low_on },
-    Row {
-        key: "bloom",
-        // Soft, or dreamy (Storybook's): halos and bloomy fog (Research round 17).
-        values: &[0.0, 1.0, 2.0],
-        get: || FX_BLOOM.get() as f64,
-        set: |v| FX_BLOOM.set(v as i32),
-        shown: |v| word(["off", "soft", "dreamy"][(v as usize).min(2)]),
     },
     Row {
         key: "view",
@@ -379,6 +371,13 @@ const ROWS: [Row; 13] = [
         shown: |v| if v == 0.0 { word("unlimited") } else { number(v) },
     },
     Row {
+        key: "aa",
+        values: &[0.0, 1.0, 2.0],
+        get: || AA.get() as f64,
+        set: |v| AA.set(v as i32),
+        shown: |v| word(["off", "taa", "taa_camera"][(v as usize).min(2)]),
+    },
+    Row {
         key: "upscaler",
         values: &[0.0, 1.0, 2.0],
         get: || UPSCALER.get() as f64,
@@ -387,33 +386,164 @@ const ROWS: [Row; 13] = [
     },
 ];
 
+/// A feature's steps, Low to Ultra (`video.base.value.<name>`).
+const STEP_NAMES: [&str; 5] = ["low", "medium", "high", "max", "ultra"];
+
+/// A feature's quality row (Ronald, 11-24: "shadows have a quality setting, like all those things
+/// need their own quality setting as well"): the parts it sets (`PARTS`' keys, the Developer
+/// screen's rows) and their values at each step, Low to Ultra. Its cost is its parts' costs.
+struct Feature {
+    key: &'static str,
+    parts: &'static [&'static str],
+    steps: [&'static [f64]; 5],
+}
+
+/// The features' rows on the Video screen, from Look's table (11-24: Phone and Low the same, then
+/// Medium, High, Max and Ultra). A traced part runs only where the GPU traces rays (`runs`).
+const FEATURES: [Feature; 6] = [
+    // The sun's shadows: near (1) or near and far (2), their map's size, how far they reach
+    // (blocks), contact shadows; at Ultra traced, soft-edged.
+    Feature {
+        key: "shadow_quality",
+        parts: &["shadows", "shadow_size", "shadow_reach", "contact", "rt_shadows"],
+        steps: [
+            &[1.0, 1024.0, 64.0, 1.0, 0.0],
+            &[1.0, 1024.0, 96.0, 1.0, 0.0],
+            &[2.0, 2048.0, 128.0, 1.0, 0.0],
+            &[2.0, 4096.0, 128.0, 2.0, 0.0],
+            &[2.0, 4096.0, 128.0, 2.0, 2.0],
+        ],
+    },
+    // Reflections on water and glass: the screen's, low or full; at Ultra traced.
+    Feature {
+        key: "reflect_quality",
+        parts: &["reflect", "rt_reflections"],
+        steps: [&[1.0, 0.0], &[1.0, 0.0], &[2.0, 0.0], &[2.0, 0.0], &[2.0, 1.0]],
+    },
+    // The light in the air: the mist's light, its detail (`core:froxels`) and the light shafts.
+    Feature {
+        key: "air_quality",
+        parts: &["volume", "mist_volume", "shafts"],
+        steps: [&[1.0, 1.0, 1.0], &[1.0, 1.0, 1.0], &[2.0, 2.0, 1.0], &[2.0, 2.0, 2.0], &[2.0, 2.0, 2.0]],
+    },
+    // The far shade from the sky between far crowns and at the foot of far steps.
+    Feature { key: "shade_quality", parts: &["far_ao"], steps: [&[1.0], &[1.0], &[2.0], &[2.0], &[2.0]] },
+    // Bloom: its glow's levels, four (1) or six (2), as the presets had them.
+    Feature { key: "bloom_quality", parts: &["bloom_levels"], steps: [&[2.0], &[2.0], &[2.0], &[2.0], &[2.0]] },
+    // The screen effects' half-size parts (1) or every effect at full size (0, Ultra's).
+    Feature { key: "effect_quality", parts: &["effect_detail"], steps: [&[1.0], &[1.0], &[1.0], &[1.0], &[0.0]] },
+];
+
+/// Whether this GPU runs a part: the traced ones only where it traces rays, never on a phone.
+fn runs(key: &str) -> bool {
+    !key.starts_with("rt_") || (GPU_RAY_QUERY.get() && !on_phone())
+}
+
+fn part(key: &str) -> &'static Row {
+    PARTS
+        .iter()
+        .find(|r| r.key == key)
+        .expect("a feature's part is in PARTS")
+}
+
+/// What feature `key`'s step sets each of its parts to here (a part this GPU doesn't run, 0), or
+/// None if `key` is no feature (`video_costs` sums a feature's cost from these).
+pub(crate) fn feature_parts(key: &str, step: usize) -> Option<Vec<(&'static str, f64)>> {
+    let f = FEATURES.iter().find(|f| f.key == key)?;
+    let values = f.steps.get(step)?;
+    Some(
+        f.parts
+            .iter()
+            .zip(values.iter())
+            .map(|(&k, &v)| (k, if runs(k) { v } else { 0.0 }))
+            .collect(),
+    )
+}
+
+/// Feature `f`'s step now: the highest whose parts all hold its values, or -1 (Custom: a part
+/// moved on the Developer screen).
+fn feature_now(f: usize) -> f64 {
+    let key = FEATURES[f].key;
+    (0..STEP_NAMES.len())
+        .rev()
+        .find(|&s| {
+            feature_parts(key, s)
+                .unwrap_or_default()
+                .iter()
+                .all(|&(k, v)| ((part(k).get)() - v).abs() < 1e-3)
+        })
+        .map_or(-1.0, |s| s as f64)
+}
+
+fn feature_set(f: usize, step: f64) {
+    let Some(parts) = feature_parts(FEATURES[f].key, step.max(0.0) as usize) else { return };
+    for (k, v) in parts {
+        (part(k).set)(v);
+    }
+}
+
+fn feature_get_n<const F: usize>() -> f64 {
+    feature_now(F)
+}
+
+fn feature_set_n<const F: usize>(v: f64) {
+    feature_set(F, v)
+}
+
+fn step_shown(v: f64) -> (String, i64) {
+    word(if v < 0.0 { "custom" } else { STEP_NAMES[(v as usize).min(4)] })
+}
+
+const STEPS: &[f64] = &[0.0, 1.0, 2.0, 3.0, 4.0];
+
+/// The features' rows on the Video screen (`FEATURES`, in its order).
+const FEATURE_ROWS: [Row; 6] = [
+    Row { key: FEATURES[0].key, values: STEPS, get: feature_get_n::<0>, set: feature_set_n::<0>, shown: step_shown },
+    Row { key: FEATURES[1].key, values: STEPS, get: feature_get_n::<1>, set: feature_set_n::<1>, shown: step_shown },
+    Row { key: FEATURES[2].key, values: STEPS, get: feature_get_n::<2>, set: feature_set_n::<2>, shown: step_shown },
+    Row { key: FEATURES[3].key, values: STEPS, get: feature_get_n::<3>, set: feature_set_n::<3>, shown: step_shown },
+    Row { key: FEATURES[4].key, values: STEPS, get: feature_get_n::<4>, set: feature_set_n::<4>, shown: step_shown },
+    Row { key: FEATURES[5].key, values: STEPS, get: feature_get_n::<5>, set: feature_set_n::<5>, shown: step_shown },
+];
+
 fn off_low_on(v: f64) -> (String, i64) {
     word(["off", "low", "on"][(v as usize).min(2)])
 }
 
-/// Sets every row to preset `p` (0 low .. 3 ultra), and the fantasy rows that cost to what it
-/// allows (`fantasy_caps`).
+/// Sets the player's rows and every feature to preset `p`, the look's always-on parts, Ultra's
+/// extras, and the fantasy rows that cost to what it allows (`fantasy_caps`).
 fn apply(p: usize) {
-    let Some(values) = preset(p) else { return };
+    let (Some(values), Some(at)) = (preset(p), preset_step(p)) else { return };
     for (row, &v) in ROWS.iter().zip(values.iter()) {
         (row.set)(v);
     }
+    for f in 0..FEATURES.len() {
+        feature_set(f, at as f64);
+    }
+    look_on();
     QUALITY.set(p as i32);
-    if p == MAX {
-        max_extras();
+    weft_sdk::info!("video: the {} preset, every feature at {}", preset_name(p as i32).unwrap_or("?"), STEP_NAMES[at]);
+    if p == ULTRA {
+        ultra_extras();
     } else if GPU_DLSS_MODES.get() != 0 {
-        // DLSS is live: off again with any other preset, as Max is the one that turns it on.
+        // DLSS is live: off again with any other preset, as Ultra is the one that turns it on.
         DLSS.set(0);
     }
     fantasy_caps(p, true);
 }
 
-/// One row a step on (`dir` 1) or back (-1) through its values; the quality becomes Custom.
+/// One player's row a step on (`dir` 1) or back (-1); a row a preset sets makes the quality Custom.
 fn step(i: usize, dir: i32) {
     step_row(&ROWS[i], dir);
     if i < PRESET_ROWS {
         QUALITY.set(4);
     }
+}
+
+/// One feature a step on or back: the quality becomes Custom.
+fn step_feature(i: usize, dir: i32) {
+    step_row(&FEATURE_ROWS[i], dir);
+    QUALITY.set(4);
 }
 
 fn step_row(row: &Row, dir: i32) {
@@ -574,9 +704,9 @@ fn apply_fantasy(f: usize) {
 }
 
 /// What quality preset `q` allows of the rows that cost (Research round 17's table): Low few
-/// fireflies, no motes, a subtle night sky, no sparkle, no bloom; Medium soft bloom. Soft clouds
+/// fireflies, no motes, a subtle night sky, no sparkle, soft bloom; Medium soft bloom. Soft clouds
 /// cost no more than blocky (Lighting, on the PC and the Mac), so they follow the master alone. With
-/// `bloom_up`, High and Ultra take the master's bloom (a quality preset just chosen).
+/// `bloom_up`, High, Max and Ultra take the master's bloom (a quality preset just chosen).
 fn fantasy_caps(q: usize, bloom_up: bool) {
     // Phone: as Low, its bloom as Medium's.
     if q == PHONE {
@@ -591,11 +721,12 @@ fn fantasy_caps(q: usize, bloom_up: bool) {
         FX_MOTES.set(0);
         FX_NIGHT_SKY.set(FX_NIGHT_SKY.get().min(1));
         FX_SPARKLE.set(0);
-        FX_BLOOM.set(0);
+        // Soft, never off: the look is always on (Ronald 11-24).
+        FX_BLOOM.set(1);
     } else if q == 1 {
         FX_BLOOM.set(FX_BLOOM.get().min(1));
     } else if bloom_up
-        && (q <= 3 || q == MAX)
+        && (q <= 3 || q == ULTRA)
         && let Some(&b) = FANTASY_BLOOM.get(FANTASY.get() as usize)
     {
         FX_BLOOM.set(b);
@@ -634,18 +765,47 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
     });
 }
 
-/// The Extra quality tab's rows (`EXTRA_SCREEN`): the newer features, each a setting of its own,
-/// outside Low to Ultra so no preset changes the look by them; Max sets them all (`max_extras`).
-/// Traced shadows, reflections and the path tracing denoiser only where the GPU can trace rays (the last rows, from `RT_ROW`).
-const EXTRA_ROWS: [Row; 16] = [
-    Row { key: "hdr", values: &[0.0, 1.0], get: || HDR_WORLD.get() as u8 as f64, set: |v| HDR_WORLD.set(v > 0.0), shown: off_on },
+/// Every part the features set, and the parts no feature steps, each a row of its own on the
+/// Developer screen (`DEV_SCREEN`), where a developer moves one alone (the quality becomes Custom).
+/// Players see the features' rows instead (Ronald, 11-24: the tuning "is more for developer
+/// things"). Traced shadows, reflections and the path tracer's denoiser only where the GPU traces
+/// rays (`traced`).
+const PARTS: [Row; 22] = [
     Row {
-        key: "aa",
+        key: "shadows",
         values: &[0.0, 1.0, 2.0],
-        get: || AA.get() as f64,
-        set: |v| AA.set(v as i32),
-        shown: |v| word(["off", "taa", "taa_camera"][(v as usize).min(2)]),
+        get: || SHADOWS.get() as f64,
+        set: |v| SHADOWS.set(v as i32),
+        shown: |v| word(["off", "near", "near_far"][v as usize % 3]),
     },
+    Row { key: "shadow_size", values: &[1024.0, 2048.0, 4096.0], get: shadow_size, set: |v| SHADOW_SIZE_NEXT.set(v as i32), shown: number },
+    // How far the sun's shadows reach before the sky light's mask takes over (Look, 11-24).
+    Row {
+        key: "shadow_reach",
+        values: &[32.0, 64.0, 96.0, 128.0, 192.0, 256.0],
+        get: || crate::look::LOOK_SHADOW_REACH.get() as f64,
+        set: |v| crate::look::LOOK_SHADOW_REACH.set(v as f32),
+        shown: |v| ("blocks".into(), v as i64),
+    },
+    Row { key: "contact", values: &[0.0, 1.0, 2.0], get: || FX_CONTACT.get() as f64, set: |v| FX_CONTACT.set(v as i32), shown: off_low_on },
+    Row {
+        key: "rt_shadows",
+        // Ultra: soft edges from more rays a pixel (with TAA), about three times the cost.
+        values: &[0.0, 1.0, 2.0],
+        get: || RT_SHADOWS.get() as f64,
+        set: |v| RT_SHADOWS.set(v as i32),
+        shown: |v| word(["off", "on", "ultra"][(v as usize).min(2)]),
+    },
+    Row { key: "reflect", values: &[0.0, 1.0, 2.0], get: || FX_REFLECT.get() as f64, set: |v| FX_REFLECT.set(v as i32), shown: off_low_on },
+    // Reflections traced on water, glass, polished stone and metal, in place of the screen's.
+    Row {
+        key: "rt_reflections",
+        values: &[0.0, 1.0],
+        get: || RT_REFLECTIONS.get() as u8 as f64,
+        set: |v| RT_REFLECTIONS.set(v > 0.0),
+        shown: off_on,
+    },
+    Row { key: "volume", values: &[0.0, 1.0, 2.0], get: || FX_VOLUME.get() as f64, set: |v| FX_VOLUME.set(v as i32), shown: off_low_on },
     Row {
         key: "mist_volume",
         values: &[0.0, 1.0, 2.0],
@@ -653,12 +813,17 @@ const EXTRA_ROWS: [Row; 16] = [
         set: |v| FROXELS.set(v as i32),
         shown: |v| word(["off", "on", "ultra"][(v as usize).min(2)]),
     },
+    Row { key: "shafts", values: &[0.0, 1.0, 2.0], get: || FX_SHAFTS.get() as f64, set: |v| FX_SHAFTS.set(v as i32), shown: off_low_on },
+    // The far shade from the sky in the gaps between far crowns and at the foot of far steps
+    // (Look, 11-06: Bliss's shading with distance, our own code).
+    Row { key: "far_ao", values: &[0.0, 1.0, 2.0], get: || FX_FAR_AO.get() as f64, set: |v| FX_FAR_AO.set(v as i32), shown: off_low_on },
     Row {
-        key: "cloud_shadows",
-        values: &[0.0, 1.0],
-        get: || CLOUD_SHADOWS.get() as u8 as f64,
-        set: |v| CLOUD_SHADOWS.set(v > 0.0),
-        shown: off_on,
+        key: "bloom",
+        // Soft, or dreamy (Storybook's): halos and bloomy fog (Research round 17).
+        values: &[0.0, 1.0, 2.0],
+        get: || FX_BLOOM.get() as f64,
+        set: |v| FX_BLOOM.set(v as i32),
+        shown: |v| word(["off", "soft", "dreamy"][(v as usize).min(2)]),
     },
     Row {
         key: "bloom_levels",
@@ -668,19 +833,29 @@ const EXTRA_ROWS: [Row; 16] = [
         shown: |v| word(["off", "narrow", "wide"][(v as usize).min(2)]),
     },
     Row {
-        key: "shadow_far",
-        values: &[0.0, 400.0, 1000.0, 2000.0, 2400.0],
-        get: || SHADOW_FAR.get() as f64,
-        set: |v| SHADOW_FAR.set(v as i32),
-        shown: |v| if v == 0.0 { word("auto") } else { ("blocks".into(), v as i64) },
-    },
-    Row {
         key: "effect_detail",
         // The half-size parts on (1) or every effect at full size (0).
         values: &[1.0, 0.0],
         get: || POST_LOW.get() as u8 as f64,
         set: |v| POST_LOW.set(v > 0.0),
         shown: |v| word(if v > 0.0 { "half" } else { "full" }),
+    },
+    Row { key: "hdr", values: &[0.0, 1.0], get: || HDR_WORLD.get() as u8 as f64, set: |v| HDR_WORLD.set(v > 0.0), shown: off_on },
+    Row {
+        key: "cloud_shadows",
+        values: &[0.0, 1.0],
+        get: || CLOUD_SHADOWS.get() as u8 as f64,
+        set: |v| CLOUD_SHADOWS.set(v > 0.0),
+        shown: off_on,
+    },
+    // The mist's banks walked per pixel on the ground the engine maps (stage 2, 11-24): on as made
+    // and in every preset (the look always on, Ronald 11-24).
+    Row {
+        key: "mist_banks",
+        values: &[0.0, 1.0],
+        get: || (crate::look::LOOK_MIST_DOMES.get() > 0.5) as u8 as f64,
+        set: |v| crate::look::LOOK_MIST_DOMES.set(if v > 0.0 { 1.0 } else { 0.0 }),
+        shown: off_on,
     },
     Row {
         key: "leaf_holes",
@@ -689,9 +864,8 @@ const EXTRA_ROWS: [Row; 16] = [
         set: |v| crate::look::LOOK_LEAF_HOLES.set(if v > 0.0 { 1.0 } else { 0.0 }),
         shown: off_on,
     },
-    Row { key: "far_detail", values: &[4.0, 8.0, 12.0], get: || LOD_DETAIL.get() as f64, set: |v| LOD_DETAIL.set(v as i32), shown: number },
-    // The light through leaves (Trees, 11-06): its own setting, off by default and not in Max for
-    // now (Planner: Max's turn on it is a later call), as Ronald's Bliss has none.
+    // The light through leaves (Trees, 11-06): off by default and in no preset for now (Planner:
+    // a later call), as Ronald's Bliss has none.
     Row {
         key: "leaf_light",
         values: &[0.0, 1.0],
@@ -699,38 +873,13 @@ const EXTRA_ROWS: [Row; 16] = [
         set: |v| crate::look::LOOK_LEAF_LIGHT.set(if v > 0.0 { 1.0 } else { 0.0 }),
         shown: off_on,
     },
-    // The mist's banks walked per pixel on the ground the engine maps (stage 2, 11-24): off as made.
+    Row { key: "far_detail", values: &[4.0, 8.0, 12.0], get: || LOD_DETAIL.get() as f64, set: |v| LOD_DETAIL.set(v as i32), shown: number },
     Row {
-        key: "mist_banks",
-        values: &[0.0, 1.0],
-        get: || (crate::look::LOOK_MIST_DOMES.get() > 0.5) as u8 as f64,
-        set: |v| crate::look::LOOK_MIST_DOMES.set(if v > 0.0 { 1.0 } else { 0.0 }),
-        shown: off_on,
-    },
-    // The look fitted to Ronald's Bliss (stage 2, 11-23): its knobs all at once, off as made.
-    // Before the rows only a GPU that traces rays shows, so every machine has it.
-    Row {
-        key: "bliss_match",
-        values: &[0.0, 1.0],
-        get: || crate::look::LOOK_BLISS.get() as u8 as f64,
-        set: |v| crate::look::set_bliss_match(v > 0.0),
-        shown: off_on,
-    },
-    Row {
-        key: "rt_shadows",
-        // Ultra: soft edges from more rays a pixel (with TAA), about three times the cost.
-        values: &[0.0, 1.0, 2.0],
-        get: || RT_SHADOWS.get() as f64,
-        set: |v| RT_SHADOWS.set(v as i32),
-        shown: |v| word(["off", "on", "ultra"][(v as usize).min(2)]),
-    },
-    // Reflections traced on water, glass, polished stone and metal, in place of the screen's.
-    Row {
-        key: "rt_reflections",
-        values: &[0.0, 1.0],
-        get: || RT_REFLECTIONS.get() as u8 as f64,
-        set: |v| RT_REFLECTIONS.set(v > 0.0),
-        shown: off_on,
+        key: "shadow_far",
+        values: &[0.0, 400.0, 1000.0, 2000.0, 2400.0],
+        get: || SHADOW_FAR.get() as f64,
+        set: |v| SHADOW_FAR.set(v as i32),
+        shown: |v| if v == 0.0 { word("auto") } else { ("blocks".into(), v as i64) },
     },
     Row {
         key: "pt_denoiser",
@@ -740,23 +889,46 @@ const EXTRA_ROWS: [Row; 16] = [
         set: |v| PT_DENOISER.set(v as i32),
         shown: |v| word(if v > 0.0 { "pt_denoiser_svgf" } else { "pt_denoiser_raw" }),
     },
-    // The far shade from the sky in the gaps between far crowns and at the foot of far steps
-    // (Look, 11-06: Bliss's shading with distance, our own code).
-    Row { key: "far_ao", values: &[0.0, 1.0, 2.0], get: || FX_FAR_AO.get() as f64, set: |v| FX_FAR_AO.set(v as i32), shown: off_low_on },
 ];
-/// The first of the rows only a GPU that traces rays shows (traced shadows, reflections, then the
-/// path tracer's denoiser).
-const RT_ROW: usize = 12;
 
-/// An extra row a step on: Max becomes Custom (the Low to Ultra presets leave these rows as they are).
-fn step_extra(i: usize, dir: i32) {
-    step_row(&EXTRA_ROWS[i], dir);
-    if QUALITY.get() == MAX as i32 {
-        QUALITY.set(4);
-    }
+/// A part only a GPU that traces rays shows (traced shadows, reflections, the path tracer's denoiser).
+fn traced(key: &str) -> bool {
+    key.starts_with("rt_") || key.starts_with("pt_")
 }
 
-pub static EXTRA_SCREEN: Menu = Menu::named("video_extra");
+/// A part a step on, on the Developer screen: the quality becomes Custom.
+fn step_part(i: usize, dir: i32) {
+    step_row(&PARTS[i], dir);
+    QUALITY.set(4);
+}
+
+/// The Developer screen (`developer.rs`): the parts' rows, then the look's tuning knobs.
+pub static DEV_SCREEN: Menu = Menu::named("video_developer");
+
+/// The Video screens' tabs, but the one shown (`here`, its title key): Video, Fantasy, DLSS where
+/// the renderer has it, and Developer while `base:developer_menu` is on.
+pub(crate) fn tabs(here: &str) -> Vec<crate::window::Tab> {
+    let mut tabs: Vec<crate::window::Tab> = vec![
+        ("video.base.title", |c| {
+            c.client().menu_open(&SCREEN);
+        }),
+        ("video.base.fantasy.title", |c| {
+            c.client().menu_open(&FANTASY_SCREEN);
+        }),
+    ];
+    if crate::dlss::available() {
+        tabs.push(("video.base.dlss.title", |c| {
+            c.client().menu_open(&crate::dlss::SCREEN);
+        }));
+    }
+    if crate::developer::MENU.get() {
+        tabs.push(("video.base.developer.title", |c| {
+            c.client().menu_open(&DEV_SCREEN);
+        }));
+    }
+    tabs.retain(|t| t.0 != here);
+    tabs
+}
 
 fn step_fantasy(i: usize, dir: i32) {
     step_row(&FANTASY_ROWS[i], dir);
@@ -769,7 +941,8 @@ static DEFAULTS: Config<i32> = Config::named("video_defaults");
 /// Saved settings take the new defaults once (the engine saves every setting, so a changed
 /// default alone reaches no one who has played): on a preset, its values for the rows whose
 /// defaults changed; on Custom, a row still at its old default takes the new one, a row the
-/// player changed stays. 1: contact shadows off, light shafts low (11-05). 2: temporal
+/// player changed stays. 1: on a preset, its features' steps (11-05's contact shadows and light
+/// shafts, since 11-24 the feature rows). 2: temporal
 /// anti-aliasing on (11-06), from the camera alone on a phone, where it is still off.
 fn new_defaults() {
     if DEFAULTS.get() >= 2 || QUALITY.get() < 0 {
@@ -793,14 +966,13 @@ fn new_defaults() {
         DEFAULTS.set(2);
         return;
     }
-    let q = QUALITY.get();
-    let (contact, shafts) = match usize::try_from(q).ok().and_then(preset) {
-        Some(p) => (p[4] as i32, p[6] as i32),
-        None => (if FX_CONTACT.get() == 2 { 0 } else { FX_CONTACT.get() }, if FX_SHAFTS.get() == 2 { 1 } else { FX_SHAFTS.get() }),
-    };
-    weft_sdk::info!("video: new defaults, contact shadows {} -> {contact}, light shafts {} -> {shafts}", FX_CONTACT.get(), FX_SHAFTS.get());
-    FX_CONTACT.set(contact);
-    FX_SHAFTS.set(shafts);
+    // On a preset, its features' steps.
+    if let Some(at) = usize::try_from(QUALITY.get()).ok().and_then(preset_step) {
+        weft_sdk::info!("video: new defaults, every feature at {}", STEP_NAMES[at]);
+        for f in 0..FEATURES.len() {
+            feature_set(f, at as f64);
+        }
+    }
     DEFAULTS.set(1);
     // And the next step at once (`DEFAULTS` 2).
     new_defaults();
@@ -823,26 +995,30 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
     };
     match tab {
         Tab::Video => {
-            pick(&ROWS, &[("shadows", 0.6), ("reflect", 0.4), ("contact", 0.4), ("volume", 0.4), ("shafts", 0.4), ("bloom", 0.4)])
-        }
-        Tab::Extra => {
             let mut keys = vec![
+                ("shadows", 0.6),
+                ("contact", 0.4),
+                ("reflect", 0.4),
+                ("volume", 0.4),
                 ("mist_volume", 0.6),
-                ("cloud_shadows", 0.6),
+                ("shafts", 0.4),
+                ("far_ao", 0.4),
                 ("bloom_levels", 0.4),
                 ("effect_detail", 0.4),
-                ("leaf_holes", 0.4),
-                ("far_detail", 0.6),
-                ("leaf_light", 0.4),
-                ("far_ao", 0.4),
             ];
             if GPU_RAY_QUERY.get() {
                 // A new world shader each change, and its scene.
                 keys.push(("rt_shadows", 2.0));
                 keys.push(("rt_reflections", 2.0));
+            }
+            pick(&PARTS, &keys)
+        }
+        Tab::Extra => {
+            let mut keys = vec![("bloom", 0.4), ("cloud_shadows", 0.6), ("leaf_holes", 0.4), ("far_detail", 0.6), ("leaf_light", 0.4)];
+            if GPU_RAY_QUERY.get() {
                 keys.push(("pt_denoiser", 1.0));
             }
-            pick(&EXTRA_ROWS, &keys)
+            pick(&PARTS, &keys)
         }
         Tab::Fantasy => pick(
             &FANTASY_ROWS,
@@ -891,12 +1067,12 @@ fn after_restart(window: [u32; 2]) -> Option<f64> {
 }
 
 pub fn register(r: &mut Registry) {
+    crate::developer::register(r);
     r.config(&QUALITY).int(-1, -1, 6);
     r.config(&FX_REFLECT).int(2, 0, 2);
-    // Off by default, low shafts (Ronald, 11-05: "Off by default", "Default to Low").
-    r.config(&FX_CONTACT).int(0, 0, 2);
-    // Off unless chosen or Max (its cost on the cost table).
-    r.config(&FX_FAR_AO).int(0, 0, 2);
+    // Low by default, as every look part (Ronald 11-24: on by default; 11-05 had contact shadows off).
+    r.config(&FX_CONTACT).int(1, 0, 2);
+    r.config(&FX_FAR_AO).int(1, 0, 2);
     // Cheap (Tester 2's PC bench, 11-04: +0.04 ms of effects at 1280x720): low until a preset
     // says otherwise; off on the Low preset until the Mac's Retina numbers are in.
     r.config(&FX_VOLUME).int(1, 0, 2);
@@ -927,8 +1103,11 @@ pub fn register(r: &mut Registry) {
             return;
         }
         // Scripts, tests and benchmarks keep their own settings (`--config` sets them per run),
-        // unless one pretends a GPU to check this (`--fake-gpu`).
-        let fake = weft_sdk::client::launch_option("fake-gpu").is_some();
+        // unless one pretends a GPU to check this (`--fake-gpu`) or plays a player's start
+        // (`--player-start`, with an empty `--run-dir` for a first start).
+        let fake = ["fake-gpu", "player-start"]
+            .iter()
+            .any(|o| weft_sdk::client::launch_option(o).is_some());
         if !fake
             && ["script", "test", "config"]
                 .iter()
@@ -948,20 +1127,7 @@ pub fn register(r: &mut Registry) {
         AT_START.get_or_init(|| (HDR_WORLD.get(), AA.get()));
     });
     r.menu(&SCREEN).screen(|ui| {
-        let mut tabs: Vec<crate::window::Tab> = vec![
-            ("video.base.fantasy.title", |c| {
-                c.client().menu_open(&FANTASY_SCREEN);
-            }),
-            ("video.base.extra.title", |c| {
-                c.client().menu_open(&EXTRA_SCREEN);
-            }),
-        ];
-        // DLSS's tab, where the renderer has it.
-        if crate::dlss::available() {
-            tabs.push(("video.base.dlss.title", |c| {
-                c.client().menu_open(&crate::dlss::SCREEN);
-            }));
-        }
+        let tabs = tabs("video.base.title");
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.title", &tabs, |ui| {
             crate::video_costs::top_line(ui, &SCREEN, || measured_rows(crate::video_costs::Tab::Video), after_restart);
             // The presets, and which one the settings are now.
@@ -973,7 +1139,7 @@ pub fn register(r: &mut Registry) {
                 for (p, name) in PRESET_NAMES.iter().enumerate() {
                     ui.button(&format!("video.base.preset.{name}"), S::default().w(52.0), move |_| apply(p));
                 }
-                ui.button("video.base.preset.max", S::default().w(52.0), move |_| apply(MAX));
+                ui.button("video.base.preset.ultra", S::default().w(52.0), move |_| apply(ULTRA));
             });
             ui.row(S::row().gap(3.0), |ui| {
                 ui.row(S::row().w(84.0), |_| {});
@@ -1006,50 +1172,40 @@ pub fn register(r: &mut Registry) {
                 });
                 ui.button("video.base.detect", S::default().h(12.0).pad(2.0), |c| apply_detected(c.client().state().window));
             });
+            // Each feature's quality, Low to Ultra (what a preset sets), then the player's own rows.
+            for i in 0..FEATURE_ROWS.len() {
+                row_ui(ui, &FEATURE_ROWS, i, step_feature);
+            }
             for i in 0..ROWS.len() {
                 row_ui(ui, &ROWS, i, step);
             }
         });
     });
-    r.menu(&EXTRA_SCREEN).screen(|ui| {
-        let mut tabs: Vec<crate::window::Tab> = vec![
-            ("video.base.title", |c| {
-                c.client().menu_open(&SCREEN);
-            }),
-            ("video.base.fantasy.title", |c| {
-                c.client().menu_open(&FANTASY_SCREEN);
-            }),
-        ];
-        if crate::dlss::available() {
-            tabs.push(("video.base.dlss.title", |c| {
-                c.client().menu_open(&crate::dlss::SCREEN);
-            }));
-        }
-        crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.extra.title", &tabs, |ui| {
-            crate::video_costs::top_line(ui, &EXTRA_SCREEN, || measured_rows(crate::video_costs::Tab::Extra), after_restart);
-            for i in 0..EXTRA_ROWS.len() {
-                // Traced shadows only where the GPU traces rays.
-                if i >= RT_ROW && !GPU_RAY_QUERY.get() {
-                    continue;
-                }
-                row_ui(ui, &EXTRA_ROWS, i, step_extra);
+    // The Developer screen: shown only with `base:developer_menu` on (its tab, `tabs`); a menu
+    // opened another way says so and shows nothing.
+    r.menu(&DEV_SCREEN).screen(|ui| {
+        let tabs = tabs("video.base.developer.title");
+        crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.developer.title", &tabs, |ui| {
+            if !crate::developer::MENU.get() {
+                ui.text_styled(S::default().class("dim").max_w(320.0), "video.base.developer.off", &[]);
+                return;
             }
+            crate::video_costs::top_line(ui, &DEV_SCREEN, || measured_rows(crate::video_costs::Tab::Extra), after_restart);
+            ui.column(S::column().gap(3.0).h(240.0).scroll(), |ui| {
+                ui.text_styled(S::default().class("dim").max_w(320.0), "video.base.developer.parts", &[]);
+                for i in 0..PARTS.len() {
+                    // Traced shadows, reflections and the denoiser only where the GPU traces rays.
+                    if traced(PARTS[i].key) && !GPU_RAY_QUERY.get() {
+                        continue;
+                    }
+                    row_ui(ui, &PARTS, i, step_part);
+                }
+                crate::developer::knob_rows(ui);
+            });
         });
     });
     r.menu(&FANTASY_SCREEN).screen(|ui| {
-        let mut tabs: Vec<crate::window::Tab> = vec![
-            ("video.base.title", |c| {
-                c.client().menu_open(&SCREEN);
-            }),
-            ("video.base.extra.title", |c| {
-                c.client().menu_open(&EXTRA_SCREEN);
-            }),
-        ];
-        if crate::dlss::available() {
-            tabs.push(("video.base.dlss.title", |c| {
-                c.client().menu_open(&crate::dlss::SCREEN);
-            }));
-        }
+        let tabs = tabs("video.base.fantasy.title");
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.fantasy.title", &tabs, |ui| {
             crate::video_costs::top_line(ui, &FANTASY_SCREEN, || measured_rows(crate::video_costs::Tab::Fantasy), after_restart);
             // The master, and which of its looks the rows are now.

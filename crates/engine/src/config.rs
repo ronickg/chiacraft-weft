@@ -751,8 +751,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         // Screen effects' half-size parts (`post_low`); off, every effect at full size, as before.
         number("core:post_low", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // The world drawn in 16-bit float (linear light past 1) with the screen effects after it and
-        // the picture finished in one last pass (chiacraft, the HDR world); read at start.
-        number("core:hdr_world", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // the picture finished in one last pass (chiacraft, the HDR world); read at start. On by
+        // default so a fresh install's first start shows the game's look (Ronald 11-24: the look
+        // always on; a mod's first-start settings come after the engine has read this one).
+        number("core:hdr_world", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Anti-aliasing: 0 off, 1 temporal (`post::Post`: the world drawn a fraction of a pixel
         // aside each frame and gathered over frames by where each pixel was, the motion image), 2
         // temporal from the camera alone (no motion image: cheaper on phones' tiled GPUs; leaves and

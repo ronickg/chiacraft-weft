@@ -1,0 +1,46 @@
+# The look always on (Ronald 11-24): a player's start, played by a script. Run with
+# `-- --run-dir <name> --player-start` and no --shader-pack: a new run dir is a first start (run.log:
+# the GPU's preset, "video: ...: the X preset" and "video: the high preset, every feature at high"); an old one
+# with `shader_pack =` empty (and the old `.offered` marker) is a later start. Either way, after
+# the join, "shader pack: none chosen, chiacraft on". Shots: the world with the pack drawn, the
+# Video screen (the presets, feature rows, player rows), Medium, Medium flipped to Custom by one
+# feature row's ›, then the Developer tab (after /developer_menu on): the parts, then the knobs.
+loaded
+idle
+wait 8
+look 30 -5
+wait 3
+shot fs_01_world.png
+screen base:video
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot fs_02_video.png
+tap_once base:video text:Medium
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot fs_03_medium.png
+tap_beside base:video text:Reflections 1.96
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot fs_04_custom.png
+key Escape
+wait 1
+chat /developer_menu on
+wait 1
+screen base:video_developer
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot fs_05_developer.png
+cursor 0.5 0.6
+scroll -12
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot fs_06_developer_knobs.png
+key Escape
+wait 1
+quit

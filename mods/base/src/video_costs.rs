@@ -175,6 +175,38 @@ fn estimate(window: [u32; 2], key: &str, value: f64) -> Option<f64> {
 
 /// What `key` at `value` costs over its cheapest here: measured, else estimated.
 pub fn cost(window: [u32; 2], key: &str, value: f64) -> Cost {
+    // A feature's row (`video.rs`' `FEATURES`): its parts' costs at that step over its Low step's,
+    // measured when every part was.
+    if let Some(low) = crate::video::feature_parts(key, 0) {
+        let Some(at) = (value >= 0.0)
+            .then(|| crate::video::feature_parts(key, value as usize))
+            .flatten()
+        else {
+            return Cost::None;
+        };
+        let (mut ms, mut all_measured, mut any) = (0.0, true, false);
+        for (parts, sign) in [(at, 1.0), (low, -1.0)] {
+            for (k, v) in parts {
+                match cost(window, k, v) {
+                    Cost::Measured(m) => {
+                        ms += sign * m;
+                        any = true;
+                    }
+                    Cost::Estimate(m) => {
+                        ms += sign * m;
+                        any = true;
+                        all_measured = false;
+                    }
+                    Cost::None => {}
+                }
+            }
+        }
+        return match (any, all_measured) {
+            (false, _) => Cost::None,
+            (true, true) => Cost::Measured(ms.max(0.0)),
+            (true, false) => Cost::Estimate(ms.max(0.0)),
+        };
+    }
     if let Some(ms) = measured(window, key, value) {
         return Cost::Measured(ms);
     }

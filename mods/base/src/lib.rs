@@ -16,6 +16,7 @@ mod crafts;
 mod crops;
 mod death;
 mod discovery;
+mod developer;
 mod dlss;
 mod doors;
 mod effects;
