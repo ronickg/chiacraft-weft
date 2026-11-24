@@ -1,0 +1,120 @@
+# The knowledge gate's first ruin (vitals::ruins, ruins.rs): the Stone ring near spawn, its
+# pedestal giving the crucible blueprint once, and the crucible refused at a crafting table until
+# the blueprint is read. One copy, a fresh world.
+# Passes when every `until` meets. Read in run.log and the shots:
+# - "nearest Stone ring ..." under 300 blocks from spawn (the first /ruin line);
+# - ruin_ring.png: a ring of ley stone pillars round a worn floor, the pedestal in front;
+# - ruin_locked.png: the crucible's bricks and coal in the grid, the result slot EMPTY;
+# - ruin_unlocked.png: the same grid, the result a crucible.
+loaded
+idle
+chat /ruin forget all
+until chat blueprints known within 10
+chat /ruin
+until chat nearest within 10
+chat /tk mode survival
+until mode survival within 10
+# 1. The ring: stand on its floor two blocks south of the pedestal, facing it.
+chat /ruin goto ring
+until chat beside the within 20
+wait 3
+loaded
+idle
+look 0 -35
+wait 1
+shot ruin_ring.png
+# 2. The pedestal gives the blueprint (into hotbar slot 0), then only once.
+press core:use
+until chat pedestal gives within 10
+wait 1
+chat /tk inv me
+until chat blueprint_crucible within 5
+press core:use
+until chat taken this pedestal within 10
+# 3. A crafting table in front (between the player and the pedestal), the crucible's pieces in hotbar slots 1-8 (menu slots 44-51).
+chat /tk set ~ ~ ~-1 base:crafting_table
+until block ~ ~ ~-1 base:crafting_table within 10
+chat /tk put me 1 base:bricks 1
+chat /tk put me 2 base:bricks 1
+chat /tk put me 3 base:bricks 1
+chat /tk put me 4 base:bricks 1
+chat /tk put me 5 base:bricks 1
+chat /tk put me 6 base:bricks 1
+chat /tk put me 7 base:bricks 1
+chat /tk put me 8 base:coal 1
+wait 1
+look 0 -45
+wait 1
+press core:use
+until screen core:menu within 10
+wait 1
+# The crucible: "b b" / "bcb" / "bbb" (grid 0-8, the coal in 4).
+tap_once core:menu slot:44
+tap_once core:menu slot:0
+tap_once core:menu slot:45
+tap_once core:menu slot:2
+tap_once core:menu slot:46
+tap_once core:menu slot:3
+tap_once core:menu slot:47
+tap_once core:menu slot:5
+tap_once core:menu slot:48
+tap_once core:menu slot:6
+tap_once core:menu slot:49
+tap_once core:menu slot:7
+tap_once core:menu slot:50
+tap_once core:menu slot:8
+tap_once core:menu slot:51
+tap_once core:menu slot:4
+wait 1
+shot ruin_locked.png
+key Escape
+until screen none within 10
+# 4. Read the blueprint (slot 0, looking up, away from the pedestal and the table).
+key 1
+look 0 60
+wait 1
+press core:use
+until chat its knowledge is yours within 10
+chat /ruin
+until chat blueprints known: crucible within 10
+# 5. The same grid again: now a crucible.
+chat /tk put me 1 base:bricks 1
+chat /tk put me 2 base:bricks 1
+chat /tk put me 3 base:bricks 1
+chat /tk put me 4 base:bricks 1
+chat /tk put me 5 base:bricks 1
+chat /tk put me 6 base:bricks 1
+chat /tk put me 7 base:bricks 1
+chat /tk put me 8 base:coal 1
+wait 1
+look 0 -45
+wait 1
+press core:use
+until screen core:menu within 10
+wait 1
+tap_once core:menu slot:44
+tap_once core:menu slot:0
+tap_once core:menu slot:45
+tap_once core:menu slot:2
+tap_once core:menu slot:46
+tap_once core:menu slot:3
+tap_once core:menu slot:47
+tap_once core:menu slot:5
+tap_once core:menu slot:48
+tap_once core:menu slot:6
+tap_once core:menu slot:49
+tap_once core:menu slot:7
+tap_once core:menu slot:50
+tap_once core:menu slot:8
+tap_once core:menu slot:51
+tap_once core:menu slot:4
+wait 1
+shot ruin_unlocked.png
+tap_once core:menu slot:9
+tap_once core:menu slot:44
+wait 1
+key Escape
+until screen none within 10
+chat /tk inv me
+until chat base:crucible within 5
+quit

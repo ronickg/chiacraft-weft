@@ -308,6 +308,9 @@ fn craft_result(m: &MenuCtx) {
     let made = crate::survival::crafted(&cells, made, m.world().day_time());
     // An axe lashed by hand takes its parts from the grid (`first.rs`).
     let made = crate::first::finish(&m.world(), m.player(), &cells, made, None);
+    // Nothing a blueprint not yet read teaches (`ruins.rs`).
+    let made =
+        if !made.is_empty() && crate::ruins::craft_locked(&m.world(), m.player(), made.item).is_some() { ItemStack::EMPTY } else { made };
     m.group("result").set(0, made);
 }
 

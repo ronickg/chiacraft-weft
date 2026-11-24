@@ -33,6 +33,7 @@ pub fn markdown() -> String {
     web_prices(&mut w);
     keys(&mut w, &g);
     age_gates(&mut w, &g);
+    knowledge(&mut w);
     tags(&mut w, &g);
     materials(&mut w);
     w
@@ -401,6 +402,38 @@ fn age_gates(w: &mut String, g: &graph::Solved) {
     }
     for (root, why) in graph::KNOWN_SKIPS {
         let _ = writeln!(w, "- {root}: {why}");
+    }
+    w.push('\n');
+}
+
+fn knowledge(w: &mut String) {
+    use vitals::ruins as r;
+    let _ = write!(
+        w,
+        "## The knowledge gate\n\nAn age's key needs its age's blueprint, found in its age's ruins on the ley lines (`vitals::ruins`, `graph::knowledge`): a pedestal gives each player one, and until it is read the grid, the book and the furnace refuse what it teaches. One Stone ring always stands within {:.0} blocks of the world's spawn.\n\n| blueprint | age | ruin | its grid (blocks), chance | ward (harvest) | teaches | finding (EM) |\n|---|---|---|---|---|---|---|\n",
+        r::SPAWN_REACH
+    );
+    for b in r::BLUEPRINTS {
+        let Some(k) = r::kind_of_age(b.age) else { continue };
+        let teaches: Vec<String> = b
+            .crafts
+            .iter()
+            .map(|c| format!("crafting {c}"))
+            .chain(b.smelts.iter().map(|s| format!("smelting {s}")))
+            .collect();
+        let ward = if k.ward == 0 { "open".to_string() } else { k.ward.to_string() };
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} ({} deep) | {}, {:.0} % | {ward} | {} | {} |",
+            b.item(),
+            AGES[b.age as usize].name(),
+            k.id,
+            k.depth,
+            k.cell,
+            k.chance * 100.0,
+            teaches.join(", "),
+            k.find_em
+        );
     }
     w.push('\n');
 }
