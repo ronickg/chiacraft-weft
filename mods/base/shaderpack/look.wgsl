@@ -1907,12 +1907,9 @@ fn fog_through_banks(c: vec3<f32>, rel: vec3<f32>, bank_rel: vec3<f32>, sky: f32
         return c;
     }
     if scene.froxels.x > 0.5 {
-        let banked = bank_march(c, bank_rel);
-        // The banks' debug views show their march alone (`bank_march`).
-        if look_debug() >= 3u && look_debug() <= 5u {
-            return banked;
-        }
-        return froxel_fog(banked, rel, sky);
+        // (The banks, `bank_march`, are marched once per pixel in post's pass before TAA,
+        // `fs_pre_taa`, no longer here for each fragment drawn.)
+        return froxel_fog(c, rel, sky);
     }
     // The whole view: walked only to 220 blocks, the fog lying on the land ended 220 blocks out, a
     // flat pale disc seen from high up (the world playtester, y 250 over snow, 11-04).
