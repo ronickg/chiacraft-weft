@@ -49,6 +49,10 @@ thread_local! {
 }
 
 // Center even-sized footprints between cells so they fit even-width passages.
+/// The tallest floor stood on inside its own cell (`find`): under a half slab, whose top a body
+/// stands on from the cell above.
+const THIN: f64 = 7.0 / 16.0;
+
 fn offset(dims: Dims) -> DVec3 {
     let half = (dims.half_width * 2.0).ceil() * 0.5;
     DVec3::new(half, 0.0, half)
@@ -68,9 +72,14 @@ pub fn find(c: &Content, block: &impl physics::Cells, from: DVec3, to: DVec3, di
             .liquid
             .is_some_and(|l| c.liquids[l as usize].burns())
     };
+    // A floor thinner than `THIN` in the cell itself (a carpet, snow layers, a dried mud crust)
+    // is stood on in that cell: its room is looked for above it, and it is the cell's ground.
+    // Without it a cell over one had neither room (the floor in it) nor ground (the floor too far
+    // under the cell above), so mobs could not walk on snow or a dried pond's bed at all.
+    let thin = |area: Aabb| physics::collides(c, block, area) && !physics::collides(c, block, area.shifted(DVec3::Y * THIN));
     let room = |p: IVec3| {
         let area = area(p);
-        if physics::collides(c, block, area) {
+        if physics::collides(c, block, area) && physics::collides(c, block, area.shifted(DVec3::Y * THIN)) {
             return false;
         }
         let lo = area.min.floor().as_ivec3();
@@ -92,7 +101,7 @@ pub fn find(c: &Content, block: &impl physics::Cells, from: DVec3, to: DVec3, di
         let lo = area.min.floor().as_ivec3();
         let hi = area.max.ceil().as_ivec3() - IVec3::ONE;
         let floor = Aabb { min: area.min - DVec3::Y * 0.50001, max: DVec3::new(area.max.x, area.min.y, area.max.z) };
-        let mut supported = physics::collides(c, block, floor);
+        let mut supported = physics::collides(c, block, floor) || thin(area);
         for z in lo.z..=hi.z {
             for x in lo.x..=hi.x {
                 let below = IVec3::new(x, p.y - 1, z);

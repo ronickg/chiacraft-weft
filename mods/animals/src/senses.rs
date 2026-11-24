@@ -158,6 +158,12 @@ pub fn init(r: &mut Registry) {
     r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
+            // Its own body's hurts (starving, thirst, the cold, the heat: `comfort::bodily`) are
+            // no fight: a parched deer's every tick of thirst set it and its kin running and
+            // calling the alarm (ai1124_savanna10: 241 alarms, none with a hunter or a player).
+            if crate::comfort::bodily(h.cause) {
+                continue;
+            }
             if let Some(e) = w.entity(h.entity) {
                 noise(&w, e.pos.to_array(), perception::FIGHT_HEARD, h.source);
             }
