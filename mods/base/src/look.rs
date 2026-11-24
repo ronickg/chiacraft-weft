@@ -49,7 +49,7 @@ pub static LOOK_LEAF_LIGHT: Config<f32> = Config::named("look_leaf_light");
 /// A debug view for matching the light against Bliss's (its debug_DIRECT / debug_INDIRECT): 0 the
 /// picture, 1 the sun's light alone, 2 the sky's alone, on white; with the mist's banks on
 /// (`look_mist_domes`), 3 the light they scatter alone, on black, 4 how much they hide (grey),
-/// 5 the picture with them ten times as dense.
+/// 5 where along their march the sun reaches them (white lit, blue in shade, black none).
 pub static LOOK_DEBUG: Config<f32> = Config::named("look_debug");
 /// The HDR world's sky light by day in the upper sky's own hue, as Bliss's: 0 the palette's fill as
 /// made, 1 all the way.

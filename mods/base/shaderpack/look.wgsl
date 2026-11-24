@@ -236,7 +236,7 @@ const MIST_DEEP: f32 = 0.0;
 // on the ground but a level sea of mist at one height, that the hills and crowns rise out of. The
 // domes followed the land and covered every crown, and read as paint on it (Planner on lv8).
 // The sea's full height over sea level, and how fast it thins above it (per block, exp).
-const MIST_SEA_LEVEL: f32 = 22.0;
+const MIST_SEA_LEVEL: f32 = 30.0;
 const MIST_SEA_FALL: f32 = 0.12;
 // Its density per block at `/air` 1 (Bliss's morning, about 0.45 a block where full, at `/air` 0.05).
 const MIST_SEA_DENSE: f32 = 12.0;
@@ -1776,7 +1776,7 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     if scene.froxels.x > 0.5 {
         let banked = bank_march(c, rel);
         // The banks' debug views show their march alone (`bank_march`).
-        if look_debug() == 3u || look_debug() == 4u {
+        if look_debug() >= 3u && look_debug() <= 5u {
             return banked;
         }
         return froxel_fog(banked, rel, sky);
@@ -1903,9 +1903,7 @@ fn bank_phase(mu: f32) -> f32 {
     return MIST_SEA_PHASE.x * exp(-MIST_SEA_PHASE.y * off) + MIST_SEA_PHASE.z * exp(-MIST_SEA_PHASE.w * off);
 }
 fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
-    // Debug view 5: the banks ten times as dense, to see their shape (Planner on lv6, 11-24: prove the
-    // volume is there before tuning its colour).
-    let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0) * select(1.0, 10.0, look_debug() == 5u);
+    let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
     if deep <= 0.0 || scene.frame.x < 0.5 || storm() > 0.5 || air_mist() <= 0.0 {
         return c;
     }
@@ -1945,6 +1943,10 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let span = t1 - t0;
     var through = 1.0;
     var gained = vec3(0.0);
+    // Debug view 5: where along the march the sun reaches the mist (Planner on lv8: no shafts and no
+    // shaded hollows showed, so check the shadow term itself): white the mist the sun lights, blue the
+    // mist in shade, black no mist.
+    var shaft = 0.0;
     // Debug views with the banks on (the world and the evening's mist left out): 3 the light the banks
     // scatter toward the eye alone, on black; 4 how much they hide (1 - through) as grey.
     for (var i = 0u; i < n; i++) {
@@ -1959,6 +1961,7 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         // in the crowns' shade.
         let lit = sun_reaches(dir * t) * cloud_shadow(dir * t);
         let kept = exp(-d * step);
+        shaft += through * (1.0 - kept) * lit;
         gained += through * (1.0 - kept) * (sky_in + sun_in * lit);
         through *= kept;
     }
@@ -1967,6 +1970,9 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     }
     if look_debug() == 4u {
         return vec3(1.0 - through);
+    }
+    if look_debug() == 5u {
+        return vec3(shaft, shaft, 1.0 - through);
     }
     return c * through + gained;
 }
@@ -2279,6 +2285,10 @@ const BAND_DEPTH: f32 = 12.0;
 
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
+    // The mist banks' debug views (3 to 5) alone, without the haze after them.
+    if look_debug() >= 3u && look_debug() <= 5u {
+        return c;
+    }
     let dist = length(rel);
     if !CALM && in_water() {
         return under_water(c, rel);
