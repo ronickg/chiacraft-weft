@@ -4538,9 +4538,9 @@ fn evening_mist_floor(sun: [f32; 4]) -> f32 {
 }
 
 /// The values of the settings the shader pack reads (`Scene::options`).
-fn pack_options() -> [[f32; 4]; 16] {
-    let mut out = [[0.0; 4]; 16];
-    for (i, name) in crate::packs::pack_options().iter().enumerate().take(64) {
+fn pack_options() -> [[f32; 4]; 20] {
+    let mut out = [[0.0; 4]; 20];
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(80) {
         if let Some(id) = crate::config::by_name(name) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }

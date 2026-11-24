@@ -224,6 +224,8 @@ const OPT_DAWN_SKY: u32 = 60u;
 const OPT_BANK_DENSE: u32 = 61u;
 const OPT_BANK_SUN: u32 = 62u;
 const OPT_BANK_SHADE: u32 = 63u;
+// The sun's shadows' reach (blocks, `base:look_shadow_reach`): 0 as made, to the view's end.
+const OPT_SHADOW_REACH: u32 = 64u;
 // How much of it this morning: the option, in the east, with the sun under the horizon (full from
 // 1.7° down, none at 1° up) and not yet night (gone by about 12° down, where the night sky takes it).
 fn dawn_sky() -> f32 {
