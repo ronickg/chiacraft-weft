@@ -3,8 +3,8 @@
 # the blueprint is read. One copy, a fresh world.
 # Passes when every `until` meets. Read in run.log and the shots:
 # - "nearest Stone ring ..." under 300 blocks from spawn (the first /ruin line);
-# - ruin_ring.png, ruin_ring_side.png: ley stone pillars (some fallen) round a worn floor, the
-#   pedestal in front; ruin_pedestal.png: the pedestal close;
+# - ruin_ring.png, ruin_ring_side.png, ruin_ring_back.png: ley stone pillars 2-4 high (the
+#   broken ones moss-topped) on the edge of a level floor, the pedestal in front; ruin_pedestal.png: the pedestal close;
 # - the second pedestal use gives nothing: "/tk slot me 1" is "- 0 0" and the /tk inv line holds
 #   one blueprint_crucible;
 # - ruin_locked.png: the crucible's bricks and coal in the grid, the result slot EMPTY;
@@ -29,6 +29,9 @@ shot ruin_ring.png
 look 60 -5
 wait 1
 shot ruin_ring_side.png
+look 180 -10
+wait 1
+shot ruin_ring_back.png
 look 0 -35
 wait 1
 shot ruin_pedestal.png

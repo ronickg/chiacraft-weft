@@ -249,28 +249,34 @@ fn ruin_blocks(ruin: &Ruin, ground: &dyn Fn(i32, i32) -> i32) -> Vec<([i32; 3], 
     };
     match ruin.kind().id {
         "ring" => {
-            // A floor of worn ley stone and moss, cleared above, a broken ring of pillars round it.
-            for dz in -3..=3i32 {
-                for dx in -3..=3i32 {
-                    if dx * dx + dz * dz > 10 {
+            // A level floor of worn ley stone and moss (radius 4), its own ground cut away above and
+            // built up below on a slope, and a broken ring of pillars standing on its edge: on the
+            // floor, so they are seen from the pedestal however the land falls (11-24,
+            // pl1123_ruin1 and 3: pillars on their own columns hid below the floor's edge downhill
+            // and above the cut uphill).
+            for dz in -4..=4i32 {
+                for dx in -4..=4i32 {
+                    if dx * dx + dz * dz > 20 {
                         continue;
                     }
                     let b = if h(dx, dz) % 3 == 0 { moss } else { stone };
                     out.push(([x + dx, gy, z + dz], b, false));
-                    out.push(([x + dx, gy - 1, z + dz], stone, false));
-                    for y in gy + 1..=gy + 4 {
+                    // Built up to the floor from the ground below it (at most 8 deep).
+                    let under = ground(x + dx, z + dz).max(gy - 8);
+                    for y in under.min(gy - 1)..gy {
+                        out.push(([x + dx, y, z + dz], stone, false));
+                    }
+                    for y in gy + 1..=gy + 5 {
                         out.push(([x + dx, y, z + dz], 0, false));
                     }
                 }
             }
             for k in 0..8 {
                 let a = k as f64 / 8.0 * std::f64::consts::TAU;
-                let (dx, dz) = ((5.0 * a.cos()).round() as i32, (5.0 * a.sin()).round() as i32);
-                let tall = 1 + h(dx, dz) % 3; // 1 (a broken stump) to 3 high
-                let foot = ground(x + dx, z + dz);
-                out.push(([x + dx, foot, z + dz], stone, false));
+                let (dx, dz) = ((4.0 * a.cos()).round() as i32, (4.0 * a.sin()).round() as i32);
+                let tall = 2 + h(dx, dz) % 3; // 2 (broken) to 4 high
                 for y in 1..=tall as i32 {
-                    out.push(([x + dx, foot + y, z + dz], if y == tall as i32 && tall < 3 { moss } else { stone }, false));
+                    out.push(([x + dx, gy + y, z + dz], if y == tall as i32 && tall < 4 { moss } else { stone }, false));
                 }
             }
             out.push(([x, gy + 1, z], PEDESTAL.id(), false));
