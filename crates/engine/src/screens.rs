@@ -725,10 +725,20 @@ impl Screen for Pause {
         let bg = if cx.in_game { "overlay" } else { "background" };
         ui.root_style(Style::default().stretch());
         ui.panel(bg, Style::default().grow().center(), |ui| {
-            let mut style = Style::default().center().gap(7.0);
+            // 8 GUI between the buttons: their parts reach 2 past the box each side (`outset`),
+            // so 4 show between them (Planner 11-24: they touched).
+            let mut style = Style::default().center().gap(8.0);
             style.pad = [16.0, 14.0, 16.0, 18.0];
             ui.panel("menu_panel", style, |ui| {
-                title(ui, cx, "menu.paused");
+                // The title at 3x where it fits the buttons' width (whole steps, one pixel grid),
+                // with 4 more under it.
+                let t = label(ui, cx, "menu.paused", &[], "title");
+                if let Some(t) = ui.text_mut(t) {
+                    t.wrap = false;
+                    let chars = cx.lang.get("menu.paused").chars().count().max(1) as f32;
+                    t.scale = (200.0 / (chars * 6.0)).floor().clamp(2.0, 3.0);
+                }
+                ui.add(Kind::Container { class: None }, Style::default().h(4.0));
                 pause_buttons(ui, cx);
             });
         });
@@ -1058,13 +1068,14 @@ impl Screen for ConfigScreen {
             }
             let list = ui.panel(
                 "panel",
+                // As tall as what it holds, up to the room there is (then it scrolls: a scrolling
+                // node gives way when the column is too tall), so a short page leaves no empty
+                // half (chiacraft, Planner 11-24).
                 Style::default()
                     .pad(8.0)
                     .gap(6.0)
                     .stretch()
                     .w(320.0)
-                    .h(0.0)
-                    .grow()
                     .min_h(40.0)
                     .scroll(),
                 |ui| {
