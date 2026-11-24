@@ -25,6 +25,7 @@ pub fn checks() -> Vec<(&'static str, Vec<String>)> {
         ("nothing at tier N needs anything above N", graph::tiers(&g)),
         ("each age's key by each declared route", graph::keys(&g)),
         ("path parity: each age's key by each route within ×1.15 of its cheapest, in EM", graph::path_parity(&g)),
+        ("each age's materials need the age before (its tools, stations or materials): no age skipped", graph::age_gates(&g)),
         ("every tool-part material tagged, made from its tier or below", graph::materials(&g)),
         ("each age's making inside its budget", graph::budget(&g)),
         ("every size and role inside its bands, floors hold", matrix::sizes()),

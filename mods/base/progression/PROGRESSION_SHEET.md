@@ -12,6 +12,7 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | nothing at tier N needs anything above N | passes |
 | each age's key by each declared route | passes |
 | path parity: each age's key by each route within ×1.15 of its cheapest, in EM | passes |
+| each age's materials need the age before (its tools, stations or materials): no age skipped | passes |
 | every tool-part material tagged, made from its tier or below | passes |
 | each age's making inside its budget | passes |
 | every size and role inside its bands, floors hold | passes |
@@ -384,6 +385,41 @@ What each route costs from scratch (`graph::route_cost`): its items at their che
 | Bronze Age | tech | 60 | 1.00 | 0.00 |  |
 | Bronze Age | beasts | 60 | 1.00 | 0.00 |  |
 | Bronze Age | magic | 60 | 1.00 | 0.00 |  |
+
+## The materials gate
+
+An age's key needs the age before's tools or stations (`graph::age_gates`): each material past the Stone Age has something of the age before on its cheapest way, or the age could be skipped. Known skips wait on a decision and don't fail the check.
+
+| material | age | through the age before | otherwise up to | skips |
+|---|---|---|---|---|
+| animals:mountain_offering | Bronze Age | base:pickaxe | Stone Age | - |
+| base:bronze_ingot | Bronze Age | base:pickaxe | Stone Age | - |
+| base:bucket | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:copper_ingot | Bronze Age | base:pickaxe | Stone Age | - |
+| base:diamond | Age of Steam | base:steel_ingot | Iron Age | - |
+| base:diamond_block | Age of Steam | base:steel_ingot | Iron Age | - |
+| base:gem_diamond | Age of Steam | base:steel_ingot | Iron Age | - |
+| base:gem_peridot | Iron Age | base:pallasite | Bronze Age | - |
+| base:gold_block | Bronze Age | base:pickaxe | Stone Age | - |
+| base:gold_ingot | Bronze Age | base:pickaxe | Stone Age | - |
+| base:iron_block | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:iron_ingot | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:lava_bucket | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:meteoric_iron | Bronze Age | base:pickaxe | Stone Age | - |
+| base:raw_copper | Bronze Age | base:pickaxe | Stone Age | - |
+| base:raw_gold | Bronze Age | base:pickaxe | Stone Age | - |
+| base:raw_iron | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:raw_tin | Bronze Age | base:pickaxe | Stone Age | - |
+| base:star_steel_ingot | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:star_steel_lump | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:steel_ingot | Iron Age | base:bricks | Bronze Age | - |
+| base:tin_ingot | Bronze Age | base:pickaxe | Stone Age | - |
+| base:unlearning_stone | Iron Age | base:pallasite | Bronze Age | - |
+| base:water_bucket | Iron Age | - | Stone Age | known, by base:raw_iron |
+
+Known skips:
+
+- base:raw_iron: iron ore breaks with a stone pickaxe and smelts in the Stone Age furnace; Ronald to choose A (a bronze pickaxe for iron ore) or B (a bloomery that takes bronze), Planner 11-23
 
 ## What exists, by age and path
 
