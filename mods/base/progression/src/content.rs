@@ -104,6 +104,8 @@ use Path::{Beasts, Magic, Shared, Tech};
 pub const AXE: Needs = Needs::Tool("axe", 0);
 pub const PICK: Needs = Needs::Tool("pickaxe", 0);
 pub const PICK_STONE: Needs = Needs::Tool("pickaxe", 100);
+/// Iron ore's: a bronze pickaxe or better (`vitals::gear::IRON_ORE_HARVEST`).
+pub const PICK_BRONZE: Needs = Needs::Tool("pickaxe", vitals::gear::IRON_ORE_HARVEST);
 pub const PICK_IRON: Needs = Needs::Tool("pickaxe", 200);
 pub const PICK_STEEL: Needs = Needs::Tool("pickaxe", 300);
 pub const PICK_DIAMOND: Needs = Needs::Tool("pickaxe", 300);
@@ -230,19 +232,20 @@ pub const RULES: &[Rule] = &[
         "breaks into raw copper or raw tin (a stone pickaxe): copper in cold, dry and beach land, tin on beaches and in mountains (`metals.rs`)",
     ),
     n(
-        &[
-            "base:iron_ore",
-            "base:granite_iron_ore",
-            "base:red_sandstone_iron_ore",
-            "base:meteorite",
-            "base:gold_ore",
-            "base:granite_gold_ore",
-        ],
+        &["base:iron_ore", "base:granite_iron_ore", "base:red_sandstone_iron_ore"],
+        2,
+        Tech,
+        Ground,
+        Not,
+        "breaks into raw iron (a bronze pickaxe: `vitals::gear::IRON_ORE_HARVEST`, Ronald 11-23)",
+    ),
+    n(
+        &["base:meteorite", "base:gold_ore", "base:granite_gold_ore"],
         1,
         Tech,
         Ground,
         Not,
-        "breaks into raw iron, meteoric iron or raw gold (a stone pickaxe)",
+        "breaks into meteoric iron or raw gold (a stone pickaxe)",
     ),
     n(&["base:redstone_ore", "base:star_steel_ore"], 2, Tech, Ground, Not, "breaks into its ore (an iron pickaxe)"),
     n(&["base:diamond_ore"], 3, Tech, Ground, Not, "breaks into a diamond (a steel pickaxe: harvest 300)"),

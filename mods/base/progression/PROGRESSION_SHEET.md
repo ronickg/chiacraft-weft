@@ -32,8 +32,8 @@ Power grows Ã—1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier Ã
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 551 | 159 | 48 | 33 % | 217 EM |
-| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 52 | 35 | 150 | 52 % | 143 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 58 | 28 | 61 | 16 % | 270 EM |
+| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 49 | 35 | 150 | 52 % | 143 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 61 | 28 | 61 | 16 % | 270 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 38 | 32 | 94 | 22 % | 328 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -394,7 +394,7 @@ An age's key needs the age before's tools or stations (`graph::age_gates`): each
 |---|---|---|---|---|
 | animals:mountain_offering | Bronze Age | base:pickaxe | Stone Age | - |
 | base:bronze_ingot | Bronze Age | base:pickaxe | Stone Age | - |
-| base:bucket | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:bucket | Iron Age | base:bronze_ingot | Bronze Age | - |
 | base:copper_ingot | Bronze Age | base:pickaxe | Stone Age | - |
 | base:diamond | Age of Steam | base:steel_ingot | Iron Age | - |
 | base:diamond_block | Age of Steam | base:steel_ingot | Iron Age | - |
@@ -402,24 +402,24 @@ An age's key needs the age before's tools or stations (`graph::age_gates`): each
 | base:gem_peridot | Iron Age | base:pallasite | Bronze Age | - |
 | base:gold_block | Bronze Age | base:pickaxe | Stone Age | - |
 | base:gold_ingot | Bronze Age | base:pickaxe | Stone Age | - |
-| base:iron_block | Iron Age | - | Stone Age | known, by base:raw_iron |
-| base:iron_ingot | Iron Age | - | Stone Age | known, by base:raw_iron |
-| base:lava_bucket | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:iron_block | Iron Age | base:bronze_ingot | Bronze Age | - |
+| base:iron_ingot | Iron Age | base:bronze_ingot | Bronze Age | - |
+| base:lava_bucket | Iron Age | base:bronze_ingot | Bronze Age | - |
 | base:meteoric_iron | Bronze Age | base:pickaxe | Stone Age | - |
 | base:raw_copper | Bronze Age | base:pickaxe | Stone Age | - |
 | base:raw_gold | Bronze Age | base:pickaxe | Stone Age | - |
-| base:raw_iron | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:raw_iron | Iron Age | base:bronze_ingot | Bronze Age | - |
 | base:raw_tin | Bronze Age | base:pickaxe | Stone Age | - |
-| base:star_steel_ingot | Iron Age | - | Stone Age | known, by base:raw_iron |
-| base:star_steel_lump | Iron Age | - | Stone Age | known, by base:raw_iron |
-| base:steel_ingot | Iron Age | base:bricks | Bronze Age | - |
+| base:star_steel_ingot | Iron Age | base:bronze_ingot | Bronze Age | - |
+| base:star_steel_lump | Iron Age | base:bronze_ingot | Bronze Age | - |
+| base:steel_ingot | Iron Age | base:bronze_ingot | Bronze Age | - |
 | base:tin_ingot | Bronze Age | base:pickaxe | Stone Age | - |
 | base:unlearning_stone | Iron Age | base:pallasite | Bronze Age | - |
-| base:water_bucket | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:water_bucket | Iron Age | base:bronze_ingot | Bronze Age | - |
 
 Known skips:
 
-- base:raw_iron: iron ore breaks with a stone pickaxe and smelts in the Stone Age furnace; Ronald to choose A (a bronze pickaxe for iron ore) or B (a bloomery that takes bronze), Planner 11-23
+- none (iron, the first, takes a bronze pickaxe since 11-23)
 
 ## What exists, by age and path
 
@@ -495,11 +495,11 @@ Notes:
 - animals:warden_antler, animals:warden_bark: Drenkaun's part breaks and loot
 - animals:kibble: an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: "move them to fit")
 
-### Bronze Age (52)
+### Bronze Age (49)
 
-**tech** (46)
+**tech** (43)
 
-- ground: copper_ore (-), gold_ore (-), granite_gold_ore (-), granite_iron_ore (-), iron_ore (-), meteorite (-), red_sandstone_iron_ore (-), tin_ore (-)
+- ground: copper_ore (-), gold_ore (-), granite_gold_ore (-), meteorite (-), tin_ore (-)
 - material: bronze_ingot (7.3), copper_ingot (1.7), gold_block (29), gold_ingot (3.2), meteoric_iron (10), raw_copper (1.5), raw_gold (3.0), raw_tin (5.0), tin_ingot (5.2)
 - armour: boots_scale (-), chestplate_scale (-), helmet_scale (-), leggings_scale (-)
 - station: crucible (2.2)
@@ -518,7 +518,7 @@ Notes:
 
 Notes:
 - base:copper_ore, base:tin_ore: breaks into raw copper or raw tin (a stone pickaxe): copper in cold, dry and beach land, tin on beaches and in mountains (`metals.rs`)
-- base:iron_ore, base:granite_iron_ore, base:red_sandstone_iron_ore, base:meteorite, base:gold_ore, base:granite_gold_ore: breaks into raw iron, meteoric iron or raw gold (a stone pickaxe)
+- base:meteorite, base:gold_ore, base:granite_gold_ore: breaks into meteoric iron or raw gold (a stone pickaxe)
 - base:pallasite: a stony-iron meteorite's olivine, found where one fell
 - base:helmet_scale, base:chestplate_scale, base:leggings_scale, base:boots_scale: a bronze or copper shell's worn look: no copper or bronze in the game yet (only `/gear`)
 - base:meteoric_iron: hammered cold, iron-grade before a player can smelt (Research round 17)
@@ -529,11 +529,11 @@ Notes:
 - animals:summit_stone: Borkon's loot, certain by the third kill: the Bronze Age key's boss part
 - animals:borkon_horn, animals:height_fleece: Borkon's part breaks and loot
 
-### Iron Age (58)
+### Iron Age (61)
 
-**tech** (22)
+**tech** (25)
 
-- ground: redstone_ore (-), star_steel_ore (-)
+- ground: granite_iron_ore (-), iron_ore (-), red_sandstone_iron_ore (-), redstone_ore (-), star_steel_ore (-)
 - material: bucket (3.5), gem_peridot (10), iron_block (11), iron_ingot (1.2), lava_bucket (4.1), raw_iron (1.0), star_steel_ingot (12), star_steel_lump (12), steel_ingot (2.3), water_bucket (3.7)
 - tool: grappling_hook (3.8)
 - armour: boots_mail (2.8), chestplate_mail (4.0), helmet_mail (2.8), leggings_mail (4.0), shield (1.7)
@@ -561,6 +561,7 @@ Notes:
 - base:woodcutter: upstream's woodcutter: an iron blade on planks; cuts beams and eighths
 - base:music_player: upstream's music player: planks round an iron works
 - base:potion_*, base:glass_bottle: upstream's potions and their bottle: no brewing yet, only creative or commands
+- base:iron_ore, base:granite_iron_ore, base:red_sandstone_iron_ore: breaks into raw iron (a bronze pickaxe: `vitals::gear::IRON_ORE_HARVEST`, Ronald 11-23)
 - base:redstone_ore, base:star_steel_ore: breaks into its ore (an iron pickaxe)
 - base:helmet_mail, base:chestplate_mail, base:leggings_mail, base:boots_mail: the same armour with an iron or steel shell, an item of its own only for its worn look (`parts::ARMOUR_LOOKS`)
 - base:star_lantern: a starheart in iron
