@@ -147,7 +147,7 @@ pub static LOOK_MIST_CLOCK: Config<f32> = Config::named("look_mist_clock");
 /// keeps its own setting, so one can still be moved after.
 pub static LOOK_BLISS: Config<bool> = Config::named("look_bliss");
 /// Each knob, its value in the Bliss match, and as made.
-pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 18] = [
+pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 20] = [
     // The shade: no glare lift, less fill, the sky light occluded as Bliss's (lsN_ao3).
     (&LOOK_GLARE, 0.0, 1.0),
     (&LOOK_FILL, 0.7, 1.0),
@@ -175,9 +175,12 @@ pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 18] = [
     // 82 84 107, ours as made cream 186 159 130), 18:30 near land 37 38 73 (Bliss 35 37 70);
     // 08:00 the same, 19:00 outside the golden hours (lsAR_glow2).
     (&LOOK_GLOW_FILL, 0.0, 1.0),
-    // The low sun a near-white disc with a wide glow (lv5, 11-24). The mist's banks
-    // (look_mist_domes) join once 18:00 and 19:00 with them on are checked (Planner, 11-24).
+    // The low sun a near-white disc with a wide glow (lv5, 11-24).
     (&LOOK_SUN_DISC, 1.0, 0.0),
+    // The dawn mist as banks over the land, and their dawn tint (lv8-lv16, 11-24; 18:00 with them on
+    // as before from lv14). They show where the air has mist: a dry dawn has none.
+    (&LOOK_MIST_DOMES, 1.0, 0.0),
+    (&LOOK_MIST_DAWN_TINT, 1.0, 0.0),
 ];
 
 /// Switches the Bliss match on (every knob to its fitted value) or off (every knob as made).
