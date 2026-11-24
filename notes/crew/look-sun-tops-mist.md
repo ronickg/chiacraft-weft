@@ -64,18 +64,22 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
 - lv10 m against Bliss (`lv10/luma_spread_m.txt`): saturation 06 vista 0.47 (Bliss 0.48), 06 low
   0.54 (0.51), 07 vista 0.32 (0.34), 07 low 0.36 (0.45); tones as before; 18:00 unchanged.
 
-### The ring round the low sun (open)
+### The ring round the low sun (lv11: gone)
 
-- Not the tone curve: a hue-keeping curve and a hue-keeping clip changed the band by 1-2 levels.
-  Not the rainbow (needs rain), not the sun quad (ends about 10° out), not the banks (there with
-  them off).
-- It is the hue path out from the sun: ours goes cream-white (red less green 20, green less blue
-  28), then yellow (19, 63) at 15-25°, then the dawn sky's pink-orange (46, 47); the yellow next to
-  pink reads green, and the bloom spreads the cream core wider. Bliss stays yellow-gold right in to
-  the sun (24, 67) and grades out to tan, with no pink near the sun.
-- Making the wide glow gold made it worse (a white-yellow-orange-pink rainbow). Next to try: the
-  dawn sky near the sun (the `toward` term and the horizon's pink) taking the glow's hue, so the
-  path is gold to tan, as Bliss's.
+- Its cause: post's sky saturation boost (`hdr_light`, up to 2.3x) grows with height, none at the
+  horizon, full by about 17° up. A low sun's warm glow stayed pale level with the sun and went
+  saturated just above it: a yellow-orange arc over the sun, read against the pink as green.
+  With `look_sun_disc` and a low sun, no boost within about 25° of the sun.
+- Also with `look_sun_disc` on a low morning sun: the sky's wide round sun glow a third as strong
+  (near white, through the curve's top it stood as a flat cream disc about 20° across), its light
+  along the horizon instead (`SUN_BAND`); the sky within about 18-45° of the sun in a pale gold at
+  its own brightness (`SUN_GOLD`).
+- Not it, tested live: the tone curve (hue-keeping curve and clip moved the band 1-2 levels), the
+  rainbow, the sun quad, the banks, the mist and the land haze.
+- lv11 d against Bliss (`lv11/luma_spread_d.txt`): 06 vista sat 0.50 (Bliss 0.48), 06 low 0.51
+  (0.47), 07 low 0.32 (0.40); tones as before; 18:00 and noon unchanged.
+- Low-view darks still p5 109 against Bliss's 69: `look_bank_shade` 0.25 moved them 1 level, so
+  not the banks' sky light; the banks' sunlight and the bloomy fog near the eye are next to check.
 
 ## Open
 

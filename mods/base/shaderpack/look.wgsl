@@ -265,6 +265,15 @@ const MIST_SEA_TAIL: vec2<f32> = vec2(0.76, 1.19);
 // dawn sun's orange and read as sand, and from inside the mist the uncapped peak blew the sky
 // round the sun out to a yellow ball: lv8).
 const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.8, 1.2);
+// With Bliss's sun on a low morning sun (`sky_color`): the sky toward it in the glow's gold, full
+// within the first cosine, gone by the second (about 14° and 32°), in this gold; and the glow along
+// the horizon round it: how tightly round the sun across (a power of the cosine), how fast it fades
+// above and below the horizon (per unit of dir.y), how bright.
+const SUN_GOLD: vec2<f32> = vec2(0.7, 0.95);
+const SUN_GOLD_TINT: vec3<f32> = vec3(1.0, 0.88, 0.74);
+const SUN_BAND: vec3<f32> = vec3(6.0, 9.0, 1.0);
+// How much of the sky's wide round sun glow (`OPT_SUN_GLOW`) goes with Bliss's sun low in the morning.
+const SUN_BAND_ROUND: f32 = 0.67;
 // Its light from the sky, brighter looking up through it (how much, how sharply), and its share (Bliss's
 // shaded hollows are a dark blue-grey; at the full sky's light ours read as pale frost: lv8).
 const MIST_SEA_SKY: vec3<f32> = vec3(5.0, 4.0, 0.45);
@@ -1004,6 +1013,25 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         c = mix(c, mix(deep * (base / luma(deep)), pink * (base * 1.3 / luma(pink)), line), dawn);
     }
     let glow_up = 1.0 - dawn;
+    // With Bliss's sun (`OPT_SUN_DISC`), on a low morning sun: the sky within about 30° of it
+    // takes the glow's gold at its own brightness (no pink there), and a broad gold-white glow lies
+    // along the horizon round it, which the haze over the land toward the sun reads and carries
+    // down into the mist. Ours went cream-white by the sun, yellow at 15-25° and the dawn's pink
+    // beyond, the yellow beside the pink reading as a green ring (lv10); Bliss's stays yellow-gold
+    // in to the sun (255 231 164), grades out to tan, and its low sun stands in a wide glow on the
+    // horizon.
+    let bliss_sun = clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0) * glow_up * (1.0 - rain_amount())
+        * smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.25, 0.45, scene.sun.y))
+        * smoothstep(-0.03, 0.02, scene.sun.y);
+    if bliss_sun > 0.0 && scene.frame.x > 0.5 {
+        let near_sun = smoothstep(SUN_GOLD.x, SUN_GOLD.y, mu);
+        c = mix(c, SUN_GOLD_TINT * (luma(c) / luma(SUN_GOLD_TINT)), near_sun * bliss_sun);
+        let flat = normalize(vec3(dir.x, 0.0, dir.z) + vec3(1e-5));
+        let sun_flat = normalize(vec3(scene.sun.x, 0.0, scene.sun.z) + vec3(1e-5));
+        let along = pow(max(dot(flat, sun_flat), 0.0), SUN_BAND.x);
+        let band = exp(-abs(dir.y - 0.01) * SUN_BAND.y);
+        c += vec3(1.0, 0.88, 0.66) * luma(p.sun) * light_strength() * along * band * SUN_BAND.z * bliss_sun;
+    }
     c += sun_glow(dir, p) * glow_up;
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
     // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
@@ -1031,7 +1059,12 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             // 113 -> 126 red, lsW_air2), full under about 27° up (sun.y 0.45), where 08:00 stands.
             let not_high = 1.0 - smoothstep(0.45, 0.8, scene.sun.y);
             let wide = (pow(m, 3.0) * 0.7 + pow(m, 12.0) * 0.3) * not_high * (1.0 - rain_amount());
-            c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.5 * wide_k * glow_up;
+            // With Bliss's sun on a low morning sun (`bliss_sun` above) a third of it: near white
+            // and round, through the curve's top it stood as a flat cream disc some 20° across round
+            // the sun, its edge a yellow ring against the sky (lv11, with the mist, haze and banks
+            // off still there; gone with this glow off). That light lies along the horizon instead.
+            let round = 1.0 - SUN_BAND_ROUND * bliss_sun;
+            c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.5 * wide_k * glow_up * round;
         }
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new

@@ -414,7 +414,15 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         // the band between the clouds' far end and the land went deep blue, and the clouds' cut
         // edge along the far land's outline showed (mc_forest noon, gr5).
         let wv = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 1.0, 1.0);
-        let up = smoothstep(0.03, 0.3, normalize(wv.xyz / wv.w).y);
+        let view_dir = normalize(wv.xyz / wv.w);
+        // With Bliss's sun (`OPT_SUN_DISC`) none of it toward the sun (gone within about 25°): a
+        // low sun's glow, warm, pale on the horizon where this is off and boosted just above it,
+        // stood as a saturated yellow-orange arc over the sun at 06:00 (lv11; with the mist, haze
+        // and banks off still there).
+        // Only with the sun low (gone by about 25° up): at noon it left the sky round the sun grey.
+        let toward_sun = smoothstep(0.6, 0.9, dot(view_dir, normalize(scene.sun.xyz))) * clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0)
+            * (1.0 - smoothstep(0.25, 0.45, scene.sun.y));
+        let up = smoothstep(0.03, 0.3, view_dir.y) * (1.0 - toward_sun);
         // Most in the morning, less at noon: with the clouds counted as sky the noon blue between
         // them went to saturation 75 against Bliss's 48 and the clouds' shaded bellies steel blue,
         // while 08:00's stayed 35 against 45 (skf).
