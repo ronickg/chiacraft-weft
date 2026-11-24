@@ -252,6 +252,16 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         });
     let Some((t, kg)) = prey else {
         w.component_mut(id, &HUNT).map(|c| *c = h);
+        // Thirsty, it goes to water before it looks further for prey (`drink::drink` after this
+        // goal): a starving, thirsty wolf went between a kill site and water it couldn't reach
+        // each look, stood 64 s and died of thirst (ai1124_wolvesDays1b).
+        if w.component(id, &ANIMAL)
+            .is_some_and(|a| 1.0 - a.thirst < animals_core::needs::THIRSTY)
+        {
+            w.component_mut(id, &PROWL).map(|p| *p = 0);
+            w.component_mut(id, &FOLLOW).map(|f| f[0] = 0);
+            return false;
+        }
         // No prey in sight: it goes where kills were (`memory::haunt`), where prey come and die.
         // A site it has just been to and found nothing at it leaves for `needs::SITE_AGAIN_SECS`
         // (a wolf went between one and a prowl's leg 12 times in 150 s, ai1124_wolves1c).
@@ -273,6 +283,10 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
             // turn back each time, so two wolves lay 80 s "going" to one (ai1124_wolves1b).
             weft_sdk::info!("{} {id} goes to a kill site at {:.0} {:.0}", s.name, site[0], site[2]);
             w.navigate(id, site, 1.0);
+            // Checked once it sets off: the walk keeps the turn as a prowl's leg does, and one it
+            // can't reach isn't set off for again at every look (465 times in 60 s, wolvesDays1b).
+            w.component_mut(id, &SITE)
+                .map(|c| *c = [site[0], site[2], (now + (animals_core::needs::SITE_AGAIN_SECS * 20.0) as u64) as f64]);
             w.component_mut(id, &PROWL)
                 .map(|p| *p = now + (animals_core::needs::PROWL_SECS * 20.0) as u64);
             return true;
