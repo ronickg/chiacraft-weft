@@ -111,6 +111,23 @@ fn fs_low(in: VOut) -> @location(0) vec4<f32> {
     return post_low(pass_.slot, px);
 }
 
+// The mist banks (`bank_march`, `OPT_MIST_DOMES`) over the world's image, before temporal
+// anti-aliasing (the engine's pass before TAA, run while `core:ground_map` is on): marched once per
+// pixel to the depth there (the nearest surface, water's too; the sky to the march's far end). In
+// the world's and the sky's shaders each fragment drawn marched them, overdraw and what is seen
+// through included: about 3 ms at the 06:00 vista on the PC (lst_knobs, 11-24). Jittered per pixel
+// as before, so TAA still blends the steps.
+@fragment
+fn fs_pre_taa(in: VOut) -> @location(0) vec4<f32> {
+    let pass_ = passes[in.pass_index];
+    let px = vec2<i32>(in.clip.xy);
+    let color = textureLoad(textures[pass_.scene], px, 0);
+    if scene.frame.x < 0.5 || in_liquid() || !open_sky() {
+        return color;
+    }
+    return vec4(bank_march(color.rgb, view_rel(in.uv, pass_)), color.a);
+}
+
 // A copy of the world before what is seen through is drawn (`Post::copy_behind`): its color and
 // depth, for packs whose water bends and tints what lies under it (`scene.behind`).
 struct BehindOut {
