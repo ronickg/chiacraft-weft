@@ -25,26 +25,29 @@ impl Screen for FinderScreen {
         frame(ui, cx, "finder.title", |ui| {
             // On a panel, as the other Multiplayer screens: dim text straight on the title's
             // picture couldn't be read (the UI audit, 11-04).
-            let (key, args) = f.phase.clone();
-            if !key.is_empty() || f.left_out > 0 {
-                ui.panel("panel", Style::default().pad(6.0).gap(2.0).w(400.0), |ui| {
-                    if !key.is_empty() {
-                        label(ui, cx, &key, &args.into_iter().map(Arg::Text).collect::<Vec<_>>(), "dim");
-                    }
-                    if f.left_out > 0 {
-                        label(ui, cx, "finder.left_out", &[Arg::Int(f.left_out as i64)], "dim");
-                    }
-                    // Honest about the wait: a listing shows once the chain has it.
-                    label(ui, cx, "finder.new_listings", &[], "dim");
-                });
-            }
-            // This game's own listings still on their way to the chain.
-            for name in &f.pending {
-                ui.panel("panel", Style::default().pad(6.0).gap(2.0).w(400.0), |ui| {
-                    label(ui, cx, "finder.name", &[Arg::Text(name.clone())], "default");
-                    label(ui, cx, "finder.pending", &[], "dim");
-                });
-            }
+            // In a column as wide as the list below, so every panel lines up on its left edge.
+            ui.container(Style::default().gap(6.0).w(420.0), |ui| {
+                let (key, args) = f.phase.clone();
+                if !key.is_empty() || f.left_out > 0 {
+                    ui.panel("panel", Style::default().pad(6.0).gap(2.0).w(400.0), |ui| {
+                        if !key.is_empty() {
+                            label(ui, cx, &key, &args.into_iter().map(Arg::Text).collect::<Vec<_>>(), "dim");
+                        }
+                        if f.left_out > 0 {
+                            label(ui, cx, "finder.left_out", &[Arg::Int(f.left_out as i64)], "dim");
+                        }
+                        // Honest about the wait: a listing shows once the chain has it.
+                        label(ui, cx, "finder.new_listings", &[], "dim");
+                    });
+                }
+                // This game's own listings still on their way to the chain.
+                for name in &f.pending {
+                    ui.panel("panel", Style::default().pad(6.0).gap(2.0).w(400.0), |ui| {
+                        label(ui, cx, "finder.name", &[Arg::Text(name.clone())], "default");
+                        label(ui, cx, "finder.pending", &[], "dim");
+                    });
+                }
+            });
             let mut worlds = f.worlds.clone();
             // Online first, then the longest listed.
             worlds.sort_by_key(|w| (w.status.is_none(), std::cmp::Reverse(w.days())));

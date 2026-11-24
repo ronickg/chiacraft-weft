@@ -257,22 +257,24 @@ impl Screen for Friends {
         ask_all(cx.settings);
         let friends = list();
         frame(ui, cx, "friends.title", |ui| {
+            // Panels 400 wide: a scrolled column doesn't stretch them, and the 20 beside them are
+            // its scrollbar's (as Find Worlds).
             let body = ui.container(
                 Style::default()
                     .gap(10.0)
-                    .w(400.0)
+                    .w(420.0)
                     .h(0.0)
                     .grow()
                     .min_h(60.0)
                     .scroll(),
                 |ui| {
                     if friends.is_empty() {
-                        ui.panel("panel", Style::default().pad(8.0).stretch(), |ui| {
+                        ui.panel("panel", Style::default().pad(8.0).w(400.0), |ui| {
                             label(ui, cx, "friends.none", &[], "dim");
                         });
                     }
                     for (i, f) in friends.iter().enumerate() {
-                        ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch(), |ui| {
+                        ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(400.0), |ui| {
                             ui.container(Style::row().gap(6.0).stretch(), |ui| {
                                 label(
                                     ui,
