@@ -117,7 +117,7 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], wings: &'static
                             .with(Need::Wander, ai::wander(wings.wander, 8.0)),
                     ),
             )
-            .on_hurt(|w, h| crate::taming::hurt(w, h.entity, h.source));
+            .on_hurt(|w, h| crate::taming::hurt(w, h.entity, h.source, h.cause));
     }
 }
 

@@ -245,6 +245,7 @@ command.base.rain.dry = сегодня здесь без дождя; здесь 
 command.base.waterholes.dry = водоёмы мелеют везде, {0}x
 command.base.waterholes.wet = водоёмы наполняются везде, {0}x
 command.base.waterholes.real = водоёмы по климату
+command.base.waterholes.watch = водоёмы по климату, их обходы в журнале
 command.base.air.now = воздух здесь {4} °C, туман {0}%, ветер {1} м/с дует на {2}°; туман здесь в {3}% дней этого сезона
 command.base.air.set = туман {0}% и ветер {1} м/с везде на десять минут
 season.base.spring = весна

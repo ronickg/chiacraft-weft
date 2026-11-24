@@ -61,54 +61,54 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 
 Health and damage (one hit, engine points) come from each species' size, role, mass and tweaks on the curve (`danger`, `PROGRESSION_SHEET.md`); speed is each kind's own (1 = 100%).
 
-| Species | health | stamina | food | damage | speed | weight | oxygen | torpor | fortitude | hunger (s a point) |
-|---|---|---|---|---|---|---|---|---|---|---|
-| dog (chihuahua) | 4.3 | 100 | 80 | 2.3 | 1 | 40 | 100 | 60 | 10 | 30 |
-| cat | 5.2 | 80 | 60 | 2.8 | 1 | 30 | 80 | 40 | 10 | 40 |
-| capybara | 19 | 150 | 200 | 2.5 | 1 | 150 | 400 | 150 | 20 | 25 |
-| raptor | 21 | 150 | 150 | 6 | 1 | 140 | 150 | 200 | 15 | 20 |
-| utahraptor | 103 | 300 | 400 | 9.7 | 1 | 400 | 200 | 700 | 30 | 12 |
-| osmolskae | 21 | 150 | 150 | 6 | 1 | 140 | 150 | 200 | 15 | 20 |
-| wyvern | 456 | 800 | 2000 | 15 | 1 | 1200 | 400 | 3000 | 80 | 5 |
-| hare | 3.8 | 120 | 40 | 1.1 | 1 | 15 | 60 | 20 | 5 | 30 |
-| mountain_hare | 3.5 | 120 | 40 | 1.0 | 1 | 13 | 60 | 20 | 5 | 30 |
-| wood_mouse | 0.8 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
-| field_vole | 0.8 | 60 | 15 | 0.2 | 1 | 3 | 30 | 5 | 2 | 30 |
-| white_tailed_deer | 19 | 200 | 120 | 2.5 | 1 | 70 | 80 | 60 | 15 | 15 |
-| red_deer | 94 | 250 | 180 | 4.0 | 1 | 120 | 80 | 90 | 20 | 15 |
-| brown_trout | 1.9 | 60 | 20 | 0.6 | 1 | 5 | 400 | 10 | 3 | 30 |
-| pacu | 3.9 | 80 | 40 | 1.1 | 1 | 20 | 400 | 15 | 4 | 25 |
-| red_fox | 5.6 | 120 | 60 | 3.0 | 1 | 30 | 80 | 40 | 10 | 30 |
-| arctic_fox | 4.8 | 120 | 60 | 2.6 | 1 | 22 | 80 | 35 | 12 | 30 |
-| raven | 2.6 | 120 | 40 | 0.8 | 1 | 10 | 60 | 20 | 5 | 30 |
-| protoceratops | 27 | 200 | 120 | 4 | 1 | 90 | 80 | 70 | 18 | 15 |
-| kryptobaatar | 0.8 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
-| priscagama | 0.8 | 60 | 12 | 0.2 | 1 | 2 | 40 | 5 | 2 | 40 |
-| reindeer | 27 | 260 | 160 | 4 | 1 | 110 | 80 | 80 | 25 | 15 |
-| coyote | 24 | 150 | 80 | 6 | 1 | 45 | 80 | 60 | 12 | 30 |
-| house_sparrow | 0.8 | 60 | 15 | 0.2 | 1 | 1 | 40 | 5 | 2 | 20 |
-| snow_bunting | 0.8 | 60 | 15 | 0.2 | 1 | 1.2 | 40 | 5 | 3 | 20 |
-| great_horned_owl | 3.5 | 100 | 40 | 1.9 | 1 | 14 | 60 | 20 | 6 | 30 |
-| snowy_owl | 4.0 | 110 | 45 | 2.2 | 1 | 20 | 60 | 24 | 8 | 30 |
-| golden_eagle | 5.2 | 150 | 60 | 2.8 | 1 | 30 | 60 | 40 | 10 | 30 |
-| savanna_hawk | 3.0 | 110 | 40 | 1.6 | 1 | 10 | 60 | 20 | 6 | 30 |
-| turkey_vulture | 2.7 | 140 | 50 | 0.8 | 1 | 14 | 60 | 24 | 10 | 40 |
-| herring_gull | 2.5 | 130 | 40 | 0.7 | 1 | 10 | 70 | 20 | 8 | 30 |
-| yacare_caiman | 24 | 160 | 120 | 6 | 1 | 80 | 300 | 60 | 30 | 60 |
-| spectacled_caiman | 24 | 150 | 100 | 6 | 1 | 60 | 300 | 50 | 26 | 60 |
-| grey_wolf | 24 | 220 | 120 | 6 | 1 | 60 | 80 | 90 | 20 | 40 |
-| jaguar | 35 | 260 | 200 | 6.5 | 1 | 120 | 160 | 300 | 25 | 20 |
-| lungfish | 3.5 | 90 | 40 | 1.0 | 1 | 12 | 600 | 20 | 6 | 30 |
-| lycoptera | 0.8 | 40 | 8 | 0.2 | 1 | 1 | 300 | 4 | 1 | 30 |
-| psittacosaurus | 27 | 160 | 80 | 4 | 1.1 | 45 | 70 | 45 | 14 | 15 |
-| gastonia | 135 | 300 | 400 | 5.7 | 0.8 | 600 | 200 | 400 | 60 | 12 |
-| pinacosaurus | 135 | 300 | 400 | 5.7 | 0.8 | 600 | 200 | 400 | 60 | 12 |
-| iguanodont | 351 | 400 | 600 | 9.2 | 1 | 800 | 250 | 500 | 50 | 12 |
-| crocodyliform | 122 | 180 | 160 | 9.7 | 1 | 120 | 400 | 90 | 40 | 60 |
-| citipati | 27 | 220 | 120 | 4 | 1.2 | 80 | 90 | 80 | 20 | 15 |
-| confuciusornis | 1.9 | 120 | 30 | 0.6 | 1 | 6 | 60 | 15 | 6 | 30 |
-| gobipteryx | 1.6 | 120 | 30 | 0.5 | 1 | 6 | 60 | 15 | 6 | 30 |
-| cedarosaurus | 351 | 600 | 1200 | 11 | 0.8 | 2000 | 400 | 1200 | 80 | 10 |
+| Species | health | stamina | food | damage | speed | weight | oxygen | torpor | fortitude | hunger (s a point) | fasts (game days) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| dog (chihuahua) | 4.3 | 100 | 80 | 2.3 | 1 | 40 | 100 | 60 | 10 | 30 | 1.4 |
+| cat | 5.2 | 80 | 60 | 2.8 | 1 | 30 | 80 | 40 | 10 | 40 | 1.8 |
+| capybara | 19 | 150 | 200 | 2.5 | 1 | 150 | 400 | 150 | 20 | 25 | 5.2 |
+| raptor | 21 | 150 | 150 | 6 | 1 | 140 | 150 | 200 | 15 | 20 | 3 |
+| utahraptor | 103 | 300 | 400 | 9.7 | 1 | 400 | 200 | 700 | 30 | 12 | 11.4 |
+| osmolskae | 21 | 150 | 150 | 6 | 1 | 140 | 150 | 200 | 15 | 20 | 3 |
+| wyvern | 456 | 800 | 2000 | 15 | 1 | 1200 | 400 | 3000 | 80 | 5 | 14 |
+| hare | 3.8 | 120 | 40 | 1.1 | 1 | 15 | 60 | 20 | 5 | 30 | 1.7 |
+| mountain_hare | 3.5 | 120 | 40 | 1.0 | 1 | 13 | 60 | 20 | 5 | 30 | 1.5 |
+| wood_mouse | 0.8 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 | 1 |
+| field_vole | 0.8 | 60 | 15 | 0.2 | 1 | 3 | 30 | 5 | 2 | 30 | 1 |
+| white_tailed_deer | 19 | 200 | 120 | 2.5 | 1 | 70 | 80 | 60 | 15 | 15 | 6 |
+| red_deer | 94 | 250 | 180 | 4.0 | 1 | 120 | 80 | 90 | 20 | 15 | 8.6 |
+| brown_trout | 1.9 | 60 | 20 | 0.6 | 1 | 5 | 400 | 10 | 3 | 30 | 3.4 |
+| pacu | 3.9 | 80 | 40 | 1.1 | 1 | 20 | 400 | 15 | 4 | 25 | 8.5 |
+| red_fox | 5.6 | 120 | 60 | 3.0 | 1 | 30 | 80 | 40 | 10 | 30 | 2 |
+| arctic_fox | 4.8 | 120 | 60 | 2.6 | 1 | 22 | 80 | 35 | 12 | 30 | 1.6 |
+| raven | 2.6 | 120 | 40 | 0.8 | 1 | 10 | 60 | 20 | 5 | 30 | 1 |
+| protoceratops | 27 | 200 | 120 | 4 | 1 | 90 | 80 | 70 | 18 | 15 | 6.5 |
+| kryptobaatar | 0.8 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 | 1 |
+| priscagama | 0.8 | 60 | 12 | 0.2 | 1 | 2 | 40 | 5 | 2 | 40 | 1 |
+| reindeer | 27 | 260 | 160 | 4 | 1 | 110 | 80 | 80 | 25 | 15 | 7.6 |
+| coyote | 24 | 150 | 80 | 6 | 1 | 45 | 80 | 60 | 12 | 30 | 2.9 |
+| house_sparrow | 0.8 | 60 | 15 | 0.2 | 1 | 1 | 40 | 5 | 2 | 20 | 1 |
+| snow_bunting | 0.8 | 60 | 15 | 0.2 | 1 | 1.2 | 40 | 5 | 3 | 20 | 1 |
+| great_horned_owl | 3.5 | 100 | 40 | 1.9 | 1 | 14 | 60 | 20 | 6 | 30 | 1.1 |
+| snowy_owl | 4.0 | 110 | 45 | 2.2 | 1 | 20 | 60 | 24 | 8 | 30 | 1.3 |
+| golden_eagle | 5.2 | 150 | 60 | 2.8 | 1 | 30 | 60 | 40 | 10 | 30 | 1.8 |
+| savanna_hawk | 3.0 | 110 | 40 | 1.6 | 1 | 10 | 60 | 20 | 6 | 30 | 1 |
+| turkey_vulture | 2.7 | 140 | 50 | 0.8 | 1 | 14 | 60 | 24 | 10 | 40 | 1.1 |
+| herring_gull | 2.5 | 130 | 40 | 0.7 | 1 | 10 | 70 | 20 | 8 | 30 | 1 |
+| yacare_caiman | 24 | 160 | 120 | 6 | 1 | 80 | 300 | 60 | 30 | 60 | 14 |
+| spectacled_caiman | 24 | 150 | 100 | 6 | 1 | 60 | 300 | 50 | 26 | 60 | 14 |
+| grey_wolf | 24 | 220 | 120 | 6 | 1 | 60 | 80 | 90 | 20 | 40 | 4.8 |
+| jaguar | 35 | 260 | 200 | 6.5 | 1 | 120 | 160 | 300 | 25 | 20 | 6.5 |
+| lungfish | 3.5 | 90 | 40 | 1.0 | 1 | 12 | 600 | 20 | 6 | 30 | 7.5 |
+| lycoptera | 0.8 | 40 | 8 | 0.2 | 1 | 1 | 300 | 4 | 1 | 30 | 1 |
+| psittacosaurus | 27 | 160 | 80 | 4 | 1.1 | 45 | 70 | 45 | 14 | 15 | 3.8 |
+| gastonia | 135 | 300 | 400 | 5.7 | 0.8 | 600 | 200 | 400 | 60 | 12 | 14 |
+| pinacosaurus | 135 | 300 | 400 | 5.7 | 0.8 | 600 | 200 | 400 | 60 | 12 | 14 |
+| iguanodont | 351 | 400 | 600 | 9.2 | 1 | 800 | 250 | 500 | 50 | 12 | 14 |
+| crocodyliform | 122 | 180 | 160 | 9.7 | 1 | 120 | 400 | 90 | 40 | 60 | 14 |
+| citipati | 27 | 220 | 120 | 4 | 1.2 | 80 | 90 | 80 | 20 | 15 | 6.7 |
+| confuciusornis | 1.9 | 120 | 30 | 0.6 | 1 | 6 | 60 | 15 | 6 | 30 | 1 |
+| gobipteryx | 1.6 | 120 | 30 | 0.5 | 1 | 6 | 60 | 15 | 6 | 30 | 1 |
+| cedarosaurus | 351 | 600 | 1200 | 11 | 0.8 | 2000 | 400 | 1200 | 80 | 10 | 14 |
 
 ## The food web
 
@@ -3061,7 +3061,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 |---|---|
 | a meal that fills it | 10% of its mass: a kill, a mouthful off the ground, by mass |
 | a wild one arrives fed | 30% where its food grows least (or its prey are thinnest), all of it where most |
-| starving, a wild one dies in | 1200 s on an empty stomach |
+| starving, a wild one dies in | 6 · (mass / 70 kg)^0.44 game days on an empty stomach, x5 cold-blooded, 1 to 14 (the stats' "fasts"; Lindstedt & Boyce 1985) |
 | water needed a day | 0.099 · kg^0.9 L (a mammal's), x0.2 cold-blooded; a species drinks its share of it (`DRINKS`) |
 | a drink lasts | 15% of its mass spared, a real day of drinking 600 s of play |
 | thirsty | under 50% water, drinking 25% a gulp every 1.5 s until 95%; parched, a wild one dies in 1200 s |

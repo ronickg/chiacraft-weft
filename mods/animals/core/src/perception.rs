@@ -16,6 +16,13 @@ pub const HUNTER_FIELD: f32 = 200.0;
 /// Awareness at which it acts (runs), and at which it stops to stare.
 pub const NOTICED: f32 = 1.0;
 pub const STARE: f32 = 0.4;
+/// Game seconds it stares at a player it has half noticed before it goes on with what it was
+/// doing, still wary (it bolts at `NOTICED`); it stares again only once its awareness has fallen
+/// under `STARE` and risen past it again. A deer's look-up lasts seconds, then it feeds with its
+/// head coming up now and then. A player standing still is only smelled, which never reaches
+/// `NOTICED` alone (`senses`): a deer 2 blocks from one stood staring a whole game day until its
+/// thirst drove it on at 7 % water, too late (ai1124_graze7).
+pub const STARE_SECS: f32 = 20.0;
 /// Its awareness once it has run: alert, staring if it still senses the danger, bolting again
 /// only if it is noticed again (it ran from deer 30 blocks off while its awareness faded).
 pub const ALERT: f32 = 0.6;

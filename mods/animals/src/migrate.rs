@@ -145,7 +145,18 @@ pub fn lead(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {
         if !dry {
             return None;
         }
+        // Only toward ground near water its herd knows (`groups::WATER_RANGE`): a dry season's
+        // migration follows the water (ai1124_savanna3: led out past its last pool, a herd died
+        // parched).
+        let kind = w
+            .component(id, &crate::animal::ANIMAL)
+            .and_then(|a| a.species())
+            .map(|s| s.kind)?;
+        let pos = st.pos.to_array();
         let looks = groups::migrate_looks(x as f32, z as f32)
+            .filter(|&[px, pz]| {
+                crate::drink::herd_water_from(w, id, kind, pos, [px as f64, pz as f64]).is_some_and(|d| d <= groups::WATER_RANGE as f64)
+            })
             .filter_map(|[px, pz]| rain_at(w, px as f64, st.pos.y, pz as f64).map(|(r, _)| ([px, pz], r)));
         groups::wetter(here, looks).map(|to| (to, here))
     });

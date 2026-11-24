@@ -90,7 +90,7 @@ fn register(r: &mut Registry, kind: &'static EntityKind, index: usize, texture: 
                 ),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity, h.source);
+            crate::taming::hurt(w, h.entity, h.source, h.cause);
             crate::rest::stop(w, h.entity);
         });
 }

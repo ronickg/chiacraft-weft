@@ -115,14 +115,16 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
         _ => 0.0,
     };
     s[Need::Love as usize] = LOVE;
-    s[Need::Rest as usize] = REST + animals_core::routines::SLEEPY * (1.0 - active);
+    // A sleepy rest still gives way to thirst or hunger that drives it (`needs::rest_under`).
+    s[Need::Rest as usize] =
+        needs::rest_under(REST + animals_core::routines::SLEEPY * (1.0 - active), s[Need::Drink as usize].max(s[Need::Eat as usize]));
     s[Need::Wander as usize] = WANDER;
     s[Need::Watch as usize] = animals_core::roles::WATCH;
     s[Need::Investigate as usize] = animals_core::roles::INVESTIGATE;
     // A herd on the move, its leader and those whose leader is on it, goes on above a daytime rest
-    // (`groups::MIGRATE_PULL`).
+    // (`groups::MIGRATE_PULL`), but a thirsty one drinks first (`groups::migrate_pull`).
     if crate::migrate::migrating(w, id) || crate::group::leader_doing(w, id) == Some(Need::Migrate as u8) {
-        s[Need::Migrate as usize] = animals_core::groups::MIGRATE_PULL;
+        s[Need::Migrate as usize] = animals_core::groups::migrate_pull(s[Need::Drink as usize]);
     }
     // Staying put outranks what would move it, and nothing else.
     s[Need::Hold as usize] = s[Need::Comfort as usize]

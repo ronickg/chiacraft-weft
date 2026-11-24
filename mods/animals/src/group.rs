@@ -42,8 +42,12 @@ pub fn or_follow(speed: f32, wander: impl Goal) -> impl Goal {
             return false;
         }
         // A member keeps to its place; a herd's leader in the dry season leads it to wetter ground
-        // (`migrate`); else it wanders.
-        if let Some(acted) = follow(w, id, st, speed).or_else(|| crate::migrate::lead(w, id, st, speed)) {
+        // (`migrate`); one far from the water it knows turns back toward it (`drink::home`); else
+        // it wanders.
+        if let Some(acted) = follow(w, id, st, speed)
+            .or_else(|| crate::migrate::lead(w, id, st, speed))
+            .or_else(|| crate::drink::home(w, id, st, speed))
+        {
             return acted;
         }
         wander.run(w, id, st)

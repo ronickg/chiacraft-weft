@@ -95,6 +95,16 @@ fn bubble(item: &str) -> String {
     format!("want_{}", item.split_once(':').map_or(item, |(_, n)| n))
 }
 
+/// Whether thirst or hunger presses `id` past `memory::DRIVEN` (as it goes onto feared ground):
+/// then a half-noticed player doesn't stop it; one it has noticed still sends it off.
+fn driven(w: &World, id: u64) -> bool {
+    use animals_core::needs;
+    w.component(id, &crate::animal::ANIMAL).is_some_and(|a| {
+        let fed = a.food as f32 / a.stat(crate::species::FOOD).max(1.0);
+        needs::thirst_score(1.0 - a.thirst, false).max(needs::hunger_score(fed, false)) >= animals_core::memory::DRIVEN
+    })
+}
+
 /// A goal for wild animals of species `index`, after `animal::upkeep`: running off when
 /// scared, standing still while asking for food, asking when a player is near and calm. One that
 /// is never tamed (`Taming::Wild`: a hare) only runs off.
@@ -138,7 +148,14 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                     crate::senses::ran(w, id, true);
                     return true;
                 }
-                if seen.fright >= animals_core::perception::STARE {
+                // Half aware it stops to stare, unless thirst or hunger drives it on (`driven`): a
+                // player standing still by the only pool froze the herd that came to drink there,
+                // and it drifted off and died parched (ai1124_graze3: deer at 5 % water staring 10
+                // blocks from the water).
+                // And it stares only a while (`perception::STARE_SECS`, `senses::staring`): a
+                // player standing still is only smelled, which never makes it bolt, and a deer
+                // stood staring at one a whole game day (ai1124_graze7).
+                if seen.fright >= animals_core::perception::STARE && !driven(w, id) && crate::senses::staring(w, id) {
                     crate::senses::stare(w, id, st, seen.player_pos);
                     return true;
                 }
@@ -294,10 +311,15 @@ fn flee(w: &World, id: u64, st: &EntityState) {
     w.navigate(id, to, 1.6);
 }
 
-/// It was hurt by `source` (0: nothing, a fall, the cold): a taming under way loses effectiveness,
+/// It was hurt by `source` (0: nothing, a fall, a fire), not by its own body (`comfort::bodily`):
+/// a taming under way loses effectiveness,
 /// and it runs off, from what hurt it (a deer a wolf bit runs from the wolf, not from the player
 /// who happens to be nearest).
-pub fn hurt(w: &World, id: u64, source: u64) {
+pub fn hurt(w: &World, id: u64, source: u64, cause: u32) {
+    // Its own body's hurts (`comfort::bodily`: starving, thirst) send it nowhere.
+    if crate::comfort::bodily(cause) {
+        return;
+    }
     let passive = w
         .component(id, &ANIMAL)
         .and_then(|a| a.species())

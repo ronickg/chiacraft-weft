@@ -64,7 +64,7 @@ pub fn init(r: &mut Registry) {
                 ), // slow and calm
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity, h.source);
+            crate::taming::hurt(w, h.entity, h.source, h.cause);
             crate::rest::stop(w, h.entity);
         });
 }

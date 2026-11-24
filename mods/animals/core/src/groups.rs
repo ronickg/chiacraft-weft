@@ -74,6 +74,17 @@ pub const WATER_TREK: f32 = 96.0;
 // Further than it looks or goes back on its own (`drink.rs` LOOK 16, RECALL 32).
 const _: () = assert!(WATER_TREK > 32.0);
 
+/// A wild drinker keeps within this many blocks of the nearest water it knows (`drink::home`):
+/// wandering further, it turns back toward it; and a herd's leader leads it only to ground this
+/// near water its herd knows (`migrate.rs`). Grazers that drink stay within reach of water in
+/// the dry season (zebra and wildebeest within a day's walk of it, Redfern et al. 2003, *Ecology*
+/// 84; savanna elephants and buffalo the same) and the dry-season migrations follow the rivers;
+/// half the trek here, so a thirsty one is always within its trek of what it knows.
+/// Without it a winter savanna's deer grazed and wandered 130-145 blocks from the only pool and
+/// died parched (ai1124_graze2).
+pub const WATER_RANGE: f32 = 48.0;
+const _: () = assert!(2.0 * WATER_RANGE <= WATER_TREK && WATER_RANGE >= MIGRATE_RINGS[0]);
+
 /// The dry season's migration (slice 5; `notes/ECOLOGY.md`, "Later": herds move towards wetter
 /// ground in the dry season). A grazing herd's leader in its place's dry season
 /// (`vitals::climate::dry_season`) looks this often (ticks: a game minute) at the rain of the
@@ -97,6 +108,19 @@ pub const MIGRATE_GIVE_UP: u64 = 6000;
 /// leader walked off alone (24-block legs, no waiting) out of its members' 16 blocks.
 pub const MIGRATE_WAIT: f32 = 4.0;
 pub const MIGRATE_PULL: f32 = JOIN_PULL;
+/// A thirsty one leaves the march to drink (`migrate_pull`): a migration pulls this share of
+/// its thirst's score, under it even while marching (`needs::KEEP_AT`), so it goes to water near
+/// or treks back to water its herd remembers (`drink::trek`), and the leader waits for it. Pulling
+/// above thirst, a herd led out of the llanos' winter followed its leader past its last pool and
+/// died parched within two days (ai1124_savanna3: four of five deer).
+pub const MIGRATE_THIRST: f32 = 0.75;
+const _: () = assert!(MIGRATE_THIRST * crate::needs::KEEP_AT < 1.0);
+
+/// How hard a migration pulls one whose thirst scores `thirst` (`needs::thirst_score`; 0 not
+/// thirsty): `MIGRATE_PULL`, or under its thirst when it is thirsty.
+pub fn migrate_pull(thirst: f32) -> f32 {
+    if thirst > 0.0 { MIGRATE_PULL.min(thirst * MIGRATE_THIRST) } else { MIGRATE_PULL }
+}
 // A leg ends inside the distance its members count it within (`senses::KIN` 16, less the ring),
 // and it gets there before giving up (6000 ticks: five minutes; 96 blocks at a deer's walk with
 // its waits is two or three).
@@ -198,5 +222,16 @@ mod tests {
     fn the_lowest_leads() {
         assert_eq!(leader([9, 4, 7]), 4);
         assert_eq!(leader([]), 0);
+    }
+
+    /// A thirsty one leaves the march for water even while marching; one not thirsty marches.
+    #[test]
+    fn thirst_goes_before_the_march() {
+        use crate::needs::{KEEP_AT, THIRSTY, thirst_score};
+        assert_eq!(migrate_pull(thirst_score(0.9, false)), MIGRATE_PULL);
+        for water in [THIRSTY - 0.01, 0.3, 0.1, 0.0] {
+            let thirst = thirst_score(water, false);
+            assert!(migrate_pull(thirst) * KEEP_AT < thirst, "at {water} water the march pulls over thirst");
+        }
     }
 }

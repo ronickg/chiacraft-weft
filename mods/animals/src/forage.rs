@@ -392,6 +392,16 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     } else if now < f[3] {
         // Walking to it; or nothing near, wandering on.
         return target.is_some();
+    } else if target.is_some() && !w.navigating(id) {
+        // Its walk ended short of the food: it can't get there. It gives that patch up and lets
+        // its wander take it elsewhere, not walking at it again and again (graze5: a deer stood
+        // "eating" a game day at one spot while its food went from 55 % to 4 % and its thirst
+        // past saving).
+        weft_sdk::debug!("animal {id} can't reach the food at {target:?}: looks elsewhere");
+        w.component_mut(id, &PATCH).map(|k| *k = [0; 4]);
+        w.component_mut(id, &FORAGE)
+            .map(|c| *c = [f64::NAN, 0.0, 0.0, now + NOTHING]);
+        return false;
     }
     if let Some((t, p)) = ground_food(w, s, st.pos.to_array(), ITEM_LOOK) {
         w.navigate(id, p, 1.0);

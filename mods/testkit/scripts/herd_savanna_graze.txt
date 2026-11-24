@@ -1,0 +1,223 @@
+# Does a herd keep itself fed through a savanna's winter (its dry season) on its own? The
+# savanna's natural ground as worldgen made it, its tall grass and acacias untouched, but for a
+# 9 x 9 rim round a 5 x 5 pond (water, as `herd_savanna_winter`: the deer's only sure water near).
+# Five white-tailed deer, fed as they arrive (`animal::arrive`: 30 % plus the rest by how much
+# their food grows here this season) and never topped up. One whole winter (14 game days) at 30
+# times the game's pace (`/tick rate 600`: a game day in 40 s). Winter grass is poor fodder (a
+# tuft feeds 1 point, 40 % growth), grazed tufts grow back slowly in the dry season, and a deer
+# uses a point every 15 s (`SPECIES.md`: 120 food, 1.5 game days from full to empty), then
+# lives 6 game days on its reserves before it starves (`needs::fasts`, by mass), so a deer that
+# finds too little loses health slowly from about day 2-3 and dies from about day 7.
+# Seed 1's savanna at x 0 z 544, as herd_savanna_winter.
+# `/animalprof senses` each sample lists up to 8 animals within 48 blocks with their
+# "food N% water N% health N".
+# Not a pass/fail run: report, day by day (`/time query`), the deer's food and water from the
+# senses rows, how many are still within 48 blocks, deaths (day, cause, where), the
+# "holds graze" and "holds drink" lines a day, and the farthest any deer went from x 0 z 544.
+# A herd that lives the winter on the savanna's grass, some thin, is what the ecology wants
+# (`notes/ECOLOGY.md`, Capacity: "fewer and thinner" in the dry season); all dead within a few
+# days says the grass or the fasting is too thin (`notes/ANIMALS.md`, the savanna runs).
+# `/animalprof where` every 10 s (a quarter of a game day): every wild animal within 256 blocks,
+# where it is and what it is doing, so a deer that leaves the pond shows how and when.
+loaded
+idle
+# Creative, not spectator: the drying visits go round visible players, which leave spectators out.
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season winter 1
+chat /time set 6000
+chat /rain
+chat /time query
+chat /animalprof where
+chat /tk fill ~-4 ~ ~-10 ~4 ~6 ~-2 core:air
+chat /tk fill ~-4 ~-1 ~-10 ~4 ~-1 ~-2 base:grass
+chat /tk fill ~-2 ~-2 ~-8 ~2 ~-2 ~-4 base:dirt
+chat /tk fill ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+wait 3
+chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+chat /tk count ~-20 ~ ~-30 ~20 ~2 ~10 base:tall_grass
+look 0 -20
+wait 1
+shot herd_savanna_graze_1.png
+chat /tk ring animals:white_tailed_deer 5 10 14
+wait 2
+chat /animalprof senses
+chat /anim log
+chat /waterholes watch
+# The player stands back 32 blocks south (within the drying visits' 40, `air::SNOW_REACH`): beside
+# the pool he scared the drinkers off it (savanna6: 6 bolts and 18 alarms there, fright 0.80 on
+# every deer that came to drink). Back at the pool only for the noon shots. Counts by fixed
+# places from here (seed 1: the pool at x -2..2, y 69, z 536..540).
+chat /tp 0 90 572
+wait 3
+where
+chat /tick rate 600
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /time query
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -20 70 514 20 72 554 base:tall_grass
+chat /tick rate 20
+chat /time set 6000
+wait 3
+chat /tp 0 70 544
+wait 2
+look 0 -20
+wait 1
+shot herd_savanna_graze_2.png
+where
+chat /waterholes real
+quit
