@@ -331,9 +331,14 @@ pub async fn models(t: T) -> R {
     t.frames(3).await?;
     let a = t.grab().await?;
     t.op("action me wave").await?;
-    t.secs(0.5).await?;
-    let b = t.grab().await?;
-    t.check(T::differ(&a, &b) > 0.002, "the first person hand waves");
+    // The most it moved over two seconds: the wave starts a round trip after the op, and one grab
+    // half a second on missed it on a loaded PC (--jobs 2).
+    let (mut moved, end) = (0.0f64, crate::runner::script_clock() + Duration::from_secs(2));
+    while moved <= 0.002 && crate::runner::script_clock() < end {
+        t.secs(0.1).await?;
+        moved = moved.max(T::differ(&a, &t.grab().await?));
+    }
+    t.check(moved > 0.002, format!("the first person hand waves: {moved:.4}"));
     Ok(())
 }
 
