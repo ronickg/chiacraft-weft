@@ -108,6 +108,11 @@ Ronald found the title menu "cheap" and picked style 1 of six generated directio
 
 - The parts were generated with Codex from a close-up of the chosen screen (attach it first; the first round without it came out flat), on an exact grid of 5 image pixels a UI pixel, and cut exactly by `notes/ui/style1/style1.py`, which writes `button*`, `button_secondary*`, `button_quit*` (the secondary's look: no red Quit), `panel`, `news`, `slot`, `slot_highlight` and `divider`.
 - These parts replace kit 2's: don't re-run `kit2/install.py` over them. Kit 2 still draws the parts style 1 hasn't reached yet (tabs, wells, tooltips, the HUD).
+- **Chunkiness comes from rim pixels, never from bigger pixels.** The first style 1 cut asked for a 3 px button rim and a 10 px frame. Next to the mock it came out thin and flat: hairline rims, dot-sized caps, no visible bevel or chamfer. The tempting fix, scaling parts to 1.5 or 2 GUI per pixel, breaks the one pixel grid: a UI pixel is half a GUI pixel, the same as the font's and the 32 px items' pixels. Ronald: "we had intially got the ui drawing kidna well and cosntistnt whats the issue here?" (11-24); the consistency is what he liked. Treat the mock as a shape reference and draw its thickness with more pixels on our grid. Minimums, in UI px:
+  - title frame 18 px thick (9 GUI), bronze corner plates about 28 px;
+  - window frame 10 px (5 GUI), corner plates about 16 px (a thinner design drawn at the same pixel, never the big frame scaled down);
+  - button rim 7 px (outline, bronze band, bevel step, inner line) with 4 px 45° chamfered corners; buttons 40 px tall (20 GUI).
+- Before installing, lay the cut parts out the way the screen does and set them beside the mock at the same width; if they don't read as the same style, they aren't done.
 
 ### Yellow and gold only for state, never at rest (Ronald, 2026-11-04)
 

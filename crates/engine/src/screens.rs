@@ -461,7 +461,7 @@ impl Screen for Title {
         "core:title"
     }
 
-    /// The menu in a framed `panel` on the left, the logo at its top and the buttons right under
+    /// The menu in a framed `menu_panel` on the left, the logo at its top and the buttons right under
     /// it, centred down the window (chiacraft, 11-23: Ronald's style 1, not a bar to the bottom);
     /// the rest of the window for whatever packs and mods show there (`menu.news`, the `side` place).
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
@@ -473,7 +473,9 @@ impl Screen for Title {
                     .justify(Justify::Center)
                     .stretch(),
                 |ui| {
-                    ui.panel("panel", Style::default().w(188.0).pad(16.0).gap(4.0), |ui| {
+                    // The title's own heavier frame (`menu_panel`) when the look has one, else the windows' `panel`.
+                    let frame = if cx.look.texture("menu_panel", "").is_some() { "menu_panel" } else { "panel" };
+                    ui.panel(frame, Style::default().w(188.0).pad(16.0).gap(4.0), |ui| {
                         // The `logo` texture across the bar: whole multiples of its pixels while it fits.
                         if let Some(logo) = cx.look.texture("logo", "") {
                             let size = cx

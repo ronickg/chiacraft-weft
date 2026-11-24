@@ -1,0 +1,86 @@
+# Style 1, batch 1 (UI redo, 11-24): the menus. The pause screen and settings from a world, then the
+# title and its menus, each opened by name; the inventory and Select World for the shared parts.
+# Run once on dev (before) and once on the branch (after); contact sheets pair them by file name.
+loaded
+idle
+chat /tk mode survival
+chat /tk give base:iron_pickaxe 1
+chat /tk give base:apple 5
+chat /tk give base:oak_log 12
+wait 2
+key Escape
+wait 1.5
+shot b1_01_pause.png
+key Escape
+wait 1
+press core:inventory
+wait 1.5
+shot b1_02_inventory.png
+key Escape
+wait 1
+leave
+wait 2
+shot b1_10_title.png
+cursor 0.12 0.5
+wait 0.5
+shot b1_11_title_hover.png
+screen core:settings
+wait 1.5
+shot b1_20_settings.png
+cursor 0.5 0.5
+scroll -40
+wait 1
+shot b1_21_settings_end.png
+key Escape
+wait 1
+screen base:video
+wait 1.5
+shot b1_22_video.png
+key Escape
+wait 1
+screen base:video_extra
+wait 1.5
+shot b1_23_video_extra.png
+key Escape
+wait 1
+screen base:video_fantasy
+wait 1.5
+shot b1_24_video_fantasy.png
+key Escape
+wait 1
+screen base:video_dlss
+wait 1.5
+shot b1_25_video_dlss.png
+key Escape
+wait 1
+screen core:sound
+wait 1.5
+shot b1_26_sound.png
+key Escape
+wait 1
+screen core:language
+wait 1.5
+shot b1_27_language.png
+key Escape
+wait 1
+screen core:controls
+wait 1.5
+shot b1_28_controls.png
+key Escape
+wait 1
+screen core:mod_settings
+wait 1.5
+shot b1_29_mod_settings.png
+key Escape
+wait 1
+screen core:profile
+wait 1.5
+shot b1_30_profile.png
+key Escape
+wait 1
+screen core:worlds
+wait 1.5
+shot b1_31_worlds.png
+key Escape
+wait 1
+quit

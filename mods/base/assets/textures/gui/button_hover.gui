@@ -1,4 +1,4 @@
 scaling = nine_slice
-border = 2 4.5 2 4.5
-size = 32 11
+border = 4 4 4 4
+size = 48 20
 selected_offset = 0.5

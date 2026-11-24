@@ -1,3 +1,3 @@
 scaling = nine_slice
-border = 1.5
+border = 2.5 2.5 2.5 2.5
 size = 32 12

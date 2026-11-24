@@ -32,10 +32,14 @@ from PIL import Image
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, os.path.join(ROOT, "mods", "base", "source", "ui"))
 import sheet  # noqa: E402
+from pxkit import tone  # noqa: E402
 
 ARC = os.path.expanduser("~/Coding/chiacraft-archive/images/ui-redo/2026-11-23")
-BUTTONS = os.path.join(ARC, "parts", "buttons_try3_chosen.png")
-FRAMES = os.path.join(ARC, "parts", "frames_try3_chosen.png")
+BUTTONS = os.path.join(ARC, "parts", "grid_buttons_try1.png")
+FRAMES = os.path.join(ARC, "parts", "grid_frames_try1.png")
+TABS = os.path.join(ARC, "parts", "grid_tabs_try1.png")
+SMALL = os.path.join(ARC, "parts", "grid_small_try2.png")
+FRAMES_OLD = os.path.join(ARC, "parts", "frames_try3_chosen.png")  # the slots
 GUI = os.path.join(ROOT, "mods", "base", "assets", "textures", "gui")
 K = 5  # image pixels per UI pixel
 
@@ -57,14 +61,40 @@ def cut(path, box):
     return out
 
 
-def even(a, border):
+def grab(path, near, size, slack=60):
+    """A part of `size` pixels drawn near `near` (x, y): found by its outline (the non-background
+    box around `near`), then sampled at the pitch its drawn width gives (the sheets drift a little
+    off 5 image px a pixel)."""
+    a = np.array(Image.open(path).convert("RGBA"))
+    bg = sheet.background(a)
+    x0, y0 = max(near[0] - slack, 0), max(near[1] - slack, 0)
+    x1 = min(near[0] + size[0] * K + slack, a.shape[1])
+    y1 = min(near[1] + size[1] * K + slack, a.shape[0])
+    fg = ~bg[y0:y1, x0:x1]
+    ys, xs = np.nonzero(fg)
+    bx, by = x0 + xs.min(), y0 + ys.min()
+    pw, ph = (xs.max() + 1 - xs.min()) / size[0], (ys.max() + 1 - ys.min()) / size[1]
+    out = np.zeros((size[1], size[0], 4), np.uint8)
+    for j in range(size[1]):
+        for i in range(size[0]):
+            cy, cx = int(by + (j + 0.5) * ph), int(bx + (i + 0.5) * pw)
+            if bg[cy - 1:cy + 2, cx - 1:cx + 2].mean() > 0.5:
+                continue
+            cell = a[cy - 1:cy + 2, cx - 1:cx + 2, :3].reshape(-1, 3)
+            vals, counts = np.unique(cell, axis=0, return_counts=True)
+            out[j, i, :3] = vals[counts.argmax()]
+            out[j, i, 3] = 255
+    return out, (pw, ph)
+
+
+def even(a, border, rows=True):
     """The stretch zones made even: inside the border, every row is the middle row and every
     column the middle column (the corners and edges' ends stay as drawn)."""
     l, t, r, b = border
     h, w = a.shape[:2]
     a = a.copy()
     mid_y, mid_x = (t + h - b) // 2, (l + w - r) // 2
-    if t or b:  # no border across: that way doesn't stretch, keep it as drawn
+    if rows and (t or b):  # no border across: that way doesn't stretch, keep it as drawn
         a[t:h - b, :] = a[mid_y:mid_y + 1, :]
     if l or r:
         a[:, l:w - r] = a[:, mid_x:mid_x + 1]
@@ -82,15 +112,23 @@ def gui(scaling, border=None, size=None, extra=""):
 
 def build():
     parts = {}
-    # Buttons: 64 x 22, a 3-pixel rim, the face's bands in the top and bottom 9 rows (only the
-    # flat middle stretches when a button is taller).
-    cols = {"": 35, "_hover": 420, "_pressed": 805, "_disabled": 1190}
-    raw = {k: cut(BUTTONS, (x, 455, 320, 110)) for k, x in cols.items()}
+    pitches = {}
+
+    def take(sheet_, name, near, size, slack=60):
+        px, pitch = grab(sheet_, near, size, slack)
+        pitches[name] = pitch
+        return px
+
+    # Buttons: 96 x 40 (20 GUI, the buttons' own height), a 7-pixel rim with 4-pixel chamfers.
+    # Only the columns are made even: the faces' gradient bands run across, and a taller button
+    # stretches them (nearest) rather than repeating one row.
+    at = {"": (150, 200), "_hover": (850, 200), "_pressed": (150, 560), "_disabled": (850, 560)}
+    raw = {k: take(BUTTONS, "button" + k, xy, (96, 40)) for k, xy in at.items()}
     mask = raw[""][..., 3] > 0
-    bb = (4, 9, 4, 9)
+    bb = (8, 8, 8, 8)
     for k, a in raw.items():
         a[~mask] = 0
-        raw[k] = even(a, bb)
+        raw[k] = even(a, bb, rows=False)
     extra = "selected_offset = 0.5\n"
     for k, a in raw.items():
         parts["button_secondary" + k] = (a, gui("nine_slice", bb, a.shape[1::-1], extra))
@@ -101,30 +139,70 @@ def build():
     main[..., :3] = (main[..., :3].astype(float) * 0.88).astype(np.uint8)
     h, w = main.shape[:2]
     ring = np.zeros((h, w), bool)
-    ring[:3, :] = ring[-3:, :] = True
-    ring[:, :3] = ring[:, -3:] = True
+    ring[:7, :] = ring[-7:, :] = True
+    ring[:, :7] = ring[:, -7:] = True
     main[ring] = raw[""][ring]
     parts["button"] = (main, gui("nine_slice", bb, main.shape[1::-1], extra))
     for k in ("_hover", "_pressed", "_disabled"):
         parts["button" + k] = (raw[k], gui("nine_slice", bb, raw[k].shape[1::-1], extra))
-    # The panel: 64 x 64, corner caps 10 pixels, its inside a little see-through.
-    panel = even(cut(FRAMES, (100, 100, 320, 320)), (10, 10, 10, 10))
-    inside = np.zeros(panel.shape[:2], bool)
-    inside[9:-9, 9:-9] = True
-    flat = inside & (np.abs(panel[..., :3].astype(int) - panel[32, 32, :3].astype(int)).sum(-1) < 12)
-    panel[flat, 3] = 232
+
+    # Frames: the title's 96 x 96 (18-pixel oak, 28-pixel bronze plates) and the windows' 64 x 64
+    # (10-pixel oak, 16-pixel plates), drawn at the same pixel; pulled from orange toward bronze
+    # (the guide's "too yellow" rule); insides a little see-through.
+    def frame(near, size, cap, rim):
+        f = tone(take(FRAMES, f"frame{size}", near, (size, size)))
+        f = even(f, (cap, cap, cap, cap))
+        inside = np.zeros(f.shape[:2], bool)
+        inside[rim:-rim, rim:-rim] = True
+        c = f[size // 2, size // 2, :3].astype(int)
+        flat = inside & (np.abs(f[..., :3].astype(int) - c).sum(-1) < 12)
+        f[flat, 3] = 232
+        return f
+    big = frame((80, 80), 96, 28, 18)
+    parts["menu_panel"] = (big, gui("nine_slice", (28,) * 4, (96, 96)))
+    small = frame((760, 80), 64, 16, 10)
     for name in ("panel", "news"):
-        parts[name] = (panel, gui("nine_slice", (10, 10, 10, 10), (64, 64)))
-    # Slots: 36 x 36, a 4-pixel border; the highlight is the selected slot's ring alone.
-    slot = even(cut(FRAMES, (660, 100, 180, 180)), (4, 4, 4, 4))
-    sel = even(cut(FRAMES, (960, 100, 180, 180)), (4, 4, 4, 4))
+        parts[name] = (small, gui("nine_slice", (16,) * 4, (64, 64)))
+    div = even(tone(take(FRAMES, "divider", (760, 600), (96, 6))), (6, 0, 6, 0))
+    parts["divider"] = (div, gui("nine_slice", (6, 0, 6, 0), (96, 6)))
+
+    # Tabs, category buttons, list rows: 4 states each, a 4-pixel rim with 2-pixel chamfers.
+    states = ("", "_hover", "_pressed", "_disabled")
+    rows = [("tab", (48, 26), 100, (80, 400, 720, 1040), ""),
+            ("category", (32, 24), 360, (80, 400, 720, 1040), "selected_offset = 0.5\n"),
+            ("list_row", (64, 24), 600, (80, 440, 800, 1160), "selected_offset = 0.5\n")]
+    for name, size, y, xs, ex in rows:
+        for k, x in zip(states, xs):
+            a = even(take(TABS, name + k, (x, y), size, 30), (5, 5, 5, 5), rows=False)
+            parts[name + k] = (a, gui("nine_slice", (5, 5, 5, 5), size, ex if k == "" else ""))
+
+    # The small parts.
+    small_parts = [
+        ("input", (80, 100), (64, 18), 4), ("input_focused", (480, 100), (64, 18), 4),
+        ("tooltip", (900, 100), (32, 24), 4), ("well", (1150, 100), (32, 24), 4),
+        ("scrollbar", (80, 330), (12, 40), 4),
+        ("scrollbar_handle", (220, 330), (12, 28), 4), ("scrollbar_handle_hover", (360, 330), (12, 28), 4),
+        ("slider", (520, 330), (62, 10), 4),
+        ("slider_knob", (900, 330), (14, 20), 4), ("slider_knob_hover", (1040, 330), (14, 20), 4),
+        ("close", (80, 650), (14, 14), 3), ("close_hover", (220, 650), (14, 14), 3),
+        ("close_pressed", (360, 650), (14, 14), 3), ("chip", (520, 650), (16, 16), 3),
+    ]
+    for name, near, size, bd in small_parts:
+        a = take(SMALL, name, near, size)
+        if not name.startswith("scrollbar_handle"):  # the handle's grip line stays as drawn
+            a = even(a, (bd,) * 4)
+        parts[name] = (a, gui("nine_slice", (bd,) * 4, size))
+
+    # Slots stay the earlier cut (an 18-GUI slot has room for a 2-GUI rim only).
+    slot = even(cut(FRAMES_OLD, (660, 100, 180, 180)), (4, 4, 4, 4))
+    sel = even(cut(FRAMES_OLD, (960, 100, 180, 180)), (4, 4, 4, 4))
     ring = (np.abs(sel[..., :3].astype(int) - slot[..., :3].astype(int)).sum(-1) > 30) & (sel[..., 3] > 0)
     hl = np.where(ring[..., None], sel, 0).astype(np.uint8)
     parts["slot"] = (slot, gui("nine_slice", (4, 4, 4, 4), (36, 36), "icon = 16\n"))
     parts["slot_highlight"] = (hl, gui("nine_slice", (4, 4, 4, 4), (36, 36)))
-    # The divider: 96 x 6, its end studs kept, only the middle stretches.
-    div = even(cut(FRAMES, (100, 650, 480, 30)), (6, 0, 6, 0))
-    parts["divider"] = (div, gui("nine_slice", (6, 0, 6, 0), (96, 6)))
+    for n, (pw, ph) in sorted(pitches.items()):
+        if abs(pw - K) > 0.4 or abs(ph - K) > 0.4:
+            print(f"warning: {n} drawn at {pw:.2f} x {ph:.2f} image px a pixel (want {K})")
     return parts
 
 
