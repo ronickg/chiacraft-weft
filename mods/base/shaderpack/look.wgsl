@@ -216,6 +216,8 @@ const MIST_BANK_EDGE: vec2<f32> = vec2(0.42, 0.66);
 const MIST_BANK_BASE: f32 = 10.0;
 const MIST_BANK_FALL: f32 = 3.0;
 const MIST_BANK_DENSE: f32 = 0.4;
+// The banks' depth over the ground the engine maps (`ground_at`): under a forest's crowns.
+const MIST_GROUND_DEEP: f32 = 7.0;
 const MIST_DEEP_DENSE: f32 = 1.2;
 // With it, how much light the mist in the sun's shade keeps (Bliss's in shade is dark, the shafts
 // show): of the bounce, and of the sky's.
@@ -1777,17 +1779,47 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
 // its fog the same way, 8 steps a pixel (`overworld_fog.glsl`, method only); ours in the volume's
 // coarse cells could not hold a bank's edge or a tree's shadow.
 const MIST_MARCH_FAR: f32 = 1500.0;
-fn bank_density(p: vec3<f32>) -> f32 {
+// The ground's top under the open sky at `rel` (camera relative), leaves left out (the engine's
+// `client::ground_map`, `core:ground_map`): x its height, y 1 where known (0 off the map or before
+// the engine has built it), z 1 over water.
+fn ground_at(rel: vec3<f32>) -> vec3<f32> {
+    let g = scene.ground_map;
+    if g.x < 0.5 {
+        return vec3(0.0);
+    }
+    let t = textures[u32(g.x) - 1u];
+    let size = vec2<i32>(textureDimensions(t));
+    let at = vec2<i32>(floor((rel.xz - g.zw) / g.y));
+    if any(at < vec2(0)) || any(at >= size) {
+        return vec3(0.0);
+    }
+    let v = textureLoad(t, at, 0);
+    let h = round(v.r * 255.0) * 256.0 + round(v.g * 255.0) - 2048.0;
+    return vec3(h, step(0.5, v.a), step(0.5, v.b));
+}
+
+// The mist's banks at `p` (world), `rel` from the camera. Over known ground they lie on it, a lid
+// about MIST_GROUND_DEEP blocks over it (under a forest's crowns, so they shade it, as Bliss's
+// banks: the shafts), thinner on high ground; elsewhere a lid over the sea.
+fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
     let b = fog_banks(p);
     let bank = smoothstep(MIST_BANK_EDGE.x, MIST_BANK_EDGE.y, b);
-    // A soft lid under the crowns, as Bliss's: full up to about 10 blocks over the sea, gone a few
-    // blocks higher, the lid rising and sinking with the banks. With an open fall above it the mist
-    // lay over the crowns, all in the sun, and the canopy's shade never reached it (lv2, 11-24).
-    let top = SEA_LEVEL + MIST_BANK_BASE + (b - 0.5) * 8.0;
+    let ground = ground_at(rel);
+    var top = SEA_LEVEL + MIST_BANK_BASE + (b - 0.5) * 8.0;
+    var bed = SEA_LEVEL - 6.0;
+    var high = 1.0;
+    if ground.y > 0.5 {
+        let base = max(ground.x, SEA_LEVEL);
+        top = base + MIST_GROUND_DEEP + (b - 0.5) * 6.0;
+        bed = base - 2.0;
+        high = 1.0 - smoothstep(SEA_LEVEL + 24.0, SEA_LEVEL + 64.0, base);
+    }
+    // A soft lid: with an open fall above it the mist lay over the crowns, all in the sun, and the
+    // canopy's shade never reached it (lv2, 11-24).
     let tall = 1.0 - smoothstep(top - MIST_BANK_FALL, top + MIST_BANK_FALL, p.y);
     // Thinner as the sun climbs, gone by about 40° up.
     let burn = 1.0 - smoothstep(0.3, 0.65, scene.sun.y);
-    return air_mist() * bank * tall * MIST_BANK_DENSE * burn * smoothstep(SEA_LEVEL - 6.0, SEA_LEVEL, p.y);
+    return air_mist() * bank * tall * high * MIST_BANK_DENSE * burn * smoothstep(bed - 2.0, bed, p.y);
 }
 fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
@@ -1798,7 +1830,7 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let dir = rel / max(dist, 1e-4);
     let eye = scene.eye.xyz;
     let lo = SEA_LEVEL - 6.0;
-    let hi = SEA_LEVEL + MIST_BANK_BASE + MIST_BANK_FALL + 4.0;
+    let hi = SEA_LEVEL + 64.0 + MIST_GROUND_DEEP + MIST_BANK_FALL + 3.0;
     var t0 = 0.0;
     var t1 = min(dist, MIST_MARCH_FAR);
     if abs(dir.y) > 1e-4 {
@@ -1819,8 +1851,10 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     // In the crowns' shade the mist takes the open sky's cool light (Bliss's shafts are blue-grey), not
     // the warm glow of the sky toward the sun.
     let cool = palette().ambient * 0.75 * look_opt(OPT_FOG, 1.0) * MIST_DEEP_SHADE;
+    // Closer together toward the surface, where the mist lies on the ground (t = t1 - L (1 - u)^2):
+    // spread evenly from a high eye, the steps passed over the forest floor's mist in two or three.
     let n = 16u;
-    let step = (t1 - t0) / f32(n);
+    let span = t1 - t0;
     var through = 1.0;
     var gained = vec3(0.0);
     // Debug view 2 with the banks on: red the sun's reach along the walk, weighted by the mist (black
@@ -1828,8 +1862,10 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     var reach = 0.0;
     var misty = 0.0;
     for (var i = 0u; i < n; i++) {
-        let t = t0 + (f32(i) + 0.5 + 0.8 * jitter) * step;
-        let d = bank_density(eye + dir * t) * deep;
+        let u = (f32(i) + 0.5 + 0.8 * jitter) / f32(n);
+        let t = t1 - span * (1.0 - u) * (1.0 - u);
+        let step = 2.0 * span * (1.0 - u) / f32(n);
+        let d = bank_density(eye + dir * t, dir * t) * deep;
         if d <= 0.0 {
             continue;
         }

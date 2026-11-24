@@ -113,6 +113,9 @@ pub static LOOK_MIST_DAWN_TINT: Config<f32> = Config::named("look_mist_dawn_tint
 /// The mist's banks as lumps that stand up out of the layer: 0 as made (a top heaving 5 blocks
 /// either way), 1 Bliss's domes (20 either way, a softer top).
 pub static LOOK_MIST_DOMES: Config<f32> = Config::named("look_mist_domes");
+/// The engine's map of the ground's height (`client::ground_map`), which the banks lie on: on with
+/// them (`register`'s frame hook keeps it so, however the banks were set).
+static GROUND_MAP: Config<bool> = Config::named("core:ground_map");
 /// The mist clock: a dawn mist every morning whatever the air (the engine's `evening_mist_floor`),
 /// 0 as made (only the air's own), 1 our dampest dawn mist, up to 3.
 pub static LOOK_MIST_CLOCK: Config<f32> = Config::named("look_mist_clock");
@@ -232,4 +235,10 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_MIST_DOMES).float(0.0, 0.0, 1.0);
     r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0);
     r.config(&LOOK_BLISS).bool(false);
+    r.client_frame(|_| {
+        let want = LOOK_MIST_DOMES.get() > 0.0;
+        if GROUND_MAP.get() != want {
+            GROUND_MAP.set(want);
+        }
+    });
 }

@@ -8,6 +8,7 @@ pub mod frame_look;
 pub mod froxels;
 pub mod gizmo;
 pub mod glow;
+pub mod ground_map;
 mod lightning;
 pub mod lod;
 pub mod looks;
@@ -754,6 +755,8 @@ pub struct Client {
     shadow_index: u32,
     /// The far cascade: map, light, scene buffers and bindless index, as the near one's.
     shadow_far_map: Option<weft_render::TextureId>,
+    /// The ground's height about the camera for packs (`core:ground_map`, chiacraft's mist).
+    ground_map: ground_map::GroundMap,
     shadow_far: (glam::Mat4, bool),
     shadow_far_bufs: Vec<BufferId>,
     shadow_far_index: u32,
@@ -1230,6 +1233,7 @@ impl Client {
             shadow: (glam::Mat4::IDENTITY, false),
             shadow_index: 0,
             shadow_far_map: None,
+            ground_map: Default::default(),
             shadow_far: (glam::Mat4::IDENTITY, false),
             shadow_far_bufs: Vec::new(),
             shadow_far_index: 0,
@@ -3548,6 +3552,7 @@ impl Client {
         if let Some(t) = self.shadow_far_map.take() {
             gpu.destroy_texture(t);
         }
+        self.ground_map.destroy(gpu);
         self.shadow_far_drawn = None;
         for b in self.shadow_far_bufs.drain(..) {
             gpu.destroy_buffer(b);
@@ -3772,6 +3777,7 @@ impl Client {
             cloud_cache: [0; 4],
             atmosphere_cache: [0; 4],
             rain_cover: [0.0; 4],
+            ground_map: self.ground_map.scene,
             lightning_start,
             lightning_end,
             weather: [self.wind.x, self.wind.y, self.fog.max(evening_mist_floor(self.sun())), self.thunder()],
@@ -4225,6 +4231,9 @@ impl Client {
         // Ray tracing's scene (`core:rt_shadows`): this frame's builds and its TLAS, before the
         // world's draws that bind it (`app` switched the world shader before this, `rt_switch`).
         self.render.rt_frame(gpu, early, frame.slot, &cam);
+        // The ground's height for the pack (chiacraft's mist banks), before the scene reads it.
+        self.ground_map
+            .frame(gpu, crate::settings::ground_map(), cam.pos, &self.world);
         let mut scene = self.scene(&cam, frame);
         (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
         let aspect = frame.width as f32 / frame.height.max(1) as f32;

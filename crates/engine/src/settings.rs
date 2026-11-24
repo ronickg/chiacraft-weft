@@ -413,6 +413,11 @@ pub fn froxels() -> bool {
     number("core:froxels") != 0.0
 }
 
+/// The ground's height about the camera for packs (`client::ground_map`), live.
+pub fn ground_map() -> bool {
+    number("core:ground_map") != 0.0
+}
+
 /// Pixels a mist volume cell covers each way: 8 (`core:froxels` 1), 4 (2, ultra).
 pub fn froxel_cell() -> u32 {
     if number("core:froxels") >= 2.0 { 4 } else { 8 }
