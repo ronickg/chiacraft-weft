@@ -1815,6 +1815,10 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let step = (t1 - t0) / f32(n);
     var through = 1.0;
     var gained = vec3(0.0);
+    // Debug view 2 with the banks on: red the sun's reach along the walk where there is mist (black
+    // in the crowns' shade), green the share of the walk with mist, blue what of the surface shows.
+    var reach = 0.0;
+    var misty = 0.0;
     for (var i = 0u; i < n; i++) {
         let t = t0 + (f32(i) + 0.5 + 0.8 * jitter) * step;
         let d = bank_density(eye + dir * t) * deep;
@@ -1822,10 +1826,15 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
             continue;
         }
         let lit = sun_reaches(dir * t);
+        reach += lit;
+        misty += 1.0;
         let shade = mix(1.0, MIST_DEEP_SHADE, 1.0 - lit);
         let kept = exp(-d * step);
         gained += through * (1.0 - kept) * (light.sky * mix(shade, 1.0, lit) + light.sun * lit + mist_bounce(d, lit) * shade);
         through *= kept;
+    }
+    if look_debug() == 2u {
+        return vec3(reach / max(misty, 1.0), misty / f32(n), through);
     }
     return c * through + gained;
 }
