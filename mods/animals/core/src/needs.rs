@@ -383,7 +383,27 @@ pub const TRAP_CELLS: usize = 48;
 pub const RAN_GAP: f64 = 10.0;
 /// The steepest drop a running animal takes (`senses::escape`): it can step back up one, not two.
 pub const FLEE_DROP: i32 = 1;
+const _: () = assert!(HEAL_AFTER > 1.0);
 const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WAY_OUT_WAYS);
+
+/// Healing: an animal neither hungry nor thirsty (its food at `HUNGRY` of its most or more, its
+/// water at `THIRSTY` or more) and unhurt for `HEAL_AFTER` seconds heals its whole health in
+/// `HEAL_DAYS` game days. Without it a deer bitten to half by a wolf or a fall stayed at half for
+/// good, and the next blow killed it.
+pub const HEAL_DAYS: f32 = 1.0;
+pub const HEAL_AFTER: f32 = 10.0;
+
+/// Whether an animal at `fed` (its share of its food) and `water` (its share of its water), last
+/// hurt `since` seconds ago, heals. A starving or parched one is hurt every second
+/// (`starves_secs`, `PARCHED_SECS`) and empty besides, so it never heals what it loses.
+pub fn heals(fed: f32, water: f32, since: f32) -> bool {
+    fed >= HUNGRY && water >= THIRSTY && since >= HEAL_AFTER
+}
+
+/// Health a second an animal of `max` health heals.
+pub fn heal_per_sec(max: f32) -> f32 {
+    max / (HEAL_DAYS * vitals::DAY_SECS)
+}
 
 /// The push (blocks a second) of a leap that lands `dx, dz` off and `dy` up: up fast enough to
 /// clear the edge by `LEAP_CLEAR`, and across in the time it is in the air.
@@ -404,5 +424,21 @@ mod leaping {
         let [x, up, _] = leap(1.5, 2.0, 0.0);
         assert!(up * up / (2.0 * GRAVITY) > 2.0 + LEAP_CLEAR);
         assert!(x > 0.0 && x < up);
+    }
+}
+
+#[cfg(test)]
+mod healing {
+    use super::*;
+
+    #[test]
+    fn a_fed_unhurt_animal_heals_in_a_day_and_a_hungry_one_does_not() {
+        // Half its health back in half a day, the whole in a day.
+        let max = 20.0;
+        assert!((heal_per_sec(max) * vitals::DAY_SECS * HEAL_DAYS - max).abs() < 1e-3);
+        assert!(heals(FULL, 1.0, HEAL_AFTER));
+        assert!(!heals(FULL, 1.0, HEAL_AFTER - 1.0), "just hurt");
+        assert!(!heals(HUNGRY - 0.01, 1.0, 60.0), "hungry");
+        assert!(!heals(FULL, THIRSTY - 0.01, 60.0), "thirsty");
     }
 }
