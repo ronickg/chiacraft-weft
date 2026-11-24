@@ -102,6 +102,13 @@ Decided by Ronald (2026-11-04): **always attach `Voxel Fantasy Survival UI Suite
 
 What a first round missed against his sheet, so say it in every frame prompt: thick bronze frames with a double line (an outer and an inner bronze line with a dark groove between), bevelled corner blocks with a rivet; slots lighter and warmer than the panel; title tabs in orange with an icon; a soft gold glow around the hovered part.
 
+### Style 1: the carved oak panel (Ronald's pick, 2026-11-23)
+
+Ronald found the title menu "cheap" and picked style 1 of six generated directions (`~/Coding/chiacraft-archive/images/ui-redo/2026-11-23/menu_styles_sheet_v2.jpg`): the menu in a framed panel with an oak frame, bronze corner caps with rivets, a dark charcoal inside that lets the painting show faintly, bevelled plates with a bronze rim, orange with a gold rim on hover. He looked at six variants of it (1a-1f) and kept the original. It is the style for the whole game: the shared parts come first, and every screen follows from them.
+
+- The parts were generated with Codex from a close-up of the chosen screen (attach it first; the first round without it came out flat), on an exact grid of 5 image pixels a UI pixel, and cut exactly by `notes/ui/style1/style1.py`, which writes `button*`, `button_secondary*`, `button_quit*` (the secondary's look: no red Quit), `panel`, `news`, `slot`, `slot_highlight` and `divider`.
+- These parts replace kit 2's: don't re-run `kit2/install.py` over them. Kit 2 still draws the parts style 1 hasn't reached yet (tabs, wells, tooltips, the HUD).
+
 ### Yellow and gold only for state, never at rest (Ronald, 2026-11-04)
 
 Round 2 of the parts was "too yellow everywhere". The rule:
