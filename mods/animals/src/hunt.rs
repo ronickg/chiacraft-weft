@@ -112,6 +112,8 @@ pub fn init(r: &mut Registry) {
                             && w.entity(o).is_some_and(|e| Some(e.kind) == kind)
                             && !animal::tamed(&w, o)
                             && (w.component(o, &HUNT).is_some_and(|h| h[0] == d.entity) || w.component(o, &LAST) == Some(d.entity))
+                            && w.component(o, &ANIMAL)
+                                .is_some_and(|a| (a.food as f32) < a.stat(species::FOOD) * FULL)
                     })
                     .collect();
                 eaters.extend(on_it);
@@ -493,7 +495,15 @@ const PACK_RANGE: f64 = crate::senses::KIN;
 fn rally(w: &World, id: u64, st: &EntityState, target: u64, now: u64) {
     let kind = w.entity(id).map(|e| e.kind);
     for o in w.entities_near(st.pos, PACK_RANGE, None) {
-        if o == id || w.entity(o).map(|e| e.kind) != kind || animal::tamed(w, o) {
+        // Only the hungry join: a wolf full from its own kill joined the next hunt 18 s later and
+        // took half that deer too (ai1124_wolvesDays1g).
+        if o == id
+            || w.entity(o).map(|e| e.kind) != kind
+            || animal::tamed(w, o)
+            || !w
+                .component(o, &ANIMAL)
+                .is_some_and(|a| (a.food as f32) < a.stat(species::FOOD) * FULL)
+        {
             continue;
         }
         if let Some(c) = w.component_mut(o, &HUNT)
