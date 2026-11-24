@@ -20,6 +20,9 @@ use weft_sdk::*;
 
 /// The quality chosen: 0 low .. 3 ultra, 4 custom, 5 phone, 6 max, -1 not chosen yet (picked from the machine).
 pub static QUALITY: Config<i32> = Config::named("quality");
+/// The preset last chosen, still known once the quality is Custom: a feature row whose values
+/// several steps share keeps that preset's name (Medium's bloom is Low's, and reads Medium).
+static PRESET_LAST: Config<i32> = Config::named("preset_last");
 /// The pack's screen effects: 0 off, 1 low (fewer steps), 2 on. Bloom has no low.
 pub static FX_REFLECT: Config<i32> = Config::named("fx_reflect");
 pub static FX_CONTACT: Config<i32> = Config::named("fx_contact");
@@ -469,14 +472,16 @@ fn feature_at(f: usize, s: usize) -> bool {
         .all(|&(k, v)| ((part(k).get)() - v).abs() < 1e-3)
 }
 
-/// Feature `f`'s step now, as its row names it: the preset's own step when the quality is a
-/// preset and the parts still hold it (steps can share values: High's reflections are Max's), else
+/// Feature `f`'s step now, as its row names it: the preset's own step (or, once Custom, the last
+/// preset's) when the parts still hold it (steps can share values: High's reflections are Max's), else
 /// the lowest step they hold, or -1 (Custom: a part moved on the Developer screen).
 fn feature_now(f: usize) -> f64 {
-    if let Some(s) = usize::try_from(QUALITY.get()).ok().and_then(preset_step)
-        && feature_at(f, s)
-    {
-        return s as f64;
+    for q in [QUALITY.get(), PRESET_LAST.get()] {
+        if let Some(s) = usize::try_from(q).ok().and_then(preset_step)
+            && feature_at(f, s)
+        {
+            return s as f64;
+        }
     }
     (0..STEP_NAMES.len())
         .find(|&s| feature_at(f, s))
@@ -530,6 +535,7 @@ fn apply(p: usize) {
     }
     look_on();
     QUALITY.set(p as i32);
+    PRESET_LAST.set(p as i32);
     weft_sdk::info!("video: the {} preset, every feature at {}", preset_name(p as i32).unwrap_or("?"), STEP_NAMES[at]);
     if p == ULTRA {
         ultra_extras();
@@ -1093,6 +1099,7 @@ fn after_restart(window: [u32; 2]) -> Option<f64> {
 pub fn register(r: &mut Registry) {
     crate::developer::register(r);
     r.config(&QUALITY).int(-1, -1, 6);
+    crate::developer::page(r.config(&PRESET_LAST).int(-1, -1, 6));
     r.config(&FX_REFLECT).int(2, 0, 2);
     // Low by default, as every look part (Ronald 11-24: on by default; 11-05 had contact shadows off).
     r.config(&FX_CONTACT).int(1, 0, 2);
