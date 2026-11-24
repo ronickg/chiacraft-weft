@@ -217,9 +217,9 @@ const MIST_DEEP: f32 = 0.0;
 const MIST_BANK_EDGE: vec2<f32> = vec2(0.42, 0.66);
 const MIST_BANK_BASE: f32 = 10.0;
 const MIST_BANK_FALL: f32 = 3.0;
-const MIST_BANK_DENSE: f32 = 0.4;
+const MIST_BANK_DENSE: f32 = 0.6;
 // The banks' depth over the ground the engine maps (`ground_at`): under a forest's crowns.
-const MIST_GROUND_DEEP: f32 = 7.0;
+const MIST_GROUND_DEEP: f32 = 12.0;
 const MIST_DEEP_DENSE: f32 = 1.2;
 // With it, how much light the mist in the sun's shade keeps (Bliss's in shade is dark, the shafts
 // show): of the bounce, and of the sky's.
