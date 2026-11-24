@@ -2458,10 +2458,19 @@ impl Backend for VulkanBackend {
             .clamp(1, 16);
         let next = std::sync::atomic::AtomicUsize::new(0);
         let took = std::sync::Mutex::new(Vec::new());
-        let (device, cache) = (&self.device, self.pipeline_cache);
+        let device = &self.device;
+        // A cache per thread, merged into the kept one after: MoltenVK holds a pipeline cache's
+        // lock while it compiles into it, so threads sharing one compiled one at a time (the Mac:
+        // 63 s to 44 s only).
+        let own: Vec<vk::PipelineCache> = (0..threads.min(prepared.len()))
+            .filter_map(|_| unsafe { device.create_pipeline_cache(&Default::default(), None) }.ok())
+            .collect();
+        // Without caches of their own, the threads share the kept one.
+        let caches = if own.is_empty() && !prepared.is_empty() { vec![self.pipeline_cache] } else { own.clone() };
         std::thread::scope(|scope| {
-            for _ in 0..threads.min(prepared.len()) {
-                scope.spawn(|| {
+            for &cache in &caches {
+                let (next, took, prepared) = (&next, &took, &prepared);
+                scope.spawn(move || {
                     loop {
                         let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         let Some(p) = prepared.get(i) else { break };
@@ -2477,6 +2486,14 @@ impl Backend for VulkanBackend {
                 });
             }
         });
+        if !own.is_empty() {
+            if let Err(e) = unsafe { device.merge_pipeline_caches(self.pipeline_cache, &own) } {
+                log::warn!("merging the warmed pipelines: {e:?}");
+            }
+            for c in &own {
+                unsafe { device.destroy_pipeline_cache(*c, None) };
+            }
+        }
         if !descs.is_empty() {
             self.cache_dirty = true;
             let mut took = took.into_inner().unwrap();
@@ -2490,9 +2507,10 @@ impl Backend for VulkanBackend {
                 })
                 .collect();
             log::info!(
-                "warmed {} pipelines in {:.1} s on {threads} threads ({:.1} s of compiling; slowest {})",
+                "warmed {} pipelines in {:.1} s on {} threads ({:.1} s of compiling; slowest {})",
                 descs.len(),
                 started.elapsed().as_secs_f32(),
+                caches.len(),
                 took.iter().map(|t| t.0).sum::<f32>(),
                 slowest.join(", ")
             );
