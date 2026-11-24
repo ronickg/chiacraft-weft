@@ -259,6 +259,40 @@ fn desert_animals_barely_drink() {
     report(problems);
 }
 
+/// A wild plant eater out of food lives on its reserves longer than its stomach lasts
+/// (`needs::fasts`, by mass: Lindstedt & Boyce 1985), so a herd crossing bare ground or a poor
+/// season gets thin, not dead overnight; and a bigger warm-blooded one never fasts shorter.
+#[test]
+fn plant_eaters_fast_longer_than_their_stomach() {
+    use animals_core::needs;
+    let mut problems = Vec::new();
+    for s in SPECIES
+        .iter()
+        .filter(|s| s.forages_wild() && !s.scavenges())
+    {
+        let stomach = s.base_stat(animals_core::species::FOOD) * s.hunger / vitals::DAY_SECS;
+        if needs::fasts(s) < stomach {
+            problems.push(format!(
+                "{}: fasts {:.1} game days, under its full stomach's {:.1}: needs::FAST_DAYS or its food and hunger",
+                s.name,
+                needs::fasts(s),
+                stomach
+            ));
+        }
+    }
+    let masses = [0.02, 1.0, 10.0, 70.0, 500.0, 5000.0];
+    if masses
+        .windows(2)
+        .any(|m| needs::fast_days(m[1], false) < needs::fast_days(m[0], false))
+    {
+        problems.push("a bigger animal fasts shorter: needs::fast_days".into());
+    }
+    if (needs::fast_days(needs::FAST_MASS, false) - needs::FAST_DAYS).abs() > 1e-3 {
+        problems.push("needs::FAST_MASS doesn't fast FAST_DAYS".into());
+    }
+    report(problems);
+}
+
 /// Every taming food is food of its diet (`species::foods_off_diet`): a deer isn't tamed with meat.
 #[test]
 fn taming_foods_are_in_the_diet() {

@@ -783,8 +783,14 @@ and cactus.**
   (`animal::arrive`).
 - **Fodder:** each mouthful feeds as well as the plant grows that day, so dry-season grass is
   poor fodder.
-- **Starving:** a wild animal with an empty stomach starves in a game day. A tame never does;
-  its condition falls instead.
+- **Starving (by mass since 2026-11-24):** a wild animal with an empty stomach lives on its
+  reserves, then starves: 6 game days at 70 kg (a white-tailed deer, about 39 days of the 56-day
+  year), scaled by mass to the power 0.44, a mammal's fasting endurance (Lindstedt & Boyce 1985,
+  "Seasonality, fasting endurance, and body size in mammals", *American Naturalist* 125); from a
+  game day (a mouse, a sparrow) up to a season (the biggest), five times as long cold-blooded
+  (`animals_core::needs::fasts`; the sheet's "fasts" column). Until then one game day for all,
+  which starved a herd overnight on a bare patch (ai1124_savanna1). Thirst still kills in a game
+  day whatever the size (`PARCHED_SECS`). A tame never starves; its condition falls instead.
 - **The sheet:** `SPECIES.md` shows each plant eater's food at home season by season (the
   capybara: savanna 43/82/75/19%).
 - **Seen in the game (plains):** a capybara met in summer arrived 68% fed (53% lush); one met in

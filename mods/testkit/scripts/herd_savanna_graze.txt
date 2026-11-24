@@ -6,7 +6,8 @@
 # times the game's pace (`/tick rate 600`: a game day in 40 s). Winter grass is poor fodder (a
 # tuft feeds 1 point, 40 % growth), grazed tufts grow back slowly in the dry season, and a deer
 # uses a point every 15 s (`SPECIES.md`: 120 food, 1.5 game days from full to empty), then
-# starves in a game day on an empty stomach (`needs::STARVES_SECS`).
+# lives 6 game days on its reserves before it starves (`needs::fasts`, by mass), so a deer that
+# finds too little loses health slowly from about day 2-3 and dies from about day 7.
 # Seed 1's savanna at x 0 z 544, as herd_savanna_winter.
 # `/animalprof senses` each sample lists up to 8 animals within 48 blocks with their
 # "food N% water N% health N".

@@ -33,10 +33,37 @@ pub fn fills(own: f32, kg: f32) -> f32 {
 /// plant eater), or where its prey are thinnest (a hunter); the rest comes with the place's food.
 pub const ARRIVES_FED: f32 = 0.3;
 
-/// Seconds a wild one lives on an empty stomach at full health before it starves (a game day).
+/// How long a wild one lives on an empty stomach at full health, on its body's reserves: a
+/// mammal's fasting endurance grows with its mass to the power 0.44 (Lindstedt & Boyce 1985,
+/// "Seasonality, fasting endurance, and body size in mammals"), so a deer lasts weeks of the
+/// calendar where a mouse lasts days. `FAST_DAYS` game days at `FAST_MASS` kg (a white-tailed
+/// deer: 6 game days, about 39 days of the 56-day year), `FAST_POWER` of the mass ratio, within
+/// `FAST_RANGE` game days (a small one still a day; the biggest a season). A cold-blooded one
+/// burns about a fifth of what a mammal of its mass does at rest (as it drinks, `COLD_BLOODED_WATER`)
+/// and fasts `FAST_COLD_BLOODED` times as long: a caiman goes months without a meal.
 /// A scavenger (`Species::scavenges`) never starves in the wild: a turkey vulture fasts two
-/// weeks, and the world's carrion is too patchy to hold its life to a game day.
-pub const STARVES_SECS: f32 = 1200.0;
+/// weeks, and the world's carrion is too patchy to hold its life to its fasting.
+pub const FAST_DAYS: f32 = 6.0;
+pub const FAST_MASS: f32 = 70.0;
+pub const FAST_POWER: f32 = 0.44;
+pub const FAST_RANGE: (f32, f32) = (1.0, vitals::calendar::SEASON_DAYS as f32);
+pub const FAST_COLD_BLOODED: f32 = 5.0;
+
+/// Game days one of `mass` kg lives on an empty stomach (`FAST_DAYS`).
+pub fn fast_days(mass: f32, cold_blooded: bool) -> f32 {
+    let days = FAST_DAYS * (mass.max(0.001) / FAST_MASS).powf(FAST_POWER);
+    (days * if cold_blooded { FAST_COLD_BLOODED } else { 1.0 }).clamp(FAST_RANGE.0, FAST_RANGE.1)
+}
+
+/// Game days `s` lives on an empty stomach at full health (`fast_days`).
+pub fn fasts(s: &Species) -> f32 {
+    fast_days(s.bio.mass, s.bio.cold_blooded)
+}
+
+/// Seconds `s` lives on an empty stomach at full health before it starves (`fasts`).
+pub fn starves_secs(s: &Species) -> f32 {
+    fasts(s) * vitals::DAY_SECS
+}
 
 /// Blocks a hungry scavenger smells carrion from, from the air or the ground (a turkey vulture
 /// finds a carcass hidden under a forest's canopy by its smell, Houston 1986); it flies there.
@@ -144,8 +171,9 @@ pub const SLAKED: f32 = 0.95;
 /// A gulp: this share of its water, every `GULP_TICKS`.
 pub const GULP: f32 = 0.25;
 pub const GULP_TICKS: u32 = 30;
-/// Seconds a wild one lives parched at full health before thirst kills it (as starving).
-pub const PARCHED_SECS: f32 = STARVES_SECS;
+/// Seconds a wild one lives parched at full health before thirst kills it: a game day, whatever
+/// its size (water, unlike fat, isn't stored for long).
+pub const PARCHED_SECS: f32 = vitals::DAY_SECS;
 
 /// The share of its water each species drinks; the rest comes from its food and its own body.
 /// A species not here drinks all of it (a dog, the capybara by its rivers, the wyvern). From what's
