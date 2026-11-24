@@ -57,7 +57,11 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
         let way = ((id % WAY_OUT_WAYS as u64) as u8 + n - STUCK_AFTER) % WAY_OUT_WAYS;
         let a = way as f64 * std::f64::consts::TAU / WAY_OUT_WAYS as f64;
         let (dx, dz) = (a.cos(), a.sin());
-        if n >= LEAP_AFTER {
+        // Up the way to the highest ground it can walk to; with none (a pit: nothing it can walk
+        // to is higher, and a leg along its level gets it nowhere the search hasn't seen) it leaps
+        // at once (ai1124_pit5d: four legs in the pit before each leap, 25 s to 60 s).
+        let up = way_up(w, st);
+        if n >= LEAP_AFTER || up.is_none() {
             // At ground it can land on, up to `LEAP_MOST` above, else straight up along its way.
             let (lx, ly, lz) = landing(w, st).unwrap_or((dx, LEAP_MOST as f64, dz));
             let v = animals_core::needs::leap(lx, ly, lz);
@@ -66,14 +70,14 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
                 w.navigate(id, st.pos, 0.0);
             }
             w.push(id, v.map(|c| c as f32));
+            // It waits the leap out (`going`), and leaps again if it fell back in.
+            k[2] = k[2].max(LEAP_AFTER as f64);
             k[3] = (now + (WAY_OUT_SECS * 20.0) as u64) as f64;
             if let Some(c) = w.component_mut(id, &STUCK) {
                 *c = k;
             }
             return true;
         }
-        // Up the way to the highest ground it can walk to, else along its level.
-        let up = way_up(w, st);
         let to = up.unwrap_or([x + dx * WAY_OUT_LEG, st.pos.y, z + dz * WAY_OUT_LEG]);
         weft_sdk::info!(
             "animal {id} is stuck at {x:.0} {:.0} {z:.0} ({n} walks ended there): looks for a way out toward {:.0} {:.0} {:.0}{}",
@@ -103,7 +107,16 @@ pub fn going(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     let near = (k[0] - st.pos.x).powi(2) + (k[1] - st.pos.z).powi(2) <= STUCK_NEAR * STUCK_NEAR;
-    let out = !near || st.pos.y > k[4] + 1.0;
+    // Higher only standing on ground: in a leap's arc, or on a herd mate's back, it is not out yet
+    // (ai1124_pit5d: each leap and each climb on the other deer counted it out mid-air, and its
+    // count began again from one in the pit, 90 s to its first leap).
+    let airborne = st.on_ground == 0 && st.in_liquid == 0;
+    let floor = [st.pos.x.floor() as i32, (st.pos.y - 0.05).floor() as i32, st.pos.z.floor() as i32];
+    let high = !airborne && w.block_flags(floor) & abi::block_flags::SOLID != 0 && st.pos.y > k[4] + 1.0;
+    let out = !near || high;
+    if airborne && !out {
+        return true;
+    }
     let now = w.game_time() as f64;
     if !out && now < k[3] && (w.navigating(id) || k[2] as u8 >= LEAP_AFTER) {
         return true;
