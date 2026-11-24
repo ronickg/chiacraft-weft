@@ -265,10 +265,6 @@ const MIST_SEA_TAIL: vec2<f32> = vec2(0.76, 1.19);
 // dawn sun's orange and read as sand, and from inside the mist the uncapped peak blew the sky
 // round the sun out to a yellow ball: lv8).
 const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.8, 1.2);
-// With Bliss's sun on a low morning sun (`sky_color`): the sky toward it in the glow's gold, full
-// within the first cosine, gone by the second (about 14° and 32°), in this gold; and the glow along
-// the horizon round it: how tightly round the sun across (a power of the cosine), how fast it fades
-// above and below the horizon (per unit of dir.y), how bright.
 // The banks' sunlight fades in with distance from the eye, none to the first, full from the second
 // (blocks). From inside the mist, looking toward a low sun, the lit mist in front of the near
 // crowns covered them all (06:00 low view, at Bliss's own spot and camera: darkest 5 % at 109
@@ -276,9 +272,25 @@ const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.8, 1.2);
 // mist with shafts between. Every overall cut took the vista, seen from 120 blocks over the banks,
 // darker and greyer than Bliss's (lv12); this leaves it alone.
 const MIST_NEAR_SUN: vec2<f32> = vec2(24.0, 120.0);
-const SUN_GOLD: vec2<f32> = vec2(0.7, 0.95);
-const SUN_GOLD_TINT: vec3<f32> = vec3(1.0, 0.88, 0.74);
-const SUN_BAND: vec3<f32> = vec3(6.0, 9.0, 1.0);
+// With Bliss's sun on a low morning sun (`sky_color`): the sky toward it in a peach, full within
+// the first cosine, gone by the second (about 8° and 25°; it reached out to 45° in a yellow, which
+// stood against the lavender as a yellow-green arc over the sun, lv13-14), in this peach; and the glow
+// along the horizon round it: how tightly round the sun across (a power of the cosine), how fast it
+// fades above and below the horizon (per unit of dir.y), how bright.
+const SUN_GOLD: vec2<f32> = vec2(0.9, 0.99);
+const SUN_GOLD_TINT: vec3<f32> = vec3(1.0, 0.9, 0.82);
+// The dawn's cream over the sun's half of the sky drawn in to a lobe round the sun (a power of the
+// cosine) with Bliss's sun.
+const SUN_CREAM_TIGHT: f32 = 24.0;
+// The sun's glow in the sky with Bliss's sun on a low morning sun: this cream, this much of it.
+const SUN_GLOW_CREAM: vec3<f32> = vec3(1.0, 0.9, 0.8);
+const SUN_GLOW_CREAM_K: f32 = 0.85;
+// Away from it the sky in these at its own brightness: from the first cosine (none) to the second
+// (full, lavender), blue beyond; how much.
+const SKY_AWAY: vec3<f32> = vec3(0.985, 0.87, 1.0);
+const SKY_AWAY_LAVENDER: vec3<f32> = vec3(0.95, 0.88, 1.0);
+const SKY_AWAY_BLUE: vec3<f32> = vec3(0.55, 0.7, 1.0);
+const SUN_BAND: vec3<f32> = vec3(10.0, 9.0, 2.0);
 // How much of the sky's wide round sun glow (`OPT_SUN_GLOW`) goes with Bliss's sun low in the morning.
 const SUN_BAND_ROUND: f32 = 0.67;
 // Its light from the sky, brighter looking up through it (how much, how sharply), and its share (Bliss's
@@ -950,6 +962,18 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
         c += vec3(0.55, 0.22, 0.05) * toward;
     }
+    let bliss_sun = clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0) * (1.0 - dawn_sky()) * (1.0 - rain_amount())
+        * smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.25, 0.45, scene.sun.y))
+        * smoothstep(-0.03, 0.02, scene.sun.y);
+    // With Bliss's sun, away from the sun the sky lavender and then blue at its own brightness, not
+    // the golden key's gold horizon mixed up into the blue: ours stood tan-mauve over the whole sky
+    // (06 vista top right 165 145 153, Bliss's 96 130 191; blue channel 140-155 all over against
+    // Bliss's 185-190), with the haze, banks, mist, low air and bloom each off (lv14).
+    if bliss_sun > 0.0 && scene.frame.x > 0.5 {
+        let away_sun = smoothstep(SKY_AWAY.x, SKY_AWAY.y, mu);
+        let tint = mix(SKY_AWAY_LAVENDER, SKY_AWAY_BLUE, smoothstep(SKY_AWAY.y, 0.5, mu));
+        c = mix(c, tint * (luma(c) / luma(tint)), away_sun * bliss_sun * SKY_AWAY.z);
+    }
     // (B5: on the sky's own colour, before the sun's glow and glare are added: on top of them it
     // turned the glare gold, and the dawn mist that reads it went flat orange over the land, PC
     // shdawnB3/B4.)
@@ -968,12 +992,19 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             // which the script left free and which came and went between runs: with it pinned off
             // a third at 1.0 0.87 0.66 only halved the lavender gaps, 6.7 % to 3.3 %; PC shdawnm0,
             // shdawnm5.)
-            let cream = vec3(1.0, 0.84, 0.58);
+            // With Bliss's sun a peach (Bliss's 235 213 192 some 7° from the sun): this cream's yellow
+            // stood as a faint ring there between the white core and the pink (lv14).
+            let cream = mix(vec3(1.0, 0.84, 0.58), SUN_GLOW_CREAM, bliss_sun);
             // Over the sun's whole half, overhead too (about a third there): a lobe about the sun
             // alone left the gaps between the clouds lavender (7 % of the 06:00 sky band, Bliss's
             // none; PC shdawn0).
             let wide = 0.5 + 0.5 * mu;
-            let dawn = pow(wide, 1.5) * morning * (1.0 - rain_amount());
+            // With Bliss's sun only round the sun: Bliss's 06:00 sky is warm white within about 12° of
+            // it, lavender at 15-25° and blue beyond (blue channel 185-190 all over); ours went tan
+            // over the whole half (blue 140-155), and its edge against the lavender read as a
+            // yellow-green arc over the sun (lv13 06 vista and 07 low).
+            let lobe = mix(pow(wide, 1.5), pow(max(mu, 0.0), SUN_CREAM_TIGHT), bliss_sun);
+            let dawn = lobe * morning * (1.0 - rain_amount());
             c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.7);
         }
     }
@@ -1027,9 +1058,6 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     // beyond, the yellow beside the pink reading as a green ring (lv10); Bliss's stays yellow-gold
     // in to the sun (255 231 164), grades out to tan, and its low sun stands in a wide glow on the
     // horizon.
-    let bliss_sun = clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0) * glow_up * (1.0 - rain_amount())
-        * smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.25, 0.45, scene.sun.y))
-        * smoothstep(-0.03, 0.02, scene.sun.y);
     if bliss_sun > 0.0 && scene.frame.x > 0.5 {
         let near_sun = smoothstep(SUN_GOLD.x, SUN_GOLD.y, mu);
         c = mix(c, SUN_GOLD_TINT * (luma(c) / luma(SUN_GOLD_TINT)), near_sun * bliss_sun);
@@ -1039,6 +1067,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let band = exp(-abs(dir.y - 0.01) * SUN_BAND.y);
         c += vec3(1.0, 0.88, 0.66) * luma(p.sun) * light_strength() * along * band * SUN_BAND.z * bliss_sun;
     }
+    let c_pre_glow = c;
     c += sun_glow(dir, p) * glow_up;
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
     // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
@@ -1073,6 +1102,15 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             let round = 1.0 - SUN_BAND_ROUND * bliss_sun;
             c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.5 * wide_k * glow_up * round;
         }
+    }
+    // With Bliss's sun on a low morning sun all of that glow a pale cream: in the golden key's
+    // saturated gold the tight lobes went yellow through the curve just outside the sun's white
+    // core (hue 44, saturation 0.28 at about 7°), a yellow ring between the core and the pink sky
+    // (lv14 06 low, with mist, banks, bloom, glow and disc each off still there); Bliss's goes
+    // from cream at the sun through peach to the lavender, its saturation even.
+    if bliss_sun > 0.0 && scene.frame.x > 0.5 {
+        let g = c - c_pre_glow;
+        c = c_pre_glow + mix(g, SUN_GLOW_CREAM * (luma(g) / luma(SUN_GLOW_CREAM)), bliss_sun * SUN_GLOW_CREAM_K);
     }
     // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
     // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).

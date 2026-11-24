@@ -105,12 +105,34 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
   07 low 76/169/231 (101/174/234); vistas as before (06: 52/129/220 against 59/131/213). 18:00
   went 24/65/125 (Bliss 34/65/115) from `look_glow_fill 0`, now set by the live script, not from this.
 
+### The arc over the sun and the sky round it (lv14)
+
+- Not a ring of its own: our sky round a low sun stood tan-yellow out to about 45° (06 vista blue
+  channel 140-155, Bliss's 185-190 all over; Bliss is warm white within about 12°, lavender at
+  15-25°, blue beyond), and its edge against the lavender read as a yellow-green arc. At 06 low a
+  saturation bump about 7° out (hue 44, 0.28; Bliss's hue falls evenly 46 to 340 at 0.14-0.19)
+  through the curve from the golden key's saturated gold glow. It stayed with the mist, banks,
+  bloom, wide glow, sun disc and post's saturation boost each off.
+- With Bliss's sun on a low morning sun (`sky_color`): the sun's glow all a pale cream
+  (`SUN_GLOW_CREAM`), the dawn's cream drawn in to a lobe round the sun in a peach
+  (`SUN_CREAM_TIGHT`), the peach band nearer the sun (`SUN_GOLD` 8-25°), and away from the sun
+  the sky lavender from about 10° and blue beyond 30° at its own brightness (`SKY_AWAY`).
+- lv14 k (`lv14/sheet_lv14_k.jpg`, Bliss | lv13 b | now): the 06 vista's arc gone, its right side
+  blue (a little teal where it meets the tan); 06 low a faint ring left (saturation 0.21 at 7°
+  against 0.18 either side); 07 and 18:00 unchanged. 06 vista saturation 0.47 to 0.40 (Bliss
+  0.48): the land's haze reads the sky's colour, less gold now.
+- Tried and dropped: a bright core lobe round the sun (cos^60-150, x1.5-8): the sun barely grew
+  and a white blotch came up on the near forest. A brighter, tighter horizon band (`SUN_BAND` 10 9 2)
+  did not show: the land and banks cover that sky.
+- Live script: a fresh game has `look_mist_domes` and `look_mist_dawn_tint` off (as made); earlier
+  games had them set by hand (lv14's first set had no banks). Both now in `live.txt`.
+
 ## Open
 
-- 07 low darks now a little deep (p5 76 against Bliss's 101): the fade's far end may want shortening.
-- Bliss's large gold-white glow on the horizon round the sun, bleeding into the mist below: check
-  against the peak cap of 1.2; maybe a horizon-only glow.
-- The faint lavender arc at 07 low.
+- 07 low darks a little deep (p5 76 against Bliss's 101); 06 low as it is (Planner).
+- Bliss's large gold-white glow round the low sun, bleeding into the mist below: not in the sky
+  (the land covers it); it wants the banks' or the land haze's light toward the sun, or the bloom.
+- The 06 vista's sky still tan-grey between the sun and the blue, and its land 0.40 saturation.
 - Dawn clouds saturated yellow; 19:00 night curve; midday greens; horizon band.
 - Before ready: merge dev, niced `cargo check --workspace --all-targets`, keep the ENGINE_CHANGES
   row, bench the banks at Max on the final candidate.
