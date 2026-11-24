@@ -1238,6 +1238,10 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl physics::Cel
         ctl.ground = target * (1.0 - 0.6 * 0.91);
         ctl.air = if e.sprinting { 0.026 } else { 0.02 };
         ctl.careful = sneak;
+        // A mob doesn't walk off a drop deeper than it falls unharmed (`Control::drop_guard`).
+        if !e.player {
+            ctl.drop_guard = (e.safe_fall as f64).max(1.0);
+        }
         if w.has(weft_abi::walk::JUMP) {
             ctl.jump = physics::JUMP * e.jump_mul as f64;
             ctl.swim = true;

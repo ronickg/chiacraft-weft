@@ -276,8 +276,10 @@ pub fn search(w: &World, id: u64, st: &EntityState, water: bool) -> bool {
         let (dx, dz) = way(i);
         let (x, z) = ((st.pos.x + dx * WAY_OUT_LEG).floor() as i32, (st.pos.z + dz * WAY_OUT_LEG).floor() as i32);
         let y = st.pos.y.floor() as i32;
-        // The ground there, from 8 over its feet down to 24 under.
-        (y - 24..=y + 8)
+        // The ground there within what its paths go: one up, `FLEE_DROP` + 2 down (from 24
+        // under, a search for water picked the floor of a shaft 9 deep as the lowest way,
+        // ai1124_shaft1). A way with no such ground isn't taken.
+        (y - (FLEE_DROP + 2)..=y + 1)
             .rev()
             .find(|&g| crate::comfort::ground(w, x, g, z) == Some(g))
     };
