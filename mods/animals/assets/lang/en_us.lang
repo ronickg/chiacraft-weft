@@ -885,3 +885,4 @@ hint.animals.borkon.height = Borkon keeps only the heights: the altar stands at 
 hint.animals.borkon.rock = Borkon answers only among bare rock: {0} stone round the altar, {1} wanted.
 hint.animals.borkon.awake = Borkon is already awake near here.
 hint.animals.borkon_kid.tamed = The kid takes to you and follows.
+death.animals.thirst = {0} died of thirst

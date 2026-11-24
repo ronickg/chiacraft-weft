@@ -97,6 +97,19 @@ pub const MIGRATE_GIVE_UP: u64 = 6000;
 /// leader walked off alone (24-block legs, no waiting) out of its members' 16 blocks.
 pub const MIGRATE_WAIT: f32 = 4.0;
 pub const MIGRATE_PULL: f32 = JOIN_PULL;
+/// A thirsty one leaves the march to drink (`migrate_pull`): a migration pulls this share of
+/// its thirst's score, under it even while marching (`needs::KEEP_AT`), so it goes to water near
+/// or treks back to water its herd remembers (`drink::trek`), and the leader waits for it. Pulling
+/// above thirst, a herd led out of the llanos' winter followed its leader past its last pool and
+/// died parched within two days (ai1124_savanna3: four of five deer).
+pub const MIGRATE_THIRST: f32 = 0.75;
+const _: () = assert!(MIGRATE_THIRST * crate::needs::KEEP_AT < 1.0);
+
+/// How hard a migration pulls one whose thirst scores `thirst` (`needs::thirst_score`; 0 not
+/// thirsty): `MIGRATE_PULL`, or under its thirst when it is thirsty.
+pub fn migrate_pull(thirst: f32) -> f32 {
+    if thirst > 0.0 { MIGRATE_PULL.min(thirst * MIGRATE_THIRST) } else { MIGRATE_PULL }
+}
 // A leg ends inside the distance its members count it within (`senses::KIN` 16, less the ring),
 // and it gets there before giving up (6000 ticks: five minutes; 96 blocks at a deer's walk with
 // its waits is two or three).
@@ -198,5 +211,16 @@ mod tests {
     fn the_lowest_leads() {
         assert_eq!(leader([9, 4, 7]), 4);
         assert_eq!(leader([]), 0);
+    }
+
+    /// A thirsty one leaves the march for water even while marching; one not thirsty marches.
+    #[test]
+    fn thirst_goes_before_the_march() {
+        use crate::needs::{KEEP_AT, THIRSTY, thirst_score};
+        assert_eq!(migrate_pull(thirst_score(0.9, false)), MIGRATE_PULL);
+        for water in [THIRSTY - 0.01, 0.3, 0.1, 0.0] {
+            let thirst = thirst_score(water, false);
+            assert!(migrate_pull(thirst) * KEEP_AT < thirst, "at {water} water the march pulls over thirst");
+        }
     }
 }

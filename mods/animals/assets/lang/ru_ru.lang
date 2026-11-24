@@ -880,3 +880,4 @@ hint.animals.borkon.height = Боркон хранит только высоты
 hint.animals.borkon.rock = Боркон отвечает только среди голого камня: камня вокруг алтаря {0}, нужно {1}.
 hint.animals.borkon.awake = Боркон уже пробудился неподалёку.
 hint.animals.borkon_kid.tamed = Козлёнок привязался к вам и идёт следом.
+death.animals.thirst = {0} умер от жажды

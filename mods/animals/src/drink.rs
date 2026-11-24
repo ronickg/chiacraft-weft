@@ -33,7 +33,14 @@ const NOTHING: f64 = 400.0;
 const RAIN: f32 = 0.005;
 const WADING: f32 = 0.05;
 
+/// Death by thirst (`thirst`): its own cause, so a run's log tells a parched animal from a starved
+/// one (ai1124_savanna3's "starve" deaths were thirst).
+static THIRST: DamageCause = DamageCause::named("thirst");
+
 pub fn init(r: &mut Registry) {
+    r.damage_cause(&THIRST)
+        .bypasses_armor()
+        .death_message("death.animals.thirst");
     r.entity_component(&DRINK, [0.0; 4], 0);
     r.entity_component(&WATERS, [[0.0f32; 4]; 2], 0);
     for s in &SPECIES {
@@ -69,7 +76,7 @@ pub fn thirst(w: &World, id: u64, a: &Animal, st: &EntityState, rate: f32, secs:
         a.thirst = t;
     }
     if t >= 1.0 && !animal::tamed(w, id) {
-        w.damage(id, Damage::new(st.max_health / PARCHED_SECS * secs, damage_cause::STARVE));
+        w.damage(id, Damage::new(st.max_health / PARCHED_SECS * secs, &THIRST));
     }
 }
 

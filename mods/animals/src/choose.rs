@@ -120,9 +120,9 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
     s[Need::Watch as usize] = animals_core::roles::WATCH;
     s[Need::Investigate as usize] = animals_core::roles::INVESTIGATE;
     // A herd on the move, its leader and those whose leader is on it, goes on above a daytime rest
-    // (`groups::MIGRATE_PULL`).
+    // (`groups::MIGRATE_PULL`), but a thirsty one drinks first (`groups::migrate_pull`).
     if crate::migrate::migrating(w, id) || crate::group::leader_doing(w, id) == Some(Need::Migrate as u8) {
-        s[Need::Migrate as usize] = animals_core::groups::MIGRATE_PULL;
+        s[Need::Migrate as usize] = animals_core::groups::migrate_pull(s[Need::Drink as usize]);
     }
     // Staying put outranks what would move it, and nothing else.
     s[Need::Hold as usize] = s[Need::Comfort as usize]
