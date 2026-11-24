@@ -51,6 +51,14 @@ fn metal(words: &[u32], out: &std::path::Path) -> Result<(), String> {
 fn main() {
     let repo = std::path::PathBuf::from(std::env::args().nth(1).expect("repo"));
     let msl = !std::env::args().any(|a| a == "--no-msl");
+    // `--only <label>` checks the shaders whose label is exactly that; `--entry <name>` only that
+    // entry point's Metal pass. Each Metal pass then prints its time (to find what is slow to compile).
+    let arg = |flag: &str| {
+        let a: Vec<String> = std::env::args().collect();
+        a.iter().position(|x| x == flag).and_then(|i| a.get(i + 1).cloned())
+    };
+    let (only, entry) = (arg("--only"), arg("--entry"));
+    let timed = only.is_some() || entry.is_some();
     let out_dir = std::env::temp_dir().join("shadercheck2-msl");
     let _ = std::fs::create_dir_all(&out_dir);
     let rd = |p: &str| std::fs::read_to_string(repo.join(p)).unwrap_or_else(|e| panic!("{p}: {e}"));
@@ -59,6 +67,9 @@ fn main() {
     let pack = |f: &str| format!("// From vitals::air\nconst MIST_TOP: f32 = 18.0;\n{look}\n{}", rd(&format!("mods/base/shaderpack/{f}")));
     let mut bad = 0;
     let mut check = |label: &str, src: String, hooks: &[&Hook]| {
+        if only.as_ref().is_some_and(|o| o != label) {
+            return;
+        }
         let parts: Vec<(&Hook, &[(String, String)])> = hooks.iter().map(|h| (*h, &[][..])).collect();
         let shader = match shaders::compose(label, &src, &parts) {
             Ok((shader, _)) => shader,
@@ -74,9 +85,16 @@ fn main() {
         }
         let mut errors = Vec::new();
         for ep in shader.module.entry_points.iter() {
+            if entry.as_ref().is_some_and(|e| *e != ep.name) {
+                continue;
+            }
+            let started = std::time::Instant::now();
             let file = out_dir.join(format!("{}.{}.metal", label.replace([' ', '(', ')', ','], "_"), ep.name));
             if let Err(e) = spirv(&shader, ep.stage, &ep.name).and_then(|w| metal(&w, &file)) {
                 errors.push(format!("{}: {e}", ep.name));
+            }
+            if timed {
+                println!("     {} {:.2} s ({} bytes of MSL)", ep.name, started.elapsed().as_secs_f32(), std::fs::metadata(&file).map_or(0, |m| m.len()));
             }
         }
         if errors.is_empty() {
