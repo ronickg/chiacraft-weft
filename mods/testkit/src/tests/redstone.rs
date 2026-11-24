@@ -2108,7 +2108,9 @@ pub async fn redstone_on_a_structure(t: T) -> R {
     // a frame (5 fps on CI) missed it.
     let moving = EntityKind::lookup("core:moving_blocks").ok_or("no moving blocks kind")?;
     if t.c().entity(uid).is_none() {
-        let near = t.op(&format!("near {} {} {} 40", f[0] + 4, f[1] + 2, f[2] - 4)).await?;
+        let near = t
+            .op(&format!("near {} {} {} 40", f[0] + 4, f[1] + 2, f[2] - 4))
+            .await?;
         return Err(format!("the lift is gone before the piston moved (CI: 'entity 4'): {near}"));
     }
     let (mut seen, mut carried) = (false, false);
