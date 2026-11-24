@@ -286,6 +286,12 @@ pub struct Post {
     /// The world before what is seen through it is drawn (`copy_behind`): the copy pipeline, the
     /// color and depth images with their bindless indices and size, and the copy's pass entries.
     copy_pipe: Option<PipelineId>,
+    /// A pack's pass over the world's image before temporal anti-aliasing (`fs_pre_taa` in its
+    /// post.wgsl), run while `core:ground_map` is on (chiacraft's mist banks, marched once per
+    /// pixel there, not per fragment drawn): its pipeline and its image (texture, bindless index,
+    /// size), which TAA, the upscaler and the effects then read as the world's.
+    pre_pipe: Option<PipelineId>,
+    pre_target: Option<(TextureId, u32, (u32, u32))>,
     behind: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
     copy_params: Vec<BufferId>,
     /// The HDR world's bloom pyramid and exposure: the pack's three passes (down, up, exposure),
@@ -359,6 +365,8 @@ impl Post {
             params: Vec::new(),
             no_scene: None,
             copy_pipe: None,
+            pre_pipe: None,
+            pre_target: None,
             behind: None,
             copy_params: Vec::new(),
             bloom_pipes: None,
@@ -582,6 +590,21 @@ impl Post {
                     })
                     .map_err(|e| log::warn!("post: no copy of the world for water: {}", e.0))
                     .ok();
+                // The pass before TAA (`fs_pre_taa`); most packs have none.
+                let pre = gpu
+                    .create_pipeline(&PipelineDesc {
+                        label: "post pre taa",
+                        shader: &s,
+                        vertex: "vs",
+                        fragment: Some("fs_pre_taa"),
+                        color: Some(world_format()),
+                        depth: None,
+                        blend: Blend::None,
+                        cull_back: false,
+                        topology: Topology::Triangles,
+                        motion: false,
+                    })
+                    .ok();
                 // The last pass onto the screen, from the HDR world.
                 let last = if hdr() {
                     Some(
@@ -640,10 +663,13 @@ impl Post {
                 } else {
                     None
                 };
-                Ok((p, copy, slots.pop().unwrap_or_default(), low, low_slots, last, bloom))
+                Ok((p, copy, slots.pop().unwrap_or_default(), low, low_slots, last, bloom, pre))
             });
         match made {
-            Ok((p, copy, slots, low, low_slots, last, bloom)) => {
+            Ok((p, copy, slots, low, low_slots, last, bloom, pre)) => {
+                if let Some(old) = std::mem::replace(&mut self.pre_pipe, pre) {
+                    gpu.destroy_pipeline(old);
+                }
                 if let Some(old) = std::mem::replace(&mut self.bloom_pipes, bloom) {
                     old.into_iter().for_each(|p| gpu.destroy_pipeline(p));
                 }
@@ -910,6 +936,27 @@ impl Post {
                     (world_tex, world_idx) = (out, gpu.texture_index(out));
                 }
             }
+        }
+        // The pack's pass before TAA (`fs_pre_taa`), while the ground map is on: its image is this
+        // frame's world from here on, for TAA, the upscaler and the effects.
+        let mut pre_entry: Option<(Pass, TextureId)> = None;
+        if let (Some(_), true) = (self.pre_pipe, crate::settings::ground_map()) {
+            let (w, h) = (frame.width.max(1), frame.height.max(1));
+            if self.pre_target.is_none_or(|t| t.2 != (w, h)) {
+                if let Some((old, ..)) = self.pre_target.take() {
+                    gpu.destroy_texture(old);
+                }
+                let t = gpu.create_texture(
+                    &TextureDesc { width: w, height: h, mips: 1, format: world_format(), render_target: true },
+                    "post pre taa",
+                );
+                self.pre_target = Some((t, gpu.texture_index(t), (w, h)));
+            }
+            let (t, ti, _) = self.pre_target.unwrap();
+            pre_entry = Some((Pass { scene: world_idx, slot: 0, time, size: [w as f32, h as f32], depth, ..Pass::default() }, t));
+            (world_tex, world_idx) = (t, ti);
+        } else if let Some((old, ..)) = self.pre_target.take() {
+            gpu.destroy_texture(old);
         }
         // Temporal anti-aliasing first: this frame's world gathered into the picture so far, which
         // all after it read in the world's place (`src`): the bloom, the half-size parts and the
@@ -1273,11 +1320,23 @@ impl Post {
                 p.exposure = now_idx + 1;
             }
         }
-        // Temporal anti-aliasing's entries last, kept whatever else is cut.
-        passes.truncate(MAX_PASSES - taa_entries.len());
+        // Temporal anti-aliasing's entries last, kept whatever else is cut, and the pass before it.
+        passes.truncate(MAX_PASSES - taa_entries.len() - pre_entry.is_some() as usize);
         let first_taa = passes.len();
         passes.extend(taa_entries);
+        let pre_draw = pre_entry.map(|(entry, target)| {
+            passes.push(entry);
+            (target, (passes.len() - 1) as u32)
+        });
         gpu.mapped(buf)[..passes.len() * size_of::<Pass>()].copy_from_slice(bytemuck::cast_slice(&passes));
+        if let (Some((target, entry)), Some(pre)) = (pre_draw, self.pre_pipe) {
+            list.push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(target), None)), depth: None });
+            list.pipeline(pre);
+            list.bind(crate::gpu_layout::bind::post::PASSES, buf);
+            list.bind(crate::gpu_layout::bind::post::SCENE, scene);
+            list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: entry });
+            list.push(Cmd::EndPass);
+        }
         for (target, beside, pipe, k) in taa_draws {
             list.push(Cmd::BeginPass {
                 motion: beside.map(|t| (t, Some([0.0; 4]))),
