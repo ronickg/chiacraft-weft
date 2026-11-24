@@ -396,6 +396,9 @@ fn age_gates(w: &mut String, g: &graph::Solved) {
         );
     }
     w.push_str("\nKnown skips:\n\n");
+    if graph::KNOWN_SKIPS.is_empty() {
+        w.push_str("- none (iron, the first, takes a bronze pickaxe since 11-23)\n");
+    }
     for (root, why) in graph::KNOWN_SKIPS {
         let _ = writeln!(w, "- {root}: {why}");
     }

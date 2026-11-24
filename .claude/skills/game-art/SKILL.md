@@ -131,6 +131,16 @@ the icons (the one cleanup kept is `pixfix`, orphan speckle and the outline, whi
 `art.py` runs on every item cut since 11-22). Items stay flat pictures, as in Minecraft; 3D held models are set aside
 (`mods/base/source/items/`).
 
+**A part made in many materials** (approved by Ronald 11-23, the arrowheads: "arrows lgtm"):
+generate one drawing per family whose members share a shape (knapped stone, bone, forged metal,
+gem), turn it into a shade map (red = ramp step × 36, what `stack_look` reads), and paint it with
+each member's ramp in code; a family's map uses only the steps that rise in every member's ramp.
+Where a member's ramp makes it read as something else (wrought iron's beige read as bone, chert
+was flint's twin, a grey obsidian read as flint), give that member its own 8 colours in the
+painting rather than changing the shared ramp. The same part smaller (an arrow's head, 8 px) is the
+loose drawing shrunk in code, edge pixels its darkest shade; generating it small gave 5 px smudges.
+Worked example: `chiacraft-archive/images/art/2026-11-23/arrowheads/process.py`.
+
 ## UI parts (the kit)
 
 UI parts come from the master prompt below, run through Codex (`notes/ui-codex/gen.sh NAME

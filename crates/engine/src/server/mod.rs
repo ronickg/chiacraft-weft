@@ -1213,6 +1213,7 @@ impl Server {
             .enumerate()
             .map(|(dim, tops)| {
                 let dim = dim as u32;
+                tops.finish_checks(c, dim, seed);
                 let all = tops.finish_rebuild(c, dim, seed);
                 let cols = if all { tops.columns.values().cloned().collect() } else { tops.take_changed() };
                 (dim, all, cols)
