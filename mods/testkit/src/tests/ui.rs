@@ -980,8 +980,10 @@ pub async fn rebind(t: T) -> R {
     // stopped the walks.
     // `keys`: (key, seconds held, seconds before the next one).
     let bind = async |keys: &[(&str, f32, f32)]| -> R {
-        t.c().menu_open(&screens::CONTROLS);
-        t.screen("core:controls").await?;
+        t.open_screen("core:controls", |t| {
+            t.c().menu_open(&screens::CONTROLS);
+        })
+        .await?;
         t.frames(2).await?;
         t.click_ui("id:bind:core:forward:0", 0);
         t.secs(0.2).await?;

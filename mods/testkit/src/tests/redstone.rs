@@ -1095,9 +1095,9 @@ pub async fn body_walking(t: T) -> R {
     };
     let (b, p) = (pos(t.clone(), id.to_string()).await?, pos(t.clone(), pig.clone()).await?);
     let start_z = p[2] - b[2];
-    // Somewhere on the deck.
-    t.op(&format!("navigate {pig} {} {} {}", p[0].floor(), p[1].floor(), p[2].floor() as i32 + 2))
-        .await?;
+    // Somewhere on the deck: two blocks on from where it stands when the order arrives (the deck
+    // flies at 6 a second; a point read a round trip before was off it on CI).
+    t.op(&format!("navigate_by {pig} 0 0 2")).await?;
     t.secs(3.0).await?;
     let (b, p) = (pos(t.clone(), id.to_string()).await?, pos(t.clone(), pig.clone()).await?);
     t.check(p[1] > b[1] + 0.5, format!("it is still on the deck: {p:?} on {b:?}"));

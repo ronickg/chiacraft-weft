@@ -397,8 +397,8 @@ pub async fn advancements(t: T) -> R {
     t.press("core:use");
     t.until("advancement for the torch", Duration::from_secs(5), |t| made(t).count_ones() == 2)
         .await?;
-    t.press("base:advancements");
-    t.screen("base:advancements").await?;
+    t.open_screen("base:advancements", |t| t.press("base:advancements"))
+        .await?;
     t.frames(3).await?;
     t.laid_out(&["text:Advancements", "text:Getting Started", "text:Exploration", "text:2 of "]);
     t.shot("list").await?;
@@ -2719,8 +2719,12 @@ pub async fn swimming_no_bob(t: T) -> R {
     t.hold("core:sprint", 4.0);
     t.hold("core:forward", 4.0);
     t.secs(1.0).await?;
-    for _ in 0..120 {
+    // 2.5 s inside the 4 s hold by the script clock, not 120 frames: on CI (software Vulkan) those
+    // outlast the hold, and the swim ended after 12 of them.
+    let (end, mut frames) = (crate::runner::script_clock() + Duration::from_secs_f32(2.5), 0);
+    while crate::runner::script_clock() < end {
         t.frames(1).await?;
+        frames += 1;
         if let Some(me) = t
             .c()
             .view()
@@ -2732,8 +2736,8 @@ pub async fn swimming_no_bob(t: T) -> R {
             swum = swum.max(t.state().bob);
         }
     }
-    t.note(format!("swimming frames {samples}, touching the bottom {touching}, bob {swum}"));
-    t.check(samples > 20, format!("swam for {samples} frames"));
+    t.note(format!("swimming frames {samples} of {frames}, touching the bottom {touching}, bob {swum}"));
+    t.check(samples >= 3 && samples * 3 > frames, format!("swam for {samples} of {frames} frames"));
     t.check(swum < 0.01, format!("swimming bobs: {swum}"));
     Ok(())
 }

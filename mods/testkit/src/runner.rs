@@ -244,6 +244,24 @@ impl T {
         })
     }
 
+    /// Does `open` (a key press, `menu_open`) until screen `name` shows, again every 3 seconds
+    /// up to four times: on CI (software Vulkan) a single one right after joining or placing a
+    /// block was lost, and the test waited 30 s for a screen nothing had opened.
+    pub async fn open_screen(&self, name: &str, open: impl Fn(&T)) -> R {
+        let shown = |t: &T| t.0.borrow().screen == name && t.flag(cf::SCREEN_READY);
+        for _ in 0..4 {
+            open(self);
+            let end = script_clock() + Duration::from_secs(3);
+            while script_clock() < end {
+                self.frames(1).await?;
+                if shown(self) {
+                    return Ok(());
+                }
+            }
+        }
+        self.screen(name).await
+    }
+
     /// `name` is the top screen and it is laid out and drawn.
     pub fn screen(&self, name: &str) -> Wait<impl FnMut(&T) -> bool + Unpin> {
         let n = name.to_string();
