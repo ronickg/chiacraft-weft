@@ -1166,10 +1166,13 @@ impl UiRenderer {
             });
             return Some(row.at + col.unwrap_or(0));
         }
+        // A one-line input's text at `input_scale`, inset as drawn (`input_inset`).
+        let px = px * ui.input_scale;
+        let inset = input_inset(ui);
         let width = |s: &str| super::text::layout(&super::text::plain(s), &self.font, None).width * px;
         // As drawn: slid left so the caret is in sight.
         let before: String = value.chars().take(*caret).collect();
-        let x = p.x - n.rect.x - 4.0 + (width(&before) - (n.rect.w - 8.0) + px).max(0.0);
+        let x = p.x - n.rect.x - inset + (width(&before) - (n.rect.w - 2.0 * inset) + px).max(0.0);
         let chars: Vec<char> = value.chars().collect();
         // The boundary between two chars the click is nearest to.
         (0..=chars.len()).min_by(|&i, &j| {
@@ -1751,16 +1754,17 @@ impl UiRenderer {
             }
             Kind::Input { value, caret, .. } => {
                 background(self, "input", if ui.focused == Some(id) { "focused" } else { "" });
-                let px = scale * ui.text_unit;
+                let px = scale * ui.text_unit * ui.input_scale;
                 let spans = super::text::plain(value);
                 let layout = super::text::layout(&spans, &self.font, None);
                 let before: String = value.chars().take(*caret).collect();
                 let caret_x = super::text::layout(&super::text::plain(&before), &self.font, None).width * px;
                 // Text longer than the field slides left so the caret stays visible; the rest is
                 // clipped to the field.
-                let room = r.w - 8.0 * scale;
+                let inset = input_inset(ui) * scale;
+                let room = r.w - 2.0 * inset;
                 let shift = (caret_x - room + px).max(0.0);
-                let tx = r.x + 4.0 * scale - shift;
+                let tx = r.x + inset - shift;
                 let ty = r.y + (r.h - 16.0 * px) / 2.0;
                 let start = self.quads.len();
                 if let Some(a) = ui.anchor.filter(|&a| ui.focused == Some(id) && a != *caret) {
@@ -2058,4 +2062,10 @@ mod preview_tests {
             }
         }
     }
+}
+
+/// How far a one-line input's text sits in from its sides, GUI pixels: 4, and 6 for text at 2x
+/// (chiacraft, style 1's fields had almost no room round their text; Planner 11-24).
+fn input_inset(ui: &crate::ui::Ui) -> f32 {
+    4.0 + 2.0 * (ui.input_scale - 1.0).max(0.0)
 }

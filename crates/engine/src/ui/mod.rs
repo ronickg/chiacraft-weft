@@ -403,6 +403,9 @@ pub struct Ui {
     pub size: Vec2,
     /// GUI pixels per font pixel, chosen by the caller so glyphs land on whole physical pixels.
     pub text_unit: f32,
+    /// Font pixels per text unit in its one-line inputs (chiacraft: style 1's menu windows set 2,
+    /// so a field's text is the size of the labels and buttons round it; Planner 11-24).
+    pub input_scale: f32,
     /// When it opened (`shaders::clock`), for `open` animations.
     pub shown: f32,
 }
@@ -591,6 +594,7 @@ impl Ui {
             dragging: None,
             size: Vec2::ZERO,
             text_unit: 0.5,
+            input_scale: 1.0,
             shown: crate::shaders::clock(),
         }
     }

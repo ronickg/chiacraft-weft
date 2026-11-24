@@ -311,7 +311,7 @@ fn client(r: &mut Registry) {
         let tabs: [crate::window::Tab; 1] = [("window.base.tab.stats", |c| {
             c.client().menu_open(&crate::levels::SCREEN);
         })];
-        crate::window::family_window(ui, S::column().pad(8.0).gap(6.0), Some("advancements.base.title"), &tabs, |ui| {
+        crate::window::family_window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(6.0), Some("advancements.base.title"), &tabs, |ui| {
             ui.row(S::row().gap(8.0), |ui| {
                 ui.spacer();
                 ui.text_bind_styled(S::column().class("dim").no_wrap(), |v, out| {

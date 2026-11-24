@@ -54,7 +54,7 @@ pub fn register(r: &mut Registry) {
         .on_change(crate::ruins::furnace_changed)
         .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
+            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.column(S::column().gap(2.0), |ui| {
@@ -95,7 +95,7 @@ pub fn register(r: &mut Registry) {
         // Its screen (ours, not the default one) draws the player's slots: the menu must have them.
         .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0), &[], |ui| {
+            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0), &[], |ui| {
                 ui.group("chest");
                 ui.player_inventory(true);
             });

@@ -592,21 +592,28 @@ pub fn frame(ui: &mut Ui, cx: &BuildCx, key: &str, f: impl FnOnce(&mut Ui)) {
     });
 }
 
+/// The inside of a style 1 menu window, GUI pixels from the panel's box (`UI Style Guide.md`,
+/// "Spacing", chiacraft 11-24): its rail is 10 thick, then 10 to the content at the sides and the
+/// bottom; at the top 8 to the heading's line, whose 3x glyphs start a little below it.
+const WINDOW_PAD: [f32; 4] = [20.0, 18.0, 20.0, 20.0];
+
 /// A menu window in style 1 (chiacraft, Planner 11-24): the title's framed panel (`menu_panel`,
-/// corner plates, see-through) centred on the screen, its heading inside at 3x in the title
-/// colour (2x or 1x where that is too wide), 4 GUI more under it, then what `f` adds, `gap` apart.
-/// No taller than the screen: a scrolling list in it gives way. Without `menu_panel` in the look,
-/// Weft's `frame`. Returns whether it drew the panel (the caller's own inner panels then go).
+/// corner plates, nearly opaque) centred on the screen, its heading inside at 3x in the title
+/// colour (2x or 1x where that is too wide), then what `f` adds, `gap` apart, with even margins
+/// (`WINDOW_PAD`). Its one-line fields write at 2x. No taller than the screen: a scrolling list in
+/// it gives way. Without `menu_panel` in the look, Weft's `frame`. Returns whether it drew the
+/// panel (the caller's own inner panels then go).
 pub fn window(ui: &mut Ui, cx: &BuildCx, key: &str, gap: f32, f: impl FnOnce(&mut Ui)) -> bool {
     if cx.look.texture("menu_panel", "").is_none() {
         frame(ui, cx, key, f);
         return false;
     }
+    ui.input_scale = 2.0;
     let bg = if cx.in_game { "overlay" } else { "background" };
     ui.root_style(Style::default().stretch());
     ui.panel(bg, Style::default().grow().center().pad(12.0), |ui| {
         let mut style = Style::default().center().gap(gap);
-        style.pad = [16.0, 14.0, 16.0, 18.0];
+        style.pad = WINDOW_PAD;
         style.max_h = (cx.size.y - 24.0).max(80.0);
         ui.panel("menu_panel", style, |ui| {
             let t = label(ui, cx, key, &[], "title");
@@ -616,11 +623,24 @@ pub fn window(ui: &mut Ui, cx: &BuildCx, key: &str, gap: f32, f: impl FnOnce(&mu
                 text.fit = 3.0;
             }
             ui.nodes[t].style = ui.nodes[t].style.self_align(crate::ui::Align::Stretch);
-            ui.add(Kind::Container { class: None }, Style::default().h(4.0));
             f(ui);
         });
     });
     true
+}
+
+/// A label over a field or a slider in a menu: at 2x in style 1, the size of the buttons round it
+/// (the type scale in `UI Style Guide.md`: no 1x label beside 2x buttons, Planner 11-24), else as
+/// it was. Left-aligned, across its column.
+pub fn field_label(ui: &mut Ui, cx: &BuildCx, t: NodeId) {
+    if !cx.look.has_text("menu_button") {
+        return;
+    }
+    if let Some(text) = ui.text_mut(t) {
+        text.wrap = false;
+        text.fit = 2.0;
+    }
+    ui.nodes[t].style = ui.nodes[t].style.self_align(crate::ui::Align::Stretch);
 }
 
 // ---------------------------------------------------------------- title
@@ -648,8 +668,10 @@ impl Screen for Title {
                     let frame = if cx.look.texture("menu_panel", "").is_some() { "menu_panel" } else { "panel" };
                     // Style 1's proportions (11-24, `reports/UI craft.md`): 188 wide and about 260
                     // tall, the logo near the top frame, the buttons 77% of the width.
+                    // The rail is 10 thick: 10 more above the logo and below the last row (it
+                    // touched the top frame, Planner 11-24); 12 at the sides with the column's 6.
                     let mut style = Style::default().w(188.0).gap(7.0);
-                    style.pad = [16.0, 14.0, 16.0, 18.0];
+                    style.pad = [16.0, 20.0, 16.0, 20.0];
                     ui.panel(frame, style, |ui| {
                         // The `logo` texture across the bar: whole multiples of its pixels while it fits.
                         if let Some(logo) = cx.look.texture("logo", "") {
@@ -661,8 +683,10 @@ impl Screen for Title {
                             let k = if size[0] <= 156.0 { (156.0 / size[0]).floor() } else { 156.0 / size[0] };
                             ui.add(Kind::Image { texture: logo, color: 0xFFFFFFFF }, Style::default().w(size[0] * k).h(size[1] * k));
                         }
-                        // The buttons in a narrower column than the logo.
-                        let mut column = Style::default().gap(7.0).stretch();
+                        // The buttons in a narrower column than the logo, its width fixed: the
+                        // version line under them wraps instead of widening every button past the
+                        // rail (Planner 11-24, after the version text grew).
+                        let mut column = Style::default().gap(7.0).stretch().w(156.0);
                         column.pad = [6.0, 0.0, 6.0, 0.0];
                         ui.container(column, |ui| {
                             // Style 1's own button classes, cut at the buttons' height so their bands never
@@ -973,13 +997,14 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
             // meanwhile.
             let dragged: Rc<std::cell::Cell<Option<f64>>> = Rc::default();
             let (k, d2, show, shown) = (key.clone(), d.clone(), show.clone(), dragged.clone());
-            ui.text_bound(
+            let t = ui.text_bound(
                 "default",
                 Box::new(move |_: &Ctx| {
                     let v = shown.get().unwrap_or_else(|| crate::config::get(id));
                     ("settings.config_value".into(), vec![Arg::Key(k.clone()), show(&d2, &k, v)])
                 }),
             );
+            field_label(ui, cx, t);
             if !locked {
                 let range = (d.max - d.min).max(1e-9);
                 let unit = if d.kind == weft_abi::config_kind::INT { 1.0 } else { range / 100.0 };
@@ -1111,7 +1136,7 @@ impl Screen for ConfigScreen {
                 // node gives way when the column is too tall), so a short page leaves no empty
                 // half (chiacraft, Planner 11-24).
                 Style::default()
-                    .pad(8.0)
+                    .pad(if framed { 0.0 } else { 8.0 })
                     .gap(6.0)
                     .stretch()
                     .w(if framed { 320.0 + crate::ui::Scrollbar::ROOM } else { 320.0 })

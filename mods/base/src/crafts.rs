@@ -160,7 +160,7 @@ fn station(
     m.group("output", Slots::single().output().holder())
         .player_inventory()
         .screen(move |ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
+            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.column(S::column().gap(2.0), |ui| {

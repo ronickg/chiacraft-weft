@@ -1114,14 +1114,23 @@ impl Screen for CreateWorld {
         crate::screens::window(ui, cx, "world.create", 6.0, |ui| {
             let fields = Kind::Container { class: (!framed).then(|| "panel".to_string()) };
             let pad = if framed { 0.0 } else { 8.0 };
-            ui.with(fields, Style::default().pad(pad).gap(4.0).stretch().w(260.0), |ui| {
-                label(ui, cx, "world.name", &[], "default");
-                // The default name in the player's language (chiacraft; it was "New World" in every one).
-                let name = ui.add(Kind::input(cx.lang.get("world.default_name"), 32), Style::default().h(18.0).stretch());
-                ui.set_id(name, "name");
-                label(ui, cx, "world.seed", &[], "default");
-                let seed = ui.add(Kind::input("", 32), Style::default().h(18.0).stretch());
-                ui.set_id(seed, "seed");
+            // Style 1 (the spacing in `UI Style Guide.md`): fields 22 tall for their 2x text, a
+            // label 2 over its field, 8 between the pairs.
+            let (field_h, pair_gap, gap) = if framed { (22.0, 2.0, 8.0) } else { (18.0, 4.0, 4.0) };
+            ui.with(fields, Style::default().pad(pad).gap(gap).stretch().w(260.0), |ui| {
+                ui.container(Style::default().gap(pair_gap).stretch(), |ui| {
+                    let t = label(ui, cx, "world.name", &[], "default");
+                    crate::screens::field_label(ui, cx, t);
+                    // The default name in the player's language (chiacraft; it was "New World" in every one).
+                    let name = ui.add(Kind::input(cx.lang.get("world.default_name"), 32), Style::default().h(field_h).stretch());
+                    ui.set_id(name, "name");
+                });
+                ui.container(Style::default().gap(pair_gap).stretch(), |ui| {
+                    let t = label(ui, cx, "world.seed", &[], "default");
+                    crate::screens::field_label(ui, cx, t);
+                    let seed = ui.add(Kind::input("", 32), Style::default().h(field_h).stretch());
+                    ui.set_id(seed, "seed");
+                });
             });
             // Every game mode, then hardcore: survival with one life and no cheats.
             let modes = crate::world::GameMode::all().count();

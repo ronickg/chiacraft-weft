@@ -45,7 +45,7 @@ DOOR = os.path.join(ARC2, "parts", "door_try2.png")  # Quit's door (10 image px 
 PENCIL = os.path.join(ARC2, "parts", "pencil_try1.png")  # the editor square (before icons16)
 ICONS = os.path.join(ARC2, "parts", "icons16_try3.png")  # the title's six icons, 16 x 16, 10 px a pixel, solid (Planner 11-24: fuller)
 CORNERS = os.path.join(ARC2, "parts", "corners_try3.png")  # the title frame's four plates, 48 x 48
-SEE = 217  # menu screens' insides: about 85% opaque, the world shows through (Ronald, 11-24)
+SEE = 235  # menu screens' insides: about 92% opaque (Ronald 11-24 "a little transparent"; 85% was busy over the title art, Planner 11-24)
 GUI = os.path.join(ROOT, "mods", "base", "assets", "textures", "gui")
 K = 5  # image pixels per UI pixel
 
@@ -481,7 +481,9 @@ def build():
     # `panel` as `menu_window`, the same frame with a see-through inside (Ronald, 11-24: "we should
     # make it also a little transparent in the menu screen").
     small = frame((760, 80), 64, 16, 10)
-    parts["panel"] = (small, gui("nine_slice", (16,) * 4, (64, 64), "middle = tile\n"))
+    # `corner`: how far in from the top right a menu's corner icons (sort, put away, close) sit,
+    # GUI pixels: the content margin, so they sit in the heading's row (Planner 11-24).
+    parts["panel"] = (small, gui("nine_slice", (16,) * 4, (64, 64), "middle = tile\ncorner = 12\n"))
     see = frame((760, 80), 64, 16, 10, alpha=SEE)
     for name in ("menu_window", "news"):
         parts[name] = (see, gui("nine_slice", (16,) * 4, (64, 64), "middle = tile\n"))

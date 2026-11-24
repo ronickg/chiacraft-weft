@@ -175,7 +175,7 @@ fn screen(ui: &mut Ui) {
             c.client().menu_open(&crate::advancements::SCREEN);
         }),
     ];
-    crate::window::window_titled(ui, S::row().pad(6.0).gap(6.0), "web.base.title", &tabs, |ui| {
+    crate::window::window_titled(ui, S::row().pad(crate::window::WINDOW_PAD).gap(6.0), "web.base.title", &tabs, |ui| {
         sidebar(ui, &s, points, v.refund);
         ui.column(S::column().gap(3.0), |ui| {
             ui.row(S::row().gap(3.0).center(), |ui| {
