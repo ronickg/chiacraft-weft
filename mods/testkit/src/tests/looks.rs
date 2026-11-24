@@ -106,6 +106,11 @@ pub async fn texture_reload(t: T) -> R {
         .await?;
     t.c().set_look(0.0, 0.0);
     t.settled().await?;
+    // Time stands still and the GUI is off between the grabs: on CI "plain" and "back" are ~30 s
+    // of game apart (~3 s on a GPU), and the clock, vitals and the hour's light change meanwhile.
+    t.cmd("/tick freeze").await?;
+    t.press("core:hide_hud");
+    t.frames(3).await?;
     let plain = t.grab().await?;
     let pack = format!("{}/resourcepacks/testkit_reload", t.c().run_dir());
     let file = format!("{pack}/base/textures/block/dirt.png");
@@ -124,9 +129,11 @@ pub async fn texture_reload(t: T) -> R {
     let blue = reload(Some([40, 40, 200])).await?;
     weft_sdk::settings::RESOURCE_PACKS.set("");
     let back = reload(None).await?;
+    t.press("core:hide_hud");
+    t.cmd("/tick unfreeze").await?;
     t.check(T::differ(&plain, &red) > 0.2, "the pack's dirt shows after a reload");
     t.check(T::differ(&red, &blue) > 0.2, "a changed file shows after the next reload");
-    t.check(T::differ(&plain, &back) < 0.01, "without the pack the dirt is back");
+    t.check(T::differ(&plain, &back) < 0.01, format!("without the pack the dirt is back: {:.4}", T::differ(&plain, &back)));
     Ok(())
 }
 
@@ -296,12 +303,20 @@ pub async fn models(t: T) -> R {
     t.frames(3).await?;
     t.press("core:use");
     t.secs(1.5).await?;
-    let a = t.grab().await?;
-    t.secs(0.3).await?;
-    let b = t.grab().await?;
     // Below the horizon: clouds drift up there.
     let ground = |f: &[u8]| f[f.len() / 4 / 3 * 4..].to_vec();
-    t.check(T::differ(&ground(&a), &ground(&b)) == 0.0, "the bow holds its last frame");
+    // Two grabs 0.3 s apart the same (the idle, a 3 s loop, never is). The bow starts a round
+    // trip after the press: on CI that was over a second, and 1.5 s on it still moved.
+    // Near nothing rather than nothing: under load (--jobs 2) no two grabs in 8 s were the same.
+    let (mut least, mut a) = (f64::MAX, t.grab().await?);
+    let end = crate::runner::script_clock() + Duration::from_secs(8);
+    while least > 0.0001 && crate::runner::script_clock() < end {
+        t.secs(0.3).await?;
+        let b = t.grab().await?;
+        least = least.min(T::differ(&ground(&a), &ground(&b)));
+        a = b;
+    }
+    t.check(least <= 0.0001, format!("the bow holds its last frame: {least:.5}"));
     t.shot("idol_bow").await?;
     // A mod has it play one action as another for a while.
     t.op(&format!("action {idol}")).await?;
@@ -317,9 +332,14 @@ pub async fn models(t: T) -> R {
     t.frames(3).await?;
     let a = t.grab().await?;
     t.op("action me wave").await?;
-    t.secs(0.5).await?;
-    let b = t.grab().await?;
-    t.check(T::differ(&a, &b) > 0.002, "the first person hand waves");
+    // The most it moved over two seconds: the wave starts a round trip after the op, and one grab
+    // half a second on missed it on a loaded PC (--jobs 2).
+    let (mut moved, end) = (0.0f64, crate::runner::script_clock() + Duration::from_secs(2));
+    while moved <= 0.002 && crate::runner::script_clock() < end {
+        t.secs(0.1).await?;
+        moved = moved.max(T::differ(&a, &t.grab().await?));
+    }
+    t.check(moved > 0.002, format!("the first person hand waves: {moved:.4}"));
     Ok(())
 }
 
@@ -661,9 +681,20 @@ pub async fn block_dust_scatters(t: T) -> R {
     let sides = |s: &crate::runner::Shot| [s.share(0.30, 0.3, 0.42, 0.7, piece), s.share(0.58, 0.3, 0.70, 0.7, piece)];
     let before = sides(&t.shot("before").await?);
     t.op(&format!("break {} {} {}", b[0], b[1], b[2])).await?;
-    t.secs(0.25).await?;
-    let shot = t.shot("after").await?;
-    let after = sides(&shot);
+    t.until("the block gone on the client", Duration::from_secs(2), |t| t.c().block(b) == Some(0))
+        .await?;
+    // The most seen each frame for a quarter second: on CI a frame or two outlived the pieces
+    // (half a second to a second), and one shot 0.25 s on found none.
+    let end = crate::runner::script_clock() + Duration::from_secs_f32(0.25);
+    let mut after = [0f32; 2];
+    let shot = loop {
+        let shot = t.shot("after").await?;
+        let s = sides(&shot);
+        after = [after[0].max(s[0]), after[1].max(s[1])];
+        if crate::runner::script_clock() >= end {
+            break shot;
+        }
+    };
     t.note(format!("pieces at the sides: {before:?} then {after:?}"));
     t.check(after[0] > before[0] + 0.0005, format!("pieces on the left: {before:?} then {after:?}"));
     t.check(after[1] > before[1] + 0.0005, format!("pieces on the right: {before:?} then {after:?}"));
@@ -728,6 +759,8 @@ pub async fn light_by_day(t: T) -> R {
     t.c()
         .teleport([f[0] as f64 + 0.5, f[1] as f64 + 7.0, f[2] as f64 - 2.0]);
     t.c().set_look(0.0, -60.0);
+    // No HUD: on CI the test runs past base's first hint, whose box covers the probed snow.
+    t.press("core:hide_hud");
     t.secs(0.4).await?;
     let spot = t
         .on_screen([f[0] as f64 + 0.5, f[1] as f64 + 1.0, f[2] as f64 - 5.5])
@@ -745,6 +778,7 @@ pub async fn light_by_day(t: T) -> R {
     let lit = beside(&t.shot("lamp").await?);
     t.note(format!("snow {plain:?}, beside a blue lamp {lit:?}"));
     t.probe("how much bluer the snow is than red, by a blue lamp at noon", lit[2] - lit[0], lit[2] - lit[0] > 12.0);
+    t.press("core:hide_hud");
     Ok(())
 }
 

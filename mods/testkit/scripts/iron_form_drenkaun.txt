@@ -1,0 +1,47 @@
+# Drenkaun's Iron Age form (animals_core::bosses, 11-23): a heartwood offering at its altar calls it
+# with 2334 health (the Stone form 912). Passes when `until chat /233` meets (the state line's
+# "health 2334.x/2334.x"). Then /boss kill: run.log's "loot for player" line must list
+# animals:warden_heartwood, got or missed (the Iron Age key's boss part).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /tk mode spectator
+chat /tp 0.5 206 0.5
+wait 2
+loaded
+# 1. Drenkaun among old trees (drenkaun_hud.txt's pen).
+chat /tk fill -22 198 -22 22 198 22 stone
+chat /tk fill -22 199 -22 22 199 22 base:grass
+chat /tk fill -22 200 -22 22 212 22 core:air
+chat /tk fill 0 200 0 0 200 0 animals:drenkaun_altar
+chat /tk fill -4 200 -4 -4 204 -4 base:oak_log
+chat /tk fill -5 205 -5 -3 206 -3 base:oak_leaves
+chat /tk fill 4 200 -4 4 204 -4 base:oak_log
+chat /tk fill 3 205 -5 5 206 -3 base:oak_leaves
+chat /tk fill -4 200 4 -4 204 4 base:oak_log
+chat /tk fill -5 205 3 -3 206 5 base:oak_leaves
+chat /tk fill 4 200 4 4 204 4 base:oak_log
+chat /tk fill 3 205 3 5 206 5 base:oak_leaves
+chat /tp 0.5 200 2.5
+wait 1
+loaded
+chat /tk mode survival
+chat /tk attr_mod me core:max_health testkit:hp core:add 300 0
+chat /tk put me 0 animals:heartwood_offering 2
+chat /tk heal
+key 1
+look 0 -29
+wait 0.5
+press core:use
+wait 1
+look 0 12
+wait 3
+shot iron_forms_01_drenkaun.png
+chat /boss state
+until chat /233 within 5
+chat /boss kill
+wait 2
+chat /boss luck
+wait 1
+quit

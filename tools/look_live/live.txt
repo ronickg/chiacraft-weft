@@ -1,0 +1,40 @@
+# Live look tuning (tools/look_live/live.py): the like-for-like stage 2 spot with Bliss match, then
+# each line written to ~/looktest/live/lv1/cmd.txt runs as a step. Ends on a 'quit' line or 20 min idle.
+chat /tk mode spectator
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /season spring 8
+chat /time set 6000
+chat /tk mode spectator
+chat /rule base:mc_leaf_colours on
+chat /tp 165.5 200 168.5
+wait 10
+loaded
+wait 20
+look -120 -12
+wait 2
+# compare mode: one switch (testkit compare.rs)
+compare on
+set_config base:look_glare 0
+set_config base:look_fill 0.7
+set_config base:look_ao_power 4
+set_config base:look_twilight 0.5
+set_config base:look_water_absorb 1
+set_config base:look_water_foam 0
+set_config base:look_water_mirror 1
+set_config base:look_water_body 0.35
+set_config base:look_low_air 0.75
+set_config base:look_haze 1.6
+set_config base:look_haze_sun 0
+set_config base:look_sun_glow 1
+set_config base:look_evening_away 1
+set_config base:look_bliss true
+set_config base:look_low_sun_keep 0.6
+set_config base:look_evening_shade 0.5
+set_config base:look_air_fade 0.5
+hour 18
+shot live_start.png
+live /home/ronaldg/looktest/live/lv1/cmd.txt 20
+quit
