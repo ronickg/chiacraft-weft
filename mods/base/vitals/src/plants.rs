@@ -11,7 +11,7 @@ use crate::{DAY_SECS, calendar, temperature};
 /// How much water a plant needs.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Water {
-    /// Desert plants: they grow at half speed on dry ground.
+    /// Desert plants, and foxfire in its wood: they grow at half speed on dry ground.
     Dry,
     Moderate,
     /// Water plants: only on wet ground or by water.
@@ -159,9 +159,11 @@ pub const PLANTS: [Plant; 58] = [
     p("base:water_hyacinth", "water hyacinth", (12.0, 25.0, 30.0, 38.0), Water::Wet, 10.0, ANY, -1.0),
     // Plants that glow in the dark (`wild::GLOW`, `notes/NIGHT_GLOW.md`). Foxfire is honey
     // fungus and bitter oyster mycelium creeping through the litter (growth 5-30 °C, best 20-25),
-    // a mycelium that frost doesn't kill; glow mycena (Mycena chlorophos) a tropical toadstool
+    // a mycelium that frost doesn't kill, and that keeps growing, at half speed, through a dry
+    // spell in the rotting wood that holds its water (`Water::Dry`: the sequoia grove's rainless
+    // summers); glow mycena (Mycena chlorophos) a tropical toadstool
     // that fruits in warm wet weather and dies at a frost; goblin's gold a cool-loving moss.
-    p("base:foxfire", "honey fungus and bitter oyster mycelium", (5.0, 20.0, 25.0, 30.0), Water::Moderate, 30.0, ANY, HARDY),
+    p("base:foxfire", "honey fungus and bitter oyster mycelium", (5.0, 20.0, 25.0, 30.0), Water::Dry, 30.0, ANY, HARDY),
     p("base:glow_mycena", "Mycena chlorophos", (18.0, 24.0, 28.0, 32.0), Water::Wet, 8.0, ANY, -1.0),
     p("base:goblins_gold", "goblin's gold moss (Schistostega pennata)", (0.0, 10.0, 18.0, 25.0), Water::Moderate, 60.0, ANY, HARDY),
     // Our trees' saplings, at the game's time as the oak's: mesquite, a desert legume that a
