@@ -69,29 +69,49 @@ pub fn init(r: &mut Registry) {
         r.edit(s.kind).attach(&FOLLOW);
         r.edit(s.kind).attach(&SITE);
     }
-    // A kill feeds the hunter that made it, by the prey's mass against its own.
+    // A kill feeds the hunter that made it and its pack near (`needs::KILL_SHARED`), the prey's
+    // mass shared out against each one's own. Fed only the killer, each wolf of three hunted on
+    // its own hunger, and they took all six deer of a herd in ten days (ai1124_wolvesDays1b);
+    // fed together, a pack hunts together when it is hungry again, a deer every few days.
     r.on_event(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             let Some(a) = w.component(d.source, &ANIMAL) else { continue };
             let Some(s) = a.species().filter(|s| s.hunts()) else { continue };
             // The prey's own mass if it can still be read (its genes and growth), its kind's if not.
-            let prey = mass(&w, d.entity).or_else(|| kind_mass(d.kind, None));
-            let (Some(own), Some(prey)) = (mass(&w, d.source), prey) else { continue };
-            let max = a.stat(species::FOOD);
-            let meal = (max * animals_core::needs::fills(own, prey))
-                .round()
-                .max(1.0) as u16;
-            animal::feed(&w, d.source, meal);
-            weft_sdk::info!(
-                "{} {} eats its kill ({:.1} kg of {}): food {} of {max:.0}",
-                s.name,
-                d.source,
-                prey,
-                name_of(abi::entry_kind::ENTITY, d.kind),
-                a.food.saturating_add(meal).min(max as u16)
-            );
-            w.component_mut(d.source, &HUNT).map(|h| *h = [0; 4]);
+            let Some(prey) = mass(&w, d.entity).or_else(|| kind_mass(d.kind, None)) else { continue };
+            let Some(at) = w.entity(d.source).map(|e| e.pos) else { continue };
+            let kind = w.entity(d.source).map(|e| e.kind);
+            let mut eaters = vec![d.source];
+            if s.pack_prey().is_some() && !animal::tamed(&w, d.source) {
+                eaters.extend(
+                    w.entities_near(at, animals_core::needs::KILL_SHARED, None)
+                        .into_iter()
+                        .filter(|&o| {
+                            o != d.source
+                                && w.entity(o)
+                                    .is_some_and(|e| e.health > 0.0 && Some(e.kind) == kind)
+                                && !animal::tamed(&w, o)
+                                && w.component(o, &ANIMAL)
+                                    .is_some_and(|a| (a.food as f32) < a.stat(species::FOOD) * FULL)
+                        }),
+                );
+            }
+            let kg = animals_core::needs::share(prey, eaters.len());
+            for &e in &eaters {
+                let (Some(a), Some(own)) = (w.component(e, &ANIMAL), mass(&w, e)) else { continue };
+                let max = a.stat(species::FOOD);
+                let meal = (max * animals_core::needs::fills(own, kg)).round().max(1.0) as u16;
+                animal::feed(&w, e, meal);
+                weft_sdk::info!(
+                    "{} {e} eats {}'s kill ({kg:.1} of {prey:.1} kg of {}): food {} of {max:.0}",
+                    s.name,
+                    d.source,
+                    name_of(abi::entry_kind::ENTITY, d.kind),
+                    a.food.saturating_add(meal).min(max as u16)
+                );
+                w.component_mut(e, &HUNT).map(|h| *h = [0; 4]);
+            }
         }
     });
 }

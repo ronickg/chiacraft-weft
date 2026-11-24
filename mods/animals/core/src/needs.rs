@@ -29,6 +29,13 @@ pub fn fills(own: f32, kg: f32) -> f32 {
     (kg / (own * MEAL)).min(1.0)
 }
 
+/// Blocks from its killer within which a pack's hungry members eat of a kill too (a wolf pack
+/// feeds together at a carcass; `senses::KIN`'s reach), and each one's share of its `kg`.
+pub const KILL_SHARED: f64 = 16.0;
+pub fn share(kg: f32, eaters: usize) -> f32 {
+    kg / eaters.max(1) as f32
+}
+
 /// Share of its food a wild one has when it arrives where nothing it eats grows this season (a
 /// plant eater), or where its prey are thinnest (a hunter); the rest comes with the place's food.
 pub const ARRIVES_FED: f32 = 0.3;
@@ -450,6 +457,20 @@ mod leaping {
         let [x, up, _] = leap(1.5, 2.0, 0.0);
         assert!(up * up / (2.0 * GRAVITY) > 2.0 + LEAP_CLEAR);
         assert!(x > 0.0 && x < up);
+    }
+}
+
+#[cfg(test)]
+mod kills {
+    use super::*;
+
+    /// A deer shared by a pack of three fills each wolf (a wolf eats up to a fifth of its mass at
+    /// a kill), so the pack is fed together and hungry again together (ai1124_wolvesDays1b).
+    #[test]
+    fn a_deer_feeds_a_pack_of_three() {
+        assert_eq!(share(60.0, 3), 20.0);
+        assert_eq!(share(60.0, 0), 60.0);
+        assert!(fills(40.0, share(50.0, 3)) >= 1.0);
     }
 }
 
