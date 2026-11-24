@@ -797,6 +797,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         // The mist as a volume read by every surface (`client::froxels`); off, each walks it. 2 (ultra,
         // not held to the Mac's budget): cells a quarter of the pixels each way instead of an eighth.
         number("core:froxels", ck::INT, 1.0, 0.0, 2.0, 1.0),
+        // The ground's height about the camera for packs (`client::ground_map`; chiacraft's mist
+        // banks turn it on with them), live.
+        number("core:ground_map", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0).set(c::SCOPE, scope::WORLD),
         number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0).set(c::SCOPE, scope::WORLD),
         rule("core:ship_thrust", ck::FLOAT, 7.0, 0.0, 64.0),

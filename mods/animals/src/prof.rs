@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -137,6 +137,23 @@ pub fn init(r: &mut Registry) {
                     }
                 }
                 format!("{n} animals at {:.0}% water", v * 100.0)
+            }
+            "wound" => {
+                // Every wild animal within 96 blocks down to this share of its health (a blow with
+                // no one behind it), for runs that watch it heal (`animal::heal`).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(0.5) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if w.component(id, &crate::animal::ANIMAL).is_some_and(|a| a.species != 0)
+                        && let Some(e) = w.entity(id)
+                        && e.health > e.max_health * v
+                    {
+                        w.damage(id, Damage::new(e.health - e.max_health * v, damage_cause::GENERIC));
+                        n += 1;
+                    }
+                }
+                format!("{n} animals at {:.0}% health", v * 100.0)
             }
             "food" => {
                 // Every wild animal within 96 blocks has this share of its food.

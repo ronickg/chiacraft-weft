@@ -116,12 +116,24 @@ static APPLIED: Component<[f32; 2]> = Component::named("animal_applied");
 static SCALED: Component<f32> = Component::named("animal_scaled");
 /// The owner's player key (64 hex digits), zeros while wild.
 pub static OWNER: Component<[u8; 64]> = Component::named("owner");
+/// The game tick it was last hurt (`heal`).
+static HURT_AT: Component<f64> = Component::named("animal_hurt_at");
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&ANIMAL, Animal::default(), component_flags::SAVE | component_flags::SYNC_MENU);
     r.entity_component(&APPLIED, [0.0; 2], 0);
     r.entity_component(&SCALED, 0.0f32, 0);
     r.entity_component(&OWNER, [0u8; 64], component_flags::SAVE | component_flags::SYNC_MENU);
+    r.entity_component(&HURT_AT, 0.0f64, 0);
+    r.on_event(&actions::HURT, |b| {
+        let w = b.world();
+        let now = w.game_time() as f64;
+        for h in b.iter() {
+            if let Some(t) = w.component_mut(h.entity, &HURT_AT) {
+                *t = now;
+            }
+        }
+    });
     // A young one bites as hard as its size: by the area of its jaws, the square of how far it has
     // grown (a hatchling raptor a fortieth of a grown one's mass killed a cat in a PC run).
     r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
@@ -250,6 +262,7 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                     crate::drink::thirst(w, id, &a, st, rate, secs);
                 }
             }
+            heal(w, id, secs);
         }
         if slow {
             let (health, speed) = factors(w, id, &a);
@@ -511,6 +524,27 @@ fn hunger(w: &World, id: u64, a: &Animal, rate: f32, secs: f32) {
         && let Some(a) = w.component_mut(id, &ANIMAL)
     {
         a.food = a.food.saturating_sub(used);
+    }
+}
+
+/// Heals `id` over `secs` seconds while it is neither hungry nor thirsty and unhurt for a while
+/// (`needs::heals`): its whole health in `needs::HEAL_DAYS`. One that goes hungry in the wild
+/// heals by its food; one that doesn't, as if fed.
+fn heal(w: &World, id: u64, secs: f32) {
+    let Some(a) = w.component(id, &ANIMAL) else { return };
+    let Some(st) = w
+        .entity(id)
+        .filter(|st| st.health > 0.0 && st.health < st.max_health)
+    else {
+        return;
+    };
+    let most = a.stat(species::FOOD);
+    let fed = if most > 0.0 { a.food as f32 / most } else { 1.0 };
+    let since = w
+        .component(id, &HURT_AT)
+        .map_or(f32::MAX, |t| ((w.game_time() as f64 - t) / 20.0) as f32);
+    if animals_core::needs::heals(fed, 1.0 - a.thirst, since) {
+        w.heal(id, animals_core::needs::heal_per_sec(st.max_health) * secs);
     }
 }
 

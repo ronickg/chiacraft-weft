@@ -568,6 +568,7 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     var color = c.rgb / alpha_cloud;
     // Toward the far end they hand over to the sky.
     let dist = length(rel.xz) / SOFT_REACH;
+    sky_seen = 1.0;
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.45, 1.0, dist));
     // Rain's mist on the soft deck only low over the horizon, by how low it stands, not by its
     // distance: misted by distance, even at two fifths, a storm's near deck went pale slate and its
@@ -576,7 +577,7 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     // were the default, PC shf2_rain).
     let misted = rain_amount() * (1.0 - smoothstep(0.02, 0.22, dir.y));
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
-    color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
+    color = display(fog_through_sky(rainbow_on(color, dir), dir * 220.0, 1.0));
     // In the HDR world the far ones thin out into the haze from about half the reach: handed over
     // to the sky's horizon colour at full cover, they stood as a flat grey belt above the horizon
     // where Bliss's far sky is open haze with a few far clouds (the stage 2 sheet, noon).
@@ -738,6 +739,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         // the Researcher's weather findings, 11-05); the bellies still darken (`dark`).
         let albedo = max(s.color.rgb / max(dimmed, vec3(0.005)), vec3(0.55, 0.58, 0.64) * scene.weather.w);
         color = albedo * light / alpha_cloud;
+        sky_seen = 1.0;
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(mix(0.3, 0.15, wet), mix(1.0, 0.85, wet), dist));
         // The rainbow stands in the falling rain under the clouds, in front of them: drawn in the sky
         // alone, the shower's clouds hid it (the after-rain check from under the clouds, 11-05).
@@ -749,7 +751,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
         // A lightning flash glows inside the deck; its bolt hangs under the deck, in front of it.
         color += lightning_in_clouds(dir) * albedo + lightning_bolt(dir);
-        color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
+        color = display(fog_through_sky(rainbow_on(color, dir), dir * 220.0, 1.0));
     } else {
         color = mix(s.color.rgb * light / alpha_cloud, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
     }
@@ -999,6 +1001,7 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         return vec4(scene.fog_color.rgb, 1.0);
     }
     if open_sky() && !in_liquid() {
+        sky_seen = 1.0;
         var c = sky_color(dir) + milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir) + fireball(dir) + lightning_bolt(dir);
         // The rainbow in the rain, in front of the high cirrus.
         c = rainbow_on(cirrus(c, dir), dir);
@@ -1007,7 +1010,10 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
             c *= 1.0 - s.uv.x * smoothstep(0.0, 0.08, -dir.y);
         }
         // The fog on the land hides the horizon and fades upward.
-        c = fog_through(c, dir * 220.0, 1.0);
+        // With `OPT_HORIZON_LIFT` the haze only lightens the sky, as Bliss's brightens to the horizon:
+        // lit dimmer than the sky away from the sun, it drew a grey band above the land.
+        let hazed = fog_through_sky(c, dir * 220.0, 1.0);
+        c = mix(hazed, max(hazed, c), clamp(fantasy_opt(OPT_HORIZON_LIFT), 0.0, 1.0));
         // A held torch's glow in the mist goes on over the sky (`haze_lit` gives it the land's).
         c += held_in_fog(dir * 48.0, 1.0);
         return vec4(display(c), 1.0);
@@ -1207,8 +1213,19 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             // what the screen's white could hold here), so the bloom spreads a wide glare round it
             // as Bliss's low sun has, and the curve keeps the disc itself white-gold.
             let hot = select(1.0, 16.0, scene.frame.x > 0.5);
-            rgb = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g) * (disc * mix(3.0, 1.5, g) * hot + halo);
-            shape = smoothstep(0.0, 0.004, disc + halo);
+            // With `OPT_SUN_DISC` as Bliss's: the disc near white at any height (a sun bright enough
+            // to glare reads white; only its glow takes the low sun's gold) and the glow twice as
+            // wide. Deep orange at 16 times the screen's white, ours clipped to a yellow-green blob.
+            let soft = clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0);
+            let wide = exp(-r * 3.0) * (1.0 - smoothstep(0.7, 1.0, r)) * 0.9;
+            let glow = mix(halo, wide, soft);
+            let core = mix(mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g), mix(vec3(1.0, 0.97, 0.92), vec3(1.0, 0.86, 0.68), g), soft);
+            let ring = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g);
+            rgb = core * disc * mix(3.0, 1.5, g) * hot + ring * glow;
+            shape = smoothstep(0.0, 0.004, disc + glow);
+            // Before sunrise (`OPT_DAWN_SKY`) none of it under the horizon: from a high eye the land's
+            // edge lies a few degrees down, and the sun 3.5° under the horizon showed over it.
+            shape *= 1.0 - dawn_sky() * (1.0 - smoothstep(-0.012, 0.004, dir.y));
         }
         // A blood moon: copper, then a deep red disc, dimmer in totality.
         if is_moon && blood_moon() > 0.0 {

@@ -333,6 +333,7 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         }
         return false;
     }
+    crate::stuck::ran(w, id, true);
     // Walking a way out of where it is stuck (`stuck`).
     if crate::stuck::going(w, id, st) {
         return true;
