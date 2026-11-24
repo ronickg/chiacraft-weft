@@ -487,12 +487,18 @@ fn command(cmd: &mut ServerCommand) {
                 Some("above") => (0, 6, Some(centre + 12)),
                 // Inside a vault, two south of its pedestal (yaw 0 faces it).
                 Some("inside") if !ring => (0, 2, Some(floor + 1)),
-                // On a vault's roof, one south of its middle; the deep vault's in its shaft, in
-                // the cell whose lowest step is four above the stair's last (head room).
+                // On a vault's roof with roof one north of it (`look 0 -60` aims at that one, so
+                // breaking it doesn't drop the player in): one south of the sealed vault's middle;
+                // the deep vault's in its shaft, a side cell pair clear of the stair's last two
+                // steps (head room; pl1124_vaults1: digging straight down fell through the floor).
                 Some("roof") if !ring => {
                     if ruin.kind().id == "deep" {
-                        let last = centre - (floor + 4) - 2;
-                        let (cx, cz) = STAIR[((last + 4) % 8) as usize];
+                        let last = (centre - (floor + 4) - 2).max(0) as usize;
+                        let steps = [STAIR[last % 8], STAIR[(last + 7) % 8]];
+                        let (cx, cz) = [(-1, 1), (-1, 0), (1, 1), (1, 0)]
+                            .into_iter()
+                            .find(|&(cx, cz)| !steps.contains(&(cx, cz)) && !steps.contains(&(cx, cz - 1)))
+                            .unwrap_or((-1, 1));
                         (cx, cz, Some(floor + 5))
                     } else {
                         (0, 1, Some(centre + 1))
