@@ -73,7 +73,7 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
 | base:toadstool | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
-| base:cooked_dryads_saddle | fungi | 75 | 8 | 2 | 4 | 0 | 2 | 68 | 4 min | 2 + 2 | hot when cooked |
+| base:cooked_dryads_saddle | fungi | 75 | 8 | 2 | 2 | 0 | 2 | 68 | 4 min | 2 + 2 | hot when cooked |
 | animals:venison | meat | 200 | 20 | 44 | 0 | 5 | 0 | 147 | 27 min | 2 + 2 | raw |
 | animals:cooked_venison | meat | 150 | 15 | 45 | 0 | 5 | 0 | 98 | 24 min | 4 + 4 | hot when cooked |
 | animals:hare | meat | 150 | 15 | 33 | 0 | 3 | 0 | 109 | 20 min | 2 + 2 | raw |
