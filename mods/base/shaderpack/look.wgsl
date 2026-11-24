@@ -236,7 +236,7 @@ const MIST_DEEP: f32 = 0.0;
 // on the ground but a level sea of mist at one height, that the hills and crowns rise out of. The
 // domes followed the land and covered every crown, and read as paint on it (Planner on lv8).
 // The sea's full height over sea level, and how fast it thins above it (per block, exp).
-const MIST_SEA_LEVEL: f32 = 30.0;
+const MIST_SEA_LEVEL: f32 = 26.0;
 const MIST_SEA_FALL: f32 = 0.12;
 // Its density per block at `/air` 1 (Bliss's morning, about 0.45 a block where full, at `/air` 0.05).
 const MIST_SEA_DENSE: f32 = 12.0;
@@ -244,7 +244,7 @@ const MIST_SEA_DENSE: f32 = 12.0;
 // below, full above), so banks with clear air between them, not an even veil; and a fine noise
 // (cells this wide and tall) that eats their edges (`MIST_ERODE.z`, how much), shifted by the shape
 // so the rims break up differently from bank to bank.
-const MIST_SHAPE: vec4<f32> = vec4(36.0, 18.0, 0.4, 0.65);
+const MIST_SHAPE: vec4<f32> = vec4(36.0, 18.0, 0.35, 0.75);
 const MIST_ERODE: vec3<f32> = vec3(1.5, 3.0, 0.4);
 // Its light from the sun (Bliss's fog: no shade of its own, the land's and the clouds' shadow at each
 // step): a sharp peak toward the sun and a broad forward tail, about 12 toward it, a quarter across,
@@ -1944,9 +1944,10 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     var through = 1.0;
     var gained = vec3(0.0);
     // Debug view 5: where along the march the sun reaches the mist (Planner on lv8: no shafts and no
-    // shaded hollows showed, so check the shadow term itself): white the mist the sun lights, blue the
-    // mist in shade, black no mist.
-    var shaft = 0.0;
+    // shaded hollows showed, so check the shadow terms): red the shadow map's light, green the
+    // clouds', blue how much mist. White lit by both, cyan in the land's shade, magenta in a cloud's,
+    // blue in both, black no mist.
+    var shaft = vec2(0.0);
     // Debug views with the banks on (the world and the evening's mist left out): 3 the light the banks
     // scatter toward the eye alone, on black; 4 how much they hide (1 - through) as grey.
     for (var i = 0u; i < n; i++) {
@@ -1959,9 +1960,11 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         }
         // The land's and the clouds' shadow: shafts where the sun comes through, the sky's light alone
         // in the crowns' shade.
-        let lit = sun_reaches(dir * t) * cloud_shadow(dir * t);
+        let land = sun_reaches(dir * t);
+        let clouds = cloud_shadow(dir * t);
+        let lit = land * clouds;
         let kept = exp(-d * step);
-        shaft += through * (1.0 - kept) * lit;
+        shaft += through * (1.0 - kept) * vec2(land, clouds);
         gained += through * (1.0 - kept) * (sky_in + sun_in * lit);
         through *= kept;
     }
@@ -1972,7 +1975,7 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         return vec3(1.0 - through);
     }
     if look_debug() == 5u {
-        return vec3(shaft, shaft, 1.0 - through);
+        return vec3(shaft, 1.0 - through);
     }
     return c * through + gained;
 }
