@@ -56,7 +56,8 @@ pub static LOOK_DEBUG: Config<f32> = Config::named("look_debug");
 /// made, 1 all the way.
 pub static LOOK_SKY_HUE: Config<f32> = Config::named("look_sky_hue");
 /// The HDR world's exposure by day in Bliss's own units (its curve's gentle slope, no near-land dim):
-/// 0 as made, 1 all the way.
+/// 1 as made since 11-24 (with auto exposure, bloom added and fill 1.0 our cave, arch, overhang,
+/// forest and vista land within about 10 luma of Bliss's auto-exposed refs: PC lkauto1), 0 the old curve.
 pub static LOOK_EXPOSURE_ABS: Config<f32> = Config::named("look_exposure_abs");
 /// The HDR world's warmth on sunlit foliage toward a leaf-top yellow: 0.7 as made, 0 none.
 pub static LOOK_SPLIT_WARM: Config<f32> = Config::named("look_split_warm");
@@ -65,7 +66,8 @@ pub static LOOK_SPLIT_WARM: Config<f32> = Config::named("look_split_warm");
 /// to 3 thicker.
 pub static LOOK_EVENING_MIST: Config<f32> = Config::named("look_evening_mist");
 /// The HDR world's bloom by day added on top, as Bliss's (+35% at the centre, +12% in the corners at
-/// noon): 0 mixed in as made, 1 all the way.
+/// noon): 1 as made since 11-24 (it lifts the shade as Bliss's does: the noon vista's darkest quarter
+/// 102 against Bliss's 103, PC lkstack2), 0 mixed in keeping the light's sum.
 pub static LOOK_BLOOM_ADD: Config<f32> = Config::named("look_bloom_add");
 /// A test switch for like-for-like compares: 1 takes the high cirrus out of the sky (with soft
 /// clouds and cloud shadows off and a blank clouds texture, no cloud at all). 0 as made.
@@ -159,7 +161,7 @@ pub static LOOK_BLISS: Config<bool> = Config::named("look_bliss");
 pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 21] = [
     // The shade: no glare lift, less fill, the sky light occluded as Bliss's (lsN_ao3).
     (&LOOK_GLARE, 0.0, 0.0),
-    (&LOOK_FILL, 0.7, 0.7),
+    (&LOOK_FILL, 1.0, 1.0),
     (&LOOK_AO_POWER, 4.0, 4.0),
     // The evening's blue hour (lsZ_tw2, lsAA_tw3).
     (&LOOK_TWILIGHT, 0.5, 0.5),
@@ -208,78 +210,80 @@ base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
 base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away, base:look_mist_tint, base:look_low_sun_keep, base:look_evening_shade, base:look_air_fade, base:look_glow_fill, base:look_mist_dawn_tint, base:look_mist_domes, base:look_horizon_lift, base:look_sun_disc, base:look_dawn_sky, base:look_bank_dense, base:look_bank_sun, base:look_bank_shade, base:look_shadow_reach";
 
+/// Every setting here is on the Developer page (`developer::page`): players pick presets and
+/// quality on the Video screen, the fitted values are tuned on its Developer tab (Ronald 11-24).
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
     // a 4300 K orange), the sky's fill light in the shade and how cool it is (-1 neutral, +1 bluer),
     // the curve's contrast, the colour after it, how fast the sky's light fades under cover (more:
     // darker forest floors), the haze over distance and the fog's light.
-    r.config(&LOOK_EXPOSURE).float(1.0, 0.5, 2.0);
-    r.config(&LOOK_SUN).float(1.0, 0.5, 2.0);
-    r.config(&LOOK_SUN_WARMTH).float(0.0, -1.0, 1.0);
-    r.config(&LOOK_FILL).float(0.7, 0.5, 2.0);
-    r.config(&LOOK_FILL_COOL).float(0.0, -1.0, 1.0);
-    r.config(&LOOK_CONTRAST).float(1.0, 0.8, 1.3);
-    r.config(&LOOK_SATURATION).float(1.0, 0.7, 1.3);
-    r.config(&LOOK_SHADE).float(1.0, 0.5, 2.0);
+    crate::developer::page(r.config(&LOOK_EXPOSURE).float(1.0, 0.5, 2.0));
+    crate::developer::page(r.config(&LOOK_SUN).float(1.0, 0.5, 2.0));
+    crate::developer::page(r.config(&LOOK_SUN_WARMTH).float(0.0, -1.0, 1.0));
+    crate::developer::page(r.config(&LOOK_FILL).float(1.0, 0.5, 2.0));
+    crate::developer::page(r.config(&LOOK_FILL_COOL).float(0.0, -1.0, 1.0));
+    crate::developer::page(r.config(&LOOK_CONTRAST).float(1.0, 0.8, 1.3));
+    crate::developer::page(r.config(&LOOK_SATURATION).float(1.0, 0.7, 1.3));
+    crate::developer::page(r.config(&LOOK_SHADE).float(1.0, 0.5, 2.0));
     // 1.6: Ronald's pick, "crisp + more depth" (11-05).
-    r.config(&LOOK_HAZE).float(1.6, 0.0, 3.0);
-    r.config(&LOOK_FOG).float(1.0, 0.0, 2.0);
+    crate::developer::page(r.config(&LOOK_HAZE).float(1.6, 0.0, 3.0));
+    crate::developer::page(r.config(&LOOK_FOG).float(1.0, 0.0, 2.0));
     // By night (dark by design): the night's sky light and the moon's light.
-    r.config(&NIGHT_LIGHT).float(1.0, 0.3, 2.0);
-    r.config(&NIGHT_MOON).float(1.0, 0.3, 2.0);
+    crate::developer::page(r.config(&NIGHT_LIGHT).float(1.0, 0.3, 2.0));
+    crate::developer::page(r.config(&NIGHT_MOON).float(1.0, 0.3, 2.0));
     // Under a forest's canopy (how closed it is comes from the biome, `vitals::air::CANOPY`): how
     // dim and green the shade under the leaves is, with its sunflecks, and how strong the light
     // shafts through the crown gaps are.
-    r.config(&LOOK_CANOPY).float(1.0, 0.2, 2.0);
-    r.config(&LOOK_SHAFTS).float(1.0, 0.2, 3.0);
+    crate::developer::page(r.config(&LOOK_CANOPY).float(1.0, 0.2, 2.0));
+    crate::developer::page(r.config(&LOOK_SHAFTS).float(1.0, 0.2, 3.0));
     // The HDR world's picture: 0 Lottes's curve (the look as made), 1 Hejl's (the default, Ronald's
     // pick of 11-05: "Hejl 2015"), 2 AgX; bloom 0 none to 3;
     // the exposure following the view, 0 fixed to 2.
-    r.config(&LOOK_CURVE).float(1.0, 0.0, 2.0);
-    r.config(&LOOK_BLOOM).float(1.0, 0.0, 3.0);
-    r.config(&LOOK_AUTO_EXPOSURE).float(1.0, 0.0, 2.0);
-    r.config(&LOOK_SKY_LIGHT).float(1.0, 0.2, 1.5);
-    r.config(&LOOK_FOLIAGE_TEST).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_WHITE).float(1.6, -1.0, 2.5);
-    r.config(&LOOK_AO_TEST).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_SHARPEN).float(0.4, 0.0, 1.0);
-    r.config(&LOOK_LEAF_SUN).float(1.0, 0.5, 4.0);
-    r.config(&LOOK_LEAF_HOLES).float(1.0, 0.0, 1.0);
-    r.config(&LOOK_LEAF_LIGHT).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_DEBUG).float(0.0, 0.0, 5.0);
-    r.config(&LOOK_SKY_HUE).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_EXPOSURE_ABS).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_SPLIT_WARM).float(0.7, 0.0, 1.0);
-    r.config(&LOOK_EVENING_MIST).float(0.0, 0.0, 3.0);
-    r.config(&LOOK_BLOOM_ADD).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_CIRRUS_OFF).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_GLARE).float(0.0, 0.0, 2.0);
-    r.config(&LOOK_AO_POWER).float(4.0, 0.0, 8.0);
-    r.config(&LOOK_WATER_ABSORB).float(1.0, 0.0, 4.0);
-    r.config(&LOOK_WATER_FOAM).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_WATER_MIRROR).float(1.0, 0.0, 1.0);
-    r.config(&LOOK_TWILIGHT).float(0.5, 0.0, 8.0);
-    r.config(&LOOK_WATER_BODY).float(0.35, 0.0, 2.0);
-    r.config(&LOOK_LOW_AIR).float(0.75, 0.0, 2.0);
-    r.config(&LOOK_HAZE_SUN).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_SUN_GLOW).float(1.0, 0.0, 4.0);
-    r.config(&LOOK_EVENING_AWAY).float(1.0, 0.0, 1.0);
-    r.config(&LOOK_MIST_TINT).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_LOW_SUN_KEEP).float(0.6, 0.0, 1.0);
-    r.config(&LOOK_EVENING_SHADE).float(0.5, 0.0, 1.0);
-    r.config(&LOOK_AIR_FADE).float(0.5, 0.0, 1.0);
-    r.config(&LOOK_GLOW_FILL).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_MIST_DAWN_TINT).float(1.0, 0.0, 1.0);
-    r.config(&LOOK_MIST_DOMES).float(1.0, 0.0, 1.0);
-    r.config(&LOOK_HORIZON_LIFT).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_SUN_DISC).float(1.0, 0.0, 1.0);
-    r.config(&LOOK_DAWN_SKY).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_BANK_DENSE).float(0.0, 0.0, 5.0);
-    r.config(&LOOK_BANK_SUN).float(0.0, 0.0, 5.0);
-    r.config(&LOOK_BANK_SHADE).float(0.0, 0.0, 10.0);
-    r.config(&LOOK_SHADOW_REACH).float(128.0, 0.0, 1024.0);
-    r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0);
-    r.config(&LOOK_BLISS).bool(true);
+    crate::developer::page(r.config(&LOOK_CURVE).float(1.0, 0.0, 2.0));
+    crate::developer::page(r.config(&LOOK_BLOOM).float(1.0, 0.0, 3.0));
+    crate::developer::page(r.config(&LOOK_AUTO_EXPOSURE).float(1.0, 0.0, 2.0));
+    crate::developer::page(r.config(&LOOK_SKY_LIGHT).float(1.0, 0.2, 1.5));
+    crate::developer::page(r.config(&LOOK_FOLIAGE_TEST).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_WHITE).float(1.6, -1.0, 2.5));
+    crate::developer::page(r.config(&LOOK_AO_TEST).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_SHARPEN).float(0.4, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_LEAF_SUN).float(1.0, 0.5, 4.0));
+    crate::developer::page(r.config(&LOOK_LEAF_HOLES).float(1.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_LEAF_LIGHT).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_DEBUG).float(0.0, 0.0, 5.0));
+    crate::developer::page(r.config(&LOOK_SKY_HUE).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_EXPOSURE_ABS).float(1.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_SPLIT_WARM).float(0.7, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_EVENING_MIST).float(0.0, 0.0, 3.0));
+    crate::developer::page(r.config(&LOOK_BLOOM_ADD).float(1.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_CIRRUS_OFF).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_GLARE).float(0.0, 0.0, 2.0));
+    crate::developer::page(r.config(&LOOK_AO_POWER).float(4.0, 0.0, 8.0));
+    crate::developer::page(r.config(&LOOK_WATER_ABSORB).float(1.0, 0.0, 4.0));
+    crate::developer::page(r.config(&LOOK_WATER_FOAM).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_WATER_MIRROR).float(1.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_TWILIGHT).float(0.5, 0.0, 8.0));
+    crate::developer::page(r.config(&LOOK_WATER_BODY).float(0.35, 0.0, 2.0));
+    crate::developer::page(r.config(&LOOK_LOW_AIR).float(0.75, 0.0, 2.0));
+    crate::developer::page(r.config(&LOOK_HAZE_SUN).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_SUN_GLOW).float(1.0, 0.0, 4.0));
+    crate::developer::page(r.config(&LOOK_EVENING_AWAY).float(1.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_MIST_TINT).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_LOW_SUN_KEEP).float(0.6, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_EVENING_SHADE).float(0.5, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_AIR_FADE).float(0.5, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_GLOW_FILL).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_MIST_DAWN_TINT).float(1.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_MIST_DOMES).float(1.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_HORIZON_LIFT).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_SUN_DISC).float(1.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_DAWN_SKY).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_BANK_DENSE).float(0.0, 0.0, 5.0));
+    crate::developer::page(r.config(&LOOK_BANK_SUN).float(0.0, 0.0, 5.0));
+    crate::developer::page(r.config(&LOOK_BANK_SHADE).float(0.0, 0.0, 10.0));
+    crate::developer::page(r.config(&LOOK_SHADOW_REACH).float(128.0, 0.0, 1024.0));
+    crate::developer::page(r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0));
+    crate::developer::page(r.config(&LOOK_BLISS).bool(true));
     r.client_frame(|_| {
         let want = LOOK_MIST_DOMES.get() > 0.0;
         if GROUND_MAP.get() != want {

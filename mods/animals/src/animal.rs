@@ -527,8 +527,8 @@ fn hunger(w: &World, id: u64, a: &Animal, rate: f32, secs: f32) {
     }
 }
 
-/// Heals `id` over `secs` seconds while it is neither hungry nor thirsty and unhurt for a while
-/// (`needs::heals`): its whole health in `needs::HEAL_DAYS`. One that goes hungry in the wild
+/// Heals `id` over `secs` seconds while it is watered, fed or thin, and unhurt for a while
+/// (`needs::heal_share`): its whole health in `needs::HEAL_DAYS`. One that goes hungry in the wild
 /// heals by its food; one that doesn't, as if fed.
 fn heal(w: &World, id: u64, secs: f32) {
     let Some(a) = w.component(id, &ANIMAL) else { return };
@@ -543,8 +543,9 @@ fn heal(w: &World, id: u64, secs: f32) {
     let since = w
         .component(id, &HURT_AT)
         .map_or(f32::MAX, |t| ((w.game_time() as f64 - t) / 20.0) as f32);
-    if animals_core::needs::heals(fed, 1.0 - a.thirst, since) {
-        w.heal(id, animals_core::needs::heal_per_sec(st.max_health) * secs);
+    let share = animals_core::needs::heal_share(fed, 1.0 - a.thirst, since);
+    if share > 0.0 {
+        w.heal(id, animals_core::needs::heal_per_sec(st.max_health) * share * secs);
     }
 }
 
