@@ -346,6 +346,14 @@ pub const WALK_MOVED: f64 = 2.0;
 pub const WAY_OUT_LEG: f64 = 12.0;
 pub const WAY_OUT_WAYS: u8 = 8;
 pub const WAY_OUT_SECS: f32 = 10.0;
+/// The way up: before a leg along its level, a stuck animal searches the ground it can walk from
+/// where it stands (stepping up one, dropping at most `FLEE_DROP` + 2), up to `WAY_UP_CELLS`
+/// places within `WAY_UP_REACH` blocks, for the highest, and walks `WAY_OUT_LEG` steps of that
+/// way. The engine's paths search 600 places toward the goal and stop at the nearest, so from a
+/// cave under a pond the best they find is under the pond (ai1124_cave3b: deer 10 blocks under
+/// it walked legs along the cave floor and leapt for 160 s, and died of thirst there).
+pub const WAY_UP_CELLS: usize = 4000;
+pub const WAY_UP_REACH: i32 = 40;
 /// A leap: onto ground at most `LEAP_MOST` blocks above its feet (a walker's jump clears 1.25; a
 /// deer clears a fence of 2.4 m) and `LEAP_REACH` off, over the edge by `LEAP_CLEAR`; the
 /// world's pull (the engine's dimension gravity, blocks a second squared) and a share more for

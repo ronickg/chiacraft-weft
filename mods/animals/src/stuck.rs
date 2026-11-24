@@ -4,7 +4,8 @@
 //! `LEAP_AFTER` it leaps. Its need's goal carries the walk while it lasts (`going`).
 
 use animals_core::needs::{
-    LEAP_AFTER, LEAP_MOST, LEAP_REACH, STUCK_AFTER, STUCK_NEAR, WALK_MOVED, WAY_OUT_LEG, WAY_OUT_SECS, WAY_OUT_WAYS,
+    FLEE_DROP, LEAP_AFTER, LEAP_MOST, LEAP_REACH, STUCK_AFTER, STUCK_NEAR, WALK_MOVED, WAY_OUT_LEG, WAY_OUT_SECS, WAY_OUT_WAYS,
+    WAY_UP_CELLS, WAY_UP_REACH,
 };
 use weft_sdk::*;
 
@@ -71,12 +72,16 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
             }
             return true;
         }
-        let to = [x + dx * WAY_OUT_LEG, st.pos.y, z + dz * WAY_OUT_LEG];
+        // Up the way to the highest ground it can walk to, else along its level.
+        let up = way_up(w, st);
+        let to = up.unwrap_or([x + dx * WAY_OUT_LEG, st.pos.y, z + dz * WAY_OUT_LEG]);
         weft_sdk::info!(
-            "animal {id} is stuck at {x:.0} {:.0} {z:.0} ({n} walks ended there): looks for a way out toward {:.0} {:.0}",
+            "animal {id} is stuck at {x:.0} {:.0} {z:.0} ({n} walks ended there): looks for a way out toward {:.0} {:.0} {:.0}{}",
             st.pos.y,
             to[0],
-            to[2]
+            to[1],
+            to[2],
+            if up.is_some() { " (up)" } else { "" }
         );
         w.navigate(id, to, 1.0);
         k[3] = (now + (WAY_OUT_SECS * 20.0) as u64) as f64;
@@ -134,4 +139,66 @@ fn landing(w: &World, st: &EntityState) -> Option<(f64, f64, f64)> {
         }
     }
     best.map(|(x, y, z, _)| (x, y, z))
+}
+
+/// The way up out of where it is (`needs::WAY_UP_*`): a search of the ground it can walk from its
+/// feet, stepping up one or dropping at most `FLEE_DROP` + 2, for the highest place, and the
+/// place `WAY_OUT_LEG` steps along the way there (its centre, at its feet). None when nothing it
+/// can walk to is higher than its feet: a pit, for the leap.
+fn way_up(w: &World, st: &EntityState) -> Option<[f64; 3]> {
+    use std::collections::{HashMap, VecDeque};
+    let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
+    let stand = |p: [i32; 3]| solid([p[0], p[1] - 1, p[2]]) && !solid(p) && !solid([p[0], p[1] + 1, p[2]]);
+    let start = [st.pos.x.floor() as i32, st.pos.y.floor() as i32, st.pos.z.floor() as i32];
+    let mut from: HashMap<[i32; 3], [i32; 3]> = HashMap::new();
+    let mut queue = VecDeque::from([start]);
+    from.insert(start, start);
+    let mut best = start;
+    while let Some(p) = queue.pop_front() {
+        if from.len() > WAY_UP_CELLS {
+            break;
+        }
+        if p[1] > best[1] {
+            best = p;
+        }
+        for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let (nx, nz) = (p[0] + dx, p[2] + dz);
+            if (nx - start[0]).abs() > WAY_UP_REACH || (nz - start[2]).abs() > WAY_UP_REACH {
+                continue;
+            }
+            // Up one with room overhead to jump, along, or down as far as it may drop.
+            let up = !solid([p[0], p[1] + 2, p[2]]);
+            for dy in (-(FLEE_DROP + 2)..=1).rev() {
+                let n = [nx, p[1] + dy, nz];
+                if dy == 1 && !up {
+                    continue;
+                }
+                // Down: the column it falls through is open.
+                if dy < 0 && (dy + 1..=0).any(|d| solid([nx, p[1] + d, nz]) || solid([nx, p[1] + d + 1, nz])) {
+                    break;
+                }
+                if stand(n) {
+                    if let std::collections::hash_map::Entry::Vacant(e) = from.entry(n) {
+                        e.insert(p);
+                        queue.push_back(n);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    if best[1] <= start[1] {
+        return None;
+    }
+    // Back from the highest to its feet, then `WAY_OUT_LEG` steps out along it.
+    let mut way = vec![best];
+    while let Some(&p) = from.get(way.last().unwrap()) {
+        if p == *way.last().unwrap() {
+            break;
+        }
+        way.push(p);
+    }
+    way.reverse();
+    let at = way[(WAY_OUT_LEG as usize).min(way.len() - 1)];
+    Some([at[0] as f64 + 0.5, at[1] as f64, at[2] as f64 + 0.5])
 }
