@@ -32,6 +32,7 @@ pub fn markdown() -> String {
     loot_table(&mut w, &g);
     web_prices(&mut w);
     keys(&mut w, &g);
+    age_gates(&mut w, &g);
     tags(&mut w, &g);
     materials(&mut w);
     w
@@ -374,6 +375,31 @@ fn web_prices(w: &mut String) {
             .collect::<Vec<_>>()
             .join(", ")
     );
+}
+
+fn age_gates(w: &mut String, g: &graph::Solved) {
+    w.push_str("## The materials gate\n\nAn age's key needs the age before's tools or stations (`graph::age_gates`): each material past the Stone Age has something of the age before on its cheapest way, or the age could be skipped. Known skips wait on a decision and don't fail the check.\n\n| material | age | through the age before | otherwise up to | skips |\n|---|---|---|---|---|\n");
+    for x in graph::gates(g) {
+        let skips = match (&x.through, x.known) {
+            (Some(_), _) => "-".to_string(),
+            (None, Some(root)) => format!("known, by {root}"),
+            (None, None) => "**yes**".to_string(),
+        };
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {} | {skips} |",
+            x.id,
+            AGES[x.tier as usize].name(),
+            x.through.as_deref().unwrap_or("-"),
+            x.top
+                .map_or("-".to_string(), |t| AGES[t as usize].name().to_string()),
+        );
+    }
+    w.push_str("\nKnown skips:\n\n");
+    for (root, why) in graph::KNOWN_SKIPS {
+        let _ = writeln!(w, "- {root}: {why}");
+    }
+    w.push('\n');
 }
 
 fn keys(w: &mut String, g: &graph::Solved) {
