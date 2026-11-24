@@ -284,18 +284,22 @@ const SUN_GOLD: vec2<f32> = vec2(0.97, 0.9995);
 const SUN_GOLD_TINT: vec3<f32> = vec3(1.0, 0.9, 0.82);
 // The dawn's cream over the sun's half of the sky drawn in to a lobe round the sun (a power of the
 // cosine) with Bliss's sun.
-const SUN_CREAM_TIGHT: f32 = 48.0;
+const SUN_CREAM_TIGHT: f32 = 80.0;
 // The sun's glow in the sky with Bliss's sun on a low morning sun: this cream, this much of it.
 const SUN_GLOW_CREAM: vec3<f32> = vec3(1.0, 0.9, 0.8);
 const SUN_GLOW_CREAM_K: f32 = 1.0;
 // Away from it the sky in these at its own brightness: from the first cosine (none) to the second
 // (full, lavender), blue beyond; how much.
-const SKY_AWAY: vec3<f32> = vec3(0.9995, 0.85, 1.0);
+const SKY_AWAY: vec3<f32> = vec3(0.998, 0.96, 1.0);
 // Where its lavender turns blue (cosines: none, full).
-const SKY_AWAY_TURN: vec2<f32> = vec2(0.985, 0.7);
-const SKY_AWAY_LAVENDER: vec3<f32> = vec3(0.92, 0.86, 1.02);
-const SKY_AWAY_DARK: f32 = 0.85;
-const SKY_AWAY_BLUE: vec3<f32> = vec3(0.48, 0.6, 1.0);
+const SKY_AWAY_TURN: vec2<f32> = vec2(0.975, 0.9);
+const SKY_AWAY_LAVENDER: vec3<f32> = vec3(0.92, 0.85, 1.0);
+const SKY_AWAY_DARK: f32 = 1.0;
+// The tint at the sky's own blue (1), not its brightness (0): Bliss's 06:00 sweep from the sun keeps
+// its blue channel at 187-190 while red and green fall (warm white, rose, mauve, periwinkle, blue);
+// ours kept the brightness, stayed warm to about 20° and then went grey-blue (lv17).
+const SKY_AWAY_KEEP_BLUE: f32 = 1.0;
+const SKY_AWAY_BLUE: vec3<f32> = vec3(0.43, 0.52, 1.0);
 // The horizon band's blue (`sky_color`) where Bliss's low morning sky is seen: less green (Bliss's far
 // blue hue about 218, ours 203 with the band's own blue, lv16).
 const SKY_BAND_BLUE_SEEN: vec3<f32> = vec3(0.64, 0.78, 1.25);
@@ -304,7 +308,7 @@ const SUN_BAND: vec3<f32> = vec3(10.0, 9.0, 8.0);
 const SUN_BAND_ROUND: f32 = 0.67;
 // And where the sky is seen (`sky_seen`): this much of the wide glow gone, and of the Mie's broad lobe.
 const SUN_ROUND_SEEN: f32 = 0.9;
-const SUN_MIE_BROAD_CUT: f32 = 0.6;
+const SUN_MIE_BROAD_CUT: f32 = 0.85;
 // Its light from the sky, brighter looking up through it (how much, how sharply), and its share (Bliss's
 // shaded hollows are a dark blue-grey; at the full sky's light ours read as pale frost: lv8).
 const MIST_SEA_SKY: vec3<f32> = vec3(5.0, 4.0, 0.45);
@@ -1000,7 +1004,8 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let turn = smoothstep(SKY_AWAY_TURN.x, SKY_AWAY_TURN.y, mu);
         let tint = mix(SKY_AWAY_LAVENDER, SKY_AWAY_BLUE, turn);
         // The blue a little darker than the sky there (Bliss's 06:00 blue about 0.85 of ours, lv16).
-        c = mix(c, tint * (luma(c) / luma(tint)) * mix(1.0, SKY_AWAY_DARK, turn), away_sun * seen * SKY_AWAY.z);
+        let level = mix(luma(c) / luma(tint), c.b / tint.b, SKY_AWAY_KEEP_BLUE);
+        c = mix(c, tint * level * mix(1.0, SKY_AWAY_DARK, turn), away_sun * seen * SKY_AWAY.z);
     }
     // (B5: on the sky's own colour, before the sun's glow and glare are added: on top of them it
     // turned the glare gold, and the dawn mist that reads it went flat orange over the land, PC
