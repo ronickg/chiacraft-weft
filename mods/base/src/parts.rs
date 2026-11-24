@@ -159,7 +159,10 @@ pub fn register(r: &mut Registry) {
         register_armour(r, k);
     }
     // An arrow is no tool: its head is a part, the arrows `base:arrow` (`fletched`).
-    for k in KINDS.iter().filter(|k| k.use_ != Use::Guard && k.id != "arrow") {
+    for k in KINDS
+        .iter()
+        .filter(|k| k.use_ != Use::Guard && k.id != "arrow")
+    {
         let tool = match k.id {
             "axe" | "pickaxe" | "shovel" | "hoe" | "sword" => Some(k.id),
             _ => None,
@@ -229,10 +232,7 @@ pub fn register(r: &mut Registry) {
                 .map_or(ItemStack::EMPTY, |(item, fit)| base_api::saddle_stack(item, fit))
         } else if kind == "arrow" {
             // `/gear arrow [head] [count]`: arrows headed with that material (flint by default).
-            let count = names
-                .get(1)
-                .and_then(|n| n.parse().ok())
-                .unwrap_or(16);
+            let count = names.get(1).and_then(|n| n.parse().ok()).unwrap_or(16);
             arrows(names.first().copied().unwrap_or("flint"), count)
         } else if kind == "part" {
             names

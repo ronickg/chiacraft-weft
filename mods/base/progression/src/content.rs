@@ -373,7 +373,14 @@ pub const RULES: &[Rule] = &[
     n(&["base:gem_tektite", "base:gem_amber"], 0, Tech, Material, Made, "cut gems: a boost in a tool's, weapon's or armour's socket"),
     r(&["base:gem_peridot"], 2, Tech, Material, Made),
     r(&["base:gem_diamond"], 3, Tech, Material, Made),
-    n(&["base:arrow"], 0, Tech, Tool, Kill, "dropped by skeletons, or fletched from an arrowhead part, a stick and a feather (its head's material its age)"),
+    n(
+        &["base:arrow"],
+        0,
+        Tech,
+        Tool,
+        Kill,
+        "dropped by skeletons, or fletched from an arrowhead part, a stick and a feather (its head's material its age)",
+    ),
     // ---- metals and gems
     r(&["base:coal", "base:coal_block"], 0, Shared, Material, Made),
     // Copper, tin and bronze (`metals.rs`): the Bronze Age's; steel the Iron Age's.

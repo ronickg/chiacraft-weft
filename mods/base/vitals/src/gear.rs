@@ -149,7 +149,10 @@ pub const ARROWHEADS: &[&str] = &[
 
 /// An arrowhead's place in `ARROWHEADS`.
 pub fn arrowhead_of(material: &str) -> Option<u32> {
-    ARROWHEADS.iter().position(|m| *m == material).map(|i| i as u32)
+    ARROWHEADS
+        .iter()
+        .position(|m| *m == material)
+        .map(|i| i as u32)
 }
 
 /// The item level of an arrow headed with `ARROWHEADS[head]`: its material's (a plain one
