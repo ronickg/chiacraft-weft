@@ -222,6 +222,8 @@ const MIST_BANK_FALL: f32 = 6.0;
 const MIST_BANK_WANDER: f32 = 5.0;
 const MIST_BANK_CAP: f32 = 34.0;
 const MIST_BANK_DENSE: f32 = 0.9;
+// The lumps' contrast curve on their noise (from, to) and the scale that keeps the average.
+const MIST_LUMP: vec3<f32> = vec3(0.42, 0.62, 0.76);
 const MIST_DEEP_DENSE: f32 = 1.2;
 // With it, how much light the mist in the sun's shade keeps (Bliss's in shade is dark, the shafts
 // show): of the bounce, and of the sky's.
@@ -1809,7 +1811,13 @@ fn ground_at(rel: vec3<f32>) -> vec3<f32> {
 // thins it in patches but leaves no hard edge. With a lid and a hard bank edge it read as a surface,
 // sand painted on the clearings (Planner on lv4, 11-24). Thinner on high ground.
 fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
-    let bank = smoothstep(0.05, 0.95, fog_banks(p));
+    // Lumps with gaps, not an even veil (Planner on lv5: Bliss's 07:00 is cream billows with the crowns
+    // as dark islands): three octaves of noise from about 60 blocks to 12, squashed in height and
+    // drifting with the wind, through a contrast curve; scaled so the average holds what lv5's
+    // frame means fitted.
+    let q = (p - vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * 0.6) * vec3(1.0, 2.2, 1.0);
+    let f = noise3(q / 58.0) * 0.55 + noise3(q / 26.0 + vec3(17.3)) * 0.3 + noise3(q / 12.0 + vec3(41.7)) * 0.15;
+    let bank = smoothstep(MIST_LUMP.x, MIST_LUMP.y, f) * MIST_LUMP.z;
     let ground = ground_at(rel);
     var base = SEA_LEVEL + MIST_BANK_BASE;
     var high = 1.0;
@@ -1823,7 +1831,7 @@ fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
     let tall = exp(-max(h, 0.0) / MIST_BANK_FALL) * (1.0 - smoothstep(MIST_BANK_CAP * 0.6, MIST_BANK_CAP, h));
     // Thinner as the sun climbs, gone by about 40° up.
     let burn = 1.0 - smoothstep(0.3, 0.65, scene.sun.y);
-    return air_mist() * mix(0.15, 1.0, bank) * tall * high * MIST_BANK_DENSE * burn * smoothstep(-6.0, -2.0, p.y - base);
+    return air_mist() * bank * tall * high * MIST_BANK_DENSE * burn * smoothstep(-6.0, -2.0, p.y - base);
 }
 fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
@@ -1873,7 +1881,9 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         if d <= 0.0 {
             continue;
         }
-        let lit = sun_reaches(dir * t);
+        // The clouds' shadow too: Bliss's broad dark streaks through dawn mist come from what stands
+        // far off, the clouds among it, not only the crowns.
+        let lit = sun_reaches(dir * t) * cloud_shadow(dir * t);
         reach += lit * d;
         misty += d;
         let kept = exp(-d * step);
