@@ -487,7 +487,8 @@ pub struct Key {
     pub missing: &'static [&'static str],
 }
 
-/// The keys so far: the Stone Age's, and the Bronze Age's boss part (11-05).
+/// The keys so far: the Stone Age's, the Bronze Age's boss part (11-05) and materials gate, and the
+/// Iron Age's materials gate (11-23).
 pub const KEYS: &[Key] = &[
     Key {
         age: Age::Stone,
@@ -498,18 +499,31 @@ pub const KEYS: &[Key] = &[
         ],
         missing: &["knowledge: a ruin's blueprint or lore page"],
     },
-    // The Bronze Age's key: only its boss part is built (Borkon's Summit Stone, by every route).
+    // The Bronze Age's key: its boss part (Borkon's Summit Stone) and its materials gate, a
+    // bronze pickaxe (`base:bronze_ingot` stands for its head), which iron ore takes
+    // (`vitals::gear::IRON_ORE_HARVEST`, 11-23), by every route.
     Key {
         age: Age::Bronze,
         routes: &[
-            (Path::Tech, &["animals:summit_stone"]),
-            (Path::Beasts, &["animals:summit_stone"]),
-            (Path::Magic, &["animals:summit_stone"]),
+            (Path::Tech, &["base:bronze_ingot", "animals:summit_stone"]),
+            (Path::Beasts, &["base:bronze_ingot", "animals:summit_stone"]),
+            (Path::Magic, &["base:bronze_ingot", "animals:summit_stone"]),
+        ],
+        missing: &["knowledge: a ruin's blueprint or lore page", "infrastructure: a working setup from the Bronze Age"],
+    },
+    // The Iron Age's key: only its materials gate, a steel pickaxe (diamond ore and obsidian take
+    // harvest 300) from the forge that makes steel, by every route.
+    Key {
+        age: Age::Iron,
+        routes: &[
+            (Path::Tech, &["base:steel_ingot", "base:forge"]),
+            (Path::Beasts, &["base:steel_ingot", "base:forge"]),
+            (Path::Magic, &["base:steel_ingot", "base:forge"]),
         ],
         missing: &[
-            "materials and tools: the Bronze Age's own",
+            "a biome boss: no Iron Age form has an offering yet",
             "knowledge: a ruin's blueprint or lore page",
-            "infrastructure: a working setup from the Bronze Age",
+            "infrastructure: past the forge, a working setup from the Iron Age",
         ],
     },
 ];

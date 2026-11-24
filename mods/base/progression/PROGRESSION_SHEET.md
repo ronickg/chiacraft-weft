@@ -368,8 +368,8 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 | age | tech | magic | beasts | not built yet |
 |---|---|---|---|---|
 | Stone Age | base:pickaxe, base:furnace, animals:warden_heartseed | base:dowsing_rod, animals:warden_heartseed | animals:club, animals:tranquilizer_dart, animals:nest, animals:warden_heartseed | knowledge: a ruin's blueprint or lore page |
-| Bronze Age | animals:summit_stone | animals:summit_stone | animals:summit_stone | materials and tools: the Bronze Age's own; knowledge: a ruin's blueprint or lore page; infrastructure: a working setup from the Bronze Age |
-| Iron Age | - | - | - | all of it |
+| Bronze Age | base:bronze_ingot, animals:summit_stone | base:bronze_ingot, animals:summit_stone | base:bronze_ingot, animals:summit_stone | knowledge: a ruin's blueprint or lore page; infrastructure: a working setup from the Bronze Age |
+| Iron Age | base:steel_ingot, base:forge | base:steel_ingot, base:forge | base:steel_ingot, base:forge | a biome boss: no Iron Age form has an offering yet; knowledge: a ruin's blueprint or lore page; infrastructure: past the forge, a working setup from the Iron Age |
 | Age of Steam | - | - | - | all of it |
 | Age of Lightning | - | - | - | all of it |
 | Age of the Future | - | - | - | all of it |
@@ -382,9 +382,12 @@ What each route costs from scratch (`graph::route_cost`): its items at their che
 | Stone Age | tech | 48 | 1.01 | 2.9 | crafting_table, axe, sharp_flake |
 | Stone Age | beasts | 47 | 1.00 | 2.3 | crafting_table, axe, sharp_flake |
 | Stone Age | magic | 50 | 1.07 | 5.5 | sharp_flake |
-| Bronze Age | tech | 60 | 1.00 | 0.00 |  |
-| Bronze Age | beasts | 60 | 1.00 | 0.00 |  |
-| Bronze Age | magic | 60 | 1.00 | 0.00 |  |
+| Bronze Age | tech | 74 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
+| Bronze Age | beasts | 74 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
+| Bronze Age | magic | 74 | 1.00 | 6.3 | crucible, furnace, pickaxe, sharp_flake, crafting_table, axe, charcoal_clamp |
+| Iron Age | tech | 22 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
+| Iron Age | beasts | 22 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
+| Iron Age | magic | 22 | 1.00 | 14 | crafting_table, pickaxe, sharp_flake, furnace, bronze_ingot, crucible, charcoal_clamp, axe |
 
 ## The materials gate
 
