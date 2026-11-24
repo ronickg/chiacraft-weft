@@ -525,7 +525,10 @@ pub async fn lod_columns(t: T) -> R {
 pub async fn crater_saved(t: T) -> R {
     t.world(8).await?;
     t.idle().await?;
-    t.op("mode creative").await?;
+    // Spectator: in creative without flight the player fell into the crater. On CI (software
+    // Vulkan) the ~40 s from the fill to the check took them hundreds of blocks down, and the gold
+    // block was no longer loaded (an unloaded block reads as air).
+    t.op("mode spectator").await?;
     let f = t.feet();
     t.op("crater_fast 600").await?;
     t.op("look").await?;
@@ -1233,6 +1236,11 @@ pub async fn worldgen(t: T) -> R {
             .await?;
         t.secs(0.5).await?;
         t.loaded().await?;
+        // Straight away: a pig left alone wanders off (on CI, seconds of slow frames later).
+        let near = t
+            .op(&format!("near {} {} {} 8", hx + 1, hy + 1, hz + 1))
+            .await?;
+        t.check(near.contains("base:pig"), format!("the template's pig is there: {near}"));
         t.check_eq(t.block([hx, hy, hz]).await?, "base:bricks".to_string(), "the hub in the palette's block");
         let roof = t.block([hx, hy + 3, hz]).await?;
         t.check(roof.starts_with("base:bricks_slab"), format!("its roof the slabs made of it: {roof}"));
@@ -1247,10 +1255,6 @@ pub async fn worldgen(t: T) -> R {
             .filter_map(|e| e.rsplit(':').next()?.parse::<u32>().ok())
             .sum();
         t.check_eq(diamonds, 3, &format!("the chest filled from its loot table: {inv}"));
-        let near = t
-            .op(&format!("near {} {} {} 4", hx + 1, hy + 1, hz + 1))
-            .await?;
-        t.check(near.contains("base:pig"), format!("the template's pig is there: {near}"));
         let placed = t.op("placed").await?;
         t.check(placed.contains(&format!("testmod:outpost {hx} {hy} {hz}")), format!("FEATURE_PLACED told of it: {placed}"));
     }

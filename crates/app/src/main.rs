@@ -272,6 +272,28 @@ fn main() {
     opts.mod_dirs.push(player_mods);
     if testing {
         opts.mod_dirs.push(test_mods);
+    } else {
+        // The test-only mods (`play = false`, Weft's testmod) off in play, debug builds and stale
+        // copies in run/mods too: its about screen put "About Test Mod" on the title. A folder
+        // given with `--mods` still brings them (the test kit's own servers).
+        let given = |name: &str| {
+            folders.iter().any(|(flag, dir)| {
+                *flag == "--mods"
+                    && subdirs(dir)
+                        .iter()
+                        .chain(files(dir).iter())
+                        .any(|p| p.file_stem().is_some_and(|s| s == name))
+            })
+        };
+        for dir in subdirs(&root.join("mods")) {
+            let name = dir
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            if marked(&dir, "play=false") && !given(&name) && !opts.mods_off.contains(&name) {
+                opts.mods_off.push(name);
+            }
+        }
     }
     if separate {
         opts.mod_dirs.push(shipped);
@@ -421,6 +443,18 @@ fn test_jobs(extra: &[(String, String)], folders: &[(&str, PathBuf)], run_dir: &
         println!("{l}");
     }
     Some(failed + crashed)
+}
+
+/// The files (not folders) right in `dir`.
+fn files(dir: &std::path::Path) -> Vec<PathBuf> {
+    std::fs::read_dir(dir)
+        .map(|r| {
+            r.flatten()
+                .map(|e| e.path())
+                .filter(|p| p.is_file())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn subdirs(dir: &std::path::Path) -> Vec<PathBuf> {
