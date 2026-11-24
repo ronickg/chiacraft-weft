@@ -10,7 +10,7 @@ cursor 0.02 0.02
 screen core:multiplayer
 wait 1.5
 shot b3_01_multiplayer_world.png
-tap core:multiplayer links
+tap core:multiplayer id:links
 wait 1.5
 cursor 0.02 0.02
 wait 0.5
@@ -56,14 +56,14 @@ cursor 0.02 0.02
 screen core:multiplayer
 wait 1.5
 shot b3_10_multiplayer.png
-tap core:multiplayer links
+tap core:multiplayer id:links
 wait 1.5
 cursor 0.02 0.02
 wait 0.5
 shot b3_11_links.png
 key Escape
 wait 1
-tap core:multiplayer friends
+tap core:multiplayer id:friends
 wait 1.5
 cursor 0.02 0.02
 wait 0.5
@@ -99,9 +99,9 @@ key Escape
 wait 1
 screen core:worlds
 wait 1.5
-tap_once core:worlds world:0
+tap_once core:worlds id:world:0
 wait 1
-tap core:worlds new_address
+tap core:worlds id:new_address
 wait 1.5
 cursor 0.02 0.02
 wait 0.5

@@ -66,8 +66,12 @@ impl Screen for Admission {
                         ui.set_id(id, "only_listed");
                         let p = rules.probation.clone();
                         let hours = p.hours.ceil() as u32;
-                        ui.container(Style::row().gap(4.0), |ui| {
-                            label(ui, cx, "admission.screen.probation", &[Arg::Int(hours as i64)], "default");
+                        // Style 1: the label on a line of its own at 2x, the steps under it (beside
+                        // them it had room only at 1x).
+                        let line = cx.look.has_text("menu_button");
+                        ui.container(stepper(line), |ui| {
+                            let t = label(ui, cx, "admission.screen.probation", &[Arg::Int(hours as i64)], "default");
+                            crate::screens::field_label(ui, cx, t);
                             let less = HOURS
                                 .iter()
                                 .rev()
@@ -75,12 +79,14 @@ impl Screen for Admission {
                                 .copied()
                                 .unwrap_or(0);
                             let more = HOURS.iter().find(|h| **h > hours).copied().unwrap_or(hours);
-                            let id =
-                                button(ui, cx, "admission.screen.less", &[], 30.0, move |c| run(c, format!("/probation hours {less}")));
-                            ui.set_id(id, "probation_less");
-                            let id =
-                                button(ui, cx, "admission.screen.more", &[], 30.0, move |c| run(c, format!("/probation hours {more}")));
-                            ui.set_id(id, "probation_more");
+                            ui.container(Style::row().gap(4.0), |ui| {
+                                let id =
+                                    button(ui, cx, "admission.screen.less", &[], 30.0, move |c| run(c, format!("/probation hours {less}")));
+                                ui.set_id(id, "probation_less");
+                                let id =
+                                    button(ui, cx, "admission.screen.more", &[], 30.0, move |c| run(c, format!("/probation hours {more}")));
+                                ui.set_id(id, "probation_more");
+                            });
                         });
                         ui.container(Style::row().gap(4.0), |ui| {
                             let (b, k) = (p.build, p.containers);
@@ -106,14 +112,19 @@ impl Screen for Admission {
                             run(c, format!("/didrule unchecked {}", if guest { "refuse" } else { "guest" }))
                         });
                         ui.set_id(id, "did_unchecked");
-                        ui.container(Style::row().gap(4.0), |ui| {
-                            label(ui, cx, "admission.screen.did_days", &[Arg::Int(days as i64)], "default");
+                        ui.container(stepper(line), |ui| {
+                            let t = label(ui, cx, "admission.screen.did_days", &[Arg::Int(days as i64)], "default");
+                            crate::screens::field_label(ui, cx, t);
                             let less = DAYS.iter().rev().find(|d| **d < days).copied().unwrap_or(0);
                             let more = DAYS.iter().find(|d| **d > days).copied().unwrap_or(days);
-                            let id = button(ui, cx, "admission.screen.less", &[], 30.0, move |c| run(c, format!("/didrule age {less}")));
-                            ui.set_id(id, "did_days_less");
-                            let id = button(ui, cx, "admission.screen.more", &[], 30.0, move |c| run(c, format!("/didrule age {more}")));
-                            ui.set_id(id, "did_days_more");
+                            ui.container(Style::row().gap(4.0), |ui| {
+                                let id =
+                                    button(ui, cx, "admission.screen.less", &[], 30.0, move |c| run(c, format!("/didrule age {less}")));
+                                ui.set_id(id, "did_days_less");
+                                let id =
+                                    button(ui, cx, "admission.screen.more", &[], 30.0, move |c| run(c, format!("/didrule age {more}")));
+                                ui.set_id(id, "did_days_more");
+                            });
                         });
                     });
                     // The world's DID (phase 4): named by the owner's DID, naming it back.
@@ -416,4 +427,10 @@ impl Screen for Admission {
             button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
+}
+
+/// A setting stepped with − and +: its label beside the steps, or in style 1 on a line of its own
+/// above them (`line`), where the label has room at 2x.
+fn stepper(line: bool) -> Style {
+    if line { Style::default().gap(4.0) } else { Style::row().gap(4.0) }
 }
