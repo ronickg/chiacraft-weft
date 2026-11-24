@@ -272,25 +272,33 @@ const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.8, 1.2);
 // mist with shafts between. Every overall cut took the vista, seen from 120 blocks over the banks,
 // darker and greyer than Bliss's (lv12); this leaves it alone.
 const MIST_NEAR_SUN: vec2<f32> = vec2(24.0, 120.0);
+// The far air's glow toward Bliss's low morning sun (`haze_lit`): how tight (a power of the cosine),
+// how bright, and from what distance to what (blocks) it comes in.
+const HAZE_SUN_GLOW: vec4<f32> = vec4(16.0, 5.0, 200.0, 800.0);
 // With Bliss's sun on a low morning sun (`sky_color`): the sky toward it in a peach, full within
 // the first cosine, gone by the second (about 8° and 25°; it reached out to 45° in a yellow, which
 // stood against the lavender as a yellow-green arc over the sun, lv13-14), in this peach; and the glow
 // along the horizon round it: how tightly round the sun across (a power of the cosine), how fast it
 // fades above and below the horizon (per unit of dir.y), how bright.
-const SUN_GOLD: vec2<f32> = vec2(0.9, 0.99);
+const SUN_GOLD: vec2<f32> = vec2(0.85, 0.999);
 const SUN_GOLD_TINT: vec3<f32> = vec3(1.0, 0.9, 0.82);
 // The dawn's cream over the sun's half of the sky drawn in to a lobe round the sun (a power of the
 // cosine) with Bliss's sun.
 const SUN_CREAM_TIGHT: f32 = 24.0;
 // The sun's glow in the sky with Bliss's sun on a low morning sun: this cream, this much of it.
 const SUN_GLOW_CREAM: vec3<f32> = vec3(1.0, 0.9, 0.8);
-const SUN_GLOW_CREAM_K: f32 = 0.85;
+const SUN_GLOW_CREAM_K: f32 = 1.0;
 // Away from it the sky in these at its own brightness: from the first cosine (none) to the second
 // (full, lavender), blue beyond; how much.
-const SKY_AWAY: vec3<f32> = vec3(0.985, 0.87, 1.0);
-const SKY_AWAY_LAVENDER: vec3<f32> = vec3(0.95, 0.88, 1.0);
+const SKY_AWAY: vec3<f32> = vec3(0.995, 0.6, 1.0);
+// Where its lavender turns blue (cosines: none, full).
+const SKY_AWAY_TURN: vec2<f32> = vec2(0.95, 0.45);
+// How much of it the haze over the land takes (it reads the sky's colour): at full the 06 vista's land
+// went from saturation 0.47 to 0.40 against Bliss's 0.48 (lv14).
+const SKY_AWAY_LAND: f32 = 0.35;
+const SKY_AWAY_LAVENDER: vec3<f32> = vec3(0.93, 0.9, 1.0);
 const SKY_AWAY_BLUE: vec3<f32> = vec3(0.55, 0.7, 1.0);
-const SUN_BAND: vec3<f32> = vec3(10.0, 9.0, 2.0);
+const SUN_BAND: vec3<f32> = vec3(10.0, 9.0, 8.0);
 // How much of the sky's wide round sun glow (`OPT_SUN_GLOW`) goes with Bliss's sun low in the morning.
 const SUN_BAND_ROUND: f32 = 0.67;
 // Its light from the sky, brighter looking up through it (how much, how sharply), and its share (Bliss's
@@ -944,10 +952,23 @@ fn sun_glow(dir: vec3<f32>, p: Palette) -> vec3<f32> {
 
 // The sky in `dir` (unit, world): horizon to zenith, the warm side toward the sun at sunset and the
 // purple opposite, the glow round the sun, a faint one round the moon.
+// Bliss's sun (`OPT_SUN_DISC`) on a low morning sun, clear: 0 to 1.
+fn bliss_low_sun() -> f32 {
+    return clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0) * (1.0 - dawn_sky()) * (1.0 - rain_amount())
+        * smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.25, 0.45, scene.sun.y))
+        * smoothstep(-0.03, 0.02, scene.sun.y);
+}
+// How much of the sky's colour away from the sun (`SKY_AWAY`) this read takes: 1 for the sky, less for
+// the haze over the land (`haze_lit` sets it while it reads the sky).
+var<private> sky_away_scale: f32 = 1.0;
 fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let p = palette();
     let h = clamp(dir.y, 0.0, 1.0);
-    var c = mix(p.horizon, p.zenith, pow(h, 0.4));
+    let bliss_sun = bliss_low_sun();
+    // With Bliss's sun the horizon's colour a peach, not the golden key's yellow (hue 40): where the
+    // sun's creamed glow fades out it showed through as a faint yellow ring about 7° out (lv15).
+    let horizon = mix(p.horizon, SUN_GLOW_CREAM * (luma(p.horizon) / luma(SUN_GLOW_CREAM)), bliss_sun * select(0.0, 0.8, scene.frame.x > 0.5));
+    var c = mix(horizon, p.zenith, pow(h, 0.4));
     let mu = dot(dir, scene.sun.xyz);
     let low = 1.0 - smoothstep(0.0, 0.2, abs(scene.sun.y));
     // (This and the moon's and the rain's parts below are skipped for the whole frame where they
@@ -962,17 +983,14 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
         c += vec3(0.55, 0.22, 0.05) * toward;
     }
-    let bliss_sun = clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0) * (1.0 - dawn_sky()) * (1.0 - rain_amount())
-        * smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.25, 0.45, scene.sun.y))
-        * smoothstep(-0.03, 0.02, scene.sun.y);
     // With Bliss's sun, away from the sun the sky lavender and then blue at its own brightness, not
     // the golden key's gold horizon mixed up into the blue: ours stood tan-mauve over the whole sky
     // (06 vista top right 165 145 153, Bliss's 96 130 191; blue channel 140-155 all over against
     // Bliss's 185-190), with the haze, banks, mist, low air and bloom each off (lv14).
     if bliss_sun > 0.0 && scene.frame.x > 0.5 {
         let away_sun = smoothstep(SKY_AWAY.x, SKY_AWAY.y, mu);
-        let tint = mix(SKY_AWAY_LAVENDER, SKY_AWAY_BLUE, smoothstep(SKY_AWAY.y, 0.5, mu));
-        c = mix(c, tint * (luma(c) / luma(tint)), away_sun * bliss_sun * SKY_AWAY.z);
+        let tint = mix(SKY_AWAY_LAVENDER, SKY_AWAY_BLUE, smoothstep(SKY_AWAY_TURN.x, SKY_AWAY_TURN.y, mu));
+        c = mix(c, tint * (luma(c) / luma(tint)), away_sun * bliss_sun * SKY_AWAY.z * sky_away_scale);
     }
     // (B5: on the sky's own colour, before the sun's glow and glare are added: on top of them it
     // turned the glare gold, and the dawn mist that reads it went flat orange over the land, PC
@@ -1026,7 +1044,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let away = smoothstep(0.2, -0.4, mu);
         let low_morning = smoothstep(-0.05, 0.05, scene.sun.x) * (1.0 - smoothstep(0.45, 0.7, scene.sun.y));
         let aw = away * low_morning;
-        c = mix(c, blue, k * mix(0.6, 0.85, aw)) * (1.0 - mix(0.4, 0.15, aw) * k);
+        // (With Bliss's sun on a low morning less of the darkening: under the blue away from the sun it
+        // stood as a grey band over the horizon, where Bliss's sky is brightest; lv14.)
+        c = mix(c, blue, k * mix(0.6, 0.85, aw)) * (1.0 - mix(0.4, 0.15, aw) * k * (1.0 - 0.7 * bliss_sun));
         // The evening's side away from the sun (`OPT_EVENING_AWAY`): Bliss's sky low in the east at
         // 18:00 is a clear blue, 90 129 186 two to five degrees up, where ours stayed a grey-cream,
         // 143 145 151, and the far land hazed into it (lsV_air, 11-23). A deep blue at a little under
@@ -2442,7 +2462,15 @@ fn wet_depth(dist: f32) -> f32 {
 const BAND_HDR: f32 = 0.006;
 const BAND_DEPTH: f32 = 12.0;
 
+// The haze over the land takes only part of the sky's colour away from the sun (`SKY_AWAY_LAND`).
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    sky_away_scale = SKY_AWAY_LAND;
+    let c = haze_lit_inner(c_in, rel, sky);
+    sky_away_scale = 1.0;
+    return c;
+}
+
+fn haze_lit_inner(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     // The mist banks' debug views (3 to 5) alone, without the haze after them.
     if look_debug() >= 3u && look_debug() <= 5u {
@@ -2505,6 +2533,15 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let banks_on = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0) * select(0.0, 1.0, scene.frame.x > 0.5);
     var lit = color + p.glow * light_strength() * lobe * mix(0.25, 0.7, golden()) * (1.0 - rain) * near_end * (1.0 - banks_on);
     lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
+    // With Bliss's low morning sun, the far air toward it in a broad cream glow (`HAZE_SUN_GLOW`): Bliss's
+    // low sun stands in a gold-white glow on the horizon that runs down over the far mist; ours had a
+    // pale grey-blue band there (the lobe above is off with the banks, lv10; the banks' own light
+    // far out, raised ninefold, did not reach it, lv15).
+    let bl = bliss_low_sun();
+    if bl > 0.0 && scene.frame.x > 0.5 {
+        lit += SUN_GLOW_CREAM * luma(p.sun) * light_strength() * pow(max(mu, 0.0), HAZE_SUN_GLOW.x) * HAZE_SUN_GLOW.y
+            * smoothstep(HAZE_SUN_GLOW.z, HAZE_SUN_GLOW.w, dist) * bl;
+    }
     // Rain's mist is as dark as the rain's sky, darker in a thunderstorm: lit as a clear day's
     // air, a storm's mist was pale under a dark sky.
     // (The sky's colour it starts from is already the rain's; darker than it, the land under a

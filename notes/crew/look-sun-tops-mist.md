@@ -127,8 +127,30 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
 - Live script: a fresh game has `look_mist_domes` and `look_mist_dawn_tint` off (as made); earlier
   games had them set by hand (lv14's first set had no banks). Both now in `live.txt`.
 
+### Seam, ring, horizon glow (lv15)
+
+- The away-from-sun ramp wider (`SKY_AWAY` from about 6° to 53°, blue from 18° to 63°, a lighter
+  lavender): the near-vertical seam with a grey-pink band in lv14 k's 06 vista is gone. Under Bliss's
+  sun less of the horizon band's darkening: the grey band low on the right is gone.
+- The faint ring at 06 low (saturation peak about 100 px out): not the tone curve (it stays put at
+  exposure 0.6 to 1.5), not post's saturation boost, not any one of sun_glow, the Mie lobes or the
+  dawn cream (each off only moved it). The golden key's yellow horizon (hue 40) showed through where
+  the creamed glow fades: with Bliss's sun the horizon's colour a peach too, and the glow fully cream.
+  Peak 0.28 in lv14's base to 0.21 now against 0.18 either side: faint, not gone.
+- Horizon glow: the banks' sun far out, even ninefold, did not reach the band under the sun (from the
+  vista's height the march ends before it), dropped. What reaches it is the sky's horizon band
+  (`SUN_BAND` now 8) and the far air's haze: a cream glow toward the sun from 200 to 800 blocks
+  (`HAZE_SUN_GLOW`, `haze_lit`). lv15 b: the horizon under the sun glows into the far mist.
+- The land haze takes a third of the away tint (`SKY_AWAY_LAND`): no change in the vista's land
+  saturation (0.40), so that drop was not the haze's sky colour. With the glow it is now 0.36 (Bliss 0.48).
+- The streaks low in the haze at the horizon (06 low): in lv13 too, so older than the sky change.
+- Live game: the third pack reload in a row took about 90 s (lv14, lv15), the others a few seconds.
+
 ## Open
 
+- 06 vista land saturation 0.36 against Bliss's 0.48: find what took it from 0.47 (lv13) to 0.40 (lv14), then the glow's share.
+- A faint arc high on the right of the 06 vista (lv14 k and lv15 b).
+- The faint ring at 06 low; the streaks in the far haze at 06 low.
 - 07 low darks a little deep (p5 76 against Bliss's 101); 06 low as it is (Planner).
 - Bliss's large gold-white glow round the low sun, bleeding into the mist below: not in the sky
   (the land covers it); it wants the banks' or the land haze's light toward the sun, or the bloom.
