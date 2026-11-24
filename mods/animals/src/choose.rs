@@ -105,6 +105,12 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
         if lead == Some(Need::Drink as u8) && 1.0 - a.thirst < animals_core::groups::JOIN_DRINK {
             s[Need::Drink as usize] = s[Need::Drink as usize].max(animals_core::groups::JOIN_PULL);
         }
+        // Grazing with its herd doesn't pull it from water it is driven to: thirst past
+        // `memory::DRIVEN` goes first (ai1124_pit8: a deer whose leader grazed ate 80 s at the
+        // pond, 1-4 blocks from it, as its water fell 13 to 9 %, `JOIN_PULL` 0.85 over its thirst): it scores its own hunger.
+        if lead == Some(Need::Eat as u8) && s[Need::Drink as usize] >= animals_core::memory::DRIVEN {
+            s[Need::Eat as usize] = needs::hunger_score(fed, at(Need::Eat));
+        }
     }
     s[Need::Comfort as usize] = match w
         .component(id, &BODY)
