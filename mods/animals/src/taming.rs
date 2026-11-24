@@ -95,6 +95,16 @@ fn bubble(item: &str) -> String {
     format!("want_{}", item.split_once(':').map_or(item, |(_, n)| n))
 }
 
+/// Whether thirst or hunger presses `id` past `memory::DRIVEN` (as it goes onto feared ground):
+/// then a half-noticed player doesn't stop it; one it has noticed still sends it off.
+fn driven(w: &World, id: u64) -> bool {
+    use animals_core::needs;
+    w.component(id, &crate::animal::ANIMAL).is_some_and(|a| {
+        let fed = a.food as f32 / a.stat(crate::species::FOOD).max(1.0);
+        needs::thirst_score(1.0 - a.thirst, false).max(needs::hunger_score(fed, false)) >= animals_core::memory::DRIVEN
+    })
+}
+
 /// A goal for wild animals of species `index`, after `animal::upkeep`: running off when
 /// scared, standing still while asking for food, asking when a player is near and calm. One that
 /// is never tamed (`Taming::Wild`: a hare) only runs off.
@@ -138,7 +148,11 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                     crate::senses::ran(w, id, true);
                     return true;
                 }
-                if seen.fright >= animals_core::perception::STARE {
+                // Half aware it stops to stare, unless thirst or hunger drives it on (`driven`): a
+                // player standing still by the only pool froze the herd that came to drink there,
+                // and it drifted off and died parched (ai1124_graze3: deer at 5 % water staring 10
+                // blocks from the water).
+                if seen.fright >= animals_core::perception::STARE && !driven(w, id) {
                     crate::senses::stare(w, id, st, seen.player_pos);
                     return true;
                 }
