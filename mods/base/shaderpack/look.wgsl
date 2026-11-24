@@ -103,8 +103,8 @@ const OPT_DEBUG: u32 = 33u;
 // between the horizon and the zenith, normalised: `deferred.vsh:121-151`), `base:look_sky_hue` read
 // raw: 0 the palette's fill as made, 1 all the way to the sky's hue.
 const OPT_SKY_HUE: u32 = 34u;
-// The HDR world's exposure by day in Bliss's own units (`base:look_exposure_abs`, read raw: 0 as
-// made, 1 all the way): its curve fed our light x41 (our light is in units about 41x smaller than
+// The HDR world's exposure by day in Bliss's own units (`base:look_exposure_abs`, read raw: 1 as
+// made since 11-24, 0 our old curve): its curve fed our light x41 (our light is in units about 41x smaller than
 // Bliss's, sun luma 1.77 against 72.7: Research's code read, 11-22), so its slope is Bliss's gentle
 // one; without our 0.83 and the near land's dim. Still 1 at an average sunlit view.
 const OPT_EXPOSURE_ABS: u32 = 35u;
@@ -116,8 +116,8 @@ const OPT_SPLIT_WARM: u32 = 36u;
 // Ronald's 0.18 uniform + 0.09 cloudy), densest at the low land and halving every 6.7 blocks up, no
 // sharp-topped layer: the 18:00 warm veil over the land (Research's code read, 11-22).
 const OPT_EVENING_MIST: u32 = 37u;
-// The HDR world's bloom by day added on top as Bliss's (`base:look_bloom_add`, read raw: 0 as made,
-// mixed in keeping the light's sum; 1 all the way).
+// The HDR world's bloom by day added on top as Bliss's (`base:look_bloom_add`, read raw: 1 as made
+// since 11-24; 0 mixed in keeping the light's sum).
 const OPT_BLOOM_ADD: u32 = 38u;
 // A test switch for like-for-like compares (`base:look_cirrus_off`, read raw: 0 as made, 1 no high
 // cirrus): with `core:soft_clouds` 0, `core:cloud_shadows` 0 and a blank clouds texture (mcclear)

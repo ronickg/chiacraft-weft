@@ -56,7 +56,8 @@ pub static LOOK_DEBUG: Config<f32> = Config::named("look_debug");
 /// made, 1 all the way.
 pub static LOOK_SKY_HUE: Config<f32> = Config::named("look_sky_hue");
 /// The HDR world's exposure by day in Bliss's own units (its curve's gentle slope, no near-land dim):
-/// 0 as made, 1 all the way.
+/// 1 as made since 11-24 (with auto exposure, bloom added and fill 1.0 our cave, arch, overhang,
+/// forest and vista land within about 10 luma of Bliss's auto-exposed refs: PC lkauto1), 0 the old curve.
 pub static LOOK_EXPOSURE_ABS: Config<f32> = Config::named("look_exposure_abs");
 /// The HDR world's warmth on sunlit foliage toward a leaf-top yellow: 0.7 as made, 0 none.
 pub static LOOK_SPLIT_WARM: Config<f32> = Config::named("look_split_warm");
@@ -65,7 +66,8 @@ pub static LOOK_SPLIT_WARM: Config<f32> = Config::named("look_split_warm");
 /// to 3 thicker.
 pub static LOOK_EVENING_MIST: Config<f32> = Config::named("look_evening_mist");
 /// The HDR world's bloom by day added on top, as Bliss's (+35% at the centre, +12% in the corners at
-/// noon): 0 mixed in as made, 1 all the way.
+/// noon): 1 as made since 11-24 (it lifts the shade as Bliss's does: the noon vista's darkest quarter
+/// 102 against Bliss's 103, PC lkstack2), 0 mixed in keeping the light's sum.
 pub static LOOK_BLOOM_ADD: Config<f32> = Config::named("look_bloom_add");
 /// A test switch for like-for-like compares: 1 takes the high cirrus out of the sky (with soft
 /// clouds and cloud shadows off and a blank clouds texture, no cloud at all). 0 as made.
@@ -159,7 +161,7 @@ pub static LOOK_BLISS: Config<bool> = Config::named("look_bliss");
 pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 21] = [
     // The shade: no glare lift, less fill, the sky light occluded as Bliss's (lsN_ao3).
     (&LOOK_GLARE, 0.0, 0.0),
-    (&LOOK_FILL, 0.7, 0.7),
+    (&LOOK_FILL, 1.0, 1.0),
     (&LOOK_AO_POWER, 4.0, 4.0),
     // The evening's blue hour (lsZ_tw2, lsAA_tw3).
     (&LOOK_TWILIGHT, 0.5, 0.5),
@@ -218,7 +220,7 @@ pub fn register(r: &mut Registry) {
     crate::developer::page(r.config(&LOOK_EXPOSURE).float(1.0, 0.5, 2.0));
     crate::developer::page(r.config(&LOOK_SUN).float(1.0, 0.5, 2.0));
     crate::developer::page(r.config(&LOOK_SUN_WARMTH).float(0.0, -1.0, 1.0));
-    crate::developer::page(r.config(&LOOK_FILL).float(0.7, 0.5, 2.0));
+    crate::developer::page(r.config(&LOOK_FILL).float(1.0, 0.5, 2.0));
     crate::developer::page(r.config(&LOOK_FILL_COOL).float(0.0, -1.0, 1.0));
     crate::developer::page(r.config(&LOOK_CONTRAST).float(1.0, 0.8, 1.3));
     crate::developer::page(r.config(&LOOK_SATURATION).float(1.0, 0.7, 1.3));
@@ -250,10 +252,10 @@ pub fn register(r: &mut Registry) {
     crate::developer::page(r.config(&LOOK_LEAF_LIGHT).float(0.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_DEBUG).float(0.0, 0.0, 5.0));
     crate::developer::page(r.config(&LOOK_SKY_HUE).float(0.0, 0.0, 1.0));
-    crate::developer::page(r.config(&LOOK_EXPOSURE_ABS).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_EXPOSURE_ABS).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_SPLIT_WARM).float(0.7, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_EVENING_MIST).float(0.0, 0.0, 3.0));
-    crate::developer::page(r.config(&LOOK_BLOOM_ADD).float(0.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_BLOOM_ADD).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_CIRRUS_OFF).float(0.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_GLARE).float(0.0, 0.0, 2.0));
     crate::developer::page(r.config(&LOOK_AO_POWER).float(4.0, 0.0, 8.0));
