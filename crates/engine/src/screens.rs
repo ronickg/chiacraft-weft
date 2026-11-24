@@ -356,22 +356,43 @@ pub fn label(ui: &mut Ui, cx: &BuildCx, key: &str, args: &[Arg], class: &str) ->
 /// A button whose text `text` says each frame (a choice going round).
 pub fn bound_button(
     ui: &mut Ui,
+    cx: &BuildCx,
     width: f32,
     text: impl Fn() -> (String, Vec<Arg>) + 'static,
     action: impl Fn(&mut Ctx) + 'static,
 ) -> NodeId {
+    let class = button_text(cx);
     ui.button("button", Style::default().min_w(width).min_h(20.0).pad_xy(6.0, 4.0), Rc::new(action), |ui| {
-        ui.text_bound("button", Box::new(move |_: &Ctx| text()));
+        let t = ui.text_bound(class, Box::new(move |_: &Ctx| text()));
+        big_label(ui, t, class);
     })
+}
+
+/// The text class of a menu button's label: style 1's outlined one (`color.menu_button*`, the
+/// title's) when the look has it.
+fn button_text(cx: &BuildCx) -> &'static str {
+    if cx.look.has_text("menu_button") { "menu_button" } else { "button" }
+}
+
+/// A button label at twice the font where the button has room (style 1, Planner 11-24: the title's
+/// labels on every menu button), else at the font's own size (a narrow button keeps its width).
+fn big_label(ui: &mut Ui, t: NodeId, class: &str) {
+    if let Some(t) = ui.text_mut(t) {
+        t.wrap = false;
+        t.center = true;
+        if class == "menu_button" {
+            t.fit = 2.0;
+        }
+    }
+    ui.nodes[t].style = ui.nodes[t].style.self_align(crate::ui::Align::Stretch);
 }
 
 pub fn button(ui: &mut Ui, cx: &BuildCx, key: &str, args: &[Arg], width: f32, action: impl Fn(&mut Ctx) + 'static) -> NodeId {
     let spans = cx.t(key, args);
+    let class = button_text(cx);
     ui.button("button", Style::default().min_w(width).min_h(20.0).pad_xy(6.0, 4.0), Rc::new(action), |ui| {
-        let t = ui.text(spans, "button");
-        if let Some(t) = ui.text_mut(t) {
-            t.wrap = false;
-        }
+        let t = ui.text(spans, class);
+        big_label(ui, t, class);
     })
 }
 
@@ -693,23 +714,41 @@ impl Screen for Pause {
         true
     }
 
+    /// In a look with the title's panel (`menu_panel`, style 1) the buttons sit in it under the
+    /// title, see-through like the menus (chiacraft, Planner 11-24: they floated over the world);
+    /// else as Weft draws them.
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
-        frame(ui, cx, "menu.paused", |ui| {
-            back_button(ui, cx, "menu.resume", &[], 200.0, |c| c.requests.push(Request::Close));
-            // Back to your own world from a visit elsewhere (chiacraft).
-            if let Some(home) = cx.home {
-                button(ui, cx, "menu.return_home", &[Arg::Text(home.to_string())], 200.0, |c| c.requests.push(Request::ReturnHome));
-            }
-            button(ui, cx, "menu.multiplayer", &[], 200.0, |c| open(c, "core:multiplayer"));
-            // Who may come into your world (chiacraft): only in a world this game runs.
-            if cx.in_game && !cx.remote {
-                button(ui, cx, "menu.admission", &[], 200.0, |c| open(c, "core:admission"));
-            }
-            button(ui, cx, "menu.settings", &[], 200.0, |c| open(c, "core:settings"));
-            parts(ui, cx, "core:pause", "buttons");
-            button(ui, cx, "menu.save_quit", &[], 200.0, |c| c.requests.push(Request::LeaveWorld));
+        if cx.look.texture("menu_panel", "").is_none() {
+            frame(ui, cx, "menu.paused", |ui| pause_buttons(ui, cx));
+            return;
+        }
+        let bg = if cx.in_game { "overlay" } else { "background" };
+        ui.root_style(Style::default().stretch());
+        ui.panel(bg, Style::default().grow().center(), |ui| {
+            let mut style = Style::default().center().gap(7.0);
+            style.pad = [16.0, 14.0, 16.0, 18.0];
+            ui.panel("menu_panel", style, |ui| {
+                title(ui, cx, "menu.paused");
+                pause_buttons(ui, cx);
+            });
         });
     }
+}
+
+fn pause_buttons(ui: &mut Ui, cx: &BuildCx) {
+    back_button(ui, cx, "menu.resume", &[], 200.0, |c| c.requests.push(Request::Close));
+    // Back to your own world from a visit elsewhere (chiacraft).
+    if let Some(home) = cx.home {
+        button(ui, cx, "menu.return_home", &[Arg::Text(home.to_string())], 200.0, |c| c.requests.push(Request::ReturnHome));
+    }
+    button(ui, cx, "menu.multiplayer", &[], 200.0, |c| open(c, "core:multiplayer"));
+    // Who may come into your world (chiacraft): only in a world this game runs.
+    if cx.in_game && !cx.remote {
+        button(ui, cx, "menu.admission", &[], 200.0, |c| open(c, "core:admission"));
+    }
+    button(ui, cx, "menu.settings", &[], 200.0, |c| open(c, "core:settings"));
+    parts(ui, cx, "core:pause", "buttons");
+    button(ui, cx, "menu.save_quit", &[], 200.0, |c| c.requests.push(Request::LeaveWorld));
 }
 
 // ---------------------------------------------------------------- settings

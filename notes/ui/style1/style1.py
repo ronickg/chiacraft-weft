@@ -407,9 +407,33 @@ def build():
         put("button" + k, st[k], gb, sel + tail)
         if k != "_disabled":
             put("button_quit" + k, st[k], gb, tail)
+    # Every button at rest is the brown face, as on the title (Planner 11-24: orange at rest made
+    # every button look selected); the deep orange only hovered or selected.
     put("button_secondary", st["item"], gb, sel + tail)
     put("button_quit", st["item"], gb, tail)
-    put("button", st["main"], gb, sel + tail)
+    put("button", st["item"], gb, sel + tail)
+
+    # The slider's track: the buttons' copper rim round a sunken banded face (the bands darker
+    # going up, the highlight row at the bottom), 20 GUI like the settings' sliders; no shadow.
+    track = banded(rim, (7, 7, rim.shape[1] - 7, 33), brown(24, 28, 32), brown(18)[0], brown(44)[0], 3, [8, 8, 8])
+    put("slider", track, (12, 20, 12, 20), "middle = tile\n")
+    # Its knob: a bronze bar 8 GUI wide (`Slider::KNOB_WIDTH`), the copper rim round a banded
+    # bronze face; hovered, warmer with a gold inner line.
+    knob = np.zeros((40, 16, 4), np.uint8)
+    knob[:, :, 3] = 255
+    for (y, x) in [(0, 0), (0, 1), (1, 0), (0, 15), (0, 14), (1, 15), (39, 0), (38, 0), (39, 1), (39, 15), (38, 15), (39, 14)]:
+        knob[y, x, 3] = 0
+    edge = np.pad(knob[..., 3] > 0, 1)
+    from scipy.ndimage import binary_erosion
+    outline = (knob[..., 3] > 0) & ~binary_erosion(edge)[1:-1, 1:-1]
+    knob[outline, :3] = hexc("#24120a")
+    knob = copper(knob, depth=5)
+    bronze = ["#c8823c", "#b87232", "#a4642c"]
+    knob = banded(knob, (4, 4, 12, 36), bronze, "#f2b25e", "#6e3c1e", 5, [10, 10, 10])
+    put("slider_knob", knob, (6, 6, 6, 6), "")
+    hot = warm_rim(knob)
+    hot = banded(hot, (4, 4, 12, 36), [c for c in ("#d88a44", "#c87a38", "#b46a30")], "#ffd54a", "#7a3802", 5, [10, 10, 10])
+    put("slider_knob_hover", hot, (6, 6, 6, 6), "")
     # The title's buttons (`menu_main`, `menu_item`), cut at their height, 26 GUI (52 pixels): 4
     # bands of 9, never stretched; a 4-pixel margin (`outset = 2`) for the shadow. The borders
     # leave a one-row middle (the second band's last row).
@@ -471,8 +495,6 @@ def build():
         ("tooltip", (900, 100), (32, 24), 4), ("well", (1150, 100), (32, 24), 4),
         ("scrollbar", (80, 330), (12, 40), 4),
         ("scrollbar_handle", (220, 330), (12, 28), 4), ("scrollbar_handle_hover", (360, 330), (12, 28), 4),
-        ("slider", (520, 330), (62, 10), 4),
-        ("slider_knob", (900, 330), (14, 20), 4), ("slider_knob_hover", (1040, 330), (14, 20), 4),
         ("close", (80, 650), (14, 14), 3), ("close_hover", (220, 650), (14, 14), 3),
         ("close_pressed", (360, 650), (14, 14), 3), ("chip", (520, 650), (16, 16), 3),
     ]

@@ -1118,6 +1118,7 @@ impl Screen for CreateWorld {
             let (mode, shown, cheats) = (self.mode.clone(), self.mode.clone(), self.cheats.clone());
             bound_button(
                 ui,
+                cx,
                 260.0,
                 move || ("world.game_mode".into(), vec![Arg::Key(mode_key(shown.get(), modes))]),
                 move |_| {
@@ -1129,11 +1130,12 @@ impl Screen for CreateWorld {
                 },
             );
             let (cheats, shown) = (self.cheats.clone(), self.cheats.clone());
-            bound_button(ui, 260.0, move || ("world.cheats".into(), vec![on_off(shown.get())]), move |_| cheats.set(!cheats.get()));
+            bound_button(ui, cx, 260.0, move || ("world.cheats".into(), vec![on_off(shown.get())]), move |_| cheats.set(!cheats.get()));
             button(ui, cx, "world.rules", &[], 260.0, |c| c.requests.push(Request::Screen("core:world_rules".into())));
             ui.container(Style::row().gap(6.0), |ui| {
                 let (mode, cheats) = (self.mode.clone(), self.cheats.clone());
-                let create_button = button(ui, cx, "world.create", &[], 120.0, move |c| {
+                // Create wider than Cancel, so its label has room at 2x (chiacraft, style 1).
+                let create_button = button(ui, cx, "world.create", &[], 150.0, move |c| {
                     let name = c.input_text("name").unwrap_or_default();
                     let seed = parse_seed(&c.input_text("seed").unwrap_or_default());
                     let name = if name.trim().is_empty() { "World".to_string() } else { name.trim().to_string() };
@@ -1151,7 +1153,7 @@ impl Screen for CreateWorld {
                     c.requests.push(Request::StartWorldAnyway(meta));
                 });
                 ui.set_id(create_button, "create");
-                back_button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
+                back_button(ui, cx, "menu.cancel", &[], 104.0, |c| c.requests.push(Request::Close));
             });
         });
     }
