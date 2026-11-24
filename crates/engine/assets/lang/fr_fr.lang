@@ -167,7 +167,7 @@ world.play = Jouer dans ce monde
 world.delete = Supprimer
 world.folder = Dossier
 world.name = Nom du monde
-world.seed = Seed (laissez vide pour une génération aléatoire)
+world.seed = Graine (vide = aléatoire)
 world.game_mode = Mode de jeu : {0}
 world.cheats = Triche : {0}
 world.rules = Règles du monde

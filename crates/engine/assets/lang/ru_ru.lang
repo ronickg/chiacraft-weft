@@ -137,7 +137,7 @@ world.play = Играть в выбранном мире
 world.folder = Папка
 world.delete = Удалить
 world.name = Название мира
-world.seed = Ключ генератора (пусто = случайный)
+world.seed = Ключ мира (пусто = случайный)
 world.game_mode = Режим игры: {0}
 world.cheats = Читы: {0}
 world.rules = Правила мира

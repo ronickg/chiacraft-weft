@@ -1,7 +1,7 @@
 language.name = Русский
 menu.base.inventory = Инвентарь
 window.base.crafting = Создание
-window.base.tab.stats = Навыки
+window.base.tab.stats = Статистика
 window.base.tab.advancements = Достижения
 window.base.close = 
 window.base.close_tip = Закрыть
