@@ -36,7 +36,7 @@ chat /tk fill ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 wait 3
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-20 ~ ~-30 ~20 ~2 ~10 base:tall_grass
-look 0 -40
+look 0 -20
 wait 1
 shot herd_savanna_graze_1.png
 chat /tk ring animals:white_tailed_deer 5 10 14
@@ -105,7 +105,7 @@ chat /tk count ~-20 ~ ~-30 ~20 ~2 ~10 base:tall_grass
 chat /tick rate 20
 chat /time set 6000
 wait 3
-look 0 -40
+look 0 -20
 wait 1
 shot herd_savanna_graze_2.png
 where

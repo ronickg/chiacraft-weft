@@ -45,7 +45,7 @@ chat /tk fill ~-2 ~-2 ~-8 ~2 ~-2 ~-4 base:dirt
 chat /tk fill ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 wait 3
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
-look 0 -55
+look 0 -20
 wait 1
 shot herd_savanna_winter_1.png
 chat /tk ring animals:white_tailed_deer 5 10 14
@@ -108,7 +108,7 @@ chat /tick rate 20
 chat /time set 6000
 wait 20
 chat /animalprof senses
-look 0 -55
+look 0 -20
 wait 1
 shot herd_savanna_winter_2.png
 chat /season spring 1
@@ -124,7 +124,7 @@ chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /tick rate 20
 chat /time set 6000
 wait 2
-look 0 -55
+look 0 -20
 wait 1
 shot herd_savanna_winter_3.png
 where
