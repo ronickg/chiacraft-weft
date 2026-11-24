@@ -716,7 +716,7 @@ and cactus.**
   hunter fills up on its biggest prey at home in ten kills or fewer (`places.rs`; the raven takes
   3.4 mice, the wyvern 1.7 kills). Seen: a fox at 10% hunted a mouse, gave up a 30-second chase,
   took it on the next try and ate it (food 10 to 12 of 96).
-- **Prowling (2026-11-24):** a hungry hunter with no prey in sight and no kill site to go to walks 16-block legs a new way, looking as it goes (`needs::PROWL_LEG`, `hunt::prowl`): a jaguar 24 blocks from a resting herd had sat where it arrived and starved (ai1124_jaguar1).
+- **Prowling (2026-11-24):** a hungry hunter with no prey in sight and no kill site to go to walks 16-block legs a new way, looking as it goes (`needs::PROWL_LEG`, `hunt::prowl`): a jaguar 24 blocks from a resting herd had sat where it arrived and starved (ai1124_jaguar1). Seen (jaguar1b): 17 legs, then it saw the herd from the pond's rim, charged and killed. A pack prowls behind its leader (`needs::PACK_FOLLOW`), rallies on any prey it finds (deer too, which one wolf could take), and the walk to a kill site keeps the turn as a leg does: in wolves1b each wolf prowled and killed alone, and two lay 80 s "going" to a kill site while their rest took the turn back.
 - **Prey watch:** a wild animal that sees a hunter able to take it within 10 blocks runs.
 - **The old random hunts are gone:** the raptors' and Utahraptor's "now and then" hunts are
   replaced.

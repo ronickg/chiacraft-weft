@@ -392,6 +392,8 @@ const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WA
 /// and never saw them (ai1124_jaguar1): a big cat or a wolf pack ranges kilometres a day for prey.
 pub const PROWL_LEG: f64 = 16.0;
 pub const PROWL_SECS: f32 = 15.0;
+/// Blocks a pack's member keeps within of its leader as they prowl.
+pub const PACK_FOLLOW: f64 = 4.0;
 
 /// Healing: an animal watered (its water at `THIRSTY` or more) and unhurt for `HEAL_AFTER`
 /// seconds heals its whole health in `HEAL_DAYS` game days while fed (its food at `HUNGRY` of its

@@ -237,16 +237,24 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
             && dist2(site, st.pos) > 16.0
             && !w.navigating(id)
         {
+            // Walked as a prowl's leg, keeping the turn: it went every 3 s and its rest took the
+            // turn back each time, so two wolves lay 80 s "going" to one (ai1124_wolves1b).
             weft_sdk::info!("{} {id} goes to a kill site at {:.0} {:.0}", s.name, site[0], site[2]);
             w.navigate(id, site, 1.0);
-            return false;
+            w.component_mut(id, &PROWL)
+                .map(|p| *p = now + (animals_core::needs::PROWL_SECS * 20.0) as u64);
+            return true;
         }
-        // Nor any kill site: it prowls for prey (`prowl`).
-        return prowl(w, id, st, s, now);
+        // Nor any kill site: it prowls for prey (`prowl`), a pack behind its leader.
+        let leader = (s.pack_prey().is_some() && seen.leader != id && seen.leader != 0).then_some(seen.leader);
+        return prowl(w, id, st, s, now, leader);
     };
     w.component_mut(id, &PROWL).map(|p| *p = 0);
     weft_sdk::info!("{} {id} hunts {} ({kg:.1} kg, a pack of {pack})", s.name, t);
-    if pack >= species::PACK && !s.takes(own, kg) {
+    // A pack hunts what it finds together, prey it could take alone too (wolves run deer down
+    // as a pack): in ai1124_wolves1b each of three wolves took its own deer alone while the
+    // others lay by.
+    if pack >= species::PACK {
         rally(w, id, st, t, now);
     }
     h = [t, now, now + LOOK_EVERY, (pack >= species::PACK) as u64];
@@ -265,10 +273,22 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
 /// A hungry hunter with nothing in sight and no kill site: it walks a leg of
 /// `needs::PROWL_LEG` blocks a new way, onto ground its paths reach, and keeps the turn while it
 /// walks it (`needs::PROWL_SECS` at most), looking for prey at each `LOOK_EVERY`. True while it
-/// prowls.
-fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64) -> bool {
-    use animals_core::needs::{FLEE_DROP, PROWL_LEG, PROWL_SECS};
+/// prowls. A pack's other members follow its leader (`needs::PACK_FOLLOW`).
+fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Option<u64>) -> bool {
+    use animals_core::needs::{FLEE_DROP, PACK_FOLLOW, PROWL_LEG, PROWL_SECS};
     if w.component(id, &PROWL).is_some_and(|p| now < p) && w.navigating(id) {
+        return true;
+    }
+    // A pack prowls together: one not its leader keeps up with it (each on its own legs, the
+    // pack spread over the savanna and never counted three to hunt as one, ai1124_wolves1b).
+    // Only a leader that prowls itself: a fed one lying by its kill would hold the hungry back.
+    let prowling = |l: u64| w.component(l, &PROWL).is_some_and(|p| now < p);
+    if let Some(l) = leader.filter(|&l| prowling(l)).and_then(|l| w.entity(l)) {
+        if dist2(l.pos, st.pos) > PACK_FOLLOW * PACK_FOLLOW {
+            w.navigate(id, l.pos.to_array(), 1.0);
+            w.component_mut(id, &PROWL)
+                .map(|p| *p = now + (PROWL_SECS * 20.0) as u64);
+        }
         return true;
     }
     let y = st.pos.y.floor() as i32;
