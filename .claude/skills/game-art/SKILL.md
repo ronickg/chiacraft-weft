@@ -143,6 +143,14 @@ Worked example: `chiacraft-archive/images/art/2026-11-23/arrowheads/process.py`.
 
 ## UI parts (the kit)
 
+**Screens, not just parts: spacing and type scale.** Before a UI sheet goes to Ronald, check every
+screen against the UI guide's "Spacing and type scale" (`guides/6 UI/UI Style Guide.md`, Ronald
+11-24: "shouldn't there be some more like padding and stuff? ... compare to like other UIs like
+Valheim"): content 10 GUI inside a menu window's rail and 7.5 inside a game window's, even on all
+four sides; about 8 from a heading to its content; groups 8-12 apart; three text sizes (title 3x,
+label 2x, body 1x), a label the size of the buttons beside it; tabs in one row on the frame; corner
+icons inside the margin. Measure these in the shot at full size; they were the review's findings.
+
 UI parts come from the master prompt below, run through Codex (`notes/ui-codex/gen.sh NAME
 request.txt`, which attaches `approved_parts.png` and Ronald's two mockups,
 `notes/ui-reference/hud-in-game-mockup.jpg` and `screens-overview-mockup.jpg`). Many small parts

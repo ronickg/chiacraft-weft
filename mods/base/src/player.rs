@@ -192,7 +192,7 @@ pub fn register(r: &mut Registry) {
             ];
             // The recipe book beside it, hand recipes only (`book.rs`).
             ui.row(S::row().gap(4.0), |ui| {
-                crate::window::family_window(ui, S::column().pad(7.0).gap(5.0), None, &tabs, |ui| {
+                crate::window::family_window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(5.0), None, &tabs, |ui| {
                     ui.row(S::row().gap(1.0), |ui| {
                         // Armor, and the clothes worn under it beside, the cloak under them.
                         ui.column(S::column(), |ui| {
@@ -209,7 +209,8 @@ pub fn register(r: &mut Registry) {
                         ui.player_model(51.0, 72.0);
                         ui.spacer();
                         ui.column(S::column().gap(2.0).stretch(), |ui| {
-                            ui.text_styled(S::default().no_wrap(), "window.base.crafting", &[]);
+                            // A heading at 2x, as every window's (`UI Style Guide.md`, type scale).
+                            ui.text_styled(S::default().no_wrap().scale(2.0), "window.base.crafting", &[]);
                             ui.row(S::row().gap(4.0), |ui| {
                                 ui.group("grid");
                                 ui.recipe_arrow();
@@ -278,7 +279,7 @@ pub fn register(r: &mut Registry) {
         .screen(|ui| {
             // The recipe book beside it: every recipe, from the bag and the chests near the table.
             ui.row(S::row().gap(4.0), |ui| {
-                crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
+                crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0).stretch(), &[], |ui| {
                     ui.row(S::row().gap(8.0), |ui| {
                         ui.spacer();
                         ui.group("grid");

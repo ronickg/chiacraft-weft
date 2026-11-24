@@ -886,3 +886,4 @@ hint.animals.borkon.rock = Borkon answers only among bare rock: {0} stone round 
 hint.animals.borkon.awake = Borkon is already awake near here.
 hint.animals.borkon_kid.tamed = The kid takes to you and follows.
 death.animals.thirst = {0} died of thirst
+config.core.damage.animals.thirst = Thirst damage

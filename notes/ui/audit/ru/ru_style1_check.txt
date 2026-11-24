@@ -1,0 +1,47 @@
+# The same in Russian (--config core:language=ru_ru).
+# Style 1 (Ronald's pick, 11-23): the title screen in its framed oak panel, the shared parts
+# (button states, panel, slot, divider) on the inventory, Select World and Settings.
+# Starts in a world: inventory with a few items first, then leaves to the title.
+loaded
+idle
+chat /tk mode survival
+chat /tk give base:iron_pickaxe 1
+chat /tk give base:apple 5
+chat /tk give base:oak_log 12
+chat /tk give base:torch 16
+wait 2
+press core:inventory
+wait 1.5
+shot ru_s1_10_inventory.png
+cursor 0.45 0.5
+wait 0.5
+shot ru_s1_11_inventory_hover.png
+key Escape
+wait 0.5
+press animals:journal
+wait 1.5
+shot ru_s1_12_journal.png
+key Escape
+wait 0.5
+leave
+wait 2
+shot ru_s1_20_title.png
+cursor 0.12 0.5
+wait 0.5
+shot ru_s1_21_title_hover.png
+tap core:title text:Одиночная
+wait 1.5
+shot ru_s1_22_worlds.png
+key Escape
+wait 1
+tap core:title text:Настройки
+wait 1.5
+shot ru_s1_23_settings.png
+key Escape
+wait 1
+tap core:title text:Моды
+wait 1.5
+shot ru_s1_24_mods.png
+key Escape
+wait 1
+quit

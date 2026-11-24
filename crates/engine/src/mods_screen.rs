@@ -825,7 +825,8 @@ fn detail(ui: &mut Ui, cx: &BuildCx, r: &Row, dir: &PathBuf, busy: bool, width: 
             .any(|d| crate::screens::on_config_screen(d, &Shown::Mod(r.id.clone())));
         if has_settings {
             let id = r.id.clone();
-            crate::screens::button(ui, cx, "mods.settings", &[], 80.0, move |c| {
+            // Wide enough for the longest label at 2x (Russian's Настройки, chiacraft 11-24).
+            crate::screens::button(ui, cx, "mods.settings", &[], 92.0, move |c| {
                 c.requests
                     .push(Request::Open(Box::new(ConfigScreen { shown: Shown::Mod(id.clone()) })))
             });

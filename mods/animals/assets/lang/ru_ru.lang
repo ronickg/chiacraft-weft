@@ -881,3 +881,4 @@ hint.animals.borkon.rock = Боркон отвечает только среди
 hint.animals.borkon.awake = Боркон уже пробудился неподалёку.
 hint.animals.borkon_kid.tamed = Козлёнок привязался к вам и идёт следом.
 death.animals.thirst = {0} умер от жажды
+config.core.damage.animals.thirst = Урон от жажды
