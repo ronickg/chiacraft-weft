@@ -4,8 +4,8 @@
 //! `LEAP_AFTER` it leaps. Its need's goal carries the walk while it lasts (`going`).
 
 use animals_core::needs::{
-    FLEE_DROP, LEAP_AFTER, LEAP_MOST, LEAP_OVER, LEAP_REACH, STUCK_AFTER, STUCK_NEAR, WALK_MOVED, WAY_OUT_LEG, WAY_OUT_SECS, WAY_OUT_WAYS,
-    WAY_UP_CELLS, WAY_UP_REACH,
+    FLEE_DROP, LEAP_AFTER, LEAP_MOST, LEAP_OVER, LEAP_REACH, STUCK_AFTER, STUCK_NEAR, WALK_MOVED, WAY_CLOSER, WAY_OUT_LEG, WAY_OUT_SECS,
+    WAY_OUT_WAYS, WAY_UP_CELLS, WAY_UP_REACH,
 };
 use weft_sdk::*;
 
@@ -17,12 +17,13 @@ static STUCK: Component<[f64; 5]> = Component::named("animal_stuck");
 /// and when it leapt (game ticks).
 static LEAP_TO: Component<[f64; 5]> = Component::named("animal_leap_to");
 
-/// Where its walk to food or water set off (x, z).
-static SET_OFF: Component<[f64; 2]> = Component::named("animal_set_off");
+/// Where its walk to food or water set off (x, z), and where it walked to (x, y, z; the last one,
+/// kept as the goal of its way out: `way_out`), with 1 once it has walked to one.
+static SET_OFF: Component<[f64; 6]> = Component::named("animal_set_off");
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&STUCK, [0.0; 5], 0);
-    r.entity_component(&SET_OFF, [0.0; 2], 0);
+    r.entity_component(&SET_OFF, [0.0; 6], 0);
     r.entity_component(&LEAP_TO, [0.0; 5], 0);
     for s in crate::species::SPECIES.iter() {
         r.edit(s.kind).attach(&STUCK);
@@ -31,11 +32,18 @@ pub fn init(r: &mut Registry) {
     }
 }
 
-/// `id` sets off on a walk to food or water (`ended_short` judges it).
-pub fn sets_off(w: &World, id: u64, st: &EntityState) {
+/// `id` sets off on a walk to food or water at `to` (`ended_short` judges it).
+pub fn sets_off(w: &World, id: u64, st: &EntityState, to: [f64; 3]) {
     if let Some(c) = w.component_mut(id, &SET_OFF) {
-        *c = [st.pos.x, st.pos.z];
+        *c = [st.pos.x, st.pos.z, to[0], to[1], to[2], 1.0];
     }
+}
+
+/// The food or water it last walked to, which its way out heads for.
+fn goal(w: &World, id: u64) -> Option<[f64; 3]> {
+    w.component(id, &SET_OFF)
+        .filter(|c| c[5] != 0.0)
+        .map(|c| [c[2], c[3], c[4]])
 }
 
 /// Whether its walk to food or water has failed: the engine stopped walking it, or it is less
@@ -66,7 +74,7 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
         // Up the way to the highest ground it can walk to; with none (a pit: nothing it can walk
         // to is higher, and a leg along its level gets it nowhere the search hasn't seen) it leaps
         // at once (ai1124_pit5d: four legs in the pit before each leap, 25 s to 60 s).
-        let up = way_up(w, st);
+        let up = way_out(w, st, goal(w, id));
         let leap_on = match up {
             Some(Way::Leap(off)) => Some(off),
             _ => None,
@@ -112,7 +120,7 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
             to[0],
             to[1],
             to[2],
-            if walk_to.is_some() { " (up)" } else { "" }
+            if walk_to.is_some() { " (way)" } else { "" }
         );
         w.navigate(id, to, 1.0);
         k[3] = (now + (WAY_OUT_SECS * 20.0) as u64) as f64;
@@ -210,17 +218,20 @@ enum Way {
     Leap((f64, f64, f64)),
 }
 
-/// The way up out of where it is (`needs::WAY_UP_*`): a search of the ground it can get to from
-/// its feet, walking (up one, down at most `FLEE_DROP` + 2) and leaping (up to `LEAP_MOST`, to the
-/// next column, with room overhead), for the highest place. Its first stretch: a walk of up to
-/// `WAY_OUT_LEG` steps, ending where the first leap begins; or that leap, when it begins where it
-/// stands. None when nothing it can get to is higher than its feet.
-fn way_up(w: &World, st: &EntityState) -> Option<Way> {
-    way_up_counted(w, st).0
+/// The way out of where it is (`needs::WAY_UP_*`): a search of the ground it can get to from its
+/// feet, walking (up one, down at most `FLEE_DROP` + 2) and leaping (up to `LEAP_MOST`, to the
+/// next column, with room overhead), for the place nearest the food or water it couldn't reach
+/// (`goal`), or with none known, the highest. Its first stretch: a walk of up to `WAY_OUT_LEG`
+/// steps, ending where the first leap begins; or that leap, when it begins where it stands. None
+/// when nothing it can get to is nearer (by `WAY_CLOSER`) or higher than its feet. The highest
+/// alone took a deer on a hill 10 over the pond further up and away from it, leaping from ledge to
+/// ledge till it died of thirst at 142 (ai1124_savanna16c).
+fn way_out(w: &World, st: &EntityState, goal: Option<[f64; 3]>) -> Option<Way> {
+    way_out_counted(w, st, goal).0
 }
 
-/// `way_up`, and how many places it searched, the highest and how many leaps it found.
-fn way_up_counted(w: &World, st: &EntityState) -> (Option<Way>, usize, [i32; 3], usize) {
+/// `way_out`, and how many places it searched, the best and how many leaps it found.
+fn way_out_counted(w: &World, st: &EntityState, goal: Option<[f64; 3]>) -> (Option<Way>, usize, [i32; 3], usize) {
     use std::collections::{HashMap, VecDeque};
     let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
     let stand = |p: [i32; 3]| solid([p[0], p[1] - 1, p[2]]) && !solid(p) && !solid([p[0], p[1] + 1, p[2]]);
@@ -229,13 +240,20 @@ fn way_up_counted(w: &World, st: &EntityState) -> (Option<Way>, usize, [i32; 3],
     let mut from: HashMap<[i32; 3], ([i32; 3], bool)> = HashMap::new();
     let mut queue = VecDeque::from([start]);
     from.insert(start, (start, false));
+    // Nearer the goal (its centre to the place's), else higher.
+    let far =
+        |p: [i32; 3], g: [f64; 3]| (p[0] as f64 + 0.5 - g[0]).powi(2) + (p[1] as f64 - g[1]).powi(2) + (p[2] as f64 + 0.5 - g[2]).powi(2);
+    let better = |p: [i32; 3], than: [i32; 3]| match goal {
+        Some(g) => far(p, g) < far(than, g),
+        None => p[1] > than[1],
+    };
     let mut best = start;
     let mut leaps = 0;
     while let Some(p) = queue.pop_front() {
         if from.len() > WAY_UP_CELLS {
             break;
         }
-        if p[1] > best[1] {
+        if better(p, best) {
             best = p;
         }
         // Room over it to jump one, or to leap (its body clears `LEAP_MOST` plus its height).
@@ -278,7 +296,11 @@ fn way_up_counted(w: &World, st: &EntityState) -> (Option<Way>, usize, [i32; 3],
         }
     }
     let searched = from.len();
-    if best[1] <= start[1] {
+    let gets_on = match goal {
+        Some(g) => far(best, g).sqrt() < far(start, g).sqrt() - WAY_CLOSER,
+        None => best[1] > start[1],
+    };
+    if !gets_on {
         return (None, searched, best, leaps);
     }
     // Back from the highest to its feet, then each place and whether it is left by a leap.
@@ -306,13 +328,14 @@ fn way_up_counted(w: &World, st: &EntityState) -> (Option<Way>, usize, [i32; 3],
     (Some(Way::Walk(centre(out[end].0))), searched, best, leaps)
 }
 
-/// What the way-up search finds from where `st` stands, as a line (`/animalprof cave`).
-pub fn way_up_report(w: &World, st: &EntityState) -> String {
-    let (way, searched, best, leaps) = way_up_counted(w, st);
+/// What the way-out search finds from where `id` stands, as a line (`/animalprof cave`).
+pub fn way_out_report(w: &World, id: u64, st: &EntityState) -> String {
+    let goal = goal(w, id);
+    let (way, searched, best, leaps) = way_out_counted(w, st, goal);
     let way = match way {
-        None => "no way up".to_string(),
+        None => format!("no way out (toward {goal:?})"),
         Some(Way::Walk(p)) => format!("walk to {:.1} {:.0} {:.1}", p[0], p[1], p[2]),
         Some(Way::Leap(o)) => format!("leap {:.1} {:.0} {:.1} off", o.0, o.1, o.2),
     };
-    format!("{way}; searched {searched} places, the highest {} {} {}, {leaps} leaps", best[0], best[1], best[2])
+    format!("{way}; searched {searched} places, the best {} {} {}, {leaps} leaps", best[0], best[1], best[2])
 }

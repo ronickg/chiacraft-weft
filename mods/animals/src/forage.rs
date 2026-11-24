@@ -423,7 +423,7 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     }
     if let Some((t, p)) = ground_food(w, s, st.pos.to_array(), ITEM_LOOK) {
         w.navigate(id, p, 1.0);
-        crate::stuck::sets_off(w, id, st);
+        crate::stuck::sets_off(w, id, st, p);
         w.component_mut(id, &ITEM).map(|i| *i = t);
         w.component_mut(id, &FORAGE)
             .map(|c| *c = [p[0], p[1], p[2], now + WALK]);
@@ -434,8 +434,9 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
         .flatten()
     {
         Some(p) => {
-            w.navigate(id, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0);
-            crate::stuck::sets_off(w, id, st);
+            let to = [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5];
+            w.navigate(id, to, 1.0);
+            crate::stuck::sets_off(w, id, st, to);
             f = [p[0] as f64, p[1] as f64, p[2] as f64, now + WALK];
         }
         None => f = [f64::NAN, 0.0, 0.0, now + NOTHING],

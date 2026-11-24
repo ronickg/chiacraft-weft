@@ -280,7 +280,7 @@ pub fn init(r: &mut Registry) {
                 // Every wild animal within `value` blocks (32 by default): the blocks round it,
                 // 17 x 17 a layer from 3 under its feet to 14 over ('#' solid, '~' water, '.' open;
                 // rows north to south, x west to east, its own column 'A'), and what its way-up
-                // search finds (`stuck::way_up`), for a cave or a pit a script can't see into.
+                // search finds (`stuck::way_out`), for a cave or a pit a script can't see into.
                 let Some(me) = w.entity(cmd.player()) else { return };
                 let r = cmd.float("value").unwrap_or(32.0);
                 let mut n = 0;
@@ -291,7 +291,7 @@ pub fn init(r: &mut Registry) {
                     let Some(e) = w.entity(id) else { continue };
                     n += 1;
                     let (fx, fy, fz) = (e.pos.x.floor() as i32, (e.pos.y + 0.05).floor() as i32, e.pos.z.floor() as i32);
-                    weft_sdk::info!("ANIMAL_CAVE {id} at {fx} {fy} {fz}: {}", crate::stuck::way_up_report(&w, &e));
+                    weft_sdk::info!("ANIMAL_CAVE {id} at {fx} {fy} {fz}: {}", crate::stuck::way_out_report(&w, id, &e));
                     for y in fy - 3..=fy + 14 {
                         let rows: Vec<String> = (fz - 8..=fz + 8)
                             .map(|z| {

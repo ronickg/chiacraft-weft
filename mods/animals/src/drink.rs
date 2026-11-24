@@ -395,7 +395,7 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         Some(p) => {
             weft_sdk::debug!("{} {id} is thirsty (water {:.0}%): to water at {p:?}", s.name, water * 100.0);
             w.navigate(id, p, 1.0);
-            crate::stuck::sets_off(w, id, st);
+            crate::stuck::sets_off(w, id, st, p);
             d = [p[0], p[1], p[2], now + WALK];
         }
         None => d = [f64::NAN, 0.0, 0.0, now + NOTHING],
