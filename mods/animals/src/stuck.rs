@@ -204,6 +204,11 @@ enum Way {
 /// `WAY_OUT_LEG` steps, ending where the first leap begins; or that leap, when it begins where it
 /// stands. None when nothing it can get to is higher than its feet.
 fn way_up(w: &World, st: &EntityState) -> Option<Way> {
+    way_up_counted(w, st).0
+}
+
+/// `way_up`, and how many places it searched, the highest and how many leaps it found.
+fn way_up_counted(w: &World, st: &EntityState) -> (Option<Way>, usize, [i32; 3], usize) {
     use std::collections::{HashMap, VecDeque};
     let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
     let stand = |p: [i32; 3]| solid([p[0], p[1] - 1, p[2]]) && !solid(p) && !solid([p[0], p[1] + 1, p[2]]);
@@ -213,6 +218,7 @@ fn way_up(w: &World, st: &EntityState) -> Option<Way> {
     let mut queue = VecDeque::from([start]);
     from.insert(start, (start, false));
     let mut best = start;
+    let mut leaps = 0;
     while let Some(p) = queue.pop_front() {
         if from.len() > WAY_UP_CELLS {
             break;
@@ -240,6 +246,7 @@ fn way_up(w: &World, st: &EntityState) -> Option<Way> {
                 leap && stand(n) && !solid([nx, n[1] + 2, nz])
             }) {
                 reach([nx, p[1] + dy, nz], true);
+                leaps += 1;
             }
             // Up one with room overhead to jump, along, or down as far as it may drop.
             for dy in (-(FLEE_DROP + 2)..=1).rev() {
@@ -258,8 +265,9 @@ fn way_up(w: &World, st: &EntityState) -> Option<Way> {
             }
         }
     }
+    let searched = from.len();
     if best[1] <= start[1] {
-        return None;
+        return (None, searched, best, leaps);
     }
     // Back from the highest to its feet, then each place and whether it is left by a leap.
     let mut way = vec![best];
@@ -276,12 +284,23 @@ fn way_up(w: &World, st: &EntityState) -> Option<Way> {
     let centre = |c: [i32; 3]| [c[0] as f64 + 0.5, c[1] as f64, c[2] as f64 + 0.5];
     if out[0].1 {
         let to = centre(out[1].0);
-        return Some(Way::Leap((to[0] - st.pos.x, to[1] - st.pos.y, to[2] - st.pos.z)));
+        return (Some(Way::Leap((to[0] - st.pos.x, to[1] - st.pos.y, to[2] - st.pos.z))), searched, best, leaps);
     }
     let end = out
         .iter()
         .take(WAY_OUT_LEG as usize + 1)
         .position(|c| c.1)
         .unwrap_or((WAY_OUT_LEG as usize).min(out.len() - 1));
-    Some(Way::Walk(centre(out[end].0)))
+    (Some(Way::Walk(centre(out[end].0))), searched, best, leaps)
+}
+
+/// What the way-up search finds from where `st` stands, as a line (`/animalprof cave`).
+pub fn way_up_report(w: &World, st: &EntityState) -> String {
+    let (way, searched, best, leaps) = way_up_counted(w, st);
+    let way = match way {
+        None => "no way up".to_string(),
+        Some(Way::Walk(p)) => format!("walk to {:.1} {:.0} {:.1}", p[0], p[1], p[2]),
+        Some(Way::Leap(o)) => format!("leap {:.1} {:.0} {:.1} off", o.0, o.1, o.2),
+    };
+    format!("{way}; searched {searched} places, the highest {} {} {}, {leaps} leaps", best[0], best[1], best[2])
 }

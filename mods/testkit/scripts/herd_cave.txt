@@ -36,6 +36,8 @@ chat /tp 0 90 572
 wait 3
 chat /tick rate 100
 chat /animalprof where
+# The blocks round each deer and what its way-up search finds (`ANIMAL_CAVE` lines): report them.
+chat /animalprof cave 80
 wait 15
 chat /animalprof where
 wait 15
@@ -58,6 +60,7 @@ wait 15
 chat /animalprof where
 wait 15
 chat /animalprof where
+chat /animalprof cave 80
 chat /animalprof senses
 chat /tick rate 20
 quit
