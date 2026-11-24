@@ -303,6 +303,41 @@ pub fn ranged() -> Vec<String> {
     if (best - 1.0).abs() > 1e-4 {
         out.push(format!("the springiest stave is ×{best}, not the reference bow's ×1"));
     }
+    // Arrows of other heads: every material that makes an arrow's head is an arrowhead, and every
+    // age with working materials has an arrowhead of its own, so a bow keeps up age by age.
+    use vitals::gear::{ARROWHEADS, arrow_level};
+    let heads: Vec<&str> = crafting::MATERIALS
+        .iter()
+        .filter(|m| crafting::materials::fits(m, "arrow", "head", crafting::Role::Working))
+        .map(|m| m.id)
+        .collect();
+    for m in &heads {
+        if !ARROWHEADS.contains(m) {
+            out.push(format!("{m} makes an arrow's head but isn't in vitals::gear::ARROWHEADS"));
+        }
+    }
+    for m in ARROWHEADS {
+        if !heads.contains(m) {
+            out.push(format!("{m} is an arrowhead but makes no arrow's head"));
+        }
+        if vitals::gear::material(m).is_none() {
+            out.push(format!("arrowhead {m} has no item level in vitals::gear"));
+        }
+    }
+    if (arrow_level(0) - ARROW_LEVEL).abs() > 1e-4 {
+        out.push(format!("a flint arrow is item level {}, not a plain arrow's {ARROW_LEVEL}", arrow_level(0)));
+    }
+    for age in AGES {
+        let made = crafting::MATERIALS
+            .iter()
+            .filter(|m| m.roles.contains(&crafting::Role::Working))
+            .filter_map(|m| vitals::gear::material(m.id))
+            .any(|l| age_of(l.level()) == age);
+        let headed = (0..ARROWHEADS.len() as u32).any(|h| age_of(arrow_level(h)) == age);
+        if made && !headed {
+            out.push(format!("{}: working materials but no arrowhead of the age", age.name()));
+        }
+    }
     for age in AGES {
         let p = Player::of(age);
         let dps = arrow_hit(age.reference(), 1.0) / FULL_DRAW_SECS;

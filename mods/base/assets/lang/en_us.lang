@@ -1286,6 +1286,7 @@ recipes.all = All recipes
 command.base.inspect.part = {0}: {1}, {2}, made on day {3}, repaired {4}×, worn {5}
 command.base.inspect.tool = {0}: {1}, built from {2} parts
 command.base.inspect.tool_part =   {0}: {1}, {2}, made on day {3}, repaired {4}×
+command.base.inspect.arrow = {1} {0}: {2} head, item level {3}
 command.base.inspect.plain = Not built from parts
 command.base.inspect.gems =   Gems: {0} of {1} sockets
 command.base.inspect.gem =     {0}, item level {1}: +{2}% in all
@@ -1895,3 +1896,5 @@ age.base.future = Age of the Future
 age.base.stars = Age of Stars
 # A saddle's fitting (vitals::gear::SADDLE_FITTINGS, in its order; levels from vitals::gear::saddle_level).
 tagged.base.saddle_fit = {#c6a383}{if:value==0}{lang:material.base.leather} fittings · {lang:age.base.stone} · item level 5{/if}{if:value==1}{lang:material.base.copper} fittings · {lang:age.base.bronze} · item level 12{/if}{if:value==2}{lang:material.base.bronze} fittings · {lang:age.base.bronze} · item level 16{/if}{if:value==3}{lang:material.base.meteoric_iron} fittings · {lang:age.base.bronze} · item level 18{/if}{if:value==4}{lang:material.base.wrought_iron} fittings · {lang:age.base.iron} · item level 23{/if}{if:value==5}{lang:material.base.steel} fittings · {lang:age.base.iron} · item level 27{/if}{if:value==6}{lang:material.base.star_steel} fittings · {lang:age.base.iron} · item level 29{/if}{/}
+item.base.part_arrowhead = Arrowhead
+tagged.base.arrow_head = {#c6a383}{if:value==1}{lang:material.base.flint} head · {lang:age.base.stone} · item level 5{/if}{if:value==2}{lang:material.base.chert} head · {lang:age.base.stone} · item level 5{/if}{if:value==3}{lang:material.base.obsidian} head · {lang:age.base.stone} · item level 6{/if}{if:value==4}{lang:material.base.tektite} head · {lang:age.base.stone} · item level 6{/if}{if:value==5}{lang:material.base.bone} head · {lang:age.base.stone} · item level 3{/if}{if:value==6}{lang:material.base.antler} head · {lang:age.base.stone} · item level 3{/if}{if:value==7}{lang:material.base.copper} head · {lang:age.base.bronze} · item level 12{/if}{if:value==8}{lang:material.base.bronze} head · {lang:age.base.bronze} · item level 16{/if}{if:value==9}{lang:material.base.meteoric_iron} head · {lang:age.base.bronze} · item level 18{/if}{if:value==10}{lang:material.base.wrought_iron} head · {lang:age.base.iron} · item level 23{/if}{if:value==11}{lang:material.base.steel} head · {lang:age.base.iron} · item level 27{/if}{if:value==12}{lang:material.base.star_steel} head · {lang:age.base.iron} · item level 29{/if}{if:value==13}{lang:material.base.diamond} head · {lang:age.base.steam} · item level 35{/if}

@@ -136,6 +136,8 @@ const RECIPES_LIST: &[Recipe] = &[
     Recipe { out: "base:coal", n: 1.0, ins: &[("#logs", 1.0)], at: Station("base:charcoal_clamp"), secs: 2.0 },
     // parts from the recipe book (parts.rs): any part, of any material its shape takes
     c("base:part_*", 1.0, &[("#part_material", 2.0)], Table),
+    // Four arrows from a head, a stick and a feather at the assembly row (`parts::fletched`).
+    c("base:arrow", 4.0, &[("base:part_arrowhead", 1.0), ("#stick", 1.0), ("base:feather", 1.0)], Table),
     // tools built from parts (the assembly)
     c("base:hoe", 1.0, &[("base:part_hoe_blade", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
     c("base:spear", 1.0, &[("base:part_leaf_point", 1.0), ("base:part_shaft", 1.0), ("base:part_lashing", 1.0)], Table),
