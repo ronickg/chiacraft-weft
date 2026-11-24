@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead,recall,wetter)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,lead,recall,wetter,where)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -247,6 +247,34 @@ pub fn init(r: &mut Registry) {
                 let v = cmd.float("value").map_or(f32::NAN, |v| v as f32);
                 crate::senses::WIND_TEST.store(v.to_bits(), Relaxed);
                 format!("animals' wind toward {v}")
+            }
+            "where" => {
+                // Every wild animal within `value` blocks (256 by default): where it is, what it is
+                // doing, its food, water and health, for runs that follow a herd's wanderings.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let r = cmd.float("value").unwrap_or(256.0);
+                let rows: Vec<String> = w
+                    .entities_near(me.pos, r, None)
+                    .into_iter()
+                    .filter_map(|id| {
+                        let a = w.component(id, &crate::animal::ANIMAL).filter(|a| a.species != 0)?;
+                        let e = w.entity(id)?;
+                        Some(format!(
+                            "{id} {} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}",
+                            a.species()?.name,
+                            e.pos.x,
+                            e.pos.y,
+                            e.pos.z,
+                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
+                                .get(crate::choose::doing(&w, id) as usize)
+                                .unwrap_or(&"?"),
+                            a.food as f32 / a.stat(crate::species::FOOD).max(1.0) * 100.0,
+                            (1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0,
+                            e.health
+                        ))
+                    })
+                    .collect();
+                format!("ANIMAL_WHERE {}", rows.join(" | "))
             }
             "senses" => {
                 // What the animals nearest the player have noticed: awareness of hunters and of

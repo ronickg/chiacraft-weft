@@ -25,6 +25,8 @@
 # `/animalprof food 1` tops their food up at each sample (their water is left alone: the run is
 # about their drinking; whether a herd keeps itself fed through a dry season is another run).
 # The shots are at noon (`/time set 6000`): a winter's 06:00 and 18:00 are dark.
+# `/animalprof where` every 10 s (a quarter of a game day): every wild animal within 256 blocks,
+# where it is and what it is doing, so a deer that leaves the pond shows how and when.
 loaded
 idle
 # Creative, not spectator: the drying visits go round visible players, which leave spectators out.
@@ -37,6 +39,7 @@ chat /season winter 1
 chat /time set 6000
 chat /rain
 chat /time query
+chat /animalprof where
 chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
 chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
 chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
@@ -54,53 +57,123 @@ chat /animalprof food 1
 chat /anim log
 chat /waterholes watch
 chat /tick rate 600
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /animalprof food 1
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /animalprof food 1
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /animalprof senses
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /animalprof food 1
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /animalprof food 1
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /animalprof senses
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /animalprof food 1
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /animalprof food 1
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /animalprof food 1
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 # The shot at noon (a winter's dusk is dark): back to the game's pace.
@@ -114,11 +187,24 @@ shot herd_savanna_winter_2.png
 chat /season spring 1
 chat /rain
 chat /tick rate 600
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /time query
+chat /animalprof where
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
-wait 40
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
 chat /tk count ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:dried_mud
 chat /tick rate 20
