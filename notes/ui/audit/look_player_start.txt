@@ -1,5 +1,5 @@
 # The look always on (Ronald 11-24): a player's start, played by a script. Run with
-# `-- --run-dir <name> --player-start` and no --shader-pack: a new run dir is a first start (run.log:
+# `-- --player-start --shader-pack ""` (an empty pack undoes the PC runner's): a fresh run dir is a first start (run.log:
 # the GPU's preset, "video: ...: the X preset" and "video: the high preset, every feature at high"); an old one
 # with `shader_pack =` empty (and the old `.offered` marker) is a later start. Either way, after
 # the join, "shader pack: none chosen, chiacraft on". Shots: the world with the pack drawn, the

@@ -16,6 +16,13 @@ use weft_sdk::*;
 
 pub const ID: &str = "chiacraft";
 
+/// `--shader-pack <id>`: a pack picked for this run (a script checking a look). An empty one is
+/// none picked: a later `--shader-pack ""` undoes one a runner always passes (the PC's), for a
+/// run that plays a player's start (`--player-start`).
+fn launch_pack() -> Option<String> {
+    weft_sdk::client::launch_option("shader-pack").filter(|p| !p.is_empty())
+}
+
 /// chiacraft's pack, or a variant of it for a look check (`shaderpacks/chiacraft_<name>/`, a copy
 /// with one change, picked with `--shader-pack chiacraft_<name>`): both get the screen effects, so
 /// a shader change can be tried on a PC run without a build of its own (Trees, 11-06). Only
@@ -65,7 +72,7 @@ pub fn register_for_scripts(r: &mut Registry) {
     static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
     static TIMES: AtomicU32 = AtomicU32::new(0);
     r.client_frame(|c| {
-        let Some(pack) = weft_sdk::client::launch_option("shader-pack") else { return };
+        let Some(pack) = launch_pack() else { return };
         let after: f32 = weft_sdk::client::launch_option("shader-pack-after")
             .and_then(|s| s.parse().ok())
             .unwrap_or(0.0);
@@ -186,7 +193,7 @@ fn install(c: &Client) {
     }
     // A variant picked for this run (`--shader-pack chiacraft_live`) with no files yet starts as a
     // copy of this build's pack, for the testkit's live mode to write edits over (`reload_pack`).
-    if let Some(pack) = weft_sdk::client::launch_option("shader-pack").filter(|p| p != ID && is_ours(p)) {
+    if let Some(pack) = launch_pack().filter(|p| p != ID && is_ours(p)) {
         let var = Path::new(&c.run_dir()).join("shaderpacks").join(&pack);
         if !var.join("world.wgsl").exists() && std::fs::create_dir_all(&var).is_ok() {
             for name in FILES
@@ -203,7 +210,7 @@ fn install(c: &Client) {
     }
     let mut changed = files_changed && SHADER_PACK.get() == ID;
     // `--shader-pack <id>` picks one for this run (a script checking the look).
-    if let Some(pack) = weft_sdk::client::launch_option("shader-pack") {
+    if let Some(pack) = launch_pack() {
         if SHADER_PACK.get() != pack {
             SHADER_PACK.set(&pack);
             changed = true;
