@@ -266,7 +266,7 @@ fn ruin_blocks(ruin: &Ruin, ground: &dyn Fn(i32, i32) -> i32) -> Vec<([i32; 3], 
             for k in 0..8 {
                 let a = k as f64 / 8.0 * std::f64::consts::TAU;
                 let (dx, dz) = ((5.0 * a.cos()).round() as i32, (5.0 * a.sin()).round() as i32);
-                let tall = h(dx, dz) % 4; // 0: fallen, 1-3 high
+                let tall = 1 + h(dx, dz) % 3; // 1 (a broken stump) to 3 high
                 let foot = ground(x + dx, z + dz);
                 out.push(([x + dx, foot, z + dz], stone, false));
                 for y in 1..=tall as i32 {
@@ -369,8 +369,13 @@ fn ruins(g: &mut Gen) {
             .map(|(x, z)| ((x, z), g.column(x, z).height))
             .collect();
         let ground = |x: i32, z: i32| heights.get(&(x, z)).copied().unwrap_or(i32::MIN / 2);
+        // Every cube the ruin reaches, by its footprint's lowest and highest ground: a ring's
+        // pillars stand on their own columns, which on a slope lie well above or below the
+        // centre's (11-24, pl1123_ruin1: a ring on a hillside showed no pillars).
         let gy = ground(ruin.x, ruin.z);
-        if gy - ruin.kind().depth - 2 > oy + 15 || gy + 6 < oy {
+        let low = heights.values().copied().min().unwrap_or(gy).min(gy - ruin.kind().depth);
+        let high = heights.values().copied().max().unwrap_or(gy).max(gy);
+        if low - 2 > oy + 15 || high + 6 < oy {
             continue;
         }
         for (p, b, soft) in ruin_blocks(&ruin, &ground) {
