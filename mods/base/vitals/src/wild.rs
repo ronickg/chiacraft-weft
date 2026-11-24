@@ -329,11 +329,17 @@ pub const AGARICS: &[&str] = &["base:forest", "base:old_growth_forest", "base:bi
 /// Where the berry bush (blueberries) grows: the forests' floor.
 pub const FORESTS: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga"];
 pub const WETLANDS: &[&str] = &["base:swamp", "base:savanna"];
-/// Foxfire: the damp forests, where wood rots on the floor. Not the sequoia grove: its dry
-/// summers and cold winters leave a mycelium a quarter of its growth at best, and sequoia wood,
-/// full of tannins, lies for centuries without rotting.
-pub const FOXFIRE_WOODS: &[&str] =
-    &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga", "base:swamp", "base:tropical_forest"];
+/// Foxfire: the damp forests, where wood rots on the floor, and the sequoia grove's fallen
+/// wood (Ronald, 11-24: "Keep foxfire").
+pub const FOXFIRE_WOODS: &[&str] = &[
+    "base:forest",
+    "base:old_growth_forest",
+    "base:birch_forest",
+    "base:taiga",
+    "base:swamp",
+    "base:tropical_forest",
+    "base:sequoia_grove",
+];
 /// Glow mycena: the warm wet forests.
 pub const MYCENA_WOODS: &[&str] = &["base:tropical_forest", "base:swamp"];
 pub const MARSHES: &[&str] = &["base:swamp", "base:plains", "base:forest", "base:taiga", "base:savanna"];
