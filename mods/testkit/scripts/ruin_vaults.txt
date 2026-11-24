@@ -97,15 +97,15 @@ idle
 look 0 -30
 wait 1
 shot vault_pedestal.png
-# The hotbar after the pickaxe emptied (the broken stone picked up), so the blueprint lands in slot 1.
-chat /tk put me 1 core:air 0
-chat /tk put me 2 core:air 0
-chat /tk put me 3 core:air 0
-chat /tk put me 4 core:air 0
-chat /tk put me 5 core:air 0
-chat /tk put me 6 core:air 0
-chat /tk put me 7 core:air 0
-chat /tk put me 8 core:air 0
+# The hotbar after the pickaxe emptied (a count of 0 is empty; core:air is no item) (the broken stone picked up), so the blueprint lands in slot 1.
+chat /tk put me 1 base:stick 0
+chat /tk put me 2 base:stick 0
+chat /tk put me 3 base:stick 0
+chat /tk put me 4 base:stick 0
+chat /tk put me 5 base:stick 0
+chat /tk put me 6 base:stick 0
+chat /tk put me 7 base:stick 0
+chat /tk put me 8 base:stick 0
 wait 1
 press core:use
 wait 1
@@ -150,13 +150,13 @@ look 0 -30
 wait 1
 shot deep_pedestal.png
 # Slot 2 on emptied, so the forge blueprint lands there.
-chat /tk put me 2 core:air 0
-chat /tk put me 3 core:air 0
-chat /tk put me 4 core:air 0
-chat /tk put me 5 core:air 0
-chat /tk put me 6 core:air 0
-chat /tk put me 7 core:air 0
-chat /tk put me 8 core:air 0
+chat /tk put me 2 base:stick 0
+chat /tk put me 3 base:stick 0
+chat /tk put me 4 base:stick 0
+chat /tk put me 5 base:stick 0
+chat /tk put me 6 base:stick 0
+chat /tk put me 7 base:stick 0
+chat /tk put me 8 base:stick 0
 wait 1
 press core:use
 wait 1
