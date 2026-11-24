@@ -226,6 +226,15 @@ const OPT_BANK_SUN: u32 = 62u;
 const OPT_BANK_SHADE: u32 = 63u;
 // The sun's shadows' reach (blocks, `base:look_shadow_reach`): 0 as made, to the view's end.
 const OPT_SHADOW_REACH: u32 = 64u;
+// The mist banks' shape for tuning against Bliss's soft, graded mist (Ronald, 11-24: ours "blocky",
+// Bliss's "fades in smoothly everywhere"), each read through `look_opt` (0 is as made):
+// `base:look_bank_fall` times how fast a bank thins above its top (1 as made, under 1 softer);
+// `base:look_bank_edge` how soft the banks' edges are, 0 as made to 1 wide (the broad noise's cut
+// widened and eased); `base:look_bank_top` times the height the banks lie full to (1 as made;
+// toward 0.01 no flat full layer, the density thinning from the sea level up).
+const OPT_BANK_FALL: u32 = 65u;
+const OPT_BANK_EDGE: u32 = 66u;
+const OPT_BANK_TOP: u32 = 67u;
 // How much of it this morning: the option, in the east, with the sun under the horizon (full from
 // 1.7° down, none at 1° up) and not yet night (gone by about 12° down, where the night sky takes it).
 fn dawn_sky() -> f32 {
@@ -2028,7 +2037,9 @@ fn ground_at(rel: vec3<f32>) -> vec3<f32> {
 fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
     let q = p - vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * 0.6;
     let shape = noise3(q / MIST_SHAPE.xyx);
-    let cut = clamp((shape - MIST_SHAPE.z) / max(MIST_SHAPE.w - MIST_SHAPE.z, 1e-3), 0.0, 1.0);
+    let edge = clamp(fantasy_opt(OPT_BANK_EDGE), 0.0, 1.0);
+    let cut_lin = clamp((shape - (MIST_SHAPE.z - 0.25 * edge)) / max(MIST_SHAPE.w + 0.2 * edge - (MIST_SHAPE.z - 0.25 * edge), 1e-3), 0.0, 1.0);
+    let cut = mix(cut_lin, smoothstep(0.0, 1.0, cut_lin), edge);
     // A thin even part under the billows, thinning fast with height (`MIST_SEA_EVEN`), as Bliss's
     // uniform fog beside its cloudy one; the billows alone carry the shape.
     let burn = (1.0 - smoothstep(0.3, 0.65, scene.sun.y)) * mix(MIST_BANK_EVENING, 1.0, smoothstep(-0.1, 0.1, scene.sun.x));
@@ -2041,7 +2052,8 @@ fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
     let banks = max(cut - erode * MIST_ERODE.z, 0.0);
     // The thick cores stand taller (`MIST_SEA_RISE`), so the billows have tops of their own over the
     // canopy, not one level skin on the low forests' crowns (lv9).
-    let fall = exp(-MIST_SEA_FALL * max(p.y - (SEA_LEVEL + MIST_SEA_LEVEL + cut * MIST_SEA_RISE), 0.0));
+    let top = SEA_LEVEL + (MIST_SEA_LEVEL + cut * MIST_SEA_RISE) * look_opt(OPT_BANK_TOP, 1.0);
+    let fall = exp(-MIST_SEA_FALL * look_opt(OPT_BANK_FALL, 1.0) * max(p.y - top, 0.0));
     return k * (banks * fall + even);
 }
 // `x` eased toward `cap` instead of clipped at it: clipped, the forward peak lay flat out to where
