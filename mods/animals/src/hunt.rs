@@ -97,6 +97,21 @@ pub fn init(r: &mut Registry) {
                         }),
                 );
             }
+            // Those on the same hunt eat of it wherever the chase left them: in wolvesFar2 two
+            // wolves gave its prey up as gone at the kill and each took a deer of its own.
+            if s.pack_prey().is_some() {
+                let on_it: Vec<u64> = w
+                    .entities_near(at, animals_core::needs::KILL_SHARED * 4.0, None)
+                    .into_iter()
+                    .filter(|&o| {
+                        !eaters.contains(&o)
+                            && w.entity(o).is_some_and(|e| Some(e.kind) == kind)
+                            && !animal::tamed(&w, o)
+                            && w.component(o, &HUNT).is_some_and(|h| h[0] == d.entity)
+                    })
+                    .collect();
+                eaters.extend(on_it);
+            }
             let kg = animals_core::needs::share(prey, eaters.len());
             for &e in &eaters {
                 let (Some(a), Some(own)) = (w.component(e, &ANIMAL), mass(&w, e)) else { continue };
