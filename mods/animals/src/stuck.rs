@@ -4,8 +4,8 @@
 //! `LEAP_AFTER` it leaps. Its need's goal carries the walk while it lasts (`going`).
 
 use animals_core::needs::{
-    FLEE_DROP, LEAP_AFTER, LEAP_MOST, LEAP_OVER, LEAP_REACH, LEAP_TRIES, STUCK_AFTER, STUCK_NEAR, WALK_MOVED, WAY_CLOSER, WAY_OUT_LEG,
-    WAY_OUT_SECS, WAY_OUT_WAYS, WAY_UP_CELLS, WAY_UP_REACH,
+    FLEE_DROP, LEAP_AFTER, LEAP_MOST, LEAP_OVER, LEAP_REACH, LEAP_TRIES, STUCK_AFTER, STUCK_NEAR, TRAP_CELLS, WALK_MOVED, WAY_CLOSER,
+    WAY_OUT_LEG, WAY_OUT_SECS, WAY_OUT_WAYS, WAY_UP_CELLS, WAY_UP_REACH,
 };
 use weft_sdk::*;
 
@@ -66,7 +66,12 @@ pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
     let n = k[2] as u8;
     let now = w.game_time();
     let mut walks = false;
-    if n >= STUCK_AFTER {
+    // Only shut in: the ground it can walk to is a pit's or a pocket's, under `TRAP_CELLS` places.
+    // On open ground a walk ends short for other reasons (food on a ledge, a herd mate lying down
+    // in its way, its own rest), and a way out with leaps took deer up a hill away from the water
+    // and hopped them in place a hundred times (ai1124_savanna16c, graze14, savanna17): there it
+    // gives the place up, as before, and wanders on.
+    if n >= STUCK_AFTER && enclosed(w, st) {
         // A way of 8, turned on each try from one of its own.
         let way = ((id % WAY_OUT_WAYS as u64) as u8 + n - STUCK_AFTER) % WAY_OUT_WAYS;
         let a = way as f64 * std::f64::consts::TAU / WAY_OUT_WAYS as f64;
@@ -212,6 +217,42 @@ fn landing(w: &World, st: &EntityState) -> Option<(f64, f64, f64)> {
         }
     }
     best.map(|(x, y, z, _)| (x, y, z))
+}
+
+/// Whether the ground `st` can walk to from its feet (up one, down at most `FLEE_DROP` + 2) is
+/// fewer than `needs::TRAP_CELLS` places: a pit, a shaft's foot, a pocket of a cave.
+fn enclosed(w: &World, st: &EntityState) -> bool {
+    use std::collections::{HashSet, VecDeque};
+    let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
+    let stand = |p: [i32; 3]| solid([p[0], p[1] - 1, p[2]]) && !solid(p) && !solid([p[0], p[1] + 1, p[2]]);
+    let start = [st.pos.x.floor() as i32, (st.pos.y + 0.05).floor() as i32, st.pos.z.floor() as i32];
+    let mut seen = HashSet::from([start]);
+    let mut queue = VecDeque::from([start]);
+    while let Some(p) = queue.pop_front() {
+        if seen.len() >= TRAP_CELLS {
+            return false;
+        }
+        let hop = !solid([p[0], p[1] + 2, p[2]]);
+        for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let (nx, nz) = (p[0] + dx, p[2] + dz);
+            for dy in (-(FLEE_DROP + 2)..=1).rev() {
+                let n = [nx, p[1] + dy, nz];
+                if dy == 1 && !hop {
+                    continue;
+                }
+                if dy < 0 && (dy + 1..=0).any(|d| solid([nx, p[1] + d, nz]) || solid([nx, p[1] + d + 1, nz])) {
+                    break;
+                }
+                if stand(n) {
+                    if seen.insert(n) {
+                        queue.push_back(n);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    true
 }
 
 /// The first stretch of the way up: a walk to a place (its centre, at its feet), or a leap from

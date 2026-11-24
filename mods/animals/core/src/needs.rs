@@ -373,6 +373,10 @@ pub const LEAP_OVER: f64 = 7.0;
 /// Leaps from one stuck place that leave it there before it stops leaping (till it is somewhere
 /// else): a deer on level ground leapt 70 times at a rim it could step onto (ai1124_savanna17).
 pub const LEAP_TRIES: u8 = 3;
+/// Shut in: the ground it can walk to from where it stands is fewer places than this (a pit 3 x 3
+/// is 9, a shaft's foot 3). Only then does a stuck animal look for a way out and leap
+/// (`stuck::enclosed`); on open ground it gives the place up and wanders on.
+pub const TRAP_CELLS: usize = 48;
 /// The steepest drop a running animal takes (`senses::escape`): it can step back up one, not two.
 pub const FLEE_DROP: i32 = 1;
 const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WAY_OUT_WAYS);
