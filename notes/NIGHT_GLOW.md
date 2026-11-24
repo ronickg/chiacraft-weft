@@ -81,7 +81,7 @@ which is the world's and the same for every player.
 
 | block | real | where | light | growth (base, best, max °C; water) | share |
 |---|---|---|---|---|---|
-| `base:foxfire` | honey fungus (*Armillaria*) and bitter oyster (*Panellus*) mycelium in rotting twigs, glowing green | a flat mat (1/16 high) on the forest floor of the damp forests: forest, birch_forest, taiga, swamp, tropical_forest, sequoia_grove | 2 | 5, 20-25, 30; moderate | 0.004 |
+| `base:foxfire` | honey fungus (*Armillaria*) and bitter oyster (*Panellus*) mycelium in rotting twigs, glowing green | a flat mat (1/16 high) on the forest floor of the damp forests: forest, old_growth_forest, birch_forest, taiga, swamp, tropical_forest (not the sequoia grove: dry summers, and sequoia wood hardly rots) | 2 | 5, 20-25, 30; moderate | 0.004 |
 | `base:glow_mycena` | *Mycena chlorophos* and kin, small glowing caps | clusters on the floor of the tropical forest and the swamp | 3 | 18, 24-28, 32; wet | 0.003 |
 | `base:goblins_gold` (third, if worldgen can find the spots) | goblin's gold moss (*Schistostega pennata*), whose cells catch the faint light of cave mouths and glow gold-green | on stone under overhangs and in cave mouths: taiga, forest, birch_forest, mountains | 2 | 0, 10-18, 25; moist | Terrain's call: it needs a scatter on shaded rock |
 
