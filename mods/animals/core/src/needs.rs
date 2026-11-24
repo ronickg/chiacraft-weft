@@ -335,22 +335,43 @@ mod choosing {
 /// out, and those before it leaps.
 pub const STUCK_AFTER: u8 = 2;
 pub const LEAP_AFTER: u8 = 6;
-pub const STUCK_NEAR: f64 = 2.0;
+pub const STUCK_NEAR: f64 = 4.0;
 /// A leg out: blocks along its own level, the ways (of 8, turned on each try), and the game
 /// seconds it has to walk it.
 pub const WAY_OUT_LEG: f64 = 12.0;
 pub const WAY_OUT_WAYS: u8 = 8;
 pub const WAY_OUT_SECS: f32 = 10.0;
-/// A leap's height in blocks (a walker's jump clears 1.25), and its push sideways, blocks a
-/// second.
-pub const LEAP_BLOCKS: f64 = 2.3;
-pub const LEAP_SIDE: f64 = 3.0;
+/// A leap: onto ground at most `LEAP_MOST` blocks above its feet (a walker's jump clears 1.25; a
+/// deer clears a fence of 2.4 m) and `LEAP_REACH` off, over the edge by `LEAP_CLEAR`; the
+/// world's pull (the engine's dimension gravity, blocks a second squared) and a share more for
+/// the air's drag. With no such ground near it leaps `LEAP_MOST` up along the way it tried.
+pub const LEAP_MOST: i32 = 2;
+pub const LEAP_REACH: i32 = 3;
+pub const LEAP_CLEAR: f64 = 0.7;
+pub const GRAVITY: f64 = 32.0;
+pub const LEAP_DRAG: f64 = 1.15;
 /// The steepest drop a running animal takes (`senses::escape`): it can step back up one, not two.
 pub const FLEE_DROP: i32 = 1;
 const _: () = assert!(STUCK_AFTER < LEAP_AFTER && LEAP_AFTER - STUCK_AFTER <= WAY_OUT_WAYS);
 
-/// The push up, blocks a second, that lifts a walker `blocks` high (a walker's jump, 0.42 blocks
-/// a tick, lifts 1.25: the height goes as the square of the speed).
-pub fn leap_up(blocks: f64) -> f64 {
-    0.42 * 20.0 * (blocks / 1.25).sqrt()
+/// The push (blocks a second) of a leap that lands `dx, dz` off and `dy` up: up fast enough to
+/// clear the edge by `LEAP_CLEAR`, and across in the time it is in the air.
+pub fn leap(dx: f64, dy: f64, dz: f64) -> [f64; 3] {
+    let rise = dy.max(0.0) + LEAP_CLEAR;
+    let up = (2.0 * GRAVITY * rise).sqrt();
+    let air = up / GRAVITY + (2.0 * LEAP_CLEAR / GRAVITY).sqrt();
+    [dx / air * LEAP_DRAG, up * LEAP_DRAG, dz / air * LEAP_DRAG]
+}
+
+#[cfg(test)]
+mod leaping {
+    use super::*;
+
+    #[test]
+    fn a_leap_out_of_a_pit_clears_its_rim() {
+        // Out of a pit 2 deep, 1.5 blocks to the rim: up past 2.7 blocks, as a deer's fence.
+        let [x, up, _] = leap(1.5, 2.0, 0.0);
+        assert!(up * up / (2.0 * GRAVITY) > 2.0 + LEAP_CLEAR);
+        assert!(x > 0.0 && x < up);
+    }
 }
