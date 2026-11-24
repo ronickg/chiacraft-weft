@@ -355,6 +355,8 @@ const RECIPES_LIST: &[Recipe] = &[
         &[("base:edelweiss", 1.0), ("base:gentian", 1.0), ("base:wool", 1.0), ("base:gold_ingot", 1.0)],
         Hand,
     ),
+    c("animals:heartwood_offering", 1.0, &[("animals:forest_offering", 1.0), ("base:iron_ingot", 1.0), ("animals:warden_bark", 1.0)], Hand),
+    c("animals:peak_offering", 1.0, &[("animals:mountain_offering", 1.0), ("base:iron_ingot", 1.0), ("animals:height_fleece", 1.0)], Hand),
     c("animals:borkon_altar", 1.0, &[("base:granite", 4.0), ("base:gold_ingot", 1.0), ("base:stone_bricks", 4.0)], Table),
     s("animals:cooked_venison", &[("animals:venison", 1.0)], Fire),
     s("animals:cooked_hare", &[("animals:hare", 1.0)], Fire),
@@ -394,6 +396,8 @@ pub const GROUPS: &[(&str, &[&str])] = &[
     ("#logs", &["base:*_log", "animals:*_log"]),
     ("#planks", &["base:*_planks"]),
     ("#stick", &["base:stick"]),
+    // A key's boss part where any one of an age's bosses will do (`KEYS`).
+    ("#iron_boss_part", &["animals:warden_heartwood", "animals:summit_lodestone"]),
     ("#string", &["base:string"]),
     ("#cobblestone", &["base:cobblestone", "base:mossy_cobblestone"]),
     ("#coal", &["base:coal"]),
@@ -511,20 +515,17 @@ pub const KEYS: &[Key] = &[
         ],
         missing: &["knowledge: a ruin's blueprint or lore page", "infrastructure: a working setup from the Bronze Age"],
     },
-    // The Iron Age's key: only its materials gate, a steel pickaxe (diamond ore and obsidian take
-    // harvest 300) from the forge that makes steel, by every route.
+    // The Iron Age's key: its materials gate, a steel pickaxe (diamond ore and obsidian take
+    // harvest 300) from the forge that makes steel, and (11-23) either boss's Iron form part, by
+    // every route.
     Key {
         age: Age::Iron,
         routes: &[
-            (Path::Tech, &["base:steel_ingot", "base:forge"]),
-            (Path::Beasts, &["base:steel_ingot", "base:forge"]),
-            (Path::Magic, &["base:steel_ingot", "base:forge"]),
+            (Path::Tech, &["base:steel_ingot", "base:forge", "#iron_boss_part"]),
+            (Path::Beasts, &["base:steel_ingot", "base:forge", "#iron_boss_part"]),
+            (Path::Magic, &["base:steel_ingot", "base:forge", "#iron_boss_part"]),
         ],
-        missing: &[
-            "a biome boss: no Iron Age form has an offering yet",
-            "knowledge: a ruin's blueprint or lore page",
-            "infrastructure: past the forge, a working setup from the Iron Age",
-        ],
+        missing: &["knowledge: a ruin's blueprint or lore page", "infrastructure: past the forge, a working setup from the Iron Age"],
     },
 ];
 
@@ -742,7 +743,7 @@ pub fn keys(g: &Solved) -> Vec<String> {
     for k in KEYS {
         for (path, items) in k.routes {
             for id in *items {
-                match content::tier(id) {
+                match tier_of(&g.ids, id) {
                     None => out.push(format!("{}'s {} key takes {id}, which has no tag", k.age.name(), path.name())),
                     Some(t) if t > k.age.tier() => out.push(format!("{}'s {} key takes {id} of tier {t}", k.age.name(), path.name())),
                     _ if !g.reachable(id) => out.push(format!("{}'s {} key takes {id}, which can't be reached", k.age.name(), path.name())),
@@ -798,7 +799,11 @@ pub fn route_walk(g: &Solved, items: &[&str]) -> (Vec<String>, Vec<String>) {
     let all = recipes();
     let mut seen: Vec<String> = Vec::new();
     let mut kept: Vec<String> = Vec::new();
-    let mut todo: Vec<String> = items.iter().map(|s| s.to_string()).collect();
+    // A `#group` stands for its cheapest member (any one of an age's bosses' parts will do).
+    let mut todo: Vec<String> = items
+        .iter()
+        .map(|s| if s.starts_with('#') { cheapest_member(g, s).unwrap_or_else(|| s.to_string()) } else { s.to_string() })
+        .collect();
     while let Some(id) = todo.pop() {
         if seen.contains(&id) {
             continue;
@@ -1059,6 +1064,8 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
             ("base:bucket", 2.0),
             ("animals:spyglass", 1.0),
             ("animals:wyvern_saddle", 1.0),
+            // The Iron Age's boss: Drenkaun's Iron form, as the Stone Age's kit calls its first.
+            ("animals:heartwood_offering", 2.0),
         ],
     ),
     (

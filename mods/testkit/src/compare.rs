@@ -10,7 +10,8 @@
 //! scripted runs. `/compare off` puts the settings back as they were and lets time run.
 //!
 //! Each control can be overridden alone, for the steps that test it: `exposure=1` (auto exposure
-//! back on), `bloom=2`, `clouds=1` (all the clouds back), `mist=0.3` (pinned mist), `wind=1`, or
+//! back on), `bloom=2`, `clouds=1` (all the clouds back), `mist=0.3` (pinned mist), `mist=natural`
+//! (the air as the game makes it, unpinned), `wind=1`, or
 //! any setting by its full name (`base:look_leaf_sun=3`).
 
 use std::sync::Mutex;
@@ -61,6 +62,8 @@ pub fn apply(c: &Client, on: bool, overrides: &str) -> String {
     }
     let mut values: Vec<(String, f64)> = SETTINGS.iter().map(|&(n, v)| (n.to_string(), v)).collect();
     let (mut mist, mut wind) = (0.0, 0.0);
+    // `mist=natural`: the air left as the game makes it (its dawn mist, fog days), not pinned.
+    let natural = overrides.split_whitespace().any(|w| w == "mist=natural");
     for word in overrides.split_whitespace() {
         let Some((k, v)) = word.split_once('=') else { continue };
         let Ok(v) = v.parse::<f64>() else { continue };
@@ -89,17 +92,18 @@ pub fn apply(c: &Client, on: bool, overrides: &str) -> String {
     for (n, v) in &values {
         set(n, *v);
     }
-    for line in [
-        "/rule core:mob_spawning 0".to_string(),
-        "/weather clear 99999".to_string(),
-        format!("/air {mist} {wind} 0 mist"),
-        "/tick freeze".to_string(),
-    ] {
+    let air = if natural { None } else { Some(format!("/air {mist} {wind} 0 mist")) };
+    for line in ["/rule core:mob_spawning 0".to_string(), "/weather clear 99999".to_string()]
+        .into_iter()
+        .chain(air)
+        .chain(["/tick freeze".to_string()])
+    {
         c.say(&line);
     }
     format!(
-        "compare mode on ({} settings, mist {mist}, wind {wind}){}",
+        "compare mode on ({} settings, mist {}, wind {wind}){}",
         values.len(),
+        if natural { "natural".to_string() } else { mist.to_string() },
         if overrides.is_empty() { String::new() } else { format!(": {overrides}") }
     )
 }

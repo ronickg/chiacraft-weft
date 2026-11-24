@@ -3236,8 +3236,17 @@ impl Client {
                 .unwrap_or(c.game.entities[c.game.player_kind as usize].size());
         } else if comp == game_mode {
             let mode = crate::world::GameMode(u32::from_bytes(bytes).unwrap_or(0) as u16);
+            let always = crate::tag_bits::game_mode::ALWAYS_FLY;
+            let was_always = self.mode.has(always);
             self.mode = mode;
-            self.player.flying = mode.has(crate::tag_bits::game_mode::ALWAYS_FLY) || (self.can_fly() && self.player.flying);
+            // Flight that comes with the mode starts here. Flight a mode allows (CAN_FLY) arrives
+            // with the attributes a tick later, which also end it when the new mode takes it away:
+            // ended here, it undid flying started between the two (chiacraft, Weft bug).
+            if mode.has(always) {
+                self.player.flying = true;
+            } else if was_always && !self.can_fly() {
+                self.player.flying = false;
+            }
             self.player.noclip = mode.has(crate::tag_bits::game_mode::NOCLIP);
             self.player.fly_speed = 1.0;
         } else if comp == permission {

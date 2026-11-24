@@ -631,7 +631,8 @@ pub const FOODS: &[Food] = &[
     },
     // Upstream Weft's forest mushrooms (11-22 sync, kept until Ronald's call): its toadstool as our
     // red one, poisonous; the dryad's saddle (a polypore, too tough raw) cooked, as cooked white
-    // mushrooms (USDA, boiled), a 75 g shelf.
+    // mushrooms (USDA, boiled: 5.3 g carbohydrate of which 2.2 fibre, so 3.1 net as the others),
+    // a 75 g shelf.
     Food {
         name: "base:toadstool",
         grams: 50.0,
@@ -645,7 +646,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:cooked_dryads_saddle",
         grams: 75.0,
-        per100: per(91.1, 2.2, 5.3, 0.5, 2.2, 4.0),
+        per100: per(91.1, 2.2, 3.1, 0.5, 2.2, 4.0),
         meal: Meal::Cooked,
         raw: false,
         keeps: (2.0, 2.0),

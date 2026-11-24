@@ -194,6 +194,20 @@ const OPT_EVENING_SHADE: u32 = 53u;
 // Bliss's 18:30 land is dim (mean 38 41 80) where our near and twilight airs kept the 18:00
 // sky's strength (72 68 85 with the sun kept, lsAL_lowsun3).
 const OPT_AIR_FADE: u32 = 54u;
+// The golden hour's warm fill from the sky round the low sun (`base:look_glow_fill`): 1 as made, 0
+// none. Bliss's shade light is the averaged sky alone (deferred.vsh:118-152), lavender-grey at 18:00
+// (86 87 112 on white); ours with this fill went cream, 185 159 133 (lsAN_dbg18).
+const OPT_GLOW_FILL: u32 = 55u;
+// The dawn mist lit in the light's own colours (`base:look_mist_dawn_tint`): 0 as made (gold toward
+// the sun, half the sky's light away from it), 1 as Bliss's, the sun's and the sky's colours as they
+// are. Bliss's 06:00 mist is cream-white, 229 201 167, where ours was orange, 219 184 122
+// (lsAO_mistnat).
+const OPT_MIST_DAWN_TINT: u32 = 56u;
+// The mist's banks as domes standing out of the layer (`base:look_mist_domes`): 0 as made (the top
+// heaving 5 blocks either way), 1 up to 20 either way with a softer top, so the banks stand as lit
+// domes with shaded sides, as Bliss's 06:00-07:00 mist does, where ours lay as a flat sheet
+// (lsAO_mistnat).
+const OPT_MIST_DOMES: u32 = 57u;
 fn evening_air_fade() -> f32 {
     let k = clamp(fantasy_opt(OPT_AIR_FADE), 0.0, 1.0);
     if k <= 0.0 {
@@ -1327,7 +1341,8 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     let l = light_dir();
     let side = normalize(vec3(l.x, 0.0, l.z) + vec3(1e-4, 0.0, 0.0));
     let toward = clamp(dot(n, side) * 0.5 + 0.5, 0.0, 1.0);
-    c += p.glow * golden() * 0.35 * mix(0.3, 1.1, toward) * sky * hemi * ao * leaves;
+    let glow_k = fantasy_opt(OPT_GLOW_FILL);
+    c += p.glow * golden() * 0.35 * select(1.0, glow_k, glow_k >= 0.0) * mix(0.3, 1.1, toward) * sky * hemi * ao * leaves;
     // Direct light only where the sky reaches (it keeps caves out of reach of the traced shadow's
     // gaps), and without corner shading: corners are dark where little sky gets in.
     // Under a forest's canopy the sun comes through the gaps the shadow map shows at nearly its
@@ -1535,10 +1550,13 @@ fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
             // The top heaves with the banks, up to 5 blocks either way, so it is a lumpy sea that
             // crowns break through, not a flat sheet (a level top laid straight stripes along
             // every terrace of a valley's sides: spot A's first layer sheet, 11-06).
-            let top = SEA_LEVEL + MIST_TOP + (b - 0.45) * 10.0;
+            // With `OPT_MIST_DOMES` the heave up to 20 blocks either way, on the broad banks, and the
+            // top softer, so they stand as domes the sun lights on one side.
+            let domes = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
+            let top = SEA_LEVEL + MIST_TOP + (b - 0.45) * mix(10.0, 40.0, domes);
             // The top a little softer (6 blocks of fade, not 5.5: the pancakes along the river
             // had cut edges, try 2's sheet).
-            let layer = 1.0 - smoothstep(top - 5.0, top + 2.5, p.y);
+            let layer = 1.0 - smoothstep(top - mix(5.0, 10.0, domes), top + mix(2.5, 4.0, domes), p.y);
             // Wisps in the crowns above the layer, in patches: Bliss's dawn mist lies among the
             // tree tops all over, not only in the valleys (try 2 left the forests above the mist
             // line clear, the mist flat pancakes on the rivers). Within a few blocks of what the
@@ -1602,7 +1620,9 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     var warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
     // In the evening, as Bliss's, no gold of its own (`OPT_MIST_TINT`): the sun's colour is already
     // its sunset colour.
-    let plain = clamp(fantasy_opt(OPT_MIST_TINT), 0.0, 1.0) * (1.0 - smoothstep(-0.05, 0.05, scene.sun.x));
+    // In the morning likewise with `OPT_MIST_DAWN_TINT`.
+    let plain = clamp(fantasy_opt(OPT_MIST_TINT), 0.0, 1.0) * (1.0 - smoothstep(-0.05, 0.05, scene.sun.x))
+        + clamp(fantasy_opt(OPT_MIST_DAWN_TINT), 0.0, 1.0) * smoothstep(-0.05, 0.05, scene.sun.x);
     warm *= 1.0 - plain;
     // With the sun up and low, the sky's light in the mist goes gold too (sunlight scattered all
     // round in it): lit by the sky's cool fill, a dawn mist read pale pink-white where Bliss's is

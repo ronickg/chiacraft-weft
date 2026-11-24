@@ -171,6 +171,8 @@ pub const DRINKS: &[(&str, f32)] = &[
     ("protoceratops", 0.4),
     ("kryptobaatar", 0.1),
     ("priscagama", 0.1),
+    // The red dunes' omnivore: its water from leaves, seeds and prey, as Protoceratops's.
+    ("citipati", 0.4),
 ];
 
 /// The share of its water `s` drinks (`DRINKS`; 0 for fish, which live in it).

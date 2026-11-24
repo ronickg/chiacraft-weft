@@ -300,7 +300,8 @@ mod tests {
             .fold((0.0, 0.0), |t, x| (t.0 + x.0, t.1 + x.1));
         assert!((a - Player::of(Age::Iron).armour()).abs() < 1e-3);
         assert!((REF_HEALTH + v - Player::of(Age::Iron).health()).abs() < 1e-3);
-        assert!(((REF_HEALTH + v) - 65.5).abs() < 0.5, "{}", REF_HEALTH + v);
+        // 20 × 1.6^2.5: the sheet's Iron Age reference health, 65.
+        assert!(((REF_HEALTH + v) - 64.76).abs() < 0.05, "{}", REF_HEALTH + v);
     }
 
     #[test]

@@ -182,6 +182,23 @@ fn install(c: &Client) {
             }
         }
     }
+    // A variant picked for this run (`--shader-pack chiacraft_live`) with no files yet starts as a
+    // copy of this build's pack, for the testkit's live mode to write edits over (`reload_pack`).
+    if let Some(pack) = weft_sdk::client::launch_option("shader-pack").filter(|p| p != ID && is_ours(p)) {
+        let var = Path::new(&c.run_dir()).join("shaderpacks").join(&pack);
+        if !var.join("world.wgsl").exists() && std::fs::create_dir_all(&var).is_ok() {
+            for name in FILES
+                .iter()
+                .map(|(n, _)| *n)
+                .chain(std::iter::once("pack.cfg"))
+            {
+                if let Err(e) = std::fs::copy(dir.join(name), var.join(name)) {
+                    weft_sdk::warn!("shader pack {pack}: {name}: {e}");
+                }
+            }
+            weft_sdk::info!("shader pack {pack}: a copy of {ID}");
+        }
+    }
     let mut changed = files_changed && SHADER_PACK.get() == ID;
     // `--shader-pack <id>` picks one for this run (a script checking the look).
     if let Some(pack) = weft_sdk::client::launch_option("shader-pack") {

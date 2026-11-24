@@ -26,7 +26,36 @@ fn the_climates_are_their_real_places() {
         if p["estimate"].as_bool() == Some(true) {
             continue;
         }
-        let months = p["months"].as_array().expect("months");
+        // A place whose source gave no monthly table (Białowieża's old growth): its summary's
+        // year mean and half range, and its wet months for the rainiest season.
+        let Some(months) = p["months"].as_array() else {
+            let sum = &p["summary"];
+            let (mean, half) = (sum["year_mean_c"].as_f64(), sum["half_range_c"].as_f64());
+            let (Some(mean), Some(half)) = (mean, half) else {
+                problems.push(format!("{}: no months and no summary in the research", c.biome));
+                continue;
+            };
+            if (mean as f32 - c.celsius).abs() > 1.0 {
+                problems.push(format!("{}: year mean {} °C, {} has {mean:.1}", c.biome, c.celsius, c.place));
+            }
+            if (half as f32 - c.seasons).abs() > 1.0 {
+                problems.push(format!("{}: seasons ±{} °C, {} has ±{half:.1}", c.biome, c.seasons, c.place));
+            }
+            let names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            let south = p["hemisphere"].as_str().is_some_and(|h| h.starts_with('s'));
+            let mut wet = [0.0f32; 4];
+            for m in p["wet_months"].as_array().into_iter().flatten() {
+                if let Some(i) = names.iter().position(|n| m.as_str() == Some(n)) {
+                    wet[season_of(i, south)] += 1.0;
+                }
+            }
+            let top = c.rain.iter().cloned().fold(0.0f32, f32::max);
+            let wettest = (0..4).max_by(|&a, &b| wet[a].total_cmp(&wet[b])).unwrap();
+            if wet.iter().any(|&w| w > 0.0) && c.rain[wettest] < top {
+                problems.push(format!("{}: {} is wettest in season {wettest}, not the table's", c.biome, c.place));
+            }
+            continue;
+        };
         let t: Vec<f32> = months
             .iter()
             .map(|m| m["t_mean"].as_f64().unwrap_or(0.0) as f32)

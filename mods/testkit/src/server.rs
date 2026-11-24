@@ -1188,6 +1188,15 @@ const OPS: &[(&str, &str, Run)] = &[
         let p = pos(cmd, "to")?;
         Ok((w.navigate(owner(w, cmd)?, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0) as u32).to_string())
     }),
+    ("navigate_by", "@owner <dx:int> <dy:int> <dz:int>", |w, cmd, _, _| {
+        // `navigate` to where the walker stands now plus a step, read here in the same tick: on a
+        // flying deck, a point read a round trip earlier had moved off it (CI's slow frames).
+        let id = owner(w, cmd)?;
+        let p = w.entity(id).ok_or("no such entity")?.pos;
+        let (dx, dy, dz) = (int::<i32>(cmd, "dx")?, int::<i32>(cmd, "dy")?, int::<i32>(cmd, "dz")?);
+        let to = [p.x.floor() + dx as f64 + 0.5, p.y.floor() + dy as f64, p.z.floor() + dz as f64 + 0.5];
+        Ok((w.navigate(id, to, 1.0) as u32).to_string())
+    }),
     ("structure", "<name:word> <r:int>", |w, cmd, _, me| {
         Ok(w.structure_near(word(cmd, "name")?, me, int(cmd, "r")?)
             .map_or("none".into(), |a| format!("{} {} {}", a.x, a.y, a.z)))
