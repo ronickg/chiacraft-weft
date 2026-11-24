@@ -25,13 +25,20 @@ static SET_OFF: Component<[f64; 6]> = Component::named("animal_set_off");
 /// leg, the way of 8 it walked, and when it set off.
 static SEARCH: Component<[f64; 3]> = Component::named("animal_search");
 
+/// When its drink and its eat goal last ran (game ticks), and whether the one running now was
+/// kept from running in between (1): another goal took the turn, so a walk it had set off on was
+/// cut short by that, not by the ground (`ran`).
+static RAN: Component<[f64; 3]> = Component::named("animal_ran");
+
 pub fn init(r: &mut Registry) {
     r.entity_component(&STUCK, [0.0; 5], 0);
+    r.entity_component(&RAN, [0.0; 3], 0);
     r.entity_component(&SEARCH, [0.0; 3], 0);
     r.entity_component(&SET_OFF, [0.0; 6], 0);
     r.entity_component(&LEAP_TO, [0.0; 5], 0);
     for s in crate::species::SPECIES.iter() {
         r.edit(s.kind).attach(&STUCK);
+        r.edit(s.kind).attach(&RAN);
         r.edit(s.kind).attach(&SEARCH);
         r.edit(s.kind).attach(&SET_OFF);
         r.edit(s.kind).attach(&LEAP_TO);
@@ -60,10 +67,28 @@ pub fn ended_short(w: &World, id: u64, st: &EntityState) -> bool {
             .is_some_and(|o| (o[0] - st.pos.x).powi(2) + (o[1] - st.pos.z).powi(2) < WALK_MOVED * WALK_MOVED)
 }
 
+/// Its drink (`water`) or eat goal runs now: noted, with whether another goal took the turn in
+/// between (more than `needs::RAN_GAP` ticks since it last ran), for `short`.
+pub fn ran(w: &World, id: u64, water: bool) {
+    let now = w.game_time() as f64;
+    if let Some(r) = w.component_mut(id, &RAN) {
+        let i = if water { 0 } else { 1 };
+        r[2] = if now - r[i] > animals_core::needs::RAN_GAP { 1.0 } else { 0.0 };
+        r[i] = now;
+    }
+}
+
 /// A walk of `id`'s to food or water ended short of it: counted, and from `STUCK_AFTER` within
 /// `STUCK_NEAR` of the first a leg out (true: it walks one, its need's goal keeps the turn).
 pub fn short(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(mut k) = w.component(id, &STUCK) else { return false };
+    // Cut short by another goal (lying down with its leader, a rest, a fright): not the ground, so
+    // not counted (ai1124_savanna17: walks to water 2 blocks off ended each time it lay down with
+    // its leader, and it was counted stuck and leapt 70 times).
+    if w.component(id, &RAN).is_some_and(|r| r[2] != 0.0) {
+        weft_sdk::debug!("animal {id}'s walk was cut short by another goal: not counted stuck");
+        return false;
+    }
     let (x, z) = (st.pos.x, st.pos.z);
     if k[2] == 0.0 || (k[0] - x).powi(2) + (k[1] - z).powi(2) > STUCK_NEAR * STUCK_NEAR {
         k = [x, z, 0.0, 0.0, st.pos.y];
@@ -251,8 +276,10 @@ pub fn search(w: &World, id: u64, st: &EntityState, water: bool) -> bool {
         let (dx, dz) = way(i);
         let (x, z) = ((st.pos.x + dx * WAY_OUT_LEG).floor() as i32, (st.pos.z + dz * WAY_OUT_LEG).floor() as i32);
         let y = st.pos.y.floor() as i32;
-        // The ground there, from 8 over its feet down to 24 under.
-        (y - 24..=y + 8)
+        // The ground there within what its paths go: one up, `FLEE_DROP` + 2 down (from 24
+        // under, a search for water picked the floor of a shaft 9 deep as the lowest way,
+        // ai1124_shaft1). A way with no such ground isn't taken.
+        (y - (FLEE_DROP + 2)..=y + 1)
             .rev()
             .find(|&g| crate::comfort::ground(w, x, g, z) == Some(g))
     };

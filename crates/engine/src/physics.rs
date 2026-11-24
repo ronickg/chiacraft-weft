@@ -1695,6 +1695,9 @@ pub struct Control {
     pub swim_look: Option<f64>,
     /// Never steps off an edge, and holds on to a ladder (sneaking).
     pub careful: bool,
+    /// Never steps off an edge higher than this many blocks (a mob walking: its safe fall), 0 for
+    /// any (chiacraft: a deer grazing beside a shaft 9 deep stepped in and was shut in for good).
+    pub drop_guard: f64,
     /// Blocks per tick it climbs up any wall it pushes into in the air, times the wall's grip
     /// (`attribute::CLIMB_SPEED`); 0 climbs only ladders.
     // SYNC: upstream's `core:climb_speed` is a ladder speed multiplier (default 1, `Moves::climb`);
@@ -1875,6 +1878,33 @@ pub fn walk(
         while vel.x != 0.0 && vel.z != 0.0 && !ground(vel.x, vel.z) {
             vel.x = shrink(vel.x);
             vel.z = shrink(vel.z);
+        }
+    }
+    // A mob walking keeps off drops deeper than it falls unharmed, as `careful` but with that
+    // much room under it: it still steps down what its paths go down.
+    if !ctl.careful && ctl.drop_guard > 0.0 && on_ground {
+        let ground = |dx: f64, dz: f64| {
+            let area = Aabb::around(*pos + DVec3::new(dx, -ctl.drop_guard - 0.6, dz), f.half_width, f.height);
+            let reach = Aabb { min: area.min, max: DVec3::new(area.max.x, pos.y - 0.01, area.max.z) };
+            // Water under it is somewhere to go as well (a swimmer into a deep river).
+            let at = (*pos + DVec3::new(dx, 0.0, dz)).floor().as_ivec3();
+            occupied(c, block, bodies, skip, reach)
+                || (0..=ctl.drop_guard.ceil() as i32 + 1).any(|k| block.liquid(c, at - IVec3::Y * k).is_some())
+        };
+        let shrink = |v: f64| if v.abs() < 0.05 { 0.0 } else { v - 0.05 * v.signum() };
+        let wanted = (vel.x, vel.z);
+        while vel.x != 0.0 && !ground(vel.x, 0.0) {
+            vel.x = shrink(vel.x);
+        }
+        while vel.z != 0.0 && !ground(0.0, vel.z) {
+            vel.z = shrink(vel.z);
+        }
+        while vel.x != 0.0 && vel.z != 0.0 && !ground(vel.x, vel.z) {
+            vel.x = shrink(vel.x);
+            vel.z = shrink(vel.z);
+        }
+        if (vel.x, vel.z) != wanted {
+            log::debug!(target: "drop_guard", "entity {skip} at {:.2} {:.2} {:.2} held back: {:.3} {:.3} to {:.3} {:.3}", pos.x, pos.y, pos.z, wanted.0, wanted.1, vel.x, vel.z);
         }
     }
     let before = *pos;
