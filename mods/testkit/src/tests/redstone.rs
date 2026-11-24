@@ -2104,34 +2104,28 @@ pub async fn redstone_on_a_structure(t: T) -> R {
         .await?;
     t.op(&format!("structureset {id} -1 2 0 base:piston[facing=east]"))
         .await?;
+    // Watched on the client each frame: the piston's body lives a few ticks, and server ops one
+    // a frame (5 fps on CI) missed it.
+    let moving = EntityKind::lookup("core:moving_blocks").ok_or("no moving blocks kind")?;
+    if t.c().entity(uid).is_none() {
+        let near = t.op(&format!("near {} {} {} 40", f[0] + 4, f[1] + 2, f[2] - 4)).await?;
+        return Err(format!("the lift is gone before the piston moved (CI: 'entity 4'): {near}"));
+    }
     let (mut seen, mut carried) = (false, false);
-    let at = |t: T, id: String| async move {
-        let line = t.op(&format!("entity {id}")).await?;
-        let v: Vec<f64> = line
-            .split_whitespace()
-            .skip(1)
-            .take(3)
-            .filter_map(|s| s.parse().ok())
-            .collect();
-        Ok::<_, String>(v)
-    };
-    let lift = at(t.clone(), id.clone()).await?;
     t.op(&format!("structureset {id} -1 3 0 base:redstone_block"))
         .await?;
-    for _ in 0..8 {
-        let list = t
-            .op(&format!("near {} {} {} 8", lift[0].floor(), lift[1].floor(), lift[2].floor()))
-            .await?;
-        if let Some(m) = list
-            .split_whitespace()
-            .find(|e| e.ends_with("core:moving_blocks"))
-            .and_then(|e| e.split(':').next())
-        {
-            seen = true;
-            let (l, b) = (at(t.clone(), id.clone()).await?, at(t.clone(), m.to_string()).await?);
-            carried |= b.len() == 3 && (b[1] - l[1] - 2.0).abs() < 0.3;
+    t.until("the piston's body at the structure's height", Duration::from_secs(5), |t| {
+        let Some(lift) = t.c().entity(uid) else { return false };
+        for e in t.c().entities() {
+            if let Some(b) = t.c().entity(e).filter(|b| b.kind == moving) {
+                seen = true;
+                carried |= (b.pos.y - lift.pos.y - 2.0).abs() < 0.3;
+            }
         }
-    }
+        carried
+    })
+    .await
+    .ok();
     t.check(seen, "what the piston moves is a body of the region, not lost inside the structure");
     t.check(carried, "at the height of the structure it is on");
     settle(&t).await?;
