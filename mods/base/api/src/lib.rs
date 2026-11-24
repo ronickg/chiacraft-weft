@@ -722,6 +722,38 @@ pub static ARMOR: Component<Armor> = Component::named("armor");
 /// on today's tools as their item's, on a tool built from parts as its stack's. Against a big
 /// creature it counts at most its size's cap over the creature (`vitals::combat::Band::cap`).
 pub static ITEM_LEVEL: Component<f32> = Component::named("base:item_level");
+/// A saddle's fitting (`vitals::gear::SADDLE_FITTINGS`' index; 0 or none: plain leather). Base's
+/// assembly row fits one (`parts.rs`); the animals mod reads it when it saddles a tame. Items
+/// tagged `saddle` take it.
+pub static SADDLE_FIT: Component<u32> = Component::named("base:saddle_fit");
+/// The tag every saddle item carries, for the assembly row.
+pub const SADDLE_TAG: &str = "saddle";
+
+/// A saddle stack of `item` fitted with `fit` (`vitals::gear::SADDLE_FITTINGS`' index): its fitting
+/// and its item level on it. Fitting in base's assembly row and unsaddling a tame both make it.
+pub fn saddle_stack(item: u32, fit: u32) -> ItemStack {
+    ItemStack::new(item, 1)
+        .with(&SADDLE_FIT, fit)
+        .with(&ITEM_LEVEL, vitals::gear::saddle_level(fit))
+}
+
+/// A saddle stack's fitting (0: plain).
+pub fn saddle_fit(stack: &ItemStack) -> u32 {
+    SADDLE_FIT.on_stack(stack).unwrap_or(0)
+}
+
+/// An arrow's head: its place in `vitals::gear::ARROWHEADS` plus one (none or 0: a plain
+/// flint-tipped arrow). Base's assembly row makes them (`parts::fletched`); a bow reads the arrow's
+/// `ITEM_LEVEL`.
+pub static ARROW_HEAD: Component<u32> = Component::named("base:arrow_head");
+
+/// `count` arrows headed with `vitals::gear::ARROWHEADS[head]`: the head and its item level on
+/// them (base's `parts` adds the look).
+pub fn arrow_stack(head: u32, count: u32) -> ItemStack {
+    ItemStack::new(items::ARROW.id(), count)
+        .with(&ARROW_HEAD, head + 1)
+        .with(&ITEM_LEVEL, vitals::gear::arrow_level(head))
+}
 
 /// Clothes' slots, head to feet, worn under armor (`vitals::clothing`); armor's are in `slots`.
 pub static HAT: EquipmentSlot = EquipmentSlot::named("base:hat");

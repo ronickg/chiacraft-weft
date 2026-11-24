@@ -303,12 +303,112 @@ pub fn ranged() -> Vec<String> {
     if (best - 1.0).abs() > 1e-4 {
         out.push(format!("the springiest stave is ×{best}, not the reference bow's ×1"));
     }
+    // Arrows of other heads: every material that makes an arrow's head is an arrowhead, and every
+    // age with working materials has an arrowhead of its own, so a bow keeps up age by age.
+    use vitals::gear::{ARROWHEADS, arrow_level};
+    let heads: Vec<&str> = crafting::MATERIALS
+        .iter()
+        .filter(|m| crafting::materials::fits(m, "arrow", "head", crafting::Role::Working))
+        .map(|m| m.id)
+        .collect();
+    for m in &heads {
+        if !ARROWHEADS.contains(m) {
+            out.push(format!("{m} makes an arrow's head but isn't in vitals::gear::ARROWHEADS"));
+        }
+    }
+    for m in ARROWHEADS {
+        if !heads.contains(m) {
+            out.push(format!("{m} is an arrowhead but makes no arrow's head"));
+        }
+        if vitals::gear::material(m).is_none() {
+            out.push(format!("arrowhead {m} has no item level in vitals::gear"));
+        }
+    }
+    if (arrow_level(0) - ARROW_LEVEL).abs() > 1e-4 {
+        out.push(format!("a flint arrow is item level {}, not a plain arrow's {ARROW_LEVEL}", arrow_level(0)));
+    }
+    for age in AGES {
+        let made = crafting::MATERIALS
+            .iter()
+            .filter(|m| m.roles.contains(&crafting::Role::Working))
+            .filter_map(|m| vitals::gear::material(m.id))
+            .any(|l| age_of(l.level()) == age);
+        let headed = (0..ARROWHEADS.len() as u32).any(|h| age_of(arrow_level(h)) == age);
+        if made && !headed {
+            out.push(format!("{}: working materials but no arrowhead of the age", age.name()));
+        }
+    }
     for age in AGES {
         let p = Player::of(age);
         let dps = arrow_hit(age.reference(), 1.0) / FULL_DRAW_SECS;
         let want = p.hit() * combat::REF_RATE * bow.share;
         if (dps / want - 1.0).abs() > 0.01 {
             out.push(format!("{}: the reference bow's arrows deal {dps:.2} a second, not the reference's {want:.2}", age.name()));
+        }
+    }
+    out
+}
+
+/// The ages' lang keys (`age.base.<key>` in base's lang), tier by tier.
+const AGE_KEYS: [&str; 7] = ["stone", "bronze", "iron", "steam", "lightning", "future", "stars"];
+
+/// Saddles lift tames (Planner 11-23, option A: a saddle's fitting sets its level): the plain one
+/// is leather at the Stone reference; each fitting is a crafting material with a fitting's role,
+/// no lower than the one before; the game's lift (`vitals::gear::saddle_lift` on health, hit and
+/// armour) is what the checks' tame model gives (`danger::tame_with`); a saddle never carries a
+/// tame past it; and the saddle's tooltip line names each fitting's material, age and level.
+pub fn saddles() -> Vec<String> {
+    use vitals::gear::{SADDLE_FITTINGS, SADDLE_PLAIN_LEVEL, saddle_level, saddle_lift};
+    let mut out = Vec::new();
+    if SADDLE_FITTINGS.first() != Some(&"leather") || (saddle_level(0) - Age::Stone.reference()).abs() > 1e-4 {
+        out.push(format!("the plain saddle isn't leather at the Stone reference (level {})", saddle_level(0)));
+    }
+    if (SADDLE_PLAIN_LEVEL - Age::Stone.reference()).abs() > 1e-4 {
+        out.push(format!("a plain saddle is level {SADDLE_PLAIN_LEVEL}, not the Stone reference"));
+    }
+    let lang = include_str!("../../assets/lang/en_us.lang");
+    for (i, m) in SADDLE_FITTINGS.iter().enumerate() {
+        let fit = i as u32;
+        match crafting::materials::material(m) {
+            Some(mat) if mat.roles.contains(&crafting::Role::Fitting) => {}
+            _ => out.push(format!("saddle fitting {m} is no crafting material with a fitting's role")),
+        }
+        if i > 0 && saddle_level(fit) + 1e-4 < saddle_level(fit - 1) {
+            out.push(format!("saddle fitting {m} (level {}) is below the one before it", saddle_level(fit)));
+        }
+        let level = saddle_level(fit);
+        let line = format!(
+            "{{if:value=={i}}}{{lang:material.base.{m}}} fittings · {{lang:age.base.{}}} · item level {level:.0}{{/if}}",
+            AGE_KEYS[age_of(level).tier() as usize]
+        );
+        if !lang.contains(&line) {
+            out.push(format!("base's en_us tagged.base.saddle_fit has no `{line}`"));
+        }
+    }
+    for s in SPECIES.iter() {
+        let Some(d) = danger::danger(s.name) else { continue };
+        for level in [0, 100, 200] {
+            let own = d.area_level(level);
+            let Some(plain) = danger::tame_with(s, level, None, 1.0) else { continue };
+            for fit in 0..SADDLE_FITTINGS.len() as u32 {
+                let at = saddle_level(fit);
+                let Some(on) = danger::tame_with(s, level, Some(at), 1.0) else { continue };
+                let lift = saddle_lift(at, own);
+                for (stat, a, b) in [("health", on.health, plain.health), ("hit", on.hit, plain.hit), ("armour", on.armour, plain.armour)] {
+                    if b > 1e-6 && ((a / b) / lift - 1.0).abs() > 0.02 {
+                        out.push(format!(
+                            "a {} tame (level {level}) on a {} saddle: the game lifts its {stat} ×{lift:.3}, the model ×{:.3}",
+                            s.name,
+                            SADDLE_FITTINGS[fit as usize],
+                            a / b
+                        ));
+                    }
+                }
+                let Some(fights_at) = danger::tame_level(s, level, None).map(|o| o.max(at)) else { continue };
+                if fights_at > own.max(at) + 1e-4 {
+                    out.push(format!("a {} tame on a {} saddle fights past it", s.name, SADDLE_FITTINGS[fit as usize]));
+                }
+            }
         }
     }
     out

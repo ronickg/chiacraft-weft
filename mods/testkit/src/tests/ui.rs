@@ -136,6 +136,23 @@ pub async fn hud_editor(t: T) -> R {
     t.frames(3).await?;
     t.check(t.click_ui("text:Reset all", 0), "reset all");
     t.secs(0.3).await?;
+    // Weft asks first now: the question's own Reset all, 90 units left of its Cancel (two 84
+    // wide buttons 6 apart; a unit is a twentieth of a button's height). A close only cancelled
+    // the question, and the editor stayed open.
+    let Rect { x, y, w, h } = t.c().ui_rect("text:Cancel").ok_or("no reset question")?;
+    let unit = t
+        .c()
+        .ui_rect("id:hud_reset_all")
+        .ok_or("no Reset all button")?
+        .h
+        / 20.0;
+    let shot = t.shot("reset_question").await?;
+    let aspect = shot.w as f32 / shot.h.max(1) as f32;
+    t.c()
+        .input_cursor(x + w / 2.0 - 90.0 * unit / aspect, y + h / 2.0);
+    t.frames(3).await?;
+    t.c().input_click(0, 0.0);
+    t.secs(0.3).await?;
     t.c().menu_close();
     t.no_screen().await?;
     t.frames(3).await?;
@@ -256,8 +273,14 @@ pub async fn inventory_crafting(t: T) -> R {
         .await
         .map_err(|e| {
             let c = t.c();
+            // Where the log went: every slot of the menu holding something.
+            let filled: Vec<String> = (0..c.menu().map_or(0, |m| m.slots))
+                .filter(|&i| !c.menu_slot(i).is_empty())
+                .map(|i| format!("{i}:{}x{}", c.menu_slot(i).item, c.menu_slot(i).count))
+                .collect();
+            let at = c.ui_rect("slot:0");
             format!(
-                "{e} (cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})",
+                "{e} (filled {filled:?}, slot:0 at {at:?}, cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})",
                 c.cursor_stack(),
                 c.menu_slot(0),
                 c.menu_slot(1),
@@ -357,7 +380,13 @@ pub async fn creative_inventory(t: T) -> R {
     t.screen("core:menu").await?;
     t.shot("tab").await?;
     let stone = id("base:bricks");
-    if t.click_ui(&format!("item:{stone}"), 0) {
+    // Found by searching: the palette scrolls, and base's bricks are below its first rows (the
+    // click landed outside the grid's view).
+    t.click_settled("id:creative_search", 0).await?;
+    t.c().input_type("bricks");
+    t.frames(4).await?;
+    if t.c().ui_rect(&format!("item:{stone}")).is_some() {
+        t.click_settled(&format!("item:{stone}"), 0).await?;
         t.until("bricks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == stone)
             .await?;
         t.click_ui(&t.hotbar(0), 0);
@@ -945,6 +974,8 @@ pub async fn inventory_hotkeys(t: T) -> R {
 /// in the second slot, and a right click clears it.
 pub async fn rebind(t: T) -> R {
     t.flat().await?;
+    // H: K, Weft's, opens base's skills (`mods/base/src/web.rs`), and the screen it opened
+    // stopped the walks.
     // `keys`: (key, seconds held, seconds before the next one).
     let bind = async |keys: &[(&str, f32, f32)]| -> R {
         t.c().menu_open(&screens::CONTROLS);
@@ -976,14 +1007,14 @@ pub async fn rebind(t: T) -> R {
     t.c().menu_close();
     t.no_screen().await?;
     let k = {
-        bind(&[("KeyK", 0.0, 0.0)]).await?;
-        walked(&["KeyK"]).await?
+        bind(&[("KeyH", 0.0, 0.0)]).await?;
+        walked(&["KeyH"]).await?
     };
     let (alone, chord) = {
-        bind(&[("ControlLeft", 0.5, 0.1), ("KeyK", 0.0, 0.5)]).await?;
-        t.check(t.c().ui_rect("text:Ctrl+K").is_some(), "the entry shows Ctrl+K");
+        bind(&[("ControlLeft", 0.5, 0.1), ("KeyH", 0.0, 0.5)]).await?;
+        t.check(t.c().ui_rect("text:Ctrl+H").is_some(), "the entry shows Ctrl+H");
         t.shot("chord").await?;
-        (walked(&["KeyK"]).await?, walked(&["ControlLeft", "KeyK"]).await?)
+        (walked(&["KeyH"]).await?, walked(&["ControlLeft", "KeyH"]).await?)
     };
     let shift = {
         bind(&[("ShiftRight", 0.1, 0.3)]).await?;
@@ -1002,8 +1033,8 @@ pub async fn rebind(t: T) -> R {
     t.check(t.c().ui_rect("text:J*2").is_none(), "a right click clears it");
     t.c().menu_close();
     t.no_screen().await?;
-    t.check(k > 1.0, format!("K walks after rebinding forward to it (moved {k:.2})"));
-    t.check(alone < 0.2 && chord > 1.0, format!("bound to Ctrl+K, K alone moved {alone:.2} and Ctrl+K {chord:.2}"));
+    t.check(k > 1.0, format!("H walks after rebinding forward to it (moved {k:.2})"));
+    t.check(alone < 0.2 && chord > 1.0, format!("bound to Ctrl+H, H alone moved {alone:.2} and Ctrl+H {chord:.2}"));
     t.check(shift > 1.0, format!("a right Shift let go of alone is the key (moved {shift:.2})"));
     Ok(())
 }

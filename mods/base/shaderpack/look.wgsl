@@ -141,6 +141,20 @@ const OPT_WATER_MIRROR: u32 = 44u;
 // its light (Bliss's bliss_tw, 11-22: land 5 23 78 at 19:00, 0 10 75 at 19:30, dark at 20:00, where
 // ours was grey-black, 10 13 21, at 19:00).
 const OPT_TWILIGHT: u32 = 45u;
+// The blue hour's end (with `OPT_TWILIGHT` on): full to about 15° under, gone by about 24°.
+fn twilight_window() -> f32 {
+    return smoothstep(-0.42, -0.26, scene.sun.y);
+}
+// How far under the horizon the sun must be before the night sky's stars show (`dark` from 0 to
+// 1): with `OPT_TWILIGHT` on, Bliss's, none until about 16° under and all by 27° (none in its 20:00
+// sky, the sun 16° under; ours from 19:00, 3° under; from 13° under a third were still out at 20:00,
+// lsY_tw). `day_from`, `night_at` as made.
+fn night_sky_dark(day_from: f32, night_at: f32) -> f32 {
+    if fantasy_opt(OPT_TWILIGHT) > 0.0 {
+        return smoothstep(-0.28, -0.45, scene.sun.y);
+    }
+    return smoothstep(day_from, night_at, scene.sun.y);
+}
 // How bright the water's own body is, near and far (`base:look_water_body`): 1 as made, less darker.
 // Looking down at a lake the mirror is a few percent; the rest is the body's light, which kept our
 // open water a light blue (lsL, 11-22: 102 123 133 against Bliss's dark navy 68 93 125).
@@ -163,6 +177,11 @@ fn haze_sun() -> f32 {
 const OPT_SUN_GLOW: u32 = 49u;
 // The low sky away from the evening sun a clear blue (`base:look_evening_away`): 0 as made, 1 Bliss's.
 const OPT_EVENING_AWAY: u32 = 50u;
+// The mist with the sun low in the west lit in the light's own colours (`base:look_mist_tint`): 0 as
+// made (the low sun's gold in the sunlit mist and the sky's light in it), 1 Bliss's: its fog takes
+// the sun's colour and the sky's as they are (`overworld_fog.glsl`: light colour times phase, plus
+// the ambient), so its evening layer reads pale pink-lavender where ours went orange (lsG_ev, 11-22).
+const OPT_MIST_TINT: u32 = 51u;
 fn water_body() -> f32 {
     let b = fantasy_opt(OPT_WATER_BODY);
     return select(1.0, b, b >= 0.0);
@@ -172,10 +191,25 @@ fn water_body() -> f32 {
 // west (17:00), a little at 12° (18:00), all with it on the horizon, into the dusk. (It began at 32°
 // up and drowned the 17:00 land in orange, where Bliss's shows its golden layer only at sunset:
 // lsG_ev against bliss_ctl, 11-22.)
-fn evening_mist() -> f32 {
+fn evening_window() -> f32 {
     let west = smoothstep(0.1, -0.1, scene.sun.x);
     let low = 1.0 - smoothstep(0.03, 0.3, scene.sun.y);
-    return clamp(fantasy_opt(OPT_EVENING_MIST), 0.0, 1.0) * west * low * smoothstep(-0.2, -0.05, scene.sun.y);
+    return west * low * smoothstep(-0.2, -0.05, scene.sun.y);
+}
+fn evening_mist() -> f32 {
+    return clamp(fantasy_opt(OPT_EVENING_MIST), 0.0, 1.0) * evening_window();
+}
+// The mist the evening layer has of its own (the client's `evening_mist_floor`, the same sum): 0.3
+// at 1, thicker past it up to 3 (at 1 it was a faint grey veil next to Bliss's, lsAH_mist).
+fn evening_floor() -> f32 {
+    return 0.3 * clamp(fantasy_opt(OPT_EVENING_MIST), 0.0, 3.0) * evening_window();
+}
+
+// The air's own mist (`scene.weather.z` less the evening layer's floor, `evening_mist_floor` in the
+// client): what every mist but the evening layer's, the haze and the grade go by, so the evening
+// layer brings no dawn mist, haze or grey with it (lsAF_mist03).
+fn air_mist() -> f32 {
+    return max(scene.weather.z - evening_floor(), 0.0);
 }
 
 // The surface's light from the sun and in all, before its tint (`light_on`, `surface_light`), for
@@ -333,15 +367,25 @@ fn palette_now() -> Palette {
     let blue_k = max(fantasy_opt(OPT_TWILIGHT), 0.0);
     if blue_k > 0.0 {
         let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
-        let tw = smoothstep(-0.3, -0.17, scene.sun.y) * (1.0 - smoothstep(0.02, 0.12, scene.sun.y)) * evening * (1.0 - rain_amount());
+        // To about 24° under (20:30 on our clock): Bliss's 20:00, the sun 16° under, is still a deep
+        // navy (sky 0 3 113, land 0 0 21), where ours had gone grey night (it ended at 17° under).
+        let tw = twilight_window() * (1.0 - smoothstep(0.02, 0.12, scene.sun.y)) * evening * (1.0 - rain_amount());
         let deep = vec3(0.08, 0.3, 1.0);
-        p.zenith = mix(p.zenith, deep * (luma(p.zenith) / luma(deep)), tw * 0.7);
-        p.horizon = mix(p.horizon, mix(p.horizon, deep * (luma(p.horizon) / luma(deep)), 0.5), tw);
+        // Nearly all of it (Bliss's 20:00 sky is a pure navy, 0 4 114; at seven tenths ours kept a
+        // grey in it, 36 56 106, lsY_tw).
+        p.zenith = mix(p.zenith, deep * (luma(p.zenith) / luma(deep)), tw * 0.95);
+        p.horizon = mix(p.horizon, mix(p.horizon, deep * (luma(p.horizon) / luma(deep)), 0.8), tw);
         let sky = p.zenith * 0.65 + p.horizon * 0.35;
         // The land lit by it only once the sun is down: from 4° up it turned the 18:30 land a
         // bright green (lsO_tw2: 125 136 88 at 4, where Bliss's is already dim, 35 36 69).
         let down = 1.0 - smoothstep(-0.04, 0.0, scene.sun.y);
         p.ambient = mix(p.ambient, sky * blue_k, tw * down);
+        // The evening sun dims over its last 10° (the long path through the air): Bliss's 18:30
+        // land, the sun 4° up, is already dim and blue-lit, 35 36 69, where ours stood in its full
+        // light, 69 61 44 (lsS_mix after f3cfb0f84). At 4° up about two fifths, none off by 10°.
+        // (From 2° under, two fifths at 18:30 took the land only 70 62 48 -> 66 60 60, lsY_tw: now a
+        // quarter.)
+        p.sun *= mix(1.0, smoothstep(0.0, 0.2, scene.sun.y), evening * (1.0 - rain_amount()));
     }
     return p;
 }
@@ -1419,6 +1463,8 @@ fn fog_banks(p: vec3<f32>) -> f32 {
 // cell and the height's shape at several places through it (`froxel_cell`).
 fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
     let f = scene.weather.z * dust_reach(p);
+    // Every layer but the evening's by the air's own mist (`air_mist`).
+    let f_air = air_mist() * dust_reach(p);
     let s = storm();
     // The mist (not a storm's dust or snow) lies below a height of its own, `MIST_TOP` over the
     // sea (`vitals::air`), as Bliss's does: rivers, lakes and valleys fill, and ridges and forests higher up stand
@@ -1472,11 +1518,11 @@ fn fog_density_with(p: vec3<f32>, floor: f32, banks: f32) -> f32 {
             // edges soft (hard-edged blobs on the crowns, the same sheet).
             let wisp = exp(-max(p.y - floor, 0.0) / 5.0) * smoothstep(0.4, 0.9, smoothstep(0.25, 0.75, banks))
                 * (1.0 - smoothstep(0.2, 0.5, scene.sun.y)) * (1.0 - layer) * (1.0 - smoothstep(top + 25.0, top + 45.0, p.y));
-            return mix(f * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11, even, ev);
+            return mix(f_air * open * burn * (layer * mix(2.2, 5.5, b) + wisp * 1.8 + 0.012 * high) * 0.11, even, ev);
         }
-        return mix(f * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11, even, ev);
+        return mix(f_air * open * burn * (low * (mix(0.05, 0.7, s) + mix(6.5, 0.6, s) * b) + 0.012 * high) * 0.11, even, ev);
     }
-    return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
+    return f_air * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
 }
 
 // Light the fog sends toward the eye: the sky's from all around, the sun's mostly forward, so it
@@ -1523,7 +1569,11 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // hour's colour alone the 07:30 shafts in a rainforest's mist read grey-white (canopy sheet).
     // Dimmer too: thick mist lit at the sun's full strength toward it clipped to white, and white
     // shows no colour (the dawn check's 07:30 mist, luma p50 170, saturation 0.03).
-    let warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
+    var warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
+    // In the evening, as Bliss's, no gold of its own (`OPT_MIST_TINT`): the sun's colour is already
+    // its sunset colour.
+    let plain = clamp(fantasy_opt(OPT_MIST_TINT), 0.0, 1.0) * (1.0 - smoothstep(-0.05, 0.05, scene.sun.x));
+    warm *= 1.0 - plain;
     // With the sun up and low, the sky's light in the mist goes gold too (sunlight scattered all
     // round in it): lit by the sky's cool fill, a dawn mist read pale pink-white where Bliss's is
     // gold (the Look session's checkpoint, 11-05). None before sunrise: the blue hour keeps its blue.
@@ -1532,8 +1582,9 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // In the HDR world the sun's forward glow carries the mist's light toward it, and away from it
     // the mist is dim, the sky's light alone (Bliss's mist across the sun is a blue-grey that lets
     // the land through, not a bright veil).
+    // With the evening's tint (`OPT_MIST_TINT`) the sky's light at full, as Bliss's fog takes it.
     if scene.frame.x > 0.5 {
-        sky_part *= 0.55;
+        sky_part *= mix(0.55, 1.0, plain);
     }
     // In the HDR world the sunlit mist a deeper gold (Bliss's dawn mist, saturation 181 against our 99).
     let gold = select(MIST_GOLD * 0.65, vec3(1.0, 0.58, 0.2) * 0.7, scene.frame.x > 0.5);
@@ -1883,7 +1934,7 @@ fn haze_veil(rel: vec3<f32>, dist: f32) -> vec3<f32> {
     // A third thicker than it was (Far view, 11-05: Bliss's far land is about two thirds sky-blue
     // at 2000 blocks, ours was under 0.6): far land reads as far, the near stays as clear.
     let rayleigh = vec3(0.35, 0.6, 1.0) * 3.4e-4 * k;
-    let mie = (0.4e-4 + 2.0e-4 * scene.weather.z + 0.8e-4 * min(canopy(), 1.0)) * k;
+    let mie = (0.4e-4 + 2.0e-4 * air_mist() + 0.8e-4 * min(canopy(), 1.0)) * k;
     let far = dist * smoothstep(90.0, 450.0, dist);
     // Rain's own mist starts at the eye (Ronald, 11-05: "when raining shouldn't it be more
     // misty??"): rain alone a soft veil (a third gone at 100 blocks), a thunderstorm down to about
@@ -1950,7 +2001,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // In a dust storm the far land goes into the dust, as the sky does (it is fogged over 220
     // blocks): veiled toward the clear sky's colour, far ridges stood blue-lavender against a
     // sand-coloured sky (the dust-layers sheet, 11-06). The fog's own light at full depth.
-    let dust = clamp(scene.ground.z, 0.0, 1.0) * smoothstep(0.0, 0.3, scene.weather.z);
+    let dust = clamp(scene.ground.z, 0.0, 1.0) * smoothstep(0.0, 0.3, air_mist());
     if !CALM && dust > 0.0 {
         let fl = fog_light(dir);
         color = mix(color, fl.sky + fl.sun, dust);
@@ -1981,7 +2032,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // In rain everything takes a little grey-blue wash, near too.
     // (Clear air takes less of its colour: a fifth of the veil, a tenth at most, as far biome colours
     // under Bliss stay saturated, a snowfield white and a forest green; rain's grey as before.)
-    let grey = mix(clamp(veil.b * 0.2, 0.0, 0.1), clamp(veil.b * 0.6, 0.0, 0.3), max(rain, scene.weather.z));
+    let grey = mix(clamp(veil.b * 0.2, 0.0, 0.1), clamp(veil.b * 0.6, 0.0, 0.3), max(rain, air_mist()));
     let pale = mix(mix(c, vec3(luma(c)), grey), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
     // Haze keeps the land's colour (Ronald, 11-05, on the glass slabs: "Haze keeps land colour"):
     // in clear air the veil stops at four fifths, the land veils toward a tenth under the sky's
@@ -1989,7 +2040,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // of it). Veiled all the way to the sky's own colour, pale bare rock 400-500 blocks off read as
     // glass, the land behind seen through it. Rain and the weather's fog veil as before (the Shader
     // session's), and the handover where the terrain ends is still the sky's.
-    let wet = clamp(max(rain, scene.weather.z), 0.0, 1.0);
+    let wet = clamp(max(rain, air_mist()), 0.0, 1.0);
     var v = mix(min(veil, vec3(0.8)), veil, wet);
     var toward = lit * mix(0.9, 1.0, wet);
     // The clear air's haze takes the sun's colour, most with it low, not the sky's blue: Bliss's 08:00
@@ -2107,7 +2158,10 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             let evening = 1.0 - smoothstep(-0.05, 0.05, scene.sun.x);
             // From sunset: begun with the sun 6° up, the 18:30 land went a grey-blue (lsR_tw 0.5: 87 83 88
             // where Bliss's is dim and warm, 35 36 69).
-            let tw = smoothstep(-0.3, -0.17, scene.sun.y) * (1.0 - smoothstep(-0.04, 0.0, scene.sun.y)) * evening * (1.0 - rain_amount());
+            // From about 6° up, under a third by 4° (18:30): with the sun dimmed there the land is
+            // Bliss's blue haze over dark ground, 35 38 74. From sunset ours stayed warm, 66 60 60
+            // (lsY_tw); half by 4° overshot, 69 88 143 (lsZ_tw2).
+            let tw = twilight_window() * (1.0 - smoothstep(0.0, 0.1, scene.sun.y)) * evening * (1.0 - rain_amount());
             if tw > 0.0 {
                 let fill = vec3(1.0) - exp(-vec3(1.5e-3, 3.0e-3, 6.0e-3) * min(dist, 600.0));
                 let sky_up = sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 0.3, dir.z)));
@@ -2378,7 +2432,7 @@ fn finish_picture(c_in: vec3<f32>) -> vec3<f32> {
         // In mist the gold kept, more of it (Bliss's misty dawn is all gold, 181 of saturation and
         // +106 warmth; with the cut, ours fell from 174/+101 to 151/+88, gr5m): the low sun's gold
         // is the mist's light.
-        let misty = smoothstep(0.02, 0.1, scene.weather.z) * (1.0 - rain_amount());
+        let misty = smoothstep(0.02, 0.1, air_mist()) * (1.0 - rain_amount());
         let w = fantasy_opt(OPT_WHITE) * day * mix(1.0, 0.25, smoothstep(0.4, 0.75, scene.sun.y)) * mix(1.0 - 0.7 * golden(), 1.0 + 0.6 * golden(), misty);
         // On the land only: on the sky it took the blue out of the horizon band at 08:00
         // (Shader's spot C rows, 11-06).
@@ -2426,7 +2480,7 @@ fn finish_picture(c_in: vec3<f32>) -> vec3<f32> {
     // With a low sun 0.95 in mist (a gold dawn mist's colour) but 0.75 in clear air: on a clear
     // evening the land at 17:00 and 18:00 measured 139-153 of saturation against Bliss's 56-84
     // (mc_forest, gr4), where Bliss's misty mornings run 181.
-    let low_sat = mix(0.75, 0.95, smoothstep(0.02, 0.1, scene.weather.z));
+    let low_sat = mix(0.75, 0.95, smoothstep(0.02, 0.1, air_mist()));
     // In Bliss's own world (imported block for block) the land with the sun 30-55° up came out
     // grey-green at the cut tuned on the test world (0.62 at noon): land saturation 52 against
     // Bliss's 72 at 08:00, 61 against 92 at noon, where 17:00 matched (75 against 83). A quarter

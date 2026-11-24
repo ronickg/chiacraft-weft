@@ -215,6 +215,7 @@ item.base.gunpowder = Порох
 item.base.spider_eye = Паучий глаз
 item.base.paper = Бумага
 entity.base.zombie = Зомби
+entity.base.creeper = Крипер
 entity.base.spider = Паук
 entity.base.pig = Свинья
 entity.base.cow = Корова
@@ -972,6 +973,8 @@ video.base.far_ao = Дальнее затенение
 video.base.far_ao.what = Тень в просветах между дальними деревьями и у подножия дальних склонов
 video.base.leaf_light = Свет сквозь листву
 video.base.leaf_light.what = Солнце просвечивает листья насыщенной зеленью
+video.base.bliss_match = Как в Bliss
+video.base.bliss_match.what = Вид, подобранный под шейдеры Bliss: глубже тень, темнее вода, синий воздух при низком солнце, синие сумерки
 video.base.value.taa = Временное
 video.base.value.taa_camera = От камеры
 video.base.value.narrow = Узкое
@@ -1279,6 +1282,7 @@ recipes.all = Все рецепты
 command.base.inspect.part = {0}: {1}, {2}, сделано в день {3}, чинилось {4}×, износ {5}
 command.base.inspect.tool = {0}: {1}, собрано из {2} деталей
 command.base.inspect.tool_part =   {0}: {1}, {2}, сделано в день {3}, чинилось {4}×
+command.base.inspect.arrow = {0} ×{1}: наконечник — {2}, уровень предмета {3}
 command.base.inspect.plain = Не собрано из деталей
 command.base.inspect.gems =   Камни: {0} из {1} гнёзд
 command.base.inspect.gem =     {0}, уровень предмета {1}: +{2}% всего
@@ -1879,3 +1883,15 @@ block.base.tulip_yellow = Жёлтый тюльпан
 block.base.inula = Девясил
 block.base.verbascum = Коровяк
 block.base.lavender = Лаванда
+# Ages by name (vitals::curve::AGES), for lines that name one.
+age.base.stone = Каменный век
+age.base.bronze = Бронзовый век
+age.base.iron = Железный век
+age.base.steam = Век пара
+age.base.lightning = Век молнии
+age.base.future = Век будущего
+age.base.stars = Век звёзд
+# A saddle's fitting (vitals::gear::SADDLE_FITTINGS, in its order; levels from vitals::gear::saddle_level).
+tagged.base.saddle_fit = {#c6a383}{if:value==0}Оковка: {lang:material.base.leather} · {lang:age.base.stone} · уровень предмета 5{/if}{if:value==1}Оковка: {lang:material.base.copper} · {lang:age.base.bronze} · уровень предмета 12{/if}{if:value==2}Оковка: {lang:material.base.bronze} · {lang:age.base.bronze} · уровень предмета 16{/if}{if:value==3}Оковка: {lang:material.base.meteoric_iron} · {lang:age.base.bronze} · уровень предмета 18{/if}{if:value==4}Оковка: {lang:material.base.wrought_iron} · {lang:age.base.iron} · уровень предмета 23{/if}{if:value==5}Оковка: {lang:material.base.steel} · {lang:age.base.iron} · уровень предмета 27{/if}{if:value==6}Оковка: {lang:material.base.star_steel} · {lang:age.base.iron} · уровень предмета 29{/if}{/}
+item.base.part_arrowhead = Наконечник стрелы
+tagged.base.arrow_head = {#c6a383}{if:value==1}Наконечник: {lang:material.base.flint} · {lang:age.base.stone} · уровень предмета 5{/if}{if:value==2}Наконечник: {lang:material.base.chert} · {lang:age.base.stone} · уровень предмета 5{/if}{if:value==3}Наконечник: {lang:material.base.obsidian} · {lang:age.base.stone} · уровень предмета 6{/if}{if:value==4}Наконечник: {lang:material.base.tektite} · {lang:age.base.stone} · уровень предмета 6{/if}{if:value==5}Наконечник: {lang:material.base.bone} · {lang:age.base.stone} · уровень предмета 3{/if}{if:value==6}Наконечник: {lang:material.base.antler} · {lang:age.base.stone} · уровень предмета 3{/if}{if:value==7}Наконечник: {lang:material.base.copper} · {lang:age.base.bronze} · уровень предмета 12{/if}{if:value==8}Наконечник: {lang:material.base.bronze} · {lang:age.base.bronze} · уровень предмета 16{/if}{if:value==9}Наконечник: {lang:material.base.meteoric_iron} · {lang:age.base.bronze} · уровень предмета 18{/if}{if:value==10}Наконечник: {lang:material.base.wrought_iron} · {lang:age.base.iron} · уровень предмета 23{/if}{if:value==11}Наконечник: {lang:material.base.steel} · {lang:age.base.iron} · уровень предмета 27{/if}{if:value==12}Наконечник: {lang:material.base.star_steel} · {lang:age.base.iron} · уровень предмета 29{/if}{if:value==13}Наконечник: {lang:material.base.diamond} · {lang:age.base.steam} · уровень предмета 35{/if}

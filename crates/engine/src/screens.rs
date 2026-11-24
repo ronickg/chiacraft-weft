@@ -264,7 +264,14 @@ impl Screen for Profile {
                             crate::mods_screen::separator(ui);
                         }
                         config_rows(ui, cx, "core:profile", &["core:skin_model", "core:first_person_model", "core:show_avatars"]);
-                        // The key comes from the account's 24 words (chiacraft): the account and its words.
+                        // The key worlds know the player by, from the account's 24 words (chiacraft):
+                        // shown and copied here, the account and its words below.
+                        let key = crate::net::p2p::player_key(&cx.settings.run_dir);
+                        label(ui, cx, "profile.key", &[], "default");
+                        ui.text(text::plain(if key.is_empty() { "-" } else { &key }), "dim");
+                        button(ui, cx, "profile.copy", &[], 120.0, move |_| {
+                            crate::clipboard::set(&key);
+                        });
                         if chiacraft_account::current().is_some_and(|s| s.needs_backup()) {
                             label(ui, cx, "profile.account_backup", &[], "dim");
                         }

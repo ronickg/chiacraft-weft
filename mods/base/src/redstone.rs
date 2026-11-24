@@ -499,6 +499,8 @@ pub fn register(r: &mut Registry) {
         .opens(&DISPENSER_MENU);
     r.menu(&DISPENSER_MENU)
         .group("dispenser", Slots::chest(1).holder())
+        // Its screen (ours, not the default one) draws the player's slots: the menu must have them.
+        .player_inventory()
         .screen(|ui| {
             crate::window::window(ui, S::column().pad(7.0).gap(4.0), &[], |ui| {
                 ui.group("dispenser");

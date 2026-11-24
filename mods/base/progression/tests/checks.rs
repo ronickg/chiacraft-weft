@@ -11,7 +11,7 @@ fn check(name: &str) {
 
 #[test]
 fn every_check_runs() {
-    assert_eq!(progression::checks().len(), 14);
+    assert_eq!(progression::checks().len(), 17);
 }
 
 #[test]
@@ -82,4 +82,21 @@ fn stagger() {
 #[test]
 fn ranged() {
     check("bows on the curve: full draw a shot a second, a reference bow's arrows the reference's damage");
+}
+
+#[test]
+fn saddles() {
+    check("saddles lift tames by their fitting, as the tame model does, tooltip in step");
+}
+
+#[test]
+fn loot_per_hour() {
+    check(
+        "loot per hour: kill drops priced from their cheapest kill, no kill paying over its time (+30 %, +50 % more for what fights back)",
+    );
+}
+
+#[test]
+fn path_parity() {
+    check("path parity: each age's key by each route within ×1.15 of its cheapest, in EM");
 }

@@ -46,14 +46,14 @@ pub async fn packages(t: T) -> R {
     t.frames(2).await?;
     t.press("core:use");
     t.screen("core:menu").await?;
-    // Crafting table menu: 0-8 grid, 9 result, 10-36 main, 37-45 hotbar.
+    // Crafting table menu: 0-8 grid, 9 result, then the player's inventory (`t.hotbar` finds
+    // its hotbar: base's has more slots than Weft's 36).
     let ruby = item("gems:ruby");
-    t.click_ui("slot:37", 0);
+    t.click_settled(&t.hotbar(0), 0).await?;
     t.until("rubies on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == ruby)
         .await?;
     for slot in 0..9 {
-        t.click_ui(&format!("slot:{slot}"), 1);
-        t.frames(2).await?;
+        t.click_settled(&format!("slot:{slot}"), 1).await?;
     }
     let block_item = item("gems:ruby_block");
     let made = t

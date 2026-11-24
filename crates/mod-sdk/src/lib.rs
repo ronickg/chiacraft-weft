@@ -66,11 +66,19 @@ pub use types::{
     BlockUpdateEvent as __BlockUpdate, BlockUseEvent as __BlockUse, ItemUseEvent as __ItemUse, ItemUseResult as __ItemUseResult,
 };
 
-/// Permission levels (`permission::EVERYONE` .. `permission::OWNER`), value-chain stages and
-/// component flags: Weft's own, so each has one name. A sandboxed component takes `SAVE`,
-/// `SYNC_OWNER`, `SYNC_WATCHERS` and `KEEP` (`SYNC_MENU` is for machines' menus, which a sandboxed
-/// mod has none of).
-pub use weft_abi::{component_flags, permission, stage};
+/// Permission levels (`permission::EVERYONE` .. `permission::OWNER`) and component flags: Weft's
+/// own, so each has one name. A sandboxed component takes `SAVE`, `SYNC_OWNER`, `SYNC_WATCHERS` and
+/// `KEEP_ON_RESPAWN` (`SYNC_MENU` is for machines' menus, which a sandboxed mod has none of).
+pub use weft_abi::{component_flags, permission};
+
+/// A value chain's stages for [`Registry::modify`]: the numbers the API has always carried. The
+/// host runs them in Weft's phases (`ADD`, `MULTIPLY`, `FINAL`); Weft's own `stage` is now
+/// world generation's.
+pub mod stage {
+    pub const ADD: u32 = 100;
+    pub const MULTIPLY: u32 = 200;
+    pub const FINAL: u32 = 300;
+}
 
 /// The API version this SDK builds for.
 pub const API: &str = "1.3.0";

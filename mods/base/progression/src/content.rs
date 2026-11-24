@@ -71,8 +71,12 @@ pub enum Get {
     /// Gathered in the world with `Needs`, at this many effort minutes a piece (finding it
     /// included).
     World(Needs, f32),
-    /// Dropped by creatures, effort minutes a piece (the hunt included).
+    /// Dropped by creatures, effort minutes a piece (the hunt included): boss loot and found
+    /// things, priced by hand.
     Drop(f32),
+    /// Dropped by wild animals' and mobs' kills: what its cheapest kill makes it (`crate::loot`,
+    /// its weight in `vitals::loot::KILL_DROPS`).
+    Kill,
     /// Made: a recipe in `graph::RECIPES` must make it.
     Made,
     /// Not had as an item: a block that breaks into something else, a liquid, a growing stage, a
@@ -92,7 +96,7 @@ pub struct Rule {
     pub note: &'static str,
 }
 
-use Get::{Drop, Made, Not, World};
+use Get::{Drop, Kill, Made, Not, World};
 use Kind::*;
 use Needs::Hand;
 use Path::{Beasts, Magic, Shared, Tech};
@@ -370,7 +374,14 @@ pub const RULES: &[Rule] = &[
     n(&["base:gem_tektite", "base:gem_amber"], 0, Tech, Material, Made, "cut gems: a boost in a tool's, weapon's or armour's socket"),
     r(&["base:gem_peridot"], 2, Tech, Material, Made),
     r(&["base:gem_diamond"], 3, Tech, Material, Made),
-    n(&["base:arrow"], 0, Tech, Tool, Drop(2.0), "dropped by skeletons; no recipe yet"),
+    n(
+        &["base:arrow"],
+        0,
+        Tech,
+        Tool,
+        Kill,
+        "dropped by skeletons, or fletched from an arrowhead part, a stick and a feather (its head's material its age)",
+    ),
     // ---- metals and gems
     r(&["base:coal", "base:coal_block"], 0, Shared, Material, Made),
     // Copper, tin and bronze (`metals.rs`): the Bronze Age's; steel the Iron Age's.
@@ -481,22 +492,13 @@ pub const RULES: &[Rule] = &[
     n(&["base:salt", "base:salted_meat"], 2, Shared, Food, Made, "salt is boiled from a water bucket (iron)"),
     // ---- materials of hunting, farming and sewing
     r(
-        &[
-            "base:hide",
-            "base:fur",
-            "base:bone",
-            "base:feather",
-            "base:egg",
-            "base:gunpowder",
-            "base:spider_eye",
-            "base:rotten_flesh",
-            "base:dung",
-        ],
+        &["base:hide", "base:fur", "base:bone", "base:feather", "base:gunpowder", "base:spider_eye", "base:rotten_flesh"],
         0,
         Shared,
         Material,
-        Drop(2.0),
+        Kill,
     ),
+    r(&["base:egg", "base:dung"], 0, Shared, Material, Drop(2.0)),
     r(
         &[
             "base:string",
@@ -517,13 +519,8 @@ pub const RULES: &[Rule] = &[
     ),
     r(&["base:fur_*", "base:hide_*", "base:wool_*", "base:linen_*", "base:rain_cape"], 0, Shared, Clothing, Made),
     // ---- food
-    r(
-        &["base:beef", "base:porkchop", "base:chicken", "base:mutton", "animals:venison", "animals:hare", "animals:trout", "animals:pacu"],
-        0,
-        Shared,
-        Food,
-        Drop(3.0),
-    ),
+    r(&["base:beef", "base:porkchop", "base:chicken", "base:mutton"], 0, Shared, Food, Drop(3.0)),
+    r(&["animals:venison", "animals:hare", "animals:trout", "animals:pacu"], 0, Shared, Food, Kill),
     r(
         &[
             "base:cooked_*",
@@ -629,13 +626,14 @@ pub const RULES: &[Rule] = &[
         World(Hand, 0.2),
     ),
     // ---- the animals mod: taming, riding, eggs, the gateway
-    r(&["animals:*_egg", "animals:carcass"], 0, Beasts, Beast, Drop(4.0)),
+    r(&["animals:*_egg"], 0, Beasts, Beast, Drop(4.0)),
+    r(&["animals:carcass"], 0, Beasts, Beast, Kill),
     n(
         &["animals:claw", "animals:scute"],
         0,
         Beasts,
         Material,
-        Drop(10.0),
+        Kill,
         "a large animal's stagger breaks (animals_core::parts): a fight with a Utahraptor or an ankylosaur",
     ),
     r(

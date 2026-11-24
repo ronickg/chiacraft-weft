@@ -128,6 +128,42 @@ pub fn weapon(kind: &str, level: f32) -> Option<(f32, f32)> {
 /// times, as a blade's grade is: its stave's spring, its grade and its gems (`crafting::combine`).
 pub const ARROW_LEVEL: f32 = REFERENCE_DEPTH;
 
+/// What an arrow's head can be, in order (an arrow keeps its place here plus one; 0 is a plain
+/// flint one): every material that makes an arrow's head (`crafting`'s working materials;
+/// progression's ranged check holds them equal). Its item level is its material's.
+pub const ARROWHEADS: &[&str] = &[
+    "flint",
+    "chert",
+    "obsidian",
+    "tektite",
+    "bone",
+    "antler",
+    "copper",
+    "bronze",
+    "meteoric_iron",
+    "wrought_iron",
+    "steel",
+    "star_steel",
+    "diamond",
+];
+
+/// An arrowhead's place in `ARROWHEADS`.
+pub fn arrowhead_of(material: &str) -> Option<u32> {
+    ARROWHEADS
+        .iter()
+        .position(|m| *m == material)
+        .map(|i| i as u32)
+}
+
+/// The item level of an arrow headed with `ARROWHEADS[head]`: its material's (a plain one
+/// `ARROW_LEVEL`).
+pub fn arrow_level(head: u32) -> f32 {
+    ARROWHEADS
+        .get(head as usize)
+        .and_then(|m| material(m))
+        .map_or(ARROW_LEVEL, |m| m.level())
+}
+
 /// A drawn bow's power after `secs` held, 0 to 1 (vanilla's draw: full at one second, under 0.1
 /// it doesn't shoot). An arrow flies at its power times full speed and hits by its speed.
 pub fn draw_power(secs: f32) -> f32 {
@@ -142,6 +178,45 @@ pub const FULL_DRAW_SECS: f32 = 1.0;
 /// head, twice (a bow's critical hit, kept from vanilla).
 pub fn arrow_hit(arrow_level: f32, bow_times: f32) -> f32 {
     weapon("bow", arrow_level).map_or(0.0, |(hit, _)| hit) * bow_times
+}
+
+// ------------------------------------------------------------------ saddles
+
+/// A plain saddle's item level: leather, the Stone Age's reference.
+pub const SADDLE_PLAIN_LEVEL: f32 = REFERENCE_DEPTH;
+
+/// What a saddle may be fitted with, plain first (Planner 11-23, option A: its fittings set its
+/// level, as a tool's working part does). A fitted saddle carries its fitting's index
+/// (`base_api::SADDLE_FIT`); a saddle item per age (option B) would carry its own the same way.
+/// Each is a crafting material with a fitting's role (checked); gold is too soft to hold a rider.
+pub const SADDLE_FITTINGS: &[&str] = &["leather", "copper", "bronze", "meteoric_iron", "wrought_iron", "steel", "star_steel"];
+
+/// The fitting at `fit`'s index.
+pub fn saddle_fitting(fit: u32) -> Option<&'static str> {
+    SADDLE_FITTINGS.get(fit as usize).copied()
+}
+
+/// The index of `material` as a saddle's fitting.
+pub fn saddle_fit_of(material: &str) -> Option<u32> {
+    SADDLE_FITTINGS
+        .iter()
+        .position(|m| *m == material)
+        .map(|i| i as u32)
+}
+
+/// A saddle's item level: its fitting's, never under a plain one's.
+pub fn saddle_level(fit: u32) -> f32 {
+    saddle_fitting(fit)
+        .and_then(material)
+        .map_or(SADDLE_PLAIN_LEVEL, |m| m.level().max(SADDLE_PLAIN_LEVEL))
+}
+
+/// What a saddle at `saddle_level` does for a tame fighting at area level `own` (`notes/PROGRESSION.md`:
+/// "a higher-age saddle ... raises the tame, capped like player gear"): its health, hit and armour
+/// times the curve from its level to the saddle's, never below 1. The over-tier cap then reads
+/// the higher of the two, as a player's gear (`animals_core::danger::tame`).
+pub fn saddle_lift(saddle_level: f32, own: f32) -> f32 {
+    (g(saddle_level) / g(own)).max(1.0)
 }
 
 /// A weapon or tool of `kind` made of `material`.

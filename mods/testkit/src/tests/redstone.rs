@@ -2200,7 +2200,10 @@ pub async fn redstone_clock(t: T) -> R {
     };
     let mut flips = 0;
     let mut was = on(&t, torch);
-    for _ in 0..200 {
+    // Four seconds by the script clock: 200 waits of 0.02 s took a frame each at least, over 6 s
+    // at 30 frames a second (14 flips).
+    let end = crate::runner::script_clock() + std::time::Duration::from_secs(4);
+    while crate::runner::script_clock() < end {
         t.secs(0.02).await?;
         let now = on(&t, torch);
         flips += (now != was) as u32;

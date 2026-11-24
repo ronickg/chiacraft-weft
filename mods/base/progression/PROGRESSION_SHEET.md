@@ -11,6 +11,8 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | everything reachable from the start | passes |
 | nothing at tier N needs anything above N | passes |
 | each age's key by each declared route | passes |
+| path parity: each age's key by each route within ×1.15 of its cheapest, in EM | passes |
+| each age's materials need the age before (its tools, stations or materials): no age skipped | passes |
 | every tool-part material tagged, made from its tier or below | passes |
 | each age's making inside its budget | passes |
 | every size and role inside its bands, floors hold | passes |
@@ -20,6 +22,8 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | grade and gems at most +60% over a plain item | passes |
 | stagger: same-age fights break every part, knockdowns at most a third of a fight | passes |
 | bows on the curve: full draw a shot a second, a reference bow's arrows the reference's damage | passes |
+| saddles lift tames by their fitting, as the tame model does, tooltip in step | passes |
+| loot per hour: kill drops priced from their cheapest kill, no kill paying over its time (+30 %, +50 % more for what fights back) | passes |
 
 ## The ages
 
@@ -27,9 +31,9 @@ Power grows ×1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier �
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 549 | 158 | 52 | 36 % | 223 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 551 | 159 | 48 | 33 % | 217 EM |
 | 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 52 | 35 | 150 | 52 % | 143 EM |
-| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 58 | 28 | 60 | 16 % | 272 EM |
+| 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 58 | 28 | 61 | 16 % | 270 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 38 | 32 | 94 | 22 % | 328 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
 | 5 | Age of the Future | 18 | 1080 | 10.49 | 79.6 / 265 / 332 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -276,6 +280,83 @@ drenkaun: a titan apex; attacks charge (×0.75 hit, 1.2 s tell), sweep (×0.50 h
 
 borkon: a titan apex; attacks charge (×0.75 hit, 1.4 s tell), toss (×0.55 hit, 0.9 s tell), rockfall (×0.35 hit, 1.6 s tell), leap (×0.50 hit, 1.0 s tell); parts left_horn at 10 %, right_horn at 20 %, fleece at 30 %; knocked down by 8 % of its health in stagger; loot animals:summit_stone 35 % (certain by kill 3), animals:borkon_horn 60 % (certain by kill 2), animals:height_fleece 100 %, wool 100 %, raw_gold 100 %, bone 100 %; its young animals:borkon_kid (30 %, certain by kill 4).
 
+## Loot per hour
+
+Every kill priced in effort minutes (`crate::loot`, `vitals::loot`): its drops at their cheapest cost in the graph, against its time, which is finding one (1.5 min for a common animal, longer as its spawn chance is smaller, shared by a pack that comes at you together; 0.5 min for a mob at night), the fight at its home age (grade 4), 0.25 min to take what it leaves and 2 min to work each hide or fur (scraping, tanning, drying: `vitals::loot::PELT_MINUTES`, added to their price). A fair rate is about 1 EM a minute, within ±30 % (up to +50 % more for what fights back). Wild ones at level 0; a big one's breaks counted. Drops that kills give are priced from their cheapest kill (Planner 11-23, option A: its minutes shared among its drops by their old hand prices, `vitals::loot::KILL_DROPS`), so that kill pays 1 and the rest less: "poor" is only a poor way to spend time, "over" fails the check.
+
+| kill | age | role | find (min) | kills | fight (s) | drops | loot (EM) | minutes | EM a minute | band |
+|---|---|---|---|---|---|---|---|---|---|---|
+| brown_trout | Stone Age | prey | 3.7 | 1.0 | 0.3 | 1.0 animals:trout | 4.0 | 4.0 | 1.00 | ok |
+| pacu | Stone Age | prey | 3.7 | 1.0 | 0.5 | 1.5 animals:pacu | 4.0 | 4.0 | 1.00 | ok |
+| gastonia | Stone Age | tank | 1.5 | 1.0 | 25.3 | 9.5 animals:carcass, 3.0 animals:scute | 2.2 | 2.2 | 1.00 | ok |
+| pinacosaurus | Stone Age | tank | 1.5 | 1.0 | 25.3 | 9.5 animals:carcass, 3.0 animals:scute | 2.2 | 2.2 | 1.00 | ok |
+| zombie | Stone Age | hunter | 0.5 | 1.0 | 3.5 | 1.0 rotten_flesh | 0.81 | 0.8 | 1.00 | ok |
+| creeper | Stone Age | prey | 0.5 | 1.0 | 2.7 | 1.0 gunpowder | 0.80 | 0.8 | 1.00 | ok |
+| reindeer | Stone Age | grazer | 1.5 | 1.0 | 3.9 | 3.5 animals:venison, 2.5 fur | 6.7 | 6.8 | 0.98 | ok |
+| white_tailed_deer | Stone Age | prey | 1.5 | 1.0 | 2.7 | 3.5 animals:venison, 1.5 hide | 4.4 | 4.8 | 0.92 | ok |
+| mountain_hare | Stone Age | prey | 1.5 | 1.0 | 0.5 | 1.5 animals:hare, 1.0 fur | 3.4 | 3.8 | 0.91 | ok |
+| hare | Stone Age | prey | 1.5 | 1.0 | 0.5 | 1.5 animals:hare, 1.0 fur | 3.4 | 3.8 | 0.91 | ok |
+| arctic_fox | Stone Age | hunter | 1.5 | 2.5 | 0.6 | 1.5 animals:carcass, 1.5 fur | 3.5 | 3.9 | 0.90 | ok |
+| coyote | Stone Age | hunter | 1.5 | 2.5 | 3.5 | 1.5 animals:carcass, 1.5 fur | 3.5 | 3.9 | 0.89 | ok |
+| cedarosaurus | Stone Age | grazer | 3.7 | 1.0 | 65.9 | 16.5 animals:carcass, 5.0 hide | 13 | 15.1 | 0.85 | ok |
+| iguanodont | Stone Age | grazer | 1.5 | 1.0 | 65.9 | 12.5 animals:carcass, 2.0 animals:claw | 2.4 | 2.8 | 0.85 | ok |
+| red_fox | Stone Age | hunter | 1.5 | 2.5 | 0.7 | 1.5 animals:carcass, 1.0 fur | 2.4 | 2.9 | 0.83 | ok |
+| grey_wolf | Stone Age | hunter | 3.7 | 2.5 | 3.5 | 2.5 animals:carcass, 2.0 fur | 4.7 | 5.8 | 0.81 | ok |
+| red_deer | Stone Age | prey | 3.7 | 1.0 | 15.7 | 4.5 animals:venison, 2.0 hide | 5.8 | 8.3 | 0.71 | ok |
+| skeleton | Stone Age | hunter | 0.5 | 1.0 | 2.8 | 1.0 arrow, 1.0 bone | 0.52 | 0.8 | 0.66 | poor |
+| jaguar | Stone Age | apex | 3.7 | 1.0 | 5.0 | 3.5 animals:carcass, 2.5 fur | 5.9 | 9.1 | 0.65 | poor |
+| capybara | Stone Age | prey | 1.5 | 1.0 | 2.7 | 2.5 animals:carcass, 1.0 hide | 2.5 | 3.8 | 0.65 | poor |
+| spider | Stone Age | hunter | 0.5 | 1.0 | 2.8 | 1.0 string, 0.3 spider_eye | 0.40 | 0.8 | 0.50 | poor |
+| utahraptor | Stone Age | hunter | 7.5 | 2.5 | 17.2 | 5.5 animals:carcass, 1.0 animals:claw, 3.0 feather | 1.7 | 3.5 | 0.47 | poor |
+| crocodyliform | Stone Age | hunter | 3.7 | 1.0 | 20.2 | 4.5 animals:carcass, 2.0 animals:scute | 1.2 | 4.3 | 0.28 | poor |
+| protoceratops | Stone Age | grazer | 1.5 | 1.0 | 3.9 | 3.5 animals:carcass | 0.45 | 1.8 | 0.25 | poor |
+| citipati | Stone Age | grazer | 1.5 | 1.0 | 3.9 | 3.5 animals:carcass | 0.45 | 1.8 | 0.25 | poor |
+| dog | Stone Age | hunter | 1.5 | 2.5 | 0.6 | 1.5 animals:carcass | 0.19 | 0.9 | 0.22 | poor |
+| yacare_caiman | Stone Age | hunter | 1.5 | 1.0 | 3.5 | 2.5 animals:carcass | 0.32 | 1.8 | 0.18 | poor |
+| spectacled_caiman | Stone Age | hunter | 1.5 | 1.0 | 3.5 | 2.5 animals:carcass | 0.32 | 1.8 | 0.18 | poor |
+| psittacosaurus | Stone Age | grazer | 1.5 | 1.0 | 3.9 | 2.5 animals:carcass | 0.32 | 1.8 | 0.18 | poor |
+| cat | Stone Age | hunter | 1.5 | 1.0 | 0.7 | 1.5 animals:carcass | 0.19 | 1.8 | 0.11 | poor |
+| herring_gull | Stone Age | prey | 1.5 | 1.0 | 0.3 | 1.0 animals:carcass | 0.13 | 1.8 | 0.07 | poor |
+| turkey_vulture | Stone Age | prey | 1.5 | 1.0 | 0.4 | 1.0 animals:carcass | 0.13 | 1.8 | 0.07 | poor |
+| wyvern | Stone Age | apex | 50.0 | 1.0 | 85.7 | 13.5 animals:carcass, 1.5 animals:scute, 1.0 animals:claw | 2.6 | 51.7 | 0.05 | poor |
+| lungfish | Stone Age | prey | 3.7 | 1.0 | 0.5 | 1.5 animals:carcass | 0.19 | 4.0 | 0.05 | poor |
+| golden_eagle | Stone Age | hunter | 3.7 | 1.0 | 0.7 | 1.5 animals:carcass | 0.19 | 4.0 | 0.05 | poor |
+| raptor | Stone Age | hunter | 3.7 | 1.0 | 3.0 | 1.5 animals:carcass | 0.19 | 4.0 | 0.05 | poor |
+| osmolskae | Stone Age | hunter | 3.7 | 1.0 | 3.0 | 1.5 animals:carcass | 0.19 | 4.0 | 0.05 | poor |
+| raven | Stone Age | prey | 3.7 | 1.0 | 0.3 | 1.0 animals:carcass | 0.13 | 4.0 | 0.03 | poor |
+| great_horned_owl | Stone Age | hunter | 3.7 | 1.0 | 0.5 | 1.0 animals:carcass | 0.13 | 4.0 | 0.03 | poor |
+| snowy_owl | Stone Age | hunter | 3.7 | 1.0 | 0.5 | 1.0 animals:carcass | 0.13 | 4.0 | 0.03 | poor |
+| wood_mouse | Stone Age | prey | 1.5 | 1.0 | 0.1 | - | -0.00 | 1.8 | -0.00 | no loot |
+| field_vole | Stone Age | prey | 1.5 | 1.0 | 0.1 | - | -0.00 | 1.8 | -0.00 | no loot |
+| kryptobaatar | Stone Age | prey | 1.5 | 1.0 | 0.1 | - | -0.00 | 1.8 | -0.00 | no loot |
+| priscagama | Stone Age | prey | 1.5 | 1.0 | 0.1 | - | -0.00 | 1.8 | -0.00 | no loot |
+| house_sparrow | Stone Age | prey | 1.5 | 1.0 | 0.1 | - | -0.00 | 1.8 | -0.00 | no loot |
+| snow_bunting | Stone Age | prey | 1.5 | 1.0 | 0.1 | - | -0.00 | 1.8 | -0.00 | no loot |
+| savanna_hawk | Stone Age | hunter | 1.5 | 1.0 | 0.4 | - | -0.00 | 1.8 | -0.00 | no loot |
+| lycoptera | Stone Age | prey | 1.5 | 1.0 | 0.1 | - | -0.00 | 1.8 | -0.00 | no loot |
+| confuciusornis | Stone Age | prey | 1.5 | 1.0 | 0.3 | - | -0.00 | 1.8 | -0.00 | no loot |
+| gobipteryx | Stone Age | prey | 3.7 | 1.0 | 0.2 | - | -0.00 | 4.0 | -0.00 | no loot |
+
+What kills drop, priced from their cheapest kill; the weight is the old hand price (option B, to come back to):
+
+| drop | weight (old EM) | EM now | cheapest from |
+|---|---|---|---|
+| animals:carcass | 4.0 | 0.13 | gastonia |
+| animals:venison | 3.0 | 0.35 | reindeer |
+| animals:hare | 3.0 | 0.81 | mountain_hare |
+| animals:trout | 3.0 | 4.0 | brown_trout |
+| animals:pacu | 3.0 | 2.7 | pacu |
+| animals:claw | 10 | 0.41 | iguanodont |
+| animals:scute | 10 | 0.32 | gastonia |
+| hide | 2.0 | 2.1 | cedarosaurus |
+| fur | 2.0 | 2.2 | arctic_fox |
+| feather | 2.0 | 0.19 | utahraptor |
+| bone | 2.0 | 0.40 | skeleton |
+| arrow | 2.0 | 0.13 | skeleton |
+| gunpowder | 2.0 | 0.80 | creeper |
+| spider_eye | 2.0 | 0.96 | spider |
+| rotten_flesh | 2.0 | 0.81 | zombie |
+
 ## The perk web's prices
 
 A unit is +2 % to one family; a small node gives 1, a notable 3-4, a keystone nets 0. Inside a family bonuses add, between families they multiply. A family tops out at ×1.6 (30 units: one age); everything together (gear, web, a tame's bond, food) at ×2.5 (two ages). Families: melee damage, ranged damage, spell damage, defence, health, tame damage, taming speed, craft grade, gathering speed, mining speed, move speed, mana cost, stamina, slower hunger, cooking, harvest, riding speed, trade, smelting speed, machine speed. The nodes, skills and their checks: `mods/base/vitals/WEB_SHEET.md`.
@@ -294,20 +375,66 @@ Moving to the next age takes a key, one thing from each gate (materials and tool
 | Age of the Future | - | - | - | all of it |
 | Age of Stars | - | - | - | all of it |
 
+What each route costs from scratch (`graph::route_cost`): its items at their cheapest, plus every tool and station on the way once. Path parity: a route at most ×1.15 its age's cheapest. Own: without what every route of the age takes (its boss part), what tells the paths apart.
+
+| age | path | EM | × cheapest | own EM | tools and stations |
+|---|---|---|---|---|---|
+| Stone Age | tech | 48 | 1.01 | 2.9 | crafting_table, axe, sharp_flake |
+| Stone Age | beasts | 47 | 1.00 | 2.3 | crafting_table, axe, sharp_flake |
+| Stone Age | magic | 50 | 1.07 | 5.5 | sharp_flake |
+| Bronze Age | tech | 60 | 1.00 | 0.00 |  |
+| Bronze Age | beasts | 60 | 1.00 | 0.00 |  |
+| Bronze Age | magic | 60 | 1.00 | 0.00 |  |
+
+## The materials gate
+
+An age's key needs the age before's tools or stations (`graph::age_gates`): each material past the Stone Age has something of the age before on its cheapest way, or the age could be skipped. Known skips wait on a decision and don't fail the check.
+
+| material | age | through the age before | otherwise up to | skips |
+|---|---|---|---|---|
+| animals:mountain_offering | Bronze Age | base:pickaxe | Stone Age | - |
+| base:bronze_ingot | Bronze Age | base:pickaxe | Stone Age | - |
+| base:bucket | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:copper_ingot | Bronze Age | base:pickaxe | Stone Age | - |
+| base:diamond | Age of Steam | base:steel_ingot | Iron Age | - |
+| base:diamond_block | Age of Steam | base:steel_ingot | Iron Age | - |
+| base:gem_diamond | Age of Steam | base:steel_ingot | Iron Age | - |
+| base:gem_peridot | Iron Age | base:pallasite | Bronze Age | - |
+| base:gold_block | Bronze Age | base:pickaxe | Stone Age | - |
+| base:gold_ingot | Bronze Age | base:pickaxe | Stone Age | - |
+| base:iron_block | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:iron_ingot | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:lava_bucket | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:meteoric_iron | Bronze Age | base:pickaxe | Stone Age | - |
+| base:raw_copper | Bronze Age | base:pickaxe | Stone Age | - |
+| base:raw_gold | Bronze Age | base:pickaxe | Stone Age | - |
+| base:raw_iron | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:raw_tin | Bronze Age | base:pickaxe | Stone Age | - |
+| base:star_steel_ingot | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:star_steel_lump | Iron Age | - | Stone Age | known, by base:raw_iron |
+| base:steel_ingot | Iron Age | base:bricks | Bronze Age | - |
+| base:tin_ingot | Bronze Age | base:pickaxe | Stone Age | - |
+| base:unlearning_stone | Iron Age | base:pallasite | Bronze Age | - |
+| base:water_bucket | Iron Age | - | Stone Age | known, by base:raw_iron |
+
+Known skips:
+
+- base:raw_iron: iron ore breaks with a stone pickaxe and smelts in the Stone Age furnace; Ronald to choose A (a bronze pickaxe for iron ore) or B (a bloomery that takes bronze), Planner 11-23
+
 ## What exists, by age and path
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (549)
+### Stone Age (551)
 
-**tech** (45)
+**tech** (46)
 
 - material: gem_amber (2.0), gem_tektite (5.1)
-- tool: arrow (2.0), axe (0.48), bow (0.48), glider (7.8), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
+- tool: arrow (0.13), axe (0.48), bow (0.48), glider (8.2), hoe (0.70), knife (0.43), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
 - armour: boots (0.70), chestplate (0.70), helmet (0.70), leggings (0.70)
 - station: furnace (1.2)
 - building: slate_tiles (0.16)
-- part: part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_boot_shell (0.22), part_bowstring (0.22), part_chest_shell (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_helmet_shell (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_leg_shell (0.22), part_lining (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22), part_straps (0.22)
+- part: part_arrowhead (0.22), part_bar_guard (0.22), part_barbed_point (0.22), part_bearded_axe_head (0.22), part_boot_shell (0.22), part_bowstring (0.22), part_chest_shell (0.22), part_felling_axe_head (0.22), part_grip (0.22), part_haft (0.22), part_helmet_shell (0.22), part_hoe_blade (0.22), part_knife_blade (0.22), part_lashing (0.22), part_leaf_point (0.22), part_leg_shell (0.22), part_lining (0.22), part_long_blade (0.22), part_long_haft (0.22), part_pick_head (0.22), part_round_pommel (0.22), part_self_stave (0.22), part_shaft (0.22), part_short_blade (0.22), part_short_stave (0.22), part_shovel_blade (0.22), part_straight_blade (0.22), part_straps (0.22)
 
 **magic** (4)
 
@@ -319,21 +446,21 @@ Every named item and block, by its tag (`content::RULES`). EM is the cheapest wa
 **beasts** (45)
 
 - ground: animals:amber_ore (-), animals:termite_mound (0.30)
-- material: animals:claw (10), animals:scute (10)
-- beast: animals:amber (2.0), animals:amber_block (8.1), animals:brown_trout_egg (4.0), animals:carcass (4.0), animals:cedarosaurus_egg (4.0), animals:citipati_egg (4.0), animals:club (0.40), animals:confuciusornis_egg (4.0), animals:crocodyliform_egg (4.0), animals:gastonia_egg (4.0), animals:gobipteryx_egg (4.0), animals:golden_eagle_egg (4.0), animals:great_horned_owl_egg (4.0), animals:herring_gull_egg (4.0), animals:house_sparrow_egg (4.0), animals:iguanodont_egg (4.0), animals:kibble (0.62), animals:lungfish_egg (4.0), animals:lycoptera_egg (4.0), animals:nest (0.45), animals:pacu_egg (4.0), animals:pinacosaurus_egg (4.0), animals:priscagama_egg (4.0), animals:protoceratops_egg (4.0), animals:psittacosaurus_egg (4.0), animals:raptor_egg (4.0), animals:raven_egg (4.0), animals:savanna_hawk_egg (4.0), animals:sedative (1.2), animals:snow_bunting_egg (4.0), animals:snowy_owl_egg (4.0), animals:spectacled_caiman_egg (4.0), animals:tranquilizer_dart (1.0), animals:turkey_vulture_egg (4.0), animals:utahraptor_egg (4.0), animals:utahraptor_saddle (7.7), animals:velociraptor_osmolskae_egg (4.0), animals:wyvern_egg (4.0), animals:yacare_caiman_egg (4.0)
+- material: animals:claw (0.41), animals:scute (0.32)
+- beast: animals:amber (2.0), animals:amber_block (8.1), animals:brown_trout_egg (4.0), animals:carcass (0.13), animals:cedarosaurus_egg (4.0), animals:citipati_egg (4.0), animals:club (0.40), animals:confuciusornis_egg (4.0), animals:crocodyliform_egg (4.0), animals:gastonia_egg (4.0), animals:gobipteryx_egg (4.0), animals:golden_eagle_egg (4.0), animals:great_horned_owl_egg (4.0), animals:herring_gull_egg (4.0), animals:house_sparrow_egg (4.0), animals:iguanodont_egg (4.0), animals:kibble (0.62), animals:lungfish_egg (4.0), animals:lycoptera_egg (4.0), animals:nest (0.45), animals:pacu_egg (4.0), animals:pinacosaurus_egg (4.0), animals:priscagama_egg (4.0), animals:protoceratops_egg (4.0), animals:psittacosaurus_egg (4.0), animals:raptor_egg (4.0), animals:raven_egg (4.0), animals:savanna_hawk_egg (4.0), animals:sedative (0.73), animals:snow_bunting_egg (4.0), animals:snowy_owl_egg (4.0), animals:spectacled_caiman_egg (4.0), animals:tranquilizer_dart (0.31), animals:turkey_vulture_egg (4.0), animals:utahraptor_egg (4.0), animals:utahraptor_saddle (8.1), animals:velociraptor_osmolskae_egg (4.0), animals:wyvern_egg (4.0), animals:yacare_caiman_egg (4.0)
 - technical: animals:gateway (-), animals:termite_mound_upper (-)
 
-**shared** (455)
+**shared** (456)
 
 - ground: animals:red_sand (0.10), animals:red_sandstone (0.15), banded_clay (0.15), banded_clay_coal_ore (-), brain_coral_block (0.15), clay (0.10), coal_ore (-), coarse_dirt (0.10), cobblestone (0.15), coral_rubble (0.15), cream_sandstone (0.15), deep_leaf_litter (0.10), dirt (0.10), dried_mud (0.10), fallen_branch (-), glacier_ice (0.15), granite (0.15), grass (0.10), gravel (0.10), ice (0.15), impact_glass (0.10), lake_ice (0.15), leaf_litter (0.10), limestone (0.15), loose_flint (-), loose_rock (-), loose_tektite (-), moss_block (0.10), mossy_cobblestone (0.15), ochre_sandstone (0.15), podzol (0.10), porites_coral_block (0.15), red_sandstone (0.15), sand (0.10), sandstone (0.15), slate (0.15), snow (0.10), snow_layer (0.10), snowy_grass (0.10), staghorn_coral_block (0.15), suevite (0.15), weathered_limestone (0.15)
-- wood: animals:araucaria_leaves (0.10), animals:araucaria_log (0.30), animals:araucaria_sapling (0.10), animals:ginkgo_leaves (0.10), animals:ginkgo_log (0.30), animals:ginkgo_sapling (0.10), animals:rotten_log (0.30), animals:scale_conifer_leaves (0.10), animals:scale_conifer_log (0.30), animals:scale_conifer_sapling (0.10), animals:swamp_cypress_leaves (0.10), animals:swamp_cypress_log (0.30), animals:swamp_cypress_sapling (0.10), animals:tempskya_leaves (0.10), animals:tempskya_log (0.30), acacia_branch (0.20), acacia_leaves (0.10), acacia_log (0.30), acacia_planks (0.09), acuri_palm_leaves (0.10), acuri_palm_log (0.30), acuri_palm_planks (0.09), acuri_palm_sapling (0.10), andiroba_branch (0.20), andiroba_leaves (0.10), andiroba_log (0.30), andiroba_planks (0.09), andiroba_sapling (0.10), birch_branch (0.20), birch_leaves (0.10), birch_log (0.30), birch_log_hollow (0.31), birch_planks (0.09), birch_wood (0.31), brazil_nut_branch (0.20), brazil_nut_buttress (0.30), brazil_nut_leaves (0.10), brazil_nut_log (0.30), brazil_nut_planks (0.09), brazil_nut_sapling (0.10), cacao_leaves (0.10), cacao_log (0.30), cacao_planks (0.09), cacao_sapling (0.10), cherry_branch (0.20), cherry_leaves (0.10), cherry_log (0.30), cherry_planks (0.09), cherry_sapling (0.10), creosote_leaves (0.10), dogwood_branch (0.20), dogwood_leaves (0.10), dogwood_log (0.30), ipe_branch (0.20), ipe_leaves (0.10), ipe_log (0.30), ipe_planks (0.09), ipe_sapling (0.10), juniper_leaves (0.10), matamata_branch (0.20), matamata_leaves (0.10), matamata_log (0.30), matamata_planks (0.09), matamata_sapling (0.10), mesquite_branch (0.20), mesquite_leaves (0.10), mesquite_log (0.30), mesquite_planks (0.09), mesquite_sapling (0.10), moriche_palm_leaves (0.10), moriche_palm_log (0.30), moriche_palm_planks (0.09), moriche_palm_sapling (0.10), mossy_sequoia_log (0.30), oak_branch (0.20), oak_leaves (0.10), oak_log (0.30), oak_log_hollow (0.31), oak_planks (0.09), oak_wood (0.31), sapling (0.10), sequoia_leaves (0.10), sequoia_log (0.30), sequoia_planks (0.09), sequoia_sapling (0.10), spruce_leaves (0.10), spruce_log (0.30), spruce_log_hollow (0.31), spruce_planks (0.09), spruce_wood (0.31), stripped_acacia_log (0.30), stripped_acuri_palm_log (0.30), stripped_andiroba_log (0.30), stripped_birch_log (0.30), stripped_brazil_nut_log (0.30), stripped_cacao_log (0.30), stripped_cherry_log (0.30), stripped_dogwood_log (0.30), stripped_ipe_log (0.30), stripped_matamata_log (0.30), stripped_mesquite_log (0.30), stripped_moriche_palm_log (0.30), stripped_oak_log (0.30), stripped_sequoia_log (0.30), stripped_spruce_log (0.30), willow_leaves (0.10)
+- wood: animals:araucaria_leaves (0.10), animals:araucaria_log (0.30), animals:araucaria_sapling (0.10), animals:ginkgo_leaves (0.10), animals:ginkgo_log (0.30), animals:ginkgo_sapling (0.10), animals:rotten_log (0.30), animals:scale_conifer_leaves (0.10), animals:scale_conifer_log (0.30), animals:scale_conifer_sapling (0.10), animals:swamp_cypress_leaves (0.10), animals:swamp_cypress_log (0.30), animals:swamp_cypress_sapling (0.10), animals:tempskya_leaves (0.10), animals:tempskya_log (0.30), acacia_branch (0.20), acacia_leaves (0.10), acacia_log (0.30), acacia_planks (0.09), acuri_palm_leaves (0.10), acuri_palm_log (0.30), acuri_palm_planks (0.09), acuri_palm_sapling (0.10), andiroba_branch (0.20), andiroba_leaves (0.10), andiroba_log (0.30), andiroba_planks (0.09), andiroba_sapling (0.10), birch_branch (0.20), birch_leaves (0.10), birch_log (0.30), birch_log_hollow (0.31), birch_planks (0.09), birch_wood (0.31), brazil_nut_branch (0.20), brazil_nut_buttress (0.30), brazil_nut_leaves (0.10), brazil_nut_log (0.30), brazil_nut_planks (0.09), brazil_nut_sapling (0.10), bush_leaves (0.10), cacao_leaves (0.10), cacao_log (0.30), cacao_planks (0.09), cacao_sapling (0.10), cherry_branch (0.20), cherry_leaves (0.10), cherry_log (0.30), cherry_planks (0.09), cherry_sapling (0.10), creosote_leaves (0.10), dogwood_branch (0.20), dogwood_leaves (0.10), dogwood_log (0.30), ipe_branch (0.20), ipe_leaves (0.10), ipe_log (0.30), ipe_planks (0.09), ipe_sapling (0.10), juniper_leaves (0.10), matamata_branch (0.20), matamata_leaves (0.10), matamata_log (0.30), matamata_planks (0.09), matamata_sapling (0.10), mesquite_branch (0.20), mesquite_leaves (0.10), mesquite_log (0.30), mesquite_planks (0.09), mesquite_sapling (0.10), moriche_palm_leaves (0.10), moriche_palm_log (0.30), moriche_palm_planks (0.09), moriche_palm_sapling (0.10), mossy_sequoia_log (0.30), oak_branch (0.20), oak_leaves (0.10), oak_log (0.30), oak_log_hollow (0.31), oak_planks (0.09), oak_wood (0.31), sapling (0.10), sequoia_leaves (0.10), sequoia_log (0.30), sequoia_planks (0.09), sequoia_sapling (0.10), spruce_leaves (0.10), spruce_log (0.30), spruce_log_hollow (0.31), spruce_planks (0.09), spruce_wood (0.31), stripped_acacia_log (0.30), stripped_acuri_palm_log (0.30), stripped_andiroba_log (0.30), stripped_birch_log (0.30), stripped_brazil_nut_log (0.30), stripped_cacao_log (0.30), stripped_cherry_log (0.30), stripped_dogwood_log (0.30), stripped_ipe_log (0.30), stripped_matamata_log (0.30), stripped_mesquite_log (0.30), stripped_moriche_palm_log (0.30), stripped_oak_log (0.30), stripped_sequoia_log (0.30), stripped_spruce_log (0.30), willow_leaves (0.10)
 - plant: animals:cycad (0.10), animals:fern (0.10), animals:flowering_shrub (0.10), animals:horsetail (0.10), animals:water_lily (0.10), alligator_flag (0.10), alpenrose (0.10), alpine_aster (0.10), arctic_coltsfoot (0.10), arctic_poppy (0.10), banana (0.10), beach_plum_bush (0.10), bellflower (0.10), berry_bush (0.10), black_eyed_susan (0.10), blazing_star (0.10), bluegrass (-), bracket_fungus (0.10), bramble_bush (0.10), brittlebush (0.10), bromeliad (0.10), bunchberry (0.10), bush_stem (-), butterfly_milkweed (0.10), cattail (0.10), chanterelle (0.10), chanterelle_mushroom (-), cloudberry_bush (0.10), clover (0.10), cottongrass (0.10), crowberry_bush (0.10), dandelion (0.10), dead_bush (0.10), desert_marigold (0.10), dryads_saddle_mushroom (-), dune_grass (0.10), dung_pat (0.10), dwarf_birch (0.10), edelweiss (0.10), elkhorn_coral (0.10), fern (0.10), finger_coral (0.10), fireweed (0.10), foxfire (0.10), foxglove (0.10), gentian (0.10), globeflower (0.10), globemallow (0.10), glow_mycena (0.10), goblins_gold (0.10), gold_poppy (0.10), hazel_bush (0.10), heliconia (0.10), honey_fungus (0.10), horned_poppy (0.10), hottentot_fig (0.10), huckleberry_bush (0.10), inula (-), labrador_tea (0.10), lavender (-), leadplant (0.10), lesser_celandine (0.10), liana (0.10), lily_of_the_valley (0.10), lily_pad (0.10), lingonberry_bush (0.10), lousewort (0.10), lungwort (0.10), lupine (0.10), may_lily (0.10), morning_glory (0.10), moss (-), ocotillo (0.10), pencil_flower (0.10), philodendron (0.10), porcini (0.10), porcini_mushroom (-), prickly_pear (0.10), prickly_rose (0.10), purple_coneflower (0.10), pygmy_buttercup (0.10), raspberry_leaves (-), reed (0.10), reindeer_lichen (0.10), rose (0.10), saxifrage (0.10), sea_daffodil (0.10), sea_fan (0.10), sea_holly (0.10), sea_rocket (0.10), sea_rod (0.10), seagrass (0.10), sedge (0.10), senna (0.10), sensitive_plant (0.10), short_grass (-), snowberry_leaves (-), staghorn_coral (0.10), sweet_woodruff (0.10), sword_fern (0.10), tall_grass (0.10), tall_grass_double (0.10), tall_tallgrass (-), toadstool_mushroom (-), tulip_orange (-), tulip_pink (-), tulip_purple (-), tulip_red (-), tulip_white (-), tulip_yellow (-), turtle_grass (0.10), twinflower (0.10), verbascum (-), water_hyacinth (0.10), water_primrose (0.10), wild_sunflower (0.10), wood_anemone (0.10), wood_cranesbill (0.10)
 - crop: barley (0.20), barley_seeds (0.20), bean_seeds (0.20), beans (0.20), beetroot (0.20), beetroots (0.20), cactus (0.20), carrot (0.20), carrots (0.20), cassava (0.20), chia (0.20), chia_seeds (0.20), corn (0.20), maize (0.20), maize_seeds (0.20), melon (0.20), millet (0.20), millet_seeds (0.20), potato (0.20), potatoes (0.20), pumpkin (0.20), rice (0.20), rice_seeds (0.20), rye (0.20), rye_seeds (0.20), sorghum (0.20), sorghum_seeds (0.20), sugar_cane (0.20), tepary_beans (0.20), wheat (0.20), wheat_seeds (0.20), wild_rice (0.20)
-- food: animals:araucaria_cone (0.20), animals:cooked_hare (3.2), animals:cooked_pacu (3.2), animals:cooked_trout (3.2), animals:cooked_venison (3.2), animals:cycad_seed (0.20), animals:ginkgo_seed (0.20), animals:hare (3.0), animals:pacu (3.0), animals:trout (3.0), animals:venison (3.0), acorn (0.20), acuri_nut (0.20), andiroba_seed (0.20), apple (0.20), apple_pie (2.7), baked_potato (0.37), bananas (0.20), beach_plums (0.20), beef (3.0), berries (0.20), brazil_nut (0.20), bread (0.65), cacao_beans (0.25), cacao_pod (0.20), cattail_root (0.20), cherry (0.20), chicken (3.0), cloudberries (0.20), cooked_beef (3.2), cooked_chicken (3.2), cooked_dryads_saddle (-), cooked_egg (2.2), cooked_mutton (3.2), cooked_porkchop (3.2), cooked_rice (0.37), cooked_wild_rice (0.37), crowberries (0.20), dried_apple (0.25), dried_berries (0.25), dried_meat (3.0), dryads_saddle (-), hazelnut (0.20), huckleberries (0.20), ipe_seed (0.20), kelp (0.20), lingonberries (0.20), matamata_fruit (0.20), melon_seeds (0.03), melon_slice (0.01), mesquite_pod (0.20), moriche_fruit (0.20), mushroom_brown (0.20), mushroom_red (0.20), mutton (3.0), pine_nut (0.20), porkchop (3.0), prickly_pear_fruit (0.20), pumpkin_seeds (0.03), pumpkin_slice (0.01), raspberries (0.20), raspberry (-), roasted_cacao (0.42), roasted_corn (0.37), rose_hip (0.20), sequoia_cone (0.20), smoked_meat (3.2), snowberry (-), sunflower_seeds (0.20), toadstool (-)
-- material: animals:forest_offering (0.75), animals:warden_antler (15), animals:warden_bark (15), bandage (0.14), bone (2.0), book (3.2), bowl (0.08), clay_ball (-), cloth (0.30), coal (0.33), coal_block (3.0), compost (0.45), dung (2.0), egg (2.0), feather (2.0), flint (0.20), fur (2.0), gunpowder (2.0), hide (2.0), leather (2.5), oak_bark (0.08), paper (0.22), plant_fibre (0.02), rock (0.10), rotten_flesh (2.0), sharp_flake (0.25), sole_leather (2.2), spider_eye (2.0), stick (0.05), string (0.08), sugar (0.25), tektite (5.0)
-- clothing: fur_boots (4.1), fur_coat (8.2), fur_hat (4.1), fur_robe (10), fur_trousers (6.2), hide_boots (4.1), hide_coat (8.2), hide_hat (4.1), hide_trousers (6.2), linen_boots (0.73), linen_coat (1.4), linen_hat (0.73), linen_trousers (1.1), rain_cape (13), wool_boots (0.90), wool_cloak (1.3), wool_coat (1.8), wool_hat (0.90), wool_trousers (1.4)
-- station: animals:drenkaun_altar (1.9), bow_drill (0.23), campfire_laid (0.75), charcoal_clamp (1.1), compost_bin (0.66), cooking_pot (0.75), drying_rack (0.30), fire_bed (0.22), hand_drill (0.15), stew (3.4), tanning_frame (0.58), tanning_pit (0.66)
-- building: bed (1.5), bookshelf (10), chest (0.75), crafting_table (0.40), hay_bale (1.9), ladder (0.13), oak_door (0.19), wool (0.38)
+- food: animals:araucaria_cone (0.20), animals:cooked_hare (0.98), animals:cooked_pacu (2.8), animals:cooked_trout (4.2), animals:cooked_venison (0.52), animals:cycad_seed (0.20), animals:ginkgo_seed (0.20), animals:hare (0.81), animals:pacu (2.7), animals:trout (4.0), animals:venison (0.35), acorn (0.20), acuri_nut (0.20), andiroba_seed (0.20), apple (0.20), apple_pie (2.7), baked_potato (0.37), bananas (0.20), beach_plums (0.20), beef (3.0), berries (0.20), brazil_nut (0.20), bread (0.65), cacao_beans (0.25), cacao_pod (0.20), cattail_root (0.20), cherry (0.20), chicken (3.0), cloudberries (0.20), cooked_beef (3.2), cooked_chicken (3.2), cooked_dryads_saddle (-), cooked_egg (2.2), cooked_mutton (3.2), cooked_porkchop (3.2), cooked_rice (0.37), cooked_wild_rice (0.37), crowberries (0.20), dried_apple (0.25), dried_berries (0.25), dried_meat (0.40), dryads_saddle (-), hazelnut (0.20), huckleberries (0.20), ipe_seed (0.20), kelp (0.20), lingonberries (0.20), matamata_fruit (0.20), melon_seeds (0.03), melon_slice (0.01), mesquite_pod (0.20), moriche_fruit (0.20), mushroom_brown (0.20), mushroom_red (0.20), mutton (3.0), pine_nut (0.20), porkchop (3.0), prickly_pear_fruit (0.20), pumpkin_seeds (0.03), pumpkin_slice (0.01), raspberries (0.20), raspberry (-), roasted_cacao (0.42), roasted_corn (0.37), rose_hip (0.20), sequoia_cone (0.20), smoked_meat (0.52), snowberry (-), sunflower_seeds (0.20), toadstool (-)
+- material: animals:forest_offering (0.75), animals:warden_antler (15), animals:warden_bark (15), bandage (0.14), bone (0.40), book (3.3), bowl (0.08), clay_ball (-), cloth (0.30), coal (0.33), coal_block (3.0), compost (0.45), dung (2.0), egg (2.0), feather (0.19), flint (0.20), fur (2.2), gunpowder (0.80), hide (2.1), leather (2.6), oak_bark (0.08), paper (0.22), plant_fibre (0.02), rock (0.10), rotten_flesh (0.81), sharp_flake (0.25), sole_leather (2.4), spider_eye (0.96), stick (0.05), string (0.08), sugar (0.25), tektite (5.0)
+- clothing: fur_boots (4.5), fur_coat (9.0), fur_hat (4.5), fur_robe (11), fur_trousers (6.8), hide_boots (4.4), hide_coat (8.8), hide_hat (4.4), hide_trousers (6.6), linen_boots (0.73), linen_coat (1.4), linen_hat (0.73), linen_trousers (1.1), rain_cape (13), wool_boots (0.90), wool_cloak (1.3), wool_coat (1.8), wool_hat (0.90), wool_trousers (1.4)
+- station: animals:drenkaun_altar (1.9), bow_drill (0.23), campfire_laid (0.75), charcoal_clamp (1.1), compost_bin (0.66), cooking_pot (0.75), drying_rack (0.30), fire_bed (0.22), hand_drill (0.15), stew (0.80), tanning_frame (0.58), tanning_pit (0.66)
+- building: bed (1.5), bookshelf (11), chest (0.75), crafting_table (0.40), hay_bale (1.9), ladder (0.13), oak_door (0.19), wool (0.38)
 - light: torch (0.11)
 - part: animals:warden_heartseed (45)
 - technical: campfire (-), farmland (-), grazed_grass (-), lava (-), maize_top (-), melon_stem (-), millet_top (-), paddy_rice (-), pumpkin_stem (-), sorghum_top (-), tombstone (-), water (-), packages:unknown (-), portals:portal (-)
@@ -358,7 +485,7 @@ Notes:
 - base:helmet, base:chestplate, base:leggings, base:boots: built from a shell, fastening and lining: its shell sets its real age; a leather-look shell (leather, rawhide, bone)
 - base:part_*: a part's material sets its real age (`MATERIALS`)
 - base:gem_tektite, base:gem_amber: cut gems: a boost in a tool's, weapon's or armour's socket
-- base:arrow: dropped by skeletons; no recipe yet
+- base:arrow: dropped by skeletons, or fletched from an arrowhead part, a stick and a feather (its head's material its age)
 - base:furnace: the Stone Age key's infrastructure: what it makes is the Bronze Age's
 - base:cooking_pot, base:stew: a clay pot (Ronald, 11-07: "move them to fit")
 - animals:claw, animals:scute: a large animal's stagger breaks (animals_core::parts): a fight with a Utahraptor or an ankylosaur
@@ -422,11 +549,11 @@ Notes:
 
 **beasts** (1)
 
-- beast: animals:wyvern_saddle (14)
+- beast: animals:wyvern_saddle (15)
 
 **shared** (3)
 
-- food: salt (3.9), salted_meat (6.9)
+- food: salt (3.9), salted_meat (4.3)
 - tool: animals:spyglass (2.6)
 
 Notes:

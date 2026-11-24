@@ -136,6 +136,8 @@ const RECIPES_LIST: &[Recipe] = &[
     Recipe { out: "base:coal", n: 1.0, ins: &[("#logs", 1.0)], at: Station("base:charcoal_clamp"), secs: 2.0 },
     // parts from the recipe book (parts.rs): any part, of any material its shape takes
     c("base:part_*", 1.0, &[("#part_material", 2.0)], Table),
+    // Four arrows from a head, a stick and a feather at the assembly row (`parts::fletched`).
+    c("base:arrow", 4.0, &[("base:part_arrowhead", 1.0), ("#stick", 1.0), ("base:feather", 1.0)], Table),
     // tools built from parts (the assembly)
     c("base:hoe", 1.0, &[("base:part_hoe_blade", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
     c("base:spear", 1.0, &[("base:part_leaf_point", 1.0), ("base:part_shaft", 1.0), ("base:part_lashing", 1.0)], Table),
@@ -569,6 +571,7 @@ pub fn solve() -> Solved {
     let ids = content::universe();
     let mut g = Solved { ids: ids.clone(), cost: HashMap::new(), by: HashMap::new() };
     let all = recipes();
+    let kill_prices = crate::loot::prices();
     let outs: Vec<Vec<String>> = all
         .iter()
         .map(|r| members(&ids, r.out).into_iter().cloned().collect())
@@ -589,6 +592,11 @@ pub fn solve() -> Solved {
             match content::rule(id).map(|r| r.get) {
                 Some(Get::World(needs, em)) if g.can(needs) => relax(&mut g, id, em, None),
                 Some(Get::Drop(em)) => relax(&mut g, id, em, None),
+                Some(Get::Kill) => {
+                    if let Some(&em) = kill_prices.get(id.as_str()) {
+                        relax(&mut g, id, em, None)
+                    }
+                }
                 _ => {}
             }
         }
@@ -733,6 +741,196 @@ pub fn keys(g: &Solved) -> Vec<String> {
 }
 
 /// The routes each age's key has, by path, for the sheet: `None` where a path has none yet.
+/// The cheapest thing that meets `needs` (`Needs::Hand`: none).
+fn tool_for(g: &Solved, needs: Needs) -> Option<&'static str> {
+    match needs {
+        Needs::Hand => None,
+        n => tools_for(n).filter(|t| g.reachable(t)).min_by(|a, b| {
+            g.cost_of(a)
+                .unwrap_or(f32::MAX)
+                .total_cmp(&g.cost_of(b).unwrap_or(f32::MAX))
+        }),
+    }
+}
+
+/// The cheapest id a name (an id or a `#group`) stands for.
+fn cheapest_member(g: &Solved, name: &str) -> Option<String> {
+    members(&g.ids, name)
+        .into_iter()
+        .filter(|m| g.cost.contains_key(m.as_str()))
+        .min_by(|a, b| g.cost[a.as_str()].total_cmp(&g.cost[b.as_str()]))
+        .cloned()
+}
+
+/// What a route's `items` cost together, from scratch: each item at its cheapest cost (what it
+/// uses up), plus each tool and station needed anywhere on the way there once (kept, not used up),
+/// and those tools and stations.
+pub fn route_cost(g: &Solved, items: &[&str]) -> (Em, Vec<String>) {
+    let (_, kept) = route_walk(g, items);
+    let used: Em = items.iter().filter_map(|i| g.cost_of(i)).sum();
+    let tools: Em = kept.iter().filter_map(|t| g.cost_of(t)).sum();
+    (used + tools, kept)
+}
+
+/// Everything on the cheapest way to `items` (what's used up, `items` included) and the tools and
+/// stations kept on the way, each once.
+pub fn route_walk(g: &Solved, items: &[&str]) -> (Vec<String>, Vec<String>) {
+    let all = recipes();
+    let mut seen: Vec<String> = Vec::new();
+    let mut kept: Vec<String> = Vec::new();
+    let mut todo: Vec<String> = items.iter().map(|s| s.to_string()).collect();
+    while let Some(id) = todo.pop() {
+        if seen.contains(&id) {
+            continue;
+        }
+        seen.push(id.clone());
+        let mut needs_tool = |t: Option<&str>, todo: &mut Vec<String>| {
+            if let Some(t) = t
+                && !items.contains(&t)
+                && !kept.iter().any(|k| k == t)
+            {
+                kept.push(t.to_string());
+                todo.push(t.to_string());
+            }
+        };
+        if let Some(&i) = g.by.get(&id) {
+            let r = all[i];
+            let station =
+                r.at.stations()
+                    .into_iter()
+                    .filter(|s| g.reachable(s))
+                    .min_by(|a, b| {
+                        g.cost_of(a)
+                            .unwrap_or(f32::MAX)
+                            .total_cmp(&g.cost_of(b).unwrap_or(f32::MAX))
+                    });
+            needs_tool(station, &mut todo);
+            if let At::Break(n) = r.at {
+                needs_tool(tool_for(g, n), &mut todo);
+            }
+            for &(name, _) in r.ins {
+                if let Some(m) = cheapest_member(g, name) {
+                    todo.push(m);
+                }
+            }
+        } else if let Some(Get::World(n, _)) = content::rule(&id).map(|r| r.get) {
+            needs_tool(tool_for(g, n), &mut todo);
+        }
+    }
+    (seen, kept)
+}
+
+/// Each declared route of each key with its cost (`route_cost`), and how far it is over the cheapest
+/// route of its age (1: the cheapest).
+pub fn parity(g: &Solved) -> Vec<(Age, Path, Em, f32)> {
+    let mut out = Vec::new();
+    for k in KEYS {
+        let costs: Vec<(Path, Em)> = k
+            .routes
+            .iter()
+            .map(|(p, items)| (*p, route_cost(g, items).0))
+            .collect();
+        let low = costs.iter().map(|c| c.1).fold(f32::MAX, f32::min).max(1e-6);
+        out.extend(costs.into_iter().map(|(p, em)| (k.age, p, em, em / low)));
+    }
+    out
+}
+
+/// Path parity (`reports/Balance model.md`, 5.3): each age's key by each route costs at most
+/// `vitals::curve::PARITY` more than its cheapest route.
+pub fn path_parity(g: &Solved) -> Vec<String> {
+    parity(g)
+        .into_iter()
+        .filter(|&(_, _, _, over)| over > 1.0 + vitals::curve::PARITY)
+        .map(|(a, p, em, over)| {
+            format!(
+                "{}'s key by the {} route costs {em:.0} EM, ×{over:.2} its cheapest route (at most ×{:.2})",
+                a.name(),
+                p.name(),
+                1.0 + vitals::curve::PARITY
+            )
+        })
+        .collect()
+}
+
+/// Gate skips waiting on a decision, by root: a material whose cheapest way goes through one of
+/// these (or is one) is listed but doesn't fail the check. Each goes once its fix is in.
+pub const KNOWN_SKIPS: &[(&str, &str)] = &[(
+    "base:raw_iron",
+    "iron ore breaks with a stone pickaxe and smelts in the Stone Age furnace; Ronald to choose A (a bronze pickaxe for iron ore) or B (a bloomery that takes bronze), Planner 11-23",
+)];
+
+/// A material of tier `tier` and how it stands at the gate (`age_gates`).
+pub struct Gate {
+    pub id: String,
+    pub tier: u8,
+    /// The first thing of the age before on its cheapest way, if any.
+    pub through: Option<String>,
+    /// The highest tier below its own on that way (none: only its own age's things).
+    pub top: Option<u8>,
+    /// The known skip it waits on, if it skips the age before.
+    pub known: Option<&'static str>,
+}
+
+/// Every material past the Stone Age had in the game (made or gathered, not a creature's drop: a
+/// boss is its own gate) and whether its cheapest way goes through the age before.
+pub fn gates(g: &Solved) -> Vec<Gate> {
+    let mut out = Vec::new();
+    for id in &g.ids {
+        let Some(r) = content::rule(id) else { continue };
+        if r.tier == 0 || r.kind != content::Kind::Material || !matches!(r.get, Get::Made | Get::World(..)) || !g.reachable(id) {
+            continue;
+        }
+        let (seen, _) = route_walk(g, &[id.as_str()]);
+        let on: Vec<(&String, u8)> = seen
+            .iter()
+            .filter(|x| *x != id)
+            .filter_map(|x| Some((x, content::tier(x)?)))
+            .collect();
+        let through = on
+            .iter()
+            .find(|(_, t)| *t + 1 == r.tier)
+            .map(|(x, _)| x.to_string());
+        let top = on.iter().map(|(_, t)| *t).filter(|t| *t < r.tier).max();
+        let known = through.is_none().then(|| {
+            KNOWN_SKIPS
+                .iter()
+                .find(|(root, _)| root == id || seen.iter().any(|x| x == root))
+                .map(|k| k.0)
+        });
+        out.push(Gate { id: id.clone(), tier: r.tier, through, top, known: known.flatten() });
+    }
+    out
+}
+
+/// The materials gate (`notes/PROGRESSION.md`, "How an age is gated"): each age's materials need
+/// something of the age before on their cheapest way (its tools, stations or materials), so no age
+/// can be skipped. Skips waiting on a decision (`KNOWN_SKIPS`) are listed in the sheet; a known
+/// skip that no longer happens fails, to be taken off the list.
+pub fn age_gates(g: &Solved) -> Vec<String> {
+    let gates = gates(g);
+    let mut out: Vec<String> = gates
+        .iter()
+        .filter(|x| x.through.is_none() && x.known.is_none())
+        .map(|x| {
+            format!(
+                "{} (tier {}) skips the age before: its cheapest way has nothing of tier {}{}",
+                x.id,
+                x.tier,
+                x.tier - 1,
+                x.top
+                    .map_or(String::new(), |t| format!(", only up to tier {t}"))
+            )
+        })
+        .collect();
+    for (root, _) in KNOWN_SKIPS {
+        if !gates.iter().any(|x| x.known == Some(*root)) {
+            out.push(format!("{root} is a known skip, but nothing skips through it now: take it off `graph::KNOWN_SKIPS`"));
+        }
+    }
+    out
+}
+
 pub fn routes(age: Age) -> Vec<(Path, Option<&'static [&'static str]>)> {
     let key = KEYS.iter().find(|k| k.age == age);
     ROUTES
