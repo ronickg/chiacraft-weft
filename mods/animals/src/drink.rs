@@ -85,6 +85,13 @@ pub fn thirst(w: &World, id: u64, a: &Animal, st: &EntityState, rate: f32, secs:
     }
 }
 
+/// Whether open water lies beside `st`'s feet (the eight blocks round it, level with its feet or a
+/// block down), so it can reach it with its mouth.
+fn beside_water(w: &World, st: &EntityState) -> bool {
+    let [x, y, z] = [st.pos.x, st.pos.y, st.pos.z].map(|v| v.floor() as i32);
+    (-1..=1).any(|dx| (-1..=1).any(|dz| (dx, dz) != (0, 0) && (-1..=0).any(|dy| open_water(w, [x + dx, y + dy, z + dz]))))
+}
+
 /// Whether the block at `pos` is open water to drink from: its surface, air above it.
 fn open_water(w: &World, pos: [i32; 3]) -> bool {
     crate::comfort::WATER.at(w, pos) && w.block([pos[0], pos[1] + 1, pos[2]]) == 0
@@ -323,7 +330,10 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         || spot.is_some_and(|p| {
             let (dx, dz) = (p[0] - st.pos.x, p[2] - st.pos.z);
             dx * dx + dz * dz <= 2.25 && (p[1] - st.pos.y).abs() <= 1.5
-        });
+        })
+        // On its way to water and beside some, any of it: it drinks there (graze5: five deer round
+        // a pool's last block, one 3 blocks off its shore spot and never on it, died parched).
+        || (spot.is_some() && beside_water(w, st));
     if there {
         // Head down at the water, lapping, while it drinks.
         crate::anim::hold(w, id, crate::anim::Act::Drink);
