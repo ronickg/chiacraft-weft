@@ -58,7 +58,8 @@ pub static LOOK_EXPOSURE_ABS: Config<f32> = Config::named("look_exposure_abs");
 /// The HDR world's warmth on sunlit foliage toward a leaf-top yellow: 0.7 as made, 0 none.
 pub static LOOK_SPLIT_WARM: Config<f32> = Config::named("look_split_warm");
 /// The HDR world's evening mist, Bliss's evening fog (the 18:00 warm veil): with the sun low in the
-/// west the mist lies densest at the low land, thinning with height. 0 as made, 1 all the way.
+/// west the mist lies densest at the low land, thinning with height. 0 as made, 1 all the way, up
+/// to 3 thicker.
 pub static LOOK_EVENING_MIST: Config<f32> = Config::named("look_evening_mist");
 /// The HDR world's bloom by day added on top, as Bliss's (+35% at the centre, +12% in the corners at
 /// noon): 0 mixed in as made, 1 all the way.
@@ -180,7 +181,7 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_SKY_HUE).float(0.0, 0.0, 1.0);
     r.config(&LOOK_EXPOSURE_ABS).float(0.0, 0.0, 1.0);
     r.config(&LOOK_SPLIT_WARM).float(0.7, 0.0, 1.0);
-    r.config(&LOOK_EVENING_MIST).float(0.0, 0.0, 1.0);
+    r.config(&LOOK_EVENING_MIST).float(0.0, 0.0, 3.0);
     r.config(&LOOK_BLOOM_ADD).float(0.0, 0.0, 1.0);
     r.config(&LOOK_CIRRUS_OFF).float(0.0, 0.0, 1.0);
     r.config(&LOOK_GLARE).float(1.0, 0.0, 2.0);

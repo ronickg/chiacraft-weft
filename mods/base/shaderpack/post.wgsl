@@ -415,7 +415,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     }
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
-        let air = clamp(max(rain_amount(), scene.weather.z), 0.0, 1.0);
+        let air = clamp(max(rain_amount(), air_mist()), 0.0, 1.0);
         // Bloomy fog (Bliss's): where mist covers the view (the mist volume's own opacity there,
         // `froxels`), it takes much more of the glow, so thick mist reads as soft light rather than
         // a grey wall, and its banks' noise melts.

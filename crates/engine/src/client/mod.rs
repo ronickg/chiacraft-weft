@@ -4493,13 +4493,13 @@ const FAR_TERRAIN_WAIT: u32 = 10;
 const FAR_DEPTH: f32 = 1200.0;
 
 /// The mist the pack's evening layer brings with it (chiacraft, `base:look_evening_mist`, 0 as made
-/// and then none): as much as `/air` 0.3 with the sun low in the west, as Bliss's evening fog has
+/// and then none): as much as `/air` 0.3 a step (up to 3) with the sun low in the west, as Bliss's evening fog has
 /// its own amount whatever the weather. Only what the shaders see (`Scene::weather`); the air's own
 /// mist, and play, are untouched. Without it the layer drew nothing on a clear evening (lsAD_mist).
 /// The same window as the pack's `evening_mist`.
 fn evening_mist_floor(sun: [f32; 4]) -> f32 {
     let Some(id) = crate::config::by_name("base:look_evening_mist") else { return 0.0 };
-    let k = (crate::config::get(id) as f32).clamp(0.0, 1.0);
+    let k = (crate::config::get(id) as f32).clamp(0.0, 3.0);
     if k <= 0.0 {
         return 0.0;
     }
