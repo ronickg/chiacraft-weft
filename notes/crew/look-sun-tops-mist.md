@@ -194,3 +194,14 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
   at start) and benches slow (lst_bb2_branch, lst_fin_branch: shadows 0.18 against 0.07, +0.5 ms);
   run each new tree once before its bench. Bench numbers by `gpu wait` (the engine's submit split),
   not the GPU parts' sum, which misses work.
+
+## The banks in a pass before TAA (banks-pass, 11-24)
+
+- The banks' march moved from the world's and sky's shaders (each fragment drawn) to post's
+  `fs_pre_taa`, the engine's new pass before TAA (only while `core:ground_map` is on), once per pixel
+  to the depth. Look (06 low, full size, lst_bp_warm_b against lst_fin_banks): water and leaves as
+  before, no halos at leaf edges, no doubled mist on the water; the far lake strip a little mistier
+  and warmer (the banks now over the volume's fog, not under it).
+- Warm benches, Bliss match, frame ms (banks on / off): vista branch 6.83 / 6.62, dev 9.32 / 6.54
+  (the banks +0.2 ms, were +2.8); low branch 9.81 / 7.86, dev 10.70 / 8.46 (+1.95, were +2.2: the
+  march near the eye with its shadow taps; effects 0.73 ms GPU, the rest untimed).
