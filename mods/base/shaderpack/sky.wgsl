@@ -576,7 +576,7 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     // were the default, PC shf2_rain).
     let misted = rain_amount() * (1.0 - smoothstep(0.02, 0.22, dir.y));
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
-    color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
+    color = display(fog_through_sky(rainbow_on(color, dir), dir * 220.0, 1.0));
     // In the HDR world the far ones thin out into the haze from about half the reach: handed over
     // to the sky's horizon colour at full cover, they stood as a flat grey belt above the horizon
     // where Bliss's far sky is open haze with a few far clouds (the stage 2 sheet, noon).
@@ -749,7 +749,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
         // A lightning flash glows inside the deck; its bolt hangs under the deck, in front of it.
         color += lightning_in_clouds(dir) * albedo + lightning_bolt(dir);
-        color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
+        color = display(fog_through_sky(rainbow_on(color, dir), dir * 220.0, 1.0));
     } else {
         color = mix(s.color.rgb * light / alpha_cloud, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
     }
@@ -1009,7 +1009,7 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         // The fog on the land hides the horizon and fades upward.
         // With `OPT_HORIZON_LIFT` the haze only lightens the sky, as Bliss's brightens to the horizon:
         // lit dimmer than the sky away from the sun, it drew a grey band above the land.
-        let hazed = fog_through(c, dir * 220.0, 1.0);
+        let hazed = fog_through_sky(c, dir * 220.0, 1.0);
         c = mix(hazed, max(hazed, c), clamp(fantasy_opt(OPT_HORIZON_LIFT), 0.0, 1.0));
         // A held torch's glow in the mist goes on over the sky (`haze_lit` gives it the land's).
         c += held_in_fog(dir * 48.0, 1.0);

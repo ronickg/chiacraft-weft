@@ -51,12 +51,31 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
   2.35 e^-6x, a broad tail 0.76 e^-1.19x (x = 1 - cos): about 12.5 / 3.4 / 1.7 at 0 / 14 / 30 deg
   before the cap.
 - haze_lit: with the banks on, no glow lobe and no mist grey over land (a second even wash).
-- Compare mode pins `core:bloom 0` (testkit compare.rs), so every sheet before lv10 c had no bloom,
+- Compare mode pins `core:bloom 0` (testkit compare.rs, now noted in its doc), so every sheet before lv10 c had no bloom,
   and the bloomy fog never ran; Bliss's refs have its bloom. The live script now says `bloom=1`.
 - lv10 c (bloom on), against lv9 k: fine detail 06 vista 13.0 (19 before, Bliss 5.7), 07 vista 13.9
   (19.4, Bliss 9.3), 06 low 5.8 (10.5, Bliss 6.6), 07 low 5.8 (10.7, Bliss 6.7). Low views match in
   fineness now; their darks are still light (p5 108 against Bliss's 66) and the near crowns of the vista read through.
-- Not done yet: sky pixels march the banks only 220 blocks (sky.wgsl), Bliss to the render distance.
+- Sky pixels walk the banks to `MIST_MARCH_FAR` (`fog_through_sky`), the rest of their fog to 220 as before.
+- Banks' sun light gold, not cream (`MIST_SEA_CREAM.x` 0.15), its peak toward the sun capped at 1.2
+  (was 3): at 3 the long low rays toward the sun went to a blown white blob, whose edge the bloom
+  spread into a ring. Lowering all their sun (0.4) instead turned the banks pink (the sky's dawn
+  light), not gold.
+- lv10 m against Bliss (`lv10/luma_spread_m.txt`): saturation 06 vista 0.47 (Bliss 0.48), 06 low
+  0.54 (0.51), 07 vista 0.32 (0.34), 07 low 0.36 (0.45); tones as before; 18:00 unchanged.
+
+### The ring round the low sun (open)
+
+- Not the tone curve: a hue-keeping curve and a hue-keeping clip changed the band by 1-2 levels.
+  Not the rainbow (needs rain), not the sun quad (ends about 10° out), not the banks (there with
+  them off).
+- It is the hue path out from the sun: ours goes cream-white (red less green 20, green less blue
+  28), then yellow (19, 63) at 15-25°, then the dawn sky's pink-orange (46, 47); the yellow next to
+  pink reads green, and the bloom spreads the cream core wider. Bliss stays yellow-gold right in to
+  the sun (24, 67) and grades out to tan, with no pink near the sun.
+- Making the wide glow gold made it worse (a white-yellow-orange-pink rainbow). Next to try: the
+  dawn sky near the sun (the `toward` term and the horizon's pink) taking the glow's hue, so the
+  path is gold to tan, as Bliss's.
 
 ## Open
 

@@ -264,7 +264,7 @@ const MIST_SEA_TAIL: vec2<f32> = vec2(0.76, 1.19);
 // forward peak may give (Bliss's sunlit tops are cream and brighter than the land; ours took the
 // dawn sun's orange and read as sand, and from inside the mist the uncapped peak blew the sky
 // round the sun out to a yellow ball: lv8).
-const MIST_SEA_CREAM: vec3<f32> = vec3(0.45, 1.8, 3.0);
+const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.8, 1.2);
 // Its light from the sky, brighter looking up through it (how much, how sharply), and its share (Bliss's
 // shaded hollows are a dark blue-grey; at the full sky's light ours read as pale frost: lv8).
 const MIST_SEA_SKY: vec3<f32> = vec3(5.0, 4.0, 0.45);
@@ -1783,12 +1783,21 @@ fn sun_reaches(rel: vec3<f32>) -> f32 {
 // the sun reaches its glow, so light shafts show where it comes through. Lit as if all in the open,
 // a rainforest's morning mist was a white wall between the trunks (Lighting's canopy checks, 11-04).
 fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    return fog_through_banks(c, rel, rel, sky);
+}
+// The sky's pixels (`sky.wgsl`): the mist banks walked out to `MIST_MARCH_FAR` as on the land, the
+// rest of the fog to `rel` as before. At 220 blocks the banks under the horizon ended short of the
+// land's, where Bliss's go to the render distance (Planner's read, point 6).
+fn fog_through_sky(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    return fog_through_banks(c, rel, normalize(rel) * MIST_MARCH_FAR, sky);
+}
+fn fog_through_banks(c: vec3<f32>, rel: vec3<f32>, bank_rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // No fog in a calm scene's air (`CALM`: `scene.weather.z` 0).
     if CALM || scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 {
         return c;
     }
     if scene.froxels.x > 0.5 {
-        let banked = bank_march(c, rel);
+        let banked = bank_march(c, bank_rel);
         // The banks' debug views show their march alone (`bank_march`).
         if look_debug() >= 3u && look_debug() <= 5u {
             return banked;
@@ -2669,6 +2678,15 @@ fn split_warm() -> f32 {
 // 1 where the picture's pixel is land, 0 sky or cloud (set by `hdr_light` before `finish_picture`).
 var<private> LAND_PIXEL: f32 = 1.0;
 
+// Bliss's chain of Hejl's 2015 fit (0.85 in, 1.75, white 3), output taken as the light itself
+// (`finish_picture`, `base:look_curve` 1).
+fn hejl_bliss(x: vec3<f32>) -> vec3<f32> {
+    let vb = vec4(x * 0.389 * 0.85, 3.0);
+    let ab = 1.75 * vb + vec4(0.05);
+    let fb = (vb * ab + vec4(0.004)) / (vb * (ab + vec4(0.55)) + vec4(0.0491)) - vec4(0.0821 - 0.000633604888);
+    return max(fb.rgb / fb.w, vec3(0.0));
+}
+
 fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     let v = vec4(c, white);
     let a = 1.425 * v + vec4(0.05);
@@ -2807,10 +2825,7 @@ fn finish_picture(c_in: vec3<f32>) -> vec3<f32> {
         // deeper darks, steeper mids, a gentler shoulder that keeps bright leaf tops' colour (ours
         // undid the fit's baked-in gamma, so its darks sat on the toe floor and its brights went
         // pale; Look's reading of Bliss's source, 11-06).
-        let vb = vec4(x * 0.389 * 0.85, 3.0);
-        let ab = 1.75 * vb + vec4(0.05);
-        let fb = (vb * ab + vec4(0.004)) / (vb * (ab + vec4(0.55)) + vec4(0.0491)) - vec4(0.0821 - 0.000633604888);
-        day_t = max(fb.rgb / fb.w, vec3(0.0));
+        day_t = hejl_bliss(x);
     }
     var t = mix(night_t, day_t, day);
     // The HDR world's white balance by day (`base:look_white`): warmer, less blue (our land read
