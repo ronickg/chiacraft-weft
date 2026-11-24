@@ -178,3 +178,19 @@ the sun disc only. Sheets: `~/Coding/chiacraft-archive/images/tester-2/2026-11-2
 - Bliss's large gold-white glow round the low sun, bleeding into the mist below: not in the sky
   (the land covers it); it wants the banks' or the land haze's light toward the sun, or the bloom.
 - Dawn clouds saturated yellow; 19:00 night curve; midday greens; horizon band.
+
+## Cost (11-24)
+
+- As made the branch matches dev once the banks' march is left out of the world shader while the
+  ground map is off (`GROUND_MAP_ON`, engine `set_ground_prelude`, 46b53eda9): lst_fin2_branch vista
+  GPU 3.90-4.02 / world 3.28-3.40 ms against lst_fin_dev 3.89-3.91 / 3.28-3.30; low 4.53-4.55 against
+  4.42-4.45 (in noise). Before it the branch was +0.14 ms GPU in the world pass (lst_am_nobanks proved it).
+- Bliss match: only the banks cost, about +3 ms frame at the 06 vista (lst_knobs_branch, one game:
+  9.5 on, 6.6 off, the rest 6.4; dev 6.2-6.5). Next: (B') an engine pass before TAA to march them once
+  per pixel instead of per fragment.
+- Turning the banks on or off recompiles the world shader: about 0.3 s warm; the first time on a cold
+  pipeline cache it took 119 s on the PC (as the first start of a new build does).
+- Benching on the PC: the first game on a new tree runs with a cold pipeline cache (a 79-174 s stall
+  at start) and benches slow (lst_bb2_branch, lst_fin_branch: shadows 0.18 against 0.07, +0.5 ms);
+  run each new tree once before its bench. Bench numbers by `gpu wait` (the engine's submit split),
+  not the GPU parts' sum, which misses work.
