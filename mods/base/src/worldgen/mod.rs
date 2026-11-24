@@ -399,7 +399,11 @@ pub fn register(r: &mut Registry) {
     // a forest's clearings; and where a forest stands thick (`STAND_TREES`), more in its stands, a
     // site per 3 x 3 cell. Stands and clearings follow one smooth noise (`stand`), so woods have
     // groves and glades instead of trees spread evenly.
+    // Every scatter here is `.impostor()`: distant terrain draws them itself (its crowns), so the
+    // saved cubes' untouched trees, shrubs and boulders aren't sent to it as built columns
+    // (`server::lod_tops`; untagged, a world's spawn sent some 1100).
     r.scatter(&TREE_SITES)
+        .impostor()
         .spacing(5)
         .reach(8)
         .ground("#plant_soil")
@@ -409,6 +413,7 @@ pub fn register(r: &mut Registry) {
         .thin_in(&STAND_TREES, stand_over(-CLEARING).and(cherry_grove().not()).not(), 4)
         .plan(tree);
     r.scatter(&GIANT_SITES)
+        .impostor()
         .spacing(24)
         .reach(12)
         // Giants rise higher than the default reach (Weft's 32 up).
@@ -417,6 +422,7 @@ pub fn register(r: &mut Registry) {
         .density(&GIANT_TREES)
         .plan(giant);
     r.scatter(&STAND_SITES)
+        .impostor()
         .spacing(3)
         .reach(8)
         .ground("#plant_soil")
@@ -427,6 +433,7 @@ pub fn register(r: &mut Registry) {
     // noise some 320 blocks across, about 1.8% of the ground), among the forest's trees; a little taller than the oaks, so
     // their spring blossom shows over the canopy.
     r.scatter(&CHERRY_SITES)
+        .impostor()
         .spacing(4)
         .reach(8)
         .ground("#plant_soil")
@@ -436,6 +443,7 @@ pub fn register(r: &mut Registry) {
     // Boulders where a biome has them (`BOULDERS`): a heap of stone two to five blocks across, half
     // sunk in the ground, mossy in the woods and the wet.
     r.scatter(&BOULDER_SITES)
+        .impostor()
         .spacing(12)
         .reach(3)
         .density(&BOULDERS)
@@ -443,6 +451,7 @@ pub fn register(r: &mut Registry) {
     // Shrubs where a biome has them (`SHRUBS`): a low clump of leaves per 4 x 4 cell, only in
     // thickets (a noise some 24 blocks across), so they stand in groups with open ground between.
     r.scatter(&SHRUB_SITES)
+        .impostor()
         .spacing(4)
         .reach(1)
         .density(&SHRUBS)
@@ -451,6 +460,7 @@ pub fn register(r: &mut Registry) {
     // Young trees where light comes in: in clearings and at the stands' edges, none deep in a
     // stand (`stand_over`).
     r.scatter(&YOUNG_SITES)
+        .impostor()
         .spacing(5)
         .reach(base_api::tree_recipes::UNDERSTORY_REACH)
         .ground("#plant_soil")
