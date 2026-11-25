@@ -318,6 +318,10 @@ wait 2
 chat /animalprof food 0.9
 chat /animalprof water 0.9
 chat /animalprof hunters 0.3
+chat /tp 1200 72 544
+chat /animal hurry
+wait 2
+chat /time set 18000
 chat /tp 1200 95 574
 wait 1
 chat /animalprof where 64

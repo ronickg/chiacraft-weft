@@ -107,6 +107,15 @@ there was no prey for them on the pad (run 3: their own pad, with hares and pacu
 
 Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_hunters_m-171045/r2_hunters_grid.jpg`.
 
+Run 3 (8fe0410c3, `r7_hunters_m-181008`, 649 s): every hunter but the utahraptors and the caimans killed and
+ate again: the jaguar (stalk, cover, a deer), a coyote (a hare; the other ate its share off the ground), both
+foxes (a vole and mice; the red fox first gave one up, gone), the raptor (three small prey), the osmolskae,
+and the crocodyliform (broke cover, a capybara). The utahraptor pack chased a psittacosaurus 60 s, gave up
+("too long") and began again: no kill this time (run 2: a kill shared three ways). The caimans had prey their
+size (hares, pacu) but didn't hunt: the yacare rested (caimans hunt by night, and at 29 % it wasn't driven)
+and the spectacled was young (its prey sizes go by its mass). Run 4: their pad at night, both grown first.
+Grid r3: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r7_hunters_m-181008/r7_hunters_grid.jpg`.
+
 ## Birds and fliers (cov_birds.txt)
 
 | Species | flies | lands | flocks | flees | hunts / scavenges | shot |

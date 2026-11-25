@@ -132,6 +132,10 @@ for i, g in enumerate(HUNTERS):
     x = i * 200
     s += pad(x, pond=2 if i >= 5 else 1, deep=2 if i >= 5 else 1) + spawns(x, g)
     s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.3"]
+    if g[0][0] == "yacare_caiman":
+        # Caimans hunt by night and rest by day unless starving (round 3: the yacare rested at noon),
+        # and a young one's prey are its own size (the spectacled was young): grown, at night.
+        s += [f"chat /tp {x} 72 {Z}", "chat /animal hurry", "wait 2", "chat /time set 18000"]
     s += watch(x, 8) + shot(x, f"cov_hunters_{i+1}_{g[0][0]}")
 write("hunters", s)
 
