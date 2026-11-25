@@ -231,24 +231,36 @@ fn fs_exposure(in: VOut) -> @location(0) vec4<f32> {
     let pass_ = passes[in.pass_index];
     var sum = 0.0;
     var weight = 0.0;
+    // The rods' mean, Bliss's (deferred.vsh, method): over the middle 70 % of the view, evenly, the
+    // geometric mean of its blue-weighed luma (0.07 0.22 0.71) in its units, each sample capped at
+    // 0.08 before the mean (so a few bright lamps or stars do not blind the rods).
+    var rod_sum = 0.0;
     for (var j = 0; j < 8; j++) {
         for (var i = 0; i < 8; i++) {
             let uv = (vec2(f32(i), f32(j)) + 0.5) / 8.0;
             let w = 1.0 - 0.7 * smoothstep(0.1, 0.75, length(uv - vec2(0.5)));
             sum += w * log(max(luma(bloom_tap(pass_.scene, uv)), 1e-5));
             weight += w;
+            let rod_px = dot(bloom_tap(pass_.scene, 0.5 + (uv - 0.5) * 0.7), vec3(0.07, 0.22, 0.71)) * BLISS_UNITS;
+            rod_sum += log(clamp(rod_px, 1e-6, 0.08));
         }
     }
     let now = sum / weight;
     var eased = now;
+    var rod = exp(rod_sum / 64.0);
     if pass_.spare == 0u {
-        let before = textureLoad(textures[pass_.low - 1u], vec2(0, 0), 0).r;
+        let last = textureLoad(textures[pass_.low - 1u], vec2(0, 0), 0);
+        let before = last.r;
         if before == before && abs(before) < 50.0 {
             let tau = select(2.5, 0.8, now > before);
             eased = mix(before, now, 1.0 - exp(-pass_.strength / tau));
         }
+        // Eased as Bliss's, 0.985 of last frame's a frame at 60 fps (1.1 s), in light, not its log.
+        if last.b == last.b && last.b > 0.0 {
+            rod = mix(last.b, rod, 1.0 - exp(-pass_.strength / 1.1));
+        }
     }
-    return vec4(eased, exp(eased), 0.0, 1.0);
+    return vec4(eased, exp(eased), clamp(rod, 0.00003051757, 65000.0), 1.0);
 }
 
 // How much brighter or darker the view is taken for how bright it is (`mean`, the exposure's luma):
@@ -436,9 +448,12 @@ fn chain_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     var col = max(c, vec3(0.0));
     var mean = EXPOSURE_REF;
     if pass_.exposure != 0u {
-        let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
-        if e == e && e > 0.0 {
-            mean = e;
+        let t = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0);
+        if t.g == t.g && t.g > 0.0 {
+            mean = t.g;
+        }
+        if t.b == t.b && t.b > 0.0 {
+            VIEW_ROD = t.b;
         }
     }
     VIEW_MEAN = mean;

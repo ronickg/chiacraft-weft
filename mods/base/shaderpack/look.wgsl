@@ -255,12 +255,12 @@ fn bliss_exposure(mean: f32) -> f32 {
     return 2.2 * log2(2.5 * 0.35 * BLISS_UNITS + 1.045) / log2(2.5 * max(mean, 1e-6) * BLISS_UNITS + 1.045);
 }
 // Bliss's Purkinje (composite11.fsh, method): with a dark view the dim pixels slide toward its
-// rods' blue-grey (0.4 0.7 1.0 x 5 of their luma), by its rod exposure from the view's mean;
-// `x` the exposed light (`hejl_bliss`'s input), `mean` the view's luma.
+// rods' blue-grey (0.4 0.7 1.0 x 5 of their luma), by its rod exposure from the rods' own mean
+// (`VIEW_ROD`, `fs_exposure`'s); `x` the exposed light (`hejl_bliss`'s input), `mean` the view's luma.
 fn bliss_purkinje(x: vec3<f32>, mean: f32) -> vec3<f32> {
     let lb = mean * BLISS_UNITS;
     let e = 0.18 / log2(2.5 * max(lb, 1e-6) + 1.045) * 0.62;
-    let rod_e = max(0.012 / log2(min(lb, 0.08) + 1.002) - 0.1, 0.0) * 1.2;
+    let rod_e = bliss_rod_exposure();
     let purk = clamp(e * e, 0.0, 1.0) * clamp(rod_e / (1.0 + rod_e), 0.0, 1.0);
     let col = x * 0.389;
     let lum = dot(col, vec3(0.15, 0.3, 0.55));
@@ -271,6 +271,13 @@ fn bliss_purkinje(x: vec3<f32>, mean: f32) -> vec3<f32> {
 // The view's mean luma for the chain (`hdr_light` sets it), the average sunlit view's without the
 // exposure pass.
 var<private> VIEW_MEAN: f32 = 0.35;
+// The rods' mean in Bliss's units (`fs_exposure`'s blue-weighed, capped mean; `hdr_light` sets it),
+// the cap (no rods) without the exposure pass.
+var<private> VIEW_ROD: f32 = 0.08;
+// Bliss's rod exposure from it (deferred.vsh): 0 for a view at the cap, about 3 by a dark night.
+fn bliss_rod_exposure() -> f32 {
+    return max(0.012 / log2(VIEW_ROD + 1.002) - 0.1, 0.0) * 1.2;
+}
 
 // ---- the physical sky (`base:look_sky_phys`), as Bliss's method: the air's own scattering ----
 // Single scattering through a round planet's air (Rayleigh, Mie, ozone; the usual sea-level
@@ -3489,6 +3496,15 @@ fn display(c: vec3<f32>) -> vec3<f32> {
 
 // The picture finished: exposure, the tone curve and the grade, from linear light to the screen.
 fn finish_picture(c_in: vec3<f32>) -> vec3<f32> {
+    // Debug view 6 (`base:look_debug`): the night's rods as Bliss's chain sees this view: r the
+    // Purkinje's strength, g the rods' mean / 0.08 (its cap), b the exposure / 2.
+    if bliss_chain() && look_debug() == 6u {
+        let lb = VIEW_MEAN * BLISS_UNITS;
+        let e = 0.18 / log2(2.5 * max(lb, 1e-6) + 1.045) * 0.62;
+        let rod_e = bliss_rod_exposure();
+        let purk = clamp(e * e, 0.0, 1.0) * clamp(rod_e / (1.0 + rod_e), 0.0, 1.0);
+        return vec3(purk, clamp(VIEW_ROD / 0.08, 0.0, 1.0), clamp(e * 0.5, 0.0, 1.0));
+    }
     if bliss_chain() {
         // Bliss's chain: exposed in `hdr_light`, its Purkinje, Hejl 2015, then 0.3 of saturation in
         // display space (composite11, composite12; Ronald's profile SATURATION 0.3).
