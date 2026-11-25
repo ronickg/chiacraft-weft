@@ -949,13 +949,10 @@ pub async fn inventory_hotkeys(t: T) -> R {
     t.c().input_click(0, 30.0);
     t.frames(4).await?;
     log.push(format!("press+4f {}", snap(&t)));
-    t.secs(0.5).await?;
-    log.push(format!("press+0.5s {}", snap(&t)));
+    // The upstream timing: on at once, four frames a slot.
     hover(14)?;
-    t.frames(2).await?;
-    log.push(format!("on14+2f {}", snap(&t)));
-    t.secs(1.0).await?;
-    log.push(format!("on14+1s {}", snap(&t)));
+    t.frames(4).await?;
+    log.push(format!("on14+4f {}", snap(&t)));
     hover(15)?;
     t.frames(2).await?;
     log.push(format!("on15+2f {}", snap(&t)));
