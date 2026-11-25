@@ -334,6 +334,15 @@ summon went back to its place with no one to fight. Borkon's toss (24.9) killed 
 
 Grid r4: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r11_bosses_m-185756/r11_bosses_grid.jpg`.
 
+Borkon's toss (Planner, 11-25: make it survivable from full health, armour counting): fixed in 5b36e74c2.
+One boss blow on a player now takes at most `animals_core::bosses::PLAYER_BLOW` (80 %) of the player's max
+health before the player's armour, so the 24.9 toss takes an unarmoured player (20) to 16 and leaves 4; armour
+takes its share after that, and armour's health raises the cap. The knock-back is unchanged.
+
+| What | before | now | checked |
+|---|---|---|---|
+| borkon toss on an unarmoured player at full health | 24.9: dead (runs 3, 4) | 16.0: lives at 20 % | not tested in a run yet (expect "toss hits 1 for 16.0" and no "player 1 died") |
+
 Run 1: cov_bosses, Mac, 403.9 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_bosses_m-160951.log`; grid
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_bosses_m-161637/cov_bosses_grid.jpg`). The big plant
 eaters ran from the hit (this run was before e91a79201, which has them turn and charge). The bosses'
