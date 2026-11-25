@@ -2,6 +2,7 @@
 //! engine knows about stone, water or zombies.
 
 mod advancements;
+mod ambience;
 mod assembly;
 mod beds;
 mod block_entities;
@@ -166,6 +167,7 @@ fn init(r: &mut Registry) {
     snow::register(r);
     waterholes::register(r);
     weather_sound::register(r);
+    ambience::register(r);
     seasons::register(r);
     growth::register(r);
     farming::register(r);

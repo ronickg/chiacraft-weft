@@ -46,6 +46,11 @@ pub fn init(r: &mut Registry) {
         }
         r.sounds_on_entities(&format!("animals:{kind}"), &format!("animals:{kind}"));
     }
+    // The bosses' young have no species of their own yet: a deer's voice for Borkon's ibex kid and
+    // Drenkaun's calf till they get theirs (the testkit's `sound_coverage` found them silent).
+    for young in ["animals:borkon_kid", "animals:drenkaun_calf"] {
+        r.sounds_on_entities(young, "animals:reindeer");
+    }
 }
 
 /// A goal for wolves (never taken, it only howls): a wild wolf howls once as a blood moon's
