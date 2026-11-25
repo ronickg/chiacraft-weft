@@ -493,26 +493,6 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         if i >= 0 {
             pt_cache_add(u32(i), indirect);
         }
-        // And at the surface the bounce met, one ray further (SHaRC's update along the path): the
-        // cells the bounce rays read are mostly off screen (a cave's ceiling, the walls behind the
-        // eye), and learning only where the eye looks left them empty, their light the lightmap's
-        // flat sky (reports/Path tracing research.md, 1).
-        if b.hit && !b.clear {
-            let bd = length(b.rel);
-            let d2 = pt_cosine(b.n, pt_noise(px + vec2(19.0, 23.0)));
-            let b2 = rt_hit(b.rel + b.n * (0.01 + bd * 3e-4), d2, 96.0, 2.0);
-            var found = vec3(0.0);
-            if b2.hit {
-                found = pt_lit(b2, l, pt_noise(px + vec2(29.0, 31.0)));
-            } else {
-                let dark_b = light_on(b.n, vec4(0.0), 0.0, 1.0, b.world, b.rel);
-                found = max(light_on(b.n, vec4(1.0, 0.0, 0.0, 0.0), 0.0, 1.0, b.world, b.rel) - dark_b, vec3(0.0));
-            }
-            let j = pt_cache_find(pt_cell(b.world, b.n, bd, pt_noise(px + vec2(37.0, 41.0))), true);
-            if j >= 0 {
-                pt_cache_add(u32(j), found);
-            }
-        }
     }
     if pt.debug == 10u {
         pt_out[at] = vec4(diffuse, 1.0);
