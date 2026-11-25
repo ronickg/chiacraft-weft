@@ -66,17 +66,26 @@ stretch on capybara_sit; groom, sniff on caiman_bask.
 
 | Species | flies | lands | flocks | flees | hunts / scavenges | shot |
 |---|---|---|---|---|---|---|
-| house_sparrow | - | - | - | - | n/a | |
-| snow_bunting | - | - | - | - | n/a | |
-| confuciusornis | - | - | - | - | n/a | |
-| gobipteryx | - | - | - | - | n/a | |
-| golden_eagle | - | - | n/a | - | - | |
-| savanna_hawk | - | - | n/a | - | - | |
-| great_horned_owl | - | - | n/a | - | - | |
-| snowy_owl | - | - | n/a | - | - | |
-| turkey_vulture | - | - | - | - | - | |
-| raven | - | - | n/a | - | - | |
-| herring_gull | - | - | - | - | - | |
+| house_sparrow | short hops (to 72) | pass | pass, 5 blocks | pass ("bolts from player") | n/a | grid 1 |
+| snow_bunting | pass (to 80) | - (comfort all run) | fail: 18 blocks apart | pass | n/a | grid 1 |
+| confuciusornis | pass (to 79) | pass | pass, 5 blocks | pass | n/a | grid 1 |
+| gobipteryx | pass (to 78) | pass | 20 blocks at widest | - (no bolt) | n/a | grid 1 |
+| golden_eagle | fail: on foot all run | n/a | n/a | - | pass on foot (a hare; gave up one "too long") | grid 2 |
+| savanna_hawk | fail: on foot all run | n/a | n/a | - | pass on foot (a mouse) | grid 2 |
+| great_horned_owl | one row at 77 | - | n/a | - | pass (a mouse) | grid 3 |
+| snowy_owl | fail: on foot all run | - | n/a | - | pass on foot (a mouse) | grid 3 |
+| turkey_vulture | pass (to 86) | pass | - | - | pass ("smells carrion" 19-20 blocks, ate venison) | grid 4 |
+| raven | fail: y 69-70 only | - | n/a | - | pass by food (29 to 100 %, no line) | grid 4 |
+| herring_gull | pass (to 86) | - | 15 blocks | - | pass by food (no line) | grid 4 |
+
+cov_birds, Mac, 345.8 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_birds_m-155832.log`; grid
+`~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_birds_m-160420/cov_birds_grid.jpg`, no bird
+visible in any shot). Fixed (birds.rs, after 91a328628): birds of prey hunted on foot; a hungry one
+now soars to search, flies at prey it sees and stoops on it. The `hit 2` killed a sparrow (1 health):
+flight from a hit isn't testable on songbirds that way. Missing clips: groom, play, alarm, sniff,
+stare on small_bird_fly; look, groom, alarm on early_bird_fly; alarm, sniff on owl_fly; groom, look
+on gull_fly and vulture_fly; play on hare_lie; alarm, sniff, scratch, look on vole_sit; scratch on
+mouse_sit (idle clips asked for in the air: the fly looks should be left out of idle life).
 
 ## Small animals and fish (cov_small.txt)
 
