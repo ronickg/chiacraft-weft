@@ -1653,10 +1653,12 @@ struct RtHit {
     lod: bool,
     // A translucent record (water, glass).
     clear: bool,
+    // A free quad (a plant's blade, a torch), not a cube's face.
+    quad: bool,
 }
 
 fn rt_miss() -> RtHit {
-    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false);
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false, false);
 }
 fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     return rt_miss();
@@ -1821,10 +1823,12 @@ struct RtHit {
     lod: bool,
     // A translucent record (water, glass).
     clear: bool,
+    // A free quad (a plant's blade, a torch), not a cube's face.
+    quad: bool,
 }
 
 fn rt_miss() -> RtHit {
-    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false);
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false, false);
 }
 
 // The first surface along `dir` (unit) from `rel` (camera relative), out to `t_max` blocks: through
@@ -1896,6 +1900,7 @@ fn rt_hit_mask(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32, mask: u32)
     out.rel = rel + dir * c.t;
     out.world = out.rel + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
     out.lod = row.z == 2u;
+    out.quad = row.z == 1u;
     out.albedo = vec4(0.5, 0.5, 0.5, 1.0);
     out.light = vec4(1.0, 0.0, 0.0, 0.0);
     out.n = -dir;

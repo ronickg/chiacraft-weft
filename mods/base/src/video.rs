@@ -600,6 +600,10 @@ fn apply(p: usize) {
         // the GPU (`dlss::follow_auto`), as most RTX games start (Planner from Ronald, 11-25). Off
         // is one step back on the DLSS tab's Mode row. Elsewhere the upscaler setting as before.
         crate::dlss::AUTO.set(true);
+        // Ray Reconstruction is Ultra's, for the path tracer's light: left on from it, Max with
+        // nothing to denoise ran it at Quality, 11.75 of its 25.9 ms, under Ultra's 20 (3060
+        // Laptop, w28; from a fresh start 0.65 and 91 fps, w39).
+        DLSS_RR.set(false);
     }
     // Reflex's low latency on with DLSS, on every preset (Planner from Ronald, 11-25).
     if GPU_DLSS_MODES.get() != 0 {
