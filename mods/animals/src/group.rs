@@ -213,6 +213,7 @@ fn regroup(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {
         return Some(true);
     }
     let to = regroup_leg(w, id, st)?;
+    weft_sdk::debug!("animal {id} heads for its pack: a leg to {:.0} {:.0} {:.0}", to[0], to[1], to[2]);
     w.navigate(id, to, speed * CATCH_UP);
     Some(true)
 }

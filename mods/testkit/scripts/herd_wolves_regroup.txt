@@ -1,10 +1,10 @@
 # A pack's kill's noise and a stray that regroups (Planner 11-25, the wolf follow-ups after animals-wolves; `notes/ECOLOGY.md`,
 # part 6). On the flattened field of `herd_wolves_far.txt`: two wolves at 30 % food with a deer beside them, the nearer kills it
 # at once (`/animalprof bite 1000`). Their kill's own fight noise should not send them running (no "runs from 0" or alarm from a
-# wolf; senses: a fight its own kind makes is no threat). A third wolf, fed (70 %), stands alone on a pad 90 blocks east: after
+# wolf; senses: a fight its own kind makes is no threat). A third wolf, grown (`/animal age 400`) and fed, stands alone 80 blocks east at the end of a flat strip: after
 # `groups::STRAY_SECS` (20 s) alone it should howl ("howls for its pack: N answers ... blocks off"), head for them in legs, and
 # end within 16 blocks of the pair ("keeps up with its leader", or kin 2+ in the senses rows). The player watches as a spectator
-# from midway, so both stay within the activation distance.
+# from midway (40 blocks from each), so both stay within the activation distance. A leg it walks logs "heads for its pack: a leg to".
 # Report from the log (`--log mod:animals=debug`): the BITE, HUNTER and "eats N's kill" lines, any "runs from" or "calls the alarm"
 # of a wolf in the 10 s after the kill, every "howls for its pack" line (who, who answers, how far), the stray's distance to the
 # pair in the where rows over time, and when it first counts kin (the senses dump at the end).
@@ -22,15 +22,16 @@ chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
 chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
 chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
 chat /tk mode spectator
-chat /tp 90 90 544
+chat /tp 40 90 544
 wait 4
-chat /tk fill 84 60 538 96 69 550 base:dirt
-chat /tk fill 84 69 538 96 69 550 base:grass
-chat /tk fill 84 70 538 96 85 550 core:air
+chat /tk fill -20 68 538 86 68 550 base:dirt
+chat /tk fill -20 69 538 86 69 550 base:grass
+chat /tk fill -20 70 538 86 78 550 core:air
 wait 1
-chat /tk spawn animals:grey_wolf 90 70 544
+chat /tk spawn animals:grey_wolf 80 70 544
 wait 2
-chat /animalprof hunter 0.7
+chat /tp 80 72 546
+chat /animal age 400
 chat /tp 0 72 540
 wait 2
 chat /tk spawn animals:white_tailed_deer 2 70 540
@@ -45,7 +46,7 @@ chat /animalprof hunter 0.3
 chat /tp 0 72 540
 chat /animalprof bite 1000
 wait 1
-chat /tp 45 95 544
+chat /tp 40 95 544
 wait 2
 chat /animalprof where
 wait 10
