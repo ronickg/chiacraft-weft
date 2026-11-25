@@ -25,21 +25,67 @@ Based on dev at 6043dfdb7: `animals_core::voices`, `mods/animals/src/voices.rs`,
 | kryptobaatar, priscagama | rodent squeaks and lizard hisses (fair stand-ins) | low priority |
 | fish (4 species) | silent by design | the splash on leaving water is already in `ambient/splash` |
 
-The animals session is listing species with no calls of their own too: Planner was asked for its list,
-and it will be merged in here.
+**Every species, one by one.** Every voiced species plays a family's files (`animals_core::voices`),
+pitched for its size. "Own" means the family was recorded from that animal or a very close one.
+"Borrowed" means another animal stands in. "Invented" means an extinct or made-up animal with
+recordings picked to suggest it. The Animals session's behaviour table will be cross-checked here
+when Planner forwards it.
 
-**Blocks:** 13 block groups, each with `dig/` and `step/` files. The `dirt` group has its own CC0 files
-since 11-04 (Footsteps Dirt 01, Shovel_dirt), and `groups.txt` moves `base:dirt`, clay, farmland, podzol
-and the charcoal clamp onto it. So the "dirt plays grass steps" gap may already be fixed, unless Ronald
-hears the dirt files as grass (asked Planner). The gaps that remain:
+| species | family | status | note |
+|---|---|---|---|
+| dog (chihuahua) | canine | own | dog barks, chihuahua whines |
+| grey_wolf | canine | own | wolf howl |
+| coyote | canine | own | coyote barks |
+| red_fox | fox | own | fox screams |
+| arctic_fox | fox | own (close) | red fox's screams |
+| cat | cat | own | |
+| jaguar | big_cat | borrowed | a tiger's growl; jaguars give a sawing cough |
+| white_tailed_deer | deer | own (close) | a doe's mew |
+| red_deer | deer | own | a stag's roar |
+| reindeer | deer | **borrowed** | reindeer grunt and click |
+| capybara | rodent | **borrowed** | mouse squeaks at 0.55; real ones click, purr, whistle, bark |
+| wood_mouse, field_vole | rodent | own (close) | |
+| kryptobaatar | rodent | invented | mouse squeaks fit |
+| hare, mountain_hare | hare | **borrowed** | rat and mouse squeaks; a hare's scream is louder and harsher. Silent by design otherwise |
+| house_sparrow | songbird | own | |
+| snow_bunting | songbird | borrowed | sparrow; a bunting trills |
+| confuciusornis, gobipteryx | songbird | invented | sparrow chirps |
+| golden_eagle | hawk | borrowed | a hawk's scream; eagles yelp and whistle thinly |
+| savanna_hawk | hawk | own (close) | |
+| great_horned_owl | owl | own (close) | hoots |
+| snowy_owl | owl | borrowed | hoots; snowy owls bark and croak |
+| herring_gull | gull | own | |
+| raven | corvid | own | |
+| turkey_vulture | hiss | borrowed, fair | vultures do hiss; the file is an alligator's |
+| yacare_caiman, spectacled_caiman | hiss | own (close) | alligator hiss |
+| crocodyliform | bellow | **invented** | cut from "T-Rex Calls" |
+| priscagama | hiss | borrowed, fair | snake hiss |
+| raptor, osmolskae, utahraptor, citipati | small_dino | **invented** | goose hisses and two "dinosaur" clips |
+| psittacosaurus, protoceratops, gastonia, pinacosaurus, iguanodont, cedarosaurus | bellow | **invented** | all five files cut from one "T-Rex Calls" recording |
+| wyvern | dragon | invented | four dragon-roar clips; fine |
+| borkon_kid, drenkaun_calf | reindeer's | **borrowed** | (above) |
+| Drenkaun, Borkon | none found | **none?** | to check with `/sounds check` |
+| brown_trout, pacu, lungfish, lycoptera | none | silent by design | |
+
+In bold: the ones AI could help most with, because no recording of the real animal exists (dinosaurs,
+the bosses and their young) or the stand-in is clearly another animal (capybara, reindeer, hares).
+
+**Blocks:** dropped from the list. This was an old 11-04 playtest line. Every dirt-like block already
+has a fitting group of its own:
+- `dirt`, `clay`, `farmland`, `podzol` and the charcoal clamp are in the `dirt` group (`groups.txt`), with their own CC0 dirt steps and digs since 11-04.
+- `coarse_dirt` and `dried_mud` use `gravel`, as vanilla does.
+- `dung_pat` uses `mud`.
+- Leaf litter and moss use `grass`, as they should.
+
+There are no rooted-dirt or path blocks. The gaps that remain:
 - Only glass, ice and metal have their own break sounds. Every other group breaks with its dig files.
 - The engine has no sneak, sprint, fall, landing or swim steps (`reports/sound.md` E8).
 - No sounds for eating, drinking, splashing into water, or an item breaking.
 
 **Order for the test batch** (4 to 6 sounds, about 3 tries each): borkon_kid bleat, drenkaun_calf bawl,
-a big dinosaur boom for the plant-eaters, a small-raptor chirp and hiss, a capybara call, and a dirt step.
-These cover animal calls, a young animal, an invented creature and a footstep, so one batch shows where
-AI is good and where CC0 recordings still win.
+a big dinosaur boom for the plant-eaters, a small-raptor chirp and hiss, a capybara call, and a reindeer
+grunt. These cover a young animal, an invented creature and two real animals whose recordings we lack,
+so one batch shows where AI is good and where CC0 recordings still win.
 
 ## 2. The tools
 
