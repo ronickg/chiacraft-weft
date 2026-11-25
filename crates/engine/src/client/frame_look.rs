@@ -8,8 +8,10 @@ use weft_render::*;
 
 use crate::gpu_layout::bind;
 
-/// Texels in the row (the pack fills as many as it needs).
-const TEXELS: u32 = 8;
+/// The target's size: a first row of texels the pack fills as it needs, and below it room for a
+/// sky-view picture (chiacraft's physical sky: 128 x 64).
+const TEXELS: u32 = 128;
+const ROWS: u32 = 65;
 
 #[derive(Default)]
 pub struct FrameLook {
@@ -72,7 +74,7 @@ impl FrameLook {
         };
         let (t, index) = *self.target.get_or_insert_with(|| {
             let t = gpu.create_texture(
-                &TextureDesc { width: TEXELS, height: 1, mips: 1, format: Format::Rgba16Float, render_target: true },
+                &TextureDesc { width: TEXELS, height: ROWS, mips: 1, format: Format::Rgba16Float, render_target: true },
                 "frame look",
             );
             (t, gpu.texture_index(t))

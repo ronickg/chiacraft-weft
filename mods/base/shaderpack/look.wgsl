@@ -271,6 +271,128 @@ fn bliss_purkinje(x: vec3<f32>, mean: f32) -> vec3<f32> {
 // The view's mean luma for the chain (`hdr_light` sets it), the average sunlit view's without the
 // exposure pass.
 var<private> VIEW_MEAN: f32 = 0.35;
+
+// ---- the physical sky (`base:look_sky_phys`), as Bliss's method: the air's own scattering ----
+// Single scattering through a round planet's air (Rayleigh, Mie, ozone; the usual sea-level
+// coefficients and scale heights), marched from the eye in ten steps with four toward the light,
+// plus a share for the light scattered more than once; worked out once a frame into a small
+// sky-view texture (`fs_frame_look`, rows 1-64 of its target: 128 directions round, 64 up, the
+// rows bunched toward the horizon) that `sky_color` reads. In place of our hand colour sets and
+// their per-hour fixes for the seen sky (the land's light still takes the palette).
+const OPT_SKY_PHYS: u32 = 71u;
+const ATM_GROUND: f32 = 6371e3;
+const ATM_TOP: f32 = 6471e3;
+const ATM_RAYLEIGH: vec3<f32> = vec3(5.8e-6, 13.5e-6, 33.1e-6);
+const ATM_MIE: f32 = 3.0e-6;
+const ATM_OZONE: vec3<f32> = vec3(0.65e-6, 1.881e-6, 0.085e-6);
+// The sun's light outside the air, warm (Ronald's Bliss profile: Sun_temp 4300 K), and the moon's
+// against it (its moon 200, its sun 250000).
+const ATM_SUN: vec3<f32> = vec3(1.0, 0.70, 0.45);
+const ATM_MOON: f32 = 8e-4;
+// The light toward the sun crosses half the air it would (Bliss bends its sun ray for the same:
+// sunrises less deep red-blue).
+const ATM_SUN_PATH: f32 = 0.5;
+// The light scattered more than once, as a share of the once-scattered, more with the sun low.
+const ATM_MULTI: f32 = 0.25;
+// To our units: the noon sky 30 degrees up about as bright as our palette's (luma 0.29; the zenith
+// then 0.22, the horizon's bright band 1.7, as the air's physics gives).
+const ATM_SCALE: f32 = 30.0;
+fn sky_phys_on() -> bool {
+    return scene.frame.x > 0.5 && scene.frame_look.x > 0.5 && fantasy_opt(OPT_SKY_PHYS) > 0.5;
+}
+// Rayleigh, Mie and ozone's densities at `h` metres up (ozone in a layer round 25 km).
+fn atm_density(h: f32) -> vec3<f32> {
+    return vec3(exp(-max(h, 0.0) / 8e3), exp(-max(h, 0.0) / 1.2e3), max(0.0, 1.0 - abs(h - 25e3) / 15e3));
+}
+fn atm_extinction(d: vec3<f32>) -> vec3<f32> {
+    return ATM_RAYLEIGH * d.x + vec3(ATM_MIE * 1.11 * d.y) + ATM_OZONE * d.z;
+}
+// How far from `o` (metres from the planet's centre) along `d` to the sphere of radius `r` (-1: missed).
+fn atm_sphere(o: vec3<f32>, d: vec3<f32>, r: f32) -> vec2<f32> {
+    let b = dot(o, d);
+    let c = dot(o, o) - r * r;
+    let h = b * b - c;
+    if h < 0.0 {
+        return vec2(-1.0);
+    }
+    let s = sqrt(h);
+    return vec2(-b - s, -b + s);
+}
+// The optical depth from `o` toward `d` to the air's top, in four steps.
+fn atm_toward(o: vec3<f32>, d: vec3<f32>) -> vec3<f32> {
+    let far = atm_sphere(o, d, ATM_TOP).y;
+    if far <= 0.0 {
+        return vec3(0.0);
+    }
+    let step = far / 4.0;
+    var od = vec3(0.0);
+    for (var i = 0; i < 4; i++) {
+        od += atm_extinction(atm_density(length(o + d * (f32(i) + 0.5) * step) - ATM_GROUND)) * step;
+    }
+    return od;
+}
+// The sky's light along `dir` (world, unit), the sun toward `sun`, the moon toward `moon` lit by
+// `moon_k`, in our units.
+fn atm_sky(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3<f32> {
+    let o = vec3(0.0, ATM_GROUND + max(scene.eye.y, 0.0) + 100.0, 0.0);
+    let top = atm_sphere(o, dir, ATM_TOP).y;
+    let ground = atm_sphere(o, dir, ATM_GROUND);
+    let far = select(top, ground.x, ground.x > 0.0);
+    let step = far / 10.0;
+    let mu_s = dot(dir, sun);
+    let mu_m = dot(dir, moon);
+    let ray_s = 3.0 / (16.0 * 3.14159) * (1.0 + mu_s * mu_s);
+    let ray_m = 3.0 / (16.0 * 3.14159) * (1.0 + mu_m * mu_m);
+    let mie_s = hg_phase(mu_s, 0.8) / (4.0 * 3.14159);
+    let mie_m = hg_phase(mu_m, 0.8) / (4.0 * 3.14159);
+    let low = clamp((1.0 - abs(sun.y)) * 3.0 - clamp(pow(sun.y + 0.6, 5.0), 0.0, 1.0) * 3.0, 1.0, 1.8);
+    var through = vec3(1.0);
+    var s_sun = vec3(0.0);
+    var s_moon = vec3(0.0);
+    var s_multi = vec3(0.0);
+    for (var i = 0; i < 10; i++) {
+        let p = o + dir * (f32(i) + 0.5) * step;
+        let d = atm_density(length(p) - ATM_GROUND);
+        let ext = atm_extinction(d) * step;
+        let kept = exp(-ext);
+        // What this step scatters toward the eye, of what reaches it, less what it dims itself.
+        let seen = through * select((vec3(1.0) - kept) / max(ext, vec3(1e-7)), vec3(1.0), ext < vec3(1e-7));
+        let ray = ATM_RAYLEIGH * d.x * step;
+        let mie = ATM_MIE * d.y * step;
+        let to_sun = exp(-atm_toward(p, sun) * ATM_SUN_PATH);
+        let to_moon = exp(-atm_toward(p, moon));
+        s_sun += (ray * ray_s + vec3(mie * mie_s)) * seen * to_sun;
+        s_moon += (ray * ray_m + vec3(mie * mie_m)) * seen * to_moon;
+        s_multi += (ray + vec3(mie)) * seen * to_sun * low;
+        through *= kept;
+    }
+    let lit = s_sun + s_multi * ATM_MULTI / (4.0 * 3.14159);
+    return (lit * ATM_SUN + s_moon * ATM_SUN * ATM_MOON * moon_k) * ATM_SCALE;
+}
+// The sky-view texture's direction for texel (`x`, `y`) of its 128 x 64, and back.
+fn atm_dir_of(x: f32, y: f32) -> vec3<f32> {
+    let az = (x / 128.0) * 6.28318 - 3.14159;
+    let v = y / 64.0 * 2.0 - 1.0;
+    let el = sign(v) * v * v * 1.5708;
+    return vec3(cos(el) * cos(az), sin(el), cos(el) * sin(az));
+}
+fn sky_phys(dir: vec3<f32>) -> vec3<f32> {
+    let t = textures[u32(scene.frame_look.x) - 1u];
+    let el = asin(clamp(dir.y, -1.0, 1.0));
+    let v = 0.5 + 0.5 * sign(el) * sqrt(abs(el) / 1.5708);
+    let fx = (atan2(dir.z, dir.x) + 3.14159) / 6.28318 * 128.0 - 0.5;
+    let fy = clamp(v * 64.0 - 0.5, 0.0, 63.0);
+    let x0 = i32(floor(fx));
+    let y0 = i32(floor(fy));
+    let f = vec2(fx - floor(fx), fy - floor(fy));
+    let xa = (x0 % 128 + 128) % 128;
+    let xb = (xa + 1) % 128;
+    let ya = 1 + y0;
+    let yb = 1 + min(y0 + 1, 63);
+    let a = mix(textureLoad(t, vec2(xa, ya), 0).rgb, textureLoad(t, vec2(xb, ya), 0).rgb, f.x);
+    let b = mix(textureLoad(t, vec2(xa, yb), 0).rgb, textureLoad(t, vec2(xb, yb), 0).rgb, f.x);
+    return mix(a, b, f.y);
+}
 // How much of it this morning: the option, in the east, with the sun under the horizon (full from
 // 1.7° down, none at 1° up) and not yet night (gone by about 12° down, where the night sky takes it).
 fn dawn_sky() -> f32 {
@@ -1061,6 +1183,20 @@ fn bliss_low_sun() -> f32 {
 // saturation 0.47 to 0.36 against Bliss's 0.48, whose shade stays a warm brown-olive (lv14-15).
 var<private> sky_seen: f32 = 0.0;
 fn sky_color(dir: vec3<f32>) -> vec3<f32> {
+    if sky_phys_on() {
+        var c = sky_phys(dir);
+        // The moon's glow and rain's slate, as below (ours).
+        if scene.sun.y < -0.05 && scene.moon.w > 0.0 {
+            let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
+            c += vec3(0.05, 0.07, 0.12) * mix(vec3(1.0), blood_tint() * vec3(2.0, 1.4, 1.0), smoothstep(0.0, 0.4, blood_moon())) * moon;
+        }
+        if rain_amount() > 0.0 {
+            // Bliss's: toward the sky's average, darker, low down most.
+            let wet = rain_amount() * (1.0 - smoothstep(-0.1, 0.9, dir.y) * 0.6);
+            c = mix(c, vec3(luma(c)) * vec3(0.76, 0.8, 0.86) - vec3(0.12) * scene.weather.w * luma(c), wet);
+        }
+        return max(c, vec3(0.0));
+    }
     let p = palette();
     let h = clamp(dir.y, 0.0, 1.0);
     let bliss_sun = bliss_low_sun();

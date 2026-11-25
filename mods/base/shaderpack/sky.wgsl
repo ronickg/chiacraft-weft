@@ -1303,6 +1303,14 @@ fn fs_froxel_sum(in: CloudOut) -> @location(0) vec4<f32> {
 // a member a texel (`look.wgsl`'s `palette`).
 @fragment
 fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
+    // Rows 1-64: the physical sky's view (`atm_sky`), in the HDR world with it on.
+    if in.clip.y > 1.0 {
+        if scene.frame.x < 0.5 || fantasy_opt(OPT_SKY_PHYS) < 0.5 || in.clip.x > 128.0 || in.clip.y > 65.0 {
+            return vec4(0.0);
+        }
+        let dir = atm_dir_of(in.clip.x, in.clip.y - 1.0);
+        return vec4(atm_sky(dir, normalize(scene.sun.xyz), normalize(scene.moon.xyz), scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y)), 1.0);
+    }
     let p = palette_made();
     switch u32(in.clip.x) {
         case 0u: { return vec4(p.zenith, 1.0); }
