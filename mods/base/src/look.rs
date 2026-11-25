@@ -276,7 +276,7 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_LEAF_SUN).float(1.0, 0.5, 4.0);
     r.config(&LOOK_LEAF_HOLES).float(1.0, 0.0, 1.0);
     r.config(&LOOK_LEAF_LIGHT).float(0.0, 0.0, 1.0);
-    r.config(&LOOK_DEBUG).float(0.0, 0.0, 50.0); // TEMP 50 for the horizon variants (lkfwC1), back to 5.0 before merge
+    r.config(&LOOK_DEBUG).float(0.0, 0.0, 5.0);
     r.config(&LOOK_SKY_HUE).float(0.0, 0.0, 1.0);
     r.config(&LOOK_EXPOSURE_ABS).float(1.0, 0.0, 1.0);
     r.config(&LOOK_SPLIT_WARM).float(0.7, 0.0, 1.0);
