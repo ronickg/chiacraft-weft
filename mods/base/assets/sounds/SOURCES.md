@@ -1,6 +1,6 @@
 # Where base's sounds come from
 
-All the files listed here are **CC0** (public domain dedication): no attribution needed. They are
+All the files listed here are **CC0** (public domain dedication): no attribution needed; all but the AI-made player and use sounds at the end, which have their own licence. They are
 credited anyway, so anyone can find the originals. The downloads are kept in
 `~/Coding/chiacraft-archive/references/sound/` (`kenney/`, `freesound/`). Prepared 2026-11-04 by
 the Researcher with `reports/sound-files/sfx.py`, which does the following:
@@ -153,3 +153,109 @@ ffmpeg), from nothing but synthesis and CC0 files already here:
 |---|---|---|
 | `random/ley_twitch.wav` (the dowsing rod's tick, `ley.rs`) | synthesised: bell-like partials over a short decay, `mods/base/source/sounds/ley_twitch.py` | CC0 |
 | `random/ley_wake.wav` (a waystone waking, `waystones.rs`) | synthesised: a low swell rising into a bell chime, `mods/base/source/sounds/ley_wake.py` | CC0 |
+
+## The player and using things (`player/`, `use/`): AI-made
+
+Not CC0, unlike the rest of this file. Made 2026-11-25 with **Stable Audio 3 Small SFX**
+(`stabilityai/stable-audio-3-small-sfx`, Stability AI) on our own PC, as the animals' AI voices
+(`mods/animals/assets/sounds/SOURCES.md` has the whole note). Licence: the
+[Stability AI Community License](https://stability.ai/license): we own the outputs and may use them
+commercially while annual revenue stays under USD 1M (above that an Enterprise licence). Its text
+encoder (T5Gemma) is under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms). Ronald
+approved the model on 11-25 and asked for these sounds the same day ("Yes, top 4", Planner's sound
+audit).
+
+Each event got its variants plus two spare candidates, each worded a little differently (the
+model gives nearly the same clip for one prompt whatever the seed). Every candidate was trimmed
+and cut (`reports/sound-files/sfx.py`, copy mode), scored by numbers (voiced sounds by how
+call-like they are, knocks and rustles by a clean hit over a quiet floor, the fire loops by how
+steady they are) and kept only when its spectrum is unlike the ones already kept. The picks were
+levelled to **-24 LUFS integrated, under -1 dBTP** (a limiter holds the peaks; a few peaky loops
+stay up to 2.5 dB under), and the fire, torch and furnace loops have their tail crossfaded into
+their head (0.4 s) so they repeat without a seam. Every candidate, the scores, the picks and a
+spectrogram sheet are in `~/Coding/chiacraft-archive/sounds/ai-sound/2026-11-25-player/`. Where
+they play: `src/player_sounds.rs`.
+
+| File | Prompt | Seed | LUFS / dBTP |
+|---|---|---|---|
+| `player/hurt1` | "man short pained grunt, hit, louder and more intense, close, dry, no background noise, no music" | 9004 | -24.0 / -12.3 |
+| `player/hurt2` | "man short pained grunt, hit, short and sharp, close, dry, no background noise, no music" | 9002 | -23.9 / -9.3 |
+| `player/hurt3` | "man short pained grunt, hit, two in a row, close, dry, no background noise, no music" | 9006 | -24.0 / -12.9 |
+| `player/hurt4` | "man short pained grunt, hit, softer and calmer, close, dry, no background noise, no music" | 9005 | -23.9 / -12.2 |
+| `player/death1` | "man dying groan, short, falling, short and sharp, close, dry, no background noise, no music" | 9008 | -24.0 / -13.0 |
+| `player/death2` | "man dying groan, short, falling, longer and lower, close, dry, no background noise, no music" | 9009 | -24.0 / -11.6 |
+| `player/eat1` | "person biting and chewing an apple, crunchy, short and sharp, close, dry, no background noise, no music" | 9012 | -24.1 / -4.8 |
+| `player/eat2` | "person biting and chewing an apple, crunchy, louder and more intense, close, dry, no background noise, no music" | 9014 | -24.0 / -5.6 |
+| `player/eat3` | "person biting and chewing an apple, crunchy, close, dry, no background noise, no music" | 9011 | -24.0 / -4.9 |
+| `player/burp1` | "short soft satisfied burp, longer and lower, close, dry, no background noise, no music" | 9018 | -24.0 / -7.0 |
+| `player/drink1` | "person gulping water from a flask, two swallows, close, dry, no background noise, no music" | 9019 | -23.9 / -4.4 |
+| `player/drink2` | "person gulping water from a flask, two swallows, longer and lower, close, dry, no background noise, no music" | 9021 | -24.0 / -8.2 |
+| `player/drink3` | "person gulping water from a flask, two swallows, softer and calmer, close, dry, no background noise, no music" | 9023 | -26.8 / -7.9 |
+| `player/swim1` | "swimmer arm stroke splashing water, single stroke, louder and more intense, close, dry, no background noise, no music" | 9027 | -24.0 / -1.8 |
+| `player/swim2` | "swimmer arm stroke splashing water, single stroke, close, dry, no background noise, no music" | 9024 | -24.3 / -2.0 |
+| `player/swim3` | "swimmer arm stroke splashing water, single stroke, two in a row, close, dry, no background noise, no music" | 9029 | -24.0 / -4.4 |
+| `player/swim4` | "swimmer arm stroke splashing water, single stroke, longer and lower, close, dry, no background noise, no music" | 9026 | -24.0 / -10.7 |
+| `player/splash1` | "person jumping into a lake, big splash, short and sharp, close, dry, no background noise, no music" | 9031 | -24.0 / -1.9 |
+| `player/splash2` | "person jumping into a lake, big splash, louder and more intense, close, dry, no background noise, no music" | 9033 | -24.3 / -2.0 |
+| `player/splash3` | "person jumping into a lake, big splash, softer and calmer, close, dry, no background noise, no music" | 9034 | -24.0 / -2.4 |
+| `player/land1` | "person landing on their feet on ground after a jump, soft thud, louder and more intense, close, dry, no background noise, no music" | 9038 | -24.1 / -2.7 |
+| `player/land2` | "person landing on their feet on ground after a jump, soft thud, close, dry, no background noise, no music" | 9035 | -24.1 / -4.7 |
+| `player/land3` | "person landing on their feet on ground after a jump, soft thud, longer and lower, close, dry, no background noise, no music" | 9037 | -23.9 / -4.4 |
+| `player/fall1` | "person falling hard onto ground, heavy body thud with grunt, longer and lower, close, dry, no background noise, no music" | 9042 | -24.0 / -8.0 |
+| `player/fall2` | "person falling hard onto ground, heavy body thud with grunt, louder and more intense, close, dry, no background noise, no music" | 9043 | -23.9 / -8.8 |
+| `player/fall3` | "person falling hard onto ground, heavy body thud with grunt, softer and calmer, close, dry, no background noise, no music" | 9044 | -23.9 / -6.9 |
+| `player/drown1` | "air bubbles escaping underwater, gurgle, softer and calmer, close, dry, no background noise, no music" | 9049 | -23.9 / -7.7 |
+| `player/drown2` | "air bubbles escaping underwater, gurgle, short and sharp, close, dry, no background noise, no music" | 9046 | -24.0 / -8.0 |
+| `player/drown3` | "air bubbles escaping underwater, gurgle, louder and more intense, close, dry, no background noise, no music" | 9048 | -24.0 / -7.0 |
+| `player/breath1` | "person gasping for air after surfacing from water, louder and more intense, close, dry, no background noise, no music" | 9053 | -24.0 / -13.7 |
+| `player/breath2` | "person gasping for air after surfacing from water, longer and lower, close, dry, no background noise, no music" | 9052 | -23.9 / -13.8 |
+| `use/door_open1` | "wooden door opening, creak and latch, close, dry, no background noise, no music" | 9054 | -24.0 / -5.0 |
+| `use/door_open2` | "wooden door opening, creak and latch, louder and more intense, close, dry, no background noise, no music" | 9057 | -24.1 / -2.1 |
+| `use/door_open3` | "wooden door opening, creak and latch, longer and lower, close, dry, no background noise, no music" | 9056 | -24.0 / -7.3 |
+| `use/door_close1` | "wooden door closing, knock and latch, louder and more intense, close, dry, no background noise, no music" | 9062 | -24.0 / -4.8 |
+| `use/door_close2` | "wooden door closing, knock and latch, short and sharp, close, dry, no background noise, no music" | 9060 | -23.9 / -6.5 |
+| `use/door_close3` | "wooden door closing, knock and latch, longer and lower, close, dry, no background noise, no music" | 9061 | -24.1 / -6.6 |
+| `use/chest_open1` | "wooden chest lid opening, creak, short and sharp, close, dry, no background noise, no music" | 9065 | -24.6 / -2.0 |
+| `use/chest_open2` | "wooden chest lid opening, creak, longer and lower, close, dry, no background noise, no music" | 9066 | -24.0 / -3.5 |
+| `use/chest_open3` | "wooden chest lid opening, creak, louder and more intense, close, dry, no background noise, no music" | 9067 | -25.2 / -1.8 |
+| `use/chest_close1` | "wooden chest lid closing, thump, short and sharp, close, dry, no background noise, no music" | 9070 | -23.9 / -7.4 |
+| `use/chest_close2` | "wooden chest lid closing, thump, close, dry, no background noise, no music" | 9069 | -23.9 / -5.4 |
+| `use/chest_close3` | "wooden chest lid closing, thump, louder and more intense, close, dry, no background noise, no music" | 9072 | -23.9 / -3.2 |
+| `use/craft1` | "crafting with wood and tools on a workbench, short hammering and shuffling, short and sharp, close, dry, no background noise, no music" | 9075 | -24.0 / -5.1 |
+| `use/craft2` | "crafting with wood and tools on a workbench, short hammering and shuffling, louder and more intense, close, dry, no background noise, no music" | 9077 | -24.3 / -2.0 |
+| `use/craft3` | "crafting with wood and tools on a workbench, short hammering and shuffling, longer and lower, close, dry, no background noise, no music" | 9076 | -24.2 / -1.9 |
+| `use/furnace_open1` | "stone furnace door opening, iron latch scrape, short and sharp, close, dry, no background noise, no music" | 9080 | -23.9 / -3.7 |
+| `use/furnace_open2` | "stone furnace door opening, iron latch scrape, softer and calmer, close, dry, no background noise, no music" | 9083 | -24.1 / -4.3 |
+| `use/furnace_open3` | "stone furnace door opening, iron latch scrape, close, dry, no background noise, no music" | 9079 | -24.0 / -5.7 |
+| `use/furnace_fire1` | "fire crackling in a stone furnace, steady, softer and calmer, close, dry, no background noise, no music" | 9088 | -26.5 / -1.8 |
+| `use/furnace_fire2` | "fire crackling in a stone furnace, steady, close, dry, no background noise, no music" | 9084 | -23.9 / -1.9 |
+| `use/furnace_fire3` | "fire crackling in a stone furnace, steady, short and sharp, close, dry, no background noise, no music" | 9085 | -26.1 / -1.9 |
+| `use/fire1` | "campfire crackling and popping, steady, longer and lower, close, dry, no background noise, no music" | 9091 | -25.4 / -1.2 |
+| `use/fire2` | "campfire crackling and popping, steady, close, dry, no background noise, no music" | 9089 | -25.7 / -1.6 |
+| `use/fire3` | "campfire crackling and popping, steady, softer and calmer, close, dry, no background noise, no music" | 9093 | -26.4 / -1.3 |
+| `use/fire4` | "campfire crackling and popping, steady, louder and more intense, close, dry, no background noise, no music" | 9092 | -26.1 / -1.7 |
+| `use/torch1` | "torch flame flickering and crackling softly, short and sharp, close, dry, no background noise, no music" | 9096 | -25.2 / -1.8 |
+| `use/torch2` | "torch flame flickering and crackling softly, softer and calmer, close, dry, no background noise, no music" | 9099 | -25.0 / -1.8 |
+| `use/torch3` | "torch flame flickering and crackling softly, close, dry, no background noise, no music" | 9095 | -24.0 / -4.1 |
+| `player/swing1` | "swinging a stick through the air, swoosh, louder and more intense, close, dry, no background noise, no music" | 9103 | -23.9 / -6.0 |
+| `player/swing2` | "swinging a stick through the air, swoosh, short and sharp, close, dry, no background noise, no music" | 9101 | -23.9 / -3.0 |
+| `player/swing3` | "swinging a stick through the air, swoosh, softer and calmer, close, dry, no background noise, no music" | 9104 | -23.9 / -6.1 |
+| `player/swing4` | "swinging a stick through the air, swoosh, longer and lower, close, dry, no background noise, no music" | 9102 | -23.9 / -6.0 |
+| `player/tool_break1` | "wooden tool snapping and breaking, crack, louder and more intense, close, dry, no background noise, no music" | 9109 | -24.1 / -3.1 |
+| `player/tool_break2` | "wooden tool snapping and breaking, crack, short and sharp, close, dry, no background noise, no music" | 9107 | -24.6 / -1.7 |
+| `player/tool_break3` | "wooden tool snapping and breaking, crack, softer and calmer, close, dry, no background noise, no music" | 9110 | -26.5 / -2.0 |
+| `player/bow_draw1` | "drawing a wooden bow string, creak and stretch, softer and calmer, close, dry, no background noise, no music" | 9115 | -24.0 / -11.2 |
+| `player/bow_draw2` | "drawing a wooden bow string, creak and stretch, close, dry, no background noise, no music" | 9111 | -24.0 / -10.2 |
+| `player/bow_draw3` | "drawing a wooden bow string, creak and stretch, louder and more intense, close, dry, no background noise, no music" | 9114 | -24.0 / -9.2 |
+| `player/bow_shoot1` | "bow string release and arrow whoosh, short and sharp, close, dry, no background noise, no music" | 9117 | -23.9 / -10.9 |
+| `player/bow_shoot2` | "bow string release and arrow whoosh, longer and lower, close, dry, no background noise, no music" | 9118 | -23.9 / -2.1 |
+| `player/bow_shoot3` | "bow string release and arrow whoosh, softer and calmer, close, dry, no background noise, no music" | 9120 | -23.9 / -3.6 |
+| `player/armour1` | "putting on leather and metal armour, buckle and clink, close, dry, no background noise, no music" | 9121 | -24.1 / -1.8 |
+| `player/armour2` | "putting on leather and metal armour, buckle and clink, softer and calmer, close, dry, no background noise, no music" | 9125 | -24.0 / -4.8 |
+| `player/armour3` | "putting on leather and metal armour, buckle and clink, longer and lower, close, dry, no background noise, no music" | 9123 | -24.0 / -6.6 |
+| `use/inventory_open1` | "leather bag opening, rustle, louder and more intense, close, dry, no background noise, no music" | 9129 | -24.0 / -6.4 |
+| `use/inventory_open2` | "leather bag opening, rustle, close, dry, no background noise, no music" | 9126 | -24.0 / -7.4 |
+| `use/inventory_open3` | "leather bag opening, rustle, longer and lower, close, dry, no background noise, no music" | 9128 | -24.0 / -5.4 |
+| `use/inventory_close1` | "leather bag closing, soft rustle, longer and lower, close, dry, no background noise, no music" | 9133 | -24.0 / -6.5 |
+| `use/inventory_close2` | "leather bag closing, soft rustle, close, dry, no background noise, no music" | 9131 | -24.0 / -7.8 |
+| `use/inventory_close3` | "leather bag closing, soft rustle, louder and more intense, close, dry, no background noise, no music" | 9134 | -24.0 / -3.9 |

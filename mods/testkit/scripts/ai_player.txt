@@ -1,0 +1,137 @@
+# The player's own sounds and the sounds of using things (mods/base/src/player_sounds.rs,
+# notes/crew/plans/ai-sound.md batch 4). A script can't hear: read run.log's "sound files:" line
+# and `/sounds check` reply (no events missing files) and every `/sounds recent` reply after each
+# part. Expect, part by part (base:player.* and base:use.*):
+#  hurt: player.hurt | fall: player.fall (+ hurt) | short drop: player.land | water: player.splash,
+#  player.swim, player.drown (after ~15 s under), player.breath (coming up) | eating: player.eat
+#  while chewing, player.burp at the end | swing: player.swing | bow: player.bow_draw,
+#  player.bow_shoot | armour: player.armour (if the use puts it on) | door: use.door_open, then
+#  use.door_close | chest: use.chest_open, use.chest_close | furnace: use.furnace_open |
+#  inventory: use.inventory_open, use.inventory_close | fires: use.fire, use.torch loops.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /weather clear 99999
+chat /sounds check
+chat /tk mode creative
+chat /tp 0.5 206 0.5
+wait 2
+loaded
+# a stone floor at 199, a pool 6 deep at x 8..12 z -2..2, open air above
+chat /tk fill -12 199 -12 16 199 12 stone
+chat /tk fill -12 200 -12 16 220 12 core:air
+chat /tk fill 7 192 -3 13 199 3 stone
+chat /tk fill 8 193 -2 12 199 2 base:water
+chat /tk attr_mod me core:max_health testkit:hp core:add 200 0
+chat /tp 0.5 200 0.5
+wait 1
+chat /tk mode survival
+chat /tk heal
+# hurt
+chat /tk hurt_me 2
+wait 1
+chat /sounds recent
+# a long fall (hurts) and a short drop (lands)
+chat /tp 0.5 210 0.5
+wait 2.5
+chat /sounds recent
+chat /tk heal
+chat /tp -3.5 202.5 0.5
+wait 1.5
+chat /sounds recent
+# water: a splash in, strokes, held under until drowning, then up for air
+chat /tp 10.5 206 0.5
+wait 2
+look 90 0
+hold core:forward 2
+chat /sounds recent
+chat /tp 10.5 194 0.5
+wait 19
+chat /sounds recent
+chat /tk heal
+chat /tp 10.5 199.2 0.5
+hold core:jump 1.5
+wait 1
+chat /sounds recent
+# eating an apple
+chat /tp 0.5 200 0.5
+wait 1
+chat /tk put me 0 base:apple 4
+key 1
+hold core:use 2.5
+wait 0.5
+chat /sounds recent
+# a swing at the air
+look 0 10
+press core:attack
+wait 0.4
+press core:attack
+wait 0.4
+chat /sounds recent
+# the bow
+chat /gear bow yew slot=1
+chat /tk give base:arrow 8
+key 2
+look 0 5
+hold core:use 1.3
+wait 1
+chat /sounds recent
+# armour: a helmet put on with a use
+chat /gear helmet copper slot=2
+key 3
+press core:use
+wait 0.5
+chat /sounds recent
+# a door: placed on the floor ahead, opened, closed
+chat /tk mode creative
+chat /tk put me 3 base:oak_door 1
+key 4
+look 0 -55
+press core:use
+wait 0.5
+press core:use
+wait 0.5
+press core:use
+wait 0.5
+chat /sounds recent
+# a chest and a furnace, opened and closed
+chat /tp -4.5 200 0.5
+wait 0.5
+chat /tk put me 4 base:chest 1
+key 5
+look 0 -55
+press core:use
+wait 0.5
+press core:use
+wait 1
+key Escape
+wait 0.5
+chat /sounds recent
+chat /tp -8.5 200 0.5
+wait 0.5
+chat /tk put me 5 base:furnace 1
+key 6
+look 0 -55
+press core:use
+wait 0.5
+press core:use
+wait 1
+key Escape
+wait 0.5
+chat /sounds recent
+# the inventory
+press core:inventory
+wait 1
+press core:inventory
+wait 0.5
+chat /sounds recent
+# fires near: a campfire and torches round the player
+chat /tp 0.5 200 -6.5
+wait 0.5
+chat /tk fill 2 200 -6 2 200 -6 base:campfire
+chat /tk fill -2 200 -6 -2 200 -6 base:torch
+wait 3
+shot ai_player_01_fires.png
+chat /sounds recent
+quit

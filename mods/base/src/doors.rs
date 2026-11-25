@@ -42,12 +42,16 @@ pub fn register(r: &mut Registry) {
         .mined_by("axe", tool_tier::HAND)
         .on_use(|u| {
             u.world().prop_cycle(u.pos(), "open");
+            crate::player_sounds::door(&u.world(), u.pos());
             true
         })
         .signal_sink()
         .on_signal(|e| {
             let open = if e.level() > 0 { "true" } else { "false" };
-            e.world().prop_set(e.pos(), "open", open);
+            if e.world().prop(e.pos(), "open") != Some(open) {
+                e.world().prop_set(e.pos(), "open", open);
+                crate::player_sounds::door(&e.world(), e.pos());
+            }
         })
         .tab(&crate::tabs::REDSTONE);
     r.shaped(&base_api::recipes::CRAFTING, "oak_door", 3, &["pp", "pp", "pp"], &[('p', "oak_planks")]);

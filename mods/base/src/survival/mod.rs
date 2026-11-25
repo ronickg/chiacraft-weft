@@ -15,7 +15,7 @@
 //! order.
 
 pub mod body;
-mod breath;
+pub mod breath;
 mod camp;
 mod food;
 mod health;
