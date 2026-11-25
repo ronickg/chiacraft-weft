@@ -40,16 +40,27 @@ on citipati_lie): art for blocky-model.
 
 | Species | hunts | stalks / ambush | chase | kill | share | gives up | shot |
 |---|---|---|---|---|---|---|---|
-| jaguar | - | - | - | - | n/a | - | |
-| coyote | - | - | - | - | - | - | |
-| red_fox | - | - | - | - | n/a | - | |
-| arctic_fox | - | - | - | - | n/a | - | |
-| raptor | - | - | - | - | n/a | - | |
-| osmolskae | - | - | - | - | n/a | - | |
-| utahraptor | - | - | - | - | - | - | |
-| crocodyliform | - | - | - | - | n/a | - | |
-| yacare_caiman | - | - | - | - | n/a | - | |
-| spectacled_caiman | - | - | - | - | n/a | - | |
+| jaguar | pass (deer, 56 kg) | pass (stalk, "breaks cover", 9 blocks) | pass (60 s, off the pad) | pass (70 kg, full) | n/a | pass ("too long" at 61 s, then a second hunt killed) | grid 1 |
+| coyote | pass (37: a hare) | n/a | pass (2 s) | pass (3.8 kg) | fail: 36 never joined | - | grid 2 |
+| red_fox | pass (4 hunts) | n/a | pass | pass (2 mice, a vole) | n/a | - | grid 3 |
+| arctic_fox | pass | n/a | pass | pass (a vole) | n/a | - | grid 3 |
+| raptor | pass | n/a | pass | pass (kryptobaatar, Priscagama) | n/a | pass ("gone": the other took it) | grid 4 |
+| osmolskae | pass | n/a | pass | pass (kryptobaatar) | n/a | pass ("gone") | grid 4 |
+| utahraptor | pass (a pack of 3, two "join") | - | pass (10 s) | pass (Psittacosaurus) | pass (8.3 kg each of 25) | - | grid 5 |
+| crocodyliform | pass (took a spectacled caiman) | pass ("breaks cover", 6 blocks) | pass | pass (25 kg, full) | n/a | - | grid 6 (dark) |
+| yacare_caiman | - (ran from the crocodyliform; no prey its size) | - | - | - | n/a | - | grid 6 |
+| spectacled_caiman | - (killed by the crocodyliform at 1.5 s) | - | - | - | n/a | - | grid 6 |
+
+cov_hunters, Mac, 557.2 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_hunters_m-154912.log`;
+grid `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_hunters_m-155831/cov_hunters_grid.jpg`, parts 4-6
+dark). Fixed (91a328628): coyote 36 ate the insects in the grass 33 times, from 28 to 90 %, and never
+hunted or joined its pack: a fallback food (insects, roots, lichen) now fills a hunter only to its
+share of the diet. Seen and left: the raptors stopped hunting with two prey left, both young (a few
+grams: under what they take); kills of mice and voles printed "0.0 of 0.0 kg" (now grams). Missing
+clips: pounce on jaguar; graze on coyote, both foxes, both raptors (they don't graze: the anim asks
+for one); bite on raptor_rest; look, scratch on hare_lie; play on vole_sit, kryptobaatar_sit,
+psittacosaurus_lie, caiman_bask; groom, sniff, play on lizard_bask; watch, scratch, groom, look,
+stretch on capybara_sit; groom, sniff on caiman_bask.
 
 ## Birds and fliers (cov_birds.txt)
 
