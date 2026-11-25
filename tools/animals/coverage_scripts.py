@@ -289,7 +289,8 @@ for n, (x, kinds) in enumerate([(0, ["grey_wolf"]), (200, ["capybara"]), (400, [
         s += pen(x + dx, Z) + [f"chat /tk spawn animals:{k} {x+dx} 70 {Z}"]
     s += ["wait 2", "chat /tk mode creative", f"chat /tp {x} 70 {Z}", "look 0 -20", "chat /animalprof food 1",
           "chat /animalprof water 1", "chat /tk put me 0 animals:kibble 64", "key 1", "wait 2"]
-    s += ["chat /animalprof feed 6", "wait 3"] * 70
+    # The wolf needs 14 asked-for feeds (7 % each) and asks every 10-30 s: round 3 reached 57 % in 70.
+    s += ["chat /animalprof feed 6", "wait 3"] * (160 if kinds == ["grey_wolf"] else 70)
     s += ["chat /animalprof where 64", "chat /tk mode spectator"] + shot(x, f"cov_taming_{n+1}_{kinds[0]}", z_back=8, pitch=-50)
 x = 600
 # Bites enough for each kind (round 2: the jaguar reached 73 % in 12, the wyvern 69 % in 35).

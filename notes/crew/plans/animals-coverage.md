@@ -431,6 +431,31 @@ of asking a pad, 30 bites for the raptors, four of each laying kind.
 
 Grid r3: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r7_taming_m-173815/r7_taming_grid.jpg`.
 
+Run 4 (46f12cbd7, `r11_taming_m`, 1035 s, script pass). Everything but the wolf tamed: capybara (3 asked
+feeds), cat (6), chihuahua (3); knocked out and fed, raptor (7 bites), osmolskae (7), utahraptor (10), jaguar
+(14), wyvern (40). The wolf took 8 asked feeds at 7 % each to 57 % and then its pad's time ran out: it needs
+about 14 asks at 10-30 s apart, so the script now feeds it for 480 s (not run yet). Every laying kind nested and
+hatched, the psittacosaurus too (5 eggs, 5 born). One female nested per pad: the others are within 24 blocks of
+that nest, which is the rule (`wild_clutch`), so not a bug. Shots fine.
+
+| Species | tamed | lays | hatches, keeps by mother | shot |
+|---|---|---|---|---|
+| grey_wolf | not tested (57 %, rising 7 % a feed; script lengthened) | n/a | n/a | r4 1 |
+| capybara | pass (3 feeds) | n/a | n/a | r4 2 |
+| cat | pass (6 feeds) | n/a | n/a | r4 3 |
+| chihuahua | pass (3 feeds) | n/a | n/a | r4 3 |
+| raptor | pass (7 bites) | pass (2) | pass (2) | r4 4, 8 |
+| osmolskae | pass (7 bites) | n/a | n/a | r4 4 |
+| utahraptor | pass (10 bites) | n/a | n/a | r4 4 |
+| jaguar | pass (14 bites) | n/a | n/a | r4 4 |
+| wyvern | pass (40 bites) | n/a | n/a | r4 4 |
+| protoceratops | n/a | pass (5) | pass (5, 1-3 blocks) | r4 5 |
+| psittacosaurus | n/a | pass (5) | pass (5) | r4 6 |
+| citipati | n/a | pass (4) | pass (4) | r4 7 |
+| house_sparrow | n/a | pass (3) | pass (3) | r4 9 |
+
+Grid r4: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r11_taming_m-184927/r11_taming_grid.jpg`.
+
 ## Sounds
 
 Every species' calls come from a shared voice family (`animals_core::voices`, files in
