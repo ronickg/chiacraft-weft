@@ -918,8 +918,12 @@ impl Ui {
         let style = self.nodes[id].style;
         // A fixed width is a column's (`layout`): as wide as the widest need among the widgets
         // given that width.
+        // Only what holds words or other widgets: a picture, bar or slot given the same width
+        // keeps it (a 16 px icon never stretches to a heading's column).
+        let holds = matches!(self.nodes[id].kind, Kind::Text(_) | Kind::Button { .. } | Kind::Container { .. });
         let fixed_w = match style.w {
-            Len::Px(v) => Some(v.max(self.columns.get(&v.to_bits()).copied().unwrap_or(0.0))),
+            Len::Px(v) if holds => Some(v.max(self.columns.get(&v.to_bits()).copied().unwrap_or(0.0))),
+            Len::Px(v) => Some(v),
             l => Self::resolve(l, avail[0]),
         };
         let fixed_h = Self::resolve(style.h, avail[1]);
@@ -980,7 +984,7 @@ impl Ui {
         // words (a whole line, or the longest word of wrapping text) and what it holds, with its
         // padding. Heights stay as built (a 2x label is measured 2x tall; small buttons take 1x).
         let floor = content[0] + pad_w;
-        if let Len::Px(v) = style.w {
+        if let (Len::Px(v), true) = (style.w, holds) {
             let e = self.needs.entry(v.to_bits()).or_insert(0.0);
             *e = e.max(floor);
         }
@@ -1024,7 +1028,10 @@ impl Ui {
             t.scale = s;
             lower = (t.layout.height * (t.fit - s) / 2.0).round() * unit;
         }
+        // Moved down, not longer: the box keeps to the room it was given (it ran `lower` into
+        // the field under a label that fell back to 1x: the check's "siblings overlap").
         self.nodes[id].rect.y += lower;
+        self.nodes[id].rect.h = (self.nodes[id].rect.h - lower).max(0.0);
         if let Kind::Text(t) = &mut self.nodes[id].kind {
             // Final fit: wrap to the box we actually got. Never a smaller scale (uneven pixels, and
             // not the UI's one size): one-line text the box can't hold wraps too, said once per

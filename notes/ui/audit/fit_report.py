@@ -29,6 +29,8 @@ def main(argv):
             m = LINE.search(line)
             if m:
                 screen, what, wpath, text, by, lang, scale, window = m.groups()
+                # Live numbers (a GPU readout, a clock) are one fault, not one per value.
+                text = re.sub(r"\d+([.,]\d+)?", "#", text)
                 f = faults[(screen, what, wpath, text)]
                 f["by"] = max(f["by"], abs(float(by)))
                 f["where"].add((lang, float(scale), window))

@@ -1259,9 +1259,13 @@ pub fn register(r: &mut Registry) {
                     t.set("video.base.now", &[Arg::Key(&format!("video.base.fantasy.{name}"))]);
                 });
             });
-            for i in 0..FANTASY_ROWS.len() {
-                row_ui(ui, &FANTASY_ROWS, i, step_fantasy);
-            }
+            // Scrolled as the Video tab's: in a long language the rows pass a 720p window at 2x
+            // (the text-fit check, pseudo-locale: 6.5 GUI px off the screen).
+            ui.column(S::column().gap(3.0).h(196.0).scroll(), |ui| {
+                for i in 0..FANTASY_ROWS.len() {
+                    row_ui(ui, &FANTASY_ROWS, i, step_fantasy);
+                }
+            });
         });
     });
     // On the settings screen, beside the engine's own.

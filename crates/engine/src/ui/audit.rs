@@ -187,7 +187,9 @@ fn overlaps(ui: &Ui, parent: &[usize], out: &mut Vec<Fault>) {
                 if ra.w <= 0.0 || rb.w <= 0.0 || ra.h <= 0.0 || rb.h <= 0.0 {
                     continue;
                 }
-                if let Some(by) = hit(ra, rb) {
+                // A negative gap overlaps on purpose (a window's tabs standing on its frame):
+                // only more than it is a fault.
+                if let Some(by) = hit(ra, rb).filter(|&by| by > -n.style.gap.min(0.0) + SLACK) {
                     let text = format!("{} / {}", words_of(ui, a), words_of(ui, b));
                     out.push(Fault { what: "siblings overlap", path: path(ui, parent, a), text, by });
                 }
