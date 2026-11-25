@@ -165,6 +165,23 @@ black: night, nothing lit.
 
 Grid r4: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r11_hunters_m-191009/r11_hunters_grid.jpg`.
 
+Run 5 (faf35b50, `r12_hunters_m`, 651 s, script pass). Thirteen kills; the jaguar killed its deer this time (86 kg).
+Each kill now feeds the prey's own mass (deer 86.02, hare 4.06, capybara 48.34, pacu 3.79) except the utahraptors'.
+Utahraptor 117 started the hunt but 115 killed, so the kill fed the grown 25 kg instead of 21.3. Fixed in ffdb839c1:
+the killer's packmates who knew the prey's mass count. The hurt-cause debug line printed nothing. `HURT_AT` was
+registered but never attached to the animals, so that handler never ran. Animals also healed straight through
+fights (`needs::HEAL_AFTER` never held). Both fixed in ffdb839c1, to re-run.
+
+| Species | kill feeds the prey's own mass | shot |
+|---|---|---|
+| jaguar | pass (86.02 kg deer) | r5 1 |
+| coyote, foxes, raptor, osmolskae | pass | r5 2-4 |
+| utahraptor | fail: 25 kg, not 21.3 (pack kill by another; fixed ffdb839c1) | r5 5 |
+| crocodyliform | pass (48.34 kg capybara) | r5 6 |
+| yacare_caiman, spectacled_caiman | pass (hare 0.87, pacu 3.79) | r5 7 (black: night) |
+
+Grid r5: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r12_hunters_m-195516/r12_hunters_grid.jpg`.
+
 ## Birds and fliers (cov_birds.txt)
 
 | Species | flies | lands | flocks | flees | hunts / scavenges | shot |
@@ -545,7 +562,7 @@ The sound runs heard a grey wolf (`ai_acts_2`, 56.2 s) and a reindeer (`ai_acts_
 sound with no "hurt by" line. Both were heard at volume 0.05, so they were far from the player, which is why the
 sounds were quiet. The wolf was one of three wild ones that spawned 7 s before, next to water 7 blocks below them,
 so a fall is the likeliest cause. Hunger, thirst, the cold, falls and crowding hurt an animal without any line of
-their own. Since facb1a89f every hurt logs at debug: "animal N takes X (cause id) from source". Not tested yet:
+their own. Since facb1a89f (working since ffdb839c1, which attaches `HURT_AT`) every hurt logs at debug: "animal N takes X (cause id) from source". Not tested yet:
 the next debug run will name the cause.
 
 ## Sounds
