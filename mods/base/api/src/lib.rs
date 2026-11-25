@@ -507,10 +507,19 @@ value! {
     pub struct Keeps { pub larder: u16, pub cold: u16 }
 }
 pub static KEEPS: Component<Keeps> = Component::named("base:keeps");
-/// A food stack's tick of making + 1 (0: not stamped yet; moved on by where it sat, `vitals::rot`), the second it came hot off the fire
+/// A food stack's tick of making + `MADE_BASE` + 1 (0: not stamped yet; moved on by where it sat, `vitals::rot`), the second it came hot off the fire
 /// (gone once it cools, `vitals::food::HOT_FOR`), and how fresh it is now (`freshness`): stamped
 /// in a player's inventory as it ages, so stacks of a day stack and the tooltip can say it.
 pub static MADE: Component<u32> = Component::named("base:made");
+/// Ticks a making stamp counts from ahead of the clock, so food that ages faster than the clock
+/// (a hot chest, `vitals::rot`) can get older than the world itself: 1000 game days, more than the
+/// longest-keeping food's whole life at the fastest rate (Tester's rot1125a, 11-25: hot chests
+/// stopped at the world's age).
+pub const MADE_BASE: u64 = 1000 * vitals::calendar::DAY_TICKS;
+/// The making stamp (`MADE`) of food made at day time `now` (never 0, which is unstamped).
+pub fn made_stamp(now: u64) -> u64 {
+    now + MADE_BASE + 1
+}
 pub static HOT: Component<u32> = Component::named("base:hot");
 pub static FRESHNESS: Component<u8> = Component::named("base:freshness");
 /// A stew's ingredients (`vitals::meals::pack`), and what it holds, shown in its tooltip; both on
@@ -545,8 +554,9 @@ pub fn food_age(stack: &ItemStack, now: u64) -> (f32, bool) {
     if made == 0 {
         return (0.0, false);
     }
-    // The tick of making + 1, moved on by where the food sat (`vitals::rot`, base's `survival/rot.rs`).
-    let ticks = (now + 1).saturating_sub(made as u64);
+    // The tick of making past `MADE_BASE`, moved on by where the food sat (`vitals::rot`, base's
+    // `survival/rot.rs`).
+    let ticks = made_stamp(now).saturating_sub(made as u64);
     (ticks as f32 / vitals::TICKS as f32, false)
 }
 

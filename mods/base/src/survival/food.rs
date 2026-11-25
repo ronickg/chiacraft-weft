@@ -275,9 +275,9 @@ pub fn spoiled(stack: &ItemStack, now: u64) -> bool {
     life_used(stack, now).is_some_and(|u| u >= 1.0)
 }
 
-/// The making stamp (`MADE`) of food made at day time `now`: the tick + 1 (0 is unstamped).
+/// The making stamp (`MADE`) of food made at day time `now` (`base_api::made_stamp`).
 pub fn stamp(now: u64) -> u32 {
-    (now + 1).min(u32::MAX as u64) as u32
+    base_api::made_stamp(now).min(u32::MAX as u64) as u32
 }
 
 /// The making stamp (`MADE`) for a new food keeping `keeps` that starts with `used` of its life gone

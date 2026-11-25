@@ -107,8 +107,9 @@ fn rot_inventory(w: &World, id: impl Into<Holder>, ticks: u64, rate: f32, carry:
         if made == 0 || shift == 0 {
             continue;
         }
-        // Never younger than now (the stamp is now + 1), never unstamped (0).
-        let moved = (made as i64 + shift).clamp(1, now as i64 + 1) as u32;
+        // Never younger than new, never unstamped (0); `MADE_BASE` leaves room to grow older
+        // than the world.
+        let moved = (made as i64 + shift).clamp(1, super::food::stamp(now) as i64) as u32;
         if moved != made {
             inv.set(i, s.with(&MADE, moved));
         }
