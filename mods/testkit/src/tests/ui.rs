@@ -894,14 +894,27 @@ pub async fn inventory_hotkeys(t: T) -> R {
     t.c().input_click(0, 0.0);
     t.secs(0.3).await?;
 
-    t.c().input_key("ShiftLeft", 1.0);
+    // Shift and the button held well past the sweep, then let go once it has landed: a fixed
+    // real-time hold ran out before a frame-counted sweep reached the second slot at low fps.
+    t.c().input_key("ShiftLeft", 30.0);
     hover(20)?;
     t.frames(3).await?;
-    t.c().input_click(0, 0.6);
+    t.c().input_click(0, 30.0);
     t.frames(3).await?;
     hover(21)?;
-    t.secs(0.8).await?;
-    t.check(t.slot("me", 20).await?.1 == 0 && t.slot("me", 21).await?.1 == 0, "shift-sweeping moved both cobblestone stacks to the hotbar");
+    let (c20, c21) = (menu(20), menu(21));
+    let swept = t
+        .until("both cobblestone stacks moved", Duration::from_secs(10), |t| {
+            t.c().menu_slot(c20).count == 0 && t.c().menu_slot(c21).count == 0
+        })
+        .await
+        .is_ok();
+    t.c().input_release_all();
+    t.frames(3).await?;
+    t.check(
+        swept && t.slot("me", 20).await?.1 == 0 && t.slot("me", 21).await?.1 == 0,
+        "shift-sweeping moved both cobblestone stacks to the hotbar",
+    );
     t.secs(0.5).await?;
 
     // The drop keys over a slot: one, then with Ctrl the rest.
@@ -923,12 +936,16 @@ pub async fn inventory_hotkeys(t: T) -> R {
     t.secs(0.2).await?;
     hover(13)?;
     t.frames(3).await?;
-    t.c().input_click(0, 1.0);
+    t.c().input_click(0, 30.0);
     t.frames(4).await?;
     hover(14)?;
     t.frames(4).await?;
     hover(15)?;
-    t.secs(1.0).await?;
+    let _ = t
+        .until("the sand gathered", Duration::from_secs(10), |t| t.c().cursor_stack().count == 3)
+        .await;
+    t.c().input_release_all();
+    t.frames(3).await?;
     t.check_eq(t.c().cursor_stack().count, 3, "sweeping on with the stack picked up gathered the sand");
     hover(13)?;
     t.frames(3).await?;
@@ -939,9 +956,14 @@ pub async fn inventory_hotkeys(t: T) -> R {
     for s in 0..9 {
         t.op(&format!("put me {s} dirt 1")).await?;
     }
-    t.op("put me 37 iron_chestplate 1").await?;
+    // Gear is built from parts here (no base:iron_chestplate): /gear makes a worn one.
+    t.cmd("/gear chestplate wrought_iron slot=37").await?;
     t.secs(0.3).await?;
-    let plate = id("base:iron_chestplate");
+    let worn = t.slot("me", 37).await?.0;
+    if worn.is_empty() {
+        return Err("/gear put no chestplate in slot 37".into());
+    }
+    let plate = id(&worn);
     let at = (0..64)
         .find(|&i| t.c().menu_slot(i).item == plate)
         .ok_or("no chestplate in the menu")?;
