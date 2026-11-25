@@ -2455,6 +2455,8 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let mie_phase = hg_phase(mu, 0.8);
     let amb_air = p.ambient;
     let rain = rain_amount();
+    let rain_sky = vec3(luma(p.ambient)) * vec3(1.0, 0.96, 0.86) * 0.45;
+    let rain_sun = cream * light_strength() * bank_phase(mu) * 0.2 * k;
     // The sky already holds the air (its own scattering, `sky_phys`): over it only the mist and the
     // rain. With the air too a sky pixel took most of the sky's light again in blue over the
     // march's 1500 blocks, a bright blue frame at night and a white sky by day (lkmxF1).
@@ -2488,11 +2490,18 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         // up over 8 km into a white sheet on the noon land (lkfwA1: banks off, the far land 152 167 151
         // against 211 216 207 with them; Bliss's 157 178 212).
         let banks = select(0.0, bank_density(at, dir * t) * deep, t < MIST_MARCH_FAR);
-        let d = banks + rain * RAIN_FOG * exp2(-0.03 * above);
+        let wet_d = rain * RAIN_FOG * exp2(-0.03 * above);
+        let d = banks + wet_d;
         if d > 0.0 {
             let kept = exp(-d * step);
             let near_sun = smoothstep(MIST_NEAR_SUN.x, MIST_NEAR_SUN.y, t);
-            gained += through * (1.0 - kept) * (sky_in + sun_in * lit * near_sun);
+            // The rain's fog in the rain's own light, as Bliss's: its dim grey sky light, and the sun
+            // only where the deck lets it through (`lit` carries the cloud shadow: the shafts). Lit as
+            // the clear day's mist it stood a pale veil and a bright band under the deck where Bliss's
+            // rain is a dark warm veil with shafts (lkrpA1).
+            let rain_in = rain_sky * k + rain_sun * lit;
+            let mix_in = (sky_in + sun_in * lit * near_sun) * banks + rain_in * wet_d;
+            gained += through * (1.0 - kept) * mix_in / d;
             through *= kept;
         }
         // The air: its Rayleigh and Mie (with the mist's droplets, Bliss's x300).
