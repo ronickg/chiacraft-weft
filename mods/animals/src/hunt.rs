@@ -99,11 +99,20 @@ pub fn init(r: &mut Registry) {
             let Some(s) = a.species().filter(|s| s.hunts()) else { continue };
             // The prey's own mass if it can still be read (its genes and growth), else what it weighed
             // when the killer set off after it, else its kind's.
+            // A pack's kill may be made by another than the one that set off after it (r12_hunters:
+            // utahraptor 117 hunted, 115 killed): its kin near who knew the prey's mass count too.
+            let knew = |o: u64| {
+                w.component(o, &PREY_KG)
+                    .filter(|p| p[0] == d.entity)
+                    .map(|p| f32::from_bits(p[1] as u32))
+            };
             let Some(prey) = mass(&w, d.entity)
+                .or_else(|| knew(d.source))
                 .or_else(|| {
-                    w.component(d.source, &PREY_KG)
-                        .filter(|p| p[0] == d.entity)
-                        .map(|p| f32::from_bits(p[1] as u32))
+                    let at = w.entity(d.source)?.pos;
+                    w.entities_near(at, animals_core::needs::KILL_SHARED * 4.0, None)
+                        .into_iter()
+                        .find_map(knew)
                 })
                 .or_else(|| kind_mass(d.kind, None))
             else {

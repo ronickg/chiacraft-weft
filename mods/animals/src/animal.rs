@@ -159,6 +159,9 @@ pub fn init(r: &mut Registry) {
         r.edit(s.kind).attach(&ANIMAL);
         r.edit(s.kind).attach(&APPLIED);
         r.edit(s.kind).attach(&SCALED);
+        // When it was last hurt: healing waits `needs::HEAL_AFTER` after a hurt. Registered but never
+        // attached till 11-25, it healed through fights and logged no hurt's cause.
+        r.edit(s.kind).attach(&HURT_AT);
         r.edit(s.kind).attach(&OWNER);
         r.edit(s.kind).attach(&base_api::TAME_OF);
     }
