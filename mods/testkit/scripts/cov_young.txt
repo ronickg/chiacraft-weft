@@ -1,0 +1,211 @@
+# Animal AI coverage, the young. `/tk spawn` gives some of a kind young ("(young)" in the where rows). Each part: six of
+# a kind fed and watered, watched 40 s (a young one keeps near its mother: its distance to the nearest grown one of its
+# kind), then `/animal hurry` (growing up within a second) and watched again ("(young)" gone, max health up). Report per
+# species: young spawned (how many), keeps by a grown one (distance), grows up (before/after health); the shots.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 70 528 16 70 560 base:tall_grass
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /tk spawn animals:white_tailed_deer -8 70 536
+chat /tk spawn animals:white_tailed_deer -6 70 536
+chat /tk spawn animals:white_tailed_deer -4 70 536
+chat /tk spawn animals:white_tailed_deer -8 70 538
+chat /tk spawn animals:white_tailed_deer -6 70 538
+chat /tk spawn animals:white_tailed_deer -4 70 538
+chat /tk spawn animals:reindeer 4 70 548
+chat /tk spawn animals:reindeer 6 70 548
+chat /tk spawn animals:reindeer 8 70 548
+chat /tk spawn animals:reindeer 4 70 550
+chat /tk spawn animals:reindeer 6 70 550
+chat /tk spawn animals:reindeer 8 70 550
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /tp 0 95 574
+wait 1
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /tick freeze
+chat /tp 0 82 558
+look 0 -38
+wait 2
+shot cov_young_1_white_tailed_deer.png
+chat /tick unfreeze
+wait 1
+chat /tp 0 72 544
+chat /animal hurry
+wait 3
+chat /tp 0 95 574
+wait 1
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /tp 200 90 544
+wait 4
+chat /tk fill 184 60 528 216 68 560 base:dirt
+chat /tk fill 184 69 528 216 69 560 base:grass
+chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 70 528 216 70 560 base:tall_grass
+chat /tk fill 199 69 543 201 69 545 base:water
+chat /tk fill 199 70 543 201 70 545 core:air
+wait 1
+chat /tk spawn animals:capybara 192 70 536
+chat /tk spawn animals:capybara 194 70 536
+chat /tk spawn animals:capybara 196 70 536
+chat /tk spawn animals:capybara 192 70 538
+chat /tk spawn animals:capybara 194 70 538
+chat /tk spawn animals:capybara 196 70 538
+chat /tk spawn animals:grey_wolf 204 70 548
+chat /tk spawn animals:grey_wolf 206 70 548
+chat /tk spawn animals:grey_wolf 208 70 548
+chat /tk spawn animals:grey_wolf 204 70 550
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /tp 200 95 574
+wait 1
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /tick freeze
+chat /tp 200 82 558
+look 0 -38
+wait 2
+shot cov_young_2_capybara.png
+chat /tick unfreeze
+wait 1
+chat /tp 200 72 544
+chat /animal hurry
+wait 3
+chat /tp 200 95 574
+wait 1
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /tp 400 90 544
+wait 4
+chat /tk fill 384 60 528 416 68 560 base:dirt
+chat /tk fill 384 69 528 416 69 560 base:grass
+chat /tk fill 384 70 528 416 85 560 core:air
+chat /tk fill 384 70 528 416 70 560 base:tall_grass
+chat /tk fill 399 69 543 401 69 545 base:water
+chat /tk fill 399 70 543 401 70 545 core:air
+wait 1
+chat /tk spawn animals:jaguar 392 70 536
+chat /tk spawn animals:jaguar 394 70 536
+chat /tk spawn animals:jaguar 396 70 536
+chat /tk spawn animals:jaguar 392 70 538
+chat /tk spawn animals:hare 404 70 548
+chat /tk spawn animals:hare 406 70 548
+chat /tk spawn animals:hare 408 70 548
+chat /tk spawn animals:hare 404 70 550
+chat /tk spawn animals:hare 406 70 550
+chat /tk spawn animals:hare 408 70 550
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /tp 400 95 574
+wait 1
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /tick freeze
+chat /tp 400 82 558
+look 0 -38
+wait 2
+shot cov_young_3_jaguar.png
+chat /tick unfreeze
+wait 1
+chat /tp 400 72 544
+chat /animal hurry
+wait 3
+chat /tp 400 95 574
+wait 1
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /tp 600 90 544
+wait 4
+chat /tk fill 584 60 528 616 68 560 base:dirt
+chat /tk fill 584 69 528 616 69 560 base:grass
+chat /tk fill 584 70 528 616 85 560 core:air
+chat /tk fill 584 70 528 616 70 560 base:tall_grass
+chat /tk fill 599 69 543 601 69 545 base:water
+chat /tk fill 599 70 543 601 70 545 core:air
+wait 1
+chat /tk spawn animals:protoceratops 592 70 536
+chat /tk spawn animals:protoceratops 594 70 536
+chat /tk spawn animals:protoceratops 596 70 536
+chat /tk spawn animals:protoceratops 592 70 538
+chat /tk spawn animals:protoceratops 594 70 538
+chat /tk spawn animals:protoceratops 596 70 538
+chat /tk spawn animals:iguanodont 604 70 548
+chat /tk spawn animals:iguanodont 606 70 548
+chat /tk spawn animals:iguanodont 608 70 548
+chat /tk spawn animals:iguanodont 604 70 550
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /tp 600 95 574
+wait 1
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /tick freeze
+chat /tp 600 82 558
+look 0 -38
+wait 2
+shot cov_young_4_protoceratops.png
+chat /tick unfreeze
+wait 1
+chat /tp 600 72 544
+chat /animal hurry
+wait 3
+chat /tp 600 95 574
+wait 1
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+quit

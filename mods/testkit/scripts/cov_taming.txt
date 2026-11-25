@@ -1,0 +1,323 @@
+# Animal AI coverage, taming and eggs. Part 1: passive kinds (grey wolf, cat, chihuahua, capybara) hand-fed kibble
+# (aimed, `core:use`): expected "tamed at N%" or the taming screen's progress. Part 2: knock-out kinds (raptor,
+# osmolskae, utahraptor, jaguar, wyvern) knocked out (`/animalprof ko 1`), given kibble (aimed, `core:use`) and made to eat (`/animal bite` x8):
+# "knocked out", "tamed at". Part 3: laying kinds (protoceratops, psittacosaurus, citipati, raptor, house sparrow):
+# `/animal nest` then `/animal hurry`: "nested at", eggs, hatching ("born"/young in the where rows). Report per
+# species: tamed (yes/no, the line), laid, hatched; the shots.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 70 528 16 70 560 base:tall_grass
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /tk spawn animals:grey_wolf -8 70 538
+chat /tk spawn animals:cat -4 70 538
+chat /tk spawn animals:chihuahua 0 70 538
+chat /tk spawn animals:capybara 4 70 538
+wait 2
+chat /tk mode creative
+chat /tk put me 0 animals:kibble 64
+key 1
+chat /tp -8 70 541
+look 0 0
+wait 1
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+chat /tp -4 70 541
+look 0 0
+wait 1
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+chat /tp 0 70 541
+look 0 0
+wait 1
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+chat /tp 4 70 541
+look 0 0
+wait 1
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+aim 6
+press core:use
+wait 0.6
+chat /animalprof where 40
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 0 82 558
+look 0 -38
+wait 2
+shot cov_taming_1_passive.png
+chat /tick unfreeze
+wait 1
+chat /tp 200 90 544
+wait 4
+chat /tk fill 184 60 528 216 68 560 base:dirt
+chat /tk fill 184 69 528 216 69 560 base:grass
+chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 70 528 216 70 560 base:tall_grass
+chat /tk fill 199 69 543 201 69 545 base:water
+chat /tk fill 199 70 543 201 70 545 core:air
+wait 1
+chat /tk spawn animals:raptor 192 70 538
+chat /tk spawn animals:velociraptor_osmolskae 196 70 538
+chat /tk spawn animals:utahraptor 200 70 538
+chat /tk spawn animals:jaguar 206 70 538
+chat /tk spawn animals:wyvern 200 70 552
+wait 2
+chat /animalprof ko 1
+wait 2
+chat /tk mode creative
+chat /tk put me 0 animals:kibble 64
+key 1
+chat /tp 192 70 540
+look 0 0
+wait 1
+aim 6
+press core:use
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /tp 196 70 540
+look 0 0
+wait 1
+aim 6
+press core:use
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /tp 200 70 540
+look 0 0
+wait 1
+aim 6
+press core:use
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /tp 206 70 540
+look 0 0
+wait 1
+aim 6
+press core:use
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /tp 200 70 554
+look 0 0
+wait 1
+aim 6
+press core:use
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animal bite
+wait 0.5
+chat /animalprof where 40
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 200 82 558
+look 0 -38
+wait 2
+shot cov_taming_2_knockout.png
+chat /tick unfreeze
+wait 1
+chat /tp 400 90 544
+wait 4
+chat /tk fill 384 60 528 416 68 560 base:dirt
+chat /tk fill 384 69 528 416 69 560 base:grass
+chat /tk fill 384 70 528 416 85 560 core:air
+chat /tk fill 384 70 528 416 70 560 base:tall_grass
+chat /tk fill 399 69 543 401 69 545 base:water
+chat /tk fill 399 70 543 401 70 545 core:air
+wait 1
+chat /tk spawn animals:protoceratops 392 70 536
+chat /tk spawn animals:protoceratops 394 70 536
+chat /tk spawn animals:psittacosaurus 404 70 536
+chat /tk spawn animals:psittacosaurus 406 70 536
+chat /tk spawn animals:citipati 392 70 548
+chat /tk spawn animals:citipati 394 70 548
+chat /tk spawn animals:raptor 404 70 548
+chat /tk spawn animals:raptor 406 70 548
+chat /tk spawn animals:house_sparrow 400 70 544
+chat /tk spawn animals:house_sparrow 402 70 544
+wait 2
+chat /tp 392 72 536
+chat /animal nest
+wait 1
+chat /tp 404 72 536
+chat /animal nest
+wait 1
+chat /tp 392 72 548
+chat /animal nest
+wait 1
+chat /tp 404 72 548
+chat /animal nest
+wait 1
+chat /tp 400 72 544
+chat /animal nest
+wait 1
+chat /tp 400 95 574
+wait 1
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /tick freeze
+chat /tp 400 82 558
+look 0 -38
+wait 2
+shot cov_taming_3_nests.png
+chat /tick unfreeze
+wait 1
+chat /tp 392 72 536
+chat /animal hurry
+wait 1
+chat /tp 404 72 536
+chat /animal hurry
+wait 1
+chat /tp 392 72 548
+chat /animal hurry
+wait 1
+chat /tp 404 72 548
+chat /animal hurry
+wait 1
+chat /tp 400 72 544
+chat /animal hurry
+wait 1
+wait 3
+chat /tp 400 95 574
+wait 1
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /animalprof where 40
+wait 10
+chat /tick freeze
+chat /tp 400 82 558
+look 0 -38
+wait 2
+shot cov_taming_4_hatched.png
+chat /tick unfreeze
+wait 1
+quit

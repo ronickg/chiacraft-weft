@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave,hit)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -296,6 +296,25 @@ pub fn init(r: &mut Registry) {
                 w.damage(id, Damage::new(1e6, damage_cause::ATTACK).by(cmd.player()));
                 format!("KILL {id}")
             }
+            "hit" => {
+                // The player hits the wild animal nearest him (within 48 blocks) for `value` damage
+                // (2 by default): it runs or turns on him, as its kind does (the coverage checks).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let near = w
+                    .entities_near(me.pos, 48.0, None)
+                    .into_iter()
+                    .filter(|&id| {
+                        w.component(id, &crate::animal::ANIMAL)
+                            .is_some_and(|a| a.species != 0)
+                            && !crate::animal::tamed(&w, id)
+                    })
+                    .filter_map(|id| Some((crate::dist2(w.entity(id)?.pos, me.pos), id)))
+                    .min_by(|a, b| a.0.total_cmp(&b.0));
+                let Some((_, id)) = near else { return };
+                let dmg = cmd.float("value").unwrap_or(2.0) as f32;
+                w.damage(id, Damage::new(dmg, damage_cause::ATTACK).by(cmd.player()));
+                format!("HIT {id} for {dmg}")
+            }
             "fear" => {
                 // The fear of the ground where the player stands, and red deer's (and hares')
                 // reputation of him there.
@@ -333,8 +352,9 @@ pub fn init(r: &mut Registry) {
                         let a = w.component(id, &crate::animal::ANIMAL).filter(|a| a.species != 0)?;
                         let e = w.entity(id)?;
                         Some(format!(
-                            "{id} {} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}/{:.0}",
+                            "{id} {}{} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}/{:.0}",
                             a.species()?.name,
+                            if crate::breeding::young(&w, id) { " (young)" } else { "" },
                             e.pos.x,
                             e.pos.y,
                             e.pos.z,
