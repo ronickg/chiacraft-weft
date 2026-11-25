@@ -2,9 +2,13 @@
 Usage: python3 fetch_freesound.py <user>/<id> [...]     (e.g. Villehardt/613995)
 Each lands in ~/Coding/chiacraft-archive/references/sound/freesound/<id>_<user>_<title>.mp3, and
 one line per sound is printed: id, user, licence, seconds, title, file (for SOURCES.md).
-Freesound answers 429 to parallel fetches: this goes one at a time, with a pause.
+Freesound answers 429 to parallel fetches: this goes one at a time, with a pause. Its CDN sends
+about 75 KB/s, so only the first HEAD bytes of a preview are taken (4 MB, about 4 minutes at
+128 kbit/s; a cut MP3 still decodes): enough to cut loops and calls from.
 """
-import os, re, sys, time, urllib.request
+import os, re, subprocess, sys, time, urllib.request
+
+HEAD = 4_000_000
 
 OUT = os.path.expanduser("~/Coding/chiacraft-archive/references/sound/freesound")
 UA = {"User-Agent": "Mozilla/5.0 (sound fetch for a CC0 game asset list)"}
@@ -34,9 +38,10 @@ def fetch(spec):
     slug = re.sub(r"[^a-z0-9]+", "_", os.path.splitext(title)[0].lower()).strip("_")[:48]
     path = os.path.join(OUT, f"{sid}_{user}_{slug}.mp3")
     if not os.path.exists(path):
-        data = get(prev.group(0))
-        with open(path, "wb") as f:
-            f.write(data)
+        subprocess.run(["curl", "-s", "-f", "--max-time", "240", "-A", UA["User-Agent"], "-r", f"0-{HEAD - 1}",
+                        "-o", path + ".part", prev.group(0)], check=False)
+        if os.path.exists(path + ".part") and os.path.getsize(path + ".part") > 10_000:
+            os.rename(path + ".part", path)
     print(f"{sid}\t{user}\tCC0\t{float(dur.group(1)) if dur else 0:.0f}s\t{title}\t{path}")
 
 

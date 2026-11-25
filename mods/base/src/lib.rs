@@ -70,6 +70,7 @@ mod waterholes;
 mod waystones;
 mod weather;
 mod weather_sound;
+mod ambience;
 mod web;
 mod wild;
 mod wind_life;
@@ -165,6 +166,7 @@ fn init(r: &mut Registry) {
     snow::register(r);
     waterholes::register(r);
     weather_sound::register(r);
+    ambience::register(r);
     seasons::register(r);
     growth::register(r);
     farming::register(r);

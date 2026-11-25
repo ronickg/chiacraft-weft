@@ -52,6 +52,13 @@ struct State {
 
 static STATE: Mutex<Option<State>> = Mutex::new(None);
 
+/// The cover last found over the player (open sky before the first look), for the ambience.
+static COVER: Mutex<Cover> = Mutex::new(Cover { open: 1.0, roof: 0.0, leaves: 0.0 });
+
+pub(crate) fn cover_now() -> Cover {
+    *COVER.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 pub fn register(r: &mut Registry) {
     use sound_categories::AMBIENT;
     // Beds over footsteps and creatures: the weather is never crowded out by a herd.
@@ -119,6 +126,7 @@ fn frame(c: &Client) {
         return;
     }
     let cover = cover(c, s, eye);
+    *COVER.lock().unwrap_or_else(|e| e.into_inner()) = cover;
     for &(_, metres) in s.coming.iter().filter(|t| t.0 <= 0.0) {
         thunder(c, metres, cover);
     }
