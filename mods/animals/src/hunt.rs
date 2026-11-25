@@ -130,7 +130,7 @@ pub fn init(r: &mut Registry) {
                 let meal = (max * animals_core::needs::fills(own, kg)).round().max(1.0) as u16;
                 animal::feed(&w, e, meal);
                 weft_sdk::info!(
-                    "{} {e} eats {}'s kill ({kg:.1} of {prey:.1} kg of {}): food {} of {max:.0}",
+                    "{} {e} eats {}'s kill ({kg:.3} of {prey:.3} kg of {}): food {} of {max:.0}",
                     s.name,
                     d.source,
                     name_of(abi::entry_kind::ENTITY, d.kind),
