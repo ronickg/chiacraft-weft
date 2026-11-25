@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -153,6 +153,12 @@ pub fn init(r: &mut Registry) {
                     }
                 }
                 format!("{n} hunters at {:.0}% food", v * 100.0)
+            }
+            "chill" => {
+                // Warm-blooded hunters feel cold (not freezing) whatever the air, 1 on, 0 off.
+                let on = cmd.float("value").unwrap_or(1.0) > 0.5;
+                crate::comfort::CHILL.store(on, Relaxed);
+                format!("CHILL {on}")
             }
             "hunter" => {
                 // The hunter nearest the player alone has this share of its food (one of a pack

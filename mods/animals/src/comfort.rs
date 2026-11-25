@@ -66,6 +66,9 @@ const FIRE_LOOK: i32 = 16;
 /// Places tried for a better one, and degrees better it must be to go.
 const TRIES: u32 = 12;
 const BETTER: f32 = 1.5;
+/// A test's chill (`/animalprof chill 1`): every warm-blooded hunter feels cold, not freezing,
+/// whatever the air (`herd_wolves_cold.txt`).
+pub static CHILL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// A tame's health lost to the cold or heat stops at this share of its max.
 const TAME_FLOOR: f32 = 0.1;
 
@@ -121,6 +124,8 @@ pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState, secs: f32) -> f3
         let core = temperature::step_core(start, body.target(air), secs, mass);
         (core, temperature::feeling(core), 1.0)
     };
+    let feeling =
+        if !s.bio.cold_blooded && s.hunts() && CHILL.load(std::sync::atomic::Ordering::Relaxed) { Feeling::Cold } else { feeling };
     let feel = FEELINGS.iter().position(|&f| f == feeling).unwrap_or(0);
     let condition = condition(a);
     if let Some(b) = w.component_mut(id, &BODY) {
