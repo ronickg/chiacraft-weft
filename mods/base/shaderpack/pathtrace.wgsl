@@ -296,10 +296,11 @@ fn pt_light_find(c: vec3<i32>) -> vec2<u32> {
 }
 
 // How much of the block light reaches a surface at `world` (`rel` camera relative) facing `ng`:
-// x 1 seen, 0 hidden, by one light drawn as above (1 when none is near); y 1 when a light was drawn.
+// x 1 seen, 0 hidden, by one light drawn as above (1 when none is near); y 1 when a light was drawn
+// (else why not, for debug view 15: 0 no list for the cube, -1 none of the draws in reach, -2 no lights at all).
 fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: vec3<f32>, px: vec2<f32>) -> vec2<f32> {
     if pt_lights[1] == 0u {
-        return vec2(1.0, 0.0);
+        return vec2(1.0, -2.0);
     }
     let cell = vec3<i32>(floor(world + ng * 0.5));
     let cube = cell >> vec3(4u);
@@ -335,7 +336,7 @@ fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: ve
         }
     }
     if !found {
-        return vec2(1.0, 0.0);
+        return vec2(1.0, -1.0);
     }
     if own {
         return vec2(1.0, 1.0);
@@ -552,11 +553,19 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 6u: { out = albedo * pt_cached(h.world, ng, dist, pt_noise(px + vec2(3.0, 11.0))).rgb; }
             // 14: the lightmap's block light at the surface (as light, without the texture).
             case 14u: { out = block; }
-            // 15: the traced block lights: green seen, red hidden, blue where no light was drawn,
-            // black where the lightmap gives no block light.
+            // 15: the traced block lights: green seen, red hidden; no light drawn: blue no list for
+            // the cube, cyan none in reach, magenta no lights at all; black no block light.
             case 15u: {
                 if max(block.r, max(block.g, block.b)) > 1e-4 {
-                    out = select(vec3(0.0, 0.0, 1.0), select(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), block_vis.x > 0.5), block_vis.y > 0.5);
+                    if block_vis.y > 0.5 {
+                        out = select(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), block_vis.x > 0.5);
+                    } else if block_vis.y > -0.5 {
+                        out = vec3(0.0, 0.0, 1.0);
+                    } else if block_vis.y > -1.5 {
+                        out = vec3(0.0, 1.0, 1.0);
+                    } else {
+                        out = vec3(1.0, 0.0, 1.0);
+                    }
                 }
             }
             default: {}
