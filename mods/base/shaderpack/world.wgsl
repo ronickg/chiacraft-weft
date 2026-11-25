@@ -737,6 +737,12 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // 7: where the sun's light is cut: r the clouds' shadow here, g 1 on distant terrain (`fs_lod`),
     // b the sun map's coverage where the map was asked (`SHADOW_DEBUG`).
     // 8: the weather's values about the player: r its snow cover, g its snowing, b the puddles.
+    // 9: where the clouds' shadow map is read for this point: rg its uv, b 1 past the map.
+    if debug == 9u {
+        let uv = cloud_shadow_uv(in.rel);
+        let past = select(0.0, 1.0, any(uv < vec2(0.0)) || any(uv > vec2(1.0)));
+        return vec4(clamp(uv, vec2(0.0), vec2(1.0)), past, lit.a);
+    }
     if debug == 8u {
         return vec4(clamp(scene.ground.x, 0.0, 1.0), clamp(scene.ground.y, 0.0, 1.0), clamp(scene.canopy.z, 0.0, 1.0), lit.a);
     }
@@ -790,7 +796,9 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
             // read as the wet ground round it (PC shpd4: puddles over a quarter of the field and
             // none seen); a puddle shows by the sky in it.
             let film = lit.rgb * 0.3 + sky_color(reflect(-v, pn)) * mix(0.3, 1.0, fresnel);
-            lit = vec4(mix(lit.rgb, film, pool), lit.a);
+            // (Its strength x where it rains, as Bliss's Puddle_shape x noPuddleAreas: the share of
+            // cells alone left full puddles on the snow plains, lkrdA3.)
+            lit = vec4(mix(lit.rgb, film, pool * rains_here), lit.a);
         }
     }
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).

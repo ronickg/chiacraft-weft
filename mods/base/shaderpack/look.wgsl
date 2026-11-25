@@ -1735,6 +1735,17 @@ fn cloud_fuzz(cell: vec2<f32>) -> f32 {
 const CLOUD_SHADOW_SPAN: f32 = 4096.0;
 
 // The soft clouds' shadow at `rel` from their map, 1 out of it or without it.
+// Where the clouds' shadow map is read for camera-relative `rel` (debug view 9; as `soft_cloud_shadow`).
+fn cloud_shadow_uv(rel: vec3<f32>) -> vec2<f32> {
+    let l = light_dir();
+    if scene.cloud_shadow.x < 0.5 || l.y < 0.03 {
+        return vec2(0.5);
+    }
+    let t = textures[u32(scene.cloud_shadow.x) - 1u];
+    let half = i32(scene.cloud_shadow.y) / 2;
+    let mid = textureLoad(t, vec2(half, half), 0).g;
+    return (rel.xz + l.xz * (mid - rel.y) / l.y) / CLOUD_SHADOW_SPAN + 0.5;
+}
 fn soft_cloud_shadow(rel: vec3<f32>) -> f32 {
     let l = light_dir();
     if l.y < 0.03 {
@@ -2609,7 +2620,7 @@ fn fog_hour_weights() -> vec4<f32> {
 // the land about the player lies under snow (`scene.ground.x`, its air's snow cover, eased): Bliss's
 // gate is the player's biome, not what falls, and our snow plains took rain and puddles (lkrdA2).
 fn rain_fog_at(y: f32) -> f32 {
-    let snowy = max(clamp(scene.ground.y, 0.0, 1.0), clamp(scene.ground.x, 0.0, 1.0));
+    let snowy = max(clamp(scene.ground.y, 0.0, 1.0), smoothstep(0.2, 0.6, scene.ground.x));
     return (1.0 - smoothstep(-6.0, 6.0, y - (SEA_LEVEL + scene.canopy.w))) * (1.0 - snowy);
 }
 // The sky light where the eye is (`scene.frame_look.y`, eased by the engine), as Bliss weights the
