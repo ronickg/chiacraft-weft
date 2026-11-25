@@ -320,9 +320,8 @@ const ATM_NIGHT_FLOOR: f32 = 1.0;
 // with the chain. Ours were set for the per-hour exposures; under Bliss's one log curve the night
 // came out much brighter than Bliss's dark navy (lkmxC1), whose moon is 1/1250 of its sun.
 const OPT_CHAIN_NIGHT: u32 = 73u;
-// The sun's light outside the air with the chain: the blackbody colour of 4300 K (Ronald's profile;
-// linear, normalised to red 1), and how much of the sky's light's blue goes by day.
-const CHAIN_SUN_K: vec3<f32> = vec3(1.0, 0.67, 0.43);
+// How much of the sky's light's blue goes by day, with the chain. (The sun's light is already the
+// 4300 K of Ronald's profile through the air, `sun_kelvin_linear`, since 11-06.)
 const CHAIN_AMBIENT_GREY: f32 = 0.4;
 fn sky_phys_on() -> bool {
     return scene.frame.x > 0.5 && scene.frame_look.x > 0.5 && fantasy_opt(OPT_SKY_PHYS) > 0.5;
@@ -375,6 +374,7 @@ fn atm_sky(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3
     let low = clamp((1.0 - abs(sun.y)) * 3.0 - clamp(pow(sun.y + 0.6, 5.0), 0.0, 1.0) * 3.0, 1.0, 1.8);
     var through = vec3(1.0);
     var s_sun = vec3(0.0);
+    var s_mie = vec3(0.0);
     var s_moon = vec3(0.0);
     var s_multi = vec3(0.0);
     for (var i = 0; i < 10; i++) {
@@ -388,12 +388,18 @@ fn atm_sky(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3
         let mie = ATM_MIE * d.y * step;
         let to_sun = exp(-atm_toward(p, sun) * ATM_SUN_PATH);
         let to_moon = exp(-atm_toward(p, moon));
-        s_sun += (ray * ray_s + vec3(mie * mie_s)) * seen * to_sun;
+        s_sun += ray * ray_s * seen * to_sun;
+        s_mie += vec3(mie * mie_s) * seen * to_sun;
         s_moon += (ray * ray_m + vec3(mie * mie_m)) * seen * to_moon;
         s_multi += (ray + vec3(mie)) * seen * to_sun * low;
         through *= kept;
     }
-    let lit = s_sun + s_multi * ATM_MULTI / (4.0 * 3.14159);
+    // The glow round the sun (Mie: the sun's own light scattered forward) in the sun's colour, the
+    // 4300 K of Ronald's profile at the same brightness; the blue (Rayleigh) by a white sun. Bliss's
+    // dawn glow is a deep gold where ours, all white, went pale cream (lkmxI1 sunup); the 4300 K sun
+    // on Rayleigh too turned the noon sky grey-blue (lkmxP1).
+    let warm = sun_kelvin_linear() / luma(sun_kelvin_linear());
+    let lit = s_sun + s_mie * warm + s_multi * ATM_MULTI / (4.0 * 3.14159);
     return (lit * ATM_SUN + s_moon * ATM_SUN * ATM_MOON * moon_k) * ATM_SCALE;
 }
 // The sky-view texture's direction for texel (`x`, `y`) of its 128 x 64, and back.
@@ -779,15 +785,6 @@ fn palette_now() -> Palette {
         p.ambient *= mix(1.0, shade_k, low * evening * (1.0 - rain_amount()));
     }
     if bliss_chain() {
-        // The sun's light as Bliss's: its colour the 4300 K of Ronald's profile through the air
-        // toward the sun (the same air as the sky's, `atm_toward`), at our palette's brightness. A
-        // deep gold at sunrise where ours went pale cream through the chain (lkmxH1 sunup), warm
-        // white at noon (Bliss's sunlit stone beige where ours stayed grey, its cave rows).
-        let up = normalize(vec3(scene.sun.x, max(scene.sun.y, 0.03), scene.sun.z));
-        let through = exp(-atm_toward(vec3(0.0, ATM_GROUND + 100.0, 0.0), up) * ATM_SUN_PATH);
-        let tint = CHAIN_SUN_K * through;
-        // (The sun's only: at night `p.sun` is the moon's light.)
-        p.sun = mix(p.sun, tint * (luma(p.sun) / max(luma(tint), 1e-4)), smoothstep(-0.06, 0.0, scene.sun.y));
         // The sky's light by day half its blue: Bliss's is the sky's average with its clouds (grey-
         // white) in it, and its shade reads a neutral grey where ours stood cold blue-grey (cave rows).
         let day = smoothstep(-0.02, 0.1, scene.sun.y);
@@ -1247,7 +1244,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         if rain_amount() > 0.0 {
             // Bliss's: toward the sky's average, darker, low down most.
             let wet = rain_amount() * (1.0 - smoothstep(-0.1, 0.9, dir.y) * 0.6);
-            c = mix(c, vec3(luma(c)) * vec3(0.76, 0.8, 0.86) - vec3(0.12) * scene.weather.w * luma(c), wet);
+            // At 0.55 of its brightness: Bliss's rain sky is a dark slate (its rain vista), ours a
+            // pale grey-white at nearly the clear sky's (lkmxI1).
+            c = mix(c, vec3(luma(c)) * vec3(0.76, 0.8, 0.86) * 0.55 - vec3(0.12) * scene.weather.w * luma(c), wet);
         }
         return max(c, vec3(0.0));
     }
@@ -2889,7 +2888,11 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         // into the sky's colour level with it (Bliss's, composite1).
         let dist = length(rel);
         let dir = rel / max(dist, 1e-4);
-        let end = scene.params.y;
+        // In rain the engine pulls the fog's end in to 170 blocks (its rain mist, `environment.w`
+        // its weight): past it all stood the sky's pale colour, a white wall over the land (lkmxI1
+        // rain vista). The rain's fog is in the march (Bliss's), so the border stays where the
+        // land ends, at the march's far end while the rain mist is on.
+        let end = mix(scene.params.y, max(scene.params.y, MIST_MARCH_FAR), clamp(scene.environment.w, 0.0, 1.0));
         let edge = smoothstep(end * 0.84, end, dist);
         var out = c_in;
         if edge > 0.0 {

@@ -451,7 +451,11 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         // The sky's light from above, brighter on the tops; under a storm the bellies darker.
         // Grey-blue shaded bases, bright tops: evenly lit, a clear day's read as flat white cut-outs.
         let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a)) * mix(1.0, 0.72, cloud_low_sun()) * select(1.0, CLOUD_SKY_HDR, scene.frame.x > 0.5);
-        var c = (sun * direct * powder * 0.9 + ambient) * albedo;
+        // With the chain at night the sky's light on them at 0.4: lit by their sky alone they still
+        // stood well above it, white-blue over the navy, where Bliss's are barely lighter than its
+        // sky (lkmxI1 night clouds; the moon's light cut to 0.06 moved them little).
+        let night_amb = select(1.0, mix(1.0, 0.4, smoothstep(-0.12, -0.3, scene.sun.y)), bliss_chain());
+        var c = (sun * direct * powder * 0.9 + ambient * night_amb) * albedo;
         if scene.frame.x > 0.5 {
             // In the HDR world bright undersides, as Bliss's: the light scattered many times inside
             // (its slow lobe, falling off a third as fast) and more of the sky's from below. Seen
