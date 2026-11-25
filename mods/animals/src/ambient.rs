@@ -76,7 +76,56 @@ pub fn init(r: &mut Registry) {
         .on_enter_liquid(When::any(), Then::die());
     r.world_tick(tell);
     r.client_frame(frame);
+    // What lives where you stand and what flies now; `force` sets what flies round you (any of
+    // soar, gull, owl, fish, dusk; the sprites the place's or an eagle's, a gull's, a great horned
+    // owl's) until `off`, for looks in a place that has none.
+    r.command("ambient", "[what:text]", |cmd| {
+        let w = cmd.world();
+        let player = cmd.player();
+        let Some(st) = w.entity(player) else { return };
+        let what = cmd.text("what").unwrap_or("").to_string();
+        let mut words = what.split_whitespace();
+        match words.next() {
+            Some("off") => {
+                FORCED.lock().unwrap().retain(|(p, _)| *p != player);
+            }
+            Some("force") => {
+                let life = am::life_in(name_of(abi::entry_kind::BIOME, w.biome(st.pos.block().to_array())));
+                let mut n = am::Now::default();
+                for word in words {
+                    match word {
+                        "soar" => (n.soar, n.soarers) = (if life.soar != 0 { life.soar } else { 1 }, am::SOARERS as u8),
+                        "gull" => (n.gull, n.gulls) = (3, am::GULLS as u8),
+                        "owl" => n.owl = if life.owl != 0 { life.owl } else { 4 },
+                        "fish" => (n.fish, n.fish_rate) = (5, n.fish_rate.max(10)),
+                        "dusk" => n.fish_rate = (am::FISH_DUSK * 10.0) as u8,
+                        _ => {}
+                    }
+                }
+                let mut forced = FORCED.lock().unwrap();
+                forced.retain(|(p, _)| *p != player);
+                forced.push((player, n.pack()));
+            }
+            _ => {}
+        }
+        let block = st.pos.block().to_array();
+        let biome = name_of(abi::entry_kind::BIOME, w.biome(block));
+        let on_you = w.component(Holder::entity(player), &NOW).unwrap_or(0);
+        let forced = FORCED.lock().unwrap().iter().any(|(p, _)| *p == player);
+        cmd.reply(
+            "command.animals.ambient",
+            &[
+                Arg::Text(biome),
+                Arg::Text(&format!("{:?}", am::life_in(biome))),
+                Arg::Text(&format!("{:?}", am::Now::unpack(on_you))),
+                Arg::Int(forced as i64),
+            ],
+        );
+    });
 }
+
+/// Players whose word `/ambient force` set, and the word.
+static FORCED: Mutex<Vec<(u64, u32)>> = Mutex::new(Vec::new());
 
 /// Every `TELL_EVERY` ticks, what flies and jumps round each player now. Spectators are not in
 /// `players()`: scripts that look at it play in creative.
@@ -93,7 +142,13 @@ fn tell(w: &World) {
         let Some(st) = w.entity(player) else { continue };
         let block = st.pos.block().to_array();
         let life = am::life_in(name_of(abi::entry_kind::BIOME, w.biome(block)));
-        let n = am::now(life, hour, sunset, w.raining_at(block), winter).pack();
+        let forced = FORCED
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(p, _)| *p == player)
+            .map(|&(_, n)| n);
+        let n = forced.unwrap_or_else(|| am::now(life, hour, sunset, w.raining_at(block), winter).pack());
         if let Some(v) = w.component_mut(player, &NOW) {
             *v = n;
         }
@@ -246,7 +301,9 @@ fn frame(c: &Client) {
         s.soarers.clear();
     }
     if now_word.soarers > 0 {
-        let gone = s.thermal.is_none_or(|m| far(m.at) || (m.at[1] - me[1]).abs() > 24.0);
+        let gone = s
+            .thermal
+            .is_none_or(|m| far(m.at) || (m.at[1] - me[1]).abs() > 24.0);
         if gone {
             s.thermal = Some(s.middle(me, 24.0, am::THERMAL_DRIFT));
         }
@@ -264,7 +321,10 @@ fn frame(c: &Client) {
         let m = s.thermal.unwrap();
         for b in s.soarers.clone() {
             let (at, vel, rate) = on_circle(&b, &m, t);
-            drop(c.spawn_particles(banked(now_word.soar, rate), at).velocity(vel));
+            drop(
+                c.spawn_particles(banked(now_word.soar, rate), at)
+                    .velocity(vel),
+            );
             spawned += 1;
         }
     } else {
@@ -302,7 +362,10 @@ fn frame(c: &Client) {
         let m = s.flock.unwrap();
         for b in s.gulls.clone() {
             let (at, vel, rate) = on_circle(&b, &m, t);
-            drop(c.spawn_particles(banked(now_word.gull, rate), at).velocity(vel));
+            drop(
+                c.spawn_particles(banked(now_word.gull, rate), at)
+                    .velocity(vel),
+            );
             spawned += 1;
         }
     } else {
@@ -312,7 +375,9 @@ fn frame(c: &Client) {
     // An owl crossing at night: now and then, low over the player and on.
     if now_word.owl == 0 {
         s.owl = None;
-    } else if s.owl.is_none() && s.unit() < dt / am::OWL_EVERY as f64 {
+    } else if s.owl.is_none() && (s.told.owl == 0 || s.unit() < dt / am::OWL_EVERY as f64) {
+        // The first as they come out at dusk (or the player comes into their wood), then now
+        // and then.
         let a = s.unit() * TAU;
         let (dir, side) = ([a.cos(), a.sin()], (s.unit() - 0.5) * 16.0);
         let from = am::OWL_FROM as f64;
@@ -349,8 +414,16 @@ fn frame(c: &Client) {
             let across = am::FISH_ACROSS as f64 * (0.6 + 0.4 * s.unit());
             let leap = am::FISH_LEAP as f64 * (0.75 + 0.25 * s.unit());
             let at = [w[0], w[1] + 0.05, w[2]];
-            drop(c.spawn_particles(&LEVEL[4], at).velocity([a.cos() * across, leap, a.sin() * across]));
-            drop(c.spawn_particles(&SPLASH, at).count(6).spread(0.15).speed(1.2));
+            drop(
+                c.spawn_particles(&LEVEL[4], at)
+                    .velocity([a.cos() * across, leap, a.sin() * across]),
+            );
+            drop(
+                c.spawn_particles(&SPLASH, at)
+                    .count(6)
+                    .spread(0.15)
+                    .speed(1.2),
+            );
             let flight = 2.0 * leap / am::FISH_FALL as f64;
             let down = [at[0] + a.cos() * across * flight, at[1], at[2] + a.sin() * across * flight];
             s.splashes
@@ -367,7 +440,12 @@ fn frame(c: &Client) {
         .collect();
     s.splashes.retain(|(when, _)| *when > began);
     for at in due {
-        drop(c.spawn_particles(&SPLASH, at).count(8).spread(0.2).speed(1.6));
+        drop(
+            c.spawn_particles(&SPLASH, at)
+                .count(8)
+                .spread(0.2)
+                .speed(1.6),
+        );
         spawned += 1;
     }
 

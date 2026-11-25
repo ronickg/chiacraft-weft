@@ -58,6 +58,7 @@ command.animals.line = {0}
 command.animals.pool = {0}
 command.animals.tamed = It is yours now.
 command.animals.points = {0} points to place.
+command.animals.ambient = ambient life here: {0}, {1}; flying now {2} (forced {3})
 command.animals.wild = It is wild again, with new levels.
 item.animals.kibble = Kibble
 screen.animals.favorite = Favorite food: {0}
