@@ -334,8 +334,9 @@ const SKY_DAWN_LINE_K: vec2<f32> = vec2(28.0, 0.85);
 // with no window. Ours had about ten layers round the sun (the away lavender and blue, the cream lobe, the
 // gold, the band, three Mie powers, the wide glow, the sunset fan), each with its own window, ending
 // together 25-30° out as a hard seam from the horizon to the top of the frame (lkmC0-C4). The lobe's g,
-// and how much of the sky's own brightness it adds at the sun (5 at 10°, 1.6 at 20°, 0.6 at 30°).
-const SKY_LOBE: vec2<f32> = vec2(0.8, 10.0);
+// and how much of the sky's own brightness it adds at the sun (2.5 at 10°, 0.8 at 20°, 0.3 at 30°).
+// (10 at first, lklobe1: the glow covered most of the morning sky.)
+const SKY_LOBE: vec2<f32> = vec2(0.8, 5.0);
 // Its colour: the sun's own, this much toward a cream (the low sun's orange alone went saturated).
 const SKY_LOBE_CREAM: f32 = 0.5;
 fn hg_rel(mu: f32, g: f32) -> f32 {
@@ -1034,7 +1035,11 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     // Where the lobe stands in for our layers round the sun: those go, all of them.
     // (Its value past 0 also scales the lobe's strength, for tuning: 1 as made.)
     let lobe_amt = max(fantasy_opt(OPT_SKY_LOBE), 0.0);
-    let lobe_k = seen * min(lobe_amt, 1.0);
+    // Mornings and evenings alike (the evening's low sun kept the old layers' seam, lklobe1 s18:
+    // cream to blue some 25° out, as the morning's was).
+    let low_both = clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0) * (1.0 - dawn_sky()) * (1.0 - rain_amount())
+        * (1.0 - smoothstep(0.25, 0.45, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y);
+    let lobe_k = low_both * sky_seen * min(lobe_amt, 1.0);
     let keep = 1.0 - lobe_k;
     // With Bliss's sun the horizon's colour a peach, not the golden key's yellow (hue 40): where the
     // sun's creamed glow fades out it showed through as a faint yellow ring about 7° out (lv15).
