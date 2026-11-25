@@ -189,6 +189,17 @@ fn pt_cached(world: vec3<f32>, n: vec3<f32>, dist: f32, u: vec2<f32>) -> vec4<f3
 
 // A surface met by a ray, lit as the world lights it: its block light, the sun through one more
 // ray, and its indirect light from the cache (the lightmap's sky light until the cache has it).
+// `light_on` with the sun as traced: its direct part not gated by the lightmap's sky light. The
+// world lets the sun in only where the sky light is high (`light_on`'s `open`), to keep its shadow
+// map's gaps out of caves; the traced shadow has no gaps, and with the gate the sun through a 2x2
+// roof hole never reached the cave floor (w41 cave_sky). The ambient-occlusion term is 1 here.
+fn pt_light_on(n: vec3<f32>, light: vec4<f32>, sun: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let c = light_on(n, light, 0.0, 1.0, pos, rel);
+    let sun_part = palette().sun * light_strength() * sun_facing(n) * sun;
+    LIGHT_SUN = sun_part;
+    return c + sun_part;
+}
+
 fn pt_lit(b: RtHit, l: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
     var s = 0.0;
     if dot(b.n, l) > 0.0 && light_strength() > 0.0 {
@@ -196,9 +207,9 @@ fn pt_lit(b: RtHit, l: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
     }
     let c = pt_cached(b.world, b.n, length(b.rel), u);
     if c.a > 0.5 {
-        return pt_albedo(b) * (light_on(b.n, vec4(0.0, b.light.yzw), s, 1.0, b.world, b.rel) + c.rgb);
+        return pt_albedo(b) * (pt_light_on(b.n, vec4(0.0, b.light.yzw), s, b.world, b.rel) + c.rgb);
     }
-    return pt_albedo(b) * light_on(b.n, b.light, s, 1.0, b.world, b.rel);
+    return pt_albedo(b) * pt_light_on(b.n, b.light, s, b.world, b.rel);
 }
 
 // Folds each cell's sums into its light (more samples this frame, a bigger step; never under 1/24,
@@ -317,7 +328,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
     // lightmap gives it (already lowered under cover) and as the open sky would give it.
-    let lit = light_on(n, h.light, sun, 1.0, h.world, h.rel);
+    let lit = pt_light_on(n, h.light, sun, h.world, h.rel);
     if pt.debug == 9u {
         pt_out[at] = vec4(lit, 1.0);
         return;
