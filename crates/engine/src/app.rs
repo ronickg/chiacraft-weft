@@ -1982,20 +1982,6 @@ impl Running {
             Kind::Custom { tag: crate::client::modui::TAG_SLOT, data } => Some(data as u32),
             _ => None,
         });
-        // DIAG (temporary, inventory_hotkeys): what the pointer meets in a menu while a button is
-        // down or pressed.
-        if self.input.held_button(0) || self.input.pressed_button(0) || self.input.pressed_button(1) {
-            let what = hovered.map(|h| format!("{h}:{:?}", std::mem::discriminant(&ui.nodes[h].kind)));
-            log::info!(
-                "DIAG menu_input frame {} cursor {:?} hovered {what:?} slot {slot:?} pressed {}{} held0 {} picking {:?}",
-                self.frame_no,
-                cursor,
-                self.input.pressed_button(0) as u8,
-                self.input.pressed_button(1) as u8,
-                self.input.held_button(0),
-                self.game.as_ref().map(|g| g.client.picking.clone())
-            );
-        }
         if let Some(g) = &mut self.game {
             let shift = self.input.held_key(Key::Code(KeyCode::ShiftLeft)) || self.input.held_key(Key::Code(KeyCode::ShiftRight));
             // Pressing with a stack on the cursor starts a drag; releasing over one slot is
