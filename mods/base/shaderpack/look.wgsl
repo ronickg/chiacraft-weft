@@ -238,14 +238,6 @@ const OPT_BANK_TOP: u32 = 67u;
 // The banks' march steps (`base:look_mist_steps`, the quality row: 0 as made = 8; Low 4, never off).
 const OPT_MIST_STEPS: u32 = 68u;
 const OPT_SKY_LOBE: u32 = 69u;
-// The soft clouds' blur, test switches (`base:look_cloud_test`, bits; 0 as made): 1 no history of
-// their own (each frame's trace alone, the world's TAA averaging it, as Bliss's), 2 a sharper
-// upsample (Catmull-Rom in place of bilinear), 4 the edges' erosion as before the HDR world's
-// gentler one (128 blocks, 0.5).
-const OPT_CLOUD_TEST: u32 = 70u;
-fn cloud_test(bit: u32) -> bool {
-    return (u32(max(fantasy_opt(OPT_CLOUD_TEST), 0.0) + 0.5) & bit) != 0u;
-}
 // How much of it this morning: the option, in the east, with the sun under the horizon (full from
 // 1.7° down, none at 1° up) and not yet night (gone by about 12° down, where the night sky takes it).
 fn dawn_sky() -> f32 {

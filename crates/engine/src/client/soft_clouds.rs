@@ -1,6 +1,7 @@
-//! Soft clouds (chiacraft): a pack's volumetric clouds traced at a quarter of the pixels each way
-//! and blended with last frame's, as Photon and Horizon Zero Dawn do, so a soft cloud of many
-//! steps costs what a blocky one does. Off (`core:soft_clouds`), or with a pack without the
+//! Soft clouds (chiacraft): a pack's volumetric clouds traced at fewer pixels (half each way,
+//! `core:cloud_res`) and, without TAA, blended with last frame's, as Photon and Horizon Zero Dawn
+//! do, so a soft cloud of many steps costs little; with TAA the world's history does the blending
+//! at full size, as Bliss's. Off (`core:soft_clouds`), or with a pack without the
 //! entries, the sky's clouds draw as they always did.
 //!
 //! Each frame, after the opaque world is copied (`post::copy_behind`, whose depth the trace stops
@@ -14,8 +15,8 @@ use weft_render::*;
 
 use crate::gpu_layout::bind;
 
-/// The trace target's size for a world of `w` × `h` pixels: a quarter each way as made, or what
-/// `core:cloud_res` sets (2 half, as Bliss's, 1 full).
+/// The trace target's size for a world of `w` × `h` pixels: `core:cloud_res` (2 half each way, as
+/// Bliss's; 4 a quarter, 1 full).
 fn quarter(w: u32, h: u32) -> (u32, u32) {
     let d = crate::settings::cloud_res();
     (w.div_ceil(d).max(1), h.div_ceil(d).max(1))
