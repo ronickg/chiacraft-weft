@@ -1401,16 +1401,9 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     let k = mix(1.0, clamp(fantasy_opt(OPT_CHAIN_NIGHT), 0.0, 1.0), smoothstep(-0.04, -0.2, scene.sun.y));
                     PAL = Palette(p.zenith * k, p.horizon * k, p.glow * k, land_sun(sun, moon_k), land_ambient(clear / 9.0));
                     PAL_READ = true;
-                    // Its clouds there are lit as in its sky-with-clouds map (deferred.fsh): by the
-                    // light source x 2 / 5 in the map's units (1.07 x the land's sun in ours) and by
-                    // the sky seen straight down, not by the clear sky's average: lit by that blue,
-                    // a rain deck averaged blue and so did the land under it (lkmxBC1's snow).
-                    let down_dir = vec3(0.0, -1.0, 0.0);
-                    let da = atm_march(down_dir, sun, moon, sky_k, atm_background(mean), 4, 2);
-                    let down = atm_rain(da.light, down_dir, da.through, mean);
                     var cloudy = vec3(0.0);
                     for (var i = 0; i < 9; i++) {
-                        let cl = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k) * 1.07, down);
+                        let cl = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), bc_sky_light(clear / 9.0));
                         cloudy += wet[i] * cl.a + cl.rgb;
                     }
                     return vec4(land_ambient(cloudy / 9.0), 1.0);
