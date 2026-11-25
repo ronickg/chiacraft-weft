@@ -89,6 +89,14 @@ then spoiled (eating it: chance of food poisoning). Cooking resets and multiplie
 x1.5), salted, smoked and dried foods keep much longer; meals from several ingredients add theirs
 and keep the best freshness.
 
+**Rot by place** (`vitals::rot`, 11-25): where food sits changes how fast it ages, so a cellar, an
+ice house and a cool room are worth building. The keeps were tuned in play as game days, so they
+stay as they are and count for a cool larder (15 °C); the place only speeds that up or slows it
+down, by the Q10 rule real spoilage follows (microbes grow 2-3 times faster per 10 °C, Labuza;
+2.5 fits the USDA's fridge-to-room gap for steak, about 5 to 1). It's capped at x4 so a desert
+noon still leaves raw meat 20 minutes, and frozen food keeps for months (x0.05), as frozen meat
+does. Why not the growing pace: on it a real day of raw meat in a room would be 77 seconds.
+
 **Body temperature.** The air temperature where you stand, in °C:
 
 - the biome's temperature (the engine's climate) mapped to °C;
