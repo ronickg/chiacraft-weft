@@ -2514,6 +2514,20 @@ impl Backend for VulkanBackend {
                 took.iter().map(|t| t.0).sum::<f32>(),
                 slowest.join(", ")
             );
+            // Every pipeline over a second, in the order asked (for finding what a driver is slow
+            // to compile: the world's plain set first, then its calm sets).
+            let mut all: Vec<_> = took.iter().filter(|t| t.0 >= 1.0).collect();
+            all.sort_by_key(|t| t.1);
+            let all: Vec<String> = all
+                .iter()
+                .map(|&&(t, i)| {
+                    let p = &prepared[i];
+                    format!("#{i} {}/{} {t:.1}", p.vs_name.to_string_lossy(), p.fs.map_or("-".into(), |_| p.fs_name.to_string_lossy()))
+                })
+                .collect();
+            if !all.is_empty() {
+                log::info!("warmed pipelines over 1 s: {}", all.join(", "));
+            }
         }
         for p in prepared {
             unsafe {

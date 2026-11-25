@@ -835,6 +835,7 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
                 "fps_limit",
                 "fullscreen",
                 "renderer",
+                "terrain_gpu",
             ],
         ),
         ("core:controls", &["sensitivity", "invert_y", "auto_jump"]),
