@@ -272,15 +272,7 @@ const MIST_SEA_DENSE: f32 = 9.0;
 // so the rims break up differently from bank to bank.
 const MIST_SHAPE: vec4<f32> = vec4(36.0, 18.0, 0.5, 0.75);
 const MIST_ERODE: vec3<f32> = vec3(1.5, 3.0, 0.4);
-// Its light from the sun (Bliss's fog: no shade of its own, the land's and the clouds' shadow at each
-// step): a sharp peak toward the sun and a broad forward tail, about 12 toward it, a quarter across,
-// a fifteenth away (peak, its sharpness, tail, its fall), so the mist's sunny side toward a low sun
-// glows and away from it the sky's light alone shows.
-const MIST_SEA_PHASE: vec4<f32> = vec4(9.4, 87.0, 2.35, 6.0);
-// The broad tail of it (share, fall): with only a sharp peak and a tail, the 15-40° round the sun,
-// most of the vista, got half Bliss's sun against the sky (its fog: about 12.5 at the sun, 3.4 at
-// 14°, 1.7 at 30°, a quarter across, 0.07 away; Planner's read of overworld_fog.glsl:54-71, 123).
-const MIST_SEA_TAIL: vec2<f32> = vec2(0.76, 1.19);
+// Its light from the sun: `bank_phase` (Bliss's fog's weights).
 // The sun's light in it: how much of the low sun's orange goes to cream, how bright, and the most the
 // forward peak may give (Bliss's sunlit tops are cream and brighter than the land; ours took the
 // dawn sun's orange and read as sand, and from inside the mist the uncapped peak blew the sky
@@ -2066,17 +2058,15 @@ fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
     let fall = exp(-MIST_SEA_FALL * look_opt(OPT_BANK_FALL, 1.0) * max(p.y - top, 0.0));
     return k * (banks * fall + even);
 }
-// `x` eased toward `cap` instead of clipped at it: clipped, the forward peak lay flat out to where
-// it fell under the cap and drew a hard-edged disc a third of the frame wide round the sun (lv9).
-fn soft_cap(x: f32, cap: f32) -> f32 {
-    return cap * (1.0 - exp(-x / cap));
-}
-// The banks' sunlight by the angle from the sun (`MIST_SEA_PHASE`).
-// Only the sharp peak (within a few degrees of the sun) is eased to the cap (`MIST_SEA_CREAM.z`).
+// The banks' sunlight by the angle from the sun.
+// Uncapped now, Bliss's weights (its fog's phase, `overworld_fog.glsl:54-62`, x5 at :123, method only):
+// with a fall in 2^(-15 l^0.3) and one in 2^(-12.5 sqrt l) / 2 of l = (1 - mu) / 2, about 12.5 at the
+// sun, 3.4 at 14°, 1.7 at 30°, 0.24 across and 0.07 away. Capped at 1.2 near the sun (d8f11ff94, against
+// a blown disc) the mist toward a low sun was lit about as across it: no backlit gold glow, no dark
+// crowns against it (Ronald, 11-24: "how the sun shines in it is also different").
 fn bank_phase(mu: f32) -> f32 {
-    let off = 1.0 - mu;
-    return soft_cap(MIST_SEA_PHASE.x * exp(-MIST_SEA_PHASE.y * off), MIST_SEA_CREAM.z)
-        + MIST_SEA_PHASE.z * exp(-MIST_SEA_PHASE.w * off) + MIST_SEA_TAIL.x * exp(-MIST_SEA_TAIL.y * off);
+    let l = clamp(0.5 - 0.5 * mu, 0.0, 1.0);
+    return (1.5 * exp2(-15.0 * pow(l, 0.3)) + exp2(-6.25 * sqrt(l))) * 5.0;
 }
 // How much of what lies `rel` away (camera relative) the banks hide, 0..1, walked as `bank_march`
 // walks them (its steps, without the light), for the bloomy fog in `post.wgsl`: Bliss blends the
