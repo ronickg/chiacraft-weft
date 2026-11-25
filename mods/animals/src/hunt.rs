@@ -231,7 +231,7 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
             && s.pack_prey().is_some()
             && let Some(l) = with_pack(w, id, st, s.name)
         {
-            return keep_up(w, id, st, l);
+            return follow_on(w, id, st, l, w.game_time());
         }
         return false;
     }
@@ -283,7 +283,7 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
             return false;
         }
         if let Some(l) = w.component(id, &FOLLOW).map(|f| f[0]).filter(|&l| l != 0) {
-            return keep_up(w, id, st, l);
+            return follow_on(w, id, st, l, now);
         }
         return w.navigating(id);
     }
@@ -401,13 +401,16 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
     // own way (ai1124_wolves1d).
     let hungry = |l: u64| {
         w.component(l, &PROWL).is_some_and(|p| now < p)
+            // Or out on a hunt: wolvesPack3's second hungry wolf dropped its leader as it joined
+            // a chase (too fed to prowl itself) and prowled alone 240 s, far from both.
+            || w.component(l, &HUNT).is_some_and(|h| h[0] != 0)
             || w.component(l, &ANIMAL)
                 .is_some_and(|a| (a.food as f32) < a.stat(species::FOOD) * HUNTS_AT)
     };
     if let Some(l) = leader.filter(|&l| hungry(l)) {
         w.component_mut(id, &FOLLOW).map(|f| f[0] = l);
         w.component_mut(id, &PROWL).map(|p| *p = until);
-        return keep_up(w, id, st, l);
+        return follow_on(w, id, st, l, now);
     }
     w.component_mut(id, &FOLLOW).map(|f| f[0] = 0);
     if w.component(id, &PROWL).is_some_and(|p| now < p) && w.navigating(id) {
@@ -510,6 +513,26 @@ fn with_pack(w: &World, id: u64, st: &EntityState, name: &str) -> Option<u64> {
     crate::rest::stop(w, id);
     w.component_mut(id, &FOLLOW).map(|f| f[0] = leader);
     Some(leader)
+}
+
+/// It follows its leader (`keep_up`), and joins the hunt that one is on once within
+/// `PACK_RANGE` of it: a follower behind a leader already chasing kept up and never hunted
+/// (wolvesPack3: a pack of 2 while a third hungry one trailed).
+fn follow_on(w: &World, id: u64, st: &EntityState, leader: u64, now: u64) -> bool {
+    let prey = w.component(leader, &HUNT).map_or(0, |h| h[0]);
+    if prey != 0
+        && w.entity(leader)
+            .is_some_and(|l| dist2(l.pos, st.pos) < PACK_RANGE * PACK_RANGE)
+        && let Some(c) = w.component_mut(id, &HUNT)
+        && c[0] == 0
+    {
+        *c = [prey, now, now + LOOK_EVERY, 1];
+        w.component_mut(id, &FOLLOW).map(|f| f[0] = 0);
+        w.component_mut(id, &PROWL).map(|p| *p = 0);
+        weft_sdk::info!("animal {id} joins {leader}'s hunt of {prey}");
+        return true;
+    }
+    keep_up(w, id, st, leader)
 }
 
 /// A pack's member keeps within `needs::PACK_FOLLOW` of the leader it follows as they prowl, at
