@@ -162,7 +162,7 @@ SMALL = [
     ("hares_mice", [("hare", 2, -8, -8), ("mountain_hare", 2, 4, -8), ("wood_mouse", 3, -8, 4), ("field_vole", 3, 4, 4)], 1, 1),
     ("cretaceous_small", [("kryptobaatar", 3, -8, -8), ("priscagama", 3, 4, 4)], 1, 1),
     ("cat_dog", [("cat", 2, -8, -8), ("chihuahua", 2, 4, 4)], 1, 1),
-    ("fish", [("brown_trout", 2, -2, -2), ("pacu", 2, 0, -2), ("lungfish", 2, -2, 1), ("lycoptera", 3, 1, 1)], 4, 3),
+    ("fish", [("brown_trout", 2, -2, -2), ("pacu", 2, 0, -2), ("lungfish", 2, -2, 1), ("lycoptera", 3, -2, 3)], 4, 3),
 ]
 s = head("small", [
     "Animal AI coverage, small animals and fish. Parts: hares, mountain hares, mice and voles; the Cretaceous's kryptobaatar",

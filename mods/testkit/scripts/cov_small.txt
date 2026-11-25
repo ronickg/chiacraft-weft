@@ -187,9 +187,9 @@ chat /tk spawn animals:pacu 600 68 542
 chat /tk spawn animals:pacu 602 68 542
 chat /tk spawn animals:lungfish 598 68 545
 chat /tk spawn animals:lungfish 600 68 545
-chat /tk spawn animals:lycoptera 601 68 545
-chat /tk spawn animals:lycoptera 603 68 545
-chat /tk spawn animals:lycoptera 605 68 545
+chat /tk spawn animals:lycoptera 598 68 547
+chat /tk spawn animals:lycoptera 600 68 547
+chat /tk spawn animals:lycoptera 602 68 547
 wait 2
 chat /animalprof food 0.3
 chat /animalprof water 0.3

@@ -162,6 +162,30 @@ vole_sit; scratch, groom on lizard_bask; graze on chihuahua_adult and cat; groom
 stare, alarm on cat_sit; groom on cat_lie; idle clips on the fish (flinch, sniff, groom, look, play,
 scratch on lungfish, pacu, lycoptera, brown_trout, fish_flop): fish should get no idle life.
 
+Run 2 (b7ef3aaf7, `r2_small_m-171615`, 327 s). Hares, mountain hares, mice and voles drank to full; hares,
+mice, voles, kryptobaatars and priscagamas ate; the insect eaters now get hungry (mice and voles 22-27 % at
+the end; 946ea9fee holds). No "runs from" after the walk-in on land (not tested: the hits killed the
+young hare and kryptobaatar hit, 1 health each). A wild cat hunted, killed and ate a chihuahua (2.5 kg, in its
+prey sizes; a question for Planner: should hunters leave the dogs alone?). Fish: 8 of 9 alive at y 68-69,
+swimming; the ninth lycoptera was spawned outside the pool and suffocated (script, fixed). A hit trout swam
+on: fish now dart off from what hurts them ("fish N hurt by M: darts off"), and darting from a walker is
+logged. Fish don't eat or drink and don't get hungry, by design. Vole 12's "health 0/0" is a young vole's
+0.4 rounded.
+
+| Species | eat | drink | wander | flee | shot |
+|---|---|---|---|---|---|
+| hare | pass (tall grass) | pass | pass | not tested | r2 1 |
+| mountain_hare | not tested (no eat line) | pass | pass | not tested | r2 1 |
+| wood_mouse | pass (grass), gets hungry | pass | pass | not tested | r2 1 |
+| field_vole | pass (one), gets hungry | pass | pass | not tested | r2 1 |
+| kryptobaatar | pass | pass | pass | not tested | r2 2 |
+| priscagama | pass | pass | pass | not tested | r2 2 |
+| cat | pass (killed a chihuahua) | pass | pass | pass ("runs from" when hit) | r2 3 |
+| chihuahua | pass | pass | pass | pass (ran from the cat) | r2 3 |
+| fish (4 kinds) | n/a | n/a | pass (swim) | fail: no dart when hit (fixed, to re-run) | r2 4 (dark) |
+
+Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_small_m-171615/r2_small_grid.jpg`.
+
 ## Big dinosaurs and bosses (cov_bosses.txt)
 
 Run 2 (b7ef3aaf7, `r2_bosses_m-165534`, 408 s). The bosses: summon, aggro, death with loot and Drenkaun's
