@@ -29,7 +29,7 @@ pub fn video(b: ConfigBuilder<'_>) -> ConfigBuilder<'_> {
 
 /// The knobs, their settings' names and ranges as `look.rs` registers them (change both together).
 /// Not the ones a feature's row sets (leaf holes, mist banks, shadow reach: `video.rs`' parts).
-pub static KNOBS: [(&Config<f32>, &str, f32, f32); 54] = {
+pub static KNOBS: [(&Config<f32>, &str, f32, f32); 59] = {
     use crate::look::*;
     [
         (&LOOK_EXPOSURE, "look_exposure", 0.5, 2.0),
@@ -86,6 +86,11 @@ pub static KNOBS: [(&Config<f32>, &str, f32, f32); 54] = {
         (&LOOK_BANK_SUN, "look_bank_sun", 0.0, 5.0),
         (&LOOK_BANK_SHADE, "look_bank_shade", 0.0, 10.0),
         (&LOOK_MIST_CLOCK, "look_mist_clock", 0.0, 3.0),
+        (&LOOK_BANK_FALL, "look_bank_fall", 0.0, 4.0),
+        (&LOOK_BANK_EDGE, "look_bank_edge", 0.0, 1.0),
+        (&LOOK_BANK_TOP, "look_bank_top", 0.0, 2.0),
+        (&LOOK_MIST_STEPS, "look_mist_steps", 0.0, 16.0),
+        (&LOOK_SKY_LOBE, "look_sky_lobe", 0.0, 2.0),
     ]
 };
 
