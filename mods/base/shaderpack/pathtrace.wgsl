@@ -483,8 +483,9 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // surface (one light drawn among those near, one shadow ray; frames average it). The
     // lightmap's block light keeps its colour and reach; the held light is not a block's.
     let block = max(light_on(n, h.light, 0.0, 1.0, h.world, h.rel) - light_on(n, vec4(h.light.x, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel), vec3(0.0));
+    var block_vis = vec2(1.0, 0.0);
     if max(block.r, max(block.g, block.b)) > 1e-4 {
-        let block_vis = pt_block_visibility(h.world, h.rel, ng, lift, px);
+        block_vis = pt_block_visibility(h.world, h.rel, ng, lift, px);
         diffuse -= block * (1.0 - block_vis.x);
     }
     // Into the cache: the indirect light found here (one pixel in four a frame).
@@ -559,7 +560,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         diffuse *= k;
         specular = specular * k + added / max(s_alb, vec3(1e-3));
     }
-    if pt.debug != 0u && pt.debug < 7u {
+    if (pt.debug != 0u && pt.debug < 7u) || pt.debug >= 14u {
         var out = vec3(0.0);
         switch pt.debug {
             case 1u: { out = albedo; }
@@ -568,6 +569,15 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 4u: { out = bounce; }
             case 5u: { out = specular * s_alb; }
             case 6u: { out = albedo * pt_cached(h.world, ng, dist, pt_noise(px + vec2(3.0, 11.0))).rgb; }
+            // 14: the lightmap's block light at the surface (as light, without the texture).
+            case 14u: { out = block; }
+            // 15: the traced block lights: green seen, red hidden, blue where no light was drawn,
+            // black where the lightmap gives no block light.
+            case 15u: {
+                if max(block.r, max(block.g, block.b)) > 1e-4 {
+                    out = select(vec3(0.0, 0.0, 1.0), select(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), block_vis.x > 0.5), block_vis.y > 0.5);
+                }
+            }
             default: {}
         }
         pt_out[at] = vec4(out, 0.0);
