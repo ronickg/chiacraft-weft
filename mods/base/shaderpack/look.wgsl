@@ -461,8 +461,31 @@ fn atm_mean(sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3<f32> {
 fn atm_background(mean: vec3<f32>) -> vec3<f32> {
     return max(0.75 * mean, ATM_FLOOR);
 }
+// The sky's average as Bliss keeps it in rain: its sky turns toward last frame's average (`atm_rain`,
+// deferred.fsh), and that average is taken over the turned sky (deferred.vsh), so frame by frame it
+// settles where the two agree, grey where the rain hides the air. Ours turned once, toward the dry
+// air's blue average, and a rain's sky, deck and fog stayed blue (lkmxBC3, lkcdA1's opaque deck the
+// sky's own blue). Settled here in a few rounds, the multiple scattering lit by it as well; in dry
+// weather the one round as before.
+fn atm_rain_mean(sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3<f32> {
+    var m = atm_mean(sun, moon, moon_k);
+    let rounds = select(1, 4, rain_amount() > 0.0);
+    for (var k = 0; k < rounds; k++) {
+        var sum = vec3(0.0);
+        for (var i = 0; i < 9; i++) {
+            let dir = atm_mean_dir(i, sun);
+            let a = atm_march(dir, sun, moon, moon_k, atm_background(m), 4, 2);
+            sum += atm_rain(a.light, dir, a.through, m);
+        }
+        m = sum / 9.0;
+    }
+    return m;
+}
 fn atm_sky(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3<f32> {
-    let mean = atm_mean(sun, moon, moon_k);
+    var mean = atm_mean(sun, moon, moon_k);
+    if rain_amount() > 0.0 {
+        mean = atm_rain_mean(sun, moon, moon_k);
+    }
     let a = atm_march(dir, sun, moon, moon_k, atm_background(mean), 10, 4);
     return atm_rain(a.light, dir, a.through, mean);
 }
