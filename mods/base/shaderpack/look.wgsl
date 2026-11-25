@@ -2343,7 +2343,10 @@ fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
     let cut = mix(cut_lin, smoothstep(0.0, 1.0, cut_lin), edge);
     // A thin even part under the billows, thinning fast with height (`MIST_SEA_EVEN`), as Bliss's
     // uniform fog beside its cloudy one; the billows alone carry the shape.
-    let burn = (1.0 - smoothstep(0.3, 0.65, scene.sun.y)) * mix(MIST_BANK_EVENING, 1.0, smoothstep(-0.1, 0.1, scene.sun.x));
+    // Burnt off by about 27° up (sin 0.45), not 40°: at noon the banks still stood a white veil
+    // over the land under 2 km (lkfwA1: banks off, the far land 152 167 151 against 211 216 207 with
+    // them; Bliss's 157 178 212, whose morning fog has its weight by hour and is gone by midday).
+    let burn = (1.0 - smoothstep(0.2, 0.45, scene.sun.y)) * mix(MIST_BANK_EVENING, 1.0, smoothstep(-0.1, 0.1, scene.sun.x));
     let k = air_mist() * MIST_SEA_DENSE * look_opt(OPT_BANK_DENSE, 1.0) * burn;
     let even = MIST_SEA_EVEN.x * exp2(-MIST_SEA_EVEN.y * max(p.y - (SEA_LEVEL + MIST_SEA_EVEN.z), 0.0));
     if cut <= 0.0 {
