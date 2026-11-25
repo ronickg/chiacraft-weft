@@ -27,7 +27,11 @@ pub fn cover(c: &Client, eye: [f64; 3]) -> Cover {
     let block = |p: [i32; 3]| c.block(p).unwrap_or(0);
     let mut cache = LEAFY.lock().unwrap();
     let cache = cache.get_or_insert_with(HashMap::new);
-    let mut leafy = |state: u32| *cache.entry(state).or_insert_with(|| block_name(state).contains("leaves"));
+    let mut leafy = |state: u32| {
+        *cache
+            .entry(state)
+            .or_insert_with(|| block_name(state).contains("leaves"))
+    };
     let mut places = vec![(head, 2.0f32)];
     for r in ws::SAMPLE_RINGS {
         for (dx, dz) in [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)] {
