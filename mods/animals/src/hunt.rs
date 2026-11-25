@@ -461,7 +461,11 @@ fn keep_up(w: &World, id: u64, st: &EntityState, leader: u64) -> bool {
         return false;
     };
     if dist2(l.pos, st.pos) > PACK_FOLLOW * PACK_FOLLOW {
-        w.navigate(id, l.pos.to_array(), PACK_CATCH_UP);
+        // To its own place beside its leader, not onto it: walked to the leader itself, a pack
+        // stood stacked on one block behind it (reports/Creature AI.md, step 10).
+        let a = (id % 8) as f64 * std::f64::consts::TAU / 8.0;
+        let to = [l.pos.x + a.cos() * PACK_FOLLOW * 0.75, l.pos.y, l.pos.z + a.sin() * PACK_FOLLOW * 0.75];
+        w.navigate(id, to, PACK_CATCH_UP);
     }
     true
 }
