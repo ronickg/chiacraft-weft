@@ -45,6 +45,10 @@ static SITE: Component<[f64; 3]> = Component::named("animal_site");
 /// The water a prowl last reached, `[x, z, until]`: not a leg's goal again until then
 /// (`needs::SITE_AGAIN_SECS`).
 static WATER_SEEN: Component<[f64; 3]> = Component::named("animal_water_seen");
+/// The prey it set off after and what that weighed then, `[id, kg as f32 bits]` (not saved): the
+/// dead can't be read at the kill, and its kind's grown mass fed hunters a young one's carcass as
+/// a grown one's (cov_hunters run 4: a 2.7 kg young capybara eaten as 50 kg).
+static PREY_KG: Component<[u64; 2]> = Component::named("animal_prey_kg");
 
 /// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
 /// a dust storm close both in (`base_api::sight`).
@@ -70,7 +74,9 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&LAST, 0u64, 0);
     r.entity_component(&SITE, [0.0; 3], 0);
     r.entity_component(&WATER_SEEN, [0.0; 3], 0);
+    r.entity_component(&PREY_KG, [0u64; 2], 0);
     for s in &SPECIES {
+        r.edit(s.kind).attach(&PREY_KG);
         r.edit(s.kind).attach(&HUNT);
         r.edit(s.kind).attach(&WARY);
         r.edit(s.kind).attach(&CHARGING);
@@ -91,8 +97,18 @@ pub fn init(r: &mut Registry) {
         for d in b.iter() {
             let Some(a) = w.component(d.source, &ANIMAL) else { continue };
             let Some(s) = a.species().filter(|s| s.hunts()) else { continue };
-            // The prey's own mass if it can still be read (its genes and growth), its kind's if not.
-            let Some(prey) = mass(&w, d.entity).or_else(|| kind_mass(d.kind, None)) else { continue };
+            // The prey's own mass if it can still be read (its genes and growth), else what it weighed
+            // when the killer set off after it, else its kind's.
+            let Some(prey) = mass(&w, d.entity)
+                .or_else(|| {
+                    w.component(d.source, &PREY_KG)
+                        .filter(|p| p[0] == d.entity)
+                        .map(|p| f32::from_bits(p[1] as u32))
+                })
+                .or_else(|| kind_mass(d.kind, None))
+            else {
+                continue;
+            };
             let Some(at) = w.entity(d.source).map(|e| e.pos) else { continue };
             let kind = w.entity(d.source).map(|e| e.kind);
             let mut eaters = vec![d.source];
@@ -368,6 +384,8 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     w.component_mut(id, &PROWL).map(|p| *p = 0);
     w.component_mut(id, &FOLLOW).map(|f| *f = [0; 2]);
     weft_sdk::info!("{} {id} hunts {} ({kg:.1} kg, a pack of {pack})", s.name, t);
+    w.component_mut(id, &PREY_KG)
+        .map(|p| *p = [t, kg.to_bits() as u64]);
     // A pack hunts what it finds together, prey it could take alone too (wolves run deer down
     // as a pack): in ai1124_wolves1b each of three wolves took its own deer alone while the
     // others lay by.
