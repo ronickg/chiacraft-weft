@@ -119,12 +119,20 @@ scratch on lungfish, pacu, lycoptera, brown_trout, fish_flop): fish should get n
 
 | Species | aggro / stands | leash | death | shot |
 |---|---|---|---|---|
-| iguanodont | - | n/a | - | |
-| gastonia | - | n/a | - | |
-| cedarosaurus | - | n/a | - | |
-| wyvern | - | n/a | - | |
-| drenkaun | - | - | - | |
-| borkon | - | - | - | |
+| iguanodont | fail: ran when hit (fixed, to re-run) | n/a | - | grid 1 |
+| gastonia | fail: ran when hit (fixed, to re-run) | n/a | - | grid 1 |
+| cedarosaurus | fail: ran when hit (fixed, to re-run) | n/a | - | grid 1 |
+| wyvern | partial: flinched, stayed, breathed frost twice; no charge | n/a | - | grid 1 (dark) |
+| drenkaun | pass ("summoned", chase, "sweep hits 1 for 14.1") | pass ("back to its place" 60 s after) | - (script: see below) | grid 1 |
+| borkon | pass ("toss hits 1 for 24.9": killed the player) | pass (62 s) | - (script) | grid 1 ("You Died") |
+
+cov_bosses, Mac, 403.9 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_bosses_m-160951.log`; grid
+`~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_bosses_m-161637/cov_bosses_grid.jpg`). The big plant
+eaters ran from the hit (this run was before e91a79201, which has them turn and charge). The bosses'
+deaths weren't reached, the script's fault: its blows went over the boss (looking up), and a boss
+left alone despawns at its altar (the leash), so `/boss kill` after it found "no boss near". The
+script now aims its blows, kills first, then summons again for the leash. The wyvern (a knock-out
+kind) has no answer to a hit but its breath; left as is.
 
 ## Young (cov_young.txt)
 

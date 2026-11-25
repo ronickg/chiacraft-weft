@@ -171,8 +171,9 @@ s = head("bosses", [
     "Animal AI coverage, big dinosaurs and bosses. Part 1-4: an iguanodont, a gastonia, a cedarosaurus and a wyvern, each",
     "hit by the player (`/animalprof hit 4`, creative): expected a charge or a stand (\"charges\", \"stands\") or flight, logged.",
     "Parts 5-6: Drenkaun and Borkon summoned at their altars on sky pads (as drenkaun.txt / borkon.txt): it rises and fights",
-    "(\"summoned\", \"hits\"), the player leaves (spectator 90 blocks off for 70 s): \"no one to fight, back to its place\";",
-    "back, `/boss kill`: \"died\", \"loot\". Report per species: aggro, leash, death, with the lines; the shots.",
+    "(\"summoned\", \"hits\", its health down from the player's aimed blows), `/boss kill`: \"died\", \"loot\"; summoned again,",
+    "the player leaves (spectator 90 blocks off for 70 s): \"no one to fight, back to its place\". Report per boss: aggro,",
+    "damage taken, death and loot, leash, with the lines; the shots.",
 ])
 for i, kind in enumerate(["iguanodont", "gastonia", "cedarosaurus", "wyvern"]):
     x = i * 200
@@ -193,15 +194,21 @@ for j, (boss, offering, sword, armour) in enumerate([("drenkaun", "forest_offeri
                   f"chat /tk fill {x+dx-1} 205 {dz-1} {x+dx+1} 206 {dz+1} base:oak_leaves"]
     else:
         s += [f"chat /tk fill {x+10} 200 -18 {x+18} 204 -10 stone"]
+    # Fight, then kill (`/boss kill`): a boss left alone despawns back at its place (the leash),
+    # so the leash is a second summoning after (cov_bosses: "no boss near" after the leash).
+    summon = [f"chat /tp {x}.5 200 2.5", "chat /tk mode survival", "chat /tk heal", "key 1", "look 0 -29",
+              "wait 0.5", "press core:use", "wait 3"]
     s += [f"chat /tk fill {x} 200 0 {x} 200 0 animals:{boss}_altar", f"chat /tp {x}.5 200 2.5", "wait 1",
           "chat /tk mode survival", "chat /tk attr_mod me core:max_health testkit:hp core:add 300 0",
-          f"chat /tk put me 0 animals:{offering} 8", f"chat /gear sword {sword} slot=1", "chat /tk heal",
-          "key 1", "look 0 -29", "wait 0.5", "press core:use", "wait 3", "look 0 8", "chat /boss state",
-          "press core:attack", "wait 0.7", "press core:attack", "wait 3", "chat /boss state", "chat /tk heal",
-          "chat /tick freeze", f"chat /tp {x}.5 204 12", "look 0 -15", "wait 2", f"shot cov_bosses_{5+j}_{boss}.png",
-          "chat /tick unfreeze", "chat /tk mode spectator", f"chat /tp {x}.5 210 92", "wait 70", "chat /boss state",
-          f"chat /tp {x}.5 204 8", "chat /tk mode survival", "chat /tk heal", "wait 2", "chat /boss state",
-          "chat /boss kill", "wait 3", "chat /boss state", "chat /tk mode spectator"]
+          f"chat /tk put me 0 animals:{offering} 8", f"chat /gear sword {sword} slot=1", "wait 0.5", "chat /tk heal"]
+    s += summon + ["chat /boss state", "key 2", "aim 10", "press core:attack", "wait 0.7", "aim 10",
+                   "press core:attack", "wait 0.7", "chat /tk heal", "aim 10", "press core:attack", "wait 1",
+                   "chat /boss state", "chat /tk heal",
+                   "chat /tick freeze", f"chat /tp {x}.5 204 12", "look 0 -15", "wait 2",
+                   f"shot cov_bosses_{5+j}_{boss}.png", "chat /tick unfreeze",
+                   f"chat /tp {x}.5 200 6", "chat /boss kill", "wait 3", "chat /boss state"]
+    s += summon + ["chat /boss state", "chat /tk mode spectator", f"chat /tp {x}.5 210 92", "wait 70",
+                   f"chat /tp {x}.5 204 8", "chat /boss state", "wait 1"]
 write("bosses", s)
 
 # 6. Young: follow the mother, grow up.
