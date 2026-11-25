@@ -3037,6 +3037,10 @@ const BAND_HDR: f32 = 0.006;
 const BAND_DEPTH: f32 = 12.0;
 
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    // Debug view 7 (the sun's cuts, `world.wgsl`) unveiled.
+    if look_debug() == 7u {
+        return c_in;
+    }
     if one_fog_on() && !in_liquid() && open_sky() {
         // The fog is `one_fog`'s, after the picture; here only the border fog, where the terrain ends,
         // into the sky's colour level with it (Bliss's, composite1).

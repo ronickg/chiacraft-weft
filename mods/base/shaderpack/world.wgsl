@@ -475,6 +475,8 @@ fn sun_shadow_near(in: VOut, n: vec3<f32>) -> f32 {
     return mix(traced, sun_shadow_mapped(in, n), fade);
 }
 
+// Debug view 7's: the sun map's coverage, the clouds' shadow, the map's own shadow (`sun_shadow_mapped`).
+var<private> SHADOW_DEBUG: vec3<f32> = vec3(0.0);
 fn sun_shadow_mapped(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
     // A plant's blade asks the map from most of a block toward the sun: the blades round it, as
@@ -490,6 +492,7 @@ fn sun_shadow_mapped(in: VOut, n: vec3<f32>) -> f32 {
     // where the map isn't, with no sky-light gate (its cave walls took 3 % of the sun under ours).
     if land_from_sky() {
         let l = min(max(in.light.x - 0.05, 0.0) * 1.06, 1.0);
+        SHADOW_DEBUG = vec3(mapped.y, cloud_shadow(in.rel), mapped.x);
         return mix(clamp((l - 0.8) * 25.0, 0.0, 1.0), mapped.x, mapped.y) * cloud_shadow(in.rel);
     }
     return mix(sky, min(mapped.x, smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x)), mapped.y) * cloud_shadow(in.rel);
@@ -730,6 +733,11 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     let debug = look_debug();
     if debug == 1u || debug == 2u {
         return vec4(select(LIGHT_ALL - LIGHT_SUN, LIGHT_SUN, debug == 1u), lit.a);
+    }
+    // 7: where the sun's light is cut (`SHADOW_DEBUG`): r the sun map's coverage, g the clouds'
+    // shadow, b the map's own shadow.
+    if debug == 7u {
+        return vec4(SHADOW_DEBUG, lit.a);
     }
     // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
     // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
