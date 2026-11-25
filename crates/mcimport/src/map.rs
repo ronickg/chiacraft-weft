@@ -244,6 +244,14 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
         "brown_mushroom" => near(&["base:mushroom_brown", AIR]),
         "red_mushroom" => near(&["base:mushroom_red", AIR]),
         "torch" | "wall_torch" => near(&["base:torch", AIR]),
+        // Light blocks keep their light: the sea lantern was air (its name holds `lantern`, a small
+        // thing) and the redstone lamp stone (NVIDIA's showcase, w12). Fire has no block of ours.
+        "sea_lantern" => near(&["base:glowstone", "base:stone"]),
+        "redstone_lamp" => {
+            let lit = if s.prop("lit") == Some("true") { "on" } else { "off" };
+            (vec![format!("base:redstone_lamp[power={lit}]"), "base:redstone_lamp".into()], true)
+        }
+        "fire" | "soul_fire" => one(AIR),
         _ => {
             // Waterlogged small things stand in water; other small things are left out; any other
             // unknown full block is the stone it most likely sits in.
