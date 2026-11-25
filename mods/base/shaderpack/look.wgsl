@@ -2465,6 +2465,22 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
             break;
         }
     }
+    // Debug views (`base:look_debug`): 3 the fog's opacity (1 - its transmittance, the air not
+    // counted) in grey; 4 the hour's fog weights (red morning, green evening, blue night); 5 the
+    // cloudy fog's body at the surface, unworn (red) beside the fog's density there x 8 (green).
+    let dbg = look_debug();
+    if dbg == 3u {
+        return vec3(1.0 - through);
+    }
+    if dbg == 4u {
+        let w = fog_hour_weights();
+        return vec3(w.x, w.z, w.w);
+    }
+    if dbg == 5u {
+        let q = eye + rel - vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * 0.6;
+        let body = clamp((0.4 - noise3(q / vec3(36.0, 18.0, 36.0))) * 2.0, 0.0, 1.0);
+        return vec3(body, bliss_fog_density(eye + rel) * 8.0, 0.0);
+    }
     return c * through + gained + air;
 }
 
