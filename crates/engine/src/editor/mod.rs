@@ -607,7 +607,13 @@ impl Screen for Editor {
         }
         let tall = (cx.size.y - 70.0).clamp(160.0, 430.0);
         // Stacked (`narrow` below): the list and form shorter, so both rows fit the screen.
-        let stacked = (cx.size.x - 16.0).clamp(400.0, 960.0) - 20.0 - LIST_W - FORM_W - 2.0 * (Scrollbar::HANDLE[0] + Scrollbar::OUTSIDE_GAP * 2.0) - 24.0 < RIGHT_MIN;
+        let stacked = (cx.size.x - 16.0).clamp(400.0, 960.0)
+            - 20.0
+            - LIST_W
+            - FORM_W
+            - 2.0 * (Scrollbar::HANDLE[0] + Scrollbar::OUTSIDE_GAP * 2.0)
+            - 24.0
+            < RIGHT_MIN;
         let tall = if stacked { ((cx.size.y - 76.0) / 1.5).clamp(120.0, 430.0) } else { tall };
         // As wide as the screen inside the background's padding allows, up to 960: a floor of 660
         // passed a 640 GUI px screen (4K at 6x, 720p at 2x: the text-fit check, chiacraft 11-24),

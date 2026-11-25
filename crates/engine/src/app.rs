@@ -761,7 +761,9 @@ impl App {
             assets,
             textures,
             ui,
-            audit: api::launch_options().contains_key("ui-audit").then(Default::default),
+            audit: api::launch_options()
+                .contains_key("ui-audit")
+                .then(Default::default),
             post,
             audio: crate::audio::Audio::new().map(|mut a| {
                 a.muted = self.opts.automated;
@@ -3542,9 +3544,7 @@ fn layout_uis(r: &mut Running, scale: f32) -> f32 {
     if let Some(insets) = r.audit.as_mut() {
         let window = r.gpu.surface_size();
         for (screen, ui) in &r.screens {
-            let faults = crate::ui::audit::check(ui, [screen_size.x, screen_size.y], &mut |class| {
-                insets.get(&r.look, &r.assets, class)
-            });
+            let faults = crate::ui::audit::check(ui, [screen_size.x, screen_size.y], &mut |class| insets.get(&r.look, &r.assets, class));
             insets.log(screen.name(), &faults, &r.lang.code, scale, window);
         }
     }

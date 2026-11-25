@@ -92,7 +92,10 @@ impl Lang {
         let fallback = load_code(assets, FALLBACK);
         let entries = match code {
             FALLBACK => FxHashMap::default(),
-            PSEUDO => fallback.iter().map(|(k, v)| (k.clone(), pseudo(k, v))).collect(),
+            PSEUDO => fallback
+                .iter()
+                .map(|(k, v)| (k.clone(), pseudo(k, v)))
+                .collect(),
             _ => load_code(assets, code),
         };
         Lang { code: code.to_string(), entries, fallback, dev, reported: RefCell::new(FxHashSet::default()) }

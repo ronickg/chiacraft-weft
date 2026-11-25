@@ -1064,8 +1064,7 @@ impl Ui {
                 if !t.wrap && t.layout.width > 0.0 {
                     squeezed(&text::plain_text(&t.spans), inner.w / (t.layout.width * t.scale * unit), inner.w);
                 }
-                t.layout =
-                    text::layout_with(&t.spans, font, Some(inner.w / (t.scale * unit)), t.line.unwrap_or(font.line_height), t.mono);
+                t.layout = text::layout_with(&t.spans, font, Some(inner.w / (t.scale * unit)), t.line.unwrap_or(font.line_height), t.mono);
             }
             return;
         }

@@ -843,10 +843,17 @@ pub fn book(ui: &mut Ui, station: Station) {
                     c.client().rebuild_screen();
                 });
                 ui.text_args("crafting.book.page", &[Arg::Int(page as i64 + 1), Arg::Int(pages as i64)]);
-                ui.button("crafting.book.next", S::default().h(12.0).pad_xy(5.0, 2.0).disabled(page + 1 >= pages), move |c| {
-                    edit(|b| b.page = page + 1);
-                    c.client().rebuild_screen();
-                });
+                ui.button(
+                    "crafting.book.next",
+                    S::default()
+                        .h(12.0)
+                        .pad_xy(5.0, 2.0)
+                        .disabled(page + 1 >= pages),
+                    move |c| {
+                        edit(|b| b.page = page + 1);
+                        c.client().rebuild_screen();
+                    },
+                );
             });
         }
         if let Some(r) = picked.and_then(recipe_of) {

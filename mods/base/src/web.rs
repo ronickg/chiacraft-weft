@@ -195,9 +195,14 @@ fn screen(ui: &mut Ui) {
                         .tooltip("web.base.zoom_in_tip"),
                     |c| change(c, |v| v.zoom = (v.zoom + 1).min(ZOOMS.len() - 1)),
                 );
-                ui.button("web.base.centre", S::default().h(12.0).pad_xy(5.0, 2.0).tooltip("web.base.centre_tip"), |c| {
-                    change(c, |v| v.centre = (0.0, 0.0))
-                });
+                ui.button(
+                    "web.base.centre",
+                    S::default()
+                        .h(12.0)
+                        .pad_xy(5.0, 2.0)
+                        .tooltip("web.base.centre_tip"),
+                    |c| change(c, |v| v.centre = (0.0, 0.0)),
+                );
             });
             ui.panel("well", S::column().size(VIEW_W, VIEW_H), |ui| {
                 web(ui, &s, points, &v);

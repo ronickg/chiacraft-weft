@@ -180,7 +180,12 @@ fn overlaps(ui: &Ui, parent: &[usize], out: &mut Vec<Fault>) {
     };
     // Siblings laid out side by side or one under another never meet.
     for n in &ui.nodes {
-        let flow: Vec<usize> = n.children.iter().copied().filter(|&c| ui.nodes[c].style.at.is_none()).collect();
+        let flow: Vec<usize> = n
+            .children
+            .iter()
+            .copied()
+            .filter(|&c| ui.nodes[c].style.at.is_none())
+            .collect();
         for (i, &a) in flow.iter().enumerate() {
             for &b in &flow[i + 1..] {
                 let (ra, rb) = (ui.nodes[a].rect, ui.nodes[b].rect);
@@ -199,7 +204,9 @@ fn overlaps(ui: &Ui, parent: &[usize], out: &mut Vec<Fault>) {
             }
         }
     }
-    let all: Vec<(usize, Rect, &'static str)> = (0..ui.nodes.len()).filter_map(|i| drawn(ui, i).map(|(r, w)| (i, r, w))).collect();
+    let all: Vec<(usize, Rect, &'static str)> = (0..ui.nodes.len())
+        .filter_map(|i| drawn(ui, i).map(|(r, w)| (i, r, w)))
+        .collect();
     let holds = |a: usize, b: usize| {
         // whether `a` is above `b` in the tree
         let mut i = b;
@@ -253,7 +260,11 @@ fn looks_like_key(words: &str) -> bool {
     let w = words.trim();
     let parts: Vec<&str> = w.split('.').collect();
     parts.len() >= 3
-        && parts.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == ':'))
+        && parts.iter().all(|p| {
+            !p.is_empty()
+                && p.chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == ':')
+        })
         && w.chars().any(|c| c.is_ascii_lowercase())
 }
 
@@ -280,7 +291,15 @@ fn path(ui: &Ui, parent: &[usize], id: usize) -> String {
             Kind::Container { class: Some(c) } => c.clone(),
             Kind::Container { class: None } => {
                 let p = parent[i];
-                let at = if p == usize::MAX { 0 } else { ui.nodes[p].children.iter().position(|&c| c == i).unwrap_or(0) };
+                let at = if p == usize::MAX {
+                    0
+                } else {
+                    ui.nodes[p]
+                        .children
+                        .iter()
+                        .position(|&c| c == i)
+                        .unwrap_or(0)
+                };
                 if n.style.row { format!("row{at}") } else { format!("col{at}") }
             }
             Kind::Input { .. } => "input".into(),
@@ -321,7 +340,10 @@ impl Insets {
             .map(|b| String::from_utf8_lossy(&b).into_owned())
             .and_then(|src| crate::kv::get(&src, "inset").map(|v| v.to_string()))
             .map(|v| {
-                let n: Vec<f32> = v.split_whitespace().filter_map(|x| x.parse().ok()).collect();
+                let n: Vec<f32> = v
+                    .split_whitespace()
+                    .filter_map(|x| x.parse().ok())
+                    .collect();
                 match n.as_slice() {
                     [a] => [*a; 4],
                     [l, t, r, b] => [*l, *t, *r, *b],
@@ -345,10 +367,8 @@ impl Insets {
             log::warn!("ui-audit-seen: {screen}");
         }
         for f in faults {
-            let line = format!(
-                "{screen} | {} | {} | \"{}\" | {:.2} | {lang} | {scale} | {}x{}",
-                f.what, f.path, f.text, f.by, window.0, window.1
-            );
+            let line =
+                format!("{screen} | {} | {} | \"{}\" | {:.2} | {lang} | {scale} | {}x{}", f.what, f.path, f.text, f.by, window.0, window.1);
             if self.said.insert(line.clone()) {
                 log::warn!("ui-audit: {line}");
             }

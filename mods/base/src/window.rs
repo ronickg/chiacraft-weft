@@ -51,7 +51,14 @@ fn framed(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], family: bool, bo
                 None => ui.title(),
             });
             for &(key, open) in tabs {
-                ui.button(key, S::default().class("tab").h(TAB_H).pad_xy(TAB_PAD_X, TAB_PAD), move |c| open(c));
+                ui.button(
+                    key,
+                    S::default()
+                        .class("tab")
+                        .h(TAB_H)
+                        .pad_xy(TAB_PAD_X, TAB_PAD),
+                    move |c| open(c),
+                );
             }
             if family {
                 // Beside the window's own, in the same row (a column of them stood a row higher).

@@ -29,62 +29,86 @@ impl Screen for Multiplayer {
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         frame(ui, cx, "multiplayer.title", |ui| {
             if cx.in_game && !cx.remote {
-                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().min_w(340.0).self_align(crate::ui::Align::Stretch), |ui| {
-                    let hosting = super::p2p::HOSTING.lock().is_some();
-                    if hosting {
-                        label(ui, cx, "multiplayer.your_port", &[crate::ui::text::Arg::Int(crate::settings::server_port() as i64)], "dim");
-                    } else {
-                        button(ui, cx, "multiplayer.host", &[], 200.0, |c| c.requests.push(Request::Host));
-                    }
-                });
-            }
-            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().min_w(340.0).self_align(crate::ui::Align::Stretch), |ui| {
-                crate::screens::heading(ui, cx, "multiplayer.ticket");
-                ui.container(Style::row().gap(4.0).stretch(), |ui| {
-                    let input = ui.add(Kind::input("", TICKET_MAX_LEN), Style::default().h(18.0).w(0.0).grow());
-                    ui.set_id(input, "ticket");
-                    if cfg!(target_os = "android") || crate::settings::touch_controls() {
-                        let paste = button(ui, cx, "multiplayer.paste_ticket", &[], 70.0, |c| {
-                            let clip = crate::clipboard::get().unwrap_or_default();
-                            let text: String = clip
-                                .trim()
-                                .lines()
-                                .next()
-                                .unwrap_or_default()
-                                .trim()
-                                .chars()
-                                .filter(|ch| !ch.is_control())
-                                .take(TICKET_MAX_LEN)
-                                .collect();
-                            if text.is_empty() {
-                                Self::show_clipboard_status(c, Some("multiplayer.clipboard_empty"));
-                            } else {
-                                c.set_input("ticket", text);
-                                Self::show_clipboard_status(c, None);
-                            }
-                        });
-                        ui.set_id(paste, "paste_ticket");
-                    }
-                    let copy = crate::mods_screen::icon_button(ui, cx, "button", "icon_copy", "multiplayer.copy_ticket", &[], |c| {
-                        let ticket = super::current_ticket().unwrap_or_else(|| super::p2p::player_key(&c.settings.run_dir));
-                        let status = if !ticket.is_empty() && crate::clipboard::set(&ticket) {
-                            "multiplayer.ticket_copied"
+                ui.panel(
+                    "panel",
+                    Style::default()
+                        .pad(8.0)
+                        .gap(4.0)
+                        .stretch()
+                        .min_w(340.0)
+                        .self_align(crate::ui::Align::Stretch),
+                    |ui| {
+                        let hosting = super::p2p::HOSTING.lock().is_some();
+                        if hosting {
+                            label(
+                                ui,
+                                cx,
+                                "multiplayer.your_port",
+                                &[crate::ui::text::Arg::Int(crate::settings::server_port() as i64)],
+                                "dim",
+                            );
                         } else {
-                            "multiplayer.copy_failed"
-                        };
-                        Self::show_clipboard_status(c, Some(status));
+                            button(ui, cx, "multiplayer.host", &[], 200.0, |c| c.requests.push(Request::Host));
+                        }
+                    },
+                );
+            }
+            ui.panel(
+                "panel",
+                Style::default()
+                    .pad(8.0)
+                    .gap(4.0)
+                    .stretch()
+                    .min_w(340.0)
+                    .self_align(crate::ui::Align::Stretch),
+                |ui| {
+                    crate::screens::heading(ui, cx, "multiplayer.ticket");
+                    ui.container(Style::row().gap(4.0).stretch(), |ui| {
+                        let input = ui.add(Kind::input("", TICKET_MAX_LEN), Style::default().h(18.0).w(0.0).grow());
+                        ui.set_id(input, "ticket");
+                        if cfg!(target_os = "android") || crate::settings::touch_controls() {
+                            let paste = button(ui, cx, "multiplayer.paste_ticket", &[], 70.0, |c| {
+                                let clip = crate::clipboard::get().unwrap_or_default();
+                                let text: String = clip
+                                    .trim()
+                                    .lines()
+                                    .next()
+                                    .unwrap_or_default()
+                                    .trim()
+                                    .chars()
+                                    .filter(|ch| !ch.is_control())
+                                    .take(TICKET_MAX_LEN)
+                                    .collect();
+                                if text.is_empty() {
+                                    Self::show_clipboard_status(c, Some("multiplayer.clipboard_empty"));
+                                } else {
+                                    c.set_input("ticket", text);
+                                    Self::show_clipboard_status(c, None);
+                                }
+                            });
+                            ui.set_id(paste, "paste_ticket");
+                        }
+                        let copy = crate::mods_screen::icon_button(ui, cx, "button", "icon_copy", "multiplayer.copy_ticket", &[], |c| {
+                            let ticket = super::current_ticket().unwrap_or_else(|| super::p2p::player_key(&c.settings.run_dir));
+                            let status = if !ticket.is_empty() && crate::clipboard::set(&ticket) {
+                                "multiplayer.ticket_copied"
+                            } else {
+                                "multiplayer.copy_failed"
+                            };
+                            Self::show_clipboard_status(c, Some(status));
+                        });
+                        ui.set_id(copy, "copy_ticket");
                     });
-                    ui.set_id(copy, "copy_ticket");
-                });
-                if let Some(status) = self.clipboard_status {
-                    label(ui, cx, status, &[], "dim");
-                }
-                // Labelled like every menu button (style 1: 2x).
-                button(ui, cx, "multiplayer.join", &[], 120.0, |c| {
-                    let ticket = c.input_text("ticket").unwrap_or_default();
-                    c.requests.push(Request::Join(ticket));
-                });
-            });
+                    if let Some(status) = self.clipboard_status {
+                        label(ui, cx, status, &[], "dim");
+                    }
+                    // Labelled like every menu button (style 1: 2x).
+                    button(ui, cx, "multiplayer.join", &[], 120.0, |c| {
+                        let ticket = c.input_text("ticket").unwrap_or_default();
+                        c.requests.push(Request::Join(ticket));
+                    });
+                },
+            );
             saved_worlds(ui, cx);
             // The panels above are as wide as this row (they stretch, 340 at least): its three
             // 2x buttons reached past them (chiacraft 11-25, the batch 3 sheet).
@@ -113,41 +137,50 @@ fn saved_worlds(ui: &mut Ui, cx: &BuildCx) {
     let run_dir = cx.settings.run_dir.clone();
     let worlds = crate::saved_worlds::load(&run_dir);
     crate::saved_worlds::ping_all(&run_dir, cx.settings);
-    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().min_w(340.0).self_align(crate::ui::Align::Stretch), |ui| {
-        crate::screens::heading(ui, cx, "multiplayer.saved");
-        if worlds.is_empty() {
-            label(ui, cx, "multiplayer.saved_none", &[], "dim");
-        }
-        for w in worlds.into_iter().take(8) {
-            ui.container(Style::row().gap(6.0).stretch(), |ui| {
-                ui.container(Style::default().gap(1.0).stretch(), |ui| {
-                    let saved = w.clone();
-                    ui.text_bound("default", Box::new(move |_: &Ctx| crate::saved_worlds::title_line(&saved)));
-                    let (dir, key) = (run_dir.clone(), w.key.clone());
-                    ui.text_bound("dim", Box::new(move |_: &Ctx| crate::saved_worlds::status_line(&dir, &key)));
-                    // What it asks of visitors and its DID (chiacraft, phase 4), on a line of its own.
+    ui.panel(
+        "panel",
+        Style::default()
+            .pad(8.0)
+            .gap(4.0)
+            .stretch()
+            .min_w(340.0)
+            .self_align(crate::ui::Align::Stretch),
+        |ui| {
+            crate::screens::heading(ui, cx, "multiplayer.saved");
+            if worlds.is_empty() {
+                label(ui, cx, "multiplayer.saved_none", &[], "dim");
+            }
+            for w in worlds.into_iter().take(8) {
+                ui.container(Style::row().gap(6.0).stretch(), |ui| {
+                    ui.container(Style::default().gap(1.0).stretch(), |ui| {
+                        let saved = w.clone();
+                        ui.text_bound("default", Box::new(move |_: &Ctx| crate::saved_worlds::title_line(&saved)));
+                        let (dir, key) = (run_dir.clone(), w.key.clone());
+                        ui.text_bound("dim", Box::new(move |_: &Ctx| crate::saved_worlds::status_line(&dir, &key)));
+                        // What it asks of visitors and its DID (chiacraft, phase 4), on a line of its own.
+                        let key = w.key.clone();
+                        ui.text_bound("dim", Box::new(move |_: &Ctx| crate::saved_worlds::notes_line(&key)));
+                    });
+                    let address = w.address.clone();
+                    let id = button(ui, cx, "multiplayer.join", &[], 60.0, move |c| c.requests.push(Request::Join(address.clone())));
+                    ui.set_id(id, &format!("join:{}", w.name));
+                    if !w.inbox.is_empty() && !w.owner.is_empty() && !crate::friends::is_friend(&w.inbox) {
+                        let (inbox, owner, name) = (w.inbox.clone(), w.owner.clone(), w.name.clone());
+                        let id = button(ui, cx, "friends.add", &[], 60.0, move |c| {
+                            crate::friends::add(&inbox, &owner, &name);
+                            c.requests.push(Request::Rebuild);
+                        });
+                        ui.set_id(id, &format!("befriend:{}", w.name));
+                    }
                     let key = w.key.clone();
-                    ui.text_bound("dim", Box::new(move |_: &Ctx| crate::saved_worlds::notes_line(&key)));
-                });
-                let address = w.address.clone();
-                let id = button(ui, cx, "multiplayer.join", &[], 60.0, move |c| c.requests.push(Request::Join(address.clone())));
-                ui.set_id(id, &format!("join:{}", w.name));
-                if !w.inbox.is_empty() && !w.owner.is_empty() && !crate::friends::is_friend(&w.inbox) {
-                    let (inbox, owner, name) = (w.inbox.clone(), w.owner.clone(), w.name.clone());
-                    let id = button(ui, cx, "friends.add", &[], 60.0, move |c| {
-                        crate::friends::add(&inbox, &owner, &name);
+                    button(ui, cx, "multiplayer.remove", &[], 60.0, move |c| {
+                        crate::saved_worlds::forget(&c.settings.run_dir, &key);
                         c.requests.push(Request::Rebuild);
                     });
-                    ui.set_id(id, &format!("befriend:{}", w.name));
-                }
-                let key = w.key.clone();
-                button(ui, cx, "multiplayer.remove", &[], 60.0, move |c| {
-                    crate::saved_worlds::forget(&c.settings.run_dir, &key);
-                    c.requests.push(Request::Rebuild);
                 });
-            });
-        }
-    });
+            }
+        },
+    );
 }
 
 /// What the join in progress is doing (chiacraft): a lang key and its arguments.

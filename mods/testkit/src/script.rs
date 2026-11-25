@@ -658,10 +658,8 @@ async fn run_lines(t: T, src: String) -> R {
                 } else {
                     let end = t.state().frame + 240;
                     let want = name.clone();
-                    t.until(&format!("peek {name}"), Duration::from_secs(30), move |t| {
-                        t.c().screen() == want || t.state().frame >= end
-                    })
-                    .await?;
+                    t.until(&format!("peek {name}"), Duration::from_secs(30), move |t| t.c().screen() == want || t.state().frame >= end)
+                        .await?;
                     if t.c().screen() != name {
                         t.note(format!("peek: {name} did not open"));
                     }
