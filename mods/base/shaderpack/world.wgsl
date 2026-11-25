@@ -770,7 +770,13 @@ fn traced_view(rel: vec3<f32>, r_in: vec3<f32>, blur: f32, cone: f32, px: vec2<f
     if scene.rt.x > 0.5 && dot(h.n, light_dir()) > 0.0 {
         sun = min(sun, dot(rt_sun(h.rel, h.n, light_dir(), false), vec3(1.0 / 3.0)));
     }
+    // The night's blue (`display`) goes by this pixel's own sky share, which `light_on` sets for the
+    // surface it lights: kept, or a lamp-lit wall mirroring the skylit glass overhead took the glass's
+    // share and turned a periwinkle band at its own brightness (RT modes, hall at 23:00; w9_blueband,
+    // 11-25; the path tracer keeps it the same way).
+    let share = NIGHT_SKY_SHARE;
     let lit = albedo * light_on(h.n, h.light, sun, 1.0, h.world, h.rel);
+    NIGHT_SKY_SHARE = share;
     return haze_lit(lit, normalize(rel) * (length(rel) + h.t), h.light.x);
 }
 
