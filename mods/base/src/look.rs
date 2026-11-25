@@ -166,7 +166,7 @@ pub static LOOK_SKY_PHYS: Config<f32> = Config::named("look_sky_phys");
 /// One fog as Bliss's (1): the mist, the rain's fog and the air's haze in one march per pixel before
 /// TAA, in place of the froxel volume and the surfaces' haze; 0 ours before, to compare.
 pub static LOOK_FOG_ONE: Config<f32> = Config::named("look_fog_one");
-/// With the chain, the night's light and sky to this share (0.25 as made; 1 as before).
+/// With the chain, the night's light and sky to this share (0.08 as made; 1 as before).
 pub static LOOK_CHAIN_NIGHT: Config<f32> = Config::named("look_chain_night");
 /// The engine's map of the ground's height (`client::ground_map`), which the banks lie on: on with
 /// them (`register`'s frame hook keeps it so, however the banks were set).
@@ -316,7 +316,7 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_CHAIN).float(1.0, 0.0, 1.0);
     r.config(&LOOK_SKY_PHYS).float(1.0, 0.0, 1.0);
     r.config(&LOOK_FOG_ONE).float(1.0, 0.0, 1.0);
-    r.config(&LOOK_CHAIN_NIGHT).float(0.25, 0.0, 1.0);
+    r.config(&LOOK_CHAIN_NIGHT).float(0.08, 0.0, 1.0);
     r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0);
     r.config(&LOOK_BLISS).bool(true);
     r.client_frame(|_| {

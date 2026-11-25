@@ -315,7 +315,8 @@ const ATM_SCALE: f32 = 22.0;
 // the moon's single scattering alone left the sky pitch black between the clouds (lkmxP1); Bliss
 // adds a floor of light to its night sky too.
 const ATM_NIGHT_FLOOR: f32 = 1.0;
-// The chain's night (`base:look_chain_night`, 0.25 as made): our night's light and sky to this share,
+// The chain's night (`base:look_chain_night`, 0.08 as made; 0.25 left the night land a lit blue,
+// lkmxG1: the log curve lifts a dark scene, so its light must come down far more than its picture): our night's light and sky to this share,
 // with the chain. Ours were set for the per-hour exposures; under Bliss's one log curve the night
 // came out much brighter than Bliss's dark navy (lkmxC1), whose moon is 1/1250 of its sun.
 const OPT_CHAIN_NIGHT: u32 = 73u;
@@ -2185,7 +2186,9 @@ fn fog_through_sky(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     return fog_through_banks(c, rel, normalize(rel) * MIST_MARCH_FAR, sky);
 }
 fn fog_through_banks(c: vec3<f32>, rel: vec3<f32>, bank_rel: vec3<f32>, sky: f32) -> vec3<f32> {
-    if one_fog_on() {
+    // (Under water its own fog as before: skipped there too, the sun's square picture showed through
+    // the water from below, lkmxF1/G1.)
+    if one_fog_on() && !in_liquid() {
         return c;
     }
     // No fog in a calm scene's air (`CALM`: `scene.weather.z` 0).
@@ -2409,10 +2412,14 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     // The sky already holds the air (its own scattering, `sky_phys`): over it only the mist and the
     // rain. With the air too a sky pixel took most of the sky's light again in blue over the
     // march's 1500 blocks, a bright blue frame at night and a white sky by day (lkmxF1).
-    let on_sky = select(1.0, 0.0, dist >= MIST_MARCH_FAR * 0.999);
+    // (The sky's pixels stand exactly at the march's far end, `view_rel`; land past it is land: taken
+    // for sky, the far land lost all its haze and stood as a crisp dark strip, lkmxG1.)
+    let is_sky = abs(dist - MIST_MARCH_FAR) < 0.5;
+    let on_sky = select(1.0, 0.0, is_sky);
     let n = u32(clamp(look_opt(OPT_MIST_STEPS, 8.0), 2.0, 16.0));
     let e = 11.0;
-    let span = min(dist, MIST_MARCH_FAR);
+    // To the surface, however far (Bliss's), the sky to the march's far end.
+    let span = select(dist, MIST_MARCH_FAR, is_sky);
     let reach = fantasy_opt(OPT_SHADOW_REACH);
     var through = 1.0;
     var gained = vec3(0.0);
