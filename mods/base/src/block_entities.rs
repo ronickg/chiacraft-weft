@@ -96,7 +96,8 @@ pub fn register(r: &mut Registry) {
         .hardness(2.5)
         .mined_by("axe", tool_tier::HAND)
         .tab(&crate::tabs::FUNCTIONAL)
-        .entity(|e| e.inventory(27))
+        // Its food rots by its place (`survival/rot.rs`).
+        .entity(|e| e.attach(&crate::survival::LARDER).inventory(27))
         .opens(&CHEST_MENU);
     r.menu(&CHEST_MENU)
         .group("chest", Slots::chest(3).holder())
@@ -115,7 +116,7 @@ pub fn register(r: &mut Registry) {
 fn cooked(w: &World, out: ItemStack) -> ItemStack {
     let Some(f) = vitals::food::find(item_name(out.item)).map(|f| &vitals::food::FOODS[f]) else { return out };
     let now = w.day_time();
-    let made = out.with(&base_api::MADE, (now / vitals::calendar::DAY_TICKS) as u32 + 1);
+    let made = out.with(&base_api::MADE, crate::survival::stamp(now));
     if f.meal == vitals::food::Meal::Cooked {
         made.with(&base_api::HOT, (now / 20) as u32)
             .with(&base_api::FRESHNESS, base_api::freshness::HOT)

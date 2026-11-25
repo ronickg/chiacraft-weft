@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 88 · ◧ partly built: 70 · □ not built yet: 10 · ◌ planned for later: 5
+■ built and seen working: 88 · ◧ partly built: 71 · □ not built yet: 10 · ◌ planned for later: 5
 
 ## Core next
 
@@ -120,7 +120,7 @@ Code: `crates/engine/src/dedicated.rs`. Docs: `notes/PLAN.md`.
 
 ## Survival
 
-One body for players and animals: food sets how much of your stats you reach, temperature from a real climate, seasons, levels. 12 of 16 parts built.
+One body for players and animals: food sets how much of your stats you reach, temperature from a real climate, seasons, levels. 12 of 17 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -137,6 +137,7 @@ One body for players and animals: food sets how much of your stats you reach, te
 | ◧ | Seasons | Day length, temperatures, breeding. Rain by season and plants by season are in the living world, snow falls and lies by temperature (Wind and fog); autumn leaves later. Code: `mods/base/vitals/src/calendar.rs`. |
 | ■ | Rested and comfort | Which furniture counts is still open. Code: `mods/base/src/survival/camp.rs`. |
 | ■ | Freshness and cooking | Stews from a cooking pot that are what went into them (x1.25, keeping as their shortest-keeping ingredient); dried, smoked and salted meat and dried fruit from a drying rack and salt, each a food of real nutrition; food stamped as it's made and brought up to date when a chest opens. Seen in the game 11-04: a pot made a stew of beef, an apple and bread; a rack over a lit furnace smoked beef and dried an apple, one in winter air didn't. Not yet seen: eating a stew. Not yet: roasts and pies of several ingredients (the apple pie is a fixed row). Code: `mods/base/vitals/src/meals.rs`, `mods/base/vitals/src/preserve.rs`, `mods/base/src/cooking.rs`, `mods/base/src/survival/food.rs`. |
+| ◧ | Rot by place | Built 2026-11-25 (branch food-rot, rot plan approved 11-04): food keeps as tuned in a cool larder (15 °C) and spoils 2.5 times faster per 10 °C warmer by the Q10 rule, at most x4, x0.05 frozen below -2 °C, held at 0 °C by snow or ice next to a chest (an ice house); a cellar keeps the year's mean, a room its evened-out air, carried food the air the player feels (vitals::rot). The making stamp is in ticks and moved on by the place: chests once a game hour by day time (catching up unloaded time and /time jumps), the player every second. Tooltips say how many days a food keeps in a larder and on snow or ice. Spoiled as before (the mark, 50% poisoning, compost 2). /rot <pos> logs a store's air, rate and foods. Carcass stages and yields in vitals::rot for Animals' wave two. Checked in game (PC rot1125b, 11-24): porkchops in chests by snow, in a room, in the open and by a campfire used 51%, 568%, 663% and 801% of their life over 8 days, each step days x rate / 4 as the table says. Not yet: barrels or other stores than chests, food on the ground rotting (engine item lifetime). Code: `mods/base/vitals/src/rot.rs`, `mods/base/src/survival/rot.rs`, `mods/base/src/survival/food.rs`. Docs: `notes/crew/plans/rot-plan.md`, `notes/SURVIVAL.md`. |
 | ■ | Body effects | Poison, bleeding, sedation, carried weight. Code: `mods/base/vitals/src/effects.rs`, `mods/base/src/survival/body.rs`, `mods/base/src/survival/load.rs`. |
 | ◧ | Death | Tombstone and XP lost; the tombstone doesn't crumble yet. Code: `mods/base/src/survival/mod.rs`, `mods/base/src/levels.rs`. |
 | ■ | Difficulty | Code: `mods/base/vitals/src/difficulty.rs`. |

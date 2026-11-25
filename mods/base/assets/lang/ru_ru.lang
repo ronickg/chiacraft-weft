@@ -627,6 +627,8 @@ color.debug = {#ffffff}
 color.debug_shadow = {#202020}
 tagged.base.nutrition = {value.units}0 г: {#e8907a}Б{/} {value.protein} · {#ffbe45}Э{/} {value.energy} · {#f0d27a}Ж{/} {value.fat} · {#8fd16a}З{/} {value.greens} · {#7ac4f0}В{/} {value.water}
 tagged.base.freshness = {if:value==0}{#8fd16a}Свежее{/}{/if}{if:value==1}{#f0d27a}Несвежее: вдвое хуже{/}{/if}{if:value==2}{#e8907a}Испорчено: вчетверо хуже и может отравить{/}{/if}{if:value==3}{#ffbe45}Горячее, с огня: согревает{/}{/if}
+tagged.base.keeps = {#a8c8d8}Хранится {value.larder} дн. в прохладной кладовой, {value.cold} на снегу или льду; в жару быстрее{/}
+command.base.rot = Воздух в хранилище {0} °C, еда портится в ×{1} быстрее, чем в кладовой: {2}
 mod.base.name = Weft
 mod.base.description = Сама игра: блоки, предметы, мобы, верхний мир и его механизмы.
     Это такой же мод, как все, и он не использует ничего, что недоступно другим модам.

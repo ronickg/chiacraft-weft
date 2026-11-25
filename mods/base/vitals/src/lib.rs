@@ -42,6 +42,7 @@ pub mod mobs;
 pub mod perks;
 pub mod plants;
 pub mod preserve;
+pub mod rot;
 pub mod ruins;
 pub mod sheet;
 pub mod shelter;

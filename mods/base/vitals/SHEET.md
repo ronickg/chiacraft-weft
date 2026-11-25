@@ -127,6 +127,29 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | base:pumpkin_slice (8) | base:dried_berries | - | - | 112 |
 | base:melon_slice (4) | base:dried_berries | - | - | 112 |
 
+## Where food keeps
+
+Rot by place (`vitals::rot`): the keeps above are for a cool larder at 15 °C. Elsewhere food spoils 2.5 times faster per 10 °C warmer, at most x4, and x0.05 frozen (below -2 °C). Snow or ice next to a chest holds it at 0 °C (an ice house); underground it keeps at the year's mean; in a room at the room's air; carried, at the air the player feels. A chest's food is aged once a game hour (1000 ticks), a player's every second. The world's difficulty `keep` applies on top. Days in total (fresh + stale):
+
+| air | rate | porkchop | bread | apple |
+|---|---|---|---|---|
+| 35 °C, desert noon | x4.00 | 1.0 | 2.5 | 10.0 |
+| 25 °C, summer day | x2.50 | 1.6 | 4.0 | 16.0 |
+| 15 °C, larder (as tuned) | x1.00 | 4.0 | 10.0 | 40.0 |
+| 10 °C, temperate cellar | x0.63 | 6.3 | 15.8 | 63.2 |
+| 0 °C, snow or ice store | x0.25 | 15.8 | 39.5 | 158.1 |
+| -5 °C, frozen | x0.05 | 80.0 | 200.0 | 800.0 |
+
+Carcasses (for Animals' wave two): a body ages as its raw meat at its spot's air: fresh while the meat is fresh, bloated while it's stale, remains for 1 more life, bones for 1 more, then gone.
+
+| stage | meat | hide | bones |
+|---|---|---|---|
+| fresh | x1.0 | x1.0 | x1.0 |
+| bloated | x1.0 | x1.0 | x1.0 |
+| remains | x0.5 | x0.0 | x1.0 |
+| bones | x0.0 | x0.0 | x1.0 |
+| gone | x0.0 | x0.0 | x0.0 |
+
 ## Clothing
 
 Worn in four slots of their own under armor (hat, coat, trousers, boots), no armor value; armor and clothes stack, and leather armor is hide. A full set's real insulation in clo at 12 °C of comfort each; a piece gives its share ([0.15, 0.4, 0.3, 0.15], head to feet). Wet, armor keeps 35% of its warmth; being wet itself feels 6 °C colder. Each piece is sewn with [1, 2, 1, 1] string, a string is 2 plant fibre. A new player arrives in linen hat, wool coat, hide trousers, hide boots.
