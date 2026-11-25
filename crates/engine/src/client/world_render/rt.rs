@@ -261,9 +261,15 @@ pub(super) fn pre_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[P
 }
 
 /// The light-giving blocks for the path tracer (`pathtrace.wgsl`'s `pt_lights`, binding 37): a hash
-/// table from a cube's coordinate to its lights, then the lights (`Mesh::lights`, each its place in
-/// the cube and its light per channel). Words: [0] the table's slots (a power of two), [1] the
-/// lights; then 4 a slot (x, y, z, start | count << 20; x `i32::MIN` empty); then the lights.
+/// table from a cube's coordinate to the lights that reach into it, then the lists. Words: [0] the
+/// table's slots (a power of two), [1] the lights listed; then 4 a slot (x, y, z, start | count <<
+/// 20; x `i32::MIN` empty); then the lights, each its place from the cube's corner plus 16 (6 bits
+/// an axis, the light may be in a cube next to it) and its light per channel (4 bits each).
+///
+/// A cube's list holds only lights whose level is left above 0 somewhere in it (the lightmap's
+/// falloff, a level a block), strongest there first, at most `LIGHTS_PER_CUBE`: drawing among all
+/// the lights of the 27 cubes round found none in reach. Dim glowing plants and lava made some 60
+/// a cube, 1600 round each pixel, and a torch was all but never drawn (w50, w52).
 pub struct RtLights {
     buffer: BufferId,
     words: u64,
@@ -272,7 +278,7 @@ pub struct RtLights {
 }
 
 const LIGHTS_EVERY: u64 = 15;
-const LIGHTS_PER_CUBE: usize = 256;
+const LIGHTS_PER_CUBE: usize = 48;
 const LIGHTS_MAX: usize = 1 << 20;
 
 /// The table's hash of a cube coordinate (`pt_light_find` in `pathtrace.wgsl`: the same).
@@ -280,26 +286,61 @@ fn light_hash(c: IVec3) -> u32 {
     (c.x as u32).wrapping_mul(73856093) ^ (c.y as u32).wrapping_mul(19349663) ^ (c.z as u32).wrapping_mul(83492791)
 }
 
-/// The table's words for `lights` (see `RtLights`).
+/// The table's words for `lights` (see `RtLights`): each cube's own lights and its neighbours'
+/// that reach into it.
 fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
-    let slots = (lights.len() * 2).next_power_of_two().max(1024);
+    // Every cube a light may reach: those with lights and the 26 round each.
+    let mut targets: rustc_hash::FxHashSet<IVec3> = rustc_hash::FxHashSet::default();
+    for &c in lights.keys() {
+        for d in 0..27 {
+            targets.insert(c + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1));
+        }
+    }
+    let mut lists: Vec<(IVec3, Vec<u32>)> = Vec::new();
+    let mut near: Vec<(i32, u32)> = Vec::new();
+    for &t in &targets {
+        near.clear();
+        let lo = t * 16;
+        let hi = lo + IVec3::splat(15);
+        for d in 0..27 {
+            let n = t + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1);
+            let Some(l) = lights.get(&n) else { continue };
+            for &w in l {
+                let p = n * 16 + IVec3::new((w & 15) as i32, (w >> 4 & 15) as i32, (w >> 8 & 15) as i32);
+                let e = ((w >> 12) & 15).max((w >> 16) & 15).max((w >> 20) & 15) as i32;
+                // Its level at the cube's nearest block.
+                let gap = (lo - p).max(IVec3::ZERO) + (p - hi).max(IVec3::ZERO);
+                let level = e - (gap.x + gap.y + gap.z);
+                if level > 0 {
+                    let o = (p - lo + IVec3::splat(16)).as_uvec3();
+                    near.push((level, o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18));
+                }
+            }
+        }
+        if near.is_empty() {
+            continue;
+        }
+        near.sort_unstable_by_key(|n| std::cmp::Reverse(n.0));
+        near.truncate(LIGHTS_PER_CUBE);
+        lists.push((t, near.iter().map(|n| n.1).collect()));
+    }
+    let slots = (lists.len() * 2).next_power_of_two().max(1024);
     let mut table = vec![0u32; slots * 4];
     for i in 0..slots {
         table[i * 4] = i32::MIN as u32;
     }
     let mut out: Vec<u32> = Vec::new();
-    for (&c, l) in lights {
-        if out.len() >= LIGHTS_MAX {
+    for (c, l) in &lists {
+        if out.len() + l.len() > LIGHTS_MAX {
             break;
         }
-        let n = l.len().min(LIGHTS_PER_CUBE).min(LIGHTS_MAX - out.len());
         let start = out.len() as u32;
-        out.extend_from_slice(&l[..n]);
-        let mut i = light_hash(c) as usize & (slots - 1);
+        out.extend_from_slice(l);
+        let mut i = light_hash(*c) as usize & (slots - 1);
         while table[i * 4] != i32::MIN as u32 {
             i = (i + 1) & (slots - 1);
         }
-        table[i * 4..i * 4 + 4].copy_from_slice(&[c.x as u32, c.y as u32, c.z as u32, start | (n as u32) << 20]);
+        table[i * 4..i * 4 + 4].copy_from_slice(&[c.x as u32, c.y as u32, c.z as u32, start | (l.len() as u32) << 20]);
     }
     let mut words = Vec::with_capacity(2 + table.len() + out.len());
     words.push(slots as u32);
@@ -799,7 +840,7 @@ impl WorldRenderer {
         if stale {
             let words = light_words(&self.cube_lights);
             let n = words.len() as u64;
-            log::info!("path traced lights: {} cubes, {} lights, frame {frame}", self.cube_lights.len(), words[1]);
+            log::debug!("path traced lights: {} cubes with lights, {} listed, frame {frame}", self.cube_lights.len(), words[1]);
             if self.pt_lights.as_ref().is_none_or(|l| l.words < n) {
                 if let Some(l) = self.pt_lights.take() {
                     l.destroy(gpu);

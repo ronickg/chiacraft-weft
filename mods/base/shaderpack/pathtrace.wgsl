@@ -268,15 +268,15 @@ fn pt_rand(px: vec2<f32>, salt: u32) -> vec2<f32> {
 // ---- block lights (M2; reports/Path tracing plan.md) ----
 //
 // The lightmap's block light stays the light's colour and reach (our grade); what tracing adds is
-// whether the light can be seen. Each pixel draws a few candidates from the light-giving blocks in
-// the 27 cubes round it (`pt_lights`, from the meshes), each weighted by the light it gives there
+// whether the light can be seen. Each pixel draws a few candidates from the light-giving blocks
+// that reach its cube (`pt_lights`, from the meshes, listed per cube on the CPU), each weighted by the light it gives there
 // by the lightmap's own falloff (its level less the blocks between), keeps one in proportion
 // (resampled importance sampling), and sends one shadow ray to it. Averaged over frames, that is the
 // share of the block light that reaches the surface: shadows behind pillars and furniture.
 
 const PT_LIGHT_CANDIDATES: u32 = 8u;
 
-// Where cube `c`'s lights are in `pt_lights` (start, count); count 0 when it has none.
+// Where the lights reaching cube `c` are in `pt_lights` (start, count); count 0 when none do.
 fn pt_light_find(c: vec3<i32>) -> vec2<u32> {
     let slots = pt_lights[0];
     var i = ((u32(c.x) * 73856093u) ^ (u32(c.y) * 19349663u) ^ (u32(c.z) * 83492791u)) & (slots - 1u);
@@ -304,20 +304,9 @@ fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: ve
     let cell = vec3<i32>(floor(world + ng * 0.5));
     let cube = cell >> vec3(4u);
     let base = 2u + pt_lights[0] * 4u;
-    // The cubes round with lights, first: drawing the cube at random among all 27 found a light in
-    // a quarter of frames in NVIDIA's storeroom, and a frame with none counted as seen, so the
-    // shadows all but vanished (pt1_rtxd_m10v).
-    var held: array<vec4<u32>, 27>;
-    var n = 0u;
-    var total = 0u;
-    for (var ci = 0u; ci < 27u; ci++) {
-        let r = pt_light_find(cube + vec3<i32>(i32(ci % 3u) - 1, i32((ci / 3u) % 3u) - 1, i32(ci / 9u) - 1));
-        if r.y > 0u {
-            held[n] = vec4(r.x, r.y, ci, total);
-            total += r.y;
-            n += 1u;
-        }
-    }
+    // The lights that reach into this cube (the table lists them per cube, strongest first).
+    let r = pt_light_find(cube);
+    let total = r.y;
     if total == 0u {
         return vec2(1.0, 0.0);
     }
@@ -328,17 +317,9 @@ fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: ve
     for (var k = 0u; k < PT_LIGHT_CANDIDATES; k++) {
         // One of the `total` lights, each as likely.
         let t = min(u32(pt_rand(px, 16u + k * 2u).x * f32(total)), total - 1u);
-        var c = 0u;
-        for (var j = 1u; j < n; j++) {
-            if held[j].w <= t {
-                c = j;
-            }
-        }
-        let ci = held[c].z;
-        let at = cube + vec3<i32>(i32(ci % 3u) - 1, i32((ci / 3u) % 3u) - 1, i32(ci / 9u) - 1);
-        let l = pt_lights[base + held[c].x + (t - held[c].w)];
-        let lp = vec3<i32>(i32(l & 15u), i32((l >> 4u) & 15u), i32((l >> 8u) & 15u)) + at * 16;
-        let e = f32(max((l >> 12u) & 15u, max((l >> 16u) & 15u, (l >> 20u) & 15u)));
+        let l = pt_lights[base + r.x + t];
+        let lp = vec3<i32>(i32(l & 63u), i32((l >> 6u) & 63u), i32((l >> 12u) & 63u)) - 16 + cube * 16;
+        let e = f32(max((l >> 18u) & 15u, max((l >> 22u) & 15u, (l >> 26u) & 15u)));
         let d = abs(lp - cell);
         let level = e - f32(d.x + d.y + d.z);
         if level <= 0.0 {
