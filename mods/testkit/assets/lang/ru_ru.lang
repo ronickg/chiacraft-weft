@@ -9,3 +9,5 @@ testkit.screen_text = текст на экране из покадрового �
 testkit.ok = ok {0}
 testkit.err = err {0}
 command.testkit.compare = {0}
+
+config.testkit.op_joiners = Входящие игроки — операторы (тестовые запуски)

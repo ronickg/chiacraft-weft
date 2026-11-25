@@ -2541,6 +2541,12 @@ impl Running {
             .first()
             .and_then(|n| content().commands.iter().find(|d| d.client && d.name == *n))?;
         let g = self.game.as_ref()?;
+        // chiacraft: client commands ask for their level like the server's, against the level
+        // the server gave this player.
+        if g.client.permission < def.level {
+            log::info!("refused /{} here: it asks for level {}, this player has {}", def.name, def.level, g.client.permission);
+            return Some(vec![Msg::new("command.no_permission", vec![Arg::Text(def.name.clone()), Arg::Int(def.level as i64)])]);
+        }
         let p = &g.client.player;
         let here = crate::commands::Origin { pos: p.pos, yaw: p.yaw, pitch: p.pitch };
         let players = g.client.players.clone();

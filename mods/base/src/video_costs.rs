@@ -460,5 +460,6 @@ pub fn register(r: &mut Registry, all: fn(Tab) -> Vec<Measured>) {
         let secs = sweep_secs(&rows).ceil() as i64;
         start(rows, window());
         cmd.reply("video.base.cost.started", &[Arg::Int(secs)]);
-    });
+    })
+    .permission(permission::EVERYONE);
 }

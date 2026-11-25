@@ -11,3 +11,5 @@ testkit.screen_text = screen text from a frame hook
 testkit.ok = ok {0}
 testkit.err = err {0}
 command.testkit.compare = {0}
+
+config.testkit.op_joiners = Joining players are operators (test runs)

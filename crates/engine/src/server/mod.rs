@@ -1465,6 +1465,13 @@ impl Server {
             return vec![Msg::new("command.client_only", vec![Arg::Text(name.to_string())])];
         }
         if self.permission_of(pi) < def.level {
+            // chiacraft: the host's log notes every refusal.
+            log::info!(
+                "refused /{name} for {}: it asks for level {}, they have {}",
+                self.players[pi].identity.name,
+                def.level,
+                self.permission_of(pi)
+            );
             return vec![Msg::new("command.no_permission", vec![Arg::Text(name.to_string()), Arg::Int(def.level as i64)])];
         }
         let (dim, entity) = (self.players[pi].dim, self.players[pi].entity);
