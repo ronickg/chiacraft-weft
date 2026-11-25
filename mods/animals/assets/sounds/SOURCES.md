@@ -187,3 +187,109 @@ not a noise bed) were kept. The raw outputs, every candidate, the scores and the
 | `bunting/ambient3` | "small bird twittering call, short, louder and more intense, close, dry, no background noise, no music" | 5175 |
 | `bunting/hurt1` | "small bird alarm chirp, sharp, longer and lower, close, dry, no background noise, no music" | 5179 |
 | `bunting/death1` | "small bird weak chirp, fading, close, dry, no background noise, no music" | 1181 |
+
+## AI act sounds (`voice/<family>/alarm|attack<n>`, `voice/eat/`, `voice/steps/`)
+
+Made 2026-11-25 with the same model, licence and method as the AI voices above: alarm calls (played
+as an animal bolts), attack calls (pounce, bite, rear, its species' attack clips), eating by how it
+eats (graze, tear meat, peck) and heavy footfalls (heavy, huge) for the big animals and the bosses
+(`animals_core::voices::ACTS`, `eat_way`, `step_size`). Cut: alarm and attack 1.2 s, eating 1.2 s
+(peck 1.0 s), steps 0.5 s (huge 0.8 s); eating and steps picked by shape alone (they are noises,
+not calls). Every candidate, the scores and the picks are in
+`~/Coding/chiacraft-archive/sounds/ai-sound/2026-11-25-acts/` (`v2_` = the reworded second round).
+
+| File | Prompt | Seed |
+|---|---|---|
+| `canine/alarm1` | "dog sharp warning bark, single, longer and lower, close, dry, no background noise, no music" | 7003 |
+| `canine/alarm2` | "dog sharp warning bark, single, close, dry, no background noise, no music" | 7001 |
+| `canine/attack1` | "dog aggressive growl and snapping bark, short and sharp, close, dry, no background noise, no music" | 7006 |
+| `canine/attack2` | "dog aggressive growl and snapping bark, close, dry, no background noise, no music" | 3006 |
+| `fox/alarm1` | "red fox alarm bark, short hoarse yap, longer and lower, close, dry, no background noise, no music" | 7011 |
+| `fox/alarm2` | "red fox alarm bark, short hoarse yap, short and sharp, close, dry, no background noise, no music" | 7010 |
+| `fox/attack1` | "fox snarl and snap, louder and more intense, close, dry, no background noise, no music" | 7016 |
+| `fox/attack2` | "fox snarl and snap, close, dry, no background noise, no music" | 3014 |
+| `cat/alarm1` | "cat hissing and spitting, short, longer and lower, close, dry, no background noise, no music" | 7019 |
+| `cat/alarm2` | "cat hissing and spitting, short, close, dry, no background noise, no music" | 3018 |
+| `cat/attack1` | "cat angry yowl and hiss, close, dry, no background noise, no music" | 7021 |
+| `cat/attack2` | "cat angry yowl and hiss, close, dry, no background noise, no music" | 3022 |
+| `jaguar/alarm1` | "big cat warning snarl, short, close, dry, no background noise, no music" | 3026 |
+| `jaguar/alarm2` | "big cat warning snarl, short, close, dry, no background noise, no music" | 3025 |
+| `jaguar/attack1` | "jaguar attack roar, short snarl, close, dry, no background noise, no music" | 3031 |
+| `jaguar/attack2` | "jaguar attack roar, short snarl, close, dry, no background noise, no music" | 7029 |
+| `deer/alarm1` | "deer alarm snort, sharp blow through the nose, close, dry, no background noise, no music" | 3034 |
+| `deer/alarm2` | "deer alarm snort, sharp blow through the nose, close, dry, no background noise, no music" | 3035 |
+| `deer/attack1` | "stag angry grunt, charging, short and sharp, close, dry, no background noise, no music" | 7038 |
+| `deer/attack2` | "stag angry grunt, charging, close, dry, no background noise, no music" | 3040 |
+| `reindeer/alarm1` | "reindeer alarm snort and grunt, short and sharp, close, dry, no background noise, no music" | 7042 |
+| `reindeer/alarm2` | "reindeer alarm snort and grunt, longer and lower, close, dry, no background noise, no music" | 7043 |
+| `reindeer/attack1` | "reindeer angry grunt, charging, close, dry, no background noise, no music" | 3047 |
+| `reindeer/attack2` | "reindeer angry grunt, charging, longer and lower, close, dry, no background noise, no music" | 7047 |
+| `rodent/alarm1` | "mouse alarm squeak, short and sharp, close, dry, no background noise, no music" | 3049 |
+| `rodent/alarm2` | "mouse alarm squeak, short and sharp, close, dry, no background noise, no music" | 3050 |
+| `capybara/alarm1` | "capybara alarm bark, short gruff cough, close, dry, no background noise, no music" | 3054 |
+| `capybara/alarm2` | "capybara alarm bark, short gruff cough, louder and more intense, close, dry, no background noise, no music" | 7056 |
+| `songbird/alarm1` | "sparrow alarm chirps, rapid, close, dry, no background noise, no music" | 3057 |
+| `songbird/alarm2` | "sparrow alarm chirps, rapid, louder and more intense, close, dry, no background noise, no music" | 7060 |
+| `bunting/alarm1` | "small bird alarm chip calls, close, dry, no background noise, no music" | 7061 |
+| `bunting/alarm2` | "small bird alarm chip calls, close, dry, no background noise, no music" | 3062 |
+| `hawk/alarm1` | "hawk alarm scream, short, close, dry, no background noise, no music" | 3068 |
+| `hawk/alarm2` | "hawk alarm scream, short, short and sharp, close, dry, no background noise, no music" | 7066 |
+| `hawk/attack1` | "hawk attack scream, harsh, short and sharp, close, dry, no background noise, no music" | 7070 |
+| `hawk/attack2` | "hawk attack scream, harsh, close, dry, no background noise, no music" | 3071 |
+| `eagle/alarm1` | "eagle alarm yelps, close, dry, no background noise, no music" | 7073 |
+| `eagle/alarm2` | "eagle alarm yelps, close, dry, no background noise, no music" | 3076 |
+| `eagle/attack1` | "eagle attack scream, harsh, short and sharp, close, dry, no background noise, no music" | 7078 |
+| `eagle/attack2` | "eagle attack scream, harsh, close, dry, no background noise, no music" | 3079 |
+| `owl/alarm1` | "owl alarm hiss and bill clacking, close, dry, no background noise, no music" | 3083 |
+| `owl/alarm2` | "owl alarm hiss and bill clacking, close, dry, no background noise, no music" | 3084 |
+| `owl/attack1` | "owl angry hiss and screech, short and sharp, close, dry, no background noise, no music" | 7086 |
+| `owl/attack2` | "owl angry hiss and screech, close, dry, no background noise, no music" | 3085 |
+| `snowy_owl/alarm1` | "snowy owl alarm bark, harsh, longer and lower, close, dry, no background noise, no music" | 7091 |
+| `snowy_owl/alarm2` | "snowy owl alarm bark, harsh, close, dry, no background noise, no music" | 3091 |
+| `snowy_owl/attack1` | "owl angry hiss and screech, close, dry, no background noise, no music" | 7093 |
+| `snowy_owl/attack2` | "owl angry hiss and screech, close, dry, no background noise, no music" | 3095 |
+| `gull/alarm1` | "gull alarm call, sharp repeated kek, longer and lower, close, dry, no background noise, no music" | 7099 |
+| `gull/alarm2` | "gull alarm call, sharp repeated kek, close, dry, no background noise, no music" | 3097 |
+| `gull/attack1` | "angry gull screech, longer and lower, close, dry, no background noise, no music" | 7103 |
+| `gull/attack2` | "angry gull screech, close, dry, no background noise, no music" | 3101 |
+| `corvid/alarm1` | "crow alarm caws, harsh and rapid, close, dry, no background noise, no music" | 3107 |
+| `corvid/alarm2` | "crow alarm caws, harsh and rapid, close, dry, no background noise, no music" | 3106 |
+| `corvid/attack1` | "angry crow attack caw, close, dry, no background noise, no music" | 3112 |
+| `corvid/attack2` | "angry crow attack caw, close, dry, no background noise, no music" | 7109 |
+| `hiss/alarm1` | "crocodile warning hiss, loud, close, dry, no background noise, no music" | 3116 |
+| `hiss/alarm2` | "crocodile warning hiss, loud, close, dry, no background noise, no music" | 3113 |
+| `hiss/attack1` | "crocodile lunge, hiss and jaw snap, close, dry, no background noise, no music" | 3118 |
+| `hiss/attack2` | "crocodile lunge, hiss and jaw snap, longer and lower, close, dry, no background noise, no music" | 7119 |
+| `bellow/alarm1` | "crocodile warning growl, deep, short and sharp, close, dry, no background noise, no music" | 7122 |
+| `bellow/alarm2` | "crocodile warning growl, deep, longer and lower, close, dry, no background noise, no music" | 7123 |
+| `bellow/attack1` | "crocodile attack growl with jaw snap, close, dry, no background noise, no music" | 3126 |
+| `bellow/attack2` | "crocodile attack growl with jaw snap, close, dry, no background noise, no music" | 3127 |
+| `horned_dino/alarm1` | "large animal alarm honk, loud and short, longer and lower, close, dry, no background noise, no music" | 7131 |
+| `horned_dino/alarm2` | "large animal alarm honk, loud and short, close, dry, no background noise, no music" | 3131 |
+| `horned_dino/attack1` | "large animal angry bellow, charging, short and sharp, close, dry, no background noise, no music" | 7134 |
+| `horned_dino/attack2` | "large animal angry bellow, charging, close, dry, no background noise, no music" | 3134 |
+| `raptor/alarm1` | "large bird alarm shriek, harsh, close, dry, no background noise, no music" | 7137 |
+| `raptor/alarm2` | "large bird alarm shriek, harsh, close, dry, no background noise, no music" | 3140 |
+| `raptor/attack1` | "angry large bird screech and hiss, attacking, close, dry, no background noise, no music" | 7141 |
+| `raptor/attack2` | "angry large bird screech and hiss, attacking, close, dry, no background noise, no music" | 3144 |
+| `dragon/alarm1` | "dragon warning growl, deep, short and sharp, close, dry, no background noise, no music" | 7146 |
+| `dragon/alarm2` | "dragon warning growl, deep, close, dry, no background noise, no music" | 3145 |
+| `dragon/attack1` | "dragon attack roar, short, short and sharp, close, dry, no background noise, no music" | 7150 |
+| `dragon/attack2` | "dragon attack roar, short, close, dry, no background noise, no music" | 3151 |
+| `eat/graze1` | "animal grazing, tearing and chewing grass, louder and more intense, close, dry, no background noise, no music" | 7164 |
+| `eat/graze2` | "animal grazing, tearing and chewing grass, longer and lower, close, dry, no background noise, no music" | 7163 |
+| `eat/graze3` | "animal grazing, tearing and chewing grass, close, dry, no background noise, no music" | 7161 |
+| `eat/meat1` | "animal tearing and chewing raw meat, louder and more intense, close, dry, no background noise, no music" | 7169 |
+| `eat/meat2` | "animal tearing and chewing raw meat, longer and lower, close, dry, no background noise, no music" | 7168 |
+| `eat/meat3` | "animal tearing and chewing raw meat, short and sharp, close, dry, no background noise, no music" | 7167 |
+| `eat/peck1` | "bird pecking seeds on the ground, short and sharp, close, dry, no background noise, no music" | 7172 |
+| `eat/peck2` | "bird pecking seeds on the ground, close, dry, no background noise, no music" | 3175 |
+| `eat/peck3` | "bird pecking seeds on the ground, softer and calmer, close, dry, no background noise, no music" | 7175 |
+| `steps/heavy1` | "heavy hooved animal footstep on earth, single thud, softer and calmer, close, dry, no background noise, no music" | 7180 |
+| `steps/heavy2` | "heavy hooved animal footstep on earth, single thud, louder and more intense, close, dry, no background noise, no music" | 7179 |
+| `steps/heavy3` | "heavy hooved animal footstep on earth, single thud, close, dry, no background noise, no music" | 3178 |
+| `steps/heavy4` | "heavy hooved animal footstep on earth, single thud, longer and lower, close, dry, no background noise, no music" | 7178 |
+| `steps/huge1` | "giant creature footstep, single deep heavy thud, two in a row, close, dry, no background noise, no music" | 7187 |
+| `steps/huge2` | "giant creature footstep, single deep heavy thud, softer and calmer, close, dry, no background noise, no music" | 7186 |
+| `steps/huge3` | "giant creature footstep, single deep heavy thud, louder and more intense, close, dry, no background noise, no music" | 7185 |
+| `steps/huge4` | "giant creature footstep, single deep heavy thud, longer and lower, close, dry, no background noise, no music" | 7184 |

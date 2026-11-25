@@ -240,3 +240,48 @@ Hurt clips score low by design: a 0.8 s cry fills its clip.
 - Page: https://claude.ai/artifact/QQ73ToVGfBheAANZrth5m7
 
 **Check:** `mods/testkit/scripts/ai_voices.txt` covers a herd, a Drenkaun fight, and Borkon's summon.
+
+## The acts (2026-11-25, after the full sets merged)
+
+Planner: eat, alarm, flee and footsteps per species, hooked thinly (the Animals session is editing
+behaviour). Made like the sets (spec, two rounds, the second reworded, the likeness filter):
+`~/Coding/chiacraft-archive/sounds/ai-sound/2026-11-25-acts/`, 97 picks, 93 in the game (the bosses'
+young have no species, so nothing plays their alarm; their two pairs stay in the archive).
+
+- Alarm and flight are one moment (`wild::alarm` plays the alarm clip as an animal bolts), so one
+  `alarm` set each, played from `anim::play` with the clip; `attack` with pounce, bite, rear and the
+  species' own attack clips (`commands::fight` plays one per hit). 21 families (`voices::ACTS`).
+- Eating: `animal::feed` (every way an animal eats: grazing, items on the ground, its kill, by
+  hand), `graze`, `meat` or `peck` by diet and family, pitch and volume by mass.
+- Steps: the engine plays a kind's own step sound in place of the ground's when it has one, every
+  1.6 blocks (more often running). Plant-eaters from 80 kg and anything from 250 kg get `heavy`,
+  from 1 t `huge`, pitched and loudened by mass; small and padded ones keep the ground's.
+
+## Next: the sound gaps (Ronald, 11-25: "Yes, top 4")
+
+Planner's audit, copied from the main checkout's notes/crew/plans/sound-audit-2026-11-25.md:
+
+### Sound audit, 2026-11-25 (Planner's subagent, read only)
+
+Engine (Kira, crates/engine/src/audio.rs + client/acoustics.rs) already has: 3D falloff, pitch range,
+variants without repeats, categories (master, music, blocks, creatures, players, ambient, ui), 64 voices
+with stealing, occlusion + low-pass, reverb from 14 probe rays, underwater filter, speed-of-sound delay,
+biome/hour/season/rain ambient beds (base ambience.rs, weather_sound.rs). Missing: random volume, weather
+slider, Doppler, subtitles, loudness check.
+
+Dev has ~352 files: blocks 93 (13 groups x dig 3 + step 3; place = dig, hit = step at pitch 0.5),
+ambient/weather 40, creatures 205, UI/items 3, music 1 (418DreamingSheep).
+
+Gaps: no player sounds (hurt, death, eat, drink, swim, splash, land, fall damage, drowning); silent
+doors, chests, crafting, furnace, fire/torch crackle, tool swing, item break, bow, armour equip,
+inventory open/close; no water footsteps; 3 variants per material (Minecraft 4-6).
+
+Ronald 11-25 picked "Yes, top 4":
+1. Player sounds.
+2. Interaction sounds (doors, chests, crafting, furnace, fire/torch, tool swing, item break, bow, armour, inventory).
+3. Water footsteps and wading; 2-3 more variants per material; own place and hit sounds.
+4. Merge the act sounds (claude/ai-sound-36697c).
+Later (not picked): more music, loudness check, random volume + weather slider, subtitles.
+Sources: Minecraft wiki Sounds.json; Sound Physics Remastered; Audiokinetic / IESD loudness (-24 LUFS, -1 dBTP).
+
+Order: player sounds and interaction sounds first, then water steps, more block variants and own place/hit sounds. Same method (Stable Audio, picked for distinctness, SOURCES rows), no engine changes without asking Planner, levelled to -24 LUFS integrated and -1 dBTP. Each batch: a listening page, a Tester run, all-targets, then ready to merge.

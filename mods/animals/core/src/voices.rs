@@ -76,6 +76,91 @@ pub const BOSS_CALLS: [(&str, &str, u32); 6] = [
 /// The bosses' young (not species): their kind and voice family.
 pub const YOUNG: [(&str, &str); 2] = [("borkon_kid", "goat_kid"), ("drenkaun_calf", "calf")];
 
+/// The calls of its acts (AI, batch 3), `voice/<family>/alarm<n>` and `attack<n>`: how many of each
+/// a family has (0: none). `alarm` plays with its alarm clip (as it bolts: alarm and flight are one
+/// moment, `wild::alarm`), `attack` with a pounce, bite, rear or one of its species' attack clips.
+pub const ACTS: [(&str, u32, u32); 21] = [
+    ("canine", 2, 2),
+    ("fox", 2, 2),
+    ("cat", 2, 2),
+    ("jaguar", 2, 2),
+    ("deer", 2, 2),
+    ("reindeer", 2, 2),
+    ("rodent", 2, 0),
+    ("capybara", 2, 0),
+    ("songbird", 2, 0),
+    ("bunting", 2, 0),
+    ("hawk", 2, 2),
+    ("eagle", 2, 2),
+    ("owl", 2, 2),
+    ("snowy_owl", 2, 2),
+    ("gull", 2, 2),
+    ("corvid", 2, 2),
+    ("hiss", 2, 2),
+    ("bellow", 2, 2),
+    ("horned_dino", 2, 2),
+    ("raptor", 2, 2),
+    ("dragon", 2, 2),
+];
+
+/// `family`'s alarm and attack files, if it has any.
+pub fn acts(family: &str) -> (u32, u32) {
+    ACTS.iter().find(|a| a.0 == family).map_or((0, 0), |a| (a.1, a.2))
+}
+
+/// How it eats, by sound, `voice/eat/<way><n>`: three files each. Birds peck, meat-eaters tear and
+/// chew, the rest graze.
+pub const EAT_FILES: u32 = 3;
+/// The families that peck their food.
+pub const PECKERS: [&str; 8] = ["songbird", "bunting", "hawk", "eagle", "owl", "snowy_owl", "gull", "corvid"];
+
+pub fn eat_way(family: &str, carnivore: bool) -> &'static str {
+    if PECKERS.contains(&family) {
+        "peck"
+    } else if carnivore {
+        "meat"
+    } else {
+        "graze"
+    }
+}
+
+/// Eating's pitch and volume by its mass in kg: a vole nibbles high and quiet, a sauropod low and
+/// loud (volume 0.4 at 0.02 kg, 1 at 50 kg, about 1.5 at 10 t; pitch from 1.5 down to 0.7).
+pub fn eat_pitch(kg: f32) -> f32 {
+    (50.0 / kg.max(0.01)).powf(0.07).clamp(0.7, 1.5)
+}
+pub fn eat_volume(kg: f32) -> f32 {
+    (1.0 + 0.2 * (kg.max(0.01) / 50.0).log10()).clamp(0.4, 1.6)
+}
+
+/// Heavy footfalls (`voice/steps/<size><n>`, four files each) in place of the ground's step sound:
+/// a hoofed or big-footed plant-eater from `HEAVY_KG`, anything from `HEAVY_ANY_KG` (padded hunters
+/// below it walk softly), and `huge` from `HUGE_KG`. The bosses step `huge`.
+pub const STEP_FILES: u32 = 4;
+pub const HEAVY_KG: f32 = 80.0;
+pub const HEAVY_ANY_KG: f32 = 250.0;
+pub const HUGE_KG: f32 = 1000.0;
+
+pub fn step_size(kg: f32, carnivore: bool) -> Option<&'static str> {
+    if kg >= HUGE_KG {
+        Some("huge")
+    } else if kg >= HEAVY_ANY_KG || (kg >= HEAVY_KG && !carnivore) {
+        Some("heavy")
+    } else {
+        None
+    }
+}
+
+/// A step's pitch and volume by mass: the heavier, the lower and louder (the engine plays steps at
+/// a quarter volume). Heavy: pitch 1.15 at 80 kg to 0.8 at 900 kg; huge: 1.1 at 1 t to 0.75 at 10 t.
+pub fn step_pitch(kg: f32) -> f32 {
+    let (from, at) = if kg >= HUGE_KG { (HUGE_KG, 1.1) } else { (HEAVY_KG, 1.15) };
+    (at - 0.35 * (kg / from).log10()).clamp(0.7, 1.2)
+}
+pub fn step_volume(kg: f32) -> f32 {
+    (1.2 + 0.6 * (kg / HEAVY_KG).log10()).clamp(1.0, 2.5)
+}
+
 /// A species' voice: its family and playback speed (1 as recorded).
 #[derive(Clone, Copy, Debug)]
 pub struct Voice {
@@ -155,6 +240,15 @@ mod tests {
         for (kind, fam) in YOUNG {
             assert!(family(fam).is_some(), "{kind} has no family {fam}");
         }
+        for (fam, _, _) in ACTS {
+            assert!(family(fam).is_some(), "acts of no family {fam}");
+        }
+        assert_eq!(step_size(50.0, false), None);
+        assert_eq!(step_size(120.0, false), Some("heavy"));
+        assert_eq!(step_size(120.0, true), None);
+        assert_eq!(step_size(300.0, true), Some("heavy"));
+        assert_eq!(step_size(4000.0, false), Some("huge"));
+        assert!(eat_pitch(0.03) > 1.0 && eat_pitch(10000.0) < 1.0);
         for (boss, event, n) in BOSS_CALLS {
             assert!(family(boss).is_some() && n > 0, "{boss}.{event}");
         }
