@@ -259,7 +259,7 @@ fell in love and why the others didn't.
 | reindeer | pass (2 pairs) | pass (2) | pass (1-2) | pass (27/56 to 30/125) | r2 1 |
 | capybara | pass (2 pairs) | pass (4) | pass (1-2) | pass (12/13 to 13/28) | r2 2 |
 | grey_wolf | pass (1 pair) | pass (3) | pass (1-3) | pass (24/27 to 26/61) | r2 2 |
-| jaguar | fail: never mated (slept through love; fixed, to re-run) | not tested | not tested | not tested | r2 3 |
+| jaguar | pass in run 3 (2 pairs at noon) | pass (3 cubs) | pass (1-3, one 8) | pass (none young after the hurry) | r3 3 |
 | hare | pass (2 pairs) | pass (4) | pass (1-5) | pass (3/3 to 3/7) | r2 3 |
 | protoceratops | pass (1 pair) | pass (5 eggs hatched) | pass (1-3) | pass (21/21 to 21/46) | r2 4 (dark) |
 | iguanodont | pass (1 pair) | pass (1 egg hatched) | pass (2-3) | pass (353/545 to 379/1226) | r2 4 (dark) |
@@ -267,6 +267,12 @@ fell in love and why the others didn't.
 Grown ones keep their health and only their maximum rises (a young one grown by `hurry` heals as any
 other). The dark pad at x 600 (every run): a hill over the 15 cleared blocks; pads now clear the sky to 140.
 Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_young_m-164843/r2_young_grid.jpg`.
+
+Run 3 (8fe0410c3, `r7_young_m-174610`, 471 s): the jaguars, in love at noon, now mated (2 pairs, 3 cubs, kept
+1 to 3 blocks from their mothers) and grew up; the fix holds. Every other pad mated, bore young that kept by
+their mothers, and grew up, again. The love lines say why the others didn't: young ones and an elder
+protoceratops. The four wolves (on the capybara pad) didn't mate this time (run 2: they did).
+Grid r3: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r7_young_m-174610/r7_young_grid.jpg`.
 
 Run 1 grid: `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_young_m-162151/cov_young_grid.jpg`.
 
