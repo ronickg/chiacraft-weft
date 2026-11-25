@@ -83,6 +83,18 @@ pub fn muffle(open: f32) -> f32 {
     500.0 * 40.0f32.powf(open.clamp(0.0, 1.0))
 }
 
+/// Deep under ground: next to no sky round the head and no roof the rain falls on.
+pub fn deep(c: Cover) -> bool {
+    c.open < 0.05 && c.roof == 0.0
+}
+
+/// How a sound from the open air is heard under `c`: its share of the volume (through the walls
+/// indoors, none deep under ground) and the low-pass it's muffled to (Hz).
+pub fn outdoors(c: Cover) -> (f32, f32) {
+    let heard = if deep(c) { 0.0 } else { THROUGH_WALLS + (1.0 - THROUGH_WALLS) * c.open };
+    (heard, muffle(c.open))
+}
+
 /// The wind is heard from this speed (m/s) and at full from that (a strong breeze to a gale).
 pub const WIND_HEARD: (f32, f32) = (1.5, 16.0);
 
@@ -129,6 +141,16 @@ pub fn levels(rain: f32, thunder: f32, wind: f32, snowing: f32, cover: Cover) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn open_air_sounds_follow_the_cover() {
+        let open = Cover { open: 1.0, roof: 0.0, leaves: 0.0 };
+        let hut = Cover { open: 0.3, roof: 0.6, leaves: 0.0 };
+        let cave = Cover { open: 0.0, roof: 0.0, leaves: 0.0 };
+        assert_eq!(outdoors(open).0, 1.0);
+        assert!(outdoors(hut).0 < 0.6 && outdoors(hut).1 < 5000.0, "indoors: quieter, muffled");
+        assert_eq!(outdoors(cave).0, 0.0, "deep under ground: not heard");
+    }
 
     #[test]
     fn thunder_comes_late_and_quiet_from_far() {

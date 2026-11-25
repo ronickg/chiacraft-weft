@@ -12,6 +12,11 @@
 //! turn (a sprite drawn banked, mirrored for the other way round). A leaping fish is one particle
 //! thrown up and falling back, its nose along its arc, with a splash where it leaves the water and
 //! where it comes down.
+//!
+//! Each makes its sound from where it is (`am::EAGLE_CRY_EVERY` and the rest): an eagle's cry
+//! from one of the circling birds, a gull's call from one of the flock, an owl's hoot as it passes
+//! nearest, a splash where a fish leaves the water and where it falls back. One sound started now
+//! and then, a few a minute: nothing a frame.
 
 use std::f64::consts::TAU;
 use std::sync::Mutex;
@@ -35,6 +40,12 @@ static BANK_RIGHT: [Particle; 3] =
     [Particle::named("ambient_eagle_bank_r"), Particle::named("ambient_vulture_bank_r"), Particle::named("ambient_gull_bank_r")];
 static SPLASH: Particle = Particle::named("core:splash");
 static WATER: Tag = Tag::named("water");
+static CRY: Sound = Sound::named("ambient.eagle");
+static SPLASHING: Sound = Sound::named("ambient.splash");
+/// The land's calls (`mods/base/src/ambience.rs`): the flock and the owl are the gulls and owls
+/// it calls for.
+static GULL_CALL: Sound = Sound::named("base:ambient.call.gull");
+static OWL_CALL: Sound = Sound::named("base:ambient.call.owl");
 
 /// What flies here now (`am::Now::pack`), the server's.
 static NOW: Component<u32> = Component::named("ambient_life");
@@ -74,6 +85,22 @@ pub fn init(r: &mut Registry) {
         .drag(1.0)
         .streak(1e-4)
         .on_enter_liquid(When::any(), Then::die());
+    r.sound(&CRY)
+        .files(&["ambient/eagle1", "ambient/eagle2", "ambient/eagle3"])
+        .category(&sound_categories::AMBIENT)
+        .volume(0.55)
+        .pitch(0.92, 1.08)
+        .range(am::CRY_RANGE)
+        .priority(20)
+        .voices(2);
+    r.sound(&SPLASHING)
+        .files(&["ambient/splash1", "ambient/splash2", "ambient/splash3", "ambient/splash4"])
+        .category(&sound_categories::AMBIENT)
+        .volume(0.6)
+        .pitch(0.85, 1.2)
+        .range(am::SPLASH_RANGE)
+        .priority(20)
+        .voices(3);
     r.world_tick(tell);
     r.client_frame(frame);
     // What lives where you stand and what flies now; `force` sets what flies round you (any of
@@ -181,6 +208,8 @@ struct Owl {
     vel: [f64; 3],
     born: Instant,
     secs: f64,
+    /// When in its crossing (seconds) it hoots: nearest the player, and maybe once more.
+    hoots: Vec<f64>,
 }
 
 struct Sky {
@@ -196,6 +225,10 @@ struct Sky {
     owl: Option<Owl>,
     /// Splashes still to come: when, and where.
     splashes: Vec<(Instant, [f64; 3])>,
+    /// Since the last log line: the sounds started (cries, gull calls, hoots, splashes), and the
+    /// last one's volume and muffle as the listener's cover let it through.
+    sounds: [u32; 4],
+    last_sound: (f32, f32),
     /// Since the last log line: frames, spawns, fish jumps and the time spent (s).
     frames: u32,
     spawned: u32,
@@ -218,6 +251,8 @@ static SKY: Mutex<Sky> = Mutex::new(Sky {
     gulls: Vec::new(),
     owl: None,
     splashes: Vec::new(),
+    sounds: [0; 4],
+    last_sound: (0.0, 0.0),
     frames: 0,
     spawned: 0,
     jumps: 0,
@@ -326,13 +361,19 @@ fn frame(c: &Client) {
             m.at[1] += (me[1] - m.at[1]) * (dt * 0.1).min(1.0);
         }
         let m = s.thermal.unwrap();
-        for b in s.soarers.clone() {
+        // Eagles (sprite 1) cry now and then, from one of them; vultures (2) are silent.
+        let cry = now_word.soar == 1 && s.unit() < dt / am::EAGLE_CRY_EVERY as f64;
+        let crier = (s.unit() * s.soarers.len() as f64) as usize;
+        for (k, b) in s.soarers.clone().into_iter().enumerate() {
             let (at, vel, rate) = on_circle(&b, &m, t);
             drop(
                 c.spawn_particles(banked(now_word.soar, rate), at)
                     .velocity(vel),
             );
             spawned += 1;
+            if cry && k == crier {
+                heard(&mut s, 0, base_api::hearing::start_outdoors(c, &CRY, at, 1.0));
+            }
         }
     } else {
         s.thermal = None;
@@ -367,13 +408,18 @@ fn frame(c: &Client) {
             m.at[1] += (me[1] - m.at[1]) * (dt * 0.1).min(1.0);
         }
         let m = s.flock.unwrap();
-        for b in s.gulls.clone() {
+        let call = s.unit() < dt / am::GULL_CALL_EVERY as f64;
+        let caller = (s.unit() * s.gulls.len() as f64) as usize;
+        for (k, b) in s.gulls.clone().into_iter().enumerate() {
             let (at, vel, rate) = on_circle(&b, &m, t);
             drop(
                 c.spawn_particles(banked(now_word.gull, rate), at)
                     .velocity(vel),
             );
             spawned += 1;
+            if call && k == caller {
+                heard(&mut s, 1, base_api::hearing::start_outdoors(c, &GULL_CALL, at, 1.0));
+            }
         }
     } else {
         s.flock = None;
@@ -390,14 +436,20 @@ fn frame(c: &Client) {
         let from = am::OWL_FROM as f64;
         let height = s.between(am::OWL_HEIGHT);
         let speed = am::OWL_SPEED as f64;
+        let secs = 2.0 * from / speed;
+        let mut hoots = vec![secs / 2.0];
+        if s.unit() < am::OWL_SECOND_HOOT as f64 {
+            hoots.push(secs * (0.2 + 0.6 * s.unit()));
+        }
         s.owl = Some(Owl {
             from: [me[0] - dir[0] * from - dir[1] * side, me[1] + height, me[2] - dir[1] * from + dir[0] * side],
             vel: [dir[0] * speed, 0.0, dir[1] * speed],
             born: began,
-            secs: 2.0 * from / speed,
+            secs,
+            hoots,
         });
     }
-    if let Some(o) = s.owl.as_ref() {
+    if let Some(o) = s.owl.as_mut() {
         let age = began.duration_since(o.born).as_secs_f64();
         if age > o.secs {
             s.owl = None;
@@ -408,6 +460,11 @@ fn frame(c: &Client) {
             let vel = [o.vel[0], 0.4 * 2.2 * (age * 2.2).cos(), o.vel[2]];
             drop(c.spawn_particles(&LEVEL[3], at).velocity(vel));
             spawned += 1;
+            let due = o.hoots.len();
+            o.hoots.retain(|&h| h > age);
+            if o.hoots.len() < due {
+                heard(&mut s, 2, base_api::hearing::start_outdoors(c, &OWL_CALL, at, 1.0));
+            }
         }
     }
 
@@ -431,6 +488,7 @@ fn frame(c: &Client) {
                     .spread(0.15)
                     .speed(1.2),
             );
+            heard(&mut s, 3, base_api::hearing::start_outdoors(c, &SPLASHING, at, am::SPLASH_OUT));
             let flight = 2.0 * leap / am::FISH_FALL as f64;
             let down = [at[0] + a.cos() * across * flight, at[1], at[2] + a.sin() * across * flight];
             s.splashes
@@ -453,6 +511,7 @@ fn frame(c: &Client) {
                 .spread(0.2)
                 .speed(1.6),
         );
+        heard(&mut s, 3, base_api::hearing::start_outdoors(c, &SPLASHING, at, 1.0));
         spawned += 1;
     }
 
@@ -465,8 +524,8 @@ fn frame(c: &Client) {
         .is_none_or(|l| began.duration_since(l).as_secs_f32() >= 10.0)
     {
         if s.frames > 0 && s.logged.is_some() {
-            weft_sdk::debug!(
-                "ambient: {:?}; {} soarers, {} gulls, owl {}, {} fish jumps ({} searches found no water, last on {}); {:.1} spawns and {:.4} ms a frame",
+            weft_sdk::info!(
+                "ambient: {:?}; {} soarers, {} gulls, owl {}, {} fish jumps ({} searches found no water, last on {}); sounds: {} cries, {} gull calls, {} hoots, {} splashes (last at volume {:.2}, muffle {:.0} Hz); {:.1} spawns and {:.4} ms a frame",
                 now_word,
                 s.soarers.len(),
                 s.gulls.len(),
@@ -474,13 +533,26 @@ fn frame(c: &Client) {
                 s.jumps,
                 s.dry,
                 s.last_ground,
+                s.sounds[0],
+                s.sounds[1],
+                s.sounds[2],
+                s.sounds[3],
+                s.last_sound.0,
+                s.last_sound.1,
                 s.spawned as f64 / s.frames as f64,
                 s.spent * 1000.0 / s.frames as f64
             );
         }
         s.logged = Some(began);
-        (s.frames, s.spawned, s.jumps, s.dry, s.spent) = (0, 0, 0, 0, 0.0);
+        (s.frames, s.spawned, s.jumps, s.dry, s.spent, s.sounds) = (0, 0, 0, 0, 0.0, [0; 4]);
     }
+}
+
+/// Counts a sound started (by kind: cry, gull call, hoot, splash) with the volume and muffle the
+/// listener's cover let through.
+fn heard(s: &mut Sky, kind: usize, (volume, muffle): (f32, f32)) {
+    s.sounds[kind] += 1;
+    s.last_sound = (volume, muffle);
 }
 
 /// The top of open water near `me` within `reach`: a few columns tried, each read down from a

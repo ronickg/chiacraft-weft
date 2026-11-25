@@ -8,6 +8,8 @@ use weft_sdk::*;
 
 /// Shared components, their value types, and food-item helpers.
 pub mod components;
+/// The cover over the listener's head, for sounds from the open air.
+pub mod hearing;
 
 /// Events emitted by the base game.
 pub mod events;
