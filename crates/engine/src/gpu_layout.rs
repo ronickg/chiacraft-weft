@@ -2025,6 +2025,7 @@ var<immediate> pt: PtArgs;
 @group(1) @binding(35) var<storage, read> pt_in: array<vec4<f32>>;
 const PT_CACHE: u32 = 1048576u;
 @group(1) @binding(36) var<storage, read_write> pt_cache: array<atomic<u32>>;
+@group(1) @binding(37) var<storage, read> pt_lights: array<u32>;
 ";
 
 /// The radiance cache's cells (`PT_CACHE` in `PT_DECLS`: change both), ten words each.
@@ -2036,6 +2037,7 @@ pub mod pt_bind {
     pub const OUT: u32 = 34;
     pub const IN: u32 = 35;
     pub const CACHE: u32 = 36;
+    pub const LIGHTS: u32 = 37;
 }
 
 /// The path tracer's push constants (`PT_DECLS`).

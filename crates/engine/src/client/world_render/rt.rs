@@ -260,6 +260,61 @@ pub(super) fn pre_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[P
     made.try_into().ok()
 }
 
+/// The light-giving blocks for the path tracer (`pathtrace.wgsl`'s `pt_lights`, binding 37): a hash
+/// table from a cube's coordinate to its lights, then the lights (`Mesh::lights`, each its place in
+/// the cube and its light per channel). Words: [0] the table's slots (a power of two), [1] the
+/// lights; then 4 a slot (x, y, z, start | count << 20; x `i32::MIN` empty); then the lights.
+pub struct RtLights {
+    buffer: BufferId,
+    words: u64,
+    /// The frame it was last made (made again at most every `LIGHTS_EVERY` frames).
+    made: u64,
+}
+
+const LIGHTS_EVERY: u64 = 15;
+const LIGHTS_PER_CUBE: usize = 256;
+const LIGHTS_MAX: usize = 1 << 20;
+
+/// The table's hash of a cube coordinate (`pt_light_find` in `pathtrace.wgsl`: the same).
+fn light_hash(c: IVec3) -> u32 {
+    (c.x as u32).wrapping_mul(73856093) ^ (c.y as u32).wrapping_mul(19349663) ^ (c.z as u32).wrapping_mul(83492791)
+}
+
+/// The table's words for `lights` (see `RtLights`).
+fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
+    let slots = (lights.len() * 2).next_power_of_two().max(1024);
+    let mut table = vec![0u32; slots * 4];
+    for i in 0..slots {
+        table[i * 4] = i32::MIN as u32;
+    }
+    let mut out: Vec<u32> = Vec::new();
+    for (&c, l) in lights {
+        if out.len() >= LIGHTS_MAX {
+            break;
+        }
+        let n = l.len().min(LIGHTS_PER_CUBE).min(LIGHTS_MAX - out.len());
+        let start = out.len() as u32;
+        out.extend_from_slice(&l[..n]);
+        let mut i = light_hash(c) as usize & (slots - 1);
+        while table[i * 4] != i32::MIN as u32 {
+            i = (i + 1) & (slots - 1);
+        }
+        table[i * 4..i * 4 + 4].copy_from_slice(&[c.x as u32, c.y as u32, c.z as u32, start | (n as u32) << 20]);
+    }
+    let mut words = Vec::with_capacity(2 + table.len() + out.len());
+    words.push(slots as u32);
+    words.push(out.len() as u32);
+    words.extend_from_slice(&table);
+    words.extend_from_slice(&out);
+    words
+}
+
+impl RtLights {
+    pub(super) fn destroy(self, gpu: &mut dyn Backend) {
+        gpu.destroy_buffer(self.buffer);
+    }
+}
+
 impl RtScene {
     /// The expansion's pipeline (`expand_pipeline`), made with the world's other pipelines.
     pub(super) fn expand_pipeline(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<PipelineId> {
@@ -530,6 +585,7 @@ impl WorldRenderer {
         }
         let (diffuse, specular, _) = self.pt_images.unwrap();
         use crate::gpu_layout::{PT_CACHE, PT_CACHE_BYTES, pt_bind};
+        let lights = self.pt_lights_buffer(gpu, self.rt_frame_no());
         let cache = match self.pt_cache {
             Some(c) => c,
             None => {
@@ -556,6 +612,7 @@ impl WorldRenderer {
         self.bind_run(list, cs, page, origins);
         list.bind(pt_bind::OUT, out);
         list.bind(pt_bind::CACHE, cache);
+        list.bind(pt_bind::LIGHTS, lights);
         list.push_constants(&args);
         list.push(Cmd::Dispatch { x: size.0.div_ceil(8), y: size.1.div_ceil(8), z: 1 });
         crate::diag::probe(list, "pt_trace");
@@ -735,6 +792,28 @@ impl WorldRenderer {
     }
 
     /// Frames the ray-traced scene has been kept (`Scene::rt.y`, for noise that moves every frame).
+    /// The path tracer's light table, made again when the cubes' lights changed (at most every
+    /// `LIGHTS_EVERY` frames), its buffer grown as needed.
+    fn pt_lights_buffer(&mut self, gpu: &mut dyn Backend, frame: u64) -> BufferId {
+        let stale = self.pt_lights.as_ref().is_none_or(|l| self.lights_dirty && frame >= l.made + LIGHTS_EVERY);
+        if stale {
+            let words = light_words(&self.cube_lights);
+            let n = words.len() as u64;
+            if self.pt_lights.as_ref().is_none_or(|l| l.words < n) {
+                if let Some(l) = self.pt_lights.take() {
+                    l.destroy(gpu);
+                }
+                let cap = n.next_power_of_two();
+                self.pt_lights = Some(RtLights { buffer: gpu.create_buffer(cap * 4, usage::STORAGE, "path traced lights"), words: cap, made: 0 });
+            }
+            let l = self.pt_lights.as_mut().unwrap();
+            gpu.write_buffer(l.buffer, 0, bytemuck::cast_slice(&words));
+            l.made = frame;
+            self.lights_dirty = false;
+        }
+        self.pt_lights.as_ref().unwrap().buffer
+    }
+
     pub fn rt_frame_no(&self) -> u64 {
         self.rt.as_ref().map_or(0, |r| r.frame_no)
     }

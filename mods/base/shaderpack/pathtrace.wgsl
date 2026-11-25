@@ -251,6 +251,125 @@ fn cs_cache(@builtin(global_invocation_id) id: vec3<u32>) {
 
 const PT_SKY_T: f32 = 65504.0;
 
+// Two numbers 0..1 for pixel `px`, this frame, and a draw `salt` of its own (`pt_noise`'s hash with
+// the salt in the frame's word): each of the block lights' draws apart from the others.
+fn pt_rand(px: vec2<f32>, salt: u32) -> vec2<f32> {
+    var v = vec3<u32>(vec2<u32>(max(floor(px), vec2(0.0))), u32(scene.rt.y) ^ (salt * 0x9E3779B9u));
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v = v ^ (v >> vec3(16u));
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    return vec2<f32>(v.xy >> vec2(8u)) / 16777216.0;
+}
+
+// ---- block lights (M2; reports/Path tracing plan.md) ----
+//
+// The lightmap's block light stays the light's colour and reach (our grade); what tracing adds is
+// whether the light can be seen. Each pixel draws a few candidates from the light-giving blocks in
+// the 27 cubes round it (`pt_lights`, from the meshes), each weighted by the light it gives there
+// by the lightmap's own falloff (its level less the blocks between), keeps one in proportion
+// (resampled importance sampling), and sends one shadow ray to it. Averaged over frames, that is the
+// share of the block light that reaches the surface: shadows behind pillars and furniture.
+
+const PT_LIGHT_CANDIDATES: u32 = 8u;
+
+// Where cube `c`'s lights are in `pt_lights` (start, count); count 0 when it has none.
+fn pt_light_find(c: vec3<i32>) -> vec2<u32> {
+    let slots = pt_lights[0];
+    var i = ((u32(c.x) * 73856093u) ^ (u32(c.y) * 19349663u) ^ (u32(c.z) * 83492791u)) & (slots - 1u);
+    for (var p = 0u; p < 32u; p++) {
+        let at = 2u + i * 4u;
+        let x = pt_lights[at];
+        if x == 0x80000000u {
+            return vec2(0u);
+        }
+        if x == u32(c.x) && pt_lights[at + 1u] == u32(c.y) && pt_lights[at + 2u] == u32(c.z) {
+            let v = pt_lights[at + 3u];
+            return vec2(v & 0xFFFFFu, v >> 20u);
+        }
+        i = (i + 1u) & (slots - 1u);
+    }
+    return vec2(0u);
+}
+
+// How much of the block light reaches a surface at `world` (`rel` camera relative) facing `ng`:
+// x 1 seen, 0 hidden, by one light drawn as above (1 when none is near); y 1 when a light was drawn.
+fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: vec3<f32>, px: vec2<f32>) -> vec2<f32> {
+    if pt_lights[1] == 0u {
+        return vec2(1.0, 0.0);
+    }
+    let cell = vec3<i32>(floor(world + ng * 0.5));
+    let cube = cell >> vec3(4u);
+    let base = 2u + pt_lights[0] * 4u;
+    // The cubes round with lights, first: drawing the cube at random among all 27 found a light in
+    // a quarter of frames in NVIDIA's storeroom, and a frame with none counted as seen, so the
+    // shadows all but vanished (pt1_rtxd_m10v).
+    var held: array<vec4<u32>, 27>;
+    var n = 0u;
+    var total = 0u;
+    for (var ci = 0u; ci < 27u; ci++) {
+        let r = pt_light_find(cube + vec3<i32>(i32(ci % 3u) - 1, i32((ci / 3u) % 3u) - 1, i32(ci / 9u) - 1));
+        if r.y > 0u {
+            held[n] = vec4(r.x, r.y, ci, total);
+            total += r.y;
+            n += 1u;
+        }
+    }
+    if total == 0u {
+        return vec2(1.0, 0.0);
+    }
+    var chosen = vec3(0.0);
+    var own = false;
+    var w_sum = 0.0;
+    var found = false;
+    for (var k = 0u; k < PT_LIGHT_CANDIDATES; k++) {
+        // One of the `total` lights, each as likely.
+        let t = min(u32(pt_rand(px, 16u + k * 2u).x * f32(total)), total - 1u);
+        var c = 0u;
+        for (var j = 1u; j < n; j++) {
+            if held[j].w <= t {
+                c = j;
+            }
+        }
+        let ci = held[c].z;
+        let at = cube + vec3<i32>(i32(ci % 3u) - 1, i32((ci / 3u) % 3u) - 1, i32(ci / 9u) - 1);
+        let l = pt_lights[base + held[c].x + (t - held[c].w)];
+        let lp = vec3<i32>(i32(l & 15u), i32((l >> 4u) & 15u), i32((l >> 8u) & 15u)) + at * 16;
+        let e = f32(max((l >> 12u) & 15u, max((l >> 16u) & 15u, (l >> 20u) & 15u)));
+        let d = abs(lp - cell);
+        let level = e - f32(d.x + d.y + d.z);
+        if level <= 0.0 {
+            continue;
+        }
+        // Its weight over the chance of drawing it (1 in `total`).
+        let w = level * f32(total);
+        w_sum += w;
+        if pt_rand(px, 17u + k * 2u).x * w_sum < w {
+            chosen = vec3<f32>(lp) + 0.5;
+            own = all(lp == vec3<i32>(floor(world - ng * 0.5)));
+            found = true;
+        }
+    }
+    if !found {
+        return vec2(1.0, 0.0);
+    }
+    if own {
+        return vec2(1.0, 1.0);
+    }
+    let to = chosen - world;
+    let dist = length(to);
+    let dir = to / max(dist, 1e-4);
+    // A light behind the face lights it only round a corner, as the lightmap spreads it: hidden.
+    if dot(dir, ng) <= 0.0 {
+        return vec2(0.0, 1.0);
+    }
+    let hit = rt_hit(rel + lift, dir, max(dist - 0.9, 0.0), 0.0);
+    return vec2(select(1.0, 0.0, hit.hit && !hit.clear), 1.0);
+}
+
 @compute @workgroup_size(8, 8)
 fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     if id.x >= pt.size.x || id.y >= pt.size.y {
@@ -360,6 +479,14 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     let indirect = select(sky_open, bounce, b.hit);
     var diffuse = lit - sky_part + indirect;
+    // The block light, shadowed: its share of the world's light, as much of it as reaches the
+    // surface (one light drawn among those near, one shadow ray; frames average it). The
+    // lightmap's block light keeps its colour and reach; the held light is not a block's.
+    let block = max(light_on(n, h.light, 0.0, 1.0, h.world, h.rel) - light_on(n, vec4(h.light.x, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel), vec3(0.0));
+    if max(block.r, max(block.g, block.b)) > 1e-4 {
+        let block_vis = pt_block_visibility(h.world, h.rel, ng, lift, px);
+        diffuse -= block * (1.0 - block_vis.x);
+    }
     // Into the cache: the indirect light found here (one pixel in four a frame).
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
         let i = pt_cache_find(pt_cell(h.world, ng, dist, pt_noise(px + vec2(7.0, 5.0))), true);
