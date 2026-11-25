@@ -1,7 +1,7 @@
 //! Herds and packs that keep together (`reports/Creature AI.md`, part 3, step 9: shared group
-//! plans; the crew's step 10). A wild herd's or pack's leader is the one of its kind near with the
-//! lowest id, itself included (every member works out the same one from its own look round, so no
-//! record has to be kept or handed over when one dies: the next lowest leads). The leader wanders
+//! plans; the crew's step 10). A wild herd's or pack's leader stays leader (`keep_or_pick`):
+//! first picked as the strongest (then the lowest id) of its kind near, it is kept until it dies,
+//! leaves or weakens, and a newcomer joins the group's leader instead of taking over. The leader wanders
 //! as one alone does; the others, wandering, keep to their own place round it (`slot`) instead of
 //! walking off each its own way, so the herd drifts together and only the leader picks where to.
 //!
@@ -169,9 +169,109 @@ pub fn leader(ids: impl IntoIterator<Item = u64>) -> u64 {
     ids.into_iter().min().unwrap_or(0)
 }
 
+/// A leader stays leader. A wolf pack is led by its breeding pair, its parents, for as long as
+/// they live and hold it: a lower-ranked or newly joined wolf doesn't take over by arriving, a
+/// new pair leads only when one is gone, has left, or is displaced when old or hurt (Mech 1999,
+/// "Alpha status, dominance, and division of labor in wolf packs"; Mech and Boitani 2003,
+/// *Wolves*, ch. 2), and a lone wolf meeting a pack joins it or keeps away, it doesn't lead it.
+/// So a member keeps its leader until it dies, is out of `senses::KIN` for `LEADER_LOST_SECS`,
+/// or is down to `LEADER_WEAK` of its health (or is young: the young never lead). One leading
+/// itself that meets a group with more following its leader joins it (`keep_or_pick`).
+pub const LEADER_LOST_SECS: f32 = 60.0;
+pub const LEADER_WEAK: f32 = 0.35;
+/// A pack at rest keeps its leader by it: wolves rest together at a rendezvous site between
+/// hunts and travel together when the leaders set off (Mech and Boitani 2003, ch. 1; Murie 1944).
+/// A leader awake while at least `PACK_RESTS` of the others lie resting walks no further than
+/// `LEADER_TETHER` blocks from their middle instead of wandering off (it waits for them).
+pub const PACK_RESTS: f32 = 0.5;
+pub const LEADER_TETHER: f32 = 6.0;
+const _: () = assert!(LEADER_TETHER <= SLOT_FAR && LEADER_WEAK < 0.5);
+
+/// One of its kind in a member's look round (`keep_or_pick`).
+#[derive(Clone, Copy, Debug)]
+pub struct Kin {
+    pub id: u64,
+    /// Whom it follows (itself if it leads; 0: none yet).
+    pub leads: u64,
+    /// Grown and above `LEADER_WEAK`: it may lead.
+    pub fit: bool,
+    /// Its full health (a bigger animal), which picks among equals.
+    pub strength: f32,
+}
+
+/// Whom `me` follows: `current` (its leader so far, 0: none; `current_ok`: alive, near enough,
+/// fit) kept, but for one leading itself that meets a group with more following its leader (or
+/// as many, with a lower id: two lone ones settle on one), and for a leader that itself now
+/// follows another (one hop). With none to keep, the one most kin follow among the fit (itself
+/// in `kin` too), then the strongest, then the lowest id: every member working it out from the
+/// same look gets the same one.
+pub fn keep_or_pick(me: u64, current: u64, current_ok: bool, kin: &[Kin]) -> u64 {
+    let followers = |x: u64| kin.iter().filter(|k| k.leads == x).count();
+    let entry = |x: u64| kin.iter().find(|k| k.id == x);
+    if current_ok && current != 0 && current != me {
+        // Its leader joined another: it goes along.
+        return match entry(current) {
+            Some(k) if k.leads != 0 && k.leads != current && entry(k.leads).is_some_and(|l| l.fit) => k.leads,
+            _ => current,
+        };
+    }
+    if current_ok && current == me {
+        let other = kin
+            .iter()
+            .filter(|k| k.leads != 0 && k.leads != me && entry(k.leads).is_some_and(|l| l.fit))
+            .map(|k| k.leads)
+            .max_by(|&a, &b| followers(a).cmp(&followers(b)).then(b.cmp(&a)));
+        return match other {
+            Some(l) if followers(l) > followers(me) || (followers(l) == followers(me) && l < me) => l,
+            _ => me,
+        };
+    }
+    let any_fit = kin.iter().any(|k| k.fit && k.id != current);
+    kin.iter()
+        .filter(|k| !any_fit || (k.fit && k.id != current))
+        .max_by(|a, b| {
+            followers(a.id)
+                .cmp(&followers(b.id))
+                .then(a.strength.total_cmp(&b.strength))
+                .then(b.id.cmp(&a.id))
+        })
+        .map_or(me, |k| k.id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn k(id: u64, leads: u64) -> Kin {
+        Kin { id, leads, fit: true, strength: 80.0 }
+    }
+
+    /// A stray (the lowest id) joining a pair joins their leader; the pair's leader keeps
+    /// leading; its follower keeps following it (wolvesRegroup3: the stray took over).
+    #[test]
+    fn a_joining_lower_id_does_not_take_over() {
+        let seen = [k(115, 115), k(119, 119), k(120, 119)];
+        assert_eq!(keep_or_pick(115, 115, true, &seen), 119);
+        assert_eq!(keep_or_pick(119, 119, true, &seen), 119);
+        assert_eq!(keep_or_pick(120, 119, true, &seen), 119);
+    }
+
+    /// Two lone ones meeting settle on one; with no leader yet the strongest leads; a weak or
+    /// lost leader is replaced by the one most follow.
+    #[test]
+    fn leaders_settle_and_hand_over() {
+        let seen = [k(4, 4), k(9, 9)];
+        assert_eq!(keep_or_pick(4, 4, true, &seen), 4);
+        assert_eq!(keep_or_pick(9, 9, true, &seen), 4);
+        let fresh = [Kin { strength: 70.0, ..k(3, 0) }, k(8, 0)];
+        assert_eq!(keep_or_pick(3, 0, false, &fresh), 8);
+        assert_eq!(keep_or_pick(8, 0, false, &fresh), 8);
+        let weak = [Kin { fit: false, ..k(2, 2) }, k(5, 2), k(6, 2), k(7, 5)];
+        assert_eq!(keep_or_pick(6, 2, false, &weak), 5);
+        // Its leader joined another group: it goes along.
+        let hop = [k(1, 1), k(2, 1), k(3, 2)];
+        assert_eq!(keep_or_pick(3, 2, true, &hop), 1);
+    }
 
     #[test]
     fn places_lie_round_the_leader_inside_the_ring() {
@@ -235,3 +335,17 @@ mod tests {
         }
     }
 }
+
+/// A pack member stranded from its kin (none within `senses::KIN` at its looks) this many seconds
+/// calls them: it howls, at most once in `RALLY_HOWL_EVERY_SECS`, and the nearest pack of its
+/// kind in earshot answers; it then heads for them in legs of `REGROUP_LEG` blocks, or for where
+/// it last was with them if none answers. Wolves howl to reassemble after a chase or a split, and
+/// separated members answer and come (Harrington and Mech 1979, Joslin 1967); a howl carries some
+/// 6-11 km in forest and open country (Harrington and Mech 1979), scaled here, as every sense is,
+/// to the game's distances: well past view, within loaded ground.
+pub const STRAY_SECS: f32 = 20.0;
+pub const RALLY_HOWL_EVERY_SECS: f32 = 60.0;
+pub const HOWL_HEARD: f64 = 192.0;
+pub const REGROUP_LEG: f64 = 24.0;
+// A stray calls well before its rally howl repeats, and a howl reaches past the pack's own reach.
+const _: () = assert!(STRAY_SECS < RALLY_HOWL_EVERY_SECS && HOWL_HEARD > 4.0 * 16.0);
