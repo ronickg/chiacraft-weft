@@ -387,9 +387,13 @@ pub fn init(r: &mut Registry) {
                             e.pos.x,
                             e.pos.y,
                             e.pos.z,
-                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
-                                .get(crate::choose::doing(&w, id) as usize)
-                                .unwrap_or(&"?"),
+                            // A young one's love goal is keeping by its mother (`breeding::behave`).
+                            match crate::choose::doing(&w, id) {
+                                1 if crate::breeding::young(&w, id) => "follow",
+                                d => ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
+                                    .get(d as usize)
+                                    .unwrap_or(&"?"),
+                            },
                             a.food as f32 / a.stat(crate::species::FOOD).max(1.0) * 100.0,
                             (1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0,
                             e.health,
@@ -472,9 +476,13 @@ pub fn init(r: &mut Registry) {
                                 .map(|f| f.persona().map(|v| format!("{v:.2}")).join("/"))
                                 .unwrap_or_default(),
                             crate::routines::activity_of(&w, id),
-                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
-                                .get(crate::choose::doing(&w, id) as usize)
-                                .unwrap_or(&"?"),
+                            // A young one's love goal is keeping by its mother (`breeding::behave`).
+                            match crate::choose::doing(&w, id) {
+                                1 if crate::breeding::young(&w, id) => "follow",
+                                d => ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
+                                    .get(d as usize)
+                                    .unwrap_or(&"?"),
+                            },
                             // Its walk, for a check that wandering moves it.
                             w.navigating(id) as u8,
                             e.moved,

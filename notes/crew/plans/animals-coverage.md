@@ -174,27 +174,39 @@ nested; its 8 eggs hatched, and the hurries after grew the hatchlings up at once
 Game bug found: knocked-out raptors played groom and scratch clips while out cold (fixed: no idle clips
 while out). The part 3 pad's panic (67 alarms) was its raptors and citipati hunting the hatchlings.
 
-Run 2 (to come): `/animalprof feed` feeds through the right click's code; the passive kinds are fed only when
-they ask (a creative player standing among them); bites enough for each kind's feedings (wyvern 35); one
-laying kind a pad; feeding and bite lines in the log.
+Grid r1: `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_taming_m-162426/cov_taming_grid.jpg`.
 
-| Species | tamed (run 1) | lays | hatches | shot |
+Run 2 (b7ef3aaf7, `r2_taming_m-164051`, 652 s): the feeding and bite lines all came. Passive: the cat was tamed
+in 3 feeds as it asked (39, 78, 100 %, one about every 25 s); the wolf (18 %), capybara (69 %) and chihuahua
+(47 %) were fed as they asked but then walked out of the 5 blocks a player must be within for them to ask
+(the capybara ran from the wolf on their shared pad): a script limit, not a bug. Knock-out: raptor,
+osmolskae and utahraptor out cold, given kibble, bit to 100 % and tamed; the jaguar reached 73 % in the
+script's 12 bites and the wyvern 69 % in 35 (about 2 % a bite): too few bites, not a bug. No idle clips
+from animals out cold (the fix holds). Laying: every kind nested on its own pad, the eggs hatched, and the
+hatchlings kept 1 to 5 blocks from their mothers over 3 rows (one citipati 10 once, resting). Hatchlings read
+"doing love" in the rows: a young one's love goal is following its mother (the rows now say "follow").
+Shots 4 and 7 came out near black at midday (not looked into; the other pads are lit).
+
+Run 3 (to come): each passive kind in a glass pen beside the player (wolf, capybara, cat with chihuahua on
+three pads), bites 16 for the utahraptor, 24 for the jaguar, 70 for the wyvern.
+
+| Species | tamed | lays | hatches, keeps by mother | shot |
 |---|---|---|---|---|
-| grey_wolf | not fed (aim) | n/a | n/a | |
-| cat | not fed (aim) | n/a | n/a | |
-| chihuahua | not fed (aim) | n/a | n/a | |
-| capybara | not fed (aim) | n/a | n/a | |
-| raptor | not fed (aim) | kept off by another nest | not tested | |
-| osmolskae | not fed (aim) | n/a | n/a | |
-| utahraptor | not fed (aim) | n/a | n/a | |
-| jaguar | pass (tamed at 100 %, 7 bonus levels) | n/a | n/a | |
-| wyvern | not fed (aim) | n/a | n/a | |
-| protoceratops | n/a | kept off by another nest | not tested | |
-| psittacosaurus | n/a | pass (8 eggs) | pass (8 born) | |
-| citipati | n/a | kept off by another nest | not tested | |
-| house_sparrow | n/a | kept off by another nest | not tested | |
+| grey_wolf | not tested (18 %, walked off) | n/a | n/a | r2 1 |
+| cat | pass (3 feeds, "tamed at 100 %") | n/a | n/a | r2 2 |
+| chihuahua | not tested (47 %, walked off) | n/a | n/a | r2 2 |
+| capybara | not tested (69 %, fled the wolf) | n/a | n/a | r2 1 |
+| raptor | pass (6 bites) | pass (3 eggs) | pass (3 born, 1-2 blocks) | r2 3, 7 |
+| osmolskae | pass (6 bites) | n/a | n/a | r2 3 |
+| utahraptor | pass (8 bites) | n/a | n/a | r2 3 |
+| jaguar | not tested (73 % at the last bite; run 1 tamed it) | n/a | n/a | r2 3 |
+| wyvern | not tested (69 % at the last bite) | n/a | n/a | r2 3 |
+| protoceratops | n/a | pass (6 eggs) | pass (6 born, 1-5 blocks) | r2 4 (dark) |
+| psittacosaurus | n/a | pass (6 eggs) | pass (6 born, 1-3 blocks) | r2 5 |
+| citipati | n/a | pass (5 eggs) | pass (5 born, 1-3; one 10 once) | r2 6 |
+| house_sparrow | n/a | pass (2 eggs) | pass (2 born, 1-5) | r2 8 |
 
-Grid: `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_taming_m-162426/cov_taming_grid.jpg`.
+Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_taming_m-164051/r2_taming_grid.jpg`.
 
 ## Sounds
 
