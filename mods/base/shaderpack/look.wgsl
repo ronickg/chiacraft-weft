@@ -320,6 +320,11 @@ const SKY_AWAY_BLUE: vec3<f32> = vec3(0.43, 0.52, 1.0);
 // blue hue about 218, ours 203 with the band's own blue, lv16).
 const SKY_BAND_BLUE_SEEN: vec3<f32> = vec3(0.64, 0.78, 1.25);
 const SUN_BAND: vec3<f32> = vec3(10.0, 9.0, 8.0);
+// Where the sky is seen that band's extra (`SUN_BAND.z`) only low, fading this fast with height (per
+// unit of dir.y): the band goes by the sun's bearing alone, so at 8 over the whole height its sides
+// stood as a hard vertical seam from the horizon to the top of the frame, cream on the sun's side and
+// clear blue past about 40° (lv16-18 and Ronald's 06:00 vista, 11-24; from d16de7a26's x4).
+const SUN_BAND_SEEN_FALL: f32 = 25.0;
 // How much of the sky's wide round sun glow (`OPT_SUN_GLOW`) goes with Bliss's sun low in the morning.
 const SUN_BAND_ROUND: f32 = 0.67;
 // And where the sky is seen (`sky_seen`): this much of the wide glow gone, and of the Mie's broad lobe.
@@ -1116,7 +1121,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let sun_flat = normalize(vec3(scene.sun.x, 0.0, scene.sun.z) + vec3(1e-5));
         let along = pow(max(dot(flat, sun_flat), 0.0), SUN_BAND.x);
         let band = exp(-abs(dir.y - 0.01) * SUN_BAND.y);
-        c += vec3(1.0, 0.88, 0.66) * luma(p.sun) * light_strength() * along * band * mix(1.0, SUN_BAND.z, sky_seen) * bliss_sun;
+        c += vec3(1.0, 0.88, 0.66) * luma(p.sun) * light_strength() * along * band * mix(1.0, SUN_BAND.z, sky_seen * exp(-abs(dir.y - 0.01) * SUN_BAND_SEEN_FALL)) * bliss_sun;
     }
     let c_pre_glow = c;
     c += sun_glow(dir, p) * glow_up;
