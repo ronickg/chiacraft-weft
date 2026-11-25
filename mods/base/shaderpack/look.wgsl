@@ -1990,17 +1990,56 @@ fn light_on_bliss(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec
     var held = vec3(0.0);
     if !CALM {
         indirect += lightning_glow_at(rel) * curve;
-        held = held_light(rel, n);
+        held = bliss_held_light(rel);
     }
     let look = normalize(rel + vec3(0.0, 1e-6, 0.0));
     let floor_light = vec3(max(bliss_min_light(), brightness_curve(scene.light.x) * 0.25)) * (1.0 + 0.7 * dot(n, look));
-    let blocks = block_light(max(light.yzw, held), pos) * block_by_day(light.x);
+    let blocks = bliss_block_light(max(light.yzw, held));
     let sun_part = p.sun * light_strength() * clamp((dot(n, light_dir()) * 255.0 - 15.0) / 240.0, 0.0, 1.0) * shadow;
     LIGHT_SUN = sun_part;
     NIGHT_SKY_SHARE = night_sky_share(indirect + sun_part, blocks);
     let c = (indirect + blocks + floor_light) * ao + sun_part;
     LIGHT_ALL = c;
     return c;
+}
+
+// Bliss's block light (diffuse_lighting.glsl, method only), where the land is lit from the physical
+// sky: per level (1 - sqrt(1 - L))^2 x 2 (a small, steep pool: 2 at 15, 0.17 at half), white light
+// its torch colour (1, 0.75, 0.65) and coloured light its own, x its autoBrightness mix(1, 30,
+// exp(-10 x the view's exposure)) so a torch still shows by day, / 41; added to the sky's light.
+// Replaced on this path: the engine's curve ^0.9, the warm ramp, x1.4, the flicker and the cut to a
+// quarter in daylit open air (`block_by_day`).
+fn bliss_block_light(b: vec3<f32>) -> vec3<f32> {
+    let m = max(max(b.x, b.y), b.z);
+    if m <= 0.0 {
+        return vec3(0.0);
+    }
+    let r = vec3(1.0) - sqrt(max(vec3(1.0) - b, vec3(0.0)));
+    let curve = r * r * 2.0;
+    let grey = 1.0 - (m - min(min(b.x, b.y), b.z)) / m;
+    let colour = mix(vec3(1.0), vec3(1.0, 0.75, 0.65), grey);
+    // (The average sunlit view's mean, post.wgsl's `EXPOSURE_REF`, before the first frame's.)
+    var mean = 0.35;
+    if scene.frame_look.w > 0.5 {
+        let e = textureLoad(textures[u32(scene.frame_look.w) - 1u], vec2(0, 0), 0).g;
+        if e == e && e > 0.0 {
+            mean = e;
+        }
+    }
+    let exposure = 0.18 / log2(2.5 * mean * BLISS_UNITS + 1.045) * 0.62;
+    let auto_k = mix(1.0, 30.0, clamp(exp(-10.0 * exposure), 0.0, 1.0));
+    return curve * colour * auto_k / BLISS_UNITS;
+}
+// Bliss's held light: the lightmap's max with 0.9 x (1 - d / 10)^1.5 (its HANDHELD_LIGHT_RANGE 10),
+// in the held light's colour; in place of our wider pool (a level a block, faded 2.5-10 blocks).
+fn bliss_held_light(rel: vec3<f32>) -> vec3<f32> {
+    let l = scene.hand_light.rgb;
+    let m = max(max(l.x, l.y), l.z);
+    if m <= 0.0 {
+        return vec3(0.0);
+    }
+    let d = length(scene.hand.xyz - rel);
+    return l / m * 0.9 * pow(max(1.0 - d / 10.0, 0.0), 1.5);
 }
 
 // What share of a surface's light is the sky's and the moon's, not a lamp's, for the night's blue
@@ -2055,7 +2094,7 @@ fn light_weather(light: vec4<f32>, rel: vec3<f32>) -> vec3<f32> {
     let phase = (0.25 - 0.25 * g * g) * pow(1.0 + g * g - 2.0 * g * mu, -1.5) / 3.14;
     let shadow = min(sun_reaches(rel), clamp((l - 0.8) * 25.0, 0.0, 1.0)) * cloud_shadow(rel);
     c += p.sun * light_strength() * shadow * (phase * 2.0 + 0.5);
-    let blocks = block_light(light.yzw, vec3(0.0)) * block_by_day(l);
+    let blocks = bliss_block_light(light.yzw);
     NIGHT_SKY_SHARE = night_sky_share(c, blocks);
     return c + blocks;
 }

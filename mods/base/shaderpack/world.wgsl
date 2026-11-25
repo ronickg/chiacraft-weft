@@ -679,7 +679,10 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         albedo = vec4(mix(albedo.rgb, vec3(0.86, 0.9, 0.95), snow), albedo.a);
     }
     var light = surface_light(in, n, mix(in.color, vec3(1.0), snow), ao);
-    if in.glow != 0xffffffffu {
+    // (Not where the land is lit from the physical sky: Ronald's Bliss has no emissive boost, EMISSIVE
+    // type 3 with no LabPBR pack, and a lamp's face takes only its own block light, Bliss's steep
+    // curve x its autoBrightness; the gap list's lighting 16.)
+    if in.glow != 0xffffffffu && !land_from_sky() {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
         light = max(light, select(pow(in.tint, vec3(2.2)), vec3(1.0), in.overlay != 0u) * e * 1.7);
     }

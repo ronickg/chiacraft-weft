@@ -902,6 +902,9 @@ pub struct Client {
     /// Temporal anti-aliasing's count image this frame, bindless index + 1 (`Scene::taa_frame`),
     /// set by the app before `render` (`post::Post::taa_out`).
     pub taa_out: u32,
+    /// The last frame's exposure texel, bindless index + 1 (`Scene::frame_look.w`), set by the app
+    /// before `render` (`post::Post::exposure_last`).
+    pub exposure_last: u32,
     /// The camera the last frame was drawn with, for the backend's upscaler (`upscale_camera`).
     pub frame_camera: Option<FrameCamera>,
     /// Seconds until the next dust piece from the block being hit.
@@ -1292,6 +1295,7 @@ impl Client {
             behind: [0.0; 4],
             taa_last: None,
             taa_out: 0,
+            exposure_last: 0,
             frame_camera: None,
             hit_dust: 0.0,
             sounds: Vec::new(),
@@ -4389,6 +4393,7 @@ impl Client {
         (scene.soft_clouds, scene.prev_view_proj, scene.cloud_moved) = self.sky.soft.scene;
         scene.frame_look = self.sky.frame_look.scene;
         scene.frame_look[1] = self.eye_sky;
+        scene.frame_look[3] = self.exposure_last as f32;
         scene.froxels = self.sky.froxels.scene;
         scene.cloud_shadow = self.sky.cloud_shadow.scene;
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));

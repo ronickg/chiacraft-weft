@@ -739,6 +739,16 @@ impl Post {
     /// The count image this frame's gathering will write (bindless index + 1, `Scene::taa_frame`),
     /// asked before the world is drawn: 0 without temporal anti-aliasing, or on a frame whose size
     /// differs from the images' (they are made anew in `apply`).
+    /// The HDR world's exposure texel the last frame wrote (bindless index + 1, `fs_exposure`'s:
+    /// g the view's mean), for packs whose world pass needs the view's brightness (chiacraft's
+    /// torches, Bliss's autoBrightness); 0 without the pyramid or before its first frame.
+    pub fn exposure_last(&self) -> u32 {
+        match &self.pyramid {
+            Some(py) if !py.fresh => py.exposure[py.flip].1 + 1,
+            _ => 0,
+        }
+    }
+
     pub fn taa_out(&self, w: u32, h: u32) -> u32 {
         match self.counts {
             Some((_, idx, size)) if self.taa_on() && size == (w, h) && self.upscaled.is_none() => idx[self.taa_cur] + 1,
