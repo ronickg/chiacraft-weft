@@ -1039,6 +1039,9 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         // clouds: the Milky Way and the aurora stood out bright over Bliss's dark navy).
         let night_lights = select(1.0, 10.0 / BLISS_UNITS, land_from_sky());
         var c = sky_color(dir) + (milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir)) * night_lights + fireball(dir) + lightning_bolt(dir);
+        if land_from_sky() {
+            c += bliss_stars(dir);
+        }
         // The rainbow in the rain, in front of the high cirrus.
         c = rainbow_on(cirrus(c, dir), dir);
         if dir.y < 0.0 {
@@ -1060,6 +1063,39 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         return vec4(scene.fog_color.rgb * (1.0 - dark), 1.0);
     }
     return vec4(mix(s.color.rgb, scene.fog_color.rgb, clamp(0.0625 / dir.y, 0.0, 1.0)), 1.0);
+}
+
+// Bliss's stars (stars.glsl and composite1, method only), where the land is lit from the physical
+// sky, in place of the engine's star quads: a field over the look scaled 300 times, one cell in a
+// hundred a star (a hash over the cell's corner, the top 1 % stretched to 0..1), blended between the
+// four corners across the look's x and y, then exp(-20 (1 - s)): sharp points that a pixel mostly
+// misses the peak of, so most stars faint and few bright (lkmxBF1's night: 474 stars 50 over the
+// sky round them against Bliss's 32). x 10 in its sky's units (/ 41 in ours) x clamp(-2 sun.y),
+// turned with the day about the x-y plane, and darkened low as its ground darkens the sky.
+fn bliss_star_hash(p_in: vec3<f32>) -> f32 {
+    var p = fract(p_in * 0.1031);
+    p += dot(p, p.zyx + 31.32);
+    return fract((p.x + p.y) * p.z);
+}
+fn bliss_star_cell(p: vec3<f32>) -> f32 {
+    return clamp(bliss_star_hash(p) / 0.01 - 0.99 / 0.01, 0.0, 1.0);
+}
+fn bliss_stars(dir: vec3<f32>) -> vec3<f32> {
+    let night = clamp(-2.0 * normalize(scene.sun.xyz).y, 0.0, 1.0);
+    if night <= 0.0 {
+        return vec3(0.0);
+    }
+    let a = 2.39996 - day_ticks() / 24000.0;
+    var o = dir;
+    o = vec3(o.x * cos(a) + o.y * sin(a), -o.x * sin(a) + o.y * cos(a), o.z);
+    let q = o * 300.0;
+    let f = fract(q.xy);
+    let b = floor(q);
+    let v = bliss_star_cell(b) * (1.0 - f.x) * (1.0 - f.y) + bliss_star_cell(b + vec3(0.0, 1.0, 0.0)) * (1.0 - f.x) * f.y
+        + bliss_star_cell(b + vec3(1.0, 0.0, 0.0)) * f.x * (1.0 - f.y) + bliss_star_cell(b + vec3(1.0, 1.0, 0.0)) * f.x * f.y;
+    let star = exp(max(1.0 - v, 0.0) * -20.0);
+    let ground = 1.0 - exp2(-50.0 * pow(clamp(dir.y + 0.025, 0.0, 1.0), 2.0));
+    return vec3(star * 10.0 / BLISS_UNITS * night * ground);
 }
 
 // A soft high layer of thin cloud, far above the blocky ones (Research round 15, rec. 2 slice 4:
@@ -1219,11 +1255,9 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // With the land lit from the physical sky, Bliss's stars (composite1, method only): 10 at a
         // star's peak in its sky's units (/ 41 in ours), x clamp(-2 sun.y), in place of the engine's
         // star at the screen's white (4-10 x Bliss's: lkmxS1's night stars stood out bright).
+        // (In its place, `bliss_stars` in the sky's gradient.)
         if land_from_sky() {
-            let bright = pow(unit(in.star * 9u + 5u), 3.0);
-            rgb = star.rgb * 10.0 / BLISS_UNITS * (0.4 + 0.6 * bright) * clamp(-2.0 * normalize(scene.sun.xyz).y, 0.0, 1.0);
-            // A steady field, as Bliss's: no twinkle and no fade of our own.
-            a = s.color.a;
+            discard;
         }
     }
     if open_sky() && !in_liquid() {
