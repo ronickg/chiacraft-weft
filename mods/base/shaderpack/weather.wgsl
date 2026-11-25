@@ -125,7 +125,8 @@ fn fs(in: VOut) -> WeatherOut {
     // the motion image's w (as before, for the temporal anti-aliasing), which thins the bloomy fog
     // where a drop or flake lies (`bloomy_fog`). The drawing stays for the other looks. Only within
     // the 10 blocks round the eye Minecraft draws its weather in (fancy), which is all Bliss's mask
-    // ever holds: ours reaches far, and far flakes cut dark holes in the fog over the land (lkwxA1).
+    // ever holds: ours reaches far. (The dark spots over lkwxA1's snow plains were far puddles, not
+    // this: lkwxA2 kept them; 379efefc's gate took them.)
     if land_from_sky() {
         let near = 1.0 - smoothstep(8.0, 10.0, length(in.rel.xz));
         let mask = min(cover * in.alpha * near, 1.0);
