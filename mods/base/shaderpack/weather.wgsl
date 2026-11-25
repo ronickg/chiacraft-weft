@@ -123,9 +123,12 @@ fn fs(in: VOut) -> WeatherOut {
     // Where the land is lit from the physical sky, Bliss's weather (all_particles.fsh with WEATHER,
     // method only; Ronald, 11-25: "copy Bliss exactly"): no colour of its own, only its cover in
     // the motion image's w (as before, for the temporal anti-aliasing), which thins the bloomy fog
-    // where a drop or flake lies (`bloomy_fog`). The drawing stays for the other looks.
+    // where a drop or flake lies (`bloomy_fog`). The drawing stays for the other looks. Only within
+    // the 10 blocks round the eye Minecraft draws its weather in (fancy), which is all Bliss's mask
+    // ever holds: ours reaches far, and far flakes cut dark holes in the fog over the land (lkwxA1).
     if land_from_sky() {
-        let mask = min(cover * in.alpha, 1.0);
+        let near = 1.0 - smoothstep(8.0, 10.0, length(in.rel.xz));
+        let mask = min(cover * in.alpha * near, 1.0);
         return WeatherOut(vec4(0.0), vec4(0.0, 0.0, -1.0, min(mask * 2.5, 1.0)));
     }
     let light = light_weather(unpack_light(in.data.y), in.rel);
