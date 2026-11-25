@@ -102,9 +102,13 @@ chat /drenkaun kill
 wait 2
 chat /sounds recent
 # Borkon's summon (the herd's hunters killed first: a raptor left alive killed the player here)
+# (the respawn puts the player at world spawn: back to the pad first, or the fills hit unloaded chunks)
 respawn
 wait 1
 chat /tk mode creative
+chat /tp 0.5 200 -17.5
+wait 3
+loaded
 chat /kill @e[type=animals:raptor]
 chat /kill @e[type=animals:jaguar]
 chat /tk fill -30 200 -30 30 212 30 core:air
