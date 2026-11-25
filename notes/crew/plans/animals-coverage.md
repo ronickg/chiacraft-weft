@@ -514,6 +514,31 @@ that nest, which is the rule (`wild_clutch`), so not a bug. Shots fine.
 
 Grid r4: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r11_taming_m-184927/r11_taming_grid.jpg`.
 
+Run 5 (fe121098, `r12_taming_m`, 1307 s, script pass). All nine kinds tamed. The wolf took 7 asked-for feeds,
+15 % each, and was tamed at 179 s of its 480 s. Capybara 3 feeds, cat 3, chihuahua 4; knocked out and fed,
+raptor 8 bites, osmolskae 6, utahraptor 17, jaguar 10, wyvern 41. All five laying kinds nested and hatched
+(22 hatchlings). Shot 1 (the wolf) was black because its pad ran into the night; the script now sets noon before
+that shot. Not tested: a player's own right click and a player's own blows, which the script replaces with
+`/animalprof feed` and `/animal bite`.
+
+| Species | tamed | lays | hatches | shot |
+|---|---|---|---|---|
+| grey_wolf | pass (7 feeds) | n/a | n/a | r5 1 (black) |
+| capybara | pass (3) | n/a | n/a | r5 2 |
+| cat | pass (3) | n/a | n/a | r5 3 |
+| chihuahua | pass (4) | n/a | n/a | r5 3 |
+| raptor | pass (8 bites) | pass (4) | pass (4) | r5 4, 8 |
+| osmolskae | pass (6) | n/a | n/a | r5 4 |
+| utahraptor | pass (17) | n/a | n/a | r5 4 |
+| jaguar | pass (10) | n/a | n/a | r5 4 |
+| wyvern | pass (41) | n/a | n/a | r5 4 |
+| protoceratops | n/a | pass (4) | pass (4) | r5 5 |
+| psittacosaurus | n/a | pass (5) | pass (5) | r5 6 |
+| citipati | n/a | pass (3) | pass (3) | r5 7 |
+| house_sparrow | n/a | pass (6) | pass (6) | r5 9 |
+
+Grid r5: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r12_taming_m-194404/r12_taming_grid.jpg`.
+
 ## Hurts with no logged cause (Planner, 11-25)
 
 The sound runs heard a grey wolf (`ai_acts_2`, 56.2 s) and a reindeer (`ai_acts_3`, 63.2 s) play their hurt

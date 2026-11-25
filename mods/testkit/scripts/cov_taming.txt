@@ -366,6 +366,7 @@ chat /animalprof feed 6
 wait 3
 chat /animalprof where 64
 chat /tk mode spectator
+chat /time set 6000
 chat /tick freeze
 chat /tp 0 82 552
 look 0 -50
@@ -539,6 +540,7 @@ chat /animalprof feed 6
 wait 3
 chat /animalprof where 64
 chat /tk mode spectator
+chat /time set 6000
 chat /tick freeze
 chat /tp 200 82 552
 look 0 -50
@@ -715,6 +717,7 @@ chat /animalprof feed 6
 wait 3
 chat /animalprof where 64
 chat /tk mode spectator
+chat /time set 6000
 chat /tick freeze
 chat /tp 400 82 552
 look 0 -50

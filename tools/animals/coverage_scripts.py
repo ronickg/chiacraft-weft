@@ -294,7 +294,8 @@ for n, (x, kinds) in enumerate([(0, ["grey_wolf"]), (200, ["capybara"]), (400, [
           "chat /animalprof water 1", "chat /tk put me 0 animals:kibble 64", "key 1", "wait 2"]
     # The wolf needs 14 asked-for feeds (7 % each) and asks every 10-30 s: round 3 reached 57 % in 70.
     s += ["chat /animalprof feed 6", "wait 3"] * (160 if kinds == ["grey_wolf"] else 70)
-    s += ["chat /animalprof where 64", "chat /tk mode spectator"] + shot(x, f"cov_taming_{n+1}_{kinds[0]}", z_back=8, pitch=-50)
+    # Noon again for the shot: the wolf's 480 s ran into the night (round 5: shot 1 black at 21:46).
+    s += ["chat /animalprof where 64", "chat /tk mode spectator", f"chat /time set {TIME}"] + shot(x, f"cov_taming_{n+1}_{kinds[0]}", z_back=8, pitch=-50)
 x = 600
 # Bites enough for each kind (round 2: the jaguar reached 73 % in 12, the wyvern 69 % in 35).
 KO = [("raptor", -12, 30), ("velociraptor_osmolskae", -6, 20), ("utahraptor", 0, 30), ("jaguar", 6, 24), ("wyvern", 0, -8, 70)]
