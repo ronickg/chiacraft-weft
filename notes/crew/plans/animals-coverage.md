@@ -182,6 +182,22 @@ fights (`needs::HEAL_AFTER` never held). Both fixed in ffdb839c1, to re-run.
 
 Grid r5: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r12_hunters_m-195516/r12_hunters_grid.jpg`.
 
+Run 6 (02def5bc, `r13_hunters_m`, 651 s, script pass). Twelve kills, each feeding the prey's own mass. The
+crocodyliform took a young capybara this time and ate 1.828 kg of 1.828: the old bug would have shown 50. The
+jaguar killed again. The utahraptors (two young, one grown) bit their psittacosaurus ten times but gave up after
+60 s, so the pack-kill fix is not tested yet. Their prey had 71 health; its herd-mate had the 26. The hurt-cause
+lines now print: 12 lines, all `core:attack`. A lethal hit fires a death, not a hurt, so kills have no "takes"
+line.
+
+| Species | kill feeds the prey's own mass | shot |
+|---|---|---|
+| jaguar, coyote, foxes, raptor, osmolskae | pass | r6 1-4 |
+| utahraptor | not tested (no kill: gave up after 60 s) | r6 5 |
+| crocodyliform | pass (a young 1.83 kg capybara) | r6 6 |
+| yacare_caiman, spectacled_caiman | pass | r6 7 (black: night) |
+
+Grid r6: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r13_hunters_m-201354/r13_hunters_grid.jpg`.
+
 ## Birds and fliers (cov_birds.txt)
 
 | Species | flies | lands | flocks | flees | hunts / scavenges | shot |
@@ -569,8 +585,9 @@ The sound runs heard a grey wolf (`ai_acts_2`, 56.2 s) and a reindeer (`ai_acts_
 sound with no "hurt by" line. Both were heard at volume 0.05, so they were far from the player, which is why the
 sounds were quiet. The wolf was one of three wild ones that spawned 7 s before, next to water 7 blocks below them,
 so a fall is the likeliest cause. Hunger, thirst, the cold, falls and crowding hurt an animal without any line of
-their own. Since facb1a89f (working since ffdb839c1, which attaches `HURT_AT`) every hurt logs at debug: "animal N takes X (cause id) from source". Not tested yet:
-the next debug run will name the cause.
+their own. Since facb1a89f (working since ffdb839c1, which attaches `HURT_AT`) every hurt logs at debug: "animal N takes X (cause id) from source". Hunters run 6: 12 lines, all
+`core:attack`; no fall, hunger or cold. The sound runs' cases are still unnamed: the next sound run with
+`--log mod:animals=debug` will show them.
 
 ## Sounds
 
