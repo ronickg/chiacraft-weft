@@ -27,6 +27,7 @@ chat /time set 6000
 chat /tk fill -1 69 543 1 69 545 base:water
 chat /tk fill -1 70 543 1 70 545 core:air
 wait 1
+chat /tk fill -16 70 528 16 70 536 base:tall_grass
 chat /tk spawn animals:white_tailed_deer -8 70 536
 chat /tk spawn animals:white_tailed_deer -6 70 536
 chat /tk spawn animals:white_tailed_deer -4 70 536
@@ -78,6 +79,7 @@ chat /time set 6000
 chat /tk fill 199 69 543 201 69 545 base:water
 chat /tk fill 199 70 543 201 70 545 core:air
 wait 1
+chat /tk fill 184 70 528 216 70 536 base:tall_grass
 chat /tk spawn animals:reindeer 192 70 536
 chat /tk spawn animals:reindeer 194 70 536
 chat /tk spawn animals:reindeer 196 70 536
@@ -129,6 +131,7 @@ chat /time set 6000
 chat /tk fill 399 69 543 401 69 545 base:water
 chat /tk fill 399 70 543 401 70 545 core:air
 wait 1
+chat /tk fill 384 70 528 416 70 536 base:tall_grass
 chat /tk spawn animals:protoceratops 392 70 536
 chat /tk spawn animals:protoceratops 394 70 536
 chat /tk spawn animals:protoceratops 396 70 536
@@ -180,6 +183,7 @@ chat /time set 6000
 chat /tk fill 599 69 543 601 69 545 base:water
 chat /tk fill 599 70 543 601 70 545 core:air
 wait 1
+chat /tk fill 584 70 528 616 70 536 base:tall_grass
 chat /tk spawn animals:gastonia 592 70 536
 chat /tk spawn animals:gastonia 594 70 536
 chat /tk spawn animals:pinacosaurus 604 70 548
@@ -229,6 +233,7 @@ chat /time set 6000
 chat /tk fill 799 69 543 801 69 545 base:water
 chat /tk fill 799 70 543 801 70 545 core:air
 wait 1
+chat /tk fill 784 70 528 816 70 536 base:tall_grass
 chat /tk spawn animals:iguanodont 792 70 536
 chat /tk spawn animals:iguanodont 794 70 536
 chat /tk spawn animals:cedarosaurus 804 70 548
@@ -278,6 +283,7 @@ chat /time set 6000
 chat /tk fill 999 69 543 1001 69 545 base:water
 chat /tk fill 999 70 543 1001 70 545 core:air
 wait 1
+chat /tk fill 984 70 528 1016 70 536 base:tall_grass
 chat /tk spawn animals:citipati 992 70 536
 chat /tk spawn animals:citipati 994 70 536
 wait 2

@@ -26,6 +26,7 @@ chat /time set 6000
 chat /tk fill -1 69 543 1 69 545 base:water
 chat /tk fill -1 70 543 1 70 545 core:air
 wait 1
+chat /tk fill -16 70 528 16 70 536 base:tall_grass
 chat /tk spawn animals:hare -8 70 536
 chat /tk spawn animals:hare -6 70 536
 chat /tk spawn animals:mountain_hare 4 70 536
@@ -81,6 +82,7 @@ chat /time set 6000
 chat /tk fill 199 69 543 201 69 545 base:water
 chat /tk fill 199 70 543 201 70 545 core:air
 wait 1
+chat /tk fill 184 70 528 216 70 536 base:tall_grass
 chat /tk spawn animals:kryptobaatar 192 70 536
 chat /tk spawn animals:kryptobaatar 194 70 536
 chat /tk spawn animals:kryptobaatar 196 70 536
@@ -132,6 +134,7 @@ chat /time set 6000
 chat /tk fill 399 69 543 401 69 545 base:water
 chat /tk fill 399 70 543 401 70 545 core:air
 wait 1
+chat /tk fill 384 70 528 416 70 536 base:tall_grass
 chat /tk spawn animals:cat 392 70 536
 chat /tk spawn animals:cat 394 70 536
 chat /tk spawn animals:chihuahua 404 70 548
@@ -181,6 +184,7 @@ chat /time set 6000
 chat /tk fill 596 67 540 604 69 548 base:water
 chat /tk fill 596 70 540 604 70 548 core:air
 wait 1
+chat /tk fill 584 70 528 616 70 536 base:tall_grass
 chat /tk spawn animals:brown_trout 598 68 542
 chat /tk spawn animals:brown_trout 600 68 542
 chat /tk spawn animals:pacu 600 68 542

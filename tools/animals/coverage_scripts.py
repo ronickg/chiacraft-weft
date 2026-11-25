@@ -19,7 +19,7 @@ def head(title, lines):
     return out
 
 
-def pad(x, pond=1, deep=1):
+def pad(x, pond=1, deep=1, meadow=False):
     """A flat 33 x 33 pad round (x, Z) at ground 69, a pond of (2*pond+1) blocks square, `deep` deep."""
     return [
         f"chat /tp {x} 90 {Z}", "wait 4",
@@ -36,7 +36,12 @@ def pad(x, pond=1, deep=1):
         f"chat /tk fill {x-pond} {70-deep} {Z-pond} {x+pond} 69 {Z+pond} base:water",
         f"chat /tk fill {x-pond} 70 {Z-pond} {x+pond} 70 {Z+pond} core:air",
         "wait 1",
-    ]
+    ] + ([
+        # Tall grass on the pad's far (north) strip, out of the shots' foreground: the turf alone
+        # is only the ground's roots and insects, a top-up (`Species::fills_to`), and round 2's
+        # grazers at 30 % ate next to nothing on bare pads.
+        f"chat /tk fill {x-16} 70 {Z-16} {x+16} 70 {Z-8} base:tall_grass",
+    ] if meadow else [])
 
 
 FISH = {"brown_trout", "pacu", "lungfish", "lycoptera"}
@@ -99,7 +104,7 @@ s = head("grazers", [
 for i, (a, na, b, nb) in enumerate(GRAZERS):
     x = i * 200
     g = [(a, na, -8, -8)] + ([(b, nb, 4, 4)] if b else [])
-    s += pad(x) + spawns(x, g) + ["chat /animalprof food 0.3", "chat /animalprof water 0.3"]
+    s += pad(x, meadow=True) + spawns(x, g) + ["chat /animalprof food 0.3", "chat /animalprof water 0.3"]
     s += watch(x, 6) + scare(x) + shot(x, f"cov_grazers_{i+1}_{a}")
 write("grazers", s)
 
@@ -172,7 +177,7 @@ s = head("small", [
 ])
 for i, (name, g, pond, deep) in enumerate(SMALL):
     x = i * 200
-    s += pad(x, pond, deep) + spawns(x, g) + ["chat /animalprof food 0.3", "chat /animalprof water 0.3"]
+    s += pad(x, pond, deep, meadow=True) + spawns(x, g) + ["chat /animalprof food 0.3", "chat /animalprof water 0.3"]
     s += watch(x, 6) + scare(x, -6 if name != "fish" else 0) + shot(x, f"cov_small_{i+1}_{name}")
 write("small", s)
 

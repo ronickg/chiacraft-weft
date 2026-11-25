@@ -38,6 +38,26 @@ for action": groom on deer_lie; watch, graze, drink on capybara_sit; watch, scra
 reindeer_lie; play, stretch on psittacosaurus_lie; groom, scratch, look on ankylosaur_lie; scratch
 on citipati_lie): art for blocky-model.
 
+Run 2 (b7ef3aaf7, `r2_grazers_m-172424`, 486 s). All six hit animals ran ("flees from what hurt it") and five
+called the alarm with the right count of hearers, but only the reindeer's hearers ran: the others stood
+staring at the player. The shy check (`taming::behave`) stopped them to stare before `hunt::wary` could run
+them off with their herd; fixed (a fresh alarm goes first: `senses::alarmed`). Every pad drank to full. Grazing
+was not shown: the pads had no grass plants since e91a79201 (tall grass hid the shots), and the turf's roots
+and insects are a top-up only (`fills_to`); the pads now have tall grass on their far strip. Herds held
+together (3 to 28 blocks).
+
+| Species | eat | drink | flee when hit | herd runs on the alarm | holds together | shot |
+|---|---|---|---|---|---|---|
+| red_deer | not tested (no grass) | pass | pass | fail (stared; fixed) | pass | r2 |
+| white_tailed_deer | not tested | pass | not tested | not tested | pass (up to 20) | r2 |
+| reindeer | not tested | pass | pass | pass (2 ran) | pass (2-9) | r2 |
+| protoceratops | not tested | pass | pass | fail (stared; fixed) | pass (up to 25) | r2 |
+| pinacosaurus | not tested | pass | pass | fail (stared; fixed) | pass | r2 |
+| cedarosaurus | not tested | pass | pass (young: runs) | fail (stared; fixed) | pass | r2 |
+| citipati | not tested | pass | pass | n/a (not a herd kind) | pass (up to 24) | r2 |
+
+Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_grazers_m-172424/r2_grazers_grid.jpg`.
+
 ## Hunters other than wolves (cov_hunters.txt)
 
 | Species | hunts | stalks / ambush | chase | kill | share | gives up | shot |
