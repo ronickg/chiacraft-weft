@@ -368,7 +368,12 @@ fn atm_sky(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3
     let o = vec3(0.0, ATM_GROUND + max(scene.eye.y, 0.0) + 100.0, 0.0);
     let top = atm_sphere(o, dir, ATM_TOP).y;
     let ground = atm_sphere(o, dir, ATM_GROUND);
-    let far = select(top, ground.x, ground.x > 0.0);
+    var far = select(top, ground.x, ground.x > 0.0);
+    // TEMP horizon test (lkfwB1, look_debug 40-43; not for merge): 43 the path capped at 200 km.
+    let hv = look_debug();
+    if hv == 43u {
+        far = min(far, 200e3);
+    }
     let step = far / 10.0;
     let mu_s = dot(dir, sun);
     let mu_m = dot(dir, moon);
@@ -391,7 +396,7 @@ fn atm_sky(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3
         let seen = through * select((vec3(1.0) - kept) / max(ext, vec3(1e-7)), vec3(1.0), ext < vec3(1e-7));
         let ray = ATM_RAYLEIGH * d.x * step;
         let mie = ATM_MIE * d.y * step;
-        let to_sun = exp(-atm_toward(p, sun) * ATM_SUN_PATH);
+        let to_sun = exp(-atm_toward(p, sun) * select(ATM_SUN_PATH, 1.0, hv == 42u));
         let to_moon = exp(-atm_toward(p, moon));
         s_sun += ray * ray_s * seen * to_sun;
         s_mie += vec3(mie * mie_s) * seen * to_sun;
@@ -409,7 +414,15 @@ fn atm_sky(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3
     // 204) and blown white by the sun (249 233 202; lkmxJ1 sunup). At noon as before.
     let low_sun = 1.0 - smoothstep(0.1, 0.35, sun.y);
     let ray_k = mix(vec3(1.0), warm, low_sun);
-    let lit = s_sun * ray_k + s_mie * warm * mix(1.0, 0.6, low_sun) + s_multi * ray_k * ATM_MULTI / (4.0 * 3.14159);
+    var multi_k = ray_k * ATM_MULTI / (4.0 * 3.14159);
+    // TEMP horizon test: 40 no multiple scattering; 41 Bliss's, lit by the sky's own blue (its
+    // `background`) not the sun's white; 42 the sun's path at full length (ATM_SUN_PATH 1).
+    if hv == 40u {
+        multi_k = vec3(0.0);
+    } else if hv == 41u {
+        multi_k = vec3(0.35, 0.6, 1.0) * ATM_MULTI / (4.0 * 3.14159);
+    }
+    let lit = s_sun * ray_k + s_mie * warm * mix(1.0, 0.6, low_sun) + s_multi * multi_k;
     return (lit * ATM_SUN + s_moon * ATM_SUN * ATM_MOON * moon_k) * ATM_SCALE;
 }
 // The sky-view texture's direction for texel (`x`, `y`) of its 128 x 64, and back.
