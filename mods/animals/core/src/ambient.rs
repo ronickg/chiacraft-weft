@@ -64,6 +64,21 @@ pub const FISH_ACROSS: f32 = 1.6;
 /// Columns a client tries for water per jump, at most.
 pub const FISH_TRIES: usize = 6;
 
+/// The sprites' sounds (the sound worker's; `mods/animals/src/ambient.rs`), from where the bird
+/// or fish is. An eagle on a thermal cries every so many seconds on average (a red-tailed hawk's
+/// scream stands in for the golden eagle's and the savanna hawk's: thin, high, carrying);
+/// vultures are silent. A gull flock calls every so many seconds; a crossing owl hoots once as it
+/// passes nearest the player (the middle of its crossing) and, now and then, once more on its
+/// way. A fish's leap splashes where it leaves the water (quieter) and where it falls back.
+pub const EAGLE_CRY_EVERY: f32 = 20.0;
+pub const GULL_CALL_EVERY: f32 = 5.0;
+pub const OWL_SECOND_HOOT: f32 = 0.4;
+pub const SPLASH_OUT: f32 = 0.45;
+/// How far a cry and a splash are heard (blocks): a hawk's carries to the top of a thermal and
+/// past. Gulls and owls use the land's calls (`base:ambient.call.*`, heard to 32).
+pub const CRY_RANGE: f32 = 90.0;
+pub const SPLASH_RANGE: f32 = 28.0;
+
 /// Hours (0-24, from the sun): soarers ride thermals from this long after sunrise to this long
 /// before sunset (the ground has to warm first; they come down before evening), strongest from 11
 /// to 15; gulls are about from just before sunrise to just after sunset; owls hunt from this long

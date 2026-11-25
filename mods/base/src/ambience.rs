@@ -228,7 +228,9 @@ fn frame(c: &Client) {
         ((here[amb::BIRDS] + here[amb::DAWN] * 1.5).min(1.0)) * heard,
         here[6] * heard,
         here[7] * heard,
-        here[amb::SURF] * heard,
+        // Gulls call from ambient life's flock, where it flies (`mods/animals/src/ambient.rs`), and
+        // not at night; owls still call unseen from the wood as well as from the crossing owl.
+        0.0,
         here[amb::SWAMP] * heard,
         if deep { 1.0 } else { 0.0 },
         lava_pop,
