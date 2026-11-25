@@ -356,12 +356,16 @@ impl Screen for DebugOptions {
                     .h(0.0)
                     .grow()
                     .min_h(60.0)
-                    .scroll(),
+                    .scroll()
+                    .snap_rows(true),
                 |ui| {
                     let row = |ui: &mut Ui, id: String, name: Vec<crate::ui::text::Span>| {
                         let state = lines.get(&id).copied().unwrap_or_default();
                         ui.container(Style::row().gap(6.0).self_align(crate::ui::Align::Stretch), |ui| {
                             let n = ui.text(name, "default");
+                            // 2x like the button beside it (style 1).
+                            crate::screens::field_label(ui, cx, n);
+                            ui.nodes[n].style.w = crate::ui::Len::Px(0.0);
                             ui.nodes[n].style.grow = 1.0;
                             let shown = id.clone();
                             let b = button(ui, cx, state.key(), &[], 90.0, move |c| {
@@ -378,6 +382,9 @@ impl Screen for DebugOptions {
                         ui.add(Kind::Container { class: None }, Style::default().h(3.0));
                         ui.container(Style::row().gap(6.0).self_align(crate::ui::Align::Stretch), |ui| {
                             let n = ui.text(cx.t(title, &[]), "default");
+                            // 2x like the button beside it (style 1).
+                            crate::screens::field_label(ui, cx, n);
+                            ui.nodes[n].style.w = crate::ui::Len::Px(0.0);
                             ui.nodes[n].style.grow = 1.0;
                             let b = button(ui, cx, key, &[], 90.0, move |c| {
                                 let groups = crate::settings::debug_groups();

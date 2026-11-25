@@ -135,8 +135,10 @@ pub(crate) fn same_conditions(c: &Client) {
             AUTO_JUMP.set(false);
         }
     }
-    // The player's packs would change every picture.
-    let packs = !RESOURCE_PACKS.get().is_empty() || !SHADER_PACK.get().is_empty();
+    // The player's packs would change every picture; a run playing a player's start
+    // (`--player-start`, base's) keeps what that start chose.
+    let first_start = launch_option("player-start").is_some();
+    let packs = !first_start && (!RESOURCE_PACKS.get().is_empty() || !SHADER_PACK.get().is_empty());
     LANGUAGE.set("en_us");
     GUI_SCALE.set(2);
     VIEW_DISTANCE.set(12);
@@ -144,8 +146,10 @@ pub(crate) fn same_conditions(c: &Client) {
     FOV.set(70.0);
     BRIGHTNESS.set(0.5);
     VSYNC.set(true);
-    RESOURCE_PACKS.set("");
-    SHADER_PACK.set("");
+    if !first_start {
+        RESOURCE_PACKS.set("");
+        SHADER_PACK.set("");
+    }
     DEBUG_GROUPS.set(u32::MAX);
     ADVANCED_TOOLTIPS.set(false);
     DEBUG_LINES.set("");

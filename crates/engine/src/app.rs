@@ -286,6 +286,21 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
     }),
     // What this client hears now, most important first (also in the log, for scripts).
     ("sounds", "[which:word]", |r, args| match &r.audio {
+        // What has no sound, with or without a sound device (chiacraft; the testkit's `sounds`).
+        _ if args.text("which") == Some("check") => {
+            let c = crate::audio::sound_check(&r.assets);
+            let list = |v: &[String]| if v.is_empty() { "-".to_string() } else { v.join(" ") };
+            log::info!(
+                "sound check: silent blocks [{}] silent kinds [{}] missing files [{}]",
+                list(&c.silent_blocks),
+                list(&c.silent_kinds),
+                list(&c.missing)
+            );
+            vec![Msg::new(
+                "command.sounds.check",
+                vec![Arg::Text(list(&c.silent_blocks)), Arg::Text(list(&c.silent_kinds)), Arg::Text(list(&c.missing))],
+            )]
+        }
         Some(a) if args.text("which") == Some("recent") => {
             // The last sounds started, newest first (also in the log): one-shots that already ended.
             let mut out = Vec::new();
@@ -370,6 +385,8 @@ pub(crate) struct Running {
     assets: Assets,
     textures: GameTextures,
     ui: UiRenderer,
+    /// `--ui-audit`: the text-fit check after each screen's layout (`ui::audit`).
+    audit: Option<crate::ui::audit::Insets>,
     post: crate::post::Post,
     /// The screen shaders the local player's effects turned on (`EntityEffectDef::screen`).
     audio: Option<crate::audio::Audio>,
@@ -759,6 +776,9 @@ impl App {
             assets,
             textures,
             ui,
+            audit: api::launch_options()
+                .contains_key("ui-audit")
+                .then(Default::default),
             post,
             audio: crate::audio::Audio::new().map(|mut a| {
                 a.muted = self.opts.automated;
@@ -3516,10 +3536,31 @@ fn layout_uis(r: &mut Running, scale: f32) -> f32 {
         for (ui, size) in uis {
             if ui.dirty || ui.size != size || ui.text_unit != text_unit {
                 ui.text_unit = text_unit;
+                let look = &r.look;
+                ui.keep_off_frames(&mut |class| {
+                    let v: Vec<f32> = look
+                        .sidecar(class, "inset")?
+                        .split_whitespace()
+                        .filter_map(|x| x.parse().ok())
+                        .collect();
+                    match v.as_slice() {
+                        [a] => Some([*a; 4]),
+                        [l, t, r, b] => Some([*l, *t, *r, *b]),
+                        _ => None,
+                    }
+                });
                 ui.layout(size, &r.ui.font);
                 ui.dirty = false;
                 r.quads_dirty = true;
             }
+        }
+    }
+    // The text-fit check: each screen as laid out, its faults once each (`ui::audit`).
+    if let Some(insets) = r.audit.as_mut() {
+        let window = r.gpu.surface_size();
+        for (screen, ui) in &r.screens {
+            let faults = crate::ui::audit::check(ui, [screen_size.x, screen_size.y], &mut |class| insets.get(&r.look, &r.assets, class));
+            insets.log(screen.name(), &faults, &r.lang.code, scale, window);
         }
     }
     text_unit
