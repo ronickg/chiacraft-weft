@@ -2993,32 +2993,17 @@ fn bliss_fog_density(p: vec3<f32>) -> f32 {
     d += (0.5 * exp2(-0.3 * h) + exp2(-0.06 * h)) * rain_amount() * 0.3 * rain_fog_at(p.y);
     return d / 8.0;
 }
-fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
-    let dist = length(rel);
-    let dir = rel / max(dist, 1e-4);
+// The one fog's march along the unit look `dir` from the eye for `span` blocks (`one_fog`), lit by
+// the sun `sun` (with its phase, the clouds' shadow and, with `shadows`, the shadow map's), the sky's
+// light `sky_fog` on the fog and `air_sky` on the air; jittered by `jitter`. rgb the light gathered,
+// a how much of what lies behind the fog lets through (the air never dims it).
+fn fog_march(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in: vec3<f32>, air_sky: vec3<f32>, eye_k: f32, shadows: bool) -> vec4<f32> {
     let eye = scene.eye.xyz;
-    let clip = scene.view_proj * vec4(rel, 1.0);
-    let px = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * vec2(2048.0, 1152.0)) + 5.588238 * scene.frame.w;
-    let jitter = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
-    let p = palette();
     let mu = dot(dir, light_dir());
     // The fog's forward phase (Bliss's, x5) and Rayleigh's (its (0.1 c + 0.28) / pi).
     let sun_phase = bank_phase(mu);
     let ray_phase = (0.1 * mu + 0.28) / 3.14159;
-    let sun = p.sun * light_strength();
-    // The sky's light on the fog, brighter looking up (x6 straight up, x1.4 level), and on fog and
-    // air alike dimmed by the sky light where the eye is, cubed (Bliss's: in a cave or under a
-    // canopy the air's light goes with the eye's own).
-    let eye_k = eye_sky_k();
-    // The fog by the clear sky's average (Bliss's AmbientColor, averageSkyCol / 30: `bc_sky_read`),
-    // the air below by the land's, with the clouds in it (its AveragedAmbientColor), as in its
-    // composite2: lit by the land's, a rain's fog took the deck's colour (lkmxBC2's sepia rain).
-    let fog_sky = select(p.ambient, bc_sky_read(), land_from_sky());
-    let sky_fog = fog_sky * (1.0 + 5.0 * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), 4.0)) * eye_k;
-    // The sky's pixels stand at the march's far end (`view_rel`); they are marched to the render
-    // distance, as Bliss marches its sky to the far distance.
-    let is_sky = abs(dist - MIST_MARCH_FAR) < 0.5;
-    let span = select(dist, max(scene.params.y, MIST_MARCH_FAR), is_sky);
+    let sky_fog = sky_fog_in * (1.0 + 5.0 * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), 4.0)) * eye_k;
     let n = 8u;
     let e = 11.0;
     let reach = fantasy_opt(OPT_SHADOW_REACH);
@@ -3032,7 +3017,7 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let step = span * pow(e, u) * log(e) / (f32(n) * (e - 1.0));
         let at = eye + dir * t;
         var land = 1.0;
-        if reach <= 0.0 || t < reach {
+        if shadows && (reach <= 0.0 || t < reach) {
             land = mix(sun_reaches(dir * t), 1.0, select(0.0, smoothstep(reach * 0.75, reach, t), reach > 0.0));
         }
         let lit = land * cloud_shadow(dir * t);
@@ -3050,13 +3035,38 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let m_k = ATM_MIE * BLISS_AIR * (exp2(-up / 1200.0 * 7.0) + 300.0 * d * 8.0) * below;
         let ext = r_k + vec3(m_k);
         let a_kept = exp(-ext * step);
-        let light = sun * lit * sun_phase * (ray_phase * r_k + vec3(sun_phase * m_k)) + p.ambient * ext * eye_k;
+        let light = sun * lit * sun_phase * (ray_phase * r_k + vec3(sun_phase * m_k)) + air_sky * ext * eye_k;
         air += (light - light * a_kept) / max(ext, vec3(1e-9)) * air_through * through;
         air_through *= a_kept;
         if through < 1e-5 {
             break;
         }
     }
+    return vec4(gained + air, through);
+}
+fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let dist = length(rel);
+    let dir = rel / max(dist, 1e-4);
+    let eye = scene.eye.xyz;
+    let clip = scene.view_proj * vec4(rel, 1.0);
+    let px = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * vec2(2048.0, 1152.0)) + 5.588238 * scene.frame.w;
+    let jitter = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
+    let p = palette();
+    let sun = p.sun * light_strength();
+    // The sky's light on the fog, brighter looking up (x6 straight up, x1.4 level), and on fog and
+    // air alike dimmed by the sky light where the eye is, cubed (Bliss's: in a cave or under a
+    // canopy the air's light goes with the eye's own).
+    let eye_k = eye_sky_k();
+    // The fog by the clear sky's average (Bliss's AmbientColor, averageSkyCol / 30: `bc_sky_read`),
+    // the air below by the land's, with the clouds in it (its AveragedAmbientColor), as in its
+    // composite2: lit by the land's, a rain's fog took the deck's colour (lkmxBC2's sepia rain).
+    let fog_sky = select(p.ambient, bc_sky_read(), land_from_sky());
+    // The sky's pixels stand at the march's far end (`view_rel`); they are marched to the render
+    // distance, as Bliss marches its sky to the far distance.
+    let is_sky = abs(dist - MIST_MARCH_FAR) < 0.5;
+    let span = select(dist, max(scene.params.y, MIST_MARCH_FAR), is_sky);
+    let f = fog_march(dir, span, jitter, sun, fog_sky, p.ambient, eye_k, true);
+    let through = f.a;
     // Debug views (`base:look_debug`): 3 the fog's opacity (1 - its transmittance, the air not
     // counted) in grey; 4 the hour's fog weights (red morning, green evening, blue night); 5 the
     // cloudy fog's body at the surface, unworn (red) beside the fog's density there x 8 (green).
@@ -3073,7 +3083,7 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let body = clamp((0.4 - noise3(q / vec3(36.0, 18.0, 36.0))) * 2.0, 0.0, 1.0);
         return vec3(body, bliss_fog_density(eye + rel) * 8.0, 0.0);
     }
-    return c * through + gained + air;
+    return c * through + f.rgb;
 }
 
 // The mist as a volume (`client::froxels`, `core:froxels`): the view cut into cells an eighth of

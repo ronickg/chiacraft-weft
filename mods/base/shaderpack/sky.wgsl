@@ -1405,10 +1405,17 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     let k = mix(1.0, clamp(fantasy_opt(OPT_CHAIN_NIGHT), 0.0, 1.0), smoothstep(-0.04, -0.2, scene.sun.y));
                     PAL = Palette(p.zenith * k, p.horizon * k, p.glow * k, land_sun(sun, moon_k), land_ambient(clear / 9.0));
                     PAL_READ = true;
+                    // And the fog over both, as in Bliss's map (deferred.fsh: GetVolumetricFog 1024 blocks
+                    // along each look, lit by the same sun and sky light as its clouds, its air by the
+                    // cloudy average, here this frame's clear one: this pass may not read its own
+                    // target): in rain its deep, sunlit fog is what turns the cloudy average, and so
+                    // the land's light, warm grey (Bliss's rain ground INDIRECT, 1 : 0.73 : 0.39).
                     var cloudy = vec3(0.0);
                     for (var i = 0; i < 9; i++) {
-                        let cl = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), bc_sky_light(clear / 9.0));
-                        cloudy += wet[i] * cl.a + cl.rgb;
+                        let dir = atm_mean_dir(i, sun);
+                        let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), bc_sky_light(clear / 9.0));
+                        let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k), bc_sky_light(clear / 9.0), land_ambient(clear / 9.0), 1.0, false);
+                        cloudy += (wet[i] * cl.a + cl.rgb) * fog.a + fog.rgb;
                     }
                     return vec4(land_ambient(cloudy / 9.0), 1.0);
                 }
