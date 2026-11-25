@@ -77,7 +77,7 @@ pub fn init(r: &mut Registry) {
     r.world_tick(tell);
     r.client_frame(frame);
     // What lives where you stand and what flies now; `force` sets what flies round you (any of
-    // soar, gull, owl, fish, dusk; the sprites the place's or an eagle's, a gull's, a great horned
+    // soar, gull, owl, fish, dusk, busy; the sprites the place's or an eagle's, a gull's, a great horned
     // owl's) until `off`, for looks in a place that has none.
     r.command("ambient", "[what:text]", |cmd| {
         let w = cmd.world();
@@ -99,6 +99,8 @@ pub fn init(r: &mut Registry) {
                         "owl" => n.owl = if life.owl != 0 { life.owl } else { 4 },
                         "fish" => (n.fish, n.fish_rate) = (5, n.fish_rate.max(10)),
                         "dusk" => n.fish_rate = (am::FISH_DUSK * 10.0) as u8,
+                        // For looks: as many jumps as the word holds (6.3 times the day's).
+                        "busy" => n.fish_rate = 63,
                         _ => {}
                     }
                 }
@@ -198,6 +200,9 @@ struct Sky {
     frames: u32,
     spawned: u32,
     jumps: u32,
+    /// Searches for water that found none, and the last block one stopped at instead.
+    dry: u32,
+    last_ground: &'static str,
     spent: f64,
     logged: Option<Instant>,
 }
@@ -216,6 +221,8 @@ static SKY: Mutex<Sky> = Mutex::new(Sky {
     frames: 0,
     spawned: 0,
     jumps: 0,
+    dry: 0,
+    last_ground: "",
     spent: 0.0,
     logged: None,
 });
@@ -459,18 +466,20 @@ fn frame(c: &Client) {
     {
         if s.frames > 0 && s.logged.is_some() {
             weft_sdk::debug!(
-                "ambient: {:?}; {} soarers, {} gulls, owl {}, {} fish jumps; {:.1} spawns and {:.4} ms a frame",
+                "ambient: {:?}; {} soarers, {} gulls, owl {}, {} fish jumps ({} searches found no water, last on {}); {:.1} spawns and {:.4} ms a frame",
                 now_word,
                 s.soarers.len(),
                 s.gulls.len(),
                 s.owl.is_some(),
                 s.jumps,
+                s.dry,
+                s.last_ground,
                 s.spawned as f64 / s.frames as f64,
                 s.spent * 1000.0 / s.frames as f64
             );
         }
         s.logged = Some(began);
-        (s.frames, s.spawned, s.jumps, s.spent) = (0, 0, 0, 0.0);
+        (s.frames, s.spawned, s.jumps, s.dry, s.spent) = (0, 0, 0, 0, 0.0);
     }
 }
 
@@ -484,10 +493,25 @@ fn water_near(c: &Client, s: &mut Sky, me: [f64; 3], reach: f64) -> Option<[f64;
         for y in (top - 20..=top).rev() {
             match c.block([x, y, z]) {
                 Some(0) => continue,
-                Some(state) if WATER.on_block(state) => return Some([x as f64 + 0.5, y as f64 + 1.0, z as f64 + 0.5]),
-                _ => break,
+                Some(state) if is_water(state) => {
+                    return Some([x as f64 + 0.5, y as f64 + 1.0, z as f64 + 0.5]);
+                }
+                Some(state) => {
+                    s.last_ground = block_name(state);
+                    break;
+                }
+                None => {
+                    s.last_ground = "(not loaded)";
+                    break;
+                }
             }
         }
     }
+    s.dry += 1;
     None
+}
+
+/// Water, by its liquid (a liquid's states with their levels all count) or its tag.
+fn is_water(state: u32) -> bool {
+    WATER.on_block(state) || (liquid_of(state).is_some() && block_name(state).contains("water"))
 }
