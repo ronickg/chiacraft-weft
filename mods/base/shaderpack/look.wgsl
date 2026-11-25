@@ -237,6 +237,7 @@ const OPT_BANK_EDGE: u32 = 66u;
 const OPT_BANK_TOP: u32 = 67u;
 // The banks' march steps (`base:look_mist_steps`, the quality row: 0 as made = 8; Low 4, never off).
 const OPT_MIST_STEPS: u32 = 68u;
+const OPT_SKY_LOBE: u32 = 69u;
 // How much of it this morning: the option, in the east, with the sun under the horizon (full from
 // 1.7° down, none at 1° up) and not yet night (gone by about 12° down, where the night sky takes it).
 fn dawn_sky() -> f32 {
@@ -327,6 +328,20 @@ const SKY_AWAY_TURN: vec2<f32> = vec2(0.96, 0.8);
 // (colour; how fast it fades per unit of dir.y; how much).
 const SKY_DAWN_LINE: vec3<f32> = vec3(1.0, 0.85, 0.64);
 const SKY_DAWN_LINE_K: vec2<f32> = vec2(28.0, 0.85);
+// The low morning sun's glow where the sky is seen as Bliss's (`OPT_SKY_LOBE`): its sky is a physical
+// atmosphere whose glow round the sun is one Mie lobe, Henyey-Greenstein g 0.8 (`lib/ROBOBO_sky.glsl:45-48`,
+// `:126`, method only): of its peak 0.81 at 5°, 0.49 at 10°, 0.16 at 20°, 0.06 at 30°, 0.02 at 45°, a tail
+// with no window. Ours had about ten layers round the sun (the away lavender and blue, the cream lobe, the
+// gold, the band, three Mie powers, the wide glow, the sunset fan), each with its own window, ending
+// together 25-30° out as a hard seam from the horizon to the top of the frame (lkmC0-C4). The lobe's g,
+// and how much of the sky's own brightness it adds at the sun (5 at 10°, 1.6 at 20°, 0.6 at 30°).
+const SKY_LOBE: vec2<f32> = vec2(0.8, 10.0);
+// Its colour: the sun's own, this much toward a cream (the low sun's orange alone went saturated).
+const SKY_LOBE_CREAM: f32 = 0.5;
+fn hg_rel(mu: f32, g: f32) -> f32 {
+    let gg = g * g;
+    return pow((1.0 - g) * (1.0 - g) / max(1.0 + gg - 2.0 * g * mu, 1e-5), 1.5);
+}
 const SKY_AWAY_LAVENDER: vec3<f32> = vec3(0.92, 0.85, 1.0);
 const SKY_AWAY_DARK: f32 = 1.0;
 // The tint at the sky's own blue (1), not its brightness (0): Bliss's 06:00 sweep from the sun keeps
@@ -1016,6 +1031,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let h = clamp(dir.y, 0.0, 1.0);
     let bliss_sun = bliss_low_sun();
     let seen = bliss_sun * sky_seen;
+    // Where the lobe stands in for our layers round the sun: those go, all of them.
+    let lobe_k = seen * clamp(fantasy_opt(OPT_SKY_LOBE), 0.0, 1.0);
+    let keep = 1.0 - lobe_k;
     // With Bliss's sun the horizon's colour a peach, not the golden key's yellow (hue 40): where the
     // sun's creamed glow fades out it showed through as a faint yellow ring about 7° out (lv15).
     let horizon = mix(p.horizon, SUN_GLOW_CREAM * (luma(p.horizon) / luma(SUN_GLOW_CREAM)), seen * select(0.0, 0.8, scene.frame.x > 0.5));
@@ -1029,10 +1047,10 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // Most of it once the sun is down (the blue hour); with the sun up a little only (it tinted
         // the whole sunrise sky lavender).
         let away = (0.5 - 0.5 * mu) * (1.0 - h) * low * mix(0.35, 1.0, smoothstep(0.03, -0.05, scene.sun.y));
-        c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
+        c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4 * keep);
         // Toward it, a warmer band low on the horizon.
         let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
-        c += vec3(0.55, 0.22, 0.05) * toward;
+        c += vec3(0.55, 0.22, 0.05) * toward * keep;
     }
     // With Bliss's sun, away from the sun the sky lavender and then blue at its own brightness, not
     // the golden key's gold horizon mixed up into the blue: ours stood tan-mauve over the whole sky
@@ -1044,7 +1062,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let tint = mix(SKY_AWAY_LAVENDER, SKY_AWAY_BLUE, turn);
         // The blue a little darker than the sky there (Bliss's 06:00 blue about 0.85 of ours, lv16).
         let level = mix(luma(c) / luma(tint), c.b / tint.b, SKY_AWAY_KEEP_BLUE);
-        c = mix(c, tint * level * mix(1.0, SKY_AWAY_DARK, turn), away_sun * seen * SKY_AWAY.z);
+        c = mix(c, tint * level * mix(1.0, SKY_AWAY_DARK, turn), away_sun * seen * SKY_AWAY.z * keep);
     }
     // (B5: on the sky's own colour, before the sun's glow and glare are added: on top of them it
     // turned the glare gold, and the dawn mist that reads it went flat orange over the land, PC
@@ -1076,7 +1094,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             // over the whole half (blue 140-155), and its edge against the lavender read as a
             // yellow-green arc over the sun (lv13 06 vista and 07 low).
             let lobe = mix(pow(wide, 1.5), pow(max(mu, 0.0), SUN_CREAM_TIGHT), seen);
-            let dawn = lobe * morning * (1.0 - rain_amount());
+            let dawn = lobe * morning * (1.0 - rain_amount()) * keep;
             c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.7);
         }
     }
@@ -1134,18 +1152,24 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     // horizon.
     if bliss_sun > 0.0 && scene.frame.x > 0.5 {
         let near_sun = smoothstep(SUN_GOLD.x, SUN_GOLD.y, mu);
-        c = mix(c, SUN_GOLD_TINT * (luma(c) / luma(SUN_GOLD_TINT)), near_sun * seen);
+        c = mix(c, SUN_GOLD_TINT * (luma(c) / luma(SUN_GOLD_TINT)), near_sun * seen * keep);
         let flat = normalize(vec3(dir.x, 0.0, dir.z) + vec3(1e-5));
         let sun_flat = normalize(vec3(scene.sun.x, 0.0, scene.sun.z) + vec3(1e-5));
         let along = pow(max(dot(flat, sun_flat), 0.0), SUN_BAND.x);
         let band = exp(-abs(dir.y - 0.01) * SUN_BAND.y);
-        c += vec3(1.0, 0.88, 0.66) * luma(p.sun) * light_strength() * along * band * mix(1.0, SUN_BAND.z, sky_seen * exp(-abs(dir.y - 0.01) * SUN_BAND_SEEN_FALL)) * bliss_sun;
+        c += vec3(1.0, 0.88, 0.66) * luma(p.sun) * light_strength() * along * band * mix(1.0, SUN_BAND.z, sky_seen * exp(-abs(dir.y - 0.01) * SUN_BAND_SEEN_FALL)) * bliss_sun * keep;
         let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y) * smoothstep(-0.05, 0.05, scene.sun.x);
         let line = exp(-max(dir.y, 0.0) * SKY_DAWN_LINE_K.x) * morning * seen * SKY_DAWN_LINE_K.y * (1.0 - rain_amount());
         c = mix(c, SKY_DAWN_LINE * (luma(c) * 1.1 / luma(SKY_DAWN_LINE)), line);
     }
+    // The lobe, over the sky's own colour as it stands here (blue, its horizon line), at that
+    // colour's brightness.
+    if lobe_k > 0.0 {
+        let sun_tint = mix(p.sun / max(luma(p.sun), 1e-4), SUN_GLOW_CREAM / luma(SUN_GLOW_CREAM), SKY_LOBE_CREAM);
+        c += sun_tint * luma(c) * SKY_LOBE.y * hg_rel(mu, SKY_LOBE.x) * lobe_k * (1.0 - rain_amount());
+    }
     let c_pre_glow = c;
-    c += sun_glow(dir, p) * glow_up;
+    c += sun_glow(dir, p) * glow_up * keep;
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
     // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
     // curve rolls off and the bloom spreads: Bliss's low sun stands in a great gold glare. The
@@ -1164,7 +1188,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // third weaker: in the sun's pale mid-morning colour the glow went cream-white through the
         // curve's shoulder (08:00 sky saturation 23 against Bliss's 43, warmth +15 against +36).
         let gold = vec3(1.0, 0.72, 0.4) * luma(p.sun) * 1.4;
-        c += mix(p.sun, gold, 0.6 * (1.0 - smoothstep(0.6, 0.9, scene.sun.y))) * mie * 0.34 * glow_up;
+        c += mix(p.sun, gold, 0.6 * (1.0 - smoothstep(0.6, 0.9, scene.sun.y))) * mie * 0.34 * glow_up * keep;
         // The wide glow (`OPT_SUN_GLOW`), near white (forward Mie scattering by haze and droplets
         // keeps most of the light's colour, the eye sees it whitish), the more so with the sun low.
         // The far land toward the sun takes it through the haze, which reads this colour.
@@ -1179,7 +1203,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             // the sun, its edge a yellow ring against the sky (lv11, with the mist, haze and banks
             // off still there; gone with this glow off). That light lies along the horizon instead.
             let round = 1.0 - mix(SUN_BAND_ROUND, SUN_ROUND_SEEN, sky_seen) * bliss_sun;
-            c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.5 * wide_k * glow_up * round;
+            c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.5 * wide_k * glow_up * round * keep;
         }
     }
     // With Bliss's sun on a low morning sun all of that glow a pale cream: in the golden key's

@@ -151,6 +151,10 @@ pub static LOOK_BANK_TOP: Config<f32> = Config::named("look_bank_top");
 /// The mist banks' march steps per pixel (0 as made = 8): the quality row's, Low 4 to Max 12; never
 /// off (Bliss's VL_SAMPLES, 8).
 pub static LOOK_MIST_STEPS: Config<f32> = Config::named("look_mist_steps");
+/// The low morning sun's glow in the sky as Bliss's (1): one smooth Mie lobe (Henyey-Greenstein, g 0.8)
+/// in the sun's colour over the sky's blue, in place of our ten hand-made layers round the sun, whose
+/// windows ended together about 25-30° out as a hard seam (Planner, 11-25); 0 those layers.
+pub static LOOK_SKY_LOBE: Config<f32> = Config::named("look_sky_lobe");
 /// The engine's map of the ground's height (`client::ground_map`), which the banks lie on: on with
 /// them (`register`'s frame hook keeps it so, however the banks were set).
 static GROUND_MAP: Config<bool> = Config::named("core:ground_map");
@@ -167,7 +171,7 @@ pub static LOOK_MIST_CLOCK: Config<f32> = Config::named("look_mist_clock");
 /// keeps its own setting, so one can still be moved after.
 pub static LOOK_BLISS: Config<bool> = Config::named("look_bliss");
 /// Each knob, its value in the Bliss match, and as made.
-pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 21] = [
+pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 22] = [
     // The shade: no glare lift, less fill, the sky light occluded as Bliss's (lsN_ao3).
     (&LOOK_GLARE, 0.0, 0.0),
     (&LOOK_FILL, 1.0, 1.0),
@@ -203,6 +207,8 @@ pub static BLISS_MATCH: [(&Config<f32>, f32, f32); 21] = [
     (&LOOK_MIST_DAWN_TINT, 1.0, 1.0),
     // The sun's shadows to 128 blocks, then the sky light's mask (the condition matrix, 11-24).
     (&LOOK_SHADOW_REACH, 128.0, 128.0),
+    // The sun's glow one smooth lobe, as Bliss's sky (11-25).
+    (&LOOK_SKY_LOBE, 1.0, 1.0),
 ];
 
 /// Switches the Bliss match on (every knob to its fitted value) or off (every knob as made).
@@ -217,7 +223,7 @@ pub fn set_bliss_match(on: bool) {
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away, base:look_mist_tint, base:look_low_sun_keep, base:look_evening_shade, base:look_air_fade, base:look_glow_fill, base:look_mist_dawn_tint, base:look_mist_domes, base:look_horizon_lift, base:look_sun_disc, base:look_dawn_sky, base:look_bank_dense, base:look_bank_sun, base:look_bank_shade, base:look_shadow_reach, base:look_bank_fall, base:look_bank_edge, base:look_bank_top, base:look_mist_steps";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away, base:look_mist_tint, base:look_low_sun_keep, base:look_evening_shade, base:look_air_fade, base:look_glow_fill, base:look_mist_dawn_tint, base:look_mist_domes, base:look_horizon_lift, base:look_sun_disc, base:look_dawn_sky, base:look_bank_dense, base:look_bank_sun, base:look_bank_shade, base:look_shadow_reach, base:look_bank_fall, base:look_bank_edge, base:look_bank_top, base:look_mist_steps, base:look_sky_lobe";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -293,6 +299,7 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_BANK_EDGE).float(0.0, 0.0, 1.0);
     r.config(&LOOK_BANK_TOP).float(0.0, 0.0, 2.0);
     r.config(&LOOK_MIST_STEPS).float(0.0, 0.0, 16.0);
+    r.config(&LOOK_SKY_LOBE).float(1.0, 0.0, 1.0);
     r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0);
     r.config(&LOOK_BLISS).bool(true);
     r.client_frame(|_| {
