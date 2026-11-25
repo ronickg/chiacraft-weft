@@ -18,3 +18,4 @@ config.testkit.no_use = Без использования предметов
 config.testkit.chat_hooks = Перехват чата
 config.testkit.no_placing = Без установки блоков
 config.testkit.half_damage = Половина урона
+config.testkit.op_joiners = Входящие игроки — операторы (тестовые запуски)

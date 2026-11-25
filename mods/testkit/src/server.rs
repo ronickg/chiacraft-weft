@@ -37,6 +37,9 @@ static LIT: EntityEffect = EntityEffect::named("lit");
 /// Shows what is in its one slot.
 static PEDESTAL: Block = Block::named("pedestal");
 pub static COUNT_MARKS: Config<bool> = Config::named("count_marks");
+/// Every player who joins becomes an operator (level 4), for scripted runs of several games in
+/// one world: the host passes `--config testkit:op_joiners=true`, its own player already is one.
+pub static OP_JOINERS: Config<bool> = Config::named("op_joiners");
 pub static PROTECT_GOLD: Config<bool> = Config::named("protect_gold");
 pub static HALF_DAMAGE: Config<bool> = Config::named("half_damage");
 /// Mobs may not attack while it is on.
@@ -253,6 +256,7 @@ pub fn register(r: &mut Registry) {
     r.edit(&GEAR).group("extra", Slots::row(2));
     r.edit(&PLAYER).attach_storage(&STASH);
     r.config(&COUNT_MARKS).bool(false).world();
+    r.config(&OP_JOINERS).bool(false).server();
     // While the rule is on, every marked pig counts up once a tick.
     r.system(&MARK, |b| {
         if !COUNT_MARKS.get() {
@@ -348,6 +352,13 @@ pub fn register(r: &mut Registry) {
         }
     });
     r.on_event(&PLAYER_JOINED, |b| count(5, b.len()));
+    r.on_event(&PLAYER_JOINED, |b| {
+        if OP_JOINERS.get() {
+            for p in b.iter() {
+                b.world().set_permission(p.player, permission::OWNER);
+            }
+        }
+    });
     r.on_event(&actions::USE_ITEM, |b| count(6, b.len()));
     r.on_event(&SMELTED, |b| count(7, b.len()));
     // A mob walks where a test says for a while, after its own AI had its say.

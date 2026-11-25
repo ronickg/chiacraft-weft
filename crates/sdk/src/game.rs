@@ -1930,9 +1930,17 @@ impl Registry {
 
     /// Like `command`, but runs on the client that types it (`cmd.client()`), never on the
     /// server: for what only the player's own game has (views, local settings, debug output).
-    pub fn client_command(&mut self, name: &str, usage: &str, f: impl Fn(&mut crate::ClientCommand) + Send + Sync + 'static) {
+    /// It asks for `permission::GAME_MASTER` too (chiacraft), checked against the level the
+    /// server gave the player, unless `.permission(..)` says otherwise.
+    pub fn client_command(
+        &mut self,
+        name: &str,
+        usage: &str,
+        f: impl Fn(&mut crate::ClientCommand) + Send + Sync + 'static,
+    ) -> crate::CommandOptions {
         let cb = crate::command::client_cb(f);
-        unsafe { (host().reg_command)(self.raw, Str::new(name), Str::new(usage), 1, cb) }
+        unsafe { (host().reg_command)(self.raw, Str::new(name), Str::new(usage), 1, cb) };
+        crate::CommandOptions::new(self.raw, name)
     }
 
     /// A word set: command parameters `word(#set)` complete from its words, which other mods
