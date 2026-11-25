@@ -20,8 +20,7 @@ LOOK_ON = [
     ("fs_04_custom.png", "One row changed: Custom"),
     ("fs_05_developer.png", "Developer page (/developer_menu on)"),
     ("fs_06_developer_knobs.png", "Developer page: the look's knobs"),
-    ("fs_08_mod_settings_base.png", "Mod Settings, base: no look knobs"),
-    ("fs_09_mod_settings_base_end.png", "Mod Settings, base, end"),
+    ("fs_08_mod_settings_base.png", "Mod Settings: no look knobs, no Video settings"),
     ("fs_01_world.png", "The look on at a player's first start", None),
 ]
 LOOK_ON_CROP = ("fs_02_video.png", "4K, 1:1 pixels: the Video tab")
