@@ -766,11 +766,21 @@ fn fantasy_caps(q: usize, bloom_up: bool) {
 
 /// A row's line on a settings screen: its name, ‹ value ›, and what it does (or that it waits
 /// for a restart).
+/// Runs `f`, and builds the screen again when it moved the quality (a preset chosen, a row making
+/// it Custom): a mod's screen is built once, and the presets' buttons show which one is on.
+fn quality_changing(c: &ClientView, f: impl FnOnce()) {
+    let was = QUALITY.get();
+    f();
+    if QUALITY.get() != was {
+        c.client().rebuild_screen();
+    }
+}
+
 fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
     let row = &rows[i];
     ui.row(S::row().gap(3.0).center(), move |ui| {
         ui.text_styled(S::default().w(84.0).no_wrap(), &format!("video.base.{}", row.key), &[]);
-        ui.button("video.base.less", S::default().size(12.0, 12.0).pad(0.5), move |_| step(i, -1));
+        ui.button("video.base.less", S::default().size(12.0, 12.0).pad(0.5), move |c| quality_changing(c, || step(i, -1)));
         ui.row(S::row().w(96.0).center(), move |ui| {
             ui.text_bind_styled(S::default().no_wrap(), move |_, t| {
                 let (k, n) = (rows[i].shown)((rows[i].get)());
@@ -781,7 +791,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
                 }
             });
         });
-        ui.button("video.base.more", S::default().size(12.0, 12.0).pad(0.5), move |_| step(i, 1));
+        ui.button("video.base.more", S::default().size(12.0, 12.0).pad(0.5), move |c| quality_changing(c, || step(i, 1)));
         // What its value costs here (`video_costs`).
         crate::video_costs::cost_cell(ui, row.key, row.get);
         // A value waiting for the next start says so in place of what the row does.
@@ -1165,13 +1175,20 @@ pub fn register(r: &mut Registry) {
             // The presets, and which one the settings are now.
             ui.row(S::row().gap(3.0).center(), |ui| {
                 ui.text_styled(S::default().w(84.0).no_wrap(), "video.base.quality", &[]);
+                // The preset the settings are now stands pressed (amber); none while Custom.
+                let preset = |ui: &mut Ui, name: &str, p: usize| {
+                    let on = QUALITY.get() == p as i32;
+                    ui.button(&format!("video.base.preset.{name}"), S::default().w(52.0).selected(on), move |c| {
+                        quality_changing(c, || apply(p))
+                    });
+                };
                 if on_phone() {
-                    ui.button("video.base.preset.phone", S::default().w(52.0), move |_| apply(PHONE));
+                    preset(ui, "phone", PHONE);
                 }
                 for (p, name) in PRESET_NAMES.iter().enumerate() {
-                    ui.button(&format!("video.base.preset.{name}"), S::default().w(52.0), move |_| apply(p));
+                    preset(ui, name, p);
                 }
-                ui.button("video.base.preset.ultra", S::default().w(52.0), move |_| apply(ULTRA));
+                preset(ui, "ultra", ULTRA);
             });
             ui.row(S::row().gap(3.0), |ui| {
                 ui.row(S::row().w(84.0), |_| {});
@@ -1202,7 +1219,9 @@ pub fn register(r: &mut Registry) {
                         None => t.set("video.base.detected.gpu", &[Arg::Text(&shown), Arg::Key(&format!("video.base.gpu.{class}"))]),
                     }
                 });
-                ui.button("video.base.detect", S::default().h(12.0).pad_xy(5.0, 2.0), |c| apply_detected(c.client().state().window));
+                ui.button("video.base.detect", S::default().h(12.0).pad_xy(5.0, 2.0), |c| {
+                    quality_changing(c, || apply_detected(c.client().state().window))
+                });
             });
             // Each feature's quality, Low to Ultra (what a preset sets), then the player's own rows,
             // scrolled: they don't fit a 720p window at 2x.
