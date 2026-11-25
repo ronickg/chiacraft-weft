@@ -154,6 +154,24 @@ ground, and taking off stops what played. The pads' shots were hidden by a hill 
 
 Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_birds_m-170124/r2_birds_grid.jpg`.
 
+Run 3 (8fe0410c3, `r7_birds_m-175912`, 346 s): kills from the air. The golden eagle flew at a hare 14 blocks
+off and struck it three times from the air ("strikes 45 from the air"), killing it; the great horned owl
+struck a vole at night and killed it. The hawk and the snowy owl soared to look but struck nothing in the
+time. Both vultures smelled the deer and ate its venison; the raven and the gull ate (where rows) without a
+smell line. Songbirds bolted from the walk-in (4 to 19 blocks off) and flew up to 74-81. One "no clip" in
+the whole run, none on a flying look (run 2: 8): the fix holds.
+
+| Species | air hunt (run 3) | kill from the air |
+|---|---|---|
+| golden_eagle | pass | pass (a hare, 3 strikes) |
+| savanna_hawk | soared, no strike | not tested |
+| great_horned_owl | pass | pass (a vole) |
+| snowy_owl | soared, no strike | not tested |
+| turkey_vulture | pass (both smell and eat) | n/a |
+| songbirds (4 kinds) | pass (bolt from the walk-in, fly) | n/a |
+
+Grid r3: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r7_birds_m-175912/r7_birds_grid.jpg`.
+
 ## Small animals and fish (cov_small.txt)
 
 | Species | eats | drinks | wanders | flees | shot |
