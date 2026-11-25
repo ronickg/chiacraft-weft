@@ -325,9 +325,14 @@ fn ultra_extras() {
 /// (`--fake-gpu-name` pretends): Turing and Ampere, which run DLSS's transformer models (K, M) at
 /// several times the CNN's cost. An RTX 40, 50 or a name not known: the newest models at full size.
 fn older_rtx() -> bool {
-    let name = weft_sdk::client::launch_option("fake-gpu-name").unwrap_or_else(|| GPU_NAME.get()).to_lowercase();
+    let name = weft_sdk::client::launch_option("fake-gpu-name")
+        .unwrap_or_else(|| GPU_NAME.get())
+        .to_lowercase();
     // (Ada's workstation cards are named "RTX 2000 Ada" and the like.)
-    !name.contains("ada") && ["rtx 20", "rtx 30", "titan rtx", "rtx a"].iter().any(|w| name.contains(w))
+    !name.contains("ada")
+        && ["rtx 20", "rtx 30", "titan rtx", "rtx a"]
+            .iter()
+            .any(|w| name.contains(w))
 }
 
 /// Preset `q`'s name (`video.base.preset.<name>`); None for Custom and not chosen.
