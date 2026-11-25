@@ -96,6 +96,18 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // before, so a merged pass never finished the picture.
         if pass_.spare == 1u && scene.frame.x > 0.5 {
             color = vec4(finish_picture(hdr_light(color.rgb + sharpen_delta(first.scene, in.uv), in.uv, pass_)), 1.0);
+            // Debug view 10: the clouds' shadow map itself (r through, as grey) on the screen's left
+            // square, north up; red where the ground below the camera reads it.
+            if look_debug() == 10u && scene.cloud_shadow.x > 0.5 {
+                let sq = vec2(in.uv.x * 16.0 / 9.0, in.uv.y);
+                if sq.x <= 1.0 {
+                    let t = textures[u32(scene.cloud_shadow.x) - 1u];
+                    let v = textureSampleLevel(t, linear_clamp, sq, 0.0).r;
+                    let me = cloud_shadow_uv(vec3(0.0, -scene.eye.y + 64.0, 0.0));
+                    let dot_ = select(0.0, 1.0, length(sq - me) < 0.006);
+                    color = vec4(mix(vec3(v), vec3(1.0, 0.0, 0.0), dot_), 1.0);
+                }
+            }
         }
     }
     return color;
