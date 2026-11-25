@@ -426,7 +426,28 @@ fn sky_sun_mask(in: VOut) -> f32 {
     return smoothstep(0.86, 0.94, in.light.x) * cloud_shadow(in.rel);
 }
 
+// The pixel's sun shadow, once: `surface_light` and `mat_shine` both ask it for the same normal,
+// and traced it is a soft shadow's rays each time (the same rays: the same pixel, frame and normal).
+var<private> SHADOW_MEMO: vec4<f32> = vec4(0.0, 0.0, 0.0, -1.0);
+
+// Path traced (`scene.rt.x` 2): an opaque block face near enough, which the path tracer lights again
+// (`pathtrace.wgsl` takes every terrain pixel the G-buffer drew within its reach and puts its own
+// picture there). Its traced shadow and reflection here would be thrown away, so they aren't
+// traced: the sky's mask and the blurred guess stand in (Planner, 11-25: path tracing at 60 on an
+// RTX 3060, optimised, not downgraded). Leaves and plants keep theirs: where their holes make the
+// path tracer's check miss, the world's pixel stays.
+var<private> PT_SKIP: bool = false;
+
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
+    if SHADOW_MEMO.w >= 0.0 && all(SHADOW_MEMO.xyz == n) {
+        return SHADOW_MEMO.w;
+    }
+    let s = sun_shadow_once(in, n);
+    SHADOW_MEMO = vec4(n, s);
+    return s;
+}
+
+fn sun_shadow_once(in: VOut, n: vec3<f32>) -> f32 {
     let reach = fantasy_opt(OPT_SHADOW_REACH);
     if reach > 0.0 {
         let past = smoothstep(reach * 0.8, reach + 16.0, in.dist);
@@ -447,6 +468,9 @@ fn sun_shadow_near(in: VOut, n: vec3<f32>) -> f32 {
     // its brightness.
     if scene.rt.x < 0.5 || in.dist >= RT_REACH {
         return sun_shadow_mapped(in, n);
+    }
+    if PT_SKIP {
+        return sky_sun_mask(in);
     }
     // A solid face turned from the light is in its own shade (leaves and plants let it through).
     if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
@@ -820,7 +844,7 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     var sky = mix(light * 0.5, sky_seen, open * open);
     // Traced (`scene.rt.w`): what really lies that way, the room or the hills, off the screen too;
     // the rougher, the more it gives way to the blurred guess above.
-    if scene.rt.w > 0.5 && m.rough < 0.5 {
+    if scene.rt.w > 0.5 && m.rough < 0.5 && !PT_SKIP {
         sky = mix(traced_view(in.rel + n * 0.01, r, m.rough * 6.0, 0.01 + m.rough * 0.5, in.clip.xy), sky, smoothstep(0.1, 0.5, m.rough));
     }
     // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
@@ -1310,6 +1334,7 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
 
 @fragment
 fn fs_opaque(in: VOut) -> WorldOut {
+    PT_SKIP = scene.rt.x > 1.5 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE;
     return world_out(in, opaque(in));
 }
 

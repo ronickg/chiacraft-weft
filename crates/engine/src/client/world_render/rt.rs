@@ -657,6 +657,12 @@ impl WorldRenderer {
         self.rt_compiled && self.rt.is_some() && self.rt_modes.0
     }
 
+    /// Whether the path tracer can run (`path_trace`): the traced scene, its pipelines and the
+    /// G-buffer's. The world's shader then leaves the rays it would redo to it (`Scene::rt.x` 2).
+    pub fn pt_ready(&self) -> bool {
+        self.rt_traced() && self.pt_pipes.is_some() && self.gb_pipes.is_some()
+    }
+
     /// Whether the world's shader traces its reflections this frame (`Scene::rt.w`).
     pub fn rt_reflects(&self) -> bool {
         self.rt_compiled && self.rt.is_some() && self.rt_modes.1
