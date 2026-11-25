@@ -293,7 +293,8 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     // Debug 8-12, timing only (a bench's probes): the trace stopped after its primary test (8), the
-    // sun's ray (9), the bounce and the cache (10), or with no specular ray (11); 12 before any ray, above. The picture they
+    // sun's ray (9), the bounce and the cache (10), or with no specular ray (11); 12 before any ray, above; 13 the whole trace without the air's
+    // two `haze_lit`s. The picture they
     // leave is no use.
     if pt.debug == 8u {
         return;
@@ -422,8 +423,12 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     // The air between the eye and the surface, as an affine map of the colour.
-    let air = haze_lit(vec3(0.0), h.rel, h.light.x);
-    let through = haze_lit(vec3(1.0), h.rel, h.light.x) - air;
+    var air = vec3(0.0);
+    var through = vec3(1.0);
+    if pt.debug != 13u {
+        air = haze_lit(vec3(0.0), h.rel, h.light.x);
+        through = haze_lit(vec3(1.0), h.rel, h.light.x) - air;
+    }
     let dif = through * diffuse;
     let spe = through * specular;
     pt_out[at] = vec4(dif, diffuse_t);
@@ -433,7 +438,11 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // curve); under a denoiser (mode 1) the air's light alone, which `fs_pt_finish` adds the
     // denoised light to and finishes.
     NIGHT_SKY_SHARE = share;
-    let under = select(display(air + dif * albedo + spe * s_alb), air, pt.mode == 1u);
+    // (Branched, not `select`: that worked out `display` under the denoiser too, to drop it.)
+    var under = air;
+    if pt.mode != 1u {
+        under = display(air + dif * albedo + spe * s_alb);
+    }
     // The share rides in the kind (1 to 1.25: traced) for `fs_pt_finish`.
     pt_out[at + 2u] = vec4(under, 1.0 + 0.25 * share);
 }
