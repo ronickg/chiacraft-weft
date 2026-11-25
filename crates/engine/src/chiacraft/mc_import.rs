@@ -57,8 +57,10 @@ impl<'c> Resolver<'c> {
         // A data package with the id `mc` may define Minecraft's own blocks by their names (a test
         // environment: the RTX showcase world with its own textures and material maps,
         // `notes/RTX_SHOWCASE.md`); such a block comes before our nearest one. Without that
-        // package nothing changes.
-        let own = format!("mc:{}", map::State::parse(mc).name);
+        // package nothing changes. A mod's block goes by its name alone (`rtx-remix-renderer:
+        // copper_beacon`, the showcase lighthouse's lamp, is `mc:copper_beacon`).
+        let name = map::State::parse(mc).name;
+        let own = format!("mc:{}", name.rsplit(':').next().unwrap_or(name));
         if self.c.state_by_name(&own).is_some() {
             candidates.insert(0, own);
             exact = true;
