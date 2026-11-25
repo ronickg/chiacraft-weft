@@ -124,11 +124,7 @@ fn mode_row(ui: &mut Ui) {
         ui,
         "dlss",
         || {
-            if AUTO.get() {
-                (format!("auto_{}", MODE_NAMES[mode() as usize]), 0)
-            } else {
-                (MODE_NAMES[mode() as usize].to_string(), 0)
-            }
+            if AUTO.get() { (format!("auto_{}", MODE_NAMES[mode() as usize]), 0) } else { (MODE_NAMES[mode() as usize].to_string(), 0) }
         },
         |dir| {
             // Off, Auto, then the modes the upscaler offers (-1 stands for Auto).
