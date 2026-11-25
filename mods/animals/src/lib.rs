@@ -23,6 +23,7 @@ use weft_sdk::*;
 declare_mod!(deps: ["base"], init: init);
 
 pub mod anim;
+mod ambient;
 mod animal;
 mod ankylosaur;
 mod armour;
@@ -162,6 +163,7 @@ fn init(r: &mut Registry) {
     gull::init(r);
     caiman::init(r);
     wolf::init(r);
+    ambient::init(r);
     jaguar::init(r);
     voices::init(r);
     journal::init(r);
