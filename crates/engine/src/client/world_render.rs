@@ -1788,7 +1788,13 @@ impl WorldRenderer {
         for (&p, &[r, g, b]) in cells {
             let l = p & 15;
             // Bit 24: a small light (a torch's flame, a light in hand), not a whole glowing block.
-            let w = l.x as u32 | (l.y as u32) << 4 | (l.z as u32) << 8 | u32::from(r.min(15)) << 12 | u32::from(g.min(15)) << 16 | u32::from(b.min(15)) << 20 | 1 << 24;
+            let w = l.x as u32
+                | (l.y as u32) << 4
+                | (l.z as u32) << 8
+                | u32::from(r.min(15)) << 12
+                | u32::from(g.min(15)) << 16
+                | u32::from(b.min(15)) << 20
+                | 1 << 24;
             self.body_lights.entry(p >> 4).or_default().push(w);
         }
         self.lights_dirty = true;

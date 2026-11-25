@@ -164,7 +164,8 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
                     }
                     // The cell's light as the lightmap takes it (`CellLayout::light`, all its
                     // parts): a resident's own state gave none for a torch (w55).
-                    mesh.lights.extend(emitter(layout.light(c, states[i]).light, x, y, z));
+                    mesh.lights
+                        .extend(emitter(layout.light(c, states[i]).light, x, y, z));
                     for &part in &layout.covers {
                         let (owner, resident) = part.owner(glam::IVec3::new(x, y, z));
                         if (owner.cmplt(glam::IVec3::ZERO).any() || owner.cmpge(glam::IVec3::splat(16)).any())
@@ -175,7 +176,8 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
                     }
                 } else {
                     draw_block(c, n, ctm, &looks, &opaque, &leafy, &mut mesh, x, y, z, Part::aligned(states[i]));
-                    mesh.lights.extend(emitter(c.tight[states[i] as usize].light, x, y, z));
+                    mesh.lights
+                        .extend(emitter(c.tight[states[i] as usize].light, x, y, z));
                 }
             }
         }
