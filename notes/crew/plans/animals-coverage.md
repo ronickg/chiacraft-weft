@@ -365,7 +365,7 @@ takes its share after that, and armour's health raises the cap. The knock-back i
 
 | What | before | now | checked |
 |---|---|---|---|
-| borkon toss on an unarmoured player at full health | 24.9: dead (runs 3, 4) | 16.0: lives at 20 % | not tested in a run yet (expect "toss hits 1 for 16.0" and no "player 1 died") |
+| borkon toss on an unarmoured player at full health | 24.9: dead (runs 3, 4) | about 14 of about 18: lives at 20 % | run 5 (fe121098): still 24.9 and dead, the script's fault: it gave the player +300 max health (`testkit:hp`), which raised the cap to about 270, while base's survival keeps health at the fed max (about 18). Borkon's part now takes the +300 off, and the hit line prints the player's health after it; to re-run |
 
 Run 1: cov_bosses, Mac, 403.9 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_bosses_m-160951.log`; grid
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_bosses_m-161637/cov_bosses_grid.jpg`). The big plant

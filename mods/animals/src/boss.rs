@@ -683,7 +683,10 @@ pub fn land(def: &Def, w: &World, id: u64, a: &Attack, hit: f32, hits: Vec<(u64,
         };
         w.damage(e, Damage::new(hit, damage_cause::ATTACK).by(id));
         w.push(e, push);
-        weft_sdk::info!("{} {id}: {} hits {e} for {hit:.1}", def.name, a.name);
+        let left = w
+            .entity(e)
+            .map_or(String::new(), |t| format!(" (health {:.1}/{:.1} after)", t.health, t.max_health));
+        weft_sdk::info!("{} {id}: {} hits {e} for {hit:.1}{left}", def.name, a.name);
     }
 }
 

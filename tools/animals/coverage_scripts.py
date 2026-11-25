@@ -221,7 +221,10 @@ for j, (boss, offering, sword, armour) in enumerate([("drenkaun", "forest_offeri
     summon = [f"chat /tp {x}.5 200 2.5", "chat /tk mode survival", "chat /tk heal", "key 1", "look 0 -29",
               "wait 0.5", "press core:use", "wait 3"]
     s += [f"chat /tk fill {x} 200 0 {x} 200 0 animals:{boss}_altar", f"chat /tp {x}.5 200 2.5", "wait 1",
-          "chat /tk mode survival", "chat /tk attr_mod me core:max_health testkit:hp core:add 300 0",
+          # Drenkaun's player gets 300 more health to last the part; Borkon's has its own (the cap on a
+          # boss's blow, `bosses::PLAYER_BLOW`, is a share of the max the player really has: base's
+          # survival clamps health to the fed max, so the +300 only raised the cap, round 5).
+          "chat /tk mode survival"] + (["chat /tk attr_mod me core:max_health testkit:hp core:add 300 0"] if boss == "drenkaun" else ["chat /tk attr_rm me core:max_health testkit:hp"]) + [
           f"chat /tk put me 0 animals:{offering} 8", f"chat /gear sword {sword} slot=1", "wait 0.5", "chat /tk heal"]
     # The damage step through `/boss hurt` too (round 2: the aimed blows never reached it).
     s += summon + ["chat /boss state", "chat /boss hurt 40", "wait 0.5", "chat /boss hurt 40", "wait 0.5",
