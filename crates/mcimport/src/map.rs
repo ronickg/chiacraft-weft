@@ -252,6 +252,11 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
             (vec![format!("base:redstone_lamp[power={lit}]"), "base:redstone_lamp".into()], true)
         }
         "fire" | "soul_fire" => one(AIR),
+        // Vines and cave vines: our liana (a hanging climber, crossed planes) in the vine's own cell
+        // rather than flat on the wall; air left the showcase's ruins bare (about 280,000 vines,
+        // the cathedral and the nave against NVIDIA's Remix, 11-25).
+        "vine" | "cave_vines" | "cave_vines_plant" | "weeping_vines" | "weeping_vines_plant" | "twisting_vines"
+        | "twisting_vines_plant" => (vec!["base:liana".into(), AIR.into()], false),
         _ => {
             // Waterlogged small things stand in water; other small things are left out; any other
             // unknown full block is the stone it most likely sits in.
@@ -406,5 +411,7 @@ mod tests {
         assert_eq!(full_shape("minecraft:cobblestone_slab").as_deref(), Some("cobblestone"));
         assert_eq!(full_shape("minecraft:oak_fence_gate"), None);
         assert_eq!(full_shape("minecraft:vine"), None);
+        assert_eq!(block("minecraft:vine[north=true,up=false]").0[0], "base:liana");
+        assert_eq!(block("minecraft:cave_vines_plant[berries=false]").0[0], "base:liana");
     }
 }
