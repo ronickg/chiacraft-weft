@@ -249,6 +249,11 @@ atmosphere shader, and missing idle clips.
 
 Grid r7: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r14_hunters_m-202849/r14_hunters_grid.jpg`.
 
+Run 8 (09494f1f, `r15_hunters_m`, 651 s, script pass). Fifteen eats lines, every one at the prey's own mass. The
+utahraptor pack hunted at 26.0 kg and ate 25.951 in three shares. The jaguar, the crocodyliform and the yacare
+killed. The spectacled caiman made no kill. Five hurt lines, all `core:attack`. Grid r8:
+`~/Coding/chiacraft-archive/images/tester/2026-11-25/r15_hunters_m-205818/r15_hunters_grid.jpg`.
+
 ## Birds and fliers (cov_birds.txt)
 
 | Species | flies | lands | flocks | flees | hunts / scavenges | shot |
@@ -652,7 +657,7 @@ their own. Since facb1a89f (working since ffdb839c1, which attaches `HURT_AT`) e
 |---|---|---|---|
 | HUD health over max in Drenkaun's shot ("1585 / 90") | base clamped health to its own fed max and the HUD divided by it, but anything else on the engine's max (the script's +300, the game's health boost +4) was outside both | base counts the rest of the engine's max (`base:fed_set`), and the HUD and the levels screen show the engine's whole max (7d0700f1b) | pass (r15_bosses, 09494f1f): shot 5 "1585 / 1590", shot 6 "84 / 89" |
 | wyvern pad empty in the shot | the hit wyvern stayed angry at the player after they turned spectator and followed them to the watch spot at z 574, out of frame | anger at a spectator ends (`knockout::behave`, 598c06be7) | pass (r15_bosses): the wyvern stays at its pad's centre and is in shot 4 |
-| night caiman shot black | no light at 01:37 | glowstone round the night pads after the watching, before the shot (hunters' caimans, birds' owls; 75668b544) | to run |
+| night caiman shot black | no light at 01:37 | glowstone round the night pads after the watching, before the shot (hunters' caimans, birds' owls; 75668b544) | hunters r15: the pad is lit and readable, but no caiman in frame. The spectacled caiman rested under water in the pond (y 68), the yacare had wandered behind the camera (z 573) and the hares were 22 blocks off: placement, not drawing. Owls: to run |
 
 ## Sounds
 
