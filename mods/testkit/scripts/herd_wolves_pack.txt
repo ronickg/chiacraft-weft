@@ -57,18 +57,19 @@ chat /tk fill -160 60 510 -140 69 530 base:dirt
 chat /tk fill -160 69 510 -140 69 530 base:grass
 chat /tk fill -160 70 510 -140 90 530 core:air
 wait 1
-chat /tk spawn animals:white_tailed_deer -150 70 520
-chat /tk spawn animals:grey_wolf -148 70 520
-chat /tk spawn animals:grey_wolf -150 70 523
-chat /tk spawn animals:grey_wolf -153 70 518
+# The wolves 6-7 blocks apart: 3 apart, the second tp found the first wolf again and only one was hungry (wolvesPack5).
+chat /tk spawn animals:white_tailed_deer -148 70 520
+chat /tk spawn animals:grey_wolf -146 70 520
+chat /tk spawn animals:grey_wolf -150 70 526
+chat /tk spawn animals:grey_wolf -153 70 514
 wait 2
-chat /tp -148 70 520
+chat /tp -146 70 520
 chat /animalprof hunter 0.3
-chat /tp -150 70 523
+chat /tp -150 70 526
 chat /animalprof hunter 0.3
-chat /tp -153 70 518
+chat /tp -153 70 514
 chat /animalprof hunter 0.99
-chat /tp -148 70 520
+chat /tp -146 70 520
 chat /animalprof bite 1000
 wait 1
 chat /tp 0 95 575

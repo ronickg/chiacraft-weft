@@ -612,6 +612,11 @@ fn rally(w: &World, id: u64, st: &EntityState, target: u64, now: u64) {
 }
 
 /// A goal for wild animals: a hunter near that could take it, and it runs the other way.
+/// Whether it is on a hunt now (chasing its prey).
+pub fn on_hunt(w: &World, id: u64) -> bool {
+    w.component(id, &HUNT).is_some_and(|h| h[0] != 0)
+}
+
 pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     let now = w.game_time();
     // Running already; else it looks round once in `senses::EVERY` ticks (a tame never does: it
@@ -626,6 +631,11 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     // it stops and stares that way, aware it runs, over ground it can run on.
     let seen = crate::senses::sense(w, id, st, |sight| watch(w, sight));
     let h = seen.threat_pos.map(f64::from);
+    // A hunter on a hunt doesn't run from a noise (its own chase's fight and its prey's calls):
+    // a pack ran from "0" twice in its chase (wolvesPack5).
+    if seen.threat == 0 && on_hunt(w, id) {
+        return false;
+    }
     if seen.aware >= animals_core::perception::NOTICED && (seen.threat != 0 || h != [0.0; 3]) {
         // A big plant eater faces a lone hunter, a mother stays between it and her young.
         if seen.threat != 0 && stands_ground(w, id, st, seen.threat) {

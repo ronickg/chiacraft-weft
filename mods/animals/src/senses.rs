@@ -727,7 +727,9 @@ pub fn alarm(w: &World, id: u64, st: &EntityState, threat: u64, pos: [f32; 3]) -
     }
     let mut heard = 0;
     for o in w.entities_near(st.pos, roles::ALARM, Some(kind)) {
-        if o == id || crate::animal::tamed(w, o) {
+        // One on a hunt keeps at it, unless the alarm is of a hunter (wolvesPack5: a full wolf's
+        // alarm at the chase's noise sent its hunting pack running).
+        if o == id || crate::animal::tamed(w, o) || (threat == 0 && crate::hunt::on_hunt(w, o)) {
             continue;
         }
         if let Some(s) = w.component_mut(o, &SENSES) {
