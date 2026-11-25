@@ -279,8 +279,9 @@ const PT_LIGHT_CANDIDATES: u32 = 8u;
 const PT_FLAME: f32 = 0.2;
 // The share of the lightmap's block light a shadow takes away. The rest stays: the light's further
 // bounces, which the lightmap's spread stands for and one traced bounce leaves out (all of it taken,
-// a block's side away from the torch came out near black in a stone cave, w59).
-const PT_BLOCK_SHADOW: f32 = 0.7;
+// a block's side away from the torch came out near black in a stone cave, w59; 70 % read faint,
+// Ronald chose 90 %, 11-25).
+const PT_BLOCK_SHADOW: f32 = 0.9;
 
 // Where the lights reaching cube `c` are in `pt_lights` (start, count); count 0 when none do.
 fn pt_light_find(c: vec3<i32>) -> vec2<u32> {
