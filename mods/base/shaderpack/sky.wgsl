@@ -1037,10 +1037,14 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         // star at the screen's white: with the land lit from the physical sky they keep their place
         // against Bliss's stars (10 / 41 at a star's peak), as the stars took (lkmxS1's night
         // clouds: the Milky Way and the aurora stood out bright over Bliss's dark navy).
-        let night_lights = select(1.0, 10.0 / BLISS_UNITS, land_from_sky());
+        // With Bliss's night (Ronald: "nearly one to one", delete extra layers) none of them: its
+        // night is an even navy with its stars and moon alone (lkmoon1: our Milky Way a wide pink
+        // band across Bliss's empty sky).
+        let night_lights = select(1.0, 0.0, land_from_sky());
         var c = sky_color(dir) + (milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir)) * night_lights + fireball(dir) + lightning_bolt(dir);
         if land_from_sky() {
-            c += bliss_stars(dir);
+            let m = bliss_moon(dir);
+            c += bliss_stars(dir) * m.a + m.rgb;
         }
         // The rainbow in the rain, in front of the high cirrus.
         c = rainbow_on(cirrus(c, dir), dir);
@@ -1096,6 +1100,39 @@ fn bliss_stars(dir: vec3<f32>) -> vec3<f32> {
     let star = exp(max(1.0 - v, 0.0) * -20.0);
     let ground = 1.0 - exp2(-50.0 * pow(clamp(dir.y + 0.025, 0.0, 1.0), 2.0));
     return vec3(star * 10.0 / BLISS_UNITS * night * ground);
+}
+
+// Bliss's moon (sky_gradient.glsl drawMoon, called in composite1, method only), with the land lit
+// from the physical sky: no picture (its RESOURCEPACK_SKY 0 drops the pack's moon) but a disc about
+// 2° across, exp(1 - 1000 (1 - cos)) - 1.5, lit by its phase's light vector through a mock normal, x
+// the land's direct light x 20, plus a faint 0.004 rim; the stars hidden behind it (rgb, a: how
+// much of the stars is left). Its light is the one that lights the land (`light_dir`), the disc
+// drawn opposite it. Ours drew the pack's square moon picture, twice the size, with a wide glow
+// (lkmoon1). The phase from the moon's light (`moon_light`), waning side only: the engine sends
+// how full it is, not which side.
+fn bliss_moon(dir: vec3<f32>) -> vec4<f32> {
+    let l = -normalize(light_dir());
+    let shape = clamp(exp(1.0 - 1000.0 * dot(l + dir, dir)) - 1.5, 0.0, 25.0);
+    if shape <= 0.0 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let shape2 = pow(exp(shape * -10.0), 0.15) * 255.0;
+    let n = vec3((l.x + dir.x) * shape2, (l.y + dir.y) * shape2, -dot(l, dir) * 15.0);
+    let k = u32(clamp(round(acos(clamp(2.0 * moon_light() - 1.0, -1.0, 1.0)) * 4.0 / 3.14159), 0.0, 4.0));
+    var ph = vec3(-1.0, -0.5, 1.0);
+    switch k {
+        case 1u: { ph = vec3(-1.0, -0.5, 0.35); }
+        case 2u: { ph = vec3(-1.0, -0.5, 0.2); }
+        case 3u: { ph = vec3(-1.0, -0.5, 0.1); }
+        case 4u: { ph = vec3(1.0, 0.25, -1.0); }
+        default: {}
+    }
+    let sun = normalize(scene.sun.xyz);
+    let moon_k = scene.moon.w * mix(1.0, 0.12, smoothstep(0.5, 1.0, blood_moon()));
+    let c = land_sun(sun, moon_k) * 20.0;
+    let lit = shape * pow(clamp(dot(n, ph) / 5.0, 0.0, 1.5), 5.0) * c + clamp(shape * 4.0 * pow(shape2 / 200.0, 2.0), 0.0, 1.0) * 0.004 / BLISS_UNITS;
+    let ground = 1.0 - exp2(-50.0 * pow(clamp(dir.y + 0.025, 0.0, 1.0), 2.0));
+    return vec4(lit * ground, max(1.0 - shape * 5.0, 0.0));
 }
 
 // A soft high layer of thin cloud, far above the blocky ones (Research round 15, rec. 2 slice 4:
@@ -1279,6 +1316,10 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         let to_moon = dot(s.axes[0].xyz, normalize(scene.moon.xyz));
         let is_sun = s.ids.y == SKY_BODY && to_sun > 0.99 && to_sun >= to_moon;
         let is_moon = s.ids.y == SKY_BODY && !is_sun && to_moon > 0.99;
+        // Bliss's moon (`bliss_moon`, in the gradient) in place of the body's picture.
+        if is_moon && land_from_sky() {
+            discard;
+        }
         if is_moon {
             let m = moon_body(s, local);
             rgb = m.rgb;
