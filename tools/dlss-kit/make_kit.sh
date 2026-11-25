@@ -56,13 +56,28 @@ while [ ${#todo[@]} -gt 0 ]; do
 done
 echo "weft.exe imports:"; x86_64-w64-mingw32-objdump -p "$game/weft.exe" | grep "DLL Name" | sed 's/^/  /'
 
-# NVIDIA's runtime: production (signed, what a release would carry) and development.
+# NVIDIA's runtime: production (signed, what a release would carry) and development: DLSS and
+# Ray Reconstruction first.
 tmp=$(mktemp -d)
 unzip -q "$zip" 'bin/x64/*' 'license.txt' -d "$tmp"
 mkdir -p "$game/streamline" "$game/streamline-dev"
 for f in sl.interposer.dll sl.common.dll sl.dlss.dll sl.dlss_d.dll nvngx_dlss.dll nvngx_dlssd.dll nvngx_dlss.license.txt; do
 	cp "$tmp/bin/x64/$f" "$game/streamline/"
 	cp "$tmp/bin/x64/development/$f" "$game/streamline-dev/"
+done
+# Reflex (low latency, PC Latency markers) and frame generation, with Reflex's licence: copied
+# where the zip has them (frame generation runs only on an RTX 40 or 50; the game asks).
+for f in sl.reflex.dll sl.pcl.dll NvLowLatencyVk.dll sl.dlss_g.dll nvngx_dlssg.dll reflex.license.txt; do
+	for d in "" development/; do
+		out="$game/streamline"; [ -n "$d" ] && out="$game/streamline-dev"
+		if [ -f "$tmp/bin/x64/$d$f" ]; then
+			cp "$tmp/bin/x64/$d$f" "$out/"
+		elif [ -f "$tmp/bin/x64/$f" ]; then
+			cp "$tmp/bin/x64/$f" "$out/" # one copy for both (the licence, the Reflex driver shim)
+		else
+			echo "warning: $f is not in the zip's bin/x64/$d" >&2
+		fi
+	done
 done
 cp "$tmp/license.txt" "$game/streamline/streamline-license.txt"
 cp "$tmp/license.txt" "$game/streamline-dev/streamline-license.txt"

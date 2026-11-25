@@ -32,7 +32,7 @@ use ash::vk;
 use ash::vk::Handle;
 use weft_render::{UpscaleMode, UpscaleModel, UpscaleParams, UpscalerInfo};
 
-use crate::upscale::{Image, Inputs, Upscaler};
+use crate::upscale::{Image, Inputs, Mark, Upscaler};
 
 /// The SDK version these bindings follow (`sl_version.h`): 2.14.16.
 const SDK_VERSION: u64 = (2u64 << 48) | (14u64 << 32) | (16u64 << 16) | 0xfedc;
@@ -42,6 +42,9 @@ const PROJECT_ID: &CStr = c"f264d7e7-3c55-4a0e-90d7-35933f37130f";
 const ENGINE_VERSION: &CStr = c"26.11";
 
 const FEATURE_DLSS: u32 = 0;
+const FEATURE_REFLEX: u32 = 3;
+const FEATURE_PCL: u32 = 4;
+const FEATURE_DLSS_G: u32 = 1000;
 const FEATURE_DLSS_RR: u32 = 1001;
 
 const OK: u32 = 0;
@@ -79,6 +82,10 @@ const T_DLSSD_OPTIONS: StructType = StructType(0x0ad87504, 0x774e, 0x4bf3, [0x96
 const T_DLSSD_OPTIMAL: StructType = StructType(0xfbd0c637, 0xa28f, 0x41f2, [0xbc, 0x91, 0xb4, 0x21, 0xfa, 0xee, 0x8e, 0x1e]);
 const T_ADAPTER: StructType = StructType(0x0677315f, 0xa746, 0x4492, [0x9f, 0x42, 0xcb, 0x61, 0x42, 0xc9, 0xc3, 0xd4]);
 const T_FEATURE_VERSION: StructType = StructType(0x6d5b51f0, 0x076b, 0x486d, [0x99, 0x95, 0x5a, 0x56, 0x10, 0x43, 0xf5, 0xc1]);
+const T_REFLEX_OPTIONS: StructType = StructType(0xf03af81a, 0x6d0b, 0x4902, [0xa6, 0x51, 0xc4, 0x96, 0x5e, 0x21, 0x54, 0x34]);
+const T_REFLEX_REPORT: StructType = StructType(0x0d569b37, 0xa1c8, 0x4453, [0xbe, 0x4d, 0x40, 0xf4, 0xde, 0x57, 0x95, 0x2b]);
+const T_REFLEX_REPORT2: StructType = StructType(0x68bb0632, 0x5e1c, 0x402b, [0x89, 0x9d, 0xb4, 0x9f, 0x63, 0x3c, 0x56, 0xc2]);
+const T_REFLEX_STATE: StructType = StructType(0xf0bb5985, 0xdaf9, 0x4728, [0xb2, 0xfd, 0xae, 0x80, 0xa2, 0xbd, 0x79, 0x89]);
 
 /// `sl::Preferences` (version 1).
 #[repr(C)]
@@ -261,6 +268,60 @@ struct FeatureVersion {
     ngx: [u32; 3],
 }
 
+/// `sl::ReflexOptions` (version 1, `sl_reflex.h`).
+#[repr(C)]
+struct ReflexOptions {
+    base: Base,
+    /// `sl::ReflexMode`: 0 off, 1 low latency, 2 low latency with boost.
+    mode: u32,
+    frame_limit_us: u32,
+    use_markers_to_optimize: u8,
+    virtual_key: u16,
+    id_thread: u32,
+}
+
+/// `sl::ReflexReport` (version 1): one frame's times, in microseconds.
+#[repr(C)]
+struct ReflexReport {
+    base: Base,
+    frame_id: u64,
+    input_sample_time: u64,
+    sim_start_time: u64,
+    sim_end_time: u64,
+    render_submit_start_time: u64,
+    render_submit_end_time: u64,
+    present_start_time: u64,
+    present_end_time: u64,
+    driver_start_time: u64,
+    driver_end_time: u64,
+    os_render_queue_start_time: u64,
+    os_render_queue_end_time: u64,
+    gpu_render_start_time: u64,
+    gpu_render_end_time: u64,
+    gpu_active_render_time_us: u32,
+    gpu_frame_time_us: u32,
+}
+
+/// `sl::ReflexReport2` (version 1).
+#[repr(C)]
+struct ReflexReport2 {
+    base: Base,
+    camera_constructed_time: u64,
+    cross_adapter_copy_time_us: u32,
+}
+
+/// `sl::ReflexState` (version 2): what Reflex runs here and the last 64 frames' reports.
+#[repr(C)]
+struct ReflexState {
+    base: Base,
+    low_latency_available: u8,
+    latency_report_available: u8,
+    stats_window_message: u32,
+    frame_report: [ReflexReport; 64],
+    flash_indicator_driver_controlled: u8,
+    frame_report2: [ReflexReport2; 64],
+}
+
 // The sizes the C++ headers give on x86_64 (MSVC), checked where it is built.
 const _: () = {
     use std::mem::size_of;
@@ -275,6 +336,10 @@ const _: () = {
     assert!(size_of::<OptimalSettings>() == 64);
     assert!(size_of::<AdapterInfo>() == 56);
     assert!(size_of::<FeatureVersion>() == 56);
+    assert!(size_of::<ReflexOptions>() == 48);
+    assert!(size_of::<ReflexReport>() == 152);
+    assert!(size_of::<ReflexReport2>() == 48);
+    assert!(size_of::<ReflexState>() == 12848);
 };
 
 /// The models offered for Super Resolution and DLAA, and for Ray Reconstruction (see the top).
@@ -329,6 +394,11 @@ type FnDlssOptimal = unsafe extern "C" fn(*const DlssOptions, *mut OptimalSettin
 type FnDlssSetOptions = unsafe extern "C" fn(*const Viewport, *const DlssOptions) -> Result_;
 type FnDlssdOptimal = unsafe extern "C" fn(*const DlssdOptions, *mut OptimalSettings) -> Result_;
 type FnDlssdSetOptions = unsafe extern "C" fn(*const Viewport, *const DlssdOptions) -> Result_;
+type FnReflexSetOptions = unsafe extern "C" fn(*const ReflexOptions) -> Result_;
+type FnReflexSleep = unsafe extern "C" fn(*const c_void) -> Result_;
+type FnReflexGetState = unsafe extern "C" fn(*mut ReflexState) -> Result_;
+type FnPclSetMarker = unsafe extern "C" fn(u32, *const c_void) -> Result_;
+type FnSetFeatureLoaded = unsafe extern "C" fn(u32, bool) -> Result_;
 
 /// What `slInit` and the interposer gave, before the Vulkan device exists.
 pub(crate) struct Streamline {
@@ -343,6 +413,7 @@ pub(crate) struct Streamline {
     new_frame: FnNewFrameToken,
     feature_version: FnFeatureVersion,
     free_resources: FnFreeResources,
+    set_feature_loaded: FnSetFeatureLoaded,
     // Kept alive while Streamline may read them.
     _plugin_dir: Vec<WChar>,
     _plugin_dirs: [*const WChar; 1],
@@ -426,6 +497,7 @@ impl Streamline {
             new_frame: sym!(b"slGetNewFrameToken", FnNewFrameToken),
             feature_version: sym!(b"slGetFeatureVersion", FnFeatureVersion),
             free_resources: sym!(b"slFreeResources", FnFreeResources),
+            set_feature_loaded: sym!(b"slSetFeatureLoaded", FnSetFeatureLoaded),
             _lib: lib,
             interposer,
             _plugin_dir: wide(&dir),
@@ -439,6 +511,15 @@ impl Streamline {
         }
         if dir.join("sl.dlss_d.dll").is_file() {
             s._features.push(FEATURE_DLSS_RR);
+        }
+        // Reflex (`sl.reflex.dll`, low latency) and PC Latency (`sl.pcl.dll`, its markers and
+        // stats), and frame generation (`sl.dlss_g.dll`), as far as they are there.
+        if dir.join("sl.reflex.dll").is_file() && dir.join("sl.pcl.dll").is_file() {
+            s._features.push(FEATURE_REFLEX);
+            s._features.push(FEATURE_PCL);
+        }
+        if dir.join("sl.dlss_g.dll").is_file() {
+            s._features.push(FEATURE_DLSS_G);
         }
         s._plugin_dirs = [s._plugin_dir.as_ptr()];
         let verbose = std::env::var_os("WEFT_STREAMLINE_VERBOSE").is_some();
@@ -491,6 +572,7 @@ impl Streamline {
             r == OK && loaded.contains(&f)
         };
         let (dlss, rr) = (supported(FEATURE_DLSS), supported(FEATURE_DLSS_RR));
+        let (reflex, pcl, dlss_g) = (supported(FEATURE_REFLEX), supported(FEATURE_PCL), supported(FEATURE_DLSS_G));
         let get_function = self.get_function;
         let function = |f: u32, name: &CStr| -> *mut c_void {
             let mut p = null_mut();
@@ -509,6 +591,16 @@ impl Streamline {
             name: String::new(),
             modes: 0,
             rr: false,
+            reflex_options: None,
+            reflex_sleep: None,
+            reflex_state: None,
+            pcl_marker: None,
+            low_latency: u32::MAX,
+            token: null_mut(),
+            fresh: false,
+            latency: None,
+            frames: 0,
+            frame_gen_why: String::new(),
             sl: self,
         };
         unsafe {
@@ -535,6 +627,50 @@ impl Streamline {
             log::warn!("streamline: DLSS doesn't run here (Ray Reconstruction needs it too)");
             return None;
         }
+        unsafe {
+            // PC Latency's markers run on every GPU; Reflex's low latency where the GPU and driver
+            // have it. Its options are set once at the start, off (Streamline asks for that even
+            // when nothing turns it on), and again when the mode changes.
+            if pcl {
+                let m = function(FEATURE_PCL, c"slPCLSetMarker");
+                if !m.is_null() {
+                    up.pcl_marker = Some(std::mem::transmute::<*mut c_void, FnPclSetMarker>(m));
+                }
+            }
+            if reflex {
+                let (o, sl, st) = (
+                    function(FEATURE_REFLEX, c"slReflexSetOptions"),
+                    function(FEATURE_REFLEX, c"slReflexSleep"),
+                    function(FEATURE_REFLEX, c"slReflexGetState"),
+                );
+                if !o.is_null() && !sl.is_null() && !st.is_null() {
+                    up.reflex_options = Some(std::mem::transmute::<*mut c_void, FnReflexSetOptions>(o));
+                    up.reflex_sleep = Some(std::mem::transmute::<*mut c_void, FnReflexSleep>(sl));
+                    up.reflex_state = Some(std::mem::transmute::<*mut c_void, FnReflexGetState>(st));
+                    up.set_low_latency(0);
+                }
+            }
+        }
+        // Frame generation: what this GPU says, then unloaded. Its frames need a HUD-less copy of
+        // the picture and depth and motion tagged until the present, which the backend doesn't
+        // give yet; loaded, its plugin would sit on every present for nothing.
+        up.frame_gen_why = if !up.sl._features.contains(&FEATURE_DLSS_G) {
+            "no_plugin".into() // no sl.dlss_g.dll
+        } else if !dlss_g {
+            "gpu".into() // this GPU has none (an RTX 40 or 50 has)
+        } else {
+            "not_wired".into() // its present path isn't built yet
+        };
+        if up.sl._features.contains(&FEATURE_DLSS_G) {
+            unsafe { (up.sl.set_feature_loaded)(FEATURE_DLSS_G, false) };
+            up.sl._features.retain(|&f| f != FEATURE_DLSS_G);
+        }
+        log::info!(
+            "streamline: Reflex {}, PC Latency {}, frame generation: {}",
+            if up.reflex_options.is_some() { "ready" } else { "not here" },
+            if up.pcl_marker.is_some() { "ready" } else { "not here" },
+            up.frame_gen_why
+        );
         let version = |f: u32| {
             let mut v = FeatureVersion { base: Base::new(T_FEATURE_VERSION, 1), sl: [0; 3], ngx: [0; 3] };
             let r = unsafe { (up.sl.feature_version)(f, &mut v) };
@@ -559,7 +695,63 @@ struct Dlss {
     name: String,
     modes: u32,
     rr: bool,
+    reflex_options: Option<FnReflexSetOptions>,
+    reflex_sleep: Option<FnReflexSleep>,
+    reflex_state: Option<FnReflexGetState>,
+    pcl_marker: Option<FnPclSetMarker>,
+    /// The Reflex mode set last (`u32::MAX` none yet).
+    low_latency: u32,
+    /// This frame's token (`slGetNewFrameToken`), taken at the frame's start: the markers, the
+    /// constants and the evaluate all name the same frame.
+    token: *mut c_void,
+    /// Whether `token` is this frame's (taken at its start, until its present).
+    fresh: bool,
+    /// The PC latency measured lately (ms), read every 30 frames.
+    latency: Option<f32>,
+    frames: u64,
+    frame_gen_why: String,
 }
+
+impl Dlss {
+    /// A new frame token, kept for the frame.
+    fn new_token(&mut self) -> bool {
+        let mut token: *mut c_void = null_mut();
+        if unsafe { (self.sl.new_frame)(&mut token, null()) } != OK || token.is_null() {
+            return false;
+        }
+        self.token = token;
+        true
+    }
+
+    /// The mean PC latency over the reports Reflex has (from the frame's start to the GPU done).
+    fn read_latency(&mut self) {
+        let Some(get) = self.reflex_state else { return };
+        // Large (13 kB): on the heap, zeroed, each part with its own type and version.
+        let mut st: Box<ReflexState> = Box::new(unsafe { std::mem::zeroed() });
+        st.base = Base::new(T_REFLEX_STATE, 2);
+        for r in st.frame_report.iter_mut() {
+            r.base = Base::new(T_REFLEX_REPORT, 1);
+        }
+        for r in st.frame_report2.iter_mut() {
+            r.base = Base::new(T_REFLEX_REPORT2, 1);
+        }
+        if unsafe { get(&mut *st) } != OK || st.latency_report_available == 0 {
+            return;
+        }
+        let spans: Vec<f32> = st
+            .frame_report
+            .iter()
+            .filter(|r| r.sim_start_time > 0 && r.gpu_render_end_time > r.sim_start_time)
+            .map(|r| (r.gpu_render_end_time - r.sim_start_time) as f32 / 1000.0)
+            .collect();
+        if !spans.is_empty() {
+            self.latency = Some(spans.iter().sum::<f32>() / spans.len() as f32);
+        }
+    }
+}
+
+// The frame token is Streamline's own handle, used only from the render thread.
+unsafe impl Send for Dlss {}
 
 /// `sl::DLSSMode` for ours.
 fn dlss_mode(mode: UpscaleMode) -> u32 {
@@ -686,6 +878,8 @@ impl Upscaler for Dlss {
             reconstruct: self.rr,
             neural: false,
             frame_gen: 0,
+            frame_gen_why: self.frame_gen_why.clone(),
+            low_latency: self.reflex_options.is_some(),
             models: MODELS.to_vec(),
             rr_models: if self.rr { RR_MODELS.to_vec() } else { Vec::new() },
         }
@@ -716,11 +910,12 @@ impl Upscaler for Dlss {
             return false;
         }
         let vp = viewport();
-        let mut token: *mut c_void = null_mut();
-        if unsafe { (self.sl.new_frame)(&mut token, null()) } != OK || token.is_null() {
+        // The frame's token from its start (`mark`), or a new one where the game marks none.
+        if !self.fresh && !self.new_token() {
             log::warn!("streamline: no frame token");
             return false;
         }
+        let token = self.token;
         let sign = jitter_sign();
         let consts = Constants {
             base: Base::new(T_CONSTANTS, 2),
@@ -810,6 +1005,64 @@ impl Upscaler for Dlss {
             return false;
         }
         true
+    }
+
+    fn mark(&mut self, mark: Mark) {
+        if mark == Mark::SimulationStart {
+            // A frame starts: its token, then Reflex's sleep (where the driver holds the frame back
+            // so input is read as late as it can be), then the marker.
+            self.fresh = self.new_token();
+            if !self.fresh {
+                return;
+            }
+            if let Some(sleep) = self.reflex_sleep {
+                unsafe { sleep(self.token) };
+            }
+            self.frames += 1;
+            if self.frames.is_multiple_of(30) {
+                self.read_latency();
+            }
+        }
+        if !self.fresh {
+            return;
+        }
+        if mark == Mark::PresentEnd {
+            self.fresh = false;
+        }
+        let Some(set) = self.pcl_marker else { return };
+        // `sl::PCLMarker`.
+        let id = match mark {
+            Mark::SimulationStart => 0,
+            Mark::SimulationEnd => 1,
+            Mark::RenderSubmitStart => 2,
+            Mark::RenderSubmitEnd => 3,
+            Mark::PresentStart => 4,
+            Mark::PresentEnd => 5,
+        };
+        unsafe { set(id, self.token) };
+    }
+
+    fn set_low_latency(&mut self, mode: u32) {
+        let Some(set) = self.reflex_options else { return };
+        let mode = mode.min(2);
+        if mode == self.low_latency {
+            return;
+        }
+        let opts = ReflexOptions {
+            base: Base::new(T_REFLEX_OPTIONS, 1),
+            mode,
+            frame_limit_us: 0,
+            use_markers_to_optimize: 0,
+            virtual_key: 0,
+            id_thread: 0,
+        };
+        let r = unsafe { set(&opts) };
+        log::info!("streamline: Reflex {} ({r})", ["off", "on", "on with boost"][mode as usize]);
+        self.low_latency = mode;
+    }
+
+    fn latency_ms(&self) -> Option<f32> {
+        self.latency
     }
 }
 

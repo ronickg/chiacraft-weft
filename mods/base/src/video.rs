@@ -601,6 +601,10 @@ fn apply(p: usize) {
         // is one step back on the DLSS tab's Mode row. Elsewhere the upscaler setting as before.
         crate::dlss::AUTO.set(true);
     }
+    // Reflex's low latency on with DLSS, on every preset (Planner from Ronald, 11-25).
+    if GPU_DLSS_MODES.get() != 0 {
+        crate::dlss::REFLEX.set(1);
+    }
     fantasy_caps(p, true);
 }
 
