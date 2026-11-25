@@ -134,6 +134,56 @@ chat /animalprof feed 6
 wait 3
 chat /animalprof feed 6
 wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
 chat /animalprof where 64
 chat /tk mode spectator
 chat /tick freeze
@@ -167,6 +217,56 @@ chat /animalprof water 1
 chat /tk put me 0 animals:kibble 64
 key 1
 wait 2
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
 chat /animalprof feed 6
 wait 3
 chat /animalprof feed 6
@@ -383,6 +483,56 @@ chat /animalprof feed 6
 wait 3
 chat /animalprof feed 6
 wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
+chat /animalprof feed 6
+wait 3
 chat /animalprof where 64
 chat /tk mode spectator
 chat /tick freeze
@@ -443,6 +593,42 @@ chat /animal bite
 wait 0.4
 chat /animal bite
 wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
 chat /tp 594 70 546
 wait 1
 chat /animalprof feed 3
@@ -471,10 +657,54 @@ chat /animal bite
 wait 0.4
 chat /animal bite
 wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
 chat /tp 600 70 546
 wait 1
 chat /animalprof feed 3
 wait 0.5
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
+chat /animal bite
+wait 0.4
 chat /animal bite
 wait 0.4
 chat /animal bite
@@ -727,6 +957,7 @@ wait 1
 chat /tk spawn animals:protoceratops 798 70 542
 chat /tk spawn animals:protoceratops 800 70 542
 chat /tk spawn animals:protoceratops 802 70 542
+chat /tk spawn animals:protoceratops 798 70 544
 wait 2
 chat /animalprof food 1
 chat /animalprof water 1
@@ -770,6 +1001,7 @@ wait 1
 chat /tk spawn animals:psittacosaurus 998 70 542
 chat /tk spawn animals:psittacosaurus 1000 70 542
 chat /tk spawn animals:psittacosaurus 1002 70 542
+chat /tk spawn animals:psittacosaurus 998 70 544
 wait 2
 chat /animalprof food 1
 chat /animalprof water 1
@@ -813,6 +1045,7 @@ wait 1
 chat /tk spawn animals:citipati 1198 70 542
 chat /tk spawn animals:citipati 1200 70 542
 chat /tk spawn animals:citipati 1202 70 542
+chat /tk spawn animals:citipati 1198 70 544
 wait 2
 chat /animalprof food 1
 chat /animalprof water 1
@@ -856,6 +1089,7 @@ wait 1
 chat /tk spawn animals:raptor 1398 70 542
 chat /tk spawn animals:raptor 1400 70 542
 chat /tk spawn animals:raptor 1402 70 542
+chat /tk spawn animals:raptor 1398 70 544
 wait 2
 chat /animalprof food 1
 chat /animalprof water 1
@@ -899,6 +1133,7 @@ wait 1
 chat /tk spawn animals:house_sparrow 1598 70 542
 chat /tk spawn animals:house_sparrow 1600 70 542
 chat /tk spawn animals:house_sparrow 1602 70 542
+chat /tk spawn animals:house_sparrow 1598 70 544
 wait 2
 chat /animalprof food 1
 chat /animalprof water 1

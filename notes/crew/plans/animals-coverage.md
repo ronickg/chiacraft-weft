@@ -293,8 +293,6 @@ hatchlings kept 1 to 5 blocks from their mothers over 3 rows (one citipati 10 on
 "doing love" in the rows: a young one's love goal is following its mother (the rows now say "follow").
 Shots 4 and 7 came out near black at midday (not looked into; the other pads are lit).
 
-Run 3 (to come): each passive kind in a glass pen beside the player (wolf, capybara, cat with chihuahua on
-three pads), bites 16 for the utahraptor, 24 for the jaguar, 70 for the wyvern.
 
 | Species | tamed | lays | hatches, keeps by mother | shot |
 |---|---|---|---|---|
@@ -313,6 +311,32 @@ three pads), bites 16 for the utahraptor, 24 for the jaguar, 70 for the wyvern.
 | house_sparrow | n/a | pass (2 eggs) | pass (2 born, 1-5) | r2 8 |
 
 Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_taming_m-164051/r2_taming_grid.jpg`.
+
+Run 3 (8fe0410c3, `r7_taming_m-173815`, 792 s). Penned beside the player, the passive kinds ask and are fed:
+capybara tamed in 3 feeds, chihuahua in 5; the wolf reached 70 % in 4 feeds and the cat 44 % (asks 17 to
+50 s apart: the window too short). Knocked out and fed: osmolskae, jaguar and wyvern (34 bites) tamed; the
+raptor and utahraptor stopped at 88 %, one to three bites short (their levels vary the bites needed). Laying:
+protoceratops, citipati, raptor and sparrow nested and hatched (young 1 block from their mothers); the one
+psittacosaurus female didn't nest, with no line to say why (now logged: "doesn't nest: <why>"). Run 4: 210 s
+of asking a pad, 30 bites for the raptors, four of each laying kind.
+
+| Species | tamed | lays | hatches, keeps by mother | shot |
+|---|---|---|---|---|
+| grey_wolf | not tested (70 % in the time) | n/a | n/a | r3 1 |
+| capybara | pass (3 feeds) | n/a | n/a | r3 2 |
+| cat | not tested (44 % in the time; run 2: pass) | n/a | n/a | r3 3 |
+| chihuahua | pass (5 feeds) | n/a | n/a | r3 3 |
+| raptor | not tested (88 %, bites short; run 2: pass) | pass | pass (1 born) | r3 4, 8 |
+| osmolskae | pass | n/a | n/a | r3 4 |
+| utahraptor | not tested (88 %, bites short; run 2: pass) | n/a | n/a | r3 4 |
+| jaguar | pass (8 bites) | n/a | n/a | r3 4 |
+| wyvern | pass (34 bites, 26 bonus levels) | n/a | n/a | r3 4 |
+| protoceratops | n/a | pass (6) | pass (6, 1 block) | r3 5 |
+| psittacosaurus | n/a | not tested (no nest; run 2: pass) | not tested | r3 6 |
+| citipati | n/a | pass (4) | pass (4) | r3 7 |
+| house_sparrow | n/a | pass (2) | pass (2, 1 block) | r3 9 |
+
+Grid r3: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r7_taming_m-173815/r7_taming_grid.jpg`.
 
 ## Sounds
 

@@ -283,11 +283,11 @@ for n, (x, kinds) in enumerate([(0, ["grey_wolf"]), (200, ["capybara"]), (400, [
         s += pen(x + dx, Z) + [f"chat /tk spawn animals:{k} {x+dx} 70 {Z}"]
     s += ["wait 2", "chat /tk mode creative", f"chat /tp {x} 70 {Z}", "look 0 -20", "chat /animalprof food 1",
           "chat /animalprof water 1", "chat /tk put me 0 animals:kibble 64", "key 1", "wait 2"]
-    s += ["chat /animalprof feed 6", "wait 3"] * 45
+    s += ["chat /animalprof feed 6", "wait 3"] * 70
     s += ["chat /animalprof where 64", "chat /tk mode spectator"] + shot(x, f"cov_taming_{n+1}_{kinds[0]}", z_back=8, pitch=-50)
 x = 600
 # Bites enough for each kind (round 2: the jaguar reached 73 % in 12, the wyvern 69 % in 35).
-KO = [("raptor", -12, 12), ("velociraptor_osmolskae", -6, 12), ("utahraptor", 0, 16), ("jaguar", 6, 24), ("wyvern", 0, -8, 70)]
+KO = [("raptor", -12, 30), ("velociraptor_osmolskae", -6, 20), ("utahraptor", 0, 30), ("jaguar", 6, 24), ("wyvern", 0, -8, 70)]
 s += pad(x) + spawns(x, [(k[0], 1, k[1], 0 if len(k) == 3 else k[2]) for k in KO])
 s += ["chat /animalprof ko 1", "wait 2", "chat /tk mode creative", "chat /tk put me 0 animals:kibble 64", "key 1"]
 for k in KO:
@@ -297,7 +297,7 @@ for k in KO:
 s += ["chat /animalprof where 64", "chat /tk mode spectator"] + shot(x, "cov_taming_4_knockout")
 for n, kind in enumerate(["protoceratops", "psittacosaurus", "citipati", "raptor", "house_sparrow"]):
     x = 800 + n * 200
-    s += pad(x) + spawns(x, [(kind, 3, -2, -2)]) + ["chat /animalprof food 1", "chat /animalprof water 1"]
+    s += pad(x) + spawns(x, [(kind, 4, -2, -2)]) + ["chat /animalprof food 1", "chat /animalprof water 1"]
     s += [f"chat /tp {x} 72 {Z}", "chat /animal nest", "wait 2"] + watch(x, 1)
     s += [f"chat /tp {x} 72 {Z}", "chat /animal hurry", "wait 4"] + watch(x, 3, every=8)
     s += shot(x, f"cov_taming_{n+5}_{kind}", z_back=8, pitch=-50)
