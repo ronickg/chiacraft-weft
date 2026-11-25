@@ -5,7 +5,7 @@
 # reply (the last sounds started). Expect in them: animals:reindeer.ambient, capybara, raptor,
 # protoceratops, borkon_kid, drenkaun_calf, jaguar ambient calls during the herd waits;
 # animals:drenkaun.summon after the offering, drenkaun.attack while it fights, drenkaun.hurt on
-# the hits, drenkaun.death on the kill; animals:borkon.summon at the end. A tester with sound on
+# the hits, drenkaun.death on the kill; animals:borkon.summon and borkon.death at the end. A tester with sound on
 # listens to the herd and the fight too (run with sound, not muted).
 loaded
 idle
@@ -101,8 +101,12 @@ chat /sounds recent
 chat /drenkaun kill
 wait 2
 chat /sounds recent
-# Borkon's summon
+# Borkon's summon (the herd's hunters killed first: a raptor left alive killed the player here)
+respawn
+wait 1
 chat /tk mode creative
+chat /kill @e[type=animals:raptor]
+chat /kill @e[type=animals:jaguar]
 chat /tk fill -30 200 -30 30 212 30 core:air
 chat /tk fill 0 200 -20 0 200 -20 animals:borkon_altar
 chat /tp 0.5 200 -17.5
@@ -119,7 +123,8 @@ chat /sounds recent
 shot ai_voices_03_borkon.png
 wait 6
 chat /sounds recent
-chat /borkon kill
+chat /boss state
+chat /boss kill
 wait 2
 chat /sounds recent
 quit
