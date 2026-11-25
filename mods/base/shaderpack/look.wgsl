@@ -2479,8 +2479,17 @@ fn fog_hour_weights() -> vec4<f32> {
 // Where the rain's fog lies: not above the snow line (`scene.canopy.w`, blocks above the sea; the
 // weather's own, where rain turns to snow, over the same 12-block band), as Bliss's lies only where
 // it rains (its noPuddleAreas: none in snowy biomes).
+// Nor while it snows where the player is (`scene.ground.y`, the air's own flag, eased).
 fn rain_fog_at(y: f32) -> f32 {
-    return 1.0 - smoothstep(-6.0, 6.0, y - (SEA_LEVEL + scene.canopy.w));
+    return (1.0 - smoothstep(-6.0, 6.0, y - (SEA_LEVEL + scene.canopy.w))) * (1.0 - clamp(scene.ground.y, 0.0, 1.0));
+}
+// The sky light where the eye is (`scene.frame_look.y`, eased by the engine), as Bliss weights the
+// fog's and the air's sky light: its cube x 0.99 + 0.01.
+fn eye_sky_k() -> f32 {
+    if scene.frame.x < 0.5 {
+        return 1.0;
+    }
+    return pow(clamp(scene.frame_look.y, 0.0, 1.0), 3.0) * 0.99 + 0.01;
 }
 // Our value noise with the spread of Bliss's fog noise (a linear map, matching its percentiles
 // within 0.01).
@@ -2529,8 +2538,11 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let sun_phase = bank_phase(mu);
     let ray_phase = (0.1 * mu + 0.28) / 3.14159;
     let sun = p.sun * light_strength();
-    // The sky's light on the fog, brighter looking up (x6 straight up, x1.4 level).
-    let sky_fog = p.ambient * (1.0 + 5.0 * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), 4.0));
+    // The sky's light on the fog, brighter looking up (x6 straight up, x1.4 level), and on fog and
+    // air alike dimmed by the sky light where the eye is, cubed (Bliss's: in a cave or under a
+    // canopy the air's light goes with the eye's own).
+    let eye_k = eye_sky_k();
+    let sky_fog = p.ambient * (1.0 + 5.0 * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), 4.0)) * eye_k;
     // The sky's pixels stand at the march's far end (`view_rel`); they are marched to the render
     // distance, as Bliss marches its sky to the far distance.
     let is_sky = abs(dist - MIST_MARCH_FAR) < 0.5;
@@ -2566,7 +2578,7 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let m_k = ATM_MIE * BLISS_AIR * (exp2(-up / 1200.0 * 7.0) + 300.0 * d * 8.0) * below;
         let ext = r_k + vec3(m_k);
         let a_kept = exp(-ext * step);
-        let light = sun * lit * sun_phase * (ray_phase * r_k + vec3(sun_phase * m_k)) + p.ambient * ext;
+        let light = sun * lit * sun_phase * (ray_phase * r_k + vec3(sun_phase * m_k)) + p.ambient * ext * eye_k;
         air += (light - light * a_kept) / max(ext, vec3(1e-9)) * air_through * through;
         air_through *= a_kept;
         if through < 1e-5 {

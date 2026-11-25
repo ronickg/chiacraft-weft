@@ -777,7 +777,9 @@ gpu_struct! {
         pub sky_landing: [f32; 4],
         /// What the pack's look works out once a frame (`client::frame_look`, a pack whose sky
         /// has `fs_frame_look`; chiacraft): x the bindless index + 1 of its row of texels (0:
-        /// none this frame, each shader works them out itself), yzw unused.
+        /// none this frame, each shader works them out itself); y the sky light where the eye is,
+        /// 0..1, eased over a couple of seconds (for packs' light from the open sky in caves, as
+        /// Iris's `eyeBrightnessSmooth`); zw unused.
         pub frame_look: [f32; 4],
         /// The last lightning flash where the player is (a weather with `lightning`, chiacraft):
         /// x seconds since it began (1e4 when none yet; real time, not the shaders' clock, which
