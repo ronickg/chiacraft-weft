@@ -192,7 +192,7 @@ fn pt_cached(world: vec3<f32>, n: vec3<f32>, dist: f32, u: vec2<f32>) -> vec4<f3
 fn pt_lit(b: RtHit, l: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
     var s = 0.0;
     if dot(b.n, l) > 0.0 && light_strength() > 0.0 {
-        s = dot(rt_sun(b.rel, b.n, l, false), vec3(1.0 / 3.0));
+        s = dot(rt_sun(b.rel, b.n, l, false), vec3(1.0 / 3.0)) * models_shadow(b.rel, b.n) * cloud_shadow(b.rel);
     }
     let c = pt_cached(b.world, b.n, length(b.rel), u);
     if c.a > 0.5 {
@@ -310,6 +310,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     var sun = 0.0;
     if dot(ng, l) > 0.0 && light_strength() > 0.0 {
         sun = dot(rt_sun_soft(h.rel + lift, ng, l, false, PT_SUN_CONE, px, false), vec3(1.0 / 3.0));
+        // As the world's traced sun (`world.wgsl` `sun_shadow_near`): the models' shadows (mobs
+        // and players are not in the traced scene) and the clouds'. Without them a rainy day's
+        // ground stayed sunlit where the world's lay under its clouds (w33).
+        sun *= models_shadow(h.rel, n) * cloud_shadow(h.rel);
     }
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
     // lightmap gives it (already lowered under cover) and as the open sky would give it.
@@ -407,6 +411,16 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     let edge = smoothstep(PT_REACH * 0.75, PT_REACH, dist);
     diffuse = mix(diffuse, lit, edge);
     specular *= 1.0 - edge;
+    // Rain on the ground as the world's pass has it (`rain_on_ground`: wet, darker, the sky's sheen,
+    // puddles): traced, the ground stayed dry and bright in the rain (w27). It is affine in the
+    // colour: its factor on both lights, what it adds into the specular.
+    if ground_wet() > 0.0 || scene.canopy.z > 0.0 {
+        let leafy = h.quad || h.tint == 2u; // (2: foliage, `world.wgsl` TINT_FOLIAGE)
+        let added = rain_on_ground(vec3(0.0), n, h.rel, h.world, h.light.x, leafy);
+        let k = rain_on_ground(vec3(1.0), n, h.rel, h.world, h.light.x, leafy) - added;
+        diffuse *= k;
+        specular = specular * k + added / max(s_alb, vec3(1e-3));
+    }
     if pt.debug != 0u && pt.debug < 7u {
         var out = vec3(0.0);
         switch pt.debug {
@@ -422,27 +436,35 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
         return;
     }
-    // The air between the eye and the surface, as an affine map of the colour.
-    var air = vec3(0.0);
-    var through = vec3(1.0);
-    if pt.debug != 13u {
-        air = haze_lit(vec3(0.0), h.rel, h.light.x);
-        through = haze_lit(vec3(1.0), h.rel, h.light.x) - air;
+    // The picture's own (mode 0): the surface's light through the air as the world's pass puts it
+    // (`haze_lit` on the colour itself) and finished as it finishes it (`display`: the night's
+    // blue, or the LDR tone curve). As an affine map from white (`through`) the air's greying in
+    // the rain, which mixes each colour toward its own grey, was lost: the traced ground stayed
+    // warm where the world's went grey (w29). One call, where the map took two.
+    // Under a denoiser (mode 1) the air as that map: its light alone (`under`, which
+    // `fs_pt_finish` adds the denoised light to and finishes) and what it lets through.
+    NIGHT_SKY_SHARE = share;
+    var dif = diffuse;
+    var spe = specular;
+    var under: vec3<f32>;
+    if pt.mode == 1u {
+        let air = haze_lit(vec3(0.0), h.rel, h.light.x);
+        let through = haze_lit(vec3(1.0), h.rel, h.light.x) - air;
+        dif *= through;
+        spe *= through;
+        under = air;
+    } else {
+        let surface = diffuse * albedo + specular * s_alb;
+        // (Debug 13, timing only: without the air; a branch, as a `select` works out both.)
+        if pt.debug == 13u {
+            under = display(surface);
+        } else {
+            under = display(haze_lit(surface, h.rel, h.light.x));
+        }
     }
-    let dif = through * diffuse;
-    let spe = through * specular;
+    // The light alone for the denoisers (with the air's share through it under one, mode 1).
     pt_out[at] = vec4(dif, diffuse_t);
     pt_out[at + 1u] = vec4(spe, specular_t);
-    // The picture's own (mode 0), or what the denoiser adds onto (1).
-    // The picture as the world's pass finishes it (`display`: the night's blue, or the LDR tone
-    // curve); under a denoiser (mode 1) the air's light alone, which `fs_pt_finish` adds the
-    // denoised light to and finishes.
-    NIGHT_SKY_SHARE = share;
-    // (Branched, not `select`: that worked out `display` under the denoiser too, to drop it.)
-    var under = air;
-    if pt.mode != 1u {
-        under = display(air + dif * albedo + spe * s_alb);
-    }
     // The share rides in the kind (1 to 1.25: traced) for `fs_pt_finish`.
     pt_out[at + 2u] = vec4(under, 1.0 + 0.25 * share);
 }

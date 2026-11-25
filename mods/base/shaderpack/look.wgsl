@@ -38,6 +38,89 @@ fn ground_wet() -> f32 {
     return clamp(scene.canopy.y, 0.0, 1.0);
 }
 
+// Rain on the ground seen at `rel` (camera relative; `pos` the world's), its colour `c`, its normal
+// `n`, its sky light `sky` (0..1): wet and darker out under the sky, puddles on flat open ground.
+// `leafy`: leaves and plants, wet less. The world's pass and the path tracer both (`pathtrace.wgsl`:
+// traced, the ground stayed dry and bright in the rain, w27).
+fn rain_on_ground(c_in: vec3<f32>, n: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>, sky: f32, leafy: bool) -> vec3<f32> {
+    var c = c_in;
+    // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
+    // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
+    // after it stopped, Tester 2's after-rain shots, 11-05). Leaves and plants wet too, less: a
+    // little darker, a faint sheen.
+    let open_top = smoothstep(0.85, 1.0, sky);
+    let wet = ground_wet() * open_top * select(smoothstep(0.3, 0.9, n.y), 0.45, leafy);
+    if wet > 0.0 {
+        let v = -normalize(rel);
+        // (Darker and glossier than in the rain alone: after it, in the sun, 0.7 and a 0.12 sheen
+        // read only 2-4 % darker than dry ground, PC shw_wet.)
+        let sheen = (0.04 + pow(1.0 - max(dot(n, v), 0.0), 4.0) * 0.3) * select(1.0, 0.35, leafy);
+        c = c * mix(1.0, select(0.58, 0.8, leafy), wet) + sky_color(reflect(-v, n)) * sheen * wet;
+    }
+    // Puddles on flat open ground (the Recrafted study, item 4): they grow over minutes of rain
+    // (`scene.canopy.z`, the engine's) and dry slower than the ground after: a shower leaves a few
+    // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
+    // mirrored by Fresnel, and rings where the rain still falls on it.
+    let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
+    // (None in the calm-and-dry pipelines, `DRY`.)
+    if !DRY && puddles > 0.01 && !leafy && n.y > 0.95 {
+        // In cells three blocks across, some hold a puddle (one hash each against a share that grows
+        // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
+        // that widens as it fills, edged in the blocks' own pixels.
+        // (A threshold on two octaves of value noise left none: in the shader the noise stayed
+        // near its middle, PC debug runs shpdd-shpdd3; with `hash3` picking the cells, one or two
+        // in the whole field where a fifth were due, shpd6. `puddle_hash` is a sine hash.)
+        let q = floor(pos.xz * 16.0) / 16.0;
+        let cell = vec2<i32>(floor(q / 3.0));
+        let pick = puddle_hash(cell, 1.0);
+        let middle = (vec2<f32>(cell) + 0.3 + 0.4 * vec2(puddle_hash(cell, 2.0), puddle_hash(cell, 3.0))) * 3.0;
+        let reach = mix(0.6, 1.5, puddles) * mix(0.7, 1.0, puddle_hash(cell, 4.0));
+        let wobble = (noise3(vec3(q * 0.9, 5.3)) - 0.5) * 0.5;
+        let pool = select(0.0, 1.0, pick < mix(0.12, 0.6, puddles)) * smoothstep(reach, reach - 0.12, length(q - middle) + wobble);
+        if pool > 0.0 {
+            let v = -normalize(rel);
+            let slope = rain_rings(pos.xz) * rain_amount();
+            let pn = normalize(vec3(-slope.x, 1.0, -slope.y));
+            let cos_v = max(dot(pn, v), 0.0);
+            let fresnel = 0.02 + 0.98 * pow(1.0 - cos_v, 5.0);
+            // A still mirror over darker ground: at Fresnel's few percent from eye height the film
+            // read as the wet ground round it (PC shpd4: puddles over a quarter of the field and
+            // none seen); a puddle shows by the sky in it.
+            let film = c * 0.3 + sky_color(reflect(-v, pn)) * mix(0.3, 1.0, fresnel);
+            c = mix(c, film, pool);
+        }
+    }
+    return c;
+}
+
+// 0..1 for puddle cell `c` and key `k`: a sine hash (the pack's `hash3` picked far too few cells,
+// PC shpd6).
+fn puddle_hash(c: vec2<i32>, k: f32) -> f32 {
+    return fract(sin(dot(vec2<f32>(c), vec2(12.9898, 78.233)) + k * 37.719) * 43758.5453);
+}
+
+// Rain on water: each drop's ring spreads and fades in its own cell, at its own time. The slope
+// it gives the surface, on the texture's pixel grid.
+fn rain_rings(p: vec2<f32>) -> vec2<f32> {
+    let q = floor(p * 16.0) / 16.0 / 0.8;
+    let base = floor(q);
+    var slope = vec2(0.0);
+    for (var j = -1; j <= 1; j++) {
+        for (var i = -1; i <= 1; i++) {
+            let cell = vec2<i32>(base) + vec2(i, j);
+            let h = hash3(vec3(cell.x, 7, cell.y));
+            let k = hash3(vec3(cell.x, 13, cell.y));
+            let t = fract(scene.params.w * 0.9 + h * 7.31);
+            let v = q - (vec2<f32>(cell) + vec2(0.2 + 0.6 * h, 0.2 + 0.6 * k));
+            let d = length(v);
+            let x = d - t * 1.1;
+            let wave = sin(x * 26.0) * exp(-x * x * 70.0) * (1.0 - t) * (1.0 - t);
+            slope += v / max(d, 1e-3) * wave;
+        }
+    }
+    return slope * 0.3;
+}
+
 fn luma(c: vec3<f32>) -> f32 {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
