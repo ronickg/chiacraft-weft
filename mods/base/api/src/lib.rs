@@ -501,7 +501,13 @@ value! {
     pub struct Nutrition { pub units: u16, pub protein: u16, pub energy: u16, pub fat: u16, pub greens: u16, pub water: u16 }
 }
 pub static NUTRITION: Component<Nutrition> = Component::named("base:nutrition");
-/// A food stack's day of making + 1 (0: not stamped yet), the second it came hot off the fire
+value! {
+    /// Game days a food keeps (fresh and stale) in a cool larder and on snow or ice
+    /// (`vitals::rot`): shown in its tooltip, so it says where it keeps best.
+    pub struct Keeps { pub larder: u16, pub cold: u16 }
+}
+pub static KEEPS: Component<Keeps> = Component::named("base:keeps");
+/// A food stack's tick of making + 1 (0: not stamped yet; moved on by where it sat, `vitals::rot`), the second it came hot off the fire
 /// (gone once it cools, `vitals::food::HOT_FOR`), and how fresh it is now (`freshness`): stamped
 /// in a player's inventory as it ages, so stacks of a day stack and the tooltip can say it.
 pub static MADE: Component<u32> = Component::named("base:made");
@@ -539,8 +545,9 @@ pub fn food_age(stack: &ItemStack, now: u64) -> (f32, bool) {
     if made == 0 {
         return (0.0, false);
     }
-    let days = (now / vitals::calendar::DAY_TICKS).saturating_sub(made as u64 - 1);
-    (days as f32 * vitals::DAY_SECS, false)
+    // The tick of making + 1, moved on by where the food sat (`vitals::rot`, base's `survival/rot.rs`).
+    let ticks = (now + 1).saturating_sub(made as u64);
+    (ticks as f32 / vitals::TICKS as f32, false)
 }
 
 /// Eating for `.on_use`: the food goes into the stomach (`vitals::food::FOODS` knows it by the
