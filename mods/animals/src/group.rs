@@ -17,6 +17,7 @@ use weft_sdk::*;
 
 use animals_core::groups::{self, CATCH_UP, FOLLOW_EVERY, FOLLOW_FROM, GROUP};
 
+use crate::dist2;
 use crate::senses::SENSES;
 
 /// Ticks a wander may walk without getting anywhere before it is stopped, and the blocks a tick
@@ -24,13 +25,18 @@ use crate::senses::SENSES;
 pub const STUCK_TICKS: u32 = 60;
 const STILL: f32 = 0.02;
 
+/// When a stray last howled for its pack (`regroup`; not saved).
+static RALLIED: Component<u64> = Component::named("animal_rallied");
+
 /// Ticks its wander has walked without moving (not saved).
 static STUCK: Component<u32> = Component::named("animal_wander_stuck");
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&STUCK, 0u32, 0);
+    r.entity_component(&RALLIED, 0u64, 0);
     for s in &crate::species::SPECIES {
         r.edit(s.kind).attach(&STUCK);
+        r.edit(s.kind).attach(&RALLIED);
     }
 }
 
@@ -45,6 +51,7 @@ pub fn or_follow(speed: f32, wander: impl Goal) -> impl Goal {
         // (`migrate`); one far from the water it knows turns back toward it (`drink::home`); else
         // it wanders.
         if let Some(acted) = follow(w, id, st, speed)
+            .or_else(|| regroup(w, id, st, speed))
             .or_else(|| crate::migrate::lead(w, id, st, speed))
             .or_else(|| crate::drink::home(w, id, st, speed))
         {
@@ -143,5 +150,69 @@ pub fn follow(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> 
         weft_sdk::info!("animal {id} keeps up with its leader {} ({:.1} blocks off its place)", s.leader, d2.sqrt());
     }
     w.navigate(id, to, if far { speed * CATCH_UP } else { speed });
+    Some(true)
+}
+
+/// Where a wild pack member stranded from its kin for `groups::STRAY_SECS` heads (a leg of
+/// `groups::REGROUP_LEG` toward it): it howls now and then (`groups::RALLY_HOWL_EVERY_SECS`) and
+/// the nearest pack of its kind within `groups::HOWL_HEARD` answers, or, with none answering,
+/// where it last was with them. None: not stranded, or nowhere to go.
+pub fn regroup_leg(w: &World, id: u64, st: &EntityState) -> Option<[f64; 3]> {
+    let s = w.component(id, &SENSES)?;
+    let now = w.game_time();
+    if s.alone_since == 0 || (now.saturating_sub(s.alone_since) as f32) < groups::STRAY_SECS * 20.0 || crate::animal::tamed(w, id) {
+        return None;
+    }
+    let mut to = (s.pack_at != [0.0; 3]).then(|| s.pack_at.map(f64::from));
+    let last = w.component(id, &RALLIED).unwrap_or(0);
+    if last == 0 || now >= last + (groups::RALLY_HOWL_EVERY_SECS * 20.0) as u64 {
+        w.component_mut(id, &RALLIED).map(|r| *r = now);
+        crate::voices::howl(w, id, st);
+        // The nearest of its kind with kin about it answers (a pack), else any of its kind.
+        let answer = w
+            .entities_near(st.pos, groups::HOWL_HEARD, None)
+            .into_iter()
+            .filter(|&o| o != id && !crate::animal::tamed(w, o))
+            .filter_map(|o| {
+                w.entity(o)
+                    .filter(|e| e.kind == st.kind && e.health > 0.0)
+                    .map(|e| (o, e.pos))
+            })
+            .map(|(o, p)| {
+                let pack = w.component(o, &SENSES).is_some_and(|k| k.kin >= GROUP);
+                (!pack, dist2(p, st.pos), o, p)
+            })
+            .min_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        match answer {
+            Some((_, d2, o, p)) => {
+                weft_sdk::info!("animal {id} howls for its pack: {o} answers {:.0} blocks off", d2.sqrt());
+                if let Some(e) = w.entity(o) {
+                    crate::voices::howl(w, o, &e);
+                }
+                if let Some(k) = w.component_mut(id, &SENSES) {
+                    k.pack_at = [p.x as f32, p.y as f32, p.z as f32];
+                }
+                to = Some([p.x, p.y, p.z]);
+            }
+            None => weft_sdk::info!("animal {id} howls for its pack: none answers"),
+        }
+    }
+    let t = to?;
+    let (dx, dz) = (t[0] - st.pos.x, t[2] - st.pos.z);
+    let d = dx.hypot(dz);
+    if d < crate::senses::KIN * 0.5 {
+        return None;
+    }
+    let k = (groups::REGROUP_LEG / d).min(1.0);
+    Some([st.pos.x + dx * k, t[1], st.pos.z + dz * k])
+}
+
+/// `regroup_leg` walked at `speed` while it wanders: Some(true) while it goes.
+fn regroup(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {
+    if w.navigating(id) && w.component(id, &SENSES).is_some_and(|s| s.alone_since != 0) {
+        return Some(true);
+    }
+    let to = regroup_leg(w, id, st)?;
+    w.navigate(id, to, speed * CATCH_UP);
     Some(true)
 }

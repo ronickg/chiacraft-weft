@@ -235,3 +235,17 @@ mod tests {
         }
     }
 }
+
+/// A pack member stranded from its kin (none within `senses::KIN` at its looks) this many seconds
+/// calls them: it howls, at most once in `RALLY_HOWL_EVERY_SECS`, and the nearest pack of its
+/// kind in earshot answers; it then heads for them in legs of `REGROUP_LEG` blocks, or for where
+/// it last was with them if none answers. Wolves howl to reassemble after a chase or a split, and
+/// separated members answer and come (Harrington and Mech 1979, Joslin 1967); a howl carries some
+/// 6-11 km in forest and open country (Harrington and Mech 1979), scaled here, as every sense is,
+/// to the game's distances: well past view, within loaded ground.
+pub const STRAY_SECS: f32 = 20.0;
+pub const RALLY_HOWL_EVERY_SECS: f32 = 60.0;
+pub const HOWL_HEARD: f64 = 192.0;
+pub const REGROUP_LEG: f64 = 24.0;
+// A stray calls well before its rally howl repeats, and a howl reaches past the pack's own reach.
+const _: () = assert!(STRAY_SECS < RALLY_HOWL_EVERY_SECS && HOWL_HEARD > 4.0 * 16.0);

@@ -80,6 +80,10 @@ value! {
         /// (`hunt::rally`); a full one lying by counted, a pack of 3 took on what 2 hunted
         /// (ai1124_wolvesHollow1).
         pub pack: u16,
+        /// A pack's member: where it last was with its kin (0s: never), and since when it has had
+        /// none within `KIN` (0: it has; `group::regroup`).
+        pub pack_at: [f32; 3],
+        pub alone_since: u64,
         /// Its herd's or pack's leader among those kin: the lowest id, itself if it is lowest
         /// (`animals_core::groups`, `group.rs`).
         pub leader: u64,
@@ -474,6 +478,11 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         if n.dim != dim || n.by == id || now >= n.at + perception::NOISE_TICKS {
             continue;
         }
+        // A fight its own kind makes (its pack's kill, two deer sparring) is nothing to run from:
+        // in the tick after their kill a pack ran from its own (wolvesPack6).
+        if !n.player && n.by != 0 && w.entity(n.by).is_some_and(|e| e.kind == st.kind) {
+            continue;
+        }
         let d = dist2(n.pos.map(f64::from), p).sqrt() as f32;
         let g = perception::gain(d, n.heard);
         if g <= 0.0 {
@@ -512,6 +521,14 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     }
     out.kin = kin;
     out.pack = pack;
+    if mine.pack_prey().is_some() && wild {
+        if kin >= animals_core::groups::GROUP {
+            out.pack_at = mid.map(|v| (v / kin as f64) as f32);
+            out.alone_since = 0;
+        } else if out.alone_since == 0 {
+            out.alone_since = w.game_time().max(1);
+        }
+    }
     out.leader = leader;
     out.kin_mid = mid.map(|v| (v / kin as f64) as f32);
     // One adult of a herd at a time stands watch, the watch going round (by id and time).
