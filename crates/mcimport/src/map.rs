@@ -58,6 +58,31 @@ fn names(list: &[String]) -> Vec<String> {
     list.to_vec()
 }
 
+/// Test only (`--import-mc-full-shapes 1`): the full block a stair, slab, wall or fence is made of
+/// (`stone_brick_stairs` -> `stone_bricks`, `oak_fence` -> `oak_planks`), for importing builds
+/// whose outlines are made of shapes we don't have. Slabs come out a block thick. `None` for
+/// anything else (fence gates included).
+pub fn full_shape(mc: &str) -> Option<String> {
+    let n = State::parse(mc).name;
+    let m = ["_stairs", "_slab", "_wall", "_fence"].iter().find_map(|sfx| n.strip_suffix(sfx))?;
+    let m = m.strip_prefix("waxed_").unwrap_or(m);
+    let woods = [
+        "oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "pale_oak", "mangrove", "cherry", "bamboo", "crimson",
+        "warped",
+    ];
+    Some(if woods.contains(&m) {
+        format!("{m}_planks")
+    } else if m.ends_with("_brick") || m.ends_with("_tile") {
+        format!("{m}s")
+    } else if m == "nether_brick" {
+        "nether_bricks".into()
+    } else if m == "petrified_oak" {
+        "oak_planks".into()
+    } else {
+        m.to_string()
+    })
+}
+
 /// Candidates for a Minecraft block state (`minecraft:oak_log[axis=y]`), best first. The last is
 /// always one we have (stone for solid unknowns, air for small ones), and `exact` says whether
 /// the first is meant as the same block rather than a stand-in.
@@ -363,5 +388,16 @@ mod tests {
         assert_eq!(block("minecraft:oak_fence[east=true]").0, vec![AIR]);
         assert_eq!(block("minecraft:grass_block[snowy=false]").0, vec!["base:grass"]);
         assert_eq!(biome("minecraft:deep_cold_ocean"), vec!["base:ocean"]);
+    }
+
+    #[test]
+    fn full_shapes_take_their_material() {
+        assert_eq!(full_shape("minecraft:stone_brick_stairs[facing=east]").as_deref(), Some("stone_bricks"));
+        assert_eq!(full_shape("minecraft:oak_fence[east=true]").as_deref(), Some("oak_planks"));
+        assert_eq!(full_shape("minecraft:waxed_oxidized_cut_copper_slab").as_deref(), Some("oxidized_cut_copper"));
+        assert_eq!(full_shape("minecraft:deepslate_tile_wall").as_deref(), Some("deepslate_tiles"));
+        assert_eq!(full_shape("minecraft:cobblestone_slab").as_deref(), Some("cobblestone"));
+        assert_eq!(full_shape("minecraft:oak_fence_gate"), None);
+        assert_eq!(full_shape("minecraft:vine"), None);
     }
 }

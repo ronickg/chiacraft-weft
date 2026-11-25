@@ -10,6 +10,10 @@
 //! `far.bin`, which distant tiles show instead of the terrain formula (`client::lod`). Done once
 //! per world (`mc_import.txt` in its folder says what was made and every block that stood in for
 //! one we lack). Ronald's world is local only: never commit it or build it in.
+//!
+//! `--import-mc-full-shapes 1` (test only, off by default) brings stairs, slabs, walls and fences in
+//! as their material's full block (`map::full_shape`), so builds made of them keep their outline
+//! (slabs a block thick); without it they are left out like other small things.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -30,18 +34,26 @@ struct Resolver<'c> {
     biomes: Mutex<HashMap<String, (u16, String)>>,
     /// Minecraft states that took a stand-in, with what they became and how often.
     stand_ins: Mutex<HashMap<String, (String, u64)>>,
+    /// Test only (`--import-mc-full-shapes 1`): stairs, slabs, walls and fences as their material's
+    /// full block (`map::full_shape`) instead of air.
+    full_shapes: bool,
 }
 
 impl<'c> Resolver<'c> {
     fn new(c: &'c Content) -> Self {
-        Resolver { c, states: Mutex::default(), biomes: Mutex::default(), stand_ins: Mutex::default() }
+        let full_shapes = crate::app::api::launch_options().contains_key("import-mc-full-shapes");
+        Resolver { c, states: Mutex::default(), biomes: Mutex::default(), stand_ins: Mutex::default(), full_shapes }
     }
 
     fn state(&self, mc: &str) -> u32 {
         if let Some(&s) = self.states.lock().unwrap().get(mc) {
             return s;
         }
-        let (mut candidates, mut exact) = map::block(mc);
+        let full = self.full_shapes.then(|| map::full_shape(mc)).flatten();
+        let (mut candidates, mut exact) = match &full {
+            Some(m) => (map::block(&format!("minecraft:{m}")).0, false),
+            None => map::block(mc),
+        };
         // A data package with the id `mc` may define Minecraft's own blocks by their names (a test
         // environment: the RTX showcase world with its own textures and material maps,
         // `notes/RTX_SHOWCASE.md`); such a block comes before our nearest one. Without that
@@ -50,6 +62,8 @@ impl<'c> Resolver<'c> {
         if self.c.state_by_name(&own).is_some() {
             candidates.insert(0, own);
             exact = true;
+        } else if let Some(m) = full.as_ref().map(|m| format!("mc:{m}")).filter(|m| self.c.state_by_name(m).is_some()) {
+            candidates.insert(0, m);
         }
         let mut chosen = None;
         for (i, name) in candidates.iter().enumerate() {
