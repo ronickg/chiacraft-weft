@@ -1,9 +1,9 @@
 //! Herds and packs that keep together (`animals_core::groups`; `reports/Creature AI.md`, part 3,
 //! step 9). Its wander (the needs band's last goal) is the leader's alone: a wild member that isn't
 //! its group's leader keeps to its own place round the leader instead, walking back once it is
-//! `FOLLOW_FROM` off it, so the herd drifts where its leader goes. The leader is the lowest id of
-//! its kind near, from each member's own look round (`senses::Senses::leader`): nothing to hand
-//! over when a leader dies or wanders off, the next look finds the next one.
+//! `FOLLOW_FROM` off it, so the herd drifts where its leader goes. The leader stays leader
+//! (`groups::keep_or_pick`, from each member's look round, `senses::Senses::leader`) until it dies,
+//! is away too long or weakens; a leader whose group lies resting keeps by it (`by_resting_pack`).
 //!
 //! A wander that gets nowhere (walking, but not a block in `STUCK_TICKS`: a target it can't reach)
 //! is stopped here, so it picks again instead of standing in a walk for good, and logged with where
@@ -51,6 +51,7 @@ pub fn or_follow(speed: f32, wander: impl Goal) -> impl Goal {
         // (`migrate`); one far from the water it knows turns back toward it (`drink::home`); else
         // it wanders.
         if let Some(acted) = follow(w, id, st, speed)
+            .or_else(|| by_resting_pack(w, id, st, speed))
             .or_else(|| regroup(w, id, st, speed))
             .or_else(|| crate::migrate::lead(w, id, st, speed))
             .or_else(|| crate::drink::home(w, id, st, speed))
@@ -97,7 +98,7 @@ fn stuck(w: &World, id: u64, st: &EntityState) -> bool {
 /// group that isn't its leader (slice 2: it drinks and grazes when its leader does).
 pub fn leader_doing(w: &World, id: u64) -> Option<u8> {
     let s = w.component(id, &SENSES)?;
-    if s.kin < GROUP || s.leader == 0 || s.leader == id || crate::animal::tamed(w, id) {
+    if s.leader == 0 || s.leader == id || crate::animal::tamed(w, id) {
         return None;
     }
     w.entity(s.leader).filter(|e| e.health > 0.0)?;
@@ -122,11 +123,33 @@ pub fn rest_in_step(w: &World, id: u64, resting: bool) -> Option<bool> {
     None
 }
 
+/// A group's leader awake while `groups::PACK_RESTS` of the others lie resting keeps within
+/// `groups::LEADER_TETHER` of their middle (it waits for them instead of wandering off): walking
+/// back past it, else standing about. None: not leading a resting group.
+fn by_resting_pack(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {
+    let s = w.component(id, &SENSES)?;
+    let others = s.kin.saturating_sub(1);
+    if s.leader != id || s.kin < GROUP || (s.kin_resting as f32) < others as f32 * groups::PACK_RESTS {
+        return None;
+    }
+    let mid = s.kin_mid.map(f64::from);
+    let tether = groups::LEADER_TETHER as f64;
+    let d2 = (mid[0] - st.pos.x).powi(2) + (mid[2] - st.pos.z).powi(2);
+    if d2 <= tether * tether {
+        return Some(w.navigating(id));
+    }
+    if !w.navigating(id) || w.random_below(FOLLOW_EVERY as u32) == 0 {
+        weft_sdk::debug!("animal {id} keeps by its resting pack ({:.1} blocks off)", d2.sqrt());
+        w.navigate(id, mid, speed);
+    }
+    Some(true)
+}
+
 /// For a wild member of a group that isn't its leader: whether it walks to its place now. None:
 /// it wanders on its own (alone, the leader, tame, or its leader gone until its next look).
 pub fn follow(w: &World, id: u64, st: &EntityState, speed: f32) -> Option<bool> {
     let s = w.component(id, &SENSES)?;
-    if s.kin < GROUP || s.leader == 0 || s.leader == id || crate::animal::tamed(w, id) {
+    if s.leader == 0 || s.leader == id || crate::animal::tamed(w, id) {
         return None;
     }
     let lead = w.entity(s.leader).filter(|e| e.health > 0.0)?;
