@@ -233,6 +233,23 @@ logged. Fish don't eat or drink and don't get hungry, by design. Vole 12's "heal
 
 Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_small_m-171615/r2_small_grid.jpg`.
 
+Run 3 (46f12cbd7, `r11_small_m`, 327 s, script pass). All nine fish alive and in the pond to the end. When the
+player walks in, all nine log "darts off from a walker" within 0.8 s, and the hit trout logs "fish 81 hurt by
+1: darts off"; they move 1-3 blocks. The where rows read "doing -" for fish: they swim by `fish.rs`, outside
+the needs band, so this is expected. Land: hares, mice and voles eat (tall grass on the strip, turf) and drink;
+a kryptobaatar was killed by a hunter on the pad (core:attack). Nothing new in the warnings.
+
+| Species | eat | drink | wander | flee | shot |
+|---|---|---|---|---|---|
+| hare, mountain_hare | pass (tall grass) | pass | pass | not tested on land (no walk-in "runs from") | r11 1 |
+| wood_mouse, field_vole | pass | pass | pass | not tested | r11 1 |
+| kryptobaatar | pass | pass | pass | prey: killed by a hunter | r11 2 |
+| priscagama | pass (run 2) | pass (run 2) | pass | not tested | r11 2 |
+| cat, chihuahua | pass | pass | pass | pass (run 2) | r11 3 |
+| brown_trout, pacu, lungfish, lycoptera | n/a (by design) | n/a | pass (swim, all 9 alive) | pass (dart from a walker and from a hit) | r11 4 |
+
+Grid r11: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r11_small_m-182115/r11_small_grid.jpg`.
+
 ## Big dinosaurs and bosses (cov_bosses.txt)
 
 Run 2 (b7ef3aaf7, `r2_bosses_m-165534`, 408 s). The bosses: summon, aggro, death with loot and Drenkaun's
