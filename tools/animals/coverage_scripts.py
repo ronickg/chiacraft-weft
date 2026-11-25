@@ -33,12 +33,17 @@ def pad(x, pond=1, deep=1):
     ]
 
 
+FISH = {"brown_trout", "pacu", "lungfish", "lycoptera"}
+
+
 def spawns(x, groups):
-    """groups: [(kind, count, dx, dz)]: a cluster of `count` 2 blocks apart at (x+dx, Z+dz)."""
+    """groups: [(kind, count, dx, dz)]: a cluster of `count` 2 blocks apart at (x+dx, Z+dz); fish
+    in the water (cov_small: two lycoptera spawned on its top suffocated)."""
     out = []
     for kind, n, dx, dz in groups:
         for i in range(n):
-            out.append(f"chat /tk spawn animals:{kind} {x+dx+(i%3)*2} 70 {Z+dz+(i//3)*2}")
+            y = 68 if kind in FISH else 70
+            out.append(f"chat /tk spawn animals:{kind} {x+dx+(i%3)*2} {y} {Z+dz+(i//3)*2}")
     return out + ["wait 2"]
 
 

@@ -91,18 +91,29 @@ mouse_sit (idle clips asked for in the air: the fly looks should be left out of 
 
 | Species | eats | drinks | wanders | flees | shot |
 |---|---|---|---|---|---|
-| hare | - | - | - | - | |
-| mountain_hare | - | - | - | - | |
-| wood_mouse | - | - | - | - | |
-| field_vole | - | - | - | - | |
-| kryptobaatar | - | - | - | - | |
-| priscagama | - | - | - | - | |
-| cat | - | - | - | - | |
-| dog (chihuahua) | - | - | - | - | |
-| brown_trout | - | n/a | - | - | |
-| pacu | - | n/a | - | - | |
-| lungfish | - | n/a | - | - | |
-| lycoptera | - | n/a | - | - | |
+| hare | pass (tall grass) | pass (water full) | - (ate all run) | pass ("bolts") | grid 1 |
+| mountain_hare | pass | pass | - (comfort) | pass | grid 1 |
+| wood_mouse | pass (grass, seeds) | pass for 1 of 3 | pass (1) | pass | grid 1 |
+| field_vole | pass | pass (water 30 to 84-100) | pass (1) | pass (1 of 3) | grid 1 |
+| kryptobaatar | fail: never hungry | fail: never thirsty | - (rested: nocturnal) | pass | grid 2 |
+| priscagama | fail: never hungry | fail: never thirsty | pass | pass | grid 2 |
+| cat | pass, but on insects in the grass | pass (1 of 2) | - | pass | grid 3 |
+| dog (chihuahua) | pass, but on seeds in the tall grass | pass | pass | pass (ran from a hit) | grid 3 |
+| brown_trout | - | n/a | pass (swims) | - (no dart seen) | grid 4 (dark) |
+| pacu | - | n/a | pass | - | grid 4 |
+| lungfish | - | n/a | pass | - | grid 4 |
+| lycoptera | - | n/a | 1 of 3 (two spawned on the water's top suffocated: the script's) | - | grid 4 |
+
+cov_small, Mac, 326.5 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_small_m-160421.log`; grid
+`~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_small_m-160950/cov_small_grid.jpg`). Fixed:
+insect eaters (kryptobaatar, Priscagama) were neither plant eaters nor hunters with prey, so they
+never got hungry or thirsty: one living half or more on what the ground grows (insects, roots,
+plants) now does (the mod's `Species::hungry_in_the_wild`); the cats' insects and the dogs' seeds are
+top-up foods, now eaten only below their diet share (91a328628); the script spawns fish in the water.
+A `hit 2` kills a 1-2 health animal (a mouse, a kryptobaatar). Missing clips: look, groom on
+vole_sit; scratch, groom on lizard_bask; graze on chihuahua_adult and cat; groom, look, scratch,
+stare, alarm on cat_sit; groom on cat_lie; idle clips on the fish (flinch, sniff, groom, look, play,
+scratch on lungfish, pacu, lycoptera, brown_trout, fish_flop): fish should get no idle life.
 
 ## Big dinosaurs and bosses (cov_bosses.txt)
 
