@@ -2470,7 +2470,12 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let lit = land * cloud_shadow(dir * t);
         let above = max(at.y - SEA_LEVEL, 0.0);
         // The mist and the rain's fog (Bliss's rainy fog, its 0.3 in Ronald's profile).
-        let d = bank_density(at, dir * t) * deep + rain * RAIN_FOG * exp2(-0.03 * above);
+        // The banks within the march's old reach (`MIST_MARCH_FAR`), the rain's fog and the air to the
+        // surface: once the march ran to the land however far (fix 2) the banks' thin even part added
+        // up over 8 km into a white sheet on the noon land (lkfwA1: banks off, the far land 152 167 151
+        // against 211 216 207 with them; Bliss's 157 178 212).
+        let banks = select(0.0, bank_density(at, dir * t) * deep, t < MIST_MARCH_FAR);
+        let d = banks + rain * RAIN_FOG * exp2(-0.03 * above);
         if d > 0.0 {
             let kept = exp(-d * step);
             let near_sun = smoothstep(MIST_NEAR_SUN.x, MIST_NEAR_SUN.y, t);
