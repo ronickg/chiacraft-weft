@@ -2987,7 +2987,11 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     // air alike dimmed by the sky light where the eye is, cubed (Bliss's: in a cave or under a
     // canopy the air's light goes with the eye's own).
     let eye_k = eye_sky_k();
-    let sky_fog = p.ambient * (1.0 + 5.0 * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), 4.0)) * eye_k;
+    // The fog by the clear sky's average (Bliss's AmbientColor, averageSkyCol / 30: `bc_sky_read`),
+    // the air below by the land's, with the clouds in it (its AveragedAmbientColor), as in its
+    // composite2: lit by the land's, a rain's fog took the deck's colour (lkmxBC2's sepia rain).
+    let fog_sky = select(p.ambient, bc_sky_read(), land_from_sky());
+    let sky_fog = fog_sky * (1.0 + 5.0 * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), 4.0)) * eye_k;
     // The sky's pixels stand at the march's far end (`view_rel`); they are marched to the render
     // distance, as Bliss marches its sky to the far distance.
     let is_sky = abs(dist - MIST_MARCH_FAR) < 0.5;
