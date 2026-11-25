@@ -407,6 +407,16 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     let edge = smoothstep(PT_REACH * 0.75, PT_REACH, dist);
     diffuse = mix(diffuse, lit, edge);
     specular *= 1.0 - edge;
+    // Rain on the ground as the world's pass has it (`rain_on_ground`: wet, darker, the sky's sheen,
+    // puddles): traced, the ground stayed dry and bright in the rain (w27). It is affine in the
+    // colour: its factor on both lights, what it adds into the specular.
+    if ground_wet() > 0.0 || scene.canopy.z > 0.0 {
+        let leafy = h.quad || h.tint == 2u; // (2: foliage, `world.wgsl` TINT_FOLIAGE)
+        let added = rain_on_ground(vec3(0.0), n, h.rel, h.world, h.light.x, leafy);
+        let k = rain_on_ground(vec3(1.0), n, h.rel, h.world, h.light.x, leafy) - added;
+        diffuse *= k;
+        specular = specular * k + added / max(s_alb, vec3(1e-3));
+    }
     if pt.debug != 0u && pt.debug < 7u {
         var out = vec3(0.0);
         switch pt.debug {
