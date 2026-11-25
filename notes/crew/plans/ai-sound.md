@@ -157,3 +157,32 @@ deleted.
 - [ElevenLabs API pricing](https://elevenlabs.io/pricing/api)
 - [ElevenLabs plans](https://www.elevenlabs.io/pricing)
 - [Open TTS and audio model licences (AudioGen, MMAudio)](https://invideo.io/blog/open-ai-voice-audio-models/)
+
+## Test batch 1 (2026-11-25)
+
+Run on the PC in `~/ai-sound`: its own venv (Python 3.12, torch 2.7.1 cu128, Stability's `stable-audio-3`
+library) and the weights in `~/ai-sound/model`. 8 sampling steps, about 0.15 s a clip, 2.3 GB peak VRAM.
+
+Every file is kept in `~/Coding/chiacraft-archive/sounds/ai-sound/2026-11-25/`:
+- `raw/`: the raw tries, 44.1 kHz stereo WAV
+- `cut/`: the same tries cut and levelled with `sfx.py` (copy mode, 2.5 s, -3 dB RMS, Ogg)
+- `now/`: the game's current sounds, rendered at each species' pitch
+- `prompts.tsv`: name, length, seed, prompt
+- spectrogram sheets
+- `index.html`: the listening page (also https://claude.ai/artifact/1B8w5DX5keKs4V7oyLHm9G)
+- `build.sh` and `page.py`, which rebuild the rest
+
+Round 1 had 3 tries each for kid, calf, big dinosaur, raptor, capybara, reindeer, Drenkaun and Borkon.
+Round 2 had 3 more for the dinosaurs, both bosses and the capybara. In round 1 those came out as noise
+beds, so the round 2 prompts name a real animal instead.
+
+Judged from the spectrograms only, these show clear calls:
+- the kid
+- the calf
+- raptor 1-2
+- reindeer 3
+- capybara 3-6
+- Drenkaun 4-6
+- Borkon 4
+
+The rest look like noise beds. Ronald picks by ear.
