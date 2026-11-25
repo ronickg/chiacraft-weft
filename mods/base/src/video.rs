@@ -131,6 +131,8 @@ static RT_SHADOWS: Config<i32> = Config::named("core:rt_shadows");
 static RT_REFLECTIONS: Config<bool> = Config::named("core:rt_reflections");
 /// The path tracer's denoiser (`core:pt_denoiser`): 0 raw, 1 ours.
 static PT_DENOISER: Config<i32> = Config::named("core:pt_denoiser");
+/// Path-traced lighting (the sun, the sky, a bounce and the lamps traced: the pack's pathtrace.wgsl).
+static PATH_TRACED: Config<bool> = Config::named("core:path_traced");
 /// The newer quality settings, parts of the features' rows or rows of their own on the Developer
 /// screen (`PARTS`): the HDR world and temporal anti-aliasing (read at start), the mist as a
 /// volume, the soft clouds' shadow, the bloom's levels, the far shadow map's reach, the screen
@@ -431,23 +433,26 @@ struct Feature {
 /// Medium, High, Max and Ultra). A traced part runs only where the GPU traces rays (`runs`).
 const FEATURES: [Feature; 6] = [
     // The sun's shadows: near (1) or near and far (2), their map's size, how far they reach
-    // (blocks), contact shadows; at Ultra traced, soft-edged.
+    // (blocks), contact shadows; traced from High on an RTX card (`rtx`; Ronald, 11-25: "Ray trace
+    // lighting, ray trace reflections, ray trace shadows ... all of those should be like toggled
+    // on"), soft-edged from Max; at Ultra on any GPU that traces rays.
     Feature {
         key: "shadow_quality",
         parts: &["shadows", "shadow_size", "shadow_reach", "contact", "rt_shadows"],
         steps: [
             &[1.0, 1024.0, 64.0, 1.0, 0.0],
             &[1.0, 1024.0, 96.0, 1.0, 0.0],
-            &[2.0, 2048.0, 128.0, 1.0, 0.0],
-            &[2.0, 4096.0, 128.0, 2.0, 0.0],
+            &[2.0, 2048.0, 128.0, 1.0, 1.0],
+            &[2.0, 4096.0, 128.0, 2.0, 2.0],
             &[2.0, 4096.0, 128.0, 2.0, 2.0],
         ],
     },
-    // Reflections on water and glass: the screen's, low or full; at Ultra traced.
+    // Reflections on water and glass: the screen's, low or full; traced from High on an RTX card,
+    // at Ultra on any GPU that traces rays.
     Feature {
         key: "reflect_quality",
         parts: &["reflect", "rt_reflections"],
-        steps: [&[1.0, 0.0], &[1.0, 0.0], &[2.0, 0.0], &[2.0, 0.0], &[2.0, 1.0]],
+        steps: [&[1.0, 0.0], &[1.0, 0.0], &[2.0, 1.0], &[2.0, 1.0], &[2.0, 1.0]],
     },
     // The light in the air: the mist's light, its detail (`core:froxels`) and the light shafts.
     Feature {
@@ -469,6 +474,18 @@ fn runs(key: &str) -> bool {
     !key.starts_with("rt_") || (GPU_RAY_QUERY.get() && !on_phone())
 }
 
+/// An RTX card: rays traced and DLSS (`dlss::available`). The presets under Ultra trace here only
+/// (as the big RTX games turn ray tracing on by default there); elsewhere ray tracing is Ultra's.
+fn rtx() -> bool {
+    GPU_RAY_QUERY.get() && !on_phone() && crate::dlss::available()
+}
+
+/// Whether feature step `step` runs traced part `key` here: Ultra wherever the GPU traces rays,
+/// High and Max on an RTX card.
+fn runs_at(key: &str, step: usize) -> bool {
+    runs(key) && (!key.starts_with("rt_") || step >= 4 || rtx())
+}
+
 fn part(key: &str) -> &'static Row {
     PARTS
         .iter()
@@ -485,7 +502,7 @@ pub(crate) fn feature_parts(key: &str, step: usize) -> Option<Vec<(&'static str,
         f.parts
             .iter()
             .zip(values.iter())
-            .map(|(&k, &v)| (k, if runs(k) { v } else { 0.0 }))
+            .map(|(&k, &v)| (k, if runs_at(k, step) { v } else { 0.0 }))
             .collect(),
     )
 }
@@ -563,6 +580,9 @@ fn apply(p: usize) {
     QUALITY.set(p as i32);
     PRESET_LAST.set(p as i32);
     weft_sdk::info!("video: the {} preset, every feature at {}", preset_name(p as i32).unwrap_or("?"), STEP_NAMES[at]);
+    // Path-traced lighting only at Ultra, and there only on an RTX card, with Ray Reconstruction
+    // (`ultra_extras`): our own denoiser alone was too slow and too noisy for a default.
+    PATH_TRACED.set(p == ULTRA && rtx());
     if p == ULTRA {
         crate::dlss::AUTO.set(false);
         ultra_extras();
@@ -839,7 +859,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 /// Players see the features' rows instead (Ronald, 11-24: the tuning "is more for developer
 /// things"). Traced shadows, reflections and the path tracer's denoiser only where the GPU traces
 /// rays (`traced`).
-const PARTS: [Row; 22] = [
+const PARTS: [Row; 23] = [
     Row {
         key: "shadows",
         values: &[0.0, 1.0, 2.0],
@@ -872,6 +892,15 @@ const PARTS: [Row; 22] = [
         values: &[0.0, 1.0],
         get: || RT_REFLECTIONS.get() as u8 as f64,
         set: |v| RT_REFLECTIONS.set(v > 0.0),
+        shown: off_on,
+    },
+    // Path-traced lighting: the sun, the sky, a bounce and the lamps traced in place of the
+    // lightmap's (Ultra on an RTX card).
+    Row {
+        key: "rt_path_traced",
+        values: &[0.0, 1.0],
+        get: || PATH_TRACED.get() as u8 as f64,
+        set: |v| PATH_TRACED.set(v > 0.0),
         shown: off_on,
     },
     Row { key: "volume", values: &[0.0, 1.0, 2.0], get: || FX_VOLUME.get() as f64, set: |v| FX_VOLUME.set(v as i32), shown: off_low_on },
@@ -1079,6 +1108,7 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
                 // A new world shader each change, and its scene.
                 keys.push(("rt_shadows", 2.0));
                 keys.push(("rt_reflections", 2.0));
+                keys.push(("rt_path_traced", 2.0));
             }
             pick(&PARTS, &keys)
         }
@@ -1256,6 +1286,15 @@ pub fn register(r: &mut Registry) {
             ui.column(S::column().gap(3.0).h(196.0).scroll(), |ui| {
                 for i in 0..FEATURE_ROWS.len() {
                     row_ui(ui, &FEATURE_ROWS, i, step_feature);
+                }
+                // Ray tracing's own rows where the GPU traces rays (Planner from Ronald, 11-25: each
+                // with its row and cost): traced shadows, reflections, path-traced lighting.
+                if GPU_RAY_QUERY.get() && !on_phone() {
+                    for (i, r) in PARTS.iter().enumerate() {
+                        if ["rt_shadows", "rt_reflections", "rt_path_traced"].contains(&r.key) {
+                            row_ui(ui, &PARTS, i, step_part);
+                        }
+                    }
                 }
                 for i in 0..ROWS.len() {
                     row_ui(ui, &ROWS, i, step);
