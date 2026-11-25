@@ -324,7 +324,7 @@ fn ultra_extras() {
 /// A GeForce RTX 20 or 30, a TITAN RTX or an RTX A (workstation Ampere), by the GPU's name
 /// (`--fake-gpu-name` pretends): Turing and Ampere, which run DLSS's transformer models (K, M) at
 /// several times the CNN's cost. An RTX 40, 50 or a name not known: the newest models at full size.
-fn older_rtx() -> bool {
+pub(crate) fn older_rtx() -> bool {
     let name = weft_sdk::client::launch_option("fake-gpu-name")
         .unwrap_or_else(|| GPU_NAME.get())
         .to_lowercase();
@@ -564,10 +564,13 @@ fn apply(p: usize) {
     PRESET_LAST.set(p as i32);
     weft_sdk::info!("video: the {} preset, every feature at {}", preset_name(p as i32).unwrap_or("?"), STEP_NAMES[at]);
     if p == ULTRA {
+        crate::dlss::AUTO.set(false);
         ultra_extras();
     } else if GPU_DLSS_MODES.get() != 0 {
-        // DLSS is live: off again with any other preset, as Ultra is the one that turns it on.
-        DLSS.set(0);
+        // DLSS is live (an RTX card): on in Auto, its mode by the screen's height and its model by
+        // the GPU (`dlss::follow_auto`), as most RTX games start (Planner from Ronald, 11-25). Off
+        // is one step back on the DLSS tab's Mode row. Elsewhere the upscaler setting as before.
+        crate::dlss::AUTO.set(true);
     }
     fantasy_caps(p, true);
 }
