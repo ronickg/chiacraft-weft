@@ -238,6 +238,39 @@ const OPT_BANK_TOP: u32 = 67u;
 // The banks' march steps (`base:look_mist_steps`, the quality row: 0 as made = 8; Low 4, never off).
 const OPT_MIST_STEPS: u32 = 68u;
 const OPT_SKY_LOBE: u32 = 69u;
+// The HDR world's picture as Bliss's chain (`base:look_chain`, 1 as made; 0 the stack before
+// 11-25, to compare): its one exposure curve at every hour, its Purkinje, Hejl 2015 and its 0.3 of
+// saturation (Ronald's Bliss profile), in place of our per-hour exposures, sky and land lifts and
+// dims, glare, white balance, splits, leaf yellow, near-black cut, cool floor, rods and night blue.
+const OPT_CHAIN: u32 = 70u;
+fn bliss_chain() -> bool {
+    return scene.frame.x > 0.5 && fantasy_opt(OPT_CHAIN) > 0.5;
+}
+// Our light against Bliss's units (its sun 250000 lux scaled as its shaders do): ours x 41.
+const BLISS_UNITS: f32 = 41.0;
+// Bliss's exposure for a view of mean luma `mean` (deferred.vsh: 0.18 / log2(2.5 L + 1.045) x 0.62,
+// its multiplier 1), in our units for `hejl_bliss`'s input, which takes 0.389 of it: so the
+// average sunlit view (`EXPOSURE_REF`'s 0.35) keeps the 2.2 it had.
+fn bliss_exposure(mean: f32) -> f32 {
+    return 2.2 * log2(2.5 * 0.35 * BLISS_UNITS + 1.045) / log2(2.5 * max(mean, 1e-6) * BLISS_UNITS + 1.045);
+}
+// Bliss's Purkinje (composite11.fsh, method): with a dark view the dim pixels slide toward its
+// rods' blue-grey (0.4 0.7 1.0 x 5 of their luma), by its rod exposure from the view's mean;
+// `x` the exposed light (`hejl_bliss`'s input), `mean` the view's luma.
+fn bliss_purkinje(x: vec3<f32>, mean: f32) -> vec3<f32> {
+    let lb = mean * BLISS_UNITS;
+    let e = 0.18 / log2(2.5 * max(lb, 1e-6) + 1.045) * 0.62;
+    let rod_e = max(0.012 / log2(min(lb, 0.08) + 1.002) - 0.1, 0.0) * 1.2;
+    let purk = clamp(e * e, 0.0, 1.0) * clamp(rod_e / (1.0 + rod_e), 0.0, 1.0);
+    let col = x * 0.389;
+    let lum = dot(col, vec3(0.15, 0.3, 0.55));
+    let rod_lum = dot(col, vec3(0.85, 0.7, 0.45)) * 200.0;
+    let rod_curve = clamp(mix(1.0, rod_lum / (2.5 + rod_lum), purk), 0.0, 1.0);
+    return mix(lum * vec3(0.4, 0.7, 1.0) * 5.0, col, rod_curve) / 0.389;
+}
+// The view's mean luma for the chain (`hdr_light` sets it), the average sunlit view's without the
+// exposure pass.
+var<private> VIEW_MEAN: f32 = 0.35;
 // How much of it this morning: the option, in the east, with the sun under the horizon (full from
 // 1.7° down, none at 1° up) and not yet night (gone by about 12° down, where the night sky takes it).
 fn dawn_sky() -> f32 {
@@ -2977,6 +3010,9 @@ fn exposure() -> f32 {
 // as it is, linear and past 1, which the screen effects work on and the effects' last pass then
 // finishes (`finish_picture`, in this pack's post.wgsl); into the screen, finished here as always.
 fn display(c: vec3<f32>) -> vec3<f32> {
+    if bliss_chain() {
+        return max(c, vec3(0.0));
+    }
     if scene.frame.x > 0.5 {
         // At night the dim world seen blue, at its own brightness (the eye's night sight): Bliss's
         // moonlit land is a deep blue (22:00 sRGB 31 63 134, saturation about 200-250) where ours
@@ -3015,6 +3051,18 @@ fn display(c: vec3<f32>) -> vec3<f32> {
 
 // The picture finished: exposure, the tone curve and the grade, from linear light to the screen.
 fn finish_picture(c_in: vec3<f32>) -> vec3<f32> {
+    if bliss_chain() {
+        // Bliss's chain: exposed in `hdr_light`, its Purkinje, Hejl 2015, then 0.3 of saturation in
+        // display space (composite11, composite12; Ronald's profile SATURATION 0.3).
+        let x = bliss_purkinje(max(c_in, vec3(0.0)) * look_opt(OPT_EXPOSURE, 1.0), VIEW_MEAN);
+        var t = hejl_bliss(x);
+        let g = pow(max(t, vec3(0.0)), vec3(1.0 / 2.2));
+        let gy = dot(g, vec3(0.299, 0.587, 0.114));
+        t = pow(max(g + (g - vec3(gy)) * 0.3, vec3(0.0)), vec3(2.2));
+        // A blood moon's faint red cast over the night (ours, gameplay).
+        t *= mix(vec3(1.0), vec3(1.1, 0.88, 0.86), blood_moon() * 0.6 * (1.0 - smoothstep(-0.05, 0.15, scene.sun.y)));
+        return clamp(t, vec3(0.0), vec3(1.0));
+    }
     // The HDR world's morning twilight (the sun 0-7° under, in the east): dim land brought up after
     // the exposure, as Bliss's eye lifts its dim twilight land after its own (up to about 3x), where
     // ours took back a brighter twilight in the meter's square root (05:00 land luma 35 against

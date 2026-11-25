@@ -408,8 +408,38 @@ const GLARE_HDR: f32 = 0.02;
 // The land's lift in the evening twilight (`hdr_light`).
 const TWILIGHT_LAND_HDR: f32 = 1.55;
 
+// Bliss's chain before its curve (`bliss_chain`): the bloom as now (its bloomy fog mixed, its
+// bloom added), then its one exposure from the view's mean, at every hour.
+fn chain_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
+    var col = max(c, vec3(0.0));
+    var mean = EXPOSURE_REF;
+    if pass_.exposure != 0u {
+        let e = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0).g;
+        if e == e && e > 0.0 {
+            mean = e;
+        }
+    }
+    VIEW_MEAN = mean;
+    LAND_PIXEL = 1.0;
+    if pass_.bloom != 0u {
+        let glow = bloom_tap(pass_.bloom - 1u, uv);
+        let fog = mist_over(uv, pass_) * (1.0 - 0.85 * rain_amount());
+        col = mix(col, glow, clamp(fog * 0.6 * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
+        let banked = bank_hidden(view_rel(uv, pass_)) * (1.0 - 0.85 * rain_amount());
+        col = mix(col, glow, clamp(banked * BANK_BLOOMY * fantasy_opt(OPT_BLOOM), 0.0, 0.95));
+        let r2 = dot(uv - vec2(0.5), uv - vec2(0.5));
+        let lb = mean * BLISS_UNITS;
+        let eye = pow(0.18 / log2(2.5 * lb + 1.045) * 0.62, 0.2);
+        col += glow * clamp(0.5 * eye, 0.0, 1.0) * (1.5 - 2.0 * r2) * fantasy_opt(OPT_BLOOM);
+    }
+    return col * bliss_exposure(mean);
+}
+
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
+    if bliss_chain() {
+        return chain_light(c, uv, pass_);
+    }
     var col = max(c, vec3(0.0));
     // The sky a third more saturated by day (where nothing was drawn, depth 0): the curve's
     // shoulder takes colour out of a bright sky, and ours read grey-white where Bliss's is blue
