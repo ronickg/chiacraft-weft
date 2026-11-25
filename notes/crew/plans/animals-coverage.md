@@ -149,7 +149,7 @@ stalked, broke cover and wounded its deer five times, but the deer ran 60 blocks
 give-ups and no kill in its 110 s (runs 1 and 2 killed). Found and fixed (d62af1ac5): a kill
 fed its kind's grown mass whatever the prey weighed, because the dead can't be read at the death event. The
 crocodyliform hunted a young 2.7 kg capybara and ate 50 kg. The hunter now keeps its prey's mass from the
-start of the hunt. New in the warnings: 10 "neighbor update storm" lines (the pad and pond fills). Shot 7 is
+start of the hunt. The 10 "neighbor update storm" warnings were in earlier runs too: nothing new. Shot 7 is
 black: night, nothing lit.
 
 | Species | hunts | stalk / ambush | chase | kill, eat, share | gives up | shot |
