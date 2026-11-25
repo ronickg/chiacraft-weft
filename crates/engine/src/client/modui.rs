@@ -206,7 +206,9 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
             scroll: flag(abi::ui_flags::SCROLL),
             bar_outside: false,
             bar_thin: flag(abi::ui_flags::THIN_SCROLLBAR),
-            snap_rows: false,
+            // A mod's scrolled list shows whole rows, top and bottom (`Ui::layout`; one taller
+            // than its view scrolls freely).
+            snap_rows: flag(abi::ui_flags::SCROLL),
             fill: None,
             max_h: f32::INFINITY,
             // Placed at a point of the parent (`UiNode::at`); a point that isn't finite is none.

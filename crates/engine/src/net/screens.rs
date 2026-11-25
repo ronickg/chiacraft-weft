@@ -29,7 +29,7 @@ impl Screen for Multiplayer {
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         frame(ui, cx, "multiplayer.title", |ui| {
             if cx.in_game && !cx.remote {
-                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(340.0), |ui| {
+                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().min_w(340.0).self_align(crate::ui::Align::Stretch), |ui| {
                     let hosting = super::p2p::HOSTING.lock().is_some();
                     if hosting {
                         label(ui, cx, "multiplayer.your_port", &[crate::ui::text::Arg::Int(crate::settings::server_port() as i64)], "dim");
@@ -38,7 +38,7 @@ impl Screen for Multiplayer {
                     }
                 });
             }
-            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(340.0), |ui| {
+            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().min_w(340.0).self_align(crate::ui::Align::Stretch), |ui| {
                 crate::screens::heading(ui, cx, "multiplayer.ticket");
                 ui.container(Style::row().gap(4.0).stretch(), |ui| {
                     let input = ui.add(Kind::input("", TICKET_MAX_LEN), Style::default().h(18.0).w(0.0).grow());
@@ -86,6 +86,8 @@ impl Screen for Multiplayer {
                 });
             });
             saved_worlds(ui, cx);
+            // The panels above are as wide as this row (they stretch, 340 at least): its three
+            // 2x buttons reached past them (chiacraft 11-25, the batch 3 sheet).
             let waiting = crate::links::snapshot().incoming.len();
             ui.container(Style::row().gap(6.0), |ui| {
                 let id = button(ui, cx, "links.open", &[Arg::Text(waiting.to_string())], 160.0, |c| {
@@ -111,7 +113,7 @@ fn saved_worlds(ui: &mut Ui, cx: &BuildCx) {
     let run_dir = cx.settings.run_dir.clone();
     let worlds = crate::saved_worlds::load(&run_dir);
     crate::saved_worlds::ping_all(&run_dir, cx.settings);
-    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(340.0), |ui| {
+    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().min_w(340.0).self_align(crate::ui::Align::Stretch), |ui| {
         crate::screens::heading(ui, cx, "multiplayer.saved");
         if worlds.is_empty() {
             label(ui, cx, "multiplayer.saved_none", &[], "dim");

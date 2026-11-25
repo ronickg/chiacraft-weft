@@ -1125,8 +1125,8 @@ pub fn register(r: &mut Registry) {
     crate::developer::video(r.config(&FX_SPARKLE).int(1, 0, 1));
     crate::developer::video(r.config(&DETECTED).int(-1, -1, 5));
     crate::developer::video(r.config(&DETECTED_HALF).bool(false));
-    r.config(&RENDER_SCALE_NEXT).float(-1.0, -1.0, 1.0);
-    r.config(&SHADOW_SIZE_NEXT).int(0, 0, 4096);
+    crate::developer::video(r.config(&RENDER_SCALE_NEXT).float(-1.0, -1.0, 1.0));
+    crate::developer::video(r.config(&SHADOW_SIZE_NEXT).int(0, 0, 4096));
     r.client_frame(|_| new_defaults());
     // The first run: a preset from the screen (a high-density one draws many more pixels).
     r.client_frame(|c| {

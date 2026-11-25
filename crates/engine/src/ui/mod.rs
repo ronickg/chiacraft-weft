@@ -894,6 +894,29 @@ impl Ui {
             let r = self.nodes[id].rect;
             let p = self.nodes[id].style.pad;
             let own = Rect { x: r.x + p[0], y: r.y + p[1], w: (r.w - p[0] - p[2]).max(0.0), h: (r.h - p[1] - p[3]).max(0.0) };
+            // Whole rows at the bottom too (`snap_rows`): the view ends after the last row it
+            // holds whole, so no row shows cut in half (the Video tab's last row, 11-25).
+            let mut own = own;
+            let node = &self.nodes[id];
+            if node.style.snap_rows && !node.style.row {
+                let flow: Vec<Rect> = node
+                    .children
+                    .iter()
+                    .filter(|&&c| self.nodes[c].style.at.is_none())
+                    .map(|&c| self.nodes[c].rect)
+                    .collect();
+                let bottom = own.y + own.h;
+                if flow.iter().all(|r| r.h <= own.h + 0.01) {
+                    if let Some(end) = flow
+                        .iter()
+                        .filter(|r| r.y + r.h <= bottom + 0.5 && r.y + r.h > own.y)
+                        .map(|r| r.y + r.h)
+                        .reduce(f32::max)
+                    {
+                        own.h = end - own.y;
+                    }
+                }
+            }
             Some(match clip {
                 Some(c) => c.intersect(own),
                 None => own,
@@ -1141,7 +1164,10 @@ impl Ui {
             *v = v.min(max);
             scrolled = *v;
             past_end = max - scrolled;
-            if style.snap_rows && !style.row && style.justify == Justify::Start && scrolled > 0.0 {
+            // Rows only: a column holding something taller than its view scrolls freely (a long
+            // text would otherwise jump past itself).
+            let rows = sizes.iter().all(|s| s[1] <= main_size + 0.01);
+            if style.snap_rows && rows && !style.row && style.justify == Justify::Start && scrolled > 0.0 {
                 // On to the first row starting at or past the offset.
                 let mut start = 0.0;
                 for s in &sizes {

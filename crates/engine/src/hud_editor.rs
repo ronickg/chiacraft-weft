@@ -356,7 +356,8 @@ impl Screen for DebugOptions {
                     .h(0.0)
                     .grow()
                     .min_h(60.0)
-                    .scroll(),
+                    .scroll()
+                    .snap_rows(true),
                 |ui| {
                     let row = |ui: &mut Ui, id: String, name: Vec<crate::ui::text::Span>| {
                         let state = lines.get(&id).copied().unwrap_or_default();

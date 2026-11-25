@@ -316,6 +316,8 @@ impl Font {
 
     #[inline]
     pub fn glyph(&self, c: char) -> Glyph {
+        // A no-break space looks like a space (text only breaks lines at ' ': "0.59 ms" stays whole).
+        let c = if c == '\u{a0}' { ' ' } else { c };
         self.glyphs.get(&c).copied().unwrap_or(self.fallback)
     }
 
