@@ -1351,7 +1351,9 @@ impl Post {
         }
         // The upscaler, once its motion image and guides are drawn.
         if let Some(c) = up_cmd {
+            crate::diag::probe(list, "pre_upscale");
             list.push(c);
+            crate::diag::probe(list, "upscale");
         }
         if let Some(low_pipe) = self.low_pipe {
             for (k, target) in lows.iter().enumerate() {
@@ -1367,6 +1369,7 @@ impl Post {
                 list.push(Cmd::EndPass);
             }
         }
+        crate::diag::probe(list, "post_low");
         for (target, pipe, entry) in pyramid_draws {
             if entry as usize >= passes.len() {
                 break;
@@ -1378,6 +1381,9 @@ impl Post {
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: entry });
             list.push(Cmd::EndPass);
         }
+        crate::diag::probe(list, "bloom");
+        // The effects one by one in a bench's probes (`core:gpu_probes`); the last runs to the UI.
+        const EFFECTS: [&str; 8] = ["effect_0", "effect_1", "effect_2", "effect_3", "effect_4", "effect_5", "effect_6", "effect_7"];
         let n = draws.len();
         for (i, entry) in draws.into_iter().enumerate() {
             let target = if i + 1 == n { Target::Surface } else { Target::Texture(tex[(i + 1) % 2]) };
@@ -1389,6 +1395,7 @@ impl Post {
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: entry });
             if i + 1 < n {
                 list.push(Cmd::EndPass);
+                crate::diag::probe(list, EFFECTS[i.min(7)]);
             }
         }
     }

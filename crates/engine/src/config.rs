@@ -653,9 +653,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:rt_reflections", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // Path traced lighting over the traced scene (reports/Path tracing plan.md; M0: the sun and
         // one bounce on the terrain, with a shader pack that has `pathtrace.wgsl`); its debug views
-        // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends).
+        // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends; 8-12 timing only: the trace stopped after its primary test, the sun, the bounce, with no specular ray, before any ray, without the air's haze).
         number("core:path_traced", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
-        number("core:pt_debug", ck::INT, 0.0, 0.0, 7.0, 1.0),
+        number("core:pt_debug", ck::INT, 0.0, 0.0, 13.0, 1.0),
         // How the path tracer's light is denoised (`denoise::Denoiser`) where Ray Reconstruction
         // doesn't do it: 0 not at all (raw, for checks), 1 ours (SVGF-like), live.
         number("core:pt_denoiser", ck::INT, 1.0, 0.0, 1.0, 1.0),
@@ -793,6 +793,13 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         // NVIDIA Reflex's low latency (`Backend::set_low_latency`): 0 off, 1 on, 2 on with boost
         // (the GPU kept clocked up). Live; only where the upscaler has it (`core:gpu_reflex`).
         number("core:reflex", ck::INT, 1.0, 0.0, 2.0, 1.0),
+        // Named GPU timestamps inside the parts (`Cmd::Probe`, `diag::probe`): a bench line then
+        // also lists each one's ms (the path tracer's passes, the upscaler). Live; off by default.
+        number("core:gpu_probes", ck::BOOL, 0.0, 0.0, 1.0, 1.0),
+        // The opaque and cutout cubes' depth laid first while the world's shader traces, so it
+        // shades (and traces) each of their pixels once (`WorldRenderer::depth_prepass`). The same
+        // picture. Live; on by default, 0 to compare.
+        number("core:depth_prepass", ck::BOOL, 1.0, 0.0, 1.0, 1.0),
         // DLSS frame generation, where the GPU has it (`core:gpu_frame_gen`, an RTX 40 or 50 on
         // Windows): on by default. Not read yet: its present path isn't built (`core:gpu_frame_gen_why`).
         number("core:frame_gen", ck::BOOL, 1.0, 0.0, 1.0, 1.0),

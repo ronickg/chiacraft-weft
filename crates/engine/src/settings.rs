@@ -359,6 +359,16 @@ pub fn upscale_standin() -> bool {
     number("core:upscale_standin") != 0.0
 }
 
+/// The world's opaque depth prepass while it traces (`core:depth_prepass`), live.
+pub fn depth_prepass() -> bool {
+    number("core:depth_prepass") > 0.5
+}
+
+/// Named GPU timestamps for a finer bench split (`core:gpu_probes`), live.
+pub fn gpu_probes() -> bool {
+    number("core:gpu_probes") > 0.5
+}
+
 /// NVIDIA Reflex's low-latency mode (`core:reflex`: 0 off, 1 on, 2 with boost), live.
 pub fn reflex() -> u32 {
     number("core:reflex").clamp(0.0, 2.0) as u32

@@ -3848,7 +3848,15 @@ impl Client {
                 _ => [0.0; 4],
             },
             rt: [
-                self.render.rt_traced() as u32 as f32,
+                // 1 traced shadows; 2 also path traced, whose pass lights the terrain again (the
+                // world's shader leaves its rays there to it, `world.wgsl`'s `pt_takes`).
+                if !self.render.rt_traced() {
+                    0.0
+                } else if shadow_setting("core:path_traced", 0.0) > 0.5 && self.render.pt_ready() {
+                    2.0
+                } else {
+                    1.0
+                },
                 (self.render.rt_frame_no() % (1 << 24)) as f32,
                 (shadow_setting("core:rt_shadows", 0.0) > 1.5) as u32 as f32,
                 self.render.rt_reflects() as u32 as f32,
@@ -4020,6 +4028,12 @@ impl Client {
         self.render.rt_reload
     }
 
+    /// The opaque cubes' depth into `depth` before the world's pass (`WorldRenderer::depth_prepass`),
+    /// when this frame's draw is set for it: true, and the world's pass keeps that depth.
+    pub fn depth_prepass(&self, list: &mut weft_render::CommandList, depth: weft_render::TextureId) -> bool {
+        self.render.depth_prepass(list, depth)
+    }
+
     /// Path traced lighting (`core:path_traced`, `WorldRenderer::path_trace`), after the world's
     /// pass into `target` (the world's image, its size `size`) and before the effects: first the
     /// G-buffer pass (`WorldRenderer::gbuffer_pass`), then the traced light.
@@ -4035,7 +4049,9 @@ impl Client {
         if shadow_setting("core:path_traced", 0.0) > 0.5 {
             let debug = shadow_setting("core:pt_debug", 0.0) as u32;
             // The G-buffer (albedo, normal and roughness, spec) the denoisers read: `render.gb_images`.
+            crate::diag::probe(list, "pt_before");
             self.render.gbuffer_pass(gpu, list, depth, size);
+            crate::diag::probe(list, "pt_gbuffer");
             self.render
                 .path_trace(gpu, list, slot, depth, target, size, debug, false);
         }

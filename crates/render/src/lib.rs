@@ -360,6 +360,9 @@ pub enum Cmd {
     },
     /// GPU timestamp, see [`Backend::gpu_times`].
     Mark,
+    /// A GPU timestamp like [`Cmd::Mark`] (a backend handles both alike), named for a bench's
+    /// finer split (`core:gpu_probes`): the time up to it is that name's.
+    Probe(&'static str),
     /// Up to three more color images for the [`Cmd::BeginPass`] that follows at once, at
     /// `@location(2)` on, after its motion image (each with its clear, as `motion`); their
     /// pipelines are made by [`Backend::create_pipeline_mrt`]. The path tracer's G-buffer.

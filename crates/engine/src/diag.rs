@@ -857,6 +857,14 @@ fn log_parts(frames: f64) {
     log::debug!(target: "frame", "update split ms a frame: {}", line.join(", "));
 }
 
+/// A named GPU timestamp (`Cmd::Probe`) where `core:gpu_probes` is on: the GPU time since the
+/// mark or probe before it is `name`'s in a bench line.
+pub fn probe(list: &mut weft_render::CommandList, name: &'static str) {
+    if crate::settings::gpu_probes() {
+        list.push(weft_render::Cmd::Probe(name));
+    }
+}
+
 /// Times a step of recording the frame: a frame whose record took long logs its steps
 /// (`slow_record`). Nested ones ("render/world") are listed too, before the step they are in.
 pub fn span(name: &'static str) -> Span {

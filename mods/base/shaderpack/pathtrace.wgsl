@@ -267,11 +267,15 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
         return;
     }
-    if dist > PT_REACH {
+    if dist > PT_REACH || pt.debug == 12u {
         return;
     }
     let v = -rel / dist;
-    let h = rt_hit(vec3(0.0), -v, dist * 1.1 + 2.0, 0.0);
+    // Out to the farthest hit the test below accepts: one past it fails either way (the same
+    // pixels traced), and the ray walks no further. The cubes' faces and quads alone: a distant
+    // tile it met would be no pixel traced either (the G-buffer has none), and the hidden ones
+    // under the cubes cost each ray their shader's asking. The world's `pt_takes` asks the same.
+    let h = rt_hit_mask(vec3(0.0), -v, dist * 1.02 + 0.2, 0.0, 3u);
     // Terrain at the depth drawn there: anything else (water, glass, a model, a particle) keeps the
     // world's own pixel.
     if !h.hit || h.clear || abs(h.t - dist) > 0.02 * dist + 0.15 {
@@ -286,6 +290,13 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // reach met there has no G-buffer, and traced with no albedo a far peak came out black
     // (pt1_dark_peak_crop); it keeps the world's pixel, as the denoisers skip it.
     if dot(gb_n.xyz, gb_n.xyz) < 0.25 {
+        return;
+    }
+    // Debug 8-12, timing only (a bench's probes): the trace stopped after its primary test (8), the
+    // sun's ray (9), the bounce and the cache (10), or with no specular ray (11); 12 before any ray, above; 13 the whole trace without the air's
+    // two `haze_lit`s. The picture they
+    // leave is no use.
+    if pt.debug == 8u {
         return;
     }
     let ng = h.n;
@@ -303,6 +314,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
     // lightmap gives it (already lowered under cover) and as the open sky would give it.
     let lit = light_on(n, h.light, sun, 1.0, h.world, h.rel);
+    if pt.debug == 9u {
+        pt_out[at] = vec4(lit, 1.0);
+        return;
+    }
     // The lamps' and the sky's shares of it for the night's blue (`display`), kept before the calls
     // below, which light the sky alone and set it to 1: traced, a fire-lit wall at night went
     // white-blue where the world draws it orange (w12, the nave at 18000).
@@ -337,6 +352,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             pt_cache_add(u32(i), indirect);
         }
     }
+    if pt.debug == 10u {
+        pt_out[at] = vec4(diffuse, 1.0);
+        return;
+    }
     // Specular, where the texture has maps (F0 above 0), as the world's `mat_shine`: the sun's
     // highlight (GGX, Smith's visibility) and what lies the mirrored way, traced where smooth, the
     // sky or the room's light where rough.
@@ -365,7 +384,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         // mirror along the face or into it, where the groove and the block itself hide the sky. The
         // stone bricks' joints lit up as blue lines from the sky (pt1_rtxd_pt, the cathedral).
         let horizon = smoothstep(-0.05, 0.3, dot(r, ng));
-        if a < 0.5 && horizon > 0.0 {
+        if a < 0.5 && horizon > 0.0 && pt.debug != 11u {
             var dir = rt_cone(r, 0.01 + a * 0.5, px + vec2(17.0, 29.0));
             if dot(dir, ng) <= 0.0 {
                 dir = r;
@@ -388,7 +407,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     let edge = smoothstep(PT_REACH * 0.75, PT_REACH, dist);
     diffuse = mix(diffuse, lit, edge);
     specular *= 1.0 - edge;
-    if pt.debug != 0u && pt.debug != 7u {
+    if pt.debug != 0u && pt.debug < 7u {
         var out = vec3(0.0);
         switch pt.debug {
             case 1u: { out = albedo; }
@@ -404,8 +423,12 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     // The air between the eye and the surface, as an affine map of the colour.
-    let air = haze_lit(vec3(0.0), h.rel, h.light.x);
-    let through = haze_lit(vec3(1.0), h.rel, h.light.x) - air;
+    var air = vec3(0.0);
+    var through = vec3(1.0);
+    if pt.debug != 13u {
+        air = haze_lit(vec3(0.0), h.rel, h.light.x);
+        through = haze_lit(vec3(1.0), h.rel, h.light.x) - air;
+    }
     let dif = through * diffuse;
     let spe = through * specular;
     pt_out[at] = vec4(dif, diffuse_t);
@@ -415,7 +438,11 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // curve); under a denoiser (mode 1) the air's light alone, which `fs_pt_finish` adds the
     // denoised light to and finishes.
     NIGHT_SKY_SHARE = share;
-    let under = select(display(air + dif * albedo + spe * s_alb), air, pt.mode == 1u);
+    // (Branched, not `select`: that worked out `display` under the denoiser too, to drop it.)
+    var under = air;
+    if pt.mode != 1u {
+        under = display(air + dif * albedo + spe * s_alb);
+    }
     // The share rides in the kind (1 to 1.25: traced) for `fs_pt_finish`.
     pt_out[at + 2u] = vec4(under, 1.0 + 0.25 * share);
 }
