@@ -80,7 +80,8 @@ pub fn init(r: &mut Registry) {
                     .then(crate::animal::upkeep(index))
                     .then(move |w: &World, id: u64, st: &EntityState| court(w, id, st, index))
                     .then(move |w: &World, id: u64, st: &EntityState| swim(w, id, st, index)),
-            );
+            )
+            .on_hurt(|w, h| hurt(w, h.entity, h.source));
     }
     r.world_tick(spawn);
 }
@@ -132,10 +133,10 @@ fn swim(w: &World, id: u64, st: &EntityState, index: usize) -> bool {
             .filter(|p| p.pose != abi::pose::CROUCH)
             .find(|p| crate::dist2(p.pos, st.pos) < shy * shy)
     {
-        let (x, z) = (st.pos.x - p.pos.x, st.pos.z - p.pos.z);
-        let n = (x * x + z * z).sqrt().max(0.01);
-        s.to = [(st.pos.x + x / n * 8.0) as f32, st.pos.y as f32, (st.pos.z + z / n * 8.0) as f32];
-        (s.left, s.flee) = (60, 40);
+        if s.flee == 0 {
+            weft_sdk::debug!("fish {id} darts off from a walker");
+        }
+        dart(&mut s, st, [p.pos.x, p.pos.z]);
     }
     let to = s.to.map(|v| v as f64);
     let d = [to[0] - st.pos.x, to[1] - st.pos.y, to[2] - st.pos.z];
@@ -161,6 +162,32 @@ fn swim(w: &World, id: u64, st: &EntityState, index: usize) -> bool {
     w.fly(id, [(d[0] / dist) as f32, (d[1] / dist) as f32, (d[2] / dist) as f32], speed);
     set(w, id, s);
     true
+}
+
+/// Off eight blocks away from `from` (x, z), fast.
+fn dart(s: &mut Swim, st: &EntityState, from: [f64; 2]) {
+    let (x, z) = (st.pos.x - from[0], st.pos.z - from[1]);
+    let n = (x * x + z * z).sqrt().max(0.01);
+    s.to = [(st.pos.x + x / n * 8.0) as f32, st.pos.y as f32, (st.pos.z + z / n * 8.0) as f32];
+    (s.left, s.flee) = (60, 40);
+}
+
+/// Hurt: it darts off from what hurt it (round 2 of cov_small: a hit trout swam on as before).
+fn hurt(w: &World, id: u64, source: u64) {
+    let (Some(st), Some(mut s)) = (w.entity(id), w.component(id, &STATE)) else { return };
+    let from = w
+        .entity(source)
+        .filter(|_| source != 0 && source != id)
+        .map_or_else(
+            || {
+                let a = random(w) * std::f64::consts::TAU;
+                [st.pos.x + a.cos(), st.pos.z + a.sin()]
+            },
+            |e| [e.pos.x, e.pos.z],
+        );
+    dart(&mut s, &st, from);
+    set(w, id, s);
+    weft_sdk::info!("fish {id} hurt by {source}: darts off");
 }
 
 /// In love (`breeding`): a mate of its kind near is where it swims (`swim` takes it there), and

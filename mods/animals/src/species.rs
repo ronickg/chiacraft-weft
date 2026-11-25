@@ -85,13 +85,25 @@ impl Species {
     }
 
     /// `data::Species::hungry_in_the_wild`, worked out once a species: it looks over every
-    /// species' habitats, and foraging and drinking ask it for every animal every tick.
+    /// species' habitats, and foraging and drinking ask it for every animal every tick. Also one
+    /// that lives mostly on what the ground grows, insects and roots as well as plants
+    /// (`vitals::forage::grows`): the insect eaters, kryptobaatar and Priscagama, were neither plant
+    /// eaters nor hunters with prey, and so never got hungry or thirsty, ate or drank (cov_small).
     pub fn hungry_in_the_wild(&'static self) -> bool {
         static HUNGRY: std::sync::OnceLock<Vec<bool>> = std::sync::OnceLock::new();
         HUNGRY.get_or_init(|| {
             SPECIES
                 .iter()
-                .map(|s| s.data.hungry_in_the_wild())
+                .map(|s| {
+                    let grown: f32 = s
+                        .data
+                        .eats
+                        .iter()
+                        .filter(|&&(c, _)| vitals::forage::grows(c))
+                        .map(|&(_, p)| p)
+                        .sum();
+                    s.data.hungry_in_the_wild() || (grown >= 0.5 && !s.data.in_water())
+                })
                 .collect()
         })[self.index()]
     }

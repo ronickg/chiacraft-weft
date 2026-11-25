@@ -155,6 +155,7 @@ fn lift(w: &World, id: u64, st: &EntityState, wings: &Wings, to: [f64; 3]) -> bo
             left: wings.flight,
         },
     );
+    crate::anim::take_off(w, id);
     w.set_appearance(id, Some(&format!("animals:{}", fly_look(wings))));
     if let Some(t) = w.component_mut(id, &TAMING) {
         t.scared = 0;
@@ -180,6 +181,20 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
             weft_sdk::info!("bird {id} smells carrion {:.0} blocks off", dist2(at, st.pos).sqrt());
             return lift(w, id, st, wings, at);
         }
+        // A hungry bird of prey hunts from the air: at prey it sees, else up to look for some.
+        if hungry_hunter(w, id) {
+            use animals_core::roles::{SOAR_SEARCH, STOOP_FROM};
+            if let Some((_, at)) = prey_seen(w, id, st) {
+                let d = dist2(at, st.pos).sqrt();
+                if d > STOOP_FROM {
+                    weft_sdk::info!("bird {id} flies at its prey {d:.0} blocks off");
+                    return lift(w, id, st, wings, at);
+                }
+            } else if w.random_below(SOAR_SEARCH) == 0 {
+                weft_sdk::info!("bird {id} soars to look for prey");
+                return take_off(w, id, st, wings);
+            }
+        }
         let scared = w.component(id, &TAMING).is_some_and(|t| t.scared > 0);
         if scared || (!w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(wings.restless) == 0) {
             return take_off(w, id, st, wings);
@@ -198,10 +213,34 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
     if let Some(at) = smelled.filter(|_| !f.landing) {
         f.to = at.map(|v| v as f32);
     }
+    // A hungry bird of prey that sees prey from the air stoops on it: low over it from
+    // `roles::STOOP_LOW` out, and strikes it within `roles::STRIKE` (the kill is `hunt.rs`'s, as
+    // on foot: it lands and eats).
+    let mut stooping = false;
+    if !f.landing
+        && hungry_hunter(w, id)
+        && let Some((prey, at)) = prey_seen(w, id, st)
+    {
+        use animals_core::roles::{STOOP_LOW, STRIKE};
+        f.to = at.map(|v| v as f32);
+        let flat = (at[0] - st.pos.x).hypot(at[2] - st.pos.z);
+        f.cruise = at[1] as f32 + if flat < STOOP_LOW { 0.3 } else { 2.0 };
+        stooping = true;
+        if dist2(at, st.pos) <= STRIKE * STRIKE && (w.game_time() + id).is_multiple_of(20) {
+            let index = w
+                .component(id, &crate::animal::ANIMAL)
+                .map_or(0, |a| a.species as usize - 1);
+            w.damage(prey, Damage::new(crate::animal::hit(index), damage_cause::ATTACK).by(id));
+            weft_sdk::info!("bird {id} strikes {prey} from the air");
+            if w.entity(prey).is_none_or(|e| e.health <= 0.0) {
+                f.landing = true;
+            }
+        }
+    }
     f.left = f.left.saturating_sub(w.tick_elapsed(id));
     let (dx, dz) = (f.to[0] as f64 - st.pos.x, f.to[2] as f64 - st.pos.z);
     let flat = (dx * dx + dz * dz).sqrt();
-    if f.left == 0 || flat < 2.0 {
+    if f.left == 0 || (flat < 2.0 && !stooping) {
         f.landing = true;
     }
     let dir = if f.landing {
@@ -211,13 +250,29 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
     } else {
         // Climbing to its height (straight up where something holds it back), then level.
         let blocked = f.left < wings.flight.saturating_sub(20) && st.vel.x.hypot(st.vel.z) < 0.05;
-        let climb = if blocked { 1.5 } else { ((f.cruise as f64 - st.pos.y) / 4.0).clamp(-0.4, 0.8) };
+        let climb = if blocked { 1.5 } else { ((f.cruise as f64 - st.pos.y) / 4.0).clamp(if stooping { -1.2 } else { -0.4 }, 0.8) };
         let n = (1.0 + climb * climb).sqrt();
+        let flat = flat.max(0.1);
         [(dx / flat / n) as f32, (climb / n) as f32, (dz / flat / n) as f32]
     };
     w.fly(id, dir, if f.landing { wings.air * 0.5 } else { wings.air });
     set(w, id, f);
     true
+}
+
+/// A wild hunter under `needs::HUNTS_AT` (it hunts at any hour).
+fn hungry_hunter(w: &World, id: u64) -> bool {
+    !crate::animal::tamed(w, id)
+        && w.component(id, &crate::animal::ANIMAL).is_some_and(|a| {
+            a.species().is_some_and(|s| s.hunts()) && (a.food as f32) < a.stat(crate::species::FOOD) * animals_core::needs::HUNTS_AT
+        })
+}
+
+/// The prey it sees and where it is now (`senses`: its look round, every `senses::EVERY` ticks).
+fn prey_seen(w: &World, id: u64, st: &EntityState) -> Option<(u64, [f64; 3])> {
+    let seen = crate::senses::sense(w, id, st, |sight| crate::hunt::watch(w, sight));
+    let e = (seen.prey != 0).then(|| w.entity(seen.prey)).flatten()?;
+    Some((seen.prey, [e.pos.x, e.pos.y, e.pos.z]))
 }
 
 /// A hungry scavenger (`Species::scavenges`) smells carrion within `needs::SCENT` beyond its
@@ -234,6 +289,11 @@ fn scent(w: &World, id: u64, st: &EntityState) -> Option<[f64; 3]> {
     }
     let (_, at) = crate::forage::ground_food(w, s, st.pos.to_array(), animals_core::needs::SCENT)?;
     (dist2(at, st.pos) > crate::forage::ITEM_LOOK * crate::forage::ITEM_LOOK).then_some(at)
+}
+
+/// Whether `id` is a bird in the air (drawn as its flying look).
+pub fn flying(w: &World, id: u64) -> bool {
+    w.component(id, &STATE).is_some_and(|f| f.flying)
 }
 
 fn set(w: &World, id: u64, f: Flight) {
