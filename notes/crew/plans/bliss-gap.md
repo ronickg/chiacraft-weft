@@ -25,6 +25,11 @@ Engine pieces on this list (each its own ENGINE_CHANGES line): the eye's sky lig
 cave factor as uniforms, the froxel volume's removal (~900 WGSL + 144 Rust lines once nothing reads
 it), AO split (indirect only), DOF, a wider bloom level.
 
+Before ready (look-ship): the final bench measures the soft clouds on and off again, clean. The 1.25 ms
+cloud cost (lkcbF_aba a2/b2) and lkcbE_fx2's step ran beside a FLUX job on the PC's GPU (Tester 2,
+11-25: it doubled world, tripled effects); the clean lkcbF pose with clouds on is total 2.98, world 2.0,
+effects 0.37 ms (wp1125_B). Ask Tester 2 to check nvidia-smi until the runner's GPU guard is live.
+
 
 ---
 
