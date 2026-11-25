@@ -198,6 +198,20 @@ line.
 
 Grid r6: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r13_hunters_m-201354/r13_hunters_grid.jpg`.
 
+Run 7 (298ed43a, the branch with current dev merged, `r14_hunters_m`, 651 s, script pass). The utahraptor pack
+killed and shared its psittacosaurus at its own mass: hunted at 24.6 kg, eaten as 24.558 in three shares of
+8.186. The packmate that started the hunt also made the kill, so the case of another packmate killing is still
+not tested; that case is the code path of ffdb839c1. All twelve kills fed their prey's own mass. Hurt causes: 13
+lines, all `core:attack`. After the dev merge the warnings were the same classes as before: update storms, the
+atmosphere shader, and missing idle clips.
+
+| Species | kill feeds the prey's own mass | shot |
+|---|---|---|
+| utahraptor | pass (24.558 kg, three shares; another packmate killing: not tested) | r7 5 |
+| all other land hunters | pass | r7 1-7 |
+
+Grid r7: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r14_hunters_m-202849/r14_hunters_grid.jpg`.
+
 ## Birds and fliers (cov_birds.txt)
 
 | Species | flies | lands | flocks | flees | hunts / scavenges | shot |
