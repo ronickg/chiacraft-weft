@@ -480,6 +480,15 @@ fn rtx() -> bool {
     GPU_RAY_QUERY.get() && !on_phone() && crate::dlss::available()
 }
 
+/// The step whose value traced part `key` takes at feature step `step`: on an RTX 20 or 30
+/// (`older_rtx`) the step under it below Ultra, so ray tracing starts at Max there and goes soft at
+/// Ultra. A 3060 Laptop at 1080p with DLSS Auto ran Max with traced shadows (soft) and reflections
+/// at 48 fps and High with them at 63 (w15, 11-25); Planner's rule: a preset under about 60 fps on
+/// the 3060 moves the feature one preset up there, never off at the top.
+fn rt_step(key: &str, step: usize) -> usize {
+    if key.starts_with("rt_") && step < 4 && older_rtx() { step.saturating_sub(1) } else { step }
+}
+
 /// Whether feature step `step` runs traced part `key` here: Ultra wherever the GPU traces rays,
 /// High and Max on an RTX card.
 fn runs_at(key: &str, step: usize) -> bool {
@@ -497,12 +506,12 @@ fn part(key: &str) -> &'static Row {
 /// None if `key` is no feature (`video_costs` sums a feature's cost from these).
 pub(crate) fn feature_parts(key: &str, step: usize) -> Option<Vec<(&'static str, f64)>> {
     let f = FEATURES.iter().find(|f| f.key == key)?;
-    let values = f.steps.get(step)?;
+    f.steps.get(step)?;
     Some(
         f.parts
             .iter()
-            .zip(values.iter())
-            .map(|(&k, &v)| (k, if runs_at(k, step) { v } else { 0.0 }))
+            .enumerate()
+            .map(|(i, &k)| (k, if runs_at(k, step) { f.steps[rt_step(k, step)][i] } else { 0.0 }))
             .collect(),
     )
 }
