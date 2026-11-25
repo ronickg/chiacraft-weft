@@ -663,6 +663,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         // chiacraft: our soft clouds (`client::soft_clouds`), on unless a look test turns them off
         // (stage 1/2 like-for-like shots; kept until the A/B against upstream's clouds).
         number("core:soft_clouds", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // chiacraft, test: the soft clouds' trace size, pixels each way per trace pixel (4 a quarter
+        // as made, 2 half as Bliss's CLOUDS_QUALITY, 1 full): the cloud blur against Bliss (11-25).
+        number("core:cloud_res", ck::INT, 4.0, 1.0, 4.0, 1.0),
         // chiacraft, test only (the Minecraft comparison): leaves as Minecraft's fancy leaves, the
         // faces between them drawn and shaded as its smooth light does (`client::mesher`), their
         // smaller mips darkened as its are (`assets::dark_leaf_mips`).

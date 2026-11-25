@@ -14,9 +14,11 @@ use weft_render::*;
 
 use crate::gpu_layout::bind;
 
-/// The quarter target's size for a world of `w` × `h` pixels.
+/// The trace target's size for a world of `w` × `h` pixels: a quarter each way as made, or what
+/// `core:cloud_res` sets (2 half, as Bliss's, 1 full).
 fn quarter(w: u32, h: u32) -> (u32, u32) {
-    (w.div_ceil(4).max(1), h.div_ceil(4).max(1))
+    let d = crate::settings::cloud_res();
+    (w.div_ceil(d).max(1), h.div_ceil(d).max(1))
 }
 
 /// The noise volume's side, its slices' cells (a one-texel wrapped border) and the atlas's side.

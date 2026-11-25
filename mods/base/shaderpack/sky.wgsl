@@ -303,10 +303,11 @@ fn soft_density(s: Sky, at: vec2<f32>, a: f32, cover: f32, fine: bool) -> f32 {
     if fine && d > 0.0 {
         // Detail wears only the edges (Photon: by 1 - density), so the cores stay solid.
         // In the HDR world wider and gentler: Bliss's edges are soft, ours crisp cauliflower.
-        let fine_w = select(128.0, 224.0, scene.frame.x > 0.5);
+        let gentle = scene.frame.x > 0.5 && !cloud_test(4u);
+        let fine_w = select(128.0, 224.0, gentle);
         let w = soft_noise(vec3(at.x / fine_w, a * 1.4 + t * 0.002, at.y / fine_w));
         let cells = w.g * 0.625 + w.b * 0.25 + w.a * 0.125;
-        d -= (1.0 - cells) * select(0.5, 0.35, scene.frame.x > 0.5) * (1.0 - d) * mix(0.6, 1.0, a);
+        d -= (1.0 - cells) * select(0.5, 0.35, gentle) * (1.0 - d) * mix(0.6, 1.0, a);
     }
     return clamp(d, 0.0, 1.0);
 }
@@ -524,7 +525,7 @@ fn fs_cloud_resolve(in: CloudOut) -> @location(0) vec4<f32> {
     let at = vec2<i32>(in.clip.xy);
     let size = vec2<i32>(textureDimensions(textures[trace]));
     let now = textureLoad(textures[trace], at, 0);
-    if scene.soft_clouds.w < 0.5 || scene.soft_clouds.y < 0.5 {
+    if scene.soft_clouds.w < 0.5 || scene.soft_clouds.y < 0.5 || cloud_test(1u) {
         return now;
     }
     let dir = normalize(mat(sky[0]) * in.at);
@@ -555,10 +556,48 @@ fn fs_cloud_resolve(in: CloudOut) -> @location(0) vec4<f32> {
     return mix(now, history, w);
 }
 
+// The resolved clouds at `uv` by Catmull-Rom (nine bilinear taps), sharper than one bilinear tap;
+// clamped to its four nearest texels so the overshoot rings no halo (`base:look_cloud_test` 2).
+fn cloud_catmull(tex: u32, uv: vec2<f32>) -> vec4<f32> {
+    let n = vec2<f32>(textureDimensions(textures[tex]));
+    let pos = uv * n - 0.5;
+    let p1 = floor(pos);
+    let f = pos - p1;
+    let w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+    let w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+    let w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+    let w3 = f * f * (-0.5 + 0.5 * f);
+    let w12 = w1 + w2;
+    let o12 = w2 / w12;
+    let t0 = (p1 - 0.5) / n;
+    let t3 = (p1 + 2.5) / n;
+    let t12 = (p1 + 0.5 + o12) / n;
+    var c = vec4(0.0);
+    c += textureSampleLevel(textures[tex], linear_clamp, vec2(t0.x, t0.y), 0.0) * w0.x * w0.y;
+    c += textureSampleLevel(textures[tex], linear_clamp, vec2(t12.x, t0.y), 0.0) * w12.x * w0.y;
+    c += textureSampleLevel(textures[tex], linear_clamp, vec2(t3.x, t0.y), 0.0) * w3.x * w0.y;
+    c += textureSampleLevel(textures[tex], linear_clamp, vec2(t0.x, t12.y), 0.0) * w0.x * w12.y;
+    c += textureSampleLevel(textures[tex], linear_clamp, vec2(t12.x, t12.y), 0.0) * w12.x * w12.y;
+    c += textureSampleLevel(textures[tex], linear_clamp, vec2(t3.x, t12.y), 0.0) * w3.x * w12.y;
+    c += textureSampleLevel(textures[tex], linear_clamp, vec2(t0.x, t3.y), 0.0) * w0.x * w3.y;
+    c += textureSampleLevel(textures[tex], linear_clamp, vec2(t12.x, t3.y), 0.0) * w12.x * w3.y;
+    c += textureSampleLevel(textures[tex], linear_clamp, vec2(t3.x, t3.y), 0.0) * w3.x * w3.y;
+    let i = vec2<i32>(p1);
+    let m = vec2<i32>(n) - 1;
+    let a = textureLoad(textures[tex], clamp(i, vec2(0), m), 0);
+    let b = textureLoad(textures[tex], clamp(i + vec2(1, 0), vec2(0), m), 0);
+    let d = textureLoad(textures[tex], clamp(i + vec2(0, 1), vec2(0), m), 0);
+    let e = textureLoad(textures[tex], clamp(i + vec2(1, 1), vec2(0), m), 0);
+    return clamp(c, min(min(a, b), min(d, e)), max(max(a, b), max(d, e)));
+}
+
 // The full picture from the resolved clouds (`fs_clouds` with soft clouds on).
 fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     let size = vec2<f32>(textureDimensions(textures[u32(scene.behind.x)]));
-    let c = textureSampleLevel(textures[u32(scene.soft_clouds.x - 1.0)], linear_clamp, in.clip.xy / size, 0.0);
+    var c = textureSampleLevel(textures[u32(scene.soft_clouds.x - 1.0)], linear_clamp, in.clip.xy / size, 0.0);
+    if cloud_test(2u) {
+        c = cloud_catmull(u32(scene.soft_clouds.x - 1.0), in.clip.xy / size);
+    }
     let alpha_cloud = 1.0 - c.a;
     if alpha_cloud < 0.004 {
         discard;
