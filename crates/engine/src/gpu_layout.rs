@@ -17,6 +17,10 @@ macro_rules! shared {
 }
 
 shared! {
+    atmosphere_flags {
+        RAIN_MEDIA = 1,
+        DENSE_CLOUD_CELLS = 2,
+    }
     rain_cover {
         CELL = 4,
         CUBES = 16,
@@ -1587,11 +1591,14 @@ pub fn prelude(shader: &str, common: &str) -> String {
     s.push_str(DRY_OFF);
     s.push_str(common);
     s.push('\n');
-    if matches!(shader, "sky.wgsl" | "world.wgsl") {
+    let has_cloud_cache = matches!(shader, "sky.wgsl" | "world.wgsl");
+    s.push_str(&format!("const HAS_CLOUD_CACHE: bool = {has_cloud_cache};\n"));
+    if has_cloud_cache {
         s.push_str(include_str!("../assets/shaders/atmosphere-cache.wgsl"));
     } else {
         s.push_str(
-            "fn cloud_cache_value(view: Scene, cell: vec2<i32>, band: i32) -> u32 { return 0xffffffffu; }
+            "fn cloud_packed_cell(view: Scene, cell: vec2<i32>, band: i32) -> u32 { return 0xffffffffu; }
+             fn cloud_cache_value(view: Scene, cell: vec2<i32>, band: i32) -> u32 { return 0xffffffffu; }
              fn rain_exposed(view: Scene, rel: vec3<f32>) -> bool { return true; }\n",
         );
     }

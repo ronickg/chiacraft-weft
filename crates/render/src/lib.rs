@@ -710,6 +710,11 @@ pub trait Backend: Send {
         self.create_pipeline(desc)
     }
     fn create_compute(&mut self, desc: &ComputeDesc) -> Result<PipelineId, Error>;
+    /// Compiles `descs` into the kept shaders, in parallel where the backend can, and keeps no
+    /// pipeline: a `create_pipeline` of one of them later finds the driver's compiled code. A
+    /// shader pack's world shader took 40 s and more on Metal (MoltenVK) one pipeline at a time.
+    /// Without a cache of its own a backend does nothing.
+    fn warm_pipelines(&mut self, _descs: &[PipelineDesc]) {}
     /// Compiles `desc` on another thread into the kept shaders (`BackendDesc::cache`), so that
     /// `create_compute` of it later takes no time: a phone's driver needs most of a minute over a
     /// big shader. Without a cache of its own a backend compiles nothing ahead.

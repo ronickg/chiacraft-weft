@@ -1953,49 +1953,35 @@ impl VulkanBackend {
 
     /// `create_pipeline`, with `extra` color images after the motion image (`create_pipeline_mrt`).
     fn create_pipeline_with(&mut self, desc: &PipelineDesc, extra: &[Format]) -> Result<PipelineId, Error> {
+        let p = self.prepare_pipeline(desc, extra)?;
+        let result = unsafe { build_pipeline(&self.device, self.pipeline_cache, &p) };
+        unsafe { p.destroy_modules(&self.device) };
+        let raw = result.map_err(|e| Error(format!("pipeline {}: {e:?}", desc.label)))?;
+        self.cache_dirty = true;
+        Ok(PipelineId(self.pipelines.insert(Pipeline {
+            raw,
+            layout: p.layout,
+            set_layout: p.set_layout,
+            bind_point: vk::PipelineBindPoint::GRAPHICS,
+            buffers: p.buffers,
+        })))
+    }
+
+    /// What a graphics pipeline needs from the backend (SPIR-V, layout, render pass), made here so
+    /// that `build_pipeline` can run on any thread.
+    fn prepare_pipeline(&mut self, desc: &PipelineDesc, extra: &[Format]) -> Result<PreparedPipeline, Error> {
         let vs = self.spirv(desc.shader, naga::ShaderStage::Vertex, desc.vertex)?;
         let fs = match desc.fragment {
-            Some(f) => Some(self.spirv(desc.shader, naga::ShaderStage::Fragment, f)?),
+            Some(f) => match self.spirv(desc.shader, naga::ShaderStage::Fragment, f) {
+                Ok(m) => Some(m),
+                Err(e) => {
+                    unsafe { self.device.destroy_shader_module(vs, None) };
+                    return Err(e);
+                }
+            },
             None => None,
         };
         let (layout, set_layout, buffers) = self.layout_for(desc.shader)?;
-        let vs_name = CString::new(desc.vertex).unwrap();
-        let fs_name = CString::new(desc.fragment.unwrap_or("main")).unwrap();
-        let mut stages = vec![
-            vk::PipelineShaderStageCreateInfo::default()
-                .stage(vk::ShaderStageFlags::VERTEX)
-                .module(vs)
-                .name(&vs_name),
-        ];
-        if let Some(fs) = fs {
-            stages.push(
-                vk::PipelineShaderStageCreateInfo::default()
-                    .stage(vk::ShaderStageFlags::FRAGMENT)
-                    .module(fs)
-                    .name(&fs_name),
-            );
-        }
-        let vertex_input = vk::PipelineVertexInputStateCreateInfo::default();
-        let assembly = vk::PipelineInputAssemblyStateCreateInfo::default().topology(match desc.topology {
-            Topology::Triangles => vk::PrimitiveTopology::TRIANGLE_LIST,
-            Topology::Lines => vk::PrimitiveTopology::LINE_LIST,
-        });
-        let viewport = vk::PipelineViewportStateCreateInfo::default()
-            .viewport_count(1)
-            .scissor_count(1);
-        let raster = vk::PipelineRasterizationStateCreateInfo::default()
-            .polygon_mode(vk::PolygonMode::FILL)
-            .cull_mode(if desc.cull_back { vk::CullModeFlags::BACK } else { vk::CullModeFlags::NONE })
-            .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
-            .line_width(1.0);
-        let multisample = vk::PipelineMultisampleStateCreateInfo::default().rasterization_samples(vk::SampleCountFlags::TYPE_1);
-        let depth = match desc.depth {
-            Some(d) => vk::PipelineDepthStencilStateCreateInfo::default()
-                .depth_test_enable(true)
-                .depth_write_enable(d.write)
-                .depth_compare_op(compare_op(d.compare)),
-            None => vk::PipelineDepthStencilStateCreateInfo::default(),
-        };
         let blend_attachment = {
             let a = vk::PipelineColorBlendAttachmentState::default().color_write_mask(vk::ColorComponentFlags::RGBA);
             match desc.blend {
@@ -2049,9 +2035,7 @@ impl VulkanBackend {
             (true, false) => 1,
             (true, true) => 2 + extra.len(),
         };
-        let blend = vk::PipelineColorBlendStateCreateInfo::default().attachments(&attachments[..count]);
-        let dynamic = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
-        let dynamic = vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic);
+        attachments.truncate(count);
         // Any pass of the same formats will do for drawing with it.
         let load = vk::AttachmentLoadOp::LOAD;
         let colors: Vec<_> = desc
@@ -2063,34 +2047,20 @@ impl VulkanBackend {
             .map(|f| (self.vk_format(f), load))
             .collect();
         let pass = self.render_pass((colors, desc.depth.map(|_| load)));
-        let info = vk::GraphicsPipelineCreateInfo::default()
-            .stages(&stages)
-            .vertex_input_state(&vertex_input)
-            .input_assembly_state(&assembly)
-            .viewport_state(&viewport)
-            .rasterization_state(&raster)
-            .multisample_state(&multisample)
-            .depth_stencil_state(&depth)
-            .color_blend_state(&blend)
-            .dynamic_state(&dynamic)
-            .layout(layout)
-            .render_pass(pass);
-        let result = unsafe {
-            self.device
-                .create_graphics_pipelines(self.pipeline_cache, &[info], None)
-        };
-        unsafe {
-            self.device.destroy_shader_module(vs, None);
-            if let Some(fs) = fs {
-                self.device.destroy_shader_module(fs, None);
-            }
-        }
-        let raw = result.map_err(|(_, e)| Error(format!("pipeline {}: {e:?}", desc.label)))?[0];
-        self.cache_dirty = true;
-        Ok(PipelineId(
-            self.pipelines
-                .insert(Pipeline { raw, layout, set_layout, bind_point: vk::PipelineBindPoint::GRAPHICS, buffers }),
-        ))
+        Ok(PreparedPipeline {
+            vs,
+            fs,
+            vs_name: CString::new(desc.vertex).unwrap(),
+            fs_name: CString::new(desc.fragment.unwrap_or("main")).unwrap(),
+            topology: desc.topology,
+            cull_back: desc.cull_back,
+            depth: desc.depth,
+            attachments,
+            layout,
+            set_layout,
+            buffers,
+            pass,
+        })
     }
 
     fn spirv(&self, shader: &Shader, stage: naga::ShaderStage, entry: &str) -> Result<vk::ShaderModule, Error> {
@@ -2160,6 +2130,93 @@ impl VulkanBackend {
             Ok((layout, set_layout, buffers))
         }
     }
+}
+
+/// A graphics pipeline's parts made by `VulkanBackend::prepare_pipeline`: plain handles and data,
+/// so `build_pipeline` can run on another thread (`warm_pipelines`).
+struct PreparedPipeline {
+    vs: vk::ShaderModule,
+    fs: Option<vk::ShaderModule>,
+    vs_name: CString,
+    fs_name: CString,
+    topology: Topology,
+    cull_back: bool,
+    depth: Option<DepthState>,
+    attachments: Vec<vk::PipelineColorBlendAttachmentState>,
+    layout: vk::PipelineLayout,
+    set_layout: vk::DescriptorSetLayout,
+    buffers: Vec<(u32, vk::DescriptorType)>,
+    pass: vk::RenderPass,
+}
+
+impl PreparedPipeline {
+    unsafe fn destroy_modules(&self, device: &ash::Device) {
+        unsafe {
+            device.destroy_shader_module(self.vs, None);
+            if let Some(fs) = self.fs {
+                device.destroy_shader_module(fs, None);
+            }
+        }
+    }
+}
+
+/// `vkCreateGraphicsPipelines` for `p`: where the driver compiles (MoltenVK: SPIRV-Cross to MSL,
+/// then Metal's compiler, seconds for a big shader pack). The pipeline cache is internally
+/// synchronized, so this may run on several threads at once.
+unsafe fn build_pipeline(device: &ash::Device, cache: vk::PipelineCache, p: &PreparedPipeline) -> Result<vk::Pipeline, vk::Result> {
+    let mut stages = vec![
+        vk::PipelineShaderStageCreateInfo::default()
+            .stage(vk::ShaderStageFlags::VERTEX)
+            .module(p.vs)
+            .name(&p.vs_name),
+    ];
+    if let Some(fs) = p.fs {
+        stages.push(
+            vk::PipelineShaderStageCreateInfo::default()
+                .stage(vk::ShaderStageFlags::FRAGMENT)
+                .module(fs)
+                .name(&p.fs_name),
+        );
+    }
+    let vertex_input = vk::PipelineVertexInputStateCreateInfo::default();
+    let assembly = vk::PipelineInputAssemblyStateCreateInfo::default().topology(match p.topology {
+        Topology::Triangles => vk::PrimitiveTopology::TRIANGLE_LIST,
+        Topology::Lines => vk::PrimitiveTopology::LINE_LIST,
+    });
+    let viewport = vk::PipelineViewportStateCreateInfo::default()
+        .viewport_count(1)
+        .scissor_count(1);
+    let raster = vk::PipelineRasterizationStateCreateInfo::default()
+        .polygon_mode(vk::PolygonMode::FILL)
+        .cull_mode(if p.cull_back { vk::CullModeFlags::BACK } else { vk::CullModeFlags::NONE })
+        .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
+        .line_width(1.0);
+    let multisample = vk::PipelineMultisampleStateCreateInfo::default().rasterization_samples(vk::SampleCountFlags::TYPE_1);
+    let depth = match p.depth {
+        Some(d) => vk::PipelineDepthStencilStateCreateInfo::default()
+            .depth_test_enable(true)
+            .depth_write_enable(d.write)
+            .depth_compare_op(compare_op(d.compare)),
+        None => vk::PipelineDepthStencilStateCreateInfo::default(),
+    };
+    let blend = vk::PipelineColorBlendStateCreateInfo::default().attachments(&p.attachments);
+    let dynamic = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
+    let dynamic = vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic);
+    let info = vk::GraphicsPipelineCreateInfo::default()
+        .stages(&stages)
+        .vertex_input_state(&vertex_input)
+        .input_assembly_state(&assembly)
+        .viewport_state(&viewport)
+        .rasterization_state(&raster)
+        .multisample_state(&multisample)
+        .depth_stencil_state(&depth)
+        .color_blend_state(&blend)
+        .dynamic_state(&dynamic)
+        .layout(p.layout)
+        .render_pass(p.pass);
+    unsafe { device.create_graphics_pipelines(cache, &[info], None) }
+        .map(|v| v[0])
+        .map_err(|(_, e)| e)
 }
 
 impl Backend for VulkanBackend {
@@ -2384,6 +2441,102 @@ impl Backend for VulkanBackend {
             self.pipelines
                 .insert(Pipeline { raw, layout, set_layout, bind_point: vk::PipelineBindPoint::COMPUTE, buffers }),
         ))
+    }
+
+    fn warm_pipelines(&mut self, descs: &[PipelineDesc]) {
+        let started = std::time::Instant::now();
+        let prepared: Vec<PreparedPipeline> = descs
+            .iter()
+            .filter_map(|d| {
+                self.prepare_pipeline(d, &[])
+                    .map_err(|e| log::warn!("warming {}: {}", d.label, e.0))
+                    .ok()
+            })
+            .collect();
+        let threads = std::thread::available_parallelism()
+            .map_or(4, |n| n.get())
+            .clamp(1, 16);
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let took = std::sync::Mutex::new(Vec::new());
+        let device = &self.device;
+        // A cache per thread, merged into the kept one after: MoltenVK holds a pipeline cache's
+        // lock while it compiles into it, so threads sharing one compiled one at a time (the Mac:
+        // 63 s to 44 s only).
+        let own: Vec<vk::PipelineCache> = (0..threads.min(prepared.len()))
+            .filter_map(|_| unsafe { device.create_pipeline_cache(&Default::default(), None) }.ok())
+            .collect();
+        // Without caches of their own, the threads share the kept one.
+        let caches = if own.is_empty() && !prepared.is_empty() { vec![self.pipeline_cache] } else { own.clone() };
+        std::thread::scope(|scope| {
+            for &cache in &caches {
+                let (next, took, prepared) = (&next, &took, &prepared);
+                scope.spawn(move || {
+                    loop {
+                        let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(p) = prepared.get(i) else { break };
+                        // The pipeline goes: what stays is the driver's compiled code in the cache.
+                        let one = std::time::Instant::now();
+                        let built = unsafe { build_pipeline(device, cache, p) };
+                        took.lock().unwrap().push((one.elapsed().as_secs_f32(), i));
+                        match built {
+                            Ok(raw) => unsafe { device.destroy_pipeline(raw, None) },
+                            Err(e) => log::warn!("warming a pipeline: {e:?}"),
+                        }
+                    }
+                });
+            }
+        });
+        if !own.is_empty() {
+            if let Err(e) = unsafe { device.merge_pipeline_caches(self.pipeline_cache, &own) } {
+                log::warn!("merging the warmed pipelines: {e:?}");
+            }
+            for c in &own {
+                unsafe { device.destroy_pipeline_cache(*c, None) };
+            }
+        }
+        if !descs.is_empty() {
+            self.cache_dirty = true;
+            let mut took = took.into_inner().unwrap();
+            took.sort_by(|a, b| b.0.total_cmp(&a.0));
+            let slowest: Vec<String> = took
+                .iter()
+                .take(5)
+                .map(|&(t, i)| {
+                    let p = &prepared[i];
+                    format!("{}/{} {t:.1} s", p.vs_name.to_string_lossy(), p.fs.map_or("-".into(), |_| p.fs_name.to_string_lossy()))
+                })
+                .collect();
+            log::info!(
+                "warmed {} pipelines in {:.1} s on {} threads ({:.1} s of compiling; slowest {})",
+                descs.len(),
+                started.elapsed().as_secs_f32(),
+                caches.len(),
+                took.iter().map(|t| t.0).sum::<f32>(),
+                slowest.join(", ")
+            );
+            // Every pipeline over a second, in the order asked (for finding what a driver is slow
+            // to compile: the world's plain set first, then its calm sets).
+            let mut all: Vec<_> = took.iter().filter(|t| t.0 >= 1.0).collect();
+            all.sort_by_key(|t| t.1);
+            let all: Vec<String> = all
+                .iter()
+                .map(|&&(t, i)| {
+                    let p = &prepared[i];
+                    format!("#{i} {}/{} {t:.1}", p.vs_name.to_string_lossy(), p.fs.map_or("-".into(), |_| p.fs_name.to_string_lossy()))
+                })
+                .collect();
+            if !all.is_empty() {
+                log::info!("warmed pipelines over 1 s: {}", all.join(", "));
+            }
+        }
+        for p in prepared {
+            unsafe {
+                p.destroy_modules(&self.device);
+                self.device.destroy_pipeline_layout(p.layout, None);
+                self.device
+                    .destroy_descriptor_set_layout(p.set_layout, None);
+            }
+        }
     }
 
     fn precompile(&mut self, desc: &ComputeDesc) {

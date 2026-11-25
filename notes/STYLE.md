@@ -87,6 +87,14 @@ half-resolution march, parked 11-24), and the cost on Phone and Low of the HDR w
 and the low effects (one bench each, on the Pixel and a low Mac preset). Until a part's low form
 exists, Low and Phone run its full form, not none.
 
+The land's light as made (11-24, against Bliss's auto-exposed matrix refs): auto exposure on,
+exposure in Bliss's units (`base:look_exposure_abs` 1), bloom added on top (`base:look_bloom_add`
+1), the sky's fill at 1.0 (`base:look_fill`). With those the cave, arch, overhang, forest and noon
+vista sit within about 10 luma of Bliss's in the shade and the light (PC lkauto1; sheets in the
+archive's `tester-2/2026-11-24/live/matrix/`). Compare mode pins the exposure, which Bliss's refs do
+not: compare with `base:look_auto_exposure 1`. Left: the hue. Our shade on stone reads blue-grey
+where Bliss's is a warm grey, and our sunlit dirt and grass are more saturated.
+
 ## The HUD and screens: the style brief
 
 Ronald's reference sheets (`notes/ui-reference/`, eight sheets: panels and frames, inventory
