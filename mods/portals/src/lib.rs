@@ -1082,13 +1082,15 @@ fn client(r: &mut Registry) {
             c.world_join(&key);
         }
     });
+    // Anyone's: the mod itself runs it to word its lines in the player's language.
     r.client_command("portal_note", "<line:text>", |cmd| {
         let line = cmd.text("line").unwrap_or("").to_string();
         let (key, arg) = line.split_once(' ').unwrap_or((&line, ""));
         if key.starts_with("portals.msg.") {
             cmd.reply(key, &[Arg::Text(arg)]);
         }
-    });
+    })
+    .permission(permission::EVERYONE);
     r.menu(&SCREEN).screen(|ui| {
         let menu = MENU.lock().unwrap();
         let Some(m) = menu.as_ref() else { return };

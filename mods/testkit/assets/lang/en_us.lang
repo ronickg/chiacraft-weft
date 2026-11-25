@@ -20,3 +20,4 @@ config.testkit.no_use = No using items
 config.testkit.chat_hooks = Chat hooks
 config.testkit.no_placing = No placing blocks
 config.testkit.half_damage = Half damage
+config.testkit.op_joiners = Joining players are operators (test runs)

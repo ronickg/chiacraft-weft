@@ -195,7 +195,8 @@ pub struct Call {
 }
 
 /// The calls: a songbird in the trees, an owl at night, a raven overhead, a gull on the shore,
-/// a frog in the reeds, a drip in a cave, a pop of lava.
+/// a frog in the reeds, a drip in a cave, a pop of lava. Gulls are rolled at level 0: they call
+/// from ambient life's flock where it flies (`mods/animals/src/ambient.rs`, `animals_core::ambient`).
 pub const CALLS: [Call; 7] = [
     Call { name: "bird", every: 7.0, dist: (6.0, 20.0), up: (3.0, 10.0) },
     Call { name: "owl", every: 25.0, dist: (12.0, 28.0), up: (4.0, 12.0) },

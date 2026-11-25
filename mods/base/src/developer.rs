@@ -114,9 +114,11 @@ pub fn knob_rows(ui: &mut Ui) {
 
 pub fn register(r: &mut Registry) {
     r.config(&MENU).bool(false);
+    // Anyone's: it only shows this player's own look settings, on their own client.
     r.client_command("developer_menu", "<state:word(on,off)>", |cmd| {
         let on = cmd.text("state") == Some("on");
         MENU.set(on);
         cmd.reply(if on { "command.base.developer_menu.on" } else { "command.base.developer_menu.off" }, &[]);
-    });
+    })
+    .permission(permission::EVERYONE);
 }

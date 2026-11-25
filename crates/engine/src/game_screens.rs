@@ -384,18 +384,18 @@ impl Chat {
     /// Opened with `/` the command list shows at once.
     pub fn new(text: &str) -> Chat {
         let mut st = ChatState::default();
-        st.update(text, &[], weft_abi::permission::OWNER);
+        st.update(text, &[], weft_abi::permission::OWNER, true);
         Chat { state: Rc::new(RefCell::new(st)) }
     }
 }
 
 impl ChatState {
-    fn update(&mut self, text: &str, players: &[String], permission: u32) {
+    fn update(&mut self, text: &str, players: &[String], permission: u32, owner: bool) {
         self.text = text.to_string();
         self.selected = 0;
         self.stem = None;
         self.completion = text.strip_prefix('/').map(|line| {
-            let mut comp = crate::commands::complete(content(), line, players, permission);
+            let mut comp = crate::commands::complete(content(), line, players, permission, owner);
             comp.from += 1;
             comp
         });
@@ -472,9 +472,12 @@ impl Screen for Chat {
                                 .as_ref()
                                 .map(|c| c.players.clone())
                                 .unwrap_or_default();
-                            let permission = ctx.client.as_ref().map_or(0, |c| c.permission);
+                            let (permission, owner) = ctx
+                                .client
+                                .as_ref()
+                                .map_or((0, false), |c| (c.permission, c.local_host));
                             let mut s = state.borrow_mut();
-                            s.update(v, &players, permission);
+                            s.update(v, &players, permission, owner);
                             s.history = None;
                             ctx.requests.push(Request::Rebuild);
                         })),
@@ -493,7 +496,10 @@ impl Screen for Chat {
             .as_ref()
             .map(|c| c.players.clone())
             .unwrap_or_default();
-        let permission = ctx.client.as_ref().map_or(0, |c| c.permission);
+        let (permission, owner) = ctx
+            .client
+            .as_ref()
+            .map_or((0, false), |c| (c.permission, c.local_host));
         let sent = ctx
             .client
             .as_ref()
@@ -502,7 +508,7 @@ impl Screen for Chat {
         let mut st = self.state.borrow_mut();
         let n = st.completion.as_ref().map_or(0, |c| c.suggestions.len());
         let set = |st: &mut ChatState, text: String, ctx: &mut Ctx| {
-            st.update(&text, &players, permission);
+            st.update(&text, &players, permission, owner);
             ctx.set_input("chat", text);
             ctx.requests.push(Request::Rebuild);
         };

@@ -151,6 +151,7 @@ static GPU_DLSS_MODES: Config<i32> = Config::named("core:gpu_dlss_modes");
 static GPU_DLSS_RR: Config<bool> = Config::named("core:gpu_dlss_rr");
 static DLSS: Config<i32> = Config::named("core:dlss");
 static DLSS_MODEL_DLAA: Config<i32> = Config::named("core:dlss_model_dlaa");
+static DLSS_MODEL_PERFORMANCE: Config<i32> = Config::named("core:dlss_model_performance");
 static DLSS_RR: Config<bool> = Config::named("core:dlss_rr");
 /// What the detection chose (Research round 19, 7: "quality chosen by the GPU at first start"):
 /// the preset (-1 none yet), and whether the render scale went to half with it.
@@ -303,11 +304,35 @@ fn ultra_extras() {
     // DLAA (DLSS at the screen's own size) where the renderer has it, with its newest model (M,
     // 13) and Ray Reconstruction where that runs (windows-dlss5, 11-06): the engine then skips its
     // own gathering for the frame. Elsewhere TAA as above.
-    if GPU_DLSS_MODES.get() & (1 << 1) != 0 {
+    // On an RTX 20 or 30 (`older_rtx`) Performance with M instead: there M costs about 10.6 ms at
+    // DLAA (E 1.4, K 2.3) and DLAA with Ray Reconstruction 45 ms, Performance M 12.5 in all, and in
+    // motion E and K drew stripes beside the pool where M stayed clean (3060 Laptop, w4 and w8,
+    // 11-25; Planner agreed). Quality with E stays the cheaper choice in the DLSS tab.
+    let modes = GPU_DLSS_MODES.get();
+    if older_rtx() && modes & (1 << 4) != 0 {
+        DLSS.set(4);
+        DLSS_MODEL_PERFORMANCE.set(13);
+        DLSS_RR.set(GPU_DLSS_RR.get());
+    } else if modes & (1 << 1) != 0 {
         DLSS.set(1);
         DLSS_MODEL_DLAA.set(13);
         DLSS_RR.set(GPU_DLSS_RR.get());
     }
+    weft_sdk::info!("video: Ultra's DLSS mode {} (modes {modes:#b}, RTX 20/30: {})", DLSS.get(), older_rtx());
+}
+
+/// A GeForce RTX 20 or 30, a TITAN RTX or an RTX A (workstation Ampere), by the GPU's name
+/// (`--fake-gpu-name` pretends): Turing and Ampere, which run DLSS's transformer models (K, M) at
+/// several times the CNN's cost. An RTX 40, 50 or a name not known: the newest models at full size.
+pub(crate) fn older_rtx() -> bool {
+    let name = weft_sdk::client::launch_option("fake-gpu-name")
+        .unwrap_or_else(|| GPU_NAME.get())
+        .to_lowercase();
+    // (Ada's workstation cards are named "RTX 2000 Ada" and the like.)
+    !name.contains("ada")
+        && ["rtx 20", "rtx 30", "titan rtx", "rtx a"]
+            .iter()
+            .any(|w| name.contains(w))
 }
 
 /// Preset `q`'s name (`video.base.preset.<name>`); None for Custom and not chosen.
@@ -539,10 +564,13 @@ fn apply(p: usize) {
     PRESET_LAST.set(p as i32);
     weft_sdk::info!("video: the {} preset, every feature at {}", preset_name(p as i32).unwrap_or("?"), STEP_NAMES[at]);
     if p == ULTRA {
+        crate::dlss::AUTO.set(false);
         ultra_extras();
     } else if GPU_DLSS_MODES.get() != 0 {
-        // DLSS is live: off again with any other preset, as Ultra is the one that turns it on.
-        DLSS.set(0);
+        // DLSS is live (an RTX card): on in Auto, its mode by the screen's height and its model by
+        // the GPU (`dlss::follow_auto`), as most RTX games start (Planner from Ronald, 11-25). Off
+        // is one step back on the DLSS tab's Mode row. Elsewhere the upscaler setting as before.
+        crate::dlss::AUTO.set(true);
     }
     fantasy_caps(p, true);
 }
@@ -766,11 +794,21 @@ fn fantasy_caps(q: usize, bloom_up: bool) {
 
 /// A row's line on a settings screen: its name, ‹ value ›, and what it does (or that it waits
 /// for a restart).
+/// Runs `f`, and builds the screen again when it moved the quality (a preset chosen, a row making
+/// it Custom): a mod's screen is built once, and the presets' buttons show which one is on.
+fn quality_changing(c: &ClientView, f: impl FnOnce()) {
+    let was = QUALITY.get();
+    f();
+    if QUALITY.get() != was {
+        c.client().rebuild_screen();
+    }
+}
+
 fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
     let row = &rows[i];
     ui.row(S::row().gap(3.0).center(), move |ui| {
         ui.text_styled(S::default().w(84.0).no_wrap(), &format!("video.base.{}", row.key), &[]);
-        ui.button("video.base.less", S::default().size(12.0, 12.0).pad(0.5), move |_| step(i, -1));
+        ui.button("video.base.less", S::default().size(12.0, 12.0).pad(0.5), move |c| quality_changing(c, || step(i, -1)));
         ui.row(S::row().w(96.0).center(), move |ui| {
             ui.text_bind_styled(S::default().no_wrap(), move |_, t| {
                 let (k, n) = (rows[i].shown)((rows[i].get)());
@@ -781,7 +819,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
                 }
             });
         });
-        ui.button("video.base.more", S::default().size(12.0, 12.0).pad(0.5), move |_| step(i, 1));
+        ui.button("video.base.more", S::default().size(12.0, 12.0).pad(0.5), move |c| quality_changing(c, || step(i, 1)));
         // What its value costs here (`video_costs`).
         crate::video_costs::cost_cell(ui, row.key, row.get);
         // A value waiting for the next start says so in place of what the row does.
@@ -1165,13 +1203,20 @@ pub fn register(r: &mut Registry) {
             // The presets, and which one the settings are now.
             ui.row(S::row().gap(3.0).center(), |ui| {
                 ui.text_styled(S::default().w(84.0).no_wrap(), "video.base.quality", &[]);
+                // The preset the settings are now stands pressed (amber); none while Custom.
+                let preset = |ui: &mut Ui, name: &str, p: usize| {
+                    let on = QUALITY.get() == p as i32;
+                    ui.button(&format!("video.base.preset.{name}"), S::default().w(52.0).selected(on), move |c| {
+                        quality_changing(c, || apply(p))
+                    });
+                };
                 if on_phone() {
-                    ui.button("video.base.preset.phone", S::default().w(52.0), move |_| apply(PHONE));
+                    preset(ui, "phone", PHONE);
                 }
                 for (p, name) in PRESET_NAMES.iter().enumerate() {
-                    ui.button(&format!("video.base.preset.{name}"), S::default().w(52.0), move |_| apply(p));
+                    preset(ui, name, p);
                 }
-                ui.button("video.base.preset.ultra", S::default().w(52.0), move |_| apply(ULTRA));
+                preset(ui, "ultra", ULTRA);
             });
             ui.row(S::row().gap(3.0), |ui| {
                 ui.row(S::row().w(84.0), |_| {});
@@ -1202,7 +1247,9 @@ pub fn register(r: &mut Registry) {
                         None => t.set("video.base.detected.gpu", &[Arg::Text(&shown), Arg::Key(&format!("video.base.gpu.{class}"))]),
                     }
                 });
-                ui.button("video.base.detect", S::default().h(12.0).pad_xy(5.0, 2.0), |c| apply_detected(c.client().state().window));
+                ui.button("video.base.detect", S::default().h(12.0).pad_xy(5.0, 2.0), |c| {
+                    quality_changing(c, || apply_detected(c.client().state().window))
+                });
             });
             // Each feature's quality, Low to Ultra (what a preset sets), then the player's own rows,
             // scrolled: they don't fit a 720p window at 2x.
