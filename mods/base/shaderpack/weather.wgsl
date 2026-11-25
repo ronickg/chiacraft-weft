@@ -120,7 +120,7 @@ fn fs(in: VOut) -> WeatherOut {
     if cover < 0.004 {
         discard;
     }
-    let light = light_round(unpack_light(in.data.y), vec3(0.0), vec3(1e4));
+    let light = light_weather(unpack_light(in.data.y), in.rel);
     // Drops a pale grey-blue, flakes white; fading out right by the eye.
     let tint = select(vec3(0.78, 0.84, 0.92), vec3(1.0, 1.0, 1.04), snow);
     let near = smoothstep(select(1.5, 1.0, snow), select(6.0, 3.0, snow), length(in.rel));

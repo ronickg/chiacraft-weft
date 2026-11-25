@@ -65,8 +65,9 @@ impl FrameLook {
         }
     }
 
-    /// Records this frame's pass with the sky's buffers (`objects`, `scene`).
-    pub fn frame(&mut self, gpu: &mut dyn Backend, objects: BufferId, scene: BufferId) {
+    /// Records this frame's pass with the sky's buffers (`objects`, `scene`), drawn with the soft
+    /// clouds' entry (`clouds`) when there is one, so the pack can take them into its averages.
+    pub fn frame(&mut self, gpu: &mut dyn Backend, objects: BufferId, scene: BufferId, clouds: Option<u32>) {
         self.passes.clear();
         let Some(pipe) = self.pipe else {
             self.scene = [0.0; 4];
@@ -79,14 +80,14 @@ impl FrameLook {
             );
             (t, gpu.texture_index(t))
         });
-        self.scene = [index as f32 + 1.0, 0.0, 0.0, 0.0];
+        self.scene = [index as f32 + 1.0, 0.0, if clouds.is_some() { 1.0 } else { 0.0 }, 0.0];
         self.passes
             .push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(t), Some([0.0; 4]))), depth: None });
         self.passes.pipeline(pipe);
         self.passes.bind(bind::sky::OBJECTS, objects);
         self.passes.bind(bind::sky::SCENE, scene);
         self.passes
-            .push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: 0 });
+            .push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: clouds.unwrap_or(0) });
         self.passes.push(Cmd::EndPass);
     }
 }

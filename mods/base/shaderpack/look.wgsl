@@ -1738,10 +1738,18 @@ fn soft_cloud_shadow(rel: vec3<f32>) -> f32 {
     let mid = textureLoad(t, vec2(half, half), 0).g;
     let q = rel.xz + l.xz * (mid - rel.y) / l.y;
     let uv = q / CLOUD_SHADOW_SPAN + 0.5;
+    var through = 0.0;
     if any(uv < vec2(0.0)) || any(uv > vec2(1.0)) {
-        return 1.0;
+        // Past the map, the deck's mean over it (a 3 x 3 grid of taps), not an open sky: at 1 a
+        // storm's far land, the fog's far steps and the sky's march were sunlit beyond a hard
+        // straight edge (lkmxS1's rain vista). Bliss's cloud shadow has no edge to cross.
+        for (var i = 0; i < 9; i++) {
+            let g = vec2(f32(i % 3), f32(i / 3)) / 3.0 + 1.0 / 6.0;
+            through += textureSampleLevel(t, linear_clamp, g, 0.0).r / 9.0;
+        }
+    } else {
+        through = textureSampleLevel(t, linear_clamp, uv, 0.0).r;
     }
-    let through = textureSampleLevel(t, linear_clamp, uv, 0.0).r;
     // Fading in as the light climbs: long low shadows from far clouds would smear across the land.
     return mix(1.0, through, smoothstep(0.03, 0.15, l.y));
 }
@@ -1998,6 +2006,29 @@ fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
     }
     return c;
+}
+// Rain and snow's light (`weather.wgsl`). With the land lit from the physical sky, Bliss's particle
+// light (all_particles.fsh, method only): the sky's average x 0.5 through its lightmap curve
+// ((L^15 x 2 + L^2.5) x 0.5 x 0.7), its minimum light, and the sun through the shadow map (the
+// lightmap's (L - 0.8) x 25 where the map isn't) and the clouds' shadow, x (2 HG(0.65) + 0.5) toward
+// the sun. Ours before took the sun unshadowed at half strength, and under the 4300 K sun of the
+// physical sky the flakes and drops glowed gold over a dark storm (lkmxS1's snow and rain).
+// (Bliss itself draws no colour for its weather, only a mask that thins its bloomy fog.)
+fn light_weather(light: vec4<f32>, rel: vec3<f32>) -> vec3<f32> {
+    if !land_from_sky() {
+        return light_round(light, vec3(0.0), vec3(1e4));
+    }
+    let p = palette();
+    let l = light.x;
+    var c = p.ambient * 0.5 * (pow(l, 15.0) * 2.0 + pow(l, 2.5)) * 0.35 + vec3(bliss_min_light());
+    let mu = clamp(dot(normalize(rel), light_dir()), 0.0, 1.0);
+    let g = 0.65;
+    let phase = (0.25 - 0.25 * g * g) * pow(1.0 + g * g - 2.0 * g * mu, -1.5) / 3.14;
+    let shadow = min(sun_reaches(rel), clamp((l - 0.8) * 25.0, 0.0, 1.0)) * cloud_shadow(rel);
+    c += p.sun * light_strength() * shadow * (phase * 2.0 + 0.5);
+    let blocks = block_light(light.yzw, vec3(0.0)) * block_by_day(l);
+    NIGHT_SKY_SHARE = night_sky_share(c, blocks);
+    return c + blocks;
 }
 // Bliss's minimum light in ours: max(0.01, night vision x 0.1) of its lighting units, / 41; the
 // Brightness setting above its middle counts as night vision.

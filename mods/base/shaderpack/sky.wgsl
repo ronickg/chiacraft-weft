@@ -1019,7 +1019,12 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
     }
     if open_sky() && !in_liquid() {
         sky_seen = 1.0;
-        var c = sky_color(dir) + milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir) + fireball(dir) + lightning_bolt(dir);
+        // The night sky's own lights (ours; Bliss has none of them) were set against the engine's
+        // star at the screen's white: with the land lit from the physical sky they keep their place
+        // against Bliss's stars (10 / 41 at a star's peak), as the stars took (lkmxS1's night
+        // clouds: the Milky Way and the aurora stood out bright over Bliss's dark navy).
+        let night_lights = select(1.0, 10.0 / BLISS_UNITS, land_from_sky());
+        var c = sky_color(dir) + (milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir)) * night_lights + fireball(dir) + lightning_bolt(dir);
         // The rainbow in the rain, in front of the high cirrus.
         c = rainbow_on(cirrus(c, dir), dir);
         if dir.y < 0.0 {
@@ -1362,13 +1367,34 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     sum += a.light;
                 }
                 let mean = sum / 9.0;
-                var wet = vec3(0.0);
+                var wet: array<vec3<f32>, 9>;
+                var clear = vec3(0.0);
                 for (var i = 0; i < 9; i++) {
                     let dir = atm_mean_dir(i, sun);
                     let a = atm_march(dir, sun, moon, sky_k, atm_background(mean), 4, 2);
-                    wet += atm_rain(a.light, dir, a.through, mean);
+                    wet[i] = atm_rain(a.light, dir, a.through, mean);
+                    clear += wet[i];
                 }
-                return vec4(land_ambient(wet / 9.0), 1.0);
+                // Bliss averages its sky with the clouds in it (deferred.vsh's skyCloudsFromTex,
+                // method only): an overcast sky's light is the decks' grey-white, not the clear
+                // air's blue behind them. The soft clouds marched along the same nine looks (this
+                // pass is drawn with their entry, `frame_look.z`), lit by this frame's sun and the
+                // clear sky's light (the palette set here: this pass may not read its own target).
+                // Without them the land under rain and snow, and the caves, took the clear sky's
+                // blue (lkmxS1: dark blue snow at noon, blue cave stone, a blue rain vista).
+                if scene.frame_look.z > 0.5 {
+                    let s = sky[in.index];
+                    let k = mix(1.0, clamp(fantasy_opt(OPT_CHAIN_NIGHT), 0.0, 1.0), smoothstep(-0.04, -0.2, scene.sun.y));
+                    PAL = Palette(p.zenith * k, p.horizon * k, p.glow * k, land_sun(sun, moon_k), land_ambient(clear / 9.0));
+                    PAL_READ = true;
+                    var cloudy = vec3(0.0);
+                    for (var i = 0; i < 9; i++) {
+                        let cl = soft_march(s, atm_mean_dir(i, sun), SOFT_REACH, 0.5);
+                        cloudy += wet[i] * cl.a + cl.rgb;
+                    }
+                    return vec4(land_ambient(cloudy / 9.0), 1.0);
+                }
+                return vec4(land_ambient(clear / 9.0), 1.0);
             }
             return vec4(p.ambient, 1.0);
         }
