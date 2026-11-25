@@ -75,7 +75,8 @@ def main(argv):
     if md:
         open(md, "w").write(text + "\n")
     print(text)
-    if missing or not registered:
+    # Any fault fails the run, as a screen it never opened does (overflow is an error).
+    if faults or missing or not registered:
         sys.exit(1)
 
 

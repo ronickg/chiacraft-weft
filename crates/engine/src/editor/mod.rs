@@ -607,7 +607,7 @@ impl Screen for Editor {
         }
         let tall = (cx.size.y - 70.0).clamp(160.0, 430.0);
         // Stacked (`narrow` below): the list and form shorter, so both rows fit the screen.
-        let stacked = (cx.size.x - 16.0).clamp(400.0, 960.0) - 20.0 - LIST_W - FORM_W - 2.0 * (Scrollbar::HANDLE[0] + Scrollbar::OUTSIDE_GAP * 2.0) < RIGHT_MIN;
+        let stacked = (cx.size.x - 16.0).clamp(400.0, 960.0) - 20.0 - LIST_W - FORM_W - 2.0 * (Scrollbar::HANDLE[0] + Scrollbar::OUTSIDE_GAP * 2.0) - 24.0 < RIGHT_MIN;
         let tall = if stacked { ((cx.size.y - 76.0) / 1.5).clamp(120.0, 430.0) } else { tall };
         // As wide as the screen inside the background's padding allows, up to 960: a floor of 660
         // passed a 640 GUI px screen (4K at 6x, 720p at 2x: the text-fit check, chiacraft 11-24),
@@ -648,7 +648,10 @@ impl Screen for Editor {
                     close_button(ui, 15.0);
                 });
                 let gap = Scrollbar::HANDLE[0] + Scrollbar::OUTSIDE_GAP * 2.0;
-                let right_w = wide - 20.0 - LIST_W - FORM_W - 2.0 * gap;
+                // Less 24 GUI px: the three columns came out 20 wider than their widths (the
+                // text-fit check at 960 GUI px, 1080p at 2x and 4K at 4x: the window 2 px off each
+                // side), what the scrolling list and form take beside their own.
+                let right_w = wide - 20.0 - LIST_W - FORM_W - 2.0 * gap - 24.0;
                 // A screen too narrow for three columns (640 GUI px: 4K at 6x, 720p at 2x) puts
                 // the code and the preview side by side under the list and the form; the screen
                 // scrolls (chiacraft 11-24, the text-fit check: the third column ran 6 px off).
