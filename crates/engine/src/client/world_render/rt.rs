@@ -799,6 +799,7 @@ impl WorldRenderer {
         if stale {
             let words = light_words(&self.cube_lights);
             let n = words.len() as u64;
+            log::info!(target: "rt", "path traced lights: {} cubes, {} lights, frame {frame}", self.cube_lights.len(), words[1]);
             if self.pt_lights.as_ref().is_none_or(|l| l.words < n) {
                 if let Some(l) = self.pt_lights.take() {
                     l.destroy(gpu);
