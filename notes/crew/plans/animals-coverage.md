@@ -645,7 +645,7 @@ their own. Since facb1a89f (working since ffdb839c1, which attaches `HURT_AT`) e
 | What | cause | fix | checked |
 |---|---|---|---|
 | HUD health over max in Drenkaun's shot ("1585 / 90") | base clamped health to its own fed max and the HUD divided by it, but anything else on the engine's max (the script's +300, the game's health boost +4) was outside both | base counts the rest of the engine's max (`base:fed_set`), and the HUD and the levels screen show the engine's whole max (7d0700f1b) | to run: expect about "1585 / 1690" in shot 5, and 84/89 in Borkon's shot |
-| wyvern pad empty in the shot | the hit wyvern stayed angry at the player after they turned spectator and followed them to the watch spot at z 574, out of frame | anger at a spectator ends (`knockout::behave`, 7d0700f1b's next commit) | to run: wyvern on its pad in shot 4 |
+| wyvern pad empty in the shot | the hit wyvern stayed angry at the player after they turned spectator and followed them to the watch spot at z 574, out of frame | anger at a spectator ends (`knockout::behave`, 598c06be7) | to run: wyvern on its pad in shot 4 |
 | night caiman shot black | no light at 01:37 | glowstone round the night pads after the watching, before the shot (hunters' caimans, birds' owls; 75668b544) | to run |
 
 ## Sounds
