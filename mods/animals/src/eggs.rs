@@ -746,7 +746,7 @@ fn place(u: &mut ItemUse) -> bool {
 pub fn hurry(w: &World, at: [f64; 3]) {
     // Nothing left: it hatches at its next step whatever the air (with a little left, an egg in
     // air too cool to develop never did, B7's playtest).
-    for id in eggs_near(w, at, 16.0) {
+    for id in eggs_near(w, at, crate::breeding::HURRY_NEAR) {
         if let Some(e) = w.component_mut(id, &EGG) {
             e.left = 0;
         }

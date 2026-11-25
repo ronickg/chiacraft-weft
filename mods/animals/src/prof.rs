@@ -315,6 +315,14 @@ pub fn init(r: &mut Registry) {
                 w.damage(id, Damage::new(dmg, damage_cause::ATTACK).by(cmd.player()));
                 format!("HIT {id} for {dmg}")
             }
+            "love" => {
+                // Every grown wild animal within `value` blocks (24 by default) falls in love,
+                // wild (untamed, unlike `/animal love`): pairs meet and mate, for the young's
+                // coverage check (mothers whose young follow them).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let n = crate::breeding::wild_love_near(&w, me.pos, cmd.float("value").unwrap_or(24.0));
+                format!("LOVE {n}")
+            }
             "fear" => {
                 // The fear of the ground where the player stands, and red deer's (and hares')
                 // reputation of him there.
@@ -354,7 +362,7 @@ pub fn init(r: &mut Registry) {
                         Some(format!(
                             "{id} {}{} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}/{:.0}",
                             a.species()?.name,
-                            if crate::breeding::young(&w, id) { " (young)" } else { "" },
+                            crate::breeding::young_note(&w, id),
                             e.pos.x,
                             e.pos.y,
                             e.pos.z,

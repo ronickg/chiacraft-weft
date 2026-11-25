@@ -219,15 +219,22 @@ YOUNG = [
     [("protoceratops", 6, -8, -8), ("iguanodont", 4, 4, 4)],
 ]
 s = head("young", [
-    "Animal AI coverage, the young. `/tk spawn` gives some of a kind young (\"(young)\" in the where rows). Each part: six of",
-    "a kind fed and watered, watched 40 s (a young one keeps near its mother: its distance to the nearest grown one of its",
-    "kind), then `/animal hurry` (growing up within a second) and watched again (\"(young)\" gone, max health up). Report per",
-    "species: young spawned (how many), keeps by a grown one (distance), grows up (before/after health); the shots.",
+    "Animal AI coverage, the young, born to mothers on the pad. Each part: six of a kind fed and watered,",
+    "`/animalprof love` (every grown wild one in love: pairs meet and \"mated with\"), then `/animal hurry` (the",
+    "mothers give birth or lay; the egg layers' part hurries again to hatch), watched 50 s (where rows: \"(young, N",
+    "from its mother M)\": a young one keeps within a few blocks of her), then `/animal hurry` again and watched (no",
+    "\"(young)\" left, max health up). Report per species: mated, born/hatched (how many), the distances to the",
+    "mothers, grows up (before/after health); the shots.",
 ])
 for i, g in enumerate(YOUNG):
     x = i * 200
+    lays = g[0][0] == "protoceratops"
     s += pad(x) + spawns(x, g) + ["chat /animalprof food 0.9", "chat /animalprof water 0.9"]
-    s += watch(x, 4) + shot(x, f"cov_young_{i+1}_{g[0][0]}") + [f"chat /tp {x} 72 {Z}", "chat /animal hurry", "wait 3"] + watch(x, 2)
+    s += [f"chat /tp {x} 72 {Z}", "chat /animalprof love 24", "wait 25", "chat /animal hurry", "wait 4"]
+    if lays:
+        s += ["chat /animal hurry", "wait 4"]
+    s += watch(x, 5) + shot(x, f"cov_young_{i+1}_{g[0][0]}", z_back=10, pitch=-45)
+    s += [f"chat /tp {x} 72 {Z}", "chat /animal hurry", "wait 3"] + watch(x, 2)
 write("young", s)
 
 # 7. Taming and eggs.

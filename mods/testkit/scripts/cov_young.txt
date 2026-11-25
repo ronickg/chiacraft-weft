@@ -1,7 +1,9 @@
-# Animal AI coverage, the young. `/tk spawn` gives some of a kind young ("(young)" in the where rows). Each part: six of
-# a kind fed and watered, watched 40 s (a young one keeps near its mother: its distance to the nearest grown one of its
-# kind), then `/animal hurry` (growing up within a second) and watched again ("(young)" gone, max health up). Report per
-# species: young spawned (how many), keeps by a grown one (distance), grows up (before/after health); the shots.
+# Animal AI coverage, the young, born to mothers on the pad. Each part: six of a kind fed and watered,
+# `/animalprof love` (every grown wild one in love: pairs meet and "mated with"), then `/animal hurry` (the
+# mothers give birth or lay; the egg layers' part hurries again to hatch), watched 50 s (where rows: "(young, N
+# from its mother M)": a young one keeps within a few blocks of her), then `/animal hurry` again and watched (no
+# "(young)" left, max health up). Report per species: mated, born/hatched (how many), the distances to the
+# mothers, grows up (before/after health); the shots.
 loaded
 idle
 chat /tk mode creative
@@ -38,6 +40,11 @@ chat /tk spawn animals:reindeer 8 70 550
 wait 2
 chat /animalprof food 0.9
 chat /animalprof water 0.9
+chat /tp 0 72 544
+chat /animalprof love 24
+wait 25
+chat /animal hurry
+wait 4
 chat /tp 0 95 574
 wait 1
 chat /animalprof where 64
@@ -48,9 +55,11 @@ chat /animalprof where 64
 wait 10
 chat /animalprof where 64
 wait 10
+chat /animalprof where 64
+wait 10
 chat /tick freeze
-chat /tp 0 82 558
-look 0 -38
+chat /tp 0 82 554
+look 0 -45
 wait 2
 shot cov_young_1_white_tailed_deer.png
 chat /tick unfreeze
@@ -86,6 +95,11 @@ chat /tk spawn animals:grey_wolf 204 70 550
 wait 2
 chat /animalprof food 0.9
 chat /animalprof water 0.9
+chat /tp 200 72 544
+chat /animalprof love 24
+wait 25
+chat /animal hurry
+wait 4
 chat /tp 200 95 574
 wait 1
 chat /animalprof where 64
@@ -96,9 +110,11 @@ chat /animalprof where 64
 wait 10
 chat /animalprof where 64
 wait 10
+chat /animalprof where 64
+wait 10
 chat /tick freeze
-chat /tp 200 82 558
-look 0 -38
+chat /tp 200 82 554
+look 0 -45
 wait 2
 shot cov_young_2_capybara.png
 chat /tick unfreeze
@@ -134,6 +150,11 @@ chat /tk spawn animals:hare 408 70 550
 wait 2
 chat /animalprof food 0.9
 chat /animalprof water 0.9
+chat /tp 400 72 544
+chat /animalprof love 24
+wait 25
+chat /animal hurry
+wait 4
 chat /tp 400 95 574
 wait 1
 chat /animalprof where 64
@@ -144,9 +165,11 @@ chat /animalprof where 64
 wait 10
 chat /animalprof where 64
 wait 10
+chat /animalprof where 64
+wait 10
 chat /tick freeze
-chat /tp 400 82 558
-look 0 -38
+chat /tp 400 82 554
+look 0 -45
 wait 2
 shot cov_young_3_jaguar.png
 chat /tick unfreeze
@@ -182,6 +205,13 @@ chat /tk spawn animals:iguanodont 604 70 550
 wait 2
 chat /animalprof food 0.9
 chat /animalprof water 0.9
+chat /tp 600 72 544
+chat /animalprof love 24
+wait 25
+chat /animal hurry
+wait 4
+chat /animal hurry
+wait 4
 chat /tp 600 95 574
 wait 1
 chat /animalprof where 64
@@ -192,9 +222,11 @@ chat /animalprof where 64
 wait 10
 chat /animalprof where 64
 wait 10
+chat /animalprof where 64
+wait 10
 chat /tick freeze
-chat /tp 600 82 558
-look 0 -38
+chat /tp 600 82 554
+look 0 -45
 wait 2
 shot cov_young_4_protoceratops.png
 chat /tick unfreeze

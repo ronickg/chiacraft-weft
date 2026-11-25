@@ -136,16 +136,31 @@ kind) has no answer to a hit but its breath; left as is.
 
 ## Young (cov_young.txt)
 
-| Species | young spawned | keeps by a grown one | grows up | shot |
+Run 1 (1ff853abf, Tester, `cov_young_m-162151`): a script failure, not a game one. Young came only from
+`/tk spawn`'s wild ones (a quarter of those met in their breeding season, which summer is not for deer,
+reindeer or wolves), and a wild young one has no mother to keep by; `/animal hurry` reached 16 blocks, so the
+young at a pad's edge stayed young; the where rows' 40 blocks missed the deer, capybara and protoceratops.
+What it did show: hares 4 of 6 and an iguanodont 1 of 4 young, and those `hurry` reached grew up (hare 74
+health 10/10 to 10/12, iguanodont 112 263/263 to 264/430).
+
+Run 2 (to come): `/animalprof love` puts every grown wild one in love, so pairs mate and the young are born
+to mothers on the pad; where rows give each young one's distance to its mother; `hurry` reaches 32 blocks.
+
+| Species | young (run 1) | keeps by its mother | grows up | shot |
 |---|---|---|---|---|
-| white_tailed_deer | - | - | - | |
-| reindeer | - | - | - | |
-| capybara | - | - | - | |
-| grey_wolf | - | - | - | |
-| jaguar | - | - | - | |
-| hare | - | - | - | |
-| protoceratops | - | - | - | |
-| iguanodont | - | - | - | |
+| white_tailed_deer | none (out of season) | not tested | not tested | |
+| reindeer | none (out of season) | not tested | not tested | |
+| capybara | not in the rows | not tested | not tested | |
+| grey_wolf | none (out of season) | not tested | not tested | |
+| jaguar | none seen | not tested | not tested | |
+| hare | 4 of 6 | wild young, no mother (2 to 20 from grown ones) | pass (74) | |
+| protoceratops | not in the rows | not tested | not tested | |
+| iguanodont | 1 of 4 | wild young, no mother (3 to 7) | pass (112: 263 to 430 max health) | |
+
+Grid: `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_young_m-162151/cov_young_grid.jpg` (the pads
+from afar; the young can't be told from the grown ones in it). Missing clips: the lying and sitting looks
+lack their idle clips (reindeer, deer, wolf, capybara, jaguar, hare, iguanodont, protoceratops: 30 "no clip"
+lines, listed for the art side).
 
 ## Taming and eggs (cov_taming.txt)
 

@@ -577,11 +577,47 @@ pub fn love_near(w: &World, player: u64) {
     }
 }
 
+/// How near the player `/animal hurry` reaches: a whole coverage pad (33 blocks across) from its
+/// middle (at 16, the young at a pad's edge stayed young).
+pub const HURRY_NEAR: f64 = 32.0;
+
+/// `/animalprof love` (for testing): every grown, rested wild animal within `r` of `at` falls in
+/// love as `wild_love` would have it, tame ones left alone; how many.
+pub fn wild_love_near(w: &World, at: Vec3, r: f64) -> usize {
+    let mut n = 0;
+    for id in w.entities_near(at, r, None) {
+        if crate::animal::tamed(w, id)
+            || w.component(id, &ANIMAL)
+                .is_none_or(|a| a.species == 0 || !life::can_breed(a.stage))
+        {
+            continue;
+        }
+        if let Some(b) = w.component_mut(id, &BREEDING)
+            && b.growing == 0
+            && b.carrying == 0
+        {
+            (b.love, b.rest) = (LOVE_TICKS, 0);
+            n += 1;
+        }
+    }
+    n
+}
+
+/// A where row's note on a young one (`/animalprof where`): " (young)", and how far its mother
+/// is while she lives.
+pub fn young_note(w: &World, id: u64) -> String {
+    let Some(b) = w.component(id, &BREEDING).filter(|b| b.growing > 0) else { return String::new() };
+    match (w.entity(id), w.entity(b.mother).filter(|_| b.mother != 0)) {
+        (Some(me), Some(m)) => format!(" (young, {:.0} from its mother {})", crate::dist2(me.pos, m.pos).sqrt(), b.mother),
+        _ => " (young)".into(),
+    }
+}
+
 /// `/animal hurry` (for testing): every mother near `player` gives birth or lays within a
 /// second, every egg hatches, every young one grows up.
 pub fn hurry_near(w: &World, player: u64) {
     let Some(p) = w.entity(player) else { return };
-    for id in w.entities_near(p.pos, 16.0, None) {
+    for id in w.entities_near(p.pos, HURRY_NEAR, None) {
         if let Some(b) = w.component_mut(id, &BREEDING) {
             b.carrying = b.carrying.min(20);
             b.growing = b.growing.min(20);
