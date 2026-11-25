@@ -1,0 +1,84 @@
+# A countdown far from any player ends on time (Planner 11-25, after er1124b: animals' per-tick countdowns by
+# `World::tick_elapsed`). Two jaguars (a knock-out kind) knocked out at the same tick (`/animalprof ko 1`: torpor at its
+# most, it wakes when 4800 ticks have drained it, `knockout::OUT_DRAIN`): one beside the player, ticking every tick, one
+# 100 blocks east, past `core:entity_activation_distance` (48), resting (its kind ticks once in 20). Both should log
+# "woke up at game time" about 4800 ticks after their "knocked out at game time", the far one within 20 ticks of the near
+# one; counted down by 1 a call, the far one would sleep 20 times as long.
+# Report from the log: the KO line, each jaguar's "knocked out" and "woke up" game times and the difference, any other
+# animal knocked out (natural ones near), errors.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /tk fill ~-6 ~-1 ~-6 ~6 ~-1 ~6 base:grass
+chat /tk fill ~-6 ~ ~-6 ~6 ~4 ~6 core:air
+chat /tk fill 96 69 540 104 69 548 base:grass
+chat /tk fill 96 70 540 104 74 548 core:air
+wait 2
+chat /tk spawn animals:jaguar ~3 ~ ~
+chat /tk spawn animals:jaguar 100 70 544
+chat /anim log
+# The far one arrives at its first tick (once in 20 ticks): knocked out before, it had no torpor to lose (koFar1).
+wait 3
+chat /animalprof ko 1
+wait 2
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+quit

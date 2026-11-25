@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -153,6 +153,46 @@ pub fn init(r: &mut Registry) {
                     }
                 }
                 format!("{n} hunters at {:.0}% food", v * 100.0)
+            }
+            "ko" => {
+                // Every wild knock-out kind within 128 blocks out cold with this share of its most
+                // torpor (1: out, waking in 4800 ticks), near and far alike: one past the activation
+                // distance ticks once in 20 (`World::tick_elapsed`) and should wake as soon
+                // (`herd_ko_far.txt`).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(1.0).max(0.0) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 128.0, None) {
+                    if let Some(a) = w.component(id, &crate::animal::ANIMAL)
+                        && w.component(id, &crate::knockout::KNOCKOUT).is_some()
+                    {
+                        crate::knockout::add_torpor(&w, id, a.stat(crate::species::TORPOR) * v);
+                        n += 1;
+                    }
+                }
+                format!("KO {n} at {:.0}% torpor, game time {}", v * 100.0, w.game_time())
+            }
+            "chill" => {
+                // Warm-blooded hunters feel cold (not freezing) whatever the air, 1 on, 0 off.
+                let on = cmd.float("value").unwrap_or(1.0) > 0.5;
+                crate::comfort::CHILL.store(on, Relaxed);
+                format!("CHILL {on}")
+            }
+            "hunter" => {
+                // The hunter nearest the player alone has this share of its food (one of a pack
+                // full beside hungry ones, `herd_wolves_pack.txt`).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(0.3).clamp(0.0, 1.0) as f32;
+                let near = w
+                    .entities_near(me.pos, 16.0, None)
+                    .into_iter()
+                    .filter(|&id| w.component(id, &crate::animal::ANIMAL).is_some_and(|a| a.species().is_some_and(|s| s.hunts())))
+                    .filter_map(|id| Some((crate::dist2(w.entity(id)?.pos, me.pos), id)))
+                    .min_by(|a, b| a.0.total_cmp(&b.0));
+                let Some((_, id)) = near else { return };
+                let Some(a) = w.component_mut(id, &crate::animal::ANIMAL) else { return };
+                a.food = (a.stat(crate::species::FOOD) * v) as u16;
+                format!("HUNTER {id} at {:.0}% food", v * 100.0)
             }
             "wound" => {
                 // Every wild animal within 96 blocks down to this share of its health (a blow with
@@ -433,8 +473,10 @@ pub fn init(r: &mut Registry) {
                 else {
                     return;
                 };
-                w.damage(prey, Damage::new(1.0, damage_cause::ATTACK).by(hunter));
-                format!("BITE {hunter} bites {prey}")
+                // As hard as asked (a kill of its own at once with a big one).
+                let hard = cmd.float("value").unwrap_or(1.0).max(0.0) as f32;
+                w.damage(prey, Damage::new(hard, damage_cause::ATTACK).by(hunter));
+                format!("BITE {hunter} bites {prey} for {hard}")
             }
             "off" => {
                 ON.store(false, Relaxed);
