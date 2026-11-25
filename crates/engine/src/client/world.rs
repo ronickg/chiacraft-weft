@@ -1054,8 +1054,7 @@ impl ClientWorld {
             .map(|s| s.cube.light(local_index(p)))
     }
 
-    /// The cells bodies light (block entities such as torches: their own cell is air) and a count
-    /// of their changes.
+    /// The cells moving bodies light and a count of their changes.
     pub fn body_glow(&self) -> (&FxHashMap<IVec3, [u8; 3]>, u64) {
         (&self.body_glow, self.body_glow_epoch)
     }

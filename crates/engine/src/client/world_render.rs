@@ -512,8 +512,9 @@ pub struct WorldRenderer {
     /// Each meshed world cube's light-giving blocks (`Mesh::lights`), kept whether or not anything
     /// traces, and whether they changed since the GPU's table (`rt::RtLights`) was made.
     cube_lights: FxHashMap<IVec3, Vec<u32>>,
-    /// The cells bodies light (`World::body_glow`: block entities such as torches, whose own cell
-    /// the meshes see as air) by cube, as `Mesh::lights` holds them, and the change count taken.
+    /// Lights that are not the meshes' blocks (`set_body_lights`: bodies' and entities', such as
+    /// torches, whose own cell the meshes see as air) by cube, as `Mesh::lights` holds them, and
+    /// the change count taken.
     body_lights: FxHashMap<IVec3, Vec<u32>>,
     body_epoch: u64,
     lights_dirty: bool,
@@ -1775,15 +1776,16 @@ impl WorldRenderer {
         }
     }
 
-    /// Takes the cells bodies light (`World::body_glow`) into the path tracer's light table when
-    /// they changed (`epoch`).
-    pub fn set_body_lights(&mut self, glow: &FxHashMap<IVec3, [u8; 3]>, epoch: u64) {
+    /// Takes lights that are not the meshes' blocks into the path tracer's light table when they
+    /// changed (`epoch`): the cells bodies light (`World::body_glow`) and the entities' (`Glow`'s
+    /// sources: torches, which are block entities, and lights in hand).
+    pub fn set_body_lights<'a>(&mut self, cells: impl Iterator<Item = (&'a IVec3, &'a [u8; 3])>, epoch: u64) {
         if epoch == self.body_epoch {
             return;
         }
         self.body_epoch = epoch;
         self.body_lights.clear();
-        for (&p, &[r, g, b]) in glow {
+        for (&p, &[r, g, b]) in cells {
             let l = p & 15;
             let w = l.x as u32 | (l.y as u32) << 4 | (l.z as u32) << 8 | u32::from(r.min(15)) << 12 | u32::from(g.min(15)) << 16 | u32::from(b.min(15)) << 20;
             self.body_lights.entry(p >> 4).or_default().push(w);
