@@ -905,6 +905,9 @@ pub struct Client {
     /// The last frame's exposure texel, bindless index + 1 (`Scene::frame_look.w`), set by the app
     /// before `render` (`post::Post::exposure_last`).
     pub exposure_last: u32,
+    /// The motion image this frame, bindless index + 1 (`Scene::taa_frame.z`), set by the app
+    /// before `render` (`post::Post::motion_index`).
+    pub motion_out: u32,
     /// The camera the last frame was drawn with, for the backend's upscaler (`upscale_camera`).
     pub frame_camera: Option<FrameCamera>,
     /// Seconds until the next dust piece from the block being hit.
@@ -1296,6 +1299,7 @@ impl Client {
             taa_last: None,
             taa_out: 0,
             exposure_last: 0,
+            motion_out: 0,
             frame_camera: None,
             hit_dust: 0.0,
             sounds: Vec::new(),
@@ -3825,7 +3829,7 @@ impl Client {
             // Filled in by `render` (`taa_frame`).
             taa: [0.0; 4],
             taa_prev: [[0.0; 4]; 4],
-            taa_frame: [self.taa_out as f32, crate::post::motion() as u32 as f32, 0.0, 0.0],
+            taa_frame: [self.taa_out as f32, crate::post::motion() as u32 as f32, self.motion_out as f32, 0.0],
             dlss: [crate::post::mip_bias(), 0.0, 0.0, 0.0],
             cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],

@@ -719,6 +719,16 @@ impl Post {
         self.use_taa && taa() && self.taa_pipes.is_some() && self.pipeline.is_some()
     }
 
+    /// The motion image's bindless index + 1 (`Scene::taa_frame.z`), for the screen effects that
+    /// read its w (the weather's cover; chiacraft's bloomy fog thinned by the rain, as Bliss's);
+    /// 0 without it. Asked after `motion_target` sized it this frame.
+    pub fn motion_index(&self) -> u32 {
+        if !motion() {
+            return 0;
+        }
+        self.motion_tex.map_or(0, |t| t.1 + 1)
+    }
+
     /// The motion image the world's pass draws into, sized to the frame (`Cmd::BeginPass`'s
     /// `motion`); none without temporal anti-aliasing's pipelines (`set_motion`).
     pub fn motion_target(&mut self, gpu: &mut dyn Backend, w: u32, h: u32) -> Option<TextureId> {

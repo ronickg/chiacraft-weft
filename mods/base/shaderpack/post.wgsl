@@ -357,7 +357,18 @@ fn taa_motion_px(px: vec2<i32>, size: vec2<i32>) -> f32 {
 fn bloomy_fog(uv: vec2<f32>, pass_: Pass) -> f32 {
     let rain = rain_amount();
     let hidden = bank_hidden(view_rel(uv, pass_)) * (1.0 - 0.5 * rain);
-    return clamp(hidden * 1.25 * 0.75 * (1.0 + rain), 0.0, 1.0);
+    var k = clamp(hidden * 1.25 * 0.75 * (1.0 + rain), 0.0, 1.0);
+    // Where a drop or flake lies, less of it (Bliss's composite3, method only: x clamp(1 - (drops x
+    // 5)^2)): its rain shows only as these clearer streaks through the bloomy fog. The drops' cover
+    // is the weather's motion w (x 2.5 there), where the land is lit from the physical sky.
+    if land_from_sky() && scene.taa_frame.z > 0.5 {
+        let m = textures[u32(scene.taa_frame.z) - 1u];
+        let size = vec2<i32>(textureDimensions(m));
+        let at = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
+        let drops = clamp(textureLoad(m, at, 0).w / 2.5, 0.0, 1.0);
+        k *= clamp(1.0 - pow(drops * 5.0, 2.0), 0.0, 1.0);
+    }
+    return k;
 }
 // The point the pixel at `uv` shows, camera relative: on the sky (depth 0), the march's far end.
 fn view_rel(uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
