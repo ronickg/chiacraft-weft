@@ -3,7 +3,7 @@
 # bolt (animals:<kind>.alarm) and the wolves bite (animals:grey_wolf.attack); the heavy ones step
 # (animals:<kind>.step: reindeer, protoceratops heavy, gastonia huge). A script can't hear: read
 # run.log's `/sounds check` reply and "sound files:" line (no events missing files) and every
-# `/sounds recent` reply. Expect in them: reindeer/protoceratops/gastonia/capybara .eat while they
+# `/sounds recent` reply. Run with --log mod:animals=debug (the "eats" lines). Expect in them: white_tailed_deer/reindeer/protoceratops/gastonia/capybara .eat while they
 # graze, then .alarm as the wolves close in, grey_wolf.attack on the bites, and .step lines if the
 # list holds steps (the engine plays them on the client).
 loaded
@@ -13,36 +13,40 @@ chat /time set 6000
 chat /weather clear 99999
 chat /sounds check
 chat /tk mode creative
-chat /tp 0.5 206 0.5
+# Seed 1's savanna (as herd_savanna_graze), in summer: its own tall grass is food. On a built pad
+# at y 200 the grazers only searched (ai_acts_1: no eat at all).
+chat /season summer 1
+chat /tp 0 90 544
+wait 4
+loaded
+idle
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
 wait 2
-loaded
-chat /tk fill -30 198 -30 30 198 30 stone
-chat /tk fill -30 199 -30 30 199 30 base:grass
-chat /tk fill -30 200 -30 30 212 30 core:air
-chat /tk fill -30 200 -30 30 200 30 base:tall_grass
-chat /tp 0.5 204 12.5
-wait 1
-loaded
 # the grazers, hungry: they eat the grass
-chat /tk spawn animals:reindeer -4 200 -4
-chat /tk spawn animals:reindeer -2 200 -6
-chat /tk spawn animals:reindeer 0 200 -4
-chat /tk spawn animals:protoceratops 3 200 -5
-chat /tk spawn animals:protoceratops 5 200 -3
-chat /tk spawn animals:gastonia 8 200 -8
-chat /tk spawn animals:capybara -7 200 -2
+chat /tk spawn animals:white_tailed_deer ~-3 ~ ~-8
+chat /tk spawn animals:white_tailed_deer ~-1 ~ ~-9
+chat /tk spawn animals:reindeer ~1 ~ ~-8
+chat /tk spawn animals:reindeer ~3 ~ ~-10
+chat /tk spawn animals:protoceratops ~5 ~ ~-8
+chat /tk spawn animals:gastonia ~8 ~ ~-12
+chat /tk spawn animals:capybara ~-6 ~ ~-6
 wait 2
 chat /animalprof food 0.2
+chat /tp ~ ~5 ~6
 look 0 -20
-wait 12
+wait 15
 shot ai_acts_01_grazing.png
 chat /sounds recent
 wait 10
 chat /sounds recent
+wait 10
+chat /sounds recent
 # the wolves, hungry: the grazers bolt and the wolves bite
-chat /tk spawn animals:grey_wolf 20 200 -20
-chat /tk spawn animals:grey_wolf 22 200 -18
-chat /tk spawn animals:grey_wolf 21 200 -22
+chat /tk spawn animals:grey_wolf ~18 ~-5 ~-26
+chat /tk spawn animals:grey_wolf ~20 ~-5 ~-24
+chat /tk spawn animals:grey_wolf ~19 ~-5 ~-28
 wait 1
 chat /animalprof hunters 0.2
 wait 6
