@@ -892,6 +892,9 @@ pub struct Client {
     /// particles, then cracks, gizmo fills and the hand.
     late: CommandList,
     hand_late: CommandList,
+    /// What is drawn over the path tracer's composite (`over_pt`): the blended particles, the
+    /// weather, the hand and the overlays, none of which write the depth its test reads.
+    over_pt: CommandList,
     /// The world's copy for what is seen through (`gpu_layout::Scene::behind`), set by the app each
     /// frame. What is drawn after the opaque world goes into `render`'s `after` list, which the app
     /// puts after the occlusion's depth (and after the copy, with it on).
@@ -1288,6 +1291,7 @@ impl Client {
             frames: Vec::new(),
             late: CommandList::default(),
             hand_late: CommandList::default(),
+            over_pt: CommandList::default(),
             behind: [0.0; 4],
             taa_last: None,
             taa_out: 0,
@@ -4034,6 +4038,12 @@ impl Client {
         self.render.depth_prepass(list, depth)
     }
 
+    /// What `render` left to draw over the path tracer's composite (the blended particles, the
+    /// weather, the hand and the overlays), swapped for `spare` (handed back cleared next frame).
+    pub fn swap_over_pt(&mut self, spare: CommandList) -> CommandList {
+        std::mem::replace(&mut self.over_pt, spare)
+    }
+
     /// Path traced lighting (`core:path_traced`, `WorldRenderer::path_trace`), after the world's
     /// pass into `target` (the world's image, its size `size`) and before the effects: first the
     /// G-buffer pass (`WorldRenderer::gbuffer_pass`), then the traced light.
@@ -4461,17 +4471,22 @@ impl Client {
         );
         drop(s);
         let s = crate::diag::span("render/particles and weather");
-        self.particles.draw(list, &mut late, scene_buf);
+        // The blended particles and the weather into `over_pt`, then the hand and the overlays: the
+        // app draws them after the path tracer's composite, which drew over them (rain, a torch's
+        // smoke, the cracks, the outline: they write no depth, so its test took their pixels).
+        let mut over = std::mem::take(&mut self.over_pt);
+        over.clear();
+        self.particles.draw(list, &mut over, scene_buf);
         self.weather_render
-            .draw(gpu, &mut late, frame, &cam, scene_buf, &self.world, weather, weather_ticks, self.frame_dt);
+            .draw(gpu, &mut over, frame, &cam, scene_buf, &self.world, weather, weather_ticks, self.frame_dt);
         drop(s);
         self.sky.draw_overlay(&mut hand_late, scene_buf);
         // Drawn by the app once the solid world's depth was taken for the next frame's occlusion
         // culling (upstream 85f85db9a): the sky, clouds, translucent things, particles, weather and
         // the hand hide nothing behind them for good. With the copy, after the copy.
         after.append(&mut late);
-        after.append(&mut hand_late);
-        (self.late, self.hand_late) = (late, hand_late);
+        over.append(&mut hand_late);
+        (self.late, self.hand_late, self.over_pt) = (late, hand_late, over);
         after.push(weft_render::Cmd::Mark);
         world_depth.is_some()
     }

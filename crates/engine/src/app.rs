@@ -374,6 +374,8 @@ pub(crate) struct Running {
     world_list: CommandList,
     /// What is drawn over the world after its depth was taken (`Client::render`).
     after_list: CommandList,
+    /// The client's draws over the path tracer's composite (`Client::swap_over_pt`), kept for reuse.
+    over_list: CommandList,
     input: Input,
     touches: crate::touch::Touches,
     /// The phone's keyboard is up (`soft_keyboard`).
@@ -770,6 +772,7 @@ impl App {
             last_button: None,
             world_list: CommandList::default(),
             after_list: CommandList::default(),
+            over_list: CommandList::default(),
             input,
             touches: Default::default(),
             keyboard: false,
@@ -4067,6 +4070,22 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     if let (Some(g), Target::Texture(_)) = (&mut r.game, world_target) {
         g.client
             .path_trace(&mut *r.gpu, &mut r.list, info.slot, r.depth.0, world_target, (world_info.width, world_info.height));
+    }
+    // Over the path tracer's composite (or straight after the pass above without it): the blended
+    // particles, the weather, the hand and the overlays, which write no depth for its test.
+    if let Some(g) = &mut r.game {
+        let mut over = g.client.swap_over_pt(std::mem::take(&mut r.over_list));
+        if !over.cmds.is_empty() {
+            r.list.push(Cmd::BeginPass {
+                motion: motion.map(|m| (m, None)),
+                color: Some((world_target, None)),
+                depth: Some((r.depth.0, None)),
+            });
+            r.list.append(&mut over);
+            r.list.push(Cmd::EndPass);
+        }
+        over.clear();
+        r.over_list = over;
     }
     if post {
         let scene = r
