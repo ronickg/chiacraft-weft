@@ -64,6 +64,29 @@ for one); bite on raptor_rest; look, scratch on hare_lie; play on vole_sit, kryp
 psittacosaurus_lie, caiman_bask; groom, sniff, play on lizard_bask; watch, scratch, groom, look,
 stretch on capybara_sit; groom, sniff on caiman_bask.
 
+Run 2 (b7ef3aaf7, `r2_hunters_m-171045`, 557 s). The jaguar stalked, broke cover and killed a deer in 20 s; a
+coyote killed a hare in 6 s (the other gave up on it, gone); the foxes and the osmolskae took two small prey
+each and none filled up on insects (fills_to holds); the three utahraptors hunted as a pack and shared 8.3 kg
+each; the crocodyliform broke cover and took the yacare caiman (in its range, 17.9 kg) over the capybaras.
+The raptor chased a kryptobaatar 60 s, gave up ("too long") and tried again: small fast prey escaping, left as
+is. The two caimans never hunted: their prey is 0.17 to 35 kg and the capybaras (50 kg) are too big, so
+there was no prey for them on the pad (run 3: their own pad, with hares and pacu).
+
+| Species | hunts | stalk / ambush | chase | kill, share | gives up | shot |
+|---|---|---|---|---|---|---|
+| jaguar | pass | pass ("breaks cover", 8.9 blocks) | pass | pass (70 kg deer, full) | n/a | r2 1 |
+| coyote | pass (two, each alone) | not tested | pass | pass (3.8 kg hare) | pass ("gone") | r2 2 |
+| red_fox | pass | not tested | pass | pass (2 voles) | n/a | r2 3 |
+| arctic_fox | pass | not tested | pass | pass (2 mice) | n/a | r2 3 |
+| raptor | pass | not tested | pass | none in 60 s | pass ("too long") | r2 4 (dark) |
+| osmolskae | pass | not tested | pass | pass (a priscagama, a kryptobaatar) | n/a | r2 4 (dark) |
+| utahraptor | pass (a pack of 3, two join) | not tested | pass | pass (8.3 kg each) | n/a | r2 5 |
+| crocodyliform | pass | pass ("breaks cover", 8.1 blocks) | pass | pass (35 kg caiman, full) | n/a | r2 6 |
+| yacare_caiman | not tested (no prey its size) | not tested | not tested | not tested | not tested | r2 6 |
+| spectacled_caiman | not tested (no prey its size) | not tested | not tested | not tested | not tested | r2 6 |
+
+Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_hunters_m-171045/r2_hunters_grid.jpg`.
+
 ## Birds and fliers (cov_birds.txt)
 
 | Species | flies | lands | flocks | flees | hunts / scavenges | shot |

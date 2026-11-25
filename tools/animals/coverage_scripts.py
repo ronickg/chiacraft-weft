@@ -110,18 +110,22 @@ HUNTERS = [
     [("red_fox", 1, 10, -12), ("arctic_fox", 1, 12, -10), ("wood_mouse", 3, -8, 6), ("field_vole", 3, -2, 8)],
     [("raptor", 1, 10, -12), ("velociraptor_osmolskae", 1, 12, -10), ("kryptobaatar", 3, -8, 6), ("priscagama", 2, -2, 8)],
     [("utahraptor", 3, 8, -12), ("psittacosaurus", 3, -8, 6)],
-    [("crocodyliform", 1, 2, 0), ("yacare_caiman", 1, -2, 0), ("spectacled_caiman", 1, 0, 2), ("capybara", 3, -8, 6)],
+    [("crocodyliform", 1, 2, 0), ("capybara", 3, -8, 6)],
+    # The caimans take 0.17 to 35 kg: a capybara (50 kg) is too big for them (round 2: they never
+    # hunted beside the capybaras), so hares and pacu in the pond; on their own pad, or the
+    # crocodyliform takes them.
+    [("yacare_caiman", 1, -2, 0), ("spectacled_caiman", 1, 2, 2), ("pacu", 2, -2, -2), ("hare", 3, -8, 6)],
 ]
 s = head("hunters", [
     "Animal AI coverage, hunters other than wolves. Each part: hungry hunters (30 % food, `/animalprof hunters 0.3`) and",
     "fed prey (90 %) on a pad. Expected per hunter: \"hunts\" (whom, a pack of N), stalking (\"breaks cover and charges\" for",
     "ambushers) or a chase, then a kill (\"eats N's kill\", each pack member's share) or \"gives up on\"; prey \"runs from\".",
-    "The last part's pond is 5 x 5 and 2 deep for the caimans. Report per hunter: hunts, stalk/ambush, chase, kill, share,",
+    "The last two parts' ponds are 5 x 5 and 2 deep for the crocodiles. Report per hunter: hunts, stalk/ambush, chase, kill, share,",
     "gives up (each with its log line or none); the shot.",
 ])
 for i, g in enumerate(HUNTERS):
     x = i * 200
-    s += pad(x, pond=2 if i == 5 else 1, deep=2 if i == 5 else 1) + spawns(x, g)
+    s += pad(x, pond=2 if i >= 5 else 1, deep=2 if i >= 5 else 1) + spawns(x, g)
     s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.3"]
     s += watch(x, 8) + shot(x, f"cov_hunters_{i+1}_{g[0][0]}")
 write("hunters", s)

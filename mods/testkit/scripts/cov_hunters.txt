@@ -1,7 +1,7 @@
 # Animal AI coverage, hunters other than wolves. Each part: hungry hunters (30 % food, `/animalprof hunters 0.3`) and
 # fed prey (90 %) on a pad. Expected per hunter: "hunts" (whom, a pack of N), stalking ("breaks cover and charges" for
 # ambushers) or a chase, then a kill ("eats N's kill", each pack member's share) or "gives up on"; prey "runs from".
-# The last part's pond is 5 x 5 and 2 deep for the caimans. Report per hunter: hunts, stalk/ambush, chase, kill, share,
+# The last two parts' ponds are 5 x 5 and 2 deep for the crocodiles. Report per hunter: hunts, stalk/ambush, chase, kill, share,
 # gives up (each with its log line or none); the shot.
 loaded
 idle
@@ -263,8 +263,6 @@ chat /tk fill 998 68 542 1002 69 546 base:water
 chat /tk fill 998 70 542 1002 70 546 core:air
 wait 1
 chat /tk spawn animals:crocodyliform 1002 70 544
-chat /tk spawn animals:yacare_caiman 998 70 544
-chat /tk spawn animals:spectacled_caiman 1000 70 546
 chat /tk spawn animals:capybara 992 70 550
 chat /tk spawn animals:capybara 994 70 550
 chat /tk spawn animals:capybara 996 70 550
@@ -295,6 +293,54 @@ chat /tp 1000 82 558
 look 0 -38
 wait 2
 shot cov_hunters_6_crocodyliform.png
+chat /tick unfreeze
+wait 1
+chat /tp 1200 90 544
+wait 4
+chat /tk fill 1184 60 528 1216 68 560 base:dirt
+chat /tk fill 1184 69 528 1216 69 560 base:grass
+chat /tk fill 1184 70 528 1216 85 560 core:air
+chat /tk fill 1184 86 528 1216 110 560 core:air
+chat /tk fill 1184 111 528 1216 140 560 core:air
+chat /tk fill 1184 70 561 1216 100 576 core:air
+chat /time set 6000
+chat /tk fill 1198 68 542 1202 69 546 base:water
+chat /tk fill 1198 70 542 1202 70 546 core:air
+wait 1
+chat /tk spawn animals:yacare_caiman 1198 70 544
+chat /tk spawn animals:spectacled_caiman 1202 70 546
+chat /tk spawn animals:pacu 1198 68 542
+chat /tk spawn animals:pacu 1200 68 542
+chat /tk spawn animals:hare 1192 70 550
+chat /tk spawn animals:hare 1194 70 550
+chat /tk spawn animals:hare 1196 70 550
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /animalprof hunters 0.3
+chat /tp 1200 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tick freeze
+chat /tp 1200 82 558
+look 0 -38
+wait 2
+shot cov_hunters_7_yacare_caiman.png
 chat /tick unfreeze
 wait 1
 quit
