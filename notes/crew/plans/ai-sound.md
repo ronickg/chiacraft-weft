@@ -240,3 +240,19 @@ Hurt clips score low by design: a 0.8 s cry fills its clip.
 - Page: https://claude.ai/artifact/QQ73ToVGfBheAANZrth5m7
 
 **Check:** `mods/testkit/scripts/ai_voices.txt` covers a herd, a Drenkaun fight, and Borkon's summon.
+
+## The acts (2026-11-25, after the full sets merged)
+
+Planner: eat, alarm, flee and footsteps per species, hooked thinly (the Animals session is editing
+behaviour). Made like the sets (spec, two rounds, the second reworded, the likeness filter):
+`~/Coding/chiacraft-archive/sounds/ai-sound/2026-11-25-acts/`, 97 picks, 93 in the game (the bosses'
+young have no species, so nothing plays their alarm; their two pairs stay in the archive).
+
+- Alarm and flight are one moment (`wild::alarm` plays the alarm clip as an animal bolts), so one
+  `alarm` set each, played from `anim::play` with the clip; `attack` with pounce, bite, rear and the
+  species' own attack clips (`commands::fight` plays one per hit). 21 families (`voices::ACTS`).
+- Eating: `animal::feed` (every way an animal eats: grazing, items on the ground, its kill, by
+  hand), `graze`, `meat` or `peck` by diet and family, pitch and volume by mass.
+- Steps: the engine plays a kind's own step sound in place of the ground's when it has one, every
+  1.6 blocks (more often running). Plant-eaters from 80 kg and anything from 250 kg get `heavy`,
+  from 1 t `huge`, pitched and loudened by mass; small and padded ones keep the ground's.
