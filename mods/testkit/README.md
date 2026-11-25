@@ -4,6 +4,13 @@ Scripted runs, checks and test commands for chiacraft (never shipped). The scrip
 in `src/script.rs` (`COMMANDS`); how to run a script is in the project's `CLAUDE.md` ("Trying it in
 the game").
 
+Command levels (`docs/modding.md`, "Command levels"): `/tk` and testkit's client commands ask for
+level 2. A script's own player is the host (4) on a world with cheats on; on a world made with
+cheats off, or as a joiner that isn't an operator, the `op` step, the `block` and `players`
+conditions and the `entities` step are refused (wait on a `mark` / `await_file` pair instead of
+`until players`). In runs of several games, `--config testkit:op_joiners=true` (or `set_config
+testkit:op_joiners 1` in the host's script before `host`) makes every joiner 4.
+
 ## Compare mode: like-for-like look shots
 
 Every look compared against a reference (Bliss, vanilla Minecraft) runs in compare mode, so no

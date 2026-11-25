@@ -725,7 +725,9 @@ fn complete_selector(c: &Content, partial: &str, players: &[String]) -> Vec<Stri
     suggestions
 }
 
-pub fn complete(c: &Content, line: &str, players: &[String], permission: u32) -> Completion {
+/// `owner`: the player is the world's owner, offered the owner's moderation commands whatever
+/// its level (chiacraft, `server::OWNER_MODERATION`).
+pub fn complete(c: &Content, line: &str, players: &[String], permission: u32, owner: bool) -> Completion {
     let from = line.rfind(' ').map_or(0, |i| i + 1);
     let partial = &line[from..];
     let done: Vec<&str> = line[..from].split_whitespace().collect();
@@ -734,7 +736,7 @@ pub fn complete(c: &Content, line: &str, players: &[String], permission: u32) ->
         let mut names: Vec<String> = c
             .commands
             .iter()
-            .filter(|d| d.level <= permission)
+            .filter(|d| d.level <= permission || (owner && crate::server::OWNER_MODERATION.contains(&d.name.as_str())))
             .map(|d| d.name.clone())
             .filter(|n| n.starts_with(partial))
             .collect();

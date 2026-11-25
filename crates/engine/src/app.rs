@@ -1537,6 +1537,7 @@ impl Running {
                 self.world_dir = Some(dir);
                 // The synced settings the player changes here are this world's.
                 crate::config::playing_in(Some(server.configs.clone()));
+                client.local_host = true;
                 self.game = Some(Game { client, server: Some(server), world, identity });
                 self.host_if_listed();
                 self.hud.invalidate();
