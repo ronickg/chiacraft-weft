@@ -267,7 +267,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
         return;
     }
-    if dist > PT_REACH {
+    if dist > PT_REACH || pt.debug == 12u {
         return;
     }
     let v = -rel / dist;
@@ -292,6 +292,12 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     if dot(gb_n.xyz, gb_n.xyz) < 0.25 {
         return;
     }
+    // Debug 8-12, timing only (a bench's probes): the trace stopped after its primary test (8), the
+    // sun's ray (9), the bounce and the cache (10), or with no specular ray (11); 12 before any ray, above. The picture they
+    // leave is no use.
+    if pt.debug == 8u {
+        return;
+    }
     let ng = h.n;
     let n = normalize(gb_n.xyz);
     // Rays leave a little off the face, more with the distance: the hit point comes from the
@@ -307,6 +313,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
     // lightmap gives it (already lowered under cover) and as the open sky would give it.
     let lit = light_on(n, h.light, sun, 1.0, h.world, h.rel);
+    if pt.debug == 9u {
+        pt_out[at] = vec4(lit, 1.0);
+        return;
+    }
     // The lamps' and the sky's shares of it for the night's blue (`display`), kept before the calls
     // below, which light the sky alone and set it to 1: traced, a fire-lit wall at night went
     // white-blue where the world draws it orange (w12, the nave at 18000).
@@ -341,6 +351,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             pt_cache_add(u32(i), indirect);
         }
     }
+    if pt.debug == 10u {
+        pt_out[at] = vec4(diffuse, 1.0);
+        return;
+    }
     // Specular, where the texture has maps (F0 above 0), as the world's `mat_shine`: the sun's
     // highlight (GGX, Smith's visibility) and what lies the mirrored way, traced where smooth, the
     // sky or the room's light where rough.
@@ -369,7 +383,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         // mirror along the face or into it, where the groove and the block itself hide the sky. The
         // stone bricks' joints lit up as blue lines from the sky (pt1_rtxd_pt, the cathedral).
         let horizon = smoothstep(-0.05, 0.3, dot(r, ng));
-        if a < 0.5 && horizon > 0.0 {
+        if a < 0.5 && horizon > 0.0 && pt.debug != 11u {
             var dir = rt_cone(r, 0.01 + a * 0.5, px + vec2(17.0, 29.0));
             if dot(dir, ng) <= 0.0 {
                 dir = r;
@@ -392,7 +406,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     let edge = smoothstep(PT_REACH * 0.75, PT_REACH, dist);
     diffuse = mix(diffuse, lit, edge);
     specular *= 1.0 - edge;
-    if pt.debug != 0u && pt.debug != 7u {
+    if pt.debug != 0u && pt.debug < 7u {
         var out = vec3(0.0);
         switch pt.debug {
             case 1u: { out = albedo; }
