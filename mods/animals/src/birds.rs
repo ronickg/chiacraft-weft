@@ -180,6 +180,20 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
             weft_sdk::info!("bird {id} smells carrion {:.0} blocks off", dist2(at, st.pos).sqrt());
             return lift(w, id, st, wings, at);
         }
+        // A hungry bird of prey hunts from the air: at prey it sees, else up to look for some.
+        if hungry_hunter(w, id) {
+            use animals_core::roles::{SOAR_SEARCH, STOOP_FROM};
+            if let Some(at) = prey_seen(w, id, st) {
+                let d = dist2(at, st.pos).sqrt();
+                if d > STOOP_FROM {
+                    weft_sdk::info!("bird {id} flies at its prey {d:.0} blocks off");
+                    return lift(w, id, st, wings, at);
+                }
+            } else if w.random_below(SOAR_SEARCH) == 0 {
+                weft_sdk::info!("bird {id} soars to look for prey");
+                return take_off(w, id, st, wings);
+            }
+        }
         let scared = w.component(id, &TAMING).is_some_and(|t| t.scared > 0);
         if scared || (!w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(wings.restless) == 0) {
             return take_off(w, id, st, wings);
@@ -197,6 +211,14 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
     }
     if let Some(at) = smelled.filter(|_| !f.landing) {
         f.to = at.map(|v| v as f32);
+    }
+    // A hungry bird of prey that sees prey from the air stoops on it.
+    if !f.landing
+        && hungry_hunter(w, id)
+        && let Some(at) = prey_seen(w, id, st)
+    {
+        f.to = at.map(|v| v as f32);
+        f.cruise = at[1] as f32 + 2.0;
     }
     f.left = f.left.saturating_sub(w.tick_elapsed(id));
     let (dx, dz) = (f.to[0] as f64 - st.pos.x, f.to[2] as f64 - st.pos.z);
@@ -218,6 +240,21 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
     w.fly(id, dir, if f.landing { wings.air * 0.5 } else { wings.air });
     set(w, id, f);
     true
+}
+
+/// A wild hunter under `needs::HUNTS_AT` (it hunts at any hour).
+fn hungry_hunter(w: &World, id: u64) -> bool {
+    !crate::animal::tamed(w, id)
+        && w.component(id, &crate::animal::ANIMAL).is_some_and(|a| {
+            a.species().is_some_and(|s| s.hunts()) && (a.food as f32) < a.stat(crate::species::FOOD) * animals_core::needs::HUNTS_AT
+        })
+}
+
+/// Where the prey it sees is (`senses`: its look round, every `senses::EVERY` ticks).
+fn prey_seen(w: &World, id: u64, st: &EntityState) -> Option<[f64; 3]> {
+    let seen = crate::senses::sense(w, id, st, |sight| crate::hunt::watch(w, sight));
+    let e = (seen.prey != 0).then(|| w.entity(seen.prey)).flatten()?;
+    Some([e.pos.x, e.pos.y, e.pos.z])
 }
 
 /// A hungry scavenger (`Species::scavenges`) smells carrion within `needs::SCENT` beyond its

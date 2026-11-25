@@ -102,6 +102,15 @@ pub fn ambushes(family: &str) -> bool {
     AMBUSHERS.contains(&family)
 }
 
+/// Birds of prey hunt from the air: a hungry one (under `needs::HUNTS_AT`) takes off to soar and
+/// look for prey about once in this many ticks (golden eagles and hawks hunt mostly by soaring or
+/// from a perch and stoop on prey seen from above; owls from a perch, then a short flight: Watson
+/// 2010, *The Golden Eagle*; Newton 1979, *Population Ecology of Raptors*), and one that sees prey
+/// farther than `STOOP_FROM` blocks flies at it and comes down on it (the last blocks on foot,
+/// `hunt::hunt`).
+pub const SOAR_SEARCH: u32 = 200;
+pub const STOOP_FROM: f64 = 4.0;
+
 #[cfg(test)]
 mod tests {
     use super::*;
