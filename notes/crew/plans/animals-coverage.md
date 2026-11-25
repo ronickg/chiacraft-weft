@@ -2,6 +2,42 @@
 
 "not tested" marks anything the runs did not show; "pass" only what a log line or a where row showed.
 
+## Where it stands (end of 11-25)
+
+Every group was run on the Mac until each behaviour passed or had a known reason it wasn't seen; the latest
+run per group is the last table in its section.
+
+- **Pass:** grazers (graze, drink, flee when hit, the herd runs on the alarm, big ones turn and charge), small
+  animals and fish (fish dart from walkers and hits), hunters (every land hunter kills, the caimans at night,
+  kills feed the prey's own mass, the pack shares), birds (eagle and great horned owl kill from the air,
+  vultures scavenge), young (follow, grow; the jaguars mate), taming (all 9 kinds, by feeding or knock-out) and
+  eggs (5 kinds nest and hatch), bosses (Drenkaun and Borkon take damage, die, drop loot, leash; Borkon's toss
+  leaves a full-health player alive).
+- **Fixed on this branch:**
+  - idle clips while knocked out;
+  - jaguars sleeping through love;
+  - big plant eaters only staring when hit (now they turn and charge);
+  - birds of prey landing short;
+  - clips asked of flying birds;
+  - fish ignoring hits;
+  - alarm hearers staring instead of running;
+  - insect eaters never hungry;
+  - Borkon's one-hit toss (`bosses::PLAYER_BLOW`);
+  - kills fed the species' grown mass (young prey, pack kills);
+  - `HURT_AT` never attached (healing ran through fights; the hurt-cause log never ran).
+- **Not tested:**
+  - a player's own right click, blows and bites (the scripts use commands);
+  - hawk and snowy owl strikes;
+  - small land animals fleeing a walk-in;
+  - wolves mating;
+  - Borkon's leash;
+  - a pack kill made by another packmate than the one that started the hunt;
+  - the sound runs' unlogged hurts (the cause log works now; next sound run).
+- **For Planner:**
+  - should hunters spare dogs (a wild cat killed a chihuahua);
+  - many lie/sit idle clips are missing (art);
+  - the night caiman shot is black.
+
 Planner's task (from Ronald: "with animals, then you need to test more than just wolves"): every species'
 AI checked on the Mac, one check per behaviour group (`mods/testkit/scripts/cov_*.txt`, written by
 `tools/animals/coverage_scripts.py`), the results here, the failures fixed biggest first.
