@@ -40,6 +40,9 @@ static FOLLOW: Component<[u64; 2]> = Component::named("animal_follow");
 /// A kill site it went to and found nothing at (x, z), and till when it leaves it (`hunt_`; not
 /// saved).
 static SITE: Component<[f64; 3]> = Component::named("animal_site");
+/// The water a prowl last reached, `[x, z, until]`: not a leg's goal again until then
+/// (`needs::SITE_AGAIN_SECS`).
+static WATER_SEEN: Component<[f64; 3]> = Component::named("animal_water_seen");
 
 /// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
 /// a dust storm close both in (`base_api::sight`).
@@ -63,6 +66,7 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&FOLLOW, [0u64; 2], 0);
     r.entity_component(&LAST, 0u64, 0);
     r.entity_component(&SITE, [0.0; 3], 0);
+    r.entity_component(&WATER_SEEN, [0.0; 3], 0);
     for s in &SPECIES {
         r.edit(s.kind).attach(&HUNT);
         r.edit(s.kind).attach(&WARY);
@@ -72,6 +76,7 @@ pub fn init(r: &mut Registry) {
         r.edit(s.kind).attach(&FOLLOW);
         r.edit(s.kind).attach(&LAST);
         r.edit(s.kind).attach(&SITE);
+        r.edit(s.kind).attach(&WATER_SEEN);
     }
     // A kill feeds the hunter that made it and its pack near (`needs::KILL_SHARED`), the prey's
     // mass shared out against each one's own. Fed only the killer, each wolf of three hunted on
@@ -421,16 +426,27 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
     // Prey drink: every other leg toward the water it knows, while it is further than
     // `PROWL_WATER` (in wolves1e a pack's random legs took 100 s to find a herd 24 blocks off by
     // the pond).
+    // Reached, a water is left for `needs::SITE_AGAIN_SECS`: every other leg took a wolf back to
+    // the one pond it knew, 16 blocks out and back for 160 s, the herd at another 50 blocks off
+    // (wolvesPack2).
     let pos = st.pos.to_array();
+    let seen = w.component(id, &WATER_SEEN).unwrap_or_default();
     let water = (legs % 2 == 0)
         .then(|| crate::drink::known_water(w, id, pos))
         .flatten()
+        .filter(|p| !((p[0] - seen[0]).abs() < 1.0 && (p[2] - seen[1]).abs() < 1.0 && (now as f64) < seen[2]))
         .filter(|p| ((p[0] - pos[0]).powi(2) + (p[2] - pos[2]).powi(2)).sqrt() > PROWL_WATER)
         .and_then(|p| {
             let d = ((p[0] - pos[0]).powi(2) + (p[2] - pos[2]).powi(2)).sqrt();
             let k = (PROWL_LEG / d).min(1.0);
             let (x, z) = (pos[0] + (p[0] - pos[0]) * k, pos[2] + (p[2] - pos[2]) * k);
-            Some([x, ground(x, z)? as f64, z])
+            let to = [x, ground(x, z)? as f64, z];
+            // This leg reaches it: looked at, it is left a while.
+            if k >= 1.0 {
+                w.component_mut(id, &WATER_SEEN)
+                    .map(|c| *c = [p[0], p[2], (now + (animals_core::needs::SITE_AGAIN_SECS * 20.0) as u64) as f64]);
+            }
+            Some(to)
         });
     let start = w.random_below(8);
     let leg = water.or_else(|| {
