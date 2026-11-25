@@ -1,0 +1,116 @@
+# A pack with one full and one barely hungry, and a kill beside a full wolf (Planner 11-25: the wolf follow-ups;
+# `notes/ECOLOGY.md`, part 6). The ground and herd as `herd_wolves_far.txt`: six fed deer (90 %) by the pond.
+# Part 1, the share gate, staged: a deer and three wolves on the field's west side, two at 30 % food, one full (99 %),
+# within 5 blocks of each other; the nearest wolf kills the deer at once (`/animalprof bite 1000`). Its kill should feed
+# it and the hungry one ("eats N's kill", 35 kg each), not the full one (`hunt.rs`, actions::DIE: only those below FULL).
+# Part 2, the pack: on the far corner the leader and a second wolf at 30 % food, a third at 70 % (below FULL, too fed to
+# hunt itself), a fourth full (99 %). Their hunts should count "a pack of 3" (the full one left out: senses' pack), the
+# 70 % one "goes with its leader E on the hunt" and keeps up with it however far the chase goes, the full one in no hunt.
+# Report from the log (`--log mod:animals=debug`): the BITE and HUNTER lines (the ids), every "eats N's kill", "hunts ...
+# a pack of", "joins", "goes with its leader", "keeps up", "gives up", where rows of the wolves (food, distance between the
+# follower and its leader), kills and deaths by cause.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+chat /tk fill -4 70 528 4 70 536 core:air
+chat /tk fill -2 68 530 2 68 534 base:dirt
+chat /tk fill -2 69 530 2 69 534 base:water
+wait 2
+chat /tk spawn animals:white_tailed_deer 0 70 546
+chat /tk spawn animals:white_tailed_deer 2 70 547
+chat /tk spawn animals:white_tailed_deer -2 70 547
+chat /tk spawn animals:white_tailed_deer 1 70 549
+chat /tk spawn animals:white_tailed_deer -1 70 550
+chat /tk spawn animals:white_tailed_deer 3 70 550
+wait 2
+chat /tk spawn animals:grey_wolf 18 70 516
+chat /tk spawn animals:grey_wolf 20 70 513
+chat /tk spawn animals:grey_wolf 15 70 519
+chat /tk spawn animals:grey_wolf 12 70 514
+wait 1
+chat /anim log
+chat /animalprof water 0.9
+chat /animalprof food 0.9
+chat /animalprof hunters 0.3
+chat /tp 15 70 519
+chat /animalprof hunter 0.7
+chat /tp 12 70 514
+chat /animalprof hunter 0.99
+chat /tk spawn animals:white_tailed_deer -15 70 520
+chat /tk spawn animals:grey_wolf -13 70 520
+chat /tk spawn animals:grey_wolf -15 70 523
+chat /tk spawn animals:grey_wolf -18 70 518
+chat /tp -13 70 520
+chat /animalprof hunter 0.3
+chat /tp -15 70 523
+chat /animalprof hunter 0.3
+chat /tp -18 70 518
+chat /animalprof hunter 0.99
+chat /tp -13 70 520
+chat /animalprof bite 1000
+wait 1
+chat /tp 0 95 575
+wait 2
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+chat /animalprof senses
+look 0 -35
+wait 1
+shot herd_wolves_pack_1.png
+quit

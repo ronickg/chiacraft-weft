@@ -218,6 +218,16 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         if h[0] != 0 {
             w.component_mut(id, &HUNT).map(|h| *h = [0; 4]);
         }
+        // Not hungry enough to hunt itself, a pack's member not yet full goes with its leader
+        // on the hunt: a timid wolf at 29 % slept 110 s while its pack hunted and killed 40
+        // blocks off (ai1124_moveFar1).
+        if !animal::tamed(w, id)
+            && full < FULL
+            && s.pack_prey().is_some()
+            && let Some(l) = with_pack(w, id, s.name)
+        {
+            return keep_up(w, id, st, l);
+        }
         return false;
     }
     let now = w.game_time();
@@ -284,11 +294,10 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         w.component_mut(id, &HUNT).map(|c| *c = h);
         return false;
     }
-    let own = mass(w, id).unwrap_or(s.bio.mass);
     // Its prey and its pack from its last look round (`senses`): a pack's kind with others of it
     // near hunts together, bigger prey (`Species::takes_with`).
     let seen = crate::senses::sense(w, id, st, |sight| watch(w, sight));
-    let pack = if s.pack_prey().is_some() { seen.kin as u32 } else { 1 };
+    let pack = if s.pack_prey().is_some() { seen.pack.max(1) as u32 } else { 1 };
     let prey = (seen.prey != 0)
         .then_some((seen.prey, seen.prey_kg))
         .filter(|&(t, _)| {
@@ -443,6 +452,37 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
     w.navigate(id, to, 1.0);
     w.component_mut(id, &PROWL).map(|p| *p = until);
     true
+}
+
+/// The leader it goes with on a hunt it isn't hungry enough for itself (`hunt_`): the one it
+/// follows already (until `keep_up` loses it: fed, gone, past `needs::PACK_LOSE`), or its pack's
+/// leader from its last look round once that one hunts or prowls.
+fn with_pack(w: &World, id: u64, name: &str) -> Option<u64> {
+    let now = w.game_time();
+    let following = w.component(id, &FOLLOW).map_or(0, |f| f[0]);
+    let leader = if following != 0 {
+        following
+    } else {
+        w.component(id, &crate::senses::SENSES)
+            .map_or(0, |s| s.leader)
+    };
+    let out = leader != 0
+        && leader != id
+        && (following != 0
+            || w.component(leader, &HUNT).is_some_and(|h| h[0] != 0)
+            || w.component(leader, &PROWL).is_some_and(|p| now < p));
+    if !out {
+        if following != 0 {
+            w.component_mut(id, &FOLLOW).map(|f| f[0] = 0);
+        }
+        return None;
+    }
+    if following == 0 {
+        weft_sdk::info!("{name} {id} goes with its leader {leader} on the hunt");
+        crate::rest::stop(w, id);
+        w.component_mut(id, &FOLLOW).map(|f| f[0] = leader);
+    }
+    Some(leader)
 }
 
 /// A pack's member keeps within `needs::PACK_FOLLOW` of the leader it follows as they prowl, at
