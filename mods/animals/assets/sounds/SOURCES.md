@@ -84,7 +84,7 @@ Its text encoder (T5Gemma) is under the [Gemma Terms of Use](https://ai.google.d
 The model was trained on audio licensed from AudioSparx and on Freesound CC0, CC-BY and CC Sampling+
 recordings (its model card). Ronald approved using it on 11-25.
 
-Each event got its variants plus two spare candidates. Every candidate was cut like the CC0 voices
+Each event got its variants plus two spare candidates, twice: the model gives nearly the same clip for one prompt whatever the seed, so the second round (`v2_`) words each candidate differently, and a pick is skipped when its spectrum is too like one already kept. Every candidate was cut like the CC0 voices
 (`reports/sound-files/sfx.py`, copy mode: ambient 2.5 s, hurt 0.8 s, death 1.6 s; the bosses 3 / 1.2 / 3 s,
 summon 3.5, attack 1.5, stunned 2). The ones that look most like a call (clear shape, tonal,
 not a noise bed) were kept. The raw outputs, every candidate, the scores and the picks are in
@@ -94,96 +94,96 @@ not a noise bed) were kept. The raw outputs, every candidate, the scores and the
 | file | prompt | seed |
 |---|---|---|
 | `goat_kid/ambient1` | "young ibex kid calling, short nasal bleat, close, dry, no background noise, no music" | 1002 |
-| `goat_kid/ambient2` | "young ibex kid calling, short nasal bleat, close, dry, no background noise, no music" | 1004 |
-| `goat_kid/ambient3` | "young ibex kid calling, short nasal bleat, close, mountain air, quiet" | 13 |
+| `goat_kid/ambient2` | "young ibex kid calling, short nasal bleat, short and sharp, close, dry, no background noise, no music" | 5002 |
+| `goat_kid/ambient3` | "young ibex kid calling, short nasal bleat, close, dry, no background noise, no music" | 1004 |
 | `goat_kid/hurt1` | "baby goat crying out in pain, one sharp short bleat, close, dry, no background noise, no music" | 1006 |
 | `goat_kid/hurt2` | "baby goat crying out in pain, one sharp short bleat, close, dry, no background noise, no music" | 1009 |
 | `goat_kid/death1` | "baby goat weak dying bleat, fading out, close, dry, no background noise, no music" | 1012 |
 | `calf/ambient1` | "calf calling for its mother, short moo, close, dry, no background noise, no music" | 1016 |
-| `calf/ambient2` | "young calf mooing, one short low bawl, close, dry, no background noise, no music" | 1017 |
-| `calf/ambient3` | "calf calling for its mother, short moo, close, dry, no background noise, no music" | 1014 |
+| `calf/ambient2` | "young calf mooing, one short low bawl, softer and calmer, close, dry, no background noise, no music" | 5017 |
+| `calf/ambient3` | "young calf mooing, one short low bawl, close, dry, no background noise, no music" | 1015 |
 | `calf/hurt1` | "calf bawling in pain, one short loud cry, close, dry, no background noise, no music" | 1020 |
-| `calf/hurt2` | "calf bawling in pain, one short loud cry, close, dry, no background noise, no music" | 1019 |
-| `calf/death1` | "calf weak moan, fading out, close, dry, no background noise, no music" | 1024 |
+| `calf/hurt2` | "calf bawling in pain, one short loud cry, longer and lower, close, dry, no background noise, no music" | 5020 |
+| `calf/death1` | "calf weak moan, fading out, close, dry, no background noise, no music" | 5022 |
 | `horned_dino/ambient1` | "elephant low rumbling call, close, dry, no background noise, no music" | 1029 |
-| `horned_dino/ambient2` | "elephant low rumbling call, close, dry, no background noise, no music" | 1026 |
-| `horned_dino/ambient3` | "bull bison bellowing, one deep roar, close, dry, no background noise, no music" | 1025 |
-| `horned_dino/hurt1` | "bull bison grunting in pain, one short loud bellow, close, dry, no background noise, no music" | 1030 |
-| `horned_dino/hurt2` | "bull bison grunting in pain, one short loud bellow, close, dry, no background noise, no music" | 1032 |
-| `horned_dino/hurt3` | "bull bison grunting in pain, one short loud bellow, close, dry, no background noise, no music" | 1034 |
-| `horned_dino/death1` | "large animal dying groan, long deep moan fading out, close, dry, no background noise, no music" | 1035 |
-| `horned_dino/death2` | "large animal dying groan, long deep moan fading out, close, dry, no background noise, no music" | 1036 |
+| `horned_dino/ambient2` | "bull bison bellowing, one deep roar, close, dry, no background noise, no music" | 1025 |
+| `horned_dino/ambient3` | "hippo honking grunt call, longer and lower, close, dry, no background noise, no music" | 5027 |
+| `horned_dino/hurt1` | "large animal pained honk, short, louder and more intense, close, dry, no background noise, no music" | 5033 |
+| `horned_dino/hurt2` | "bull bison grunting in pain, one short loud bellow, close, dry, no background noise, no music" | 1030 |
+| `horned_dino/hurt3` | "bull bison grunting in pain, one short loud bellow, longer and lower, close, dry, no background noise, no music" | 5032 |
+| `horned_dino/death1` | "large animal dying groan, long deep moan fading out, close, dry, no background noise, no music" | 5035 |
+| `horned_dino/death2` | "large animal dying groan, long deep moan fading out, close, dry, no background noise, no music" | 1035 |
 | `raptor/ambient1` | "small feathered predatory dinosaur, sharp birdlike chirp then a hiss, close, dry, no background noise, no music" | 1041 |
 | `raptor/ambient2` | "small feathered predatory dinosaur, sharp birdlike chirp then a hiss, close, dry, no music" | 42 |
-| `raptor/ambient3` | "small feathered predatory dinosaur, sharp birdlike chirp then a hiss, close, dry, no background noise, no music" | 1043 |
+| `raptor/ambient3` | "small feathered predatory dinosaur, sharp birdlike chirp then a hiss, close, dry, no background noise, no music" | 5039 |
 | `raptor/hurt1` | "large bird screeching in pain, one short shriek, close, dry, no background noise, no music" | 1046 |
 | `raptor/hurt2` | "goose hissing angrily, short, close, dry, no background noise, no music" | 1047 |
-| `raptor/hurt3` | "large bird screeching in pain, one short shriek, close, dry, no background noise, no music" | 1044 |
+| `raptor/hurt3` | "goose hissing angrily, short, louder and more intense, close, dry, no background noise, no music" | 5047 |
 | `raptor/death1` | "large bird dying squawk, fading out, close, dry, no background noise, no music" | 1049 |
-| `raptor/death2` | "large bird dying squawk, fading out, close, dry, no background noise, no music" | 1051 |
+| `raptor/death2` | "large bird dying squawk, fading out, short and sharp, close, dry, no background noise, no music" | 5050 |
 | `capybara/ambient1` | "capybara alarm bark, short gruff cough, close" | 53 |
 | `capybara/ambient2` | "guinea pig squeaking and purring, close, dry, no background noise, no music" | 1055 |
-| `capybara/ambient3` | "guinea pig squeaking and purring, close, dry, no background noise, no music" | 1053 |
+| `capybara/ambient3` | "guinea pig squeaking and purring, close, dry, no background noise, no music" | 5053 |
 | `capybara/hurt1` | "guinea pig loud squeal in pain, short, close, dry, no background noise, no music" | 1058 |
-| `capybara/hurt2` | "guinea pig loud squeal in pain, short, close, dry, no background noise, no music" | 1060 |
-| `capybara/death1` | "small animal weak squeal, fading out, close, dry, no background noise, no music" | 1064 |
+| `capybara/hurt2` | "guinea pig loud squeal in pain, short, short and sharp, close, dry, no background noise, no music" | 5059 |
+| `capybara/death1` | "small animal weak squeal, fading out, short and sharp, close, dry, no background noise, no music" | 5063 |
 | `reindeer/ambient1` | "reindeer grunting, short low grunts and a snort, close, dry, no background noise, no music" | 1066 |
-| `reindeer/ambient2` | "reindeer grunting, short low grunts and a snort, close, dry, no background noise, no music" | 1068 |
-| `reindeer/ambient3` | "caribou calling, deep croaking grunt, close, dry, no background noise, no music" | 1067 |
-| `reindeer/hurt1` | "deer bleating in pain, one short loud cry, close, dry, no background noise, no music" | 1072 |
+| `reindeer/ambient2` | "reindeer grunting, short low grunts and a snort, short and sharp, close, dry, no background noise, no music" | 5066 |
+| `reindeer/ambient3` | "reindeer grunting, short low grunts and a snort, close, dry, no background noise, no music" | 1068 |
+| `reindeer/hurt1` | "deer bleating in pain, one short loud cry, close, dry, no background noise, no music" | 5070 |
 | `reindeer/hurt2` | "deer bleating in pain, one short loud cry, close, dry, no background noise, no music" | 1073 |
 | `reindeer/death1` | "deer dying groan, fading out, close, dry, no background noise, no music" | 1075 |
 | `drenkaun/ambient1` | "bull moose bellow, deep grunting call, close, dry, no background noise, no music" | 1081 |
-| `drenkaun/ambient2` | "bull moose bellow, deep grunting call, close, dry, no background noise, no music" | 1078 |
-| `drenkaun/ambient3` | "bull moose bellow, deep grunting call, close, forest" | 75 |
+| `drenkaun/ambient2` | "red deer stag roaring, one very deep loud roar, close" | 74 |
+| `drenkaun/ambient3` | "bull moose bellow, deep grunting call, short and sharp, close, dry, no background noise, no music" | 5078 |
 | `drenkaun/hurt1` | "red deer stag bellowing in pain, short, close, dry, no background noise, no music" | 1083 |
-| `drenkaun/hurt2` | "large bear roaring in pain, short, close, dry, no background noise, no music" | 1082 |
-| `drenkaun/hurt3` | "large bear roaring in pain, short, close, dry, no background noise, no music" | 1086 |
-| `drenkaun/death1` | "huge animal long dying roar fading into a groan, close, dry, no background noise, no music" | 1090 |
-| `drenkaun/death2` | "huge animal long dying roar fading into a groan, close, dry, no background noise, no music" | 1087 |
+| `drenkaun/hurt2` | "large bear roaring in pain, short, softer and calmer, close, dry, no background noise, no music" | 5086 |
+| `drenkaun/hurt3` | "large bear roaring in pain, short, close, dry, no background noise, no music" | 5082 |
+| `drenkaun/death1` | "huge animal long dying roar fading into a groan, close, dry, no background noise, no music" | 5087 |
+| `drenkaun/death2` | "huge animal long dying roar fading into a groan, close, dry, no background noise, no music" | 1090 |
 | `drenkaun/summon1` | "deep earth rumble then a huge stag roar, close, dry, no background noise, no music" | 1091 |
-| `drenkaun/summon2` | "giant beast awakening, cracking wood then a deep roar, close, dry, no background noise, no music" | 1092 |
-| `drenkaun/attack1` | "angry bull moose snort and bellow, short, close, dry, no background noise, no music" | 1099 |
-| `drenkaun/attack2` | "angry bull moose snort and bellow, short, close, dry, no background noise, no music" | 1097 |
-| `drenkaun/attack3` | "angry bull moose snort and bellow, short, close, dry, no background noise, no music" | 1095 |
-| `drenkaun/stunned1` | "large animal dazed, groaning and heavy breathing, close, dry, no background noise, no music" | 1102 |
-| `drenkaun/stunned2` | "large animal dazed, groaning and heavy breathing, close, dry, no background noise, no music" | 1100 |
-| `borkon/ambient1` | "bull roaring, one deep loud bellow, close, dry, no background noise, no music" | 1106 |
-| `borkon/ambient2` | "male goat loud angry bleat, deep and rough, close" | 84 |
-| `borkon/ambient3` | "male goat loud angry bleat, deep and rough, close, dry, no background noise, no music" | 1107 |
-| `borkon/hurt1` | "bull bellowing in pain, short, close, dry, no background noise, no music" | 1110 |
-| `borkon/hurt2` | "goat screaming in pain, deep, short, close, dry, no background noise, no music" | 1111 |
-| `borkon/hurt3` | "goat screaming in pain, deep, short, close, dry, no background noise, no music" | 1113 |
-| `borkon/death1` | "large goat dying bleat fading into a groan, close, dry, no background noise, no music" | 1114 |
-| `borkon/death2` | "large goat dying bleat fading into a groan, close, dry, no background noise, no music" | 1115 |
+| `drenkaun/summon2` | "giant beast awakening, cracking wood then a deep roar, short and sharp, close, dry, no background noise, no music" | 5092 |
+| `drenkaun/attack1` | "angry bull moose snort and bellow, short, softer and calmer, close, dry, no background noise, no music" | 5099 |
+| `drenkaun/attack2` | "bear growl, short and aggressive, short and sharp, close, dry, no background noise, no music" | 5096 |
+| `drenkaun/attack3` | "bear growl, short and aggressive, close, dry, no background noise, no music" | 1096 |
+| `drenkaun/stunned1` | "large animal dazed, groaning and heavy breathing, close, dry, no background noise, no music" | 5100 |
+| `drenkaun/stunned2` | "large animal dazed, groaning and heavy breathing, close, dry, no background noise, no music" | 1102 |
+| `borkon/ambient1` | "yak grunting bellow, deep, softer and calmer, close, dry, no background noise, no music" | 5108 |
+| `borkon/ambient2` | "bull roaring, one deep loud bellow, close, dry, no background noise, no music" | 1106 |
+| `borkon/ambient3` | "male goat loud angry bleat, deep and rough, close" | 84 |
+| `borkon/hurt1` | "goat screaming in pain, deep, short, softer and calmer, close, dry, no background noise, no music" | 5113 |
+| `borkon/hurt2` | "goat screaming in pain, deep, short, close, dry, no background noise, no music" | 5109 |
+| `borkon/hurt3` | "bull bellowing in pain, short, short and sharp, close, dry, no background noise, no music" | 5110 |
+| `borkon/death1` | "large goat dying bleat fading into a groan, close, dry, no background noise, no music" | 5114 |
+| `borkon/death2` | "large goat dying bleat fading into a groan, close, dry, no background noise, no music" | 1114 |
 | `borkon/summon1` | "mountain rumble, stones falling, then a deep goat roar, close, dry, no background noise, no music" | 1119 |
 | `borkon/summon2` | "mountain rumble, stones falling, then a deep goat roar, close, dry, no background noise, no music" | 1121 |
-| `borkon/attack1` | "bull snort and short angry bellow, close, dry, no background noise, no music" | 1123 |
-| `borkon/attack2` | "bull snort and short angry bellow, close, dry, no background noise, no music" | 1125 |
-| `borkon/attack3` | "ram snorting and bleating angrily, short, close, dry, no background noise, no music" | 1124 |
+| `borkon/attack1` | "bull snort and short angry bellow, short and sharp, close, dry, no background noise, no music" | 5123 |
+| `borkon/attack2` | "bull snort and short angry bellow, close, dry, no background noise, no music" | 1123 |
+| `borkon/attack3` | "bull snort and short angry bellow, close, dry, no background noise, no music" | 1125 |
 | `borkon/stunned1` | "large goat dazed, groaning and heavy breathing, close, dry, no background noise, no music" | 1130 |
-| `borkon/stunned2` | "large goat dazed, groaning and heavy breathing, close, dry, no background noise, no music" | 1127 |
-| `hare/hurt1` | "rabbit screaming in distress, one high shrill scream, close, dry, no background noise, no music" | 1132 |
-| `hare/hurt2` | "rabbit screaming in distress, one high shrill scream, close, dry, no background noise, no music" | 1131 |
+| `borkon/stunned2` | "large goat dazed, groaning and heavy breathing, close, dry, no background noise, no music" | 5127 |
+| `hare/hurt1` | "rabbit screaming in distress, one high shrill scream, short and sharp, close, dry, no background noise, no music" | 5132 |
+| `hare/hurt2` | "rabbit screaming in distress, one high shrill scream, longer and lower, close, dry, no background noise, no music" | 5133 |
 | `hare/death1` | "rabbit weak dying squeal, fading out, close, dry, no background noise, no music" | 1137 |
-| `jaguar/ambient1` | "jaguar sawing call, repeated deep rasping grunts, close, dry, no background noise, no music" | 1140 |
-| `jaguar/ambient2` | "jaguar sawing call, repeated deep rasping grunts, close, dry, no background noise, no music" | 1142 |
+| `jaguar/ambient1` | "jaguar sawing call, repeated deep rasping grunts, close, dry, no background noise, no music" | 5138 |
+| `jaguar/ambient2` | "jaguar sawing call, repeated deep rasping grunts, softer and calmer, close, dry, no background noise, no music" | 5142 |
 | `jaguar/ambient3` | "jaguar sawing call, repeated deep rasping grunts, close, dry, no background noise, no music" | 1138 |
 | `jaguar/hurt1` | "big cat snarling in pain, short, close, dry, no background noise, no music" | 1143 |
-| `jaguar/hurt2` | "big cat snarling in pain, short, close, dry, no background noise, no music" | 1146 |
-| `jaguar/death1` | "big cat dying growl, fading out, close, dry, no background noise, no music" | 1148 |
+| `jaguar/hurt2` | "big cat snarling in pain, short, close, dry, no background noise, no music" | 1144 |
+| `jaguar/death1` | "big cat dying growl, fading out, short and sharp, close, dry, no background noise, no music" | 5148 |
 | `eagle/ambient1` | "golden eagle calling, thin high yelping whistle, close, dry, no background noise, no music" | 1152 |
 | `eagle/ambient2` | "golden eagle calling, thin high yelping whistle, close, dry, no background noise, no music" | 1150 |
-| `eagle/ambient3` | "eagle calling, series of high yelps, close, dry, no background noise, no music" | 1151 |
-| `eagle/hurt1` | "eagle shriek in pain, short, close, dry, no background noise, no music" | 1156 |
+| `eagle/ambient3` | "golden eagle calling, thin high yelping whistle, softer and calmer, close, dry, no background noise, no music" | 5154 |
+| `eagle/hurt1` | "eagle shriek in pain, short, longer and lower, close, dry, no background noise, no music" | 5157 |
 | `eagle/death1` | "bird of prey weak cry, fading out, close, dry, no background noise, no music" | 1159 |
 | `snowy_owl/ambient1` | "snowy owl barking call, hoarse croak, close, dry, no background noise, no music" | 1163 |
 | `snowy_owl/ambient2` | "snowy owl barking call, hoarse croak, close, dry, no background noise, no music" | 1165 |
-| `snowy_owl/ambient3` | "snowy owl barking call, hoarse croak, close, dry, no background noise, no music" | 1161 |
-| `snowy_owl/hurt1` | "owl screech, short, close, dry, no background noise, no music" | 1167 |
-| `snowy_owl/death1` | "owl weak hiss, fading out, close, dry, no background noise, no music" | 1169 |
+| `snowy_owl/ambient3` | "snowy owl barking call, hoarse croak, close, dry, no background noise, no music" | 5161 |
+| `snowy_owl/hurt1` | "owl screech, short, close, dry, no background noise, no music" | 5166 |
+| `snowy_owl/death1` | "owl weak hiss, fading out, close, dry, no background noise, no music" | 5169 |
 | `bunting/ambient1` | "small bird twittering call, short, close, dry, no background noise, no music" | 1173 |
-| `bunting/ambient2` | "small bird twittering call, short, close, dry, no background noise, no music" | 1175 |
-| `bunting/ambient3` | "snow bunting song, short bright trill, close, dry, no background noise, no music" | 1172 |
-| `bunting/hurt1` | "small bird alarm chirp, sharp, close, dry, no background noise, no music" | 1178 |
+| `bunting/ambient2` | "small bird twittering call, short, short and sharp, close, dry, no background noise, no music" | 5173 |
+| `bunting/ambient3` | "small bird twittering call, short, louder and more intense, close, dry, no background noise, no music" | 5175 |
+| `bunting/hurt1` | "small bird alarm chirp, sharp, longer and lower, close, dry, no background noise, no music" | 5179 |
 | `bunting/death1` | "small bird weak chirp, fading, close, dry, no background noise, no music" | 1181 |
