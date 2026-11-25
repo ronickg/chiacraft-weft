@@ -284,7 +284,9 @@ const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.8, 1.2);
 // against Bliss's 66; 46 with the banks' sun off), where Bliss's near crowns stand dark out of the
 // mist with shafts between. Every overall cut took the vista, seen from 120 blocks over the banks,
 // darker and greyer than Bliss's (lv12); this leaves it alone.
-const MIST_NEAR_SUN: vec2<f32> = vec2(24.0, 120.0);
+// Now only the first few blocks, as Bliss's has none: with the banks 6x denser (f485f7ccc) the unlit
+// near 24-120 blocks stood as a dark smoky mass over the horizon from the low view (lkmC1 low6).
+const MIST_NEAR_SUN: vec2<f32> = vec2(0.0, 8.0);
 // The far air's glow toward Bliss's low morning sun (`haze_lit`): how tight (a power of the cosine),
 // how bright, and from what distance to what (blocks) it comes in.
 const HAZE_SUN_GLOW: vec4<f32> = vec4(16.0, 5.0, 200.0, 800.0);
