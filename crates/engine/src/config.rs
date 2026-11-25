@@ -793,6 +793,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         // NVIDIA Reflex's low latency (`Backend::set_low_latency`): 0 off, 1 on, 2 on with boost
         // (the GPU kept clocked up). Live; only where the upscaler has it (`core:gpu_reflex`).
         number("core:reflex", ck::INT, 1.0, 0.0, 2.0, 1.0),
+        // Named GPU timestamps inside the parts (`Cmd::Probe`, `diag::probe`): a bench line then
+        // also lists each one's ms (the path tracer's passes, the upscaler). Live; off by default.
+        number("core:gpu_probes", ck::BOOL, 0.0, 0.0, 1.0, 1.0),
         // DLSS frame generation, where the GPU has it (`core:gpu_frame_gen`, an RTX 40 or 50 on
         // Windows): on by default. Not read yet: its present path isn't built (`core:gpu_frame_gen_why`).
         number("core:frame_gen", ck::BOOL, 1.0, 0.0, 1.0, 1.0),

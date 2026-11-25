@@ -1230,7 +1230,7 @@ impl Backend for WgpuBackend {
                 // targets (`PassExtras`) and the upscaler (`Upscale`) are the Vulkan backend's alone;
                 // on wgpu they draw nothing, and the settings that use them must stay off there.
                 Cmd::PassExtras(_) | Cmd::BuildBlas(_) | Cmd::BuildTlas(_) | Cmd::BindAccel { .. } | Cmd::Upscale { .. } => {}
-                Cmd::Mark => {
+                Cmd::Mark | Cmd::Probe(_) => {
                     if let Some(t) = &self.timer
                         && marks < MAX_MARKS - 1
                     {

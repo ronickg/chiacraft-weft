@@ -1351,7 +1351,9 @@ impl Post {
         }
         // The upscaler, once its motion image and guides are drawn.
         if let Some(c) = up_cmd {
+            crate::diag::probe(list, "pre_upscale");
             list.push(c);
+            crate::diag::probe(list, "upscale");
         }
         if let Some(low_pipe) = self.low_pipe {
             for (k, target) in lows.iter().enumerate() {

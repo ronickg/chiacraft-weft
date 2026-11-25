@@ -4035,7 +4035,9 @@ impl Client {
         if shadow_setting("core:path_traced", 0.0) > 0.5 {
             let debug = shadow_setting("core:pt_debug", 0.0) as u32;
             // The G-buffer (albedo, normal and roughness, spec) the denoisers read: `render.gb_images`.
+            crate::diag::probe(list, "pt_before");
             self.render.gbuffer_pass(gpu, list, depth, size);
+            crate::diag::probe(list, "pt_gbuffer");
             self.render
                 .path_trace(gpu, list, slot, depth, target, size, debug, false);
         }

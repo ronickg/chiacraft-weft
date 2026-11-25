@@ -23,6 +23,8 @@ pub struct Bench {
     mods: crate::diag::ModWindow,
     /// Per frame sums: GPU draws (indirect records counted), draw commands, pipeline binds.
     calls: [u64; 3],
+    /// Each probe's GPU ms summed (`Cmd::Probe`, `core:gpu_probes`), in the order first seen.
+    probes: Vec<(&'static str, f64)>,
 }
 
 impl Bench {
@@ -41,6 +43,7 @@ impl Bench {
             server: Vec::new(),
             phases: [0.0; 6],
             calls: [0; 3],
+            probes: Vec::new(),
         }
     }
 
@@ -74,6 +77,37 @@ impl Bench {
         for (s, v) in self.cpu.iter_mut().zip(cpu) {
             *s += *v as f64;
         }
+        // The marks and probes in this frame's list, in order: a probe's time is its own and also
+        // the part the next mark ends; the times are an earlier frame's, alike while nothing changes.
+        let stamps: Vec<Option<&'static str>> = list
+            .cmds
+            .iter()
+            .filter_map(|c| match *c {
+                Cmd::Mark => Some(None),
+                Cmd::Probe(n) => Some(Some(n)),
+                _ => None,
+            })
+            .collect();
+        let mut folded = [0f32; GPU_N];
+        let has_probes = stamps.iter().any(|s| s.is_some());
+        let gpu: &[f32] = if has_probes && gpu.len() == stamps.len() + 2 {
+            folded[0] = gpu[0];
+            let mut part = 1;
+            for (s, &t) in stamps.iter().zip(&gpu[1..]) {
+                folded[part.min(GPU_N - 1)] += t;
+                match s {
+                    Some(n) => match self.probes.iter_mut().find(|p| p.0 == *n) {
+                        Some(p) => p.1 += t as f64,
+                        None => self.probes.push((n, t as f64)),
+                    },
+                    None => part += 1,
+                }
+            }
+            folded[GPU_N - 1] += gpu[gpu.len() - 1];
+            &folded
+        } else {
+            gpu
+        };
         if gpu.len() >= GPU_N {
             for (s, v) in self.gpu.iter_mut().zip(gpu) {
                 *s += *v as f64;
@@ -144,6 +178,12 @@ impl Bench {
             .zip(self.gpu)
             .map(|(k, v)| format!("{k} {:.2}", v / g))
             .collect();
+        let probes = if self.probes.is_empty() {
+            String::new()
+        } else {
+            let p: Vec<String> = self.probes.iter().map(|(k, v)| format!("{k} {:.2}", v / g)).collect();
+            format!(" | gpu probes ms: {}", p.join(", "))
+        };
         let srv_avg = self.server.iter().map(|&s| s as f64).sum::<f64>() / self.server.len().max(1) as f64;
         let srv_max = self.server.iter().copied().fold(0.0f32, f32::max);
         let ticks = self.start.elapsed().as_secs_f64() * crate::world::TPS as f64;
@@ -160,7 +200,7 @@ impl Bench {
             .map(|(k, v)| format!("{k} {:.2}", v / self.server.len().max(1) as f64))
             .collect();
         format!(
-            "BENCH {} | {} frames, {:.0} fps, frame avg {avg:.2} p50 {:.2} p99 {:.2} max {:.2} ms | cpu ms: {} | gpu {gpu_total:.2} ms: {} | per frame: {:.0} draws in {:.0} commands, {:.0} pipeline binds | server avg {srv_avg:.2} max {srv_max:.2} ms ({}) | mods per tick: {} | {extra}",
+            "BENCH {} | {} frames, {:.0} fps, frame avg {avg:.2} p50 {:.2} p99 {:.2} max {:.2} ms | cpu ms: {} | gpu {gpu_total:.2} ms: {} | per frame: {:.0} draws in {:.0} commands, {:.0} pipeline binds{probes} | server avg {srv_avg:.2} max {srv_max:.2} ms ({}) | mods per tick: {} | {extra}",
             self.label,
             self.frames.len(),
             1000.0 / avg.max(1e-3),

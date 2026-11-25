@@ -22,7 +22,7 @@ const FRAMES: usize = 2;
 /// Set 0 has the textures, 1 each draw's buffers, this one the samplers.
 const SAMPLER_SET: u32 = 2;
 /// Timestamp queries per frame: start, after uploads, marks, end.
-const MAX_MARKS: u32 = 16;
+const MAX_MARKS: u32 = 32;
 const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
 
 struct Buffer {
@@ -3033,7 +3033,7 @@ impl Backend for VulkanBackend {
                         }
                         stale = true;
                     }
-                    Cmd::Mark => {
+                    Cmd::Mark | Cmd::Probe(_) => {
                         if marks < MAX_MARKS - 1 {
                             self.device
                                 .cmd_write_timestamp(cmd, vk::PipelineStageFlags::BOTTOM_OF_PIPE, self.queries, first_query + marks);

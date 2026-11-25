@@ -510,12 +510,14 @@ impl WorldRenderer {
         list.bind(pt_bind::CACHE, cache);
         list.push_constants(&args);
         list.push(Cmd::Dispatch { x: size.0.div_ceil(8), y: size.1.div_ceil(8), z: 1 });
+        crate::diag::probe(list, "pt_trace");
         list.push(Cmd::Barrier);
         // The cache takes in what the paths left in it (read by the next frame's).
         self.bind_run(list, resolve, page, origins);
         list.bind(pt_bind::CACHE, cache);
         list.push_constants(&args);
         list.push(Cmd::Dispatch { x: PT_CACHE / 64, y: 1, z: 1 });
+        crate::diag::probe(list, "pt_cache");
         list.push(Cmd::Barrier);
         let none = [0.0; 4];
         list.push(Cmd::PassExtras([Some((specular, Some(none))), None, None]));
@@ -525,6 +527,7 @@ impl WorldRenderer {
         list.push_constants(&args);
         list.draw(3, 1);
         list.push(Cmd::EndPass);
+        crate::diag::probe(list, "pt_composite");
     }
 
     /// The image a denoiser writes its denoised light into (diffuse x albedo + specular x
