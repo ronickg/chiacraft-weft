@@ -137,7 +137,8 @@ fn fs_pre_taa(in: VOut) -> @location(0) vec4<f32> {
     if scene.frame.x < 0.5 || in_liquid() || !open_sky() {
         return color;
     }
-    if one_fog_on() && !in_liquid() && look_debug() != 7u {
+    // Debug views 7, 11 and 12 without the fog (11: is a deck under it; 12: the clouds' layers).
+    if one_fog_on() && !in_liquid() && look_debug() != 7u && look_debug() != 11u && look_debug() != 12u {
         return vec4(one_fog(color.rgb, view_rel(in.uv, pass_)), color.a);
     }
     return color;

@@ -2015,6 +2015,10 @@ fn bc_clouds(dir: vec3<f32>, far_in: f32, dither: vec2<f32>, sun: vec3<f32>, sky
     if !below2 {
         color = color * l2.a + l2.rgb;
     }
+    // Debug view 12: each layer's opacity, r the low cumulus, g the high, b the altostratus.
+    if look_debug() == 12u {
+        return vec4(vec3(1.0 - l0.a, 1.0 - l1.a, 1.0 - l2.a) * 0.2, 0.0);
+    }
     return vec4(color, l0.a * l1.a * l2.a);
 }
 // The clear sky's average light for the clouds (Bliss's averageSkyCol / 30, `fs_frame_look`'s texel 5).
@@ -3352,8 +3356,8 @@ const BAND_HDR: f32 = 0.006;
 const BAND_DEPTH: f32 = 12.0;
 
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
-    // Debug view 7 (the sun's cuts, `world.wgsl`) unveiled.
-    if look_debug() == 7u {
+    // Debug views 7 (the sun's cuts, `world.wgsl`), 11 and 12 (the clouds unfogged) unveiled.
+    if look_debug() == 7u || look_debug() == 11u || look_debug() == 12u {
         return c_in;
     }
     if one_fog_on() && !in_liquid() && open_sky() {
