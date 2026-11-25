@@ -1,5 +1,7 @@
 # Animal AI coverage (11-25)
 
+"not tested" marks anything the runs did not show; "pass" only what a log line or a where row showed.
+
 Planner's task (from Ronald: "with animals, then you need to test more than just wolves"): every species'
 AI checked on the Mac, one check per behaviour group (`mods/testkit/scripts/cov_*.txt`, written by
 `tools/animals/coverage_scripts.py`), the results here, the failures fixed biggest first.
@@ -14,16 +16,16 @@ Runs: commit 1ff853abf (branch claude/animals-coverage), seed 1, fresh worlds, `
 
 | Species | eats | drinks | flees | herd holds | shot |
 |---|---|---|---|---|---|
-| white_tailed_deer | pass | pass (lines; water was full) | fail: only the hit one ran | - (out of the rows' range) | grid 1 |
-| red_deer | pass | - (water 30 %, ate instead) | - (not hit) | pass, 4-5 blocks | grid 1 |
-| reindeer | pass (2 of 3) | - (ate instead) | - (not hit) | pass, 4 blocks (one row) | grid 2 |
+| white_tailed_deer | pass | pass (lines; water was full) | fail: only the hit one ran | not tested (out of the rows' range) | grid 1 |
+| red_deer | pass | not tested (water 30 %, ate instead) | not tested (not hit) | pass, 4-5 blocks | grid 1 |
+| reindeer | pass (2 of 3) | not tested (ate instead) | not tested (not hit) | pass, 4 blocks (one row) | grid 2 |
 | capybara | pass | pass for 1 of 3 (water rose 30 to 38) | fail: only the hit one ran | pass, 3-5 blocks | grid 2 |
 | protoceratops | pass | pass | fail: only the hit one ran | pass, 1-2 blocks | grid 3 |
-| psittacosaurus | pass | pass (water 30 to 99) | - (not hit) | pass, 1-8 blocks | grid 3 |
-| gastonia | pass | pass | - (not hit) | pass, 3 blocks | grid 4 |
+| psittacosaurus | pass | pass (water 30 to 99) | not tested (not hit) | pass, 1-8 blocks | grid 3 |
+| gastonia | pass | pass | not tested (not hit) | pass, 3 blocks | grid 4 |
 | pinacosaurus | pass | pass (30 to 77, 100) | fail: ran, never stood (1900 kg) | pass, 2-4 blocks | grid 4 |
 | iguanodont | pass | pass | fail: ran, never stood (4 t) | pass, 7 blocks | grid 5 |
-| cedarosaurus | pass | pass (30 to 100) | - (not hit) | pass, 3-4 blocks | grid 5 |
+| cedarosaurus | pass | pass (30 to 100) | not tested (not hit) | pass, 3-4 blocks | grid 5 |
 | citipati | pass (seeds off the ground) | pass | pass (ran) | n/a (two kept within 2) | grid 6 |
 
 cov_grazers, Mac, 494.9 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_grazers_m-154047.log`;
@@ -41,15 +43,15 @@ on citipati_lie): art for blocky-model.
 | Species | hunts | stalks / ambush | chase | kill | share | gives up | shot |
 |---|---|---|---|---|---|---|---|
 | jaguar | pass (deer, 56 kg) | pass (stalk, "breaks cover", 9 blocks) | pass (60 s, off the pad) | pass (70 kg, full) | n/a | pass ("too long" at 61 s, then a second hunt killed) | grid 1 |
-| coyote | pass (37: a hare) | n/a | pass (2 s) | pass (3.8 kg) | fail: 36 never joined | - | grid 2 |
-| red_fox | pass (4 hunts) | n/a | pass | pass (2 mice, a vole) | n/a | - | grid 3 |
-| arctic_fox | pass | n/a | pass | pass (a vole) | n/a | - | grid 3 |
+| coyote | pass (37: a hare) | n/a | pass (2 s) | pass (3.8 kg) | fail: 36 never joined | not tested | grid 2 |
+| red_fox | pass (4 hunts) | n/a | pass | pass (2 mice, a vole) | n/a | not tested | grid 3 |
+| arctic_fox | pass | n/a | pass | pass (a vole) | n/a | not tested | grid 3 |
 | raptor | pass | n/a | pass | pass (kryptobaatar, Priscagama) | n/a | pass ("gone": the other took it) | grid 4 |
 | osmolskae | pass | n/a | pass | pass (kryptobaatar) | n/a | pass ("gone") | grid 4 |
-| utahraptor | pass (a pack of 3, two "join") | - | pass (10 s) | pass (Psittacosaurus) | pass (8.3 kg each of 25) | - | grid 5 |
-| crocodyliform | pass (took a spectacled caiman) | pass ("breaks cover", 6 blocks) | pass | pass (25 kg, full) | n/a | - | grid 6 (dark) |
-| yacare_caiman | - (ran from the crocodyliform; no prey its size) | - | - | - | n/a | - | grid 6 |
-| spectacled_caiman | - (killed by the crocodyliform at 1.5 s) | - | - | - | n/a | - | grid 6 |
+| utahraptor | pass (a pack of 3, two "join") | not tested | pass (10 s) | pass (Psittacosaurus) | pass (8.3 kg each of 25) | not tested | grid 5 |
+| crocodyliform | pass (took a spectacled caiman) | pass ("breaks cover", 6 blocks) | pass | pass (25 kg, full) | n/a | not tested | grid 6 (dark) |
+| yacare_caiman | not tested (ran from the crocodyliform; no prey its size) | not tested | not tested | not tested | n/a | not tested | grid 6 |
+| spectacled_caiman | not tested (killed by the crocodyliform at 1.5 s) | not tested | not tested | not tested | n/a | not tested | grid 6 |
 
 cov_hunters, Mac, 557.2 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_hunters_m-154912.log`;
 grid `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_hunters_m-155831/cov_hunters_grid.jpg`, parts 4-6
@@ -67,16 +69,16 @@ stretch on capybara_sit; groom, sniff on caiman_bask.
 | Species | flies | lands | flocks | flees | hunts / scavenges | shot |
 |---|---|---|---|---|---|---|
 | house_sparrow | short hops (to 72) | pass | pass, 5 blocks | pass ("bolts from player") | n/a | grid 1 |
-| snow_bunting | pass (to 80) | - (comfort all run) | fail: 18 blocks apart | pass | n/a | grid 1 |
+| snow_bunting | pass (to 80) | not tested (comfort all run) | fail: 18 blocks apart | pass | n/a | grid 1 |
 | confuciusornis | pass (to 79) | pass | pass, 5 blocks | pass | n/a | grid 1 |
-| gobipteryx | pass (to 78) | pass | 20 blocks at widest | - (no bolt) | n/a | grid 1 |
-| golden_eagle | fail: on foot all run | n/a | n/a | - | pass on foot (a hare; gave up one "too long") | grid 2 |
-| savanna_hawk | fail: on foot all run | n/a | n/a | - | pass on foot (a mouse) | grid 2 |
-| great_horned_owl | one row at 77 | - | n/a | - | pass (a mouse) | grid 3 |
-| snowy_owl | fail: on foot all run | - | n/a | - | pass on foot (a mouse) | grid 3 |
-| turkey_vulture | pass (to 86) | pass | - | - | pass ("smells carrion" 19-20 blocks, ate venison) | grid 4 |
-| raven | fail: y 69-70 only | - | n/a | - | pass by food (29 to 100 %, no line) | grid 4 |
-| herring_gull | pass (to 86) | - | 15 blocks | - | pass by food (no line) | grid 4 |
+| gobipteryx | pass (to 78) | pass | 20 blocks at widest | not tested (no bolt) | n/a | grid 1 |
+| golden_eagle | fail: on foot all run | n/a | n/a | not tested | pass on foot (a hare; gave up one "too long") | grid 2 |
+| savanna_hawk | fail: on foot all run | n/a | n/a | not tested | pass on foot (a mouse) | grid 2 |
+| great_horned_owl | one row at 77 | not tested | n/a | not tested | pass (a mouse) | grid 3 |
+| snowy_owl | fail: on foot all run | not tested | n/a | not tested | pass on foot (a mouse) | grid 3 |
+| turkey_vulture | pass (to 86) | pass | not tested | not tested | pass ("smells carrion" 19-20 blocks, ate venison) | grid 4 |
+| raven | fail: y 69-70 only | not tested | n/a | not tested | pass by food (29 to 100 %, no line) | grid 4 |
+| herring_gull | pass (to 86) | not tested | 15 blocks | not tested | pass by food (no line) | grid 4 |
 
 cov_birds, Mac, 345.8 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_birds_m-155832.log`; grid
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_birds_m-160420/cov_birds_grid.jpg`, no bird
@@ -91,18 +93,18 @@ mouse_sit (idle clips asked for in the air: the fly looks should be left out of 
 
 | Species | eats | drinks | wanders | flees | shot |
 |---|---|---|---|---|---|
-| hare | pass (tall grass) | pass (water full) | - (ate all run) | pass ("bolts") | grid 1 |
-| mountain_hare | pass | pass | - (comfort) | pass | grid 1 |
+| hare | pass (tall grass) | pass (water full) | not tested (ate all run) | pass ("bolts") | grid 1 |
+| mountain_hare | pass | pass | not tested (comfort) | pass | grid 1 |
 | wood_mouse | pass (grass, seeds) | pass for 1 of 3 | pass (1) | pass | grid 1 |
 | field_vole | pass | pass (water 30 to 84-100) | pass (1) | pass (1 of 3) | grid 1 |
-| kryptobaatar | fail: never hungry | fail: never thirsty | - (rested: nocturnal) | pass | grid 2 |
+| kryptobaatar | fail: never hungry | fail: never thirsty | not tested (rested: nocturnal) | pass | grid 2 |
 | priscagama | fail: never hungry | fail: never thirsty | pass | pass | grid 2 |
-| cat | pass, but on insects in the grass | pass (1 of 2) | - | pass | grid 3 |
+| cat | pass, but on insects in the grass | pass (1 of 2) | not tested | pass | grid 3 |
 | dog (chihuahua) | pass, but on seeds in the tall grass | pass | pass | pass (ran from a hit) | grid 3 |
-| brown_trout | - | n/a | pass (swims) | - (no dart seen) | grid 4 (dark) |
-| pacu | - | n/a | pass | - | grid 4 |
-| lungfish | - | n/a | pass | - | grid 4 |
-| lycoptera | - | n/a | 1 of 3 (two spawned on the water's top suffocated: the script's) | - | grid 4 |
+| brown_trout | not tested | n/a | pass (swims) | not tested (no dart seen) | grid 4 (dark) |
+| pacu | not tested | n/a | pass | not tested | grid 4 |
+| lungfish | not tested | n/a | pass | not tested | grid 4 |
+| lycoptera | not tested | n/a | 1 of 3 (two spawned on the water's top suffocated: the script's) | not tested | grid 4 |
 
 cov_small, Mac, 326.5 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_small_m-160421.log`; grid
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_small_m-160950/cov_small_grid.jpg`). Fixed:
@@ -119,12 +121,12 @@ scratch on lungfish, pacu, lycoptera, brown_trout, fish_flop): fish should get n
 
 | Species | aggro / stands | leash | death | shot |
 |---|---|---|---|---|
-| iguanodont | fail: ran when hit (fixed, to re-run) | n/a | - | grid 1 |
-| gastonia | fail: ran when hit (fixed, to re-run) | n/a | - | grid 1 |
-| cedarosaurus | fail: ran when hit (fixed, to re-run) | n/a | - | grid 1 |
-| wyvern | partial: flinched, stayed, breathed frost twice; no charge | n/a | - | grid 1 (dark) |
-| drenkaun | pass ("summoned", chase, "sweep hits 1 for 14.1") | pass ("back to its place" 60 s after) | - (script: see below) | grid 1 |
-| borkon | pass ("toss hits 1 for 24.9": killed the player) | pass (62 s) | - (script) | grid 1 ("You Died") |
+| iguanodont | fail: ran when hit (fixed, to re-run) | n/a | not tested | grid 1 |
+| gastonia | fail: ran when hit (fixed, to re-run) | n/a | not tested | grid 1 |
+| cedarosaurus | fail: ran when hit (fixed, to re-run) | n/a | not tested | grid 1 |
+| wyvern | partial: flinched, stayed, breathed frost twice; no charge | n/a | not tested | grid 1 (dark) |
+| drenkaun | pass ("summoned", chase, "sweep hits 1 for 14.1") | pass ("back to its place" 60 s after) | not tested (script: see below) | grid 1 |
+| borkon | pass ("toss hits 1 for 24.9": killed the player) | pass (62 s) | not tested (script) | grid 1 ("You Died") |
 
 cov_bosses, Mac, 403.9 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_bosses_m-160951.log`; grid
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_bosses_m-161637/cov_bosses_grid.jpg`). The big plant
@@ -182,15 +184,15 @@ laying kind a pad; feeding and bite lines in the log.
 | cat | not fed (aim) | n/a | n/a | |
 | chihuahua | not fed (aim) | n/a | n/a | |
 | capybara | not fed (aim) | n/a | n/a | |
-| raptor | not fed (aim) | kept off by another nest | - | |
+| raptor | not fed (aim) | kept off by another nest | not tested | |
 | osmolskae | not fed (aim) | n/a | n/a | |
 | utahraptor | not fed (aim) | n/a | n/a | |
 | jaguar | pass (tamed at 100 %, 7 bonus levels) | n/a | n/a | |
 | wyvern | not fed (aim) | n/a | n/a | |
-| protoceratops | n/a | kept off by another nest | - | |
+| protoceratops | n/a | kept off by another nest | not tested | |
 | psittacosaurus | n/a | pass (8 eggs) | pass (8 born) | |
-| citipati | n/a | kept off by another nest | - | |
-| house_sparrow | n/a | kept off by another nest | - | |
+| citipati | n/a | kept off by another nest | not tested | |
+| house_sparrow | n/a | kept off by another nest | not tested | |
 
 Grid: `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_taming_m-162426/cov_taming_grid.jpg`.
 
