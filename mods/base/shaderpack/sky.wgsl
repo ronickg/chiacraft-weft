@@ -517,6 +517,13 @@ fn fs_cloud_trace(in: CloudOut) -> @location(0) vec4<f32> {
     if !open_sky() || in_liquid() {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
+    // Where the land is lit from the physical sky, Bliss's three layers (`bc_clouds`), to the world's
+    // depth or, on the sky, distant terrain's far end; lit by the land's sun and the clear sky.
+    if land_from_sky() {
+        let reach = select(BC_SKY_FAR, far, far < SOFT_REACH);
+        let dither_x = fract(unit(hash(u32(in.clip.x) * 7411u + u32(in.clip.y) * 3301u)) + f32(n) * 0.754878);
+        return bc_clouds(dir, reach, vec2(dither_x, dither), palette().sun, bc_sky_read());
+    }
     return soft_march(s, dir, far, dither);
 }
 
@@ -583,9 +590,16 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     let seen = soft_distance(s, dir);
     let rel = dir * seen;
     var color = c.rgb / alpha_cloud;
+    sky_seen = 1.0;
+    // Bliss's: no hand-over to the sky's colour, no rain mist, no fade (its far ones are lit by the
+    // sky alone, `bc_clouds`); the fog's march lays its air over them as over the sky.
+    if land_from_sky() {
+        color = display(rainbow_on(color, dir));
+        let clip_b = scene.view_proj * vec4(rel, 1.0);
+        return CloudPixel(vec4(color * alpha_cloud, alpha_cloud), clip_b.z / clip_b.w);
+    }
     // Toward the far end they hand over to the sky.
     let dist = length(rel.xz) / SOFT_REACH;
-    sky_seen = 1.0;
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.45, 1.0, dist));
     // Rain's mist on the soft deck only low over the horizon, by how low it stands, not by its
     // distance: misted by distance, even at two fifths, a storm's near deck went pale slate and its
@@ -1389,12 +1403,32 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     PAL_READ = true;
                     var cloudy = vec3(0.0);
                     for (var i = 0; i < 9; i++) {
-                        let cl = soft_march(s, atm_mean_dir(i, sun), SOFT_REACH, 0.5);
+                        let cl = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), bc_sky_light(clear / 9.0));
                         cloudy += wet[i] * cl.a + cl.rgb;
                     }
                     return vec4(land_ambient(cloudy / 9.0), 1.0);
                 }
                 return vec4(land_ambient(clear / 9.0), 1.0);
+            }
+            return vec4(p.ambient, 1.0);
+        }
+        // The clear sky's average for the clouds' sky light (Bliss's averageSkyCol / 30, `bc_sky_read`).
+        case 5u: {
+            if from_sky {
+                let moon = normalize(scene.moon.xyz);
+                let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
+                var sum = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    sum += atm_march(atm_mean_dir(i, sun), sun, moon, sky_k, ATM_FLOOR, 4, 2).light;
+                }
+                let mean = sum / 9.0;
+                var clear = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    let dir = atm_mean_dir(i, sun);
+                    let a = atm_march(dir, sun, moon, sky_k, atm_background(mean), 4, 2);
+                    clear += atm_rain(a.light, dir, a.through, mean);
+                }
+                return vec4(bc_sky_light(clear / 9.0), 1.0);
             }
             return vec4(p.ambient, 1.0);
         }

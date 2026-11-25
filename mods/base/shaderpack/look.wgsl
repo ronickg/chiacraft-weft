@@ -1735,6 +1735,295 @@ fn cloud_fuzz(cell: vec2<f32>) -> f32 {
 const CLOUD_SHADOW_SPAN: f32 = 4096.0;
 
 // The soft clouds' shadow at `rel` from their map, 1 out of it or without it.
+// ---- Bliss's clouds, where the land is lit from the physical sky (lib/volumetricClouds.glsl,
+// method only; rebuilt from its source 11-25, Ronald's "nearly one-to-one") ----
+// Three layers at fixed heights above the world's floor (its own, sea at 63): small cumulus 250-350,
+// large cumulus 500-600, an altostratus sheet at 2000. Rain changes only their cover and density
+// (Ronald's profile: cover 0.5 / 0.6 / 0.4, rain cover 1.1; densities 0.5 / 0.5 / 0.1), the large
+// layer going away and the low one closing; no deck of its own, no drop in height.
+// In place of our one soft layer, its lifts, storm towers, albedos, octaves, rims and fills there.
+const BC_L0: f32 = 250.0;
+const BC_L1: f32 = 500.0;
+const BC_WIDTH: f32 = 100.0;
+const BC_ALTO: f32 = 2000.0;
+// How far a sky pixel's clouds reach: Bliss's clouds stop at the pixel's depth, for the sky the far
+// plane, with Distant Horizons its far end (ours: distant terrain's, about 8 km).
+const BC_SKY_FAR: f32 = 8192.0;
+fn bc_rain() -> f32 {
+    return rain_amount();
+}
+// Cover and density per layer (0, 1, 2), by the rain.
+fn bc_cover(layer: u32) -> f32 {
+    let r = bc_rain();
+    return select(select(mix(0.4, 1.5, r), mix(0.6, 0.0, r), layer == 1u), mix(0.5, 1.1, r), layer == 0u);
+}
+fn bc_density(layer: u32) -> f32 {
+    let r = bc_rain();
+    return select(select(mix(0.1, 0.05, r), mix(0.5, 0.0, r), layer == 1u), mix(0.5, 1.0, r), layer == 0u);
+}
+// The wind's drift in blocks: Bliss's (ticks / 24 in its sample space, a quarter of the world's).
+fn bc_drift() -> f32 {
+    return scene.light.z / 6.0;
+}
+// Its noise texture's channels in ours: R a smooth noise low in its range (mean 0.236, 5 / 95 % at
+// 0.008 / 0.455), B a smooth one about the middle (0.5, sd 0.18); measured on it, 11-25. Our
+// value noise (cell = 1.67 x its half-correlation) mapped to the same spread.
+fn bc_value2(q: vec2<f32>, k: i32) -> f32 {
+    let i = vec2<i32>(floor(q));
+    let f = fract(q);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = mix(hash3(vec3(i, k)), hash3(vec3(i + vec2(1, 0), k)), u.x);
+    let b = mix(hash3(vec3(i + vec2(0, 1), k)), hash3(vec3(i + vec2(1, 1), k)), u.x);
+    return mix(a, b, u.y);
+}
+fn bc_r(q: vec2<f32>, cell: f32) -> f32 {
+    return max(0.236 + (bc_value2(q / cell, 3) - 0.5) * 0.717, 0.0);
+}
+fn bc_b(q: vec2<f32>, cell: f32) -> f32 {
+    return clamp(bc_value2(q / cell, 11), 0.0, 1.0);
+}
+fn bc_r3(p: vec3<f32>, cell: vec2<f32>) -> f32 {
+    return max(0.236 + (noise3(vec3(p.x / cell.x, p.y / cell.y, p.z / cell.x)) - 0.5) * 0.717, 0.0);
+}
+// A cumulus layer's 2D cover at world point `w` (absolute y), ramped in its slab (cloudCov): layer 0
+// from blobs about 120 blocks (its R at 500 of its sample space) grouped by a 900-block field, layer
+// 1 from 450-block ones in a 1800-block field.
+fn bc_coverage(layer: u32, w: vec3<f32>) -> f32 {
+    let m = bc_drift();
+    let r = bc_rain();
+    if layer == 0u {
+        let lo = BC_L0;
+        let hi = BC_L0 + BC_WIDTH;
+        let large = bc_b(w.xz + m, 912.0);
+        let small = bc_r(w.xz - m, 117.0);
+        let cov = abs(large * 2.0 - 1.2) * 0.5 - (1.0 - small);
+        let l = min(min(cov + bc_cover(0u), clamp(hi - w.y, 0.0, 1.0)), 1.0 - clamp(lo - w.y, 0.0, 1.0));
+        let top = max(w.y - (hi - 75.0), 0.0) / 200.0 + max(w.y - (hi - 10.0), 0.0) / 15.0;
+        let base = max(lo + 12.5 - w.y, 0.0) / 50.0;
+        return max(l - top - base * (1.0 - r), 0.0);
+    }
+    let lo = BC_L1;
+    let hi = BC_L1 + BC_WIDTH;
+    let large = bc_b(-(w.zx + m * 2.0), 1823.0);
+    let small = bc_b(-(w.zx - m * 2.0), 456.0);
+    let cov = abs(large - 0.8) - small;
+    let l = min(min(cov + bc_cover(1u) - 0.5, clamp(hi - w.y, 0.0, 1.0)), 1.0 - clamp(lo - w.y, 0.0, 1.0));
+    let top = max(w.y - (hi - 75.0), 0.0) / 200.0 + max(w.y - (hi - 10.0), 0.0) / 15.0;
+    let base = max(lo + 15.5 - w.y, 0.0) / 50.0;
+    return max(l - top * top - base * (1.0 - r), 0.0);
+}
+// Its density there (GetCumulusDensity, cloudVol): the cover worn by fine grain where it is thin,
+// the tops leaning with height; `lod` 0 the light taps' and the shadows' (one octave), 1 the view's.
+fn bc_cumulus(layer: u32, w: vec3<f32>, lod: u32) -> f32 {
+    let cov = bc_coverage(layer, w);
+    if cov <= 0.001 {
+        return 0.0;
+    }
+    let lo = select(BC_L1, BC_L0, layer == 0u);
+    let hi = lo + BC_WIDTH;
+    var p = w;
+    p.x -= bc_drift() * 0.25;
+    p.z -= bc_drift() * 0.25;
+    let lean = pow(max(w.y - (lo + 20.0), 0.0) / 20.0, 1.5) * 4.0;
+    p.x += lean;
+    p.z += lean;
+    // Its grain: about 0.7 blocks a texel in the low layer (1.4 in the high), slices 17 blocks apart.
+    let c1 = select(vec2(43.2, 34.6), vec2(21.6, 17.3), layer == 0u);
+    var n = (1.0 - bc_r3(p, c1)) * sqrt(1.0 - cov);
+    if lod > 0u {
+        let c2 = select(vec2(9.6, 7.7), vec2(7.2, 5.8), layer == 0u);
+        n += abs(bc_r3(p + vec3(71.0, 0.0, 37.0), c2) - (1.0 - clamp((hi - w.y) / 100.0, 0.0, 1.0))) * 0.75 * (1.0 - cov);
+    }
+    n = n * n;
+    return max(cov - n * n * 0.5, 0.0);
+}
+// The altostratus at world point `w` (GetAltostratusDensity): broad sheets (4.5 km) cut by
+// 340-block patches.
+fn bc_alto(w: vec3<f32>) -> f32 {
+    let m = bc_drift() * 0.25;
+    var large = 1.0 - bc_b(w.xz + m, 4557.0);
+    large = max(large + bc_cover(2u) - 0.7, 0.0);
+    let medium = 1.0 - bc_b(w.xz - m + vec2(-large, 1.0 - large) * 1500.0, 342.0);
+    let shape = max(large - medium * 0.4 * clamp(1.5 - large, 0.0, 1.0), 0.0);
+    return shape * shape;
+}
+// The land's sun through them at camera-relative `rel` (GetCloudShadow): each layer's density where
+// the light crosses a plane in it, summed, 2^(-100 s^2): cores black, soft over s 0.05-0.2.
+fn bc_shadow(rel: vec3<f32>) -> f32 {
+    let l = light_dir();
+    let w = rel + vec3(scene.eye.x, scene.eye.y, scene.eye.z);
+    let along = l / max(abs(l.y), 1e-3);
+    var s = bc_cumulus(0u, w + along * max(BC_L0 + 30.0 - w.y, 0.0), 0u) * bc_density(0u);
+    s += bc_cumulus(1u, w + along * max(BC_L1 + 50.0 - w.y, 0.0), 0u) * bc_density(1u);
+    s += bc_alto(w + along * max(BC_ALTO - w.y, 0.0)) * 0.1 * (1.0 - abs(l.y));
+    s = clamp(s, 0.0, 1.0);
+    return exp2(s * s * -100.0);
+}
+// Its phase (phaseg).
+fn bc_phase(x: f32, g: f32) -> f32 {
+    let gg = g * g;
+    return (gg * -0.25 + 0.25) * pow(-2.0 * (g * x) + (gg + 1.0), -1.5) / 3.14;
+}
+// Its light on a sample (DoCloudLighting): the sun's single (exp(-10 od)) and many-times scattered
+// light (exp(-3 od), dark edges by powder), and the sky's, twice on the tops, less on the bellies.
+fn bc_lighting(density: f32, sky: vec3<f32>, sky_scatter: f32, od: f32, sun1: vec3<f32>, sun_multi: vec3<f32>, distant: f32) -> vec3<f32> {
+    let powder = 1.0 - exp(-10.0 * density);
+    let direct = sun1 * exp(-10.0 * od) + sun_multi * exp(-3.0 * od) * powder;
+    let indirect = sky * mix(1.0, 2.0 * (1.0 - sqrt(sky_scatter * sky_scatter * sky_scatter * density)), pow(distant, 1.0 - bc_rain() * 0.5));
+    return direct + indirect;
+}
+// Where a look starting at the camera (absolute height `cam_y`) enters a slab, plus its dither.
+fn bc_start(step: vec3<f32>, cam_y: f32, dither: f32, lo: f32, hi: f32) -> vec3<f32> {
+    let flip = select(max(cam_y - hi, 0.0), max(lo - cam_y, 0.0), step.y > 0.0);
+    return step * dither + vec3(0.0, cam_y, 0.0) + (step / abs(step.y)) * flip;
+}
+// One cumulus layer along the look (renderLayer): its own 15 steps through the slab, three light
+// taps each and the layers above's shadows; rgb its light, a what shows through. Positions are
+// camera relative in x and z, absolute in y (`eye_xz` added for the noise).
+fn bc_layer(layer: u32, start: vec3<f32>, step: vec3<f32>, mult: f32, steps: i32, dither: f32, sky: vec3<f32>, sun1: vec3<f32>, sun_multi: vec3<f32>, distant: f32, far: f32, hidden: bool) -> vec4<f32> {
+    var color = vec3(0.0);
+    var through = 1.0;
+    if hidden {
+        return vec4(color, through);
+    }
+    let lo = select(BC_L1, BC_L0, layer == 0u);
+    let hi = lo + BC_WIDTH;
+    let dens = bc_density(layer);
+    let eye = vec3(scene.eye.x, 0.0, scene.eye.z);
+    let cam = vec3(0.0, scene.eye.y, 0.0);
+    let l = light_dir();
+    // The high layer's shade on the low one's sky light, from straight above where the look enters.
+    var occlusion = 1.0;
+    if layer == 0u {
+        let up = bc_cumulus(1u, start + eye + vec3(0.0, max(BC_L1 + 70.0 * dither - start.y, 0.0), 0.0), 0u);
+        occlusion = mix(1.0, (1.0 - bc_density(1u)) * 0.8 + 0.2, (1.0 - exp2(-5.0 * up * up)) * distant);
+    }
+    var pos = start;
+    for (var i = 0; i < steps; i++) {
+        if length(pos - cam) > far {
+            break;
+        }
+        if pos.y > lo && pos.y < hi {
+            let w = pos + eye;
+            let cumulus = bc_cumulus(layer, w, 1u);
+            let faded = dens * pow(clamp((pos.y - lo) / 25.0, 0.0, 1.0), 2.0);
+            let with_density = dens * cumulus;
+            if with_density > 1e-5 {
+                let mu_e = cumulus * faded;
+                var od = 0.0;
+                for (var j = 0; j < 3; j++) {
+                    od += bc_cumulus(layer, w + l * (20.0 + f32(j) * (20.0 + dither * 20.0)), 0u) * dens;
+                }
+                if layer == 0u {
+                    od += bc_density(1u) * 2.0 * bc_cumulus(1u, w + l / abs(l.y) * max(BC_L1 + 70.0 * dither - w.y, 0.0), 0u);
+                }
+                od += bc_alto(w + l / abs(l.y) * max(BC_ALTO - w.y, 0.0)) * 0.1 * (1.0 - abs(l.y));
+                let sky_scatter = clamp((hi - pos.y) / 100.0, 0.0, 1.0);
+                let lit = bc_lighting(with_density, sky * occlusion, sky_scatter, od, sun1, sun_multi, distant);
+                let kept = exp(-mult * mu_e);
+                color += max(lit - lit * kept, vec3(0.0)) * through;
+                through *= kept;
+                if through < 1e-5 {
+                    break;
+                }
+            }
+        }
+        pos += step;
+    }
+    return vec4(color, through);
+}
+// The altostratus along the look: one sample on its plane, two light taps.
+fn bc_alto_layer(start: vec3<f32>, dir: vec3<f32>, mult: f32, dither: f32, sky: vec3<f32>, sun1: vec3<f32>, sun_multi: vec3<f32>, distant: f32, far: f32, hidden: bool) -> vec4<f32> {
+    let cam = vec3(0.0, scene.eye.y, 0.0);
+    if hidden || length(start - cam) > far {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let flip = select(-1.0, 1.0, scene.eye.y > BC_ALTO);
+    if max(flip * dir.y, 0.0) > 0.0 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let w = start + vec3(scene.eye.x, 0.0, scene.eye.z);
+    let alto = bc_alto(w);
+    if alto <= 1e-5 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let dens = bc_density(2u);
+    let mu_e = alto * dens;
+    let l = light_dir();
+    var od = 0.0;
+    for (var j = 0; j < 2; j++) {
+        let q = w + l * (1.0 + f32(j) * dither) / (pow(abs(l.y * 0.5), 3.0) * 0.995 + 0.005);
+        od += bc_alto(q) * dens * (1.0 - abs(l.y));
+    }
+    let lit = bc_lighting(mu_e, sky, 0.5, od, sun1, sun_multi, distant);
+    let kept = exp(-mult * mu_e);
+    return vec4(max(lit - lit * kept, vec3(0.0)), kept);
+}
+// All three along the unit look `dir` up to `far` blocks (renderClouds): `dither` x for the light
+// taps, y for the starts; `sun` the light reaching them (the land's: Bliss's light / 80), `sky` the
+// clear sky's average (its / 30). rgb their light, a what shows through.
+fn bc_clouds(dir: vec3<f32>, far_in: f32, dither: vec2<f32>, sun: vec3<f32>, sky_in: vec3<f32>) -> vec4<f32> {
+    let cam_y = scene.eye.y;
+    let r = bc_rain();
+    let far = max(far_in - 1.0, 0.0);
+    let above_low = clamp(1.0 - max(cam_y - BC_L0, 0.0) / 100.0, 0.0, 1.0);
+    let steps = i32(clamp(15.0 / sqrt(exp2(dir.y)), 0.0, 15.0));
+    // The planet's curve: a level look still meets the low layer, some kilometres off.
+    var d = dir;
+    d.y += 0.025 * above_low;
+    if abs(d.y) < 1e-4 || steps < 1 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let alto_step = d * (5.0 / abs(d.y));
+    let mult_alto = length(alto_step);
+    let mult = length(d * (90.0 / abs(d.y) / f32(steps)));
+    let l = light_dir();
+    let mu = dot(l, dir);
+    let mie = bc_phase(mu, 0.85) + bc_phase(mu, 0.75);
+    let mie_multi = bc_phase(mu, 0.35) + bc_phase(-mu, 0.35) * 0.5;
+    var sun1 = sun * mie * 3.14;
+    var sun_multi = sun * mie_multi * 3.14 * 2.0;
+    // Toward the horizon they take the sky's light alone (its ground blend), and the sun reaching the
+    // far ones is reddened by the air between (its rough Rayleigh).
+    let ay = abs(normalize(d).y);
+    let distant = mix(1.0, max(1.0 - clamp(exp2(pow(ay, mix(1.5, 4.0, r)) * -mix(100.0, 35.0, r)), 0.0, 1.0), 0.0), above_low);
+    let rc = vec3(5.8e-6, 1.35e-5, 3.31e-5) * 3.0;
+    let scatter = distant * exp(-10000.0 * rc * exp(ay * -5.0));
+    sun1 *= scatter;
+    sun_multi *= scatter;
+    let sky = sky_in * mix(1.0, 1.25 - 0.75 * pow(1.0 - clamp(scene.sun.y, 0.0, 1.0), 5.0), distant);
+    let below0 = cam_y < BC_L0 + BC_WIDTH;
+    let below1 = cam_y < BC_L1;
+    let below2 = cam_y < BC_ALTO;
+    let step0 = d * (BC_WIDTH / abs(d.y) / f32(steps));
+    let l0 = bc_layer(0u, bc_start(step0, cam_y, dither.y, BC_L0, BC_L0 + BC_WIDTH), step0, mult, steps, dither.x, sky, sun1, sun_multi, distant, far, false);
+    let hidden1 = l0.a < 1e-5 && below1;
+    var l1 = bc_layer(1u, bc_start(step0, cam_y, dither.y, BC_L1, BC_L1 + BC_WIDTH), step0, mult, steps, dither.x, sky, sun1, sun_multi, distant, far, hidden1 || bc_density(1u) <= 0.0);
+    let hidden2 = (l1.a < 1e-5 || hidden1) && below1;
+    let l2 = bc_alto_layer(bc_start(alto_step, cam_y, dither.y, BC_ALTO, BC_ALTO), d, mult_alto, dither.x, sky, sun1 * (1.0 + r * 3.0), sun_multi * (1.0 + r * 3.0), distant, far, hidden2);
+    // The order by where the camera is: below the low layer front to back, above it back to front;
+    // the sheet behind all while under it.
+    if below2 {
+        l1 = vec4(l2.rgb * l1.a + l1.rgb, l1.a);
+    }
+    var color = select(l0.rgb, l1.rgb, below0);
+    color = select(color * l1.a + l1.rgb, color * l0.a + l0.rgb, below0);
+    if !below2 {
+        color = color * l2.a + l2.rgb;
+    }
+    return vec4(color, l0.a * l1.a * l2.a);
+}
+// The clear sky's average light for the clouds (Bliss's averageSkyCol / 30, `fs_frame_look`'s texel 5).
+fn bc_sky_light(mean: vec3<f32>) -> vec3<f32> {
+    return max(mean * 12.3, vec3(0.5, 0.75, 1.0) * 0.0005) * 0.122;
+}
+fn bc_sky_read() -> vec3<f32> {
+    if scene.frame_look.x > 0.5 {
+        return textureLoad(textures[u32(scene.frame_look.x) - 1u], vec2(5, 0), 0).rgb;
+    }
+    return palette().ambient;
+}
+
 // Where the clouds' shadow map is read for camera-relative `rel` (debug view 9; as `soft_cloud_shadow`).
 fn cloud_shadow_uv(rel: vec3<f32>) -> vec2<f32> {
     let l = light_dir();
@@ -1747,6 +2036,9 @@ fn cloud_shadow_uv(rel: vec3<f32>) -> vec2<f32> {
     return (rel.xz + l.xz * (mid - rel.y) / l.y) / CLOUD_SHADOW_SPAN + 0.5;
 }
 fn soft_cloud_shadow(rel: vec3<f32>) -> f32 {
+    if land_from_sky() {
+        return bc_shadow(rel);
+    }
     let l = light_dir();
     if l.y < 0.03 {
         return 1.0;
@@ -1773,6 +2065,11 @@ fn soft_cloud_shadow(rel: vec3<f32>) -> f32 {
 }
 
 fn cloud_shadow(rel: vec3<f32>) -> f32 {
+    // Where the land is lit from the physical sky, Bliss's, worked out here per pixel (`bc_shadow`):
+    // no map, so no edge to it (the rain vista's straight one lay in our map's image, lkcmA1).
+    if land_from_sky() {
+        return bc_shadow(rel);
+    }
     // In the HDR world the soft clouds' own shadow, where their map is (Bliss's cloud masses throw
     // shadow patches across the land; the blocky picture's matched nothing in the sky).
     if scene.frame.x > 0.5 && scene.cloud_shadow.x > 0.5 {
