@@ -259,7 +259,11 @@ const MIST_SEA_FALL: f32 = 0.05;
 // How much higher the thickest cores stand (blocks), and the even part under them: its share, its
 // fall per block (exp2) and where it starts over the sea (Bliss's uniform fog: about a fifth of its
 // banks, halving every 7 blocks).
-const MIST_SEA_RISE: f32 = 12.0;
+// No rise, flat at 73 as Bliss's billows (`cloudVol`, full to FOG_START + 23 then exp(-0.05)): at 12
+// the thick cores stood to 85, over the crowns (75-80), so crowns and the gaps between them took the
+// same mist and the vista read one flat beige; Bliss's crowns rise dark out of a dense layer that fills
+// the gaps gold (lkmC3; Planner).
+const MIST_SEA_RISE: f32 = 0.0;
 const MIST_SEA_EVEN: vec3<f32> = vec3(0.2, 0.15, -10.0);
 // Its density per block at `/air` 1: Ronald's Bliss morning is 0.45 a block where full
 // (Morning_Cloudy_Fog 0.45, `climate_settings.glsl:233`), ours that at `/air` 0.05, the middle of the
