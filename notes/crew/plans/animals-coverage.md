@@ -507,6 +507,15 @@ that nest, which is the rule (`wild_clutch`), so not a bug. Shots fine.
 
 Grid r4: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r11_taming_m-184927/r11_taming_grid.jpg`.
 
+## Hurts with no logged cause (Planner, 11-25)
+
+The sound runs heard a grey wolf (`ai_acts_2`, 56.2 s) and a reindeer (`ai_acts_3`, 63.2 s) play their hurt
+sound with no "hurt by" line. Both were heard at volume 0.05, so they were far from the player, which is why the
+sounds were quiet. The wolf was one of three wild ones that spawned 7 s before, next to water 7 blocks below them,
+so a fall is the likeliest cause. Hunger, thirst, the cold, falls and crowding hurt an animal without any line of
+their own. Since facb1a89f every hurt logs at debug: "animal N takes X (cause id) from source". Not tested yet:
+the next debug run will name the cause.
+
 ## Sounds
 
 Every species' calls come from a shared voice family (`animals_core::voices`, files in
