@@ -2387,7 +2387,8 @@ fn bank_phase(mu: f32) -> f32 {
 // the mist volume, near nothing over the banks, and the crowns stayed sharp (lv9: fine detail under
 // the dawn mist 17.9 against Bliss's 5.8; Planner's read). 0 with the banks off.
 fn bank_hidden(rel: vec3<f32>) -> f32 {
-    if !GROUND_MAP_ON {
+    // TEMP horizon test 44 (lkfwC1): the bloomy fog's share off.
+    if !GROUND_MAP_ON || look_debug() == 44u {
         return 0.0;
     }
     let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
