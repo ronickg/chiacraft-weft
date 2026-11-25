@@ -1078,6 +1078,44 @@ fn caustics(p: vec2<f32>) -> f32 {
     return pow(a, 6.0) + 0.5 * pow(b, 8.0);
 }
 
+// The water's body lit as Bliss's (fogBehindTranslucent_pass's water march, method only), where the
+// land is lit from the physical sky: its light scattered back between the surface and the floor,
+// `way` blocks of water seen through. Two steps spaced 11^u along twice that way, at most 12 blocks,
+// each lit by the sky's average with its clouds (the land's ambient, x Bliss's lightmap curve
+// (1 - (1 - L)^0.5)^3 and its 0.3 v.y + 0.7) dimmed by the water above it, and by the land's sun
+// through the surface's shadow, its fog's phase x 5 (`bank_phase`) and the water toward the sun (x
+// 1.1); scattered by its dirt (0.24 x 0.7 / pi) and taken away again on the way out, each step
+// summed in closed form. Its colour is the dirt's and the water's: a cyan-teal, bright toward the sun.
+// Replaced on this path: the shallow teal, the navy deep, the biome tint, the texture's pattern, the
+// grey mix and `water_body`.
+fn water_body_bliss(rel: vec3<f32>, way: f32, shadow: f32, sky_light: f32, px: vec2<f32>) -> vec3<f32> {
+    let p = palette();
+    let eps = vec3(0.2629, 0.0565, 0.01011) + 0.24 * vec3(0.65, 0.85, 1.05);
+    let scatter = 0.24 * 0.7 / 3.14;
+    let look = normalize(rel);
+    let len = min(2.0 * way, 12.0);
+    let end_depth = len * abs(look.y);
+    let sun_depth = end_depth / max(abs(light_dir().y), 0.05);
+    let lm = clamp(sky_light, 0.0, 1.0);
+    let ambient = max(p.ambient * pow(1.0 - pow(1.0 - lm, 0.5), 3.0) * (look.y * 0.3 + 0.7), vec3(0.0));
+    let sun = p.sun * light_strength() * shadow * bank_phase(dot(look, light_dir()));
+    let dither = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
+    var out = vec3(0.0);
+    var through = vec3(1.0);
+    for (var i = 0; i < 2; i++) {
+        let u = (f32(i) + dither) / 2.0;
+        let d = (pow(11.0, u) / 11.0 - 1.0 / 11.0) / (1.0 - 1.0 / 11.0);
+        let dd = pow(11.0, u) * log(11.0) / 2.0 / 10.0;
+        let indirect = max(ambient * exp(-end_depth * d * eps), vec3(0.01, 0.2, 0.4) * 0.03 / BLISS_UNITS * exp(-end_depth * d * eps));
+        let direct = sun * exp(-sun_depth * d * eps * 1.1);
+        let light = (indirect + direct) * scatter;
+        let step = exp(-eps * dd * len);
+        out += (light - light * step) / eps * through;
+        through *= step;
+    }
+    return out;
+}
+
 // What is seen through the surface at this pixel, as it reaches the screen: the bottom (or what
 // stands in the water) bent by the waves (glass-like refraction, index 1.33), its colors taken away
 // with depth (red first), light from the scattering water in their place, caustics on the bottom
@@ -1086,7 +1124,10 @@ fn water_under(in: VOut, n: vec3<f32>, v: vec3<f32>, scatter: vec3<f32>, shadow:
     let size = vec2<f32>(textureDimensions(textures[u32(scene.behind.x)]));
     let uv = in.clip.xy / size;
     let straight = behind_at(uv, size);
-    let deep = display(scatter);
+    var deep = display(scatter);
+    if land_from_sky() {
+        deep = display(water_body_bliss(in.rel, 12.0, shadow, in.light.x, in.clip.xy));
+    }
     if straight.w < 0.0 {
         return vec4(deep, 8.0);
     }
@@ -1106,6 +1147,16 @@ fn water_under(in: VOut, n: vec3<f32>, v: vec3<f32>, scatter: vec3<f32>, shadow:
     let bottom = behind_color(at);
     var gone = exp(-vec3(0.42, 0.11, 0.07) * through);
     var fill = deep;
+    // Bliss's: the floor absorbed (below) and the body's own light added (`water_body_bliss`).
+    if land_from_sky() {
+        let coef = vec3(0.263, 0.0565, 0.0101) + 0.15 * vec3(0.65, 0.85, 1.05);
+        let d = 2.0 * through * max(abs(v.y), 0.05);
+        let floor_t = mix(exp(-2.0 * coef * d), exp(-8.0 * coef), 1.0 - exp(-0.1 * d));
+        var seen_b = bottom * floor_t + display(water_body_bliss(in.rel, through, shadow, in.light.x, in.clip.xy));
+        let floor_world_b = in.pos + (straight.xyz - in.rel);
+        seen_b += bottom * floor_t * caustics(floor_world_b.xz) * light_strength() * shadow * exp(-through * 0.25) * smoothstep(0.1, 0.8, through) * 0.9;
+        return vec4(seen_b, through);
+    }
     // As Bliss's (`OPT_WATER_ABSORB`): water's own coefficients and its dirt's, per block, over
     // twice the depth the view goes down (outdoors), never darker than a floor of eight blocks'
     // worth; the body's own light only as much as the water held (up to 12 blocks of it).
@@ -1253,7 +1304,21 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     let ds = nh * nh * (a2s - 1.0) + 1.0;
     let near = 1.0 - smoothstep(12.0, 40.0, in.dist);
     let sparkle = a2s / (3.14159 * ds * ds) * 0.02 * near;
-    let glint = palette().sun * light_strength() * min(spec + sparkle, mix(40.0, 1.5, golden())) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
+    var glint = palette().sun * light_strength() * min(spec + sparkle, mix(40.0, 1.5, golden())) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
+    // Bliss's sun on water (all_translucent's WATER_SUN_SPECULAR, method only): its direct light (the
+    // sun x n.l x the shadows) x one GGX at roughness 0.035 (^2.5, as its GGX takes it) from 0.02,
+    // Schlick in its exp2 form, its visibility term; no cap, no sparkle lobe, no horizon fade: a very
+    // bright, narrow path that the bloom spreads.
+    if land_from_sky() {
+        let r = pow(0.035, 2.5);
+        let lh = clamp(dot(hv, l), 0.0, 1.0);
+        let nl = clamp(dot(n, l), 0.0, 1.0);
+        let den = nh * nh * r - nh * nh + 1.0;
+        let d_ggx = r / (3.14159265 * den * den);
+        let f_ggx = 0.02 + 0.98 * exp2((-5.55473 * lh - 6.98316) * lh);
+        let k2 = 0.25 * r;
+        glint = palette().sun * light_strength() * nl * shadow * (nl * d_ggx * f_ggx / (lh * lh * (1.0 - k2) + k2));
+    }
     // Foam where it laps the land, in a wobbling line on the pixel grid.
     let px = floor(in.pos.xz * 16.0) / 16.0;
     let wobble = noise3(vec3(px.x * 2.0, scene.params.w * 0.6, px.y * 2.0));
@@ -1279,9 +1344,13 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
         }
         return WaterLit(surface, below, 1.0);
     }
+    var body = scatter * (1.0 - through);
+    if land_from_sky() {
+        body = water_body_bliss(in.rel, depth, shadow, in.light.x, in.clip.xy);
+    }
     let lost = (1.0 - fresnel) * through;
     let a = clamp(max(1.0 - lost, max(luma(glint), foam)), 0.02, 1.0);
-    let c = (refl * fresnel + scatter * (1.0 - fresnel) * (1.0 - through) + glint + (lit * 0.9 + vec3(0.03)) * foam) / a;
+    let c = (refl * fresnel + body * (1.0 - fresnel) + glint + (lit * 0.9 + vec3(0.03)) * foam) / a;
     return WaterLit(c, vec3(0.0), a);
 }
 
