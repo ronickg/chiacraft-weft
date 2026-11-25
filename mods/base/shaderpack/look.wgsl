@@ -2457,7 +2457,7 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     var through = 1.0;
     var gained = vec3(0.0);
     var air = vec3(0.0);
-    var air_through = 1.0;
+    var air_through = vec3(1.0);
     for (var i = 0u; i < n; i++) {
         let u = (f32(i) + jitter) / f32(n);
         let t = span * (pow(e, u) - 1.0) / (e - 1.0);
@@ -2484,9 +2484,14 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let a_kept = exp(-ext * step);
         let light = sun_air * lit * (ray_phase * r_k + vec3(mie_phase * m_k)) + amb_air * ext;
         air += (light - light * a_kept) / max(ext, vec3(1e-9)) * air_through * through * on_sky;
-        air_through *= dot(a_kept, vec3(0.33333));
+        air_through *= a_kept;
     }
-    return c * through + gained + air * (1.0 - 0.5 * rain);
+    // The land behind dims through the same air, per colour (Bliss's: the far land takes the air's
+    // light and loses its own, bluer light first). Lit and never dimmed, the far land only got
+    // brighter with distance, a white horizon since the march ran to the surface (fix 2; lkmxK1
+    // noon far land 203 218 226 against Bliss's 137 169 209). The sky's pixels hold their air already.
+    let land_kept = mix(vec3(1.0), air_through, on_sky);
+    return c * through * land_kept + gained + air * (1.0 - 0.5 * rain);
 }
 fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     // Left out of the world's pipelines while the ground map is off (`GROUND_MAP_ON`, the engine's

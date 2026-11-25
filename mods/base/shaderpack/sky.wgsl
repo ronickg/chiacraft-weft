@@ -411,7 +411,9 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         sun = mix(sun, vec3(luma(sun)) * vec3(1.06, 0.98, 0.86), away * low_sun * 0.75);
     }
     // Rain darkens the clouds' albedo and keeps their shapes (Photon: ×0.66); a storm's more.
-    let albedo = mix(1.0, 0.66, s.axes[0].x) * mix(1.0, 0.6, storm);
+    // With the chain 0.4: the rain sky stood at twice the land's brightness where Bliss's dark deck
+    // is about 1.4 times it (lkmxK1 rain vista: sky 191 195 201 against Bliss's 124 117 102).
+    let albedo = mix(1.0, select(0.66, 0.4, bliss_chain()), s.axes[0].x) * mix(1.0, 0.6, storm);
     var through = 1.0;
     var light = vec3(0.0);
     for (var i = 0; i < steps; i++) {
