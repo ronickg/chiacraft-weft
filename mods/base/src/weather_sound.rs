@@ -45,6 +45,8 @@ struct State {
     flashes: u32,
     /// Thunder on its way: seconds left, metres away.
     coming: Vec<(f32, f32)>,
+    /// Seconds since a thunder was last heard; far ones closer together merge (`THUNDER_GAP`).
+    since_thunder: f32,
     rng: u64,
     /// Block states that are leaves, found once each.
     leafy: std::collections::HashMap<u32, bool>,
@@ -106,6 +108,7 @@ fn frame(c: &Client) {
         logged_playing: false,
         flashes: st.lightnings,
         coming: Vec::new(),
+        since_thunder: ws::THUNDER_GAP,
         rng: 0x9E37_79B9_7F4A_7C15 ^ st.frame,
         leafy: Default::default(),
     });
@@ -118,6 +121,7 @@ fn frame(c: &Client) {
         s.coming.push((ws::thunder_delay(metres), metres));
     }
     s.next_look -= dt;
+    s.since_thunder += dt;
     for t in &mut s.coming {
         t.0 -= dt;
     }
@@ -128,7 +132,12 @@ fn frame(c: &Client) {
     let cover = cover(c, s, eye);
     *COVER.lock().unwrap_or_else(|e| e.into_inner()) = cover;
     for &(_, metres) in s.coming.iter().filter(|t| t.0 <= 0.0) {
-        thunder(c, metres, cover);
+        if ws::thunder_heard(s.since_thunder, metres) {
+            thunder(c, metres, cover);
+            s.since_thunder = 0.0;
+        } else {
+            debug!("thunder: {metres:.0} m away merged into the last one, {:.1} s ago", s.since_thunder);
+        }
     }
     s.coming.retain(|t| t.0 > 0.0);
     if s.next_look > 0.0 {

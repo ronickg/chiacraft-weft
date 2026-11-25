@@ -17,6 +17,16 @@ pub const STRIKE: (f32, f32) = (150.0, 6000.0);
 /// Closer than this a strike cracks; farther it only rumbles (the air takes the highs first).
 pub const CRACK_WITHIN: f32 = 1200.0;
 
+/// Seconds after one rumble in which another far one is not heard (it merges into the first): a
+/// storm's flashes come every second or two, and a rumble each was a drum roll (PC run ws1124a,
+/// 11-24: 50 rumbles in 100 s). A crack (closer than `CRACK_WITHIN`) is always heard.
+pub const THUNDER_GAP: f32 = 6.0;
+
+/// Whether thunder from `metres` away is heard, `since` seconds after the last one heard.
+pub fn thunder_heard(since: f32, metres: f32) -> bool {
+    metres < CRACK_WITHIN || since >= THUNDER_GAP
+}
+
 /// Where a strike lands for a random `u` in 0..1: evenly over the ground around the player, so
 /// far strikes are more common than near ones (the area grows with the distance squared).
 pub fn strike_distance(u: f32) -> f32 {
@@ -129,6 +139,8 @@ mod tests {
         assert!((strike_distance(1.0) - STRIKE.1).abs() < 0.5);
         // Evenly over the ground: half the strikes are past about 70% of the far edge.
         assert!(strike_distance(0.5) > STRIKE.1 * 0.7);
+        // Far rumbles are spaced out; near cracks always come.
+        assert!(!thunder_heard(1.0, 3000.0) && thunder_heard(THUNDER_GAP, 3000.0) && thunder_heard(0.5, 400.0));
     }
 
     #[test]
