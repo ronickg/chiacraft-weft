@@ -734,10 +734,14 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     if debug == 1u || debug == 2u {
         return vec4(select(LIGHT_ALL - LIGHT_SUN, LIGHT_SUN, debug == 1u), lit.a);
     }
-    // 7: where the sun's light is cut (`SHADOW_DEBUG`): r the sun map's coverage, g the clouds'
-    // shadow, b the map's own shadow.
+    // 7: where the sun's light is cut: r the clouds' shadow here, g 1 on distant terrain (`fs_lod`),
+    // b the sun map's coverage where the map was asked (`SHADOW_DEBUG`).
+    // 8: the weather's values about the player: r its snow cover, g its snowing, b the puddles.
+    if debug == 8u {
+        return vec4(clamp(scene.ground.x, 0.0, 1.0), clamp(scene.ground.y, 0.0, 1.0), clamp(scene.canopy.z, 0.0, 1.0), lit.a);
+    }
     if debug == 7u {
-        return vec4(SHADOW_DEBUG, lit.a);
+        return vec4(cloud_shadow(in.rel), select(0.0, 1.0, in.kind.y == 1u), SHADOW_DEBUG.x, lit.a);
     }
     // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
     // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s

@@ -2605,9 +2605,12 @@ fn fog_hour_weights() -> vec4<f32> {
 // Where the rain's fog lies: not above the snow line (`scene.canopy.w`, blocks above the sea; the
 // weather's own, where rain turns to snow, over the same 12-block band), as Bliss's lies only where
 // it rains (its noPuddleAreas: none in snowy biomes).
-// Nor while it snows where the player is (`scene.ground.y`, the air's own flag, eased).
+// Nor while it snows where the player is (`scene.ground.y`, the air's own flag, eased), nor where
+// the land about the player lies under snow (`scene.ground.x`, its air's snow cover, eased): Bliss's
+// gate is the player's biome, not what falls, and our snow plains took rain and puddles (lkrdA2).
 fn rain_fog_at(y: f32) -> f32 {
-    return (1.0 - smoothstep(-6.0, 6.0, y - (SEA_LEVEL + scene.canopy.w))) * (1.0 - clamp(scene.ground.y, 0.0, 1.0));
+    let snowy = max(clamp(scene.ground.y, 0.0, 1.0), clamp(scene.ground.x, 0.0, 1.0));
+    return (1.0 - smoothstep(-6.0, 6.0, y - (SEA_LEVEL + scene.canopy.w))) * (1.0 - snowy);
 }
 // The sky light where the eye is (`scene.frame_look.y`, eased by the engine), as Bliss weights the
 // fog's and the air's sky light: its cube x 0.99 + 0.01.
