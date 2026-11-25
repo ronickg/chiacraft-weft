@@ -969,7 +969,42 @@ fn wave_height(p: vec2<f32>, t: f32, detail: f32) -> f32 {
 // The surface's normal at `pos` (world) seen from `dist` blocks, per pixel. The slope is taken over
 // a step that widens with distance, which smooths the far ripples away instead of letting them
 // shimmer (Bliss's way), and flattens them a little more at a glancing look.
+// Bliss's water height (waterBump.glsl's getWaterHeightmap, method only), where the land is lit
+// from the physical sky: three taps of its smooth noise (`bc_b`, its texture's blue channel, cells
+// 23.4 of its 512 texels), each turned by the golden angle from the one before, at tiles of 48 x 12,
+// 12 x 48 and 32 x 32 blocks (cells about 2.2, 0.55 and 1.5 blocks), sliding 0.035 of a tile a
+// second; a 600-block tile (cells 27 blocks) of the same noise, at least 0.1, shifts them by half
+// itself and scales the sum / 60: calm patches and rough ones.
+fn wave_bliss_height(p_in: vec2<f32>, t: f32) -> f32 {
+    let cell = 23.4 / 512.0;
+    let large = max(bc_b(p_in / 600.0, cell), 0.1);
+    let a = 2.39996;
+    let rot = mat2x2<f32>(cos(a), sin(a), -sin(a), cos(a));
+    var p = p_in;
+    var sum = 0.0;
+    let tiles = array<vec2<f32>, 3>(vec2(48.0, 12.0), vec2(12.0, 48.0), vec2(32.0, 32.0));
+    for (var i = 0; i < 3; i++) {
+        p = rot * p;
+        sum += bc_b(p / tiles[i] + vec2(large * 0.5 + t * 0.035), cell);
+    }
+    return sum / 60.0 * large;
+}
+// Its normal (getWaveNormal and the water's x 10, all_translucent.fsh): forward differences over a
+// step of dist / 224 (at most 3) + 0.15, the slopes made ten times steeper.
+fn wave_bliss_normal(pos: vec3<f32>, dist: f32) -> vec3<f32> {
+    let t = scene.params.w;
+    let e = min(dist / 224.0, 3.0) + 0.15;
+    let h = wave_bliss_height(pos.xz, t);
+    let dx = (wave_bliss_height(pos.xz + vec2(e, 0.0), t) - h) / e;
+    let dz = (wave_bliss_height(pos.xz + vec2(0.0, e), t) - h) / e;
+    let w = normalize(vec3(dx, dz, 1.0 - pow(abs(dx + dz), 2.0)));
+    let b = w * 10.0 + vec3(0.0, 0.0, -9.0);
+    return normalize(vec3(-b.x, b.z, -b.y));
+}
 fn wave_normal(pos: vec3<f32>, dist: f32, glance: f32) -> vec3<f32> {
+    if land_from_sky() {
+        return wave_bliss_normal(pos, dist);
+    }
     let t = scene.params.w;
     let p = pos.xz;
     let detail = 1.0 - smoothstep(16.0, 56.0, dist);
@@ -1281,7 +1316,8 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     if scene.rt.w > 0.5 && in.dist < 256.0 {
         // The ripples' tilt a third as strong for the ray, and what it meets a little blurred: at
         // full tilt a sharp stained window broke into a loud mosaic across the pool (rtr2_rt).
-        let rn = normalize(mix(n, vec3(0.0, 1.0, 0.0), 0.65));
+        // (Bliss's screen reflections take the full normal.)
+        let rn = select(normalize(mix(n, vec3(0.0, 1.0, 0.0), 0.65)), n, land_from_sky());
         let rr = reflect(-v, rn);
         let traced = traced_view(in.rel + vec3(0.0, 0.02, 0.0), normalize(vec3(rr.x, max(rr.y, 0.02), rr.z)), 1.5, 0.04, in.clip.xy);
         // As much as the screen's reflections gave it: Fresnel's share and a little more, the body
