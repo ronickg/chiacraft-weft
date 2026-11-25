@@ -2,9 +2,10 @@
 """Builds the two UI sheets for Ronald from a pair of PC shot runs: a captioned grid of the
 1080p shots and one 4K crop at its own pixels.
 
-    sheets.py <runs dir> <tag> <out dir>
+    sheets.py <runs dir> <look-on tag> <batch 3 tag> <out dir>
 
-<runs dir> holds t2_<tag>_lo_1920x1080, t2_<tag>_lo_3840x2160, t2_<tag>_b3_... (t2q fetch).
+<runs dir> holds t2_<tag>_lo_1920x1080 and _3840x2160 for the look-on tag, t2_<tag>_b3_... for
+batch 3's (t2q fetch).
 Writes look_on.png and batch3.png (each with its 4K crop below the grid) into <out dir>.
 """
 import pathlib
@@ -96,9 +97,9 @@ def build(title, shots, crop, d1080, d4k, out, cols, cell, box=None):
 
 
 def main():
-    runs, tag, out = pathlib.Path(sys.argv[1]), sys.argv[2], pathlib.Path(sys.argv[3])
-    lo = (runs / f"t2_{tag}_lo_1920x1080", runs / f"t2_{tag}_lo_3840x2160")
-    b3 = (runs / f"t2_{tag}_b3_1920x1080", runs / f"t2_{tag}_b3_3840x2160")
+    runs, lo_tag, b3_tag, out = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3], pathlib.Path(sys.argv[4])
+    lo = (runs / f"t2_{lo_tag}_lo_1920x1080", runs / f"t2_{lo_tag}_lo_3840x2160")
+    b3 = (runs / f"t2_{b3_tag}_b3_1920x1080", runs / f"t2_{b3_tag}_b3_3840x2160")
     build("Look always on: Video tab, presets, Developer page (1920x1080)", LOOK_ON, LOOK_ON_CROP, *lo,
           out / "look_on.png", 2, (940, 690), LOOK_ON_BOX)
     build("Batch 3: the last menus on the new frame (1920x1080, at half size)", BATCH3, BATCH3_CROP, *b3,
