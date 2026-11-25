@@ -111,7 +111,7 @@ fn fs_low(in: VOut) -> @location(0) vec4<f32> {
     return post_low(pass_.slot, px);
 }
 
-// The mist banks (`bank_march`, `OPT_MIST_DOMES`) over the world's image, before temporal
+// The one fog (`one_fog`: Bliss's fog and air) over the world's image, before temporal
 // anti-aliasing (the engine's pass before TAA, run while `core:ground_map` is on): marched once per
 // pixel to the depth there (the nearest surface, water's too; the sky to the march's far end). In
 // the world's and the sky's shaders each fragment drawn marched them, overdraw and what is seen
@@ -128,7 +128,7 @@ fn fs_pre_taa(in: VOut) -> @location(0) vec4<f32> {
     if one_fog_on() && !in_liquid() {
         return vec4(one_fog(color.rgb, view_rel(in.uv, pass_)), color.a);
     }
-    return vec4(bank_march(color.rgb, view_rel(in.uv, pass_)), color.a);
+    return color;
 }
 
 // A copy of the world before what is seen through is drawn (`Post::copy_behind`): its color and
@@ -349,8 +349,16 @@ fn taa_motion_px(px: vec2<i32>, size: vec2<i32>) -> f32 {
     return textureLoad(t, at, 0).g;
 }
 
-// What the mist banks' bloomy fog takes of the glow where they hide all (Bliss's 1.25 x 0.75).
-const BANK_BLOOMY: f32 = 0.94;
+// Bliss's bloomy fog (composite3/11, method only): the glow's share where the fog hides what lies
+// behind, its BLOOMY_FOG 1.25 (Ronald's profile) x 0.75; in rain the fog's transmittance counts
+// half (mix(T, 0.5 T + 0.5, rain)) but the share doubles (x (1 + rain)), so a storm's land is
+// softened, not turned to milk. The air is not counted. (Bliss's x (1 - 0.3 purkinje) at night is
+// not built: our Purkinje shift has no 0..1 strength to read.)
+fn bloomy_fog(uv: vec2<f32>, pass_: Pass) -> f32 {
+    let rain = rain_amount();
+    let hidden = bank_hidden(view_rel(uv, pass_)) * (1.0 - 0.5 * rain);
+    return clamp(hidden * 1.25 * 0.75 * (1.0 + rain), 0.0, 1.0);
+}
 // The point the pixel at `uv` shows, camera relative: on the sky (depth 0), the march's far end.
 fn view_rel(uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     let size = vec2<i32>(textureDimensions(textures[pass_.depth]));
@@ -426,10 +434,7 @@ fn chain_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     LAND_PIXEL = 1.0;
     if pass_.bloom != 0u {
         let glow = bloom_tap(pass_.bloom - 1u, uv);
-        let fog = mist_over(uv, pass_) * (1.0 - 0.85 * rain_amount());
-        col = mix(col, glow, clamp(fog * 0.6 * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
-        let banked = bank_hidden(view_rel(uv, pass_)) * (1.0 - 0.85 * rain_amount());
-        col = mix(col, glow, clamp(banked * BANK_BLOOMY * fantasy_opt(OPT_BLOOM), 0.0, 0.95));
+        col = mix(col, glow, bloomy_fog(uv, pass_) * fantasy_opt(OPT_BLOOM));
         let r2 = dot(uv - vec2(0.5), uv - vec2(0.5));
         let lb = mean * BLISS_UNITS;
         let eye = pow(0.18 / log2(2.5 * lb + 1.045) * 0.62, 0.2);
@@ -507,8 +512,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         col = mix(col, glow, clamp((kept + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
         // The mist banks' share too (`bank_hidden`), as Bliss's bloomy fog takes its fog's (its
         // BLOOMY_FOG 1.25 x 0.75: up to 0.94 of the glow where the mist hides all).
-        let banked = bank_hidden(view_rel(uv, pass_)) * (1.0 - 0.85 * rain_amount());
-        col = mix(col, glow, clamp(banked * BANK_BLOOMY * fantasy_opt(OPT_BLOOM), 0.0, 0.95));
+        col = mix(col, glow, bloomy_fog(uv, pass_) * fantasy_opt(OPT_BLOOM));
         let r2 = dot(uv - vec2(0.5), uv - vec2(0.5));
         // Bliss's E^0.2 follows its eye: a dark view it brings up gets more of the glow too (its
         // sunlit ravine's shade warm with the dirt's glow, 46 38 32 on the ceiling, where ours with

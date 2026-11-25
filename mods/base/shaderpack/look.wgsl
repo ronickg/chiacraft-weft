@@ -288,15 +288,6 @@ const OPT_FOG_ONE: u32 = 72u;
 fn one_fog_on() -> bool {
     return scene.frame.x > 0.5 && fantasy_opt(OPT_FOG_ONE) > 0.5;
 }
-// The air in the fog's march, as Bliss's (overworld_fog.glsl, method only): Rayleigh and Mie at the
-// sky's coefficients, 24 x its haze 1.25 times denser than real air, thinning with height over
-// 1333 and 171 blocks; adds its own light and dims only itself, not what lies behind.
-// (18, not 30: at 30 the far land at noon stood a pale haze, 189 206 217 where Bliss's is 139 167
-// 197, lkmxJ1 clear noon vista.)
-const AIR_THICK: f32 = 18.0;
-// The rain's fog per block at the sea's level (0.0012 left the rain vista's far land clear to the
-// horizon, Bliss's a thick dark veil; lkmxJ1).
-const RAIN_FOG: f32 = 0.004;
 const ATM_GROUND: f32 = 6371e3;
 const ATM_TOP: f32 = 6471e3;
 const ATM_RAYLEIGH: vec3<f32> = vec3(5.8e-6, 13.5e-6, 33.1e-6);
@@ -565,8 +556,6 @@ const SUN_MIE_BROAD_CUT: f32 = 0.85;
 // Its light from the sky, brighter looking up through it (how much, how sharply), and its share (Bliss's
 // shaded hollows are a dark blue-grey; at the full sky's light ours read as pale frost: lv8).
 const MIST_SEA_SKY: vec3<f32> = vec3(5.0, 4.0, 0.45);
-// What of the banks the evening keeps (Bliss's evening about a fifth of its morning).
-const MIST_BANK_EVENING: f32 = 0.03;
 const MIST_DEEP_DENSE: f32 = 1.2;
 // With it, how much light the mist in the sun's shade keeps (Bliss's in shade is dark, the shafts
 // show): of the bounce, and of the sky's.
@@ -2330,36 +2319,6 @@ fn ground_at(rel: vec3<f32>) -> vec3<f32> {
     return vec3(h, step(0.5, v.a), step(0.5, v.b));
 }
 
-// The mist's banks at `p` (world), `rel` from the camera: a sea of mist full up to its level and
-// thinning above (`MIST_SEA_LEVEL`), cut into banks by a broad noise and frayed by a fine one
-// (`MIST_SHAPE`, `MIST_ERODE`), drifting with the wind, out to the march's end (`MIST_MARCH_FAR`).
-// Not ended 256 blocks out: Bliss's distance term there blends its biomes' fog, and with it ours
-// left the vista from 200 up with no banks at all (lv8's debug views).
-fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
-    let q = p - vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * 0.6;
-    let shape = noise3(q / MIST_SHAPE.xyx);
-    let edge = clamp(fantasy_opt(OPT_BANK_EDGE), 0.0, 1.0);
-    let cut_lin = clamp((shape - (MIST_SHAPE.z - 0.25 * edge)) / max(MIST_SHAPE.w + 0.2 * edge - (MIST_SHAPE.z - 0.25 * edge), 1e-3), 0.0, 1.0);
-    let cut = mix(cut_lin, smoothstep(0.0, 1.0, cut_lin), edge);
-    // A thin even part under the billows, thinning fast with height (`MIST_SEA_EVEN`), as Bliss's
-    // uniform fog beside its cloudy one; the billows alone carry the shape.
-    // Burnt off by about 27° up (sin 0.45), not 40°: at noon the banks still stood a white veil
-    // over the land under 2 km (lkfwA1: banks off, the far land 152 167 151 against 211 216 207 with
-    // them; Bliss's 157 178 212, whose morning fog has its weight by hour and is gone by midday).
-    let burn = (1.0 - smoothstep(0.2, 0.45, scene.sun.y)) * mix(MIST_BANK_EVENING, 1.0, smoothstep(-0.1, 0.1, scene.sun.x));
-    let k = air_mist() * MIST_SEA_DENSE * look_opt(OPT_BANK_DENSE, 1.0) * burn;
-    let even = MIST_SEA_EVEN.x * exp2(-MIST_SEA_EVEN.y * max(p.y - (SEA_LEVEL + MIST_SEA_EVEN.z), 0.0));
-    if cut <= 0.0 {
-        return k * even;
-    }
-    let erode = noise3(q / MIST_ERODE.xyx - vec3(cut * 7.3));
-    let banks = max(cut - erode * MIST_ERODE.z, 0.0);
-    // The thick cores stand taller (`MIST_SEA_RISE`), so the billows have tops of their own over the
-    // canopy, not one level skin on the low forests' crowns (lv9).
-    let top = SEA_LEVEL + (MIST_SEA_LEVEL + cut * MIST_SEA_RISE) * look_opt(OPT_BANK_TOP, 1.0);
-    let fall = exp(-MIST_SEA_FALL * look_opt(OPT_BANK_FALL, 1.0) * max(p.y - top, 0.0));
-    return k * (banks * fall + even);
-}
 // The banks' sunlight by the angle from the sun.
 // Uncapped now, Bliss's weights (its fog's phase, `overworld_fog.glsl:54-62`, x5 at :123, method only):
 // with a fall in 2^(-15 l^0.3) and one in 2^(-12.5 sqrt l) / 2 of l = (1 - mu) / 2, about 12.5 at the
@@ -2370,58 +2329,85 @@ fn bank_phase(mu: f32) -> f32 {
     let l = clamp(0.5 - 0.5 * mu, 0.0, 1.0);
     return (1.5 * exp2(-15.0 * pow(l, 0.3)) + exp2(-6.25 * sqrt(l))) * 5.0;
 }
-// How much of what lies `rel` away (camera relative) the banks hide, 0..1, walked as `bank_march`
-// walks them (its steps, without the light), for the bloomy fog in `post.wgsl`: Bliss blends the
-// picture toward its wide bloom by the fog's 1 - transmittance (`composite11.fsh:143-154`, method
-// only), which melts the crowns' texture under the mist and keeps the broad patches; ours read only
-// the mist volume, near nothing over the banks, and the crowns stayed sharp (lv9: fine detail under
-// the dawn mist 17.9 against Bliss's 5.8; Planner's read). 0 with the banks off.
+// How much of what lies `rel` away (camera relative) the fog hides, 0..1: 1 - the fog's
+// transmittance along the look, the air not counted, as Bliss's bloomy fog takes its march's
+// (`composite3`/`composite11`, method only), for `bloomy_fog` in `post.wgsl`. Eight steps as
+// `one_fog`'s, unjittered. 0 with the one fog off.
 fn bank_hidden(rel: vec3<f32>) -> f32 {
-    if !GROUND_MAP_ON {
-        return 0.0;
-    }
-    let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
-    if deep <= 0.0 || scene.frame.x < 0.5 || storm() > 0.5 || air_mist() <= 0.0 {
+    if !one_fog_on() {
         return 0.0;
     }
     let dist = length(rel);
     let dir = rel / max(dist, 1e-4);
-    let eye = scene.eye.xyz;
-    let lo = SEA_LEVEL - 20.0;
-    let hi = SEA_LEVEL + MIST_SEA_LEVEL + 60.0;
-    var t0 = 0.0;
-    var t1 = min(dist, MIST_MARCH_FAR);
-    if abs(dir.y) > 1e-4 {
-        let ta = (lo - eye.y) / dir.y;
-        let tb = (hi - eye.y) / dir.y;
-        t0 = max(t0, min(ta, tb));
-        t1 = min(t1, max(ta, tb));
-    } else if eye.y < lo || eye.y > hi {
-        return 0.0;
-    }
-    if t1 <= t0 {
-        return 0.0;
-    }
-    // (Its steps as `bank_march`'s, from the eye.)
-    let n = u32(clamp(look_opt(OPT_MIST_STEPS, 8.0), 2.0, 16.0));
+    let is_sky = abs(dist - MIST_MARCH_FAR) < 0.5;
+    let span = select(dist, max(scene.params.y, MIST_MARCH_FAR), is_sky);
     let e = 11.0;
-    let span = t1;
     var depth = 0.0;
-    for (var i = 0u; i < n; i++) {
-        let u = (f32(i) + 0.5) / f32(n);
+    for (var i = 0u; i < 8u; i++) {
+        let u = (f32(i) + 0.5) / 8.0;
         let t = span * (pow(e, u) - 1.0) / (e - 1.0);
-        let step = span * pow(e, u) * log(e) / (f32(n) * (e - 1.0));
-        if t < t0 {
-            continue;
-        }
-        depth += bank_density(eye + dir * t, dir * t) * deep * step;
+        let step = span * pow(e, u) * log(e) / (8.0 * (e - 1.0));
+        depth += bliss_fog_density(scene.eye.xyz + dir * t) * step;
     }
     return 1.0 - exp(-depth);
 }
-// One fog (`one_fog_on`): Bliss's single march, from the eye to `rel` (the sky's: the march's far
-// end), eight steps spaced 11^u and jittered: the mist banks (`bank_density`, which absorb and
-// scatter the sun by `bank_phase` and the sky), the rain's fog, and the air's haze (Rayleigh's blue,
-// Mie's glow toward the sun), lit by the sun where the shadow map and the clouds let it through.
+// One fog (`one_fog_on`), Bliss's method (overworld_fog.glsl, method only; Ronald, 11-25: "nearly
+// one-to-one", rebuilt from its source, not tuned): one march per pixel from the eye to the surface
+// (the sky's pixels to the render distance), eight steps spaced 11^u and jittered, with
+//  - the fog (`bliss_fog_density`): uniform and cloudy parts weighted by the hour, and the rain's,
+//    lit by the sun through the fog's forward phase and the shadow, and by the sky's light, albedo 1;
+//  - the air: Rayleigh and Mie at the sky's coefficients x 30 (24 x Ronald's Haze_amount 1.25), lit
+//    by the sun only through that same forward phase and by the sky's light all round; it adds its
+//    light and never dims what lies behind (Bliss's "purely additive" air).
+// Replaced (deleted, not kept as options): the mist banks with their burn-off curve and the
+// weather's mist gate, the rain's own light, the cream and zenith tints, the near-sun fade, the land
+// dimmed by the air (fix 6) and the air thinned to 18 to make up for an air lit by the sun all round.
+const BLISS_AIR: f32 = 30.0;
+// Bliss's fog floor (FOG_START_HEIGHT 50 in Ronald's profile, + 3) and the cloudy fog's top, in the
+// world's heights (its world is Minecraft's, sea at 63, as our imported one).
+const BLISS_FOG_FLOOR: f32 = 53.0;
+const BLISS_FOG_CLOUDY_TOP: f32 = 73.0;
+// The air's own floor (Bliss's SEA_LEVEL 70 in its air term) and the cumulus base it stops at.
+const BLISS_AIR_FLOOR: f32 = 70.0;
+const BLISS_AIR_TOP: f32 = 250.0;
+// The day's ticks (0 sunrise, 6000 noon, 12000 sunset, 18000 midnight) from the sun's turn.
+fn day_ticks() -> f32 {
+    let a = atan2(scene.sun.y, scene.sun.x);
+    return fract(a / 6.28318 + 1.0) * 24000.0;
+}
+// Bliss's time-of-day weights (its TIMEOFDAYFOG): morning, noon, evening, night, each a pair of
+// linear ramps on the day's ticks.
+fn fog_hour_weights() -> vec4<f32> {
+    let t = day_ticks();
+    let morning = max(clamp((t - 22000.0) / 2000.0, 0.0, 1.0), clamp(1.0 - t / 2000.0, 0.0, 1.0));
+    let noon = clamp(t / 2000.0, 0.0, 1.0) * clamp((12000.0 - t) / 2000.0, 0.0, 1.0);
+    let evening = clamp((t - 10000.0) / 2000.0, 0.0, 1.0) * clamp((14000.0 - t) / 2000.0, 0.0, 1.0);
+    let night = clamp((t - 13000.0) / 2000.0, 0.0, 1.0) * clamp((23000.0 - t) / 2000.0, 0.0, 1.0);
+    return vec4(morning, noon, evening, night);
+}
+// The fog's density at `p` (world), per block: Bliss's values are per 8 blocks (its step's optical
+// depth is density x the step / 8). Ronald's profile: morning uniform 0.1 and cloudy 0.45, noon
+// none, evening 0.18 and 0.09, night 0.38 and 0.24; rain x RainFog_amount 0.3, not by hour.
+fn bliss_fog_density(p: vec3<f32>) -> f32 {
+    let w = fog_hour_weights();
+    let uniform_k = dot(w, vec4(0.1, 0.0, 0.18, 0.38));
+    let cloudy_k = dot(w, vec4(0.45, 0.0, 0.09, 0.24));
+    let h = max(p.y - BLISS_FOG_FLOOR, 0.0);
+    var d = uniform_k * exp2(-0.15 * h);
+    if cloudy_k > 0.0 && p.y < BLISS_FOG_CLOUDY_TOP + 120.0 {
+        // Cells 36 blocks across and 18 tall, drifting with the wind, worn by a fine grain that the
+        // temporal anti-aliasing softens into their edges.
+        let q = p - vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * 0.6;
+        let shape = 1.0 - noise3(q / vec3(36.0, 18.0, 36.0));
+        let body = clamp((shape - 0.6) * 2.0, 0.0, 1.0);
+        if body > 0.0 {
+            let erosion = 1.0 - noise3(q / vec3(0.18, 4.3, 0.18) - vec3(200.0 * body));
+            d += cloudy_k * max(body - 0.4 * erosion, 0.0) * exp(-0.05 * max(p.y - BLISS_FOG_CLOUDY_TOP, 0.0));
+        }
+    }
+    d += (0.5 * exp2(-0.3 * h) + exp2(-0.06 * h)) * rain_amount() * 0.3;
+    return d / 8.0;
+}
 fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let dist = length(rel);
     let dir = rel / max(dist, 1e-4);
@@ -2430,34 +2416,19 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let px = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * vec2(2048.0, 1152.0)) + 5.588238 * scene.frame.w;
     let jitter = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
     let p = palette();
-    let deep = select(0.0, clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0), GROUND_MAP_ON && storm() < 0.5 && air_mist() > 0.0);
-    let k = 0.75 * look_opt(OPT_FOG, 1.0);
     let mu = dot(dir, light_dir());
-    let cream = mix(p.sun, vec3(luma(p.sun)) * vec3(1.0, 0.92, 0.78), MIST_SEA_CREAM.x) * MIST_SEA_CREAM.y;
-    let sun_in = cream * light_strength() * bank_phase(mu) * k * look_opt(OPT_BANK_SUN, 1.0);
-    let sky_tint = p.zenith * (luma(p.ambient) / max(luma(p.zenith), 1e-4));
-    let sky_in = sky_tint * (1.0 + MIST_SEA_SKY.x * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), MIST_SEA_SKY.y))
-        * MIST_SEA_SKY.z * k * look_opt(OPT_BANK_SHADE, 1.0);
-    // The air's light: the sun's by Rayleigh's and Mie's phases (1 where they scatter alike every
-    // way), the sky's ambient evenly.
-    let sun_air = p.sun * light_strength();
-    let ray_phase = 0.75 * (1.0 + mu * mu);
-    let mie_phase = hg_phase(mu, 0.8);
-    let amb_air = p.ambient;
-    let rain = rain_amount();
-    let rain_sky = vec3(luma(p.ambient)) * vec3(1.0, 0.96, 0.86) * 0.45;
-    let rain_sun = cream * light_strength() * bank_phase(mu) * 0.2 * k;
-    // The sky already holds the air (its own scattering, `sky_phys`): over it only the mist and the
-    // rain. With the air too a sky pixel took most of the sky's light again in blue over the
-    // march's 1500 blocks, a bright blue frame at night and a white sky by day (lkmxF1).
-    // (The sky's pixels stand exactly at the march's far end, `view_rel`; land past it is land: taken
-    // for sky, the far land lost all its haze and stood as a crisp dark strip, lkmxG1.)
+    // The fog's forward phase (Bliss's, x5) and Rayleigh's (its (0.1 c + 0.28) / pi).
+    let sun_phase = bank_phase(mu);
+    let ray_phase = (0.1 * mu + 0.28) / 3.14159;
+    let sun = p.sun * light_strength();
+    // The sky's light on the fog, brighter looking up (x6 straight up, x1.4 level).
+    let sky_fog = p.ambient * (1.0 + 5.0 * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), 4.0));
+    // The sky's pixels stand at the march's far end (`view_rel`); they are marched to the render
+    // distance, as Bliss marches its sky to the far distance.
     let is_sky = abs(dist - MIST_MARCH_FAR) < 0.5;
-    let on_sky = select(1.0, 0.0, is_sky);
-    let n = u32(clamp(look_opt(OPT_MIST_STEPS, 8.0), 2.0, 16.0));
+    let span = select(dist, max(scene.params.y, MIST_MARCH_FAR), is_sky);
+    let n = 8u;
     let e = 11.0;
-    // To the surface, however far (Bliss's), the sky to the march's far end.
-    let span = select(dist, MIST_MARCH_FAR, is_sky);
     let reach = fantasy_opt(OPT_SHADOW_REACH);
     var through = 1.0;
     var gained = vec3(0.0);
@@ -2473,146 +2444,28 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
             land = mix(sun_reaches(dir * t), 1.0, select(0.0, smoothstep(reach * 0.75, reach, t), reach > 0.0));
         }
         let lit = land * cloud_shadow(dir * t);
-        let above = max(at.y - SEA_LEVEL, 0.0);
-        // The mist and the rain's fog (Bliss's rainy fog, its 0.3 in Ronald's profile).
-        // The banks within the march's old reach (`MIST_MARCH_FAR`), the rain's fog and the air to the
-        // surface: once the march ran to the land however far (fix 2) the banks' thin even part added
-        // up over 8 km into a white sheet on the noon land (lkfwA1: banks off, the far land 152 167 151
-        // against 211 216 207 with them; Bliss's 157 178 212).
-        let banks = select(0.0, bank_density(at, dir * t) * deep, t < MIST_MARCH_FAR);
-        let wet_d = rain * RAIN_FOG * exp2(-0.03 * above);
-        let d = banks + wet_d;
+        let d = bliss_fog_density(at);
         if d > 0.0 {
             let kept = exp(-d * step);
-            let near_sun = smoothstep(MIST_NEAR_SUN.x, MIST_NEAR_SUN.y, t);
-            // The rain's fog in the rain's own light, as Bliss's: its dim grey sky light, and the sun
-            // only where the deck lets it through (`lit` carries the cloud shadow: the shafts). Lit as
-            // the clear day's mist it stood a pale veil and a bright band under the deck where Bliss's
-            // rain is a dark warm veil with shafts (lkrpA1).
-            let rain_in = rain_sky * k + rain_sun * lit;
-            let mix_in = (sky_in + sun_in * lit * near_sun) * banks + rain_in * wet_d;
-            gained += through * (1.0 - kept) * mix_in / d;
+            gained += through * (1.0 - kept) * (sun * sun_phase * lit + sky_fog);
             through *= kept;
         }
-        // The air: its Rayleigh and Mie (with the mist's droplets, Bliss's x300).
-        let r_k = ATM_RAYLEIGH * AIR_THICK * exp2(-above / 8000.0 * 6.0);
-        let m_k = ATM_MIE * AIR_THICK * (exp2(-above / 1200.0 * 7.0) + d * 300.0);
+        // The air below the cumulus base; its Mie takes the fog's droplets too (Bliss's x300 of the
+        // fog's raw density, before its /8).
+        let below = select(0.0, 1.0, at.y < max(BLISS_AIR_TOP, eye.y));
+        let up = max(at.y - BLISS_AIR_FLOOR, 0.0);
+        let r_k = ATM_RAYLEIGH * BLISS_AIR * exp2(-up / 8000.0 * 6.0) * below;
+        let m_k = ATM_MIE * BLISS_AIR * (exp2(-up / 1200.0 * 7.0) + 300.0 * d * 8.0) * below;
         let ext = r_k + vec3(m_k);
         let a_kept = exp(-ext * step);
-        let light = sun_air * lit * (ray_phase * r_k + vec3(mie_phase * m_k)) + amb_air * ext;
-        air += (light - light * a_kept) / max(ext, vec3(1e-9)) * air_through * through * on_sky;
+        let light = sun * lit * sun_phase * (ray_phase * r_k + vec3(sun_phase * m_k)) + p.ambient * ext;
+        air += (light - light * a_kept) / max(ext, vec3(1e-9)) * air_through * through;
         air_through *= a_kept;
-    }
-    // The land behind dims through the same air, per colour (Bliss's: the far land takes the air's
-    // light and loses its own, bluer light first). Lit and never dimmed, the far land only got
-    // brighter with distance, a white horizon since the march ran to the surface (fix 2; lkmxK1
-    // noon far land 203 218 226 against Bliss's 137 169 209). The sky's pixels hold their air already.
-    let land_kept = mix(vec3(1.0), air_through, on_sky);
-    return c * through * land_kept + gained + air * (1.0 - 0.5 * rain);
-}
-fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
-    // Left out of the world's pipelines while the ground map is off (`GROUND_MAP_ON`, the engine's
-    // `set_ground_prelude`): skipped by the uniform below, it still cost the world pass 0.14 ms (lst_am, 11-24).
-    if !GROUND_MAP_ON {
-        return c;
-    }
-    let deep = clamp(fantasy_opt(OPT_MIST_DOMES), 0.0, 1.0);
-    if deep <= 0.0 || scene.frame.x < 0.5 || storm() > 0.5 || air_mist() <= 0.0 {
-        return c;
-    }
-    let dist = length(rel);
-    let dir = rel / max(dist, 1e-4);
-    let eye = scene.eye.xyz;
-    let lo = SEA_LEVEL - 20.0;
-    let hi = SEA_LEVEL + MIST_SEA_LEVEL + 60.0;
-    var t0 = 0.0;
-    var t1 = min(dist, MIST_MARCH_FAR);
-    if abs(dir.y) > 1e-4 {
-        let ta = (lo - eye.y) / dir.y;
-        let tb = (hi - eye.y) / dir.y;
-        t0 = max(t0, min(ta, tb));
-        t1 = min(t1, max(ta, tb));
-    } else if eye.y < lo || eye.y > hi {
-        return c;
-    }
-    if t1 <= t0 {
-        return c;
-    }
-    let clip = scene.view_proj * vec4(rel, 1.0);
-    let px = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * vec2(2048.0, 1152.0)) + 5.588238 * scene.frame.w;
-    let jitter = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
-    let p = palette();
-    let k = 0.75 * look_opt(OPT_FOG, 1.0);
-    // The sun's light, cream (`MIST_SEA_CREAM`), by the phase; the sky's, brighter looking up.
-    let cream = mix(p.sun, vec3(luma(p.sun)) * vec3(1.0, 0.92, 0.78), MIST_SEA_CREAM.x) * MIST_SEA_CREAM.y;
-    let sun_in = cream * light_strength() * bank_phase(dot(dir, light_dir())) * k
-        * look_opt(OPT_BANK_SUN, 1.0);
-    // In the sky's own colour, as Bliss's AmbientColor is the sky averaged (`deferred.vsh:118-145`):
-    // the palette's ambient is warm at dawn, and the mist away from a low sun read sand-orange where
-    // Bliss's is a cool grey-lilac (lkmC1 v6_away; Planner).
-    let sky_tint = p.zenith * (luma(p.ambient) / max(luma(p.zenith), 1e-4));
-    let sky_in = sky_tint * (1.0 + MIST_SEA_SKY.x * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), MIST_SEA_SKY.y))
-        * MIST_SEA_SKY.z * k * look_opt(OPT_BANK_SHADE, 1.0);
-    // Steps spaced ever wider from the eye (11^u, as Bliss's, `overworld_fog.glsl:179`), jittered
-    // per pixel (TAA blends them), from the eye itself, not from where the ray enters the banks'
-    // height: crowded into that slab from a high eye, the steps resolved the banks' top contour
-    // sharply (Ronald's "hard sand-like edges"); Bliss's one or two long steps there, jittered and
-    // blended over frames, average the density into its soft gradient. Ones above or below the
-    // banks are skipped. As many as the quality row (`OPT_MIST_STEPS`, 8 as made).
-    let n = u32(clamp(look_opt(OPT_MIST_STEPS, 8.0), 2.0, 16.0));
-    let e = 11.0;
-    let span = t1;
-    // The land's shadow in the mist only as far as the sun's shadows reach (`OPT_SHADOW_REACH`, 128
-    // as Bliss's shadowDistance; none, all the way): past it the mist is fully lit, the clouds'
-    // shadow left. Out to 1500 every crown's shadow printed into the mist 300-600 blocks below the
-    // vista, the land's shadow pattern copied onto it, where Bliss's far mist is evenly lit and its
-    // shafts are the clouds' (Ronald's 06:00 compare, 11-24).
-    let reach = fantasy_opt(OPT_SHADOW_REACH);
-    var through = 1.0;
-    var gained = vec3(0.0);
-    // Debug view 5: where along the march the sun reaches the mist (Planner on lv8: no shafts and no
-    // shaded hollows showed, so check the shadow terms): red the shadow map's light, green the
-    // clouds', blue how much mist. White lit by both, cyan in the land's shade, magenta in a cloud's,
-    // blue in both, black no mist.
-    var shaft = vec2(0.0);
-    // Debug views with the banks on (the world and the evening's mist left out): 3 the light the banks
-    // scatter toward the eye alone, on black; 4 how much they hide (1 - through) as grey.
-    for (var i = 0u; i < n; i++) {
-        let u = (f32(i) + jitter) / f32(n);
-        let t = span * (pow(e, u) - 1.0) / (e - 1.0);
-        let step = span * pow(e, u) * log(e) / (f32(n) * (e - 1.0));
-        if t < t0 {
-            continue;
+        if through < 1e-5 {
+            break;
         }
-        let d = bank_density(eye + dir * t, dir * t) * deep;
-        if d <= 0.0 {
-            continue;
-        }
-        // The land's and the clouds' shadow: shafts where the sun comes through, the sky's light alone
-        // in the crowns' shade.
-        var land = 1.0;
-        if reach <= 0.0 || t < reach {
-            land = mix(sun_reaches(dir * t), 1.0, select(0.0, smoothstep(reach * 0.75, reach, t), reach > 0.0));
-        }
-        let clouds = cloud_shadow(dir * t);
-        let lit = land * clouds;
-        let kept = exp(-d * step);
-        shaft += through * (1.0 - kept) * vec2(land, clouds);
-        // The sun's share fading in from the eye (`MIST_NEAR_SUN`).
-        let near_sun = smoothstep(MIST_NEAR_SUN.x, MIST_NEAR_SUN.y, t);
-        gained += through * (1.0 - kept) * (sky_in + sun_in * lit * near_sun);
-        through *= kept;
     }
-    if look_debug() == 3u {
-        return gained;
-    }
-    if look_debug() == 4u {
-        return vec3(1.0 - through);
-    }
-    if look_debug() == 5u {
-        return vec3(shaft, 1.0 - through);
-    }
-    return c * through + gained;
+    return c * through + gained + air;
 }
 
 // The mist as a volume (`client::froxels`, `core:froxels`): the view cut into cells an eighth of
@@ -2932,10 +2785,14 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         // rain vista). The rain's fog is in the march (Bliss's), so the border stays where the
         // land ends, at the march's far end while the rain mist is on.
         let end = mix(scene.params.y, max(scene.params.y, MIST_MARCH_FAR), clamp(scene.environment.w, 0.0, 1.0));
-        let edge = smoothstep(end * 0.84, end, dist);
+        // Bliss's: none to two thirds of the distance, all at its end, and only looking level or
+        // down (about 0.2 at 6° up), toward the plain sky in the pixel's own direction (level for a
+        // look down, where our sky has no colour of its own).
+        let edge = (1.0 - smoothstep(0.0, 1.0, clamp(3.0 * (1.0 - dist / end), 0.0, 1.0)))
+            * exp(-10.0 * pow(4.0 * clamp(dir.y, 0.0, 1.0), 2.0));
         var out = c_in;
         if edge > 0.0 {
-            out = mix(out, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), edge);
+            out = mix(out, sky_color(normalize(vec3(dir.x, max(dir.y, 1e-3), dir.z))), edge);
         }
         if !CALM {
             out += held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);
