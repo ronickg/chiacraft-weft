@@ -142,7 +142,7 @@ pub fn effects(v: &mut Vitals, s: &stomach::Stomach, capacity: f32) {
     set(v, Effect::FoodPoisoning, v.sick > 0.0);
 }
 
-/// Stamps the food one carries with the day it was made (what was cooked came hot off the fire,
+/// Stamps the food one carries with the tick it was made (what was cooked came hot off the fire,
 /// stamped there) and moves its freshness on as it ages: stale, then spoiled (`food::freshness`;
 /// a stew by its shortest-keeping ingredient, `meals::keeps`); hot food cools after a while and
 /// then stacks with the day's.
@@ -153,8 +153,11 @@ pub fn age(w: &World, player: u64) {
 /// `age` for every food stack in an inventory (a player's, a chest's, a machine's), merging stacks
 /// alike (`merge_food`) when `merge`.
 pub fn age_inventory(w: &World, id: u64, merge: bool) {
-    let inv = w.inventory(id);
-    let now = w.day_time();
+    age_inventory_of(&w.inventory(id), w.day_time(), merge);
+}
+
+/// `age_inventory` for an inventory at hand, at day time `now`.
+pub fn age_inventory_of(inv: &Inventory, now: u64, merge: bool) {
     let size = inv.len();
     let before: Vec<ItemStack> = (0..size).map(|i| inv.get(i)).collect();
     let mut after = before.clone();
@@ -215,7 +218,6 @@ pub fn merge_food(stacks: &mut [ItemStack]) {
 
 /// A food stack stamped and its freshness moved on, at day time `now`.
 fn aged(stack: ItemStack, now: u64) -> ItemStack {
-    let today = (now / calendar::DAY_TICKS) as u32 + 1;
     let keeps = if let Some(packed) = MEAL.on_stack_own(&stack) {
         meals::keeps(&meals::ingredients(packed))
     } else if let Some(f) = food::find(item_name(stack.item)).map(|f| &food::FOODS[f]) {
@@ -227,7 +229,7 @@ fn aged(stack: ItemStack, now: u64) -> ItemStack {
     // Stamped with today when first seen; hot only where it was cooked (the furnace, the campfire,
     // the pot stamp it), not here: crafted bread came out hot (integration review).
     if MADE.on_stack_own(&stack).unwrap_or(0) == 0 {
-        new = new.with(&MADE, today);
+        new = new.with(&MADE, stamp(now));
     }
     let (age, hot) = base_api::food_age(&new, now);
     if HOT.on_stack_own(&new).is_some() && !hot {
@@ -273,13 +275,18 @@ pub fn spoiled(stack: &ItemStack, now: u64) -> bool {
     life_used(stack, now).is_some_and(|u| u >= 1.0)
 }
 
-/// The day stamp (`MADE`) for a new food keeping `keeps` that starts with `used` of its life gone
+/// The making stamp (`MADE`) of food made at day time `now` (`base_api::made_stamp`).
+pub fn stamp(now: u64) -> u32 {
+    base_api::made_stamp(now).min(u32::MAX as u64) as u32
+}
+
+/// The making stamp (`MADE`) for a new food keeping `keeps` that starts with `used` of its life gone
 /// (Research round 3, D1: what is made of stale food is as far along as its stalest part, never
 /// fresh again; spoiled food isn't taken at all).
 pub fn made_for(used: f32, keeps: (f32, f32), now: u64) -> u32 {
-    let today = (now / calendar::DAY_TICKS) as u32 + 1;
-    let days = (used.clamp(0.0, 1.0) * (keeps.0 + keeps.1) * base_api::difficulty().keep).floor() as u32;
-    today.saturating_sub(days).max(1)
+    let days = used.clamp(0.0, 1.0) * (keeps.0 + keeps.1) * base_api::difficulty().keep;
+    let ticks = (days * calendar::DAY_TICKS as f32).floor() as u32;
+    stamp(now).saturating_sub(ticks).max(1)
 }
 
 /// A crafted food (salted meat, a pie) from these cells: refused if any food in them has spoiled,

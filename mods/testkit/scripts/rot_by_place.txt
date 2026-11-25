@@ -1,0 +1,78 @@
+# Rot by place (vitals::rot, survival/rot.rs): the same raw porkchops in four chests, by snow (an
+# ice house, held at 0 °C), in a closed plank room, in the open, and beside a campfire (hot). Days
+# go by with /time add (whole days, so the hour stays the same); /rot logs each chest's air, rate,
+# and its food's freshness and share of life used ("rot: x y z at T °C rate xR day D: ..." in the
+# log). Expected order after each day: snow least used, then room / open, campfire most; a chest's
+# share used = days x rate / 4 (a porkchop keeps 2 + 2 days in a larder). One copy, a fresh world.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /time set 6000
+chat /tick freeze
+wait 1
+# Open ground: a stone floor, clear air above.
+chat /tk fill ~-12 ~-1 ~-12 ~12 ~-1 ~12 base:stone
+chat /tk fill ~-12 ~ ~-12 ~12 ~8 ~12 core:air
+# 1. Snow store: a chest packed in snow on every side.
+chat /tk fill ~-9 ~ ~-1 ~-7 ~2 ~1 base:snow
+chat /tk set ~-8 ~1 ~0 base:chest
+# 2. A room: a closed plank box, the chest inside.
+chat /tk fill ~5 ~ ~-2 ~9 ~4 ~2 base:oak_planks
+chat /tk fill ~6 ~1 ~-1 ~8 ~3 ~1 core:air
+chat /tk set ~7 ~1 ~0 base:chest
+# 3. The open, in the sun.
+chat /tk set ~0 ~ ~-8 base:chest
+# 4. Hot: in the open, a campfire two blocks away.
+chat /tk set ~0 ~ ~8 base:chest
+chat /tk set ~2 ~ ~8 base:campfire
+until block ~0 ~ ~8 base:chest within 10
+chat /tk insert ~-8 ~1 ~0 base:porkchop 4
+chat /tk insert ~7 ~1 ~0 base:porkchop 4
+chat /tk insert ~0 ~ ~-8 base:porkchop 4
+chat /tk insert ~0 ~ ~8 base:porkchop 4
+chat /tick unfreeze
+wait 2
+# An hour on: each chest stamps its food (day 0).
+chat /time add 1000
+wait 3
+chat /rot ~-8 ~1 ~0
+chat /rot ~7 ~1 ~0
+chat /rot ~0 ~ ~-8
+chat /rot ~0 ~ ~8
+wait 1
+shot rot_day0.png
+# Day 1
+chat /time add 24000
+wait 3
+chat /rot ~-8 ~1 ~0
+chat /rot ~7 ~1 ~0
+chat /rot ~0 ~ ~-8
+chat /rot ~0 ~ ~8
+wait 1
+# Day 2
+chat /time add 24000
+wait 3
+chat /rot ~-8 ~1 ~0
+chat /rot ~7 ~1 ~0
+chat /rot ~0 ~ ~-8
+chat /rot ~0 ~ ~8
+wait 1
+# Day 4
+chat /time add 48000
+wait 3
+chat /rot ~-8 ~1 ~0
+chat /rot ~7 ~1 ~0
+chat /rot ~0 ~ ~-8
+chat /rot ~0 ~ ~8
+wait 1
+# Day 8
+chat /time add 96000
+wait 3
+chat /rot ~-8 ~1 ~0
+chat /rot ~7 ~1 ~0
+chat /rot ~0 ~ ~-8
+chat /rot ~0 ~ ~8
+wait 1
+shot rot_day8.png
+quit
