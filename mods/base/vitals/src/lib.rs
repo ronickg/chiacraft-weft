@@ -9,6 +9,7 @@
 //! fall to a floor, never to death.
 
 pub mod air;
+pub mod ambience;
 pub mod balance;
 pub mod calendar;
 pub mod canopy;

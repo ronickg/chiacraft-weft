@@ -600,6 +600,7 @@ command.sounds.one = {0} à {1}
 command.sounds.loop = {0} à {1}, en boucle
 command.sounds.reading = {0} à {1}, fichier en cours de lecture
 command.sounds.none_recent = aucun son n'a encore démarré
+command.sounds.check = Vérification des sons. Blocs muets : {0}. Créatures muettes : {1}. Événements sans fichier : {2}
 command.title.done = affiché à {0}
 gizmo.value = {0}
 gizmo.cubes = les bordures du cube dans lequel vous êtes et ses voisins

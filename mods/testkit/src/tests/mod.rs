@@ -277,6 +277,7 @@ pub fn bench() -> Vec<TestDef> {
         visual::inventory_figure,
         visual::player_skin,
         gameplay::sounds,
+        gameplay::sound_coverage,
         redstone::redstone_first_piece,
         redstone::redstone_head_stays_inside,
         redstone::redstone_lift_api,
