@@ -604,9 +604,10 @@ impl Screen for Editor {
                 .collect();
         }
         let tall = (cx.size.y - 70.0).clamp(160.0, 430.0);
-        // As wide as the screen allows, up to 960: a floor of 660 passed a 640 GUI px screen (4K
-        // at 6x, 720p at 2x: the text-fit check, chiacraft 11-24); its contents set the least.
-        let wide = (cx.size.x - 24.0).clamp(400.0, 960.0);
+        // As wide as the screen inside the background's padding allows, up to 960: a floor of 660
+        // passed a 640 GUI px screen (4K at 6x, 720p at 2x: the text-fit check, chiacraft 11-24),
+        // and 24 left the code and preview column 6 short of its field; its contents set the least.
+        let wide = (cx.size.x - 16.0).clamp(400.0, 960.0);
         let bg = if cx.in_game { "overlay" } else { "background" };
         ui.root_style(Style::default().stretch());
         ui.panel(bg, Style::default().grow().center().pad(8.0), |ui| {

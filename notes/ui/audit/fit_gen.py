@@ -29,7 +29,7 @@ IN_WORLD = [
     "animals:journal", "animals:scout", "animals:animal", "animals:animal_family",
     "animals:animal_genes", "animals:look", "packages:personal", "portals:portal",
     "base:inventory", "base:advancements", "base:chest", "base:crafting_table", "base:dispenser",
-    "base:furnace", "base:music_player", "base:woodcutter",
+    "base:furnace", "base:music_player", "base:woodcutter", "testkit:gear",
 ]
 # Opened last, closed outright when Escape doesn't (peek): a loading screen with nothing loading,
 # the death screen (no death: it only shows).
