@@ -532,9 +532,24 @@ pub struct UpscalerInfo {
     pub neural: bool,
     /// The most frames it generates between drawn ones (frame generation): 0 none.
     pub frame_gen: u32,
+    /// Why frame generation doesn't run here, as a short code the Video menu words
+    /// (`no_plugin`, `gpu`, `not_wired`, `linux`; empty when it runs or there is no upscaler).
+    pub frame_gen_why: String,
+    /// NVIDIA Reflex's low-latency mode ([`Backend::set_low_latency`]).
+    pub low_latency: bool,
     /// Its models for the modes, and Ray Reconstruction's, the default first.
     pub models: Vec<UpscaleModel>,
     pub rr_models: Vec<UpscaleModel>,
+}
+
+/// Where the frame is, for NVIDIA Reflex's latency markers ([`Backend::latency_mark`]): the game's
+/// own work before drawing (input and the update). The backend marks its submit and present itself.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LatencyMark {
+    /// The frame starts: Reflex may sleep here first, so input is read as late as it can be.
+    SimulationStart,
+    /// The update is done; drawing starts.
+    SimulationEnd,
 }
 
 impl UpscalerInfo {
@@ -744,6 +759,18 @@ pub trait Backend: Send {
     /// temporal anti-aliasing then).
     fn upscaler(&self) -> UpscalerInfo {
         UpscalerInfo::default()
+    }
+    /// A latency marker (NVIDIA Reflex); nothing where the backend has no Reflex.
+    fn latency_mark(&mut self, mark: LatencyMark) {
+        let _ = mark;
+    }
+    /// Reflex's low-latency mode: 0 off, 1 on, 2 on with boost (the GPU kept clocked up).
+    fn set_low_latency(&mut self, mode: u32) {
+        let _ = mode;
+    }
+    /// The PC latency Reflex measured lately, from the frame's start to the GPU done with it (ms).
+    fn latency_ms(&self) -> Option<f32> {
+        None
     }
     /// The size to draw the world at for `mode` (with Ray Reconstruction: `reconstruct`) with the
     /// screen at `output`.

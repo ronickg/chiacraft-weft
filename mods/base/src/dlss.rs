@@ -39,6 +39,17 @@ static RR: Config<bool> = Config::named("core:dlss_rr");
 static RR_MODEL: Config<i32> = Config::named("core:dlss_rr_model");
 static DLSS5: Config<bool> = Config::named("core:dlss5");
 static DLSS5_INTENSITY: Config<f32> = Config::named("core:dlss5_intensity");
+/// NVIDIA Reflex (Planner from Ronald, 11-25): where the upscaler has it (`core:gpu_reflex`, DLSS
+/// through Streamline on Windows), Off, On (the engine's default) or On with boost; the PC latency
+/// it measured (`core:gpu_latency_ms`) shows under the row.
+static REFLEX_OK: Config<bool> = Config::named("core:gpu_reflex");
+pub(crate) static REFLEX: Config<i32> = Config::named("core:reflex");
+static LATENCY: Config<f32> = Config::named("core:gpu_latency_ms");
+/// Frame generation: its row where the GPU has it (`core:gpu_frame_gen`, an RTX 40 or 50), on by
+/// default; elsewhere the row says why it isn't here (`core:gpu_frame_gen_why`).
+static FRAME_GEN_OK: Config<i32> = Config::named("core:gpu_frame_gen");
+static FRAME_GEN: Config<bool> = Config::named("core:frame_gen");
+static FRAME_GEN_WHY: TextConfig = TextConfig::named("core:gpu_frame_gen_why");
 
 const MODE_NAMES: [&str; 6] = ["off", "dlaa", "quality", "balanced", "performance", "ultra_performance"];
 /// DLSS's model numbers and their words (`video.base.value.model_<key>`), M (13) the engine's
@@ -269,6 +280,41 @@ fn dlss5_rows(ui: &mut Ui) {
     }
 }
 
+fn reflex_rows(ui: &mut Ui) {
+    row(
+        ui,
+        "reflex",
+        || (["off", "on", "reflex_boost"][REFLEX.get().clamp(0, 2) as usize].into(), 0),
+        |dir| REFLEX.set((REFLEX.get() + dir).rem_euclid(3)),
+        false,
+    );
+    ui.row(S::row().gap(3.0), |ui| {
+        ui.row(S::row().w(84.0), |_| {});
+        ui.text_bind_styled(S::default().class("dim").max_w(260.0), |_, t| {
+            let ms = LATENCY.get();
+            if REFLEX.get() == 0 || ms <= 0.0 {
+                t.set("video.base.reflex.latency_none", &[]);
+            } else {
+                t.set("video.base.reflex.latency", &[Arg::Text(&format!("{ms:.1}"))]);
+            }
+        });
+    });
+}
+
+fn frame_gen_row(ui: &mut Ui) {
+    if FRAME_GEN_OK.get() > 0 {
+        row(ui, "frame_gen", || (if FRAME_GEN.get() { "on" } else { "off" }.into(), 0), |_| FRAME_GEN.set(!FRAME_GEN.get()), false);
+        return;
+    }
+    ui.row(S::row().gap(3.0).center(), |ui| {
+        ui.text_styled(S::default().w(84.0).no_wrap(), "video.base.frame_gen", &[]);
+        ui.text_bind_styled(S::default().class("dim").max_w(260.0), |_, t| {
+            let why = FRAME_GEN_WHY.get();
+            t.set(&format!("video.base.frame_gen.why_{}", if why.is_empty() { "none" } else { &why }), &[]);
+        });
+    });
+}
+
 pub fn register(r: &mut Registry) {
     crate::developer::video(r.config(&AUTO).bool(false));
     r.client_frame(follow_auto);
@@ -297,6 +343,10 @@ pub fn register(r: &mut Registry) {
             if DLSS5_OK.get() {
                 dlss5_rows(ui);
             }
+            if REFLEX_OK.get() {
+                reflex_rows(ui);
+            }
+            frame_gen_row(ui);
         });
     });
 }
