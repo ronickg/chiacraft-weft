@@ -1774,6 +1774,9 @@ impl WorldRenderer {
         if mesh.is_empty() {
             return;
         }
+        if key.0 == 0 && (13..=16).contains(&key.1.x) && (8..=10).contains(&key.1.y) && (-12..=-10).contains(&key.1.z) {
+            log::info!("pt lights check: cube {} meshed with {} lights", key.1, mesh.lights.len());
+        }
         if key.0 == 0 && !mesh.lights.is_empty() {
             self.cube_lights.insert(key.1, mesh.lights.clone());
             self.lights_dirty = true;
