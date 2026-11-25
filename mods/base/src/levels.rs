@@ -180,11 +180,11 @@ fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
         // `set` is the dimension + 1: the marker and the grace look for it only there.
         *g = base_api::Grave { x: at[0], y: at[1], z: at[2], set: w.dimension() + 1 };
     }
-    let grave = w.block_entity(at);
+    let grave = w.block_instance(at);
     if grave == 0 {
         return;
     }
-    let into = w.inventory(grave);
+    let into = w.inventory(Holder::block_id(grave));
     let mut slot = 0;
     for (i, s) in carried.into_iter().enumerate() {
         if s.is_empty() {
@@ -211,7 +211,7 @@ fn tombstone_block(r: &mut Registry) {
         })
         .hardness(1.0)
         .tab(&crate::tabs::FUNCTIONAL)
-        .entity(|e| e.inventory(45))
+        .inventory(45)
         .opens(&TOMBSTONE_MENU);
     r.menu(&TOMBSTONE_MENU)
         .group("grave", Slots::chest(5).holder())

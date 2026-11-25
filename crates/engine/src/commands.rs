@@ -656,15 +656,7 @@ fn names_from<'a>(keys: impl Iterator<Item = &'a String>, partial: &str) -> Vec<
 }
 
 fn entry_names(c: &Content, kind: u32, partial: &str) -> Vec<String> {
-    names_from(
-        c.game
-            .catalog
-            .ids(kind)
-            .iter()
-            .filter(|(_, id)| kind != ek::ENTITY || !c.game.is_block_entity(**id))
-            .map(|(n, _)| n),
-        partial,
-    )
+    names_from(c.game.catalog.ids(kind).iter().map(|(n, _)| n), partial)
 }
 
 fn complete_selector(c: &Content, partial: &str, players: &[String]) -> Vec<String> {

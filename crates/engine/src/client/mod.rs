@@ -123,6 +123,7 @@ pub struct LocalPlayer {
 
 pub struct ClientEntity {
     pub kind: u32,
+    pub hidden_mode: bool,
     helm: Option<IVec3>,
     /// What it rides and in which seat: it is drawn there.
     pub vehicle: Option<(u64, u8)>,
@@ -407,6 +408,7 @@ impl ClientEntity {
     pub fn new(kind: u32, pos: DVec3, yaw: f32, pitch: f32) -> ClientEntity {
         ClientEntity {
             kind,
+            hidden_mode: false,
             helm: None,
             pos,
             target: pos,
@@ -701,6 +703,11 @@ const FRAME_TARGET: f64 = 0.016;
 const MIN_BUDGET: f64 = 0.002;
 const MAX_BUDGET: f64 = 0.005;
 
+pub(crate) struct ClientBlock {
+    pub view: crate::net::BlockView,
+    pub shown: Vec<ItemStack>,
+}
+
 pub struct Client {
     conn: ClientConn,
     skin: Option<crate::net::Skin>,
@@ -818,8 +825,7 @@ pub struct Client {
     /// Brightness setting, 0 moody .. 1 bright.
     pub brightness: f32,
     pub entities: FxHashMap<u64, ClientEntity>,
-    /// Block entities that show items (`registry::SHOWN`): not drawn or hit, only lit by.
-    pub showing_blocks: FxHashMap<u64, ClientEntity>,
+    pub(crate) showing_blocks: FxHashMap<u64, ClientBlock>,
     pub inventory: Vec<ItemStack>,
     pub max_health: f32,
     pub mode: GameMode,
@@ -3166,6 +3172,12 @@ impl Client {
                 self.environment.remote.insert(id, layers);
             }
         }
+        if let Some(block) = self.showing_blocks.get_mut(&id) {
+            if comp == shown {
+                block.shown = Vec::<ItemStack>::from_bytes(bytes).unwrap_or_default();
+            }
+            return;
+        }
         let now = self.ticks();
         let arriving = self.arriving_tick();
         let hp = (comp == health)
@@ -3178,10 +3190,7 @@ impl Client {
             self.entity_render.changed_items.insert(id);
         }
         let mine = id == self.player_id;
-        let other = self
-            .entities
-            .get_mut(&id)
-            .or(self.showing_blocks.get_mut(&id));
+        let other = self.entities.get_mut(&id);
         let Some(e) = (if mine { Some(&mut self.me) } else { other }) else { return };
         if let Some(hp) = &hp {
             // Lower health out of a lower maximum, or on joining, isn't a hit.
@@ -3375,10 +3384,7 @@ impl Client {
         let (now, light) = (self.ticks(), c.ids.light.unwrap_or(u32::MAX));
         let mut sources = Vec::new();
         let mine = (!self.mode.has(crate::tag_bits::game_mode::HIDDEN) && !self.dead).then_some((&self.player_id, &self.me));
-        let all = mine
-            .into_iter()
-            .chain(self.entities.iter())
-            .chain(&self.showing_blocks);
+        let all = mine.into_iter().chain(self.entities.iter());
         let hidden = |e: &ClientEntity| {
             e.effects.iter().any(|f| {
                 f.until > now
@@ -3393,6 +3399,23 @@ impl Client {
                 .map(Vec::as_slice);
             let pos = if *id == self.player_id { self.player.pos } else { e.pos };
             sources.push(glow::entity_glow(c, e, now, pos, e.body_yaw, stored));
+        }
+        for (&id, block) in &self.showing_blocks {
+            let own = self
+                .entity_components
+                .get(&(id, light))
+                .and_then(|b| b.as_slice().try_into().ok())
+                .unwrap_or([0; 3]);
+            let color = block
+                .shown
+                .iter()
+                .map(|s| c.stack_light(s))
+                .fold(own, glow::brightest);
+            sources.push((
+                self.frame_place(block.view.frame)
+                    .to_world(block.view.local),
+                color,
+            ));
         }
         let eye = self.player.pos;
         self.world.set_glow(c, eye, sources);

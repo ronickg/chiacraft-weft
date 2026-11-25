@@ -30,7 +30,7 @@ const STORE_REACH: i32 = 2;
 static CARRIED: Mutex<Option<HashMap<u64, (u64, f32)>>> = Mutex::new(None);
 
 pub fn register(r: &mut Registry) {
-    r.entity_component(&LARDER, Larder { last: 0, carry: 0.0 }, component_flags::SAVE);
+    r.instance_component(&LARDER, Larder { last: 0, carry: 0.0 }, component_flags::SAVE);
     r.system(&LARDER, tick_stores);
     r.command("rot", "<pos:pos>", |cmd| {
         let w = cmd.world();
@@ -132,8 +132,8 @@ fn tick_stores(b: &mut SystemBatch<Larder>) {
         if ticks < rot::STORE_EVERY as u64 {
             continue;
         }
-        let Some(st) = w.entity(id) else { continue };
-        let rate = rot::rate(store_celsius(&w, st.block_pos().to_array()));
+        let Some(pos) = w.block_location(id.entity) else { continue };
+        let rate = rot::rate(store_celsius(&w, pos.to_array()));
         l.carry = rot_inventory(&w, id, ticks, rate, l.carry, false);
         l.last = now;
     }

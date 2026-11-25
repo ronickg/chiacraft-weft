@@ -52,9 +52,9 @@ pub fn burning_hot(w: &World, pos: BlockPos) -> bool {
     if !crate::blocks::FURNACE.is(w.block(pos)) {
         return false;
     }
-    let id = w.block_entity(pos);
+    let id = w.block_instance(pos);
     id != 0
-        && w.component(id, &base_api::components::SMELTING_STATE)
+        && w.component(Holder::block_id(id), &base_api::components::SMELTING_STATE)
             .is_some_and(|s| s.burn > 0 && sm::hot(s.burn_max, bellows_beside(w, pos)))
 }
 
@@ -78,7 +78,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::FUNCTIONAL);
     r.shaped(&CRAFTING, "bellows", 1, &["ppp", "lll", "psp"], &[('p', "#planks"), ('l', "#leather"), ('s', "#stick")]);
 
-    r.entity_component(&CAST, Cast { done: 0.0 }, component_flags::SAVE | component_flags::SYNC_MENU);
+    r.instance_component(&CAST, Cast { done: 0.0 }, component_flags::SAVE | component_flags::SYNC_MENU);
     r.system(&CAST, tick);
     for (i, block) in MOULD_BLOCKS.iter().enumerate() {
         let unfired = UNFIRED[i];
@@ -98,7 +98,8 @@ pub fn register(r: &mut Registry) {
             .mined_by("pickaxe", tool_tier::HAND)
             .tag("moulds")
             .tab(&crate::tabs::FUNCTIONAL)
-            .entity(|e| e.attach_with(&CAST, Cast { done: 0.0 }).inventory(2))
+            .attach_with(&CAST, Cast { done: 0.0 })
+            .inventory(2)
             .opens(&MOULD_MENU);
     }
     r.menu(&MOULD_MENU)
@@ -138,8 +139,7 @@ pub fn register(r: &mut Registry) {
 fn tick(b: &mut SystemBatch<Cast>) {
     let w = b.world();
     for (id, s, ticks) in b.iter_mut() {
-        let Some(e) = w.entity(id) else { continue };
-        let pos = e.block_pos();
+        let Some(pos) = w.block_location(id.entity) else { continue };
         let Some(shape) = shape_of(w.block(pos)) else { continue };
         crate::crafts::push_out(&w, id, "input", |i| COPPER_INGOTS.on_item(i));
         let inv = w.inventory(id);
