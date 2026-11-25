@@ -58,6 +58,31 @@ together (3 to 28 blocks).
 
 Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_grazers_m-172424/r2_grazers_grid.jpg`.
 
+Run 3 (46f12cbd7, `r11_grazers_m`, 486 s, script pass). Every pad grazes: 171 "eats base:tall_grass /
+base:grass" lines (deer 18, reindeer and capybara 12, protoceratops and psittacosaurus 49, the ankylosaurs
+24, iguanodont and cedarosaurus 52, citipati 16). Each hit calls the alarm, and the herd runs with the hit one.
+Few hearers log "runs from" (they run through the alarm, not their own look round), so this was read from the
+where rows before and after: the red deer moved 20 blocks with the hit one, protoceratops 6-10, iguanodont 83
+12, capybara 34 7-9. Capybara 32 stayed: she is the mother of the hit young 33 and stands between (a
+mother over `GUARDS_KG`), by design. The hit gastonia turned on the player and charged ("turns on it",
+"holds charge"). The hit iguanodont was a young one, so it ran, by design.
+
+| Species | eat | drink | flee when hit | herd runs on the alarm | shot |
+|---|---|---|---|---|---|
+| white_tailed_deer | pass | pass (r2) | not tested (not hit) | not tested; bolted from the player on its own | r11 1 |
+| red_deer | pass | pass | pass | pass (both moved 20 blocks) | r11 1 |
+| reindeer | pass | pass (r2) | not tested (not hit in r11) | pass (r2) | r11 2 |
+| capybara | pass | pass | pass (the young) | pass (34 ran; the mother stood guard) | r11 2 |
+| protoceratops | pass | pass | pass | pass (both moved 6-10) | r11 3 |
+| psittacosaurus | pass | pass | not tested (not hit); bolted on its own | not tested | r11 3 |
+| gastonia | pass | pass | pass: turns on it and charges | n/a (stands) | r11 4 |
+| pinacosaurus | pass | pass | pass (r2) | not tested in r11 | r11 4 |
+| iguanodont | pass | pass | pass (a young one runs) | pass (83 moved 12) | r11 5 |
+| cedarosaurus | pass | pass | not tested (not hit); bolted on its own | not tested | r11 5 |
+| citipati | pass | pass | pass | n/a (not a herd kind) | r11 6 |
+
+Grid r11: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r11_grazers_m-183049/r11_grazers_grid.jpg`.
+
 ## Hunters other than wolves (cov_hunters.txt)
 
 | Species | hunts | stalks / ambush | chase | kill | share | gives up | shot |
