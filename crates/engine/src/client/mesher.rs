@@ -43,9 +43,9 @@ pub struct Mesh {
     pub lights: Vec<u32>,
 }
 
-/// A light-giving state at `x y z` in its cube as `Mesh::lights` holds it, or None.
-fn emitter(c: &Content, s: u32, x: i32, y: i32, z: i32) -> Option<u32> {
-    let [r, g, b] = c.tight[s as usize].light;
+/// A cell's light (`[r, g, b]`) at `x y z` in its cube as `Mesh::lights` holds it, or None.
+fn emitter(light: [u8; 3], x: i32, y: i32, z: i32) -> Option<u32> {
+    let [r, g, b] = light;
     if r == 0 && g == 0 && b == 0 {
         return None;
     }
@@ -161,8 +161,10 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
                 if let Some(layout) = n.extras.get(&i) {
                     for part in layout.residents(states[i]) {
                         draw_block(c, n, ctm, &looks, &opaque, &leafy, &mut mesh, x, y, z, part);
-                        mesh.lights.extend(emitter(c, part.state, x, y, z));
                     }
+                    // The cell's light as the lightmap takes it (`CellLayout::light`, all its
+                    // parts): a resident's own state gave none for a torch (w55).
+                    mesh.lights.extend(emitter(layout.light(c, states[i]).light, x, y, z));
                     for &part in &layout.covers {
                         let (owner, resident) = part.owner(glam::IVec3::new(x, y, z));
                         if (owner.cmplt(glam::IVec3::ZERO).any() || owner.cmpge(glam::IVec3::splat(16)).any())
@@ -173,9 +175,29 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
                     }
                 } else {
                     draw_block(c, n, ctm, &looks, &opaque, &leafy, &mut mesh, x, y, z, Part::aligned(states[i]));
-                    mesh.lights.extend(emitter(c, states[i], x, y, z));
+                    mesh.lights.extend(emitter(c.tight[states[i] as usize].light, x, y, z));
                 }
             }
+        }
+    }
+    // Temporary check (pt block lights, w55): lit cells the mesh recorded no light for.
+    if mesh.lights.is_empty() {
+        let mut lit = 0;
+        let mut sample = (0u32, 0i32, 0i32, 0i32, false, 0u32);
+        for y in 0..16i32 {
+            for z in 0..16i32 {
+                for x in 0..16i32 {
+                    let i = pidx(x, y, z);
+                    if c.tight[states[i] as usize].light != [0; 3] {
+                        lit += 1;
+                        let f = filled[row(y, z)] >> (x + 1) & 1;
+                        sample = (states[i], x, y, z, n.extras.contains_key(&i), f);
+                    }
+                }
+            }
+        }
+        if lit > 0 {
+            log::info!("pt lights check: mesh with {lit} lit cells and no lights, e.g. state {} at {} {} {} (layout {}, filled {})", sample.0, sample.1, sample.2, sample.3, sample.4, sample.5);
         }
     }
     // Grouped by direction so the renderer can skip faces turned away from the camera.
