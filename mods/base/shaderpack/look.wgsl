@@ -417,8 +417,15 @@ fn atm_march(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32, backg
     let light = (s_sun * sun_kelvin_linear() + s_moon * moon_kelvin_linear() * ATM_MOON * moon_k) * ATM_SKY_SUN + s_multi * background;
     return Atm(light, through);
 }
-// Bliss's nine directions for the sky's average: in the sun's vertical plane, from about 58° up to
-// straight up, on its side and the far side.
+// Bliss's nine directions for the sky's average (deferred.vsh, method only): (0, 1, 0) + its 3x3
+// pattern normalized x (0.3183, 0.9), looked up in its sky map unnormalized. The map's v is
+// 0.5 y + 0.5 and it is drawn at y = 2 v - 1 (sphereToCarte / cartToSphere), so each sample is the
+// sky at elevation y = 1 + 0.9 n.y: from straight up to 0.1 over the horizon. The bearing is the
+// x's sign along the sun's side, the far side, or (x 0) square to it. Ours normalized the vector,
+// every sample 58° up or more: the average stayed near the zenith's blue (ours 4.5x under Bliss's at clear
+// noon) and the rain, which greys toward the horizon, never reached it (lkmxD13: the same clear
+// average in rain as in sun, where Bliss's goes grey). Bliss's (0, 0) entry is a NaN normalize;
+// ours keeps it straight up.
 fn atm_mean_dir(i: i32, sun: vec3<f32>) -> vec3<f32> {
     var s = vec2(0.0, -1.0);
     switch i {
@@ -435,7 +442,9 @@ fn atm_mean_dir(i: i32, sun: vec3<f32>) -> vec3<f32> {
     let n = select(vec2(0.0), normalize(s), dot(s, s) > 0.0);
     let flat_sun = vec3(sun.x, 0.0, sun.z);
     let side = select(vec3(1.0, 0.0, 0.0), normalize(flat_sun), dot(flat_sun, flat_sun) > 1e-6);
-    return normalize(side * n.x * 0.3183 + vec3(0.0, 1.0 + n.y * 0.9, 0.0));
+    let y = clamp(1.0 + n.y * 0.9, -1.0, 1.0);
+    let across = select(cross(side, vec3(0.0, 1.0, 0.0)), side * sign(n.x), abs(n.x) > 1e-6);
+    return vec3(0.0, y, 0.0) + across * sqrt(max(1.0 - y * y, 0.0));
 }
 // The rain's sky (Bliss's): toward the sky's own average x 1.5, darker where little light gets
 // through along the look (0.7 T + 0.3), most at the horizon, gone once the eye is over the clouds.
