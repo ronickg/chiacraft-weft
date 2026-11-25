@@ -3336,9 +3336,9 @@ pub async fn sound_coverage(t: T) -> R {
         .filter(|n| !ours(n) && !fish.iter().any(|f| n.ends_with(&format!(":{f}"))) && !look_egg_or_nest(n))
         .collect();
     let missing = part("Events missing files:");
-    t.check(blocks.is_empty(), &format!("blocks with no sounds: {}", blocks.join(" ")));
-    t.check(kinds.is_empty(), &format!("creatures with no sounds: {}", kinds.join(" ")));
-    t.check(missing.is_empty(), &format!("sound events missing files: {}", missing.join(" ")));
+    t.check(blocks.is_empty(), format!("blocks with no sounds: {}", blocks.join(" ")));
+    t.check(kinds.is_empty(), format!("creatures with no sounds: {}", kinds.join(" ")));
+    t.check(missing.is_empty(), format!("sound events missing files: {}", missing.join(" ")));
     Ok(())
 }
 
