@@ -1,11 +1,12 @@
 # A pack with one full and one barely hungry, and a kill beside a full wolf (Planner 11-25: the wolf follow-ups;
 # `notes/ECOLOGY.md`, part 6). The ground and herd as `herd_wolves_far.txt`: six fed deer (90 %) by the pond.
-# Part 1, the share gate, staged: a deer and three wolves on the field's west side, two at 30 % food, one full (99 %),
+# Part 1, the share gate, staged: a deer and three wolves on a pad 150 blocks west, two at 30 % food, one full (99 %),
 # within 5 blocks of each other; the nearest wolf kills the deer at once (`/animalprof bite 1000`). Its kill should feed
 # it and the hungry one ("eats N's kill", 35 kg each), not the full one (`hunt.rs`, actions::DIE: only those below FULL).
 # Part 2, the pack: on the far corner the leader and a second wolf at 30 % food, a third at 70 % (below FULL, too fed to
 # hunt itself), a fourth full (99 %). Their hunts should count "a pack of 3" (the full one left out: senses' pack), the
-# 70 % one "goes with its leader E on the hunt" and keeps up with it however far the chase goes, the full one in no hunt.
+# 70 % one "goes with its leader N on the hunt" (one of them out hunting or prowling, whichever leads the pack) and keeps
+# up with it however far the chase goes, the full one in no hunt.
 # Report from the log (`--log mod:animals=debug`): the BITE and HUNTER lines (the ids), every "eats N's kill", "hunts ...
 # a pack of", "joins", "goes with its leader", "keeps up", "gives up", where rows of the wolves (food, distance between the
 # follower and its leader), kills and deaths by cause.
@@ -45,17 +46,26 @@ chat /tp 15 70 519
 chat /animalprof hunter 0.7
 chat /tp 12 70 514
 chat /animalprof hunter 0.99
-chat /tk spawn animals:white_tailed_deer -15 70 520
-chat /tk spawn animals:grey_wolf -13 70 520
-chat /tk spawn animals:grey_wolf -15 70 523
-chat /tk spawn animals:grey_wolf -18 70 518
-chat /tp -13 70 520
+# Part 1 on a pad of its own 150 blocks west: 30 blocks off, part 2's wolves ate its carcass and its wolves joined
+# part 2's pack (wolvesPack1).
+chat /tp -150 72 520
+wait 2
+chat /tk fill -160 60 510 -140 69 530 base:dirt
+chat /tk fill -160 69 510 -140 69 530 base:grass
+chat /tk fill -160 70 510 -140 90 530 core:air
+wait 1
+chat /tk spawn animals:white_tailed_deer -150 70 520
+chat /tk spawn animals:grey_wolf -148 70 520
+chat /tk spawn animals:grey_wolf -150 70 523
+chat /tk spawn animals:grey_wolf -153 70 518
+wait 2
+chat /tp -148 70 520
 chat /animalprof hunter 0.3
-chat /tp -15 70 523
+chat /tp -150 70 523
 chat /animalprof hunter 0.3
-chat /tp -18 70 518
+chat /tp -153 70 518
 chat /animalprof hunter 0.99
-chat /tp -13 70 520
+chat /tp -148 70 520
 chat /animalprof bite 1000
 wait 1
 chat /tp 0 95 575

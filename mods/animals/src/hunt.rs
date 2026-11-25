@@ -224,7 +224,7 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         if !animal::tamed(w, id)
             && full < FULL
             && s.pack_prey().is_some()
-            && let Some(l) = with_pack(w, id, s.name)
+            && let Some(l) = with_pack(w, id, st, s.name)
         {
             return keep_up(w, id, st, l);
         }
@@ -455,33 +455,44 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
 }
 
 /// The leader it goes with on a hunt it isn't hungry enough for itself (`hunt_`): the one it
-/// follows already (until `keep_up` loses it: fed, gone, past `needs::PACK_LOSE`), or its pack's
-/// leader from its last look round once that one hunts or prowls.
-fn with_pack(w: &World, id: u64, name: &str) -> Option<u64> {
+/// follows already (until `keep_up` loses it: fed, gone, past `needs::PACK_LOSE`), its pack's
+/// leader from its last look round once that one hunts or prowls, or, its pack's leader itself
+/// (or that one at rest), the nearest of its kin within `senses::KIN` out on a hunt: led by the
+/// lowest id, a pack's leader at 70 % lay by while its two hungry ones hunted (wolvesPack1).
+fn with_pack(w: &World, id: u64, st: &EntityState, name: &str) -> Option<u64> {
     let now = w.game_time();
+    let out =
+        |l: u64| l != 0 && l != id && (w.component(l, &HUNT).is_some_and(|h| h[0] != 0) || w.component(l, &PROWL).is_some_and(|p| now < p));
     let following = w.component(id, &FOLLOW).map_or(0, |f| f[0]);
-    let leader = if following != 0 {
-        following
+    if following != 0 {
+        return Some(following);
+    }
+    let leader = w
+        .component(id, &crate::senses::SENSES)
+        .map_or(0, |s| s.leader);
+    let leader = if out(leader) {
+        leader
+    } else if (now + id) % 20 == 0 {
+        // Looked for once a second: it is the leader, or its leader is at rest.
+        w.entities_near(st.pos, crate::senses::KIN, None)
+            .into_iter()
+            .filter(|&o| out(o) && !animal::tamed(w, o))
+            .filter_map(|o| {
+                w.entity(o)
+                    .filter(|e| e.kind == st.kind)
+                    .map(|e| (dist2(e.pos, st.pos), o))
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map_or(0, |(_, o)| o)
     } else {
-        w.component(id, &crate::senses::SENSES)
-            .map_or(0, |s| s.leader)
+        0
     };
-    let out = leader != 0
-        && leader != id
-        && (following != 0
-            || w.component(leader, &HUNT).is_some_and(|h| h[0] != 0)
-            || w.component(leader, &PROWL).is_some_and(|p| now < p));
-    if !out {
-        if following != 0 {
-            w.component_mut(id, &FOLLOW).map(|f| f[0] = 0);
-        }
+    if leader == 0 {
         return None;
     }
-    if following == 0 {
-        weft_sdk::info!("{name} {id} goes with its leader {leader} on the hunt");
-        crate::rest::stop(w, id);
-        w.component_mut(id, &FOLLOW).map(|f| f[0] = leader);
-    }
+    weft_sdk::info!("{name} {id} goes with its leader {leader} on the hunt");
+    crate::rest::stop(w, id);
+    w.component_mut(id, &FOLLOW).map(|f| f[0] = leader);
     Some(leader)
 }
 
