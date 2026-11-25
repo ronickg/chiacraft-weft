@@ -58,6 +58,7 @@ command.animals.line = {0}
 command.animals.pool = {0}
 command.animals.tamed = Теперь оно ваше.
 command.animals.points = Очков для распределения: {0}.
+command.animals.ambient = жизнь вокруг: {0}, {1}; летают сейчас {2} (задано {3})
 command.animals.wild = Оно снова дикое, с новыми уровнями.
 item.animals.kibble = Сухой корм
 screen.animals.favorite = Любимая еда: {0}

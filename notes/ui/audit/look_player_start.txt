@@ -1,0 +1,76 @@
+# The look always on (Ronald 11-24): a player's start, played by a script. Run with
+# `-- --player-start --shader-pack ""` (an empty pack undoes the PC runner's): a fresh run dir is a first start (run.log:
+# the GPU's preset, "video: ...: the X preset" and "video: the high preset, every feature at high"); an old one
+# with `shader_pack =` empty (and the old `.offered` marker) is a later start. Either way, after
+# the join, "shader pack: none chosen, chiacraft on". Shots: the world with the pack drawn, the
+# Video screen (the presets, feature rows, player rows), Medium, Medium flipped to Custom by one
+# feature row's ›, then the Developer tab (after /developer_menu on): the parts, then the knobs;
+# last, Mod Settings and base's page there, top and end (no look knob on it).
+loaded
+idle
+wait 8
+look 30 -5
+wait 3
+shot fs_01_world.png
+screen base:video
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot fs_02_video.png
+cursor 0.4 0.75
+scroll -12
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot fs_02b_video_end.png
+cursor 0.4 0.75
+scroll 12
+wait 1
+tap_once base:video text:Medium
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot fs_03_medium.png
+tap_beside base:video text:Reflections 2.47
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot fs_04_custom.png
+key Escape
+wait 1
+chat /developer_menu on
+wait 1
+screen base:video_developer
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot fs_05_developer.png
+cursor 0.5 0.6
+scroll -12
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot fs_06_developer_knobs.png
+key Escape
+wait 1
+key Escape
+wait 1
+screen core:mod_settings
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot fs_07_mod_settings.png
+tap_once core:mod_settings text:Weft
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot fs_08_mod_settings_base.png
+cursor 0.5 0.5
+scroll -40
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot fs_09_mod_settings_base_end.png
+key Escape
+wait 1
+quit

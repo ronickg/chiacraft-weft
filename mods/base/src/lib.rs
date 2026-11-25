@@ -15,6 +15,7 @@ mod cooking;
 mod crafts;
 mod crops;
 mod death;
+mod developer;
 mod discovery;
 mod dlss;
 mod doors;

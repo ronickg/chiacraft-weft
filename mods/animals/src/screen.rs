@@ -520,7 +520,7 @@ fn framed(ui: &mut Ui, page: Option<usize>, s: S, body: impl FnOnce(&mut Ui)) {
                 if j == page {
                     ui.panel("tab_pressed", S::row().pad(2.0).h(13.0).center(), |ui| ui.text_styled(S::default().no_wrap(), &key, &[]));
                 } else {
-                    ui.button(&key, S::default().class("tab").h(13.0).pad(2.0), move |c| {
+                    ui.button(&key, S::default().class("tab").h(13.0).pad_xy(5.0, 2.0), move |c| {
                         if let Some(id) = c.menu_owner() {
                             c.client().send(&PAGE, &[id, j as u64]);
                         }
@@ -783,24 +783,18 @@ fn animal_screen(ui: &mut Ui) {
                     });
                 });
             });
-            // The header in the rows' own columns: name, bar, value, wild, tamed, +. A header
-            // lines up as its column's values do (centred over centred counts).
-            // The columns' headings, each centred over its column and free to reach past it into
-            // the empty heading room beside it: in a row the longer Russian ones ("Дикий" 17.5,
-            // "Ручной" 20.5 GUI px) were shrunk to the columns' 14 and 20.
-            ui.row(S::row().size(STAT_ROW_W, 8.5), |ui| {
-                let wild = 8.0 + 3.0 + STAT_NAME_W + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0;
-                let tamed = wild + STAT_WILD_W + 3.0;
-                for (x, w, key) in [(wild, STAT_WILD_W, "screen.animals.wild_points"), (tamed, STAT_TAMED_W, "screen.animals.tamed_points")]
-                {
-                    ui.text_styled(
-                        S::default()
-                            .class("dim")
-                            .no_wrap()
-                            .at_pivot(x + w / 2.0, 0.0, [0.5, 0.0]),
-                        key,
-                        &[],
-                    );
+            // The header in the rows' own columns: icon, name, bar, value, then the wild and
+            // tamed headings, each centred over its column. The columns are shared widths
+            // (`Ui::layout`): a heading longer than its column ("Дикий", a long language) widens
+            // the column in every row with it, so heading and counts stay lined up and apart.
+            ui.row(S::row().gap(3.0), |ui| {
+                for w in [8.0, STAT_NAME_W, STAT_BAR.0, STAT_VALUE_W] {
+                    ui.row(S::row().w(w), |_| {});
+                }
+                for (w, key) in [(STAT_WILD_W, "screen.animals.wild_points"), (STAT_TAMED_W, "screen.animals.tamed_points")] {
+                    ui.row(S::row().w(w).center(), |ui| {
+                        ui.text_styled(S::default().class("dim").no_wrap(), key, &[]);
+                    });
                 }
             });
             for (i, name) in STAT_NAMES.iter().enumerate() {

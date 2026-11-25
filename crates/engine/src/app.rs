@@ -385,6 +385,8 @@ pub(crate) struct Running {
     assets: Assets,
     textures: GameTextures,
     ui: UiRenderer,
+    /// `--ui-audit`: the text-fit check after each screen's layout (`ui::audit`).
+    audit: Option<crate::ui::audit::Insets>,
     post: crate::post::Post,
     /// The screen shaders the local player's effects turned on (`EntityEffectDef::screen`).
     audio: Option<crate::audio::Audio>,
@@ -774,6 +776,9 @@ impl App {
             assets,
             textures,
             ui,
+            audit: api::launch_options()
+                .contains_key("ui-audit")
+                .then(Default::default),
             post,
             audio: crate::audio::Audio::new().map(|mut a| {
                 a.muted = self.opts.automated;
@@ -3531,10 +3536,31 @@ fn layout_uis(r: &mut Running, scale: f32) -> f32 {
         for (ui, size) in uis {
             if ui.dirty || ui.size != size || ui.text_unit != text_unit {
                 ui.text_unit = text_unit;
+                let look = &r.look;
+                ui.keep_off_frames(&mut |class| {
+                    let v: Vec<f32> = look
+                        .sidecar(class, "inset")?
+                        .split_whitespace()
+                        .filter_map(|x| x.parse().ok())
+                        .collect();
+                    match v.as_slice() {
+                        [a] => Some([*a; 4]),
+                        [l, t, r, b] => Some([*l, *t, *r, *b]),
+                        _ => None,
+                    }
+                });
                 ui.layout(size, &r.ui.font);
                 ui.dirty = false;
                 r.quads_dirty = true;
             }
+        }
+    }
+    // The text-fit check: each screen as laid out, its faults once each (`ui::audit`).
+    if let Some(insets) = r.audit.as_mut() {
+        let window = r.gpu.surface_size();
+        for (screen, ui) in &r.screens {
+            let faults = crate::ui::audit::check(ui, [screen_size.x, screen_size.y], &mut |class| insets.get(&r.look, &r.assets, class));
+            insets.log(screen.name(), &faults, &r.lang.code, scale, window);
         }
     }
     text_unit
