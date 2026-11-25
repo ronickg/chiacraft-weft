@@ -238,10 +238,6 @@ const OPT_BANK_TOP: u32 = 67u;
 // The banks' march steps (`base:look_mist_steps`, the quality row: 0 as made = 8; Low 4, never off).
 const OPT_MIST_STEPS: u32 = 68u;
 const OPT_SKY_LOBE: u32 = 69u;
-// How far the bloom spreads (`base:look_bloom_spread`, 1 as made): scales how much of the wider levels
-// each level keeps on the way up (`BLOOM_SPREAD`); 0.5 halves its mean radius (9.3 px at 960 wide to
-// 4.6; Bliss's seven levels from a quarter size, 26).
-const OPT_BLOOM_SPREAD: u32 = 70u;
 // How much of it this morning: the option, in the east, with the sun under the horizon (full from
 // 1.7° down, none at 1° up) and not yet night (gone by about 12° down, where the night sky takes it).
 fn dawn_sky() -> f32 {
