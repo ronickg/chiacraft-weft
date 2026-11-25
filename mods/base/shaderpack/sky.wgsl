@@ -1197,6 +1197,15 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         let star = star_look(in.star, in.uv, dir);
         rgb *= star.rgb;
         a *= star.a;
+        // With the land lit from the physical sky, Bliss's stars (composite1, method only): 10 at a
+        // star's peak in its sky's units (/ 41 in ours), x clamp(-2 sun.y), in place of the engine's
+        // star at the screen's white (4-10 x Bliss's: lkmxS1's night stars stood out bright).
+        if land_from_sky() {
+            let bright = pow(unit(in.star * 9u + 5u), 3.0);
+            rgb = star.rgb * 10.0 / BLISS_UNITS * (0.4 + 0.6 * bright) * clamp(-2.0 * normalize(scene.sun.xyz).y, 0.0, 1.0);
+            // A steady field, as Bliss's: no twinkle and no fade of our own.
+            a = s.color.a;
+        }
     }
     if open_sky() && !in_liquid() {
         // Bodies shine through the tone curve; stars dim in the haze low down.

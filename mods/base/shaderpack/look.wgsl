@@ -1950,8 +1950,18 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     NIGHT_SKY_SHARE = night_sky_share(c, blocks);
     c += blocks;
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
-    let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
-    c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
+    // With the land lit from the physical sky, Bliss's minimum light (composite1, method only): 0.01
+    // in its lighting units (/ 41 in ours), x (1 + 0.7 n . the look), white, no AO; night vision
+    // (and the Brightness setting above its middle, as night vision) lift it to 0.1. Ours of 0.006
+    // to 0.03 was 25-120 x Bliss's: at night and in caves it outshone the moon and the sky's light,
+    // and the exposure lifted it to a lit green land (lkmxS1's night_vista, 11-25).
+    if land_from_sky() {
+        let look = normalize(rel + vec3(0.0, 1e-6, 0.0));
+        c += vec3(max(bliss_min_light(), brightness_curve(scene.light.x) * 0.25)) * (1.0 + 0.7 * dot(n, look));
+    } else {
+        let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
+        c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
+    }
     LIGHT_ALL = c;
     return c;
 }
@@ -1982,8 +1992,18 @@ fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let blocks = block_light(max(light.yzw, held), pos) * block_by_day(light.x);
     NIGHT_SKY_SHARE = night_sky_share(c, blocks);
     c += blocks;
-    c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
+    if land_from_sky() {
+        c += vec3(max(bliss_min_light(), brightness_curve(scene.light.x) * 0.25));
+    } else {
+        c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
+    }
     return c;
+}
+// Bliss's minimum light in ours: max(0.01, night vision x 0.1) of its lighting units, / 41; the
+// Brightness setting above its middle counts as night vision.
+fn bliss_min_light() -> f32 {
+    let vision = max(scene.light.w, clamp(scene.light.y * 2.0 - 1.0, 0.0, 1.0));
+    return max(0.01, vision * 0.1) / BLISS_UNITS;
 }
 
 // ---- the air: wind and fog (`scene.weather`, from the weather in `mods/base/src/weather.rs`) ----
