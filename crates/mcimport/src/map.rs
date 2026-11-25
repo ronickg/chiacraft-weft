@@ -64,12 +64,11 @@ fn names(list: &[String]) -> Vec<String> {
 /// anything else (fence gates included).
 pub fn full_shape(mc: &str) -> Option<String> {
     let n = State::parse(mc).name;
-    let m = ["_stairs", "_slab", "_wall", "_fence"].iter().find_map(|sfx| n.strip_suffix(sfx))?;
+    let m = ["_stairs", "_slab", "_wall", "_fence"]
+        .iter()
+        .find_map(|sfx| n.strip_suffix(sfx))?;
     let m = m.strip_prefix("waxed_").unwrap_or(m);
-    let woods = [
-        "oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "pale_oak", "mangrove", "cherry", "bamboo", "crimson",
-        "warped",
-    ];
+    let woods = ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "pale_oak", "mangrove", "cherry", "bamboo", "crimson", "warped"];
     Some(if woods.contains(&m) {
         format!("{m}_planks")
     } else if m.ends_with("_brick") || m.ends_with("_tile") {

@@ -64,7 +64,11 @@ impl<'c> Resolver<'c> {
         if self.c.state_by_name(&own).is_some() {
             candidates.insert(0, own);
             exact = true;
-        } else if let Some(m) = full.as_ref().map(|m| format!("mc:{m}")).filter(|m| self.c.state_by_name(m).is_some()) {
+        } else if let Some(m) = full
+            .as_ref()
+            .map(|m| format!("mc:{m}"))
+            .filter(|m| self.c.state_by_name(m).is_some())
+        {
             candidates.insert(0, m);
         }
         let mut chosen = None;
