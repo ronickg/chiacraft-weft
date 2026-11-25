@@ -108,6 +108,20 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
                     color = vec4(mix(vec3(v), vec3(1.0, 0.0, 0.0), dot_), 1.0);
                 }
             }
+            // Debug view 13: the sky's two averages as Bliss's debug capture reads its own (bliss_tex4,
+            // 11-25), in its units (ours / 0.122): left the clear one (frame look texel 5, its
+            // averageSkyCol / 30), right the cloudy one the land is lit by (texel 4, its
+            // averageSkyCol_Clouds / 30 after its normalize), each 64 px square at 270 px down,
+            // coded (log2(v) + 24) / 28 per channel through the screen's sRGB.
+            if look_debug() == 13u && scene.frame_look.x > 0.5 {
+                let q = in.clip.xy;
+                if q.y >= 270.0 && q.y < 334.0 && q.x < 132.0 && (q.x < 64.0 || q.x >= 68.0) {
+                    let t = textures[u32(scene.frame_look.x) - 1u];
+                    let v = select(textureLoad(t, vec2(4, 0), 0).rgb, textureLoad(t, vec2(5, 0), 0).rgb, q.x < 64.0) / 0.122;
+                    let e = clamp((log2(max(v, vec3(1e-12))) + 24.0) / 28.0, vec3(0.0), vec3(1.0));
+                    color = vec4(select(pow((e + 0.055) / 1.055, vec3(2.4)), e / 12.92, e <= vec3(0.04045)), 1.0);
+                }
+            }
         }
     }
     return color;
