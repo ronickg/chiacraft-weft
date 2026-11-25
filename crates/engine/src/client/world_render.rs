@@ -509,6 +509,16 @@ pub struct WorldRenderer {
     /// The radiance cache (`pathtrace.wgsl`'s `pt_cache`, `gpu_layout::PT_CACHE` cells), made zeroed
     /// with the first traced frame.
     pt_cache: Option<BufferId>,
+    /// Each meshed world cube's light-giving blocks (`Mesh::lights`), kept whether or not anything
+    /// traces, and whether they changed since the GPU's table (`rt::RtLights`) was made.
+    cube_lights: FxHashMap<IVec3, Vec<u32>>,
+    /// Lights that are not the meshes' blocks (`set_body_lights`: bodies' and entities', such as
+    /// torches, whose own cell the meshes see as air) by cube, as `Mesh::lights` holds them, and
+    /// the change count taken.
+    body_lights: FxHashMap<IVec3, Vec<u32>>,
+    body_epoch: u64,
+    lights_dirty: bool,
+    pt_lights: Option<rt::RtLights>,
     /// The path tracer's G-buffer (`rt.rs` `gbuffer_pass`): its pipelines (faces opaque, faces
     /// cutout, quads opaque, quads cutout), the last `draw`'s opaque and cutout table draws (kind,
     /// layer, page, group, first, draws) with its frame slot (the CPU-made runs before
@@ -720,6 +730,11 @@ impl WorldRenderer {
             pt_pipes: if rt_compiled { rt::pt_pipelines(gpu, assets) } else { None },
             pt_out: Vec::new(),
             pt_cache: None,
+            cube_lights: FxHashMap::default(),
+            body_lights: FxHashMap::default(),
+            body_epoch: u64::MAX,
+            lights_dirty: false,
+            pt_lights: None,
             gb_pipes: if rt_compiled { rt::gb_pipelines(gpu, &shader) } else { None },
             pre_pipes: if rt_compiled { rt::pre_pipelines(gpu, &shader) } else { None },
             prepass_now: false,
@@ -1457,6 +1472,9 @@ impl WorldRenderer {
 
     pub fn remove(&mut self, key: MeshKey) {
         self.terrain_epoch += 1;
+        if key.0 == 0 && self.cube_lights.remove(&key.1).is_some() {
+            self.lights_dirty = true;
+        }
         if let Some(rt) = &mut self.rt {
             rt.mesh_changed(key);
         }
@@ -1500,6 +1518,9 @@ impl WorldRenderer {
         }
         if let Some(b) = self.pt_cache.take() {
             gpu.destroy_buffer(b);
+        }
+        if let Some(l) = self.pt_lights.take() {
+            l.destroy(gpu);
         }
         for p in self.gb_pipes.take().into_iter().flatten() {
             gpu.destroy_pipeline(p);
@@ -1755,10 +1776,32 @@ impl WorldRenderer {
         }
     }
 
+    /// Takes lights that are not the meshes' blocks into the path tracer's light table when they
+    /// changed (`epoch`): the cells bodies light (`World::body_glow`) and the entities' (`Glow`'s
+    /// sources: torches, which are block entities, and lights in hand).
+    pub fn set_body_lights<'a>(&mut self, cells: impl Iterator<Item = (&'a IVec3, &'a [u8; 3])>, epoch: u64) {
+        if epoch == self.body_epoch {
+            return;
+        }
+        self.body_epoch = epoch;
+        self.body_lights.clear();
+        for (&p, &[r, g, b]) in cells {
+            let l = p & 15;
+            // Bit 24: a small light (a torch's flame, a light in hand), not a whole glowing block.
+            let w = l.x as u32 | (l.y as u32) << 4 | (l.z as u32) << 8 | u32::from(r.min(15)) << 12 | u32::from(g.min(15)) << 16 | u32::from(b.min(15)) << 20 | 1 << 24;
+            self.body_lights.entry(p >> 4).or_default().push(w);
+        }
+        self.lights_dirty = true;
+    }
+
     pub fn upload(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, key: MeshKey, mesh: &Mesh) {
         self.remove(key);
         if mesh.is_empty() {
             return;
+        }
+        if key.0 == 0 && !mesh.lights.is_empty() {
+            self.cube_lights.insert(key.1, mesh.lights.clone());
+            self.lights_dirty = true;
         }
         self.terrain_epoch += 1;
         let began = std::time::Instant::now();

@@ -189,6 +189,17 @@ fn pt_cached(world: vec3<f32>, n: vec3<f32>, dist: f32, u: vec2<f32>) -> vec4<f3
 
 // A surface met by a ray, lit as the world lights it: its block light, the sun through one more
 // ray, and its indirect light from the cache (the lightmap's sky light until the cache has it).
+// `light_on` with the sun as traced: its direct part not gated by the lightmap's sky light. The
+// world lets the sun in only where the sky light is high (`light_on`'s `open`), to keep its shadow
+// map's gaps out of caves; the traced shadow has no gaps, and with the gate the sun through a 2x2
+// roof hole never reached the cave floor (w41 cave_sky). The ambient-occlusion term is 1 here.
+fn pt_light_on(n: vec3<f32>, light: vec4<f32>, sun: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let c = light_on(n, light, 0.0, 1.0, pos, rel);
+    let sun_part = palette().sun * light_strength() * sun_facing(n) * sun;
+    LIGHT_SUN = sun_part;
+    return c + sun_part;
+}
+
 fn pt_lit(b: RtHit, l: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
     var s = 0.0;
     if dot(b.n, l) > 0.0 && light_strength() > 0.0 {
@@ -196,9 +207,9 @@ fn pt_lit(b: RtHit, l: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
     }
     let c = pt_cached(b.world, b.n, length(b.rel), u);
     if c.a > 0.5 {
-        return pt_albedo(b) * (light_on(b.n, vec4(0.0, b.light.yzw), s, 1.0, b.world, b.rel) + c.rgb);
+        return pt_albedo(b) * (pt_light_on(b.n, vec4(0.0, b.light.yzw), s, b.world, b.rel) + c.rgb);
     }
-    return pt_albedo(b) * light_on(b.n, b.light, s, 1.0, b.world, b.rel);
+    return pt_albedo(b) * pt_light_on(b.n, b.light, s, b.world, b.rel);
 }
 
 // Folds each cell's sums into its light (more samples this frame, a bigger step; never under 1/24,
@@ -239,6 +250,119 @@ fn cs_cache(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 
 const PT_SKY_T: f32 = 65504.0;
+
+// Two numbers 0..1 for pixel `px`, this frame, and a draw `salt` of its own (`pt_noise`'s hash with
+// the salt in the frame's word): each of the block lights' draws apart from the others.
+fn pt_rand(px: vec2<f32>, salt: u32) -> vec2<f32> {
+    var v = vec3<u32>(vec2<u32>(max(floor(px), vec2(0.0))), u32(scene.rt.y) ^ (salt * 0x9E3779B9u));
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v = v ^ (v >> vec3(16u));
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    return vec2<f32>(v.xy >> vec2(8u)) / 16777216.0;
+}
+
+// ---- block lights (M2; reports/Path tracing plan.md) ----
+//
+// The lightmap's block light stays the light's colour and reach (our grade); what tracing adds is
+// whether the light can be seen. Each pixel draws a few candidates from the light-giving blocks
+// that reach its cube (`pt_lights`, from the meshes, listed per cube on the CPU), each weighted by the light it gives there
+// by the lightmap's own falloff (its level less the blocks between), keeps one in proportion
+// (resampled importance sampling), and sends one shadow ray to it. Averaged over frames, that is the
+// share of the block light that reaches the surface: shadows behind pillars and furniture.
+
+const PT_LIGHT_CANDIDATES: u32 = 8u;
+// Half the size of a torch's flame and glow, blocks: what its shadows soften by.
+const PT_FLAME: f32 = 0.2;
+// The share of the lightmap's block light a shadow takes away. The rest stays: the light's further
+// bounces, which the lightmap's spread stands for and one traced bounce leaves out (all of it taken,
+// a block's side away from the torch came out near black in a stone cave, w59; 70 % read faint,
+// Ronald chose 90 %, 11-25).
+const PT_BLOCK_SHADOW: f32 = 0.9;
+
+// Where the lights reaching cube `c` are in `pt_lights` (start, count); count 0 when none do.
+fn pt_light_find(c: vec3<i32>) -> vec2<u32> {
+    let slots = pt_lights[0];
+    var i = ((u32(c.x) * 73856093u) ^ (u32(c.y) * 19349663u) ^ (u32(c.z) * 83492791u)) & (slots - 1u);
+    for (var p = 0u; p < 32u; p++) {
+        let at = 2u + i * 4u;
+        let x = pt_lights[at];
+        if x == 0x80000000u {
+            return vec2(0u);
+        }
+        if x == u32(c.x) && pt_lights[at + 1u] == u32(c.y) && pt_lights[at + 2u] == u32(c.z) {
+            let v = pt_lights[at + 3u];
+            return vec2(v & 0xFFFFFu, v >> 20u);
+        }
+        i = (i + 1u) & (slots - 1u);
+    }
+    return vec2(0u);
+}
+
+// How much of the block light reaches a surface at `world` (`rel` camera relative) facing `ng`:
+// x 1 seen, 0 hidden, by one light drawn as above (1 when none is near); y 1 when a light was drawn
+// (else why not, for debug view 15: 0 no list for the cube, -1 none of the draws in reach, -2 no lights at all).
+fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: vec3<f32>, px: vec2<f32>) -> vec2<f32> {
+    if pt_lights[1] == 0u {
+        return vec2(1.0, -2.0);
+    }
+    let cell = vec3<i32>(floor(world + ng * 0.5));
+    let cube = cell >> vec3(4u);
+    let base = 2u + pt_lights[0] * 4u;
+    // The lights that reach into this cube (the table lists them per cube, strongest first).
+    let r = pt_light_find(cube);
+    let total = r.y;
+    if total == 0u {
+        return vec2(1.0, 0.0);
+    }
+    var chosen = vec3(0.0);
+    var own = false;
+    var w_sum = 0.0;
+    var found = false;
+    for (var k = 0u; k < PT_LIGHT_CANDIDATES; k++) {
+        // One of the `total` lights, each as likely.
+        let t = min(u32(pt_rand(px, 16u + k * 2u).x * f32(total)), total - 1u);
+        let l = pt_lights[base + r.x + t];
+        let lp = vec3<i32>(i32(l & 63u), i32((l >> 6u) & 63u), i32((l >> 12u) & 63u)) - 16 + cube * 16;
+        let e = f32(max((l >> 18u) & 15u, max((l >> 22u) & 15u, (l >> 26u) & 15u)));
+        let d = abs(lp - cell);
+        let level = e - f32(d.x + d.y + d.z);
+        if level <= 0.0 {
+            continue;
+        }
+        // Its weight over the chance of drawing it (1 in `total`).
+        let w = level * f32(total);
+        w_sum += w;
+        if pt_rand(px, 17u + k * 2u).x * w_sum < w {
+            // A point on the light, a new one each frame (the denoiser averages them): a torch's
+            // flame (bit 30) a small box above its middle, a glowing block its whole. The shadow's
+            // edge softens with its distance from what casts it.
+            let small = ((l >> 30u) & 1u) == 1u;
+            let j = vec3(pt_rand(px, 40u + k).xy, pt_rand(px, 48u + k).x) * 2.0 - 1.0;
+            chosen = vec3<f32>(lp) + select(vec3(0.5) + j * 0.45, vec3(0.5, 0.6, 0.5) + j * PT_FLAME, small);
+            own = all(lp == vec3<i32>(floor(world - ng * 0.5)));
+            found = true;
+        }
+    }
+    if !found {
+        return vec2(1.0, -1.0);
+    }
+    if own {
+        return vec2(1.0, 1.0);
+    }
+    let to = chosen - world;
+    let dist = length(to);
+    let dir = to / max(dist, 1e-4);
+    // A light behind the face lights it only round a corner, as the lightmap spreads it: hidden.
+    if dot(dir, ng) <= 0.0 {
+        return vec2(0.0, 1.0);
+    }
+    let hit = rt_hit(rel + lift, dir, max(dist - 0.9, 0.0), 0.0);
+    return vec2(select(1.0, 0.0, hit.hit && !hit.clear), 1.0);
+}
 
 @compute @workgroup_size(8, 8)
 fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -317,7 +441,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
     // lightmap gives it (already lowered under cover) and as the open sky would give it.
-    let lit = light_on(n, h.light, sun, 1.0, h.world, h.rel);
+    let lit = pt_light_on(n, h.light, sun, h.world, h.rel);
     if pt.debug == 9u {
         pt_out[at] = vec4(lit, 1.0);
         return;
@@ -349,6 +473,15 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     let indirect = select(sky_open, bounce, b.hit);
     var diffuse = lit - sky_part + indirect;
+    // The block light, shadowed: its share of the world's light, as much of it as reaches the
+    // surface (one light drawn among those near, one shadow ray; frames average it). The
+    // lightmap's block light keeps its colour and reach; the held light is not a block's.
+    let block = max(light_on(n, h.light, 0.0, 1.0, h.world, h.rel) - light_on(n, vec4(h.light.x, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel), vec3(0.0));
+    var block_vis = vec2(1.0, 0.0);
+    if max(block.r, max(block.g, block.b)) > 1e-4 {
+        block_vis = pt_block_visibility(h.world, h.rel, ng, lift, px);
+        diffuse -= block * ((1.0 - block_vis.x) * PT_BLOCK_SHADOW);
+    }
     // Into the cache: the indirect light found here (one pixel in four a frame).
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
         let i = pt_cache_find(pt_cell(h.world, ng, dist, pt_noise(px + vec2(7.0, 5.0))), true);
@@ -421,7 +554,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         diffuse *= k;
         specular = specular * k + added / max(s_alb, vec3(1e-3));
     }
-    if pt.debug != 0u && pt.debug < 7u {
+    if (pt.debug != 0u && pt.debug < 7u) || pt.debug >= 14u {
         var out = vec3(0.0);
         switch pt.debug {
             case 1u: { out = albedo; }
@@ -430,6 +563,23 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 4u: { out = bounce; }
             case 5u: { out = specular * s_alb; }
             case 6u: { out = albedo * pt_cached(h.world, ng, dist, pt_noise(px + vec2(3.0, 11.0))).rgb; }
+            // 14: the lightmap's block light at the surface (as light, without the texture).
+            case 14u: { out = block; }
+            // 15: the traced block lights: green seen, red hidden; no light drawn: blue no list for
+            // the cube, cyan none in reach, magenta no lights at all; black no block light.
+            case 15u: {
+                if max(block.r, max(block.g, block.b)) > 1e-4 {
+                    if block_vis.y > 0.5 {
+                        out = select(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), block_vis.x > 0.5);
+                    } else if block_vis.y > -0.5 {
+                        out = vec3(0.0, 0.0, 1.0);
+                    } else if block_vis.y > -1.5 {
+                        out = vec3(0.0, 1.0, 1.0);
+                    } else {
+                        out = vec3(1.0, 0.0, 1.0);
+                    }
+                }
+            }
             default: {}
         }
         pt_out[at] = vec4(out, 0.0);

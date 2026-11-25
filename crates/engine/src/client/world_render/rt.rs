@@ -260,6 +260,103 @@ pub(super) fn pre_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[P
     made.try_into().ok()
 }
 
+/// The light-giving blocks for the path tracer (`pathtrace.wgsl`'s `pt_lights`, binding 37): a hash
+/// table from a cube's coordinate to the lights that reach into it, then the lists. Words: [0] the
+/// table's slots (a power of two), [1] the lights listed; then 4 a slot (x, y, z, start | count <<
+/// 20; x `i32::MIN` empty); then the lights, each its place from the cube's corner plus 16 (6 bits
+/// an axis, the light may be in a cube next to it), its light per channel (4 bits each) and bit 30
+/// when it is a small light (an entity's: a torch's flame), not a whole glowing block.
+///
+/// A cube's list holds only lights whose level is left above 0 somewhere in it (the lightmap's
+/// falloff, a level a block), strongest there first, at most `LIGHTS_PER_CUBE`: drawing among all
+/// the lights of the 27 cubes round found none in reach. Dim glowing plants and lava made some 60
+/// a cube, 1600 round each pixel, and a torch was all but never drawn (w50, w52).
+pub struct RtLights {
+    buffer: BufferId,
+    words: u64,
+    /// The frame it was last made (made again at most every `LIGHTS_EVERY` frames).
+    made: u64,
+}
+
+const LIGHTS_EVERY: u64 = 15;
+const LIGHTS_PER_CUBE: usize = 48;
+const LIGHTS_MAX: usize = 1 << 20;
+
+/// The table's hash of a cube coordinate (`pt_light_find` in `pathtrace.wgsl`: the same).
+fn light_hash(c: IVec3) -> u32 {
+    (c.x as u32).wrapping_mul(73856093) ^ (c.y as u32).wrapping_mul(19349663) ^ (c.z as u32).wrapping_mul(83492791)
+}
+
+/// The table's words for `lights` (see `RtLights`): each cube's own lights and its neighbours'
+/// that reach into it.
+fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
+    // Every cube a light may reach: those with lights and the 26 round each.
+    let mut targets: rustc_hash::FxHashSet<IVec3> = rustc_hash::FxHashSet::default();
+    for &c in lights.keys() {
+        for d in 0..27 {
+            targets.insert(c + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1));
+        }
+    }
+    let mut lists: Vec<(IVec3, Vec<u32>)> = Vec::new();
+    let mut near: Vec<(i32, u32)> = Vec::new();
+    for &t in &targets {
+        near.clear();
+        let lo = t * 16;
+        let hi = lo + IVec3::splat(15);
+        for d in 0..27 {
+            let n = t + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1);
+            let Some(l) = lights.get(&n) else { continue };
+            for &w in l {
+                let p = n * 16 + IVec3::new((w & 15) as i32, (w >> 4 & 15) as i32, (w >> 8 & 15) as i32);
+                let e = ((w >> 12) & 15).max((w >> 16) & 15).max((w >> 20) & 15) as i32;
+                // Its level at the cube's nearest block.
+                let gap = (lo - p).max(IVec3::ZERO) + (p - hi).max(IVec3::ZERO);
+                let level = e - (gap.x + gap.y + gap.z);
+                if level > 0 {
+                    let o = (p - lo + IVec3::splat(16)).as_uvec3();
+                    near.push((level, o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18 | (w >> 24 & 1) << 30));
+                }
+            }
+        }
+        if near.is_empty() {
+            continue;
+        }
+        near.sort_unstable_by_key(|n| std::cmp::Reverse(n.0));
+        near.truncate(LIGHTS_PER_CUBE);
+        lists.push((t, near.iter().map(|n| n.1).collect()));
+    }
+    let slots = (lists.len() * 2).next_power_of_two().max(1024);
+    let mut table = vec![0u32; slots * 4];
+    for i in 0..slots {
+        table[i * 4] = i32::MIN as u32;
+    }
+    let mut out: Vec<u32> = Vec::new();
+    for (c, l) in &lists {
+        if out.len() + l.len() > LIGHTS_MAX {
+            break;
+        }
+        let start = out.len() as u32;
+        out.extend_from_slice(l);
+        let mut i = light_hash(*c) as usize & (slots - 1);
+        while table[i * 4] != i32::MIN as u32 {
+            i = (i + 1) & (slots - 1);
+        }
+        table[i * 4..i * 4 + 4].copy_from_slice(&[c.x as u32, c.y as u32, c.z as u32, start | (l.len() as u32) << 20]);
+    }
+    let mut words = Vec::with_capacity(2 + table.len() + out.len());
+    words.push(slots as u32);
+    words.push(out.len() as u32);
+    words.extend_from_slice(&table);
+    words.extend_from_slice(&out);
+    words
+}
+
+impl RtLights {
+    pub(super) fn destroy(self, gpu: &mut dyn Backend) {
+        gpu.destroy_buffer(self.buffer);
+    }
+}
+
 impl RtScene {
     /// The expansion's pipeline (`expand_pipeline`), made with the world's other pipelines.
     pub(super) fn expand_pipeline(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<PipelineId> {
@@ -530,6 +627,7 @@ impl WorldRenderer {
         }
         let (diffuse, specular, _) = self.pt_images.unwrap();
         use crate::gpu_layout::{PT_CACHE, PT_CACHE_BYTES, pt_bind};
+        let lights = self.pt_lights_buffer(gpu, self.rt_frame_no());
         let cache = match self.pt_cache {
             Some(c) => c,
             None => {
@@ -556,6 +654,7 @@ impl WorldRenderer {
         self.bind_run(list, cs, page, origins);
         list.bind(pt_bind::OUT, out);
         list.bind(pt_bind::CACHE, cache);
+        list.bind(pt_bind::LIGHTS, lights);
         list.push_constants(&args);
         list.push(Cmd::Dispatch { x: size.0.div_ceil(8), y: size.1.div_ceil(8), z: 1 });
         crate::diag::probe(list, "pt_trace");
@@ -735,6 +834,37 @@ impl WorldRenderer {
     }
 
     /// Frames the ray-traced scene has been kept (`Scene::rt.y`, for noise that moves every frame).
+    /// The path tracer's light table, made again when the cubes' lights changed (at most every
+    /// `LIGHTS_EVERY` frames), its buffer grown as needed.
+    fn pt_lights_buffer(&mut self, gpu: &mut dyn Backend, frame: u64) -> BufferId {
+        let stale = self.pt_lights.as_ref().is_none_or(|l| self.lights_dirty && frame >= l.made + LIGHTS_EVERY);
+        if stale {
+            let words = if self.body_lights.is_empty() {
+                light_words(&self.cube_lights)
+            } else {
+                let mut all = self.cube_lights.clone();
+                for (&c, l) in &self.body_lights {
+                    all.entry(c).or_default().extend_from_slice(l);
+                }
+                light_words(&all)
+            };
+            let n = words.len() as u64;
+            log::debug!("path traced lights: {} cubes with lights, {} listed, frame {frame}", self.cube_lights.len(), words[1]);
+            if self.pt_lights.as_ref().is_none_or(|l| l.words < n) {
+                if let Some(l) = self.pt_lights.take() {
+                    l.destroy(gpu);
+                }
+                let cap = n.next_power_of_two();
+                self.pt_lights = Some(RtLights { buffer: gpu.create_buffer(cap * 4, usage::STORAGE, "path traced lights"), words: cap, made: 0 });
+            }
+            let l = self.pt_lights.as_mut().unwrap();
+            gpu.write_buffer(l.buffer, 0, bytemuck::cast_slice(&words));
+            l.made = frame;
+            self.lights_dirty = false;
+        }
+        self.pt_lights.as_ref().unwrap().buffer
+    }
+
     pub fn rt_frame_no(&self) -> u64 {
         self.rt.as_ref().map_or(0, |r| r.frame_no)
     }
