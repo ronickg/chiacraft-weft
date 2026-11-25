@@ -1,0 +1,63 @@
+# The animals' act sounds (notes/crew/plans/ai-sound.md, "The acts"; animals_core::voices ACTS,
+# eat_way, step_size): hungry grazers eat (animals:<kind>.eat), wolves come for them, the grazers
+# bolt (animals:<kind>.alarm) and the wolves bite (animals:grey_wolf.attack); the heavy ones step
+# (animals:<kind>.step: reindeer, protoceratops heavy, gastonia huge). A script can't hear: read
+# run.log's `/sounds check` reply and "sound files:" line (no events missing files) and every
+# `/sounds recent` reply. Run with --log mod:animals=debug (the "eats" lines). Expect in them: white_tailed_deer/reindeer/protoceratops/gastonia/capybara .eat while they
+# graze, then .alarm as the wolves close in, grey_wolf.attack on the bites, and .step lines if the
+# list holds steps (the engine plays them on the client).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /weather clear 99999
+chat /sounds check
+chat /tk mode creative
+# Seed 1's savanna (as herd_savanna_graze), in summer: its own tall grass is food. On a built pad
+# at y 200 the grazers only searched (ai_acts_1: no eat at all).
+chat /season summer 1
+chat /tp 0 90 544
+wait 4
+loaded
+idle
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+wait 2
+# the grazers, hungry: they eat the grass
+chat /tk spawn animals:white_tailed_deer ~-3 ~ ~-8
+chat /tk spawn animals:white_tailed_deer ~-1 ~ ~-9
+chat /tk spawn animals:reindeer ~1 ~ ~-8
+chat /tk spawn animals:reindeer ~3 ~ ~-10
+chat /tk spawn animals:protoceratops ~5 ~ ~-8
+chat /tk spawn animals:gastonia ~8 ~ ~-12
+chat /tk spawn animals:capybara ~-6 ~ ~-6
+wait 2
+chat /animalprof food 0.2
+# beside the herd: eating is heard 16 blocks (ai_acts_2: from 15 blocks only gastonia's reached)
+chat /tp ~ ~3 ~-5
+look 0 -30
+wait 15
+shot ai_acts_01_grazing.png
+chat /sounds recent
+wait 10
+chat /sounds recent
+wait 10
+chat /sounds recent
+# the wolves, hungry: the grazers bolt and the wolves bite
+chat /tk spawn animals:grey_wolf ~12 ~-3 ~-14
+chat /tk spawn animals:grey_wolf ~14 ~-3 ~-12
+chat /tk spawn animals:grey_wolf ~13 ~-3 ~-16
+wait 1
+chat /animalprof hunters 0.2
+wait 6
+shot ai_acts_02_wolves.png
+chat /sounds recent
+wait 6
+chat /sounds recent
+wait 6
+chat /sounds recent
+wait 8
+shot ai_acts_03_after.png
+chat /sounds recent
+quit

@@ -314,6 +314,7 @@ pub fn play(w: &World, id: u64, clip: &str, secs: f32) {
     }
     log(id, "plays", clip);
     w.action_play(id, clip, false);
+    crate::voices::on_clip(w, id, clip);
     let busy = w.game_time() + (secs * 20.0).ceil() as u64;
     edit(w, id, |c| {
         // A held clip is cut by this one: it comes back after.

@@ -336,6 +336,7 @@ pub fn rise(def: &'static Def, w: &World, player: u64, at: [i32; 3], form: &Form
     crate::anim::clear(w, id);
     w.action_play(id, "rise", false);
     burst(w, spot, def.dust.id(), 40, 1.5);
+    crate::voices::boss_call(w, def.name, "summon", spot);
     for p in w.entities_near(spot, SIGHT, Some(&PLAYER)) {
         w.title(&format!("title.animals.{}", def.name), &[])
             .to(p)
@@ -450,6 +451,7 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
                     w.navigate(id, st.pos, 0.0);
                     crate::anim::clear(w, id);
                     w.action_play(id, &format!("{}_tell", b.attacks[i].name), false);
+                    crate::voices::boss_call(w, def.name, "attack", st.pos.to_array());
                     go(&mut c, WINDUP);
                 }
                 // Close enough: it stops and turns to them rather than walk into them (PC look
@@ -502,6 +504,7 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
                     burst(w, (def.head)(st), def.bits.id(), 20, 1.0);
                     crate::anim::clear(w, id);
                     w.action_play(id, "stunned", true);
+                    crate::voices::boss_call(w, def.name, "stunned", st.pos.to_array());
                     go(&mut c, STUNNED);
                 }
             }

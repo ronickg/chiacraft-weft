@@ -565,6 +565,7 @@ pub fn feed(w: &World, id: u64, amount: u16) {
         let max = a.stat(species::FOOD).round() as u16;
         a.food = a.food.saturating_add(amount).min(max);
     }
+    crate::voices::eat(w, id);
 }
 
 /// The owner places one of its unspent points on stat `i` (never torpor).
