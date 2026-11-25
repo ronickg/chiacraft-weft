@@ -136,11 +136,7 @@ pub fn daylight(hour: f32, sunrise: f32, sunset: f32) -> f32 {
 /// The dawn chorus' share at `hour`.
 pub fn dawn(hour: f32, sunrise: f32) -> f32 {
     let (before, after) = DAWN_HOURS;
-    if hour < sunrise {
-        smooth(sunrise - before, sunrise, hour)
-    } else {
-        1.0 - smooth(sunrise, sunrise + after, hour)
-    }
+    if hour < sunrise { smooth(sunrise - before, sunrise, hour) } else { 1.0 - smooth(sunrise, sunrise + after, hour) }
 }
 
 /// What the beds and calls are set to now, before the cover.
@@ -155,7 +151,17 @@ pub struct Levels {
 /// in `season` (0 spring .. 3 winter, `None` without a calendar), with `rain` and `thunder`
 /// (0 to 1, where the player is) and `height` blocks above the sea.
 #[allow(clippy::too_many_arguments)]
-pub fn levels(m: Scape, hour: f32, sunrise: f32, sunset: f32, air: f32, season: Option<usize>, rain: f32, thunder: f32, height: f32) -> Levels {
+pub fn levels(
+    m: Scape,
+    hour: f32,
+    sunrise: f32,
+    sunset: f32,
+    air: f32,
+    season: Option<usize>,
+    rain: f32,
+    thunder: f32,
+    height: f32,
+) -> Levels {
     let day = daylight(hour, sunrise, sunset);
     let calm = (1.0 - RAIN_HUSH * rain.clamp(0.0, 1.0)) * (1.0 - thunder.clamp(0.0, 1.0));
     let birds_warm = smooth(BIRDS_C.0, BIRDS_C.1, air) * season.map_or(0.8, |s| BIRD_SEASON[s.min(3)]);

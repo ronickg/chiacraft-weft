@@ -2,6 +2,7 @@
 //! engine knows about stone, water or zombies.
 
 mod advancements;
+mod ambience;
 mod assembly;
 mod beds;
 mod block_entities;
@@ -71,7 +72,6 @@ mod waterholes;
 mod waystones;
 mod weather;
 mod weather_sound;
-mod ambience;
 mod web;
 mod wild;
 mod wind_life;

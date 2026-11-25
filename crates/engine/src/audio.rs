@@ -1407,11 +1407,7 @@ pub(crate) fn sound_check(assets: &Assets) -> SoundCheck {
     let mut silent_blocks: Vec<String> = Vec::new();
     for s in &c.states {
         let name = &c.blocks[s.block as usize].name;
-        if s.block != 0
-            && s.liquid.is_none()
-            && s.effects.iter().all(|f| f.sound == u32::MAX)
-            && silent_blocks.last() != Some(name)
-        {
+        if s.block != 0 && s.liquid.is_none() && s.effects.iter().all(|f| f.sound == u32::MAX) && silent_blocks.last() != Some(name) {
             silent_blocks.push(name.clone());
         }
     }

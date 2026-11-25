@@ -3302,7 +3302,9 @@ pub async fn mob_in_the_way(t: T) -> R {
 /// drawn in place of the creature, which keeps its own voice), eggs and nests.
 fn look_egg_or_nest(n: &str) -> bool {
     let path = n.split_once(':').map_or(n, |p| p.1);
-    ["_lie", "_sit", "_fly", "_bask", "_rest"].iter().any(|s| path.ends_with(s))
+    ["_lie", "_sit", "_fly", "_bask", "_rest"]
+        .iter()
+        .any(|s| path.ends_with(s))
         || path == "fish_flop"
         || path.starts_with("egg_")
         || path.starts_with("nest")

@@ -357,7 +357,8 @@ fn find_liquids(c: &Client, s: &mut State, eye: [f64; 3]) {
                     sum[kind][k] += p[k] as f64 + 0.5;
                 }
                 if kind == 2 && s.lava_spots.len() < 16 {
-                    s.lava_spots.push([p[0] as f64 + 0.5, p[1] as f64 + 1.0, p[2] as f64 + 0.5]);
+                    s.lava_spots
+                        .push([p[0] as f64 + 0.5, p[1] as f64 + 1.0, p[2] as f64 + 0.5]);
                 }
             }
         }
