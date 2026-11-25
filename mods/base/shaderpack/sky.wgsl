@@ -1195,8 +1195,15 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // branch, and every other moon kept vanilla's square picture, which by day went white
         // through the curve as a big white square or, low down, a skewed one (Tester 2's
         // "square sun", 11-05: the moon of summer day 5, up by day).
-        let is_sun = s.ids.y == SKY_BODY && dot(s.axes[0].xyz, scene.sun.xyz) > 0.9995;
-        let is_moon = s.ids.y == SKY_BODY && !is_sun && dot(s.axes[0].xyz, scene.moon.xyz) > 0.9995;
+        // Whichever of the two the body stands nearer, within 8°: the sky draws its bodies at the
+        // smoothed clock (`smooth_time`, which runs on between the server's time updates) and
+        // `scene.sun` follows the world's ticks, so the two drift apart by a degree or more; a match
+        // within 1.8° missed the sun now and then, and its quad fell back to the square picture, a
+        // tilted white square round a noon sun (Planner, 11-25, ambient life's look-up shots).
+        let to_sun = dot(s.axes[0].xyz, normalize(scene.sun.xyz));
+        let to_moon = dot(s.axes[0].xyz, normalize(scene.moon.xyz));
+        let is_sun = s.ids.y == SKY_BODY && to_sun > 0.99 && to_sun >= to_moon;
+        let is_moon = s.ids.y == SKY_BODY && !is_sun && to_moon > 0.99;
         if is_moon {
             let m = moon_body(s, local);
             rgb = m.rgb;
