@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -153,6 +153,24 @@ pub fn init(r: &mut Registry) {
                     }
                 }
                 format!("{n} hunters at {:.0}% food", v * 100.0)
+            }
+            "ko" => {
+                // Every wild knock-out kind within 128 blocks out cold with this share of its most
+                // torpor (1: out, waking in 4800 ticks), near and far alike: one past the activation
+                // distance ticks once in 20 (`World::tick_elapsed`) and should wake as soon
+                // (`herd_ko_far.txt`).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(1.0).max(0.0) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 128.0, None) {
+                    if let Some(a) = w.component(id, &crate::animal::ANIMAL)
+                        && w.component(id, &crate::knockout::KNOCKOUT).is_some()
+                    {
+                        crate::knockout::add_torpor(&w, id, a.stat(crate::species::TORPOR) * v);
+                        n += 1;
+                    }
+                }
+                format!("KO {n} at {:.0}% torpor, game time {}", v * 100.0, w.game_time())
             }
             "chill" => {
                 // Warm-blooded hunters feel cold (not freezing) whatever the air, 1 on, 0 off.

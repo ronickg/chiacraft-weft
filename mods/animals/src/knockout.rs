@@ -146,7 +146,7 @@ pub fn add_torpor(w: &World, id: u64, amount: f32) {
         }
     });
     if fell {
-        weft_sdk::info!("animal {id} knocked out");
+        weft_sdk::info!("animal {id} knocked out at game time {}", w.game_time());
         w.navigate(id, w.entity(id).map_or([0.0; 3], |e| e.pos.to_array()), 0.0);
     }
 }
@@ -261,7 +261,7 @@ fn wake_up(w: &World, id: u64, index: usize, st: &EntityState) {
         t.feedings = 0;
     }
     crate::wake(w, id, index);
-    weft_sdk::info!("animal {id} woke up");
+    weft_sdk::info!("animal {id} woke up at game time {}", w.game_time());
     if let Some(p) = near {
         anger(w, id, p);
     }
