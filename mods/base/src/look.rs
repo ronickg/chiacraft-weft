@@ -166,6 +166,8 @@ pub static LOOK_SKY_PHYS: Config<f32> = Config::named("look_sky_phys");
 /// One fog as Bliss's (1): the mist, the rain's fog and the air's haze in one march per pixel before
 /// TAA, in place of the froxel volume and the surfaces' haze; 0 ours before, to compare.
 pub static LOOK_FOG_ONE: Config<f32> = Config::named("look_fog_one");
+/// With the chain, the night's light and sky to this share (0.25 as made; 1 as before).
+pub static LOOK_CHAIN_NIGHT: Config<f32> = Config::named("look_chain_night");
 /// The engine's map of the ground's height (`client::ground_map`), which the banks lie on: on with
 /// them (`register`'s frame hook keeps it so, however the banks were set).
 static GROUND_MAP: Config<bool> = Config::named("core:ground_map");
@@ -234,7 +236,7 @@ pub fn set_bliss_match(on: bool) {
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away, base:look_mist_tint, base:look_low_sun_keep, base:look_evening_shade, base:look_air_fade, base:look_glow_fill, base:look_mist_dawn_tint, base:look_mist_domes, base:look_horizon_lift, base:look_sun_disc, base:look_dawn_sky, base:look_bank_dense, base:look_bank_sun, base:look_bank_shade, base:look_shadow_reach, base:look_bank_fall, base:look_bank_edge, base:look_bank_top, base:look_mist_steps, base:look_sky_lobe, base:look_chain, base:look_sky_phys, base:look_fog_one";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away, base:look_mist_tint, base:look_low_sun_keep, base:look_evening_shade, base:look_air_fade, base:look_glow_fill, base:look_mist_dawn_tint, base:look_mist_domes, base:look_horizon_lift, base:look_sun_disc, base:look_dawn_sky, base:look_bank_dense, base:look_bank_sun, base:look_bank_shade, base:look_shadow_reach, base:look_bank_fall, base:look_bank_edge, base:look_bank_top, base:look_mist_steps, base:look_sky_lobe, base:look_chain, base:look_sky_phys, base:look_fog_one, base:look_chain_night";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -314,6 +316,7 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_CHAIN).float(1.0, 0.0, 1.0);
     r.config(&LOOK_SKY_PHYS).float(1.0, 0.0, 1.0);
     r.config(&LOOK_FOG_ONE).float(1.0, 0.0, 1.0);
+    r.config(&LOOK_CHAIN_NIGHT).float(0.25, 0.0, 1.0);
     r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0);
     r.config(&LOOK_BLISS).bool(true);
     r.client_frame(|_| {

@@ -297,18 +297,28 @@ const ATM_TOP: f32 = 6471e3;
 const ATM_RAYLEIGH: vec3<f32> = vec3(5.8e-6, 13.5e-6, 33.1e-6);
 const ATM_MIE: f32 = 3.0e-6;
 const ATM_OZONE: vec3<f32> = vec3(0.65e-6, 1.881e-6, 0.085e-6);
-// The sun's light outside the air, warm (Ronald's Bliss profile: Sun_temp 4300 K), and the moon's
-// against it (its moon 200, its sun 250000).
-const ATM_SUN: vec3<f32> = vec3(1.0, 0.70, 0.45);
+// The sun's light outside the air, white (the 4300 K of Ronald's Bliss profile lights the land, not
+// the sky: through Rayleigh's blue it turned the noon sky grey-blue, blue/red 2.2 against a white
+// sun's 4.9, and the horizon yellow-white; lkmxP1), and the moon's against it (its moon 200, its sun
+// 250000).
+const ATM_SUN: vec3<f32> = vec3(1.0, 1.0, 1.0);
 const ATM_MOON: f32 = 8e-4;
 // The light toward the sun crosses half the air it would (Bliss bends its sun ray for the same:
 // sunrises less deep red-blue).
 const ATM_SUN_PATH: f32 = 0.5;
 // The light scattered more than once, as a share of the once-scattered, more with the sun low.
 const ATM_MULTI: f32 = 0.25;
-// To our units: the noon sky 30 degrees up about as bright as our palette's (luma 0.29; the zenith
-// then 0.22, the horizon's bright band 1.7, as the air's physics gives).
-const ATM_SCALE: f32 = 30.0;
+// To our units: the noon sky 30 degrees up about as bright as our palette's (luma 0.29, with the
+// white sun; the zenith then 0.23).
+const ATM_SCALE: f32 = 22.0;
+// At night, with the physical sky, our night's sky colours under it (`palette`'s zenith and horizon):
+// the moon's single scattering alone left the sky pitch black between the clouds (lkmxP1); Bliss
+// adds a floor of light to its night sky too.
+const ATM_NIGHT_FLOOR: f32 = 1.0;
+// The chain's night (`base:look_chain_night`, 0.25 as made): our night's light and sky to this share,
+// with the chain. Ours were set for the per-hour exposures; under Bliss's one log curve the night
+// came out much brighter than Bliss's dark navy (lkmxC1), whose moon is 1/1250 of its sun.
+const OPT_CHAIN_NIGHT: u32 = 73u;
 fn sky_phys_on() -> bool {
     return scene.frame.x > 0.5 && scene.frame_look.x > 0.5 && fantasy_opt(OPT_SKY_PHYS) > 0.5;
 }
@@ -763,6 +773,15 @@ fn palette_now() -> Palette {
         let low = (1.0 - smoothstep(0.1, 0.22, scene.sun.y)) * smoothstep(-0.04, 0.02, scene.sun.y);
         p.ambient *= mix(1.0, shade_k, low * evening * (1.0 - rain_amount()));
     }
+    if bliss_chain() {
+        let night = smoothstep(-0.04, -0.2, scene.sun.y);
+        let k = mix(1.0, clamp(fantasy_opt(OPT_CHAIN_NIGHT), 0.0, 1.0), night);
+        p.ambient *= k;
+        p.sun *= k;
+        p.zenith *= k;
+        p.horizon *= k;
+        p.glow *= k;
+    }
     return p;
 }
 
@@ -1197,6 +1216,11 @@ var<private> sky_seen: f32 = 0.0;
 fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     if sky_phys_on() {
         var c = sky_phys(dir);
+        let night = smoothstep(-0.02, -0.18, scene.sun.y);
+        if night > 0.0 {
+            let p = palette();
+            c += mix(p.horizon, p.zenith, pow(clamp(dir.y, 0.0, 1.0), 0.4)) * night * ATM_NIGHT_FLOOR;
+        }
         // The moon's glow and rain's slate, as below (ours).
         if scene.sun.y < -0.05 && scene.moon.w > 0.0 {
             let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
@@ -2382,6 +2406,10 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let mie_phase = hg_phase(mu, 0.8);
     let amb_air = p.ambient;
     let rain = rain_amount();
+    // The sky already holds the air (its own scattering, `sky_phys`): over it only the mist and the
+    // rain. With the air too a sky pixel took most of the sky's light again in blue over the
+    // march's 1500 blocks, a bright blue frame at night and a white sky by day (lkmxF1).
+    let on_sky = select(1.0, 0.0, dist >= MIST_MARCH_FAR * 0.999);
     let n = u32(clamp(look_opt(OPT_MIST_STEPS, 8.0), 2.0, 16.0));
     let e = 11.0;
     let span = min(dist, MIST_MARCH_FAR);
@@ -2402,7 +2430,7 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let lit = land * cloud_shadow(dir * t);
         let above = max(at.y - SEA_LEVEL, 0.0);
         // The mist and the rain's fog (Bliss's rainy fog, its 0.3 in Ronald's profile).
-        let d = bank_density(at, dir * t) * deep + rain * 0.006 * exp2(-0.03 * above);
+        let d = bank_density(at, dir * t) * deep + rain * 0.0012 * exp2(-0.03 * above);
         if d > 0.0 {
             let kept = exp(-d * step);
             let near_sun = smoothstep(MIST_NEAR_SUN.x, MIST_NEAR_SUN.y, t);
@@ -2415,7 +2443,7 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let ext = r_k + vec3(m_k);
         let a_kept = exp(-ext * step);
         let light = sun_air * lit * (ray_phase * r_k + vec3(mie_phase * m_k)) + amb_air * ext;
-        air += (light - light * a_kept) / max(ext, vec3(1e-9)) * air_through * through;
+        air += (light - light * a_kept) / max(ext, vec3(1e-9)) * air_through * through * on_sky;
         air_through *= dot(a_kept, vec3(0.33333));
     }
     return c * through + gained + air * (1.0 - 0.5 * rain);
