@@ -23,34 +23,61 @@ pub fn init(r: &mut Registry) {
     r.edit(&crate::wolf::WOLF).attach(&HOWLED);
     for s in &crate::species::SPECIES {
         let Some(v) = voices::of(s.name) else { continue };
-        let Some(f) = voices::family(v.family) else {
-            weft_sdk::error!("voice of {}: no family {}", s.name, v.family);
-            continue;
-        };
-        let kind = s.kind.path();
-        for (event, n) in [("hurt", f.hurt), ("death", f.death), ("ambient", f.ambient)] {
-            if n == 0 {
-                continue;
-            }
-            let files: Vec<String> = (1..=n)
-                .map(|i| format!("voice/{}/{event}{i}", f.name))
-                .collect();
-            let files: Vec<&str> = files.iter().map(String::as_str).collect();
-            r.sound(Sound::generated(format!("{kind}.{event}")))
-                .files(&files)
-                .category(&sound_categories::CREATURES)
-                .volume(f.volume)
-                .range(f.range)
-                .pitch(v.pitch * 0.92, v.pitch * 1.08)
-                .voices(AT_ONCE);
-        }
-        r.sounds_on_entities(&format!("animals:{kind}"), &format!("animals:{kind}"));
+        family_sounds(r, s.kind.path(), v.family, v.pitch);
     }
-    // The bosses' young have no species of their own yet: a deer's voice for Borkon's ibex kid and
-    // Drenkaun's calf till they get theirs (the testkit's `sound_coverage` found them silent).
-    for young in ["animals:borkon_kid", "animals:drenkaun_calf"] {
-        r.sounds_on_entities(young, "animals:reindeer");
+    // The bosses and their young have no species: their own families, as recorded.
+    for (kind, fam) in voices::YOUNG {
+        family_sounds(r, kind, fam, 1.0);
     }
+    for b in animals_core::bosses::BOSSES {
+        family_sounds(r, b.name, b.name, 1.0);
+    }
+    for (boss, event, n) in voices::BOSS_CALLS {
+        let Some(f) = voices::family(boss) else { continue };
+        sound(r, boss, event, f, n, 1.0);
+    }
+}
+
+/// `animals:<kind>.hurt|death|ambient` from `family`'s files, and the kind's sounds pointed at them.
+fn family_sounds(r: &mut Registry, kind: &str, family: &str, pitch: f32) {
+    let Some(f) = voices::family(family) else {
+        weft_sdk::error!("voice of {kind}: no family {family}");
+        return;
+    };
+    for (event, n) in [("hurt", f.hurt), ("death", f.death), ("ambient", f.ambient)] {
+        sound(r, kind, event, f, n, pitch);
+    }
+    r.sounds_on_entities(&format!("animals:{kind}"), &format!("animals:{kind}"));
+}
+
+/// `animals:<kind>.<event>`: `n` files `voice/<family>/<event>1..n` (none: silent).
+fn sound(r: &mut Registry, kind: &str, event: &str, f: &voices::Family, n: u32, pitch: f32) {
+    if n == 0 {
+        return;
+    }
+    let files: Vec<String> = (1..=n)
+        .map(|i| format!("voice/{}/{event}{i}", f.name))
+        .collect();
+    let files: Vec<&str> = files.iter().map(String::as_str).collect();
+    r.sound(Sound::generated(format!("{kind}.{event}")))
+        .files(&files)
+        .category(&sound_categories::CREATURES)
+        .volume(f.volume)
+        .range(f.range)
+        .pitch(pitch * 0.92, pitch * 1.08)
+        .voices(AT_ONCE);
+}
+
+/// A boss's own call (`voices::BOSS_CALLS`: summon, attack, stunned), where it stands.
+pub fn boss_call(w: &World, boss: &str, event: &str, at: [f64; 3]) {
+    static CALLS: std::sync::Mutex<Option<std::collections::HashMap<String, &'static Sound>>> = std::sync::Mutex::new(None);
+    let name = format!("{boss}.{event}");
+    let mut calls = CALLS.lock().unwrap();
+    let sound = *calls
+        .get_or_insert_with(Default::default)
+        .entry(name.clone())
+        .or_insert_with(|| Sound::generated(name));
+    w.play_sound(sound, Vec3::from(at), 1.0);
 }
 
 /// A goal for wolves (never taken, it only howls): a wild wolf howls once as a blood moon's
