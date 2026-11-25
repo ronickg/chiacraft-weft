@@ -275,6 +275,12 @@ fn pt_rand(px: vec2<f32>, salt: u32) -> vec2<f32> {
 // share of the block light that reaches the surface: shadows behind pillars and furniture.
 
 const PT_LIGHT_CANDIDATES: u32 = 8u;
+// Half the size of a torch's flame and glow, blocks: what its shadows soften by.
+const PT_FLAME: f32 = 0.2;
+// The share of the lightmap's block light a shadow takes away. The rest stays: the light's further
+// bounces, which the lightmap's spread stands for and one traced bounce leaves out (all of it taken,
+// a block's side away from the torch came out near black in a stone cave, w59).
+const PT_BLOCK_SHADOW: f32 = 0.7;
 
 // Where the lights reaching cube `c` are in `pt_lights` (start, count); count 0 when none do.
 fn pt_light_find(c: vec3<i32>) -> vec2<u32> {
@@ -330,7 +336,12 @@ fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: ve
         let w = level * f32(total);
         w_sum += w;
         if pt_rand(px, 17u + k * 2u).x * w_sum < w {
-            chosen = vec3<f32>(lp) + 0.5;
+            // A point on the light, a new one each frame (the denoiser averages them): a torch's
+            // flame (bit 30) a small box above its middle, a glowing block its whole. The shadow's
+            // edge softens with its distance from what casts it.
+            let small = ((l >> 30u) & 1u) == 1u;
+            let j = vec3(pt_rand(px, 40u + k).xy, pt_rand(px, 48u + k).x) * 2.0 - 1.0;
+            chosen = vec3<f32>(lp) + select(vec3(0.5) + j * 0.45, vec3(0.5, 0.6, 0.5) + j * PT_FLAME, small);
             own = all(lp == vec3<i32>(floor(world - ng * 0.5)));
             found = true;
         }
@@ -468,7 +479,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     var block_vis = vec2(1.0, 0.0);
     if max(block.r, max(block.g, block.b)) > 1e-4 {
         block_vis = pt_block_visibility(h.world, h.rel, ng, lift, px);
-        diffuse -= block * (1.0 - block_vis.x);
+        diffuse -= block * ((1.0 - block_vis.x) * PT_BLOCK_SHADOW);
     }
     // Into the cache: the indirect light found here (one pixel in four a frame).
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {

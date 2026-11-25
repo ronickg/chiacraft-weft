@@ -264,7 +264,8 @@ pub(super) fn pre_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[P
 /// table from a cube's coordinate to the lights that reach into it, then the lists. Words: [0] the
 /// table's slots (a power of two), [1] the lights listed; then 4 a slot (x, y, z, start | count <<
 /// 20; x `i32::MIN` empty); then the lights, each its place from the cube's corner plus 16 (6 bits
-/// an axis, the light may be in a cube next to it) and its light per channel (4 bits each).
+/// an axis, the light may be in a cube next to it), its light per channel (4 bits each) and bit 30
+/// when it is a small light (an entity's: a torch's flame), not a whole glowing block.
 ///
 /// A cube's list holds only lights whose level is left above 0 somewhere in it (the lightmap's
 /// falloff, a level a block), strongest there first, at most `LIGHTS_PER_CUBE`: drawing among all
@@ -313,7 +314,7 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
                 let level = e - (gap.x + gap.y + gap.z);
                 if level > 0 {
                     let o = (p - lo + IVec3::splat(16)).as_uvec3();
-                    near.push((level, o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18));
+                    near.push((level, o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18 | (w >> 24 & 1) << 30));
                 }
             }
         }
