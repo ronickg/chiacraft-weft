@@ -1088,10 +1088,8 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
         let sky = mix(0.6, 2.4, window) * mix(0.15, 1.0, brightness_curve(in.light.x));
         return WaterLit(underwater_color() * sky, vec3(0.0), 1.0);
     }
-    if (top && v.y <= 0.0) || in_liquid() {
-        let l = shade_soft_lit(in, albedo, far_soft(in));
-        return WaterLit(l.rgb, vec3(0.0), l.a);
-    }
+    // (Seen from under its top or from inside a liquid it is lit as glass: `water_plain`, in
+    // `translucent`, which shares the glass's one copy of the lighting.)
     var n = normalize(in.normal);
     var depth = 3.0;
     var shore = 1.0;
@@ -1499,34 +1497,59 @@ fn fs_cutout_fade(in: VOut) -> WorldOut {
     return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
 
-fn translucent(in: VOut) -> vec4<f32> {
+// A see-through face's picture, before it is lit.
+fn translucent_albedo(in: VOut) -> vec4<f32> {
     let du = dpdx(in.uv) * mip_scale();
     let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
-    // Water and glass each lit, then one haze for both (one copy of it in the shader, as for distant
-    // terrain in `lod_color`; Android port, 11-06). The same colours.
-    var pre: vec3<f32>;
-    var below = vec3(0.0);
-    var a: f32;
-    if in.kind.x == TINT_WATER {
-        let wl = water(in, albedo, true);
-        pre = wl.pre;
-        below = wl.below;
-        a = wl.a;
-    } else {
-        let l = shade_soft_lit(in, albedo, far_soft(in));
-        pre = l.rgb;
-        a = l.a;
-        // Glass with a material (the showcase's): what it mirrors isn't let through, so its share
-        // of the pixel grows by its Fresnel, the more the glossier (a clear pane mirrors the sky
-        // at a glancing look instead of fading with its alpha).
+    return with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+}
+// Water lit as glass is (`water`'s plain case): seen from under its top or with the eye in a liquid,
+// and not one of the faces `water` hides or shows from below.
+fn water_plain(in: VOut) -> bool {
+    let v = -normalize(in.rel);
+    if !CALM && in_water() && (abs(in.normal.y) <= 0.5 || v.y < 0.0) {
+        return false;
+    }
+    return (in.normal.y > 0.5 && v.y <= 0.0) || in_liquid();
+}
+// Glass (anything see-through but water, and `water_plain`'s water) lit: its colour before the
+// haze, and its alpha.
+fn glass_lit(in: VOut, albedo: vec4<f32>, glass: bool) -> vec4<f32> {
+    let l = shade_soft_lit(in, albedo, far_soft(in));
+    var a = l.a;
+    // Glass with a material (the showcase's): what it mirrors isn't let through, so its share
+    // of the pixel grows by its Fresnel, the more the glossier (a clear pane mirrors the sky
+    // at a glancing look instead of fading with its alpha).
+    if glass {
         let m = shade_mat(in, albedo.rgb);
         if m.has {
             let ndv = max(dot(normalize(in.normal), -normalize(in.rel)), 0.0);
             let f = luma(mat_fresnel(m.f0, ndv)) * (1.0 - clamp(m.rough * 1.6, 0.0, 0.85));
             a = a + (1.0 - a) * f;
         }
+    }
+    return vec4(l.rgb, a);
+}
+fn translucent(in: VOut) -> vec4<f32> {
+    let albedo = translucent_albedo(in);
+    // Water and glass each lit, then one haze for both (one copy of it in the shader, as for distant
+    // terrain in `lod_color`; Android port, 11-06). The same colours.
+    var pre: vec3<f32>;
+    var below = vec3(0.0);
+    var a: f32;
+    // (One copy of the glass's lighting for glass and `water_plain`'s water: two made the shader
+    // much slower to compile.)
+    let is_water = in.kind.x == TINT_WATER;
+    if is_water && !water_plain(in) {
+        let wl = water(in, albedo, true);
+        pre = wl.pre;
+        below = wl.below;
+        a = wl.a;
+    } else {
+        let g = glass_lit(in, albedo, !is_water);
+        pre = g.rgb;
+        a = g.a;
     }
     return vec4(below + display(haze_lit(pre, in.rel, in.light.x)), a);
 }
@@ -1544,6 +1567,16 @@ fn fs_translucent_fade(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     return translucent(in);
+}
+
+// A face's upper layers (a grass side's overlay; `mesher::UPPER`): what `fs_translucent` draws
+// for them, without its water. Water is one layer and a liquid, never an upper one, so the
+// picture is the same; the engine builds these pipelines apart from the translucent ones, and
+// with the water's code each took as long to compile (NVIDIA about 42 s each, 6 per pack load).
+@fragment
+fn fs_layers(in: VOut) -> @location(0) vec4<f32> {
+    let g = glass_lit(in, translucent_albedo(in), true);
+    return vec4(display(haze_lit(g.rgb, in.rel, in.light.x)), g.a);
 }
 
 // Distances (blocks) over which distant terrain's textures give way to their average color.
