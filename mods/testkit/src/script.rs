@@ -65,6 +65,12 @@
 //! players 2           # at least 2 players in the world (the host's view)
 //! ```
 //!
+//! Command levels: the `op` step, the `block` and `players` conditions and the `entities` step
+//! ask the server through `/tk` (level 2), and testkit's own client commands (`/compare`,
+//! `/probe`, `/tk_freeze`) are level 2 too. A script's player is the host, level 4, on a world
+//! with cheats on; on a world made with cheats off (level 0) or as a joiner that isn't an operator
+//! they're refused and the step fails. Joiners: `--config testkit:op_joiners=true` on the host.
+//!
 //! `/tk time <ticks>` sets the world's whole clock (day 0 + ticks), so it also undoes a `/season`
 //! before it: set the time first, then the season (or use `/time set`, which keeps the day).
 //!

@@ -289,13 +289,8 @@ impl Screen for Admission {
                                         "default",
                                     );
                                     if let Some(u) = b.until {
-                                        label(
-                                            ui,
-                                            cx,
-                                            "admission.screen.hours_left",
-                                            &[Arg::Int(u.saturating_sub(now).div_ceil(3600) as i64)],
-                                            "dim",
-                                        );
+                                        let (minutes, n) = adm::time_left(u.saturating_sub(now));
+                                        label(ui, cx, &adm::left_key("admission.screen.hours_left", minutes), &[Arg::Int(n)], "dim");
                                     }
                                 });
                                 let value = b.value.clone();

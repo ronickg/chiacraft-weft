@@ -963,6 +963,9 @@ pub struct Client {
     told_mining: Option<(u64, IVec3, crate::world::placement::Part)>,
     /// What the server says this player may do (`abi::permission`).
     pub permission: u32,
+    /// chiacraft: the world runs in this process, so this player is its owner (for offering the
+    /// owner's moderation commands, `server::OWNER_MODERATION`; the server decides).
+    pub local_host: bool,
     /// Seconds since it died, while it is.
     dead_for: Option<f32>,
     pub components: FxHashMap<u32, Vec<u8>>,
@@ -1329,6 +1332,7 @@ impl Client {
             moved_over: 0.0,
             dead: false,
             permission: 0,
+            local_host: false,
             fog: 0.0,
             wind: Vec2::ZERO,
             snow_cover: 0.0,

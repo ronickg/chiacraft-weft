@@ -523,7 +523,10 @@ fn ban_for(s: &mut Server, x: &Ctx, until: Option<u64>) -> Vec<Msg> {
     log::info!("{by} banned {name}{}", until.map_or(String::new(), |u| format!(" until {u}")));
     s.send_banned_away(x.c);
     match until {
-        Some(u) => say("banned_for_done", vec![text(&name), Arg::Int(u.saturating_sub(crate::saves::now_secs()).div_ceil(3600) as i64)]),
+        Some(u) => {
+            let (minutes, n) = adm::time_left(u.saturating_sub(crate::saves::now_secs()));
+            say(&adm::left_key("banned_for_done", minutes), vec![text(&name), Arg::Int(n)])
+        }
         None => say("banned_done", vec![text(&name)]),
     }
 }
