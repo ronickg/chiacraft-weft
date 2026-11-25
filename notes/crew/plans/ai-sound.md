@@ -186,3 +186,57 @@ Judged from the spectrograms only, these show clear calls:
 - Borkon 4
 
 The rest look like noise beds. Ronald picks by ear.
+
+## Ronald's answer and the full sets (2026-11-25)
+
+Ronald, after batch 1: "wow sounds sounds great pick whatever, guess we need multiple soudns for
+differnet actuatoins etc". Planner asked for full sets: the 8 creatures first, then every other species
+borrowing a voice.
+
+**Batch 1 picks** joined the ambient candidates:
+- kid 1-3, calf 1-2, raptor 1-2, reindeer 3
+- capybara 3-6, Drenkaun 4-6, Borkon 4
+
+**Events a creature can play** (from the code):
+- The engine plays every creature's `hurt`, `death` and `ambient` (about every 12 s).
+- The bosses now also call from `boss.rs`: `summon` as they rise at the altar, `attack` as each attack's wind-up starts, `stunned` when they run into a trunk.
+- There are no eating, alarm, fleeing or step events per species yet. Those are new code, for later.
+
+**New families** in `animals_core::voices`, made by AI:
+
+| family | used by | ambient | hurt | death | other calls |
+|---|---|---|---|---|---|
+| goat_kid | borkon_kid | 3 | 2 | 1 | |
+| calf | drenkaun_calf | 3 | 2 | 1 | |
+| horned_dino | the six plant-eating dinosaurs | 3 | 3 | 2 | |
+| raptor | raptor, osmolskae, utahraptor, citipati (replaces small_dino) | 3 | 3 | 2 | |
+| capybara | capybara | 3 | 2 | 1 | |
+| reindeer | reindeer | 3 | 2 | 1 | |
+| jaguar | jaguar (replaces big_cat) | 3 | 2 | 1 | |
+| eagle | golden eagle | 3 | 1 | 1 | |
+| snowy_owl | snowy owl | 3 | 1 | 1 | |
+| bunting | snow bunting | 3 | 1 | 1 | |
+| drenkaun | Drenkaun | 3 | 3 | 2 | summon 2, attack 3, stunned 2 |
+| borkon | Borkon | 3 | 3 | 2 | summon 2, attack 3, stunned 2 |
+
+The `hare` family's 3 files were replaced by AI rabbit screams. The `small_dino` and `big_cat` families
+are gone (unused). The crocodyliform keeps `bellow`.
+
+That makes 94 files, from 182 candidates. Each event got its variants plus two spare tries, all cut
+with `sfx.py`. A score picked the most call-like ones: shape × tonality × not filling the clip.
+On batch 1, noise beds scored under 0.2 and clear calls over 0.4. I then checked the picks on a
+spectrogram sheet.
+
+The weak-looking ones are marked on the page:
+- Drenkaun hurt 2-3
+- jaguar death
+- bunting ambient 3
+
+Hurt clips score low by design: a 0.8 s cry fills its clip.
+
+**Where everything is:**
+- Prompts, seeds and the licence: `mods/animals/assets/sounds/SOURCES.md`
+- All files: `~/Coding/chiacraft-archive/sounds/ai-sound/2026-11-25-sets/` (spec.py, pick.py, page.py, raw, cut, scores and picks)
+- Page: https://claude.ai/artifact/QQ73ToVGfBheAANZrth5m7
+
+**Check:** `mods/testkit/scripts/ai_voices.txt` covers a herd, a Drenkaun fight, and Borkon's summon.

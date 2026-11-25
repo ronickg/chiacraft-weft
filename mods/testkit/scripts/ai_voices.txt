@@ -1,0 +1,125 @@
+# The AI voices (notes/crew/plans/ai-sound.md, animals_core::voices): a herd of the newly voiced
+# animals calling, then a Drenkaun fight (summon roar, attack roars at each wind-up, hurt, a stun
+# groan if it runs into a trunk, death) and a Borkon summon. A script can't hear: read run.log's
+# `/sounds check` reply (no silent creatures, no events missing files) and every `/sounds recent`
+# reply (the last sounds started). Expect in them: animals:reindeer.ambient, capybara, raptor,
+# protoceratops, borkon_kid, drenkaun_calf, jaguar ambient calls during the herd waits;
+# animals:drenkaun.summon after the offering, drenkaun.attack while it fights, drenkaun.hurt on
+# the hits, drenkaun.death on the kill; animals:borkon.summon at the end. A tester with sound on
+# listens to the herd and the fight too (run with sound, not muted).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /weather clear 99999
+chat /sounds check
+chat /tk mode creative
+chat /tp 0.5 206 0.5
+wait 2
+loaded
+chat /tk fill -30 198 -30 30 198 30 stone
+chat /tk fill -30 199 -30 30 199 30 base:grass
+chat /tk fill -30 200 -30 30 212 30 core:air
+chat /tp 0.5 200 0.5
+wait 1
+loaded
+# the herd: the animals that got their own voices, in front of the player
+chat /tk spawn animals:reindeer ~-6 ~0 ~-8
+chat /tk spawn animals:reindeer ~-4 ~0 ~-9
+chat /tk spawn animals:capybara ~-2 ~0 ~-6
+chat /tk spawn animals:raptor ~0 ~0 ~-8
+chat /tk spawn animals:protoceratops ~2 ~0 ~-9
+chat /tk spawn animals:borkon_kid ~4 ~0 ~-6
+chat /tk spawn animals:drenkaun_calf ~6 ~0 ~-8
+chat /tk spawn animals:jaguar ~8 ~0 ~-10
+chat /tk spawn animals:snow_bunting ~-8 ~2 ~-6
+look 0 -10
+wait 15
+shot ai_voices_01_herd.png
+chat /sounds recent
+wait 15
+chat /sounds recent
+# the herd hurt: a sword through the near ones
+chat /tk mode survival
+chat /tk attr_mod me core:max_health testkit:hp core:add 300 0
+chat /gear sword diamond slot=1
+key 1
+chat /tp 0.5 200 -4.5
+look 0 -20
+press core:attack
+wait 0.7
+press core:attack
+wait 0.7
+chat /tp 4.5 200 -3.5
+press core:attack
+wait 0.7
+chat /sounds recent
+# Drenkaun: an altar among trunks (it is stunned running into one)
+chat /tk mode creative
+chat /tk fill -30 200 -30 30 212 30 core:air
+chat /tk fill 0 200 20 0 200 20 animals:drenkaun_altar
+chat /tk fill -4 200 16 -4 204 16 base:oak_log
+chat /tk fill 4 200 16 4 204 16 base:oak_log
+chat /tk fill -4 200 24 -4 204 24 base:oak_log
+chat /tk fill 4 200 24 4 204 24 base:oak_log
+chat /tp 0.5 200 22.5
+wait 1
+chat /tk mode survival
+chat /tk heal
+chat /tk put me 0 animals:forest_offering 4
+key 1
+look 0 -29
+wait 0.5
+press core:use
+wait 3
+chat /sounds recent
+shot ai_voices_02_drenkaun.png
+chat /gear sword diamond slot=2
+key 2
+chat /tp 0.5 200 22.5
+look 0 8
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk heal
+wait 6
+chat /sounds recent
+chat /drenkaun state
+chat /tk heal
+wait 6
+chat /sounds recent
+chat /drenkaun state
+chat /tk heal
+chat /drenkaun hurt 60
+wait 0.6
+chat /drenkaun hurt 60
+wait 0.6
+chat /sounds recent
+chat /drenkaun kill
+wait 2
+chat /sounds recent
+# Borkon's summon
+chat /tk mode creative
+chat /tk fill -30 200 -30 30 212 30 core:air
+chat /tk fill 0 200 -20 0 200 -20 animals:borkon_altar
+chat /tp 0.5 200 -17.5
+wait 1
+chat /tk mode survival
+chat /tk heal
+chat /tk put me 0 animals:mountain_offering 4
+key 1
+look 0 -29
+wait 0.5
+press core:use
+wait 3
+chat /sounds recent
+shot ai_voices_03_borkon.png
+wait 6
+chat /sounds recent
+chat /borkon kill
+wait 2
+chat /sounds recent
+quit
