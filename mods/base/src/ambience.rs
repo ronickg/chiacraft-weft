@@ -216,9 +216,8 @@ fn frame(c: &Client) {
     let here = c.view().component(&HERE).unwrap_or([0.0; 8]);
     let cover = crate::weather_sound::cover_now();
     // Deep under ground: no sky through any roof over the head.
-    let deep = cover.open < 0.05 && cover.roof == 0.0;
-    let heard = if deep { 0.0 } else { ws::THROUGH_WALLS + (1.0 - ws::THROUGH_WALLS) * cover.open };
-    let muffle = ws::muffle(cover.open);
+    let deep = ws::deep(cover);
+    let (heard, muffle) = ws::outdoors(cover);
     for t in &mut s.since {
         *t += dt;
     }
@@ -228,7 +227,9 @@ fn frame(c: &Client) {
         ((here[amb::BIRDS] + here[amb::DAWN] * 1.5).min(1.0)) * heard,
         here[6] * heard,
         here[7] * heard,
-        here[amb::SURF] * heard,
+        // Gulls call from ambient life's flock, where it flies (`mods/animals/src/ambient.rs`), and
+        // not at night; owls still call unseen from the wood as well as from the crossing owl.
+        0.0,
         here[amb::SWAMP] * heard,
         if deep { 1.0 } else { 0.0 },
         lava_pop,
