@@ -1,0 +1,249 @@
+# Block sounds batch 5 (notes/crew/plans/ai-sound.md, "Batch 5"; mods/base/src/sounds.rs, and
+# player.wade in player_sounds.rs). A script can't hear: read run.log's "sound files:" line and
+# `/sounds check` reply (no events missing files), and every `/sounds recent` reply. Expect, per
+# group (stone, wood, gravel, grass, sand, glass, cloth, dirt, snow, leaves, ice, metal, and mud's
+# one block, the dung pat, which has no strip): base:block.<g>.step walking its strip,
+# .place when placed, .hit while mining it by hand (.break when a soft one goes); at the end
+# base:player.wade walking in water one block deep. Yaw 0 faces -z: every walk goes -z.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /weather clear 99999
+chat /sounds check
+chat /tk mode creative
+chat /tp 0.5 206 0.5
+wait 2
+loaded
+chat /tk fill -30 199 -20 30 199 20 stone
+chat /tk fill -30 200 -20 30 215 20 core:air
+# stone
+chat /tk mode creative
+chat /tk fill -27 199 -8 -25 199 0 base:stone
+chat /tp -25.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:stone 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# wood
+chat /tk mode creative
+chat /tk fill -23 199 -8 -21 199 0 base:oak_planks
+chat /tp -21.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:oak_planks 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# gravel
+chat /tk mode creative
+chat /tk fill -19 199 -8 -17 199 0 base:gravel
+chat /tp -17.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:gravel 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# grass
+chat /tk mode creative
+chat /tk fill -15 199 -8 -13 199 0 base:grass
+chat /tp -13.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:grass 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# sand
+chat /tk mode creative
+chat /tk fill -11 199 -8 -9 199 0 base:sand
+chat /tp -9.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:sand 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# glass
+chat /tk mode creative
+chat /tk fill -7 199 -8 -5 199 0 base:glass
+chat /tp -5.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:glass 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# cloth
+chat /tk mode creative
+chat /tk fill -3 199 -8 -1 199 0 base:wool
+chat /tp -1.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:wool 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# dirt
+chat /tk mode creative
+chat /tk fill 1 199 -8 3 199 0 base:dirt
+chat /tp 2.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:dirt 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# snow
+chat /tk mode creative
+chat /tk fill 5 199 -8 7 199 0 base:snowy_grass
+chat /tp 6.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:snowy_grass 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# leaves
+chat /tk mode creative
+chat /tk fill 9 199 -8 11 199 0 base:oak_leaves
+chat /tp 10.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:oak_leaves 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# ice
+chat /tk mode creative
+chat /tk fill 13 199 -8 15 199 0 base:ice
+chat /tp 14.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:ice 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# metal
+chat /tk mode creative
+chat /tk fill 17 199 -8 19 199 0 base:iron_block
+chat /tp 18.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:iron_block 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# mud
+chat /tk mode creative
+chat /tp 22.5 200 0.5
+wait 0.5
+look 0 0
+hold core:forward 1.5
+chat /tk put me 0 base:dung_pat 2
+key 1
+look 0 -60
+press core:use
+wait 0.4
+chat /tk mode survival
+key 9
+hold core:attack 2.5
+wait 0.3
+chat /sounds recent
+# wading: water one block deep over sand, walked across
+chat /tk mode creative
+chat /tk fill -3 198 4 3 198 16 base:sand
+chat /tk fill -3 199 4 3 199 16 base:water
+chat /tp 0.5 199 15.5
+wait 1
+look 0 0
+hold core:forward 4
+chat /sounds recent
+quit

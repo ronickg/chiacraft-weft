@@ -1,6 +1,6 @@
 # Where base's sounds come from
 
-All the files listed here are **CC0** (public domain dedication): no attribution needed; all but the AI-made player and use sounds at the end, which have their own licence. They are
+All the files listed here are **CC0** (public domain dedication): no attribution needed; all but the AI-made sounds in the last two sections, which have their own licence. They are
 credited anyway, so anyone can find the originals. The downloads are kept in
 `~/Coding/chiacraft-archive/references/sound/` (`kenney/`, `freesound/`). Prepared 2026-11-04 by
 the Researcher with `reports/sound-files/sfx.py`, which does the following:
@@ -259,3 +259,185 @@ they play: `src/player_sounds.rs`.
 | `use/inventory_close1` | "leather bag closing, soft rustle, longer and lower, close, dry, no background noise, no music" | 9133 | -24.0 / -6.5 |
 | `use/inventory_close2` | "leather bag closing, soft rustle, close, dry, no background noise, no music" | 9131 | -24.0 / -7.8 |
 | `use/inventory_close3` | "leather bag closing, soft rustle, louder and more intense, close, dry, no background noise, no music" | 9134 | -24.0 / -3.9 |
+
+## Block steps, digs, place and hit, wading (`step/`, `dig/`, `place/`, `hit/`): AI-made
+
+Not CC0. Made 2026-11-25 with the same model, licence and approval as the section above (the
+sound audit's third item: water steps and wading, more variants per block group, each group's own
+place and hit). Per group: steps and digs 4-6 (1-3 are the free packs' above), place 1-3 and hit
+1-3 (both used to be the dig and step files pitched down); `step/water1-5` are wading steps.
+
+Each event got its variants plus three spare candidates, worded a little differently, cut
+(`reports/sound-files/sfx.py`, copy mode), scored by a clean hit over a quiet floor (new steps
+and digs also by how like the group's old three they are, so a set stays one material) and kept
+only when unlike the ones already kept. These clips are shorter than 0.4 s, where integrated
+loudness is not defined (it gates to -inf, as the old files do), so each was levelled by its
+loudest 50 ms to the old files of its group: new steps and digs to that group's, place to its
+dig, hit to its step (played at 0.6, as before), wading to the steps' mean; true peak at most
+-1 dBTP. A few loud digs and places stay 2-4 dB under their target, held by the peak limit (the
+old files are peakier). Prompts end in ", close, dry, no background noise, no music". Work files:
+`~/Coding/chiacraft-archive/sounds/ai-sound/2026-11-25-blocks/`.
+
+| File | Prompt | Seed | Loudest 50 ms dB (target) / dBTP |
+|---|---|---|---|
+| `step/stone4.ogg` | single footstep on stone | 12001 | -26.7 (-26.7) / -15.9 |
+| `step/stone5.ogg` | single footstep on stone, heavier | 12003 | -26.7 (-26.7) / -16.4 |
+| `step/stone6.ogg` | boot step on stone, short and sharp | 12002 | -26.7 (-26.7) / -15.3 |
+| `dig/stone4.ogg` | breaking a block of stone, single hit, muffled | 12012 | -14.1 (-11.9) / -2.1 |
+| `dig/stone5.ogg` | breaking a block of stone, single hit, short and sharp | 12008 | -14.6 (-11.9) / -1.8 |
+| `dig/stone6.ogg` | digging and scraping stone with a tool, single | 12007 | -15.1 (-11.9) / -1.6 |
+| `place/stone1.ogg` | placing a block of stone down, single solid thud | 12013 | -12.2 (-11.9) / -2.0 |
+| `place/stone2.ogg` | setting a stone block in place, short, muffled | 12018 | -12.7 (-11.9) / -2.1 |
+| `place/stone3.ogg` | setting a stone block in place, short, short and sharp | 12014 | -15.1 (-11.9) / -2.0 |
+| `hit/stone1.ogg` | tapping stone with a pickaxe, single light knock, crisp | 12023 | -26.7 (-26.7) / -13.3 |
+| `hit/stone2.ogg` | striking stone with a tool, short hit, short and sharp | 12020 | -26.7 (-26.7) / -12.2 |
+| `hit/stone3.ogg` | tapping stone with a pickaxe, single light knock, heavier | 12021 | -26.7 (-26.7) / -13.3 |
+| `step/wood4.ogg` | boot step on wooden planks, lighter and softer | 12028 | -21.2 (-21.1) / -10.2 |
+| `step/wood5.ogg` | boot step on wooden planks, muffled | 12030 | -21.2 (-21.1) / -11.1 |
+| `step/wood6.ogg` | single footstep on wooden planks | 12025 | -21.1 (-21.1) / -10.4 |
+| `dig/wood4.ogg` | breaking a block of wooden planks, single hit, muffled | 12036 | -16.5 (-16.5) / -6.3 |
+| `dig/wood5.ogg` | breaking a block of wooden planks, single hit, lighter and softer | 12034 | -16.6 (-16.5) / -2.0 |
+| `dig/wood6.ogg` | digging and scraping wooden planks with a tool, single, crisp | 12035 | -16.5 (-16.5) / -4.8 |
+| `place/wood1.ogg` | setting a wooden planks block in place, short, muffled | 12042 | -16.5 (-16.5) / -3.7 |
+| `place/wood2.ogg` | setting a wooden planks block in place, short, short and sharp | 12038 | -16.5 (-16.5) / -2.7 |
+| `place/wood3.ogg` | placing a block of wooden planks down, single solid thud | 12037 | -16.5 (-16.5) / -6.2 |
+| `hit/wood1.ogg` | tapping wooden planks with a pickaxe, single light knock | 12043 | -21.2 (-21.1) / -6.1 |
+| `hit/wood2.ogg` | tapping wooden planks with a pickaxe, single light knock, crisp | 12047 | -21.2 (-21.1) / -6.5 |
+| `hit/wood3.ogg` | striking wooden planks with a tool, short hit, lighter and softer | 12046 | -21.2 (-21.1) / -4.9 |
+| `step/gravel4.ogg` | single footstep on gravel, heavier | 12051 | -25.9 (-25.9) / -17.0 |
+| `step/gravel5.ogg` | boot step on gravel, lighter and softer | 12052 | -25.9 (-25.9) / -15.2 |
+| `step/gravel6.ogg` | boot step on gravel, muffled | 12054 | -25.9 (-25.9) / -16.1 |
+| `dig/gravel4.ogg` | breaking a block of gravel, single hit, short and sharp | 12056 | -16.6 (-12.2) / -2.0 |
+| `dig/gravel5.ogg` | breaking a block of gravel, single hit, muffled | 12060 | -14.5 (-12.2) / -1.8 |
+| `dig/gravel6.ogg` | digging and scraping gravel with a tool, single, crisp | 12059 | -14.0 (-12.2) / -1.5 |
+| `place/gravel1.ogg` | placing a block of gravel down, single solid thud | 12061 | -12.7 (-12.2) / -2.1 |
+| `place/gravel2.ogg` | placing a block of gravel down, single solid thud, crisp | 12065 | -13.2 (-12.2) / -1.9 |
+| `place/gravel3.ogg` | placing a block of gravel down, single solid thud, heavier | 12063 | -13.9 (-12.2) / -2.1 |
+| `hit/gravel1.ogg` | striking gravel with a tool, short hit, muffled | 12072 | -25.9 (-25.9) / -11.2 |
+| `hit/gravel2.ogg` | striking gravel with a tool, short hit, lighter and softer | 12070 | -25.9 (-25.9) / -11.1 |
+| `hit/gravel3.ogg` | tapping gravel with a pickaxe, single light knock, crisp | 12071 | -25.9 (-25.9) / -8.8 |
+| `step/grass4.ogg` | boot step on grass, muffled | 12078 | -26.8 (-26.8) / -16.5 |
+| `step/grass5.ogg` | boot step on grass, short and sharp | 12074 | -26.8 (-26.8) / -12.9 |
+| `step/grass6.ogg` | boot step on grass, lighter and softer | 12076 | -26.7 (-26.8) / -16.8 |
+| `dig/grass4.ogg` | breaking a block of grass, single hit, muffled | 12084 | -13.9 (-13.0) / -2.0 |
+| `dig/grass5.ogg` | breaking a block of grass, single hit, short and sharp | 12080 | -15.5 (-13.0) / -1.6 |
+| `dig/grass6.ogg` | breaking a block of grass, single hit, lighter and softer | 12082 | -15.0 (-13.0) / -1.8 |
+| `place/grass1.ogg` | setting a grass block in place, short, short and sharp | 12086 | -15.1 (-13.0) / -2.0 |
+| `place/grass2.ogg` | setting a grass block in place, short, muffled | 12090 | -13.1 (-13.0) / -2.0 |
+| `place/grass3.ogg` | placing a block of grass down, single solid thud, crisp | 12089 | -13.0 (-13.0) / -4.0 |
+| `hit/grass1.ogg` | tapping grass with a pickaxe, single light knock, heavier | 12093 | -26.8 (-26.8) / -14.9 |
+| `hit/grass2.ogg` | tapping grass with a pickaxe, single light knock | 12091 | -26.8 (-26.8) / -14.6 |
+| `hit/grass3.ogg` | tapping grass with a pickaxe, single light knock, crisp | 12095 | -26.8 (-26.8) / -14.4 |
+| `step/sand4.ogg` | boot step on sand, muffled | 12102 | -23.0 (-23.0) / -14.3 |
+| `step/sand5.ogg` | single footstep on sand | 12097 | -23.0 (-23.0) / -7.8 |
+| `step/sand6.ogg` | boot step on sand, short and sharp | 12098 | -23.0 (-23.0) / -10.2 |
+| `dig/sand4.ogg` | breaking a block of sand, single hit, muffled | 12108 | -18.5 (-18.5) / -7.4 |
+| `dig/sand5.ogg` | breaking a block of sand, single hit, short and sharp | 12104 | -18.5 (-18.5) / -5.5 |
+| `dig/sand6.ogg` | breaking a block of sand, single hit, lighter and softer | 12106 | -18.5 (-18.5) / -3.4 |
+| `place/sand1.ogg` | setting a sand block in place, short, short and sharp | 12110 | -18.5 (-18.5) / -4.7 |
+| `place/sand2.ogg` | placing a block of sand down, single solid thud | 12109 | -18.5 (-18.5) / -6.9 |
+| `place/sand3.ogg` | placing a block of sand down, single solid thud, crisp | 12113 | -18.5 (-18.5) / -7.5 |
+| `hit/sand1.ogg` | tapping sand with a pickaxe, single light knock, crisp | 12119 | -23.0 (-23.0) / -9.2 |
+| `hit/sand2.ogg` | tapping sand with a pickaxe, single light knock | 12115 | -23.0 (-23.0) / -9.7 |
+| `hit/sand3.ogg` | striking sand with a tool, short hit, short and sharp | 12116 | -23.0 (-23.0) / -8.4 |
+| `step/glass4.ogg` | boot step on glass, lighter and softer | 12124 | -26.5 (-26.4) / -11.9 |
+| `step/glass5.ogg` | boot step on glass, muffled | 12126 | -26.5 (-26.4) / -17.7 |
+| `step/glass6.ogg` | single footstep on glass, heavier | 12123 | -26.4 (-26.4) / -16.5 |
+| `dig/glass4.ogg` | breaking a block of glass, single hit, short and sharp | 12128 | -17.5 (-17.5) / -3.4 |
+| `dig/glass5.ogg` | breaking a block of glass, single hit, muffled | 12132 | -17.5 (-17.5) / -6.7 |
+| `dig/glass6.ogg` | breaking a block of glass, single hit, lighter and softer | 12130 | -17.5 (-17.5) / -3.3 |
+| `place/glass1.ogg` | placing a block of glass down, single solid thud | 12133 | -17.4 (-17.5) / -4.8 |
+| `place/glass2.ogg` | setting a glass block in place, short, muffled | 12138 | -17.5 (-17.5) / -4.7 |
+| `place/glass3.ogg` | placing a block of glass down, single solid thud, crisp | 12137 | -17.5 (-17.5) / -4.5 |
+| `hit/glass1.ogg` | striking glass with a tool, short hit, short and sharp | 12140 | -26.4 (-26.4) / -16.2 |
+| `hit/glass2.ogg` | striking glass with a tool, short hit, muffled | 12144 | -26.4 (-26.4) / -17.1 |
+| `hit/glass3.ogg` | striking glass with a tool, short hit, lighter and softer | 12142 | -26.4 (-26.4) / -12.1 |
+| `step/cloth4.ogg` | boot step on wool cloth, muffled | 12150 | -26.1 (-26.1) / -16.1 |
+| `step/cloth5.ogg` | single footstep on wool cloth, heavier | 12147 | -26.1 (-26.1) / -18.6 |
+| `step/cloth6.ogg` | boot step on wool cloth, lighter and softer | 12148 | -26.1 (-26.1) / -16.8 |
+| `dig/cloth4.ogg` | breaking a block of wool cloth, single hit, muffled | 12156 | -12.9 (-11.9) / -2.0 |
+| `dig/cloth5.ogg` | breaking a block of wool cloth, single hit, short and sharp | 12152 | -13.7 (-11.9) / -1.9 |
+| `dig/cloth6.ogg` | breaking a block of wool cloth, single hit, lighter and softer | 12154 | -17.6 (-11.9) / -1.8 |
+| `place/cloth1.ogg` | placing a block of wool cloth down, single solid thud | 12157 | -12.2 (-11.9) / -2.0 |
+| `place/cloth2.ogg` | placing a block of wool cloth down, single solid thud, heavier | 12159 | -11.9 (-11.9) / -3.3 |
+| `place/cloth3.ogg` | placing a block of wool cloth down, single solid thud, crisp | 12161 | -12.4 (-11.9) / -2.1 |
+| `hit/cloth1.ogg` | striking wool cloth with a tool, short hit, muffled | 12168 | -26.1 (-26.1) / -16.1 |
+| `hit/cloth2.ogg` | striking wool cloth with a tool, short hit, short and sharp | 12164 | -26.2 (-26.1) / -16.5 |
+| `hit/cloth3.ogg` | striking wool cloth with a tool, short hit, lighter and softer | 12166 | -26.2 (-26.1) / -14.2 |
+| `step/dirt4.ogg` | boot step on dirt soil, lighter and softer | 12172 | -27.4 (-27.5) / -17.7 |
+| `step/dirt5.ogg` | boot step on dirt soil, muffled | 12174 | -27.5 (-27.5) / -20.1 |
+| `step/dirt6.ogg` | boot step on dirt soil, short and sharp | 12170 | -27.5 (-27.5) / -17.1 |
+| `dig/dirt4.ogg` | breaking a block of dirt soil, single hit, lighter and softer | 12178 | -12.9 (-12.9) / -2.9 |
+| `dig/dirt5.ogg` | breaking a block of dirt soil, single hit, muffled | 12180 | -13.8 (-12.9) / -2.0 |
+| `dig/dirt6.ogg` | breaking a block of dirt soil, single hit, short and sharp | 12176 | -14.8 (-12.9) / -2.0 |
+| `place/dirt1.ogg` | placing a block of dirt soil down, single solid thud, heavier | 12183 | -12.9 (-12.9) / -5.3 |
+| `place/dirt2.ogg` | setting a dirt soil block in place, short, lighter and softer | 12184 | -16.2 (-12.9) / -1.9 |
+| `place/dirt3.ogg` | placing a block of dirt soil down, single solid thud | 12181 | -12.9 (-12.9) / -4.0 |
+| `hit/dirt1.ogg` | tapping dirt soil with a pickaxe, single light knock, crisp | 12191 | -27.5 (-27.5) / -16.3 |
+| `hit/dirt2.ogg` | tapping dirt soil with a pickaxe, single light knock | 12187 | -27.5 (-27.5) / -16.3 |
+| `hit/dirt3.ogg` | striking dirt soil with a tool, short hit, muffled | 12192 | -27.5 (-27.5) / -18.4 |
+| `step/snow4.ogg` | boot step on fresh snow, muffled | 12198 | -21.9 (-22.0) / -10.9 |
+| `step/snow5.ogg` | boot step on fresh snow, lighter and softer | 12196 | -22.0 (-22.0) / -11.5 |
+| `step/snow6.ogg` | boot step on fresh snow, short and sharp | 12194 | -22.0 (-22.0) / -9.5 |
+| `dig/snow4.ogg` | breaking a block of fresh snow, single hit, lighter and softer | 12202 | -20.7 (-20.7) / -5.9 |
+| `dig/snow5.ogg` | breaking a block of fresh snow, single hit, muffled | 12204 | -20.7 (-20.7) / -7.9 |
+| `dig/snow6.ogg` | breaking a block of fresh snow, single hit, short and sharp | 12200 | -20.7 (-20.7) / -4.3 |
+| `place/snow1.ogg` | placing a block of fresh snow down, single solid thud | 12205 | -20.7 (-20.7) / -11.3 |
+| `place/snow2.ogg` | placing a block of fresh snow down, single solid thud, heavier | 12207 | -20.7 (-20.7) / -9.9 |
+| `place/snow3.ogg` | placing a block of fresh snow down, single solid thud, crisp | 12209 | -20.7 (-20.7) / -12.0 |
+| `hit/snow1.ogg` | striking fresh snow with a tool, short hit, lighter and softer | 12214 | -22.0 (-22.0) / -13.0 |
+| `hit/snow2.ogg` | tapping fresh snow with a pickaxe, single light knock, crisp | 12215 | -22.0 (-22.0) / -8.3 |
+| `hit/snow3.ogg` | tapping fresh snow with a pickaxe, single light knock, heavier | 12213 | -22.0 (-22.0) / -8.8 |
+| `step/leaves4.ogg` | boot step on dry leaves, lighter and softer | 12220 | -28.9 (-28.8) / -16.4 |
+| `step/leaves5.ogg` | single footstep on dry leaves, heavier | 12219 | -28.9 (-28.8) / -14.7 |
+| `step/leaves6.ogg` | boot step on dry leaves, muffled | 12222 | -28.8 (-28.8) / -15.7 |
+| `dig/leaves4.ogg` | digging and scraping dry leaves with a tool, single | 12223 | -20.1 (-20.1) / -9.3 |
+| `dig/leaves5.ogg` | digging and scraping dry leaves with a tool, single, heavier | 12225 | -20.1 (-20.1) / -9.8 |
+| `dig/leaves6.ogg` | breaking a block of dry leaves, single hit, short and sharp | 12224 | -20.1 (-20.1) / -6.1 |
+| `place/leaves1.ogg` | placing a block of dry leaves down, single solid thud | 12229 | -20.1 (-20.1) / -7.4 |
+| `place/leaves2.ogg` | placing a block of dry leaves down, single solid thud, heavier | 12231 | -20.0 (-20.1) / -7.3 |
+| `place/leaves3.ogg` | setting a dry leaves block in place, short, lighter and softer | 12232 | -20.0 (-20.1) / -6.1 |
+| `hit/leaves1.ogg` | tapping dry leaves with a pickaxe, single light knock, crisp | 12239 | -28.8 (-28.8) / -13.6 |
+| `hit/leaves2.ogg` | striking dry leaves with a tool, short hit, short and sharp | 12236 | -28.8 (-28.8) / -17.3 |
+| `hit/leaves3.ogg` | striking dry leaves with a tool, short hit, lighter and softer | 12238 | -28.9 (-28.8) / -16.1 |
+| `step/ice4.ogg` | boot step on ice, muffled | 12246 | -25.6 (-25.6) / -18.8 |
+| `step/ice5.ogg` | single footstep on ice | 12241 | -25.5 (-25.6) / -16.4 |
+| `step/ice6.ogg` | single footstep on ice, heavier | 12243 | -25.6 (-25.6) / -18.2 |
+| `dig/ice4.ogg` | breaking a block of ice, single hit, muffled | 12252 | -19.4 (-19.4) / -5.5 |
+| `dig/ice5.ogg` | breaking a block of ice, single hit, short and sharp | 12248 | -19.4 (-19.4) / -5.5 |
+| `dig/ice6.ogg` | breaking a block of ice, single hit, lighter and softer | 12250 | -19.4 (-19.4) / -4.2 |
+| `place/ice1.ogg` | placing a block of ice down, single solid thud, crisp | 12257 | -19.4 (-19.4) / -8.1 |
+| `place/ice2.ogg` | placing a block of ice down, single solid thud | 12253 | -19.4 (-19.4) / -8.1 |
+| `place/ice3.ogg` | placing a block of ice down, single solid thud, heavier | 12255 | -19.4 (-19.4) / -7.5 |
+| `hit/ice1.ogg` | tapping ice with a pickaxe, single light knock, crisp | 12263 | -25.6 (-25.6) / -11.3 |
+| `hit/ice2.ogg` | striking ice with a tool, short hit, lighter and softer | 12262 | -25.5 (-25.6) / -12.5 |
+| `hit/ice3.ogg` | striking ice with a tool, short hit, short and sharp | 12260 | -25.6 (-25.6) / -10.0 |
+| `step/mud4.ogg` | boot step on wet mud, lighter and softer | 12268 | -21.9 (-21.9) / -10.0 |
+| `step/mud5.ogg` | boot step on wet mud, short and sharp | 12266 | -22.0 (-21.9) / -12.2 |
+| `step/mud6.ogg` | boot step on wet mud, muffled | 12270 | -21.9 (-21.9) / -7.7 |
+| `dig/mud4.ogg` | breaking a block of wet mud, single hit, muffled | 12276 | -23.5 (-23.5) / -8.6 |
+| `dig/mud5.ogg` | breaking a block of wet mud, single hit, lighter and softer | 12274 | -23.5 (-23.5) / -8.7 |
+| `dig/mud6.ogg` | breaking a block of wet mud, single hit, short and sharp | 12272 | -23.4 (-23.5) / -9.0 |
+| `place/mud1.ogg` | setting a wet mud block in place, short, short and sharp | 12278 | -23.5 (-23.5) / -14.4 |
+| `place/mud2.ogg` | placing a block of wet mud down, single solid thud | 12277 | -23.5 (-23.5) / -14.6 |
+| `place/mud3.ogg` | placing a block of wet mud down, single solid thud, heavier | 12279 | -23.4 (-23.5) / -13.8 |
+| `hit/mud1.ogg` | tapping wet mud with a pickaxe, single light knock, heavier | 12285 | -21.9 (-21.9) / -7.0 |
+| `hit/mud2.ogg` | tapping wet mud with a pickaxe, single light knock, crisp | 12287 | -21.9 (-21.9) / -7.3 |
+| `hit/mud3.ogg` | tapping wet mud with a pickaxe, single light knock | 12283 | -21.9 (-21.9) / -7.8 |
+| `step/metal4.ogg` | boot step on iron metal, lighter and softer | 12292 | -24.2 (-24.2) / -12.3 |
+| `step/metal5.ogg` | boot step on iron metal, muffled | 12294 | -24.2 (-24.2) / -12.7 |
+| `step/metal6.ogg` | single footstep on iron metal, crisp | 12293 | -24.2 (-24.2) / -10.6 |
+| `dig/metal4.ogg` | breaking a block of iron metal, single hit, short and sharp | 12296 | -19.5 (-19.5) / -4.4 |
+| `dig/metal5.ogg` | breaking a block of iron metal, single hit, muffled | 12300 | -19.5 (-19.5) / -4.6 |
+| `dig/metal6.ogg` | breaking a block of iron metal, single hit, lighter and softer | 12298 | -19.5 (-19.5) / -2.8 |
+| `place/metal1.ogg` | placing a block of iron metal down, single solid thud, crisp | 12305 | -19.5 (-19.5) / -6.7 |
+| `place/metal2.ogg` | placing a block of iron metal down, single solid thud | 12301 | -19.5 (-19.5) / -7.8 |
+| `place/metal3.ogg` | setting a iron metal block in place, short, short and sharp | 12302 | -19.5 (-19.5) / -4.9 |
+| `hit/metal1.ogg` | tapping iron metal with a pickaxe, single light knock | 12307 | -24.2 (-24.2) / -8.7 |
+| `hit/metal2.ogg` | tapping iron metal with a pickaxe, single light knock, heavier | 12309 | -24.2 (-24.2) / -12.6 |
+| `hit/metal3.ogg` | tapping iron metal with a pickaxe, single light knock, crisp | 12311 | -24.2 (-24.2) / -8.0 |
+| `step/water1.ogg` | walking step in ankle deep water, muffled | 12318 | -25.2 (-25.1) / -11.9 |
+| `step/water2.ogg` | walking step in ankle deep water, lighter and softer | 12316 | -25.0 (-25.1) / -12.3 |
+| `step/water3.ogg` | single footstep wading through shallow water, splash, crisp | 12317 | -25.1 (-25.1) / -11.8 |
+| `step/water4.ogg` | single footstep wading through shallow water, splash | 12319 | -25.1 (-25.1) / -12.9 |
+| `step/water5.ogg` | single footstep wading through shallow water, splash, heavier | 12315 | -25.1 (-25.1) / -12.1 |

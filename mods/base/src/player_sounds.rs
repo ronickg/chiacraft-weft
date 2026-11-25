@@ -7,7 +7,7 @@
 //! - The player's kind takes `base:player.hurt|death` (the engine plays them); a fall's hurt adds
 //!   a heavy landing, drowning's a burst of bubbles.
 //! - Eating chews while the food is held to the mouth and ends in a small burp; stew is drunk.
-//! - Into water a splash, swimming a stroke now and then, up from a long dive a gasp; a jump or
+//! - Into water a splash, wading a sloshing step, swimming a stroke now and then, up from a long dive a gasp; a jump or
 //!   a short drop lands with a thud (a long one hurts instead).
 //! - A swing of the hand or a tool; a tool used up snaps; a bow creaks as it is drawn and twangs
 //!   as it shoots; armour put on buckles.
@@ -43,20 +43,21 @@ sounds!(
     BOW_SHOOT "player.bow_shoot", ARMOUR "player.armour", DOOR_OPEN "use.door_open", DOOR_CLOSE "use.door_close",
     CHEST_OPEN "use.chest_open", CHEST_CLOSE "use.chest_close", CRAFT "use.craft", FURNACE_OPEN "use.furnace_open",
     UI_OPEN "use.inventory_open", UI_CLOSE "use.inventory_close", FIRE "use.fire", TORCH "use.torch",
-    FURNACE_FIRE "use.furnace_fire",
+    FURNACE_FIRE "use.furnace_fire", WADE "player.wade",
 );
 
 const fn set(sound: &'static Sound, files: &'static str, n: u32, players: bool, volume: f32, pitch: (f32, f32), range: f32) -> Set {
     Set { sound, files, n, players, volume, pitch, range }
 }
 
-const SETS: [Set; 27] = [
+const SETS: [Set; 28] = [
     set(&HURT, "player/hurt", 4, true, 1.0, (0.9, 1.1), 16.0),
     set(&DEATH, "player/death", 2, true, 1.0, (0.95, 1.05), 24.0),
     set(&EAT, "player/eat", 3, true, 0.6, (0.85, 1.15), 12.0),
     set(&BURP, "player/burp", 1, true, 0.5, (0.9, 1.1), 12.0),
     set(&DRINK, "player/drink", 3, true, 0.6, (0.9, 1.1), 12.0),
     set(&SWIM, "player/swim", 4, true, 0.5, (0.85, 1.15), 16.0),
+    set(&WADE, "step/water", 5, true, 0.6, (0.9, 1.1), 12.0),
     set(&SPLASH, "player/splash", 3, true, 0.9, (0.9, 1.1), 24.0),
     set(&LAND, "player/land", 3, true, 0.5, (0.9, 1.1), 12.0),
     set(&FALL, "player/fall", 3, true, 1.0, (0.9, 1.1), 16.0),
@@ -86,6 +87,9 @@ static BOW: Item = Item::named("base:bow");
 /// A swim stroke every this many ticks while moving in water; chewing every this many while
 /// eating, after the first bite.
 const STROKE_TICKS: u32 = 16;
+/// A wading step every this many ticks while walking with the feet in water (the block steps
+/// are every 0.4 s or so at a walk).
+const WADE_TICKS: u32 = 8;
 const CHEW_TICKS: u32 = 5;
 /// A drop of this many blocks lands with a thud; from `HURTS` the fall's hurt sounds instead.
 const LANDS: f32 = 1.2;
@@ -204,15 +208,16 @@ fn tick(w: &World) {
         let Some(st) = w.entity(p) else { continue };
         let was = all.entry(p).or_insert_with(|| Was { on_ground: true, ..Was::default() });
         let (in_liquid, on_ground) = (st.in_liquid != 0, st.on_ground != 0);
-        // Water: a splash going in fast, strokes while swimming, a gasp up from a long dive.
+        // Water: a splash going in fast, steps while wading, strokes while swimming, a gasp up
+        // from a long dive.
         if in_liquid && !was.in_liquid && was.vy < -SPLASHES {
             w.play_sound(&SPLASH, st.pos, 1.0);
         }
         let moving = st.vel.x * st.vel.x + st.vel.z * st.vel.z > 0.002;
-        was.stroke = if in_liquid && !on_ground && moving { was.stroke + 1 } else { 0 };
-        if was.stroke >= STROKE_TICKS {
+        was.stroke = if in_liquid && moving { was.stroke + 1 } else { 0 };
+        if was.stroke >= if on_ground { WADE_TICKS } else { STROKE_TICKS } {
             was.stroke = 0;
-            w.play_sound(&SWIM, st.pos, 1.0);
+            w.play_sound(if on_ground { &WADE } else { &SWIM }, st.pos, 1.0);
         }
         let under = crate::survival::breath::underwater(w, &st);
         if !under && was.under >= GASPS {
