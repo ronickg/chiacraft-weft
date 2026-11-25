@@ -294,6 +294,11 @@ pub fn act(w: &World, id: u64, a: Act) {
 /// roar), as `act`.
 pub fn play(w: &World, id: u64, clip: &str, secs: f32) {
     let Some(h) = w.component(id, &HELD) else { return };
+    // A bird in the air is its flying look, which has its wingbeat only (cov_birds: 13 "no clip
+    // for action" of groom, alarm, look... on the `_fly` models).
+    if crate::birds::flying(w, id) {
+        return;
+    }
     log(id, "plays", clip);
     w.action_play(id, clip, false);
     let busy = w.game_time() + (secs * 20.0).ceil() as u64;

@@ -273,6 +273,11 @@ fn scent(w: &World, id: u64, st: &EntityState) -> Option<[f64; 3]> {
     (dist2(at, st.pos) > crate::forage::ITEM_LOOK * crate::forage::ITEM_LOOK).then_some(at)
 }
 
+/// Whether `id` is a bird in the air (drawn as its flying look).
+pub fn flying(w: &World, id: u64) -> bool {
+    w.component(id, &STATE).is_some_and(|f| f.flying)
+}
+
 fn set(w: &World, id: u64, f: Flight) {
     if let Some(c) = w.component_mut(id, &STATE) {
         *c = f;
