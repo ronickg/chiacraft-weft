@@ -25,6 +25,9 @@ chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
 chat /tk fill -4 70 528 4 70 536 core:air
 chat /tk fill -2 68 530 2 68 534 base:dirt
 chat /tk fill -2 69 530 2 69 534 base:water
+# The rest as a spectator, whom animals don't notice: tp'd beside the wolves to set their food, the player set off
+# an alarm and the pack scattered, its second hungry wolf 45 blocks off on its own all run (wolvesPack3, wolvesPack4).
+chat /tk mode spectator
 wait 2
 chat /tk spawn animals:white_tailed_deer 0 70 546
 chat /tk spawn animals:white_tailed_deer 2 70 547
