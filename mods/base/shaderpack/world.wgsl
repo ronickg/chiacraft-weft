@@ -439,11 +439,14 @@ var<private> PT_CAND: bool = false;
 var<private> PT_TAKES: i32 = -1;
 const PT_REACH_WORLD: f32 = 384.0;
 
-// Whether the path tracer takes this pixel: its own test (`cs_trace`), one ray from the eye that
-// must meet terrain at this depth, nothing clear (water, glass) before it, within its reach. Where it
-// fails (a floor seen through a pane or the pool's water) the world's pixel stays, with its rays:
-// skipped there, those floors lost their shade (w18, the hall's pool). Asked only where a ray would
-// be traced, once a pixel.
+// Whether the path tracer takes this pixel: its own test (`cs_trace`) is one ray from the eye that
+// must meet terrain at this depth with nothing clear (water, glass) before it, within its reach.
+// Where it fails (a floor seen through a pane or the pool's water) the world's pixel stays, with
+// its rays: skipped there, those floors lost their shade (w18, the hall's pool). This face is
+// opaque and the nearest the world drew, so only something see-through on the way can fail it:
+// the ray asks for those alone (`rt_seen_through`), out past the face as far as the path tracer's
+// test reaches (w19: the whole `rt_hit` cost the world's pass 2.8 ms). Asked only where a ray
+// would be traced, once a pixel.
 fn pt_takes(in: VOut) -> bool {
     if !PT_CAND {
         return false;
@@ -452,8 +455,7 @@ fn pt_takes(in: VOut) -> bool {
         let d = length(in.rel);
         PT_TAKES = 0;
         if d > 1e-3 && d <= PT_REACH_WORLD {
-            let h = rt_hit_mask(vec3(0.0), in.rel / d, d * 1.02 + 0.2, 0.0, 3u);
-            if h.hit && !h.clear && abs(h.t - d) <= 0.02 * d + 0.15 {
+            if !rt_seen_through(vec3(0.0), in.rel / d, d * 1.02 + 0.2, 3u) {
                 PT_TAKES = 1;
             }
         }
