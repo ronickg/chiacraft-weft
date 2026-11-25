@@ -235,6 +235,8 @@ const OPT_SHADOW_REACH: u32 = 64u;
 const OPT_BANK_FALL: u32 = 65u;
 const OPT_BANK_EDGE: u32 = 66u;
 const OPT_BANK_TOP: u32 = 67u;
+// The banks' march steps (`base:look_mist_steps`, the quality row: 0 as made = 8; Low 4, never off).
+const OPT_MIST_STEPS: u32 = 68u;
 // How much of it this morning: the option, in the east, with the sun under the horizon (full from
 // 1.7° down, none at 1° up) and not yet night (gone by about 12° down, where the night sky takes it).
 fn dawn_sky() -> f32 {
@@ -259,8 +261,11 @@ const MIST_SEA_FALL: f32 = 0.05;
 // banks, halving every 7 blocks).
 const MIST_SEA_RISE: f32 = 12.0;
 const MIST_SEA_EVEN: vec3<f32> = vec3(0.2, 0.15, -10.0);
-// Its density per block at `/air` 1 (Bliss's morning, about 0.45 a block where full, at `/air` 0.05).
-const MIST_SEA_DENSE: f32 = 1.5;
+// Its density per block at `/air` 1: Ronald's Bliss morning is 0.45 a block where full
+// (Morning_Cloudy_Fog 0.45, `climate_settings.glsl:233`), ours that at `/air` 0.05, the middle of the
+// natural dawn mist. At 1.5 it was 0.075 there, 6 times thinner: a veil the land and its shadows
+// read through at full contrast (Ronald, 11-24: "too transparent").
+const MIST_SEA_DENSE: f32 = 9.0;
 // Its shape: a broad noise (cells this wide and tall, blocks) cut at a threshold (from, to: none
 // below, full above), so banks with clear air between them, not an even veil; and a fine noise
 // (cells this wide and tall) that eats their edges (`MIST_ERODE.z`, how much), shifted by the shape
@@ -2105,14 +2110,18 @@ fn bank_hidden(rel: vec3<f32>) -> f32 {
     if t1 <= t0 {
         return 0.0;
     }
-    let n = 8u;
+    // (Its steps as `bank_march`'s, from the eye.)
+    let n = u32(clamp(look_opt(OPT_MIST_STEPS, 8.0), 2.0, 16.0));
     let e = 11.0;
-    let span = t1 - t0;
+    let span = t1;
     var depth = 0.0;
     for (var i = 0u; i < n; i++) {
         let u = (f32(i) + 0.5) / f32(n);
-        let t = t0 + span * (pow(e, u) - 1.0) / (e - 1.0);
+        let t = span * (pow(e, u) - 1.0) / (e - 1.0);
         let step = span * pow(e, u) * log(e) / (f32(n) * (e - 1.0));
+        if t < t0 {
+            continue;
+        }
         depth += bank_density(eye + dir * t, dir * t) * deep * step;
     }
     return 1.0 - exp(-depth);
@@ -2156,11 +2165,21 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         * look_opt(OPT_BANK_SUN, 1.0);
     let sky_in = p.ambient * (1.0 + MIST_SEA_SKY.x * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), MIST_SEA_SKY.y))
         * MIST_SEA_SKY.z * k * look_opt(OPT_BANK_SHADE, 1.0);
-    // 8 steps spaced ever wider from the near end (u^11 curve, as Bliss's), jittered per pixel (TAA
-    // blends them): close steps where the mist near the eye shows its shape.
-    let n = 8u;
+    // Steps spaced ever wider from the eye (11^u, as Bliss's, `overworld_fog.glsl:179`), jittered
+    // per pixel (TAA blends them), from the eye itself, not from where the ray enters the banks'
+    // height: crowded into that slab from a high eye, the steps resolved the banks' top contour
+    // sharply (Ronald's "hard sand-like edges"); Bliss's one or two long steps there, jittered and
+    // blended over frames, average the density into its soft gradient. Ones above or below the
+    // banks are skipped. As many as the quality row (`OPT_MIST_STEPS`, 8 as made).
+    let n = u32(clamp(look_opt(OPT_MIST_STEPS, 8.0), 2.0, 16.0));
     let e = 11.0;
-    let span = t1 - t0;
+    let span = t1;
+    // The land's shadow in the mist only as far as the sun's shadows reach (`OPT_SHADOW_REACH`, 128
+    // as Bliss's shadowDistance; none, all the way): past it the mist is fully lit, the clouds'
+    // shadow left. Out to 1500 every crown's shadow printed into the mist 300-600 blocks below the
+    // vista, the land's shadow pattern copied onto it, where Bliss's far mist is evenly lit and its
+    // shafts are the clouds' (Ronald's 06:00 compare, 11-24).
+    let reach = fantasy_opt(OPT_SHADOW_REACH);
     var through = 1.0;
     var gained = vec3(0.0);
     // Debug view 5: where along the march the sun reaches the mist (Planner on lv8: no shafts and no
@@ -2172,15 +2191,21 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     // scatter toward the eye alone, on black; 4 how much they hide (1 - through) as grey.
     for (var i = 0u; i < n; i++) {
         let u = (f32(i) + jitter) / f32(n);
-        let t = t0 + span * (pow(e, u) - 1.0) / (e - 1.0);
+        let t = span * (pow(e, u) - 1.0) / (e - 1.0);
         let step = span * pow(e, u) * log(e) / (f32(n) * (e - 1.0));
+        if t < t0 {
+            continue;
+        }
         let d = bank_density(eye + dir * t, dir * t) * deep;
         if d <= 0.0 {
             continue;
         }
         // The land's and the clouds' shadow: shafts where the sun comes through, the sky's light alone
         // in the crowns' shade.
-        let land = sun_reaches(dir * t);
+        var land = 1.0;
+        if reach <= 0.0 || t < reach {
+            land = mix(sun_reaches(dir * t), 1.0, select(0.0, smoothstep(reach * 0.75, reach, t), reach > 0.0));
+        }
         let clouds = cloud_shadow(dir * t);
         let lit = land * clouds;
         let kept = exp(-d * step);
