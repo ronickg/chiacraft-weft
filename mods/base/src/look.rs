@@ -153,7 +153,8 @@ pub static LOOK_BANK_TOP: Config<f32> = Config::named("look_bank_top");
 pub static LOOK_MIST_STEPS: Config<f32> = Config::named("look_mist_steps");
 /// The low morning sun's glow in the sky as Bliss's (1): one smooth Mie lobe (Henyey-Greenstein, g 0.8)
 /// in the sun's colour over the sky's blue, in place of our ten hand-made layers round the sun, whose
-/// windows ended together about 25-30° out as a hard seam (Planner, 11-25); 0 those layers.
+/// windows ended together about 25-30° out as a hard seam (Planner, 11-25); 0 those layers. Past 0
+/// it also scales the lobe's strength (tuning).
 pub static LOOK_SKY_LOBE: Config<f32> = Config::named("look_sky_lobe");
 /// The engine's map of the ground's height (`client::ground_map`), which the banks lie on: on with
 /// them (`register`'s frame hook keeps it so, however the banks were set).
@@ -299,7 +300,7 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_BANK_EDGE).float(0.0, 0.0, 1.0);
     r.config(&LOOK_BANK_TOP).float(0.0, 0.0, 2.0);
     r.config(&LOOK_MIST_STEPS).float(0.0, 0.0, 16.0);
-    r.config(&LOOK_SKY_LOBE).float(1.0, 0.0, 1.0);
+    r.config(&LOOK_SKY_LOBE).float(1.0, 0.0, 2.0);
     r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0);
     r.config(&LOOK_BLISS).bool(true);
     r.client_frame(|_| {

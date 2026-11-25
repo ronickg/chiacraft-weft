@@ -1032,7 +1032,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let bliss_sun = bliss_low_sun();
     let seen = bliss_sun * sky_seen;
     // Where the lobe stands in for our layers round the sun: those go, all of them.
-    let lobe_k = seen * clamp(fantasy_opt(OPT_SKY_LOBE), 0.0, 1.0);
+    // (Its value past 0 also scales the lobe's strength, for tuning: 1 as made.)
+    let lobe_amt = max(fantasy_opt(OPT_SKY_LOBE), 0.0);
+    let lobe_k = seen * min(lobe_amt, 1.0);
     let keep = 1.0 - lobe_k;
     // With Bliss's sun the horizon's colour a peach, not the golden key's yellow (hue 40): where the
     // sun's creamed glow fades out it showed through as a faint yellow ring about 7° out (lv15).
@@ -1166,7 +1168,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     // colour's brightness.
     if lobe_k > 0.0 {
         let sun_tint = mix(p.sun / max(luma(p.sun), 1e-4), SUN_GLOW_CREAM / luma(SUN_GLOW_CREAM), SKY_LOBE_CREAM);
-        c += sun_tint * luma(c) * SKY_LOBE.y * hg_rel(mu, SKY_LOBE.x) * lobe_k * (1.0 - rain_amount());
+        c += sun_tint * luma(c) * SKY_LOBE.y * lobe_amt * hg_rel(mu, SKY_LOBE.x) * lobe_k * (1.0 - rain_amount());
     }
     let c_pre_glow = c;
     c += sun_glow(dir, p) * glow_up * keep;
