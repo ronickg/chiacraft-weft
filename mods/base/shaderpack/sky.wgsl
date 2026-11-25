@@ -1332,12 +1332,37 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
         return vec4(atm_sky(dir, normalize(scene.sun.xyz), normalize(scene.moon.xyz), scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y)), 1.0);
     }
     let p = palette_made();
+    // The land's sun and the sky's light from the same air as the sky, Bliss's (`land_sun`,
+    // `land_ambient`), where the HDR chain draws the physical sky.
+    let from_sky = land_from_sky();
+    let sun = normalize(scene.sun.xyz);
+    let moon_k = scene.moon.w * mix(1.0, 0.12, smoothstep(0.5, 1.0, blood_moon()));
     switch u32(in.clip.x) {
         case 0u: { return vec4(p.zenith, 1.0); }
         case 1u: { return vec4(p.horizon, 1.0); }
         case 2u: { return vec4(p.glow, 1.0); }
-        case 3u: { return vec4(p.sun, 1.0); }
-        case 4u: { return vec4(p.ambient, 1.0); }
+        case 3u: { return vec4(select(p.sun, land_sun(sun, moon_k), from_sky), 1.0); }
+        case 4u: {
+            if from_sky {
+                let moon = normalize(scene.moon.xyz);
+                let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
+                var sum = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    let dir = atm_mean_dir(i, sun);
+                    let a = atm_march(dir, sun, moon, sky_k, ATM_FLOOR, 4, 2);
+                    sum += a.light;
+                }
+                let mean = sum / 9.0;
+                var wet = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    let dir = atm_mean_dir(i, sun);
+                    let a = atm_march(dir, sun, moon, sky_k, atm_background(mean), 4, 2);
+                    wet += atm_rain(a.light, dir, a.through, mean);
+                }
+                return vec4(land_ambient(wet / 9.0), 1.0);
+            }
+            return vec4(p.ambient, 1.0);
+        }
         default: { return vec4(0.0); }
     }
 }
