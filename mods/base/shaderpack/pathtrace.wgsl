@@ -432,27 +432,35 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
         return;
     }
-    // The air between the eye and the surface, as an affine map of the colour.
-    var air = vec3(0.0);
-    var through = vec3(1.0);
-    if pt.debug != 13u {
-        air = haze_lit(vec3(0.0), h.rel, h.light.x);
-        through = haze_lit(vec3(1.0), h.rel, h.light.x) - air;
+    // The picture's own (mode 0): the surface's light through the air as the world's pass puts it
+    // (`haze_lit` on the colour itself) and finished as it finishes it (`display`: the night's
+    // blue, or the LDR tone curve). As an affine map from white (`through`) the air's greying in
+    // the rain, which mixes each colour toward its own grey, was lost: the traced ground stayed
+    // warm where the world's went grey (w29). One call, where the map took two.
+    // Under a denoiser (mode 1) the air as that map: its light alone (`under`, which
+    // `fs_pt_finish` adds the denoised light to and finishes) and what it lets through.
+    NIGHT_SKY_SHARE = share;
+    var dif = diffuse;
+    var spe = specular;
+    var under: vec3<f32>;
+    if pt.mode == 1u {
+        let air = haze_lit(vec3(0.0), h.rel, h.light.x);
+        let through = haze_lit(vec3(1.0), h.rel, h.light.x) - air;
+        dif *= through;
+        spe *= through;
+        under = air;
+    } else {
+        let surface = diffuse * albedo + specular * s_alb;
+        // (Debug 13, timing only: without the air; a branch, as a `select` works out both.)
+        if pt.debug == 13u {
+            under = display(surface);
+        } else {
+            under = display(haze_lit(surface, h.rel, h.light.x));
+        }
     }
-    let dif = through * diffuse;
-    let spe = through * specular;
+    // The light alone for the denoisers (with the air's share through it under one, mode 1).
     pt_out[at] = vec4(dif, diffuse_t);
     pt_out[at + 1u] = vec4(spe, specular_t);
-    // The picture's own (mode 0), or what the denoiser adds onto (1).
-    // The picture as the world's pass finishes it (`display`: the night's blue, or the LDR tone
-    // curve); under a denoiser (mode 1) the air's light alone, which `fs_pt_finish` adds the
-    // denoised light to and finishes.
-    NIGHT_SKY_SHARE = share;
-    // (Branched, not `select`: that worked out `display` under the denoiser too, to drop it.)
-    var under = air;
-    if pt.mode != 1u {
-        under = display(air + dif * albedo + spe * s_alb);
-    }
     // The share rides in the kind (1 to 1.25: traced) for `fs_pt_finish`.
     pt_out[at + 2u] = vec4(under, 1.0 + 0.25 * share);
 }
