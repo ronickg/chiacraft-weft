@@ -4028,6 +4028,12 @@ impl Client {
         self.render.rt_reload
     }
 
+    /// The opaque cubes' depth into `depth` before the world's pass (`WorldRenderer::depth_prepass`),
+    /// when this frame's draw is set for it: true, and the world's pass keeps that depth.
+    pub fn depth_prepass(&self, list: &mut weft_render::CommandList, depth: weft_render::TextureId) -> bool {
+        self.render.depth_prepass(list, depth)
+    }
+
     /// Path traced lighting (`core:path_traced`, `WorldRenderer::path_trace`), after the world's
     /// pass into `target` (the world's image, its size `size`) and before the effects: first the
     /// G-buffer pass (`WorldRenderer::gbuffer_pass`), then the traced light.

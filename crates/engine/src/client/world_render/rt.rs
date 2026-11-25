@@ -212,6 +212,54 @@ pub(super) fn gb_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[Pi
     Some([made[0], made[1], made[2], made[3]])
 }
 
+/// The opaque depth prepass's pipelines (`WorldRenderer::pre_pipes`): depth alone for faces opaque,
+/// faces cutout (`fs_cutout_depth`, cut as `fs_cutout` cuts), quads opaque, quads cutout; then
+/// `fs_opaque` and `fs_cutout` for the same, tested Equal and writing no depth. The same vertex
+/// entries as the world's pass, so the depths match exactly (as the G-buffer's Equal already
+/// relies on). None without the pack's `fs_cutout_depth`.
+pub(super) fn pre_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 8]> {
+    if !crate::packs::pack_uses("world.wgsl", "fs_cutout_depth") {
+        return None;
+    }
+    let lay = Some(DepthState { write: true, compare: Compare::GreaterEqual });
+    let equal = Some(DepthState { write: false, compare: Compare::Equal });
+    let mut made = Vec::with_capacity(8);
+    for (label, vs, fs, depth, color) in [
+        ("faces depth", "vs_face", None, lay, false),
+        ("faces cutout depth", "vs_face", Some("fs_cutout_depth"), lay, false),
+        ("quads depth", "vs_quad", None, lay, false),
+        ("quads cutout depth", "vs_quad", Some("fs_cutout_depth"), lay, false),
+        ("faces opaque on depth", "vs_face", Some("fs_opaque"), equal, true),
+        ("faces cutout on depth", "vs_face", Some("fs_cutout"), equal, true),
+        ("quads opaque on depth", "vs_quad", Some("fs_opaque"), equal, true),
+        ("quads cutout on depth", "vs_quad", Some("fs_cutout"), equal, true),
+    ] {
+        let desc = PipelineDesc {
+            label,
+            shader,
+            vertex: vs,
+            fragment: fs,
+            color: color.then(crate::post::world_format),
+            depth,
+            blend: Blend::None,
+            cull_back: true,
+            topology: Topology::Triangles,
+            motion: color && crate::post::motion(),
+        };
+        match gpu.create_pipeline(&desc) {
+            Ok(p) => made.push(p),
+            Err(e) => {
+                log::error!("depth prepass: {}", e.0);
+                for p in made {
+                    gpu.destroy_pipeline(p);
+                }
+                return None;
+            }
+        }
+    }
+    made.try_into().ok()
+}
+
 impl RtScene {
     /// The expansion's pipeline (`expand_pipeline`), made with the world's other pipelines.
     pub(super) fn expand_pipeline(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<PipelineId> {
@@ -643,6 +691,47 @@ impl WorldRenderer {
             list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count });
         }
         list.push(Cmd::EndPass);
+    }
+
+    /// The opaque depth prepass, before the world's pass (`prepass_now`, decided by this frame's
+    /// `draw`): the opaque and cutout cubes' depth alone into `depth` (cleared here), so the world's
+    /// pass shades each of their pixels once (`equal_pipe`). With traced shadows every fragment
+    /// shaded and then hidden cost its rays (11-25: the 3060's world pass). The same draws as the
+    /// world's (`gb_draws`, the CPU's runs before `translucent`); the fading and distant ones are
+    /// left to the world's pass. Returns whether it ran (the world's pass then keeps this depth).
+    pub fn depth_prepass(&self, list: &mut CommandList, depth: TextureId) -> bool {
+        let (Some(p), true, Some((_, obuf, ibuf, ..))) = (self.pre_pipes, self.prepass_now, self.buffers) else {
+            return false;
+        };
+        list.push(Cmd::BeginPass { color: None, depth: Some((depth, Some(0.0))), motion: None });
+        let pipe = |kind: u8, layer: u8| p[kind as usize * 2 + layer as usize];
+        if let Some(o) = self.table.out.as_ref() {
+            let (draws, origins, slot) = (o.draws, o.origins, self.gb_draws_slot);
+            for &(kind, layer, page, id, base, n) in &self.gb_draws {
+                if kind >= 2 {
+                    continue;
+                }
+                let buf = if kind == 1 { self.quads.pages[page as usize].0 } else { self.faces.pages[page as usize].0 };
+                self.bind_run(list, pipe(kind, layer), buf, origins);
+                list.push(Cmd::DrawIndexedIndirectCount {
+                    buffer: draws,
+                    offset: base as u64 * 20,
+                    count_buffer: self.table.buckets[slot].0,
+                    count_offset: id as u64 * 8,
+                    max: n,
+                });
+            }
+        }
+        for &(kind, layer, page, start, count) in &self.runs[..self.translucent.min(self.runs.len())] {
+            if layer >= 2 || kind >= 2 {
+                continue;
+            }
+            let buf = if kind == 1 { self.quads.pages[page as usize].0 } else { self.faces.pages[page as usize].0 };
+            self.bind_run(list, pipe(kind, layer), buf, obuf);
+            list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count });
+        }
+        list.push(Cmd::EndPass);
+        true
     }
 
     /// Frames the ray-traced scene has been kept (`Scene::rt.y`, for noise that moves every frame).

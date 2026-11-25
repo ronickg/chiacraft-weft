@@ -514,6 +514,12 @@ pub struct WorldRenderer {
     /// layer, page, group, first, draws) with its frame slot (the CPU-made runs before
     /// `translucent` are drawn again too), and its images (albedo, normal, spec) at the world's size.
     gb_pipes: Option<[PipelineId; 4]>,
+    /// The opaque depth prepass (`rt.rs` `depth_prepass`, `core:depth_prepass`, while the world's
+    /// shader traces): depth alone for faces opaque, faces cutout, quads opaque, quads cutout,
+    /// then the world's own entries for the same four where the depth equals theirs, written no
+    /// more. `prepass_now`: this frame's `draw` drew with the second four.
+    pre_pipes: Option<[PipelineId; 8]>,
+    prepass_now: bool,
     gb_draws: Vec<(u8, u8, u32, u32, u32, u32)>,
     gb_draws_slot: usize,
     pub gb_images: Option<(TextureId, TextureId, TextureId, (u32, u32))>,
@@ -715,6 +721,8 @@ impl WorldRenderer {
             pt_out: Vec::new(),
             pt_cache: None,
             gb_pipes: if rt_compiled { rt::gb_pipelines(gpu, &shader) } else { None },
+            pre_pipes: if rt_compiled { rt::pre_pipelines(gpu, &shader) } else { None },
+            prepass_now: false,
             gb_draws: Vec::new(),
             gb_draws_slot: 0,
             gb_images: None,
@@ -991,6 +999,13 @@ impl WorldRenderer {
     // Android backend when upstream's came in (Weft sync 11-22); no split until the backend has it.
     fn cutout_split_pipelines(_gpu: &mut dyn Backend, _shader: &Shader) -> Option<[PipelineId; 4]> {
         None
+    }
+
+    /// With this frame's depth prepass (`prepass_now`), the pipeline of a run of `kind` (0 faces, 1
+    /// quads) and `layer` (0 opaque, 1 cutout): the world's own entry, where the depth equals its own.
+    fn equal_pipe(&self, kind: u8, layer: u8) -> Option<PipelineId> {
+        let p = self.pre_pipes.filter(|_| self.prepass_now)?;
+        (kind < 2 && layer < 2).then(|| p[4 + kind as usize * 2 + layer as usize])
     }
 
     /// The two passes of a run of `kind` (0 faces, 1 quads) and `layer` (1 cutout) when cutout
@@ -1365,10 +1380,14 @@ impl WorldRenderer {
                 for p in self.gb_pipes.take().into_iter().flatten() {
                     gpu.destroy_pipeline(p);
                 }
+                for p in self.pre_pipes.take().into_iter().flatten() {
+                    gpu.destroy_pipeline(p);
+                }
                 if rt {
                     self.pt_pipes = rt::pt_pipelines(gpu, assets);
                     if let Ok((s, _)) = world_shader(assets) {
                         self.gb_pipes = rt::gb_pipelines(gpu, &s);
+                        self.pre_pipes = rt::pre_pipelines(gpu, &s);
                     }
                 }
                 for p in self
@@ -1483,6 +1502,9 @@ impl WorldRenderer {
             gpu.destroy_buffer(b);
         }
         for p in self.gb_pipes.take().into_iter().flatten() {
+            gpu.destroy_pipeline(p);
+        }
+        for p in self.pre_pipes.take().into_iter().flatten() {
             gpu.destroy_pipeline(p);
         }
         if let Some((a, b, c, _)) = self.gb_images.take() {
@@ -2285,8 +2307,12 @@ impl WorldRenderer {
         // then shade, so each pixel of leaves is shaded once.
         let mut steps: Vec<(PipelineId, BufferId, usize, bool)> = Vec::with_capacity(groups.len() + 4);
         let mut depth_laid = false;
+        // With the depth prepass (`depth_prepass`), the opaque and cutout cubes shaded where their
+        // depth is already laid: each pixel once.
+        self.prepass_now = self.pre_pipes.is_some() && self.rt_traced() && crate::settings::depth_prepass();
         for (i, &(kind, layer, page, ..)) in groups.iter().enumerate() {
             let (pipe, buf) = self.pipe_of(kind, layer, page);
+            let pipe = self.equal_pipe(kind, layer).unwrap_or(pipe);
             match self.split_of(kind, layer) {
                 Some((_, shade)) => {
                     if !depth_laid {
@@ -2370,6 +2396,7 @@ impl WorldRenderer {
                 list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count });
             }
             let pipe = self.split_of(kind, layer).map_or(pipe, |s| s.1);
+            let pipe = self.equal_pipe(kind, layer).unwrap_or(pipe);
             self.bind_run(list, pipe, buf, obuf);
             list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count });
         }

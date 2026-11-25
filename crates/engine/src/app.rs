@@ -4012,11 +4012,20 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
     }
     r.list.push(Cmd::Mark);
+    // The opaque cubes' depth first while the world traces (`core:depth_prepass`): the world's pass
+    // then keeps it and shades each of their pixels once.
+    let prepass = r
+        .game
+        .as_ref()
+        .is_some_and(|g| g.client.depth_prepass(&mut r.list, r.depth.0));
+    if prepass {
+        crate::diag::probe(&mut r.list, "depth_prepass");
+    }
     r.list.push(Cmd::BeginPass {
         // A depth of -1: no surface wrote its own motion there (`taa.wgsl`).
         motion: motion.map(|m| (m, Some([0.0, 0.0, -1.0, 0.0]))),
         color: Some((world_target, Some(clear))),
-        depth: Some((r.depth.0, Some(0.0))),
+        depth: Some((r.depth.0, if prepass { None } else { Some(0.0) })),
     });
     r.list.append(&mut world);
     r.list.push(Cmd::EndPass);

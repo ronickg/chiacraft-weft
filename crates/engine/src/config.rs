@@ -796,6 +796,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         // Named GPU timestamps inside the parts (`Cmd::Probe`, `diag::probe`): a bench line then
         // also lists each one's ms (the path tracer's passes, the upscaler). Live; off by default.
         number("core:gpu_probes", ck::BOOL, 0.0, 0.0, 1.0, 1.0),
+        // The opaque and cutout cubes' depth laid first while the world's shader traces, so it
+        // shades (and traces) each of their pixels once (`WorldRenderer::depth_prepass`). The same
+        // picture. Live; on by default, 0 to compare.
+        number("core:depth_prepass", ck::BOOL, 1.0, 0.0, 1.0, 1.0),
         // DLSS frame generation, where the GPU has it (`core:gpu_frame_gen`, an RTX 40 or 50 on
         // Windows): on by default. Not read yet: its present path isn't built (`core:gpu_frame_gen_why`).
         number("core:frame_gen", ck::BOOL, 1.0, 0.0, 1.0, 1.0),

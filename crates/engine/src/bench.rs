@@ -181,7 +181,11 @@ impl Bench {
         let probes = if self.probes.is_empty() {
             String::new()
         } else {
-            let p: Vec<String> = self.probes.iter().map(|(k, v)| format!("{k} {:.2}", v / g)).collect();
+            let p: Vec<String> = self
+                .probes
+                .iter()
+                .map(|(k, v)| format!("{k} {:.2}", v / g))
+                .collect();
             format!(" | gpu probes ms: {}", p.join(", "))
         };
         let srv_avg = self.server.iter().map(|&s| s as f64).sum::<f64>() / self.server.len().max(1) as f64;
