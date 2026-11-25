@@ -141,6 +141,30 @@ size (hares, pacu) but didn't hunt: the yacare rested (caimans hunt by night, an
 and the spectacled was young (its prey sizes go by its mass). Run 4: their pad at night, both grown first.
 Grid r3: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r7_hunters_m-181008/r7_hunters_grid.jpg`.
 
+Run 4 (46f12cbd7, `r11_hunters_m`, 651 s, script pass). Eleven kills, all by hunters. The coyotes took a hare.
+The foxes took two voles and a mouse, and the raptor and osmolskae three kryptobaatars. The utahraptors hunted as
+a pack of 3 and shared a psittacosaurus (8.3 kg each), and the crocodyliform stalked, broke cover and took a
+capybara. The grown caimans hunted at night: both prowled, broke cover and took a pacu each. The jaguar
+stalked, broke cover and wounded its deer five times, but the deer ran 60 blocks off the pad: two "too long"
+give-ups and no kill in its 110 s (runs 1 and 2 killed). Found and fixed (d62af1ac5): a kill
+fed its kind's grown mass whatever the prey weighed, because the dead can't be read at the death event. The
+crocodyliform hunted a young 2.7 kg capybara and ate 50 kg. The hunter now keeps its prey's mass from the
+start of the hunt. New in the warnings: 10 "neighbor update storm" lines (the pad and pond fills). Shot 7 is
+black: night, nothing lit.
+
+| Species | hunts | stalk / ambush | chase | kill, eat, share | gives up | shot |
+|---|---|---|---|---|---|---|
+| jaguar | pass | pass (stalk, "breaks cover" 8.9 blocks) | pass (5 wounds) | not tested (deer escaped; runs 1-2 pass) | pass ("too long", hunts again) | r4 1 (no animal in view) |
+| coyote | pass | n/a | pass | pass (hare, full) | pass ("gone") | r4 2 |
+| red_fox, arctic_fox | pass | n/a | pass | pass (2 voles, a mouse) | pass ("gone") | r4 3 |
+| raptor, osmolskae | pass | n/a | pass | pass (3 kryptobaatars) | pass ("gone") | r4 4 |
+| utahraptor | pass (a pack of 3) | n/a | pass | pass (8.3 kg each) | n/a | r4 5 |
+| crocodyliform | pass | pass (stalk, 9 blocks) | pass | pass, but young prey eaten as grown (fixed d62af1ac5) | n/a | r4 6 |
+| yacare_caiman | pass (at night) | pass (2.2-6.8 blocks) | pass | pass (a pacu) | pass ("gone", then the next) | r4 7 (black) |
+| spectacled_caiman | pass (at night) | pass (8 blocks) | pass | pass (a pacu) | n/a | r4 7 (black) |
+
+Grid r4: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r11_hunters_m-191009/r11_hunters_grid.jpg`.
+
 ## Birds and fliers (cov_birds.txt)
 
 | Species | flies | lands | flocks | flees | hunts / scavenges | shot |
