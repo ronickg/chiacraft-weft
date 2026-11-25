@@ -133,7 +133,7 @@ pub fn register(r: &mut Registry) {
     });
     // A tab beside the inventory's own (Stats, Advancements).
     r.screen_part(&Menu::named(crate::window::FAMILY), "tabs", 5, |ui| {
-        ui.button("web.base.tab", S::default().class("tab").h(13.0).pad(2.0), |c| {
+        ui.button("web.base.tab", S::default().class("tab").h(13.0).pad_xy(5.0, 2.0), |c| {
             open_on_home(c);
             c.client().menu_open(&SCREEN);
         });
@@ -195,7 +195,7 @@ fn screen(ui: &mut Ui) {
                         .tooltip("web.base.zoom_in_tip"),
                     |c| change(c, |v| v.zoom = (v.zoom + 1).min(ZOOMS.len() - 1)),
                 );
-                ui.button("web.base.centre", S::default().h(12.0).pad(2.0).tooltip("web.base.centre_tip"), |c| {
+                ui.button("web.base.centre", S::default().h(12.0).pad_xy(5.0, 2.0).tooltip("web.base.centre_tip"), |c| {
                     change(c, |v| v.centre = (0.0, 0.0))
                 });
             });
@@ -478,7 +478,7 @@ fn picker(ui: &mut Ui, c: &ClientView, socket: u16) {
             );
         }
         ui.spacer();
-        ui.button("web.base.pick_cancel", S::default().h(12.0).pad(2.0), |c| change(c, |v| v.picking = None));
+        ui.button("web.base.pick_cancel", S::default().h(12.0).pad_xy(5.0, 2.0), |c| change(c, |v| v.picking = None));
     });
 }
 

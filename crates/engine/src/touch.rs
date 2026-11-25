@@ -525,6 +525,9 @@ impl crate::screens::Screen for TouchButtons {
                     _ => Vec::new(),
                 };
                 let n = ui.text(name, "default");
+                // 2x like the button beside it (style 1).
+                crate::screens::field_label(ui, cx, n);
+                ui.nodes[n].style.w = crate::ui::Len::Px(0.0);
                 ui.nodes[n].style.grow = 1.0;
             });
         };

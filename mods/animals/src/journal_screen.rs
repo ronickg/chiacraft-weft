@@ -62,7 +62,7 @@ pub fn register(r: &mut Registry) {
     });
     // A tab beside the inventory's own (Stats, Advancements), where base keeps a place for them.
     r.screen_part(&Menu::named("base:inventory"), "tabs", 10, |ui| {
-        ui.button("journal.animals.tab", S::default().class("tab").h(13.0).pad(2.0), |c| {
+        ui.button("journal.animals.tab", S::default().class("tab").h(13.0).pad_xy(5.0, 2.0), |c| {
             c.client().menu_open(&SCREEN);
         });
     });
@@ -94,7 +94,7 @@ fn framed(ui: &mut Ui, body: impl FnOnce(&mut Ui)) {
                 ui.text_styled(S::default().no_wrap(), "journal.animals.title", &[])
             });
             for (key, screen) in [("window.base.tab.stats", "base:stats"), ("window.base.tab.advancements", "base:advancements")] {
-                ui.button(key, S::default().class("tab").h(13.0).pad(2.0), move |c| {
+                ui.button(key, S::default().class("tab").h(13.0).pad_xy(5.0, 2.0), move |c| {
                     c.client().menu_open(&Menu::named(screen));
                 });
             }

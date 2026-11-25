@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::app::{Ctx, Request};
 use crate::screens::{BuildCx, Screen, back_button, button, frame, label};
 use crate::ui::text::Arg;
@@ -31,7 +29,7 @@ impl Screen for Multiplayer {
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         frame(ui, cx, "multiplayer.title", |ui| {
             if cx.in_game && !cx.remote {
-                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(340.0), |ui| {
+                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().min_w(340.0).self_align(crate::ui::Align::Stretch), |ui| {
                     let hosting = super::p2p::HOSTING.lock().is_some();
                     if hosting {
                         label(ui, cx, "multiplayer.your_port", &[crate::ui::text::Arg::Int(crate::settings::server_port() as i64)], "dim");
@@ -40,8 +38,8 @@ impl Screen for Multiplayer {
                     }
                 });
             }
-            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(340.0), |ui| {
-                label(ui, cx, "multiplayer.ticket", &[], "default");
+            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().min_w(340.0).self_align(crate::ui::Align::Stretch), |ui| {
+                crate::screens::heading(ui, cx, "multiplayer.ticket");
                 ui.container(Style::row().gap(4.0).stretch(), |ui| {
                     let input = ui.add(Kind::input("", TICKET_MAX_LEN), Style::default().h(18.0).w(0.0).grow());
                     ui.set_id(input, "ticket");
@@ -81,19 +79,15 @@ impl Screen for Multiplayer {
                 if let Some(status) = self.clipboard_status {
                     label(ui, cx, status, &[], "dim");
                 }
-                ui.button(
-                    "button",
-                    Style::default().min_w(120.0).min_h(20.0).pad_xy(6.0, 4.0),
-                    Rc::new(|c: &mut Ctx| {
-                        let ticket = c.input_text("ticket").unwrap_or_default();
-                        c.requests.push(Request::Join(ticket));
-                    }),
-                    |ui| {
-                        ui.text(cx.t("multiplayer.join", &[]), "button");
-                    },
-                );
+                // Labelled like every menu button (style 1: 2x).
+                button(ui, cx, "multiplayer.join", &[], 120.0, |c| {
+                    let ticket = c.input_text("ticket").unwrap_or_default();
+                    c.requests.push(Request::Join(ticket));
+                });
             });
             saved_worlds(ui, cx);
+            // The panels above are as wide as this row (they stretch, 340 at least): its three
+            // 2x buttons reached past them (chiacraft 11-25, the batch 3 sheet).
             let waiting = crate::links::snapshot().incoming.len();
             ui.container(Style::row().gap(6.0), |ui| {
                 let id = button(ui, cx, "links.open", &[Arg::Text(waiting.to_string())], 160.0, |c| {
@@ -119,8 +113,8 @@ fn saved_worlds(ui: &mut Ui, cx: &BuildCx) {
     let run_dir = cx.settings.run_dir.clone();
     let worlds = crate::saved_worlds::load(&run_dir);
     crate::saved_worlds::ping_all(&run_dir, cx.settings);
-    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(340.0), |ui| {
-        label(ui, cx, "multiplayer.saved", &[], "default");
+    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().min_w(340.0).self_align(crate::ui::Align::Stretch), |ui| {
+        crate::screens::heading(ui, cx, "multiplayer.saved");
         if worlds.is_empty() {
             label(ui, cx, "multiplayer.saved_none", &[], "dim");
         }
@@ -298,7 +292,7 @@ impl Screen for Links {
                     // Asking: only from one of your own worlds, which is what gets linked.
                     if cx.in_game && !cx.remote {
                         ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
-                            label(ui, cx, "links.ask", &[], "default");
+                            crate::screens::heading(ui, cx, "links.ask");
                             let input = ui.add(Kind::input("", 4096), Style::default().h(18.0).stretch());
                             ui.set_id(input, "link_address");
                             label(ui, cx, "links.note", &[], "dim");
@@ -331,7 +325,7 @@ impl Screen for Links {
                         });
                     }
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
-                        label(ui, cx, "links.incoming", &[], "default");
+                        crate::screens::heading(ui, cx, "links.incoming");
                         if store.incoming.is_empty() {
                             label(ui, cx, "links.none", &[], "dim");
                         }
@@ -374,7 +368,7 @@ impl Screen for Links {
                     });
                     if !store.outgoing.is_empty() {
                         ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
-                            label(ui, cx, "links.outgoing", &[], "default");
+                            crate::screens::heading(ui, cx, "links.outgoing");
                             for o in &store.outgoing {
                                 let r = &o.request;
                                 let to = if o.to_name.is_empty() { short(&r.body.to) } else { o.to_name.clone() };
@@ -400,7 +394,7 @@ impl Screen for Links {
                         });
                     }
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
-                        label(ui, cx, "links.links", &[], "default");
+                        crate::screens::heading(ui, cx, "links.links");
                         if store.links.is_empty() {
                             label(ui, cx, "links.no_links", &[], "dim");
                         }
