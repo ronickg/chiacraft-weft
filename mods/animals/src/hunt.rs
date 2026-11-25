@@ -434,7 +434,9 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
     // (wolvesPack2).
     let pos = st.pos.to_array();
     let seen = w.component(id, &WATER_SEEN).unwrap_or_default();
-    let water = (legs % 2 == 0)
+    // A stray from its pack heads for it first (`group::regroup_leg`: it howls, they answer).
+    let pack = crate::group::regroup_leg(w, id, st);
+    let water = (legs % 2 == 0 && pack.is_none())
         .then(|| crate::drink::known_water(w, id, pos))
         .flatten()
         .filter(|p| !((p[0] - seen[0]).abs() < 1.0 && (p[2] - seen[1]).abs() < 1.0 && (now as f64) < seen[2]))
@@ -452,7 +454,7 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
             Some(to)
         });
     let start = w.random_below(8);
-    let leg = water.or_else(|| {
+    let leg = pack.or(water).or_else(|| {
         (0..8).find_map(|k| {
             let a = (start + k) as f64 * std::f64::consts::TAU / 8.0;
             let (x, z) = (st.pos.x + a.cos() * PROWL_LEG, st.pos.z + a.sin() * PROWL_LEG);
@@ -466,7 +468,13 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
         to[0],
         to[1],
         to[2],
-        if water.is_some() { " (water)" } else { "" }
+        if pack.is_some() {
+            " (its pack)"
+        } else if water.is_some() {
+            " (water)"
+        } else {
+            ""
+        }
     );
     w.navigate(id, to, 1.0);
     w.component_mut(id, &PROWL).map(|p| *p = until);

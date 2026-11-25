@@ -55,6 +55,12 @@ pub fn init(r: &mut Registry) {
 
 /// A goal for wolves (never taken, it only howls): a wild wolf howls once as a blood moon's
 /// totality begins.
+/// A wolf's howl where it stands (a pack's rally call, `group::regroup`).
+pub fn howl(w: &World, id: u64, st: &EntityState) {
+    w.play_sound(&HOWL, st.pos, 1.0);
+    crate::anim::act(w, id, crate::anim::Act::Howl);
+}
+
 pub fn howl_at_blood_moon(w: &World, id: u64, st: &EntityState) -> bool {
     let night = w.day_time() / vitals::calendar::DAY_TICKS + 1;
     if w.component(id, &HOWLED) == Some(night)
