@@ -291,7 +291,12 @@ fn one_fog_on() -> bool {
 // The air in the fog's march, as Bliss's (overworld_fog.glsl, method only): Rayleigh and Mie at the
 // sky's coefficients, 24 x its haze 1.25 times denser than real air, thinning with height over
 // 1333 and 171 blocks; adds its own light and dims only itself, not what lies behind.
-const AIR_THICK: f32 = 30.0;
+// (18, not 30: at 30 the far land at noon stood a pale haze, 189 206 217 where Bliss's is 139 167
+// 197, lkmxJ1 clear noon vista.)
+const AIR_THICK: f32 = 18.0;
+// The rain's fog per block at the sea's level (0.0012 left the rain vista's far land clear to the
+// horizon, Bliss's a thick dark veil; lkmxJ1).
+const RAIN_FOG: f32 = 0.004;
 const ATM_GROUND: f32 = 6371e3;
 const ATM_TOP: f32 = 6471e3;
 const ATM_RAYLEIGH: vec3<f32> = vec3(5.8e-6, 13.5e-6, 33.1e-6);
@@ -399,7 +404,12 @@ fn atm_sky(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3
     // dawn glow is a deep gold where ours, all white, went pale cream (lkmxI1 sunup); the 4300 K sun
     // on Rayleigh too turned the noon sky grey-blue (lkmxP1).
     let warm = sun_kelvin_linear() / luma(sun_kelvin_linear());
-    let lit = s_sun + s_mie * warm + s_multi * ATM_MULTI / (4.0 * 3.14159);
+    // With the sun low the blue too by the 4300 K sun, and the glow at 0.6: at sunrise Bliss's sky
+    // is warm all over (173 160 143 up top) and gold by the sun (203 171 113), ours neutral (196 197
+    // 204) and blown white by the sun (249 233 202; lkmxJ1 sunup). At noon as before.
+    let low_sun = 1.0 - smoothstep(0.1, 0.35, sun.y);
+    let ray_k = mix(vec3(1.0), warm, low_sun);
+    let lit = s_sun * ray_k + s_mie * warm * mix(1.0, 0.6, low_sun) + s_multi * ray_k * ATM_MULTI / (4.0 * 3.14159);
     return (lit * ATM_SUN + s_moon * ATM_SUN * ATM_MOON * moon_k) * ATM_SCALE;
 }
 // The sky-view texture's direction for texel (`x`, `y`) of its 128 x 64, and back.
@@ -789,6 +799,11 @@ fn palette_now() -> Palette {
         // white) in it, and its shade reads a neutral grey where ours stood cold blue-grey (cave rows).
         let day = smoothstep(-0.02, 0.1, scene.sun.y);
         p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(1.0, 0.98, 0.96), CHAIN_AMBIENT_GREY * day);
+        // Under rain the light a warm grey, the sky's blue and the sun's colour gone under the deck:
+        // Bliss's rain vista land 90 90 78, ours a blue 54 87 109 (lkmxJ1).
+        let wet = rain_amount() * 0.8;
+        p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(1.0, 0.99, 0.9), wet);
+        p.sun = mix(p.sun, vec3(luma(p.sun)) * vec3(1.0, 0.99, 0.9), wet);
         let night = smoothstep(-0.04, -0.2, scene.sun.y);
         let k = mix(1.0, clamp(fantasy_opt(OPT_CHAIN_NIGHT), 0.0, 1.0), night);
         p.ambient *= k;
@@ -1246,7 +1261,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             let wet = rain_amount() * (1.0 - smoothstep(-0.1, 0.9, dir.y) * 0.6);
             // At 0.55 of its brightness: Bliss's rain sky is a dark slate (its rain vista), ours a
             // pale grey-white at nearly the clear sky's (lkmxI1).
-            c = mix(c, vec3(luma(c)) * vec3(0.76, 0.8, 0.86) * 0.55 - vec3(0.12) * scene.weather.w * luma(c), wet);
+            // (A warm grey at 0.35: at 0.55 and blue-grey it stood 194 201 212 where Bliss's is 112
+            // 111 101, lkmxJ1.)
+            c = mix(c, vec3(luma(c)) * vec3(0.98, 0.97, 0.9) * 0.35 - vec3(0.12) * scene.weather.w * luma(c), wet);
         }
         return max(c, vec3(0.0));
     }
@@ -2453,7 +2470,7 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let lit = land * cloud_shadow(dir * t);
         let above = max(at.y - SEA_LEVEL, 0.0);
         // The mist and the rain's fog (Bliss's rainy fog, its 0.3 in Ronald's profile).
-        let d = bank_density(at, dir * t) * deep + rain * 0.0012 * exp2(-0.03 * above);
+        let d = bank_density(at, dir * t) * deep + rain * RAIN_FOG * exp2(-0.03 * above);
         if d > 0.0 {
             let kept = exp(-d * step);
             let near_sun = smoothstep(MIST_NEAR_SUN.x, MIST_NEAR_SUN.y, t);
