@@ -52,7 +52,7 @@ open in about a dozen more places, and in most of them it would make ours both c
 | Post | Tonemap | One curve (AgX minimal by default) | Hejl at night blended with a day curve by sun height | more complex | Yes: one curve all day |
 | Post | Exposure | 50 samples, geometric mean, one log curve | The same idea plus day/night power, 0.83, absolute option, night/dawn ceilings, rain cap, clamp, per-hour exposures, land dimming, dusk lift, dawn lift, sky dim | **much more complex** | **Yes, strongly**: Bliss's curve in absolute units |
 | Post | TAA, sharpen | 3x3 clamp, Catmull-Rom, fixed blend; CAS 0.35 | Variance clip, frame counts, motion and rain inputs; CAS + motion push | more complex | Partly (ours handles more cases) |
-| Post | Grading | Saturation and grade off by default | About ten stacked steps (white balance, splits, leaf-yellow, saturation by sun, +30% "Bliss", cool floor, rods, blood moon, sky saturation) | **much more complex** | **Yes, strongly**; check the +30% against Ronald's own Bliss profile (Bliss's default is 0) |
+| Post | Grading | Saturation and grade off by default | About ten stacked steps (white balance, splits, leaf-yellow, saturation by sun, +30% "Bliss", cool floor, rods, blood moon, sky saturation) | **much more complex** | **Yes, strongly**; the +30% is right: Ronald's Bliss profile sets SATURATION 0.3 (Bliss's default is 0), so the chain keeps it |
 | Post | Vignette, glare | No darkening vignette, no glare | 20% vignette, veiling glare | ours extra | Dropping both is closer |
 | Post | DOF, motion blur | Off by default | None | missing, off in Bliss | Not needed |
 
