@@ -30,6 +30,10 @@ cloud cost (lkcbF_aba a2/b2) and lkcbE_fx2's step ran beside a FLUX job on the P
 11-25: it doubled world, tripled effects); the clean lkcbF pose with clouds on is total 2.98, world 2.0,
 effects 0.37 ms (wp1125_B). Message Tester 2 (local_584b78da-5d8d-473b-9309-13d0906a5789) before
 queuing it: Tester 2 sets the texture job's HOLD file so the GPU is free. Looks need no free GPU.
+Merging dev (after pt-3060 1cbb6f08f): `rain_on_ground`, `puddle_hash` and `rain_rings` live in look.wgsl,
+shared by world.wgsl and pathtrace.wgsl; keep them shared and move our snow/dry gate (379efefc's
+`rain_fog_at` on wet and puddles) into `rain_on_ground`, so path tracing has it too; pathtrace calls
+`haze_lit` differently (our debug-7 early return sits in it).
 
 
 ---
