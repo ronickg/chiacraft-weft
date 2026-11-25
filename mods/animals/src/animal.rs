@@ -131,6 +131,13 @@ pub fn init(r: &mut Registry) {
         for h in b.iter() {
             if let Some(t) = w.component_mut(h.entity, &HURT_AT) {
                 *t = now;
+                // Every hurt with its cause: the sound runs heard wolves and reindeer cry out with no
+                // "hurt by" line (hunger, thirst, the cold, a fall or crowding log nothing else).
+                let cause = damage_cause::NAMES
+                    .get(h.cause as usize)
+                    .copied()
+                    .unwrap_or("a mod's cause");
+                weft_sdk::debug!("animal {} takes {:.2} ({cause} {}) from {}", h.entity, h.amount, h.cause, h.source);
             }
         }
     });
