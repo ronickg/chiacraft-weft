@@ -28,7 +28,8 @@ it), AO split (indirect only), DOF, a wider bloom level.
 Before ready (look-ship): the final bench measures the soft clouds on and off again, clean. The 1.25 ms
 cloud cost (lkcbF_aba a2/b2) and lkcbE_fx2's step ran beside a FLUX job on the PC's GPU (Tester 2,
 11-25: it doubled world, tripled effects); the clean lkcbF pose with clouds on is total 2.98, world 2.0,
-effects 0.37 ms (wp1125_B). Ask Tester 2 to check nvidia-smi until the runner's GPU guard is live.
+effects 0.37 ms (wp1125_B). Message Tester 2 (local_584b78da-5d8d-473b-9309-13d0906a5789) before
+queuing it: Tester 2 sets the texture job's HOLD file so the GPU is free. Looks need no free GPU.
 
 
 ---
