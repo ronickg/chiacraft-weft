@@ -402,8 +402,10 @@ fn prowl(w: &World, id: u64, st: &EntityState, s: &Species, now: u64, leader: Op
     let legs = w.component(id, &FOLLOW).map_or(0, |f| f[1]);
     w.component_mut(id, &FOLLOW).map(|f| f[1] = legs + 1);
     let y = st.pos.y.floor() as i32;
+    // Up a slope too, as far as `needs::PROWL_CLIMB`: held to a block up, a pack in a pond's
+    // hollow walked legs to and fro below a herd on the rim and never saw it (ai1124_wolvesFar4).
     let ground = |x: f64, z: f64| {
-        (y - (FLEE_DROP + 2)..=y + 1)
+        (y - (FLEE_DROP + 2)..=y + animals_core::needs::PROWL_CLIMB)
             .rev()
             .find(|&g| crate::comfort::ground(w, x.floor() as i32, g, z.floor() as i32) == Some(g))
     };
