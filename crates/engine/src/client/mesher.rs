@@ -180,42 +180,6 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
             }
         }
     }
-    // Temporary check (pt block lights, w56): what the mesher sees at the cave's torches.
-    for t in [[236, 151, -165], [244, 151, -163], [240, 151, -168]] {
-        let l = [t[0] - n.origin[0], t[1] - n.origin[1], t[2] - n.origin[2]];
-        if l.iter().all(|v| (0..16).contains(v)) {
-            let i = pidx(l[0], l[1], l[2]);
-            let lay = n.extras.get(&i).map(|lay| lay.light(c, states[i]).light);
-            log::info!(
-                "pt lights check: torch cell {t:?} state {} light {:?} layout {:?} filled {} lights in mesh {}",
-                states[i],
-                c.tight[states[i] as usize].light,
-                lay,
-                filled[row(l[1], l[2])] >> (l[0] + 1) & 1,
-                mesh.lights.len()
-            );
-        }
-    }
-    // Temporary check (pt block lights, w55): lit cells the mesh recorded no light for.
-    if mesh.lights.is_empty() {
-        let mut lit = 0;
-        let mut sample = (0u32, 0i32, 0i32, 0i32, false, 0u32);
-        for y in 0..16i32 {
-            for z in 0..16i32 {
-                for x in 0..16i32 {
-                    let i = pidx(x, y, z);
-                    if c.tight[states[i] as usize].light != [0; 3] {
-                        lit += 1;
-                        let f = filled[row(y, z)] >> (x + 1) & 1;
-                        sample = (states[i], x, y, z, n.extras.contains_key(&i), f);
-                    }
-                }
-            }
-        }
-        if lit > 0 {
-            log::info!("pt lights check: mesh with {lit} lit cells and no lights, e.g. state {} at {} {} {} (layout {}, filled {})", sample.0, sample.1, sample.2, sample.3, sample.4, sample.5);
-        }
-    }
     // Grouped by direction so the renderer can skip faces turned away from the camera.
     for faces in &mut mesh.faces {
         faces.sort_by_key(|f| DIR_RANK[crate::gpu_layout::face_dir(f)]);

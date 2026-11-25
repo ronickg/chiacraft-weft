@@ -101,6 +101,8 @@ pub struct ClientWorld {
     pub bounded: bool,
     /// What moving bodies' lights give cells of the world, for working out light as the server does.
     body_glow: FxHashMap<IVec3, [u8; 3]>,
+    /// Counts changes to `body_glow` (the path tracer's light table takes them, `body_glow`).
+    body_glow_epoch: u64,
     /// Light that moves with entities, the client's own (`glow`).
     pub(super) glow: super::glow::Glow,
     pub bounds: Option<(IVec3, IVec3)>,
@@ -291,6 +293,7 @@ impl ClientWorld {
             tints_dirty: FxHashSet::default(),
             bounded: false,
             body_glow: FxHashMap::default(),
+            body_glow_epoch: 0,
             glow: Default::default(),
             bounds: None,
             batches: Vec::new(),
@@ -514,6 +517,7 @@ impl ClientWorld {
         self.tints_dirty.clear();
         self.batches.clear();
         self.body_glow.clear();
+        self.body_glow_epoch += 1;
         self.glow = Default::default();
     }
 
@@ -1050,7 +1054,14 @@ impl ClientWorld {
             .map(|s| s.cube.light(local_index(p)))
     }
 
+    /// The cells bodies light (block entities such as torches: their own cell is air) and a count
+    /// of their changes.
+    pub fn body_glow(&self) -> (&FxHashMap<IVec3, [u8; 3]>, u64) {
+        (&self.body_glow, self.body_glow_epoch)
+    }
+
     pub fn body_glow_changed(&mut self, cells: Vec<(IVec3, [u8; 3])>) {
+        self.body_glow_epoch += 1;
         for (p, v) in cells {
             if v == [0; 3] {
                 self.body_glow.remove(&p);

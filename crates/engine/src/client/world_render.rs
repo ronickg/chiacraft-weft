@@ -512,6 +512,10 @@ pub struct WorldRenderer {
     /// Each meshed world cube's light-giving blocks (`Mesh::lights`), kept whether or not anything
     /// traces, and whether they changed since the GPU's table (`rt::RtLights`) was made.
     cube_lights: FxHashMap<IVec3, Vec<u32>>,
+    /// The cells bodies light (`World::body_glow`: block entities such as torches, whose own cell
+    /// the meshes see as air) by cube, as `Mesh::lights` holds them, and the change count taken.
+    body_lights: FxHashMap<IVec3, Vec<u32>>,
+    body_epoch: u64,
     lights_dirty: bool,
     pt_lights: Option<rt::RtLights>,
     /// The path tracer's G-buffer (`rt.rs` `gbuffer_pass`): its pipelines (faces opaque, faces
@@ -726,6 +730,8 @@ impl WorldRenderer {
             pt_out: Vec::new(),
             pt_cache: None,
             cube_lights: FxHashMap::default(),
+            body_lights: FxHashMap::default(),
+            body_epoch: u64::MAX,
             lights_dirty: false,
             pt_lights: None,
             gb_pipes: if rt_compiled { rt::gb_pipelines(gpu, &shader) } else { None },
@@ -1769,13 +1775,26 @@ impl WorldRenderer {
         }
     }
 
+    /// Takes the cells bodies light (`World::body_glow`) into the path tracer's light table when
+    /// they changed (`epoch`).
+    pub fn set_body_lights(&mut self, glow: &FxHashMap<IVec3, [u8; 3]>, epoch: u64) {
+        if epoch == self.body_epoch {
+            return;
+        }
+        self.body_epoch = epoch;
+        self.body_lights.clear();
+        for (&p, &[r, g, b]) in glow {
+            let l = p & 15;
+            let w = l.x as u32 | (l.y as u32) << 4 | (l.z as u32) << 8 | u32::from(r.min(15)) << 12 | u32::from(g.min(15)) << 16 | u32::from(b.min(15)) << 20;
+            self.body_lights.entry(p >> 4).or_default().push(w);
+        }
+        self.lights_dirty = true;
+    }
+
     pub fn upload(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, key: MeshKey, mesh: &Mesh) {
         self.remove(key);
         if mesh.is_empty() {
             return;
-        }
-        if key.0 == 0 && (13..=16).contains(&key.1.x) && (8..=10).contains(&key.1.y) && (-12..=-10).contains(&key.1.z) {
-            log::info!("pt lights check: cube {} meshed with {} lights", key.1, mesh.lights.len());
         }
         if key.0 == 0 && !mesh.lights.is_empty() {
             self.cube_lights.insert(key.1, mesh.lights.clone());

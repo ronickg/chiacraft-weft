@@ -838,9 +838,17 @@ impl WorldRenderer {
     fn pt_lights_buffer(&mut self, gpu: &mut dyn Backend, frame: u64) -> BufferId {
         let stale = self.pt_lights.as_ref().is_none_or(|l| self.lights_dirty && frame >= l.made + LIGHTS_EVERY);
         if stale {
-            let words = light_words(&self.cube_lights);
+            let words = if self.body_lights.is_empty() {
+                light_words(&self.cube_lights)
+            } else {
+                let mut all = self.cube_lights.clone();
+                for (&c, l) in &self.body_lights {
+                    all.entry(c).or_default().extend_from_slice(l);
+                }
+                light_words(&all)
+            };
             let n = words.len() as u64;
-            log::info!("path traced lights: {} cubes with lights, {} listed, frame {frame}", self.cube_lights.len(), words[1]);
+            log::debug!("path traced lights: {} cubes with lights, {} listed, frame {frame}", self.cube_lights.len(), words[1]);
             if self.pt_lights.as_ref().is_none_or(|l| l.words < n) {
                 if let Some(l) = self.pt_lights.take() {
                     l.destroy(gpu);

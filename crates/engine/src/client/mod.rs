@@ -2701,6 +2701,8 @@ impl Client {
         self.render.update_solid(gpu, &self.world, center);
         drop(p);
         self.world.set_eye(center.y);
+        let (glow, epoch) = self.world.body_glow();
+        self.render.set_body_lights(glow, epoch);
         // Edits and what is around the player go right away.
         let p = crate::diag::part("uploads near (no budget)");
         let (now, later) = self.world.take_meshes(center);
