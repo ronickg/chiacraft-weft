@@ -34,8 +34,9 @@ chat /tk spawn animals:gastonia ~8 ~ ~-12
 chat /tk spawn animals:capybara ~-6 ~ ~-6
 wait 2
 chat /animalprof food 0.2
-chat /tp ~ ~5 ~6
-look 0 -20
+# beside the herd: eating is heard 16 blocks (ai_acts_2: from 15 blocks only gastonia's reached)
+chat /tp ~ ~3 ~-5
+look 0 -30
 wait 15
 shot ai_acts_01_grazing.png
 chat /sounds recent
@@ -44,9 +45,9 @@ chat /sounds recent
 wait 10
 chat /sounds recent
 # the wolves, hungry: the grazers bolt and the wolves bite
-chat /tk spawn animals:grey_wolf ~18 ~-5 ~-26
-chat /tk spawn animals:grey_wolf ~20 ~-5 ~-24
-chat /tk spawn animals:grey_wolf ~19 ~-5 ~-28
+chat /tk spawn animals:grey_wolf ~12 ~-3 ~-14
+chat /tk spawn animals:grey_wolf ~14 ~-3 ~-12
+chat /tk spawn animals:grey_wolf ~13 ~-3 ~-16
 wait 1
 chat /animalprof hunters 0.2
 wait 6

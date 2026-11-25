@@ -35,7 +35,7 @@ pub fn init(r: &mut Registry) {
             sound(r, kind, "attack", f, attack, v.pitch);
         }
         let eat = voices::eat_way(v.family, carnivore);
-        extra(r, kind, "eat", &format!("eat/{eat}"), voices::EAT_FILES, voices::eat_pitch(kg), voices::eat_volume(kg), 12.0);
+        extra(r, kind, "eat", &format!("eat/{eat}"), voices::EAT_FILES, voices::eat_pitch(kg), voices::eat_volume(kg), 16.0);
         if let Some(size) = voices::step_size(kg, carnivore) {
             extra(r, kind, "step", &format!("steps/{size}"), voices::STEP_FILES, voices::step_pitch(kg), voices::step_volume(kg), 24.0);
         }
