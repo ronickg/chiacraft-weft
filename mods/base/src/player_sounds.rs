@@ -311,7 +311,7 @@ fn frame(c: &Client) {
         if let Some(k) = s.menu {
             if k == base_api::menus::CHEST.id() {
                 c.play_sound(&CHEST_CLOSE, None, 1.0);
-            } else if k == screens::INVENTORY.id() {
+            } else if k == base_api::menus::INVENTORY.id() {
                 c.play_sound(&UI_CLOSE, None, 1.0);
             }
         }
@@ -320,7 +320,7 @@ fn frame(c: &Client) {
                 c.play_sound(&CHEST_OPEN, None, 1.0);
             } else if k == base_api::menus::FURNACE.id() {
                 c.play_sound(&FURNACE_OPEN, None, 1.0);
-            } else if k == screens::INVENTORY.id() {
+            } else if k == base_api::menus::INVENTORY.id() {
                 c.play_sound(&UI_OPEN, None, 1.0);
             }
         }

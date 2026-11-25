@@ -2,7 +2,7 @@
 # player.wade in player_sounds.rs). A script can't hear: read run.log's "sound files:" line and
 # `/sounds check` reply (no events missing files), and every `/sounds recent` reply. Expect, per
 # group (stone, wood, gravel, grass, sand, glass, cloth, dirt, snow, leaves, ice, metal, and mud's
-# one block, the dung pat, which has no strip): base:block.<g>.step walking its strip,
+# one block, the dung pat, set down by fill: no strip, no place): base:block.<g>.step walking its strip,
 # .place when placed, .hit while mining it by hand (.break when a soft one goes); at the end
 # base:player.wade walking in water one block deep. Yaw 0 faces -z: every walk goes -z.
 loaded
@@ -15,7 +15,7 @@ chat /tk mode creative
 chat /tp 0.5 206 0.5
 wait 2
 loaded
-chat /tk fill -30 199 -20 30 199 20 stone
+chat /tk fill -30 198 -20 30 199 20 stone
 chat /tk fill -30 200 -20 30 215 20 core:air
 # stone
 chat /tk mode creative
@@ -26,7 +26,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:stone 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -43,7 +44,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:oak_planks 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -60,7 +62,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:gravel 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -77,7 +80,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:grass 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -94,7 +98,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:sand 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -111,7 +116,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:glass 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -128,7 +134,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:wool 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -145,7 +152,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:dirt 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -162,7 +170,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:snowy_grass 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -179,7 +188,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:oak_leaves 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -196,7 +206,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:ice 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -213,7 +224,8 @@ look 0 0
 hold core:forward 1.5
 chat /tk put me 0 base:iron_block 2
 key 1
-look 0 -60
+look 0 -40
+wait 0.2
 press core:use
 wait 0.4
 chat /tk mode survival
@@ -227,10 +239,8 @@ chat /tp 22.5 200 0.5
 wait 0.5
 look 0 0
 hold core:forward 1.5
-chat /tk put me 0 base:dung_pat 2
-key 1
+chat /tk fill 22 200 -8 22 200 -5 base:dung_pat
 look 0 -60
-press core:use
 wait 0.4
 chat /tk mode survival
 key 9

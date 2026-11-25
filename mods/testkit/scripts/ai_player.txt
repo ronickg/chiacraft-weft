@@ -62,8 +62,8 @@ key 1
 hold core:use 2.5
 wait 0.5
 chat /sounds recent
-# a swing at the air
-look 0 10
+# a swing at the air (level: a positive pitch looks up)
+look 0 0
 press core:attack
 wait 0.4
 press core:attack
@@ -73,7 +73,7 @@ chat /sounds recent
 chat /gear bow yew slot=1
 chat /tk give base:arrow 8
 key 2
-look 0 5
+look 0 0
 hold core:use 1.3
 wait 1
 chat /sounds recent
@@ -83,6 +83,11 @@ key 3
 press core:use
 wait 0.5
 chat /sounds recent
+press core:inventory
+wait 1
+shot ai_player_02_helmet.png
+press core:inventory
+wait 0.5
 # a door: placed on the floor ahead, opened, closed
 chat /tk mode creative
 chat /tk put me 3 base:oak_door 1
@@ -90,10 +95,17 @@ key 4
 look 0 -55
 press core:use
 wait 0.5
+# opened (aimed at the closed door), then closed: the open panel stands at one side of its
+# block, so the second and third uses look a little left and right to hit it
+look 0 -30
 press core:use
-wait 0.5
+wait 0.6
+look 25 -30
 press core:use
-wait 0.5
+wait 0.6
+look -25 -30
+press core:use
+wait 0.6
 chat /sounds recent
 # a chest and a furnace, opened and closed
 chat /tp -4.5 200 0.5
@@ -130,7 +142,10 @@ chat /sounds recent
 chat /tp 0.5 200 -6.5
 wait 0.5
 chat /tk fill 2 200 -6 2 200 -6 base:campfire
-chat /tk fill -2 200 -6 -2 200 -6 base:torch
+chat /tk put me 6 base:torch 1
+key 7
+look 0 -60
+press core:use
 wait 3
 shot ai_player_01_fires.png
 chat /sounds recent
