@@ -30,6 +30,11 @@ static MODEL: [Config<i32>; 5] = [
     Config::named("core:dlss_model_performance"),
     Config::named("core:dlss_model_ultra_performance"),
 ];
+/// Auto (`base:dlss_auto`): the mode chosen by the screen's height, as most RTX games do
+/// (Planner from Ronald, 11-25: "check what most games do"; Cyberpunk, Alan Wake 2, NVIDIA's
+/// optimal settings): Quality to 1440p, Performance to 4K, Ultra Performance past it; the model by
+/// the GPU (`auto_model`). Every preset but Ultra turns it on where DLSS runs (`video::apply`).
+pub static AUTO: Config<bool> = Config::named("dlss_auto");
 static RR: Config<bool> = Config::named("core:dlss_rr");
 static RR_MODEL: Config<i32> = Config::named("core:dlss_rr_model");
 static DLSS5: Config<bool> = Config::named("core:dlss5");
@@ -118,11 +123,68 @@ fn mode_row(ui: &mut Ui) {
     row_costed(
         ui,
         "dlss",
-        || (MODE_NAMES[mode() as usize].to_string(), 0),
-        |dir| MODE.set(cycle(&[0, 1, 2, 3, 4, 5], mode(), dir, |m| m == 0 || bit(MODES.get(), m))),
+        || {
+            if AUTO.get() {
+                (format!("auto_{}", MODE_NAMES[mode() as usize]), 0)
+            } else {
+                (MODE_NAMES[mode() as usize].to_string(), 0)
+            }
+        },
+        |dir| {
+            // Off, Auto, then the modes the upscaler offers (-1 stands for Auto).
+            let now = if AUTO.get() { -1 } else { mode() };
+            let next = cycle(&[0, -1, 1, 2, 3, 4, 5], now, dir, |m| m <= 0 || bit(MODES.get(), m));
+            AUTO.set(next == -1);
+            if next >= 0 {
+                MODE.set(next);
+            }
+        },
         true,
         Some(|| mode() as f64),
     );
+}
+
+/// The mode Auto picks for a screen `height` pixels high, among the upscaler's `modes`: Quality to
+/// 1440p (1080p and 1440p alike), Performance to 4K, Ultra Performance past it; the nearest it
+/// offers if not that one.
+pub(crate) fn auto_mode(height: u32, modes: i32) -> i32 {
+    let want = if height <= 1600 {
+        2
+    } else if height <= 2400 {
+        4
+    } else {
+        5
+    };
+    [want, want - 1, want + 1, want - 2, want + 2, 1, 2, 3, 4, 5]
+        .into_iter()
+        .find(|&m| (1..=5).contains(&m) && bit(modes, m))
+        .unwrap_or(0)
+}
+
+/// Auto's model for `mode`: M (13), the newest, on an RTX 40 or 50; on an RTX 20 or 30 (Turing,
+/// Ampere: `video::older_rtx`) E (5) at DLAA, Quality and Balanced, where M cost 3.4 ms more than E
+/// at Quality and 9.2 at DLAA on a 3060 Laptop (w4, 1080p), and M at Performance and Ultra
+/// Performance (12.5 ms at Performance, clean in motion where E and K drew stripes, w8).
+pub(crate) fn auto_model(mode: i32) -> i32 {
+    if crate::video::older_rtx() && mode <= 3 { 5 } else { 13 }
+}
+
+/// Auto's choice for the window now, each frame: the mode and its model when the mode changes (a
+/// model the player picks after stays). Not while a cost sweep steps the mode.
+fn follow_auto(c: &Client) {
+    if !AUTO.get() || !available() || crate::video_costs::progress().is_some() {
+        return;
+    }
+    let h = c.state().window[1];
+    if h == 0 {
+        return;
+    }
+    let m = auto_mode(h, MODES.get());
+    if m != 0 && MODE.get() != m {
+        MODE.set(m);
+        MODEL[(m - 1) as usize].set(auto_model(m));
+        weft_sdk::info!("dlss: auto {} for {h} px high, model {}", MODE_NAMES[m as usize], auto_model(m));
+    }
 }
 
 /// The rows the DLSS tab's measuring steps through (`video_costs`): the modes the upscaler offers,
@@ -212,6 +274,8 @@ fn dlss5_rows(ui: &mut Ui) {
 }
 
 pub fn register(r: &mut Registry) {
+    crate::developer::video(r.config(&AUTO).bool(false));
+    r.client_frame(follow_auto);
     r.menu(&SCREEN).screen(|ui| {
         let tabs = crate::video::tabs("video.base.dlss.title");
         crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.dlss.title", &tabs, |ui| {
