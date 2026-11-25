@@ -239,6 +239,8 @@ chat /tp 22.5 200 0.5
 wait 0.5
 look 0 0
 hold core:forward 1.5
+# the pat needs plant soil under it (on stone it drops at once: ai_blocks_2)
+chat /tk fill 22 199 -8 22 199 -5 base:grass
 chat /tk fill 22 200 -8 22 200 -5 base:dung_pat
 look 0 -60
 wait 0.4
