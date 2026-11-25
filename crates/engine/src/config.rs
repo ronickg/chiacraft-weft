@@ -792,10 +792,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // NVIDIA Reflex's low latency (`Backend::set_low_latency`): 0 off, 1 on, 2 on with boost
         // (the GPU kept clocked up). Live; only where the upscaler has it (`core:gpu_reflex`).
-        number("core:reflex", ck::INT, 0.0, 0.0, 2.0, 1.0),
+        number("core:reflex", ck::INT, 1.0, 0.0, 2.0, 1.0),
         // DLSS frame generation, where the GPU has it (`core:gpu_frame_gen`, an RTX 40 or 50 on
         // Windows): on by default. Not read yet: its present path isn't built (`core:gpu_frame_gen_why`).
-        number("core:frame_gen", ck::BOOL, 0.0, 0.0, 1.0, 1.0),
+        number("core:frame_gen", ck::BOOL, 1.0, 0.0, 1.0, 1.0),
         // A stand-in upscaler that only scales the picture up, for checking the upscaler's path
         // where the renderer has none (the Linux PC); read at start.
         number("core:upscale_standin", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
