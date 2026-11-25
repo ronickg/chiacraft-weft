@@ -269,7 +269,9 @@ fn soft_cover(s: Sky, at: vec2<f32>) -> f32 {
     // 11-06).
     // Clear days from 0.32 (0.40 before, cover B): in Bliss's own world at noon its sky is mostly open
     // blue with a few masses, ours still a dense even layer (Planner's d1 sheet, 11-06).
-    return clamp(mix(0.32, 0.8, wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
+    // With the chain rain at 0.88: at 0.8 a rainy noon looked up through a blue gap overhead where
+    // Bliss's rain is one warm grey cover with a few breaks for its shafts (lkmxK1 rain ground).
+    return clamp(mix(0.32, select(0.8, 0.88, bliss_chain()), wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
 }
 
 // The cloud's density at `at` (its frame, blocks) and `a` (0 at the layer's underside, 1 at its
@@ -464,7 +466,9 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
             // from under them, ours went steel grey and purple with darker bellies (PC shcl1, the
             // first pass), where Bliss's are cream.
             let deep = exp(-od * 0.12) * (1.0 - exp(-sigma * 8.0) * 0.5);
-            c += (sun * deep * 0.35 + (p.horizon * 0.25 + p.ambient * 0.45) * (1.0 - smoothstep(0.0, 0.6, a))) * albedo;
+            // (The night's cut on this sky light too: without it the 0.4 above moved them little,
+            // lkmxK1 night clouds still white-blue over Bliss's darker-than-sky ones.)
+            c += (sun * deep * 0.35 + (p.horizon * 0.25 + p.ambient * 0.45) * night_amb * (1.0 - smoothstep(0.0, 0.6, a))) * albedo;
         }
         // In the HDR world a silver rim: the thin edges of a cloud before the sun, where the light
         // has crossed little of it, glow white-gold toward the eye (Bliss's and Photon's bright rims, a wide lobe: at g 0.9 and a
