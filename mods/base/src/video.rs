@@ -151,6 +151,7 @@ static GPU_DLSS_MODES: Config<i32> = Config::named("core:gpu_dlss_modes");
 static GPU_DLSS_RR: Config<bool> = Config::named("core:gpu_dlss_rr");
 static DLSS: Config<i32> = Config::named("core:dlss");
 static DLSS_MODEL_DLAA: Config<i32> = Config::named("core:dlss_model_dlaa");
+static DLSS_MODEL_PERFORMANCE: Config<i32> = Config::named("core:dlss_model_performance");
 static DLSS_RR: Config<bool> = Config::named("core:dlss_rr");
 /// What the detection chose (Research round 19, 7: "quality chosen by the GPU at first start"):
 /// the preset (-1 none yet), and whether the render scale went to half with it.
@@ -303,11 +304,29 @@ fn ultra_extras() {
     // DLAA (DLSS at the screen's own size) where the renderer has it, with its newest model (M,
     // 13) and Ray Reconstruction where that runs (windows-dlss5, 11-06): the engine then skips its
     // own gathering for the frame. Elsewhere TAA as above.
-    if GPU_DLSS_MODES.get() & (1 << 1) != 0 {
+    // On an RTX 20 or 30 (`older_rtx`) Performance with M instead: there M costs about 10.6 ms at
+    // DLAA (E 1.4, K 2.3) and DLAA with Ray Reconstruction 45 ms, Performance M 12.5 in all, and in
+    // motion E and K drew stripes beside the pool where M stayed clean (3060 Laptop, w4 and w8,
+    // 11-25; Planner agreed). Quality with E stays the cheaper choice in the DLSS tab.
+    let modes = GPU_DLSS_MODES.get();
+    if older_rtx() && modes & (1 << 4) != 0 {
+        DLSS.set(4);
+        DLSS_MODEL_PERFORMANCE.set(13);
+        DLSS_RR.set(GPU_DLSS_RR.get());
+    } else if modes & (1 << 1) != 0 {
         DLSS.set(1);
         DLSS_MODEL_DLAA.set(13);
         DLSS_RR.set(GPU_DLSS_RR.get());
     }
+}
+
+/// A GeForce RTX 20 or 30, a TITAN RTX or an RTX A (workstation Ampere), by the GPU's name
+/// (`--fake-gpu-name` pretends): Turing and Ampere, which run DLSS's transformer models (K, M) at
+/// several times the CNN's cost. An RTX 40, 50 or a name not known: the newest models at full size.
+fn older_rtx() -> bool {
+    let name = weft_sdk::client::launch_option("fake-gpu-name").unwrap_or_else(|| GPU_NAME.get()).to_lowercase();
+    // (Ada's workstation cards are named "RTX 2000 Ada" and the like.)
+    !name.contains("ada") && ["rtx 20", "rtx 30", "titan rtx", "rtx a"].iter().any(|w| name.contains(w))
 }
 
 /// Preset `q`'s name (`video.base.preset.<name>`); None for Custom and not chosen.
