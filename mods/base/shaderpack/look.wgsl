@@ -1891,6 +1891,9 @@ fn leaf_through(rel: vec3<f32>, shadow: f32, sky: f32) -> f32 {
 
 fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let ao = mix(ao_in, 1.0, clamp(fantasy_opt(OPT_AO_TEST), 0.0, 1.0));
+    if land_from_sky() {
+        return light_on_bliss(n, light, shadow, ao, pos, rel);
+    }
     let p = palette();
     // The sky's light falls off steeply under cover (Bliss's lightmap, (L^15 x 2 + L^2.5) / 3: 1 in the
     // open, 0.39 a step under, 0.21 two): a forest floor sits a few times below open shade, the open
@@ -1958,18 +1961,44 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao_in: f32, pos: vec3<f
     NIGHT_SKY_SHARE = night_sky_share(c, blocks);
     c += blocks;
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
-    // With the land lit from the physical sky, Bliss's minimum light (composite1, method only): 0.01
-    // in its lighting units (/ 41 in ours), x (1 + 0.7 n . the look), white, no AO; night vision
-    // (and the Brightness setting above its middle, as night vision) lift it to 0.1. Ours of 0.006
-    // to 0.03 was 25-120 x Bliss's: at night and in caves it outshone the moon and the sky's light,
-    // and the exposure lifted it to a lit green land (lkmxS1's night_vista, 11-25).
-    if land_from_sky() {
-        let look = normalize(rel + vec3(0.0, 1e-6, 0.0));
-        c += vec3(max(bliss_min_light(), brightness_curve(scene.light.x) * 0.25)) * (1.0 + 0.7 * dot(n, look));
-    } else {
-        let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
-        c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
+    // (Where the land is lit from the physical sky, Bliss's minimum light, `light_on_bliss`: ours of
+    // 0.006 to 0.03 was 25-120 x Bliss's 0.01 / 41 and lit the night land green, lkmxS1.)
+    let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
+    c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
+    LIGHT_ALL = c;
+    return c;
+}
+
+// The land's light as Bliss's lighting pass (composite1.fsh and diffuse_lighting.glsl, method only;
+// the lighting batch, 11-25), where the land is lit from the physical sky:
+//  - the sun: `shadow` (the map, or past it the lightmap's fallback, `sun_shadow`) x its facing,
+//    clamp((n . l x 255 - 15) / 240): no sky-light gates on it and no AO;
+//  - the sky's light: the ambient x its facing, max((n.y / 2 + 0.5)^0.1 + 1.5 (n / |n|1).y,
+//    0.2 + 0.8 (1 - L)) (tops 2.5, sides 0.93, bottoms 0.2 in the open, all round toward 1 in a
+//    cave), x its lightmap curve ((L^15 x 2 + L^2.5) x 0.5, L offset min((L - 0.05) x 1.06, 1)) x 0.7;
+//  - lamps and its minimum light added, and the AO on all but the sun.
+// Replaced on this path: the sun cut by the sky light (0.65 x 0.04 of it on a cave wall at sky
+// level 9), the rain's hemisphere, the clouds' shadow on the sky's light, the canopy's sun fill and
+// tint, the golden glow fill, the day/night divisor and the AO on the sun.
+fn light_on_bliss(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let p = palette();
+    let l = min(max(light.x - 0.05, 0.0) * 1.06, 1.0);
+    let curve = (pow(l, 15.0) * 2.0 + pow(l, 2.5)) * 0.5;
+    let dir_y = n.y / max(abs(n.x) + abs(n.y) + abs(n.z), 1e-4) * 1.5;
+    let facing = max(pow(n.y * 0.5 + 0.5, 0.1) + dir_y, 0.2 + (1.0 - l) * 0.8);
+    var indirect = p.ambient * facing * curve * 0.7;
+    var held = vec3(0.0);
+    if !CALM {
+        indirect += lightning_glow_at(rel) * curve;
+        held = held_light(rel, n);
     }
+    let look = normalize(rel + vec3(0.0, 1e-6, 0.0));
+    let floor_light = vec3(max(bliss_min_light(), brightness_curve(scene.light.x) * 0.25)) * (1.0 + 0.7 * dot(n, look));
+    let blocks = block_light(max(light.yzw, held), pos) * block_by_day(light.x);
+    let sun_part = p.sun * light_strength() * clamp((dot(n, light_dir()) * 255.0 - 15.0) / 240.0, 0.0, 1.0) * shadow;
+    LIGHT_SUN = sun_part;
+    NIGHT_SKY_SHARE = night_sky_share(indirect + sun_part, blocks);
+    let c = (indirect + blocks + floor_light) * ao + sun_part;
     LIGHT_ALL = c;
     return c;
 }

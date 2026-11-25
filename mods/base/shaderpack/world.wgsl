@@ -423,6 +423,12 @@ const RT_REACH: f32 = 256.0;
 // faded in over the reach's last fifth, as Bliss's map fades into its lightmap mask. No map or ray
 // is asked out there.
 fn sky_sun_mask(in: VOut) -> f32 {
+    // Where the land is lit from the physical sky, Bliss's fallback past its map: clamp((L - 0.8) x
+    // 25) on its offset lightmap (composite1.fsh, method only).
+    if land_from_sky() {
+        let l = min(max(in.light.x - 0.05, 0.0) * 1.06, 1.0);
+        return clamp((l - 0.8) * 25.0, 0.0, 1.0) * cloud_shadow(in.rel);
+    }
     return smoothstep(0.86, 0.94, in.light.x) * cloud_shadow(in.rel);
 }
 
@@ -453,7 +459,9 @@ fn sun_shadow_near(in: VOut, n: vec3<f32>) -> f32 {
         return 0.0;
     }
     let c = min(canopy(), 1.0);
-    let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
+    // (Where the land is lit from the physical sky, no sky-light gate: Bliss's sun is its shadow's
+    // alone, lighting cave mouths and overhangs the map or the ray reaches.)
+    let cover = select(smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x), 1.0, land_from_sky());
     // Deep under cover (a cave, a room): no sun to trace.
     if cover <= 0.0 {
         return 0.0;
@@ -478,6 +486,12 @@ fn sun_shadow_mapped(in: VOut, n: vec3<f32>) -> f32 {
     // Under a forest's canopy the map's gaps let the sun through where the leaves cut the sky light
     // (`light_on`'s sunflecks).
     let c = min(canopy(), 1.0);
+    // Where the land is lit from the physical sky, Bliss's: the map's own, its lightmap fallback
+    // where the map isn't, with no sky-light gate (its cave walls took 3 % of the sun under ours).
+    if land_from_sky() {
+        let l = min(max(in.light.x - 0.05, 0.0) * 1.06, 1.0);
+        return mix(clamp((l - 0.8) * 25.0, 0.0, 1.0), mapped.x, mapped.y) * cloud_shadow(in.rel);
+    }
     return mix(sky, min(mapped.x, smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x)), mapped.y) * cloud_shadow(in.rel);
 }
 
@@ -531,10 +545,36 @@ fn leaf_sss(in: VOut, col: vec3<f32>) -> vec3<f32> {
     return palette().sun * light_strength() * depth * absorb * phase * open * leaf_light();
 }
 
+// Bliss's sun highlight on a surface with no material maps (specular.glsl, method only; Ronald's
+// profile, Sun_specular_Strength 10, with vanilla textures: roughness 1, F0 0.02): GGX with D 1/pi,
+// Schlick's Fresnel by Bliss's exponent, its visibility 1 / (LH^2 x 0.75 + 0.25), x n . l x 10 on
+// the sun that reached the face (`LIGHT_SUN`), not by the albedo: a faint sheen with the sun
+// behind, a strong untextured one on faces seen against a low sun (the gap list's lighting 17).
+fn bliss_sun_sheen(n: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let l = light_dir();
+    let v = -normalize(rel + vec3(0.0, 1e-6, 0.0));
+    let h = normalize(l + v);
+    let lh = clamp(dot(l, h), 0.0, 1.0);
+    let f = 0.02 + 0.98 * exp2((-5.55473 * lh - 6.98316) * lh);
+    let vis = 1.0 / (lh * lh * 0.75 + 0.25);
+    let ndl = clamp((dot(n, l) * 255.0 - 15.0) / 240.0, 0.0, 1.0);
+    return LIGHT_SUN * ndl * (1.0 / 3.14159) * f * vis * 10.0;
+}
+
 // `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
 fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
     var light = paint * light_on(n, in.light, shadow, ao, in.pos, in.rel);
+    // Where the land is lit from the physical sky, leaves and plants as any block, as Ronald's Bliss
+    // (SSS type 3 with no LabPBR pack: no light through them, no extra sun, no hold-back), apart
+    // from the leaf light setting (`leaf_sss`, off as made): the crowns' back-light and leaf-sun
+    // extra lit them where Bliss's stay plain (the gap list's lighting 14).
+    if land_from_sky() {
+        if LEAF_CUBE {
+            LEAF_SHADOW = shadow;
+        }
+        return light;
+    }
     // Leaves and plants let some sun through when it is behind them.
     // In the HDR world the light through leaves (`leaf_through`), the curve rolling its brights off
     // (the screen's hold-back below was for today's look).
@@ -649,12 +689,15 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         if mat.has {
             lit = vec4(lit.rgb * (1.0 - 0.5 * mat.metal) + mat_shine(in, mat, n, albedo.rgb, light), lit.a);
             lit = vec4(lit.rgb + mat_through(in, mat, albedo.rgb), lit.a);
+        } else if land_from_sky() {
+            lit = vec4(lit.rgb + bliss_sun_sheen(n, in.rel), lit.a);
         }
         // A low sun full on a bright, saturated yellow-green (the birch's untinted leaves, whose
         // own picture is that green, so `surface_light` never sees them as leaves): some of its
         // colour and brightness held back while the sun is under about 45°. A leaf by the eye at
         // 18:00 stayed lime, 3.5 % of the frame (PC sh3c). By colour, as no flag marks them.
-        let low = 1.0 - smoothstep(0.5, 0.72, scene.sun.y);
+        // (Not where the land is lit from the physical sky: Bliss has no such cut.)
+        let low = select(1.0 - smoothstep(0.5, 0.72, scene.sun.y), 0.0, land_from_sky());
         let c = lit.rgb;
         if low > 0.0 && c.g > c.r && c.r > c.b {
             let sat = (c.g - c.b) / max(c.g, 1e-4);
