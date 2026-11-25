@@ -320,6 +320,10 @@ const ATM_NIGHT_FLOOR: f32 = 1.0;
 // with the chain. Ours were set for the per-hour exposures; under Bliss's one log curve the night
 // came out much brighter than Bliss's dark navy (lkmxC1), whose moon is 1/1250 of its sun.
 const OPT_CHAIN_NIGHT: u32 = 73u;
+// The sun's light outside the air with the chain: the blackbody colour of 4300 K (Ronald's profile;
+// linear, normalised to red 1), and how much of the sky's light's blue goes by day.
+const CHAIN_SUN_K: vec3<f32> = vec3(1.0, 0.67, 0.43);
+const CHAIN_AMBIENT_GREY: f32 = 0.4;
 fn sky_phys_on() -> bool {
     return scene.frame.x > 0.5 && scene.frame_look.x > 0.5 && fantasy_opt(OPT_SKY_PHYS) > 0.5;
 }
@@ -775,6 +779,19 @@ fn palette_now() -> Palette {
         p.ambient *= mix(1.0, shade_k, low * evening * (1.0 - rain_amount()));
     }
     if bliss_chain() {
+        // The sun's light as Bliss's: its colour the 4300 K of Ronald's profile through the air
+        // toward the sun (the same air as the sky's, `atm_toward`), at our palette's brightness. A
+        // deep gold at sunrise where ours went pale cream through the chain (lkmxH1 sunup), warm
+        // white at noon (Bliss's sunlit stone beige where ours stayed grey, its cave rows).
+        let up = normalize(vec3(scene.sun.x, max(scene.sun.y, 0.03), scene.sun.z));
+        let through = exp(-atm_toward(vec3(0.0, ATM_GROUND + 100.0, 0.0), up) * ATM_SUN_PATH);
+        let tint = CHAIN_SUN_K * through;
+        // (The sun's only: at night `p.sun` is the moon's light.)
+        p.sun = mix(p.sun, tint * (luma(p.sun) / max(luma(tint), 1e-4)), smoothstep(-0.06, 0.0, scene.sun.y));
+        // The sky's light by day half its blue: Bliss's is the sky's average with its clouds (grey-
+        // white) in it, and its shade reads a neutral grey where ours stood cold blue-grey (cave rows).
+        let day = smoothstep(-0.02, 0.1, scene.sun.y);
+        p.ambient = mix(p.ambient, vec3(luma(p.ambient)) * vec3(1.0, 0.98, 0.96), CHAIN_AMBIENT_GREY * day);
         let night = smoothstep(-0.04, -0.2, scene.sun.y);
         let k = mix(1.0, clamp(fantasy_opt(OPT_CHAIN_NIGHT), 0.0, 1.0), night);
         p.ambient *= k;
