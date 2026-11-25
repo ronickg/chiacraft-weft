@@ -308,7 +308,11 @@ fn tames(w: &mut String) {
 
 fn bosses(w: &mut String) {
     use animals_core::bosses::{BOSSES, PLAYER_BLOW, SIZE};
-    let _ = write!(w, "## Biome bosses\n\nEach boss is a titan at its form's age (`animals_core::bosses`): its numbers from the curve like any creature's, a fight of 2-5 minutes for a same-age player, the cap and the floor against over-tier gear. Seconds to kill and its hits to down the player (grade 4), by the player's age. Forms with no offering are data for later ages. One blow takes at most {:.0} % of a player's max health before the player's armour (`PLAYER_BLOW`), so a player at full health lives through any one; the hits column is the curve's, before that cap.\n\n", PLAYER_BLOW * 100.0);
+    let _ = write!(
+        w,
+        "## Biome bosses\n\nEach boss is a titan at its form's age (`animals_core::bosses`): its numbers from the curve like any creature's, a fight of 2-5 minutes for a same-age player, the cap and the floor against over-tier gear. Seconds to kill and its hits to down the player (grade 4), by the player's age. Forms with no offering are data for later ages. One blow takes at most {:.0} % of a player's max health before the player's armour (`PLAYER_BLOW`), so a player at full health lives through any one; the hits column is the curve's, before that cap.\n\n",
+        PLAYER_BLOW * 100.0
+    );
     w.push_str("| boss | form | offering | level | health | armour | hit | Stone | Bronze | Iron | Steam | Stars |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n");
     for b in &BOSSES {
         for f in b.forms {
