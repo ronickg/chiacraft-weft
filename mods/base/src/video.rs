@@ -74,13 +74,14 @@ fn waiting(key: &str) -> bool {
     }
 }
 
-/// What the render scale row's Auto (0) is on a window of `window` pixels: 0.67 on a big
+/// What the render scale row's Auto (0) is on a window of `window` pixels: 0.65 on a big
 /// high-density screen (5 million pixels or more, the line `detect` draws for a Retina MacBook),
-/// 1 elsewhere. The engine never gets the 0 itself: since the 11-22 sync it clamps the render
+/// 1 elsewhere. Every scale here is a 0.05 step, as the engine keeps `core:render_scale` (a 0.67
+/// was stored as 0.65, and Auto set it again at every start). The engine never gets the 0 itself: since the 11-22 sync it clamps the render
 /// scale to 0.25 and up, and a 0 drew the world at a quarter of the pixels (Ronald's M3 Max,
 /// 1028x629 of a 4112x2516 window, Planner 11-24).
 fn auto_render_scale(window: [u32; 2]) -> f32 {
-    if window[0] as u64 * window[1] as u64 >= 5_000_000 { 0.67 } else { 1.0 }
+    if window[0] as u64 * window[1] as u64 >= 5_000_000 { 0.65 } else { 1.0 }
 }
 
 /// The values waiting go to the engine, while no world is open (render targets made afresh then,
@@ -234,7 +235,7 @@ struct Row {
 const PRESETS: [[f64; 5]; 4] = [
     // scale view lod   vsync cap
     [0.5, 6.0, 64.0, 1.0, 60.0],
-    [0.67, 8.0, 128.0, 1.0, 60.0],
+    [0.65, 8.0, 128.0, 1.0, 60.0],
     [0.0, 12.0, 192.0, 1.0, 0.0],
     [1.0, 16.0, 256.0, 1.0, 0.0],
 ];
@@ -338,9 +339,9 @@ const PRESET_ROWS: usize = 5;
 const ROWS: [Row; 7] = [
     Row {
         key: "render_scale",
-        // 0 is Auto: 0.67 on a big high-density screen, 1 elsewhere (`auto_render_scale`), written
+        // 0 is Auto: 0.65 on a big high-density screen, 1 elsewhere (`auto_render_scale`), written
         // as that number at the next start.
-        values: &[0.0, 0.5, 0.6, 0.67, 0.75, 0.85, 1.0],
+        values: &[0.0, 0.5, 0.6, 0.65, 0.75, 0.85, 1.0],
         get: render_scale,
         set: |v| RENDER_SCALE_NEXT.set(v as f32),
         shown: |v| if v == 0.0 { word("auto") } else { ("percent".into(), (v * 100.0).round() as i64) },
