@@ -192,7 +192,7 @@ fn pt_cached(world: vec3<f32>, n: vec3<f32>, dist: f32, u: vec2<f32>) -> vec4<f3
 fn pt_lit(b: RtHit, l: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
     var s = 0.0;
     if dot(b.n, l) > 0.0 && light_strength() > 0.0 {
-        s = dot(rt_sun(b.rel, b.n, l, false), vec3(1.0 / 3.0));
+        s = dot(rt_sun(b.rel, b.n, l, false), vec3(1.0 / 3.0)) * models_shadow(b.rel, b.n) * cloud_shadow(b.rel);
     }
     let c = pt_cached(b.world, b.n, length(b.rel), u);
     if c.a > 0.5 {
@@ -310,6 +310,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     var sun = 0.0;
     if dot(ng, l) > 0.0 && light_strength() > 0.0 {
         sun = dot(rt_sun_soft(h.rel + lift, ng, l, false, PT_SUN_CONE, px, false), vec3(1.0 / 3.0));
+        // As the world's traced sun (`world.wgsl` `sun_shadow_near`): the models' shadows (mobs
+        // and players are not in the traced scene) and the clouds'. Without them a rainy day's
+        // ground stayed sunlit where the world's lay under its clouds (w33).
+        sun *= models_shadow(h.rel, n) * cloud_shadow(h.rel);
     }
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
     // lightmap gives it (already lowered under cover) and as the open sky would give it.
