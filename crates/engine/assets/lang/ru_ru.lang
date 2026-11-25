@@ -550,6 +550,7 @@ command.sounds.one = {0}, громкость {1}
 command.sounds.loop = {0}, громкость {1}, по кругу
 command.sounds.reading = {0}, громкость {1}, файл ещё читается
 command.sounds.none_recent = ни один звук ещё не начинался
+command.sounds.check = Проверка звуков. Блоки без звука: {0}. Существа без звука: {1}. События без файлов: {2}
 command.title.done = показано: {0}
 gizmo.value = {0}
 gizmo.cubes = границы куба, в котором вы стоите, и соседних

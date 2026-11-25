@@ -3295,6 +3295,41 @@ pub async fn mob_in_the_way(t: T) -> R {
         .await
 }
 
+/// Every block and every spawned creature has sounds, and every sound event's files are there
+/// (`/sounds check`, chiacraft; needs no sound device). Left silent on purpose: the testkit's and
+/// test mod's own blocks and kinds, the packages' stand-in for a missing block, and fish.
+pub async fn sound_coverage(t: T) -> R {
+    t.flat().await?;
+    let reply = t.cmd("/sounds check").await?;
+    let part = |label: &str| -> Vec<String> {
+        let Some(at) = reply.find(label) else { return vec![format!("<no {label} in {reply:?}>")] };
+        let rest = &reply[at + label.len()..];
+        let end = rest.find(". ").unwrap_or(rest.len());
+        rest[..end]
+            .trim()
+            .trim_end_matches('.')
+            .split_whitespace()
+            .filter(|w| *w != "-")
+            .map(str::to_string)
+            .collect()
+    };
+    let ours = |n: &str| n.starts_with("testkit:") || n.starts_with("testmod:");
+    let blocks: Vec<String> = part("Silent blocks:")
+        .into_iter()
+        .filter(|n| !ours(n) && n != "packages:unknown")
+        .collect();
+    let fish = ["brown_trout", "pacu", "lungfish", "lycoptera"];
+    let kinds: Vec<String> = part("Silent creatures:")
+        .into_iter()
+        .filter(|n| !ours(n) && !fish.iter().any(|f| n.ends_with(&format!(":{f}"))))
+        .collect();
+    let missing = part("Events missing files:");
+    t.check(blocks.is_empty(), &format!("blocks with no sounds: {}", blocks.join(" ")));
+    t.check(kinds.is_empty(), &format!("creatures with no sounds: {}", kinds.join(" ")));
+    t.check(missing.is_empty(), &format!("sound events missing files: {}", missing.join(" ")));
+    Ok(())
+}
+
 /// Breaking and placing play the block's sounds (from the server), walking plays steps, and
 /// `/music` starts a track. Only checks that sounds start; without a sound device it is skipped.
 pub async fn sounds(t: T) -> R {

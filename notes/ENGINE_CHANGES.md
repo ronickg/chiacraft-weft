@@ -271,7 +271,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 
 ## 6. Sound
 
-- **Handles, loops, a voice cap and safe file reading; weather sound** (415a0fe8); **block groups by data, voices for every mob and 42 species, load-time checks** (9871a15c); **sounds for 7 materials and the UI** (83019cb9); **`/sounds recent`** (869ce80c). *Why:* the game had almost no sound, and testers needed to see what played.
+- **Handles, loops, a voice cap and safe file reading; weather sound** (415a0fe8); **block groups by data, voices for every mob and 42 species, load-time checks** (9871a15c); **sounds for 7 materials and the UI** (83019cb9); **`/sounds recent`** (869ce80c). **`/sounds check`** (sound worker, 11-24): blocks and spawned kinds with no sound and events whose files are missing, as one reply line and a `sound check:` log line, without needing a sound device (`audio::sound_check`, shared with the load-time `sound files:` line), for the testkit's `sound_coverage`. *Why:* the game had almost no sound, and testers needed to see what played.
 
 ## 7. Our project's phases (the network and content layer)
 

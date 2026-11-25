@@ -286,6 +286,21 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
     }),
     // What this client hears now, most important first (also in the log, for scripts).
     ("sounds", "[which:word]", |r, args| match &r.audio {
+        // What has no sound, with or without a sound device (chiacraft; the testkit's `sounds`).
+        _ if args.text("which") == Some("check") => {
+            let c = crate::audio::sound_check(&r.assets);
+            let list = |v: &[String]| if v.is_empty() { "-".to_string() } else { v.join(" ") };
+            log::info!(
+                "sound check: silent blocks [{}] silent kinds [{}] missing files [{}]",
+                list(&c.silent_blocks),
+                list(&c.silent_kinds),
+                list(&c.missing)
+            );
+            vec![Msg::new(
+                "command.sounds.check",
+                vec![Arg::Text(list(&c.silent_blocks)), Arg::Text(list(&c.silent_kinds)), Arg::Text(list(&c.missing))],
+            )]
+        }
         Some(a) if args.text("which") == Some("recent") => {
             // The last sounds started, newest first (also in the log): one-shots that already ended.
             let mut out = Vec::new();

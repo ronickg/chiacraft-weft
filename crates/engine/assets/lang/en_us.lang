@@ -693,6 +693,7 @@ command.sounds.one = {0} at {1}
 command.sounds.loop = {0} at {1}, looping
 command.sounds.reading = {0} at {1}, its file still being read
 command.sounds.none_recent = No sound has started yet
+command.sounds.check = Sound check. Silent blocks: {0}. Silent creatures: {1}. Events missing files: {2}
 command.title.done = shown to {0}
 gizmo.value = {0}
 gizmo.cubes = borders of the cube you are in and its neighbors
