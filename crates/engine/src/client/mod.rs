@@ -3849,7 +3849,7 @@ impl Client {
             },
             rt: [
                 // 1 traced shadows; 2 also path traced, whose pass lights the terrain again (the
-                // world's shader leaves its rays there to it, `world.wgsl`'s `PT_SKIP`).
+                // world's shader leaves its rays there to it, `world.wgsl`'s `pt_takes`).
                 if !self.render.rt_traced() {
                     0.0
                 } else if shadow_setting("core:path_traced", 0.0) > 0.5 && self.render.pt_ready() {

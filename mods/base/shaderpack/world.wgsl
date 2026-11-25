@@ -430,13 +430,36 @@ fn sky_sun_mask(in: VOut) -> f32 {
 // and traced it is a soft shadow's rays each time (the same rays: the same pixel, frame and normal).
 var<private> SHADOW_MEMO: vec4<f32> = vec4(0.0, 0.0, 0.0, -1.0);
 
-// Path traced (`scene.rt.x` 2): an opaque block face near enough, which the path tracer lights again
-// (`pathtrace.wgsl` takes every terrain pixel the G-buffer drew within its reach and puts its own
-// picture there). Its traced shadow and reflection here would be thrown away, so they aren't
-// traced: the sky's mask and the blurred guess stand in (Planner, 11-25: path tracing at 60 on an
-// RTX 3060, optimised, not downgraded). Leaves and plants keep theirs: where their holes make the
-// path tracer's check miss, the world's pixel stays.
-var<private> PT_SKIP: bool = false;
+// Path traced (`scene.rt.x` 2): an opaque block face (`PT_CAND`) the path tracer will light again
+// (`pt_takes`) has its traced shadow and reflection thrown away, so they aren't traced here: the
+// sky's mask and the blurred guess stand in (Planner, 11-25: path tracing at 60 on an RTX 3060,
+// optimised, not downgraded). Leaves and plants keep theirs.
+var<private> PT_CAND: bool = false;
+// -1 not asked yet, 0 the world's pixel stays, 1 the path tracer takes it.
+var<private> PT_TAKES: i32 = -1;
+const PT_REACH_WORLD: f32 = 384.0;
+
+// Whether the path tracer takes this pixel: its own test (`cs_trace`), one ray from the eye that
+// must meet terrain at this depth, nothing clear (water, glass) before it, within its reach. Where it
+// fails (a floor seen through a pane or the pool's water) the world's pixel stays, with its rays:
+// skipped there, those floors lost their shade (w18, the hall's pool). Asked only where a ray would
+// be traced, once a pixel.
+fn pt_takes(in: VOut) -> bool {
+    if !PT_CAND {
+        return false;
+    }
+    if PT_TAKES < 0 {
+        let d = length(in.rel);
+        PT_TAKES = 0;
+        if d > 1e-3 && d <= PT_REACH_WORLD {
+            let h = rt_hit(vec3(0.0), in.rel / d, d * 1.1 + 2.0, 0.0);
+            if h.hit && !h.clear && abs(h.t - d) <= 0.02 * d + 0.15 {
+                PT_TAKES = 1;
+            }
+        }
+    }
+    return PT_TAKES == 1;
+}
 
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     if SHADOW_MEMO.w >= 0.0 && all(SHADOW_MEMO.xyz == n) {
@@ -469,9 +492,6 @@ fn sun_shadow_near(in: VOut, n: vec3<f32>) -> f32 {
     if scene.rt.x < 0.5 || in.dist >= RT_REACH {
         return sun_shadow_mapped(in, n);
     }
-    if PT_SKIP {
-        return sky_sun_mask(in);
-    }
     // A solid face turned from the light is in its own shade (leaves and plants let it through).
     if dot(n, light_dir()) <= 0.0 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE {
         return 0.0;
@@ -481,6 +501,9 @@ fn sun_shadow_near(in: VOut, n: vec3<f32>) -> f32 {
     // Deep under cover (a cave, a room): no sun to trace.
     if cover <= 0.0 {
         return 0.0;
+    }
+    if pt_takes(in) {
+        return cover;
     }
     let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, scene.rt.z > 0.5);
     let traced = min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
@@ -844,7 +867,7 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     var sky = mix(light * 0.5, sky_seen, open * open);
     // Traced (`scene.rt.w`): what really lies that way, the room or the hills, off the screen too;
     // the rougher, the more it gives way to the blurred guess above.
-    if scene.rt.w > 0.5 && m.rough < 0.5 && !PT_SKIP {
+    if scene.rt.w > 0.5 && m.rough < 0.5 && !pt_takes(in) {
         sky = mix(traced_view(in.rel + n * 0.01, r, m.rough * 6.0, 0.01 + m.rough * 0.5, in.clip.xy), sky, smoothstep(0.1, 0.5, m.rough));
     }
     // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
@@ -1334,7 +1357,7 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
 
 @fragment
 fn fs_opaque(in: VOut) -> WorldOut {
-    PT_SKIP = scene.rt.x > 1.5 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE;
+    PT_CAND = scene.rt.x > 1.5 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE;
     return world_out(in, opaque(in));
 }
 
