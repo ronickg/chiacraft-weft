@@ -737,7 +737,10 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // little darker, a faint sheen.
     let open_top = smoothstep(0.85, 1.0, in.light.x);
     let leafy = in.kind.z != 0u || in.kind.x == TINT_FOLIAGE;
-    let wet = ground_wet() * open_top * select(smoothstep(0.3, 0.9, n.y), 0.45, leafy);
+    // Neither where it snows or never rains (Bliss's noPuddleAreas, on its wetness and puddles both:
+    // as the rain's fog, `rain_fog_at`): dark-blue pools lay on the snow fields (lkwxA1).
+    let rains_here = rain_fog_at(in.pos.y);
+    let wet = ground_wet() * open_top * rains_here * select(smoothstep(0.3, 0.9, n.y), 0.45, leafy);
     if wet > 0.0 {
         let v = -normalize(in.rel);
         // (Darker and glossier than in the rain alone: after it, in the sun, 0.7 and a 0.12 sheen
@@ -749,7 +752,7 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // (`scene.canopy.z`, the engine's) and dry slower than the ground after: a shower leaves a few
     // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
     // mirrored by Fresnel, and rings where the rain still falls on it.
-    let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
+    let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top * rains_here;
     // (None in the calm-and-dry pipelines, `DRY`.)
     if !DRY && puddles > 0.01 && !leafy && n.y > 0.95 {
         // In cells three blocks across, some hold a puddle (one hash each against a share that grows
