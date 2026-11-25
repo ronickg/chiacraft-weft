@@ -332,10 +332,38 @@ pub fn hurt(w: &World, id: u64, source: u64, cause: u32) {
             t.effectiveness = (t.effectiveness - HURT).max(0.0);
         }
     });
-    if source != 0 && source != id {
+    let attacker = (source != 0 && source != id)
+        .then(|| w.entity(source))
+        .flatten();
+    if let (Some(a), Some(st)) = (attacker, w.entity(id)) {
+        let at = [a.pos.x as f32, a.pos.y as f32, a.pos.z as f32];
+        // Its herd hears it: it calls as it is hit, and they run (or stand) with it (cov_grazers:
+        // a hit deer ran alone, its herd grazed on beside the player).
+        let heard = crate::senses::alarm(w, id, &st, source, at);
+        if heard > 0 {
+            weft_sdk::info!("animal {id} calls the alarm as it is hurt: {heard} of its kind near run too");
+        }
+        // A big plant eater turns on what hit it instead of running (`roles::STANDS_KG`:
+        // `hunt::wary` stands and charges at its next look; cov_grazers: hit iguanodonts and
+        // ankylosaurs only ran).
+        if stands_when_hit(w, id) {
+            if let Some(s) = w.component_mut(id, &crate::senses::SENSES) {
+                s.aware = s.aware.max(animals_core::perception::NOTICED + 0.5);
+                (s.threat, s.threat_pos) = (source, at);
+            }
+            weft_sdk::info!("animal {id} hurt by {source}: turns on it");
+            return;
+        }
         weft_sdk::info!("animal {id} hurt by {source}: runs from it");
     }
     scare(w, id, source);
+}
+
+/// Whether a wild one turns on what hurt it: a grown plant eater of `roles::STANDS_KG` or more.
+fn stands_when_hit(w: &World, id: u64) -> bool {
+    crate::senses::facts(w, id)
+        .and_then(|f| Some((f, f.species()?)))
+        .is_some_and(|(f, s)| !s.hunts() && f.young == 0 && f.tamed == 0 && f.mass >= animals_core::roles::STANDS_KG)
 }
 
 /// A player right clicks a wild animal with `held`: food it eats goes toward taming it. True if

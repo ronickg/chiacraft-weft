@@ -798,7 +798,9 @@ pub fn alarm(w: &World, id: u64, st: &EntityState, threat: u64, pos: [f32; 3]) -
             continue;
         }
         if let Some(s) = w.component_mut(o, &SENSES) {
-            s.aware = s.aware.max(NOTICED);
+            // Past the mark by what fades before its next look (an alarm at exactly `NOTICED` faded
+            // to a stare: cov_grazers' herds never ran).
+            s.aware = s.aware.max(NOTICED + 0.5);
             s.threat = threat;
             s.threat_pos = pos;
             s.alarm_at = now.max(1);

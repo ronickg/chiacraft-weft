@@ -6,6 +6,8 @@ import os
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "mods", "testkit", "scripts")
 Z = 544
+# Each pad starts at noon: the runs are long, and their last shots were taken at night.
+TIME = 6000
 
 
 def head(title, lines):
@@ -24,7 +26,7 @@ def pad(x, pond=1, deep=1):
         f"chat /tk fill {x-16} 60 {Z-16} {x+16} 68 {Z+16} base:dirt",
         f"chat /tk fill {x-16} 69 {Z-16} {x+16} 69 {Z+16} base:grass",
         f"chat /tk fill {x-16} 70 {Z-16} {x+16} 85 {Z+16} core:air",
-        f"chat /tk fill {x-16} 70 {Z-16} {x+16} 70 {Z+16} base:tall_grass",
+        f"chat /time set {TIME}",
         f"chat /tk fill {x-pond} {70-deep} {Z-pond} {x+pond} 69 {Z+pond} base:water",
         f"chat /tk fill {x-pond} 70 {Z-pond} {x+pond} 70 {Z+pond} core:air",
         "wait 1",
@@ -40,7 +42,7 @@ def spawns(x, groups):
     return out + ["wait 2"]
 
 
-def watch(x, rows, every=10, r=40):
+def watch(x, rows, every=10, r=64):
     out = [f"chat /tp {x} 95 {Z+30}", "wait 1"]
     for _ in range(rows):
         out += [f"chat /animalprof where {r}", f"wait {every}"]
@@ -58,7 +60,7 @@ def scare(x, dz=6):
     """A creative player walks in among them, then hits the nearest (`/animalprof hit`)."""
     return [
         "chat /tk mode creative", f"chat /tp {x} 70 {Z+dz+8}", "look 0 0", "wait 1",
-        "hold core:forward 2", "chat /animalprof hit 2", "wait 5", f"chat /animalprof where 40",
+        "hold core:forward 2", "chat /animalprof hit 2", "wait 5", f"chat /animalprof where 64",
         "chat /tk mode spectator",
     ]
 
@@ -171,8 +173,8 @@ for i, kind in enumerate(["iguanodont", "gastonia", "cedarosaurus", "wyvern"]):
     x = i * 200
     s += pad(x) + spawns(x, [(kind, 1, 0, -6)])
     s += watch(x, 2) + ["chat /tk mode creative", f"chat /tp {x} 70 {Z+2}", "look 0 0", "wait 1",
-                        "chat /animalprof hit 4", "wait 2", "chat /animalprof where 40", "wait 4",
-                        "chat /animalprof where 40", "chat /tk mode spectator"]
+                        "chat /animalprof hit 4", "wait 2", "chat /animalprof where 64", "wait 4",
+                        "chat /animalprof where 64", "chat /tk mode spectator"]
     s += watch(x, 3, every=5) + shot(x, f"cov_bosses_{i+1}_{kind}", z_back=18, pitch=-25)
 for j, (boss, offering, sword, armour) in enumerate([("drenkaun", "forest_offering", "flint", "leather"), ("borkon", "mountain_offering", "bronze", "bronze")]):
     x = 1000 + j * 200
@@ -230,13 +232,13 @@ s += pad(x) + spawns(x, [("grey_wolf", 1, -8, -6), ("cat", 1, -4, -6), ("chihuah
 s += ["chat /tk mode creative", "chat /tk put me 0 animals:kibble 64", "key 1"]
 for dx in [-8, -4, 0, 4]:
     s += [f"chat /tp {x+dx} 70 {Z-3}", "look 0 0", "wait 1"] + ["aim 6", "press core:use", "wait 0.6"] * 4
-s += ["chat /animalprof where 40", "chat /tk mode spectator"] + shot(x, "cov_taming_1_passive")
+s += ["chat /animalprof where 64", "chat /tk mode spectator"] + shot(x, "cov_taming_1_passive")
 x = 200
 s += pad(x) + spawns(x, [("raptor", 1, -8, -6), ("velociraptor_osmolskae", 1, -4, -6), ("utahraptor", 1, 0, -6), ("jaguar", 1, 6, -6), ("wyvern", 1, 0, 8)])
 s += ["chat /animalprof ko 1", "wait 2", "chat /tk mode creative", "chat /tk put me 0 animals:kibble 64", "key 1"]
 for dx, dz in [(-8, -6), (-4, -6), (0, -6), (6, -6), (0, 8)]:
     s += [f"chat /tp {x+dx} 70 {Z+dz+2}", "look 0 0", "wait 1", "aim 6", "press core:use", "wait 0.5"] + ["chat /animal bite", "wait 0.5"] * 8
-s += ["chat /animalprof where 40", "chat /tk mode spectator"] + shot(x, "cov_taming_2_knockout")
+s += ["chat /animalprof where 64", "chat /tk mode spectator"] + shot(x, "cov_taming_2_knockout")
 x = 400
 s += pad(x) + spawns(x, [("protoceratops", 2, -8, -8), ("psittacosaurus", 2, 4, -8), ("citipati", 2, -8, 4), ("raptor", 2, 4, 4), ("house_sparrow", 2, 0, 0)])
 for dx, dz in [(-8, -8), (4, -8), (-8, 4), (4, 4), (0, 0)]:
