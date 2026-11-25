@@ -640,19 +640,46 @@ their own. Since facb1a89f (working since ffdb839c1, which attaches `HURT_AT`) e
 `core:attack`; no fall, hunger or cold. The sound runs' cases are still unnamed: the next sound run with
 `--log mod:animals=debug` will show them.
 
+## Follow-ups from the grids (Planner, 11-25 evening)
+
+| What | cause | fix | checked |
+|---|---|---|---|
+| HUD health over max in Drenkaun's shot ("1585 / 90") | base clamped health to its own fed max and the HUD divided by it, but anything else on the engine's max (the script's +300, the game's health boost +4) was outside both | base counts the rest of the engine's max (`base:fed_set`), and the HUD and the levels screen show the engine's whole max (7d0700f1b) | to run: expect about "1585 / 1690" in shot 5, and 84/89 in Borkon's shot |
+| wyvern pad empty in the shot | the hit wyvern stayed angry at the player after they turned spectator and followed them to the watch spot at z 574, out of frame | anger at a spectator ends (`knockout::behave`, 7d0700f1b's next commit) | to run: wyvern on its pad in shot 4 |
+| night caiman shot black | no light at 01:37 | glowstone round the night pads after the watching, before the shot (hunters' caimans, birds' owls; 75668b544) | to run |
+
 ## Sounds
 
-Every species' calls come from a shared voice family (`animals_core::voices`, files in
-`mods/animals/assets/sounds/voice/<family>/`), pitched for the species: none has calls of its own.
+Updated 11-25 from dev, after the AI voice sets, the act sounds and the bosses' voices merged. The full
+list, sources and listening pages are in `notes/crew/plans/ai-sound.md`. Each species plays a family in
+`animals_core::voices` (files in `mods/animals/assets/sounds/voice/<family>/`), pitched for its size.
 
-- **Silent:** the fish (brown_trout, pacu, lungfish, lycoptera), by design. **Drenkaun and Borkon**
-  have no voice at all (no hurt, death or call; only their stone sound group).
-- **Borrowed:** borkon_kid and drenkaun_calf use the reindeer's voice (`voices.rs`).
-- **Shared families, no own sounds:** canine (dog, grey_wolf, coyote), fox (both), cat, big_cat
-  (jaguar), deer (white-tailed, red, reindeer), rodent (capybara, wood_mouse, field_vole,
-  kryptobaatar), hare (both; hurt and death only), songbird (sparrow, bunting, confuciusornis,
-  gobipteryx), hawk (golden_eagle, savanna_hawk), owl (both), gull, corvid (raven), hiss
-  (turkey_vulture, both caimans, priscagama), bellow (crocodyliform, psittacosaurus,
-  protoceratops, gastonia, pinacosaurus, iguanodont, cedarosaurus), small_dino (raptor,
-  osmolskae, utahraptor, citipati), dragon (wyvern). The most stretched: the Cretaceous's plant
-  eaters all on one bellow (a 25 kg Psittacosaurus to a 10 t sauropod), the vulture on a hiss.
+- **Own families now, made by AI (Stable Audio 3 Small SFX; licence rows in `SOURCES.md`):**
+  - borkon_kid (goat_kid) and drenkaun_calf (calf): no longer the reindeer's voice
+  - Drenkaun and Borkon: ambient, hurt, death, plus summon, attack and stunned from `boss.rs`
+  - the six plant-eating dinosaurs (horned_dino)
+  - raptor, osmolskae, utahraptor, citipati (raptor)
+  - capybara, reindeer, jaguar, golden eagle, snowy owl, snow bunting
+  - the hares' rabbit screams
+- **Acts:** an `alarm` as an animal bolts (from `anim::play` with the alarm clip), an `attack` with each bite or
+  pounce, and eating (`animal::feed`: graze, meat or peck by diet). Steps: plant eaters from 80 kg and
+  anything from 250 kg step `heavy`, from 1 t `huge`.
+- **Still shared, CC0 recordings:**
+  - canine: dog, grey_wolf, coyote
+  - fox: both
+  - cat
+  - deer: white-tailed, red
+  - rodent: wood_mouse, field_vole, kryptobaatar
+  - songbird: sparrow, confuciusornis, gobipteryx
+  - hawk: savanna_hawk
+  - owl: great horned
+  - gull
+  - corvid: raven
+  - hiss: turkey_vulture, both caimans, priscagama
+  - bellow: crocodyliform
+  - dragon: wyvern
+- **Silent by design:** the fish (brown_trout, pacu, lungfish, lycoptera); their splash is ambient.
+- **Not checked in the coverage runs:**
+  - whether each act sound plays at the right moment;
+  - the bosses' young have no species, so nothing plays their alarm.
+- **Hurt sounds with no logged cause** (the section above): every hurt now logs its cause.
