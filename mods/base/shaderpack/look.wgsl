@@ -2421,9 +2421,11 @@ fn bank_phase(mu: f32) -> f32 {
 // How much of what lies `rel` away (camera relative) the fog hides, 0..1: 1 - the fog's
 // transmittance along the look, the air not counted, as Bliss's bloomy fog takes its march's
 // (`composite3`/`composite11`, method only), for `bloomy_fog` in `post.wgsl`. Eight steps as
-// `one_fog`'s, unjittered. 0 with the one fog off.
+// `one_fog`'s, unjittered. 0 with the one fog off, and in water or lava as Bliss's (the march
+// is the air's: underwater it mixed the picture toward the bloom, and a coarse bloom level of the
+// sun's ring stood as a blocky ring over the water, lkmxO1 underwater shore).
 fn bank_hidden(rel: vec3<f32>) -> f32 {
-    if !one_fog_on() {
+    if !one_fog_on() || in_liquid() {
         return 0.0;
     }
     let dist = length(rel);
@@ -2474,6 +2476,17 @@ fn fog_hour_weights() -> vec4<f32> {
     let night = clamp((t - 13000.0) / 2000.0, 0.0, 1.0) * clamp((23000.0 - t) / 2000.0, 0.0, 1.0);
     return vec4(morning, noon, evening, night);
 }
+// Where the rain's fog lies: not above the snow line (`scene.canopy.w`, blocks above the sea; the
+// weather's own, where rain turns to snow, over the same 12-block band), as Bliss's lies only where
+// it rains (its noPuddleAreas: none in snowy biomes).
+fn rain_fog_at(y: f32) -> f32 {
+    return 1.0 - smoothstep(-6.0, 6.0, y - (SEA_LEVEL + scene.canopy.w));
+}
+// Our value noise with the spread of Bliss's fog noise (a linear map, matching its percentiles
+// within 0.01).
+fn fog_noise(q: vec3<f32>) -> f32 {
+    return max(0.236 + (noise3(q) - 0.5) * 0.717, 0.0);
+}
 // The fog's density at `p` (world), per block: Bliss's values are per 8 blocks (its step's optical
 // depth is density x the step / 8). Ronald's profile: morning uniform 0.1 and cloudy 0.45, noon
 // none, evening 0.18 and 0.09, night 0.38 and 0.24; rain x RainFog_amount 0.3, not by hour.
@@ -2484,17 +2497,23 @@ fn bliss_fog_density(p: vec3<f32>) -> f32 {
     let h = max(p.y - BLISS_FOG_FLOOR, 0.0);
     var d = uniform_k * exp2(-0.15 * h);
     if cloudy_k > 0.0 && p.y < BLISS_FOG_CLOUDY_TOP + 120.0 {
-        // Cells 36 blocks across and 18 tall, drifting with the wind, worn by a fine grain that the
-        // temporal anti-aliasing softens into their edges.
+        // Its noise is a smooth texture whose values sit low (mean 0.236, 5 / 50 / 95 % at 0.008,
+        // 0.235, 0.455; measured, 11-25), so its shape 1 - n passes the 0.6 cut almost everywhere
+        // and the cloudy fog lies over most of the land; our value noise (mean 0.5) passed it on a
+        // quarter and the dawn banks came out a thin haze (lkmxO1). `fog_noise` gives ours its
+        // spread. Its features: half-correlated at about 24 blocks across and 18 tall for the
+        // shape, 3 across and 4.3 tall for the wear (cells 40 x 18 and 4.8 x 4.3 in ours).
         let q = p - vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * 0.6;
-        let shape = 1.0 - noise3(q / vec3(36.0, 18.0, 36.0));
+        let shape = 1.0 - fog_noise(q / vec3(40.0, 18.0, 40.0));
         let body = clamp((shape - 0.6) * 2.0, 0.0, 1.0);
         if body > 0.0 {
-            let erosion = 1.0 - noise3(q / vec3(0.18, 4.3, 0.18) - vec3(200.0 * body));
+            let erosion = 1.0 - fog_noise(q / vec3(4.8, 4.3, 4.8) - vec3(0.2, 11.0, 0.2) * body);
             d += cloudy_k * max(body - 0.4 * erosion, 0.0) * exp(-0.05 * max(p.y - BLISS_FOG_CLOUDY_TOP, 0.0));
         }
     }
-    d += (0.5 * exp2(-0.3 * h) + exp2(-0.06 * h)) * rain_amount() * 0.3;
+    // The rain's fog, not where it snows or never rains (Bliss's noPuddleAreas: its snowy and dry
+    // biomes): there it whitened the snow fields to a milky grey (lkmxO1 snow rows).
+    d += (0.5 * exp2(-0.3 * h) + exp2(-0.06 * h)) * rain_amount() * 0.3 * rain_fog_at(p.y);
     return d / 8.0;
 }
 fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
