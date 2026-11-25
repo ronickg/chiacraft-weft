@@ -673,6 +673,14 @@ pub fn land(def: &Def, w: &World, id: u64, a: &Attack, hit: f32, hits: Vec<(u64,
         if e == id || spared(w, e) {
             continue;
         }
+        // One blow never kills a player from full health (`bosses::PLAYER_BLOW`); the player's armour
+        // takes its share of what is left in the damage step.
+        let hit = if w.players_iter().any(|p| p == e) {
+            w.entity(e)
+                .map_or(hit, |p| hit.min(p.max_health * animals_core::bosses::PLAYER_BLOW))
+        } else {
+            hit
+        };
         w.damage(e, Damage::new(hit, damage_cause::ATTACK).by(id));
         w.push(e, push);
         weft_sdk::info!("{} {id}: {} hits {e} for {hit:.1}", def.name, a.name);
