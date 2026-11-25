@@ -316,6 +316,24 @@ toss kill an unarmoured player at full health?), not a coverage failure.
 
 Grid r3: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r7_bosses_m-175323/r7_bosses_grid.jpg`.
 
+Run 4 (46f12cbd7, `r11_bosses_m`, 434 s, script pass). All three big plant eaters were grown this time,
+and each turned on the player and charged it once a second until it let go: the iguanodont 9 times, the
+gastonia 9 and the cedarosaurus 7, with no bolting. The wyvern breathed fire when hit, then flew out of its
+pad's shot. Drenkaun and Borkon: `/boss hurt 40` went through the damage step (Drenkaun took 7.5 then 3.8,
+Borkon 12.1 then 6.0: the second hit lands for half, as in run 3), then death with loot; Drenkaun's second
+summon went back to its place with no one to fight. Borkon's toss (24.9) killed the unarmoured player again.
+
+| Species | aggro / stands (run 4) | leash | death | shot |
+|---|---|---|---|---|
+| iguanodont | pass (turns on it, 9 charges, lets go) | n/a | n/a | r4 1 |
+| gastonia | pass (9 charges, lets go) | n/a | n/a | r4 2 |
+| cedarosaurus | pass (7 charges, lets go) | n/a | n/a | r4 3 |
+| wyvern | breathes fire when hit (a knock-out kind, as designed) | n/a | n/a | r4 4 (flew out of shot) |
+| drenkaun | pass | pass | pass (damage step, death, loot); a real blow not tested | r4 5 |
+| borkon | pass (toss 24.9 kills an unarmoured player) | not tested (player dead) | pass; a real blow not tested | r4 6 |
+
+Grid r4: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r11_bosses_m-185756/r11_bosses_grid.jpg`.
+
 Run 1: cov_bosses, Mac, 403.9 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_bosses_m-160951.log`; grid
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_bosses_m-161637/cov_bosses_grid.jpg`). The big plant
 eaters ran from the hit (this run was before e91a79201, which has them turn and charge). The bosses'
