@@ -461,6 +461,12 @@ went back to their places. The HUD in Drenkaun's shot reads "1505 / 90": that is
 health over base's fed max, not a game bug. Grid r6:
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/r13_bosses_m-200242/r13_bosses_grid.jpg`.
 
+Run 7 (09494f1f, `r15_bosses_m`, 434 s, script pass). Borkon's toss: "hits 1 for 14.3 (health 3.1/17.9
+after)", no death. The three plant eaters turned on the player, charged 7-10 times and let go. The wyvern
+stayed on its pad and is in the shot. Drenkaun and Borkon took damage, died, dropped loot and went back to their
+places. HUD: "1585 / 1590" for Drenkaun's +300 player, "84 / 89" for Borkon's. Grid r7:
+`~/Coding/chiacraft-archive/images/tester/2026-11-25/r15_bosses_m-204422/r15_bosses_grid.jpg`.
+
 | What | before | now | checked |
 |---|---|---|---|
 | borkon toss on an unarmoured player at full health | 24.9: dead (runs 3, 4) | about 14 of about 18: lives at 20 % | run 5 (fe121098): still 24.9 and dead, the script's fault: it gave the player +300 max health (`testkit:hp`), which raised the cap to about 270, while base's survival keeps health at the fed max (about 18). Borkon's part now takes the +300 off, and the hit line prints the player's health after it. Run 6 (faf35b50, `r13_bosses_m`): pass, "toss hits 1 for 14.3 (health 3.1/17.9 after)", no death |
@@ -644,8 +650,8 @@ their own. Since facb1a89f (working since ffdb839c1, which attaches `HURT_AT`) e
 
 | What | cause | fix | checked |
 |---|---|---|---|
-| HUD health over max in Drenkaun's shot ("1585 / 90") | base clamped health to its own fed max and the HUD divided by it, but anything else on the engine's max (the script's +300, the game's health boost +4) was outside both | base counts the rest of the engine's max (`base:fed_set`), and the HUD and the levels screen show the engine's whole max (7d0700f1b) | to run: expect about "1585 / 1690" in shot 5, and 84/89 in Borkon's shot |
-| wyvern pad empty in the shot | the hit wyvern stayed angry at the player after they turned spectator and followed them to the watch spot at z 574, out of frame | anger at a spectator ends (`knockout::behave`, 598c06be7) | to run: wyvern on its pad in shot 4 |
+| HUD health over max in Drenkaun's shot ("1585 / 90") | base clamped health to its own fed max and the HUD divided by it, but anything else on the engine's max (the script's +300, the game's health boost +4) was outside both | base counts the rest of the engine's max (`base:fed_set`), and the HUD and the levels screen show the engine's whole max (7d0700f1b) | pass (r15_bosses, 09494f1f): shot 5 "1585 / 1590", shot 6 "84 / 89" |
+| wyvern pad empty in the shot | the hit wyvern stayed angry at the player after they turned spectator and followed them to the watch spot at z 574, out of frame | anger at a spectator ends (`knockout::behave`, 598c06be7) | pass (r15_bosses): the wyvern stays at its pad's centre and is in shot 4 |
 | night caiman shot black | no light at 01:37 | glowstone round the night pads after the watching, before the shot (hunters' caimans, birds' owls; 75668b544) | to run |
 
 ## Sounds
