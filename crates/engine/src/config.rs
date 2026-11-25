@@ -655,7 +655,7 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         // one bounce on the terrain, with a shader pack that has `pathtrace.wgsl`); its debug views
         // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends; 8-12 timing only: the trace stopped after its primary test, the sun, the bounce, with no specular ray, before any ray, without the air's haze; 14 the block light, 15 the traced block lights seen/hidden).
         number("core:path_traced", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
-        number("core:pt_debug", ck::INT, 0.0, 0.0, 15.0, 1.0),
+        number("core:pt_debug", ck::INT, 0.0, 0.0, 16.0, 1.0),
         // How the path tracer's light is denoised (`denoise::Denoiser`) where Ray Reconstruction
         // doesn't do it: 0 not at all (raw, for checks), 1 ours (SVGF-like), live.
         number("core:pt_denoiser", ck::INT, 1.0, 0.0, 1.0, 1.0),

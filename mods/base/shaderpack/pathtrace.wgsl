@@ -403,6 +403,18 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // Terrain at the depth drawn there: anything else (water, glass, a model, a particle) keeps the
     // world's own pixel.
     if !h.hit || h.clear || abs(h.t - dist) > 0.02 * dist + 0.15 {
+        // Debug 16: why the trace kept the world's pixel: red no hit, green a clear pane, blue
+        // a hit nearer than the depth, yellow one farther (the nave's half-screen seam, 11-25).
+        if pt.debug == 16u {
+            var why = vec3(1.0, 0.0, 0.0);
+            if h.hit && h.clear {
+                why = vec3(0.0, 1.0, 0.0);
+            } else if h.hit {
+                why = select(vec3(1.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), h.t < dist);
+            }
+            pt_out[at] = vec4(why, 0.0);
+            pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
+        }
         return;
     }
     // The surface as the G-buffer has it (its shading normal, roughness, F0); the face's own normal
@@ -414,6 +426,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // reach met there has no G-buffer, and traced with no albedo a far peak came out black
     // (pt1_dark_peak_crop); it keeps the world's pixel, as the denoisers skip it.
     if dot(gb_n.xyz, gb_n.xyz) < 0.25 {
+        if pt.debug == 16u {
+            pt_out[at] = vec4(1.0, 0.0, 1.0, 0.0);
+            pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
+        }
         return;
     }
     // Debug 8-12, timing only (a bench's probes): the trace stopped after its primary test (8), the
@@ -421,6 +437,12 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // two `haze_lit`s. The picture they
     // leave is no use.
     if pt.debug == 8u {
+        return;
+    }
+    // Debug 16: grey where the trace runs (the reasons it doesn't are above).
+    if pt.debug == 16u {
+        pt_out[at] = vec4(0.2, 0.2, 0.2, 0.0);
+        pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
         return;
     }
     let ng = h.n;
