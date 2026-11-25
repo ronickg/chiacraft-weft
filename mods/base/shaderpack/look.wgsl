@@ -1776,14 +1776,18 @@ fn bc_value2(q: vec2<f32>, k: i32) -> f32 {
     let b = mix(hash3(vec3(i + vec2(0, 1), k)), hash3(vec3(i + vec2(1, 1), k)), u.x);
     return mix(a, b, u.y);
 }
+// The spreads fitted to its texture's (value noise's own: 0.215 in 2D, 0.185 in 3D): at 0.717 and
+// the raw 2D noise the low layer stood on 0.36 of the sky against its 0.29, 0.17 of it still cloud
+// after the grain against its 0.11 (a simulation over its texture, 11-25; lkmxBC1's noon was one
+// grey-beige cover).
 fn bc_r(q: vec2<f32>, cell: f32) -> f32 {
-    return max(0.236 + (bc_value2(q / cell, 3) - 0.5) * 0.717, 0.0);
+    return max(0.235 + (bc_value2(q / cell, 3) - 0.5) * 0.62, 0.0);
 }
 fn bc_b(q: vec2<f32>, cell: f32) -> f32 {
-    return clamp(bc_value2(q / cell, 11), 0.0, 1.0);
+    return clamp(0.5 + (bc_value2(q / cell, 11) - 0.5) * 0.843, 0.0, 1.0);
 }
 fn bc_r3(p: vec3<f32>, cell: vec2<f32>) -> f32 {
-    return max(0.236 + (noise3(vec3(p.x / cell.x, p.y / cell.y, p.z / cell.x)) - 0.5) * 0.717, 0.0);
+    return max(0.235 + (noise3(vec3(p.x / cell.x, p.y / cell.y, p.z / cell.x)) - 0.5) * 0.725, 0.0);
 }
 // A cumulus layer's 2D cover at world point `w` (absolute y), ramped in its slab (cloudCov): layer 0
 // from blobs about 120 blocks (its R at 500 of its sample space) grouped by a 900-block field, layer
