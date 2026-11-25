@@ -387,9 +387,16 @@ and runs at the player to fight (`knockout::behave`). It breathes only while the
 roll at range, and its bites on the creative player log nothing. Drenkaun and Borkon: damage, death, loot and
 Drenkaun's leash as in run 4.
 
+Run 6 (faf35b50, `r13_bosses_m`, 434 s, script pass). Borkon's toss hit for 14.3 and left the player at 3.1 of
+17.9, with no death. The three plant eaters turned on the player, charged 8-10 times and let go. The wyvern
+breathed lightning twice (its genes pick the breath). Drenkaun and Borkon took damage, died, dropped loot and
+went back to their places. The HUD in Drenkaun's shot reads "1505 / 90": that is the script's +300 testkit
+health over base's fed max, not a game bug. Grid r6:
+`~/Coding/chiacraft-archive/images/tester/2026-11-25/r13_bosses_m-200242/r13_bosses_grid.jpg`.
+
 | What | before | now | checked |
 |---|---|---|---|
-| borkon toss on an unarmoured player at full health | 24.9: dead (runs 3, 4) | about 14 of about 18: lives at 20 % | run 5 (fe121098): still 24.9 and dead, the script's fault: it gave the player +300 max health (`testkit:hp`), which raised the cap to about 270, while base's survival keeps health at the fed max (about 18). Borkon's part now takes the +300 off, and the hit line prints the player's health after it; to re-run |
+| borkon toss on an unarmoured player at full health | 24.9: dead (runs 3, 4) | about 14 of about 18: lives at 20 % | run 5 (fe121098): still 24.9 and dead, the script's fault: it gave the player +300 max health (`testkit:hp`), which raised the cap to about 270, while base's survival keeps health at the fed max (about 18). Borkon's part now takes the +300 off, and the hit line prints the player's health after it. Run 6 (faf35b50, `r13_bosses_m`): pass, "toss hits 1 for 14.3 (health 3.1/17.9 after)", no death |
 
 Run 1: cov_bosses, Mac, 403.9 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_bosses_m-160951.log`; grid
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_bosses_m-161637/cov_bosses_grid.jpg`). The big plant
