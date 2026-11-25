@@ -2141,3 +2141,16 @@ Off in both (MOTION_BLUR commented). Nothing to do.
    (A8, A9), caustics (A6), no dither (B11), TAA sharpness (B8), double-Fresnel in reflect.wgsl (A5).
    Exposure, Purkinje, Hejl and saturation (B1, B4-B6) are already the same: what is left there is deleting about
    450 lines of the dead non-chain path.
+
+### Seen on the matrix (lkmxO1, Planner's read, 11-25)
+
+- **Underwater** (underwater_shore_y90): Bliss's is a dark, murky green-brown; ours a bright mint. Bliss's
+  8-step water march (σ (0.360, 0.184, 0.168), scatter 0.0334) and its absorption mix in place of our teal
+  `under_water` and its noise beams (Fog, section on underwater).
+- **Shore water** (shore_noon_y0): Bliss's bright, rippled and reflective; ours a flat deep blue. Water body
+  colour (A2), sun glint (A4) and the reflected sky with clouds above.
+- **Caves** (cave_c4): Bliss's walls catch warm sun patches and a warm bounce; ours are a cool blue-grey with
+  no sun patch. Lighting batch, first item: the tilt sign (+35 vs −35), the sun cut by sky light, the hand
+  fill.
+- **Night sky**: our stars and aurora far brighter than Bliss's near-starless navy. Bliss's stars fade in by
+  clamp(−2 sun.y) at 10/800 of its sky's scale (Sky, section 6).
