@@ -936,38 +936,34 @@ pub async fn inventory_hotkeys(t: T) -> R {
     t.secs(0.2).await?;
     hover(13)?;
     t.frames(3).await?;
+    // DIAG: the cursor and slots 13-15 (count, data) after each step, by the client and the server.
+    let snap = |t: &T| {
+        let c = t.c().cursor_stack();
+        let s = |i: u32| {
+            let m = t.c().menu_slot(menu(i));
+            format!("{}:{}x{}/{}", i, m.item, m.count, m.data)
+        };
+        format!("cursor {}x{}/{} {} {} {}", c.item, c.count, c.data, s(13), s(14), s(15))
+    };
+    let mut log = vec![format!("before {}", snap(&t))];
     t.c().input_click(0, 30.0);
     t.frames(4).await?;
+    log.push(format!("press+4f {}", snap(&t)));
+    t.secs(0.5).await?;
+    log.push(format!("press+0.5s {}", snap(&t)));
     hover(14)?;
-    let at14 = t
-        .until("the sand of slot 14", Duration::from_secs(5), |t| t.c().cursor_stack().count == 2)
-        .await
-        .is_ok();
-    t.check(at14, "swept onto slot 14, its sand joined the cursor");
+    t.frames(2).await?;
+    log.push(format!("on14+2f {}", snap(&t)));
+    t.secs(1.0).await?;
+    log.push(format!("on14+1s {}", snap(&t)));
     hover(15)?;
-    let at15 = t
-        .until("the sand of slot 15", Duration::from_secs(5), |t| t.c().cursor_stack().count == 3)
-        .await
-        .is_ok();
-    if !at15 {
-        // DIAG: off to an empty slot and back. Taken now: the first pass never reached the slot
-        // (its hover was not seen); still not: the server refused it.
-        hover(16)?;
-        t.frames(4).await?;
-        hover(15)?;
-        let again = t
-            .until("the sand of slot 15, again", Duration::from_secs(5), |t| t.c().cursor_stack().count == 3)
-            .await
-            .is_ok();
-        let left = t.c().menu_slot(menu(15));
-        t.check(
-            false,
-            format!(
-                "DIAG slot 15 missed on the first pass; on re-entry taken: {again}; slot 15 now {} x{} data {}",
-                left.item, left.count, left.data
-            ),
-        );
-    }
+    t.frames(2).await?;
+    log.push(format!("on15+2f {}", snap(&t)));
+    t.secs(1.0).await?;
+    log.push(format!("on15+1s {}", snap(&t)));
+    let server: Vec<u32> = vec![t.slot("me", 13).await?.1, t.slot("me", 14).await?.1, t.slot("me", 15).await?.1];
+    log.push(format!("server 13/14/15 counts {server:?}"));
+    t.check(false, format!("DIAG sweep: {}", log.join(" | ")));
     t.c().input_release_all();
     t.frames(3).await?;
     t.check_eq(t.c().cursor_stack().count, 3, "sweeping on with the stack picked up gathered the sand");
@@ -1020,9 +1016,21 @@ pub async fn inventory_hotkeys(t: T) -> R {
     let m12 = menu(12);
     t.until("sticks in inventory", Duration::from_secs(5), |t| t.c().menu_slot(m12).count == 5)
         .await?;
-    t.click_ui(&format!("slot:{m12}"), 1);
-    t.until("half the sticks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().count == 3)
-        .await?;
+    let clicked = t.click_ui(&format!("slot:{m12}"), 1);
+    if t.until("half the sticks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().count == 3)
+        .await
+        .is_err()
+    {
+        let (c, m) = (t.c().cursor_stack(), t.c().menu_slot(m12));
+        return Err(format!(
+            "DIAG sticks: click_ui gave {clicked:?}; cursor {}x{}, slot {m12} {}x{}, stick {}",
+            c.item,
+            c.count,
+            m.item,
+            m.count,
+            id("base:stick")
+        ));
+    }
     let trash = slots - 1;
     for count in 1..=2 {
         t.click_ui(&format!("slot:{trash}"), 1);
