@@ -270,14 +270,20 @@ const MIST_SEA_DENSE: f32 = 9.0;
 // below, full above), so banks with clear air between them, not an even veil; and a fine noise
 // (cells this wide and tall) that eats their edges (`MIST_ERODE.z`, how much), shifted by the shape
 // so the rims break up differently from bank to bank.
-const MIST_SHAPE: vec4<f32> = vec4(36.0, 18.0, 0.5, 0.75);
+// The cut graded as Bliss's (its noise's top 40 % times 2, so a bank is seldom full, about 0.3 of
+// it on average, `overworld_fog.glsl:35`): cut at 0.5 to 0.75 most of a bank was full, an even
+// opaque sheet with no depth that the crowns never faded into (lkmC1 v6).
+const MIST_SHAPE: vec4<f32> = vec4(36.0, 18.0, 0.55, 1.05);
 const MIST_ERODE: vec3<f32> = vec3(1.5, 3.0, 0.4);
 // Its light from the sun: `bank_phase` (Bliss's fog's weights).
 // The sun's light in it: how much of the low sun's orange goes to cream, how bright, and the most the
 // forward peak may give (Bliss's sunlit tops are cream and brighter than the land; ours took the
 // dawn sun's orange and read as sand, and from inside the mist the uncapped peak blew the sky
 // round the sun out to a yellow ball: lv8).
-const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.8, 1.2);
+// (Brightness 1.0 now, from 1.8: that made up for the capped forward peak, and with Bliss's phase
+// uncapped (57974b542) it left the sun's light over the sky's even away from the sun, at a phase of
+// 0.07, and the mist there read sand-orange, lkmC1 v6_away.)
+const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.0, 1.2);
 // The banks' sunlight fades in with distance from the eye, none to the first, full from the second
 // (blocks). From inside the mist, looking toward a low sun, the lit mist in front of the near
 // crowns covered them all (06:00 low view, at Bliss's own spot and camera: darkest 5 % at 109
@@ -2155,7 +2161,11 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let cream = mix(p.sun, vec3(luma(p.sun)) * vec3(1.0, 0.92, 0.78), MIST_SEA_CREAM.x) * MIST_SEA_CREAM.y;
     let sun_in = cream * light_strength() * bank_phase(dot(dir, light_dir())) * k
         * look_opt(OPT_BANK_SUN, 1.0);
-    let sky_in = p.ambient * (1.0 + MIST_SEA_SKY.x * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), MIST_SEA_SKY.y))
+    // In the sky's own colour, as Bliss's AmbientColor is the sky averaged (`deferred.vsh:118-145`):
+    // the palette's ambient is warm at dawn, and the mist away from a low sun read sand-orange where
+    // Bliss's is a cool grey-lilac (lkmC1 v6_away; Planner).
+    let sky_tint = p.zenith * (luma(p.ambient) / max(luma(p.zenith), 1e-4));
+    let sky_in = sky_tint * (1.0 + MIST_SEA_SKY.x * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), MIST_SEA_SKY.y))
         * MIST_SEA_SKY.z * k * look_opt(OPT_BANK_SHADE, 1.0);
     // Steps spaced ever wider from the eye (11^u, as Bliss's, `overworld_fog.glsl:179`), jittered
     // per pixel (TAA blends them), from the eye itself, not from where the ray enters the banks'
