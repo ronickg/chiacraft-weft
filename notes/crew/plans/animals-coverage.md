@@ -363,6 +363,13 @@ One boss blow on a player now takes at most `animals_core::bosses::PLAYER_BLOW` 
 health before the player's armour, so the 24.9 toss takes an unarmoured player (20) to 16 and leaves 4; armour
 takes its share after that, and armour's health raises the cap. The knock-back is unchanged.
 
+Run 5 (fe121098, `r12_bosses_m`, 446 s): the grown iguanodont, gastonia and cedarosaurus again turn on it,
+charge 9-10 times and let go. The wyvern breathed nothing this time, which is not a bug. A hit wyvern is angry
+and runs at the player to fight (`knockout::behave`). It breathes only while the player is 5-16 blocks off, on a
+1-in-30 roll a tick (`wyvern::breathe_at_foe`). It reached the player's spot (z 544) within 2 s, so it had no
+roll at range, and its bites on the creative player log nothing. Drenkaun and Borkon: damage, death, loot and
+Drenkaun's leash as in run 4.
+
 | What | before | now | checked |
 |---|---|---|---|
 | borkon toss on an unarmoured player at full health | 24.9: dead (runs 3, 4) | about 14 of about 18: lives at 20 % | run 5 (fe121098): still 24.9 and dead, the script's fault: it gave the player +300 max health (`testkit:hp`), which raised the cap to about 270, while base's survival keeps health at the fed max (about 18). Borkon's part now takes the +300 off, and the hit line prints the player's health after it; to re-run |
