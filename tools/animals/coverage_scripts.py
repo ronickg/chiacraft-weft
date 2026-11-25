@@ -193,7 +193,9 @@ s = head("bosses", [
 ])
 for i, kind in enumerate(["iguanodont", "gastonia", "cedarosaurus", "wyvern"]):
     x = i * 200
-    s += pad(x) + spawns(x, [(kind, 1, 0, -6)])
+    # Grown first (`/animal hurry` grows the young near): `/tk spawn` gives a share of young in
+    # their season, and a young one runs (round 3: the iguanodont and the cedarosaurus were young).
+    s += pad(x) + spawns(x, [(kind, 1, 0, -6)]) + [f"chat /tp {x} 72 {Z}", "chat /animal hurry", "wait 2"]
     s += watch(x, 2) + ["chat /tk mode creative", f"chat /tp {x} 70 {Z+2}", "look 0 0", "wait 1",
                         "chat /animalprof hit 4", "wait 2", "chat /animalprof where 64", "wait 4",
                         "chat /animalprof where 64", "wait 4", "chat /animalprof where 64", "chat /tk mode spectator"]

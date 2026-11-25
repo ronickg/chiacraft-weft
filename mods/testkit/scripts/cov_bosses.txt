@@ -31,6 +31,9 @@ chat /tk fill -1 70 543 1 70 545 core:air
 wait 1
 chat /tk spawn animals:iguanodont 0 70 538
 wait 2
+chat /tp 0 72 544
+chat /animal hurry
+wait 2
 chat /tp 0 95 574
 wait 1
 chat /animalprof where 64
@@ -77,6 +80,9 @@ chat /tk fill 199 69 543 201 69 545 base:water
 chat /tk fill 199 70 543 201 70 545 core:air
 wait 1
 chat /tk spawn animals:gastonia 200 70 538
+wait 2
+chat /tp 200 72 544
+chat /animal hurry
 wait 2
 chat /tp 200 95 574
 wait 1
@@ -125,6 +131,9 @@ chat /tk fill 399 70 543 401 70 545 core:air
 wait 1
 chat /tk spawn animals:cedarosaurus 400 70 538
 wait 2
+chat /tp 400 72 544
+chat /animal hurry
+wait 2
 chat /tp 400 95 574
 wait 1
 chat /animalprof where 64
@@ -171,6 +180,9 @@ chat /tk fill 599 69 543 601 69 545 base:water
 chat /tk fill 599 70 543 601 70 545 core:air
 wait 1
 chat /tk spawn animals:wyvern 600 70 538
+wait 2
+chat /tp 600 72 544
+chat /animal hurry
 wait 2
 chat /tp 600 95 574
 wait 1

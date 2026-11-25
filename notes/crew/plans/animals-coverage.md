@@ -229,6 +229,24 @@ cedarosaurus was young (103/192) and ran: right for a young one.
 
 Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_bosses_m-165534/r2_bosses_grid.jpg`.
 
+Run 3 (8fe0410c3, `r7_bosses_m-175323`, 426 s): the grown gastonia "turns on it", "charges 1 (it hurt it)"
+seven times a second apart and "lets 1 go" when the player turns spectator, with no bolt: the fix holds.
+The iguanodont and the cedarosaurus were young (spawned in their season) and ran, right for the young; run 4
+grows them first. `/boss hurt 40` went through each boss's damage step (Drenkaun took 7.5 and 4.1 of 40 after
+its armour, Borkon 12.1 and 6.0), then death with loot; Drenkaun's leash again. Borkon's toss (24.9) killed
+the player in one hit once more: the script gives no armour, so it is a balance question (should one
+toss kill an unarmoured player at full health?), not a coverage failure.
+
+| Species | aggro / stands (run 3) | death |
+|---|---|---|
+| gastonia | pass ("charges", "lets 1 go") | n/a |
+| iguanodont | not tested (young: ran) | n/a |
+| cedarosaurus | not tested (young: ran) | n/a |
+| drenkaun | pass | pass (damage through its step, death, loot; leash) |
+| borkon | pass | pass (damage, death, loot) |
+
+Grid r3: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r7_bosses_m-175323/r7_bosses_grid.jpg`.
+
 Run 1: cov_bosses, Mac, 403.9 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_bosses_m-160951.log`; grid
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_bosses_m-161637/cov_bosses_grid.jpg`). The big plant
 eaters ran from the hit (this run was before e91a79201, which has them turn and charge). The bosses'
