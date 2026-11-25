@@ -72,6 +72,13 @@ def shot(x, name, z_back=14, pitch=-38):
     ]
 
 
+def lights(x):
+    """Glowstone round the pad for a night shot (round 7: the caimans' shot at 01:37 was black). Set after
+    the part's watching, so the light never changes what the prey see of the hunters."""
+    return [f"chat /tk fill {x+dx} 70 {Z+dz} {x+dx} 70 {Z+dz} base:glowstone"
+            for dx, dz in [(-10, -10), (0, -12), (10, -10), (-12, 0), (12, 0), (-10, 10), (0, 12), (10, 10)]]
+
+
 def scare(x, dz=6):
     """A creative player walks in among them, then hits the nearest (`/animalprof hit`)."""
     return [
@@ -136,7 +143,7 @@ for i, g in enumerate(HUNTERS):
         # Caimans hunt by night and rest by day unless starving (round 3: the yacare rested at noon),
         # and a young one's prey are its own size (the spectacled was young): grown, at night.
         s += [f"chat /tp {x} 72 {Z}", "chat /animal hurry", "wait 2", "chat /time set 18000"]
-    s += watch(x, 8) + shot(x, f"cov_hunters_{i+1}_{g[0][0]}")
+    s += watch(x, 8) + (lights(x) if g[0][0] == "yacare_caiman" else []) + shot(x, f"cov_hunters_{i+1}_{g[0][0]}")
 write("hunters", s)
 
 # 3. Birds and fliers.
@@ -163,7 +170,7 @@ for i, (name, time, g, hungry) in enumerate(BIRDS):
         s += ["chat /animalprof hunters 0.3"]
     if name == "scavengers":
         s += ["chat /animalprof food 0.3"]
-    s += watch(x, 7) + (scare(x, -6) if name == "songbirds" else []) + shot(x, f"cov_birds_{i+1}_{name}", z_back=18, pitch=-25)
+    s += watch(x, 7) + (scare(x, -6) if name == "songbirds" else []) + (lights(x) if time == "18000" else []) + shot(x, f"cov_birds_{i+1}_{name}", z_back=18, pitch=-25)
 write("birds", s)
 
 # 4. Small animals (and fish).

@@ -340,6 +340,14 @@ chat /animalprof where 64
 wait 10
 chat /animalprof where 64
 wait 10
+chat /tk fill 1190 70 534 1190 70 534 base:glowstone
+chat /tk fill 1200 70 532 1200 70 532 base:glowstone
+chat /tk fill 1210 70 534 1210 70 534 base:glowstone
+chat /tk fill 1188 70 544 1188 70 544 base:glowstone
+chat /tk fill 1212 70 544 1212 70 544 base:glowstone
+chat /tk fill 1190 70 554 1190 70 554 base:glowstone
+chat /tk fill 1200 70 556 1200 70 556 base:glowstone
+chat /tk fill 1210 70 554 1210 70 554 base:glowstone
 chat /tick freeze
 chat /tp 1200 82 558
 look 0 -38
