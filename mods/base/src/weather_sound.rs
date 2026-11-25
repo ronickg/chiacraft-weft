@@ -32,8 +32,6 @@ const SILENT: f32 = 0.01;
 const LOG_EVERY: f32 = 10.0;
 /// The head above the feet, blocks.
 const EYE: f64 = 1.62;
-/// Leaves within this many blocks over a sampled place count as trees there.
-const LEAVES_UP: i32 = 12;
 
 struct State {
     /// Rain, heavy rain, roof, wind, trees.
@@ -48,8 +46,6 @@ struct State {
     /// Seconds since a thunder was last heard; far ones closer together merge (`THUNDER_GAP`).
     since_thunder: f32,
     rng: u64,
-    /// Block states that are leaves, found once each.
-    leafy: std::collections::HashMap<u32, bool>,
 }
 
 static STATE: Mutex<Option<State>> = Mutex::new(None);
@@ -110,7 +106,6 @@ fn frame(c: &Client) {
         coming: Vec::new(),
         since_thunder: ws::THUNDER_GAP,
         rng: 0x9E37_79B9_7F4A_7C15 ^ st.frame,
-        leafy: Default::default(),
     });
     let dt = st.dt.clamp(0.0, 0.5);
     let eye = [st.pos.x, st.pos.y + EYE, st.pos.z];
@@ -129,7 +124,7 @@ fn frame(c: &Client) {
     if s.next_look > 0.0 && !due {
         return;
     }
-    let cover = cover(c, s, eye);
+    let cover = base_api::hearing::cover(c, eye);
     *COVER.lock().unwrap_or_else(|e| e.into_inner()) = cover;
     for &(_, metres) in s.coming.iter().filter(|t| t.0 <= 0.0) {
         if ws::thunder_heard(s.since_thunder, metres) {
@@ -217,48 +212,6 @@ fn thunder(c: &Client, metres: f32, cover: Cover) {
 
 /// How open the head is to the sky, whether a roof is close over it, and how much of what is
 /// around has leaves overhead.
-fn cover(c: &Client, s: &mut State, eye: [f64; 3]) -> Cover {
-    let head = [eye[0].floor() as i32, eye[1].floor() as i32, eye[2].floor() as i32];
-    let sky = |p: [i32; 3]| c.light(p).map_or(0, |l| l & 255);
-    let block = |p: [i32; 3]| c.block(p).unwrap_or(0);
-    let mut leafy = |state: u32| {
-        *s.leafy
-            .entry(state)
-            .or_insert_with(|| block_name(state).contains("leaves"))
-    };
-    let mut places = vec![(head, 2.0f32)];
-    for r in ws::SAMPLE_RINGS {
-        for (dx, dz) in [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)] {
-            places.push(([head[0] + dx * r, head[1], head[2] + dz * r], if r == ws::SAMPLE_RINGS[0] { 1.0 } else { 0.5 }));
-        }
-    }
-    let (mut open, mut leaves, mut all) = (0.0, 0.0, 0.0);
-    for (p, w) in places {
-        all += w;
-        let over_leaves = (1..=LEAVES_UP).any(|dy| leafy(block([p[0], p[1] + dy, p[2]])));
-        if over_leaves {
-            leaves += w;
-        }
-        match sky(p) {
-            15 => open += w,
-            // Under a canopy the sky comes through the leaves, a little less.
-            l if l >= 12 && over_leaves => open += w * 0.7,
-            _ => {}
-        }
-    }
-    // A roof: the first block over the head, if the sky reaches the top of it (rain falls on it).
-    let mut roof = 0.0;
-    if sky(head) < 15
-        && let Some(dy) = (1..=ws::ROOF_UP).find(|&dy| block([head[0], head[1] + dy, head[2]]) != 0)
-    {
-        let top = (dy..dy + 6).find(|&y| block([head[0], head[1] + y, head[2]]) == 0);
-        if top.is_some_and(|y| sky([head[0], head[1] + y, head[2]]) == 15) {
-            roof = 1.0 - (dy - 1) as f32 / ws::ROOF_UP as f32;
-        }
-    }
-    Cover { open: open / all, roof, leaves: leaves / all }
-}
-
 fn random(r: &mut u64) -> f32 {
     *r ^= *r << 13;
     *r ^= *r >> 7;

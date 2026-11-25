@@ -216,9 +216,8 @@ fn frame(c: &Client) {
     let here = c.view().component(&HERE).unwrap_or([0.0; 8]);
     let cover = crate::weather_sound::cover_now();
     // Deep under ground: no sky through any roof over the head.
-    let deep = cover.open < 0.05 && cover.roof == 0.0;
-    let heard = if deep { 0.0 } else { ws::THROUGH_WALLS + (1.0 - ws::THROUGH_WALLS) * cover.open };
-    let muffle = ws::muffle(cover.open);
+    let deep = ws::deep(cover);
+    let (heard, muffle) = ws::outdoors(cover);
     for t in &mut s.since {
         *t += dt;
     }

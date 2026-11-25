@@ -225,8 +225,10 @@ struct Sky {
     owl: Option<Owl>,
     /// Splashes still to come: when, and where.
     splashes: Vec<(Instant, [f64; 3])>,
-    /// Since the last log line: the sounds started (cries, gull calls, hoots, splashes).
+    /// Since the last log line: the sounds started (cries, gull calls, hoots, splashes), and the
+    /// last one's volume and muffle as the listener's cover let it through.
     sounds: [u32; 4],
+    last_sound: (f32, f32),
     /// Since the last log line: frames, spawns, fish jumps and the time spent (s).
     frames: u32,
     spawned: u32,
@@ -250,6 +252,7 @@ static SKY: Mutex<Sky> = Mutex::new(Sky {
     owl: None,
     splashes: Vec::new(),
     sounds: [0; 4],
+    last_sound: (0.0, 0.0),
     frames: 0,
     spawned: 0,
     jumps: 0,
@@ -369,8 +372,7 @@ fn frame(c: &Client) {
             );
             spawned += 1;
             if cry && k == crier {
-                let _ = c.start_sound(&CRY, Some(at), 1.0, false, 0.0);
-                s.sounds[0] += 1;
+                heard(&mut s, 0, base_api::hearing::start_outdoors(c, &CRY, at, 1.0));
             }
         }
     } else {
@@ -416,8 +418,7 @@ fn frame(c: &Client) {
             );
             spawned += 1;
             if call && k == caller {
-                let _ = c.start_sound(&GULL_CALL, Some(at), 1.0, false, 0.0);
-                s.sounds[1] += 1;
+                heard(&mut s, 1, base_api::hearing::start_outdoors(c, &GULL_CALL, at, 1.0));
             }
         }
     } else {
@@ -462,8 +463,7 @@ fn frame(c: &Client) {
             let due = o.hoots.len();
             o.hoots.retain(|&h| h > age);
             if o.hoots.len() < due {
-                let _ = c.start_sound(&OWL_CALL, Some(at), 1.0, false, 0.0);
-                s.sounds[2] += 1;
+                heard(&mut s, 2, base_api::hearing::start_outdoors(c, &OWL_CALL, at, 1.0));
             }
         }
     }
@@ -488,8 +488,7 @@ fn frame(c: &Client) {
                     .spread(0.15)
                     .speed(1.2),
             );
-            let _ = c.start_sound(&SPLASHING, Some(at), am::SPLASH_OUT, false, 0.0);
-            s.sounds[3] += 1;
+            heard(&mut s, 3, base_api::hearing::start_outdoors(c, &SPLASHING, at, am::SPLASH_OUT));
             let flight = 2.0 * leap / am::FISH_FALL as f64;
             let down = [at[0] + a.cos() * across * flight, at[1], at[2] + a.sin() * across * flight];
             s.splashes
@@ -512,8 +511,7 @@ fn frame(c: &Client) {
                 .spread(0.2)
                 .speed(1.6),
         );
-        let _ = c.start_sound(&SPLASHING, Some(at), 1.0, false, 0.0);
-        s.sounds[3] += 1;
+        heard(&mut s, 3, base_api::hearing::start_outdoors(c, &SPLASHING, at, 1.0));
         spawned += 1;
     }
 
@@ -527,7 +525,7 @@ fn frame(c: &Client) {
     {
         if s.frames > 0 && s.logged.is_some() {
             weft_sdk::info!(
-                "ambient: {:?}; {} soarers, {} gulls, owl {}, {} fish jumps ({} searches found no water, last on {}); sounds: {} cries, {} gull calls, {} hoots, {} splashes; {:.1} spawns and {:.4} ms a frame",
+                "ambient: {:?}; {} soarers, {} gulls, owl {}, {} fish jumps ({} searches found no water, last on {}); sounds: {} cries, {} gull calls, {} hoots, {} splashes (last at volume {:.2}, muffle {:.0} Hz); {:.1} spawns and {:.4} ms a frame",
                 now_word,
                 s.soarers.len(),
                 s.gulls.len(),
@@ -539,6 +537,8 @@ fn frame(c: &Client) {
                 s.sounds[1],
                 s.sounds[2],
                 s.sounds[3],
+                s.last_sound.0,
+                s.last_sound.1,
                 s.spawned as f64 / s.frames as f64,
                 s.spent * 1000.0 / s.frames as f64
             );
@@ -546,6 +546,13 @@ fn frame(c: &Client) {
         s.logged = Some(began);
         (s.frames, s.spawned, s.jumps, s.dry, s.spent, s.sounds) = (0, 0, 0, 0, 0.0, [0; 4]);
     }
+}
+
+/// Counts a sound started (by kind: cry, gull call, hoot, splash) with the volume and muffle the
+/// listener's cover let through.
+fn heard(s: &mut Sky, kind: usize, (volume, muffle): (f32, f32)) {
+    s.sounds[kind] += 1;
+    s.last_sound = (volume, muffle);
 }
 
 /// The top of open water near `me` within `reach`: a few columns tried, each read down from a

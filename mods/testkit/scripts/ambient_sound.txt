@@ -7,6 +7,9 @@
 # lines (about two per 10 s); owl -> hoots >= 1 (one per crossing, the first crossing at once);
 # fish -> splashes in every line, about twice the jumps; off -> no cries, gull calls or hoots
 # (the sky floor's biome may still have its own). A cost check too: "ms a frame" stays under 0.05.
+# Each line also gives the last sound's volume and muffle as the cover let it through: outside
+# "volume 1.00, muffle 20000 Hz" (splashes leaving the water 0.45); in_hut (a closed stone hut,
+# the gulls and eagles still overhead) -> about "volume 0.20, muffle 500 Hz" for the calls in it.
 loaded
 idle
 chat /rule core:mob_spawning 0
@@ -22,6 +25,9 @@ chat /tk fill -40 250 -40 40 262 40 core:air
 # a pool 21x21, one deep, sunk in the floor beside the player
 chat /tk fill -10 248 -30 10 248 -10 stone
 chat /tk fill -10 249 -30 10 249 -10 base:water
+# a closed stone hut, 13x13 inside, roof at 254 (the cover's 7-block ring stays in its walls)
+chat /tk fill 18 250 18 32 254 32 stone
+chat /tk fill 19 250 19 31 253 31 core:air
 chat /tp 0.5 250 0.5
 wait 2
 # ---- eagles on a thermal and a gull flock
@@ -38,6 +44,12 @@ chat /time set 6000
 chat /ambient force fish busy
 where fish
 wait 32
+# ---- the gulls and eagles heard from inside the hut
+chat /ambient force soar gull
+chat /tp 25.5 250 25.5
+where in_hut
+wait 32
+chat /tp 0.5 250 0.5
 # ---- back to what the place has
 chat /ambient off
 where off
