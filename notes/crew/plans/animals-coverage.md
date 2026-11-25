@@ -147,7 +147,7 @@ health 10/10 to 10/12, iguanodont 112 263/263 to 264/430).
 
 Run 2 (b7ef3aaf7, `r2_young_m-164843`, 471 s): mating, births, keeping by the mother and growing up all
 seen on every pad but the jaguars'. Unpaired grown ones on each pad (about a third) are expected: pairs meet.
-The jaguars never mated: love scores 0.5, and a jaguar's sleepy rest at noon 0.8 (0.96 held), so a cat put
+The jaguars never mated, most likely (to confirm in the next run's love lines) because love scores 0.5, and a jaguar's sleepy rest at noon 0.8 (0.96 held), so a cat put
 in love in its sleepy hours slept through its 30 s of love; a tame pair fed at noon would too. Fixed:
 `needs::IN_LOVE` (0.97) for one in love now. Rows now give each one's sex, and `/animalprof love` logs who
 fell in love and why the others didn't.
