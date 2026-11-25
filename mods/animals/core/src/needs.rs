@@ -411,6 +411,8 @@ pub const PACK_CATCH_UP: f32 = 1.3;
 pub const PACK_LOSE: f64 = 48.0;
 /// Every other prowl's leg heads for the water a hunter knows while it is further than this.
 pub const PROWL_WATER: f64 = 8.0;
+/// Blocks up a prowl's leg may end, onto a rise its path climbs (a hollow is no trap).
+pub const PROWL_CLIMB: i32 = 8;
 /// Seconds a hunter leaves a kill site it went to and found no prey at.
 pub const SITE_AGAIN_SECS: f32 = 120.0;
 /// Its kind near (itself among them) from which a pack hunter rallies the others to its hunt.
