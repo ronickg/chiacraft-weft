@@ -77,10 +77,8 @@ look 0 0
 hold core:use 1.3
 wait 1
 chat /sounds recent
-# armour: a helmet put on with a use
-chat /gear helmet copper slot=2
-key 3
-press core:use
+# armour: a helmet put straight on the head (slot 36; a use doesn't put armour on in this game)
+chat /gear helmet copper slot=36
 wait 0.5
 chat /sounds recent
 press core:inventory

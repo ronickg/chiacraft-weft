@@ -42,7 +42,7 @@ pub fn register(r: &mut Registry) {
         .mined_by("axe", tool_tier::HAND)
         .on_use(|u| {
             u.world().prop_cycle(u.pos(), "open");
-            crate::player_sounds::door(&u.world(), u.pos());
+            crate::player_sounds::door(&u.world(), u.pos(), Some(u.face()));
             true
         })
         .signal_sink()
@@ -50,7 +50,7 @@ pub fn register(r: &mut Registry) {
             let open = if e.level() > 0 { "true" } else { "false" };
             if e.world().prop(e.pos(), "open") != Some(open) {
                 e.world().prop_set(e.pos(), "open", open);
-                crate::player_sounds::door(&e.world(), e.pos());
+                crate::player_sounds::door(&e.world(), e.pos(), None);
             }
         })
         .tab(&crate::tabs::REDSTONE);

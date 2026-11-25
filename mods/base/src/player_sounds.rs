@@ -162,10 +162,17 @@ fn is_player(w: &World, id: u64) -> bool {
 }
 
 /// A door swung (`doors.rs`, by hand or power): open or close by what it is now.
-pub fn door(w: &World, pos: impl Into<BlockPos>) {
+/// `side`, the face it was used from, puts the sound just outside the door on the user's side:
+/// from inside its own block the door hid it (only an echo was heard, at 0.05: ai_player_2).
+pub fn door(w: &World, pos: impl Into<BlockPos>, side: Option<Dir>) {
     let pos = pos.into();
     let open = w.prop(pos, "open") == Some("true");
-    let at = Vec3::new(pos.x as f64 + 0.5, pos.y as f64 + 1.0, pos.z as f64 + 0.5);
+    let out = side.filter(|d| d.horizontal()).map_or(BlockPos::new(0, 0, 0), Dir::offset);
+    let at = Vec3::new(
+        pos.x as f64 + 0.5 + 0.6 * out.x as f64,
+        pos.y as f64 + 0.5,
+        pos.z as f64 + 0.5 + 0.6 * out.z as f64,
+    );
     w.play_sound(if open { &DOOR_OPEN } else { &DOOR_CLOSE }, at, 1.0);
 }
 
@@ -274,6 +281,11 @@ fn tick(w: &World) {
 
 /// A tool `was` that is used up now: gone from the hand, or kept broken (a tool of parts).
 fn used_up(was: ItemStack, now: ItemStack) -> bool {
+    // A tool of parts keeps its own damage and durability and stays, broken (`parts::broken`);
+    // read by the engine's wear, a fresh part bow looked used up on its first shot (ai_player_2).
+    if DURABILITY.on_stack(&was).is_some() {
+        return now.item == was.item && !crate::parts::broken(&was) && crate::parts::broken(&now);
+    }
     let Some(most) = item_info(was.item).map(|i| i.durability).filter(|&d| d > 0) else { return false };
     let close = was.wear() + 8 >= most;
     (now.is_empty() && close) || (now.item == was.item && was.wear() < most && now.wear() >= most)
