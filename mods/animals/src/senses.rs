@@ -76,6 +76,10 @@ value! {
         /// Wild ones of its kind within `KIN` (itself among them), and their middle.
         pub kin: u16,
         pub kin_mid: [f32; 3],
+        /// A hungry hunter's pack: itself and those kin below `needs::FULL`, who join its hunt
+        /// (`hunt::rally`); a full one lying by counted, a pack of 3 took on what 2 hunted
+        /// (ai1124_wolvesHollow1).
+        pub pack: u16,
         /// Its herd's or pack's leader among those kin: the lowest id, itself if it is lowest
         /// (`animals_core::groups`, `group.rs`).
         pub leader: u64,
@@ -382,6 +386,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     // A skittish one notices sooner, a calm one later.
     let eyes = eyes * (1.0 + roles::SKITTISH * roles::lean(me.persona()[0]));
     let (mut kin, mut mid) = (1u16, [p.x, p.y, p.z]);
+    let mut pack = 1u16;
     let mut leader = id;
     let mut prey: Vec<(u64, f32, f64)> = Vec::new();
     // The hunters it senses, best first after the loop.
@@ -410,6 +415,9 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
             kin += 1;
             mid = [mid[0] + e.pos.x, mid[1] + e.pos.y, mid[2] + e.pos.z];
             leader = animals_core::groups::leader([leader, t]);
+            if hungry && mine.pack_prey().is_some() && hunting(w, t, mine, false) {
+                pack += 1;
+            }
         }
         if hunter {
             let d = d2.sqrt() as f32;
@@ -503,6 +511,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         players(w, id, st, out, mine, facing, field, secs, player_noise, full);
     }
     out.kin = kin;
+    out.pack = pack;
     out.leader = leader;
     out.kin_mid = mid.map(|v| (v / kin as f64) as f32);
     // One adult of a herd at a time stands watch, the watch going round (by id and time).
@@ -513,7 +522,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     }) as u8;
     let best = prey
         .into_iter()
-        .filter(|&(_, kg, _)| mine.takes_with(me.mass, kg, kin as u32))
+        .filter(|&(_, kg, _)| mine.takes_with(me.mass, kg, pack as u32))
         .min_by(|a, b| a.2.total_cmp(&b.2));
     (out.prey, out.prey_kg) = best.map_or((0, 0.0), |(t, kg, _)| (t, kg));
 }
@@ -718,7 +727,9 @@ pub fn alarm(w: &World, id: u64, st: &EntityState, threat: u64, pos: [f32; 3]) -
     }
     let mut heard = 0;
     for o in w.entities_near(st.pos, roles::ALARM, Some(kind)) {
-        if o == id || crate::animal::tamed(w, o) {
+        // One on a hunt keeps at it, unless the alarm is of a hunter (wolvesPack5: a full wolf's
+        // alarm at the chase's noise sent its hunting pack running).
+        if o == id || crate::animal::tamed(w, o) || (threat == 0 && crate::hunt::on_hunt(w, o)) {
             continue;
         }
         if let Some(s) = w.component_mut(o, &SENSES) {

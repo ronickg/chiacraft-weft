@@ -81,7 +81,13 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
     let mut s = [0.0f32; NEEDS];
     let at = |n: Need| doing == n as u8;
     let mut active = 1.0;
+    // A wild hunter hungry enough to hunt (`needs::HUNTS_AT`) bears a chill or the heat: its hunt
+    // comes first, unless the weather would harm it.
+    let mut hunting = false;
     if let Some(a) = w.component(id, &ANIMAL) {
+        hunting = a.species().is_some_and(|s| s.hunts())
+            && (a.food as f32) < a.stat(crate::species::FOOD) * needs::HUNTS_AT
+            && !crate::animal::tamed(w, id);
         // Out of its hours it is sleepy (`animals_core::routines`).
         active = (a.species as usize)
             .checked_sub(1)
@@ -117,7 +123,7 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
         .and_then(|b| FEELINGS.get(b.feel as usize).copied())
     {
         Some(Feeling::Freezing | Feeling::Heatstroke) => SUFFERING,
-        Some(Feeling::Cold | Feeling::Hot) => UNEASY,
+        Some(Feeling::Cold | Feeling::Hot) if !hunting => UNEASY,
         _ => 0.0,
     };
     s[Need::Love as usize] = LOVE;
