@@ -119,7 +119,12 @@ pub fn boss_call(w: &World, boss: &str, event: &str, at: [f64; 3]) {
 /// With clip `clip` (`anim::play`): a species' alarm call with its alarm, its attack call with an
 /// attack (a pounce, bite or rear, or one of its species' attack clips), if its family has them.
 pub fn on_clip(w: &World, id: u64, clip: &str) {
-    let Some(s) = w.component(id, &crate::animal::ANIMAL).and_then(|a| a.species()) else { return };
+    let Some(s) = w
+        .component(id, &crate::animal::ANIMAL)
+        .and_then(|a| a.species())
+    else {
+        return;
+    };
     let Some(v) = voices::of(s.name) else { return };
     let (alarm, attack) = voices::acts(v.family);
     let event = match clip {
@@ -134,7 +139,12 @@ pub fn on_clip(w: &World, id: u64, clip: &str) {
 
 /// As `id` is fed (`animal::feed`): its eating sound (`voices::eat_way`, pitched by its size).
 pub fn eat(w: &World, id: u64) {
-    let Some(s) = w.component(id, &crate::animal::ANIMAL).and_then(|a| a.species()) else { return };
+    let Some(s) = w
+        .component(id, &crate::animal::ANIMAL)
+        .and_then(|a| a.species())
+    else {
+        return;
+    };
     if voices::of(s.name).is_none() {
         return;
     }

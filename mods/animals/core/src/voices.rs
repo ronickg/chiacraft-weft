@@ -105,7 +105,9 @@ pub const ACTS: [(&str, u32, u32); 21] = [
 
 /// `family`'s alarm and attack files, if it has any.
 pub fn acts(family: &str) -> (u32, u32) {
-    ACTS.iter().find(|a| a.0 == family).map_or((0, 0), |a| (a.1, a.2))
+    ACTS.iter()
+        .find(|a| a.0 == family)
+        .map_or((0, 0), |a| (a.1, a.2))
 }
 
 /// How it eats, by sound, `voice/eat/<way><n>`: three files each. Birds peck, meat-eaters tear and
