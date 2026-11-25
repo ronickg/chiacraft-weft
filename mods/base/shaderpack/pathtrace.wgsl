@@ -303,6 +303,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
     // lightmap gives it (already lowered under cover) and as the open sky would give it.
     let lit = light_on(n, h.light, sun, 1.0, h.world, h.rel);
+    // The lamps' and the sky's shares of it for the night's blue (`display`), kept before the calls
+    // below, which light the sky alone and set it to 1: traced, a fire-lit wall at night went
+    // white-blue where the world draws it orange (w12, the nave at 18000).
+    let share = NIGHT_SKY_SHARE;
     let dark = light_on(n, vec4(0.0), 0.0, 1.0, h.world, h.rel);
     let sky_part = max(light_on(n, vec4(h.light.x, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel) - dark, vec3(0.0));
     let sky_open = max(light_on(n, vec4(1.0, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel) - dark, vec3(0.0));
@@ -410,8 +414,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // The picture as the world's pass finishes it (`display`: the night's blue, or the LDR tone
     // curve); under a denoiser (mode 1) the air's light alone, which `fs_pt_finish` adds the
     // denoised light to and finishes.
+    NIGHT_SKY_SHARE = share;
     let under = select(display(air + dif * albedo + spe * s_alb), air, pt.mode == 1u);
-    pt_out[at + 2u] = vec4(under, 1.0);
+    // The share rides in the kind (1 to 1.25: traced) for `fs_pt_finish`.
+    pt_out[at + 2u] = vec4(under, 1.0 + 0.25 * share);
 }
 
 struct PtOut {
@@ -458,5 +464,8 @@ fn fs_pt_finish(in: PtOut) -> @location(0) vec4<f32> {
         discard;
     }
     let light = textureLoad(textures[pt.light], vec2<i32>(px), 0).rgb;
+    // The pixel's sky share as `cs_trace` found it: left at 1, the whole denoised light went
+    // the night's blue, a fire's with it.
+    NIGHT_SKY_SHARE = clamp((kind.a - 1.0) * 4.0, 0.0, 1.0);
     return vec4(display(kind.rgb + light), 0.0);
 }
