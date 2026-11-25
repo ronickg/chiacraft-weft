@@ -384,6 +384,13 @@ fn idle_life(w: &World, id: u64, h: [u64; 4]) {
     if now < h[IDLE_NEXT] || now < h[BUSY] || w.navigating(id) {
         return;
     }
+    // Fish have no idle clips (cov_small: sniff, groom, look... asked of trout, pacu, lungfish).
+    if w.component(id, &crate::animal::ANIMAL)
+        .and_then(|a| a.species())
+        .is_some_and(|s| s.in_water())
+    {
+        return;
+    }
     let a = idle_act(w, id);
     act(w, id, a);
     edit(w, id, |c| c[IDLE_NEXT] = now + IDLE_EVERY + w.random_below(IDLE_EVERY as u32) as u64);
