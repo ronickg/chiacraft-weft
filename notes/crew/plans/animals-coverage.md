@@ -89,6 +89,28 @@ stare on small_bird_fly; look, groom, alarm on early_bird_fly; alarm, sniff on o
 on gull_fly and vulture_fly; play on hare_lie; alarm, sniff, scratch, look on vole_sit; scratch on
 mouse_sit (idle clips asked for in the air: the fly looks should be left out of idle life).
 
+Run 2 (b7ef3aaf7, `r2_birds_m-170124`, 346 s). Songbirds as in run 1. The birds of prey now take to the air
+for prey ("flies at its prey", "soars to look for prey") but killed nothing: the eagle and both owls glided
+down onto where the prey had been, landed short, lifted again (about 14 times each), the eagle once hurting a
+hare on the ground. Fixed: in the air it stays on the prey, comes down low over it from 6 blocks
+(`roles::STOOP_LOW`) and strikes it within 1.6 blocks once a second ("strikes N from the air"); the kill is
+hunt.rs's as on foot. Scavengers: one vulture and both gulls ate the deer's venison; the second vulture came
+when it was eaten; the raven found the food but couldn't reach it ("can't reach the food"). Eight clips were
+still asked of birds in flight (held states and a clip playing as it took off): held states now wait for the
+ground, and taking off stops what played. The pads' shots were hidden by a hill south of the pad (now cleared).
+
+| Species | air hunt (run 2) | kill from the air |
+|---|---|---|
+| golden_eagle | pass ("flies at its prey", 3 hunts, a hare hurt) | fail: none (fixed, to re-run) |
+| savanna_hawk | soared once, no prey taken | not tested |
+| great_horned_owl | pass ("flies at its prey", hunts a mouse and a vole) | fail: none (fixed, to re-run) |
+| snowy_owl | pass (as the great horned owl) | fail: none (fixed, to re-run) |
+| turkey_vulture | pass (smells carrion, eats 200 g venison) | n/a |
+| raven | soars for prey; can't reach the food | not tested |
+| herring_gull | pass (eats venison off the ground) | n/a |
+
+Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_birds_m-170124/r2_birds_grid.jpg`.
+
 ## Small animals and fish (cov_small.txt)
 
 | Species | eats | drinks | wanders | flees | shot |

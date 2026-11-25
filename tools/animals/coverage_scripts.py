@@ -29,6 +29,9 @@ def pad(x, pond=1, deep=1):
         # And the sky over it (the pads at x 600 and 1200 were dark at noon: a hill over them).
         f"chat /tk fill {x-16} 86 {Z-16} {x+16} 110 {Z+16} core:air",
         f"chat /tk fill {x-16} 111 {Z-16} {x+16} 140 {Z+16} core:air",
+        # And the camera's side, south to where the shots and the where rows are taken from (round 2
+        # of cov_birds: a hill between the camera and the pad at x 200).
+        f"chat /tk fill {x-16} 70 {Z+17} {x+16} 100 {Z+32} core:air",
         f"chat /time set {TIME}",
         f"chat /tk fill {x-pond} {70-deep} {Z-pond} {x+pond} 69 {Z+pond} base:water",
         f"chat /tk fill {x-pond} 70 {Z-pond} {x+pond} 70 {Z+pond} core:air",

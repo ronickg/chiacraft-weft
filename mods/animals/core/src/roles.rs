@@ -116,7 +116,12 @@ pub fn ambushes(family: &str) -> bool {
 /// farther than `STOOP_FROM` blocks flies at it and comes down on it (the last blocks on foot,
 /// `hunt::hunt`).
 pub const SOAR_SEARCH: u32 = 200;
-pub const STOOP_FROM: f64 = 4.0;
+pub const STOOP_FROM: f64 = 2.5;
+/// From the air it strikes prey within this many blocks, once a second (`birds::fly`; round 2 of
+/// cov_birds: the eagle and the owls glided down onto where the prey had been, landed short, and
+/// lifted again, 14 times each, no kill), coming down low over it from `STOOP_LOW` blocks out.
+pub const STRIKE: f64 = 1.6;
+pub const STOOP_LOW: f64 = 6.0;
 
 #[cfg(test)]
 mod tests {

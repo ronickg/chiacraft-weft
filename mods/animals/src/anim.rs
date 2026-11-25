@@ -239,6 +239,10 @@ pub fn hold(w: &World, id: u64, a: Act) {
 /// state (`/anim <clip> hold`).
 pub fn hold_for(w: &World, id: u64, a: Act, ticks: u64) {
     let Some(h) = w.component(id, &HELD) else { return };
+    // Nor a held state in the air (round 2 of cov_birds: stare and graze asked of `_fly` looks).
+    if crate::birds::flying(w, id) {
+        return;
+    }
     let now = w.game_time();
     let until = now + ticks;
     if h[STATE] & CODE == a.code() {
@@ -273,6 +277,15 @@ pub fn hold_for(w: &World, id: u64, a: Act, ticks: u64) {
         c[STATE] = state;
         c[ASKED] = until;
     });
+}
+
+/// `id` takes off (`birds::take_off`, `lift`): what it held or played on the ground stops before
+/// its flying look comes on, which has only its wingbeat (round 2 of cov_birds: an alarm played
+/// as it bolted was asked of the `_fly` look).
+pub fn take_off(w: &World, id: u64) {
+    clear(w, id);
+    w.action_stop(id);
+    edit(w, id, |c| c[BUSY] = 0);
 }
 
 /// `id` holds nothing: back to its idle, walk and run.
