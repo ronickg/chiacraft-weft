@@ -46,6 +46,13 @@ pub const CHARGE: f64 = 3.5;
 /// kind's).
 pub const CHARGE_HIT: f32 = 0.15;
 pub const CHARGE_SPEED: f32 = 1.5;
+/// A big plant eater that is hit (`STANDS_KG`) turns on what hit it: it charges it for this many
+/// seconds, striking within `CHARGE` once in `TURN_HIT_SECS`, unless it gets farther than
+/// `TURN_GIVES_UP` blocks (a bull bison or a rhino runs at a hunter that hurt it, then lets it go;
+/// cov_bosses: hit iguanodonts and gastonias only fled, or stood and bolted after).
+pub const TURN_SECS: f32 = 15.0;
+pub const TURN_HIT_SECS: f32 = 1.0;
+pub const TURN_GIVES_UP: f64 = 24.0;
 
 /// Social moments in an animal's idle life (`anim`, every 15-40 s while it stands idle), by its
 /// kind's `biology::Social`: a young one's moment is play, in percent, more often in a pack or

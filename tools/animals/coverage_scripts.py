@@ -172,7 +172,8 @@ write("small", s)
 # 5. Big dinosaurs and bosses: aggro, leash, death.
 s = head("bosses", [
     "Animal AI coverage, big dinosaurs and bosses. Part 1-4: an iguanodont, a gastonia, a cedarosaurus and a wyvern, each",
-    "hit by the player (`/animalprof hit 4`, creative): expected a charge or a stand (\"charges\", \"stands\") or flight, logged.",
+    "hit by the player (`/animalprof hit 4`, creative): a grown one of 150 kg or more \"turns on it\" and \"charges 1 (it hurt it)\"",
+    "for up to 15 s, then \"lets 1 go\" (the player turns spectator); a smaller or young one runs.",
     "Parts 5-6: Drenkaun and Borkon summoned at their altars on sky pads (as drenkaun.txt / borkon.txt): it rises and fights",
     "(\"summoned\", \"hits\", its health down from the player's aimed blows), `/boss kill`: \"died\", \"loot\"; summoned again,",
     "the player leaves (spectator 90 blocks off for 70 s): \"no one to fight, back to its place\". Report per boss: aggro,",
@@ -183,7 +184,7 @@ for i, kind in enumerate(["iguanodont", "gastonia", "cedarosaurus", "wyvern"]):
     s += pad(x) + spawns(x, [(kind, 1, 0, -6)])
     s += watch(x, 2) + ["chat /tk mode creative", f"chat /tp {x} 70 {Z+2}", "look 0 0", "wait 1",
                         "chat /animalprof hit 4", "wait 2", "chat /animalprof where 64", "wait 4",
-                        "chat /animalprof where 64", "chat /tk mode spectator"]
+                        "chat /animalprof where 64", "wait 4", "chat /animalprof where 64", "chat /tk mode spectator"]
     s += watch(x, 3, every=5) + shot(x, f"cov_bosses_{i+1}_{kind}", z_back=18, pitch=-25)
 for j, (boss, offering, sword, armour) in enumerate([("drenkaun", "forest_offering", "flint", "leather"), ("borkon", "mountain_offering", "bronze", "bronze")]):
     x = 1000 + j * 200
@@ -204,7 +205,9 @@ for j, (boss, offering, sword, armour) in enumerate([("drenkaun", "forest_offeri
     s += [f"chat /tk fill {x} 200 0 {x} 200 0 animals:{boss}_altar", f"chat /tp {x}.5 200 2.5", "wait 1",
           "chat /tk mode survival", "chat /tk attr_mod me core:max_health testkit:hp core:add 300 0",
           f"chat /tk put me 0 animals:{offering} 8", f"chat /gear sword {sword} slot=1", "wait 0.5", "chat /tk heal"]
-    s += summon + ["chat /boss state", "key 2", "aim 10", "press core:attack", "wait 0.7", "aim 10",
+    # The damage step through `/boss hurt` too (round 2: the aimed blows never reached it).
+    s += summon + ["chat /boss state", "chat /boss hurt 40", "wait 0.5", "chat /boss hurt 40", "wait 0.5",
+                   "chat /boss state", "key 2", "aim 10", "press core:attack", "wait 0.7", "aim 10",
                    "press core:attack", "wait 0.7", "chat /tk heal", "aim 10", "press core:attack", "wait 1",
                    "chat /boss state", "chat /tk heal",
                    "chat /tick freeze", f"chat /tp {x}.5 204 12", "look 0 -15", "wait 2",

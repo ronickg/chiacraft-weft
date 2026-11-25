@@ -119,16 +119,28 @@ scratch on lungfish, pacu, lycoptera, brown_trout, fish_flop): fish should get n
 
 ## Big dinosaurs and bosses (cov_bosses.txt)
 
+Run 2 (b7ef3aaf7, `r2_bosses_m-165534`, 408 s). The bosses: summon, aggro, death with loot and Drenkaun's
+leash all seen; no blow lowered a boss's health (no "hit" line: the aimed blows never reached it; run 3 adds
+`/boss hurt`, the same damage step), and Borkon's one toss (24.9) killed the player, so his second summon and
+leash never came. The big plant eaters: the iguanodont and the gastonia "turned on it" but only stood, and
+the gastonia then bolted from the player: e91a79201 only set its senses, and nothing made it charge, while
+the shy check bolted from the player it had turned on. Fixed: `hunt::turn_on`, a charge at what hurt it
+for `roles::TURN_SECS` (15 s), striking within `CHARGE` once a second ("charges 1 (it hurt it)"), letting go
+when it is gone, a spectator or past 24 blocks ("lets 1 go"); no bolting from it meanwhile. The
+cedarosaurus was young (103/192) and ran: right for a young one.
+
 | Species | aggro / stands | leash | death | shot |
 |---|---|---|---|---|
-| iguanodont | fail: ran when hit (fixed, to re-run) | n/a | not tested | grid 1 |
-| gastonia | fail: ran when hit (fixed, to re-run) | n/a | not tested | grid 1 |
-| cedarosaurus | fail: ran when hit (fixed, to re-run) | n/a | not tested | grid 1 |
-| wyvern | partial: flinched, stayed, breathed frost twice; no charge | n/a | not tested | grid 1 (dark) |
-| drenkaun | pass ("summoned", chase, "sweep hits 1 for 14.1") | pass ("back to its place" 60 s after) | not tested (script: see below) | grid 1 |
-| borkon | pass ("toss hits 1 for 24.9": killed the player) | pass (62 s) | not tested (script) | grid 1 ("You Died") |
+| iguanodont | fail: "turns on it", no charge (fixed, to re-run) | n/a | not tested | r2 1 |
+| gastonia | fail: "turns on it", then bolted (fixed, to re-run) | n/a | not tested | r2 2 |
+| cedarosaurus | pass (young: ran) | n/a | not tested | r2 3 |
+| wyvern | flinched, breathed fire twice; no charge (a knock-out kind, left as is) | n/a | not tested | r2 4 (dark) |
+| drenkaun | pass ("sweep hits 1 for 14.1") | pass ("back to its place" 60 s after) | pass ("died", loot); damage from blows not tested | r2 5 |
+| borkon | pass ("toss hits 1 for 24.9": killed the player) | not tested (player dead) | pass ("died", loot); damage from blows not tested | r2 6 |
 
-cov_bosses, Mac, 403.9 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_bosses_m-160951.log`; grid
+Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_bosses_m-165534/r2_bosses_grid.jpg`.
+
+Run 1: cov_bosses, Mac, 403.9 s (`~/Coding/chiacraft-archive/tester-tools/runs/cov_bosses_m-160951.log`; grid
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_bosses_m-161637/cov_bosses_grid.jpg`). The big plant
 eaters ran from the hit (this run was before e91a79201, which has them turn and charge). The bosses'
 deaths weren't reached, the script's fault: its blows went over the boss (looking up), and a boss

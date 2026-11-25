@@ -1,5 +1,6 @@
 # Animal AI coverage, big dinosaurs and bosses. Part 1-4: an iguanodont, a gastonia, a cedarosaurus and a wyvern, each
-# hit by the player (`/animalprof hit 4`, creative): expected a charge or a stand ("charges", "stands") or flight, logged.
+# hit by the player (`/animalprof hit 4`, creative): a grown one of 150 kg or more "turns on it" and "charges 1 (it hurt it)"
+# for up to 15 s, then "lets 1 go" (the player turns spectator); a smaller or young one runs.
 # Parts 5-6: Drenkaun and Borkon summoned at their altars on sky pads (as drenkaun.txt / borkon.txt): it rises and fights
 # ("summoned", "hits", its health down from the player's aimed blows), `/boss kill`: "died", "loot"; summoned again,
 # the player leaves (spectator 90 blocks off for 70 s): "no one to fight, back to its place". Report per boss: aggro,
@@ -41,6 +42,8 @@ look 0 0
 wait 1
 chat /animalprof hit 4
 wait 2
+chat /animalprof where 64
+wait 4
 chat /animalprof where 64
 wait 4
 chat /animalprof where 64
@@ -88,6 +91,8 @@ wait 2
 chat /animalprof where 64
 wait 4
 chat /animalprof where 64
+wait 4
+chat /animalprof where 64
 chat /tk mode spectator
 chat /tp 200 95 574
 wait 1
@@ -132,6 +137,8 @@ wait 2
 chat /animalprof where 64
 wait 4
 chat /animalprof where 64
+wait 4
+chat /animalprof where 64
 chat /tk mode spectator
 chat /tp 400 95 574
 wait 1
@@ -173,6 +180,8 @@ look 0 0
 wait 1
 chat /animalprof hit 4
 wait 2
+chat /animalprof where 64
+wait 4
 chat /animalprof where 64
 wait 4
 chat /animalprof where 64
@@ -223,6 +232,11 @@ look 0 -29
 wait 0.5
 press core:use
 wait 3
+chat /boss state
+chat /boss hurt 40
+wait 0.5
+chat /boss hurt 40
+wait 0.5
 chat /boss state
 key 2
 aim 10
@@ -286,6 +300,11 @@ look 0 -29
 wait 0.5
 press core:use
 wait 3
+chat /boss state
+chat /boss hurt 40
+wait 0.5
+chat /boss hurt 40
+wait 0.5
 chat /boss state
 key 2
 aim 10

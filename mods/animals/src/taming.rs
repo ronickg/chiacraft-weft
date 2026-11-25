@@ -116,6 +116,11 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return false;
         }
         let Some(t) = w.component(id, &TAMING) else { return false };
+        // Charging what hurt it (`hunt::turn_on`): it doesn't bolt from the player it charges
+        // (cov_bosses: a hit gastonia turned on the player, then bolted from him).
+        if crate::hunt::turned_on(w, id) {
+            return false;
+        }
         let t0 = crate::prof::stamp();
         let _slow = Slow(t0, id);
         if t.scared > 0 {
@@ -347,10 +352,7 @@ pub fn hurt(w: &World, id: u64, source: u64, cause: u32) {
         // `hunt::wary` stands and charges at its next look; cov_grazers: hit iguanodonts and
         // ankylosaurs only ran).
         if stands_when_hit(w, id) {
-            if let Some(s) = w.component_mut(id, &crate::senses::SENSES) {
-                s.aware = s.aware.max(animals_core::perception::NOTICED + 0.5);
-                (s.threat, s.threat_pos) = (source, at);
-            }
+            crate::hunt::turn_on(w, id, source);
             weft_sdk::info!("animal {id} hurt by {source}: turns on it");
             return;
         }
