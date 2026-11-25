@@ -1,0 +1,64 @@
+# Weather sound follows the weather and the cover (notes/SYSTEMS.md, weather sound).
+# A stone floor high in the open sky with a closed 17x17 stone hut on it; the player stands
+# outside, then inside, through clear, rain, a thunderstorm and clear again. Sound can't be heard
+# in a script, so read run.log: `weather sound:` lines every 10 s (bed levels, `enclosed`, the
+# weather the client has, the muffle), `thunder:` lines, and the `where` markers between steps.
+# Expect: clear -> rain/heavy ~0 (wind only); rain outside -> rain up, enclosed ~0, muffle 20000;
+# inside -> enclosed ~1, rain down to ~0.2 of outside, roof up, muffle under 1000 Hz;
+# storm outside -> heavy up, `thunder:` lines; clear again -> beds fade, "all beds quiet" or wind only.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /season summer 1
+chat /time set 6000
+chat /weather clear 99999
+chat /tp 0.5 252 0.5
+wait 2
+loaded
+chat /tk fill -40 249 -40 40 249 40 stone
+chat /tk fill -40 250 -40 40 262 40 core:air
+# The hut: walls and roof of stone, hollow inside (head 251.6, roof at 254).
+chat /tk fill -9 250 -9 9 254 9 stone
+chat /tk fill -8 250 -8 8 253 8 core:air
+chat /tk fill -40 255 -40 40 262 40 core:air
+wait 1
+chat /tp 25.5 250 25.5
+look 0 -10
+wait 3
+# ---- 1: clear, outside
+where clear_out
+chat /rain
+wait 30
+shot ws_clear_out.png
+# ---- 2: rain, outside
+chat /weather rain 99999
+where rain_out
+wait 45
+shot ws_rain_out.png
+# ---- 3: rain, inside the hut
+chat /tp 0.5 250 0.5
+where rain_in
+wait 45
+shot ws_rain_in.png
+# ---- 4: back out in the rain (eases back up)
+chat /tp 25.5 250 25.5
+where rain_out2
+wait 30
+# ---- 5: a thunderstorm, outside
+chat /weather thunder 99999
+where storm_out
+wait 60
+shot ws_storm_out.png
+# ---- 6: the storm from inside
+chat /tp 0.5 250 0.5
+where storm_in
+wait 40
+# ---- 7: clear again, outside
+chat /tp 25.5 250 25.5
+chat /weather clear 99999
+where clear_out2
+wait 45
+shot ws_clear_out2.png
+where end
+quit

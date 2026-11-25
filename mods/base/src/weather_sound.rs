@@ -40,6 +40,8 @@ struct State {
     beds: [SoundHandle; 5],
     next_look: f32,
     next_log: f32,
+    /// A bed played at the last log line: the line after they all stop says so once.
+    logged_playing: bool,
     flashes: u32,
     /// Thunder on its way: seconds left, metres away.
     coming: Vec<(f32, f32)>,
@@ -83,14 +85,18 @@ pub fn register(r: &mut Registry) {
 
 fn frame(c: &Client) {
     let st = c.state();
+    let mut guard = STATE.lock().unwrap_or_else(|e| e.into_inner());
     if st.flags & client::client_flags::JOINED == 0 {
+        // Out of the world: the engine has ended its sounds; the next world starts afresh (its
+        // flash count from zero, its beds not yet started).
+        *guard = None;
         return;
     }
-    let mut guard = STATE.lock().unwrap_or_else(|e| e.into_inner());
     let s = guard.get_or_insert_with(|| State {
         beds: [SoundHandle::default(); 5],
         next_look: 0.0,
         next_log: 0.0,
+        logged_playing: false,
         flashes: st.lightnings,
         coming: Vec::new(),
         rng: 0x9E37_79B9_7F4A_7C15 ^ st.frame,
@@ -126,11 +132,26 @@ fn frame(c: &Client) {
     beds(c, s, &l);
     s.next_log -= LOOK;
     let playing = s.beds.iter().any(|b| b.playing(c));
-    if playing && s.next_log <= 0.0 {
+    if (playing || s.logged_playing) && s.next_log <= 0.0 {
         s.next_log = LOG_EVERY;
+        s.logged_playing = playing;
+        // `enclosed` is the one cover value the muffle follows (1 - open).
         info!(
-            "weather sound: rain {:.2} heavy {:.2} roof {:.2} wind {:.2} trees {:.2} (open {:.2} roof {:.2} leaves {:.2}, wind {speed:.1} m/s, muffle {:.0} Hz)",
-            l.rain, l.heavy, l.roof, l.wind, l.trees, cover.open, cover.roof, cover.leaves, l.lowpass
+            "weather sound: rain {:.2} heavy {:.2} roof {:.2} wind {:.2} trees {:.2} (enclosed {:.2}, open {:.2} roof {:.2} leaves {:.2}, rain {:.2} thunder {:.2} snow {:.2}, wind {speed:.1} m/s, muffle {:.0} Hz){}",
+            l.rain,
+            l.heavy,
+            l.roof,
+            l.wind,
+            l.trees,
+            1.0 - cover.open,
+            cover.open,
+            cover.roof,
+            cover.leaves,
+            st.rain,
+            st.thunder,
+            st.snowing,
+            l.lowpass,
+            if playing { "" } else { ", all beds quiet" }
         );
     }
 }
