@@ -22,8 +22,8 @@ use weft_sdk::*;
 
 declare_mod!(deps: ["base"], init: init);
 
-pub mod anim;
 mod ambient;
+pub mod anim;
 mod animal;
 mod ankylosaur;
 mod armour;
