@@ -24,6 +24,8 @@ wait 2
 chat /tk spawn animals:jaguar ~3 ~ ~
 chat /tk spawn animals:jaguar 100 70 544
 chat /anim log
+# The far one arrives at its first tick (once in 20 ticks): knocked out before, it had no torpor to lose (koFar1).
+wait 3
 chat /animalprof ko 1
 wait 2
 chat /animalprof where

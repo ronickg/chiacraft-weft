@@ -134,6 +134,11 @@ pub fn add_torpor(w: &World, id: u64, amount: f32) {
     if animal::tamed(w, id) || w.component(id, &KNOCKOUT).is_none() {
         return;
     }
+    // Not yet arrived (its first tick rolls its stats): its most torpor reads 0, and it fell out
+    // with none and woke at its first tick (koFar1: a resting jaguar 8 ticks after it fell).
+    if w.component(id, &ANIMAL).is_none_or(|a| a.species == 0) {
+        return;
+    }
     let max = max_torpor(w, id);
     let mut fell = false;
     set(w, id, |k| {
