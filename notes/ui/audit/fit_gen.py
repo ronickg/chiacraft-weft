@@ -13,22 +13,27 @@ import pathlib
 LANGS = ["en_us", "ru_ru", "fr_fr", "en_xa"]  # en_xa: the pseudo-locale (+40%, accented, bracketed)
 SCALES = [0, 2, 4, 6]  # 0: auto; the engine takes even scales (settings.rs), capped by the window
 
-# Opened by name in a world (core:loading, core:death, core:editor and the test mods' left out:
-# a loading screen with nothing loading, a death that kills, the world editor's own tool).
+# Opened by name in a world. Every screen there is must be opened: the run logs the whole list
+# (`ui-audit-screens`) and fit_report.py fails on any it never laid out.
 IN_WORLD = [
     "core:pause", "core:settings", "core:video", "core:accessibility", "core:chat_settings",
     "core:sound", "core:language", "core:controls", "core:mod_settings", "core:world_rules",
     "core:resource_packs", "core:shader_packs", "core:hud_editor", "core:touch_buttons",
     "core:debug_options", "core:tags", "core:mods", "core:disabled_mods", "core:profile",
     "core:account", "core:finder", "core:achievements", "core:admission", "core:multiplayer",
-    "core:chat",
+    "core:chat", "core:controller", "core:editor",
     "base:video", "base:video_fantasy", "base:video_dlss", "base:video_developer", "base:map",
     "base:stats", "base:web", "base:knapping", "base:campfire", "base:charcoal_clamp",
     "base:cooking_pot", "base:crucible", "base:drying_rack", "base:forge", "base:tanning_frame",
     "base:tanning_pit", "base:tombstone",
     "animals:journal", "animals:scout", "animals:animal", "animals:animal_family",
     "animals:animal_genes", "animals:look", "packages:personal", "portals:portal",
+    "base:inventory", "base:advancements", "base:chest", "base:crafting_table", "base:dispenser",
+    "base:furnace", "base:music_player", "base:woodcutter",
 ]
+# Opened last, closed outright when Escape doesn't (peek): a loading screen with nothing loading,
+# the death screen (no death: it only shows).
+LAST_IN_WORLD = ["base:sleeping", "core:loading", "core:death"]
 KEYS = ["KeyE", "KeyR", "KeyP", "KeyL"]
 FROM_TITLE = ["core:title", "core:worlds", "core:create_world", "core:multiplayer"]
 
@@ -52,6 +57,8 @@ def main():
         for s in SCALES:
             out += [f"set_config core:gui_scale {s}", "wait 1", f"# {lang} at {s or 'auto'}"]
             for name in IN_WORLD:
+                opened(out, name)
+            for name in LAST_IN_WORLD:
                 opened(out, name)
             for k in KEYS:
                 out += [f"key {k}", "wait 0.6", "key Escape", "wait 0.3"]

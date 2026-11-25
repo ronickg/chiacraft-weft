@@ -23,6 +23,7 @@ def main(argv):
         argv = argv[:i] + argv[i + 2:]
     faults = defaultdict(lambda: {"by": 0.0, "where": set()})
     unopened = set()
+    registered, seen = set(), set()
     for path in argv:
         for raw in open(path, errors="replace"):
             line = ANSI.sub("", raw)
@@ -35,6 +36,12 @@ def main(argv):
                 f["by"] = max(f["by"], abs(float(by)))
                 f["where"].add((lang, float(scale), window))
                 continue
+            if "ui-audit-screens: " in line:
+                registered |= set(line.split("ui-audit-screens: ", 1)[1].split())
+                continue
+            if "ui-audit-seen: " in line:
+                seen.add(line.split("ui-audit-seen: ", 1)[1].strip())
+                continue
             n = NOTE.search(line)
             if n:
                 unopened.add(line.split("peek: ", 1)[1].strip())
@@ -42,7 +49,13 @@ def main(argv):
     screens = defaultdict(list)
     for key, f in faults.items():
         screens[key[0]].append((key, f))
-    out.append(f"# Text-fit check: {len(faults)} faults on {len(screens)} screens\n")
+    missing = sorted(registered - seen)
+    out.append(f"# Text-fit check: {len(faults)} faults on {len(screens)} screens; "
+               f"{len(seen & registered)} of {len(registered)} screens opened\n")
+    if missing:
+        out.append("## FAIL: screens the sweep never opened\n")
+        out += [f"- {m}" for m in missing]
+        out.append("")
     for screen in sorted(screens, key=lambda s: -len(screens[s])):
         out.append(f"## {screen} ({len(screens[screen])})\n")
         for (s, what, wpath, text), f in sorted(screens[screen], key=lambda kf: (kf[0][1], -kf[1]["by"])):
@@ -62,6 +75,8 @@ def main(argv):
     if md:
         open(md, "w").write(text + "\n")
     print(text)
+    if missing or not registered:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

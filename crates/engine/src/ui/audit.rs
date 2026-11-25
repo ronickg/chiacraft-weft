@@ -187,9 +187,12 @@ fn overlaps(ui: &Ui, parent: &[usize], out: &mut Vec<Fault>) {
                 if ra.w <= 0.0 || rb.w <= 0.0 || ra.h <= 0.0 || rb.h <= 0.0 {
                     continue;
                 }
-                // A negative gap overlaps on purpose (a window's tabs standing on its frame):
-                // only more than it is a fault.
-                if let Some(by) = hit(ra, rb).filter(|&by| by > -n.style.gap.min(0.0) + SLACK) {
+                // A negative gap overlaps on purpose between frames (a window's tabs standing on
+                // its frame): only more than it is a fault, and never for a text (Planner 11-24).
+                // Words touching words are `text over text` below, whatever the gap.
+                let text = |i: usize| matches!(ui.nodes[i].kind, Kind::Text(_));
+                let tuck = if text(a) || text(b) { 0.0 } else { -n.style.gap.min(0.0) };
+                if let Some(by) = hit(ra, rb).filter(|&by| by > tuck + SLACK) {
                     let text = format!("{} / {}", words_of(ui, a), words_of(ui, b));
                     out.push(Fault { what: "siblings overlap", path: path(ui, parent, a), text, by });
                 }
@@ -302,6 +305,9 @@ pub struct Insets {
     by_class: FxHashMap<String, [f32; 4]>,
     /// Faults already logged (the same screen is laid out again on every change).
     said: FxHashSet<String>,
+    /// Screens laid out at least once, and whether the list of every screen was logged.
+    seen: FxHashSet<String>,
+    listed: bool,
 }
 
 impl Insets {
@@ -329,6 +335,15 @@ impl Insets {
 
     /// Logs `faults` of `screen` not said before, with the language, GUI scale and window.
     pub fn log(&mut self, screen: &str, faults: &[Fault], lang: &str, scale: f32, window: (u32, u32)) {
+        // Coverage: every screen there is, once, then each the run lays out (`fit_report.py`
+        // fails a run that left one out, so no screen escapes the check by being hard to reach).
+        if !self.listed {
+            self.listed = true;
+            log::warn!("ui-audit-screens: {}", crate::screens::all_names().join(" "));
+        }
+        if self.seen.insert(screen.to_string()) {
+            log::warn!("ui-audit-seen: {screen}");
+        }
         for f in faults {
             let line = format!(
                 "{screen} | {} | {} | \"{}\" | {:.2} | {lang} | {scale} | {}x{}",

@@ -148,6 +148,33 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
     })
 }
 
+/// Every screen `named` opens by name: the engine's own (a mod's of the same name replaces it).
+pub const ENGINE_SCREENS: &[&str] = &[
+    "core:title", "core:loading", "core:pause", "core:settings", "core:video", "core:accessibility",
+    "core:chat_settings", "core:sound", "core:language", "core:controls", crate::controller::SCREEN,
+    "core:mod_settings", "core:worlds", "core:create_world", "core:chat", "core:death",
+    "core:multiplayer", "core:resource_packs", "core:shader_packs", "core:world_rules",
+    "core:hud_editor", "core:touch_buttons", "core:debug_options", "core:tags", "core:mods",
+    "core:disabled_mods", "core:editor", "core:profile", "core:account", "core:finder",
+    "core:achievements", "core:admission",
+];
+
+/// Every screen a name opens: the engine's and every mod menu with a screen, sorted. The text-fit
+/// sweep must open each (`ui::audit`: a screen it never laid out fails the run).
+pub fn all_names() -> Vec<String> {
+    let mut out: Vec<String> = ENGINE_SCREENS.iter().map(|s| s.to_string()).collect();
+    if let Some(c) = crate::content::try_content() {
+        for (name, &m) in c.game.catalog.ids(ek::MENU).iter() {
+            if c.game.menus[m as usize].screen.is_some() {
+                out.push(name.to_string());
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
 /// An engine screen; they always exist.
 pub fn engine(name: &str) -> Box<dyn Screen> {
     named(name).unwrap_or_else(|| panic!("no screen {name}"))

@@ -668,6 +668,11 @@ async fn run_lines(t: T, src: String) -> R {
                     t.frames(20).await?;
                     t.c().input_key("Escape", 0.0);
                     t.frames(10).await?;
+                    // A screen Escape doesn't close (death, loading): closed outright.
+                    if t.c().screen() == name {
+                        t.c().menu_close();
+                        t.frames(10).await?;
+                    }
                 }
             }
             "screen" => {
