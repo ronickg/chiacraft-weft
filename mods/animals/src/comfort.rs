@@ -169,7 +169,17 @@ pub fn speed(w: &World, id: u64) -> f32 {
 /// shade, into water, by a fire, under a roof) and rests there; it takes the turn while it does.
 pub fn seek(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(b) = w.component(id, &BODY) else { return false };
-    let uneasy = matches!(FEELINGS.get(b.feel as usize), Some(Feeling::Cold | Feeling::Freezing | Feeling::Hot | Feeling::Heatstroke));
+    let feeling = FEELINGS.get(b.feel as usize).copied();
+    // A wild hunter hungry enough to hunt bears a chill or the heat, as the band scores it
+    // (`choose.rs`): run as the band's last resort, every goal above passing, a wolf at 30 % went
+    // looking for warmth 2 s before its hunt (wolvesCold1).
+    let bears = matches!(feeling, Some(Feeling::Cold | Feeling::Hot))
+        && w.component(id, &ANIMAL).is_some_and(|a| {
+            a.species().is_some_and(|s| s.hunts())
+                && (a.food as f32) < a.stat(species::FOOD) * animals_core::needs::HUNTS_AT
+                && !animal::tamed(w, id)
+        });
+    let uneasy = !bears && matches!(feeling, Some(Feeling::Cold | Feeling::Freezing | Feeling::Hot | Feeling::Heatstroke));
     let Some(seek) = w.component(id, &SEEK) else { return false };
     if !uneasy {
         if seek[3] > 0.0 {
