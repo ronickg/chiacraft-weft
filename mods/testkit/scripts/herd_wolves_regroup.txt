@@ -1,7 +1,7 @@
 # A pack's kill's noise and a stray that regroups (Planner 11-25, the wolf follow-ups after animals-wolves; `notes/ECOLOGY.md`,
 # part 6). On the flattened field of `herd_wolves_far.txt`: two wolves at 30 % food with a deer beside them, the nearer kills it
 # at once (`/animalprof bite 1000`). Their kill's own fight noise should not send them running (no "runs from 0" or alarm from a
-# wolf; senses: a fight its own kind makes is no threat). A third wolf, grown (`/animal age 400`) and fed, stands alone 80 blocks east at the end of a flat strip: after
+# wolf; senses: a fight its own kind makes is no threat). A third wolf, grown (`/animal age 4`: a wolf grows in 1.25 game days and lives 46) and fed, stands alone 80 blocks east at the end of a flat strip: after
 # `groups::STRAY_SECS` (20 s) alone it should howl ("howls for its pack: N answers ... blocks off"), head for them in legs, and
 # end within 16 blocks of the pair ("keeps up with its leader", or kin 2+ in the senses rows). The player watches as a spectator
 # from midway (40 blocks from each), so both stay within the activation distance. A leg it walks logs "heads for its pack: a leg to".
@@ -31,7 +31,7 @@ wait 1
 chat /tk spawn animals:grey_wolf 80 70 544
 wait 2
 chat /tp 80 72 546
-chat /animal age 400
+chat /animal age 4
 chat /tp 0 72 540
 wait 2
 chat /tk spawn animals:white_tailed_deer 2 70 540
