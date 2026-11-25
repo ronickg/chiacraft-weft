@@ -741,6 +741,7 @@ impl App {
             ("core:gpu_dlss_rr_models", weft_render::UpscalerInfo::model_bits(&upscaler.rr_models) as f64),
             ("core:gpu_dlss5", upscaler.neural as u8 as f64),
             ("core:gpu_frame_gen", upscaler.frame_gen as f64),
+            ("core:gpu_reflex", upscaler.low_latency as u8 as f64),
         ] {
             if let Some(id) = crate::config::by_name(name) {
                 crate::config::put(id, v);
@@ -748,6 +749,9 @@ impl App {
         }
         if let Some(id) = crate::config::by_name("core:gpu_dlss") {
             crate::config::put_text(id, &upscaler.name);
+        }
+        if let Some(id) = crate::config::by_name("core:gpu_frame_gen_why") {
+            crate::config::put_text(id, &upscaler.frame_gen_why);
         }
         if !upscaler.name.is_empty() {
             log::info!("upscaler: {} (core:dlss picks the mode)", upscaler.name);
@@ -2928,6 +2932,12 @@ struct UiCallbacks {
 
 /// One frame. Returns true when the app should quit.
 fn frame(r: &mut Running, opts: &Options, now: Instant) -> bool {
+    // NVIDIA Reflex: the frame starts here (it may sleep first, so input is read as late as it
+    // can be), in the mode the settings say; the backend marks its submit and present itself.
+    r.gpu.set_low_latency(crate::settings::reflex());
+    r.gpu
+        .latency_mark(weft_render::LatencyMark::SimulationStart);
+    report_latency(r);
     r.retired = None;
     let dt = (now - r.last).as_secs_f64();
     r.last = now;
@@ -2999,6 +3009,7 @@ fn frame(r: &mut Running, opts: &Options, now: Instant) -> bool {
     let text_unit = layout_uis(r, scale);
     let t = Instant::now();
     r.prof[1] = (t.duration_since(now).as_secs_f32() * 1000.0 - r.prof[1]).max(0.0);
+    r.gpu.latency_mark(weft_render::LatencyMark::SimulationEnd);
     let Some(info) = r.gpu.begin_frame() else { return false };
     let t2 = Instant::now();
     r.prof[2] = t2.duration_since(t).as_secs_f32() * 1000.0;
@@ -3055,6 +3066,21 @@ fn frame(r: &mut Running, opts: &Options, now: Instant) -> bool {
     }
     count_fps(r);
     false
+}
+
+/// Reflex's measured PC latency into `core:gpu_latency_ms` (the DLSS tab shows it) and, every
+/// 10 s while it runs, the log.
+fn report_latency(r: &mut Running) {
+    let Some(ms) = r.gpu.latency_ms() else { return };
+    if let Some(id) = crate::config::by_name("core:gpu_latency_ms") {
+        crate::config::put(id, ms as f64);
+    }
+    static LAST: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
+    let mut last = LAST.lock().unwrap();
+    if last.is_none_or(|t| t.elapsed() > Duration::from_secs(10)) {
+        *last = Some(Instant::now());
+        log::info!("reflex: PC latency {ms:.1} ms (frame start to GPU done, mean of the last frames), mode {}", crate::settings::reflex());
+    }
 }
 
 /// A phone's keyboard comes up while a text field has the focus (the chat) and goes away after.

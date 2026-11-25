@@ -359,6 +359,11 @@ pub fn upscale_standin() -> bool {
     number("core:upscale_standin") != 0.0
 }
 
+/// NVIDIA Reflex's low-latency mode (`core:reflex`: 0 off, 1 on, 2 with boost), live.
+pub fn reflex() -> u32 {
+    number("core:reflex").clamp(0.0, 2.0) as u32
+}
+
 /// Ray Reconstruction with DLSS (`core:dlss_rr`), live.
 pub fn dlss_rr() -> bool {
     number("core:dlss_rr") != 0.0

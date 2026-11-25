@@ -626,6 +626,11 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:gpu_dlss_rr_models", ck::INT, 0.0, 0.0, 4.3e9, 1.0),
         number("core:gpu_dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         number("core:gpu_frame_gen", ck::INT, 0.0, 0.0, 8.0, 1.0),
+        // Why frame generation doesn't run here (empty when it does), NVIDIA Reflex's low latency
+        // (1 where the upscaler has it), and the PC latency Reflex measured (ms, 0 none; updated live).
+        string("core:gpu_frame_gen_why", ""),
+        number("core:gpu_reflex", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        number("core:gpu_latency_ms", ck::FLOAT, 0.0, 0.0, 1000.0, 0.1),
         // Blocks clouds float above where their dimension puts them.
         number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 16.0),
         number("core:cloud_distance", ck::INT, if phone { 2048.0 } else { 6144.0 }, 0.0, 32768.0, 16.0).tag("config.logarithmic"),
@@ -785,6 +790,12 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:dlss_rr_model", ck::INT, 0.0, 0.0, 31.0, 1.0),
         // DLSS 5's neural rendering over the upscaled picture (not public yet: never runs), live.
         number("core:dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // NVIDIA Reflex's low latency (`Backend::set_low_latency`): 0 off, 1 on, 2 on with boost
+        // (the GPU kept clocked up). Live; only where the upscaler has it (`core:gpu_reflex`).
+        number("core:reflex", ck::INT, 1.0, 0.0, 2.0, 1.0),
+        // DLSS frame generation, where the GPU has it (`core:gpu_frame_gen`, an RTX 40 or 50 on
+        // Windows): on by default. Not read yet: its present path isn't built (`core:gpu_frame_gen_why`).
+        number("core:frame_gen", ck::BOOL, 1.0, 0.0, 1.0, 1.0),
         // A stand-in upscaler that only scales the picture up, for checking the upscaler's path
         // where the renderer has none (the Linux PC); read at start.
         number("core:upscale_standin", ck::BOOL, 0.0, 0.0, 1.0, 0.0),

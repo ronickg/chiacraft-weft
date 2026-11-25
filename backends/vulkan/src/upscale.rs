@@ -44,6 +44,31 @@ pub(crate) trait Upscaler: Send {
     /// # Safety
     /// The images and `cmd` are live, and `cmd` is recording outside a render pass.
     unsafe fn record(&mut self, cmd: vk::CommandBuffer, inputs: &Inputs, params: &UpscaleParams) -> bool;
+    /// A Reflex latency marker for this frame (NVIDIA's PC Latency markers); nothing by default.
+    fn mark(&mut self, mark: Mark) {
+        let _ = mark;
+    }
+    /// Reflex's low-latency mode (0 off, 1 on, 2 on with boost); nothing by default.
+    fn set_low_latency(&mut self, mode: u32) {
+        let _ = mode;
+    }
+    /// The PC latency Reflex measured lately (ms).
+    fn latency_ms(&self) -> Option<f32> {
+        None
+    }
+}
+
+/// The frame's latency markers: the game's (`weft_render::LatencyMark`) and the backend's own
+/// around its submit and present.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(not(feature = "streamline"), allow(dead_code))]
+pub(crate) enum Mark {
+    SimulationStart,
+    SimulationEnd,
+    RenderSubmitStart,
+    RenderSubmitEnd,
+    PresentStart,
+    PresentEnd,
 }
 
 /// Scales the picture up and nothing else (the backend's plain blit), in every mode, Ray
