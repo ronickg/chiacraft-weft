@@ -586,19 +586,25 @@ pub const HURRY_NEAR: f64 = 32.0;
 pub fn wild_love_near(w: &World, at: Vec3, r: f64) -> usize {
     let mut n = 0;
     for id in w.entities_near(at, r, None) {
-        if crate::animal::tamed(w, id)
-            || w.component(id, &ANIMAL)
-                .is_none_or(|a| a.species == 0 || !life::can_breed(a.stage))
-        {
-            continue;
-        }
-        if let Some(b) = w.component_mut(id, &BREEDING)
-            && b.growing == 0
-            && b.carrying == 0
-        {
-            (b.love, b.rest) = (LOVE_TICKS, 0);
+        let Some(a) = w.component(id, &ANIMAL).filter(|a| a.species != 0) else { continue };
+        let Some(b) = w.component(id, &BREEDING) else { continue };
+        let why = if crate::animal::tamed(w, id) {
+            "tame"
+        } else if !life::can_breed(a.stage) {
+            ["a baby", "young", "young", "grown", "an elder"][a.stage.min(4) as usize]
+        } else if b.growing > 0 {
+            "growing"
+        } else if b.carrying > 0 {
+            "carrying"
+        } else {
+            if let Some(b) = w.component_mut(id, &BREEDING) {
+                (b.love, b.rest) = (LOVE_TICKS, 0);
+            }
             n += 1;
-        }
+            weft_sdk::debug!("animal {id} ({}) in love (test)", if a.female != 0 { "female" } else { "male" });
+            continue;
+        };
+        weft_sdk::debug!("animal {id} not in love (test): {why}");
     }
     n
 }

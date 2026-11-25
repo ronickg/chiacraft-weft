@@ -25,6 +25,8 @@ wait 4
 chat /tk fill -16 60 528 16 68 560 base:dirt
 chat /tk fill -16 69 528 16 69 560 base:grass
 chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 86 528 16 110 560 core:air
+chat /tk fill -16 111 528 16 140 560 core:air
 chat /time set 6000
 chat /tk fill -1 69 543 1 69 545 base:water
 chat /tk fill -1 70 543 1 70 545 core:air
@@ -145,6 +147,8 @@ wait 4
 chat /tk fill 184 60 528 216 68 560 base:dirt
 chat /tk fill 184 69 528 216 69 560 base:grass
 chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 86 528 216 110 560 core:air
+chat /tk fill 184 111 528 216 140 560 core:air
 chat /time set 6000
 chat /tk fill 199 69 543 201 69 545 base:water
 chat /tk fill 199 70 543 201 70 545 core:air
@@ -265,6 +269,8 @@ wait 4
 chat /tk fill 384 60 528 416 68 560 base:dirt
 chat /tk fill 384 69 528 416 69 560 base:grass
 chat /tk fill 384 70 528 416 85 560 core:air
+chat /tk fill 384 86 528 416 110 560 core:air
+chat /tk fill 384 111 528 416 140 560 core:air
 chat /time set 6000
 chat /tk fill 399 69 543 401 69 545 base:water
 chat /tk fill 399 70 543 401 70 545 core:air
@@ -388,6 +394,8 @@ wait 4
 chat /tk fill 584 60 528 616 68 560 base:dirt
 chat /tk fill 584 69 528 616 69 560 base:grass
 chat /tk fill 584 70 528 616 85 560 core:air
+chat /tk fill 584 86 528 616 110 560 core:air
+chat /tk fill 584 111 528 616 140 560 core:air
 chat /time set 6000
 chat /tk fill 599 69 543 601 69 545 base:water
 chat /tk fill 599 70 543 601 70 545 core:air
@@ -705,6 +713,8 @@ wait 4
 chat /tk fill 784 60 528 816 68 560 base:dirt
 chat /tk fill 784 69 528 816 69 560 base:grass
 chat /tk fill 784 70 528 816 85 560 core:air
+chat /tk fill 784 86 528 816 110 560 core:air
+chat /tk fill 784 111 528 816 140 560 core:air
 chat /time set 6000
 chat /tk fill 799 69 543 801 69 545 base:water
 chat /tk fill 799 70 543 801 70 545 core:air
@@ -745,6 +755,8 @@ wait 4
 chat /tk fill 984 60 528 1016 68 560 base:dirt
 chat /tk fill 984 69 528 1016 69 560 base:grass
 chat /tk fill 984 70 528 1016 85 560 core:air
+chat /tk fill 984 86 528 1016 110 560 core:air
+chat /tk fill 984 111 528 1016 140 560 core:air
 chat /time set 6000
 chat /tk fill 999 69 543 1001 69 545 base:water
 chat /tk fill 999 70 543 1001 70 545 core:air
@@ -785,6 +797,8 @@ wait 4
 chat /tk fill 1184 60 528 1216 68 560 base:dirt
 chat /tk fill 1184 69 528 1216 69 560 base:grass
 chat /tk fill 1184 70 528 1216 85 560 core:air
+chat /tk fill 1184 86 528 1216 110 560 core:air
+chat /tk fill 1184 111 528 1216 140 560 core:air
 chat /time set 6000
 chat /tk fill 1199 69 543 1201 69 545 base:water
 chat /tk fill 1199 70 543 1201 70 545 core:air
@@ -825,6 +839,8 @@ wait 4
 chat /tk fill 1384 60 528 1416 68 560 base:dirt
 chat /tk fill 1384 69 528 1416 69 560 base:grass
 chat /tk fill 1384 70 528 1416 85 560 core:air
+chat /tk fill 1384 86 528 1416 110 560 core:air
+chat /tk fill 1384 111 528 1416 140 560 core:air
 chat /time set 6000
 chat /tk fill 1399 69 543 1401 69 545 base:water
 chat /tk fill 1399 70 543 1401 70 545 core:air
@@ -865,6 +881,8 @@ wait 4
 chat /tk fill 1584 60 528 1616 68 560 base:dirt
 chat /tk fill 1584 69 528 1616 69 560 base:grass
 chat /tk fill 1584 70 528 1616 85 560 core:air
+chat /tk fill 1584 86 528 1616 110 560 core:air
+chat /tk fill 1584 111 528 1616 140 560 core:air
 chat /time set 6000
 chat /tk fill 1599 69 543 1601 69 545 base:water
 chat /tk fill 1599 70 543 1601 70 545 core:air

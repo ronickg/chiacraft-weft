@@ -381,8 +381,9 @@ pub fn init(r: &mut Registry) {
                         let a = w.component(id, &crate::animal::ANIMAL).filter(|a| a.species != 0)?;
                         let e = w.entity(id)?;
                         Some(format!(
-                            "{id} {}{} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}/{:.0}",
+                            "{id} {} {}{} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}/{:.0}",
                             a.species()?.name,
+                            if a.female != 0 { "F" } else { "M" },
                             crate::breeding::young_note(&w, id),
                             e.pos.x,
                             e.pos.y,

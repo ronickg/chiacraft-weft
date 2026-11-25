@@ -26,6 +26,9 @@ def pad(x, pond=1, deep=1):
         f"chat /tk fill {x-16} 60 {Z-16} {x+16} 68 {Z+16} base:dirt",
         f"chat /tk fill {x-16} 69 {Z-16} {x+16} 69 {Z+16} base:grass",
         f"chat /tk fill {x-16} 70 {Z-16} {x+16} 85 {Z+16} core:air",
+        # And the sky over it (the pads at x 600 and 1200 were dark at noon: a hill over them).
+        f"chat /tk fill {x-16} 86 {Z-16} {x+16} 110 {Z+16} core:air",
+        f"chat /tk fill {x-16} 111 {Z-16} {x+16} 140 {Z+16} core:air",
         f"chat /time set {TIME}",
         f"chat /tk fill {x-pond} {70-deep} {Z-pond} {x+pond} 69 {Z+pond} base:water",
         f"chat /tk fill {x-pond} 70 {Z-pond} {x+pond} 70 {Z+pond} core:air",
@@ -215,7 +218,7 @@ write("bosses", s)
 YOUNG = [
     [("white_tailed_deer", 6, -8, -8), ("reindeer", 6, 4, 4)],
     [("capybara", 6, -8, -8), ("grey_wolf", 4, 4, 4)],
-    [("jaguar", 4, -8, -8), ("hare", 6, 4, 4)],
+    [("jaguar", 6, -8, -8), ("hare", 6, 4, 4)],
     [("protoceratops", 6, -8, -8), ("iguanodont", 4, 4, 4)],
 ]
 s = head("young", [

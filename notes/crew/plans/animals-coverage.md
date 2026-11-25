@@ -145,24 +145,29 @@ young at a pad's edge stayed young; the where rows' 40 blocks missed the deer, c
 What it did show: hares 4 of 6 and an iguanodont 1 of 4 young, and those `hurry` reached grew up (hare 74
 health 10/10 to 10/12, iguanodont 112 263/263 to 264/430).
 
-Run 2 (to come): `/animalprof love` puts every grown wild one in love, so pairs mate and the young are born
-to mothers on the pad; where rows give each young one's distance to its mother; `hurry` reaches 32 blocks.
+Run 2 (b7ef3aaf7, `r2_young_m-164843`, 471 s): mating, births, keeping by the mother and growing up all
+seen on every pad but the jaguars'. Unpaired grown ones on each pad (about a third) are expected: pairs meet.
+The jaguars never mated: love scores 0.5, and a jaguar's sleepy rest at noon 0.8 (0.96 held), so a cat put
+in love in its sleepy hours slept through its 30 s of love; a tame pair fed at noon would too. Fixed:
+`needs::IN_LOVE` (0.97) for one in love now. Rows now give each one's sex, and `/animalprof love` logs who
+fell in love and why the others didn't.
 
-| Species | young (run 1) | keeps by its mother | grows up | shot |
-|---|---|---|---|---|
-| white_tailed_deer | none (out of season) | not tested | not tested | |
-| reindeer | none (out of season) | not tested | not tested | |
-| capybara | not in the rows | not tested | not tested | |
-| grey_wolf | none (out of season) | not tested | not tested | |
-| jaguar | none seen | not tested | not tested | |
-| hare | 4 of 6 | wild young, no mother (2 to 20 from grown ones) | pass (74) | |
-| protoceratops | not in the rows | not tested | not tested | |
-| iguanodont | 1 of 4 | wild young, no mother (3 to 7) | pass (112: 263 to 430 max health) | |
+| Species | mated | young born | keeps by its mother (5 rows) | grows up | shot |
+|---|---|---|---|---|---|
+| white_tailed_deer | pass (2 pairs) | pass (5) | pass (1-3 blocks) | pass (12/12 to 12/26) | r2 1 |
+| reindeer | pass (2 pairs) | pass (2) | pass (1-2) | pass (27/56 to 30/125) | r2 1 |
+| capybara | pass (2 pairs) | pass (4) | pass (1-2) | pass (12/13 to 13/28) | r2 2 |
+| grey_wolf | pass (1 pair) | pass (3) | pass (1-3) | pass (24/27 to 26/61) | r2 2 |
+| jaguar | fail: never mated (slept through love; fixed, to re-run) | not tested | not tested | not tested | r2 3 |
+| hare | pass (2 pairs) | pass (4) | pass (1-5) | pass (3/3 to 3/7) | r2 3 |
+| protoceratops | pass (1 pair) | pass (5 eggs hatched) | pass (1-3) | pass (21/21 to 21/46) | r2 4 (dark) |
+| iguanodont | pass (1 pair) | pass (1 egg hatched) | pass (2-3) | pass (353/545 to 379/1226) | r2 4 (dark) |
 
-Grid: `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_young_m-162151/cov_young_grid.jpg` (the pads
-from afar; the young can't be told from the grown ones in it). Missing clips: the lying and sitting looks
-lack their idle clips (reindeer, deer, wolf, capybara, jaguar, hare, iguanodont, protoceratops: 30 "no clip"
-lines, listed for the art side).
+Grown ones keep their health and only their maximum rises (a young one grown by `hurry` heals as any
+other). The dark pad at x 600 (every run): a hill over the 15 cleared blocks; pads now clear the sky to 140.
+Grid r2: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r2_young_m-164843/r2_young_grid.jpg`.
+
+Run 1 grid: `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_young_m-162151/cov_young_grid.jpg`.
 
 ## Taming and eggs (cov_taming.txt)
 
