@@ -1661,6 +1661,9 @@ fn rt_miss() -> RtHit {
 fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     return rt_miss();
 }
+fn rt_hit_mask(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32, mask: u32) -> RtHit {
+    return rt_miss();
+}
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
     return vec3(1.0);
 }
@@ -1826,8 +1829,15 @@ fn rt_miss() -> RtHit {
 // reflection: the pack shades what comes back as it shades the world.
 // `blur`: mips more for the hit's colour (a rippled or rough mirror softens what it shows).
 fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
+    return rt_hit_mask(rel, dir, t_max, blur, 0xFFu);
+}
+
+// `rt_hit` through the instances of `mask` alone (`world_render::rt`'s MASK_*: 1 the cubes' faces,
+// 2 their free quads, 4 distant terrain): a path tracer's test of the surface the world drew skips
+// the distant tiles, whose hidden columns under the cubes each ask the shader.
+fn rt_hit_mask(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32, mask: u32) -> RtHit {
     var rq: ray_query;
-    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_NONE, 0xFFu, 0.0, t_max, rel + g.cam_frac.xyz, dir));
+    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_NONE, mask, 0.0, t_max, rel + g.cam_frac.xyz, dir));
     while rayQueryProceed(&rq) {
         let h = rayQueryGetCandidateIntersection(&rq);
         let row = rt_inst[h.instance_custom_data];

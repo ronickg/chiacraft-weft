@@ -452,7 +452,7 @@ fn pt_takes(in: VOut) -> bool {
         let d = length(in.rel);
         PT_TAKES = 0;
         if d > 1e-3 && d <= PT_REACH_WORLD {
-            let h = rt_hit(vec3(0.0), in.rel / d, d * 1.1 + 2.0, 0.0);
+            let h = rt_hit_mask(vec3(0.0), in.rel / d, d * 1.02 + 0.2, 0.0, 3u);
             if h.hit && !h.clear && abs(h.t - d) <= 0.02 * d + 0.15 {
                 PT_TAKES = 1;
             }

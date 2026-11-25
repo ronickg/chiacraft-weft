@@ -271,7 +271,11 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     let v = -rel / dist;
-    let h = rt_hit(vec3(0.0), -v, dist * 1.1 + 2.0, 0.0);
+    // Out to the farthest hit the test below accepts: one past it fails either way (the same
+    // pixels traced), and the ray walks no further. The cubes' faces and quads alone: a distant
+    // tile it met would be no pixel traced either (the G-buffer has none), and the hidden ones
+    // under the cubes cost each ray their shader's asking. The world's `pt_takes` asks the same.
+    let h = rt_hit_mask(vec3(0.0), -v, dist * 1.02 + 0.2, 0.0, 3u);
     // Terrain at the depth drawn there: anything else (water, glass, a model, a particle) keeps the
     // world's own pixel.
     if !h.hit || h.clear || abs(h.t - dist) > 0.02 * dist + 0.15 {
