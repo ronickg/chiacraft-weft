@@ -311,9 +311,18 @@ const SUN_GLOW_CREAM: vec3<f32> = vec3(1.0, 0.9, 0.8);
 const SUN_GLOW_CREAM_K: f32 = 1.0;
 // Away from it the sky in these at its own brightness: from the first cosine (none) to the second
 // (full, lavender), blue beyond; how much.
-const SKY_AWAY: vec3<f32> = vec3(0.998, 0.96, 1.0);
-// Where its lavender turns blue (cosines: none, full).
-const SKY_AWAY_TURN: vec2<f32> = vec2(0.975, 0.9);
+// (0.998 to 0.96, 4° to 16°, read with the turn below as a hard vertical edge between the sun's
+// cream half and the blue half of the frame: lkmC3's 06:00 vista.)
+const SKY_AWAY: vec3<f32> = vec3(0.995, 0.88, 1.0);
+// Where its lavender turns blue (cosines: none, full; was 0.975 to 0.9).
+const SKY_AWAY_TURN: vec2<f32> = vec2(0.96, 0.8);
+// Bliss's low morning sky is warm along the whole horizon, not by the sun's bearing: 220 187 140 just
+// over the land at every bearing out to 45° from the sun, 173 160 152 some 3° up and a grey-blue
+// 154 166 164 by 6° (bliss_sunup h06). Ours went warm or blue by bearing alone, so the change stood as a
+// vertical seam from the horizon to the top of the frame. This peach low on the horizon all round
+// (colour; how fast it fades per unit of dir.y; how much).
+const SKY_DAWN_LINE: vec3<f32> = vec3(1.0, 0.85, 0.64);
+const SKY_DAWN_LINE_K: vec2<f32> = vec2(28.0, 0.85);
 const SKY_AWAY_LAVENDER: vec3<f32> = vec3(0.92, 0.85, 1.0);
 const SKY_AWAY_DARK: f32 = 1.0;
 // The tint at the sky's own blue (1), not its brightness (0): Bliss's 06:00 sweep from the sun keeps
@@ -1127,6 +1136,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let along = pow(max(dot(flat, sun_flat), 0.0), SUN_BAND.x);
         let band = exp(-abs(dir.y - 0.01) * SUN_BAND.y);
         c += vec3(1.0, 0.88, 0.66) * luma(p.sun) * light_strength() * along * band * mix(1.0, SUN_BAND.z, sky_seen * exp(-abs(dir.y - 0.01) * SUN_BAND_SEEN_FALL)) * bliss_sun;
+        let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y) * smoothstep(-0.05, 0.05, scene.sun.x);
+        let line = exp(-max(dir.y, 0.0) * SKY_DAWN_LINE_K.x) * morning * seen * SKY_DAWN_LINE_K.y * (1.0 - rain_amount());
+        c = mix(c, SKY_DAWN_LINE * (luma(c) * 1.1 / luma(SKY_DAWN_LINE)), line);
     }
     let c_pre_glow = c;
     c += sun_glow(dir, p) * glow_up;
