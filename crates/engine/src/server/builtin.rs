@@ -294,7 +294,7 @@ fn help(s: &mut Server, x: &Ctx) -> Vec<Msg> {
         None => c
             .commands
             .iter()
-            .filter(|d| d.level <= s.permission_of(x.pi))
+            .filter(|d| s.may_run(x.pi, d))
             .flat_map(|d| say("usage_line", vec![text(&d.name), text(&short_usage(&d.usage))]))
             .collect(),
     }
