@@ -244,7 +244,8 @@ atmosphere shader, and missing idle clips.
 | Species | kill feeds the prey's own mass | shot |
 |---|---|---|
 | utahraptor | pass (24.558 kg, three shares; another packmate killing: not tested) | r7 5 |
-| all other land hunters | pass | r7 1-7 |
+| jaguar, coyote, foxes, raptor, crocodyliform, yacare_caiman | pass | r7 1-7 |
+| osmolskae, spectacled_caiman | not tested in r7 (no kill; run 6: pass) | r7 4, 7 |
 
 Grid r7: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r14_hunters_m-202849/r14_hunters_grid.jpg`.
 
