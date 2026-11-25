@@ -1202,7 +1202,7 @@ pub fn register(r: &mut Registry) {
                         None => t.set("video.base.detected.gpu", &[Arg::Text(&shown), Arg::Key(&format!("video.base.gpu.{class}"))]),
                     }
                 });
-                ui.button("video.base.detect", S::default().h(12.0).pad(2.0), |c| apply_detected(c.client().state().window));
+                ui.button("video.base.detect", S::default().h(12.0).pad_xy(5.0, 2.0), |c| apply_detected(c.client().state().window));
             });
             // Each feature's quality, Low to Ultra (what a preset sets), then the player's own rows,
             // scrolled: they don't fit a 720p window at 2x.

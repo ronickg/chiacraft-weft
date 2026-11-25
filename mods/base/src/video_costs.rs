@@ -442,7 +442,7 @@ pub fn top_line(ui: &mut Ui, screen: &'static Menu, rows: fn() -> Vec<Measured>,
                 _ => t.set("video.base.cost.now", &[Arg::Text(&gpu), Arg::Text(&fps), Arg::Text(&frame)]),
             }
         });
-        ui.button("video.base.cost.measure", S::default().h(12.0).pad(2.0), move |_| {
+        ui.button("video.base.cost.measure", S::default().h(12.0).pad_xy(5.0, 2.0), move |_| {
             start(rows(), window());
         });
         ui.text_bind_styled(S::default().class("dim").max_w(120.0), move |_, t| match progress() {
@@ -457,11 +457,11 @@ pub fn top_line(ui: &mut Ui, screen: &'static Menu, rows: fn() -> Vec<Measured>,
     if !OFFERED.get() {
         ui.row(S::row().gap(3.0).center(), move |ui| {
             ui.text_styled(S::default().class("dim").max_w(250.0), "video.base.cost.offer", &[]);
-            ui.button("video.base.cost.measure_now", S::default().h(12.0).pad(2.0), move |c| {
+            ui.button("video.base.cost.measure_now", S::default().h(12.0).pad_xy(5.0, 2.0), move |c| {
                 start(rows(), window());
                 c.client().menu_open(screen);
             });
-            ui.button("video.base.cost.not_now", S::default().h(12.0).pad(2.0), move |c| {
+            ui.button("video.base.cost.not_now", S::default().h(12.0).pad_xy(5.0, 2.0), move |c| {
                 OFFERED.set(true);
                 c.client().menu_open(screen);
             });

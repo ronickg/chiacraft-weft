@@ -520,7 +520,7 @@ fn framed(ui: &mut Ui, page: Option<usize>, s: S, body: impl FnOnce(&mut Ui)) {
                 if j == page {
                     ui.panel("tab_pressed", S::row().pad(2.0).h(13.0).center(), |ui| ui.text_styled(S::default().no_wrap(), &key, &[]));
                 } else {
-                    ui.button(&key, S::default().class("tab").h(13.0).pad(2.0), move |c| {
+                    ui.button(&key, S::default().class("tab").h(13.0).pad_xy(5.0, 2.0), move |c| {
                         if let Some(id) = c.menu_owner() {
                             c.client().send(&PAGE, &[id, j as u64]);
                         }
