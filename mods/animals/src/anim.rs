@@ -391,6 +391,12 @@ fn idle_life(w: &World, id: u64, h: [u64; 4]) {
     {
         return;
     }
+    // Out cold, it lies still (cov_taming: knocked-out raptors groomed and scratched).
+    if w.component(id, &crate::knockout::KNOCKOUT)
+        .is_some_and(|k| k.out != 0)
+    {
+        return;
+    }
     let a = idle_act(w, id);
     act(w, id, a);
     edit(w, id, |c| c[IDLE_NEXT] = now + IDLE_EVERY + w.random_below(IDLE_EVERY as u32) as u64);

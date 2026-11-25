@@ -323,6 +323,27 @@ pub fn init(r: &mut Registry) {
                 let n = crate::breeding::wild_love_near(&w, me.pos, cmd.float("value").unwrap_or(24.0));
                 format!("LOVE {n}")
             }
+            "feed" => {
+                // The player feeds what he holds to every wild animal within `value` blocks (4 by
+                // default) that would take it from his hand now: a passive kind asking for food,
+                // a knock-out kind out cold (the coverage checks: the testkit's `aim` + use
+                // missed lying animals and placed the kibble on the ground). The same code as
+                // the right click (`taming::feed`, `knockout::feed`).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let r = cmd.float("value").unwrap_or(4.0);
+                let fed: Vec<String> = w
+                    .entities_near(me.pos, r, None)
+                    .into_iter()
+                    .filter(|&id| !crate::animal::tamed(&w, id))
+                    .filter(|&id| {
+                        let out = w.component(id, &crate::knockout::KNOCKOUT).is_some_and(|k| k.out != 0);
+                        (out && crate::knockout::feed(&w, id, cmd.player()))
+                            || (crate::taming::asking(&w, id) && crate::taming::feed(&w, id, cmd.player()))
+                    })
+                    .map(|id| id.to_string())
+                    .collect();
+                format!("FED {}", fed.join(" "))
+            }
             "fear" => {
                 // The fear of the ground where the player stands, and red deer's (and hares')
                 // reputation of him there.

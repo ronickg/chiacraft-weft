@@ -239,31 +239,36 @@ write("young", s)
 
 # 7. Taming and eggs.
 s = head("taming", [
-    "Animal AI coverage, taming and eggs. Part 1: passive kinds (grey wolf, cat, chihuahua, capybara) hand-fed kibble",
-    "(aimed, `core:use`): expected \"tamed at N%\" or the taming screen's progress. Part 2: knock-out kinds (raptor,",
-    "osmolskae, utahraptor, jaguar, wyvern) knocked out (`/animalprof ko 1`), given kibble (aimed, `core:use`) and made to eat (`/animal bite` x8):",
-    "\"knocked out\", \"tamed at\". Part 3: laying kinds (protoceratops, psittacosaurus, citipati, raptor, house sparrow):",
-    "`/animal nest` then `/animal hurry`: \"nested at\", eggs, hatching (\"born\"/young in the where rows). Report per",
-    "species: tamed (yes/no, the line), laid, hatched; the shots.",
+    "Animal AI coverage, taming and eggs. Parts 1-2: passive kinds (grey wolf and capybara, then cat and chihuahua)",
+    "with a creative player standing still among them, kibble in hand: they ask for food (within 5 blocks), and",
+    "`/animalprof feed 6` every 3 s feeds those asking (the right click's code): \"fed by .. as it asked: taming N%\",",
+    "then \"tamed at\". Part 3: knock-out kinds (raptor, osmolskae, utahraptor, jaguar, wyvern) knocked out",
+    "(`/animalprof ko 1`), given kibble (`/animalprof feed 3`: \"out cold, given 64 to eat\") and made to eat",
+    "(`/animal bite`: \"bites, out cold: taming N%\", then \"tamed at\"); while out they play no idle clips.",
+    "Parts 4-8: one laying kind a pad (protoceratops, psittacosaurus, citipati, raptor, house sparrow; a nest keeps",
+    "others off for 24 blocks): `/animal nest` (\"nested at\": eggs), `/animal hurry` once (\"born to\"), and the",
+    "hatchlings in the where rows as \"(young, N from its mother M)\". Report per species: tamed (the % lines),",
+    "laid, hatched, the hatchlings' distances to their mothers; the shots.",
 ])
-x = 0
-s += pad(x) + spawns(x, [("grey_wolf", 1, -8, -6), ("cat", 1, -4, -6), ("chihuahua", 1, 0, -6), ("capybara", 1, 4, -6)])
-s += ["chat /tk mode creative", "chat /tk put me 0 animals:kibble 64", "key 1"]
-for dx in [-8, -4, 0, 4]:
-    s += [f"chat /tp {x+dx} 70 {Z-3}", "look 0 0", "wait 1"] + ["aim 6", "press core:use", "wait 0.6"] * 4
-s += ["chat /animalprof where 64", "chat /tk mode spectator"] + shot(x, "cov_taming_1_passive")
-x = 200
-s += pad(x) + spawns(x, [("raptor", 1, -8, -6), ("velociraptor_osmolskae", 1, -4, -6), ("utahraptor", 1, 0, -6), ("jaguar", 1, 6, -6), ("wyvern", 1, 0, 8)])
-s += ["chat /animalprof ko 1", "wait 2", "chat /tk mode creative", "chat /tk put me 0 animals:kibble 64", "key 1"]
-for dx, dz in [(-8, -6), (-4, -6), (0, -6), (6, -6), (0, 8)]:
-    s += [f"chat /tp {x+dx} 70 {Z+dz+2}", "look 0 0", "wait 1", "aim 6", "press core:use", "wait 0.5"] + ["chat /animal bite", "wait 0.5"] * 8
-s += ["chat /animalprof where 64", "chat /tk mode spectator"] + shot(x, "cov_taming_2_knockout")
+for x, kinds in [(0, ["grey_wolf", "capybara"]), (200, ["cat", "chihuahua"])]:
+    s += pad(x) + spawns(x, [(kinds[0], 1, -3, 0), (kinds[1], 1, 3, 0)])
+    s += ["chat /tk mode creative", f"chat /tp {x} 70 {Z+2}", "look 0 -20", "chat /animalprof food 1",
+          "chat /animalprof water 1", "chat /tk put me 0 animals:kibble 64", "key 1", "wait 2"]
+    s += ["chat /animalprof feed 6", "wait 3"] * 50
+    s += ["chat /animalprof where 64", "chat /tk mode spectator"] + shot(x, f"cov_taming_{x//200+1}_{kinds[0]}")
 x = 400
-s += pad(x) + spawns(x, [("protoceratops", 2, -8, -8), ("psittacosaurus", 2, 4, -8), ("citipati", 2, -8, 4), ("raptor", 2, 4, 4), ("house_sparrow", 2, 0, 0)])
-for dx, dz in [(-8, -8), (4, -8), (-8, 4), (4, 4), (0, 0)]:
-    s += [f"chat /tp {x+dx} 72 {Z+dz}", "chat /animal nest", "wait 1"]
-s += watch(x, 2) + shot(x, "cov_taming_3_nests")
-for dx, dz in [(-8, -8), (4, -8), (-8, 4), (4, 4), (0, 0)]:
-    s += [f"chat /tp {x+dx} 72 {Z+dz}", "chat /animal hurry", "wait 1"]
-s += ["wait 3"] + watch(x, 3) + shot(x, "cov_taming_4_hatched")
+KO = [("raptor", -12, 12), ("velociraptor_osmolskae", -6, 12), ("utahraptor", 0, 12), ("jaguar", 6, 12), ("wyvern", 0, -8, 35)]
+s += pad(x) + spawns(x, [(k[0], 1, k[1], 0 if len(k) == 3 else k[2]) for k in KO])
+s += ["chat /animalprof ko 1", "wait 2", "chat /tk mode creative", "chat /tk put me 0 animals:kibble 64", "key 1"]
+for k in KO:
+    dx, dz = k[1], 0 if len(k) == 3 else k[2]
+    bites = k[2] if len(k) == 3 else k[3]
+    s += [f"chat /tp {x+dx} 70 {Z+dz+2}", "wait 1", "chat /animalprof feed 3", "wait 0.5"] + ["chat /animal bite", "wait 0.4"] * bites
+s += ["chat /animalprof where 64", "chat /tk mode spectator"] + shot(x, "cov_taming_3_knockout")
+for n, kind in enumerate(["protoceratops", "psittacosaurus", "citipati", "raptor", "house_sparrow"]):
+    x = 600 + n * 200
+    s += pad(x) + spawns(x, [(kind, 3, -2, -2)]) + ["chat /animalprof food 1", "chat /animalprof water 1"]
+    s += [f"chat /tp {x} 72 {Z}", "chat /animal nest", "wait 2"] + watch(x, 1)
+    s += [f"chat /tp {x} 72 {Z}", "chat /animal hurry", "wait 4"] + watch(x, 3, every=8)
+    s += shot(x, f"cov_taming_{n+4}_{kind}", z_back=8, pitch=-50)
 write("taming", s)

@@ -164,21 +164,35 @@ lines, listed for the art side).
 
 ## Taming and eggs (cov_taming.txt)
 
-| Species | tamed | lays | hatches | shot |
+Run 1 (1ff853abf, Tester, `cov_taming_m-162426`): mostly a script failure. The testkit's `aim` + `core:use`
+missed (the log's "kibble places no block": the click went to the ground), so the passive kinds were never
+fed and the knock-out kinds' mouths stayed empty; the jaguar alone was fed and tamed. Every kind but the
+psittacosaurus found the psittacosaurus' nest within 24 blocks (`wild_clutch` keeps nests apart), so only it
+nested; its 8 eggs hatched, and the hurries after grew the hatchlings up at once (so no "(young)").
+Game bug found: knocked-out raptors played groom and scratch clips while out cold (fixed: no idle clips
+while out). The part 3 pad's panic (67 alarms) was its raptors and citipati hunting the hatchlings.
+
+Run 2 (to come): `/animalprof feed` feeds through the right click's code; the passive kinds are fed only when
+they ask (a creative player standing among them); bites enough for each kind's feedings (wyvern 35); one
+laying kind a pad; feeding and bite lines in the log.
+
+| Species | tamed (run 1) | lays | hatches | shot |
 |---|---|---|---|---|
-| grey_wolf | - | n/a | n/a | |
-| cat | - | n/a | n/a | |
-| chihuahua | - | n/a | n/a | |
-| capybara | - | n/a | n/a | |
-| raptor | - | - | - | |
-| osmolskae | - | n/a | n/a | |
-| utahraptor | - | n/a | n/a | |
-| jaguar | - | n/a | n/a | |
-| wyvern | - | n/a | n/a | |
-| protoceratops | n/a | - | - | |
-| psittacosaurus | n/a | - | - | |
-| citipati | n/a | - | - | |
-| house_sparrow | n/a | - | - | |
+| grey_wolf | not fed (aim) | n/a | n/a | |
+| cat | not fed (aim) | n/a | n/a | |
+| chihuahua | not fed (aim) | n/a | n/a | |
+| capybara | not fed (aim) | n/a | n/a | |
+| raptor | not fed (aim) | kept off by another nest | - | |
+| osmolskae | not fed (aim) | n/a | n/a | |
+| utahraptor | not fed (aim) | n/a | n/a | |
+| jaguar | pass (tamed at 100 %, 7 bonus levels) | n/a | n/a | |
+| wyvern | not fed (aim) | n/a | n/a | |
+| protoceratops | n/a | kept off by another nest | - | |
+| psittacosaurus | n/a | pass (8 eggs) | pass (8 born) | |
+| citipati | n/a | kept off by another nest | - | |
+| house_sparrow | n/a | kept off by another nest | - | |
+
+Grid: `~/Coding/chiacraft-archive/images/tester/2026-11-25/cov_taming_m-162426/cov_taming_grid.jpg`.
 
 ## Sounds
 

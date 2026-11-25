@@ -389,6 +389,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
     crate::memory::fed(w, id, player);
     if t.asking == 0 {
         // Fed when it wasn't asking: it eats, warily.
+        weft_sdk::debug!("animal {id} fed by {player} unasked: a mistake");
         mistake(w, id, &st, w.random_below(3) == 0);
         return true;
     }
@@ -409,10 +410,20 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
         t.wait = wait;
     });
     hearts(w, st.pos.to_array(), 2);
+    weft_sdk::debug!(
+        "animal {id} fed by {player} as it asked{}: taming {:.0}%",
+        if wanted { " (what it wanted)" } else { "" },
+        (t.progress + gain).min(1.0) * 100.0
+    );
     if t.progress + gain >= 1.0 {
         tame(w, id, player, t.effectiveness);
     }
     true
+}
+
+/// Asking for food now (`behave`): the time to feed it.
+pub fn asking(w: &World, id: u64) -> bool {
+    w.component(id, &TAMING).is_some_and(|t| t.asking > 0)
 }
 
 /// A mistake: effectiveness down, and maybe it runs off.
