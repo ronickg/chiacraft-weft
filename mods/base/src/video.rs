@@ -318,6 +318,7 @@ fn ultra_extras() {
         DLSS_MODEL_DLAA.set(13);
         DLSS_RR.set(GPU_DLSS_RR.get());
     }
+    weft_sdk::info!("video: Ultra's DLSS mode {} (modes {modes:#b}, RTX 20/30: {})", DLSS.get(), older_rtx());
 }
 
 /// A GeForce RTX 20 or 30, a TITAN RTX or an RTX A (workstation Ampere), by the GPU's name
