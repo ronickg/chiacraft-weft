@@ -196,9 +196,10 @@ pub enum DimEvent {
 /// Path searches a region does per tick at most (in parallel); more wait for the next tick (a
 /// spawned crowd all starting to walk at once).
 const PATHS_PER_TICK: usize = 128;
-/// Walking faster than this share of its speed (a chase, a flight), a mob's path is looked for
+/// Walking faster than this share of its speed (a chase or a flight at 1.6 and up; not a pack
+/// keeping up at 1.3, so a crowd walking along pays nothing), a mob's path is looked for
 /// again after 5 ticks instead of 20 when its target moves (`navigation`).
-const SPRINT_PATHS: f32 = 1.2;
+const SPRINT_PATHS: f32 = 1.5;
 
 pub struct Dim {
     pub id: u32,

@@ -195,7 +195,17 @@ pub fn find(c: &Content, block: &impl physics::Cells, from: DVec3, to: DVec3, di
     // the walk goes straight across open ground instead of zigzagging along the diagonals from
     // cell centre to cell centre. A straight leg keeps the path's rules: every cell its body
     // crosses is one it stands in, dry if the cells it skips are.
+    // Each cell looked up once per path: the legs tried from one cell overlap, and a leg samples
+    // a cell several times (crowd bench: string-pulling without it cost 4-7 % server time).
+    let seen = std::cell::RefCell::new(FxHashMap::<IVec3, bool>::default());
+    let open = |q: IVec3| {
+        *seen
+            .borrow_mut()
+            .entry(q)
+            .or_insert_with(|| standable(q) && !wet(q))
+    };
     let clear = |a: IVec3, b: IVec3| {
+        let y = a.y;
         let (a, b) = (a.as_dvec3() + offset, b.as_dvec3() + offset);
         let along = (b - a).with_y(0.0);
         let len = along.length();
@@ -205,7 +215,7 @@ pub fn find(c: &Content, block: &impl physics::Cells, from: DVec3, to: DVec3, di
             let at = a + along * (k as f64 / steps.max(1) as f64);
             [at - side, at, at + side].into_iter().all(|q| {
                 let q = cell(q);
-                q.y == cell(a).y && standable(q) && !wet(q)
+                q.y == y && open(q)
             })
         })
     };
