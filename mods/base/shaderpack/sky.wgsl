@@ -391,7 +391,10 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     // against its blue sky, ours stood bright white over the dark land (PC shnt0, 11-06).
     if scene.frame.x > 0.5 {
         // (0.2: at 0.4 they still stood brighter than the sky, Bliss's darker than it; PC shnt2.)
-        sun *= mix(1.0, 0.2, smoothstep(-0.12, -0.3, scene.sun.y));
+        // (With the chain 0.06: under Bliss's one curve they stood bright white-blue over the navy
+        // sky, lit as a full moon at day strength, where Bliss's are barely lighter than its sky;
+        // Planner on lkmxG1, 11-25.)
+        sun *= mix(1.0, select(0.2, 0.06, bliss_chain()), smoothstep(-0.12, -0.3, scene.sun.y));
     }
     // In the HDR world half its colour on the clouds: they stood gold-orange toward the 08:00 sun
     // where Bliss's are cream-white with silver edges (PC shcl1).
