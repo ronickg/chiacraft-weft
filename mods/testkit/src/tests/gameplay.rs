@@ -3297,7 +3297,19 @@ pub async fn mob_in_the_way(t: T) -> R {
 
 /// Every block and every spawned creature has sounds, and every sound event's files are there
 /// (`/sounds check`, chiacraft; needs no sound device). Left silent on purpose: the testkit's and
-/// test mod's own blocks and kinds, the packages' stand-in for a missing block, and fish.
+/// test mod's own blocks and kinds, the packages' stand-in for a missing block, fish, and the
+/// animals' looks (a resting creature's pose, a dog's age and pose, a bird in flight: kinds
+/// drawn in place of the creature, which keeps its own voice), eggs and nests.
+fn look_egg_or_nest(n: &str) -> bool {
+    let path = n.split_once(':').map_or(n, |p| p.1);
+    ["_lie", "_sit", "_fly", "_bask", "_rest"].iter().any(|s| path.ends_with(s))
+        || path == "fish_flop"
+        || path.starts_with("egg_")
+        || path.starts_with("nest")
+        || path.starts_with("chihuahua_adult")
+        || path.starts_with("chihuahua_pup")
+}
+
 pub async fn sound_coverage(t: T) -> R {
     t.flat().await?;
     let reply = t.cmd("/sounds check").await?;
@@ -3321,7 +3333,7 @@ pub async fn sound_coverage(t: T) -> R {
     let fish = ["brown_trout", "pacu", "lungfish", "lycoptera"];
     let kinds: Vec<String> = part("Silent creatures:")
         .into_iter()
-        .filter(|n| !ours(n) && !fish.iter().any(|f| n.ends_with(&format!(":{f}"))))
+        .filter(|n| !ours(n) && !fish.iter().any(|f| n.ends_with(&format!(":{f}"))) && !look_egg_or_nest(n))
         .collect();
     let missing = part("Events missing files:");
     t.check(blocks.is_empty(), &format!("blocks with no sounds: {}", blocks.join(" ")));

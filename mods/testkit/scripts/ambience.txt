@@ -114,7 +114,8 @@ chat /tk fill 24 255 -30 24 255 -30 base:water
 chat /tk fill 24 248 24 26 248 26 stone
 chat /tk fill 24 249 24 26 249 26 base:lava
 # a box under a 10-block-thick roof (deep: no sky through it)
-chat /tk fill -30 250 20 -20 262 30 stone
+# (stone 8 blocks out on every side, so the cover's 7-block ring finds stone too)
+chat /tk fill -36 250 14 -14 262 36 stone
 chat /tk fill -27 250 23 -23 252 27 core:air
 wait 2
 chat /tp -27 250 -27

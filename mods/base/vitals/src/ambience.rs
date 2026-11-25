@@ -209,10 +209,10 @@ pub fn call_chance(level: f32, every: f32, dt: f32) -> f32 {
 }
 
 /// Water and lava near the player: blocks of each kind found in the sampled cube
-/// (`LIQUID_REACH`, every other block) that make the loop full.
-pub const FLOWING_FULL: f32 = 10.0;
-pub const STILL_FULL: f32 = 40.0;
-pub const LAVA_FULL: f32 = 6.0;
+/// (`LIQUID_REACH`, every other block across, every block up and down) that make the loop full.
+pub const FLOWING_FULL: f32 = 20.0;
+pub const STILL_FULL: f32 = 80.0;
+pub const LAVA_FULL: f32 = 12.0;
 /// Half the cube's side, blocks.
 pub const LIQUID_REACH: i32 = 10;
 

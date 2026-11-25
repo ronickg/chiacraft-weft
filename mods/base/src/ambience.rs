@@ -320,8 +320,8 @@ fn ease(c: &Client, h: &mut SoundHandle, sound: &Sound, at: Option<[f64; 3]>, le
     true
 }
 
-/// Counts flowing water, still water open to the air and lava in a cube round the head (every
-/// other block), and puts each loop at the middle of what it found.
+/// Counts flowing water, still water open to the air and lava round the head (every other block
+/// across, every block up and down), and puts each loop at the middle of what it found.
 fn find_liquids(c: &Client, s: &mut State, eye: [f64; 3]) {
     let head = [eye[0].floor() as i32, eye[1].floor() as i32, eye[2].floor() as i32];
     let r = amb::LIQUID_REACH;
@@ -329,7 +329,8 @@ fn find_liquids(c: &Client, s: &mut State, eye: [f64; 3]) {
     let mut sum = [[0.0f64; 3]; 3];
     s.lava_spots.clear();
     for dx in (-r..=r).step_by(2) {
-        for dy in (-r / 2..=r / 2).step_by(2) {
+        // Every height: a pool or lava sunk in the floor is one block thick.
+        for dy in -r / 2..=r / 2 {
             for dz in (-r..=r).step_by(2) {
                 let p = [head[0] + dx, head[1] + dy, head[2] + dz];
                 let Some(b) = c.block(p) else { continue };
