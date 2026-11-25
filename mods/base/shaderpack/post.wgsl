@@ -215,7 +215,8 @@ fn fs_bloom_up(in: VOut) -> @location(0) vec4<f32> {
     tent += (bloom_tap(wide, uv + vec2(t.x, 0.0)) + bloom_tap(wide, uv - vec2(t.x, 0.0)) + bloom_tap(wide, uv + vec2(0.0, t.y)) + bloom_tap(wide, uv - vec2(0.0, t.y))) * 2.0;
     tent += bloom_tap(wide, uv + t) + bloom_tap(wide, uv - t) + bloom_tap(wide, uv + vec2(t.x, -t.y)) + bloom_tap(wide, uv + vec2(-t.x, t.y));
     let here = bloom_tap(pass_.scene, uv);
-    return vec4((here + tent / 16.0 * BLOOM_SPREAD) / (1.0 + BLOOM_SPREAD), 1.0);
+    let spread = BLOOM_SPREAD * max(fantasy_opt(OPT_BLOOM_SPREAD), 0.0);
+    return vec4((here + tent / 16.0 * spread) / (1.0 + spread), 1.0);
 }
 
 // The exposure: how bright the view is, as the geometric mean of its luma (a dark forest floor and
