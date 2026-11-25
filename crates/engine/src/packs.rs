@@ -386,7 +386,8 @@ impl Screen for ResourcePacks {
                             .stretch()
                             .grow()
                             .h(0.0)
-                            .scroll(),
+                            .scroll()
+                            .snap_rows(framed),
                         |ui| {
                             let available: Vec<&PackInfo> = all.iter().filter(|p| !selected.contains(&p.id)).collect();
                             if available.is_empty() {
@@ -410,7 +411,8 @@ impl Screen for ResourcePacks {
                             .stretch()
                             .grow()
                             .h(0.0)
-                            .scroll(),
+                            .scroll()
+                            .snap_rows(framed),
                         |ui| {
                             for id in &selected {
                                 let gone = missing(id);

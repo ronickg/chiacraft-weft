@@ -9,6 +9,7 @@
 //! fall to a floor, never to death.
 
 pub mod air;
+pub mod ambience;
 pub mod balance;
 pub mod calendar;
 pub mod canopy;
@@ -41,6 +42,7 @@ pub mod mobs;
 pub mod perks;
 pub mod plants;
 pub mod preserve;
+pub mod rot;
 pub mod ruins;
 pub mod sheet;
 pub mod shelter;

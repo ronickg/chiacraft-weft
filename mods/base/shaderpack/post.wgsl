@@ -437,7 +437,10 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         // stood as a saturated yellow-orange arc over the sun at 06:00 (lv11; with the mist, haze
         // and banks off still there).
         // Only with the sun low (gone by about 25° up): at noon it left the sky round the sun grey.
-        let toward_sun = smoothstep(0.6, 0.9, dot(view_dir, normalize(scene.sun.xyz))) * clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0)
+        // (A smooth fall with the angle, not a window: the window's edge, from 26° to 53° out, stood
+        // as a cream disc round the low sun with a hard rim against the boosted blue, the seam that
+        // outlived the sky's own layers; lkring1 r_up, lklobe2 at low strength.)
+        let toward_sun = pow(max(dot(view_dir, normalize(scene.sun.xyz)), 0.0), 4.0) * clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0)
             * (1.0 - smoothstep(0.25, 0.45, scene.sun.y));
         let up = smoothstep(0.03, 0.3, view_dir.y) * (1.0 - toward_sun);
         // Most in the morning, less at noon: with the clouds counted as sky the noon blue between

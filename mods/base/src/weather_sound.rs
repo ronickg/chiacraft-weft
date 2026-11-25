@@ -40,15 +40,26 @@ struct State {
     beds: [SoundHandle; 5],
     next_look: f32,
     next_log: f32,
+    /// A bed played at the last log line: the line after they all stop says so once.
+    logged_playing: bool,
     flashes: u32,
     /// Thunder on its way: seconds left, metres away.
     coming: Vec<(f32, f32)>,
+    /// Seconds since a thunder was last heard; far ones closer together merge (`THUNDER_GAP`).
+    since_thunder: f32,
     rng: u64,
     /// Block states that are leaves, found once each.
     leafy: std::collections::HashMap<u32, bool>,
 }
 
 static STATE: Mutex<Option<State>> = Mutex::new(None);
+
+/// The cover last found over the player (open sky before the first look), for the ambience.
+static COVER: Mutex<Cover> = Mutex::new(Cover { open: 1.0, roof: 0.0, leaves: 0.0 });
+
+pub(crate) fn cover_now() -> Cover {
+    *COVER.lock().unwrap_or_else(|e| e.into_inner())
+}
 
 pub fn register(r: &mut Registry) {
     use sound_categories::AMBIENT;
@@ -83,16 +94,21 @@ pub fn register(r: &mut Registry) {
 
 fn frame(c: &Client) {
     let st = c.state();
+    let mut guard = STATE.lock().unwrap_or_else(|e| e.into_inner());
     if st.flags & client::client_flags::JOINED == 0 {
+        // Out of the world: the engine has ended its sounds; the next world starts afresh (its
+        // flash count from zero, its beds not yet started).
+        *guard = None;
         return;
     }
-    let mut guard = STATE.lock().unwrap_or_else(|e| e.into_inner());
     let s = guard.get_or_insert_with(|| State {
         beds: [SoundHandle::default(); 5],
         next_look: 0.0,
         next_log: 0.0,
+        logged_playing: false,
         flashes: st.lightnings,
         coming: Vec::new(),
+        since_thunder: ws::THUNDER_GAP,
         rng: 0x9E37_79B9_7F4A_7C15 ^ st.frame,
         leafy: Default::default(),
     });
@@ -105,6 +121,7 @@ fn frame(c: &Client) {
         s.coming.push((ws::thunder_delay(metres), metres));
     }
     s.next_look -= dt;
+    s.since_thunder += dt;
     for t in &mut s.coming {
         t.0 -= dt;
     }
@@ -113,8 +130,14 @@ fn frame(c: &Client) {
         return;
     }
     let cover = cover(c, s, eye);
+    *COVER.lock().unwrap_or_else(|e| e.into_inner()) = cover;
     for &(_, metres) in s.coming.iter().filter(|t| t.0 <= 0.0) {
-        thunder(c, metres, cover);
+        if ws::thunder_heard(s.since_thunder, metres) {
+            thunder(c, metres, cover);
+            s.since_thunder = 0.0;
+        } else {
+            debug!("thunder: {metres:.0} m away merged into the last one, {:.1} s ago", s.since_thunder);
+        }
     }
     s.coming.retain(|t| t.0 > 0.0);
     if s.next_look > 0.0 {
@@ -126,11 +149,26 @@ fn frame(c: &Client) {
     beds(c, s, &l);
     s.next_log -= LOOK;
     let playing = s.beds.iter().any(|b| b.playing(c));
-    if playing && s.next_log <= 0.0 {
+    if (playing || s.logged_playing) && s.next_log <= 0.0 {
         s.next_log = LOG_EVERY;
+        s.logged_playing = playing;
+        // `enclosed` is the one cover value the muffle follows (1 - open).
         info!(
-            "weather sound: rain {:.2} heavy {:.2} roof {:.2} wind {:.2} trees {:.2} (open {:.2} roof {:.2} leaves {:.2}, wind {speed:.1} m/s, muffle {:.0} Hz)",
-            l.rain, l.heavy, l.roof, l.wind, l.trees, cover.open, cover.roof, cover.leaves, l.lowpass
+            "weather sound: rain {:.2} heavy {:.2} roof {:.2} wind {:.2} trees {:.2} (enclosed {:.2}, open {:.2} roof {:.2} leaves {:.2}, rain {:.2} thunder {:.2} snow {:.2}, wind {speed:.1} m/s, muffle {:.0} Hz){}",
+            l.rain,
+            l.heavy,
+            l.roof,
+            l.wind,
+            l.trees,
+            1.0 - cover.open,
+            cover.open,
+            cover.roof,
+            cover.leaves,
+            st.rain,
+            st.thunder,
+            st.snowing,
+            l.lowpass,
+            if playing { "" } else { ", all beds quiet" }
         );
     }
 }

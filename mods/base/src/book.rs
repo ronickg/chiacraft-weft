@@ -838,15 +838,22 @@ pub fn book(ui: &mut Ui, station: Station) {
         });
         if pages > 1 {
             ui.row(S::row().gap(4.0), |ui| {
-                ui.button("crafting.book.prev", S::default().h(12.0).pad(2.0).disabled(page == 0), move |c| {
+                ui.button("crafting.book.prev", S::default().h(12.0).pad_xy(5.0, 2.0).disabled(page == 0), move |c| {
                     edit(|b| b.page = page.saturating_sub(1));
                     c.client().rebuild_screen();
                 });
                 ui.text_args("crafting.book.page", &[Arg::Int(page as i64 + 1), Arg::Int(pages as i64)]);
-                ui.button("crafting.book.next", S::default().h(12.0).pad(2.0).disabled(page + 1 >= pages), move |c| {
-                    edit(|b| b.page = page + 1);
-                    c.client().rebuild_screen();
-                });
+                ui.button(
+                    "crafting.book.next",
+                    S::default()
+                        .h(12.0)
+                        .pad_xy(5.0, 2.0)
+                        .disabled(page + 1 >= pages),
+                    move |c| {
+                        edit(|b| b.page = page + 1);
+                        c.client().rebuild_screen();
+                    },
+                );
             });
         }
         if let Some(r) = picked.and_then(recipe_of) {

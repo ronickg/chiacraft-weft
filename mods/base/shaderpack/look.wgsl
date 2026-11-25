@@ -226,6 +226,18 @@ const OPT_BANK_SUN: u32 = 62u;
 const OPT_BANK_SHADE: u32 = 63u;
 // The sun's shadows' reach (blocks, `base:look_shadow_reach`): 0 as made, to the view's end.
 const OPT_SHADOW_REACH: u32 = 64u;
+// The mist banks' shape for tuning against Bliss's soft, graded mist (Ronald, 11-24: ours "blocky",
+// Bliss's "fades in smoothly everywhere"), each read through `look_opt` (0 is as made):
+// `base:look_bank_fall` times how fast a bank thins above its top (1 as made, under 1 softer);
+// `base:look_bank_edge` how soft the banks' edges are, 0 as made to 1 wide (the broad noise's cut
+// widened and eased); `base:look_bank_top` times the height the banks lie full to (1 as made;
+// toward 0.01 no flat full layer, the density thinning from the sea level up).
+const OPT_BANK_FALL: u32 = 65u;
+const OPT_BANK_EDGE: u32 = 66u;
+const OPT_BANK_TOP: u32 = 67u;
+// The banks' march steps (`base:look_mist_steps`, the quality row: 0 as made = 8; Low 4, never off).
+const OPT_MIST_STEPS: u32 = 68u;
+const OPT_SKY_LOBE: u32 = 69u;
 // How much of it this morning: the option, in the east, with the sun under the horizon (full from
 // 1.7° down, none at 1° up) and not yet night (gone by about 12° down, where the night sky takes it).
 fn dawn_sky() -> f32 {
@@ -248,37 +260,44 @@ const MIST_SEA_FALL: f32 = 0.05;
 // How much higher the thickest cores stand (blocks), and the even part under them: its share, its
 // fall per block (exp2) and where it starts over the sea (Bliss's uniform fog: about a fifth of its
 // banks, halving every 7 blocks).
-const MIST_SEA_RISE: f32 = 12.0;
+// No rise, flat at 73 as Bliss's billows (`cloudVol`, full to FOG_START + 23 then exp(-0.05)): at 12
+// the thick cores stood to 85, over the crowns (75-80), so crowns and the gaps between them took the
+// same mist and the vista read one flat beige; Bliss's crowns rise dark out of a dense layer that fills
+// the gaps gold (lkmC3; Planner).
+const MIST_SEA_RISE: f32 = 0.0;
 const MIST_SEA_EVEN: vec3<f32> = vec3(0.2, 0.15, -10.0);
-// Its density per block at `/air` 1 (Bliss's morning, about 0.45 a block where full, at `/air` 0.05).
-const MIST_SEA_DENSE: f32 = 1.5;
+// Its density per block at `/air` 1: Ronald's Bliss morning is 0.45 a block where full
+// (Morning_Cloudy_Fog 0.45, `climate_settings.glsl:233`), ours that at `/air` 0.05, the middle of the
+// natural dawn mist. At 1.5 it was 0.075 there, 6 times thinner: a veil the land and its shadows
+// read through at full contrast (Ronald, 11-24: "too transparent").
+const MIST_SEA_DENSE: f32 = 9.0;
 // Its shape: a broad noise (cells this wide and tall, blocks) cut at a threshold (from, to: none
 // below, full above), so banks with clear air between them, not an even veil; and a fine noise
 // (cells this wide and tall) that eats their edges (`MIST_ERODE.z`, how much), shifted by the shape
 // so the rims break up differently from bank to bank.
-const MIST_SHAPE: vec4<f32> = vec4(36.0, 18.0, 0.5, 0.75);
+// The cut graded as Bliss's (its noise's top 40 % times 2, so a bank is seldom full, about 0.3 of
+// it on average, `overworld_fog.glsl:35`): cut at 0.5 to 0.75 most of a bank was full, an even
+// opaque sheet with no depth that the crowns never faded into (lkmC1 v6).
+const MIST_SHAPE: vec4<f32> = vec4(36.0, 18.0, 0.55, 1.05);
 const MIST_ERODE: vec3<f32> = vec3(1.5, 3.0, 0.4);
-// Its light from the sun (Bliss's fog: no shade of its own, the land's and the clouds' shadow at each
-// step): a sharp peak toward the sun and a broad forward tail, about 12 toward it, a quarter across,
-// a fifteenth away (peak, its sharpness, tail, its fall), so the mist's sunny side toward a low sun
-// glows and away from it the sky's light alone shows.
-const MIST_SEA_PHASE: vec4<f32> = vec4(9.4, 87.0, 2.35, 6.0);
-// The broad tail of it (share, fall): with only a sharp peak and a tail, the 15-40° round the sun,
-// most of the vista, got half Bliss's sun against the sky (its fog: about 12.5 at the sun, 3.4 at
-// 14°, 1.7 at 30°, a quarter across, 0.07 away; Planner's read of overworld_fog.glsl:54-71, 123).
-const MIST_SEA_TAIL: vec2<f32> = vec2(0.76, 1.19);
+// Its light from the sun: `bank_phase` (Bliss's fog's weights).
 // The sun's light in it: how much of the low sun's orange goes to cream, how bright, and the most the
 // forward peak may give (Bliss's sunlit tops are cream and brighter than the land; ours took the
 // dawn sun's orange and read as sand, and from inside the mist the uncapped peak blew the sky
 // round the sun out to a yellow ball: lv8).
-const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.8, 1.2);
+// (Brightness 1.0 now, from 1.8: that made up for the capped forward peak, and with Bliss's phase
+// uncapped (57974b542) it left the sun's light over the sky's even away from the sun, at a phase of
+// 0.07, and the mist there read sand-orange, lkmC1 v6_away.)
+const MIST_SEA_CREAM: vec3<f32> = vec3(0.15, 1.0, 1.2);
 // The banks' sunlight fades in with distance from the eye, none to the first, full from the second
 // (blocks). From inside the mist, looking toward a low sun, the lit mist in front of the near
 // crowns covered them all (06:00 low view, at Bliss's own spot and camera: darkest 5 % at 109
 // against Bliss's 66; 46 with the banks' sun off), where Bliss's near crowns stand dark out of the
 // mist with shafts between. Every overall cut took the vista, seen from 120 blocks over the banks,
 // darker and greyer than Bliss's (lv12); this leaves it alone.
-const MIST_NEAR_SUN: vec2<f32> = vec2(24.0, 120.0);
+// Now only the first few blocks, as Bliss's has none: with the banks 6x denser (f485f7ccc) the unlit
+// near 24-120 blocks stood as a dark smoky mass over the horizon from the low view (lkmC1 low6).
+const MIST_NEAR_SUN: vec2<f32> = vec2(0.0, 8.0);
 // The far air's glow toward Bliss's low morning sun (`haze_lit`): how tight (a power of the cosine),
 // how bright, and from what distance to what (blocks) it comes in.
 const HAZE_SUN_GLOW: vec4<f32> = vec4(16.0, 5.0, 200.0, 800.0);
@@ -297,9 +316,33 @@ const SUN_GLOW_CREAM: vec3<f32> = vec3(1.0, 0.9, 0.8);
 const SUN_GLOW_CREAM_K: f32 = 1.0;
 // Away from it the sky in these at its own brightness: from the first cosine (none) to the second
 // (full, lavender), blue beyond; how much.
-const SKY_AWAY: vec3<f32> = vec3(0.998, 0.96, 1.0);
-// Where its lavender turns blue (cosines: none, full).
-const SKY_AWAY_TURN: vec2<f32> = vec2(0.975, 0.9);
+// (0.998 to 0.96, 4° to 16°, read with the turn below as a hard vertical edge between the sun's
+// cream half and the blue half of the frame: lkmC3's 06:00 vista.)
+const SKY_AWAY: vec3<f32> = vec3(0.995, 0.88, 1.0);
+// Where its lavender turns blue (cosines: none, full; was 0.975 to 0.9).
+const SKY_AWAY_TURN: vec2<f32> = vec2(0.96, 0.8);
+// Bliss's low morning sky is warm along the whole horizon, not by the sun's bearing: 220 187 140 just
+// over the land at every bearing out to 45° from the sun, 173 160 152 some 3° up and a grey-blue
+// 154 166 164 by 6° (bliss_sunup h06). Ours went warm or blue by bearing alone, so the change stood as a
+// vertical seam from the horizon to the top of the frame. This peach low on the horizon all round
+// (colour; how fast it fades per unit of dir.y; how much).
+const SKY_DAWN_LINE: vec3<f32> = vec3(1.0, 0.85, 0.64);
+const SKY_DAWN_LINE_K: vec2<f32> = vec2(28.0, 0.85);
+// The low morning sun's glow where the sky is seen as Bliss's (`OPT_SKY_LOBE`): its sky is a physical
+// atmosphere whose glow round the sun is one Mie lobe, Henyey-Greenstein g 0.8 (`lib/ROBOBO_sky.glsl:45-48`,
+// `:126`, method only): of its peak 0.81 at 5°, 0.49 at 10°, 0.16 at 20°, 0.06 at 30°, 0.02 at 45°, a tail
+// with no window. Ours had about ten layers round the sun (the away lavender and blue, the cream lobe, the
+// gold, the band, three Mie powers, the wide glow, the sunset fan), each with its own window, ending
+// together 25-30° out as a hard seam from the horizon to the top of the frame (lkmC0-C4). The lobe's g,
+// and how much of the sky's own brightness it adds at the sun (2.5 at 10°, 0.8 at 20°, 0.3 at 30°).
+// (10 at first, lklobe1: the glow covered most of the morning sky.)
+const SKY_LOBE: vec2<f32> = vec2(0.8, 5.0);
+// Its colour: the sun's own, this much toward a cream (the low sun's orange alone went saturated).
+const SKY_LOBE_CREAM: f32 = 0.5;
+fn hg_rel(mu: f32, g: f32) -> f32 {
+    let gg = g * g;
+    return pow((1.0 - g) * (1.0 - g) / max(1.0 + gg - 2.0 * g * mu, 1e-5), 1.5);
+}
 const SKY_AWAY_LAVENDER: vec3<f32> = vec3(0.92, 0.85, 1.0);
 const SKY_AWAY_DARK: f32 = 1.0;
 // The tint at the sky's own blue (1), not its brightness (0): Bliss's 06:00 sweep from the sun keeps
@@ -311,6 +354,11 @@ const SKY_AWAY_BLUE: vec3<f32> = vec3(0.43, 0.52, 1.0);
 // blue hue about 218, ours 203 with the band's own blue, lv16).
 const SKY_BAND_BLUE_SEEN: vec3<f32> = vec3(0.64, 0.78, 1.25);
 const SUN_BAND: vec3<f32> = vec3(10.0, 9.0, 8.0);
+// Where the sky is seen that band's extra (`SUN_BAND.z`) only low, fading this fast with height (per
+// unit of dir.y): the band goes by the sun's bearing alone, so at 8 over the whole height its sides
+// stood as a hard vertical seam from the horizon to the top of the frame, cream on the sun's side and
+// clear blue past about 40° (lv16-18 and Ronald's 06:00 vista, 11-24; from d16de7a26's x4).
+const SUN_BAND_SEEN_FALL: f32 = 25.0;
 // How much of the sky's wide round sun glow (`OPT_SUN_GLOW`) goes with Bliss's sun low in the morning.
 const SUN_BAND_ROUND: f32 = 0.67;
 // And where the sky is seen (`sky_seen`): this much of the wide glow gone, and of the Mie's broad lobe.
@@ -984,6 +1032,15 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let h = clamp(dir.y, 0.0, 1.0);
     let bliss_sun = bliss_low_sun();
     let seen = bliss_sun * sky_seen;
+    // Where the lobe stands in for our layers round the sun: those go, all of them.
+    // (Its value past 0 also scales the lobe's strength, for tuning: 1 as made.)
+    let lobe_amt = max(fantasy_opt(OPT_SKY_LOBE), 0.0);
+    // Mornings and evenings alike (the evening's low sun kept the old layers' seam, lklobe1 s18:
+    // cream to blue some 25° out, as the morning's was).
+    let low_both = clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0) * (1.0 - dawn_sky()) * (1.0 - rain_amount())
+        * (1.0 - smoothstep(0.25, 0.45, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y);
+    let lobe_k = low_both * sky_seen * min(lobe_amt, 1.0);
+    let keep = 1.0 - lobe_k;
     // With Bliss's sun the horizon's colour a peach, not the golden key's yellow (hue 40): where the
     // sun's creamed glow fades out it showed through as a faint yellow ring about 7° out (lv15).
     let horizon = mix(p.horizon, SUN_GLOW_CREAM * (luma(p.horizon) / luma(SUN_GLOW_CREAM)), seen * select(0.0, 0.8, scene.frame.x > 0.5));
@@ -997,10 +1054,10 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // Most of it once the sun is down (the blue hour); with the sun up a little only (it tinted
         // the whole sunrise sky lavender).
         let away = (0.5 - 0.5 * mu) * (1.0 - h) * low * mix(0.35, 1.0, smoothstep(0.03, -0.05, scene.sun.y));
-        c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
+        c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4 * keep);
         // Toward it, a warmer band low on the horizon.
         let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
-        c += vec3(0.55, 0.22, 0.05) * toward;
+        c += vec3(0.55, 0.22, 0.05) * toward * keep;
     }
     // With Bliss's sun, away from the sun the sky lavender and then blue at its own brightness, not
     // the golden key's gold horizon mixed up into the blue: ours stood tan-mauve over the whole sky
@@ -1012,7 +1069,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         let tint = mix(SKY_AWAY_LAVENDER, SKY_AWAY_BLUE, turn);
         // The blue a little darker than the sky there (Bliss's 06:00 blue about 0.85 of ours, lv16).
         let level = mix(luma(c) / luma(tint), c.b / tint.b, SKY_AWAY_KEEP_BLUE);
-        c = mix(c, tint * level * mix(1.0, SKY_AWAY_DARK, turn), away_sun * seen * SKY_AWAY.z);
+        c = mix(c, tint * level * mix(1.0, SKY_AWAY_DARK, turn), away_sun * seen * SKY_AWAY.z * keep);
     }
     // (B5: on the sky's own colour, before the sun's glow and glare are added: on top of them it
     // turned the glare gold, and the dawn mist that reads it went flat orange over the land, PC
@@ -1044,7 +1101,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             // over the whole half (blue 140-155), and its edge against the lavender read as a
             // yellow-green arc over the sun (lv13 06 vista and 07 low).
             let lobe = mix(pow(wide, 1.5), pow(max(mu, 0.0), SUN_CREAM_TIGHT), seen);
-            let dawn = lobe * morning * (1.0 - rain_amount());
+            let dawn = lobe * morning * (1.0 - rain_amount()) * keep;
             c = mix(c, cream * (luma(c) / luma(cream)), dawn * 0.7);
         }
     }
@@ -1102,15 +1159,24 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     // horizon.
     if bliss_sun > 0.0 && scene.frame.x > 0.5 {
         let near_sun = smoothstep(SUN_GOLD.x, SUN_GOLD.y, mu);
-        c = mix(c, SUN_GOLD_TINT * (luma(c) / luma(SUN_GOLD_TINT)), near_sun * seen);
+        c = mix(c, SUN_GOLD_TINT * (luma(c) / luma(SUN_GOLD_TINT)), near_sun * seen * keep);
         let flat = normalize(vec3(dir.x, 0.0, dir.z) + vec3(1e-5));
         let sun_flat = normalize(vec3(scene.sun.x, 0.0, scene.sun.z) + vec3(1e-5));
         let along = pow(max(dot(flat, sun_flat), 0.0), SUN_BAND.x);
         let band = exp(-abs(dir.y - 0.01) * SUN_BAND.y);
-        c += vec3(1.0, 0.88, 0.66) * luma(p.sun) * light_strength() * along * band * mix(1.0, SUN_BAND.z, sky_seen) * bliss_sun;
+        c += vec3(1.0, 0.88, 0.66) * luma(p.sun) * light_strength() * along * band * mix(1.0, SUN_BAND.z, sky_seen * exp(-abs(dir.y - 0.01) * SUN_BAND_SEEN_FALL)) * bliss_sun * keep;
+        let morning = (1.0 - smoothstep(0.15, 0.35, scene.sun.y)) * smoothstep(-0.03, 0.02, scene.sun.y) * smoothstep(-0.05, 0.05, scene.sun.x);
+        let line = exp(-max(dir.y, 0.0) * SKY_DAWN_LINE_K.x) * morning * seen * SKY_DAWN_LINE_K.y * (1.0 - rain_amount());
+        c = mix(c, SKY_DAWN_LINE * (luma(c) * 1.1 / luma(SKY_DAWN_LINE)), line);
+    }
+    // The lobe, over the sky's own colour as it stands here (blue, its horizon line), at that
+    // colour's brightness.
+    if lobe_k > 0.0 {
+        let sun_tint = mix(p.sun / max(luma(p.sun), 1e-4), SUN_GLOW_CREAM / luma(SUN_GLOW_CREAM), SKY_LOBE_CREAM);
+        c += sun_tint * luma(c) * SKY_LOBE.y * lobe_amt * hg_rel(mu, SKY_LOBE.x) * lobe_k * (1.0 - rain_amount());
     }
     let c_pre_glow = c;
-    c += sun_glow(dir, p) * glow_up;
+    c += sun_glow(dir, p) * glow_up * keep;
     // In the HDR world the air round the sun glows as bright as it really is (Mie scattering's
     // forward peak, a wide lobe and a tight one in the sun's own colour, strongest low), which the
     // curve rolls off and the bloom spreads: Bliss's low sun stands in a great gold glare. The
@@ -1129,7 +1195,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
         // third weaker: in the sun's pale mid-morning colour the glow went cream-white through the
         // curve's shoulder (08:00 sky saturation 23 against Bliss's 43, warmth +15 against +36).
         let gold = vec3(1.0, 0.72, 0.4) * luma(p.sun) * 1.4;
-        c += mix(p.sun, gold, 0.6 * (1.0 - smoothstep(0.6, 0.9, scene.sun.y))) * mie * 0.34 * glow_up;
+        c += mix(p.sun, gold, 0.6 * (1.0 - smoothstep(0.6, 0.9, scene.sun.y))) * mie * 0.34 * glow_up * keep;
         // The wide glow (`OPT_SUN_GLOW`), near white (forward Mie scattering by haze and droplets
         // keeps most of the light's colour, the eye sees it whitish), the more so with the sun low.
         // The far land toward the sun takes it through the haze, which reads this colour.
@@ -1144,7 +1210,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
             // the sun, its edge a yellow ring against the sky (lv11, with the mist, haze and banks
             // off still there; gone with this glow off). That light lies along the horizon instead.
             let round = 1.0 - mix(SUN_BAND_ROUND, SUN_ROUND_SEEN, sky_seen) * bliss_sun;
-            c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.5 * wide_k * glow_up * round;
+            c += mix(vec3(luma(p.sun)), p.sun, 0.3) * light_strength() * wide * 0.5 * wide_k * glow_up * round * keep;
         }
     }
     // With Bliss's sun on a low morning sun all of that glow a pale cream: in the golden key's
@@ -2028,7 +2094,9 @@ fn ground_at(rel: vec3<f32>) -> vec3<f32> {
 fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
     let q = p - vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * 0.6;
     let shape = noise3(q / MIST_SHAPE.xyx);
-    let cut = clamp((shape - MIST_SHAPE.z) / max(MIST_SHAPE.w - MIST_SHAPE.z, 1e-3), 0.0, 1.0);
+    let edge = clamp(fantasy_opt(OPT_BANK_EDGE), 0.0, 1.0);
+    let cut_lin = clamp((shape - (MIST_SHAPE.z - 0.25 * edge)) / max(MIST_SHAPE.w + 0.2 * edge - (MIST_SHAPE.z - 0.25 * edge), 1e-3), 0.0, 1.0);
+    let cut = mix(cut_lin, smoothstep(0.0, 1.0, cut_lin), edge);
     // A thin even part under the billows, thinning fast with height (`MIST_SEA_EVEN`), as Bliss's
     // uniform fog beside its cloudy one; the billows alone carry the shape.
     let burn = (1.0 - smoothstep(0.3, 0.65, scene.sun.y)) * mix(MIST_BANK_EVENING, 1.0, smoothstep(-0.1, 0.1, scene.sun.x));
@@ -2041,20 +2109,19 @@ fn bank_density(p: vec3<f32>, rel: vec3<f32>) -> f32 {
     let banks = max(cut - erode * MIST_ERODE.z, 0.0);
     // The thick cores stand taller (`MIST_SEA_RISE`), so the billows have tops of their own over the
     // canopy, not one level skin on the low forests' crowns (lv9).
-    let fall = exp(-MIST_SEA_FALL * max(p.y - (SEA_LEVEL + MIST_SEA_LEVEL + cut * MIST_SEA_RISE), 0.0));
+    let top = SEA_LEVEL + (MIST_SEA_LEVEL + cut * MIST_SEA_RISE) * look_opt(OPT_BANK_TOP, 1.0);
+    let fall = exp(-MIST_SEA_FALL * look_opt(OPT_BANK_FALL, 1.0) * max(p.y - top, 0.0));
     return k * (banks * fall + even);
 }
-// `x` eased toward `cap` instead of clipped at it: clipped, the forward peak lay flat out to where
-// it fell under the cap and drew a hard-edged disc a third of the frame wide round the sun (lv9).
-fn soft_cap(x: f32, cap: f32) -> f32 {
-    return cap * (1.0 - exp(-x / cap));
-}
-// The banks' sunlight by the angle from the sun (`MIST_SEA_PHASE`).
-// Only the sharp peak (within a few degrees of the sun) is eased to the cap (`MIST_SEA_CREAM.z`).
+// The banks' sunlight by the angle from the sun.
+// Uncapped now, Bliss's weights (its fog's phase, `overworld_fog.glsl:54-62`, x5 at :123, method only):
+// with a fall in 2^(-15 l^0.3) and one in 2^(-12.5 sqrt l) / 2 of l = (1 - mu) / 2, about 12.5 at the
+// sun, 3.4 at 14°, 1.7 at 30°, 0.24 across and 0.07 away. Capped at 1.2 near the sun (d8f11ff94, against
+// a blown disc) the mist toward a low sun was lit about as across it: no backlit gold glow, no dark
+// crowns against it (Ronald, 11-24: "how the sun shines in it is also different").
 fn bank_phase(mu: f32) -> f32 {
-    let off = 1.0 - mu;
-    return soft_cap(MIST_SEA_PHASE.x * exp(-MIST_SEA_PHASE.y * off), MIST_SEA_CREAM.z)
-        + MIST_SEA_PHASE.z * exp(-MIST_SEA_PHASE.w * off) + MIST_SEA_TAIL.x * exp(-MIST_SEA_TAIL.y * off);
+    let l = clamp(0.5 - 0.5 * mu, 0.0, 1.0);
+    return (1.5 * exp2(-15.0 * pow(l, 0.3)) + exp2(-6.25 * sqrt(l))) * 5.0;
 }
 // How much of what lies `rel` away (camera relative) the banks hide, 0..1, walked as `bank_march`
 // walks them (its steps, without the light), for the bloomy fog in `post.wgsl`: Bliss blends the
@@ -2088,14 +2155,18 @@ fn bank_hidden(rel: vec3<f32>) -> f32 {
     if t1 <= t0 {
         return 0.0;
     }
-    let n = 8u;
+    // (Its steps as `bank_march`'s, from the eye.)
+    let n = u32(clamp(look_opt(OPT_MIST_STEPS, 8.0), 2.0, 16.0));
     let e = 11.0;
-    let span = t1 - t0;
+    let span = t1;
     var depth = 0.0;
     for (var i = 0u; i < n; i++) {
         let u = (f32(i) + 0.5) / f32(n);
-        let t = t0 + span * (pow(e, u) - 1.0) / (e - 1.0);
+        let t = span * (pow(e, u) - 1.0) / (e - 1.0);
         let step = span * pow(e, u) * log(e) / (f32(n) * (e - 1.0));
+        if t < t0 {
+            continue;
+        }
         depth += bank_density(eye + dir * t, dir * t) * deep * step;
     }
     return 1.0 - exp(-depth);
@@ -2137,13 +2208,27 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let cream = mix(p.sun, vec3(luma(p.sun)) * vec3(1.0, 0.92, 0.78), MIST_SEA_CREAM.x) * MIST_SEA_CREAM.y;
     let sun_in = cream * light_strength() * bank_phase(dot(dir, light_dir())) * k
         * look_opt(OPT_BANK_SUN, 1.0);
-    let sky_in = p.ambient * (1.0 + MIST_SEA_SKY.x * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), MIST_SEA_SKY.y))
+    // In the sky's own colour, as Bliss's AmbientColor is the sky averaged (`deferred.vsh:118-145`):
+    // the palette's ambient is warm at dawn, and the mist away from a low sun read sand-orange where
+    // Bliss's is a cool grey-lilac (lkmC1 v6_away; Planner).
+    let sky_tint = p.zenith * (luma(p.ambient) / max(luma(p.zenith), 1e-4));
+    let sky_in = sky_tint * (1.0 + MIST_SEA_SKY.x * pow(clamp(dir.y * 0.5 + 0.5, 0.0, 1.0), MIST_SEA_SKY.y))
         * MIST_SEA_SKY.z * k * look_opt(OPT_BANK_SHADE, 1.0);
-    // 8 steps spaced ever wider from the near end (u^11 curve, as Bliss's), jittered per pixel (TAA
-    // blends them): close steps where the mist near the eye shows its shape.
-    let n = 8u;
+    // Steps spaced ever wider from the eye (11^u, as Bliss's, `overworld_fog.glsl:179`), jittered
+    // per pixel (TAA blends them), from the eye itself, not from where the ray enters the banks'
+    // height: crowded into that slab from a high eye, the steps resolved the banks' top contour
+    // sharply (Ronald's "hard sand-like edges"); Bliss's one or two long steps there, jittered and
+    // blended over frames, average the density into its soft gradient. Ones above or below the
+    // banks are skipped. As many as the quality row (`OPT_MIST_STEPS`, 8 as made).
+    let n = u32(clamp(look_opt(OPT_MIST_STEPS, 8.0), 2.0, 16.0));
     let e = 11.0;
-    let span = t1 - t0;
+    let span = t1;
+    // The land's shadow in the mist only as far as the sun's shadows reach (`OPT_SHADOW_REACH`, 128
+    // as Bliss's shadowDistance; none, all the way): past it the mist is fully lit, the clouds'
+    // shadow left. Out to 1500 every crown's shadow printed into the mist 300-600 blocks below the
+    // vista, the land's shadow pattern copied onto it, where Bliss's far mist is evenly lit and its
+    // shafts are the clouds' (Ronald's 06:00 compare, 11-24).
+    let reach = fantasy_opt(OPT_SHADOW_REACH);
     var through = 1.0;
     var gained = vec3(0.0);
     // Debug view 5: where along the march the sun reaches the mist (Planner on lv8: no shafts and no
@@ -2155,15 +2240,21 @@ fn bank_march(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     // scatter toward the eye alone, on black; 4 how much they hide (1 - through) as grey.
     for (var i = 0u; i < n; i++) {
         let u = (f32(i) + jitter) / f32(n);
-        let t = t0 + span * (pow(e, u) - 1.0) / (e - 1.0);
+        let t = span * (pow(e, u) - 1.0) / (e - 1.0);
         let step = span * pow(e, u) * log(e) / (f32(n) * (e - 1.0));
+        if t < t0 {
+            continue;
+        }
         let d = bank_density(eye + dir * t, dir * t) * deep;
         if d <= 0.0 {
             continue;
         }
         // The land's and the clouds' shadow: shafts where the sun comes through, the sky's light alone
         // in the crowns' shade.
-        let land = sun_reaches(dir * t);
+        var land = 1.0;
+        if reach <= 0.0 || t < reach {
+            land = mix(sun_reaches(dir * t), 1.0, select(0.0, smoothstep(reach * 0.75, reach, t), reach > 0.0));
+        }
         let clouds = cloud_shadow(dir * t);
         let lit = land * clouds;
         let kept = exp(-d * step);

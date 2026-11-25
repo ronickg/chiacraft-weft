@@ -878,7 +878,8 @@ impl Screen for WorldSelect {
                 if let Some(t) = ui.text_mut(t) {
                     t.wrap = false;
                     let chars = cx.lang.get("world.select").chars().count().max(1) as f32;
-                    t.scale = (156.0 / (chars * 6.0)).clamp(1.0, 3.0);
+                    // Whole steps only: an uneven scale draws uneven pixels (the text-fit check).
+                    t.scale = (156.0 / (chars * 6.0)).floor().clamp(1.0, 3.0);
                 }
                 ui.spacer();
                 let sel = selected.and_then(|i| worlds.get(i)).cloned();
@@ -902,6 +903,7 @@ impl Screen for WorldSelect {
                 if let Kind::Button { enabled, .. } = &mut ui.nodes[del].kind {
                     *enabled = selected.is_some();
                 }
+                ui.set_id(del, "delete_world");
                 // The selected world's cheats, changed where it is chosen.
                 let sel = selected.and_then(|i| worlds.get(i)).cloned();
                 let on = sel.as_ref().is_some_and(|w| w.cheats);

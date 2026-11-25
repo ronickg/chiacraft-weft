@@ -1,0 +1,103 @@
+# A pack in a hollow below the herd, one of it full (`notes/ECOLOGY.md`, part 6; Planner 11-24): wolvesFar4's pack came down
+# into the pond's hollow and its prowl legs, held to a block up, never climbed out to the herd on the rim (`needs::PROWL_CLIMB` now
+# lets a leg end 8 blocks up). The ground flattened as `herd_wolves_far.txt`, then a terraced pit dug 6 blocks deep
+# (x 6..20, z 514..528, floor y 63) 25 blocks south of six fed deer (90 %). Two wolves at 30 % food start on the pit's floor;
+# a third, spawned after the others are set, arrives full (its prey fed here) and should neither join their hunt (`hunt::rally`)
+# nor take a share of their kill.
+# Report from the log (`--log mod:animals=debug`): each prowl leg's height (does one end on the rim, y 70?) and when the
+# pack leaves the pit, the first "hunts", the "joins" and "eats N's kill" lines (the full wolf, the highest id, in none of them),
+# the wolves' food in the where rows, kills and deaths by cause.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+chat /tk fill -4 70 528 4 70 536 core:air
+chat /tk fill -2 68 530 2 68 534 base:dirt
+chat /tk fill -2 69 530 2 69 534 base:water
+chat /tk fill 6 69 514 20 75 528 core:air
+chat /tk fill 7 68 515 19 75 527 core:air
+chat /tk fill 8 67 516 18 75 526 core:air
+chat /tk fill 9 66 517 17 75 525 core:air
+chat /tk fill 10 65 518 16 75 524 core:air
+chat /tk fill 11 64 519 15 75 523 core:air
+chat /tk fill 12 63 520 14 75 522 core:air
+wait 2
+chat /tk spawn animals:white_tailed_deer 0 70 546
+chat /tk spawn animals:white_tailed_deer 2 70 547
+chat /tk spawn animals:white_tailed_deer -2 70 547
+chat /tk spawn animals:white_tailed_deer 1 70 549
+chat /tk spawn animals:white_tailed_deer -1 70 550
+chat /tk spawn animals:white_tailed_deer 3 70 550
+wait 2
+chat /tk spawn animals:grey_wolf 13 63 521
+chat /tk spawn animals:grey_wolf 12 63 520
+wait 1
+chat /anim log
+chat /animalprof water 0.9
+chat /animalprof food 0.9
+chat /animalprof hunters 0.3
+wait 1
+chat /tk spawn animals:grey_wolf 10 65 519
+wait 1
+chat /tp 0 95 575
+wait 2
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+chat /animalprof senses
+look 0 -35
+wait 1
+shot herd_wolves_hollow_1.png
+quit

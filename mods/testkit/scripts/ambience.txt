@@ -1,0 +1,137 @@
+# The sounds of the land follow biome, hour, weather and cover; water and lava are heard near
+# them (notes/SYSTEMS.md, ambience). Seed 1. Sound can't be heard in a script: read run.log.
+#  - `ambience:` lines every 10 s (bed levels after the cover, heard, deep, water/lava, calls);
+#  - `ambience here:` lines, one per `/ambience`, with the biome and the levels before the cover;
+#  - the `where` markers between steps.
+# Expect: forest noon -> birds high, night 0; forest rain -> birds down to ~0.15 of noon;
+# forest dawn -> dawn high; forest midnight -> night and owls high, birds 0; the survey line
+# -> levels change with each biome (surf only on beach/ocean near sea level, dry in desert);
+# by the still pool -> water still > 0; by the falling water -> flowing > 0; by lava -> lava > 0
+# and calls counting up; inside the buried box -> deep true, every bed 0, calls (drips) counting.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /season summer 1
+chat /weather clear 99999
+chat /time set 6000
+# ---- the old-growth forest (the Bliss spot)
+chat /tp -4232 120 -392
+wait 3
+loaded
+wait 4
+where forest_noon
+chat /ambience
+wait 22
+chat /weather rain 99999
+where forest_rain
+wait 22
+chat /ambience
+chat /weather clear 99999
+chat /time set 22500
+where forest_dawn
+wait 22
+chat /ambience
+chat /time set 18000
+where forest_midnight
+wait 25
+chat /ambience
+# ---- a survey line at noon, 600 blocks a step
+chat /time set 6000
+chat /tp -3600 140 -392
+wait 3
+loaded
+wait 4
+where survey1
+chat /ambience
+chat /tp -3000 140 -392
+wait 3
+loaded
+wait 4
+where survey2
+chat /ambience
+chat /tp -2400 140 -392
+wait 3
+loaded
+wait 4
+where survey3
+chat /ambience
+chat /tp -1800 140 -392
+wait 3
+loaded
+wait 4
+where survey4
+chat /ambience
+chat /tp -1200 140 -392
+wait 3
+loaded
+wait 4
+where survey5
+chat /ambience
+chat /tp -600 140 -392
+wait 3
+loaded
+wait 4
+where survey6
+chat /ambience
+chat /tp 0 140 -392
+wait 3
+loaded
+wait 4
+where survey7
+chat /ambience
+chat /tp 600 140 -392
+wait 3
+loaded
+wait 4
+where survey8
+chat /ambience
+chat /tp 1200 140 -392
+wait 3
+loaded
+wait 4
+where survey9
+chat /ambience
+chat /tp 1800 140 -392
+wait 3
+loaded
+wait 4
+where survey10
+chat /ambience
+# ---- built on a floor in the open sky: a still pool, falling water, lava, a buried box
+chat /tp 0.5 252 0.5
+wait 2
+loaded
+chat /tk fill -40 249 -40 40 249 40 stone
+chat /tk fill -40 250 -40 40 262 40 core:air
+# a still pool, 7x7, one deep, sunk in the floor
+chat /tk fill -30 248 -30 -24 248 -24 stone
+chat /tk fill -30 249 -30 -24 249 -24 base:water
+# falling water: one source on a pillar, it runs down onto the floor
+chat /tk fill 24 250 -30 24 254 -30 stone
+chat /tk fill 24 255 -30 24 255 -30 base:water
+# lava, 3x3, sunk in the floor
+chat /tk fill 24 248 24 26 248 26 stone
+chat /tk fill 24 249 24 26 249 26 base:lava
+# a box under a 10-block-thick roof (deep: no sky through it)
+# (stone 8 blocks out on every side, so the cover's 7-block ring finds stone too)
+chat /tk fill -36 250 14 -14 262 36 stone
+chat /tk fill -27 250 23 -23 252 27 core:air
+wait 2
+chat /tp -27 250 -27
+where by_pool
+wait 20
+chat /tp 26 250 -28
+where by_falling_water
+wait 20
+chat /tp 22 250 25
+where by_lava
+wait 20
+chat /tp -25 250 25
+where in_deep_box
+wait 30
+chat /tp 0.5 250 0.5
+where open_floor
+wait 15
+where end
+quit
