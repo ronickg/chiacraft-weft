@@ -8,13 +8,15 @@
 #   step out). The shot fp_pens shows the fences joined into a ring (rails between posts, no
 #   gaps) and the deer.
 # Part 2, the gate and the scarecrow by real actions in survival:
-#   - a gate set in pen A's south side; used: /tk prop open true; used again: false.
+#   - a gate placed by hand in a gap of pen A's south side: /tk prop facing south, open false
+#     (fp_gate_shut: across the fence line); used: open true (fp_gate_open: swung to one side);
+#     used again: false.
 #   - a scarecrow set between the pens (~0 ~ ~-7); a torch in hand, used on it: /tk prop lit true,
 #     the torch gone from the hand (/tk inv me), run.log "scarecrow: a lantern hung"; /tk light
 #     at 7 and 9 blocks north of it along the ground: block light 8 or more at 7, under 8 at 9
 #     (`vitals::fences::scarecrow_reach` 7). /tk light answers the packed light: give the raw
 #     numbers, and the block light if it reads as one.
-#   - shots fp_gate_open, fp_scarecrow (lit, its lantern), fp_scarecrow_night (dark, lit round it).
+#   - shots fp_gate_shut, fp_gate_open, fp_scarecrow (lit, its lantern), fp_scarecrow_night (dark, lit round it).
 # Read: the /tk near replies, the /tk prop, /tk inv and /tk light replies, run.log "scarecrow:",
 # "died" (none), and the shots. Yaw 0 faces -z; a negative pitch looks down.
 loaded
@@ -63,15 +65,28 @@ chat /tk near ~-8 ~ ~-10 12
 chat /tk near ~8 ~ ~-10 3
 chat /tk near ~8 ~ ~-10 12
 # Part 2: the gate in pen A's south side, used for real.
+# The gate is placed by the player's hand (a set gate takes the first facing, west, across the
+# fence line): a gap left in pen A's south side, the gate set on the pad from the south.
 chat /tk mode creative
-chat /tk set ~-8 ~ ~-7 base:fence_gate
+chat /tk set ~-8 ~ ~-7 core:air
 chat /tk set ~0 ~ ~-7 base:scarecrow
 wait 1
 chat /tk mode survival
 until mode survival within 10
 chat /tp ~-8 ~ ~-4
 wait 1
+chat /tk give base:fence_gate
+chat /tk hand me base:fence_gate
+wait 0.5
+aim_block 0 -1 -3 1
+hold core:use 0.2
+wait 1
+# Expect facing south (toward the player), open false, the gate across the fence line.
+chat /tk prop ~ ~ ~-3 facing
+chat /tk prop ~ ~ ~-3 open
 look 0 -10
+wait 1
+shot fp_gate_shut.png
 aim_block 0 0 -3 0.5
 hold core:use 0.2
 wait 1
