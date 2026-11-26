@@ -175,10 +175,11 @@ pub fn init(r: &mut Registry) {
             }
         }
     });
-    // Kneeling, still, at eye height a little over half a standing one's (`player.animation.json`'s `skin` clip).
+    // Kneeling forward over the body, still (`player.animation.json`'s `skin` clip: the knees down behind, the torso
+    // leaning 30 degrees about the hips with the head and arms carried along, its eye at 1.33 blocks).
     r.pose(&SKINNING)
-        .height(0.6)
-        .eye(0.55)
+        .height(0.93)
+        .eye(0.8)
         .speed(0.0)
         .action("skin")
         .no_bob();

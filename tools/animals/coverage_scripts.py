@@ -436,8 +436,9 @@ for kind, dx in [("grey_wolf", -8), ("golden_eagle", -4), ("raptor", 0), ("yacar
           "chat /animalprof kill", "wait 1"]
 s += ["chat /tk mode spectator", "wait 2", "chat /animalprof carcass"]
 row_shot = ["chat /tick freeze", f"chat /tp {x} 76 {Z+16}", "look 0 -30", "wait 2"]
-# The wolf close, from its south-east and above (r7's 11 had it at the frame's top edge behind the chat).
-s += row_shot + ["shot cov_carcass_10_plans_whole.png", f"chat /tp {x-6} 71.5 {Z+8.5}", "look 38 -40", "wait 2",
+# The wolf close, from its south-east, low (r7's 11 had it at the frame's top edge behind the chat; r9's, from 40 degrees
+# above, had its legs splayed toward the camera read as standing).
+s += row_shot + ["shot cov_carcass_10_plans_whole.png", f"chat /tp {x-6} 70.3 {Z+8.5}", "look 38 -18", "wait 2",
                  "shot cov_carcass_11_wolf_close.png", "chat /tick unfreeze", "wait 1"]
 s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 3", "wait 2", "chat /animalprof carcass"]
 s += row_shot + ["shot cov_carcass_12_plans_opened.png", "chat /tick unfreeze", "wait 1"]

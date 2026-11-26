@@ -377,8 +377,8 @@ press core:hide_hud
 wait 0.5
 shot cov_carcass_10_plans_whole.png
 press core:hide_hud
-chat /tp 994 71.5 552.5
-look 38 -40
+chat /tp 994 70.3 552.5
+look 38 -18
 wait 2
 press core:hide_hud
 wait 0.5
