@@ -282,8 +282,8 @@ fn raids(w: &World, at: [i32; 3]) -> bool {
     if let Some(yes) = SEEN.with_borrow(|(t, m)| if *t == now { m.get(&at).copied() } else { None }) {
         return yes;
     }
-    // The brighter of the crop's own cell and the air above it; and a guard block looked for, as the light at the
-    // plants read 0 beside torches (cov_crops r2).
+    // The brighter of the crop's own cell and the air above it; and a guard block looked for (a scarecrow gives no
+    // light).
     let light = w
         .block_light(at)
         .max(w.block_light([at[0], at[1] + 1, at[2]]));
@@ -301,7 +301,8 @@ fn raids(w: &World, at: [i32; 3]) -> bool {
     yes
 }
 
-/// The nearest crop guard (`CROP_GUARDS`) within `needs::GUARD_REACH` of `at`, if any.
+/// The nearest crop guard (`CROP_GUARDS`) within `needs::GUARD_REACH` of `at`, if any: any part of a cell (a torch
+/// in with a slab).
 fn guarded(w: &World, at: [i32; 3]) -> Option<[i32; 3]> {
     let r = animals_core::needs::GUARD_REACH;
     let mut best: Option<([i32; 3], i32)> = None;
@@ -310,7 +311,7 @@ fn guarded(w: &World, at: [i32; 3]) -> Option<[i32; 3]> {
             for dx in -r..=r {
                 let p = [at[0] + dx, at[1] + dy, at[2] + dz];
                 let d = dx.abs().max(dz.abs()) * 4 + dy.abs();
-                if best.is_none_or(|(_, b)| d < b) && CROP_GUARDS.on_block(w.block(p)) {
+                if best.is_none_or(|(_, b)| d < b) && CROP_GUARDS.at(w, p) {
                     best = Some((p, d));
                 }
             }

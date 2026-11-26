@@ -46,11 +46,11 @@ chat /tk fill 3 70 531 3 71 537 base:oak_planks
 chat /tk fill 9 70 531 9 71 537 base:oak_planks
 chat /tk fill -8 69 532 -4 69 536 base:farmland
 chat /tk fill -8 70 532 -4 70 536 base:wheat[age=7]
-chat /tk fill -9 70 531 -9 70 531 base:torch
-chat /tk fill -3 70 531 -3 70 531 base:torch
-chat /tk fill -9 70 537 -9 70 537 base:torch
-chat /tk fill -3 70 537 -3 70 537 base:torch
-chat /tk fill -6 70 534 -6 70 534 base:torch
+chat /tk fill -9 70 531 -9 70 531 base:torch[facing=up]
+chat /tk fill -3 70 531 -3 70 531 base:torch[facing=up]
+chat /tk fill -9 70 537 -9 70 537 base:torch[facing=up]
+chat /tk fill -3 70 537 -3 70 537 base:torch[facing=up]
+chat /tk fill -6 70 534 -6 70 534 base:torch[facing=up]
 chat /time set 18000
 wait 1
 chat /tk light -4 70 533

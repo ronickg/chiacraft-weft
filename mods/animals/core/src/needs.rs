@@ -64,8 +64,7 @@ pub const CROP_REACH: f32 = 1.5;
 /// How far a crop guard (a block in the `crop_guards` tag: a torch, a campfire, glowstone, a lantern scarecrow) keeps
 /// raiders off, blocks each way: a torch at each corner of a 7 by 7 field, or one in the middle of a 9 by 9, guards it
 /// all. A torch's own light falls under `RAID_LIGHT` 7 blocks out along the ground, so this is the nearer of the two.
-/// The guard is looked for by block, not read from the light (cov_crops r2: the server's light at the plants read 0
-/// beside torches).
+/// The guard is looked for by block as well as by light, so a guard that gives no light (a scarecrow) counts too.
 pub const GUARD_REACH: i32 = 4;
 
 /// Whether a wild animal goes for a ripe crop in block light `light` whose roll for the day is `roll` (0 to 1).

@@ -761,9 +761,9 @@ s += pad(0) + [
     f"chat /tk fill 3 70 {Z-13} 9 71 {Z-13} base:oak_planks", f"chat /tk fill 3 70 {Z-7} 9 71 {Z-7} base:oak_planks",
     f"chat /tk fill 3 70 {Z-13} 3 71 {Z-7} base:oak_planks", f"chat /tk fill 9 70 {Z-13} 9 71 {Z-7} base:oak_planks",
     f"chat /tk fill -8 69 {Z-12} -4 69 {Z-8} base:farmland", f"chat /tk fill -8 70 {Z-12} -4 70 {Z-8} base:wheat[age=7]",
-    f"chat /tk fill -9 70 {Z-13} -9 70 {Z-13} base:torch", f"chat /tk fill -3 70 {Z-13} -3 70 {Z-13} base:torch",
-    f"chat /tk fill -9 70 {Z-7} -9 70 {Z-7} base:torch", f"chat /tk fill -3 70 {Z-7} -3 70 {Z-7} base:torch",
-    f"chat /tk fill -6 70 {Z-10} -6 70 {Z-10} base:torch",
+    f"chat /tk fill -9 70 {Z-13} -9 70 {Z-13} base:torch[facing=up]", f"chat /tk fill -3 70 {Z-13} -3 70 {Z-13} base:torch[facing=up]",
+    f"chat /tk fill -9 70 {Z-7} -9 70 {Z-7} base:torch[facing=up]", f"chat /tk fill -3 70 {Z-7} -3 70 {Z-7} base:torch[facing=up]",
+    f"chat /tk fill -6 70 {Z-10} -6 70 {Z-10} base:torch[facing=up]",
     "chat /time set 18000", "wait 1",
     # The torch field's light where its plants stand (`needs::RAID_LIGHT` 8): r1's deer ate 5 of them.
     f"chat /tk light -4 70 {Z-11}", f"chat /tk light -5 70 {Z-9}", f"chat /tk light -8 70 {Z-12}", f"chat /tk light 6 70 {Z+1}",

@@ -587,8 +587,9 @@ and cactus.**
   clearing it; never within 4 blocks of a crop guard (`GUARD_REACH`, the `crop_guards` tag: a torch,
   a campfire, glowstone; another mod adds its scarecrow to the tag) or in block light 8 or more
   (`RAID_LIGHT`), night and day; and a wall 2 high keeps them out, as they can't path through it and
-  can't reach over it (`CROP_REACH` 1.5). The guard is looked for by block, as the server's light
-  at the plants read 0 beside torches in cov_crops r2. The game has no fence block yet. Check: `cov_crops` (an open, a walled and a torch-lit field at night).
+  can't reach over it (`CROP_REACH` 1.5). The guard is looked for by block as well as by light, so an
+  unlit scarecrow counts. (cov_crops r2 to r4 read no light because `/tk fill base:torch` set a wall
+  torch, which fell off as an item: scripts place `base:torch[facing=up]`.) The game has no fence block yet. Check: `cov_crops` (an open, a walled and a torch-lit field at night).
 - **Not yet:**
   - none of the crops' raiding seen yet (`cov_crops`, below);
   - beetroot's own seed and cooked cassava, waiting for icons;
