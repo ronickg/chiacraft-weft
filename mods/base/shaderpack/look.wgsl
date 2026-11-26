@@ -1892,17 +1892,21 @@ fn bc_alto(w: vec3<f32>) -> f32 {
     let shape = max(large - medium * 0.4 * clamp(1.5 - large, 0.0, 1.0), 0.0);
     return shape * shape;
 }
-// The land's sun through them at camera-relative `rel` (GetCloudShadow): each layer's density where
-// the light crosses a plane in it, summed, exp(-100 s^2) as its (2^ before: a third too light).
-fn bc_shadow(rel: vec3<f32>) -> f32 {
+// The sun through them at camera-relative `rel`: each layer's density where the light crosses a
+// plane in it, summed. Bliss has two: the land's (GetCloudShadow: the upper layer's plane 50 above
+// its base, exp2(-100 s^2)) and the fog's (GetCloudShadow_VLFOG: 30 above, exp(-100 s^2)).
+fn bc_shadow_of(rel: vec3<f32>, fog: bool) -> f32 {
     let l = light_dir();
     let w = rel + vec3(scene.eye.x, scene.eye.y, scene.eye.z);
     let along = l / max(abs(l.y), 1e-3);
     var s = bc_cumulus(0u, w + along * max(BC_L0 + 30.0 - w.y, 0.0), 0u) * bc_density(0u);
-    s += bc_cumulus(1u, w + along * max(BC_L1 + 50.0 - w.y, 0.0), 0u) * bc_density(1u);
+    s += bc_cumulus(1u, w + along * max(BC_L1 + select(50.0, 30.0, fog) - w.y, 0.0), 0u) * bc_density(1u);
     s += bc_alto(w + along * max(BC_ALTO - w.y, 0.0)) * 0.1 * (1.0 - abs(l.y));
     s = clamp(s, 0.0, 1.0);
-    return exp(s * s * -100.0);
+    return select(exp2(s * s * -100.0), exp(s * s * -100.0), fog);
+}
+fn bc_shadow(rel: vec3<f32>) -> f32 {
+    return bc_shadow_of(rel, false);
 }
 // Its phase (phaseg).
 fn bc_phase(x: f32, g: f32) -> f32 {
@@ -3047,7 +3051,12 @@ fn fog_march(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in:
         if shadows && (reach <= 0.0 || t < reach) {
             land = mix(sun_reaches(dir * t), 1.0, select(0.0, smoothstep(reach * 0.75, reach, t), reach > 0.0));
         }
-        let lit = land * cloud_shadow(dir * t);
+        var lit = land;
+        if land_from_sky() {
+            lit *= bc_shadow_of(dir * t, true);
+        } else {
+            lit *= cloud_shadow(dir * t);
+        }
         let d = bliss_fog_density(at);
         if d > 0.0 {
             let kept = exp(-d * step);

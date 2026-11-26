@@ -1574,7 +1574,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k) * (2.0 / 1.875), bc_ground_sky(sun, moon, sky_k, mean), land_ambient(mean), 1.0, false);
                     var sh = 0.0;
                     for (var k = 0; k < 4; k++) {
-                        sh += bc_shadow(dir * (64.0 * pow(2.0, f32(k)))) / 4.0;
+                        sh += bc_shadow_of(dir * (64.0 * pow(2.0, f32(k))), true) / 4.0;
                     }
                     cl_rgb += cl.rgb / 9.0;
                     fog_rgb += fog.rgb / 9.0;
