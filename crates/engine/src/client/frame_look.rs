@@ -8,8 +8,10 @@ use weft_render::*;
 
 use crate::gpu_layout::bind;
 
-/// Texels in the row (the pack fills as many as it needs).
-const TEXELS: u32 = 8;
+/// The target's size: a first row of texels the pack fills as it needs, and below it room for a
+/// sky-view picture (chiacraft's physical sky: 128 x 64).
+const TEXELS: u32 = 128;
+const ROWS: u32 = 65;
 
 #[derive(Default)]
 pub struct FrameLook {
@@ -63,8 +65,9 @@ impl FrameLook {
         }
     }
 
-    /// Records this frame's pass with the sky's buffers (`objects`, `scene`).
-    pub fn frame(&mut self, gpu: &mut dyn Backend, objects: BufferId, scene: BufferId) {
+    /// Records this frame's pass with the sky's buffers (`objects`, `scene`), drawn with the soft
+    /// clouds' entry (`clouds`) when there is one, so the pack can take them into its averages.
+    pub fn frame(&mut self, gpu: &mut dyn Backend, objects: BufferId, scene: BufferId, clouds: Option<u32>) {
         self.passes.clear();
         let Some(pipe) = self.pipe else {
             self.scene = [0.0; 4];
@@ -72,19 +75,19 @@ impl FrameLook {
         };
         let (t, index) = *self.target.get_or_insert_with(|| {
             let t = gpu.create_texture(
-                &TextureDesc { width: TEXELS, height: 1, mips: 1, format: Format::Rgba16Float, render_target: true },
+                &TextureDesc { width: TEXELS, height: ROWS, mips: 1, format: Format::Rgba16Float, render_target: true },
                 "frame look",
             );
             (t, gpu.texture_index(t))
         });
-        self.scene = [index as f32 + 1.0, 0.0, 0.0, 0.0];
+        self.scene = [index as f32 + 1.0, 0.0, if clouds.is_some() { 1.0 } else { 0.0 }, 0.0];
         self.passes
             .push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(t), Some([0.0; 4]))), depth: None });
         self.passes.pipeline(pipe);
         self.passes.bind(bind::sky::OBJECTS, objects);
         self.passes.bind(bind::sky::SCENE, scene);
         self.passes
-            .push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: 0 });
+            .push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: clouds.unwrap_or(0) });
         self.passes.push(Cmd::EndPass);
     }
 }

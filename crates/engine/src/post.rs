@@ -719,6 +719,16 @@ impl Post {
         self.use_taa && taa() && self.taa_pipes.is_some() && self.pipeline.is_some()
     }
 
+    /// The motion image's bindless index + 1 (`Scene::taa_frame.z`), for the screen effects that
+    /// read its w (the weather's cover; chiacraft's bloomy fog thinned by the rain, as Bliss's);
+    /// 0 without it. Asked after `motion_target` sized it this frame.
+    pub fn motion_index(&self) -> u32 {
+        if !motion() {
+            return 0;
+        }
+        self.motion_tex.map_or(0, |t| t.1 + 1)
+    }
+
     /// The motion image the world's pass draws into, sized to the frame (`Cmd::BeginPass`'s
     /// `motion`); none without temporal anti-aliasing's pipelines (`set_motion`).
     pub fn motion_target(&mut self, gpu: &mut dyn Backend, w: u32, h: u32) -> Option<TextureId> {
@@ -739,6 +749,16 @@ impl Post {
     /// The count image this frame's gathering will write (bindless index + 1, `Scene::taa_frame`),
     /// asked before the world is drawn: 0 without temporal anti-aliasing, or on a frame whose size
     /// differs from the images' (they are made anew in `apply`).
+    /// The HDR world's exposure texel the last frame wrote (bindless index + 1, `fs_exposure`'s:
+    /// g the view's mean), for packs whose world pass needs the view's brightness (chiacraft's
+    /// torches, Bliss's autoBrightness); 0 without the pyramid or before its first frame.
+    pub fn exposure_last(&self) -> u32 {
+        match &self.pyramid {
+            Some(py) if !py.fresh => py.exposure[py.flip].1 + 1,
+            _ => 0,
+        }
+    }
+
     pub fn taa_out(&self, w: u32, h: u32) -> u32 {
         match self.counts {
             Some((_, idx, size)) if self.taa_on() && size == (w, h) && self.upscaled.is_none() => idx[self.taa_cur] + 1,
