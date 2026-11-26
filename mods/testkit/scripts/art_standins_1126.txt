@@ -1,0 +1,130 @@
+# Art stand-ins, batches 1-4 (11-26), in the game. Seed 1, a fresh world; textures, models and the
+# chest's lid animation only, no shader change.
+# Batch 1 shots: ac_blocks, ac_close (malachite ore, copper lump, bellows, moulds placed), ac_inv,
+# ac_hammer_lump, ac_hammer (the copper hammering squares, a head square hovered), ac_head.
+# Batches 2-4: the shed antler, two scarecrows and a chest in the back row of ac_blocks; antler, bone
+# needle, chest and scarecrow in ac_inv; ac_chest_open (menu open: the lid should swing up behind it,
+# if the menu leaves the chest in view), ac_chest_shut (lid down, latch on the front), ac_scarecrow_night
+# (the left one lit: its lantern glows; the post's top must not flicker against the head),
+# ac_scarecrow_day.
+# Read: "died" (none), "scarecrow: a lantern hung" (once), "missing block model" (none), and no
+# missing-texture pink anywhere.
+# Yaw 0 faces -z; a negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /time set 6000
+chat /tk mode creative
+chat /tp -240 86 240
+wait 2
+wait 2
+loaded
+idle
+chat /tk top -240 240
+chat /tp -240 67 240
+wait 1
+chat /tk fill ~-8 ~-2 ~-8 ~8 ~-1 ~8 base:stone
+chat /tk fill ~-8 ~ ~-8 ~8 ~5 ~8 core:air
+wait 1
+# A row 3 ahead, left to right: malachite ore, a copper lump, the bellows, a furnace, the three moulds.
+chat /tk set ~-3 ~ ~-3 base:malachite_ore
+chat /tk set ~-2 ~ ~-3 base:loose_copper
+chat /tk set ~-1 ~ ~-3 base:bellows
+chat /tk set ~ ~ ~-3 base:furnace
+chat /tk set ~1 ~ ~-3 base:mould_pick_head
+chat /tk set ~2 ~ ~-3 base:mould_felling_axe_head
+chat /tk set ~3 ~ ~-3 base:mould_shovel_blade
+chat /tk set ~-3 ~1 ~-3 base:malachite_ore
+# Batch 2-4 in a second row 5 ahead: a shed antler, a chest, two scarecrows (the left one lit later).
+chat /tk set ~-2 ~ ~-5 base:shed_antler
+chat /tk set ~ ~ ~-5 base:chest
+chat /tk set ~2 ~ ~-5 base:scarecrow
+chat /tk set ~4 ~ ~-5 base:scarecrow
+wait 2
+look 0 -25
+wait 1
+shot ac_blocks.png
+chat /tp ~1 ~ ~-1
+look 0 -50
+wait 1.5
+shot ac_close.png
+chat /tp ~-1 ~ ~1
+# The items.
+chat /tk give base:native_copper 3
+chat /tk give base:malachite 5
+chat /tk give base:unfired_mould_pick_head
+chat /tk give base:unfired_mould_felling_axe_head
+chat /tk give base:unfired_mould_shovel_blade
+chat /tk give base:copper_ingot 3
+chat /tk give base:antler 2
+chat /tk give base:bone_needle
+chat /tk give base:chest
+chat /tk give base:scarecrow
+wait 0.5
+press core:inventory
+until screen core:menu within 10
+wait 1
+shot ac_inv.png
+key Escape
+until screen none within 10
+# The hammering screen: a lump put down, struck sneaking with a rock.
+chat /tk mode survival
+until mode survival within 10
+wait 1
+chat /tk set ~ ~ ~-1 base:loose_copper
+chat /tk give base:rock
+chat /tk hand me base:rock
+wait 0.5
+hold core:sneak 2 nowait
+wait 0.6
+aim_block 0 -1 -1 1 1.45
+hold core:use 0.3
+until screen base:knapping within 5
+wait 1
+tap_once base:knapping text:Pick Head
+wait 0.5
+shot ac_hammer_lump.png
+cursor base:knapping class:knap_copper_head
+wait 0.5
+shot ac_hammer.png
+tap base:knapping class:knap_copper
+wait 0.5
+tap base:knapping class:knap_copper
+until screen none within 5
+chat /tk inv me
+until chat base:part_pick_head within 5
+chat /tk hand me base:part_pick_head
+wait 1
+shot ac_head.png
+# The chest: opened, the lid swung up (the menu holds it open), then shut again.
+chat /tk mode creative
+until mode creative within 10
+look 0 -30
+wait 1
+aim_block 0 0 -5 0.85 1.62
+hold core:use 0.2
+until screen base:chest within 5
+wait 1
+shot ac_chest_open.png
+key Escape
+until screen none within 10
+wait 1
+shot ac_chest_shut.png
+# The scarecrow: lit with a torch, then seen at night beside the unlit one.
+chat /tk give base:torch
+chat /tk hand me base:torch
+aim_block 2 0 -5 1.2 1.62
+hold core:use 0.2
+wait 1
+chat /time set 18000
+wait 1
+chat /tick freeze
+wait 2
+aim_block 3 0 -5 1 1.62
+shot ac_scarecrow_night.png
+chat /tick unfreeze
+chat /time set 6000
+wait 2
+shot ac_scarecrow_day.png
+leave

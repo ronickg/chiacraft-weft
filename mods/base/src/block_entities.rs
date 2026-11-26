@@ -88,12 +88,14 @@ pub fn register(r: &mut Registry) {
     r.block(&CHEST)
         .sound_group("wood")
         .facing(Facings::HORIZONTAL, Toward::Player)
+        // Body and a lid that opens while the chest's menu is open (art stand-ins 11-26,
+        // notes/art/standins/chest_split.py; upstream be14c5a8d's wiring).
         .states(|_, s| {
-            s.texture("chest_side")
-                .ends("chest_top")
-                .front("chest_front")
-                .model_box([1.0, 0.0, 1.0], [15.0, 14.0, 15.0])
+            s.model_file("chest_body")
+                .hitbox([1.0, 0.0, 1.0], [15.0, 14.0, 15.0])
         })
+        .animated_part("block/chest_lid", "open")
+        .animate_with_menu()
         .hardness(2.5)
         .mined_by("axe", tool_tier::HAND)
         .tab(&crate::tabs::FUNCTIONAL)
