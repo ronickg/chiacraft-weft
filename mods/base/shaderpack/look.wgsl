@@ -55,7 +55,11 @@ fn rain_on_ground(c_in: vec3<f32>, n: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>,
             let v = -normalize(rel);
             let rough = (1.0 - w) * (1.0 - w);
             let r = reflect(-v, n);
-            let seen = mix(sky_color(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(rough * 2.0, 0.0, 1.0));
+            // Bliss mirrors its sky-with-clouds map, whose sky under the horizon is turned grey at half
+            // its mean (deferred.fsh: mix(mean x 0.5, sky, (y + 1)^5)); a side face seen from above
+            // mirrors a look down. Ours mirrored the bright horizon itself there: pale, flat slabs on
+            // the wet hillside's step faces (lksp_rainconfw, Planner 11-26).
+            let seen = mix(bliss_map_sky(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(rough * 2.0, 0.0, 1.0));
             let f = 0.02 + 0.98 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
             // As `mat_shine`: a rough face mirrors little (leaves and plants as the rest, as Bliss).
             let gloss = 1.0 - clamp(rough * 1.6, 0.0, 0.85);
@@ -120,6 +124,13 @@ fn rain_on_ground(c_in: vec3<f32>, n: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>,
 // Bliss's rain smoothness at a face with sky light `sky` (0..1) at `pos`: the rain's strength where
 // it rains (not on snow, `rain_fog_at`, as its noPuddleAreas), only out under the open sky
 // (clamp((sky - 0.9) x 10), its lightmap gate).
+// The sky as Bliss's sky map holds it for its reflections: under the horizon turned toward grey at
+// half its mean (deferred.fsh, method only).
+fn bliss_map_sky(dir: vec3<f32>) -> vec3<f32> {
+    let c = sky_color(dir);
+    let k = pow(clamp(dir.y + 1.0, 0.0, 1.0), 5.0);
+    return mix(vec3(dot(c, vec3(0.333)) * 0.5), c, k);
+}
 fn rain_smooth(sky: f32, pos: vec3<f32>) -> f32 {
     return rain_amount() * rain_fog_at(pos.y) * clamp((sky - 0.9) * 10.0, 0.0, 1.0);
 }
