@@ -45,7 +45,7 @@
 //! respawn             # back from the death screen (the server ignores it while alive)
 //! aim 8               # face the nearest living creature within 8 blocks (its middle), if any
 //! aim_block 0 0 -1 0.05 # look at the block 1 north of the player's, its middle, 0.05 up it (a thin thing on the ground)
-//! aim_block 0 0 -1 0.1 1.27 # the same from a crouching eye (after `hold core:sneak .. nowait`)
+//! aim_block 0 -1 -1 1 1.45 # the top of the ground under the block north, from between a standing and a crouched eye
 //! live cmd.txt 20     # runs each line later appended to cmd.txt as a step (results in cmd.txt.out),
 //!                     # until a `quit` line, a `stop` file beside it or 20 minutes with no new line
 //! reload_pack dir     # copies dir's .wgsl and pack.cfg into the shader pack in use (only a variant,
@@ -918,6 +918,7 @@ fn aim_block(t: &T, d: [f32; 3], h: f32, eye_height: f32) {
     let v = at - eye;
     let yaw = (-v.x).atan2(-v.z).to_degrees();
     let pitch = v.y.atan2((v.x * v.x + v.z * v.z).sqrt()).to_degrees();
+    weft_sdk::info!("script: aim_block at {:.2} {:.2} {:.2} from {:.2} {:.2} {:.2}: yaw {yaw:.1} pitch {pitch:.1}", at.x, at.y, at.z, eye.x, eye.y, eye.z);
     t.c().set_look(yaw as f32, pitch as f32);
 }
 

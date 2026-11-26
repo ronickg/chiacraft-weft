@@ -38,7 +38,7 @@ chat /tk inv me
 until chat base:rock within 5
 # 2. Flakes: the rock struck on a flint nodule, three times.
 chat /tk set ~ ~ ~-1 base:loose_flint
-aim_block 0 0 -1 0.15
+aim_block 0 -1 -1 1
 chat /tk hand me base:rock
 wait 0.5
 hold core:use 0.3
@@ -57,8 +57,8 @@ chat /tk set ~ ~ ~-1 base:loose_flint
 chat /tk hand me base:rock
 wait 0.5
 hold core:sneak 2 nowait
-wait 0.3
-aim_block 0 0 -1 0.15 1.27
+wait 0.6
+aim_block 0 -1 -1 1 1.45
 hold core:use 0.3
 until screen base:knapping within 5
 wait 1

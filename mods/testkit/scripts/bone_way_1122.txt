@@ -83,7 +83,8 @@ aim_block 0 0 -1 0.05
 chat /tk hand me base:bone
 wait 0.5
 hold core:sneak 2 nowait
-wait 0.3
+wait 0.6
+aim_block 0 -1 -1 1 1.45
 hold core:use 0.3
 until screen base:knapping within 5
 wait 1
