@@ -1050,8 +1050,11 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         // cache). Only surfaces the eye saw had cells: 58 % of the nave's bounce hits (the
         // columns' backs, the walls above and behind) found none and fell back to their lightmap,
         // so the light past one bounce, the lamps' with it, hardly reached the room (s3j: the
-        // picture with the cache unread came out as bright as with it).
-        if b.hit && (pt.flags & 4u) != 0u {
+        // picture with the cache unread came out as bright as with it). One pixel in 16 a frame:
+        // at one in four it cost the hall 2.8 ms of pt_trace and the torch cave 0.8 (s3l), where it
+        // took the cave from 14.5 % near black to 3 %; the cells keep a long history, so fewer
+        // samples suffice (SHaRC's update pass traces a few percent of the pixels).
+        if b.hit && (pt.flags & 4u) != 0u && ((id.x + id.y * 3u + u32(scene.rt.y)) & 15u) == 0u {
             let bn = b.n;
             let blift = bn * 0.02;
             let u2 = pt_noise(px + vec2(19.0, 29.0));

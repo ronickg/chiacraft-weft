@@ -672,7 +672,7 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         // with many lamps for the same rays. Live.
         number("core:pt_restir", ck::BOOL, 1.0, 0.0, 1.0, 1.0),
         // chiacraft: the surface each bounce meets fills its own cell of the radiance cache from one
-        // more ray (one pixel in four a frame), so the light past one bounce (the sun's off the
+        // more ray (one pixel in 16 a frame), so the light past one bounce (the sun's off the
         // floor, a fire's off the walls) reaches surfaces the eye doesn't see. Live.
         number("core:pt_cache_fill", ck::BOOL, 1.0, 0.0, 1.0, 1.0),
         // How the path tracer's light is denoised (`denoise::Denoiser`) where Ray Reconstruction
