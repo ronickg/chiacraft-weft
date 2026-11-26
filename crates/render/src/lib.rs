@@ -733,15 +733,16 @@ pub trait Backend: Send {
     /// shader pack's world shader took 40 s and more on Metal (MoltenVK) one pipeline at a time.
     /// Without a cache of its own a backend does nothing.
     fn warm_pipelines(&mut self, _descs: &[PipelineDesc]) {}
-    /// `warm_pipelines` on other threads: returns at once, and `warming` says when it is done (a
+    /// `warm_pipelines` on other threads: returns at once with a ticket for `warming` (a
     /// `create_pipeline` of one meanwhile compiles it alone, as without warming). Where the
     /// backend can't, the same as `warm_pipelines`.
-    fn warm_pipelines_behind(&mut self, descs: &[PipelineDesc]) {
+    fn warm_pipelines_behind(&mut self, descs: &[PipelineDesc]) -> u64 {
         self.warm_pipelines(descs);
+        0
     }
-    /// Whether what `warm_pipelines_behind` started is still compiling; call it now and then
-    /// (each frame) so a finished batch is kept.
-    fn warming(&mut self) -> bool {
+    /// Whether the batch `warm_pipelines_behind` gave `ticket` for is still compiling; call it
+    /// now and then (each frame), which also keeps every finished batch.
+    fn warming(&mut self, _ticket: u64) -> bool {
         false
     }
     /// Compiles `desc` on another thread into the kept shaders (`BackendDesc::cache`), so that

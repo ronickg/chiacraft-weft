@@ -140,7 +140,8 @@ pub struct VulkanBackend {
     /// cache was last written.
     compile_threads: Vec<std::thread::JoinHandle<()>>,
     /// `warm_pipelines_behind`'s batches, merged into the kept cache by `warming` once done.
-    warm_behind: Vec<std::thread::JoinHandle<WarmDone>>,
+    warm_behind: Vec<(u64, std::thread::JoinHandle<WarmDone>)>,
+    warm_next: u64,
     /// Set on drop: the batches start no further pipeline.
     warm_stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
     compiling: std::sync::Arc<std::sync::atomic::AtomicUsize>,
@@ -822,6 +823,7 @@ impl VulkanBackend {
                 cache_dirty: false,
                 compile_threads: Vec::new(),
                 warm_behind: Vec::new(),
+                warm_next: 0,
                 warm_stop: Default::default(),
                 compiling: Default::default(),
                 compiled: Default::default(),
@@ -2638,28 +2640,31 @@ impl Backend for VulkanBackend {
         self.finish_warm(done);
     }
 
-    fn warm_pipelines_behind(&mut self, descs: &[PipelineDesc]) {
+    fn warm_pipelines_behind(&mut self, descs: &[PipelineDesc]) -> u64 {
         let started = std::time::Instant::now();
         let prepared = self.prepare_warm(descs);
+        self.warm_next += 1;
+        let ticket = self.warm_next;
         if prepared.is_empty() {
-            return;
+            return ticket;
         }
         // Half the threads: the frame and the chunk meshers keep going meanwhile.
         let threads = warm_threads(prepared.len()).div_ceil(2);
         let (device, stop) = (self.device.clone(), self.warm_stop.clone());
         // Never the kept cache: the threads have caches of their own (else they share none, and
         // a pipeline made meanwhile compiles alone as before), merged into it by `warming`.
-        self.warm_behind
-            .push(std::thread::spawn(move || warm_batch(&device, vk::PipelineCache::null(), prepared, threads, started, Some(&stop))));
+        let t = std::thread::spawn(move || warm_batch(&device, vk::PipelineCache::null(), prepared, threads, started, Some(&stop)));
+        self.warm_behind.push((ticket, t));
+        ticket
     }
 
-    fn warming(&mut self) -> bool {
+    fn warming(&mut self, ticket: u64) -> bool {
         let mut i = 0;
         while i < self.warm_behind.len() {
             // Merged only with no `precompile` thread in the kept cache: its merge is not
             // internally synchronized.
-            if self.warm_behind[i].is_finished() && !self.compiling() {
-                let t = self.warm_behind.swap_remove(i);
+            if self.warm_behind[i].1.is_finished() && !self.compiling() {
+                let (_, t) = self.warm_behind.swap_remove(i);
                 if let Ok(done) = t.join() {
                     self.finish_warm(done);
                 }
@@ -2667,7 +2672,7 @@ impl Backend for VulkanBackend {
                 i += 1;
             }
         }
-        !self.warm_behind.is_empty()
+        self.warm_behind.iter().any(|w| w.0 == ticket)
     }
 
     fn precompile(&mut self, desc: &ComputeDesc) {
@@ -3279,7 +3284,7 @@ impl Drop for VulkanBackend {
         // compiled is kept for the next start.
         self.warm_stop
             .store(true, std::sync::atomic::Ordering::Relaxed);
-        for t in std::mem::take(&mut self.warm_behind) {
+        for (_, t) in std::mem::take(&mut self.warm_behind) {
             if let Ok(done) = t.join() {
                 self.finish_warm(done);
             }

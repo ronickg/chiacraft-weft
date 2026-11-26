@@ -368,6 +368,18 @@ struct ColorPipes {
     fade: Option<[PipelineId; 6]>,
 }
 
+/// A world shader composed and compiling behind (`WorldRenderer::reload_shaders_behind`): what
+/// `finish_reload_now` makes its pipelines from.
+struct PendingReload {
+    shader: Shader,
+    slots: crate::shaders::Slots,
+    calm: [Option<Shader>; 2],
+    rt: bool,
+    ground: bool,
+    ticket: u64,
+    started: std::time::Instant,
+}
+
 pub struct WorldRenderer {
     /// Moving structures as drawn last frame, for their motion (the offsets' second part).
     structures_before: StructuresBefore,
@@ -422,6 +434,10 @@ pub struct WorldRenderer {
     /// The calm shaders whose pipelines are compiling behind (`warm_calm`), and since when.
     calm_pending: [Option<Shader>; 2],
     calm_since: std::time::Instant,
+    calm_ticket: u64,
+    /// A world shader compiling behind for a switched setting (`reload_shaders_behind`), the
+    /// pipelines in use drawing until `finish_reload` puts its in.
+    reload_pending: Option<PendingReload>,
     /// How far from the camera (blocks, across) the cubes end while distant terrain is shown; 0:
     /// no fade. Cubes past it aren't drawn.
     pub lod_fade: u32,
@@ -758,6 +774,8 @@ impl WorldRenderer {
             },
             calm_pending: [None, None],
             calm_since: std::time::Instant::now(),
+            calm_ticket: 0,
+            reload_pending: None,
             calm_level: 0,
             lod_drawn: 0,
         };
@@ -804,7 +822,7 @@ impl WorldRenderer {
     /// `sets`: the shaders whose colour pipelines to compile; `shadows`: the one whose shadow and
     /// depth-only pipelines to compile too. `behind`: on other threads, `finish_calm` taking them
     /// once done (`Backend::warm_pipelines_behind`).
-    fn warm(gpu: &mut dyn Backend, sets: &[&Shader], shadows: Option<&Shader>, behind: bool) {
+    fn warm(gpu: &mut dyn Backend, sets: &[&Shader], shadows: Option<&Shader>, behind: bool) -> u64 {
         let depth_write = Some(DepthState { write: true, compare: Compare::GreaterEqual });
         let depth_read = Some(DepthState { write: crate::packs::translucent_depth(), compare: Compare::GreaterEqual });
         let layer_depth = Some(DepthState { write: false, compare: Compare::GreaterEqual });
@@ -860,9 +878,10 @@ impl WorldRenderer {
             }
         }
         if behind {
-            gpu.warm_pipelines_behind(&descs);
+            gpu.warm_pipelines_behind(&descs)
         } else {
             gpu.warm_pipelines(&descs);
+            0
         }
     }
 
@@ -870,7 +889,7 @@ impl WorldRenderer {
     /// once the backend is done; until then the plain ones serve every calm level (`set_calm`).
     /// Call each frame, before `set_calm`.
     pub fn finish_calm(&mut self, gpu: &mut dyn Backend) {
-        if self.calm_pending.iter().all(Option::is_none) || gpu.warming() {
+        if self.calm_pending.iter().all(Option::is_none) || gpu.warming(self.calm_ticket) {
             return;
         }
         let calm = std::mem::take(&mut self.calm_pending);
@@ -887,7 +906,7 @@ impl WorldRenderer {
     fn warm_calm(&mut self, gpu: &mut dyn Backend, calm: [Option<Shader>; 2]) {
         let sets: Vec<&Shader> = calm.iter().flatten().collect();
         if !sets.is_empty() {
-            Self::warm(gpu, &sets, None, true);
+            self.calm_ticket = Self::warm(gpu, &sets, None, true);
         }
         self.calm_pending = calm;
         self.calm_since = std::time::Instant::now();
@@ -1407,24 +1426,82 @@ impl WorldRenderer {
 
     /// Recompiles the world shader; keeps the old pipelines when the new source has errors.
     pub fn reload_shaders(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, assets: &crate::assets::Assets) {
-        self.occlusion.reload(gpu, assets);
+        self.reload_with(gpu, textures, assets, false);
+    }
+
+    /// `reload_shaders` for a setting switched in a world (`core:rt_shadows`, `core:path_traced`,
+    /// `core:ground_map`): the new pipelines compile behind (`Backend::warm_pipelines_behind`)
+    /// while the ones in use draw on, and `finish_reload` puts them in once compiled. A cold
+    /// world shader took minutes on the 3060 laptop (path tracing's: 376 s), the game standing
+    /// still. Scripted runs (`config::automated`) wait for it as before, so a shot after the
+    /// switch shows it, unless `WEFT_COMPILE_BEHIND` is set.
+    pub fn reload_shaders_behind(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, assets: &crate::assets::Assets) {
+        let behind = !crate::config::automated() || std::env::var_os("WEFT_COMPILE_BEHIND").is_some();
+        self.reload_with(gpu, textures, assets, behind);
+    }
+
+    fn reload_with(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, assets: &crate::assets::Assets, behind: bool) {
         // Traced only with the scene there to bind (`set_rt` makes it first).
         self.rt_pack = crate::packs::pack_uses("world.wgsl", "rt_sun");
         let rt = self.rt_wanted && self.rt.is_some() && self.rt_pack;
+        let ground = crate::settings::ground_map();
+        // Already compiling for the same: `rt_switch` asks each frame until it is in.
+        if behind
+            && self
+                .reload_pending
+                .as_ref()
+                .is_some_and(|p| (p.rt, p.ground) == (rt, ground))
+        {
+            return;
+        }
+        self.occlusion.reload(gpu, assets);
         crate::gpu_layout::set_rt_prelude(rt);
         self.rt_reload = false;
-        self.ground_compiled = crate::settings::ground_map();
-        crate::gpu_layout::set_ground_prelude(self.ground_compiled);
+        self.ground_compiled = ground;
+        crate::gpu_layout::set_ground_prelude(ground);
         let started = std::time::Instant::now();
-        let mut calm = [None, None];
-        match world_shader(assets)
-            .map_err(|e| e.0)
-            .and_then(|(s, slots)| {
-                calm = Self::calm_shaders(assets);
-                Self::warm(gpu, &[&s], Some(&s), false);
-                Ok((Self::pipelines(gpu, &s)?, slots))
-            }) {
-            Ok(((f, q, l), slots)) => {
+        let (shader, slots) = match world_shader(assets) {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("world shader: {}", e.0);
+                return;
+            }
+        };
+        let calm = Self::calm_shaders(assets);
+        let ticket = Self::warm(gpu, &[&shader], Some(&shader), behind);
+        let p = PendingReload { shader, slots, calm, rt, ground, ticket, started };
+        if behind {
+            log::info!("world shader compiling behind (traced {rt}, ground map {ground}), the one in use drawing meanwhile");
+            self.reload_pending = Some(p);
+        } else {
+            self.reload_pending = None;
+            self.finish_reload_now(gpu, textures, assets, p);
+        }
+    }
+
+    /// The world shader `reload_shaders_behind` compiled put in use once its pipelines are
+    /// compiled; dropped when what it was for was switched back meanwhile. Call each frame.
+    pub fn finish_reload(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, assets: &crate::assets::Assets) {
+        let Some(p) = &self.reload_pending else { return };
+        if gpu.warming(p.ticket) {
+            return;
+        }
+        let p = self.reload_pending.take().unwrap();
+        let rt = self.rt_wanted && self.rt.is_some() && self.rt_pack;
+        if (rt, crate::settings::ground_map()) != (p.rt, p.ground) {
+            log::info!("world shader compiled behind dropped: switched back meanwhile");
+            return;
+        }
+        // As composed: making the pipelines composes the world shader again (`world_shader`).
+        crate::gpu_layout::set_rt_prelude(p.rt);
+        crate::gpu_layout::set_ground_prelude(p.ground);
+        self.finish_reload_now(gpu, textures, assets, p);
+    }
+
+    fn finish_reload_now(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, assets: &crate::assets::Assets, p: PendingReload) {
+        let PendingReload { shader, slots, mut calm, rt, started, .. } = p;
+        match Self::pipelines(gpu, &shader) {
+            Ok((f, q, l)) => {
                 self.drop_calm(gpu);
                 for p in self
                     .face_pipes
