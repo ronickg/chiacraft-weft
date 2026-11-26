@@ -270,7 +270,12 @@ fn nearest(w: &World, s: &Species, center: [i32; 3], r: i32, p: [i32; 3], ground
 
 /// Whether a wild animal goes for the ripe crop at `at` today (`needs::raids`: its day's roll, and no torch near).
 fn raids(w: &World, at: [i32; 3]) -> bool {
-    let (light, roll) = (w.block_light(at), raid_roll(w, at));
+    // The brighter of the crop's own cell and the air above it: a plant's cell may hold less light than the air round
+    // it (cov_crops r1: deer ate 5 plants of a torch-lit field).
+    let light = w
+        .block_light(at)
+        .max(w.block_light([at[0], at[1] + 1, at[2]]));
+    let roll = raid_roll(w, at);
     let yes = animals_core::needs::raids(light, roll);
     weft_sdk::debug!("crop at {at:?}: block light {light}, roll {roll:.2}: {}", if yes { "raided" } else { "left" });
     yes

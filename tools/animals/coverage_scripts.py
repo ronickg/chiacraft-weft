@@ -783,3 +783,30 @@ s += pad(200, pond=2) + [
 ]
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("crops", s)
+
+
+# Antlers from a skinned buck in season (`animals_core::carcass::antlers`, First hours' base:antler).
+def skin_one(x, kind="white_tailed_deer"):
+    return [
+        f"chat /tk spawn animals:{kind} {x} 70 {Z}", "wait 0.2", f"chat /tp {x} 70 {Z+3}", "wait 0.2",
+        "chat /animalprof kill", "wait 2", f"chat /tp {x} 70 {Z+2}", "look 0 -40", "wait 1", "aim 4", "wait 1",
+        "press core:use", "wait 12",
+    ]
+
+
+s = head("antlers", [
+    "Antlers from skinned deer. Part 1 (x 0, autumn 5): 6 white-tailed deer killed and skinned one by one, 4 blocks",
+    "apart: each \"skinned carcass N of white_tailed_deer (male|female): ...\" line has \"2 base:antler\" for a male",
+    "and none for a female; then 2 reindeer the same (both sexes have them in autumn). Part 2 (x 200, spring 5): 6 more",
+    "white-tailed deer: no antlers, male or female. `/tk inv me` after each part: base:antler counts 2 per autumn male",
+    "and reindeer, none added in spring.",
+]) + pad(0) + ["chat /season autumn 5", "chat /tk mode survival", "chat /tk put me 0 base:knife 1", "key 1"]
+for i in range(6):
+    s += skin_one(-10 + i * 4)
+for i in range(2):
+    s += skin_one(-14 + i * 28, "reindeer")
+s += ["chat /tk inv me"] + pad(200) + ["chat /season spring 5", "chat /tk mode survival", "key 1"]
+for i in range(6):
+    s += skin_one(190 + i * 4)
+s += ["chat /tk inv me"]
+write("antlers", s)
