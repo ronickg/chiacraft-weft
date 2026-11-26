@@ -130,7 +130,11 @@ pub(super) fn decorate(g: &mut Gen) {
                 g.set(x, y - 1, z, COARSE_DIRT.id());
                 continue;
             }
-            let rise = near.iter().map(|(_, _, c)| c.height - col.height).max().unwrap_or(0);
+            let rise = near
+                .iter()
+                .map(|(_, _, c)| c.height - col.height)
+                .max()
+                .unwrap_or(0);
             if rise >= wild::SCREE_RISE && PLANT_SOIL.on_block(below) && sh < wild::SCREE && !FROZEN.on_biome(b) {
                 let mossy = WET.on_biome(b) || WOODS.on_biome(b);
                 g.set(x, y, z, if mossy && sh < wild::SCREE / 2.0 { MOSSY_COBBLESTONE.id() } else { COBBLESTONE.id() });
