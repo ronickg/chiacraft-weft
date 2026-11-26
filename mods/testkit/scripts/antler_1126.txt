@@ -7,13 +7,13 @@
 # in deer land, more round the spawn; none on the desert's own sand.
 # Part 2, by real actions in survival on a pad in the desert: a flint axe head knapped with no
 # antler in the bag; a shed antler picked up off the ground (base:antler in the bag, the antler
-# hint shows after the felling hint, which queues first); a second flint axe head knapped with it
+# hint shows; the bare-hands hint no longer does, a rock being in the bag); a second flint axe head knapped with it
 # in the bag.
 # Read: the /tk census replies, every /tk inv me reply, run.log lines "knapping: flint
 # felling_axe_head work N (flaker F), grade G": the first with flaker 0, the second with flaker 6
 # and its work 6 more (grades roll with luck, so the work points are the check), "died" (none),
 # and the shots (ua_spawn, ua_taiga: antlers on the ground if any are in view; ua_hint: the antler
-# hint; ua_antler2, ua_antler3: an antler and a bone on the pad, two
+# hint and the antler's icon in the hotbar, not a bone's; ua_antler2, ua_antler3: an antler and a bone on the pad, two
 # blocks out, from two pitches).
 # Yaw 0 faces -z; a negative pitch looks down.
 loaded
@@ -74,8 +74,9 @@ hold core:attack 0.5
 wait 1.5
 chat /tk inv me
 until chat base:antler within 5
-wait 8
+wait 2.5
 shot ua_hint.png
+shot ua_hotbar.png
 # 3. A second flint axe head, the antler in the bag.
 chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
 chat /tk set ~ ~ ~-1 base:loose_flint
