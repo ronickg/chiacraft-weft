@@ -250,8 +250,11 @@ pub fn knapped_head(w: &World, player: u64, shape: &str, material: &str, by_hand
         s.xp[craft] = s.xp[craft].saturating_add(skills::xp_for(grade));
     }
     let made_day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
-    ItemStack::new(Item::generated(format!("part_{shape}")).id(), 1)
-        .with(&PART, PartOf { material: code(material), grade: grade as u32, worn: 0, made_day, repairs: 0 })
+    let head = ItemStack::new(Item::generated(format!("part_{shape}")).id(), 1)
+        .with(&PART, PartOf { material: code(material), grade: grade as u32, worn: 0, made_day, repairs: 0 });
+    // Drawn in its material, as a crafted part is (without it a copper head showed the item's
+    // default picture, an iron one: Tester, 11-26).
+    crate::parts::drawn_part(head, material)
 }
 
 /// Whether `player` carries an antler (`first::ANTLER`), the pressure flaker.
@@ -268,8 +271,11 @@ pub fn cast_head(w: &World, shape: &str, material: &str) -> ItemStack {
         grades::Points { material: f::COPPER_HEAD_MATERIAL_POINTS, work: vitals::smelt::CAST_WORK, station: vitals::smelt::CAST_STATION };
     let grade = grades::roll(points, unit(w));
     let made_day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
-    ItemStack::new(Item::generated(format!("part_{shape}")).id(), 1)
-        .with(&PART, PartOf { material: code(material), grade: grade as u32, worn: 0, made_day, repairs: 0 })
+    let head = ItemStack::new(Item::generated(format!("part_{shape}")).id(), 1)
+        .with(&PART, PartOf { material: code(material), grade: grade as u32, worn: 0, made_day, repairs: 0 });
+    // Drawn in its material, as a crafted part is (without it a copper head showed the item's
+    // default picture, an iron one: Tester, 11-26).
+    crate::parts::drawn_part(head, material)
 }
 
 /// The screen (kit 2, UI redo): the heads to pick as categories, the nodule in a well, a line on how.
