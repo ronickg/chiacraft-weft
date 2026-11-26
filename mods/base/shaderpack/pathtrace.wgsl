@@ -409,18 +409,16 @@ fn pt_nee_falloff(d2: f32, r2: f32, at: f32) -> f32 {
     return min((at * at + r2) / (d2 + r2), PT_NEE_HOT);
 }
 
-// How much of a light of level `e` reaches a surface `to` off its middle: whole out to its 5-block
-// match with the lightmap, then ((1 - x^2) / (1 - x_match^2))^2 by x, the surface's straight
-// distance from the block over `e`, to 0 at `e` blocks with no step. Round, as a real light's: by
-// the lightmap's axis-wise distance its reach was a diamond, and the inverse square, far brighter
-// there than the lightmap's steep level curve, ended at it in hard diagonal lines over walls and
-// floor (s2q to s2u lava_glow, the ceiling glowstone's). The lists hold every light within `e`
-// blocks of a cube the same way (`rt.rs` `light_words`).
+// How much of a light of level `e` reaches a surface `to` off its middle: (1 - x^2)^2 by x, the
+// surface's straight distance from the block over `e`, one smooth window over the whole reach to 0
+// at `e` blocks (0.79 at the 5-block match of a level-15 light). Round, as a real light's: by the
+// lightmap's axis-wise distance its reach was a diamond that the inverse square ended in hard
+// diagonal lines (s2q to s2u lava_glow); whole out to the match and windowed only past it, the
+// plateau met the inverse square in a hard rim round each glowstone (s2v). The lists hold every
+// light within `e` blocks of a cube the same way (`rt.rs` `light_words`).
 fn pt_nee_fade(e: f32, to: vec3<f32>) -> f32 {
-    let reach = max(e, 1.0);
-    let x = length(max(abs(to) - 0.5, vec3(0.0))) / reach;
-    let xa = clamp(e - 1.0, 1.0, PT_NEE_AT) / reach;
-    let w = clamp((1.0 - x * x) / max(1.0 - xa * xa, 1e-3), 0.0, 1.0);
+    let x = min(length(max(abs(to) - 0.5, vec3(0.0))) / max(e, 1.0), 1.0);
+    let w = 1.0 - x * x;
     return w * w;
 }
 
@@ -437,6 +435,17 @@ fn pt_nee_fade(e: f32, to: vec3<f32>) -> f32 {
 // about 70 times its own light, and the ceiling glowstone's reach over the lava pit's floor
 // averaged pale with a hard edge (s2q to s2t lava_glow).
 const PT_NEE_SUM: f32 = 1.0;
+// How far above the lightmap's own block light at a surface the lamps' light may come, all of
+// them, a lone lamp's included (its hue kept): within 1.5 absolute, a glowstone's near field still
+// blew out in white ellipses on the wall and floor beside it (s2v lava_glow), and one reservoir's
+// draw a red blob on the nave's floor (s2v nave12800, ReSTIR on). Shadows still take it down freely.
+const PT_NEE_NEAR: f32 = 1.25;
+
+// `c` within `k` times the luminance of `block`, its hue kept.
+fn pt_nee_near_cap(c: vec3<f32>, block: vec3<f32>, k: f32) -> vec3<f32> {
+    let w = vec3(0.2126, 0.7152, 0.0722);
+    return c * min(1.0, k * dot(block, w) / max(dot(c, w), 1e-6));
+}
 
 // A lamp's colour where it matches the lightmap (`at_d` blocks off), in the world's light (the
 // look's curve and tint): its hue as the lightmap has it a block off, its brightness as there
@@ -984,7 +993,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             if max(b_block.r, max(b_block.g, b_block.b)) > 1e-4 {
                 let e = pt_block_direct(b.world, b.rel, b.n, b.n, b.n * 0.02, px + vec2(37.0, 53.0), 0xffffffffu, vec2(0), PT_NEE_SUM * dot(b_block, vec3(0.2126, 0.7152, 0.0722)));
                 if e.a > 0.5 {
-                    bounce += pt_albedo(b) * (e.rgb - b_block);
+                    bounce += pt_albedo(b) * (pt_nee_near_cap(e.rgb, b_block, PT_NEE_NEAR) - b_block);
                 }
             }
         }
@@ -1013,7 +1022,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             let e = pt_block_direct(h.world, h.rel, n, ng, lift, px, id.y * pt.size.x + id.x, vec2<i32>(id.xy), PT_NEE_SUM * dot(block, vec3(0.2126, 0.7152, 0.0722)));
             block_vis = vec2(select(0.0, 1.0, max(e.r, max(e.g, e.b)) > 0.0), e.a);
             if e.a > 0.5 {
-                direct = e.rgb;
+                direct = pt_nee_near_cap(e.rgb, block, PT_NEE_NEAR);
                 diffuse += direct - block;
             } else {
                 direct = block;
