@@ -437,9 +437,10 @@ def skin_part(x, prefix="cov_carcass"):
         side_shot(x, f"{prefix}_9_skinned") + low_shot(x, f"{prefix}_9_low") + [
         # The hide's tooltip (its quality's stars, `tagged.base.hide_quality`): the inventory open, the cursor on the
         # hotbar row's second and third slots (the knife in the first; the hide, then the venison, after it), at GUI
-        # scale 2 in 1280 x 720 (Tester 2's b1_02_inventory, 11-24). Not hidden with the HUD.
-        "press core:inventory", "wait 1", "cursor 0.311 0.746", "wait 1", f"shot {prefix}_10_tooltip_slot2.png",
-        "cursor 0.339 0.746", "wait 1", f"shot {prefix}_10_tooltip_slot3.png", "press core:inventory", "wait 1"]
+        # scale 2 in 1280 x 720 (skin r3: the creative inventory, its palette on the left, the player's hotbar row
+        # at the bottom right). Not hidden with the HUD.
+        "press core:inventory", "wait 1", "cursor 0.547 0.710", "wait 1", f"shot {prefix}_10_tooltip_slot2.png",
+        "cursor 0.576 0.710", "wait 1", f"shot {prefix}_10_tooltip_slot3.png", "press core:inventory", "wait 1"]
 
 
 s += skin_part(x)
