@@ -455,7 +455,8 @@ fn pt_takes(in: VOut) -> bool {
         let d = length(in.rel);
         PT_TAKES = 0;
         if d > 1e-3 && d <= PT_REACH_WORLD {
-            if !rt_seen_through(vec3(0.0), in.rel / d, d * 1.02 + 0.2, 3u) {
+            // From the near plane, as `cs_trace`'s own test (a face through the eye is clipped).
+            if !rt_seen_through(in.rel / d * 0.05, in.rel / d, d * 1.02 + 0.15, 3u) {
                 PT_TAKES = 1;
             }
         }

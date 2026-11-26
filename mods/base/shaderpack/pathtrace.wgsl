@@ -282,6 +282,8 @@ const PT_FLAME: f32 = 0.2;
 // a block's side away from the torch came out near black in a stone cave, w59; 70 % read faint,
 // Ronald chose 90 %, 11-25).
 const PT_BLOCK_SHADOW: f32 = 0.9;
+// The projection's near plane (`world_render`'s perspective, 0.05): the primary test starts there.
+const PT_NEAR: f32 = 0.05;
 
 // Where the lights reaching cube `c` are in `pt_lights` (start, count); count 0 when none do.
 fn pt_light_find(c: vec3<i32>) -> vec2<u32> {
@@ -399,10 +401,14 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // pixels traced), and the ray walks no further. The cubes' faces and quads alone: a distant
     // tile it met would be no pixel traced either (the G-buffer has none), and the hidden ones
     // under the cubes cost each ray their shader's asking. The world's `pt_takes` asks the same.
-    let h = rt_hit_mask(vec3(0.0), -v, dist * 1.02 + 0.2, 0.0, 3u);
+    // From the near plane (the projection's 0.05), as the world draws: a face through the eye
+    // itself is clipped there, and traced from the eye it stopped every ray crossing it. A slab made
+    // a full block by the showcase import's full shapes stood against the nave's camera, and half
+    // the screen kept the world's pixel (debug 16 blue, the parity5 nave's seam, 11-25).
+    let h = rt_hit_mask(-v * PT_NEAR, -v, dist * 1.02 + 0.2 - PT_NEAR, 0.0, 3u);
     // Terrain at the depth drawn there: anything else (water, glass, a model, a particle) keeps the
     // world's own pixel.
-    if !h.hit || h.clear || abs(h.t - dist) > 0.02 * dist + 0.15 {
+    if !h.hit || h.clear || abs(h.t + PT_NEAR - dist) > 0.02 * dist + 0.15 {
         // Debug 16: why the trace kept the world's pixel: red no hit, green a clear pane, blue
         // a hit nearer than the depth, yellow one farther (the nave's half-screen seam, 11-25).
         if pt.debug == 16u {
@@ -410,7 +416,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             if h.hit && h.clear {
                 why = vec3(0.0, 1.0, 0.0);
             } else if h.hit {
-                why = select(vec3(1.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), h.t < dist);
+                why = select(vec3(1.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), h.t + PT_NEAR < dist);
             }
             pt_out[at] = vec4(why, 0.0);
             pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
