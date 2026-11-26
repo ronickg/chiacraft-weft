@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave,hit)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave,hit,carcass)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -368,6 +368,11 @@ pub fn init(r: &mut Registry) {
                 let v = cmd.float("value").map_or(f32::NAN, |v| v as f32);
                 crate::senses::WIND_TEST.store(v.to_bits(), Relaxed);
                 format!("animals' wind toward {v}")
+            }
+            "carcass" => {
+                // Every carcass within 64 blocks: its look, kg eaten of what can be, days aged (`value` days more first).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                crate::carcass::report(&w, me.pos, cmd.float("value").unwrap_or(0.0) as f32)
             }
             "where" => {
                 // Every wild animal within `value` blocks (256 by default): where it is, what it is
