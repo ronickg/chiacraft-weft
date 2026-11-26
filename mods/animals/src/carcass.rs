@@ -205,8 +205,9 @@ pub fn init(r: &mut Registry) {
             // arm; r5's, behind the shoulder, had the head filling the near side). r9's, level with the skinner and
             // above, showed the back of a tipped head bigger than the body: now out in front on the right and lower,
             // the body nearer the camera than the skinner, who shows face and chest.
-            let pos = Vec3 { x: eye.x + right[0] * 2.4 + f[0] * 2.2, y: eye.y + 0.45, z: eye.z + right[1] * 2.4 + f[1] * 2.2 };
-            let at = Vec3 { x: eye.x + f[0] * 1.0, y: eye.y - 0.5, z: eye.z + f[1] * 1.0 };
+            // r1b's, from above, saw only the top of the bowed head: now at the eyes' height.
+            let pos = Vec3 { x: eye.x + right[0] * 2.4 + f[0] * 2.2, y: eye.y + 0.05, z: eye.z + right[1] * 2.4 + f[1] * 2.2 };
+            let at = Vec3 { x: eye.x + f[0] * 0.8, y: eye.y - 0.55, z: eye.z + f[1] * 0.8 };
             let (yaw, pitch) = camera::look_at(pos, at);
             a.out = abi::CameraPose { pos, yaw, pitch, ..abi::CameraPose::DEFAULT };
         }))
@@ -532,8 +533,15 @@ fn start_skinning(w: &World, id: u64, player: u64) -> bool {
     if let Some(k) = w.component_mut(id, &SKIN) {
         *k = [player, now, now + ticks, tier.map_or(0, |t| t as u64 + 1)];
     }
-    // Turned to the body, kneeling beside it; the camera eases in.
+    // Kneeling beside the body, on the side they came from, its hands at it, turned to it; the camera eases in.
     let (dx, dz) = (c.pos.x - p.pos.x, c.pos.z - p.pos.z);
+    let len = (dx * dx + dz * dz).sqrt().max(1e-3);
+    let plan = (b.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+        .map_or(core::Plan::Quadruped, |s| core::plan_of(s.model));
+    let from = (core::KNEEL_FROM * core::body_scale(b.mass, plan) as f64).max(core::KNEEL_MIN);
+    w.teleport(player, None, Vec3 { x: c.pos.x - dx / len * from, y: p.pos.y, z: c.pos.z - dz / len * from });
     let facing = ((-dx).atan2(-dz) as f32).to_degrees();
     w.set_pose(player, Some(&SKINNING), Some(facing));
     w.force_camera(player, &SKIN_CAMERA, Some((0.6, camera::easing::IN_OUT)));

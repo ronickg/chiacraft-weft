@@ -159,6 +159,11 @@ pub const KNIFE_SPEED: [f32; 4] = [1.0, 0.8, 0.65, 0.55];
 pub const FLAKE_SPEED: f32 = 1.4;
 /// Blocks from the carcass the skinner must stay within (it kneels beside it).
 pub const SKIN_REACH: f64 = 3.0;
+/// Blocks from a reference-sized body's centre the skinner kneels (times its `body_scale`, at least `KNEEL_MIN`): the
+/// hands of the `skin` clip reach about 0.55 blocks ahead, a lying deer is about 0.3 blocks to its middle (r1b's
+/// skinner knelt where they clicked, a body's width short of it).
+pub const KNEEL_FROM: f64 = 0.8;
+pub const KNEEL_MIN: f64 = 0.45;
 
 /// Seconds to skin `mass` kg with a knife of `tier` (`None`: a flake).
 pub fn skin_secs(mass: f32, tier: Option<u32>) -> f32 {

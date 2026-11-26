@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from humanoid import PARTS, boxes, draw, euler  # noqa: E402
 
 HIP = np.array([0, 12, 0.0])
-LEAN, HEAD, LEGS, SPREAD = 30, 10, 60, 5
+LEAN, HEAD, LEGS, SPREAD = 30, 0, 60, 5
 RIGHT = {"0": [-70, 10, -4], "0.4": [-55, -16, -2], "0.75": [-74, 12, -6], "1.1": [-55, -16, -2], "1.5": [-70, 10, -4]}
 LEFT = {"0": [-65, -12, 6], "0.75": [-68, -8, 8], "1.5": [-65, -12, 6]}
 
