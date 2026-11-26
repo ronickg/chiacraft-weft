@@ -722,9 +722,15 @@ Ronald (11-25): wild hunters spare a tamed dog near its owner; wild or untamed d
 
 | part | expected | run |
 |---|---|---|
-| 1: tamed dog beside its owner, hungry jaguar 12 off | no "hunts" of the dog | r1 (house cat): no hunt, the cat sat beside the dog 30 s; not telling (see part 2) |
-| 2: untamed dog, hungry jaguar | the jaguar hunts it | r1 (house cat): no hunt either: a house cat takes up to 0.4 x 4.5 kg = 1.8 kg, the dog is 2.5 kg; r2 with a jaguar |
+| 1: tamed dog beside its owner, hungry jaguar 12 off | no "hunts" of the dog | **r2 pass**: jaguar 12 prowled 17x, came within 6.7 blocks of the dog at 22 s, never "hunts" it; the dog 6/6, "doing hold" (r1, house cat: no hunt, not telling) |
+| 2: untamed dog, hungry jaguar | the jaguar hunts it | **r2 pass**: 115 s "jaguar 34 hunts 33 (2.9 kg, a pack of 1)", stalk, 128 s "breaks cover and charges (8.9 blocks)", pounce, 130 s eats 2.936 of 2.936 kg (r1, house cat: no hunt: it takes up to 0.4 x 4.5 kg) |
 
 Run 1 (323f7ea32, `cov_dogs_r1-215301`, 196 s, script pass): with a house cat neither dog was hunted, so part 1
 proved nothing. The cat cannot take a grown chihuahua (the r2 kill was a big cat's or a small dog's genes);
 round 2 uses a jaguar (prey 0.01 to 1.5 of its mass), which hunted at noon in the hunters runs.
+
+Run 2 (c22aba537 on the 323f7ea32 mods, `cov_dogs_r2-215742`, 196 s, script pass): the control hunted (stalk, charge,
+kill and meal in 14 s), the tamed dog beside its owner was never chosen. Not covered: a jaguar already charging when
+it reaches a tamed dog (the rule is in prey choice, so a hunt started on a dog away from its owner goes on).
+Known: "no clip for action pounce on animals:jaguar". `/animal tame` keeps the dog's own wild level (82 in r1, 39 in
+r2: `animal::roll`), 0 bonus levels at 0 %: as designed.
