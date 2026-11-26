@@ -314,6 +314,13 @@ fn fs_exposure(in: VOut) -> @location(0) vec4<f32> {
     var rod = exp(rod_sum / 64.0);
     if pass_.spare == 0u {
         let last = textureLoad(textures[pass_.low - 1u], vec2(0, 0), 0);
+        // `base:look_auto_exposure` 0 with Bliss's chain (1 as made): the eye held where it has
+        // adapted, for A/B shots whose light differs (path tracing's checks: its easing over
+        // seconds otherwise brought a darker picture back up and a brighter one down, s3o; held
+        // at the sunlit view's instead, a torch-lit cave came out black, s3p).
+        if bliss_chain() && fantasy_opt(OPT_AUTO_EXPOSURE) < 0.5 && last.r == last.r && abs(last.r) < 50.0 && last.g > 0.0 {
+            return last;
+        }
         let before = last.r;
         if before == before && abs(before) < 50.0 {
             let tau = select(2.5, 0.8, now > before);
@@ -536,12 +543,6 @@ fn chain_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         if t.b == t.b && t.b > 0.0 {
             VIEW_ROD = t.b;
         }
-    }
-    // `base:look_auto_exposure` 0 (1 as made): the exposure held at the average sunlit view's, for
-    // A/B shots whose light differs (path tracing's checks: the eye's easing over seconds otherwise
-    // brought a darker picture back up and a brighter one down, s3o).
-    if fantasy_opt(OPT_AUTO_EXPOSURE) < 0.5 {
-        mean = EXPOSURE_REF;
     }
     VIEW_MEAN = mean;
     LAND_PIXEL = 1.0;

@@ -94,10 +94,13 @@ const TABLE: &[(&str, f64, f64, f64)] = &[
     ("pt_emissive", 4.0, 0.1, f64::NAN),
     ("pt_bounce_lights", 1.0, 0.35, f64::NAN),
     ("pt_restir", 1.0, 0.2, f64::NAN),
-    // One more ray and the sun's shadow ray at its end, one pixel in 16 (11-26, stage 3): the
-    // laptop's s3l bench at one in four cost 0.8 ms (torch cave) to 2.8 ms (hall) of pt_trace; a
-    // quarter of that, in the table's PC units, until its own bench.
-    ("pt_cache_fill", 1.0, 0.3, f64::NAN),
+    // The radiance cache filled from the bounce's surface (11-26, stage 3): one more ray and the
+    // sun's shadow ray at its end, by whole 8 x 8 tiles. Measured on the 3060 laptop at 1080p (s3n,
+    // a2ccdca27, one run): pt_trace +0.27 ms (cave) and +0.48 (hall) at few, one tile in 16; +1.19
+    // and +1.87 at many, one in 4. In the table's PC units at stage 2's ratio (its 1.5-2 laptop
+    // ms stood as 0.65 here).
+    ("pt_cache_fill", 1.0, 0.18, f64::NAN),
+    ("pt_cache_fill", 2.0, 0.7, f64::NAN),
     // The mist's banks walked per pixel (11-24): an estimate until the PC's bench at Max, 16 steps
     // a pixel each with a noise, a ground-map read and the shadow maps' taps, where there is mist.
     ("mist_banks", 1.0, 0.4, f64::NAN),
