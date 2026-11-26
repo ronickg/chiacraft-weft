@@ -430,15 +430,24 @@ fn pt_nee_fade(e: f32, to: vec3<f32>) -> f32 {
 // the room's lightmap (s2o lava_glow); at twice, the floor round it still bleached pale in the
 // tone curve, its edge the lightmap's diamond steps (s2q). A lamp alone keeps its own light
 // (capped for all, it took a third of the alcove fire's off its pillar and wall, s2p fire18000).
-// Shadows still take the light down freely.
+// Shadows still take the light down freely. The cap scales the field's share of the draws
+// (`pt_block_direct`), not the light of a field lamp once drawn: capped only when a field lamp
+// was drawn, a lone lamp drawn among them carried the whole field's weight uncapped, a spike
+// about 70 times its own light, and the ceiling glowstone's reach over the lava pit's floor
+// averaged pale with a hard edge (s2q to s2t lava_glow).
 const PT_NEE_SUM: f32 = 1.0;
-// Whether the lamp just shaded (`pt_block_direct`) is one of a field.
-var<private> PT_NEE_FIELD: bool = false;
 
-fn pt_nee_sum_cap(c: vec3<f32>, block: vec3<f32>) -> vec3<f32> {
-    let w = vec3(0.2126, 0.7152, 0.0722);
-    let most = PT_NEE_SUM * dot(block, w);
-    return c * min(1.0, most / max(dot(c, w), 1e-6));
+// A lamp's colour where it matches the lightmap (`at_d` blocks off), in the world's light (the
+// look's curve and tint): its hue as the lightmap has it a block off, its brightness as there
+// (matched off the colour itself, a fire's green and blue run out first).
+fn pt_nee_one_off(l: u32, world: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let level = vec3(f32((l >> 18u) & 15u), f32((l >> 22u) & 15u), f32((l >> 26u) & 15u));
+    let at_d = clamp(max(level.r, max(level.g, level.b)) - 1.0, 1.0, PT_NEE_AT);
+    let up = vec3(0.0, 1.0, 0.0);
+    let dark = light_on(up, vec4(0.0), 0.0, 1.0, world, rel);
+    let near = max(light_on(up, vec4(0.0, max(level - 1.0, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - dark, vec3(0.0));
+    let far = max(light_on(up, vec4(0.0, max(level - at_d, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - dark, vec3(0.0));
+    return near * (dot(far, vec3(0.2126, 0.7152, 0.0722)) / max(dot(near, vec3(0.2126, 0.7152, 0.0722)), 1e-4));
 }
 
 // The lamps' light within `PT_NEE_MAX`, its hue kept.
@@ -547,8 +556,9 @@ fn pt_res_diff(theirs: u32, mine: u32) -> vec3<i32> {
 // The lamps' light at a surface at `world` (`rel` camera relative), its shading normal `n` and
 // face's `ng`: rgb in the world's light units, a as `pt_block_visibility`'s y (1 lamps in the
 // list, drawn or none lighting this face; 0 no list for the cube, -2 no lights at all). `at`: the pixel whose reservoir
-// it keeps and reuses (`0xffffffff` none: the bounce's surface), `pix` that pixel.
-fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>, lift: vec3<f32>, px: vec2<f32>, at: u32, pix: vec2<i32>) -> vec4<f32> {
+// it keeps and reuses (`0xffffffff` none: the bounce's surface), `pix` that pixel; `most` the
+// luminance a field of lamps' light may sum to there (`PT_NEE_SUM`).
+fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>, lift: vec3<f32>, px: vec2<f32>, at: u32, pix: vec2<i32>, most: f32) -> vec4<f32> {
     let reuse = at != 0xffffffffu && (pt.flags & 2u) != 0u;
     PT_RES_M = 0.0;
     if pt_lights[1] == 0u {
@@ -560,11 +570,15 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     let strengths = base + pt_lights[1];
     let r = pt_light_find(cube);
     let total = r.y;
+    // A draw kept for the lamps alone and one for a field's, each among its own by weight: the
+    // field's share is scaled to its cap below, before one of the two is taken.
     var y = PtLamp(vec3(0), 0u, 0.0);
     var y_p = 0.0;
     var w_sum = 0.0;
+    var yf = PtLamp(vec3(0), 0u, 0.0);
+    var yf_p = 0.0;
+    var w_field = 0.0;
     var m = 0.0;
-    var found = false;
     // Fresh draws among the cube's list, each as likely.
     if total > 0u {
         for (var k = 0u; k < PT_LIGHT_CANDIDATES; k++) {
@@ -581,11 +595,18 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
             }
             // Its weight over the chance of drawing it (1 in `total`).
             let w = p * f32(total);
-            w_sum += w;
-            if pt_rand(px, 17u + k * 2u).x * w_sum < w {
-                y = lamp;
-                y_p = p;
-                found = true;
+            if (lamp.word >> 31u) == 1u {
+                w_field += w;
+                if pt_rand(px, 17u + k * 2u).x * w_field < w {
+                    yf = lamp;
+                    yf_p = p;
+                }
+            } else {
+                w_sum += w;
+                if pt_rand(px, 17u + k * 2u).x * w_sum < w {
+                    y = lamp;
+                    y_p = p;
+                }
             }
         }
     }
@@ -618,15 +639,37 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
             if w <= 0.0 {
                 continue;
             }
-            w_sum += w;
-            if pt_rand(px, 70u + j).x * w_sum < w {
-                y = lamp;
-                y_p = p;
-                found = true;
+            if (lamp.word >> 31u) == 1u {
+                w_field += w;
+                if pt_rand(px, 70u + j).x * w_field < w {
+                    yf = lamp;
+                    yf_p = p;
+                }
+            } else {
+                w_sum += w;
+                if pt_rand(px, 70u + j).x * w_sum < w {
+                    y = lamp;
+                    y_p = p;
+                }
             }
         }
     }
-    if !found || y_p <= 0.0 {
+    // The field's share at most `most`: its weights stand for its summed light over the draws
+    // (a lamp's light is its weight times its colour at the match per level), counted over every
+    // draw seen (the count below is at most that, so the share is if anything kept a little lower).
+    if w_field > 0.0 {
+        let seen = m + res_m[0] + res_m[1] + res_m[2];
+        let e = f32(max((yf.word >> 18u) & 15u, max((yf.word >> 22u) & 15u, (yf.word >> 26u) & 15u)));
+        let per = dot(pt_nee_one_off(yf.word, world, rel), vec3(0.2126, 0.7152, 0.0722)) * 15.0 / max(e, 1.0) * pt.emissive;
+        let s = min(1.0, most / max(w_field / seen * per, 1e-6));
+        w_field *= s;
+        if pt_rand(px, 75u).x * (w_sum + w_field) < w_field {
+            y = yf;
+            y_p = yf_p;
+        }
+        w_sum += w_field;
+    }
+    if y_p <= 0.0 {
         PT_RES_M = m;
         // Lamps in the list but none lighting this face (all behind it or out of reach): none of
         // their light, not the lightmap's. The lightmap's floods round a wall, so falling back to
@@ -648,7 +691,6 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     // (RIS: what was chosen, over its estimate, times the draws' mean weight.)
     let ris = w_sum / (m * y_p);
     let l = y.word;
-    PT_NEE_FIELD = (l >> 31u) == 1u;
     let lp = y.lp;
     if reuse {
         let o = lp - cell + 32;
@@ -661,17 +703,10 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     let small = ((l >> 30u) & 1u) == 1u;
     let fade = pt_nee_fade(f32(max((l >> 18u) & 15u, max((l >> 22u) & 15u, (l >> 26u) & 15u))), vec3<f32>(lp) + 0.5 - world);
     let chosen_s = y.strength * fade;
-    // Its colour where it matches the lightmap, in the world's light (the look's curve and tint),
-    // facing it.
+    // Its colour where it matches the lightmap, facing it.
     let level = vec3(f32((l >> 18u) & 15u), f32((l >> 22u) & 15u), f32((l >> 26u) & 15u));
     let at_d = clamp(max(level.r, max(level.g, level.b)) - 1.0, 1.0, PT_NEE_AT);
-    let up = vec3(0.0, 1.0, 0.0);
-    // Its hue as the lightmap has it a block off, its brightness as there: matched `at_d` blocks
-    // off the colour itself drifted (a fire's green and blue run out first).
-    let dark = light_on(up, vec4(0.0), 0.0, 1.0, world, rel);
-    let near = max(light_on(up, vec4(0.0, max(level - 1.0, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - dark, vec3(0.0));
-    let far = max(light_on(up, vec4(0.0, max(level - at_d, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - dark, vec3(0.0));
-    let one_off = near * (dot(far, vec3(0.2126, 0.7152, 0.0722)) / max(dot(near, vec3(0.2126, 0.7152, 0.0722)), 1e-4));
+    let one_off = pt_nee_one_off(l, world, rel);
     if all(lp == vec3<i32>(floor(world - ng * 0.5))) {
         return vec4(pt_nee_cap(one_off * chosen_s * PT_NEE_HOT * ris * pt.emissive), 1.0);
     }
@@ -946,9 +981,9 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         if pt.emissive > 0.0 && (pt.flags & 1u) != 0u {
             let b_block = max(light_on(b.n, vec4(0.0, b.light.yzw), 0.0, 1.0, b.world, b.rel) - light_on(b.n, vec4(0.0), 0.0, 1.0, b.world, b.rel), vec3(0.0));
             if max(b_block.r, max(b_block.g, b_block.b)) > 1e-4 {
-                let e = pt_block_direct(b.world, b.rel, b.n, b.n, b.n * 0.02, px + vec2(37.0, 53.0), 0xffffffffu, vec2(0));
+                let e = pt_block_direct(b.world, b.rel, b.n, b.n, b.n * 0.02, px + vec2(37.0, 53.0), 0xffffffffu, vec2(0), PT_NEE_SUM * dot(b_block, vec3(0.2126, 0.7152, 0.0722)));
                 if e.a > 0.5 {
-                    bounce += pt_albedo(b) * (select(e.rgb, pt_nee_sum_cap(e.rgb, b_block), PT_NEE_FIELD) - b_block);
+                    bounce += pt_albedo(b) * (e.rgb - b_block);
                 }
             }
         }
@@ -974,10 +1009,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     if max(block.r, max(block.g, block.b)) > 1e-4 {
         if pt.emissive > 0.0 {
             // The lamps' own light in place of the lightmap's, where a light of the list reaches.
-            let e = pt_block_direct(h.world, h.rel, n, ng, lift, px, id.y * pt.size.x + id.x, vec2<i32>(id.xy));
+            let e = pt_block_direct(h.world, h.rel, n, ng, lift, px, id.y * pt.size.x + id.x, vec2<i32>(id.xy), PT_NEE_SUM * dot(block, vec3(0.2126, 0.7152, 0.0722)));
             block_vis = vec2(select(0.0, 1.0, max(e.r, max(e.g, e.b)) > 0.0), e.a);
             if e.a > 0.5 {
-                direct = select(e.rgb, pt_nee_sum_cap(e.rgb, block), PT_NEE_FIELD);
+                direct = e.rgb;
                 diffuse += direct - block;
             } else {
                 direct = block;
