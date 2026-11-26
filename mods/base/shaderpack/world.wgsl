@@ -809,6 +809,9 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // Rain on the ground (`rain_on_ground`, look.wgsl: the path tracer's pixels take it too).
     let leafy = in.kind.z != 0u || in.kind.x == TINT_FOLIAGE;
     lit = vec4(rain_on_ground(lit.rgb, n, in.rel, in.pos, in.light.x, leafy), lit.a);
+    if fantasy_opt(OPT_RAIN_DARK) < 0.5 {
+        lit = vec4(lit.rgb + rain_sun(in, n), lit.a);
+    }
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
     return vec4(lit.rgb + glow, lit.a);
@@ -1002,6 +1005,51 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     return out;
 }
 
+// Bliss's rain's sun on the wet ground (`rain_on_ground`'s smoothness, look.wgsl): GGX with
+// Smith's visibility at F0 0.02, its roughness (1 - smoothness)^2, so the highlight sharpens as the
+// rain strengthens; through the sun's shadow. Faded in over the first fifth of the wetness, where
+// a nearly rough lobe would only add a grey sheen (a face without maps has no highlight dry).
+fn rain_sun(in: VOut, n: vec3<f32>) -> vec3<f32> {
+    let w = rain_smooth(in.light.x, in.pos);
+    if w <= 0.0 || scene.sun.w <= 0.0 {
+        return vec3(0.0);
+    }
+    let v = -normalize(in.rel);
+    let l = light_dir();
+    let ndl = max(dot(n, l), 0.0);
+    if ndl <= 0.0 {
+        return vec3(0.0);
+    }
+    let h = normalize(v + l);
+    let ndv = max(dot(n, v), 1e-4);
+    let ndh = max(dot(n, h), 0.0);
+    let a = max((1.0 - w) * (1.0 - w), 0.02);
+    let a2 = a * a;
+    let dd = ndh * ndh * (a2 - 1.0) + 1.0;
+    let d = a2 / (3.14159265 * dd * dd);
+    let vis = 0.5 / max(ndl * sqrt(ndv * ndv * (1.0 - a2) + a2) + ndv * sqrt(ndl * ndl * (1.0 - a2) + a2), 1e-4);
+    let f = 0.02 + 0.98 * pow(1.0 - max(dot(v, h), 0.0), 5.0);
+    let sun = palette().sun * light_strength() * sun_shadow(in, n);
+    return min(d * vis, 60.0) * f * ndl * sun * smoothstep(0.0, 0.2, w);
+}
+
+// With Bliss's rain and `base:look_rain_mirror`, the wet ground's share for the screen's
+// reflections (minus its Fresnel, as a smooth material's, `mirror_alpha`): HDR world only.
+fn rain_mirror_alpha(in: VOut) -> f32 {
+    if scene.frame.x < 0.5 || fantasy_opt(OPT_RAIN_DARK) >= 0.5 || fantasy_opt(OPT_RAIN_MIRROR) < 0.5 {
+        return 0.0;
+    }
+    let w = rain_smooth(in.light.x, in.pos);
+    // Not leaves and plants: their holes and crossed quads trace as broken mirrors.
+    if w <= 0.0 || in.kind.z != 0u || in.kind.x == TINT_FOLIAGE {
+        return 0.0;
+    }
+    let ndv = max(dot(normalize(in.normal), -normalize(in.rel)), 0.0);
+    let f = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+    let gloss = 1.0 - clamp((1.0 - w) * (1.0 - w) * 1.6, 0.0, 0.85);
+    return -f * gloss * smoothstep(0.55, 0.9, w);
+}
+
 // Light that comes through a subsurface material (LabPBR `_s` blue over 64: blue ice, wax, the
 // leaves of packs that set it): the day's sky and sun, scattered on its way through, in the
 // material's own colour squared (deep blue for blue ice), the more the less sky reaches the face
@@ -1023,12 +1071,13 @@ fn mat_through(in: VOut, m: Mat, albedo: vec3<f32>) -> vec3<f32> {
 // image keeps a negative alpha.
 fn mirror_alpha(in: VOut, albedo: vec3<f32>) -> f32 {
     let m = shade_mat(in, albedo);
+    let wet = rain_mirror_alpha(in);
     if !m.has || scene.frame.x < 0.5 {
-        return SOLID_ALPHA;
+        return min(SOLID_ALPHA, wet);
     }
     let ndv = max(dot(normalize(in.normal), -normalize(in.rel)), 0.0);
     let f = mat_fresnel(select(m.f0, albedo, m.metal > 0.5), ndv);
-    return -luma(f) * smoothstep(0.55, 0.9, m.smoothness);
+    return min(-luma(f) * smoothstep(0.55, 0.9, m.smoothness), wet);
 }
 
 // ---- water ----
