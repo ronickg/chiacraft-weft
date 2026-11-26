@@ -735,3 +735,81 @@ s = head("carcass_rot", [
 ]) + rot_part(0)
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass_rot", s)
+
+
+# Animals at the crops and the water plants (notes/ECOLOGY.md part 3's "not yet": `vitals::forage::crop` rows, eaten
+# where sown, and the reeds, lily pads, eelgrass and kelp rows).
+s = head("crops", [
+    "Animals at the crops and the water plants. Part 1 (x 0, night, ticks running): a 5 x 5 field of ripe wheat east of",
+    "the pond (x 4..8, z 542..546) and one of ripe carrots west of it (x -8..-4), 2 white-tailed deer and 2 hares beside",
+    "them, hungry (food 30%), nothing else to eat on the bare pad; north of them two more wheat fields, one walled in 2",
+    "high (x 4..8, z 532..536) and one lit by torches (x -8..-4, z 532..536). Expect \"animal N eats base:wheat at ...\"",
+    "from the deer and \"eats base:carrots\" from the hares, only in the open fields (about a third of each field's",
+    "plants a day, `needs::RAID_SHARE`), none at z 532..536; each eaten plant set back to a seedling (1_fields: gaps of",
+    "young crop in the open fields, the walled and lit ones whole). Part 2 (x 200, summer):",
+    "a pond with lily pads on it and reeds along its south side, 2 capybaras hungry on its north side: \"eats",
+    "base:lily_pad\" first (they stay: no block changes). Part 1's \"crop at ...: block light L, guard G\" lines: in the",
+    "torch field G is Some([..]) (a torch) and every one \"left\". The `/tk light` replies (plant cells, then the air above",
+    "them, then a cell beside a torch): raw packed light, sky in the low byte, block light in the three above it. Shots",
+    "1_fields, 2_pond.",
+])
+s += pad(0) + [
+    f"chat /tk fill 4 69 {Z-2} 8 69 {Z+2} base:farmland", f"chat /tk fill 4 70 {Z-2} 8 70 {Z+2} base:wheat[age=7]",
+    f"chat /tk fill -8 69 {Z-2} -4 69 {Z+2} base:farmland", f"chat /tk fill -8 70 {Z-2} -4 70 {Z+2} base:carrots[age=3]",
+    # The walled field (planks 2 high round it) and the lit one (a torch at each corner and in the middle).
+    f"chat /tk fill 4 69 {Z-12} 8 69 {Z-8} base:farmland", f"chat /tk fill 4 70 {Z-12} 8 70 {Z-8} base:wheat[age=7]",
+    f"chat /tk fill 3 70 {Z-13} 9 71 {Z-13} base:oak_planks", f"chat /tk fill 3 70 {Z-7} 9 71 {Z-7} base:oak_planks",
+    f"chat /tk fill 3 70 {Z-13} 3 71 {Z-7} base:oak_planks", f"chat /tk fill 9 70 {Z-13} 9 71 {Z-7} base:oak_planks",
+    f"chat /tk fill -8 69 {Z-12} -4 69 {Z-8} base:farmland", f"chat /tk fill -8 70 {Z-12} -4 70 {Z-8} base:wheat[age=7]",
+    f"chat /tk fill -9 70 {Z-13} -9 70 {Z-13} base:torch[facing=up]", f"chat /tk fill -3 70 {Z-13} -3 70 {Z-13} base:torch[facing=up]",
+    f"chat /tk fill -9 70 {Z-7} -9 70 {Z-7} base:torch[facing=up]", f"chat /tk fill -3 70 {Z-7} -3 70 {Z-7} base:torch[facing=up]",
+    f"chat /tk fill -6 70 {Z-10} -6 70 {Z-10} base:torch[facing=up]",
+    "chat /time set 18000", "wait 1",
+    # The torch field's light where its plants stand (`needs::RAID_LIGHT` 8): r1's deer ate 5 of them.
+    f"chat /tk light -4 70 {Z-11}", f"chat /tk light -5 70 {Z-9}", f"chat /tk light -8 70 {Z-12}", f"chat /tk light 6 70 {Z+1}",
+    f"chat /tk light -4 71 {Z-11}", f"chat /tk light -5 71 {Z-9}", f"chat /tk light -3 71 {Z-13}", f"chat /tk light -2 70 {Z-13}",
+    f"chat /tk spawn animals:white_tailed_deer 6 70 {Z+5}", f"chat /tk spawn animals:white_tailed_deer 7 70 {Z+5}",
+    f"chat /tk spawn animals:white_tailed_deer 0 70 {Z-10}", f"chat /tk spawn animals:white_tailed_deer 1 70 {Z-10}",
+    f"chat /tk spawn animals:hare -6 70 {Z+5}", f"chat /tk spawn animals:hare -5 70 {Z+5}",
+    f"chat /tp 0 74 {Z+14}", "wait 1", "chat /animalprof food 0.3", "chat /animalprof water 0.9", "wait 90",
+    "chat /time set 6000",
+    "chat /tick freeze", f"chat /tp 0 80 {Z+10}", "look 0 -50", "wait 2", "shot cov_crops_1_fields.png",
+    "chat /tick unfreeze", "wait 1",
+]
+s += pad(200, pond=2) + [
+    f"chat /tk fill 198 70 {Z-2} 202 70 {Z+2} base:lily_pad", f"chat /tk fill 198 70 {Z+3} 202 70 {Z+3} base:reed",
+    # On the lily pads' side (north), the reeds behind the pond (r1's on the south side ate only the reeds).
+    f"chat /tk spawn animals:capybara 200 70 {Z-5}", f"chat /tk spawn animals:capybara 201 70 {Z-5}",
+    f"chat /tp 200 74 {Z+14}", "wait 1", "chat /animalprof food 0.3", "chat /animalprof water 0.9", "wait 60",
+    "chat /tick freeze", f"chat /tp 200 78 {Z+9}", "look 0 -40", "wait 2", "shot cov_crops_2_pond.png",
+    "chat /tick unfreeze", "wait 1",
+]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("crops", s)
+
+
+# Antlers from a skinned buck in season (`animals_core::carcass::antlers`, First hours' base:antler).
+def skin_one(x, kind="white_tailed_deer"):
+    return [
+        f"chat /tk spawn animals:{kind} {x} 70 {Z}", "wait 0.2", f"chat /tp {x} 70 {Z+3}", "wait 0.2",
+        "chat /animalprof kill", "wait 2", f"chat /tp {x} 70 {Z+2}", "look 0 -40", "wait 1", "aim 4", "wait 1",
+        "press core:use", "wait 12",
+    ]
+
+
+s = head("antlers", [
+    "Antlers from skinned deer. Part 1 (x 0, autumn 5): 6 white-tailed deer killed and skinned one by one, 4 blocks",
+    "apart: each \"skinned carcass N of white_tailed_deer (male|female): ...\" line has \"2 base:antler\" for a male",
+    "and none for a female; then 2 reindeer the same (both sexes have them in autumn). Part 2 (x 200, spring 5): 6 more",
+    "white-tailed deer: no antlers, male or female. `/tk inv me` after each part: base:antler counts 2 per autumn male",
+    "and reindeer, none added in spring.",
+]) + pad(0) + ["chat /season autumn 5", "chat /tk mode survival", "chat /tk put me 0 base:knife 1", "key 1"]
+for i in range(6):
+    s += skin_one(-10 + i * 4)
+for i in range(2):
+    s += skin_one(-14 + i * 28, "reindeer")
+s += ["chat /tk inv me"] + pad(200) + ["chat /season spring 5", "chat /tk mode survival", "key 1"]
+for i in range(6):
+    s += skin_one(190 + i * 4)
+s += ["chat /tk inv me"]
+write("antlers", s)

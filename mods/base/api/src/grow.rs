@@ -58,7 +58,7 @@ pub fn enrich(w: &World, [x, y, z]: [i32; 3], levels: u8, reach: i32, flush: boo
                 if levels > 0 && FARMLAND.is(state) {
                     let Some(f) = fertility(w, p) else { continue };
                     if f < vitals::soil::MAX {
-                        let worn = vitals::soil::MAX - (f + levels).min(vitals::soil::MAX);
+                        let worn = vitals::soil::MAX - vitals::soil::fed(f, levels);
                         w.prop_set(p, "worn", &worn.to_string());
                         fed += 1;
                     }

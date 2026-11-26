@@ -584,10 +584,23 @@ and cactus.**
   `base_api::ground_at` and `air_at`): wheat left over a winter rests through it and a tender
   crop left into autumn meets that autumn's frost, not today's weather. Only rain falling at that
   moment is today's (it decides snow against rain in the air, not the soil's water).
+- **Water plants and crops as food (2026-11-26, branch claude/animals-plants):** reeds and lily
+  pads (spring to autumn) and the sea's eelgrass and kelp (all year) are water plants to the
+  animals that eat them (`forage::SOURCES`; capybaras graze reeds and lily pads). Ripe crops are
+  eaten where a player sowed them, the grain and beans as seeds (deer, mice, birds), roots and
+  tubers as roots (hares, voles), each set back to a seedling as a raided field is
+  (`forage::crop`, `PLANTED`); a sown field counts in no place's food, so capacity is as before.
+  Maize, sorghum, millet and the stems' fruit are left alone (two blocks tall). Farming stays
+  winnable (Planner): a wild animal goes for a ripe plant only on that plant's day, about a third
+  of a field a game day (`animals_core::needs::RAID_SHARE`), so a herd thins a field rather than
+  clearing it; never within 4 blocks of a crop guard (`GUARD_REACH`, the `crop_guards` tag: a torch,
+  a campfire, glowstone; another mod adds its scarecrow to the tag) or in block light 8 or more
+  (`RAID_LIGHT`), night and day; and a wall 2 high keeps them out, as they can't path through it and
+  can't reach over it (`CROP_REACH` 1.5). The guard is looked for by block as well as by light, so an
+  unlit scarecrow counts. (cov_crops r2 to r4 read no light because `/tk fill base:torch` set a wall
+  torch, which fell off as an item: scripts place `base:torch[facing=up]`.) The game has no fence block yet. Check: `cov_crops` (an open, a walled and a torch-lit field at night).
 - **Not yet:**
-  - the water plants as food: reeds, lily pads, eelgrass and the kelp standing in the sea
-    (2026-11-04) have no `forage::SOURCES` rows yet (the wrack washed up on beaches has);
-  - animals eating the crops and their grain;
+  - none of the crops' raiding seen yet (`cov_crops`, below);
   - beetroot's own seed and cooked cassava, waiting for icons;
   - none of it seen in the game yet;
 

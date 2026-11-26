@@ -1,0 +1,55 @@
+# A fenced pen holds hungry, thirsty deer for 5 minutes (stuck.rs: never a leap onto or over a
+# `fences` or `fence_gates` cell; First hours' fences4 and fences6 leaked a deer in 4). Seed 1, a
+# fresh world, --log mod:animals=debug, limit 400. Pen A of fences_1126 alone (a fence ring 7 x 7,
+# inside 5 x 5, on a bare stone pad: no food, no water), 4 white-tailed deer at 20% food and water,
+# so their walks to food and water end short and the stuck logic starts. Expect "animal N is stuck"
+# lines (the fix tested, not just the pen), no "leaps out" from the pen, and every minute /tk near
+# radius 4 of the pen's centre showing all 4 deer; /animalprof where at the end: every deer strictly
+# inside the ring (x between the fences at ~-11 and ~-5, z between ~-13 and ~-7 of the start).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /time set 1000
+chat /tk mode creative
+look 0 -20
+chat /tk fill ~-14 ~-1 ~-20 ~14 ~-1 ~6 base:stone
+chat /tk fill ~-14 ~ ~-20 ~14 ~6 ~6 core:air
+wait 1
+chat /tk fill ~-11 ~ ~-13 ~-5 ~ ~-13 base:fence
+chat /tk fill ~-11 ~ ~-7 ~-5 ~ ~-7 base:fence
+chat /tk fill ~-11 ~ ~-13 ~-11 ~ ~-7 base:fence
+chat /tk fill ~-5 ~ ~-13 ~-5 ~ ~-7 base:fence
+wait 1
+chat /tk spawn animals:white_tailed_deer ~-9 ~ ~-11
+chat /tk spawn animals:white_tailed_deer ~-7 ~ ~-11
+chat /tk spawn animals:white_tailed_deer ~-9 ~ ~-9
+chat /tk spawn animals:white_tailed_deer ~-7 ~ ~-9
+wait 1
+chat /anim log
+chat /animalprof food 0.2
+chat /animalprof water 0.2
+chat /tk near ~-8 ~ ~-10 4
+chat /tk mode spectator
+chat /tp ~ ~30 ~6
+look 0 -55
+wait 2
+shot pen_long_start.png
+wait 60
+chat /tk near ~-8 ~-30 ~-16 4
+chat /tk near ~-8 ~-30 ~-16 12
+wait 60
+chat /tk near ~-8 ~-30 ~-16 4
+chat /tk near ~-8 ~-30 ~-16 12
+wait 60
+chat /tk near ~-8 ~-30 ~-16 4
+chat /tk near ~-8 ~-30 ~-16 12
+wait 60
+chat /tk near ~-8 ~-30 ~-16 4
+chat /tk near ~-8 ~-30 ~-16 12
+wait 60
+chat /tk near ~-8 ~-30 ~-16 4
+chat /tk near ~-8 ~-30 ~-16 12
+chat /animalprof where
+shot pen_long_end.png
+quit

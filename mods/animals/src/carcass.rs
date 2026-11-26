@@ -733,14 +733,23 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
             got.push(format!("{n} {}", animals_core::meat::CARCASS));
         }
     }
+    // A buck's antlers in their season (`animals_core::carcass::antlers`): bone, they keep whatever its rot.
+    let female = w.component(id, &GENES).is_some_and(|g| g.genes.female != 0);
+    let grown = b.mass / s.bio.mass.max(0.001);
+    let n = core::antlers(s.name, female, crate::breeding::season_bit(w), grown);
+    if n > 0 {
+        off(ItemStack::new(Item::generated("base:antler".to_string()).id(), n));
+        got.push(format!("{n} base:antler"));
+    }
     let meat_kg = (b.mass * animals_core::meat::YIELD).min((b.mass * core::EDIBLE - b.eaten).max(0.0));
     if let Some(b) = w.component_mut(id, &BODY) {
         b.skinned = 1;
         b.eaten += meat_kg;
     }
     weft_sdk::info!(
-        "player {player} skinned carcass {id} of {}: {} (level {}, {} hits, cause {}, knife {knife:?}, {:?})",
+        "player {player} skinned carcass {id} of {} ({}): {} (level {}, {} hits, cause {}, knife {knife:?}, {:?})",
         s.name,
+        if female { "female" } else { "male" },
         if got.is_empty() { "nothing".to_string() } else { got.join(", ") },
         b.level,
         b.hits,

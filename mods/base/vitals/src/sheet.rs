@@ -619,6 +619,7 @@ fn forage_table(w: &mut String) {
             forage::Eaten::Stays => "stays".into(),
         };
         let back = match f.renews {
+            Some(p) if f.found == forage::PLANTED => format!("{p}, where sown (not in any place's food)"),
             Some(p) => p.to_string(),
             None => {
                 let when = if f.seasons == 15 {
