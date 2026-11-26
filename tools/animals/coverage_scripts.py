@@ -619,3 +619,24 @@ s = head("carcass_wall", [
 ]) + wall_part(600)
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass_wall", s)
+
+
+# Births in natural spawning (notes/ECOLOGY.md part 7: young come with their mother): spring, natural spawning on, a
+# creative player standing on a pad (ground 69: the spawner looks for ground from 16 above the player to 16 below) at
+# stops 200 blocks apart along z 544, the animals around each listed.
+s = [f"# {l}" for l in [
+    "Births in natural spawning: in spring (most temperate species breed), with natural spawning on, a creative player",
+    "stands 30 s on a flat pad at each of 14 stops 200 blocks apart (x 0 to 2600, z 544, seed 1). Report every \"wild S",
+    "N arrives with her K young (D days old, P% grown)\" line (how many, of which species), the young's \"born to N and 0",
+    "(wild)\" lines, and in the `/animalprof where` rows the young marked \"(young, X from its mother N)\": X small (a few",
+    "blocks), as they follow her. Young with no mother near (\"(young)\" alone) should now come only from command spawns",
+    "(none here). Shots (_stopN): the nearest creature at every third stop.",
+]] + ["loaded", "idle", "chat /tk mode creative", "chat /tp 0 90 544", "wait 4", "idle",
+      "chat /season spring 5", "chat /rule core:mob_spawning 1", "chat /anim log"]
+for n, hx in enumerate(range(0, 2800, 200)):
+    s += pad(hx) + [f"chat /tp {hx} 70 {Z+10}", "wait 30", "chat /animalprof where 96"]
+    if n % 3 == 2:
+        s += ["chat /tick freeze", "aim 48", "wait 1", f"shot cov_births_stop{n}.png", "chat /tick unfreeze"]
+s += ["chat /animalprof where 96"]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("births", s)
