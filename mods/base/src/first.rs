@@ -153,8 +153,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::TOOLS);
     // The bone needle: a splinter ground to a point on a rock, the rock kept.
     r.item(&BONE_NEEDLE)
-        // The splinter's picture until Art draws the needle (art list).
-        .texture("bone_splinter")
+        .texture("bone_needle")
         .tag("needles")
         .handheld()
         .max_stack(1)

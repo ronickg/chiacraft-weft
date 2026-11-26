@@ -57,19 +57,36 @@ pub fn register(r: &mut Registry) {
         .prop("lit", ["false", "true"])
         .states(|p, s| {
             let post = ("log_oak", [0.0, 0.0, 2.0, 16.0]);
-            let straw = ("hay_bale_side", [0.0, 0.0, 16.0, 16.0]);
-            let head = ("hay_bale_top", [0.0, 0.0, 16.0, 16.0]);
+            // Its own textures (notes/art/standins/scarecrow.py paints them and prints these
+            // UVs); faces in model_box_faces' order -X, +X, -Y, +Y, -Z (front), +Z.
+            let h = |uv: [f32; 4]| ("scarecrow_head", uv);
+            let head_side = h([6.0, 0.0, 12.0, 6.0]);
+            let head = [head_side, head_side, h([6.0, 6.0, 12.0, 12.0]), h([0.0, 6.0, 6.0, 12.0]), h([0.0, 0.0, 6.0, 6.0]), head_side];
+            let b = |uv: [f32; 4]| ("scarecrow_body", uv);
+            let body_side = b([12.0, 0.0, 16.0, 11.0]);
+            let body = [
+                body_side,
+                body_side,
+                b([6.0, 11.0, 12.0, 15.0]),
+                b([0.0, 11.0, 6.0, 15.0]),
+                b([0.0, 0.0, 6.0, 11.0]),
+                b([6.0, 0.0, 12.0, 11.0]),
+            ];
             let s = s
                 .cutout()
-                .model_box_faces([7.0, 0.0, 7.0], [9.0, 30.0, 9.0], [post; 6])
+                // The post ends half a pixel under the head's top, so the two tops never share a plane.
+                .model_box_faces([7.0, 0.0, 7.0], [9.0, 29.5, 9.0], [post; 6])
                 .model_box_faces([1.0, 21.0, 7.0], [15.0, 23.0, 9.0], [post; 6])
-                .model_box_faces([5.0, 13.0, 6.0], [11.0, 24.0, 10.0], [straw; 6])
-                .model_box_faces([5.0, 24.0, 5.0], [11.0, 30.0, 11.0], [head; 6])
+                .model_box_faces([5.0, 13.0, 6.0], [11.0, 24.0, 10.0], body)
+                .model_box_faces([5.0, 24.0, 5.0], [11.0, 30.0, 11.0], head)
                 .hitbox([5.0, 0.0, 5.0], [11.0, 30.0, 11.0]);
             if p.is("lit", "true") {
-                let lamp = ("bronze_lantern", [0.0, 0.0, 16.0, 16.0]);
+                // Its glow mask is scarecrow_lantern_e.png.
+                let l = |uv: [f32; 4]| ("scarecrow_lantern", uv);
+                let side = l([0.0, 0.0, 3.0, 5.0]);
+                let lamp = [side, side, l([6.0, 0.0, 9.0, 3.0]), l([3.0, 0.0, 6.0, 3.0]), side, side];
                 s.model_box_faces([13.0, 20.0, 7.5], [14.0, 21.0, 8.5], [post; 6])
-                    .model_box_faces([12.0, 15.0, 6.5], [15.0, 20.0, 9.5], [lamp; 6])
+                    .model_box_faces([12.0, 15.0, 6.5], [15.0, 20.0, 9.5], lamp)
                     .light_rgb(fv::SCARECROW_LIGHT, fv::SCARECROW_LIGHT - 2, fv::SCARECROW_LIGHT - 5)
             } else {
                 s
