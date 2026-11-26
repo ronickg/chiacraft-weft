@@ -268,7 +268,10 @@ fn put_down(u: &mut ItemUse, p: BlockPos, face: u32) -> bool {
     let player = u.entity();
     let lately = LAST_STRIKE
         .lock()
-        .map(|l| l.iter().any(|&(id, t)| id == player && t.elapsed().as_secs_f32() < f::NO_PUT_DOWN_SECS))
+        .map(|l| {
+            l.iter()
+                .any(|&(id, t)| id == player && t.elapsed().as_secs_f32() < f::NO_PUT_DOWN_SECS)
+        })
         .unwrap_or(false);
     if lately {
         weft_sdk::info!("first: not put down at {at:?}, just struck");
