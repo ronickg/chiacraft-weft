@@ -83,7 +83,8 @@ pub fn register(r: &mut Registry) {
         "native_copper",
         &[([4.0, 0.0, 5.0], [11.0, 2.5, 11.0]), ([10.0, 0.0, 7.0], [13.0, 1.5, 10.0]), ([5.0, 0.0, 3.0], [8.0, 1.5, 5.0])],
     );
-    r.loot(&LOOSE_COPPER).pool(Pool::new().item("native_copper"));
+    r.loot(&LOOSE_COPPER)
+        .pool(Pool::new().item("native_copper"));
     r.loot(&LOOSE_BONE).pool(Pool::new().item("bone"));
     r.loot(&LOOSE_ROCK).pool(Pool::new().item("rock"));
     r.loot(&LOOSE_FLINT).pool(Pool::new().item("flint"));
@@ -214,9 +215,8 @@ fn strike(u: &mut ItemUse) -> bool {
     // The stone itself, or the top of what it lies on: a small thing on the ground is easy to aim
     // past (PC run fh4_axe: the ray passed over the nodule to the ground under it).
     let above = aimed.above();
-    let loose = |q: BlockPos| {
-        LOOSE_FLINT.is(w.block(q)) || LOOSE_ROCK.is(w.block(q)) || LOOSE_BONE.is(w.block(q)) || LOOSE_COPPER.is(w.block(q))
-    };
+    let loose =
+        |q: BlockPos| LOOSE_FLINT.is(w.block(q)) || LOOSE_ROCK.is(w.block(q)) || LOOSE_BONE.is(w.block(q)) || LOOSE_COPPER.is(w.block(q));
     let p = if loose(aimed) {
         aimed
     } else if face == Dir::Up.face() && loose(above) {
