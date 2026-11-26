@@ -29,6 +29,7 @@ mod felling;
 mod firebed;
 mod fireflies;
 mod first;
+mod first_clock;
 mod gems;
 mod glider;
 mod grapple;
@@ -156,6 +157,7 @@ fn init(r: &mut Registry) {
     parts::register(r);
     gems::register(r);
     first::register(r);
+    first_clock::register(r);
     knapping::register(r);
     firebed::register(r);
     events::register(r);

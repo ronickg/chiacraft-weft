@@ -24,7 +24,7 @@ use crate::ModelFile;
 use crate::species::SPECIES;
 
 /// The body: its kind (`EntityKind`); the looks it is drawn as: its body plan's whole and opened (slice 3, at the
-/// plans' order in `animals_core::carcass::Plan::ALL`), then the bones.
+/// plans' order in `animals_core::carcass::Plan::ALL`), its bones and its pile of bones.
 pub static CARCASS: EntityKind = EntityKind::named("carcass_body");
 static WHOLE: [EntityKind; 5] = [
     EntityKind::named("carcass_quadruped"),
@@ -45,8 +45,20 @@ static COAT: Component<[u32; 2]> = Component::named("carcass_coat");
 /// Each texel of the bodies' texture: 0 coat, 1 underside, 2 dark, 3 meat, 4 bone, 255 none (`source/carcass/body.py`):
 /// its width and height (two little-endian u16), then a byte a texel.
 static BODY_MASK: &[u8] = include_bytes!("../source/carcass/body_mask.bin");
-static BONES: EntityKind = EntityKind::named("carcass_bones");
-static PILE: EntityKind = EntityKind::named("carcass_pile");
+static BONES: [EntityKind; 5] = [
+    EntityKind::named("carcass_quadruped_bones"),
+    EntityKind::named("carcass_bird_bones"),
+    EntityKind::named("carcass_biped_bones"),
+    EntityKind::named("carcass_reptile_bones"),
+    EntityKind::named("carcass_fish_bones"),
+];
+static PILE: [EntityKind; 5] = [
+    EntityKind::named("carcass_quadruped_pile"),
+    EntityKind::named("carcass_bird_pile"),
+    EntityKind::named("carcass_biped_pile"),
+    EntityKind::named("carcass_reptile_pile"),
+    EntityKind::named("carcass_fish_pile"),
+];
 /// The blood and guts under an opened body: a second entity at its place (the animal's own model can't be painted per
 /// carcass), so "opened" reads apart from "whole" until the art slice draws the opened body itself.
 static GORE: EntityKind = EntityKind::named("carcass_gore");
@@ -175,10 +187,11 @@ pub fn init(r: &mut Registry) {
             }
         }
     });
-    // Kneeling, still, at eye height a little over half a standing one's (`player.animation.json`'s `skin` clip).
+    // Kneeling forward over the body, still (`player.animation.json`'s `skin` clip: the knees down behind, the torso
+    // leaning 30 degrees about the hips with the head and arms carried along, its eye at 1.33 blocks).
     r.pose(&SKINNING)
-        .height(0.6)
-        .eye(0.55)
+        .height(0.93)
+        .eye(0.8)
         .speed(0.0)
         .action("skin")
         .no_bob();
@@ -189,9 +202,12 @@ pub fn init(r: &mut Registry) {
             let (f, right) = ([-yaw.sin(), -yaw.cos()], [yaw.cos(), -yaw.sin()]);
             // A three-quarter side view from the right, level with the body before them and looking between the
             // skinner and it, so both the knife and the body are in frame (r4's, 1.1 blocks out, sat inside the
-            // arm; r5's, behind the shoulder, had the head filling the near side).
-            let pos = Vec3 { x: eye.x + right[0] * 2.6 + f[0] * 0.7, y: eye.y + 0.8, z: eye.z + right[1] * 2.6 + f[1] * 0.7 };
-            let at = Vec3 { x: eye.x + f[0] * 0.9, y: eye.y - 0.45, z: eye.z + f[1] * 0.9 };
+            // arm; r5's, behind the shoulder, had the head filling the near side). r9's, level with the skinner and
+            // above, showed the back of a tipped head bigger than the body: now out in front on the right and lower,
+            // the body nearer the camera than the skinner, who shows face and chest.
+            // r1b's, from above, saw only the top of the bowed head: now at the eyes' height.
+            let pos = Vec3 { x: eye.x + right[0] * 2.4 + f[0] * 2.2, y: eye.y + 0.05, z: eye.z + right[1] * 2.4 + f[1] * 2.2 };
+            let at = Vec3 { x: eye.x + f[0] * 0.8, y: eye.y - 0.55, z: eye.z + f[1] * 0.8 };
             let (yaw, pitch) = camera::look_at(pos, at);
             a.out = abi::CameraPose { pos, yaw, pitch, ..abi::CameraPose::DEFAULT };
         }))
@@ -212,7 +228,8 @@ pub fn init(r: &mut Registry) {
             near.first().is_some_and(|&c| start_skinning(&w, c, player))
         });
     for (i, plan) in core::Plan::ALL.into_iter().enumerate() {
-        for (kind, model) in [(&WHOLE[i], format!("carcass_{}", plan.name())), (&OPENED[i], format!("carcass_{}_open", plan.name()))] {
+        let looks = [(&WHOLE[i], ""), (&OPENED[i], "_open"), (&BONES[i], "_bones"), (&PILE[i], "_pile")];
+        for (kind, model) in looks.map(|(k, s)| (k, format!("carcass_{}{s}", plan.name()))) {
             let (w, h) = animals_core::bodies::of(&model);
             r.entity(kind)
                 .no_egg()
@@ -223,17 +240,6 @@ pub fn init(r: &mut Registry) {
                 .model_file(&model)
                 .texture("carcass/body");
         }
-    }
-    for (kind, model) in [(&BONES, "carcass_bones"), (&PILE, "carcass_pile")] {
-        let (w, h) = animals_core::bodies::of(model);
-        r.entity(kind)
-            .no_egg()
-            .size(w, h)
-            .walk_speed(0.0)
-            .passive()
-            .unpushable()
-            .model_file(model)
-            .texture("carcass/bones");
     }
     // Read before the body goes (`DIE`'s question comes while it is still there).
     r.before_event(&actions::DIE, |q| {
@@ -391,23 +397,19 @@ fn show(w: &World, id: u64) {
     else {
         return;
     };
-    match l {
-        // Its body plan's lying model, at its size, in its own coat (`paint_body`).
-        Look::Whole | Look::Opened => {
-            let plan = core::plan_of(s.model);
-            let i = core::Plan::ALL.iter().position(|&p| p == plan).unwrap_or(0);
-            let kind = if l == Look::Whole { &WHOLE[i] } else { &OPENED[i] };
-            w.set_appearance(id, Some(name_of(abi::entry_kind::ENTITY, kind.id())));
-            w.set_scale(id, core::body_scale(b.mass, plan));
-            w.action_stop(id);
-        }
-        Look::Bones | Look::Pile => {
-            let kind = if l == Look::Bones { &BONES } else { &PILE };
-            w.set_appearance(id, Some(name_of(abi::entry_kind::ENTITY, kind.id())));
-            w.set_scale(id, core::scale(b.mass));
-            w.action_stop(id);
-        }
-    }
+    // Its body plan's lying model (or its bones, or the pile they end in), at its size, in its own coat (`paint_body`:
+    // the hide scraps and feathers left by the bones too).
+    let plan = core::plan_of(s.model);
+    let i = core::Plan::ALL.iter().position(|&p| p == plan).unwrap_or(0);
+    let kind = match l {
+        Look::Whole => &WHOLE[i],
+        Look::Opened => &OPENED[i],
+        Look::Bones => &BONES[i],
+        Look::Pile => &PILE[i],
+    };
+    w.set_appearance(id, Some(name_of(abi::entry_kind::ENTITY, kind.id())));
+    w.set_scale(id, core::body_scale(b.mass, plan));
+    w.action_stop(id);
     gore(w, id, &b, l == Look::Opened);
     if let Some(v) = w.component_mut(id, &SHOWN) {
         *v = n;
@@ -531,8 +533,15 @@ fn start_skinning(w: &World, id: u64, player: u64) -> bool {
     if let Some(k) = w.component_mut(id, &SKIN) {
         *k = [player, now, now + ticks, tier.map_or(0, |t| t as u64 + 1)];
     }
-    // Turned to the body, kneeling beside it; the camera eases in.
+    // Kneeling beside the body, on the side they came from, its hands at it, turned to it; the camera eases in.
     let (dx, dz) = (c.pos.x - p.pos.x, c.pos.z - p.pos.z);
+    let len = (dx * dx + dz * dz).sqrt().max(1e-3);
+    let plan = (b.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+        .map_or(core::Plan::Quadruped, |s| core::plan_of(s.model));
+    let from = (core::KNEEL_FROM * core::body_scale(b.mass, plan) as f64).max(core::KNEEL_MIN);
+    w.teleport(player, None, Vec3 { x: c.pos.x - dx / len * from, y: p.pos.y, z: c.pos.z - dz / len * from });
     let facing = ((-dx).atan2(-dz) as f32).to_degrees();
     w.set_pose(player, Some(&SKINNING), Some(facing));
     w.force_camera(player, &SKIN_CAMERA, Some((0.6, camera::easing::IN_OUT)));

@@ -16,8 +16,6 @@ pub const BONES: f32 = 0.65;
 pub const PILE: f32 = 0.95;
 /// What a scavenger bites off at a time, kg (a vulture swallows a few hundred grams a mouthful).
 pub const BITE_KG: f32 = 0.5;
-/// The live mass the placeholder bone looks are drawn at (`assets/models/carcass_*`): a white-tailed deer.
-pub const REF_KG: f32 = 70.0;
 /// The raw meat a carcass rots as (`vitals::food::FOODS`): venison.
 pub const ROTS_AS: &str = "animals:venison";
 
@@ -65,11 +63,6 @@ pub fn look(eaten: f32, mass: f32, rot: vitals::rot::Carcass, skinned: bool) -> 
 /// How long its meat keeps at larder pace (`vitals::food::Food::keeps`), days fresh and stale.
 pub fn keeps() -> (f32, f32) {
     vitals::food::find(ROTS_AS).map_or((2.0, 2.0), |i| vitals::food::FOODS[i].keeps)
-}
-
-/// The scale its bone looks are drawn at for an animal of `mass` kg (length goes as the cube root of mass).
-pub fn scale(mass: f32) -> f32 {
-    (mass / REF_KG).cbrt().clamp(0.15, 4.0)
 }
 
 // ---------------------------------------------------------------- the bodies drawn (slice 3)
@@ -166,6 +159,11 @@ pub const KNIFE_SPEED: [f32; 4] = [1.0, 0.8, 0.65, 0.55];
 pub const FLAKE_SPEED: f32 = 1.4;
 /// Blocks from the carcass the skinner must stay within (it kneels beside it).
 pub const SKIN_REACH: f64 = 3.0;
+/// Blocks from a reference-sized body's centre the skinner kneels (times its `body_scale`, at least `KNEEL_MIN`): the
+/// hands of the `skin` clip reach about 0.55 blocks ahead, a lying deer is about 0.3 blocks to its middle (r1b's
+/// skinner knelt where they clicked, a body's width short of it).
+pub const KNEEL_FROM: f64 = 0.8;
+pub const KNEEL_MIN: f64 = 0.45;
 
 /// Seconds to skin `mass` kg with a knife of `tier` (`None`: a flake).
 pub fn skin_secs(mass: f32, tier: Option<u32>) -> f32 {
@@ -278,8 +276,8 @@ mod tests {
     #[test]
     fn rots_as_a_meat_and_scales_by_mass() {
         assert!(vitals::food::find(ROTS_AS).is_some());
-        assert!((scale(REF_KG) - 1.0).abs() < 1e-5);
-        assert!(scale(2.5) < 0.4 && scale(500.0) > 1.8);
+        assert!((body_scale(70.0, Plan::Quadruped) - 1.0).abs() < 1e-5);
+        assert!(body_scale(2.5, Plan::Quadruped) < 0.4 && body_scale(500.0, Plan::Quadruped) > 1.8);
         const { assert!(FROM_KG >= 1.0 && EDIBLE > crate::meat::YIELD) };
     }
 

@@ -1140,7 +1140,14 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
             pick(&PARTS, &keys)
         }
         Tab::Extra => {
-            let mut keys = vec![("bloom", 0.4), ("cloud_shadows", 0.6), ("leaf_holes", 0.4), ("far_detail", 0.6), ("leaf_light", 0.4), ("wet_mirror", 0.4)];
+            let mut keys = vec![
+                ("bloom", 0.4),
+                ("cloud_shadows", 0.6),
+                ("leaf_holes", 0.4),
+                ("far_detail", 0.6),
+                ("leaf_light", 0.4),
+                ("wet_mirror", 0.4),
+            ];
             if GPU_RAY_QUERY.get() {
                 keys.push(("pt_denoiser", 1.0));
             }

@@ -570,13 +570,17 @@ and cactus.**
   corn roasts, the paddy's grain boils into white rice, and any grain bakes into bread. The
   foods are USDA rows: carrot, potato, baked potato, beetroot, corn, roasted corn, green beans,
   cooked rice, and cassava, which rots in days and, raw, poisons now and then.
+- **Catching up** (2026-11-22): a plant in an area nobody was near grows, when it loads again,
+  step by step at the time each step missed (the engine's `World::grow_time`, read by
+  `base_api::ground_at` and `air_at`): wheat left over a winter rests through it and a tender
+  crop left into autumn meets that autumn's frost, not today's weather. Only rain falling at that
+  moment is today's (it decides snow against rain in the air, not the soil's water).
 - **Not yet:**
   - the water plants as food: reeds, lily pads, eelgrass and the kelp standing in the sea
     (2026-11-04) have no `forage::SOURCES` rows yet (the wrack washed up on beaches has);
   - animals eating the crops and their grain;
   - beetroot's own seed and cooked cassava, waiting for icons;
   - none of it seen in the game yet;
-  - unloaded plants catch up at today's season, not the season they missed.
 
 
 - **The plant table:** one row per plant:
