@@ -3857,11 +3857,15 @@ impl Client {
             },
             rt: [
                 // 1 traced shadows; 2 also path traced, whose pass lights the terrain again (the
-                // world's shader leaves its rays there to it, `world.wgsl`'s `pt_takes`).
+                // world's shader leaves its rays there to it, `world.wgsl`'s `pt_takes`); 3 path
+                // traced with vanilla's lighting (`core:pt_plain`), where the pack draws the rest of
+                // the frame plain too (sky, far land, post), so the traced pixels sit in a vanilla
+                // frame for the stage-1 compare. The pack tests it by thresholds, so 3 still counts as
+                // path traced wherever 2 does.
                 if !self.render.rt_traced() {
                     0.0
                 } else if shadow_setting("core:path_traced", 0.0) > 0.5 && self.render.pt_ready() {
-                    2.0
+                    if shadow_setting("core:pt_plain", 0.0) > 0.5 { 3.0 } else { 2.0 }
                 } else {
                     1.0
                 },

@@ -4,6 +4,11 @@
 // half-size texels on this pixel's own surface, so its ordered start pattern leaves no grain and a
 // darkening keeps to its surface. Without the half-size image, worked out here from four turns.
 fn apply(p: PostPixel) -> vec4<f32> {
+    // None of the pack's look path traced plain (`scene.rt.x` 3, `core:pt_plain`): the picture as
+    // the engine draws it with no pack.
+    if scene.rt.x > 2.5 {
+        return p.color;
+    }
     var keep: f32;
     if p.low != 0u {
         keep = far_ao_filtered(p, select(4, 2, p.strength < 0.75));
