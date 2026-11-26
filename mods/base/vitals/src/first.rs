@@ -167,6 +167,11 @@ pub const SPLINTER_FROM_BONE: f32 = 0.6;
 pub const SPLINTER_USES: u32 = 25;
 /// Flakes (or splinters) a nodule, rock or bone gives before it is used up.
 pub const FLAKES_PER_STONE: u32 = 3;
+/// Seconds after a strike in which the hammer stone isn't put down on bare ground (Planner, 11-26,
+/// from the PC runs: the strike that used a nodule up left the next click on bare ground, which
+/// put the player's rock down unseen). Covers a held button's repeats and a quick second click;
+/// under `STRIKE_SECS`, so a stone put down on purpose soon after still goes down.
+pub const NO_PUT_DOWN_SECS: f32 = 1.0;
 /// Knapping a head (sneaking while striking a flint nodule opens the knapping screen): a 5 × 5
 /// nodule, each square outside the head's outline struck away with a click; a click inside the
 /// outline breaks the nodule into a flake (TerraFirmaCraft's rock knapping, about 8 clicks;
@@ -375,6 +380,13 @@ mod tests {
         // than a few clicks, less than three minutes.
         let s = axe_hands_secs();
         assert!((10.0..180.0).contains(&s), "{s} s");
+    }
+
+    #[test]
+    fn a_strike_keeps_its_hammer_stone() {
+        // A held button repeats every 0.2 s; the guard outlasts two of them and the strike's own
+        // cooldown is longer, so putting a stone down on purpose isn't blocked for long.
+        assert!((0.5..=STRIKE_SECS).contains(&NO_PUT_DOWN_SECS));
     }
 
     #[test]
