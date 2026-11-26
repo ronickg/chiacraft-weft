@@ -16,6 +16,11 @@ screen's look by UI redo) and seen in PC runs (11-05). The research behind it is
   flint's does, the axe felling to bone's tier. A knife is a splinter on a stick too. The hint
   `knap_bone` shows with a bone and no flint. The book makes heads from memory from flint only.
   Art to come: the old bones' block and the splinter's icon (both the bone item's for now).
+- **Used up** (11-26, Planner from the PC runs): a nodule, rock or old bones gone after three
+  flakes or splinters shows a hint (`hint.base.used_up_nodule`, `_stone`, `_bones`). For
+  `vitals::first::NO_PUT_DOWN_SECS` (1 s) after a strike a press on bare ground only knocks: the
+  hammer stone stays in hand (before, the press after the last flake put it down unseen). Check:
+  `mods/testkit/scripts/used_up_1126.txt`.
 - The knapping screen opens by sneaking and striking a flint nodule on the ground with a rock. It
   knaps an axe head (8 squares away), a pick head (13) or a shovel blade (8). A click inside the
   outline breaks the nodule into a flake. No knife blade: a knife is a flake on a stick.

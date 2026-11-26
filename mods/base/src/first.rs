@@ -283,6 +283,7 @@ fn put_down(u: &mut ItemUse, p: BlockPos, face: u32) -> bool {
         LOOSE_ROCK.id()
     };
     w.set_block(at, block);
+    weft_sdk::info!("first: put down at {at:?}");
     if !w.outside_survival(u.entity()) {
         u.set_stack(StackData::shrink(s, 1));
     }
