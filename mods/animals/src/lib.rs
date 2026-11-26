@@ -73,6 +73,7 @@ mod memory;
 mod migrate;
 mod mouse;
 mod owl;
+mod pelt_look;
 mod prof;
 mod protoceratops;
 mod psittacosaurus;
@@ -177,6 +178,7 @@ fn init(r: &mut Registry) {
     drink::init(r);
     stuck::init(r);
     carcass::init(r);
+    pelt_look::init(r);
     blood::init(r);
     hunt::init(r);
     anim::init(r);
