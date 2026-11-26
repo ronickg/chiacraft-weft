@@ -2646,6 +2646,18 @@ fn dust_reach(p: vec3<f32>) -> f32 {
     return mix(1.0, near * 0.6, dust);
 }
 
+// A storm's dust or blowing snow at `p` for the one fog (`fog_march`), per block, `s` its share
+// (`storm`): the layers' storm shape (`fog_density_with` at a full storm), which the one fog had
+// dropped with the rest of our mist: a dust storm drew a clear blue sky (wx_dust_B2, 11-26).
+fn storm_fog_density(p: vec3<f32>, floor: f32, s: f32) -> f32 {
+    let h = p.y - floor;
+    let low = exp(-max(h - 3.0, 0.0) / 40.0);
+    let high = exp(-max(h, 0.0) / 45.0);
+    let open = smoothstep(-24.0, -10.0, h);
+    let b = mix(smoothstep(0.25, 0.75, fog_banks(p)), 0.3, smoothstep(0.15, 0.45, scene.sun.y));
+    return s * air_mist() * dust_reach(p) * open * (low * (0.7 + 0.6 * b) + 0.012 * high) * 0.11;
+}
+
 fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     return fog_density_with(p, floor, fog_banks_at(p, floor));
 }
@@ -3143,6 +3155,10 @@ fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_f
     var air = vec3(0.0);
     var air_k = vec3(0.0);
     var air_through = vec3(1.0);
+    // A storm in the air (`storm`): its floor and colour once for the march.
+    let gale = storm();
+    let gale_floor = fog_floor(dir * span);
+    let gale_tint = mix(vec3(1.0, 1.0, 1.03), vec3(0.95, 0.68, 0.42), clamp(scene.ground.z, 0.0, 1.0));
     for (var i = 0u; i < n; i++) {
         let u = (f32(i) + jitter) / f32(n);
         let t = span * (pow(e, u) - 1.0) / (e - 1.0);
@@ -3159,9 +3175,15 @@ fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_f
             lit *= cloud_shadow(dir * t);
         }
         let d = bliss_fog_density(at);
-        if d > 0.0 {
-            let kept = exp(-d * step);
-            gained += through * (1.0 - kept) * (sun * sun_phase * lit + sky_fog);
+        // A storm's dust or blowing snow (ours: Bliss has none), in the same march, its own colour.
+        var ds = 0.0;
+        if gale > 0.0 {
+            ds = storm_fog_density(at, gale_floor, gale);
+        }
+        if d + ds > 0.0 {
+            let kept = exp(-(d + ds) * step);
+            let lit_by = sun * sun_phase * lit + sky_fog;
+            gained += through * (1.0 - kept) * lit_by * (d + ds * gale_tint) / (d + ds);
             through *= kept;
         }
         // The air below the cumulus base; its Mie takes the fog's droplets too (Bliss's x300 of the
