@@ -39,7 +39,7 @@ Ronald, 2026-11-22: "want the engine to be as up to date from weft as possible a
    - **Ledger verdict "keep in engine":** start from upstream's file and put our change back on top. Keep it as small as you can, and update the row if it moved.
    - **Ledger verdict "move out":** if the hook it needs exists, take upstream's and move our part into our crate or mod in the same branch. Until the hook exists, resolve it as keep in engine. Taking upstream's side would delete working features (11-22: ui.wgsl, looks.rs, input.rs, codec.rs, server/load.rs, the 32 px cracks).
    - **Far terrain (`client/lod.rs` and what's tied to it):** ours stays until an A/B against upstream's LOD rework picks a winner, because the stage 2 look depends on ours.
-   - **Our art (`mods/*/assets/textures`, models, lang files of ours):** keep ours.
+   - **Our art (`mods/*/assets/textures`, models, lang files of ours):** keep ours. Exception: a texture Weft made the skin of a model (a `models/item/<name>.geo.json` skins with `textures/item/<name>.png`) takes Weft's side. 11-26: `textures/item/bow.png` (`notes/ENGINE_CHANGES.md`, "What this means for syncing").
    - **Upstream's gameplay in `mods/base`** (new items, biomes, mobs): keep ours, and list theirs for Ronald. Taking their game content is his call.
    - **SDK reworks** (new APIs, renamed kinds): take upstream's and port our mods to them. Don't keep an old API alive in the engine for our sake.
    - **Generated files:** regenerate them (see `notes/crew/merge-into-dev.sh`).
