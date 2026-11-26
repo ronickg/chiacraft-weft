@@ -329,13 +329,25 @@ pub fn crown(w: &World, logs: &[[i32; 3]]) -> Vec<([i32; 3], u32)> {
 
 /// `axe` worn by `by` more (its `max` durability, 0 for none): gone once used up.
 pub(crate) fn worn(axe: ItemStack, by: u32, max: u32) -> ItemStack {
-    let damage = axe.wear() + by;
-    if max > 0 && damage >= max {
-        ItemStack::EMPTY
-    } else if max > 0 {
-        axe.with_wear(damage)
+    if max == 0 {
+        return axe;
+    }
+    match wear_after(axe.wear(), by, max) {
+        Some(damage) => axe.with_wear(damage),
+        None => ItemStack::EMPTY,
+    }
+}
+
+/// An axe's wear after `by` more on a durability of `max`: none when that uses it up; what has no
+/// durability keeps its wear. Apart from `worn`, whose stack reads its wear through the host.
+pub(crate) fn wear_after(wear: u32, by: u32, max: u32) -> Option<u32> {
+    let damage = wear + by;
+    if max == 0 {
+        Some(wear)
+    } else if damage >= max {
+        None
     } else {
-        axe
+        Some(damage)
     }
 }
 
@@ -511,9 +523,12 @@ mod tests {
 
     #[test]
     fn the_axe_wears_by_a_log_each() {
+        // A stack's wear is a component read through the host (since the 11-22 sync), so the
+        // numbers are checked on `wear_after`; `worn` only applies them.
+        assert_eq!(wear_after(0, 5, 131), Some(5));
+        assert_eq!(wear_after(129, 5, 131), None, "used up");
+        assert_eq!(wear_after(3, 5, 0), Some(3), "no durability, no wear");
         let axe = ItemStack::new(7, 1);
-        assert_eq!(worn(axe, 5, 131).wear(), 5);
-        assert_eq!(worn(axe.with_wear(129), 5, 131), ItemStack::EMPTY, "used up");
-        assert_eq!(worn(axe, 5, 0), axe, "no durability, no wear");
+        assert_eq!(worn(axe, 5, 0), axe, "no durability, the stack untouched");
     }
 }
