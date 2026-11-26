@@ -239,6 +239,15 @@ fn strike(u: &mut ItemUse) -> bool {
         let struck = w.prop_int(p, "struck").unwrap_or(0) + 1;
         if struck >= f::FLAKES_PER_STONE {
             w.set_block(p, 0);
+            let key = if bone {
+                "hint.base.used_up_bones"
+            } else if flint {
+                "hint.base.used_up_nodule"
+            } else {
+                "hint.base.used_up_stone"
+            };
+            weft_sdk::info!("first: used up at {p:?}, {key}");
+            base_api::hint(&w, player, key, &[]);
         } else {
             w.prop_set(p, "struck", &struck.to_string());
         }
@@ -254,6 +263,17 @@ fn put_down(u: &mut ItemUse, p: BlockPos, face: u32) -> bool {
     if face != Dir::Up.face() || w.block(at) != 0 || w.block_flags(p) & abi::block_flags::SOLID == 0 {
         return false;
     }
+    // Right after a strike (the thing struck just used up, or a click that slipped past it): only
+    // a knock, the stone stays in hand (`f::NO_PUT_DOWN_SECS`).
+    let player = u.entity();
+    let lately = LAST_STRIKE
+        .lock()
+        .map(|l| l.iter().any(|&(id, t)| id == player && t.elapsed().as_secs_f32() < f::NO_PUT_DOWN_SECS))
+        .unwrap_or(false);
+    if lately {
+        weft_sdk::info!("first: not put down at {at:?}, just struck");
+        return true;
+    }
     let s = u.stack();
     let block = if s.item == FLINT.id() {
         LOOSE_FLINT.id()
@@ -263,6 +283,7 @@ fn put_down(u: &mut ItemUse, p: BlockPos, face: u32) -> bool {
         LOOSE_ROCK.id()
     };
     w.set_block(at, block);
+    weft_sdk::info!("first: put down at {at:?}");
     if !w.outside_survival(u.entity()) {
         u.set_stack(StackData::shrink(s, 1));
     }
