@@ -146,7 +146,14 @@ pub fn anyone_eats(item: u32) -> bool {
 }
 
 /// Species `s`'s crowd where `pos` is: as heavily as its biome is stocked
-/// (`animals_core::species::Species::crowd_in`).
+/// (`animals_core::species::Species::crowd_in`), and a wild plant eater's as its food grew in the last days against
+/// what it usually is then (`needs::room_by_food`: smaller after a dry spell, back after rain).
 pub fn crowd_at(w: &weft_sdk::World, s: &Species, pos: impl Into<weft_sdk::BlockPos>) -> u32 {
-    s.crowd_in(weft_sdk::name_of(weft_sdk::abi::entry_kind::BIOME, w.biome(pos)))
+    let pos = pos.into();
+    let crowd = s.crowd_in(weft_sdk::name_of(weft_sdk::abi::entry_kind::BIOME, w.biome(pos)));
+    if !s.forages_wild() {
+        return crowd;
+    }
+    let (now, usual) = crate::forage::food_now(w, s, [pos.x, pos.y, pos.z]);
+    animals_core::needs::room_by_food(crowd, now, usual)
 }

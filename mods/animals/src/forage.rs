@@ -6,8 +6,9 @@
 //! fed and a dry season thins them, through their condition (`comfort::condition`).
 //!
 //! Its place feeds as many as its food grows: plant eaters come by natural spawning as often as
-//! their food grows there this season (`season_lush`), and each mouthful feeds as well as the
-//! plant grows today (dry-season grass is poor fodder).
+//! their food grew there in the last days of its weather (`recent_lush`: thin in a drought, back
+//! after rain), its room follows that against the season's usual (`species::crowd_at`), and each
+//! mouthful feeds as well as the plant grows today (dry-season grass is poor fodder).
 //!
 //! Food on the ground comes first (`notes/ECOLOGY.md`, parts 5 and 8): dropped food of its diet
 //! within `ITEM_LOOK` blocks (`vitals::forage::dropped`: seeds, fruit, meat, a kill's carcass;
@@ -84,7 +85,7 @@ pub fn init(r: &mut Registry) {
             return Verdict::Abstain;
         }
         let floor = animals_core::needs::SPAWN_FLOOR;
-        let come = floor + (1.0 - floor) * season_lush(&w, s, q.pos().to_array());
+        let come = floor + (1.0 - floor) * recent_lush(&w, s, q.pos().to_array());
         if (w.random_below(10_000) as f32) < come * 10_000.0 { Verdict::Abstain } else { Verdict::Deny }
     });
 }
@@ -99,17 +100,45 @@ pub fn kind_near(w: &World, s: &Species, pos: [i32; 3]) -> f64 {
         .sum()
 }
 
-/// How much of its food its biome grows through this season, 0 to 1
-/// (`vitals::forage::season_lushness`); 1 for one that doesn't forage.
-pub fn season_lush(w: &World, s: &animals_core::species::Species, pos: [i32; 3]) -> f32 {
+/// How much of its food its biome grew over the last `needs::FOOD_DAYS` days of its weather where `pos` is, 0 to 1
+/// (`vitals::forage::recent_lushness`): its food now, thin after a dry spell; 1 for one that doesn't forage.
+pub fn recent_lush(w: &World, s: &animals_core::species::Species, pos: [i32; 3]) -> f32 {
+    food_now(w, s, pos).0
+}
+
+/// Its food now (`recent_lush`) and what it usually is over the same days (`vitals::forage::usual_lushness`): the
+/// two its room weighs (`species::crowd_at`).
+pub fn food_now(w: &World, s: &animals_core::species::Species, pos: [i32; 3]) -> (f32, f32) {
     let biome = w.biome(pos);
     let c = base_api::CLIMATE
         .on_biome(biome)
         .unwrap_or(base_api::TEMPERATE);
-    let season = crate::breeding::season_bit(w).map(|bit| bit.trailing_zeros() as usize);
+    let calendar = base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0) > 0;
+    // The calendar's day, as base's weather counts it (`/season` and `/time set` move it).
+    let day = w.day_time() / vitals::calendar::DAY_TICKS;
     let name = name_of(abi::entry_kind::BIOME, biome);
-    vitals::forage::season_lushness(|k| s.eats(k), name, c.celsius, c.seasons, c.rain, season).unwrap_or(1.0)
+    let days = animals_core::needs::FOOD_DAYS;
+    let key = base_api::rain_key(w, biome);
+    let now = vitals::forage::recent_lushness(|k| s.eats(k), name, c.celsius, c.seasons, c.rain, calendar, key, day, days);
+    // The usual, by biome, diet (its species) and day: eight runs of ten days' weather, asked by every spawn and every
+    // wild one's look at its room.
+    let usual = {
+        let mut cache = USUAL.lock().unwrap();
+        let k = (biome, s.name.as_ptr() as usize, day);
+        if let Some(&(_, u)) = cache.iter().find(|(c, _)| *c == k) {
+            u
+        } else {
+            let u = vitals::forage::usual_lushness(|k| s.eats(k), name, c.celsius, c.seasons, c.rain, calendar, key, day, days);
+            cache.retain(|(c, _)| c.2 == day);
+            cache.push((k, u));
+            u
+        }
+    };
+    (now.unwrap_or(1.0), usual.unwrap_or(1.0))
 }
+
+/// `food_now`'s usuals worked out today: (biome, species, day) and the usual.
+static USUAL: std::sync::Mutex<Vec<((u32, usize, u64), Option<f32>)>> = std::sync::Mutex::new(Vec::new());
 
 /// How much of its food the place at `pos` grows now, 0 to 1 (`vitals::forage::lushness`); 1 for
 /// one that doesn't forage.
