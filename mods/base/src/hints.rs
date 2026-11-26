@@ -15,9 +15,9 @@ use vitals::effects::Effect;
 use weft_sdk::*;
 
 /// The hints, by their bit in `SEEN`: `hint.base.<name>` in the lang files.
-const HINTS: [&str; 16] = [
+const HINTS: [&str; 17] = [
     "logs", "table", "night", "cold", "freezing", "wet", "empty", "raw_meat", "grave", "hot", "rest", "knap", "flake", "lash", "tree",
-    "tree_far",
+    "tree_far", "knap_bone",
 ];
 const LOGS: u32 = 0;
 const TABLE: u32 = 1;
@@ -37,6 +37,8 @@ const LASH: u32 = 13;
 /// The first axe: where the nearest tree foot is (`TREE_FAR` when none is near; one seen bit).
 const TREE: u32 = 14;
 const TREE_FAR: u32 = 15;
+/// The bone lands' way in (`vitals::first::BONE_LANDS`): a bone in the bag and no edge yet.
+const KNAP_BONE: u32 = 16;
 
 /// Seconds played before the first hint, that bare hands can't fell a tree (`first.rs`).
 const LOGS_AFTER: u64 = 20;
@@ -64,6 +66,7 @@ static RAW_MEAT_TAG: Tag = Tag::named("raw_meat");
 static CAMPFIRE_TAG: Tag = Tag::named("campfires");
 static ROCKS_TAG: Tag = Tag::named("rocks");
 static FLINT_TAG: Tag = Tag::named("flint");
+static BONE_TAG: Tag = Tag::named("bone");
 /// The evening the night hint was last shown (the day count; not saved).
 static NIGHT_SHOWN: Component<u32> = Component::named("hints_night_shown");
 /// Game hours before sunset the night hint comes (the sunset by the calendar's daylight: 18:00 at
@@ -208,6 +211,9 @@ fn watch(w: &World) {
             .any(|&i| item_name(i) == "base:part_felling_axe_head");
         if has(&ROCKS_TAG) && has(&FLINT_TAG) && !flake {
             once(w, id, KNAP);
+        }
+        if has(&BONE_TAG) && !has(&FLINT_TAG) && !flake && !logs {
+            once(w, id, KNAP_BONE);
         }
         if flake && !logs {
             once(w, id, FLAKE);

@@ -25,6 +25,11 @@ pub static SHARP_FLAKE: Item = Item::named("sharp_flake");
 pub static LOOSE_ROCK: Block = Block::named("loose_rock");
 pub static LOOSE_FLINT: Block = Block::named("loose_flint");
 pub static FALLEN_BRANCH: Block = Block::named("fallen_branch");
+/// Old bones on the ground of the bone lands (`vitals::first::BONE_LANDS`), and what a bone
+/// struck on them gives: a splinter, the bone lands' flake.
+pub static LOOSE_BONE: Block = Block::named("loose_bone");
+pub static BONE: Item = Item::named("bone");
+pub static BONE_SPLINTER: Item = Item::named("bone_splinter");
 
 static LEAVES: Tag = Tag::named("leaves");
 /// Edges that cut fibre plants (a flake; a knife later).
@@ -48,6 +53,17 @@ pub fn register(r: &mut Registry) {
         &[([4.0, 0.0, 4.0], [11.0, 4.0, 11.0]), ([9.0, 0.0, 9.0], [13.0, 2.5, 13.0])],
     );
     loose(r, &FALLEN_BRANCH, &[], "wood", "fallen_branch", &[([1.0, 0.0, 7.0], [15.0, 1.5, 8.5]), ([9.0, 0.0, 8.5], [12.0, 1.0, 12.0])]);
+    // A long bone with its knobbed ends, and a rib beside it (its tile is the bone item's until
+    // Art draws one).
+    loose(
+        r,
+        &LOOSE_BONE,
+        &strikes,
+        "stone",
+        "loose_bone",
+        &[([2.0, 0.0, 7.0], [14.0, 1.5, 9.0]), ([1.0, 0.0, 6.0], [3.0, 2.5, 10.0]), ([13.0, 0.0, 6.0], [15.0, 2.5, 10.0]), ([5.0, 0.0, 11.0], [12.0, 1.0, 12.5])],
+    );
+    r.loot(&LOOSE_BONE).pool(Pool::new().item("bone"));
     r.loot(&LOOSE_ROCK).pool(Pool::new().item("rock"));
     r.loot(&LOOSE_FLINT).pool(Pool::new().item("flint"));
     r.loot(&FALLEN_BRANCH).pool(Pool::new().item("stick")).pool(
@@ -72,6 +88,19 @@ pub fn register(r: &mut Registry) {
         .max_stack(1)
         .durability(f::FLAKE_USES)
         .tab(&crate::tabs::TOOLS);
+    // A bone is a hammer and a core (`strike`), and still the ingredient it was (`items.rs`).
+    r.item(&BONE)
+        .tag("bone")
+        .on_use(strike)
+        .tab(&crate::tabs::INGREDIENTS);
+    r.item(&BONE_SPLINTER)
+        .tag("cutters")
+        .handheld()
+        .max_stack(1)
+        .durability(f::SPLINTER_USES)
+        .tab(&crate::tabs::TOOLS);
+    // A knife from a splinter too (`finish`: a bone blade).
+    r.shapeless(&crate::recipes::CRAFTING, "knife", 1, &["bone_splinter", "#stick", "#string"], 0);
 
     // Heads from memory, by the grid's pattern of nodules, and tools hafted by hand (`finish`
     // gives each its parts; `locked` keeps a head out of the book until one is made by hand).
@@ -148,15 +177,16 @@ fn unit(w: &World) -> f32 {
     (w.random() >> 40) as f32 / (1u64 << 24) as f32
 }
 
-/// A rock or a nodule used on a loose rock or nodule on the ground: one strike (`vitals::first`).
-/// Used on the top of anything else, it's put down there.
+/// A rock, a nodule or a bone used on a loose rock, nodule or bone on the ground: one strike
+/// (`vitals::first`). The thing struck decides: flint and rock give flakes, a bone splinters
+/// (any of them is hammer enough). Used on the top of anything else, it's put down there.
 fn strike(u: &mut ItemUse) -> bool {
     let Some((aimed, face)) = u.target_block() else { return false };
     let w = u.world();
     // The stone itself, or the top of what it lies on: a small thing on the ground is easy to aim
     // past (PC run fh4_axe: the ray passed over the nodule to the ground under it).
     let above = aimed.above();
-    let loose = |q: BlockPos| LOOSE_FLINT.is(w.block(q)) || LOOSE_ROCK.is(w.block(q));
+    let loose = |q: BlockPos| LOOSE_FLINT.is(w.block(q)) || LOOSE_ROCK.is(w.block(q)) || LOOSE_BONE.is(w.block(q));
     let p = if loose(aimed) {
         aimed
     } else if face == Dir::Up.face() && loose(above) {
@@ -166,14 +196,15 @@ fn strike(u: &mut ItemUse) -> bool {
     };
     let state = w.block(p);
     let flint = LOOSE_FLINT.is(state);
+    let bone = LOOSE_BONE.is(state);
     let player = u.entity();
     let at = p.center().offset(0.0, -0.3, 0.0);
     // Sneaking: crouched (the held keys aren't on the server any more).
     let sneaking = w
         .entity(player)
         .is_some_and(|e| e.pose == abi::pose::CROUCH);
-    weft_sdk::info!("first: strike at {p:?}, flint {flint}, sneaking {sneaking}");
-    if sneaking && flint {
+    weft_sdk::info!("first: strike at {p:?}, flint {flint}, bone {bone}, sneaking {sneaking}");
+    if sneaking && (flint || bone) {
         crate::knapping::open(&w, player, p);
         return true;
     }
@@ -190,9 +221,15 @@ fn strike(u: &mut ItemUse) -> bool {
         }
     }
     w.play_sound(&STRIKE, at, 1.0);
-    let chance = if flint { f::FLAKE_FROM_FLINT } else { f::FLAKE_FROM_ROCK };
+    let (chance, edge) = if bone {
+        (f::SPLINTER_FROM_BONE, BONE_SPLINTER.id())
+    } else if flint {
+        (f::FLAKE_FROM_FLINT, SHARP_FLAKE.id())
+    } else {
+        (f::FLAKE_FROM_ROCK, SHARP_FLAKE.id())
+    };
     if unit(&w) < chance {
-        w.spawn_item(at, ItemStack::new(SHARP_FLAKE.id(), 1));
+        w.spawn_item(at, ItemStack::new(edge, 1));
         w.play_sound(&CRACK, at, 0.8);
         let struck = w.prop_int(p, "struck").unwrap_or(0) + 1;
         if struck >= f::FLAKES_PER_STONE {
@@ -213,7 +250,13 @@ fn put_down(u: &mut ItemUse, p: BlockPos, face: u32) -> bool {
         return false;
     }
     let s = u.stack();
-    let block = if s.item == FLINT.id() { LOOSE_FLINT.id() } else { LOOSE_ROCK.id() };
+    let block = if s.item == FLINT.id() {
+        LOOSE_FLINT.id()
+    } else if s.item == BONE.id() {
+        LOOSE_BONE.id()
+    } else {
+        LOOSE_ROCK.id()
+    };
     w.set_block(at, block);
     if !w.outside_survival(u.entity()) {
         u.set_stack(StackData::shrink(s, 1));
@@ -274,7 +317,7 @@ pub fn finish(w: &World, player: u64, cells: &[ItemStack], made: ItemStack, roll
         if roll.is_none() || !knows(w, player, made.item) {
             return ItemStack::EMPTY;
         }
-        return crate::knapping::knapped_head(w, player, k.shape, false, roll);
+        return crate::knapping::knapped_head(w, player, k.shape, "flint", false, roll);
     }
     let kind = item_name(made.item).strip_prefix("base:").unwrap_or("");
     let Some(&(_, holding, _)) = f::HAFTED.iter().find(|h| h.0 == kind) else { return made };
@@ -293,6 +336,8 @@ pub fn finish(w: &World, player: u64, cells: &[ItemStack], made: ItemStack, roll
         }
         // A knife: a flake on a short grip.
         None if cells.iter().any(|s| s.item == SHARP_FLAKE.id()) => hand_part("knife_blade", "flint", day),
+        // Or a bone splinter on one.
+        None if cells.iter().any(|s| s.item == BONE_SPLINTER.id()) => hand_part("knife_blade", "bone", day),
         None => return made,
     };
     crate::parts::assembled(&[working, hand_part(holding, "branch", day), hand_part("lashing", "plant_cordage", day)])
@@ -304,5 +349,6 @@ pub fn ground_block(g: Ground) -> u32 {
         Ground::Rock => LOOSE_ROCK.id(),
         Ground::Flint => LOOSE_FLINT.id(),
         Ground::Branch => FALLEN_BRANCH.id(),
+        Ground::Bone => LOOSE_BONE.id(),
     }
 }
