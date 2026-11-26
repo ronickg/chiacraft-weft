@@ -72,6 +72,80 @@ pub fn scale(mass: f32) -> f32 {
     (mass / REF_KG).cbrt().clamp(0.15, 4.0)
 }
 
+// ---------------------------------------------------------------- the bodies drawn (slice 3)
+//
+// A whole or opened body is one lying model per body plan (`source/carcass/body.py`), at its reference animal's size,
+// scaled to each species by the cube root of its mass, and painted in the animal's own coat (`mods/animals/src`
+// `carcass.rs`). The bones and the pile stay the deer's (`scale`).
+
+/// The body plans a dead body is drawn as.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Plan {
+    Quadruped,
+    Bird,
+    Biped,
+    Reptile,
+    Fish,
+}
+
+impl Plan {
+    pub const ALL: [Plan; 5] = [Plan::Quadruped, Plan::Bird, Plan::Biped, Plan::Reptile, Plan::Fish];
+
+    /// Its models: `carcass_<name>` whole, `carcass_<name>_open` opened.
+    pub fn name(self) -> &'static str {
+        match self {
+            Plan::Quadruped => "quadruped",
+            Plan::Bird => "bird",
+            Plan::Biped => "biped",
+            Plan::Reptile => "reptile",
+            Plan::Fish => "fish",
+        }
+    }
+
+    /// The mass of the animal its model is built at, kg: a white-tailed deer, a vulture, a raptor, a caiman, a trout.
+    pub fn ref_kg(self) -> f32 {
+        match self {
+            Plan::Quadruped => 70.0,
+            Plan::Bird => 5.0,
+            Plan::Biped => 30.0,
+            Plan::Reptile => 40.0,
+            Plan::Fish => 3.0,
+        }
+    }
+
+    /// The blood pool's scale under an opened body against the body's own (the pool is built at the deer's size).
+    pub fn pool(self) -> f32 {
+        match self {
+            Plan::Quadruped => 1.0,
+            Plan::Bird => 0.45,
+            Plan::Biped => 0.8,
+            Plan::Reptile => 0.9,
+            Plan::Fish => 0.4,
+        }
+    }
+}
+
+/// The plan a species' model is drawn dead as (its living model's name, `species::Species::model`).
+pub fn plan_of(model: &str) -> Plan {
+    match model {
+        "eagle" | "early_bird" | "gull" | "owl" | "raven" | "small_bird" | "vulture" => Plan::Bird,
+        "citipati" | "raptor" | "utahraptor" | "iguanodont" | "psittacosaurus" => Plan::Biped,
+        "ankylosaur" | "caiman" | "lizard" | "protoceratops" | "sauropod" | "wyvern" => Plan::Reptile,
+        "fish" => Plan::Fish,
+        _ => Plan::Quadruped,
+    }
+}
+
+/// The scale a whole or opened body of `mass` kg is drawn at in its `plan`'s model.
+pub fn body_scale(mass: f32, plan: Plan) -> f32 {
+    (mass / plan.ref_kg()).cbrt().clamp(0.1, 12.0)
+}
+
+/// The coat and underside the body texture is painted in (`source/carcass/body.py`): the painter turns them to the
+/// animal's own by channel ratios.
+pub const COAT_RGB: [f32; 3] = [124.0, 80.0, 50.0];
+pub const UNDER_RGB: [f32; 3] = [212.0, 194.0, 166.0];
+
 // ---------------------------------------------------------------- skinning (slice 2)
 //
 // Ronald (11-25): "skinning only": an animal that leaves a carcass drops no hide or meat when it dies; a player kneels
@@ -207,5 +281,17 @@ mod tests {
         assert!((scale(REF_KG) - 1.0).abs() < 1e-5);
         assert!(scale(2.5) < 0.4 && scale(500.0) > 1.8);
         const { assert!(FROM_KG >= 1.0 && EDIBLE > crate::meat::YIELD) };
+    }
+
+    #[test]
+    fn every_species_has_a_plan_and_a_sane_size() {
+        for s in &crate::species::SPECIES {
+            let plan = plan_of(s.model);
+            let k = body_scale(s.bio.mass, plan);
+            assert!((0.1..=12.0).contains(&k), "{}: {k}", s.name);
+        }
+        assert_eq!(plan_of("deer"), Plan::Quadruped);
+        assert_eq!(plan_of("vulture"), Plan::Bird);
+        assert!((body_scale(70.0, Plan::Quadruped) - 1.0).abs() < 1e-6);
     }
 }

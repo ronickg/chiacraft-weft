@@ -103,6 +103,20 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   bodies (shots 1, 4, 8) and is gone at Bones and after skinning; the camera shows the kneeling skinner side-on with
   the knife and the body. The red was too bright (darkened after). The body lies at the pool's edge, not its middle:
   rolling the model about its root moves it off its entity's centre, which the art slice's lying models fix.
-- Left for later: the opened body itself (art slice); the dead body shows the base coat, not its own; vultures
+- Slice 3, first batch (Planner on r6: the kneel disjointed, the whole deer legs-up, the body off its pool): the
+  `skin` clip kneels on the shins (hips at 3 px, legs flat behind; the torso, which hangs from the neck, leans only
+  10-12 degrees, so it stays on the hips). Whole and opened bodies are now one lying model per body plan
+  (`source/carcass/body.py`: four-legged mammal, bird, two-legged dinosaur, reptile on its belly, fish; opened: the
+  upper side cut open, ribs across the meat, guts beside it), centred on the carcass, scaled by the cube root of mass
+  against each plan's reference animal (`animals_core::carcass::Plan`), and painted in the animal's own coat and
+  underside (its genes' phenotype read at death into `carcass_coat`; the client recolours the shared texture's coat
+  texels by `body_mask.bin`). Sheet: `source/carcass/sheet.py` (archived in
+  ~/Coding/chiacraft-archive/images/carcass/2026-11-26/). cov_carcass part 5 kills one of each plan for shots.
+- r7 (cd142572e): nothing sinks (low shots of each stage on the grass), each plan in its own coat; the knife missed
+  the deer (it lay 2 blocks off the aim). r9 (e2549bca5, every shot with the HUD hidden): skinning runs (7.9 s, flint,
+  1 hide at quality 1 from a level-33 deer, 4 venison; the venison taken counts as eaten, so it steps to Bones); the
+  kneel view shows the deer on its side, belly and legs toward the skinner, on its pool; the five plans' opened bodies
+  rest on the ground.
+- Left for later: white spotting and patterns on dead coats (only the base and underside colours carry over); the dead body shows the base coat, not its own; vultures
   fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.

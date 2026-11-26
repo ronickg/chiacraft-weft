@@ -679,6 +679,11 @@ impl Default for Marks {
 }
 
 impl Look {
+    /// Its coat and its underside, 0-255 (a dead body's paint: `carcass.rs`).
+    pub fn coat(&self) -> (Rgb, Rgb) {
+        (self.base, self.under)
+    }
+
     /// The color it shows at a glance, all over: what camouflages it or gives it away
     /// (`evolution.rs`).
     pub fn average(&self) -> [f32; 3] {
