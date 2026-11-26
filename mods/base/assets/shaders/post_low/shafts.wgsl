@@ -21,6 +21,12 @@ fn shaft_glow(p: PostPixel) -> vec4<f32> {
     if sun.w <= 0.0 || abs(scene.params.x - 0.6 * scene.params.y) > 0.5 {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
+    // None under the one fog (chiacraft's pack, `base:look_fog_one`, option 72, with the HDR world):
+    // its march lights the air through the sun's shadow step by step, Bliss's shafts; these beams
+    // added that light twice (feature audit B19, 11-26).
+    if scene.frame.x > 0.5 && scene.options[18][0] > 0.5 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
     let clip = scene.view_proj * vec4(sun.xyz * 1000.0, 1.0);
     if clip.w <= 0.0 {
         return vec4(0.0, 0.0, 0.0, 1.0);

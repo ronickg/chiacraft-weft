@@ -5,6 +5,10 @@
 // the half-size image (an engine without `post_low`), marched here per pixel as before.
 fn apply(p: PostPixel) -> vec4<f32> {
     var glow: vec3<f32>;
+    // Off under the one fog (its march is this light, `post_low`'s gate): skip the filter too.
+    if scene.frame.x > 0.5 && scene.options[18][0] > 0.5 {
+        return p.color;
+    }
     if p.low != 0u {
         glow = vol_filtered(p, select(4, 2, p.strength < 0.75));
     } else {

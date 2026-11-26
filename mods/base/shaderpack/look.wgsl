@@ -155,10 +155,11 @@ fn rain_rings(p: vec2<f32>) -> vec2<f32> {
 fn luma(c: vec3<f32>) -> f32 {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
-// Bliss's luma (color_transforms.glsl: Rec. 601, 0.299 0.587 0.114), for its exposure's mean and the
-// land's light's min(3 luma, 2.5): a blue night reads about 1.3x ours there.
+// Bliss's luma where deferred.vsh takes it (its own luma there, 0.21 0.72 0.07, not
+// color_transforms.glsl's Rec. 601), for its exposure's mean and the land's light's
+// min(3 luma, 2.5) (feature audit B5, 11-26).
 fn bliss_luma(c: vec3<f32>) -> f32 {
-    return dot(c, vec3(0.299, 0.587, 0.114));
+    return dot(c, vec3(0.21, 0.72, 0.07));
 }
 
 // What solid things write in the world image's alpha: nothing, so that what water, glass and ice

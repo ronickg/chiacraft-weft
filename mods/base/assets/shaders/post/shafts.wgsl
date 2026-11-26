@@ -4,6 +4,10 @@
 // image, marched here per pixel as before.
 fn apply(p: PostPixel) -> vec4<f32> {
     var s: vec4<f32>;
+    // Off under the one fog (its march is this light, `post_low`'s gate): skip the filter too.
+    if scene.frame.x > 0.5 && scene.options[18][0] > 0.5 {
+        return p.color;
+    }
     if p.low != 0u {
         s = post_low_at(p, p.uv);
     } else {

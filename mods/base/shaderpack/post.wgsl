@@ -96,6 +96,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // before, so a merged pass never finished the picture.
         if pass_.spare == 1u && scene.frame.x > 0.5 {
             color = vec4(finish_picture(hdr_light(color.rgb + sharpen_delta(first.scene, in.uv), in.uv, pass_)), 1.0);
+            color = vec4(output_dither(color.rgb, in.clip.xy), 1.0);
             // Debug view 10: the clouds' shadow map itself (r through, as grey) on the screen's left
             // square, north up; red where the ground below the camera reads it.
             if look_debug() == 10u && scene.cloud_shadow.x > 0.5 {
@@ -354,6 +355,23 @@ fn auto_exposure(mean: f32) -> f32 {
 // How strong the bloom is: a share of the glow mixed in (it keeps the light's sum), more in rain
 // and fog, where the air itself scatters.
 const BLOOM_MIX: f32 = 0.1;
+
+// With Bliss's chain, triangular noise of one 8-bit step on the display's code (Bliss's final
+// pass, method only; feature audit B20, 11-26): the night sky's and dusk's gradients band less.
+// The target is sRGB, so the step is taken on the encoded value and decoded back.
+fn output_dither(c: vec3<f32>, px: vec2<f32>) -> vec3<f32> {
+    if !bliss_chain() {
+        return c;
+    }
+    let f = f32(u32(scene.frame.w) % 64u);
+    let a = fract(52.9829189 * fract(dot(px + f * 5.588238, vec2(0.06711056, 0.00583715))));
+    let b = fract(52.9829189 * fract(dot(px + f * 7.17 + 41.0, vec2(0.06711056, 0.00583715))));
+    let n = (a + b - 1.0) / 255.0;
+    let x = clamp(c, vec3(0.0), vec3(1.0));
+    let e = select(1.055 * pow(x, vec3(1.0 / 2.4)) - 0.055, x * 12.92, x <= vec3(0.0031308));
+    let d = clamp(e + n, vec3(0.0), vec3(1.0));
+    return select(pow((d + 0.055) / 1.055, vec3(2.4)), d / 12.92, d <= vec3(0.04045));
+}
 
 // Contrast-adaptive sharpening (AMD's CAS, its published method; Bliss runs it at 0.35-0.4) for the
 // HDR world's last pass, `base:look_sharpen`: what it would add at `uv` from the world's own picture

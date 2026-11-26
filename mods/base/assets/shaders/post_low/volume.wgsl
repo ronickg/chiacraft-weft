@@ -80,7 +80,9 @@ fn vol_glow(p: PostPixel) -> vec3<f32> {
     let day = smoothstep(-0.02, 0.06, sun.y);
     // At night, in rain, or with the eye in a liquid (its fog no longer starts at 0.6 of its end).
     // In rain the beams come only through the deck's breaks (below).
-    if day <= 0.0 || abs(scene.params.x - 0.6 * scene.params.y) > 0.5 {
+    // Nor under the one fog (chiacraft's pack, `base:look_fog_one`, option 72, with the HDR world):
+    // its own march is this light in the air, through the same shadows (feature audit B19, 11-26).
+    if day <= 0.0 || abs(scene.params.x - 0.6 * scene.params.y) > 0.5 || (scene.frame.x > 0.5 && scene.options[18][0] > 0.5) {
         return vec3(0.0);
     }
     // Under a forest's canopy (`scene.canopy`) the beams are thin and near: walk a shorter view in
