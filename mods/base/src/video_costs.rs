@@ -94,6 +94,9 @@ const TABLE: &[(&str, f64, f64, f64)] = &[
     ("pt_emissive", 4.0, 0.1, f64::NAN),
     ("pt_bounce_lights", 1.0, 0.35, f64::NAN),
     ("pt_restir", 1.0, 0.2, f64::NAN),
+    // One more ray and the sun's shadow ray at its end, one pixel in four (11-26, stage 3): a guess
+    // until the laptop's bench.
+    ("pt_cache_fill", 1.0, 0.3, f64::NAN),
     // The mist's banks walked per pixel (11-24): an estimate until the PC's bench at Max, 16 steps
     // a pixel each with a noise, a ground-map read and the shadow maps' taps, where there is mist.
     ("mist_banks", 1.0, 0.4, f64::NAN),

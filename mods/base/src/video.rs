@@ -140,6 +140,8 @@ static PT_EMISSIVE: Config<f32> = Config::named("core:pt_emissive");
 static PT_BOUNCE_LIGHTS: Config<bool> = Config::named("core:pt_bounce_lights");
 /// The lamps' draws reused over frames and neighbours (`core:pt_restir`, stage 2 step 3).
 static PT_RESTIR: Config<bool> = Config::named("core:pt_restir");
+/// The bounce's surface fills the radiance cache too (`core:pt_cache_fill`, stage 3 (2)).
+static PT_CACHE_FILL: Config<bool> = Config::named("core:pt_cache_fill");
 /// The newer quality settings, parts of the features' rows or rows of their own on the Developer
 /// screen (`PARTS`): the HDR world and temporal anti-aliasing (read at start), the mist as a
 /// volume, the soft clouds' shadow, the bloom's levels, the far shadow map's reach, the screen
@@ -889,7 +891,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 /// Players see the features' rows instead (Ronald, 11-24: the tuning "is more for developer
 /// things"). Traced shadows, reflections and the path tracer's denoiser only where the GPU traces
 /// rays (`traced`).
-const PARTS: [Row; 27] = [
+const PARTS: [Row; 28] = [
     Row {
         key: "shadows",
         values: &[0.0, 1.0, 2.0],
@@ -1045,6 +1047,8 @@ const PARTS: [Row; 27] = [
     },
     // The lamps' draws reused (ReSTIR): less noise with many lamps for the same rays.
     Row { key: "pt_restir", values: &[0.0, 1.0], get: || PT_RESTIR.get() as u8 as f64, set: |v| PT_RESTIR.set(v > 0.0), shown: off_on },
+    // Light past one bounce for what the eye doesn't see: the room fills with bounced light.
+    Row { key: "pt_cache_fill", values: &[0.0, 1.0], get: || PT_CACHE_FILL.get() as u8 as f64, set: |v| PT_CACHE_FILL.set(v > 0.0), shown: off_on },
 ];
 
 /// A part only a GPU that traces rays shows (traced shadows, reflections, the path tracer's denoiser).
@@ -1184,6 +1188,7 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
                 keys.push(("pt_emissive", 0.6));
                 keys.push(("pt_bounce_lights", 0.6));
                 keys.push(("pt_restir", 0.6));
+                keys.push(("pt_cache_fill", 0.6));
             }
             pick(&PARTS, &keys)
         }

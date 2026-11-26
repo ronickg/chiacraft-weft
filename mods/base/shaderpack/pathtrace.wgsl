@@ -1039,10 +1039,34 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         }
     }
     // Into the cache: the indirect light found here (one pixel in four a frame).
+    let bounce_cached = PT_BOUNCE_CACHED;
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
         let i = pt_cache_find(pt_cell(h.world, ng, dist, pt_noise(px + vec2(7.0, 5.0))), true);
         if i >= 0 {
             pt_cache_add(u32(i), indirect);
+        }
+        // Stage 3 (2), `core:pt_cache_fill` (flags bit 2): the surface the bounce met fills its own
+        // cell too, from one more ray of its own (SHaRC's idea: every vertex of a path updates the
+        // cache). Only surfaces the eye saw had cells: 58 % of the nave's bounce hits (the
+        // columns' backs, the walls above and behind) found none and fell back to their lightmap,
+        // so the light past one bounce, the lamps' with it, hardly reached the room (s3j: the
+        // picture with the cache unread came out as bright as with it).
+        if b.hit && (pt.flags & 4u) != 0u {
+            let bn = b.n;
+            let blift = bn * 0.02;
+            let u2 = pt_noise(px + vec2(19.0, 29.0));
+            let d2 = pt_cosine(bn, u2);
+            let b2 = rt_hit(b.rel + blift, d2, 96.0, 2.0);
+            var in2 = vec3(0.0);
+            if b2.hit {
+                in2 = pt_lit(b2, l, pt_noise(px + vec2(41.0, 13.0)));
+            } else {
+                in2 = max(light_on(d2, vec4(1.0, 0.0, 0.0, 0.0), 0.0, 1.0, b.world, b.rel) - light_on(d2, vec4(0.0), 0.0, 1.0, b.world, b.rel), vec3(0.0));
+            }
+            let j = pt_cache_find(pt_cell(b.world, bn, length(b.rel), pt_noise(px + vec2(23.0, 31.0))), true);
+            if j >= 0 {
+                pt_cache_add(u32(j), in2);
+            }
         }
     }
     if pt.debug == 10u {
@@ -1134,7 +1158,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             // the sky; brighter with the pixel's own cell held.
             case 23u: {
                 let own = 0.6 + 0.4 * pt_cached(h.world, ng, dist, pt_noise(px + vec2(3.0, 11.0))).a;
-                out = select(vec3(0.0, 0.0, 1.0), select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), PT_BOUNCE_CACHED > 0.5), b.hit) * own;
+                out = select(vec3(0.0, 0.0, 1.0), select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), bounce_cached > 0.5), b.hit) * own;
             }
             case 22u: { out = vec3(min(luma(f0) * 10.0, 1.0), 1.0 - rough_p, select(0.0, 1.0, rough_p * rough_p < 0.5)); }
             // 15: the traced block lights: green seen, red hidden; no light drawn: blue no list for
