@@ -116,7 +116,7 @@ pub fn register(r: &mut Registry) {
         .tag("crop_guards")
         .prop("lit", ["false", "true"])
         .states(|p, s| {
-            let post = ("oak_log", [0.0, 0.0, 2.0, 16.0]);
+            let post = ("log_oak", [0.0, 0.0, 2.0, 16.0]);
             let straw = ("hay_bale_side", [0.0, 0.0, 16.0, 16.0]);
             let head = ("hay_bale_top", [0.0, 0.0, 16.0, 16.0]);
             let s = s
