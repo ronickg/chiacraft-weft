@@ -329,6 +329,22 @@ pub fn init(r: &mut Registry) {
 
 /// A carcass of `of` (species `index`, `mass` kg drawn at `scale`) laid at `pos` facing `yaw`.
 fn lay(w: &World, of: u64, index: usize, (mass, scale): (f32, f32), yaw: f32, pos: [f64; 3], skinned: bool) -> u64 {
+    // Out of any wall or cliff it died pressed against (`core::clear_spot`), so a knife can reach it.
+    let plan = core::plan_of(SPECIES[index].model);
+    let (bw, bh) = animals_core::bodies::of(&format!("carcass_{}", plan.name()));
+    let size = core::body_scale(mass, plan) as f64;
+    let at = core::clear_spot(pos, bw as f64 * size / 2.0, bh as f64 * size, |p| crate::boss::solid(w, p));
+    if at != pos {
+        weft_sdk::info!(
+            "carcass of {of} moved out of the blocks at {:.1} {:.1} {:.1} to {:.1} {:.1}",
+            pos[0],
+            pos[1],
+            pos[2],
+            at[0],
+            at[2]
+        );
+    }
+    let pos = at;
     let id = w.spawn_with(&CARCASS, pos, &Spawn::new().yaw(yaw));
     if id == 0 {
         return 0;

@@ -1,0 +1,91 @@
+# Carcasses at a wall (Planner, from pt_rain_4: a deer that died against a stone wall left its carcass inside the
+# wall's block, where the knife could not reach it). A white-tailed deer killed pressed to a stone wall's south face,
+# one more in a corner (a wall north and east of it). Each gets "carcass of N moved out of the blocks at ... to ..."
+# (z at least 0.7 south of the wall face, the corner one also 0.7 west of the east wall) and its "carcass N of
+# white_tailed_deer" line at the new place. Then the first is skinned with a flint knife from the south: "skins
+# carcass" and "skinned carcass N" with its hide and venison. Shots: 1_laid (from above) and 2_low: both bodies
+# lying whole on the grass beside the stone, none of either inside it; 3_skinning (the kneel); 4_skinned.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 600 90 544
+wait 4
+chat /tk fill 584 60 528 616 68 560 base:dirt
+chat /tk fill 584 69 528 616 69 560 base:grass
+chat /tk fill 584 70 528 616 85 560 core:air
+chat /tk fill 584 86 528 616 110 560 core:air
+chat /tk fill 584 111 528 616 140 560 core:air
+chat /tk fill 584 70 561 616 100 576 core:air
+chat /time set 6000
+chat /tk fill 599 69 543 601 69 545 base:water
+chat /tk fill 599 70 543 601 70 545 core:air
+wait 1
+chat /tk mode creative
+chat /tk fill 595 70 545 608 72 547 base:stone
+chat /tk fill 607 70 545 608 72 552 base:stone
+chat /tk spawn animals:white_tailed_deer 600 70 548
+wait 0.2
+chat /tp 600 70 552
+wait 0.2
+chat /animalprof kill
+wait 1
+chat /tk spawn animals:white_tailed_deer 606 70 548
+wait 0.2
+chat /tp 605 70 552
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /animalprof carcass
+chat /tick freeze
+chat /tp 603 76 554
+look 0 -45
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_wall_1_laid.png
+press core:hide_hud
+chat /tp 603 68.9 553
+look 0 -8
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_wall_2_low.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tk put me 0 base:knife 1
+key 1
+wait 1
+chat /tp 600 70 551
+look 0 -40
+wait 1
+aim 6
+wait 1
+press core:use
+wait 4
+press core:hide_hud
+wait 0.5
+shot cov_carcass_wall_3_skinning.png
+press core:hide_hud
+wait 8
+chat /animalprof carcass
+chat /tick freeze
+chat /tp 603 76 554
+look 0 -45
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_wall_4_skinned.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+quit

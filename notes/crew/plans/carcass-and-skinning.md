@@ -163,4 +163,7 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
 - Pickup shown (11-26, branch claude/animals-pickup): what a skinning takes off is tossed from the body toward the
   skinner (`animals_core::carcass::OFF_SPEED`, `OFF_UP`), fanned apart, and picked up `OFF_PICKUP_TICKS` (1.25 s)
   later, so it is seen to come off and land. cov_carcass_skin shots 8b_off, 8c_off.
+- Laid clear of walls (11-26, pt_rain_4: a deer that died against a stone wall lay half in it, out of the knife's
+  reach): `animals_core::carcass::clear_spot` moves a carcass to the nearest spot its lying box is clear of solid
+  blocks, up to `CLEAR_REACH` (1.5 blocks, or half its width), toward the side the animal stood. cov_carcass_wall.
 - Left for later: species without stagger-break rows drop nothing on a break.

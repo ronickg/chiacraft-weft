@@ -286,6 +286,47 @@ pub fn flies(step: u8, look: Look, scale: f32) -> u8 {
 // at the carcass with a knife and gets its hide and meat (`skin_*`). As RDR2's pelts: a hide is poor, good or perfect
 // by the animal's own quality, how cleanly it was killed and the knife; rot spoils it (`vitals::rot::CARCASS`).
 
+/// A carcass is laid clear of solid blocks: one that died pressed to a wall or a cliff (pt_rain_4's deer, its body half
+/// in the stone where no knife could reach it) is moved out to the nearest open spot, at most `CLEAR_REACH` blocks
+/// (or half its width, for a big one), looked for in steps of `CLEAR_STEP` (or a sixteenth of its width).
+pub const CLEAR_REACH: f64 = 1.5;
+pub const CLEAR_STEP: f64 = 0.125;
+
+/// Where a lying body `half` blocks from its middle to each side and `height` tall goes, laid at `pos` (its feet):
+/// there if clear of `solid` blocks, else the nearest spot that is (on the side away from the wall: the animal stood
+/// there), else `pos`.
+pub fn clear_spot(pos: [f64; 3], half: f64, height: f64, solid: impl Fn([i32; 3]) -> bool) -> [f64; 3] {
+    let rows = pos[1].floor() as i32..=(pos[1] + height.max(0.05) - 0.01).floor() as i32;
+    // Its footprint sampled at most a block apart, just inside its edges.
+    let n = (2.0 * half).ceil().max(1.0) as i32 + 1;
+    let inner = (half - 0.02).max(0.0);
+    let blocked = |x: f64, z: f64| {
+        (0..n).any(|i| {
+            let fx = x - inner + 2.0 * inner * i as f64 / (n - 1) as f64;
+            (0..n).any(|j| {
+                let fz = z - inner + 2.0 * inner * j as f64 / (n - 1) as f64;
+                rows.clone()
+                    .any(|y| solid([fx.floor() as i32, y, fz.floor() as i32]))
+            })
+        })
+    };
+    if !blocked(pos[0], pos[2]) {
+        return pos;
+    }
+    let reach = CLEAR_REACH.max(half);
+    let step = CLEAR_STEP.max(half / 8.0);
+    let k = (reach / step).ceil() as i32;
+    let mut tries: Vec<(f64, f64)> = (-k..=k)
+        .flat_map(|i| (-k..=k).map(move |j| (i as f64 * step, j as f64 * step)))
+        .filter(|(dx, dz)| dx * dx + dz * dz <= reach * reach)
+        .collect();
+    tries.sort_by(|a, b| (a.0 * a.0 + a.1 * a.1).total_cmp(&(b.0 * b.0 + b.1 * b.1)));
+    tries
+        .into_iter()
+        .find(|(dx, dz)| !blocked(pos[0] + dx, pos[2] + dz))
+        .map_or(pos, |(dx, dz)| [pos[0] + dx, pos[1], pos[2] + dz])
+}
+
 /// Whether an animal of species mass `kg` drops its hide and meat when it dies (too small to leave a carcass).
 pub fn drops_on_death(kg: f32) -> bool {
     kg < FROM_KG
@@ -484,5 +525,23 @@ mod tests {
         assert_eq!(plan_of("deer"), Plan::Quadruped);
         assert_eq!(plan_of("vulture"), Plan::Bird);
         assert!((body_scale(70.0, Plan::Quadruped) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn carcass_laid_clear_of_walls() {
+        // A wall of blocks at z <= -174 (pt_rain_4's pen): a 1.4 wide body laid at z -172.4 reaches into it.
+        let wall = |p: [i32; 3]| p[2] <= -174;
+        let at = clear_spot([150.5, 73.0, -172.6], 0.7, 0.36, wall);
+        assert!(at[2] - 0.7 >= -173.0 && at[2] < -172.0, "{at:?}");
+        assert_eq!(at[0], 150.5);
+        // Clear already: left where it fell.
+        assert_eq!(clear_spot([150.5, 73.0, -171.0], 0.7, 0.36, wall), [150.5, 73.0, -171.0]);
+        // Into a corner: out of both walls.
+        let corner = |p: [i32; 3]| p[2] <= -174 || p[0] >= 151;
+        let at = clear_spot([150.6, 73.0, -172.6], 0.7, 0.36, corner);
+        assert!(at[2] - 0.7 >= -173.0 && at[0] + 0.7 <= 151.0, "{at:?}");
+        // The floor under it is no wall.
+        let floor = |p: [i32; 3]| p[1] < 73;
+        assert_eq!(clear_spot([0.5, 73.0, 0.5], 0.7, 0.36, floor), [0.5, 73.0, 0.5]);
     }
 }

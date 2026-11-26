@@ -576,3 +576,44 @@ s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1
 s += ["chat /animalprof where 96", "chat /animalprof blood"]
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("blood", s)
+
+
+def wall_part(x, p="cov_carcass_wall"):
+    """A deer killed pressed against a stone wall (pt_rain_4: its carcass lay half in the wall, out of the knife's reach),
+    and one in a corner: each carcass laid clear of the stone (`animals_core::carcass::clear_spot`), then the first
+    skinned with a flint knife from the open side."""
+    out = pad(x) + [
+        "chat /tk mode creative",
+        # A wall 3 high along the deer's north side (z Z+1 to Z+3: its south face at Z+4), and one along the second
+        # deer's east side (x+7, x+8) to make a corner.
+        f"chat /tk fill {x-5} 70 {Z+1} {x+8} 72 {Z+3} base:stone",
+        f"chat /tk fill {x+7} 70 {Z+1} {x+8} 72 {Z+8} base:stone",
+        # Spawned at the wall (a deer's middle 0.5 from it, its own box clear; a lying deer's 1.4 reaches 0.2 into it).
+        f"chat /tk spawn animals:white_tailed_deer {x} 70 {Z+4}", "wait 0.2", f"chat /tp {x} 70 {Z+8}", "wait 0.2",
+        "chat /animalprof kill", "wait 1",
+        f"chat /tk spawn animals:white_tailed_deer {x+6} 70 {Z+4}", "wait 0.2", f"chat /tp {x+5} 70 {Z+8}", "wait 0.2",
+        "chat /animalprof kill", "wait 2", "chat /animalprof carcass",
+        # Both bodies at the wall, from above and low from the south.
+        "chat /tick freeze", f"chat /tp {x+3} 76 {Z+10}", "look 0 -45", "wait 2", f"shot {p}_1_laid.png",
+        f"chat /tp {x+3} 68.9 {Z+9}", "look 0 -8", "wait 2", f"shot {p}_2_low.png", "chat /tick unfreeze", "wait 1",
+        # The first skinned from the open side: the knife reaches it.
+        "chat /tk put me 0 base:knife 1", "key 1", "wait 1",
+        f"chat /tp {x} 70 {Z+7}", "look 0 -40", "wait 1", "aim 6", "wait 1", "press core:use", "wait 4",
+        f"shot {p}_3_skinning.png", "wait 8", "chat /animalprof carcass",
+        "chat /tick freeze", f"chat /tp {x+3} 76 {Z+10}", "look 0 -45", "wait 2", f"shot {p}_4_skinned.png",
+        "chat /tick unfreeze", "wait 1",
+    ]
+    return out
+
+
+s = head("carcass_wall", [
+    "Carcasses at a wall (Planner, from pt_rain_4: a deer that died against a stone wall left its carcass inside the",
+    "wall's block, where the knife could not reach it). A white-tailed deer killed pressed to a stone wall's south face,",
+    "one more in a corner (a wall north and east of it). Each gets \"carcass of N moved out of the blocks at ... to ...\"",
+    "(z at least 0.7 south of the wall face, the corner one also 0.7 west of the east wall) and its \"carcass N of",
+    "white_tailed_deer\" line at the new place. Then the first is skinned with a flint knife from the south: \"skins",
+    "carcass\" and \"skinned carcass N\" with its hide and venison. Shots: 1_laid (from above) and 2_low: both bodies",
+    "lying whole on the grass beside the stone, none of either inside it; 3_skinning (the kneel); 4_skinned.",
+]) + wall_part(600)
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("carcass_wall", s)
