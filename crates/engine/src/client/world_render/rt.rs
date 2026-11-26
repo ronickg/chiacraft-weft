@@ -279,6 +279,12 @@ pub struct RtLights {
 }
 
 const LIGHTS_EVERY: u64 = 15;
+
+/// chiacraft: `core:pt_plain`, the path tracer lighting with vanilla's math (the pack's
+/// `pathtrace.wgsl`): 1 on.
+fn pt_plain() -> u32 {
+    u32::from(crate::config::by_name("core:pt_plain").map_or(0.0, crate::config::get) > 0.5)
+}
 const LIGHTS_PER_CUBE: usize = 48;
 const LIGHTS_MAX: usize = 1 << 20;
 
@@ -648,7 +654,8 @@ impl WorldRenderer {
             spec: gpu.texture_index(spec),
             mode: u32::from(denoised && debug == 0),
             light: 0,
-            pad: [0; 3],
+            plain: pt_plain(),
+            pad: [0; 2],
         };
         let origins = page;
         self.bind_run(list, cs, page, origins);
@@ -715,7 +722,8 @@ impl WorldRenderer {
             spec: 0,
             mode: 1,
             light: gpu.texture_index(light),
-            pad: [0; 3],
+            plain: pt_plain(),
+            pad: [0; 2],
         };
         list.push(Cmd::BeginPass { color: Some((target, None)), depth: None, motion: None });
         self.bind_run(list, finish, page, page);
