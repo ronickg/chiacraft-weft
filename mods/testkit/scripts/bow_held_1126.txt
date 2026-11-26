@@ -28,13 +28,12 @@ wait 1
 press core:perspective
 wait 1
 shot bh_third.png
-press core:perspective
-wait 0.5
+# core:perspective goes first person, behind, in front, first person again.
 press core:perspective
 wait 1
 shot bh_front.png
 press core:perspective
-wait 0.5
+wait 1
 chat /gear knife flint slot=1
 key 2
 wait 1
