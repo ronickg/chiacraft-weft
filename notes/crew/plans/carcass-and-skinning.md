@@ -109,8 +109,8 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   (`source/carcass/body.py`: four-legged mammal, bird, two-legged dinosaur, reptile on its belly, fish; opened: the
   upper side cut open, ribs across the meat, guts beside it), centred on the carcass, scaled by the cube root of mass
   against each plan's reference animal (`animals_core::carcass::Plan`), and painted in the animal's own coat and
-  underside (its genes' phenotype read at death into `carcass_coat`; the client recolours the shared texture's coat
-  texels by `body_mask.bin`). Sheet: `source/carcass/sheet.py` (archived in
+  underside (its genes' phenotype read at death into `carcass_coat`, since replaced by the whole genome: see the third
+  part). Sheet: `source/carcass/sheet.py` (archived in
   ~/Coding/chiacraft-archive/images/carcass/2026-11-26/). cov_carcass part 5 kills one of each plan for shots.
 - r7 (cd142572e): nothing sinks (low shots of each stage on the grass), each plan in its own coat; the knife missed
   the deer (it lay 2 blocks off the aim). r9 (e2549bca5, every shot with the HUD hidden): skinning runs (7.9 s, flint,
@@ -124,6 +124,13 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   legs' long bones with their hooves or claws, a little meat, a scrap of the animal's own hide or feathers that the
   coat painter turns to its colour; the pile a skull, a few long bones and the hide), replacing slice 1's one
   placeholder pair. cov_carcass shots 14 (bones) and 15 (pile) of each plan's row.
-- Left for later: white spotting and patterns on dead coats (next) (only the base and underside colours carry over); the dead body shows the base coat, not its own; vultures
+- Slice 3, third part (Planner 11-26, "spotting and patterns on dead coats next"): the carcass keeps the animal's
+  whole genome (`carcass_genome`, copied at the DIE question), and the client paints it with the living coat painter
+  (`animals_core::coats::paint_dead`) on the carcass models' own layers (`genetics/layers/carcass/`, written by
+  `body.py layers`: each coat texel's model position, folded from lying back to standing so stripes, rosettes, white
+  feet and blazes land where they grow, its underside share, white and points zones), keeping the shared texture's
+  painted light by its brightness. Offline: `cargo run -p animals_core --bin carcass_coats` then `sheet.py --coats`
+  (jaguar rosettes, tabby and white cats, striped raptors, archived).
+- Left for later: vultures
   fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.

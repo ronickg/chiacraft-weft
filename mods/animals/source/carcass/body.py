@@ -344,13 +344,83 @@ MODELS = [("carcass_quadruped", quad), ("carcass_quadruped_open", quad_open), ("
 APART = 400  # units each model is painted apart from the next (so none shades another)
 
 
+POINTS = {}  # (element name, face): its texels' positions in the model's own units (`area` keeps them for `layers`)
+
+
 def area(e, face, p, uu, vv, h):
     a = np.full(p.shape[:2], e["mat"], int)
+    q = p - np.array([e["model"] * APART, 0, 0])  # painted apart along x (`APART`)
+    POINTS[(e["name"], face)] = q
     if e["under"]:
         ax, at, sgn = e["under"]
-        q = p[..., ax] - (e["model"] * APART if ax == 0 else 0)  # painted apart along x (`APART`)
-        a[(q - at) * sgn > 0] = UNDER
+        a[(q[..., ax] - at) * sgn > 0] = UNDER
     return a
+
+
+# ---- coat layers: the living painter's (`animals_core::coats`, the skill's `layers.py`) for these bodies, so a dead
+# animal shows its white spotting, points, mask and patterns, not only its two colours. Each texel's place is turned
+# back to where it would be on the animal standing (y up, z head to tail): a body on its side has its back at -x and
+# its belly, legs out, at +x; the reptile lies on its belly as it stands.
+STAND = {"quadruped": (14, 30), "bird": (8, 8), "biped": (10, 26), "fish": (6, 0)}  # belly's x, the legs' length
+
+
+def standing(name, q):
+    plan = name.split("_")[1]
+    if plan == "reptile":
+        return q
+    belly, legs = STAND[plan]
+    return np.stack([q[..., 1] - 8, belly + legs - q[..., 0], q[..., 2]], -1)
+
+
+def props_of(part, under):
+    """White, points, mask, extremity and pattern zone (0..1, `layers.py`) for a part by its name, its underside
+    texels whiter and less patterned."""
+    has = lambda *ks: any(k in part for k in ks)  # noqa: E731
+    if has("lower", "_low", "shin"):
+        v = (0.6, 0.9, 0, 0.9, 0.5)
+    elif has("upper", "_top", "thigh", "leg", "arm", "foot"):
+        v = (0.35, 0.7, 0, 0.6, 0.6)
+    elif has("muzzle", "snout", "nose"):
+        v = (0.5, 0.7, 0.9, 0.7, 0.2)
+    elif has("head"):
+        v = (0.3, 0.4, 0.4, 0.4, 0.5)
+    elif has("ear"):
+        v = (0.2, 0.5, 0, 0.95, 0.4)
+    elif has("tail"):
+        v = (0.2, 0.2, 0, 0.9 if has("_2", "top", "low") else 0.7, 0.8)
+    elif has("chest", "neck"):
+        v = (0.45, 0.3, 0, 0.1, 0.8)
+    elif has("feather", "wing", "primaries", "dorsal", "anal", "pectoral"):
+        v = (0.15, 0.1, 0, 0.5, 0.7)
+    else:
+        v = (0.08, 0, 0, 0, 1)
+    v = np.array(v, float)
+    return np.where(under[..., None], np.maximum(v * [1, 1, 1, 1, 0.3], [0.75, 0, 0, 0, 0]) + v * [0, 1, 1, 1, 0], v)
+
+
+def layers(elements, uv, mask, w, h):
+    """The four layer images and their bounds, in the texture's layout (gutters copied from each tile's edge)."""
+    info, pos, props, props2 = (np.zeros((h, w, 4)) for _ in range(4))
+    tiles = []
+    for (i, face), (u0, v0, u1, v1) in uv.items():
+        e = elements[i]
+        q = POINTS.get((e["name"], face))
+        if q is None or q.shape[:2] != (v1 - v0, u1 - u0):
+            continue
+        tiles.append((e, standing(MODELS[e["model"]][0], q), (u0, v0, u1, v1)))
+    lo = np.min([s.reshape(-1, 3).min(0) for _, s, _ in tiles], 0) - 1
+    hi = np.max([s.reshape(-1, 3).max(0) for _, s, _ in tiles], 0) + 1
+    for e, s, (u0, v0, u1, v1) in tiles:
+        sl = (slice(v0 - 1, v1 + 1), slice(u0 - 1, u1 + 1))
+        m = np.pad(mask[v0:v1, u0:u1], 1, mode="edge")
+        coat = (m == COAT) | (m == UNDER)
+        pr = props_of(e["name"].split("_", 1)[1], m == UNDER)
+        pad = lambda a: np.pad(a, ((1, 1), (1, 1), (0, 0)), mode="edge")  # noqa: E731
+        info[sl] = np.dstack([coat * 255, np.full(m.shape, 120), (m == UNDER) * 255, np.full(m.shape, 255)])
+        pos[sl] = np.dstack([pad((s - lo) / (hi - lo) * 255), np.full(m.shape, 255)])
+        props[sl] = np.dstack([pr[..., :3] * 255, np.full(m.shape, 255)])
+        props2[sl] = np.dstack([pr[..., 3] * 255, pr[..., 4] * 255, np.zeros(m.shape), np.full(m.shape, 255)])
+    return [np.clip(np.round(a), 0, 255).astype(np.uint8) for a in (info, pos, props, props2)], [lo.tolist(), hi.tolist()]
 
 
 def main():
@@ -377,6 +447,13 @@ def main():
     Image.fromarray(sheet).save(tex)
     with open(os.path.join(HERE, "body_mask.bin"), "wb") as f:
         f.write(np.array([w, h], "<u2").tobytes() + mask.tobytes())
+    maps, bounds = layers(elements, uv, mask, w, h)
+    d = os.path.join(HERE, "..", "..", "genetics", "layers", "carcass")
+    os.makedirs(d, exist_ok=True)
+    for name, img in zip(("info", "pos", "props", "props2"), maps):
+        Image.fromarray(img).save(os.path.join(d, f"{name}.png"))
+    with open(os.path.join(d, "layers.json"), "w") as f:
+        json.dump({"bounds": bounds}, f)
     for i, (name, els) in enumerate(MODELS):
         mine = [(j, e) for j, e in enumerate(elements) if e["model"] == i]
         spec_els = []

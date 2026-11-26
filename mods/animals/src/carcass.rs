@@ -40,11 +40,9 @@ static OPENED: [EntityKind; 5] = [
     EntityKind::named("carcass_reptile_open"),
     EntityKind::named("carcass_fish_open"),
 ];
-/// The animal's own coat and underside, 0xRRGGBB (0: the texture's own, a deer's); saved and drawn by its watchers.
-static COAT: Component<[u32; 2]> = Component::named("carcass_coat");
-/// Each texel of the bodies' texture: 0 coat, 1 underside, 2 dark, 3 meat, 4 bone, 255 none (`source/carcass/body.py`):
-/// its width and height (two little-endian u16), then a byte a texel.
-static BODY_MASK: &[u8] = include_bytes!("../source/carcass/body_mask.bin");
+/// The animal's genes (species 0: none, drawn in the texture's own deer coat), saved and sent to its watchers, who
+/// paint its coat on the body from them as on the living animal (`paint_dead`).
+static GENES: Component<crate::coats::Genome> = Component::named("carcass_genome");
 static BONES: [EntityKind; 5] = [
     EntityKind::named("carcass_quadruped_bones"),
     EntityKind::named("carcass_bird_bones"),
@@ -108,11 +106,11 @@ struct Dying {
     index: usize,
     mass: f32,
     yaw: f32,
-    /// Its drawn scale (genes and growth), its wild level, the hits it took, its coat (`COAT`).
+    /// Its drawn scale (genes and growth), its wild level, the hits it took, its genes (`GENES`).
     scale: f32,
     level: u32,
     hits: u32,
-    coat: [u32; 2],
+    genes: crate::coats::Genome,
 }
 static DYING: Mutex<Vec<Dying>> = Mutex::new(Vec::new());
 /// Kilograms taken off a body before its carcass was laid (the hunters' `DIE` handler may run first).
@@ -124,7 +122,7 @@ const EVERY: u64 = 100;
 pub fn init(r: &mut Registry) {
     r.entity_component(&BODY, Body::default(), component_flags::SAVE);
     r.entity_component(&SHOWN, 0u32, 0);
-    r.entity_component(&COAT, [0u32; 2], component_flags::SAVE | component_flags::SYNC_WATCHERS);
+    r.entity_component(&GENES, crate::coats::Genome::default(), component_flags::SAVE | component_flags::SYNC_WATCHERS);
     // Its box the lying deer's (scaled with it, `set_scale`), so a click on the body hits it (r7's knife use landed on
     // the grass beside one boxed as the ribcage).
     let (bw, bh) = animals_core::bodies::of("carcass_quadruped");
@@ -139,7 +137,7 @@ pub fn init(r: &mut Registry) {
         .texture("carcass/body")
         .attach(&BODY)
         .attach(&SHOWN)
-        .attach(&COAT)
+        .attach(&GENES)
         .attach(&SKIN)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
@@ -148,7 +146,7 @@ pub fn init(r: &mut Registry) {
         .goals(Goals::new().then(rot));
     r.entity_component(&SKIN, [0u64; 4], 0);
     // Its coat painted over whichever body plan it is drawn as (they share the texture), keeping the light painted in.
-    r.entity_skin(&CARCASS, &COAT, |coat, skin| paint_body(*coat, skin));
+    r.entity_skin(&CARCASS, &GENES, paint_dead);
     // A knife used at the ground beside a carcass skins it too (a body lying flat is easy to aim past: r3's use hit
     // the grass by it). The nearest carcass within `SKIN_REACH` of the block aimed at, or of the player.
     r.before_event(&actions::USE_ITEM, |q| {
@@ -254,16 +252,10 @@ pub fn init(r: &mut Registry) {
             let scale = crate::coats::size_of(&w, id).unwrap_or(1.0) * crate::breeding::growth(&w, id, index);
             // The killing blow is no `HURT` (a lethal hit fires `DIE` alone): one more.
             let hits = w.component(id, &HITS).unwrap_or(0) + 1;
-            let coat = w
-                .component(id, &crate::coats::GENOME)
-                .and_then(|g| crate::coats::phenotype(&g))
-                .map_or([0, 0], |l| {
-                    let (c, u) = l.coat();
-                    [rgb(c), rgb(u)]
-                });
+            let genes = w.component(id, &crate::coats::GENOME).unwrap_or_default();
             let mut d = DYING.lock().unwrap();
             d.retain(|r| r.id != id);
-            d.push(Dying { id, index, mass, yaw: e.yaw, scale, level: a.level(), hits, coat });
+            d.push(Dying { id, index, mass, yaw: e.yaw, scale, level: a.level(), hits, genes });
             if d.len() > 64 {
                 d.remove(0);
             }
@@ -279,9 +271,18 @@ pub fn init(r: &mut Registry) {
                 i.map(|i| dying.swap_remove(i))
             };
             // Died some other way (a command, the void): its kind's own size, facing north.
-            let Some(Dying { index, mass, yaw, scale, level, hits, coat, .. }) = read.or_else(|| {
+            let Some(Dying { index, mass, yaw, scale, level, hits, genes, .. }) = read.or_else(|| {
                 let index = SPECIES.iter().position(|s| s.kind.id() == d.kind)?;
-                Some(Dying { id: d.entity, index, mass: SPECIES[index].bio.mass, yaw: 0.0, scale: 1.0, level: 0, hits: 1, coat: [0; 2] })
+                Some(Dying {
+                    id: d.entity,
+                    index,
+                    mass: SPECIES[index].bio.mass,
+                    yaw: 0.0,
+                    scale: 1.0,
+                    level: 0,
+                    hits: 1,
+                    genes: Default::default(),
+                })
             }) else {
                 continue;
             };
@@ -293,8 +294,8 @@ pub fn init(r: &mut Registry) {
             if let Some(b) = w.component_mut(id, &BODY) {
                 (b.level, b.hits, b.cause) = (level, hits, d.cause);
             }
-            if let Some(c) = w.component_mut(id, &COAT) {
-                *c = coat;
+            if let Some(g) = w.component_mut(id, &GENES) {
+                *g = genes;
             }
         }
     });
@@ -397,7 +398,7 @@ fn show(w: &World, id: u64) {
     else {
         return;
     };
-    // Its body plan's lying model (or its bones, or the pile they end in), at its size, in its own coat (`paint_body`:
+    // Its body plan's lying model (or its bones, or the pile they end in), at its size, in its own coat (`paint_dead`:
     // the hide scraps and feathers left by the bones too).
     let plan = core::plan_of(s.model);
     let i = core::Plan::ALL.iter().position(|&p| p == plan).unwrap_or(0);
@@ -647,31 +648,16 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
 /// A hide's quality from skinning, 1 poor, 2 good, 3 perfect (`animals_core::carcass::quality`); none: an old one.
 pub static PELT_QUALITY: Component<u32> = Component::named("pelt_quality");
 
-/// 0xRRGGBB of a 0-255 colour.
-fn rgb(c: [f32; 3]) -> u32 {
-    c.iter()
-        .fold(0, |n, &v| (n << 8) | v.round().clamp(0.0, 255.0) as u32)
-}
-
-/// Paints a body's coat (`COAT`) over the bodies' texture: its coat and underside texels (`BODY_MASK`) turned from the
-/// texture's own colours (`animals_core::carcass::COAT_RGB`, `UNDER_RGB`) to the animal's by each channel's ratio,
-/// so the light painted into them stays.
-fn paint_body(coat: [u32; 2], skin: &mut Skin) {
-    if coat == [0, 0] || BODY_MASK.len() < 4 {
+/// Paints a body's coat from its genes (`GENES`) over the bodies' texture (`animals_core::coats::paint_dead`), at its
+/// species' usual size for its plan (the client has its genes, not its own mass).
+fn paint_dead(genes: &crate::coats::Genome, skin: &mut Skin) {
+    let Some(s) = (genes.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+    else {
         return;
-    }
-    let (mw, mh) = (u16::from_le_bytes([BODY_MASK[0], BODY_MASK[1]]) as usize, u16::from_le_bytes([BODY_MASK[2], BODY_MASK[3]]) as usize);
-    let mask = &BODY_MASK[4..];
-    if mw != skin.width as usize || mh != skin.height as usize || mask.len() != mw * mh {
-        return;
-    }
-    let ratio = |to: u32, from: [f32; 3]| [0, 1, 2].map(|c| ((to >> (16 - 8 * c)) & 0xff) as f32 / from[c].max(1.0));
-    let ratios = [ratio(coat[0], core::COAT_RGB), ratio(coat[1], core::UNDER_RGB)];
-    for (i, &m) in mask.iter().enumerate() {
-        let Some(r) = ratios.get(m as usize) else { continue };
-        let px = &mut skin.rgba[i * 4..i * 4 + 3];
-        for c in 0..3 {
-            px[c] = (px[c] as f32 * r[c]).round().clamp(0.0, 255.0) as u8;
-        }
-    }
+    };
+    let scale = core::body_scale(s.bio.mass, core::plan_of(s.model));
+    let (w, h) = (skin.width as usize, skin.height as usize);
+    crate::coats::paint_dead(genes, skin.rgba, w, h, scale, core::COAT_RGB, core::UNDER_RGB);
 }

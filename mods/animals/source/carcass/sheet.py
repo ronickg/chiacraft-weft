@@ -26,7 +26,49 @@ def recolor(tex, mask, coat, under):
     return out.astype(np.uint8)
 
 
+PLAN_OF = {"grey_wolf": "quadruped", "jaguar": "quadruped", "white_tailed_deer": "quadruped", "cat": "quadruped",
+           "golden_eagle": "bird", "raptor": "biped", "yacare_caiman": "reptile", "pacu": "fish"}
+PPU = {"quadruped": 2.2, "bird": 5.5, "biped": 2.2, "reptile": 2.2, "fish": 7}
+
+
+def coats():
+    """`--coats`: each species' four sample coats (`carcass_coats`, the game's painter) on its plan's whole body, and the
+    first one opened. Writes out/sheet_coats.png."""
+    d = os.path.join(OUT, "coats")
+    cell = 240
+    rows = []
+    for sp, plan in PLAN_OF.items():
+        row = []
+        for n in range(4):
+            path = os.path.join(d, f"{sp}_{n}.png")
+            if not os.path.exists(path):
+                continue
+            tex = np.array(Image.open(path).convert("RGBA"))
+            spec = json.load(open(os.path.join(OUT, f"carcass_{plan}.spec.json")))
+            img = Image.fromarray(render(spec, tex, yaw=35, pitch=-30, ppu=PPU[plan]))
+            img.thumbnail((cell, cell))
+            row.append((f"{sp} {n}", img))
+        if row:
+            tex = np.array(Image.open(os.path.join(d, f"{sp}_0.png")).convert("RGBA"))
+            spec = json.load(open(os.path.join(OUT, f"carcass_{plan}_open.spec.json")))
+            img = Image.fromarray(render(spec, tex, yaw=150, pitch=-42, ppu=PPU[plan]))
+            img.thumbnail((cell, cell))
+            row.append((f"{sp} 0 opened", img))
+            rows.append(row)
+    sheet = Image.new("RGBA", (cell * 5, len(rows) * (cell + 20)), (120, 132, 110, 255))
+    dr = ImageDraw.Draw(sheet)
+    for r, row in enumerate(rows):
+        for c, (label, img) in enumerate(row):
+            x0, y0 = c * cell, r * (cell + 20)
+            sheet.alpha_composite(img, (x0 + (cell - img.width) // 2, y0 + 18 + (cell - img.height) // 2))
+            dr.text((x0 + 4, y0 + 2), label, fill=(255, 255, 255, 255))
+    sheet.save(os.path.join(OUT, "sheet_coats.png"))
+    print(os.path.join(OUT, "sheet_coats.png"))
+
+
 def main():
+    if "--coats" in sys.argv:
+        return coats()
     tex = np.array(Image.open(os.path.join(OUT, "body.png")).convert("RGBA"))
     raw = open(os.path.join(HERE, "body_mask.bin"), "rb").read()
     w, h = np.frombuffer(raw[:4], "<u2")
