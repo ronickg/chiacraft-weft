@@ -419,6 +419,17 @@ fn pt_plain(at: u32, px: vec2<f32>, h: RtHit, ng: vec3<f32>, lift: vec3<f32>, su
         let vis = pt_block_visibility(h.world, h.rel, ng, lift, px).x;
         light -= block * ((1.0 - vis) * PT_BLOCK_SHADOW);
     }
+    // Debug 17 and 18 (plain only): the sky's share as traced (grey), the traced sun on the face
+    // (yellow; blue where the face looks away from it).
+    if pt.debug == 17u || pt.debug == 18u {
+        var out = vec3(access);
+        if pt.debug == 18u {
+            out = select(vec3(0.0, 0.0, 0.3), vec3(1.0, 0.9, 0.0) * clamp(sun, 0.0, 1.0), dot(ng, light_dir()) > 0.0);
+        }
+        pt_out[at] = vec4(out, 0.0);
+        pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
+        return;
+    }
     light = clamp(light, vec3(0.0), vec3(1.0)) * normal_shade(ng);
     let surface = pt_srgb_decode(pt_srgb_encode(albedo) * light);
     // The light alone for the denoisers (the surface over its albedo), no specular, no air.
