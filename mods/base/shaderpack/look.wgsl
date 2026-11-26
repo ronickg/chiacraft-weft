@@ -1899,10 +1899,7 @@ fn shadow_pcss(index: u32, size: i32, texel: f32, depth: f32, rel: vec3<f32>, p:
         sum += d * b;
     }
     var radius = 5.0;
-    // Test modes (`base:look_pcss` 2: the filter fixed at its smallest, no search; 3: the taps each
-    // from the point, not added up), to find what lit cave rock the 3x3 keeps dark (lksp_pcss2).
-    let mode = fantasy_opt(OPT_PCSS);
-    if count >= 0.9 && mode < 1.5 {
+    if count >= 0.9 {
         let gap = (sum / count - z) * depth;
         radius = clamp(gap, 0.0, 35.0) / 35.0 * 25.0 + 5.0;
     }
@@ -1911,9 +1908,6 @@ fn shadow_pcss(index: u32, size: i32, texel: f32, depth: f32, rel: vec3<f32>, p:
     var lit = 0.0;
     for (var i = 0; i < 13; i++) {
         q += pcss_spiral(f32(i), 12.0, turn) * step;
-        if mode > 2.5 {
-            q = p + pcss_spiral(f32(i), 12.0, turn) * step * 2.5;
-        }
         let g = textureGather(0, textures[index], nearest_clamp, q / f32(size));
         let nearest = max(max(g.x, g.y), max(g.z, g.w));
         lit += select(0.0, 1.0, nearest <= z + bias);

@@ -186,8 +186,7 @@ pub static LOOK_RAIN_MIRROR: Config<f32> = Config::named("look_rain_mirror");
 pub static LOOK_CAVE_FOG: Config<f32> = Config::named("look_cave_fog");
 /// Bliss's soft sun shadows (Variable_Penumbra_Shadows, 1 as made): a blocker search sets each
 /// pixel's filter from 5 to 30 by how far the shadow's caster stands (up to 35 blocks), then 13 taps
-/// along its spiral; 0 our fixed 3x3 of the near map (feature audit item 5, 11-26). Test modes for
-/// the cave leak (lksp_pcss2): 2 the filter fixed at 5, no search; 3 the taps not added up.
+/// along its spiral; 0 our fixed 3x3 of the near map (feature audit item 5, 11-26).
 pub static LOOK_PCSS: Config<f32> = Config::named("look_pcss");
 /// Bliss's screen-space contact shadows toward the sun (SCREENSPACE_CONTACT_SHADOWS, 1 as made):
 /// 16 steps of 3 pixels across last frame's solid world toward the light, the darker of it and the
@@ -353,7 +352,7 @@ pub fn register(r: &mut Registry) {
     crate::developer::page(r.config(&LOOK_RAIN_DARK).float(0.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_RAIN_MIRROR).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_CAVE_FOG).float(1.0, 0.0, 1.0));
-    crate::developer::page(r.config(&LOOK_PCSS).float(1.0, 0.0, 3.0));
+    crate::developer::page(r.config(&LOOK_PCSS).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_CONTACT_SUN).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_SSAO).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0));
