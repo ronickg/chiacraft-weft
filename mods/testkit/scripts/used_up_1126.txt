@@ -1,0 +1,156 @@
+# Used up (First hours, 11-26; vitals::first::NO_PUT_DOWN_SECS and the used-up hints): a strike that
+# uses a nodule or old bones up, then a second press 0.4 s later on the bare ground where it lay,
+# must keep the hammer stone in hand. A flat pad at the spawn, in survival. Each try sets a fresh
+# nodule one strike from used up (`struck 2`, FLAKES_PER_STONE 3), strikes (80% flint, 60% bone)
+# and presses again at once. Read, in run.log: "first: used up at ..., hint.base.used_up_nodule"
+# (and _bones) each followed by "first: not put down at ..., just struck", never "first: put
+# down" inside the tries; every `/tk get` in the tries air or the nodule/bone (a miss), never
+# base:loose_rock or a put-down base:loose_bone; each `/tk inv me` still base:rock x1 (then
+# base:bone x1); the hint line in the shots. Last, a stone put down on purpose 1.5 s after a
+# strike still goes down: "first: put down", /tk get base:loose_rock, no rock left in the bag.
+# A fresh world name each run. Yaw 0 faces -z; negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /tk mode creative
+chat /tk fill ~-6 ~-2 ~-6 ~6 ~-1 ~6 base:grass
+chat /tk fill ~-6 ~ ~-6 ~6 ~5 ~6 core:air
+wait 1
+chat /tk mode survival
+until mode survival within 10
+wait 1
+chat /tk give base:rock
+chat /tk hand me base:rock
+wait 0.5
+look 0 -60
+# Try 1.
+chat /tk set ~ ~ ~-1 base:loose_flint
+chat /tk setprop ~ ~ ~-1 struck 2
+aim_block 0 0 -1 0.05
+wait 0.3
+hold core:use 0.2
+wait 0.4
+hold core:use 0.2
+wait 0.3
+chat /tk get ~ ~ ~-1
+wait 1.5
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+shot uu_flint_hint.png
+# Try 2.
+chat /tk set ~ ~ ~-1 base:loose_flint
+chat /tk setprop ~ ~ ~-1 struck 2
+aim_block 0 0 -1 0.05
+wait 0.3
+hold core:use 0.2
+wait 0.4
+hold core:use 0.2
+wait 0.3
+chat /tk get ~ ~ ~-1
+wait 1.5
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+# Try 3.
+chat /tk set ~ ~ ~-1 base:loose_flint
+chat /tk setprop ~ ~ ~-1 struck 2
+aim_block 0 0 -1 0.05
+wait 0.3
+hold core:use 0.2
+wait 0.4
+hold core:use 0.2
+wait 0.3
+chat /tk get ~ ~ ~-1
+wait 1.5
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+# Try 4.
+chat /tk set ~ ~ ~-1 base:loose_flint
+chat /tk setprop ~ ~ ~-1 struck 2
+aim_block 0 0 -1 0.05
+wait 0.3
+hold core:use 0.2
+wait 0.4
+hold core:use 0.2
+wait 0.3
+chat /tk get ~ ~ ~-1
+wait 1.5
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+# Try 5.
+chat /tk set ~ ~ ~-1 base:loose_flint
+chat /tk setprop ~ ~ ~-1 struck 2
+aim_block 0 0 -1 0.05
+wait 0.3
+hold core:use 0.2
+wait 0.4
+hold core:use 0.2
+wait 0.3
+chat /tk get ~ ~ ~-1
+wait 1.5
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+chat /tk inv me
+until chat base:rock within 5
+shot uu_flint_after.png
+# The old bones: a bone struck on bones one splinter from used up.
+chat /tk give base:bone
+chat /tk hand me base:bone
+wait 0.5
+# Bones, try 1.
+chat /tk set ~ ~ ~-1 base:loose_bone
+chat /tk setprop ~ ~ ~-1 struck 2
+aim_block 0 0 -1 0.05
+wait 0.3
+hold core:use 0.2
+wait 0.4
+hold core:use 0.2
+wait 0.3
+chat /tk get ~ ~ ~-1
+wait 1.5
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+shot uu_bones_hint.png
+# Bones, try 2.
+chat /tk set ~ ~ ~-1 base:loose_bone
+chat /tk setprop ~ ~ ~-1 struck 2
+aim_block 0 0 -1 0.05
+wait 0.3
+hold core:use 0.2
+wait 0.4
+hold core:use 0.2
+wait 0.3
+chat /tk get ~ ~ ~-1
+wait 1.5
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+# Bones, try 3.
+chat /tk set ~ ~ ~-1 base:loose_bone
+chat /tk setprop ~ ~ ~-1 struck 2
+aim_block 0 0 -1 0.05
+wait 0.3
+hold core:use 0.2
+wait 0.4
+hold core:use 0.2
+wait 0.3
+chat /tk get ~ ~ ~-1
+wait 1.5
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+# Bones, try 4.
+chat /tk set ~ ~ ~-1 base:loose_bone
+chat /tk setprop ~ ~ ~-1 struck 2
+aim_block 0 0 -1 0.05
+wait 0.3
+hold core:use 0.2
+wait 0.4
+hold core:use 0.2
+wait 0.3
+chat /tk get ~ ~ ~-1
+wait 1.5
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+chat /tk inv me
+until chat base:bone within 5
+# On purpose: the rock put down on bare ground, well after the last strike.
+chat /tk hand me base:rock
+wait 2
+aim_block 0 -1 -1 1
+hold core:use 0.2
+wait 0.5
+chat /tk get ~ ~ ~-1
+chat /tk inv me
+shot uu_put_down.png
+expect alive
+quit

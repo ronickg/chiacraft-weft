@@ -7,6 +7,20 @@ screen's look by UI redo) and seen in PC runs (11-05). The research behind it is
 
 **As built, where it differs from the proposal below:**
 - The fire bed is three sticks and a fibre (the 2 × 2 holds four).
+- **The bone lands** (11-22; `CONTENT.md` decision 4): in the snowy plains, the savanna and the
+  swamp (`vitals::first::BONE_LANDS`, no stone at the surface there) no rocks or flint lie on
+  the ground, old bones do (`BONE`, about four within 24 blocks); the snowy plains had nothing
+  loose at all before. A bone (or a rock) struck on old bones splits off a bone splinter (60%,
+  three a bone): a cutter like the flake, 25 uses. Sneaking, the same knapping screen knaps a
+  bone head, graded lower than flint (`BONE_HEAD_MATERIAL_POINTS` 16 to flint's 24); it hafts as
+  flint's does, the axe felling to bone's tier. A knife is a splinter on a stick too. The hint
+  `knap_bone` shows with a bone and no flint. The book makes heads from memory from flint only.
+  Art to come: the old bones' block and the splinter's icon (both the bone item's for now).
+- **Used up** (11-26, Planner from the PC runs): a nodule, rock or old bones gone after three
+  flakes or splinters shows a hint (`hint.base.used_up_nodule`, `_stone`, `_bones`). For
+  `vitals::first::NO_PUT_DOWN_SECS` (1 s) after a strike a press on bare ground only knocks: the
+  hammer stone stays in hand (before, the press after the last flake put it down unseen). Check:
+  `mods/testkit/scripts/used_up_1126.txt`.
 - The knapping screen opens by sneaking and striking a flint nodule on the ground with a rock. It
   knaps an axe head (8 squares away), a pick head (13) or a shovel blade (8). A click inside the
   outline breaks the nodule into a flake. No knife blade: a knife is a flake on a stick.
@@ -178,6 +192,37 @@ runs at half speed from 10:00 to dusk, about 13 real minutes.
 
 So a new player has the axe as the sun goes down, and the fire just after: the first night is
 the deadline you feel.
+
+### Timing it: the first 30 minutes (planned 11-22, runs parked)
+
+The clock (`mods/base/src/first_clock.rs`, `vitals::first::CLOCK_STEPS`) notes, per player,
+the second of survival play each step first came true: `rock` (or `bone` in the bone lands),
+`edge` (a flake or splinter), `head`, `string`, `axe`, `fire` (a lit one within 4 blocks),
+`logs`, `planks`, `table`, `pickaxe`, `stone`. It logs `first-clock: <player> <step> at <s> s`
+as each comes and a summary at 1800 s; `/firstclock` shows the player's own.
+
+**The run.** Three fresh worlds (seeds 1, 7, 42; plains spawns), survival, mobs on, one player
+who hasn't read this file: the Playtester reading the screen, or Ronald. 30 minutes each,
+no commands, no `/tk`. Afterwards the `first-clock:` lines from run.log, a death count, and
+where they got stuck (what they tried, which hint they read). A script can't play this blind
+(the 11-04 playtest: hops on terraces scatter, the book has no labels to read), so the
+scripts only check the clock itself (`first_day_1122.txt` ends with `/firstclock`).
+
+**What it should show** (new player, from the table above):
+
+| Step | Target | Too slow past | Too fast under | If too slow, look at |
+|---|---|---|---|---|
+| rock | 2.5 min | 5 | 0.5 | the spawn guarantee (`SPAWN_LEAST`, `NEAR_SPAWN_TIMES`) |
+| edge | 4 | 7 | 1 | the `knap` hint, `FLAKE_FROM_FLINT` |
+| head | 7 | 11 | 2 | the knapping screen's how-to line, the sneak hint |
+| string | 9 | 13 | 3 | `FIBRE_CUT`, the `flake` hint |
+| **axe** | **13** | **17** | **8** | the `lash` hint, the book's 2x2 (Ronald's B: 13-15) |
+| fire | 16 | 22 | 9 | the dusk hint naming the drill, `BOW_DRILL` |
+| logs | 17 | 23 | 10 | the tree hint (`TREE_LOOK`), felling time at the wood tier |
+| table, pickaxe, stone | 22-25 | 30 | 14 | the pick head (13 clicks), stone 6 under the surface (11-04) |
+
+The axe is the one Ronald set; the rest follow from it. A step past "too slow" in two of the
+three worlds is a fix (a number in `vitals::first` or a hint), then the same three seeds again.
 
 ## Choices for Ronald
 
