@@ -1503,17 +1503,20 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                         if i == ATM_MEAN_SKIP { continue; }
                         cl[i] = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), map_sun, ground);
                     }
+                    // Each look's fog marched once: the rounds differ only in the air's sky light,
+                    // which its light takes linearly (`fog_march_parts`), so the sum splits into what
+                    // does not change (`fixed`) and what each round's light is multiplied by (`per`).
+                    var fixed = vec3(0.0);
+                    var per = vec3(0.0);
+                    for (var i = 0; i < 9; i++) {
+                        if i == ATM_MEAN_SKIP { continue; }
+                        let fog = fog_march_parts(atm_mean_dir(i, sun), 1024.0, 0.5, map_sun, ground, 1.0, false);
+                        fixed += (wet[i] * cl[i].a + cl[i].rgb) * fog.through + fog.light;
+                        per += fog.air_k;
+                    }
                     var amb = land_ambient(clear / 9.0);
-                    var cloudy = vec3(0.0);
                     for (var k = 0; k < 4; k++) {
-                        cloudy = vec3(0.0);
-                        for (var i = 0; i < 9; i++) {
-                            if i == ATM_MEAN_SKIP { continue; }
-                            let dir = atm_mean_dir(i, sun);
-                            let fog = fog_march(dir, 1024.0, 0.5, map_sun, ground, amb, 1.0, false);
-                            cloudy += (wet[i] * cl[i].a + cl[i].rgb) * fog.a + fog.rgb;
-                        }
-                        amb = land_ambient(cloudy / 9.0);
+                        amb = land_ambient((fixed + per * amb) / 9.0);
                     }
                     return vec4(amb, 1.0);
                 }

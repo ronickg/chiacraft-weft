@@ -3117,6 +3117,18 @@ fn bliss_fog_density(p: vec3<f32>) -> f32 {
 // light `sky_fog` on the fog and `air_sky` on the air; jittered by `jitter`. rgb the light gathered,
 // a how much of what lies behind the fog lets through (the air never dims it).
 fn fog_march(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in: vec3<f32>, air_sky: vec3<f32>, eye_k: f32, shadows: bool) -> vec4<f32> {
+    let f = fog_march_parts(dir, span, jitter, sun, sky_fog_in, eye_k, shadows);
+    return vec4(f.light + f.air_k * air_sky, f.through);
+}
+// The march's parts: the light without the air's sky light, and what that light is multiplied by
+// (the air's sky light enters linearly and never changes how much gets through), so a caller that
+// tries several of it (the frame look's settling rounds) marches once.
+struct FogParts {
+    light: vec3<f32>,
+    air_k: vec3<f32>,
+    through: f32,
+}
+fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in: vec3<f32>, eye_k: f32, shadows: bool) -> FogParts {
     let eye = scene.eye.xyz;
     let mu = dot(dir, light_dir());
     // The fog's forward phase (Bliss's, x5) and Rayleigh's (its (0.1 c + 0.28) / pi).
@@ -3129,6 +3141,7 @@ fn fog_march(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in:
     var through = 1.0;
     var gained = vec3(0.0);
     var air = vec3(0.0);
+    var air_k = vec3(0.0);
     var air_through = vec3(1.0);
     for (var i = 0u; i < n; i++) {
         let u = (f32(i) + jitter) / f32(n);
@@ -3159,14 +3172,16 @@ fn fog_march(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in:
         let m_k = ATM_MIE * BLISS_AIR * (exp2(-up / 1200.0 * 7.0) + 300.0 * d * 8.0) * below;
         let ext = r_k + vec3(m_k);
         let a_kept = exp(-ext * step);
-        let light = sun * lit * sun_phase * (ray_phase * r_k + vec3(sun_phase * m_k)) + air_sky * ext * eye_k;
-        air += (light - light * a_kept) / max(ext, vec3(1e-9)) * air_through * through;
+        let light = sun * lit * sun_phase * (ray_phase * r_k + vec3(sun_phase * m_k));
+        let held = (1.0 - a_kept) / max(ext, vec3(1e-9)) * air_through * through;
+        air += light * held;
+        air_k += ext * eye_k * held;
         air_through *= a_kept;
         if through < 1e-5 {
             break;
         }
     }
-    return vec4(gained + air, through);
+    return FogParts(gained + air, air_k, through);
 }
 fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let dist = length(rel);
