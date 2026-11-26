@@ -409,14 +409,18 @@ fn pt_nee_falloff(d2: f32, r2: f32, at: f32) -> f32 {
     return min((at * at + r2) / (d2 + r2), PT_NEE_HOT);
 }
 
-// Over how many levels at the end of its reach a lamp's light fades out.
-const PT_NEE_FADE: f32 = 3.0;
-
-// How much of a light of level `e` reaches a surface `to` off its middle (1 well within the
-// lightmap's reach, 0 past it), by the surface's own distance in blocks along the axes.
+// How much of a light of level `e` reaches a surface `to` off its middle, by the surface's own
+// distance in blocks along the axes (the lightmap's reach): (1 - (m / e)^4)^2, near 1 well within
+// it (0.97 at the 5-block match of a level-15 light) and 0 at its end with no step. The inverse
+// square keeps a far light much brighter than the lightmap's steep level curve, so a fade over the
+// last 3 levels alone cut it off in a hard diamond (the ceiling glowstone's round the lava pit,
+// s2q and s2r lava_glow), and one cut by whole blocks drew a lava pit's light in block-shaped
+// steps (s2e).
 fn pt_nee_fade(e: f32, to: vec3<f32>) -> f32 {
     let d = max(abs(to) - 0.5, vec3(0.0));
-    return clamp((e - (d.x + d.y + d.z)) / PT_NEE_FADE, 0.0, 1.0);
+    let x = (d.x + d.y + d.z) / max(e, 1.0);
+    let w = clamp(1.0 - x * x * x * x, 0.0, 1.0);
+    return w * w;
 }
 
 // How far above the lightmap's own block light at a surface a field of lamps' light may sum (a
