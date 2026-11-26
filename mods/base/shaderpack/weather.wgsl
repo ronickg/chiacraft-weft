@@ -120,7 +120,19 @@ fn fs(in: VOut) -> WeatherOut {
     if cover < 0.004 {
         discard;
     }
-    let light = light_round(unpack_light(in.data.y), vec3(0.0), vec3(1e4));
+    // Where the land is lit from the physical sky, Bliss's weather (all_particles.fsh with WEATHER,
+    // method only; Ronald, 11-25: "copy Bliss exactly"): no colour of its own, only its cover in
+    // the motion image's w (as before, for the temporal anti-aliasing), which thins the bloomy fog
+    // where a drop or flake lies (`bloomy_fog`). The drawing stays for the other looks. Only within
+    // the 10 blocks round the eye Minecraft draws its weather in (fancy), which is all Bliss's mask
+    // ever holds: ours reaches far. (The dark spots over lkwxA1's snow plains were far puddles, not
+    // this: lkwxA2 kept them; 379efefc's gate took them.)
+    if land_from_sky() {
+        let near = 1.0 - smoothstep(8.0, 10.0, length(in.rel.xz));
+        let mask = min(cover * in.alpha * near, 1.0);
+        return WeatherOut(vec4(0.0), vec4(0.0, 0.0, -1.0, min(mask * 2.5, 1.0)));
+    }
+    let light = light_weather(unpack_light(in.data.y), in.rel);
     // Drops a pale grey-blue, flakes white; fading out right by the eye.
     let tint = select(vec3(0.78, 0.84, 0.92), vec3(1.0, 1.0, 1.04), snow);
     let near = smoothstep(select(1.5, 1.0, snow), select(6.0, 3.0, snow), length(in.rel));

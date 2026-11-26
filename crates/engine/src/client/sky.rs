@@ -1044,7 +1044,8 @@ impl Sky {
             .frame(gpu, froxels, frame.width, frame.height, buf, scene);
         self.cloud_shadow
             .frame(gpu, self.cloud_shadow_wanted, buf, scene, clouds);
-        self.frame_look.frame(gpu, buf, scene);
+        let soft_clouds = clouds.filter(|&i| self.list[i as usize].ids[0] != u32::MAX);
+        self.frame_look.frame(gpu, buf, scene, soft_clouds);
         match clouds.filter(|&i| self.list[i as usize].ids[0] != u32::MAX) {
             Some(first_instance) => self.soft.record(buf, scene, first_instance),
             None => self

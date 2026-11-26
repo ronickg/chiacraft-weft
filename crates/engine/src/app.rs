@@ -3997,6 +3997,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     if let Some(g) = &mut r.game {
         // Where this frame's gathering writes its count and motion, for the effects' sharpening.
         g.client.taa_out = r.post.taa_out(world_info.width, world_info.height);
+        g.client.exposure_last = r.post.exposure_last();
+        g.client.motion_out = r.post.motion_index();
         let s = crate::diag::span("client render");
         atmosphere = g
             .client
