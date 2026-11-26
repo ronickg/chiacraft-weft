@@ -848,6 +848,7 @@ pub mod comp {
     /// 0xRRGGBB where the biome sets none and on items, white); a key's `DEFAULT` (`str`, the
     /// key by its settings name, `KeyJ`, `mouse3`).
     pub const CREATIVE_TAB_ICON: &str = "creative_tab.icon";
+    pub const CREATIVE_TAB_ICON_TEXTURE: &str = "creative_tab.icon_texture";
     pub const TINT_KIND_DEFAULT: &str = "tint_kind.default";
     pub const KEY_DEFAULT: &str = "key.default";
     /// Attribute modifiers (`[Modifier]`) of a game mode, an item, a pose, an entity kind or
@@ -2788,6 +2789,9 @@ impl<S> ItemMove<S> {
 
 pub const MAX_ITEM_MOVES: usize = 4096;
 
+/// Cursor endpoint for menu item moves.
+pub const MENU_CURSOR: u32 = u32::MAX;
+
 pub mod holder {
     /// Nothing: menus without an owner (a crafting table's grid).
     pub const NONE: u32 = 0;
@@ -4692,6 +4696,11 @@ pub struct Host {
     pub client_op: unsafe extern "C" fn(client: *mut ClientCtx, op: u32, text: Str, num: f64) -> u64,
     /// Texts the client knows, see `client_text`. Valid until the next call.
     pub client_text: unsafe extern "C" fn(client: *mut ClientCtx, which: u32, index: u32) -> Str,
+    pub client_sound_stream_open: unsafe extern "C" fn(client: *mut ClientCtx, category: u32, rate: u32, pos: *const Vec3) -> u64,
+    pub client_sound_stream_push: unsafe extern "C" fn(client: *mut ClientCtx, id: u64, samples: Slice<f32>) -> u32,
+    pub client_sound_stream_position: unsafe extern "C" fn(client: *mut ClientCtx, id: u64, pos: Vec3) -> u32,
+    pub client_sound_stream_filter: unsafe extern "C" fn(client: *mut ClientCtx, id: u64, cutoff: f32, gain: f32) -> u32,
+    pub client_sound_stream_close: unsafe extern "C" fn(client: *mut ClientCtx, id: u64) -> u32,
     pub client_music: unsafe extern "C" fn(client: *mut ClientCtx, source: MusicSource, op: u32, track: Str, value: f64) -> u32,
     pub client_music_status: unsafe extern "C" fn(client: *mut ClientCtx, source: MusicSource, out: *mut MusicStatus),
     pub client_music_track: unsafe extern "C" fn(client: *mut ClientCtx, index: u32, out: *mut MusicTrack),

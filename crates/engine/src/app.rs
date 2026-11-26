@@ -1657,6 +1657,9 @@ impl Running {
                 self.remote_address = None;
             }
             g.client.leave();
+            if let Some(audio) = &mut self.audio {
+                audio.clear_streams();
+            }
             self.gpu.wait_idle();
             g.client.destroy(&mut *self.gpu);
             if let Some(mut s) = g.server.take() {
