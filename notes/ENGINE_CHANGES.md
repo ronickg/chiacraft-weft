@@ -205,6 +205,15 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 
 - **The eye in a cave** (Look, branch `claude/look-speed`, 11-26): `client/mod.rs` counts the seconds with no sky light at the eye and eases a cave value in over 3 s after 10 s in the dark, out over 1 s (Bliss's OLD_CAVE_DETECTION); `gpu_layout.rs` documents it in `Scene::cloud_shadow.z`, unused before. *Why:* Bliss kills its fog and air in caves and adds a blue cave fog by it (feature audit item 4), and the pack has no timer of its own. *Upstream?* No (for our pack).
 
+- **A stack's model names its skin: `<file>|<skin>`** (First hours, branch `claude/first-hours-ed4b88`, 11-26):
+  `client::models::load_file` reads the geo of the part before `|` and skins it with the part after,
+  a texture or a look text (shade map `@` ramps), composed by `entity_render::load` as worn looks
+  already are. *Why:* Weft's 3D bow (`models/item/bow.geo.json`) took one skin by its file name, so
+  every bow looked alike; base sets the bow stack's `core:model` to
+  `base:item/bow|base:parts/bow/skin@<stave>,<grip>,<string ramps>` (`parts::bow_model`,
+  `crafting::looks::bow_skin`), keeping Weft's model and its bending draw. Names with no `|` load as
+  before. *Upstream?* Maybe, as per-stack skins for item models.
+
 ## 3. Distant terrain (LOD) and world generation hooks
 
 - **Trees per site, rock on steep faces, stable levels; smooth, morphing far ground; skirts under edges; a tall crown tapers** (747f25bc, 87aa8332, e2c0d171, 0399162b). *Why:* distant forests and mountains looked blocky or wrong, and giant sequoias showed flat-topped.
@@ -465,6 +474,12 @@ Upstream replaced scatters with features (`features.rs`, SDK `feature.rs`). What
     cutting worn layers by bone mask; a ridden flyer's flight counted as a fall (MountMove `flies`).
 - The bug fixes in section 1 are the natural PRs. Upstream already has its own versions of #83 and #84. The clean branches for #96 to #98 and `/rule` are in `notes/crew/upstream/for-ronald.md`.
 - Everything else is ours to keep in the fork unless Ronald decides to offer it.
+- **Take Weft's side on `mods/base/assets/textures/item/bow.png`** (First hours, 11-26). Since Weft's
+  6d41e5728 it is the skin of Weft's 3D bow (`models/item/bow.geo.json`, skinned by name), not our flat
+  icon. The 11-22 sync kept ours under "keep our art", so the bow drew as a dark-red box with no hotbar
+  icon (Tester's pt_rain_3). Restored in 042299de3. Our bow's colours come from its parts, painted onto
+  that skin, so never replace the file with an icon. Our flat icon's source is
+  `mods/base/source/items/tiles/bow.png`.
 
 - **Backed leaf faces off under `core:mc_leaves`** (Trees, branch `claude/trees-bliss-canopy-1d047c`, 11-06): `client::mesher` sets `face::BACKED` only when the test switch `core:mc_leaves` is off. *Why:* `mc_leaves` draws the faces between leaves as Minecraft's fancy leaves do, and the backed fill's dark average covered them in the holes. The plain look's shaded leaves measured luma 16 against vanilla's 23 (Bliss's own world, mc_world_forest 08:00). Test switch only; the default look is unchanged. *Upstream?* No (our test switch).
 - **Pack options 48** (Trees, branch `claude/trees-bliss-canopy-1d047c`, 11-06): `Scene::options` grows from 8 rows of four to 12 (`gpu_layout`, `client::pack_options`, `packs::pack_options` reads 48 names). *Why:* chiacraft's pack had used all 32 slots, and the leaf-light setting (`base:look_leaf_light`) needed one more. 64 bytes more in the scene buffer; nothing else reads its size. *Upstream?* Maybe, as a bigger options limit for packs.

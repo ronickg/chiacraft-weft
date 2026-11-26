@@ -516,6 +516,8 @@ struct Atm {
     light: vec3<f32>,
     // What of the light from beyond gets through along the look (Bliss's skyAbsorb).
     through: vec3<f32>,
+    // The light scattered more than once per unit of its background (`light` is linear in it).
+    multi: vec3<f32>,
 }
 // The sky's light along `dir` (world, unit), Bliss's march: `n` view steps, the sun toward `sun`,
 // the moon toward `moon` lit by `moon_k`, and the light scattered more than once lit by
@@ -566,7 +568,7 @@ fn atm_march(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32, backg
         through *= kept;
     }
     let light = (s_sun * sun_kelvin_linear() + s_moon * moon_kelvin_linear() * ATM_MOON * moon_k) * ATM_SKY_SUN + s_multi * background;
-    return Atm(light, through);
+    return Atm(light, through, s_multi);
 }
 // Bliss's nine directions for the sky's average (deferred.vsh, method only): (0, 1, 0) + its 3x3
 // pattern normalized x (0.3183, 0.9), looked up in its sky map unnormalized. The map's v is
@@ -610,14 +612,27 @@ fn atm_rain(c: vec3<f32>, dir: vec3<f32>, through: vec3<f32>, mean: vec3<f32>) -
     let grey = max(1.5 * mean, ATM_FLOOR * 2.0) * (through * 0.7 + vec3(0.3));
     return mix(c, grey, w);
 }
-// The sky's average (Bliss's nine directions, its once-scattered light over the floor), in ours.
+// The sky's average (Bliss's nine directions), in ours, where Bliss's settles: its multiple
+// scattering is lit by 0.75 x last frame's average (`atm_background`), so frame by frame the average
+// goes to m = once-scattered + multi x 0.75 m, here solved outright (each look's light is linear in
+// its background: `Atm::multi`). Ours took the once-scattered light over the floor alone and one
+// more round from it: the clouds' sky light, the sky straight down (all multiple scattering), came
+// out about 0.7x Bliss's (capture 3: 0.062 0.084 0.114 against its 0.093 0.126 0.147 in ours; the
+// map clouds' sky share 0.7x over five hours, capture 6).
 fn atm_mean(sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3<f32> {
     var sum = vec3(0.0);
+    var multi = vec3(0.0);
     for (var i = 0; i < 9; i++) {
         if i == ATM_MEAN_SKIP { continue; }
-        sum += atm_march(atm_mean_dir(i, sun), sun, moon, moon_k, ATM_FLOOR, 4, 2).light;
+        let a = atm_march(atm_mean_dir(i, sun), sun, moon, moon_k, ATM_FLOOR, 4, 2);
+        sum += a.light;
+        multi += a.multi;
     }
-    return sum / 9.0;
+    let s = multi / 9.0;
+    let once = sum / 9.0 - s * ATM_FLOOR;
+    let settled = once / max(vec3(1.0) - 0.75 * s, vec3(0.05));
+    // Where 0.75 m stays under the floor the floor lights it, as before.
+    return select(sum / 9.0, settled, 0.75 * settled > ATM_FLOOR);
 }
 // The light scattered more than once is lit by this: Bliss's 0.75 x last frame's averaged sky,
 // over its floor.
@@ -2130,7 +2145,10 @@ fn bc_layer(layer: u32, start: vec3<f32>, step: vec3<f32>, mult: f32, steps: i32
 // The altostratus along the look: one sample on its plane, two light taps.
 fn bc_alto_layer(start: vec3<f32>, dir: vec3<f32>, mult: f32, dither: f32, sky: vec3<f32>, sun1: vec3<f32>, sun_multi: vec3<f32>, distant: f32, far: f32, hidden: bool) -> vec4<f32> {
     let cam = vec3(0.0, scene.eye.y, 0.0);
-    if hidden || length(start - cam) > far {
+    // Cut only by a surface in front (Bliss's CLOUDS_INTERSECT_TERRAIN: the sky's looks reach it at any
+    // distance). Cut at the sky's own reach too, it ended in a hard curve of one height across the
+    // sky seen from in the low deck, where the sheet lay past 8192 blocks (wx_band2 y300 / y320).
+    if hidden || (far < BC_SKY_FAR - 2.0 && length(start - cam) > far) {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
     let flip = select(-1.0, 1.0, scene.eye.y > BC_ALTO);
