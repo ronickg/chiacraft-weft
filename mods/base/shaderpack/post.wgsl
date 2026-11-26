@@ -121,13 +121,12 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
                     let e = clamp((log2(max(v, vec3(1e-12))) + 24.0) / 28.0, vec3(0.0), vec3(1.0));
                     color = vec4(select(pow((e + 0.055) / 1.055, vec3(2.4)), e / 12.92, e <= vec3(0.04045)), 1.0);
                 }
-                // A third swatch, ours only: texel 6 (the cloudy average's inside: the cloud shadow
-                // on the fog, its transmittance, its light), r and g linear 0..1, b log-coded.
-                if q.y >= 270.0 && q.y < 334.0 && q.x >= 136.0 && q.x < 200.0 {
+                // Swatches 3-5 as Bliss's capture 2: texels 6-8 (the map's clouds alone, fog alone,
+                // their alphas), log-coded like the others, 68 px apart.
+                if q.y >= 270.0 && q.y < 334.0 && q.x >= 136.0 && q.x < 336.0 && (q.x - 136.0) % 68.0 < 64.0 {
                     let t = textures[u32(scene.frame_look.x) - 1u];
-                    let v = textureLoad(t, vec2(6, 0), 0).rgb;
-                    let b = clamp((log2(max(v.b, 1e-12)) + 24.0) / 28.0, 0.0, 1.0);
-                    let e = vec3(clamp(v.r, 0.0, 1.0), clamp(v.g, 0.0, 1.0), b);
+                    let v = textureLoad(t, vec2(6 + i32((q.x - 136.0) / 68.0), 0), 0).rgb;
+                    let e = clamp((log2(max(v, vec3(1e-12))) + 24.0) / 28.0, vec3(0.0), vec3(1.0));
                     color = vec4(select(pow((e + 0.055) / 1.055, vec3(2.4)), e / 12.92, e <= vec3(0.04045)), 1.0);
                 }
             }

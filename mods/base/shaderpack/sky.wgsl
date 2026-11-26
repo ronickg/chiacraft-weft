@@ -1536,25 +1536,39 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
             }
             return vec4(p.ambient, 1.0);
         }
-        // For debug view 13 only: along the nine looks of the cloudy average, r the mean cloud shadow
-        // on the fog's steps (`bc_shadow`), g the fog's mean transmittance over its 1024 blocks, b
-        // the luma of its mean light / 0.122 (Bliss's units like the other swatches).
-        case 6u: {
+        // For debug view 13 only, laid out as Bliss's capture 2 swatches: along the nine looks of the
+        // cloudy average, 6 the clouds' light alone and 7 the fog's alone, in Bliss's raw units (x 12.3,
+        // as `land_ambient` takes the mean); 8 the clouds' and the fog's mean transmittance and, where
+        // Bliss has its atmosphereAlpha, our mean cloud shadow on the fog's steps.
+        case 6u, 7u, 8u: {
             if from_sky && look_debug() == 13u {
-                var sh = 0.0;
-                var through = 0.0;
-                var light = vec3(0.0);
-                let clear = bc_sky_read();
+                let moon = normalize(scene.moon.xyz);
+                let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
+                var mean = atm_mean(sun, moon, sky_k);
+                var clear = vec3(0.0);
                 for (var i = 0; i < 9; i++) {
                     let dir = atm_mean_dir(i, sun);
-                    for (var k = 0; k < 4; k++) {
-                        sh += bc_shadow(dir * (64.0 * pow(2.0, f32(k)))) / 36.0;
-                    }
-                    let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k), clear, clear, 1.0, false);
-                    through += fog.a / 9.0;
-                    light += fog.rgb / 9.0;
+                    let a = atm_march(dir, sun, moon, sky_k, atm_background(mean), 4, 2);
+                    clear += atm_rain(a.light, dir, a.through, mean);
                 }
-                return vec4(sh, through, dot(light, vec3(0.2126, 0.7152, 0.0722)) / 0.122, 1.0);
+                mean = select(clear / 9.0, atm_rain_mean(sun, moon, sky_k), rain_amount() > 0.0);
+                var cl_rgb = vec3(0.0);
+                var fog_rgb = vec3(0.0);
+                var alphas = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    let dir = atm_mean_dir(i, sun);
+                    let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), bc_sky_light(mean));
+                    let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k), bc_sky_light(mean), land_ambient(mean), 1.0, false);
+                    var sh = 0.0;
+                    for (var k = 0; k < 4; k++) {
+                        sh += bc_shadow(dir * (64.0 * pow(2.0, f32(k)))) / 4.0;
+                    }
+                    cl_rgb += cl.rgb / 9.0;
+                    fog_rgb += fog.rgb / 9.0;
+                    alphas += vec3(cl.a, fog.a, sh) / 9.0;
+                }
+                let x = u32(in.clip.x);
+                return vec4(select(select(alphas, fog_rgb * 12.3, x == 7u), cl_rgb * 12.3, x == 6u), 1.0);
             }
             return vec4(0.0);
         }
