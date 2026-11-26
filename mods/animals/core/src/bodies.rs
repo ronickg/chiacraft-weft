@@ -83,6 +83,17 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     ("carcass_bones", (1.1, 0.4)),
     ("carcass_pile", (0.9, 0.2)),
     ("carcass_gore", (1.5, 0.1)),
+    // The dead bodies per body plan, lying (`source/carcass/body.py`), at their reference animal's size.
+    ("carcass_quadruped", (1.4, 0.36)),
+    ("carcass_quadruped_open", (1.4, 0.38)),
+    ("carcass_bird", (0.6, 0.25)),
+    ("carcass_bird_open", (0.75, 0.26)),
+    ("carcass_biped", (1.3, 0.28)),
+    ("carcass_biped_open", (1.3, 0.29)),
+    ("carcass_reptile", (1.4, 0.2)),
+    ("carcass_reptile_open", (1.4, 0.23)),
+    ("carcass_fish", (0.5, 0.12)),
+    ("carcass_fish_open", (0.55, 0.13)),
     // A bird's cup nest (`source/nest/cup.py`), scaled up for bigger birds' eggs.
     ("nest_cup", (0.44, 0.17)),
 ];

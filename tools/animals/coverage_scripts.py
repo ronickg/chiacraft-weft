@@ -372,6 +372,9 @@ s = head("carcass", [
     "Part 4: skinning: a white-tailed deer killed with one blow, the player with a (flint) knife uses its carcass: kneels, the camera",
     "comes in beside them (shot 8 is taken mid-skin from the player's own camera), and after about 8 s \"skinned carcass N",
     "of white_tailed_deer: K base:hide (quality Q), M animals:venison\" (Q at most 2 with flint), the hide and meat on the ground.",
+    "Part 5 (x 1000): a grey wolf, a golden eagle, a raptor, a yacare caiman and a pacu killed in a row: each drawn as its",
+    "body plan's own lying model (four-legged, bird, two-legged, reptile, fish) in its own coat, shot whole (10, 11: the",
+    "wolf close, grey) and opened after 3 days (12: meat and ribs on the upper side, guts beside it, a blood pool under).",
     "Report per part: the carcass, eats and skin lines, the `/animalprof carcass` rows, no hide or meat dropped at the kills,",
     "and the shots: the dead animal lying at its place, the ribcage and the bone pile sized to it, the kneel and the camera",
     "while skinning; anything floating, sunk, flickering or drawn wrong.",
@@ -408,4 +411,18 @@ s += ["chat /tk mode creative", f"chat /tp {x} 70 {Z+10}", "look 0 -30", "wait 1
       f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "press core:use", "wait 4",
       "shot cov_carcass_8_skinning.png", "wait 9", "chat /animalprof carcass"]
 s += side_shot(x, "cov_carcass_9_skinned")
+x = 1000
+# Slice 3: one of each body plan killed in a row, drawn as its plan's lying model in its own coat (a grey wolf's grey,
+# not a deer's brown), whole, then opened by 3 days' rot. West to east: a grey wolf, a golden eagle, a raptor, a yacare
+# caiman, a pacu (on the grass).
+s += pad(x) + ["chat /tk mode creative"]
+for kind, dx in [("grey_wolf", -8), ("golden_eagle", -4), ("raptor", 0), ("yacare_caiman", 4), ("pacu", 8)]:
+    s += [f"chat /tk spawn animals:{kind} {x+dx} 70 {Z+6}", "wait 1", f"chat /tp {x+dx} 70 {Z+9}", "wait 1",
+          "chat /animalprof kill", "wait 1"]
+s += ["chat /tk mode spectator", "wait 2", "chat /animalprof carcass"]
+row_shot = ["chat /tick freeze", f"chat /tp {x} 76 {Z+16}", "look 0 -30", "wait 2"]
+s += row_shot + ["shot cov_carcass_10_plans_whole.png", "chat /tp " + f"{x-6} 72 {Z+10}", "look 20 -30", "wait 2",
+                 "shot cov_carcass_11_wolf_close.png", "chat /tick unfreeze", "wait 1"]
+s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 3", "wait 2", "chat /animalprof carcass"]
+s += row_shot + ["shot cov_carcass_12_plans_opened.png", "chat /tick unfreeze", "wait 1"]
 write("carcass", s)
