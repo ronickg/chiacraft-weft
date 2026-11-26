@@ -379,9 +379,11 @@ fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: ve
 // In place of the lightmap's block light (its level falling a step a block, then shadowed), the
 // light from the lamp itself: I colour cos / (d^2 + r^2), I the light's level times its strength
 // (`light_strength`: a torch 1, fire 2.5, lava 2, glowstone 1.5) times `core:pt_emissive`, r its
-// size (a flame's small, a glowing block's half a block). Calibrated so that 1 block off a light of
-// strength 1 gives what the lightmap gives there (the look's own curve and colour: `light_on` of
-// the light's level less 1), and from there it falls off as light does. The candidates are drawn as
+// size (a flame's small, a glowing block's half a block). Calibrated so that `PT_NEE_AT` blocks off
+// (fewer for a dim light) a light of strength 1 gives what the lightmap gives there (the look's own
+// curve and colour: `light_on` of the light's level less that), and from there it falls off as light
+// does, nearer up to `PT_NEE_HOT` times that. (Matched 1 block off, a torch lit a pool a block or
+// two wide and the room went dark past it, s2b cave_torch.) The candidates are drawn as
 // above (8, then one in proportion to its estimate here: resampled importance sampling, so a near
 // fire beats a far torch) and one shadow ray goes to it. Where no light of the cube's list reaches,
 // the lightmap's block light stays (lights past the lists, the far land).
@@ -389,8 +391,26 @@ fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: ve
 // The light's size squared (blocks): a glowing block's, a flame's.
 const PT_NEE_R2_BLOCK: f32 = 0.25;
 const PT_NEE_R2_FLAME: f32 = 0.04;
-// How much of the normal map's tilt the lamps' light follows (0 the face's own normal).
-const PT_NEE_NORMAL: f32 = 0.3;
+// Where the lamps' light matches the lightmap's (blocks off the light), and how much brighter it
+// may get nearer.
+const PT_NEE_AT: f32 = 5.0;
+const PT_NEE_HOT: f32 = 6.0;
+// How far the normal map may change the lamps' light (a share either way): the cosine is the face's,
+// times 1 plus the map's difference to it, within this. (Its cosine itself, even 0.3 of its tilt,
+// mottled a wall the fire's light grazed: s2a and s2b fire18000.)
+const PT_NEE_DETAIL: f32 = 0.2;
+
+// The falloff at `d2` (squared distance) from a light of size `r2` whose match lies `at` blocks off.
+fn pt_nee_falloff(d2: f32, r2: f32, at: f32) -> f32 {
+    return min((at * at + r2) / (d2 + r2), PT_NEE_HOT);
+}
+
+// The cosine for the lamps' light: the face's own, with the normal map's detail within
+// `PT_NEE_DETAIL`.
+fn pt_nee_cos(n: vec3<f32>, ng: vec3<f32>, dir: vec3<f32>) -> f32 {
+    let c = dot(ng, dir);
+    return max(c, 0.0) * clamp(1.0 + dot(n, dir) - c, 1.0 - PT_NEE_DETAIL, 1.0 + PT_NEE_DETAIL);
+}
 
 // The lamps' light at a surface at `world` (`rel` camera relative), its shading normal `n` and
 // face's `ng`: rgb in the world's light units, a as `pt_block_visibility`'s y (1 a light drawn;
@@ -428,7 +448,7 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
         var p: f32;
         if all(lp == vec3<i32>(floor(world - ng * 0.5))) {
             // The surface is the light's own block.
-            p = strength * e / 15.0;
+            p = strength * e / 15.0 * PT_NEE_HOT;
         } else {
             var to = vec3<f32>(lp) + select(vec3(0.5), vec3(0.5, 0.6, 0.5), small) - world;
             let behind = -dot(to, ng);
@@ -440,11 +460,11 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
             }
             let d2 = dot(to, to);
             let r2 = select(PT_NEE_R2_BLOCK, PT_NEE_R2_FLAME, small);
-            let cs = dot(n, to * inverseSqrt(max(d2, 1e-6)));
+            let cs = pt_nee_cos(n, ng, to * inverseSqrt(max(d2, 1e-6)));
             if cs <= 0.0 {
                 continue;
             }
-            p = strength * e / 15.0 * cs * (1.0 + r2) / (d2 + r2);
+            p = strength * e / 15.0 * cs * pt_nee_falloff(d2, r2, clamp(e - 1.0, 1.0, PT_NEE_AT));
         }
         let w = p * f32(total);
         w_sum += w;
@@ -461,14 +481,16 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     let l = chosen;
     let lp = vec3<i32>(i32(l & 63u), i32((l >> 6u) & 63u), i32((l >> 12u) & 63u)) - 16 + cube * 16;
     let small = ((l >> 30u) & 1u) == 1u;
-    // Its colour 1 block off, in the world's light (the look's curve and tint), facing it.
+    // Its colour where it matches the lightmap, in the world's light (the look's curve and tint),
+    // facing it.
     let level = vec3(f32((l >> 18u) & 15u), f32((l >> 22u) & 15u), f32((l >> 26u) & 15u));
+    let at = clamp(max(level.r, max(level.g, level.b)) - 1.0, 1.0, PT_NEE_AT);
     let up = vec3(0.0, 1.0, 0.0);
-    let one_off = max(light_on(up, vec4(0.0, max(level - 1.0, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - light_on(up, vec4(0.0), 0.0, 1.0, world, rel), vec3(0.0));
+    let one_off = max(light_on(up, vec4(0.0, max(level - at, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - light_on(up, vec4(0.0), 0.0, 1.0, world, rel), vec3(0.0));
     // (RIS: what was chosen, over its estimate, times the candidates' mean weight.)
     let ris = w_sum / (f32(PT_LIGHT_CANDIDATES) * chosen_p);
     if all(lp == vec3<i32>(floor(world - ng * 0.5))) {
-        return vec4(one_off * chosen_s * ris * pt.emissive, 1.0);
+        return vec4(one_off * chosen_s * PT_NEE_HOT * ris * pt.emissive, 1.0);
     }
     // A point on the light, a new one each frame (as `pt_block_visibility`), and one shadow ray.
     let j = vec3(pt_rand(px, 40u).xy, pt_rand(px, 48u).x) * 2.0 - 1.0;
@@ -480,7 +502,7 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     let d2 = dot(to, to);
     let dist = sqrt(d2);
     let dir = to / max(dist, 1e-4);
-    let cs = max(dot(n, dir), 0.0);
+    let cs = pt_nee_cos(n, ng, dir);
     if cs <= 0.0 {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
@@ -489,7 +511,7 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
     let r2 = select(PT_NEE_R2_BLOCK, PT_NEE_R2_FLAME, small);
-    let f = one_off * chosen_s * cs * (1.0 + r2) / (d2 + r2);
+    let f = one_off * chosen_s * cs * pt_nee_falloff(d2, r2, at);
     return vec4(f * ris * pt.emissive, 1.0);
 }
 
@@ -738,11 +760,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     if max(block.r, max(block.g, block.b)) > 1e-4 {
         if pt.emissive > 0.0 {
             // The lamps' own light in place of the lightmap's, where a light of the list reaches.
-            // About the face's normal with only some of the normal map's tilt: a lamp a block off
-            // lit each brick's bevel by the full map, and the pillar by the alcove fire went harsh
-            // and grainy where the lightmap's light is smooth (s2a_fire18000, Planner 11-26).
-            let n_lamp = normalize(mix(ng, n, PT_NEE_NORMAL));
-            let e = pt_block_direct(h.world, h.rel, n_lamp, ng, lift, px);
+            let e = pt_block_direct(h.world, h.rel, n, ng, lift, px);
             block_vis = vec2(select(0.0, 1.0, max(e.r, max(e.g, e.b)) > 0.0), e.a);
             if e.a > 0.5 {
                 direct = e.rgb;
