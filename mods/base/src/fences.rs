@@ -9,7 +9,8 @@
 //! - **Scarecrow**: a post with a straw body two blocks tall. A torch used on it hangs as its
 //!   lantern: lit, its light (`vitals::fences::SCARECROW_LIGHT`) keeps the ground round it at the
 //!   raid rule's block light (`RAID_LIGHT` 8, Animals' crop raids) out to `SCARECROW_REACH` blocks.
-//!   Broken, it gives the torch back.
+//!   Broken, it gives the torch back. Tagged `crop_guards`: Animals' raid guard keeps raiders off
+//!   the crops within 4 blocks of it, lit or not.
 
 use vitals::fences as fv;
 use weft_sdk::*;
@@ -110,6 +111,9 @@ pub fn register(r: &mut Registry) {
     r.block(&SCARECROW)
         .sound_group("wood")
         .texture("hay_bale_side")
+        // Animals' crop raid guard (animals-plants): anything tagged keeps raiders off the crops
+        // within 4 blocks, lit or not, as a decoy; lit, its light covers the field further.
+        .tag("crop_guards")
         .prop("lit", ["false", "true"])
         .states(|p, s| {
             let post = ("oak_log", [0.0, 0.0, 2.0, 16.0]);
