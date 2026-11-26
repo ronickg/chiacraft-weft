@@ -8,6 +8,7 @@ use std::sync::Mutex;
 pub mod ambient;
 pub mod balance;
 pub mod biology;
+pub mod blood;
 pub mod bodies;
 pub mod bosses;
 pub mod carcass;

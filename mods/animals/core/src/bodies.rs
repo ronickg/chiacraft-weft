@@ -80,6 +80,8 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     ("nest", (0.9, 0.15)),
     // The pool of blood under an opened body (`source/carcass/build.py`).
     ("carcass_gore", (1.5, 0.1)),
+    // A spot of blood a wounded animal leaves (`source/carcass/build.py`, `blood.rs`).
+    ("blood_spot", (0.4, 0.05)),
     // The dead bodies per body plan, lying (`source/carcass/body.py`), at their reference animal's size.
     ("carcass_quadruped", (1.4, 0.36)),
     ("carcass_quadruped_open", (1.4, 0.38)),
