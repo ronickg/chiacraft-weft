@@ -283,6 +283,20 @@ fn screen(ui: &mut Ui) {
     let ended = k.broken != 0 || k.done != 0;
     let copper = k.copper != 0;
     let title = if copper { "knapping.base.copper_title" } else { "knapping.base.title" };
+    // Native copper has its own squares (`notes/ui/kit2/knap.py`): a tarnished lump, a bright
+    // hammered head that dents rather than cracks.
+    let sq = move |class: &'static str| -> &'static str {
+        if !copper {
+            return class;
+        }
+        match class {
+            "knap_stone" => "knap_copper",
+            "knap_head" => "knap_copper_head",
+            "knap_free" => "knap_copper_free",
+            "knap_gone" => "knap_copper_gone",
+            c => c,
+        }
+    };
     crate::window::window_titled(ui, S::column().pad(crate::window::WINDOW_PAD).gap(5.0), title, &[], |ui| {
         ui.row(S::row().gap(1.0).self_align(abi::ui_align::CENTER), |ui| {
             for (i, h) in KNAPPED.iter().enumerate() {
@@ -315,7 +329,7 @@ fn screen(ui: &mut Ui) {
                             if k.broken == i as u32 + 1 {
                                 ui.panel("knap_cracked", square, |_| {});
                             } else if k.removed & (1 << i) != 0 || (k.done != 0 && !keeps) {
-                                ui.panel("knap_gone", square, |_| {});
+                                ui.panel(sq("knap_gone"), square, |_| {});
                             } else if ended {
                                 // Shown, no longer struck: the freed head lit, or a broken nodule as it lay.
                                 let class = match (k.done != 0, keeps) {
@@ -323,13 +337,13 @@ fn screen(ui: &mut Ui) {
                                     (false, true) => "knap_head",
                                     (false, false) => "knap_stone",
                                 };
-                                ui.panel(class, square, |_| {});
+                                ui.panel(sq(class), square, |_| {});
                             } else if keeps {
                                 let tip = if copper { "knapping.base.copper_keep_tip" } else { "knapping.base.keep_tip" };
-                                let s = square.class("knap_head").tooltip(tip);
+                                let s = square.class(sq("knap_head")).tooltip(tip);
                                 ui.button_with(s, move |c| c.client().send(&HIT, &(i as u32)), |_| {});
                             } else {
-                                let s = square.class("knap_stone");
+                                let s = square.class(sq("knap_stone"));
                                 ui.button_with(s, move |c| c.client().send(&HIT, &(i as u32)), |_| {});
                             }
                         }
