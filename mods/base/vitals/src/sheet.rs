@@ -675,12 +675,18 @@ fn soil_table(w: &mut String) {
     );
     let _ = writeln!(
         w,
-        "Dung pats: a grazer drops one every {} mouthfuls where it stands on the ground, never within {} blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most {} game days, frozen or dry), and while it lies grazed grass within {} blocks grows back x{}. How long one lies, in game minutes (a game day is {:.0}):\n\n| biome | spring | summer | autumn | winter |\n|---|---|---|---|---|",
+        "Dung pats: a grazer drops one every {} mouthfuls where it stands on the ground, never within {} blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most {} game days, frozen or dry), giving farmland under and beside it {} level, and while it lies grazed grass within {} blocks grows back x{}. A body rotting away gives farmland within {} blocks a level for every {:.0} kg left of it (a 70 kg deer uneaten {}, a 10 kg fox {}, a mouse {}), and the grazed grass there grows back at once. How long a pat lies, in game minutes (a game day is {:.0}):\n\n| biome | spring | summer | autumn | winter |\n|---|---|---|---|---|",
         soil::MOUTHFULS_A_PAT,
         soil::PAT_SPACING,
         soil::PAT_MOST_DAYS,
+        soil::PAT_FEEDS,
         soil::PAT_REACH,
         soil::PAT_GROWTH,
+        soil::RICH_REACH,
+        soil::RICH_KG,
+        soil::rotted_levels(70.0),
+        soil::rotted_levels(10.0),
+        soil::rotted_levels(0.02),
         crate::DAY_SECS / 60.0
     );
     for c in crate::climate::BIOMES

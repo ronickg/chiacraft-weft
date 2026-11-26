@@ -15,7 +15,7 @@ use vitals::effects::Effect;
 use weft_sdk::*;
 
 /// The hints, by their bit in `SEEN`: `hint.base.<name>` in the lang files.
-const HINTS: [&str; 21] = [
+const HINTS: [&str; 22] = [
     "logs",
     "table",
     "night",
@@ -37,6 +37,7 @@ const HINTS: [&str; 21] = [
     "copper_ore",
     "copper_heat",
     "casting",
+    "antler",
 ];
 const LOGS: u32 = 0;
 const TABLE: u32 = 1;
@@ -66,6 +67,8 @@ const COPPER_ORE: u32 = 18;
 /// (to whoever stands near), and a copper ingot in the bag (cast it in a mould).
 const COPPER_HEAT: u32 = 19;
 const CASTING: u32 = 20;
+/// A shed antler in the bag (`vitals::first::FLAKER_POINTS`): it's a pressure flaker.
+const ANTLER: u32 = 21;
 
 /// Seconds played before the first hint, that bare hands can't fell a tree (`first.rs`).
 const LOGS_AFTER: u64 = 20;
@@ -241,21 +244,26 @@ fn watch(w: &World) {
         if has(&FURNACE_TAG) {
             mark(w, id, RAW_MEAT);
         }
-        // "Bare hands can't fell a tree": only with nothing in hand, or something that's no tool
-        // (Tester's cov_copper2: it came with a copper pickaxe in hand; Planner, 11-26).
-        let held = inv.get(w.selected_slot(id));
-        let tool_in_hand = crate::parts::PARTS.on_stack_own(&held).is_some() || has_tag(&TOOL_TAGS, held.item);
-        if st.age >= LOGS_AFTER * 20 && !logs && !tool_in_hand {
-            once(w, id, LOGS);
-        }
-        if logs && !table {
-            once(w, id, TABLE);
-        }
         // The way to the first axe, a step at a time.
         let flake = has(&crate::first::CUTTERS);
         let head = items
             .iter()
             .any(|&i| item_name(i) == "base:part_felling_axe_head");
+        // "Bare hands can't fell a tree. Look on the ground: rocks, flint…": only with nothing in
+        // hand or something that's no tool (Tester's cov_copper2: it came with a copper pickaxe in
+        // hand), and only before the ground's been found: a rock, flint, a bone, a flake or a head
+        // in the bag says it has (the antler run: it came with a rock in hand; Planner, 11-26).
+        let held = inv.get(w.selected_slot(id));
+        let tool_in_hand = crate::parts::PARTS.on_stack_own(&held).is_some() || has_tag(&TOOL_TAGS, held.item);
+        let found_the_ground = has(&ROCKS_TAG) || has(&FLINT_TAG) || has(&BONE_TAG) || flake || head;
+        if found_the_ground {
+            mark(w, id, LOGS);
+        } else if st.age >= LOGS_AFTER * 20 && !logs && !tool_in_hand {
+            once(w, id, LOGS);
+        }
+        if logs && !table {
+            once(w, id, TABLE);
+        }
         if has(&ROCKS_TAG) && has(&FLINT_TAG) && !flake {
             once(w, id, KNAP);
         }
@@ -282,6 +290,9 @@ fn watch(w: &World) {
         }
         if has(&COPPER_INGOTS_TAG) {
             once(w, id, CASTING);
+        }
+        if items.iter().any(|&i| i == crate::first::ANTLER.id()) {
+            once(w, id, ANTLER);
         }
         if !logs && !seen(w, id, TREE) && has(&AXES_TAG) {
             mark(w, id, TREE);

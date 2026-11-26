@@ -231,7 +231,9 @@ pub fn knapped_head(w: &World, player: u64, shape: &str, material: &str, by_hand
     let craft = skills::index(making);
     let xp = w.component(player, &SKILLS).map_or(0, |s| s.xp[craft]);
     let memory = grades::work_from_memory(skills::level(xp));
-    let work = if by_hand { (memory + f::BY_HAND_BONUS).min(grades::WORK_MAX) } else { memory };
+    // An antler in the bag is a pressure flaker: finer flint work (`f::FLAKER_POINTS`).
+    let flaker = if material == "flint" && has_antler(w, player) { f::FLAKER_POINTS } else { 0 };
+    let work = if by_hand { (memory + f::BY_HAND_BONUS + flaker).min(grades::WORK_MAX) } else { (memory + flaker).min(grades::MEMORY_MAX) };
     // 0.5 is no luck either way (`grades::LUCK`).
     let points = match material {
         "bone" => f::BONE_HEAD_MATERIAL_POINTS,
@@ -239,6 +241,9 @@ pub fn knapped_head(w: &World, player: u64, shape: &str, material: &str, by_hand
         _ => f::HEAD_MATERIAL_POINTS,
     };
     let grade = grades::roll(grades::Points { material: points, work, station: 0 }, roll.unwrap_or(0.5));
+    if roll.is_some() {
+        weft_sdk::info!("knapping: {material} {shape} work {work} (flaker {flaker}), grade {grade}");
+    }
     if roll.is_some()
         && let Some(s) = w.component_mut(player, &SKILLS)
     {
@@ -247,6 +252,12 @@ pub fn knapped_head(w: &World, player: u64, shape: &str, material: &str, by_hand
     let made_day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
     ItemStack::new(Item::generated(format!("part_{shape}")).id(), 1)
         .with(&PART, PartOf { material: code(material), grade: grade as u32, worn: 0, made_day, repairs: 0 })
+}
+
+/// Whether `player` carries an antler (`first::ANTLER`), the pressure flaker.
+pub fn has_antler(w: &World, player: u64) -> bool {
+    let inv = w.inventory(player);
+    (0..inv.len()).any(|i| inv.get(i).item == crate::first::ANTLER.id())
 }
 
 /// A head of part shape `shape` cast in a mould from `material` (`casting.rs`): its grade from the
