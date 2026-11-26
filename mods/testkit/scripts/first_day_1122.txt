@@ -67,31 +67,38 @@ chat /tk inv me
 until chat base:part_felling_axe_head within 5
 # 4. Sticks from six fallen branches.
 chat /tk set ~ ~ ~-1 base:fallen_branch
+aim_block 0 0 -1 0.05
 wait 0.4
 hold core:attack 0.4
 wait 1
 chat /tk set ~ ~ ~-1 base:fallen_branch
+aim_block 0 0 -1 0.05
 wait 0.4
 hold core:attack 0.4
 wait 1
 chat /tk set ~ ~ ~-1 base:fallen_branch
+aim_block 0 0 -1 0.05
 wait 0.4
 hold core:attack 0.4
 wait 1
 chat /tk set ~ ~ ~-1 base:fallen_branch
+aim_block 0 0 -1 0.05
 wait 0.4
 hold core:attack 0.4
 wait 1
 chat /tk set ~ ~ ~-1 base:fallen_branch
+aim_block 0 0 -1 0.05
 wait 0.4
 hold core:attack 0.4
 wait 1
 chat /tk set ~ ~ ~-1 base:fallen_branch
+aim_block 0 0 -1 0.05
 wait 0.4
 hold core:attack 0.4
 wait 1
 chat /tk inv me
 until chat base:stick within 5
+look 0 -60
 # 5. Fibre: 36 tufts of tall grass cut with the flake (50% each, 12.5% by hand).
 chat /tk hand me base:sharp_flake
 chat /tk set ~ ~ ~-1 base:tall_grass

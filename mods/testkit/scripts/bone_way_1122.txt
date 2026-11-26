@@ -56,6 +56,7 @@ wait 1
 look 0 -60
 # 1. A bone off the ground.
 chat /tk set ~ ~ ~-1 base:loose_bone
+aim_block 0 0 -1 0.05
 wait 0.5
 hold core:attack 0.5
 wait 1.5
@@ -63,6 +64,7 @@ chat /tk inv me
 until chat base:bone within 5
 # 2. Splinters: the bone struck on old bones, three times.
 chat /tk set ~ ~ ~-1 base:loose_bone
+aim_block 0 0 -1 0.05
 chat /tk hand me base:bone
 wait 0.5
 hold core:use 0.3
@@ -77,6 +79,7 @@ until chat base:bone_splinter within 5
 # 3. A bone axe head on the knapping screen.
 chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
 chat /tk set ~ ~ ~-1 base:loose_bone
+aim_block 0 0 -1 0.05
 chat /tk hand me base:bone
 wait 0.5
 hold core:sneak 2 nowait
@@ -91,21 +94,26 @@ chat /tk inv me
 until chat base:part_felling_axe_head within 5
 # 4. Sticks from four fallen branches.
 chat /tk set ~ ~ ~-1 base:fallen_branch
+aim_block 0 0 -1 0.05
 wait 0.4
 hold core:attack 0.4
 wait 1
 chat /tk set ~ ~ ~-1 base:fallen_branch
+aim_block 0 0 -1 0.05
 wait 0.4
 hold core:attack 0.4
 wait 1
 chat /tk set ~ ~ ~-1 base:fallen_branch
+aim_block 0 0 -1 0.05
 wait 0.4
 hold core:attack 0.4
 wait 1
 chat /tk set ~ ~ ~-1 base:fallen_branch
+aim_block 0 0 -1 0.05
 wait 0.4
 hold core:attack 0.4
 wait 1
+look 0 -60
 # 5. Fibre: 20 tufts of tall grass cut with the splinter.
 chat /tk hand me base:bone_splinter
 chat /tk set ~ ~ ~-1 base:tall_grass
