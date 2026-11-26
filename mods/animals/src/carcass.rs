@@ -329,6 +329,22 @@ pub fn init(r: &mut Registry) {
 
 /// A carcass of `of` (species `index`, `mass` kg drawn at `scale`) laid at `pos` facing `yaw`.
 fn lay(w: &World, of: u64, index: usize, (mass, scale): (f32, f32), yaw: f32, pos: [f64; 3], skinned: bool) -> u64 {
+    // Out of any wall or cliff it died pressed against (`core::clear_spot`), so a knife can reach it.
+    let plan = core::plan_of(SPECIES[index].model);
+    let (bw, bh) = animals_core::bodies::of(&format!("carcass_{}", plan.name()));
+    let size = core::body_scale(mass, plan) as f64;
+    let at = core::clear_spot(pos, bw as f64 * size / 2.0, bh as f64 * size, |p| crate::boss::solid(w, p));
+    if at != pos {
+        weft_sdk::info!(
+            "carcass of {of} moved out of the blocks at {:.1} {:.1} {:.1} to {:.1} {:.1}",
+            pos[0],
+            pos[1],
+            pos[2],
+            at[0],
+            at[2]
+        );
+    }
+    let pos = at;
     let id = w.spawn_with(&CARCASS, pos, &Spawn::new().yaw(yaw));
     if id == 0 {
         return 0;
@@ -647,7 +663,31 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     let rot = vitals::rot::carcass_stage(core::keeps(), b.aged);
     let knife = (tier != 0).then(|| tier as u32 - 1);
     let quality = core::quality(b.level, core::kill(b.hits, b.cause), knife, rot);
-    let at = [st.pos.x, st.pos.y + 0.4, st.pos.z];
+    // What comes off is tossed from the body toward the skinner (`off`), to be picked up a moment later: spawned on
+    // the skinner, it went into the inventory with nothing seen (Planner 11-26).
+    // (`st` is the carcass's own: skin r4b's toss, aimed from it to itself, went straight up and fell into the ribs.)
+    let from = st.pos;
+    let to = w.entity(player).map_or(from, |p| p.pos);
+    let mut n_off = 0;
+    let mut off = |stack: ItemStack| {
+        let (dx, dz) = (to.x - from.x, to.z - from.z);
+        let d = (dx * dx + dz * dz).sqrt().max(0.1);
+        let spread = (n_off as f64 - 1.0) * 0.6;
+        let v = [
+            ((dx / d) * core::off_speed(d) - dz / d * spread) as f32,
+            core::OFF_UP,
+            ((dz / d) * core::off_speed(d) + dx / d * spread) as f32,
+        ];
+        n_off += 1;
+        w.spawn_with(
+            &ITEM,
+            [from.x, from.y + 0.5, from.z],
+            &Spawn::new()
+                .stack(stack)
+                .velocity(v)
+                .pickup_delay(core::OFF_PICKUP_TICKS),
+        );
+    };
     let mut got = Vec::new();
     // The hide (none once rotted to remains), its quality on it.
     let hide_share = vitals::rot::CARCASS
@@ -659,7 +699,7 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     {
         let n = core::hide_count(lo, hi, quality);
         if n > 0 {
-            w.spawn_item(at, ItemStack::new(Item::generated(item.to_string()).id(), n).with(&base_api::HIDE_QUALITY, quality as u32));
+            off(ItemStack::new(Item::generated(item.to_string()).id(), n).with(&base_api::HIDE_QUALITY, quality as u32));
             got.push(format!("{n} {item} (quality {quality})"));
         }
     }
@@ -667,7 +707,7 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     if let Some((_, meat, lo, hi)) = animals_core::meat::drops().find(|d| d.0 == s.name) {
         let n = core::meat_count(lo, hi, b.eaten, b.mass, rot);
         if n > 0 {
-            w.spawn_item(at, ItemStack::new(Item::generated(format!("animals:{meat}")).id(), n));
+            off(ItemStack::new(Item::generated(format!("animals:{meat}")).id(), n));
             got.push(format!("{n} animals:{meat}"));
         }
     }
@@ -675,7 +715,7 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     if let Some((lo, hi)) = animals_core::meat::carcass(s.name) {
         let n = core::meat_count(lo, hi, b.eaten, b.mass, rot);
         if n > 0 {
-            w.spawn_item(at, ItemStack::new(Item::generated(animals_core::meat::CARCASS.to_string()).id(), n));
+            off(ItemStack::new(Item::generated(animals_core::meat::CARCASS.to_string()).id(), n));
             got.push(format!("{n} {}", animals_core::meat::CARCASS));
         }
     }
