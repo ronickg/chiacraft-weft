@@ -3153,10 +3153,12 @@ fn bliss_fog_density(p: vec3<f32>) -> f32 {
 // The one fog's march along the unit look `dir` from the eye for `span` blocks (`one_fog`), lit by
 // the sun `sun` (with its phase, the clouds' shadow and, with `shadows`, the shadow map's), the sky's
 // light `sky_fog` on the fog and `air_sky` on the air; jittered by `jitter`. rgb the light gathered,
-// a how much of what lies behind the fog lets through (the air never dims it).
+// a how much of what lies behind the fog and the air lets through (Bliss's VL_Fog.a x its atmosphereAlpha:
+// the air dims the land, sky and clouds behind it by its grey mean, composite2/3; ours had only added
+// the air's light, so far land and the horizon kept their full colour behind a lit haze).
 fn fog_march(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in: vec3<f32>, air_sky: vec3<f32>, eye_k: f32, shadows: bool) -> vec4<f32> {
     let f = fog_march_parts(dir, span, jitter, sun, sky_fog_in, eye_k, shadows);
-    return vec4(f.light + f.air_k * air_sky, f.through);
+    return vec4(f.light + f.air_k * air_sky, f.through * f.air_grey);
 }
 // The march's parts: the light without the air's sky light, and what that light is multiplied by
 // (the air's sky light enters linearly and never changes how much gets through), so a caller that
@@ -3165,6 +3167,9 @@ struct FogParts {
     light: vec3<f32>,
     air_k: vec3<f32>,
     through: f32,
+    // The air's own transmittance, grey: each step's mean, multiplied (overworld_fog.glsl's
+    // atmosphereAbsorbance; method only).
+    air_grey: f32,
 }
 fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in: vec3<f32>, eye_k: f32, shadows: bool) -> FogParts {
     let eye = scene.eye.xyz;
@@ -3181,6 +3186,7 @@ fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_f
     var air = vec3(0.0);
     var air_k = vec3(0.0);
     var air_through = vec3(1.0);
+    var air_grey = 1.0;
     // A storm in the air (`storm`): its floor and colour once for the march.
     let gale = storm();
     let gale_floor = fog_floor(dir * span);
@@ -3225,11 +3231,12 @@ fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_f
         air += light * held;
         air_k += ext * eye_k * held;
         air_through *= a_kept;
+        air_grey *= dot(a_kept, vec3(1.0 / 3.0));
         if through < 1e-5 {
             break;
         }
     }
-    return FogParts(gained + air, air_k, through);
+    return FogParts(gained + air, air_k, through, air_grey);
 }
 fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let dist = length(rel);
@@ -3254,8 +3261,8 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let span = select(dist, max(scene.params.y, MIST_MARCH_FAR), is_sky);
     let f = fog_march(dir, span, jitter, sun, fog_sky, p.ambient, eye_k, true);
     let through = f.a;
-    // Debug views (`base:look_debug`): 3 the fog's opacity (1 - its transmittance, the air not
-    // counted) in grey; 4 the hour's fog weights (red morning, green evening, blue night); 5 the
+    // Debug views (`base:look_debug`): 3 the fog's and the air's opacity (1 - their transmittance)
+    // in grey; 4 the hour's fog weights (red morning, green evening, blue night); 5 the
     // cloudy fog's body at the surface, unworn (red) beside the fog's density there x 8 (green).
     let dbg = look_debug();
     if dbg == 3u {

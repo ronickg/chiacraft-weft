@@ -1511,7 +1511,9 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     for (var i = 0; i < 9; i++) {
                         if i == ATM_MEAN_SKIP { continue; }
                         let fog = fog_march_parts(atm_mean_dir(i, sun), 1024.0, 0.5, map_sun, ground, 1.0, false);
-                        fixed += (wet[i] * cl[i].a + cl[i].rgb) * fog.through + fog.light;
+                        // The sky and clouds dimmed by the air, then the fog over them (deferred.fsh: sky *=
+                        // atmosphereAlpha before the fog; method only).
+                        fixed += (wet[i] * cl[i].a + cl[i].rgb) * fog.air_grey * fog.through + fog.light;
                         per += fog.air_k;
                     }
                     var amb = land_ambient(clear / 9.0);
