@@ -1151,7 +1151,9 @@ fn bliss_moon(dir: vec3<f32>) -> vec4<f32> {
 // sky and taking the sunset's colours and the moon's light, thicker under rain. Behind the blocky
 // clouds it gives the sky depth.
 fn cirrus(c: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
-    if dir.y <= 0.02 || fantasy_opt(OPT_CIRRUS_OFF) > 0.5 {
+    // Not under Bliss's clouds (`land_from_sky`): its altostratus is the high sheet there, and ours
+    // stacked on it (feature audit B8, 11-26).
+    if dir.y <= 0.02 || fantasy_opt(OPT_CIRRUS_OFF) > 0.5 || land_from_sky() {
         return c;
     }
     let p = palette();
@@ -1395,6 +1397,18 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             rgb = m.rgb;
             a = m.a * s.color.a;
         }
+        // Bliss's own sun (`OPT_SUN_DISC` at 1, with the physical sky): drawSun's disc alone, no halo
+        // or tints, its edge smoothstep cubed between 3.2 and 1.8 of its 0.0093 rad, at the land's
+        // sun (its lightCol / 80, `land_sun`) / 0.000882 x 0.62, dark under the horizon as its
+        // atmosphereGround; the air and the clouds over it redden and hide it as the rest of the
+        // sky (feature audit B7, 11-26; method only).
+        if is_sun && land_from_sky() && fantasy_opt(OPT_SUN_DISC) >= 0.5 {
+            let cos_y = dot(dir, normalize(scene.sun.xyz));
+            let edge = pow(smoothstep(cos(0.0093084 * 3.2), cos(0.0093084 * 1.8), cos_y), 3.0);
+            let ground = 1.0 - exp2(-50.0 * pow(clamp(dir.y + 0.025, 0.0, 1.0), 2.0));
+            let sun_rgb = land_sun(normalize(scene.sun.xyz), 0.0) / 0.0008821203 * edge * 0.62 * ground;
+            return vec4(sun_rgb * s.color.a, select(s.color.a * edge, 0.0, s.ids.w != 0u));
+        }
         if is_sun {
             // The sun as a round disc with a soft glow (Bliss's), not the picture's square: that
             // square, about 20° across with a pale border, went white through the curve, washed
@@ -1572,18 +1586,28 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     for (var i = 0; i < 9; i++) {
                         if i == ATM_MEAN_SKIP { continue; }
                         cl[i] = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), map_sun, ground);
+                        // Debug view 14: view 13's swatches with no clouds in this average (Bliss's capture 5
+                        // has its cloud cover at 0), to set the clear sky's fill against Bliss's.
+                        if look_debug() == 14u {
+                            cl[i] = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
+                    }
+                    // Each look's fog marched once: the rounds differ only in the air's sky light,
+                    // which its light takes linearly (`fog_march_parts`), so the sum splits into what
+                    // does not change (`fixed`) and what each round's light is multiplied by (`per`).
+                    var fixed = vec3(0.0);
+                    var per = vec3(0.0);
+                    for (var i = 0; i < 9; i++) {
+                        if i == ATM_MEAN_SKIP { continue; }
+                        let fog = fog_march_parts(atm_mean_dir(i, sun), 1024.0, 0.5, map_sun, ground, 1.0, false);
+                        // The sky and clouds dimmed by the air, then the fog over them (deferred.fsh: sky *=
+                        // atmosphereAlpha before the fog; method only).
+                        fixed += (wet[i] * cl[i].a + cl[i].rgb) * fog.air_grey * fog.through + fog.light;
+                        per += fog.air_k;
                     }
                     var amb = land_ambient(clear / 9.0);
-                    var cloudy = vec3(0.0);
                     for (var k = 0; k < 4; k++) {
-                        cloudy = vec3(0.0);
-                        for (var i = 0; i < 9; i++) {
-                            if i == ATM_MEAN_SKIP { continue; }
-                            let dir = atm_mean_dir(i, sun);
-                            let fog = fog_march(dir, 1024.0, 0.5, map_sun, ground, amb, 1.0, false);
-                            cloudy += (wet[i] * cl[i].a + cl[i].rgb) * fog.a + fog.rgb;
-                        }
-                        amb = land_ambient(cloudy / 9.0);
+                        amb = land_ambient((fixed + per * amb) / 9.0);
                     }
                     return vec4(amb, 1.0);
                 }
@@ -1621,8 +1645,10 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
         // cloudy average, 6 the clouds' light alone and 7 the fog's alone, in Bliss's raw units (x 12.3,
         // as `land_ambient` takes the mean); 8 the clouds' and the fog's mean transmittance and, where
         // Bliss has its atmosphereAlpha, our mean cloud shadow on the fog's steps.
-        case 6u, 7u, 8u: {
-            if from_sky && look_debug() == 13u {
+        // 9 (11-26): the clouds' light with no sun, their sky light alone (Bliss's capture 4 has the same:
+        // the sun's share is 6 less this).
+        case 6u, 7u, 8u, 9u: {
+            if from_sky && (look_debug() == 13u || look_debug() == 14u) {
                 let moon = normalize(scene.moon.xyz);
                 let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
                 var mean = atm_mean(sun, moon, sky_k);
@@ -1640,7 +1666,8 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                 for (var i = 0; i < 9; i++) {
                     if i == ATM_MEAN_SKIP { continue; }
                     let dir = atm_mean_dir(i, sun);
-                    let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k) * (2.0 / 1.875), bc_ground_sky(sun, moon, sky_k, mean));
+                    let cl_sun = select(land_sun(sun, moon_k) * (2.0 / 1.875), vec3(0.0), u32(in.clip.x) == 9u);
+                    let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), cl_sun, bc_ground_sky(sun, moon, sky_k, mean));
                     let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k) * (2.0 / 1.875), bc_ground_sky(sun, moon, sky_k, mean), land_ambient(mean), 1.0, false);
                     var sh = 0.0;
                     for (var k = 0; k < 4; k++) {
@@ -1651,7 +1678,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     alphas += vec3(cl.a, fog.a, sh) / 9.0;
                 }
                 let x = u32(in.clip.x);
-                return vec4(select(select(alphas, fog_rgb * 12.3, x == 7u), cl_rgb * 12.3, x == 6u), 1.0);
+                return vec4(select(select(alphas, fog_rgb * 12.3, x == 7u), cl_rgb * 12.3, x == 6u || x == 9u), 1.0);
             }
             return vec4(0.0);
         }

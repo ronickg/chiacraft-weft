@@ -141,6 +141,30 @@ pub fn cloak_of(item: &str) -> Option<&'static Cloak> {
 /// mail, a fur-lined helmet; proposed).
 pub const LINING_SHARE: f32 = 0.5;
 
+/// A garment's warmth against its material's by the quality of the hides it was sewn of (`base:hide_quality`, 1 poor to
+/// 3 perfect, from skinning; 0 not known: as good): a poor hide is thin, scraped through or torn, a perfect one thick
+/// and whole. Fur and leather clothes and cloaks.
+pub const HIDE_WARMTH: [f32; 4] = [1.0, 0.85, 1.0, 1.15];
+
+/// `HIDE_WARMTH` for quality `q`.
+pub fn hide_warmth(q: u32) -> f32 {
+    HIDE_WARMTH[(q as usize).min(3)]
+}
+
+/// The quality a garment sewn of `qualities` gets: its worst hide's (a coat is as good as its thinnest panel), with a
+/// hide of no known quality as a good one; none if none is known.
+pub fn sewn_quality(qualities: impl IntoIterator<Item = u32>) -> Option<u32> {
+    let mut known = false;
+    let worst = qualities
+        .into_iter()
+        .map(|q| {
+            known |= q > 0;
+            if q == 0 { 2 } else { q.min(3) }
+        })
+        .min()?;
+    known.then_some(worst)
+}
+
 /// What a body has on, summed over its armor and its clothes.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Worn {
@@ -171,10 +195,15 @@ impl Worn {
 
     /// Puts on a piece of clothing.
     pub fn clothes(&mut self, m: &Material, piece: usize) {
+        self.clothes_of(m, piece, 1.0);
+    }
+
+    /// A piece of clothing whose cold insulation is `warmth` of its material's (`hide_warmth`).
+    pub fn clothes_of(&mut self, m: &Material, piece: usize, warmth: f32) {
         let share = PIECE_SHARE[piece.min(3)];
-        self.cold += m.cold() * share;
+        self.cold += m.cold() * share * warmth;
         self.heat += m.heat * share;
-        self.cold_wet += m.cold() * share * m.wet_keeps;
+        self.cold_wet += m.cold() * share * warmth * m.wet_keeps;
         self.windproof = (self.windproof + m.windproof * share).min(1.0);
     }
 
@@ -190,9 +219,14 @@ impl Worn {
 
     /// Puts on a cloak over everything.
     pub fn cloak(&mut self, c: &Cloak) {
-        self.cold += c.cold;
+        self.cloak_of(c, 1.0);
+    }
+
+    /// A cloak whose cold insulation is `warmth` of its kind's (`hide_warmth`).
+    pub fn cloak_of(&mut self, c: &Cloak, warmth: f32) {
+        self.cold += c.cold * warmth;
         self.heat += c.heat;
-        self.cold_wet += c.cold * c.wet_keeps;
+        self.cold_wet += c.cold * warmth * c.wet_keeps;
         self.windproof = (self.windproof + c.windproof * CLOAK_COVERS).min(1.0);
         self.dry_in_rain |= c.keeps_dry;
     }
@@ -204,5 +238,25 @@ impl Worn {
             w.clothes(m, p);
         }
         w
+    }
+}
+
+#[cfg(test)]
+mod hide_tests {
+    use super::*;
+
+    #[test]
+    fn hide_quality_warms() {
+        assert!(hide_warmth(1) < hide_warmth(2) && hide_warmth(2) < hide_warmth(3));
+        assert_eq!(hide_warmth(0), hide_warmth(2));
+        assert_eq!(sewn_quality([3, 1, 3]), Some(1));
+        assert_eq!(sewn_quality([3, 0]), Some(2));
+        assert_eq!(sewn_quality([0, 0]), None);
+        assert_eq!(sewn_quality([]), None);
+        let fur = find("fur").unwrap();
+        let (mut poor, mut perfect) = (Worn::default(), Worn::default());
+        poor.clothes_of(fur, 1, hide_warmth(1));
+        perfect.clothes_of(fur, 1, hide_warmth(3));
+        assert!(poor.cold < perfect.cold && poor.windproof == perfect.windproof);
     }
 }

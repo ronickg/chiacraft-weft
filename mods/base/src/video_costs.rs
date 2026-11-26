@@ -96,6 +96,9 @@ const TABLE: &[(&str, f64, f64, f64)] = &[
     // The mist's banks walked per pixel (11-24): an estimate until the PC's bench at Max, 16 steps
     // a pixel each with a noise, a ground-map read and the shadow maps' taps, where there is mist.
     ("mist_banks", 1.0, 0.4, f64::NAN),
+    // Not yet measured: a guess from the reflections' own row (0.12 ms with water on most of the
+    // screen), in rain with wet ground filling the picture; nothing when dry.
+    ("wet_mirror", 1.0, 0.12, f64::NAN),
 ];
 
 /// The 5090 at 1920x1080 against this machine: the pixels the world is drawn at, and how much

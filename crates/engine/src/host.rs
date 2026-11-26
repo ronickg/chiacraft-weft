@@ -142,6 +142,7 @@ pub static HOST: Host = Host {
     entity_teleport,
     set_day_time,
     day_time,
+    grow_time,
     skip_ticks,
     fill,
     shape_contains,
@@ -1370,6 +1371,15 @@ unsafe extern "C" fn day_time(w: *mut abi::WorldCtx) -> u64 {
     unsafe {
         let d = dim(w);
         d.time.saturating_add_signed(d.day_offset)
+    }
+}
+
+unsafe extern "C" fn grow_time(w: *mut abi::WorldCtx) -> u64 {
+    unsafe {
+        let d = dim(w);
+        d.growing_at()
+            .unwrap_or(d.time)
+            .saturating_add_signed(d.day_offset)
     }
 }
 

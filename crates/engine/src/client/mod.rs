@@ -940,6 +940,12 @@ pub struct Client {
     /// (`Scene::frame_look.y`): a pack dims what the open sky lights by it in a cave or under cover,
     /// as Bliss does with Iris's `eyeBrightnessSmooth`.
     eye_sky: f32,
+    /// Seconds the eye has had no sky light at all (its level 0), and how much it is in a cave,
+    /// 0..1 (`Scene::cloud_shadow.z`): after ten seconds in the dark it eases in over three seconds
+    /// and out over one once any sky light reaches the eye (Bliss's OLD_CAVE_DETECTION, which kills
+    /// its fog in caves and adds a cave fog; method only).
+    dark_for: f32,
+    cave: f32,
     /// How wet the ground is where the player is, 0..1 (`weather_effects`, `Scene::canopy.y`).
     wet: f32,
     /// How far puddles have grown where the player is, 0..1 (`weather_effects`, `Scene::canopy.z`):
@@ -1357,6 +1363,8 @@ impl Client {
             aurora: 0.0,
             canopy: 0.0,
             eye_sky: 1.0,
+            dark_for: 0.0,
+            cave: 0.0,
             wet: 0.0,
             puddles: 0.0,
             snow_line: SNOW_LINE_NONE,
@@ -3673,6 +3681,10 @@ impl Client {
             .light_loaded(eye)
             .map_or(self.eye_sky, |l| weft_abi::light::sky(l) as f32 / 15.0);
         self.eye_sky += (sky - self.eye_sky) * (1.0 - (-dt / 1.5).exp());
+        self.dark_for = if sky < 0.01 { self.dark_for + dt } else { 0.0 };
+        let in_cave = if self.dark_for > 10.0 { 1.0 } else { 0.0 };
+        let pace = if in_cave > self.cave { 3.0 } else { 1.0 };
+        self.cave += (in_cave - self.cave) * (1.0 - (-dt / pace).exp());
         // The ground wets as the rain comes (in about twenty seconds) and dries after it at the
         // pace the air there gives (a mod's `DRYING_SHIFT`; 0, about two minutes): it stayed wet
         // only as long as the rain fell, gone 25 s after (Tester 2's after-rain shots, 11-05).
@@ -4445,6 +4457,7 @@ impl Client {
         scene.frame_look[3] = self.exposure_last as f32;
         scene.froxels = self.sky.froxels.scene;
         scene.cloud_shadow = self.sky.cloud_shadow.scene;
+        scene.cloud_shadow[2] = self.cave;
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         self.render
             .draw_translucent(&mut late, &cam, atmosphere.as_ref());

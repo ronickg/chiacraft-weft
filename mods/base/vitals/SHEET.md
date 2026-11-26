@@ -169,6 +169,8 @@ Cloaks, in a slot of their own over clothes and armor (covering 60% of the body 
 | fur_robe | 8 | -3 | 30% | 60% | no | pelts |
 | rain_cape | 1 | 0 | 100% | 50% | yes | leather |
 
+A fur or leather piece or cloak warms (its cold and heat °C) by its hide's quality from skinning (`base:hide_quality`, kept by tanning; a garment is as good as its worst hide): poor 0.85x, good 1.00x, perfect 1.15x; a hide of no known quality 1.00x.
+
 ## Rooms
 
 An enclosed space (`vitals::shelter`; up to 400 blocks of air, none open to the sky) shuts out the wind, lets in its walls' share of the day's swing, and keeps 2 °C over the air outside empty, or a fire's gain by its walls with a fire in it (full up to 60 blocks of air, at least 40% in a bigger room; never less than the fire gives beside it).

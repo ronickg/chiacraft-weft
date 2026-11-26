@@ -692,6 +692,12 @@ impl World {
         unsafe { (host().day_time)(self.raw()) }
     }
 
+    /// `day_time` as of the growth step being run: a plant in an area that was unloaded catches up
+    /// step by step, each at the time it missed (its season, its day's air); else `day_time`.
+    pub fn grow_time(&self) -> u64 {
+        unsafe { (host().grow_time)(self.raw()) }
+    }
+
     /// As if `ticks` passed at once: the day moves on, and growth, machines and timers catch up.
     pub fn skip_ticks(&self, ticks: u64) {
         unsafe { (host().skip_ticks)(self.raw(), ticks) }

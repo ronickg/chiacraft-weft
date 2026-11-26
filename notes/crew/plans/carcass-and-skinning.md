@@ -103,6 +103,55 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   bodies (shots 1, 4, 8) and is gone at Bones and after skinning; the camera shows the kneeling skinner side-on with
   the knife and the body. The red was too bright (darkened after). The body lies at the pool's edge, not its middle:
   rolling the model about its root moves it off its entity's centre, which the art slice's lying models fix.
-- Left for later: the opened body itself (art slice); the dead body shows the base coat, not its own; vultures
-  fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
+- Slice 3, first batch (Planner on r6: the kneel disjointed, the whole deer legs-up, the body off its pool): the
+  `skin` clip kneels on the shins (hips at 3 px, legs flat behind; the torso, which hangs from the neck, leans only
+  10-12 degrees, so it stays on the hips). Whole and opened bodies are now one lying model per body plan
+  (`source/carcass/body.py`: four-legged mammal, bird, two-legged dinosaur, reptile on its belly, fish; opened: the
+  upper side cut open, ribs across the meat, guts beside it), centred on the carcass, scaled by the cube root of mass
+  against each plan's reference animal (`animals_core::carcass::Plan`), and painted in the animal's own coat and
+  underside (its genes' phenotype read at death into `carcass_coat`, since replaced by the whole genome: see the third
+  part). Sheet: `source/carcass/sheet.py` (archived in
+  ~/Coding/chiacraft-archive/images/carcass/2026-11-26/). cov_carcass part 5 kills one of each plan for shots.
+- r7 (cd142572e): nothing sinks (low shots of each stage on the grass), each plan in its own coat; the knife missed
+  the deer (it lay 2 blocks off the aim). r9 (e2549bca5, every shot with the HUD hidden): skinning runs (7.9 s, flint,
+  1 hide at quality 1 from a level-33 deer, 4 venison; the venison taken counts as eaten, so it steps to Bones); the
+  kneel view shows the deer on its side, belly and legs toward the skinner, on its pool; the five plans' opened bodies
+  rest on the ground.
+- Planner on r9: the kneel fell apart (Weft's humanoid has no parent bones and its body hangs from the neck: r9's
+  10 degree torso and 38 degree head tipped apart over flat legs). Refitted by `mods/base/source/player/skin_pose.py`:
+  torso, head and arms turned 30 degrees about the hips with position keys holding each joint, knees down behind,
+  hands at the body. Slice 3, second part: bones and pile per body plan (`body.py`: a ribcage on its side, skull,
+  legs' long bones with their hooves or claws, a little meat, a scrap of the animal's own hide or feathers that the
+  coat painter turns to its colour; the pile a skull, a few long bones and the hide), replacing slice 1's one
+  placeholder pair. cov_carcass shots 14 (bones) and 15 (pile) of each plan's row.
+- Slice 3, third part (Planner 11-26, "spotting and patterns on dead coats next"): the carcass keeps the animal's
+  whole genome (`carcass_genome`, copied at the DIE question), and the client paints it with the living coat painter
+  (`animals_core::coats::paint_dead`) on the carcass models' own layers (`genetics/layers/carcass/`, written by
+  `body.py layers`: each coat texel's model position, folded from lying back to standing so stripes, rosettes, white
+  feet and blazes land where they grow, its underside share, white and points zones), keeping the shared texture's
+  painted light by its brightness. Offline: `cargo run -p animals_core --bin carcass_coats` then `sheet.py --coats`
+  (jaguar rosettes, tabby and white cats, striped raptors, archived).
+- Rot drawn (Planner 11-26, "rot tint and flies" first of the four): the body's coat is repainted at each rot step
+  (`animals_core::carcass::rot_step`: 0 fresh, 1-5 through the bloat, 6 at remains), turning toward a dull green-black
+  as it bloats and a dry grey-brown at remains, bright texels darkening most (`rot_tint`, `BLOAT_RGB`, `DRY_RGB`,
+  `ROT_DARKEN`, pale bellies too, by `DRY_DARKEN` at remains), the opened flesh and ribs rotting with it, a dull
+  red-brown through the bloat and a dark dried brown at remains (`MEAT_ROT_RGB`, `MEAT_DRY_RGB`; Planner on
+  sheet_rot: the meat stayed fresh red, the bellies went mint); the blood pool under it too (`gore_tint`: darker
+  red-brown through the bloat, a dry dark stain under the remains' bones, gone with the pile; `has_gore`, synced as
+  `carcass_gore_rot`; offline `carcass_coats --gore`); blow flies dart over it while it bloats (`FLIES` over a deer-sized body, as many again per body as big
+  by area, `DRY_FLIES` of them at remains, none at bones), drawn on each client as short-lived particles
+  (`carcass_fly`). The step and the flies ride in the synced `Dead` (`carcass_genome`) with the genes, so a step
+  repaints the coat. `/animalprof carcass` lists both. Offline: `sheet.py --rot`. The golden eagle's coat now has its
+  coverts' paler mottling (living and dead: a plain brown read flat).
+- Vultures (Planner 11-26, second of the four): a carcass is eaten a mouthful at a time, each the eater's own
+  (`animals_core::carcass::bite_kg`: `MOUTHFUL` 3 % of its mass, no more than it still needs, at least
+  `MOUTHFUL_MIN_KG`; a turkey vulture 40 g, a wolf a kilo), one a chew, so a 1.4 kg vulture feeds four mouthfuls to
+  its 140 g meal; the fixed 0.5 kg bite filled it at once and took the rest off the body for nothing. Check:
+  cov_carcass_vultures (part 2 alone, watched 4 minutes).
+- Hide quality (Planner 11-26, fourth of the four): the skinned stack carries `base:hide_quality` (base_api, was
+  `animals:pelt_quality`), kept through tanning (`crafts.rs`: leather of one quality stacks alone) and sewing
+  (`clothing.rs` `crafted`, the crafting grid and the book: a garment as good as its worst hide, an unknown one as
+  good); fur and leather clothes and cloaks warm by `vitals::clothing::HIDE_WARMTH` (poor 0.85, good 1, perfect
+  1.15) in `survival/temperature.rs`. The tooltip (`tagged.base.hide_quality`, en and ru) gives stars and the warmth.
+- Left for later: species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.

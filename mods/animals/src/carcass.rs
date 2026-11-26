@@ -23,13 +23,58 @@ use crate::ModelFile;
 
 use crate::species::SPECIES;
 
-/// The body: its kind (`EntityKind`); the looks it is drawn as past opened.
+/// The body: its kind (`EntityKind`); the looks it is drawn as: its body plan's whole and opened (slice 3, at the
+/// plans' order in `animals_core::carcass::Plan::ALL`), its bones and its pile of bones.
 pub static CARCASS: EntityKind = EntityKind::named("carcass_body");
-static BONES: EntityKind = EntityKind::named("carcass_bones");
-static PILE: EntityKind = EntityKind::named("carcass_pile");
+static WHOLE: [EntityKind; 5] = [
+    EntityKind::named("carcass_quadruped"),
+    EntityKind::named("carcass_bird"),
+    EntityKind::named("carcass_biped"),
+    EntityKind::named("carcass_reptile"),
+    EntityKind::named("carcass_fish"),
+];
+static OPENED: [EntityKind; 5] = [
+    EntityKind::named("carcass_quadruped_open"),
+    EntityKind::named("carcass_bird_open"),
+    EntityKind::named("carcass_biped_open"),
+    EntityKind::named("carcass_reptile_open"),
+    EntityKind::named("carcass_fish_open"),
+];
+/// What its watchers draw it from (`Dead`), saved.
+static GENES: Component<Dead> = Component::named("carcass_genome");
+/// Flies over a rotting body (`animals_core::carcass::flies`), drawn on each client.
+static FLY: Particle = Particle::named("carcass_fly");
+static BONES: [EntityKind; 5] = [
+    EntityKind::named("carcass_quadruped_bones"),
+    EntityKind::named("carcass_bird_bones"),
+    EntityKind::named("carcass_biped_bones"),
+    EntityKind::named("carcass_reptile_bones"),
+    EntityKind::named("carcass_fish_bones"),
+];
+static PILE: [EntityKind; 5] = [
+    EntityKind::named("carcass_quadruped_pile"),
+    EntityKind::named("carcass_bird_pile"),
+    EntityKind::named("carcass_biped_pile"),
+    EntityKind::named("carcass_reptile_pile"),
+    EntityKind::named("carcass_fish_pile"),
+];
 /// The blood and guts under an opened body: a second entity at its place (the animal's own model can't be painted per
 /// carcass), so "opened" reads apart from "whole" until the art slice draws the opened body itself.
 static GORE: EntityKind = EntityKind::named("carcass_gore");
+/// The blood pool's rot step (`animals_core::carcass::gore_tint`), its watchers repainting it when it changes.
+static GORE_ROT: Component<u32> = Component::named("carcass_gore_rot");
+
+value! {
+    #[derive(Default)]
+    /// What a body's watchers paint and draw it from: the animal's genes (species 0: none, drawn in the texture's own
+    /// deer coat), painted on the body as on the living animal (`paint_dead`), its rot step
+    /// (`animals_core::carcass::rot_step`, tinting the coat) and the flies over it.
+    pub struct Dead {
+        pub genes: crate::coats::Genome,
+        pub rot: u8,
+        pub flies: u8,
+    }
+}
 
 value! {
     #[derive(Default)]
@@ -58,8 +103,7 @@ value! {
     }
 }
 pub static BODY: Component<Body> = Component::named("carcass");
-/// The look it is drawn as on this run, + 1 (not saved: the engine forgets appearance and scale on loading); its
-/// watchers have it, to lay a whole or opened body on its side (`client_entity_frame`).
+/// The look it is drawn as on this run, + 1 (not saved: the engine forgets appearance and scale on loading).
 static SHOWN: Component<u32> = Component::named("carcass_shown");
 
 /// Hits taken in its life (not saved): a hide's quality (`animals_core::carcass::kill`).
@@ -70,22 +114,33 @@ static SKIN: Component<[u64; 4]> = Component::named("carcass_skin");
 static SKINNING: Pose = Pose::named("skinning");
 static SKIN_CAMERA: CameraMode = CameraMode::named("skinning");
 
-/// The dying read at the `DIE` question: the animal, its species index, mass, yaw, drawn scale, level, hits.
-type Dying = (u64, usize, f32, f32, f32, u32, u32);
+/// The dying read at the `DIE` question.
+#[derive(Clone, Copy)]
+struct Dying {
+    id: u64,
+    index: usize,
+    mass: f32,
+    yaw: f32,
+    /// Its drawn scale (genes and growth), its wild level, the hits it took, its genes (`GENES`).
+    scale: f32,
+    level: u32,
+    hits: u32,
+    genes: crate::coats::Genome,
+}
 static DYING: Mutex<Vec<Dying>> = Mutex::new(Vec::new());
 /// Kilograms taken off a body before its carcass was laid (the hunters' `DIE` handler may run first).
 static TAKEN: Mutex<Vec<(u64, f32)>> = Mutex::new(Vec::new());
-
-/// Model pixels a body laid on its side is lifted by: about half a deer's body width, so its flank lies on the ground.
-const LIE_LIFT: f32 = 4.0;
 
 /// How often a carcass ages and looks again, ticks.
 const EVERY: u64 = 100;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&BODY, Body::default(), component_flags::SAVE);
-    r.entity_component(&SHOWN, 0u32, component_flags::SYNC_WATCHERS);
-    let (bw, bh) = animals_core::bodies::of("carcass_bones");
+    r.entity_component(&SHOWN, 0u32, 0);
+    r.entity_component(&GENES, Dead::default(), component_flags::SAVE | component_flags::SYNC_WATCHERS);
+    // Its box the lying deer's (scaled with it, `set_scale`), so a click on the body hits it (r7's knife use landed on
+    // the grass beside one boxed as the ribcage).
+    let (bw, bh) = animals_core::bodies::of("carcass_quadruped");
     r.entity(&CARCASS)
         .no_egg()
         .size(bw, bh)
@@ -93,10 +148,11 @@ pub fn init(r: &mut Registry) {
         .walk_speed(0.0)
         .passive()
         .unpushable()
-        .model_file("carcass_bones")
-        .texture("carcass/bones")
+        .model_file("carcass_quadruped")
+        .texture("carcass/body")
         .attach(&BODY)
         .attach(&SHOWN)
+        .attach(&GENES)
         .attach(&SKIN)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
@@ -104,15 +160,17 @@ pub fn init(r: &mut Registry) {
         })
         .goals(Goals::new().then(rot));
     r.entity_component(&SKIN, [0u64; 4], 0);
-    // A whole or opened body is the animal's own model, laid on its side: its root rolled a quarter turn and lifted by
-    // half a body's width (r4: drawn with no clip it stood, legs down, beside the skinner).
-    r.client_entity_frame(&CARCASS, |c, e| {
-        let shown = c.view().component_of(e.id(), &SHOWN).unwrap_or(0);
-        if shown == Look::Whole as u32 + 1 || shown == Look::Opened as u32 + 1 {
-            c.bone_turn(e.id(), "root", [0.0, 0.0, 90.0]);
-            c.bone_move(e.id(), "root", [0.0, LIE_LIFT, 0.0]);
-        }
-    });
+    // Its coat painted over whichever body plan it is drawn as (they share the texture), keeping the light painted in.
+    r.entity_skin(&CARCASS, &GENES, paint_dead);
+    // The pool under an opened body rots with it: browner, then a dry dark stain (`core::gore_tint`).
+    r.entity_component(&GORE_ROT, 0u32, component_flags::SAVE | component_flags::SYNC_WATCHERS);
+    r.particle(&FLY)
+        .textures(&["carcass_fly"])
+        .life(FLY_LIFE * 0.7, FLY_LIFE * 1.3)
+        .size(0.035, 0.05)
+        .gravity(0.0)
+        .drag(0.92);
+    r.client_entity_frame(&CARCASS, flies);
     // A knife used at the ground beside a carcass skins it too (a body lying flat is easy to aim past: r3's use hit
     // the grass by it). The nearest carcass within `SKIN_REACH` of the block aimed at, or of the player.
     r.before_event(&actions::USE_ITEM, |q| {
@@ -123,8 +181,10 @@ pub fn init(r: &mut Registry) {
         let Some(me) = w.entity(player) else { return Verdict::Abstain };
         let p = q.pos();
         let at = if q.state() != 0 { Vec3 { x: p.x as f64 + 0.5, y: p.y as f64 + 1.0, z: p.z as f64 + 0.5 } } else { me.pos };
+        // A block's breadth past the reach round the spot aimed at (r7's deer lay 2.5-3 blocks off it); the player
+        // still within reach of the body.
         let near = w
-            .entities_near(at, core::SKIN_REACH, Some(&CARCASS))
+            .entities_near(at, core::SKIN_REACH + 1.0, Some(&CARCASS))
             .into_iter()
             .filter(|&c| crate::dist2(w.entity(c).map_or(at, |e| e.pos), me.pos) <= core::SKIN_REACH * core::SKIN_REACH)
             .min_by(|&a, &b| {
@@ -136,7 +196,6 @@ pub fn init(r: &mut Registry) {
             _ => Verdict::Abstain,
         }
     });
-    r.stack_component(&PELT_QUALITY, 0);
     r.entity_component(&HITS, 0u32, 0);
     for s in &SPECIES {
         r.edit(s.kind).attach(&HITS);
@@ -149,10 +208,11 @@ pub fn init(r: &mut Registry) {
             }
         }
     });
-    // Kneeling, still, at eye height a little over half a standing one's (`player.animation.json`'s `skin` clip).
+    // Kneeling forward over the body, still (`player.animation.json`'s `skin` clip: the knees down behind, the torso
+    // leaning 30 degrees about the hips with the head and arms carried along, its eye at 1.33 blocks).
     r.pose(&SKINNING)
-        .height(0.6)
-        .eye(0.55)
+        .height(0.93)
+        .eye(0.8)
         .speed(0.0)
         .action("skin")
         .no_bob();
@@ -163,9 +223,12 @@ pub fn init(r: &mut Registry) {
             let (f, right) = ([-yaw.sin(), -yaw.cos()], [yaw.cos(), -yaw.sin()]);
             // A three-quarter side view from the right, level with the body before them and looking between the
             // skinner and it, so both the knife and the body are in frame (r4's, 1.1 blocks out, sat inside the
-            // arm; r5's, behind the shoulder, had the head filling the near side).
-            let pos = Vec3 { x: eye.x + right[0] * 2.6 + f[0] * 0.7, y: eye.y + 0.8, z: eye.z + right[1] * 2.6 + f[1] * 0.7 };
-            let at = Vec3 { x: eye.x + f[0] * 0.9, y: eye.y - 0.45, z: eye.z + f[1] * 0.9 };
+            // arm; r5's, behind the shoulder, had the head filling the near side). r9's, level with the skinner and
+            // above, showed the back of a tipped head bigger than the body: now out in front on the right and lower,
+            // the body nearer the camera than the skinner, who shows face and chest.
+            // r1b's, from above, saw only the top of the bowed head: now at the eyes' height.
+            let pos = Vec3 { x: eye.x + right[0] * 2.4 + f[0] * 2.2, y: eye.y + 0.05, z: eye.z + right[1] * 2.4 + f[1] * 2.2 };
+            let at = Vec3 { x: eye.x + f[0] * 0.8, y: eye.y - 0.55, z: eye.z + f[1] * 0.8 };
             let (yaw, pitch) = camera::look_at(pos, at);
             a.out = abi::CameraPose { pos, yaw, pitch, ..abi::CameraPose::DEFAULT };
         }))
@@ -179,22 +242,27 @@ pub fn init(r: &mut Registry) {
         .unpushable()
         .model_file("carcass_gore")
         .texture("carcass/bones")
+        .attach(&GORE_ROT)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
             let Some(at) = w.entity(id).map(|g| g.pos) else { return false };
             let near = w.entities_near(at, 1.0, Some(&CARCASS));
             near.first().is_some_and(|&c| start_skinning(&w, c, player))
         });
-    for (kind, model) in [(&BONES, "carcass_bones"), (&PILE, "carcass_pile")] {
-        let (w, h) = animals_core::bodies::of(model);
-        r.entity(kind)
-            .no_egg()
-            .size(w, h)
-            .walk_speed(0.0)
-            .passive()
-            .unpushable()
-            .model_file(model)
-            .texture("carcass/bones");
+    r.entity_skin(&GORE, &GORE_ROT, |step, skin| core::gore_tint(skin.rgba, *step as u8));
+    for (i, plan) in core::Plan::ALL.into_iter().enumerate() {
+        let looks = [(&WHOLE[i], ""), (&OPENED[i], "_open"), (&BONES[i], "_bones"), (&PILE[i], "_pile")];
+        for (kind, model) in looks.map(|(k, s)| (k, format!("carcass_{}{s}", plan.name()))) {
+            let (w, h) = animals_core::bodies::of(&model);
+            r.entity(kind)
+                .no_egg()
+                .size(w, h)
+                .walk_speed(0.0)
+                .passive()
+                .unpushable()
+                .model_file(&model)
+                .texture("carcass/body");
+        }
     }
     // Read before the body goes (`DIE`'s question comes while it is still there).
     r.before_event(&actions::DIE, |q| {
@@ -209,9 +277,10 @@ pub fn init(r: &mut Registry) {
             let scale = crate::coats::size_of(&w, id).unwrap_or(1.0) * crate::breeding::growth(&w, id, index);
             // The killing blow is no `HURT` (a lethal hit fires `DIE` alone): one more.
             let hits = w.component(id, &HITS).unwrap_or(0) + 1;
+            let genes = w.component(id, &crate::coats::GENOME).unwrap_or_default();
             let mut d = DYING.lock().unwrap();
-            d.retain(|r| r.0 != id);
-            d.push((id, index, mass, e.yaw, scale, a.level(), hits));
+            d.retain(|r| r.id != id);
+            d.push(Dying { id, index, mass, yaw: e.yaw, scale, level: a.level(), hits, genes });
             if d.len() > 64 {
                 d.remove(0);
             }
@@ -223,13 +292,22 @@ pub fn init(r: &mut Registry) {
         for d in b.iter() {
             let read = {
                 let mut dying = DYING.lock().unwrap();
-                let i = dying.iter().position(|r| r.0 == d.entity);
+                let i = dying.iter().position(|r| r.id == d.entity);
                 i.map(|i| dying.swap_remove(i))
             };
             // Died some other way (a command, the void): its kind's own size, facing north.
-            let Some((_, index, mass, yaw, scale, level, hits)) = read.or_else(|| {
+            let Some(Dying { index, mass, yaw, scale, level, hits, genes, .. }) = read.or_else(|| {
                 let index = SPECIES.iter().position(|s| s.kind.id() == d.kind)?;
-                Some((d.entity, index, SPECIES[index].bio.mass, 0.0, 1.0, 0, 1))
+                Some(Dying {
+                    id: d.entity,
+                    index,
+                    mass: SPECIES[index].bio.mass,
+                    yaw: 0.0,
+                    scale: 1.0,
+                    level: 0,
+                    hits: 1,
+                    genes: Default::default(),
+                })
             }) else {
                 continue;
             };
@@ -240,6 +318,9 @@ pub fn init(r: &mut Registry) {
             let id = lay(&w, d.entity, index, (mass, scale), yaw, [d.pos.x, d.pos.y, d.pos.z], false);
             if let Some(b) = w.component_mut(id, &BODY) {
                 (b.level, b.hits, b.cause) = (level, hits, d.cause);
+            }
+            if let Some(g) = w.component_mut(id, &GENES) {
+                g.genes = genes;
             }
         }
     });
@@ -328,12 +409,29 @@ fn show(w: &World, id: u64) {
     let Some(b) = w.component(id, &BODY) else { return };
     let Some(l) = look(&b) else {
         weft_sdk::info!("carcass {id} gone ({:.1} of {:.1} kg eaten, {:.1} days aged)", b.eaten, b.mass * core::EDIBLE, b.aged);
-        gore(w, id, &b, false);
+        gore(w, id, &b, false, 0);
         w.despawn(id);
         return;
     };
+    // Its rot drawn (a repaint when the step changes) and the flies over it.
+    let plan_scale = (b.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+        .map_or(1.0, |s| core::body_scale(b.mass, core::plan_of(s.model)));
+    let step = core::rot_step(core::keeps(), b.aged);
+    let n_flies = core::flies(step, l, plan_scale);
+    let stepped = w.component(id, &GENES).is_some_and(|g| g.rot != step);
+    if w.component(id, &GENES)
+        .is_some_and(|g| (g.rot, g.flies) != (step, n_flies))
+        && let Some(g) = w.component_mut(id, &GENES)
+    {
+        (g.rot, g.flies) = (step, n_flies);
+    }
     let n = l as u32 + 1;
     if w.component(id, &SHOWN) == Some(n) {
+        if stepped {
+            gore(w, id, &b, core::has_gore(l, step), step);
+        }
         return;
     }
     let Some(s) = (b.species as usize)
@@ -342,21 +440,20 @@ fn show(w: &World, id: u64) {
     else {
         return;
     };
-    match l {
-        // The animal itself lying dead, laid on its side on the client (`client_entity_frame`).
-        Look::Whole | Look::Opened => {
-            w.set_appearance(id, Some(name_of(abi::entry_kind::ENTITY, s.kind.id())));
-            w.set_scale(id, if b.scale > 0.0 { b.scale } else { 1.0 });
-            w.action_stop(id);
-        }
-        Look::Bones | Look::Pile => {
-            let kind = if l == Look::Bones { &BONES } else { &PILE };
-            w.set_appearance(id, Some(name_of(abi::entry_kind::ENTITY, kind.id())));
-            w.set_scale(id, core::scale(b.mass));
-            w.action_stop(id);
-        }
-    }
-    gore(w, id, &b, l == Look::Opened);
+    // Its body plan's lying model (or its bones, or the pile they end in), at its size, in its own coat (`paint_dead`:
+    // the hide scraps and feathers left by the bones too).
+    let plan = core::plan_of(s.model);
+    let i = core::Plan::ALL.iter().position(|&p| p == plan).unwrap_or(0);
+    let kind = match l {
+        Look::Whole => &WHOLE[i],
+        Look::Opened => &OPENED[i],
+        Look::Bones => &BONES[i],
+        Look::Pile => &PILE[i],
+    };
+    w.set_appearance(id, Some(name_of(abi::entry_kind::ENTITY, kind.id())));
+    w.set_scale(id, core::body_scale(b.mass, plan));
+    w.action_stop(id);
+    gore(w, id, &b, core::has_gore(l, step), step);
     if let Some(v) = w.component_mut(id, &SHOWN) {
         *v = n;
     }
@@ -374,8 +471,9 @@ fn show(w: &World, id: u64) {
     }
 }
 
-/// Lays the blood and guts under carcass `id` (`on`), at its size, or takes them up; one at most.
-fn gore(w: &World, id: u64, b: &Body, on: bool) {
+/// Lays the blood and guts under carcass `id` (`on`), at its size and rot `step` (`GORE_ROT`), or takes them up; one at
+/// most.
+fn gore(w: &World, id: u64, b: &Body, on: bool, step: u8) {
     let Some(e) = w.entity(id) else { return };
     let near = w.entities_near(e.pos, 0.5, Some(&GORE));
     if !on {
@@ -395,8 +493,18 @@ fn gore(w: &World, id: u64, b: &Body, on: bool) {
             g
         }
     };
-    // Its scale isn't saved: set again whenever the carcass is shown afresh (after a load too).
-    w.set_scale(g, core::scale(b.mass));
+    // Its scale isn't saved: set again whenever the carcass is shown afresh (after a load too). The pool is built at a
+    // deer's size, under its body plan's.
+    let plan = (b.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+        .map_or(core::Plan::Quadruped, |s| core::plan_of(s.model));
+    w.set_scale(g, core::body_scale(b.mass, plan) * plan.pool());
+    if w.component(g, &GORE_ROT) != Some(step as u32)
+        && let Some(r) = w.component_mut(g, &GORE_ROT)
+    {
+        *r = step as u32;
+    }
 }
 
 /// A goal: it ages as its raw meat would at its spot's air (`vitals::rot::rate`), and looks again; a skinning goes on.
@@ -427,16 +535,19 @@ pub fn report(w: &World, at: Vec3, days: f32) -> String {
             show(w, id);
         }
         let (Some(b), Some(e)) = (w.component(id, &BODY), w.entity(id)) else { continue };
+        let dead = w.component(id, &GENES).unwrap_or_default();
         let name = (b.species as usize)
             .checked_sub(1)
             .and_then(|i| SPECIES.get(i))
             .map_or("?", |s| s.name);
         rows.push(format!(
-            "carcass {id} {name} {:?} {:.1}/{:.1} kg eaten, {:.2} d aged{} at {:.0} {:.0} {:.0}",
+            "carcass {id} {name} {:?} {:.1}/{:.1} kg eaten, {:.2} d aged, rot step {}, {} flies{} at {:.0} {:.0} {:.0}",
             look(&b),
             b.eaten,
             b.mass * core::EDIBLE,
             b.aged,
+            dead.rot,
+            dead.flies,
             if b.skinned != 0 { ", skinned" } else { "" },
             e.pos.x,
             e.pos.y,
@@ -474,8 +585,15 @@ fn start_skinning(w: &World, id: u64, player: u64) -> bool {
     if let Some(k) = w.component_mut(id, &SKIN) {
         *k = [player, now, now + ticks, tier.map_or(0, |t| t as u64 + 1)];
     }
-    // Turned to the body, kneeling beside it; the camera eases in.
+    // Kneeling beside the body, on the side they came from, its hands at it, turned to it; the camera eases in.
     let (dx, dz) = (c.pos.x - p.pos.x, c.pos.z - p.pos.z);
+    let len = (dx * dx + dz * dz).sqrt().max(1e-3);
+    let plan = (b.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+        .map_or(core::Plan::Quadruped, |s| core::plan_of(s.model));
+    let from = (core::KNEEL_FROM * core::body_scale(b.mass, plan) as f64).max(core::KNEEL_MIN);
+    w.teleport(player, None, Vec3 { x: c.pos.x - dx / len * from, y: p.pos.y, z: c.pos.z - dz / len * from });
     let facing = ((-dx).atan2(-dz) as f32).to_degrees();
     w.set_pose(player, Some(&SKINNING), Some(facing));
     w.force_camera(player, &SKIN_CAMERA, Some((0.6, camera::easing::IN_OUT)));
@@ -540,7 +658,7 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     {
         let n = core::hide_count(lo, hi, quality);
         if n > 0 {
-            w.spawn_item(at, ItemStack::new(Item::generated(item.to_string()).id(), n).with(&PELT_QUALITY, quality as u32));
+            w.spawn_item(at, ItemStack::new(Item::generated(item.to_string()).id(), n).with(&base_api::HIDE_QUALITY, quality as u32));
             got.push(format!("{n} {item} (quality {quality})"));
         }
     }
@@ -578,5 +696,48 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     show(w, id);
 }
 
-/// A hide's quality from skinning, 1 poor, 2 good, 3 perfect (`animals_core::carcass::quality`); none: an old one.
-pub static PELT_QUALITY: Component<u32> = Component::named("pelt_quality");
+/// Paints a body's coat from its genes (`GENES`) over the bodies' texture (`animals_core::coats::paint_dead`), at its
+/// species' usual size for its plan (the client has its genes, not its own mass).
+fn paint_dead(dead: &Dead, skin: &mut Skin) {
+    let genes = &dead.genes;
+    let Some(s) = (genes.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+    else {
+        return;
+    };
+    let scale = core::body_scale(s.bio.mass, core::plan_of(s.model));
+    let (w, h) = (skin.width as usize, skin.height as usize);
+    crate::coats::paint_dead(genes, skin.rgba, w, h, scale, core::COAT_RGB, core::UNDER_RGB);
+    core::rot_tint(skin.rgba, dead.rot);
+}
+
+/// A fly lives this long, seconds: a short dart, born again near the body.
+const FLY_LIFE: f32 = 0.45;
+
+/// Each frame on a client: keeps a carcass's flies (`Dead::flies`) darting over it, each a short-lived particle in a box
+/// round the body.
+fn flies(c: &Client, e: &weft_sdk::client::ClientEntity) {
+    let Some(dead) = c.component_of(e.id(), &GENES) else { return };
+    if dead.flies == 0 {
+        return;
+    }
+    // As many born a second as die, so `flies` live at once; a frame's share, the fraction by chance.
+    let born = dead.flies as f32 * e.dt() / FLY_LIFE;
+    let mut seed = (e.id() as u32).wrapping_mul(2_654_435_761) ^ (e.age() * 1000.0) as u32;
+    let mut rng = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        (seed % 10_000) as f32 / 10_000.0
+    };
+    let n = born as u32 + (rng() < born.fract()) as u32;
+    let spread = 0.25 + 0.06 * dead.flies as f32;
+    let p = e.pos();
+    for _ in 0..n {
+        let at =
+            [p.x + ((rng() - 0.5) * 2.0 * spread) as f64, p.y + 0.15 + (rng() * 0.6) as f64, p.z + ((rng() - 0.5) * 2.0 * spread) as f64];
+        let v = [(rng() - 0.5) * 2.4, (rng() - 0.5) * 1.0, (rng() - 0.5) * 2.4];
+        drop(c.spawn_particles(&FLY, at).velocity(v));
+    }
+}
