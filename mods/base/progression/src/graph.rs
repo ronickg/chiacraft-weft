@@ -399,6 +399,10 @@ const RECIPES_LIST: &[Recipe] = &[
     // doors.rs, assembly.rs, redstone.rs, woodcutter.rs; `content::RULES`).
     c("base:shield", 1.0, &[("#planks", 6.0), ("base:iron_ingot", 1.0)], Table),
     c("base:oak_door", 3.0, &[("base:oak_planks", 6.0)], Table),
+    // fences.rs
+    c("base:fence", 3.0, &[("#planks", 4.0), ("base:stick", 2.0)], Table),
+    c("base:fence_gate", 1.0, &[("#planks", 2.0), ("base:stick", 4.0)], Table),
+    c("base:scarecrow", 1.0, &[("base:plant_fibre", 2.0), ("base:stick", 3.0)], Table),
     c("base:oak_wood", 4.0, &[("base:oak_log", 4.0)], Hand),
     c("base:birch_wood", 4.0, &[("base:birch_log", 4.0)], Hand),
     c("base:spruce_wood", 4.0, &[("base:spruce_log", 4.0)], Hand),
