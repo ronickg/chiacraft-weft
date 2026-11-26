@@ -40,12 +40,27 @@ pub const WATCH: f32 = 0.42;
 pub const STANDS_KG: f32 = 150.0;
 pub const GUARDS_KG: f32 = 30.0;
 pub const YOUNG_NEAR: f64 = 10.0;
+/// Blocks from its owner within which a tamed dog is spared by wild hunters (a wolf or a cat
+/// leaves a dog at its owner's side alone); a wild or untamed dog, or one strayed farther, stays
+/// prey.
+pub const SPARED_NEAR_OWNER: f64 = 16.0;
+/// Whether a tamed animal of this species is spared near its owner (`SPARED_NEAR_OWNER`): dogs.
+pub fn spared_near_owner(species: &str) -> bool {
+    species == "dog"
+}
 pub const LONE: f64 = 10.0;
 pub const CHARGE: f64 = 3.5;
 /// A charge's hit, as a share of the hunter's max health, and the speed it charges at (times its
 /// kind's).
 pub const CHARGE_HIT: f32 = 0.15;
 pub const CHARGE_SPEED: f32 = 1.5;
+/// A big plant eater that is hit (`STANDS_KG`) turns on what hit it: it charges it for this many
+/// seconds, striking within `CHARGE` once in `TURN_HIT_SECS`, unless it gets farther than
+/// `TURN_GIVES_UP` blocks (a bull bison or a rhino runs at a hunter that hurt it, then lets it go;
+/// cov_bosses: hit iguanodonts and gastonias only fled, or stood and bolted after).
+pub const TURN_SECS: f32 = 15.0;
+pub const TURN_HIT_SECS: f32 = 1.0;
+pub const TURN_GIVES_UP: f64 = 24.0;
 
 /// Social moments in an animal's idle life (`anim`, every 15-40 s while it stands idle), by its
 /// kind's `biology::Social`: a young one's moment is play, in percent, more often in a pack or
@@ -102,6 +117,20 @@ pub fn ambushes(family: &str) -> bool {
     AMBUSHERS.contains(&family)
 }
 
+/// Birds of prey hunt from the air: a hungry one (under `needs::HUNTS_AT`) takes off to soar and
+/// look for prey about once in this many ticks (golden eagles and hawks hunt mostly by soaring or
+/// from a perch and stoop on prey seen from above; owls from a perch, then a short flight: Watson
+/// 2010, *The Golden Eagle*; Newton 1979, *Population Ecology of Raptors*), and one that sees prey
+/// farther than `STOOP_FROM` blocks flies at it and comes down on it (the last blocks on foot,
+/// `hunt::hunt`).
+pub const SOAR_SEARCH: u32 = 200;
+pub const STOOP_FROM: f64 = 2.5;
+/// From the air it strikes prey within this many blocks, once a second (`birds::fly`; round 2 of
+/// cov_birds: the eagle and the owls glided down onto where the prey had been, landed short, and
+/// lifted again, 14 times each, no kill), coming down low over it from `STOOP_LOW` blocks out.
+pub const STRIKE: f64 = 1.6;
+pub const STOOP_LOW: f64 = 6.0;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,5 +141,13 @@ mod tests {
         assert!(prey_score(100.0, true, 1.0) < prey_score(64.0, false, 1.0));
         assert!(prey_score(100.0, false, 0.2) < prey_score(80.0, false, 1.0));
         assert!(WATCH < crate::needs::REST && WATCH > crate::needs::WANDER);
+    }
+
+    #[test]
+    fn dogs_by_their_owner() {
+        // Only dogs are spared, and only near: farther than a short walk they are fair game.
+        assert!(spared_near_owner("dog"));
+        assert!(!spared_near_owner("wolf") && !spared_near_owner("cat"));
+        assert!(SPARED_NEAR_OWNER >= 8.0 && SPARED_NEAR_OWNER <= 32.0);
     }
 }

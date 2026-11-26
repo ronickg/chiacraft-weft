@@ -91,6 +91,11 @@ pub const STAGGER_SHARE: f32 = 0.35;
 pub const FIERCE: f32 = 0.7;
 /// How much softer a broken part's attack hits.
 pub const BROKEN: f32 = 0.75;
+/// The most one of its blows takes off a player, as a share of the player's max health, before the
+/// player's armour: hard, but a player at full health lives through any single blow and gets a
+/// chance to heal or back off (Planner, 11-25: Borkon's toss, 24.9, killed an unarmoured player at
+/// full health in one hit in cov_bosses runs 3 and 4). Armour lowers it further.
+pub const PLAYER_BLOW: f32 = 0.8;
 
 const fn form(age: Age, offering: Option<&'static str>, depth: u8) -> Form {
     Form { age, offering, depth }

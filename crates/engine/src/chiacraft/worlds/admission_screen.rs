@@ -58,7 +58,7 @@ impl Screen for Admission {
                     }
                     // Who may come in, and what newcomers may do.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
-                        label(ui, cx, "admission.screen.who", &[], "default");
+                        crate::screens::heading(ui, cx, "admission.screen.who");
                         let only = rules.only_listed;
                         let id = button(ui, cx, "admission.screen.only_listed", &[on_off(only)], 260.0, move |c| {
                             run(c, if only { "/allow everyone" } else { "/allow only" }.into())
@@ -66,8 +66,12 @@ impl Screen for Admission {
                         ui.set_id(id, "only_listed");
                         let p = rules.probation.clone();
                         let hours = p.hours.ceil() as u32;
-                        ui.container(Style::row().gap(4.0), |ui| {
-                            label(ui, cx, "admission.screen.probation", &[Arg::Int(hours as i64)], "default");
+                        // Style 1: the label on a line of its own at 2x, the steps under it (beside
+                        // them it had room only at 1x).
+                        let line = cx.look.has_text("menu_button");
+                        ui.container(stepper(line), |ui| {
+                            let t = label(ui, cx, "admission.screen.probation", &[Arg::Int(hours as i64)], "default");
+                            crate::screens::field_label(ui, cx, t);
                             let less = HOURS
                                 .iter()
                                 .rev()
@@ -75,12 +79,14 @@ impl Screen for Admission {
                                 .copied()
                                 .unwrap_or(0);
                             let more = HOURS.iter().find(|h| **h > hours).copied().unwrap_or(hours);
-                            let id =
-                                button(ui, cx, "admission.screen.less", &[], 30.0, move |c| run(c, format!("/probation hours {less}")));
-                            ui.set_id(id, "probation_less");
-                            let id =
-                                button(ui, cx, "admission.screen.more", &[], 30.0, move |c| run(c, format!("/probation hours {more}")));
-                            ui.set_id(id, "probation_more");
+                            ui.container(Style::row().gap(4.0), |ui| {
+                                let id =
+                                    button(ui, cx, "admission.screen.less", &[], 30.0, move |c| run(c, format!("/probation hours {less}")));
+                                ui.set_id(id, "probation_less");
+                                let id =
+                                    button(ui, cx, "admission.screen.more", &[], 30.0, move |c| run(c, format!("/probation hours {more}")));
+                                ui.set_id(id, "probation_more");
+                            });
                         });
                         ui.container(Style::row().gap(4.0), |ui| {
                             let (b, k) = (p.build, p.containers);
@@ -106,20 +112,25 @@ impl Screen for Admission {
                             run(c, format!("/didrule unchecked {}", if guest { "refuse" } else { "guest" }))
                         });
                         ui.set_id(id, "did_unchecked");
-                        ui.container(Style::row().gap(4.0), |ui| {
-                            label(ui, cx, "admission.screen.did_days", &[Arg::Int(days as i64)], "default");
+                        ui.container(stepper(line), |ui| {
+                            let t = label(ui, cx, "admission.screen.did_days", &[Arg::Int(days as i64)], "default");
+                            crate::screens::field_label(ui, cx, t);
                             let less = DAYS.iter().rev().find(|d| **d < days).copied().unwrap_or(0);
                             let more = DAYS.iter().find(|d| **d > days).copied().unwrap_or(days);
-                            let id = button(ui, cx, "admission.screen.less", &[], 30.0, move |c| run(c, format!("/didrule age {less}")));
-                            ui.set_id(id, "did_days_less");
-                            let id = button(ui, cx, "admission.screen.more", &[], 30.0, move |c| run(c, format!("/didrule age {more}")));
-                            ui.set_id(id, "did_days_more");
+                            ui.container(Style::row().gap(4.0), |ui| {
+                                let id =
+                                    button(ui, cx, "admission.screen.less", &[], 30.0, move |c| run(c, format!("/didrule age {less}")));
+                                ui.set_id(id, "did_days_less");
+                                let id =
+                                    button(ui, cx, "admission.screen.more", &[], 30.0, move |c| run(c, format!("/didrule age {more}")));
+                                ui.set_id(id, "did_days_more");
+                            });
                         });
                     });
                     // The world's DID (phase 4): named by the owner's DID, naming it back.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
                         use crate::chiacraft::worlds::world_did;
-                        label(ui, cx, "world_did.title", &[], "default");
+                        crate::screens::heading(ui, cx, "world_did.title");
                         let held = dir.as_deref().and_then(world_did::load);
                         match &held {
                             Some(d) => {
@@ -162,7 +173,7 @@ impl Screen for Admission {
                     // Finding this world (phase 5): listed on chain, a deposit locked.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
                         use crate::chiacraft::worlds::listing;
-                        label(ui, cx, "listing.title", &[], "default");
+                        crate::screens::heading(ui, cx, "listing.title");
                         let listed = dir.as_deref().and_then(listing::load);
                         let deposit = listing::txch(crate::settings::listing_deposit());
                         match &listed {
@@ -198,7 +209,7 @@ impl Screen for Admission {
                     });
                     // Players here now, and anyone else by name, key or DID.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
-                        label(ui, cx, "admission.screen.players", &[], "default");
+                        crate::screens::heading(ui, cx, "admission.screen.players");
                         let me = crate::settings::name();
                         let here: Vec<String> = cx
                             .client
@@ -256,7 +267,7 @@ impl Screen for Admission {
                     });
                     // The bans.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
-                        label(ui, cx, "admission.screen.bans", &[], "default");
+                        crate::screens::heading(ui, cx, "admission.screen.bans");
                         let active: Vec<_> = bans.bans.iter().filter(|b| b.active(now)).collect();
                         if active.is_empty() {
                             label(ui, cx, "admission.no_bans", &[], "dim");
@@ -278,13 +289,8 @@ impl Screen for Admission {
                                         "default",
                                     );
                                     if let Some(u) = b.until {
-                                        label(
-                                            ui,
-                                            cx,
-                                            "admission.screen.hours_left",
-                                            &[Arg::Int(u.saturating_sub(now).div_ceil(3600) as i64)],
-                                            "dim",
-                                        );
+                                        let (minutes, n) = adm::time_left(u.saturating_sub(now));
+                                        label(ui, cx, &adm::left_key("admission.screen.hours_left", minutes), &[Arg::Int(n)], "dim");
                                     }
                                 });
                                 let value = b.value.clone();
@@ -295,7 +301,7 @@ impl Screen for Admission {
                     });
                     // The allow list.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
-                        label(ui, cx, "admission.screen.allow_list", &[], "default");
+                        crate::screens::heading(ui, cx, "admission.screen.allow_list");
                         if rules.allow.is_empty() {
                             label(ui, cx, "admission.screen.empty", &[], "dim");
                         }
@@ -320,7 +326,7 @@ impl Screen for Admission {
                     });
                     // Ban lists: followed, and this world's own for others.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
-                        label(ui, cx, "admission.screen.lists", &[], "default");
+                        crate::screens::heading(ui, cx, "admission.screen.lists");
                         if rules.lists.is_empty() {
                             label(ui, cx, "admission.no_lists", &[], "dim");
                         }
@@ -416,4 +422,10 @@ impl Screen for Admission {
             button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
+}
+
+/// A setting stepped with − and +: its label beside the steps, or in style 1 on a line of its own
+/// above them (`line`), where the label has room at 2x.
+fn stepper(line: bool) -> Style {
+    if line { Style::default().gap(4.0) } else { Style::row().gap(4.0) }
 }

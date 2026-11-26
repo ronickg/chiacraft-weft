@@ -482,6 +482,7 @@ fn shoot_bow(u: &mut ItemUse) -> bool {
             .yaw(s.yaw),
     );
     w.set_component(shot, &ARROW_SHOT, [hit as f64, level as f64, id as f64]);
+    crate::player_sounds::bow_shot(&w, id);
     if !creative {
         if let Some(slot) = arrow {
             inv.set(slot, consume_one(inv.get(slot)));

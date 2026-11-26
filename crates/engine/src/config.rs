@@ -626,6 +626,11 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:gpu_dlss_rr_models", ck::INT, 0.0, 0.0, 4.3e9, 1.0),
         number("core:gpu_dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         number("core:gpu_frame_gen", ck::INT, 0.0, 0.0, 8.0, 1.0),
+        // Why frame generation doesn't run here (empty when it does), NVIDIA Reflex's low latency
+        // (1 where the upscaler has it), and the PC latency Reflex measured (ms, 0 none; updated live).
+        string("core:gpu_frame_gen_why", ""),
+        number("core:gpu_reflex", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        number("core:gpu_latency_ms", ck::FLOAT, 0.0, 0.0, 1000.0, 0.1),
         // Blocks clouds float above where their dimension puts them.
         number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 16.0),
         number("core:cloud_distance", ck::INT, if phone { 2048.0 } else { 6144.0 }, 0.0, 32768.0, 16.0).tag("config.logarithmic"),
@@ -648,9 +653,13 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:rt_reflections", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // Path traced lighting over the traced scene (reports/Path tracing plan.md; M0: the sun and
         // one bounce on the terrain, with a shader pack that has `pathtrace.wgsl`); its debug views
-        // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends).
+        // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends; 8-12 timing only: the trace stopped after its primary test, the sun, the bounce, with no specular ray, before any ray, without the air's haze; 14 the block light, 15 the traced block lights seen/hidden).
         number("core:path_traced", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
-        number("core:pt_debug", ck::INT, 0.0, 0.0, 7.0, 1.0),
+        number("core:pt_debug", ck::INT, 0.0, 0.0, 16.0, 1.0),
+        // chiacraft: path tracing lit with vanilla's math (texture x tint x face shade x the
+        // lightmap's curve, no grade, no haze), its sky level the traced sky's share and the sun's
+        // shadow: what tracing adds over vanilla, for the stage-1 compare (checks, no menu row).
+        number("core:pt_plain", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // How the path tracer's light is denoised (`denoise::Denoiser`) where Ray Reconstruction
         // doesn't do it: 0 not at all (raw, for checks), 1 ours (SVGF-like), live.
         number("core:pt_denoiser", ck::INT, 1.0, 0.0, 1.0, 1.0),
@@ -755,8 +764,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         // Screen effects' half-size parts (`post_low`); off, every effect at full size, as before.
         number("core:post_low", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // The world drawn in 16-bit float (linear light past 1) with the screen effects after it and
-        // the picture finished in one last pass (chiacraft, the HDR world); read at start.
-        number("core:hdr_world", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // the picture finished in one last pass (chiacraft, the HDR world); read at start. On by
+        // default so a fresh install's first start shows the game's look (Ronald 11-24: the look
+        // always on; a mod's first-start settings come after the engine has read this one).
+        number("core:hdr_world", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Anti-aliasing: 0 off, 1 temporal (`post::Post`: the world drawn a fraction of a pixel
         // aside each frame and gathered over frames by where each pixel was, the motion image), 2
         // temporal from the camera alone (no motion image: cheaper on phones' tiled GPUs; leaves and
@@ -787,6 +798,19 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:dlss_rr_model", ck::INT, 0.0, 0.0, 31.0, 1.0),
         // DLSS 5's neural rendering over the upscaled picture (not public yet: never runs), live.
         number("core:dlss5", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // NVIDIA Reflex's low latency (`Backend::set_low_latency`): 0 off, 1 on, 2 on with boost
+        // (the GPU kept clocked up). Live; only where the upscaler has it (`core:gpu_reflex`).
+        number("core:reflex", ck::INT, 1.0, 0.0, 2.0, 1.0),
+        // Named GPU timestamps inside the parts (`Cmd::Probe`, `diag::probe`): a bench line then
+        // also lists each one's ms (the path tracer's passes, the upscaler). Live; off by default.
+        number("core:gpu_probes", ck::BOOL, 0.0, 0.0, 1.0, 1.0),
+        // The opaque and cutout cubes' depth laid first while the world's shader traces, so it
+        // shades (and traces) each of their pixels once (`WorldRenderer::depth_prepass`). The same
+        // picture. Live; on by default, 0 to compare.
+        number("core:depth_prepass", ck::BOOL, 1.0, 0.0, 1.0, 1.0),
+        // DLSS frame generation, where the GPU has it (`core:gpu_frame_gen`, an RTX 40 or 50 on
+        // Windows): on by default. Not read yet: its present path isn't built (`core:gpu_frame_gen_why`).
+        number("core:frame_gen", ck::BOOL, 1.0, 0.0, 1.0, 1.0),
         // A stand-in upscaler that only scales the picture up, for checking the upscaler's path
         // where the renderer has none (the Linux PC); read at start.
         number("core:upscale_standin", ck::BOOL, 0.0, 0.0, 1.0, 0.0),

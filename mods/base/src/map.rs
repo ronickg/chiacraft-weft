@@ -823,9 +823,14 @@ fn screen(ui: &mut Ui) {
                         .tooltip("map.base.zoom_in_tip"),
                     |c| change(c, |s| s.zoom = s.zoom.saturating_sub(1)),
                 );
-                ui.button("map.base.centre", S::default().h(12.0).pad(2.0).tooltip("map.base.centre_tip"), |c| {
-                    change(c, |s| s.pan = (0, 0))
-                });
+                ui.button(
+                    "map.base.centre",
+                    S::default()
+                        .h(12.0)
+                        .pad_xy(5.0, 2.0)
+                        .tooltip("map.base.centre_tip"),
+                    |c| change(c, |s| s.pan = (0, 0)),
+                );
             });
             ui.panel("well", S::column().size(VIEW, VIEW), |ui| {
                 ui.image(IMAGE, VIEW, VIEW);

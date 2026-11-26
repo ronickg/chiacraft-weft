@@ -1,0 +1,230 @@
+# Animal AI coverage, small animals and fish. Parts: hares, mountain hares, mice and voles; the Cretaceous's kryptobaatar
+# and Priscagama; wild cats and chihuahuas; fish in a 9 x 9 pool 3 deep. Each at 30 % food and water, then a creative
+# walk-in and `/animalprof hit`. Expected: eat ("plays graze"/doing eat), drink, wander, flee ("runs from"), fish
+# swimming (y under 70 in the where rows) and darting off. Report per species: eat, drink, wander, flee; the shots.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 86 528 16 110 560 core:air
+chat /tk fill -16 111 528 16 140 560 core:air
+chat /tk fill -16 70 561 16 100 576 core:air
+chat /time set 6000
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /tk fill -16 70 528 16 70 536 base:tall_grass
+chat /tk spawn animals:hare -8 70 536
+chat /tk spawn animals:hare -6 70 536
+chat /tk spawn animals:mountain_hare 4 70 536
+chat /tk spawn animals:mountain_hare 6 70 536
+chat /tk spawn animals:wood_mouse -8 70 548
+chat /tk spawn animals:wood_mouse -6 70 548
+chat /tk spawn animals:wood_mouse -4 70 548
+chat /tk spawn animals:field_vole 4 70 548
+chat /tk spawn animals:field_vole 6 70 548
+chat /tk spawn animals:field_vole 8 70 548
+wait 2
+chat /animalprof food 0.3
+chat /animalprof water 0.3
+chat /tp 0 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk mode creative
+chat /tp 0 70 546
+look 0 0
+wait 1
+hold core:forward 2
+chat /animalprof hit 2
+wait 5
+chat /animalprof where 64
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 0 82 558
+look 0 -38
+wait 2
+shot cov_small_1_hares_mice.png
+chat /tick unfreeze
+wait 1
+chat /tp 200 90 544
+wait 4
+chat /tk fill 184 60 528 216 68 560 base:dirt
+chat /tk fill 184 69 528 216 69 560 base:grass
+chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 86 528 216 110 560 core:air
+chat /tk fill 184 111 528 216 140 560 core:air
+chat /tk fill 184 70 561 216 100 576 core:air
+chat /time set 6000
+chat /tk fill 199 69 543 201 69 545 base:water
+chat /tk fill 199 70 543 201 70 545 core:air
+wait 1
+chat /tk fill 184 70 528 216 70 536 base:tall_grass
+chat /tk spawn animals:kryptobaatar 192 70 536
+chat /tk spawn animals:kryptobaatar 194 70 536
+chat /tk spawn animals:kryptobaatar 196 70 536
+chat /tk spawn animals:priscagama 204 70 548
+chat /tk spawn animals:priscagama 206 70 548
+chat /tk spawn animals:priscagama 208 70 548
+wait 2
+chat /animalprof food 0.3
+chat /animalprof water 0.3
+chat /tp 200 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk mode creative
+chat /tp 200 70 546
+look 0 0
+wait 1
+hold core:forward 2
+chat /animalprof hit 2
+wait 5
+chat /animalprof where 64
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 200 82 558
+look 0 -38
+wait 2
+shot cov_small_2_cretaceous_small.png
+chat /tick unfreeze
+wait 1
+chat /tp 400 90 544
+wait 4
+chat /tk fill 384 60 528 416 68 560 base:dirt
+chat /tk fill 384 69 528 416 69 560 base:grass
+chat /tk fill 384 70 528 416 85 560 core:air
+chat /tk fill 384 86 528 416 110 560 core:air
+chat /tk fill 384 111 528 416 140 560 core:air
+chat /tk fill 384 70 561 416 100 576 core:air
+chat /time set 6000
+chat /tk fill 399 69 543 401 69 545 base:water
+chat /tk fill 399 70 543 401 70 545 core:air
+wait 1
+chat /tk fill 384 70 528 416 70 536 base:tall_grass
+chat /tk spawn animals:cat 392 70 536
+chat /tk spawn animals:cat 394 70 536
+chat /tk spawn animals:chihuahua 404 70 548
+chat /tk spawn animals:chihuahua 406 70 548
+wait 2
+chat /animalprof food 0.3
+chat /animalprof water 0.3
+chat /tp 400 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk mode creative
+chat /tp 400 70 546
+look 0 0
+wait 1
+hold core:forward 2
+chat /animalprof hit 2
+wait 5
+chat /animalprof where 64
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 400 82 558
+look 0 -38
+wait 2
+shot cov_small_3_cat_dog.png
+chat /tick unfreeze
+wait 1
+chat /tp 600 90 544
+wait 4
+chat /tk fill 584 60 528 616 68 560 base:dirt
+chat /tk fill 584 69 528 616 69 560 base:grass
+chat /tk fill 584 70 528 616 85 560 core:air
+chat /tk fill 584 86 528 616 110 560 core:air
+chat /tk fill 584 111 528 616 140 560 core:air
+chat /tk fill 584 70 561 616 100 576 core:air
+chat /time set 6000
+chat /tk fill 596 67 540 604 69 548 base:water
+chat /tk fill 596 70 540 604 70 548 core:air
+wait 1
+chat /tk fill 584 70 528 616 70 536 base:tall_grass
+chat /tk spawn animals:brown_trout 598 68 542
+chat /tk spawn animals:brown_trout 600 68 542
+chat /tk spawn animals:pacu 600 68 542
+chat /tk spawn animals:pacu 602 68 542
+chat /tk spawn animals:lungfish 598 68 545
+chat /tk spawn animals:lungfish 600 68 545
+chat /tk spawn animals:lycoptera 598 68 547
+chat /tk spawn animals:lycoptera 600 68 547
+chat /tk spawn animals:lycoptera 602 68 547
+wait 2
+chat /animalprof food 0.3
+chat /animalprof water 0.3
+chat /tp 600 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk mode creative
+chat /tp 600 70 552
+look 0 0
+wait 1
+hold core:forward 2
+chat /animalprof hit 2
+wait 5
+chat /animalprof where 64
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 600 82 558
+look 0 -38
+wait 2
+shot cov_small_4_fish.png
+chat /tick unfreeze
+wait 1
+quit

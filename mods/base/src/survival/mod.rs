@@ -15,7 +15,7 @@
 //! order.
 
 pub mod body;
-mod breath;
+pub mod breath;
 mod camp;
 mod food;
 mod health;
@@ -65,6 +65,7 @@ pub fn register(r: &mut Registry) {
         component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
     r.edit(&PLAYER).attach(&VITALS);
+    health::register(r);
     r.world_tick(tick);
     food::register(r);
     rot::register(r);

@@ -1,6 +1,7 @@
 //! chiacraft's look (`mods/base/shaderpack/`): a shader pack the client writes next to the game
-//! (`shaderpacks/chiacraft/`) and turns on the first time, so every player has it and can still
-//! pick another one or none in the video settings. Each file goes out with `look.wgsl` in front:
+//! (`shaderpacks/chiacraft/`) and turns on at every start that has none chosen (Ronald 11-24:
+//! "every game build should have it on by default"), so every player has it; another pack chosen
+//! stays chosen. Each file goes out with `look.wgsl` in front:
 //! the colors of the day, the sky, the light and the grade the files share.
 //!
 //! It waits for the join: turning a pack on in the first frames, before the server let the player
@@ -14,6 +15,13 @@ use weft_sdk::settings::SHADER_PACK;
 use weft_sdk::*;
 
 pub const ID: &str = "chiacraft";
+
+/// `--shader-pack <id>`: a pack picked for this run (a script checking a look). An empty one is
+/// none picked: a later `--shader-pack ""` undoes one a runner always passes (the PC's), for a
+/// run that plays a player's start (`--player-start`).
+fn launch_pack() -> Option<String> {
+    weft_sdk::client::launch_option("shader-pack").filter(|p| !p.is_empty())
+}
 
 /// chiacraft's pack, or a variant of it for a look check (`shaderpacks/chiacraft_<name>/`, a copy
 /// with one change, picked with `--shader-pack chiacraft_<name>`): both get the screen effects, so
@@ -64,7 +72,7 @@ pub fn register_for_scripts(r: &mut Registry) {
     static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
     static TIMES: AtomicU32 = AtomicU32::new(0);
     r.client_frame(|c| {
-        let Some(pack) = weft_sdk::client::launch_option("shader-pack") else { return };
+        let Some(pack) = launch_pack() else { return };
         let after: f32 = weft_sdk::client::launch_option("shader-pack-after")
             .and_then(|s| s.parse().ok())
             .unwrap_or(0.0);
@@ -153,15 +161,16 @@ pub fn register(r: &mut Registry) {
     });
 }
 
-/// Brings the folder up to date with this build; the first time the game is played, turns it on
-/// unless the player already chose a pack. Tests and scripts keep their settings apart
-/// (`test-config/`), so they neither turn it on nor count as that first time.
+/// Brings the folder up to date with this build, and turns it on when no pack is chosen: at every
+/// start, so a run dir that once had none (or the one-time `.offered` marker of before 11-24)
+/// starts with the look too. Tests and scripts keep their settings apart (`test-config/`) and
+/// leave it off, unless a script plays a player's start (`--player-start`).
 fn install(c: &Client) {
     let dir = Path::new(&c.run_dir()).join("shaderpacks").join(ID);
-    let offered = dir.join(".offered");
-    let automated = ["test", "script"]
-        .iter()
-        .any(|o| weft_sdk::client::launch_option(o).is_some());
+    let automated = weft_sdk::client::launch_option("player-start").is_none()
+        && ["test", "script"]
+            .iter()
+            .any(|o| weft_sdk::client::launch_option(o).is_some());
     if let Err(e) = std::fs::create_dir_all(&dir) {
         weft_sdk::warn!("shader pack: {}: {e}", dir.display());
         return;
@@ -184,7 +193,7 @@ fn install(c: &Client) {
     }
     // A variant picked for this run (`--shader-pack chiacraft_live`) with no files yet starts as a
     // copy of this build's pack, for the testkit's live mode to write edits over (`reload_pack`).
-    if let Some(pack) = weft_sdk::client::launch_option("shader-pack").filter(|p| p != ID && is_ours(p)) {
+    if let Some(pack) = launch_pack().filter(|p| p != ID && is_ours(p)) {
         let var = Path::new(&c.run_dir()).join("shaderpacks").join(&pack);
         if !var.join("world.wgsl").exists() && std::fs::create_dir_all(&var).is_ok() {
             for name in FILES
@@ -201,17 +210,19 @@ fn install(c: &Client) {
     }
     let mut changed = files_changed && SHADER_PACK.get() == ID;
     // `--shader-pack <id>` picks one for this run (a script checking the look).
-    if let Some(pack) = weft_sdk::client::launch_option("shader-pack") {
+    if let Some(pack) = launch_pack() {
         if SHADER_PACK.get() != pack {
             SHADER_PACK.set(&pack);
             changed = true;
         }
-    } else if !automated && !offered.exists() {
+    } else if !automated {
         if SHADER_PACK.get().is_empty() {
             SHADER_PACK.set(ID);
             changed = true;
+            weft_sdk::info!("shader pack: none chosen, {ID} on");
+        } else {
+            weft_sdk::info!("shader pack: {} as chosen", SHADER_PACK.get());
         }
-        let _ = std::fs::write(&offered, "");
     }
     if changed {
         c.reload_assets();

@@ -131,6 +131,13 @@ pub fn init(r: &mut Registry) {
         for h in b.iter() {
             if let Some(t) = w.component_mut(h.entity, &HURT_AT) {
                 *t = now;
+                // Every hurt with its cause: the sound runs heard wolves and reindeer cry out with no
+                // "hurt by" line (hunger, thirst, the cold, a fall or crowding log nothing else).
+                let cause = damage_cause::NAMES
+                    .get(h.cause as usize)
+                    .copied()
+                    .unwrap_or("a mod's cause");
+                weft_sdk::debug!("animal {} takes {:.2} ({cause} {}) from {}", h.entity, h.amount, h.cause, h.source);
             }
         }
     });
@@ -152,6 +159,9 @@ pub fn init(r: &mut Registry) {
         r.edit(s.kind).attach(&ANIMAL);
         r.edit(s.kind).attach(&APPLIED);
         r.edit(s.kind).attach(&SCALED);
+        // When it was last hurt: healing waits `needs::HEAL_AFTER` after a hurt. Registered but never
+        // attached till 11-25, it healed through fights and logged no hurt's cause.
+        r.edit(s.kind).attach(&HURT_AT);
         r.edit(s.kind).attach(&OWNER);
         r.edit(s.kind).attach(&base_api::TAME_OF);
     }
@@ -555,6 +565,7 @@ pub fn feed(w: &World, id: u64, amount: u16) {
         let max = a.stat(species::FOOD).round() as u16;
         a.food = a.food.saturating_add(amount).min(max);
     }
+    crate::voices::eat(w, id);
 }
 
 /// The owner places one of its unspent points on stat `i` (never torpor).

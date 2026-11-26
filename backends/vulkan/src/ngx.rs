@@ -720,6 +720,9 @@ impl Upscaler for Ngx {
             reconstruct: self.rr,
             neural: false,
             frame_gen: 0,
+            // NGX on Linux: no frame generation or Reflex (both Streamline's, Windows only).
+            frame_gen_why: "linux".into(),
+            low_latency: false,
             models: MODELS.to_vec(),
             rr_models: if self.rr { RR_MODELS.to_vec() } else { Vec::new() },
         }

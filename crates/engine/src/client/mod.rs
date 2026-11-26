@@ -892,6 +892,9 @@ pub struct Client {
     /// particles, then cracks, gizmo fills and the hand.
     late: CommandList,
     hand_late: CommandList,
+    /// What is drawn over the path tracer's composite (`over_pt`): the blended particles, the
+    /// weather, the hand and the overlays, none of which write the depth its test reads.
+    over_pt: CommandList,
     /// The world's copy for what is seen through (`gpu_layout::Scene::behind`), set by the app each
     /// frame. What is drawn after the opaque world goes into `render`'s `after` list, which the app
     /// puts after the occlusion's depth (and after the copy, with it on).
@@ -973,6 +976,9 @@ pub struct Client {
     told_mining: Option<(u64, IVec3, crate::world::placement::Part)>,
     /// What the server says this player may do (`abi::permission`).
     pub permission: u32,
+    /// chiacraft: the world runs in this process, so this player is its owner (for offering the
+    /// owner's moderation commands, `server::OWNER_MODERATION`; the server decides).
+    pub local_host: bool,
     /// Seconds since it died, while it is.
     dead_for: Option<f32>,
     pub components: FxHashMap<u32, Vec<u8>>,
@@ -1295,6 +1301,7 @@ impl Client {
             frames: Vec::new(),
             late: CommandList::default(),
             hand_late: CommandList::default(),
+            over_pt: CommandList::default(),
             behind: [0.0; 4],
             taa_last: None,
             taa_out: 0,
@@ -1341,6 +1348,7 @@ impl Client {
             moved_over: 0.0,
             dead: false,
             permission: 0,
+            local_host: false,
             fog: 0.0,
             wind: Vec2::ZERO,
             snow_cover: 0.0,
@@ -2706,6 +2714,10 @@ impl Client {
         self.render.update_solid(gpu, &self.world, center);
         drop(p);
         self.world.set_eye(center.y);
+        let (bodies, epoch) = self.world.body_glow();
+        let entities = self.world.glow.sources();
+        self.render
+            .set_body_lights(bodies.iter().chain(entities.iter().map(|(p, l)| (p, l))), epoch + self.world.glow.epoch);
         // Edits and what is around the player go right away.
         let p = crate::diag::part("uploads near (no budget)");
         let (now, later) = self.world.take_meshes(center);
@@ -3860,7 +3872,15 @@ impl Client {
                 _ => [0.0; 4],
             },
             rt: [
-                self.render.rt_traced() as u32 as f32,
+                // 1 traced shadows; 2 also path traced, whose pass lights the terrain again (the
+                // world's shader leaves its rays there to it, `world.wgsl`'s `pt_takes`).
+                if !self.render.rt_traced() {
+                    0.0
+                } else if shadow_setting("core:path_traced", 0.0) > 0.5 && self.render.pt_ready() {
+                    2.0
+                } else {
+                    1.0
+                },
                 (self.render.rt_frame_no() % (1 << 24)) as f32,
                 (shadow_setting("core:rt_shadows", 0.0) > 1.5) as u32 as f32,
                 self.render.rt_reflects() as u32 as f32,
@@ -4032,6 +4052,18 @@ impl Client {
         self.render.rt_reload
     }
 
+    /// The opaque cubes' depth into `depth` before the world's pass (`WorldRenderer::depth_prepass`),
+    /// when this frame's draw is set for it: true, and the world's pass keeps that depth.
+    pub fn depth_prepass(&self, list: &mut weft_render::CommandList, depth: weft_render::TextureId) -> bool {
+        self.render.depth_prepass(list, depth)
+    }
+
+    /// What `render` left to draw over the path tracer's composite (the blended particles, the
+    /// weather, the hand and the overlays), swapped for `spare` (handed back cleared next frame).
+    pub fn swap_over_pt(&mut self, spare: CommandList) -> CommandList {
+        std::mem::replace(&mut self.over_pt, spare)
+    }
+
     /// Path traced lighting (`core:path_traced`, `WorldRenderer::path_trace`), after the world's
     /// pass into `target` (the world's image, its size `size`) and before the effects: first the
     /// G-buffer pass (`WorldRenderer::gbuffer_pass`), then the traced light.
@@ -4047,7 +4079,9 @@ impl Client {
         if shadow_setting("core:path_traced", 0.0) > 0.5 {
             let debug = shadow_setting("core:pt_debug", 0.0) as u32;
             // The G-buffer (albedo, normal and roughness, spec) the denoisers read: `render.gb_images`.
+            crate::diag::probe(list, "pt_before");
             self.render.gbuffer_pass(gpu, list, depth, size);
+            crate::diag::probe(list, "pt_gbuffer");
             self.render
                 .path_trace(gpu, list, slot, depth, target, size, debug, false);
         }
@@ -4459,17 +4493,22 @@ impl Client {
         );
         drop(s);
         let s = crate::diag::span("render/particles and weather");
-        self.particles.draw(list, &mut late, scene_buf);
+        // The blended particles and the weather into `over_pt`, then the hand and the overlays: the
+        // app draws them after the path tracer's composite, which drew over them (rain, a torch's
+        // smoke, the cracks, the outline: they write no depth, so its test took their pixels).
+        let mut over = std::mem::take(&mut self.over_pt);
+        over.clear();
+        self.particles.draw(list, &mut over, scene_buf);
         self.weather_render
-            .draw(gpu, &mut late, frame, &cam, scene_buf, &self.world, weather, weather_ticks, self.frame_dt);
+            .draw(gpu, &mut over, frame, &cam, scene_buf, &self.world, weather, weather_ticks, self.frame_dt);
         drop(s);
         self.sky.draw_overlay(&mut hand_late, scene_buf);
         // Drawn by the app once the solid world's depth was taken for the next frame's occlusion
         // culling (upstream 85f85db9a): the sky, clouds, translucent things, particles, weather and
         // the hand hide nothing behind them for good. With the copy, after the copy.
         after.append(&mut late);
-        after.append(&mut hand_late);
-        (self.late, self.hand_late) = (late, hand_late);
+        over.append(&mut hand_late);
+        (self.late, self.hand_late, self.over_pt) = (late, hand_late, over);
         after.push(weft_render::Cmd::Mark);
         world_depth.is_some()
     }

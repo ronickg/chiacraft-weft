@@ -81,7 +81,13 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
     let mut s = [0.0f32; NEEDS];
     let at = |n: Need| doing == n as u8;
     let mut active = 1.0;
+    // A wild hunter hungry enough to hunt (`needs::HUNTS_AT`) bears a chill or the heat: its hunt
+    // comes first, unless the weather would harm it.
+    let mut hunting = false;
     if let Some(a) = w.component(id, &ANIMAL) {
+        hunting = a.species().is_some_and(|s| s.hunts())
+            && (a.food as f32) < a.stat(crate::species::FOOD) * needs::HUNTS_AT
+            && !crate::animal::tamed(w, id);
         // Out of its hours it is sleepy (`animals_core::routines`).
         active = (a.species as usize)
             .checked_sub(1)
@@ -117,10 +123,18 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
         .and_then(|b| FEELINGS.get(b.feel as usize).copied())
     {
         Some(Feeling::Freezing | Feeling::Heatstroke) => SUFFERING,
-        Some(Feeling::Cold | Feeling::Hot) => UNEASY,
+        Some(Feeling::Cold | Feeling::Hot) if !hunting => UNEASY,
         _ => 0.0,
     };
-    s[Need::Love as usize] = LOVE;
+    // In love now it goes to its mate even when sleepy (`needs::IN_LOVE`).
+    s[Need::Love as usize] = if w
+        .component(id, &crate::breeding::BREEDING)
+        .is_some_and(|b| b.love > 0 && b.growing == 0)
+    {
+        needs::IN_LOVE
+    } else {
+        LOVE
+    };
     // A sleepy rest still gives way to thirst or hunger that drives it (`needs::rest_under`).
     s[Need::Rest as usize] =
         needs::rest_under(REST + animals_core::routines::SLEEPY * (1.0 - active), s[Need::Drink as usize].max(s[Need::Eat as usize]));

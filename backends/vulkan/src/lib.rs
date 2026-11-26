@@ -22,7 +22,7 @@ const FRAMES: usize = 2;
 /// Set 0 has the textures, 1 each draw's buffers, this one the samplers.
 const SAMPLER_SET: u32 = 2;
 /// Timestamp queries per frame: start, after uploads, marks, end.
-const MAX_MARKS: u32 = 16;
+const MAX_MARKS: u32 = 32;
 const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
 
 struct Buffer {
@@ -2366,6 +2366,25 @@ impl Backend for VulkanBackend {
             .map_or_else(UpscalerInfo::default, |u| u.info())
     }
 
+    fn latency_mark(&mut self, mark: weft_render::LatencyMark) {
+        if let Some(u) = self.upscaler.as_mut() {
+            u.mark(match mark {
+                weft_render::LatencyMark::SimulationStart => upscale::Mark::SimulationStart,
+                weft_render::LatencyMark::SimulationEnd => upscale::Mark::SimulationEnd,
+            });
+        }
+    }
+
+    fn set_low_latency(&mut self, mode: u32) {
+        if let Some(u) = self.upscaler.as_mut() {
+            u.set_low_latency(mode);
+        }
+    }
+
+    fn latency_ms(&self) -> Option<f32> {
+        self.upscaler.as_ref()?.latency_ms()
+    }
+
     fn upscale_render_size(&mut self, mode: UpscaleMode, reconstruct: bool, output: (u32, u32)) -> (u32, u32) {
         let s = mode.scale();
         let fallback = (((output.0 as f32 * s).round() as u32).max(1), ((output.1 as f32 * s).round() as u32).max(1));
@@ -2661,6 +2680,10 @@ impl Backend for VulkanBackend {
     fn end_frame(&mut self, list: &CommandList) -> bool {
         let Some(image_index) = self.image_index.take() else { return false };
         let began = std::time::Instant::now();
+        // Reflex's markers round the submit and the present (the upscaler's own, if it has Reflex).
+        if let Some(u) = self.upscaler.as_mut() {
+            u.mark(upscale::Mark::RenderSubmitStart);
+        }
         let queued;
         let submitted;
         let frame_cmd = self.frames[self.slot].cmd;
@@ -3010,7 +3033,7 @@ impl Backend for VulkanBackend {
                         }
                         stale = true;
                     }
-                    Cmd::Mark => {
+                    Cmd::Mark | Cmd::Probe(_) => {
                         if marks < MAX_MARKS - 1 {
                             self.device
                                 .cmd_write_timestamp(cmd, vk::PipelineStageFlags::BOTTOM_OF_PIPE, self.queries, first_query + marks);
@@ -3080,6 +3103,10 @@ impl Backend for VulkanBackend {
             }
             frame.waited = false;
             submitted = std::time::Instant::now();
+            if let Some(u) = self.upscaler.as_mut() {
+                u.mark(upscale::Mark::RenderSubmitEnd);
+                u.mark(upscale::Mark::PresentStart);
+            }
 
             let swapchains = [self.swapchain.as_ref().unwrap().raw];
             let indices = [image_index];
@@ -3089,6 +3116,9 @@ impl Backend for VulkanBackend {
                 .swapchains(&swapchains)
                 .image_indices(&indices);
             let result = self.swapchain_fn.queue_present(self.queue, &present);
+            if let Some(u) = self.upscaler.as_mut() {
+                u.mark(upscale::Mark::PresentEnd);
+            }
             match result {
                 Ok(suboptimal) if !suboptimal || self.turned => {}
                 Ok(_) | Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.dirty_swapchain = true,

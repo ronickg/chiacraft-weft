@@ -134,6 +134,11 @@ pub fn add_torpor(w: &World, id: u64, amount: f32) {
     if animal::tamed(w, id) || w.component(id, &KNOCKOUT).is_none() {
         return;
     }
+    // Not yet arrived (its first tick rolls its stats): its most torpor reads 0, and it fell out
+    // with none and woke at its first tick (koFar1: a resting jaguar 8 ticks after it fell).
+    if w.component(id, &ANIMAL).is_none_or(|a| a.species == 0) {
+        return;
+    }
     let max = max_torpor(w, id);
     let mut fell = false;
     set(w, id, |k| {
@@ -146,7 +151,7 @@ pub fn add_torpor(w: &World, id: u64, amount: f32) {
         }
     });
     if fell {
-        weft_sdk::info!("animal {id} knocked out");
+        weft_sdk::info!("animal {id} knocked out at game time {}", w.game_time());
         w.navigate(id, w.entity(id).map_or([0.0; 3], |e| e.pos.to_array()), 0.0);
     }
 }
@@ -202,7 +207,9 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             }
             if k.angry > 0 {
                 set(w, id, |k| k.angry = k.angry.saturating_sub(e as _));
-                let alive = w.entity(k.angry_at).is_some_and(|e| e.health > 0.0);
+                // A spectator is out of reach: anger at one ends (cov_bosses: a hit wyvern followed the
+                // spectating player off its pad, out of the shot).
+                let alive = w.entity(k.angry_at).is_some_and(|e| e.health > 0.0) && w.game_mode(k.angry_at) != abi::game_mode::SPECTATOR;
                 if alive {
                     crate::wake(w, id, index);
                     crate::commands::fight(w, id, st, k.angry_at);
@@ -261,7 +268,7 @@ fn wake_up(w: &World, id: u64, index: usize, st: &EntityState) {
         t.feedings = 0;
     }
     crate::wake(w, id, index);
-    weft_sdk::info!("animal {id} woke up");
+    weft_sdk::info!("animal {id} woke up at game time {}", w.game_time());
     if let Some(p) = near {
         anger(w, id, p);
     }
@@ -313,6 +320,7 @@ fn bite(w: &World, id: u64, st: &EntityState) {
         k.bite = BITE_TICKS;
     });
     animal::feed(w, id, food.food);
+    weft_sdk::debug!("animal {id} bites, out cold: taming {:.0}%", progress * 100.0);
     if progress >= 1.0 {
         spill(w, id, st);
         set(w, id, |k| {
@@ -346,6 +354,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
         k.food = held.item;
         k.count += held.count;
     });
+    weft_sdk::debug!("animal {id}, out cold, given {} to eat", held.count);
     if !w.outside_survival(player) {
         inv.set(slot, ItemStack::EMPTY);
     }

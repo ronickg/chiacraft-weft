@@ -209,7 +209,8 @@ pub fn register(r: &mut Registry) {
             "packages.client_mods.total",
             &[Arg::Float(average.as_secs_f64() * 1e6, 1), Arg::Int(worst.as_micros() as i64), Arg::Int(total.len() as i64)],
         );
-    });
+    })
+    .permission(permission::EVERYONE);
 }
 
 pub(crate) fn lock(h: &Half) -> std::sync::MutexGuard<'_, ClientInstance> {

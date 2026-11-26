@@ -839,29 +839,11 @@ impl Audio {
     /// Logs, once, the sound events with a file that isn't there (`sound files:` in the log).
     fn check_files(&mut self, assets: &Assets) {
         self.checked = true;
-        let c = content();
-        let mut missing: Vec<String> = Vec::new();
-        // The folders are walked once, not once a pattern.
-        let listed: Vec<String> = ["ogg", "wav"]
-            .iter()
-            .flat_map(|e| assets.list("sounds", e))
-            .map(|f| f.0)
-            .collect();
-        for d in &c.game.sounds {
-            for f in &d.files {
-                let found = match f.strip_suffix('*') {
-                    Some(prefix) => listed.iter().any(|n| n.starts_with(prefix)),
-                    None => sound_path(assets, f).is_some(),
-                };
-                if !found {
-                    missing.push(format!("{} ({f})", d.name));
-                }
-            }
-        }
-        if missing.is_empty() {
-            log::info!("sound files: all {} events have their files", c.game.sounds.len());
+        let c = sound_check(assets);
+        if c.missing.is_empty() {
+            log::info!("sound files: all {} events have their files", c.events);
         } else {
-            log::warn!("sound files: {} of {} events miss files: {}", missing.len(), c.game.sounds.len(), missing.join(", "));
+            log::warn!("sound files: {} of {} events miss files: {}", c.missing.len(), c.events, c.missing.join(", "));
         }
     }
 
@@ -1390,4 +1372,52 @@ impl Voice {
             Track::None => Err("no track".into()),
         }
     }
+}
+
+/// What has no sound (`/sounds check`, chiacraft): events whose files aren't there, blocks with
+/// none (air and liquids have none on purpose), and spawned kinds (those with a spawn category)
+/// that make no sound on any event.
+pub(crate) struct SoundCheck {
+    pub events: usize,
+    pub missing: Vec<String>,
+    pub silent_blocks: Vec<String>,
+    pub silent_kinds: Vec<String>,
+}
+
+pub(crate) fn sound_check(assets: &Assets) -> SoundCheck {
+    let c = content();
+    let mut missing: Vec<String> = Vec::new();
+    // The folders are walked once, not once a pattern.
+    let listed: Vec<String> = ["ogg", "wav"]
+        .iter()
+        .flat_map(|e| assets.list("sounds", e))
+        .map(|f| f.0)
+        .collect();
+    for d in &c.game.sounds {
+        for f in &d.files {
+            let found = match f.strip_suffix('*') {
+                Some(prefix) => listed.iter().any(|n| n.starts_with(prefix)),
+                None => sound_path(assets, f).is_some(),
+            };
+            if !found {
+                missing.push(format!("{} ({f})", d.name));
+            }
+        }
+    }
+    let mut silent_blocks: Vec<String> = Vec::new();
+    for s in &c.states {
+        let name = &c.blocks[s.block as usize].name;
+        if s.block != 0 && s.liquid.is_none() && s.effects.iter().all(|f| f.sound == u32::MAX) && silent_blocks.last() != Some(name) {
+            silent_blocks.push(name.clone());
+        }
+    }
+    silent_blocks.dedup();
+    let silent_kinds = c
+        .game
+        .entities
+        .iter()
+        .filter(|k| !k.category_name.is_empty() && k.effects.iter().all(|f| f.sound == u32::MAX))
+        .map(|k| k.name.clone())
+        .collect();
+    SoundCheck { events: c.game.sounds.len(), missing, silent_blocks, silent_kinds }
 }

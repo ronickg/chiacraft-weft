@@ -17,6 +17,16 @@ pub const STRIKE: (f32, f32) = (150.0, 6000.0);
 /// Closer than this a strike cracks; farther it only rumbles (the air takes the highs first).
 pub const CRACK_WITHIN: f32 = 1200.0;
 
+/// Seconds after one rumble in which another far one is not heard (it merges into the first): a
+/// storm's flashes come every second or two, and a rumble each was a drum roll (PC run ws1124a,
+/// 11-24: 50 rumbles in 100 s). A crack (closer than `CRACK_WITHIN`) is always heard.
+pub const THUNDER_GAP: f32 = 6.0;
+
+/// Whether thunder from `metres` away is heard, `since` seconds after the last one heard.
+pub fn thunder_heard(since: f32, metres: f32) -> bool {
+    metres < CRACK_WITHIN || since >= THUNDER_GAP
+}
+
 /// Where a strike lands for a random `u` in 0..1: evenly over the ground around the player, so
 /// far strikes are more common than near ones (the area grows with the distance squared).
 pub fn strike_distance(u: f32) -> f32 {
@@ -73,6 +83,18 @@ pub fn muffle(open: f32) -> f32 {
     500.0 * 40.0f32.powf(open.clamp(0.0, 1.0))
 }
 
+/// Deep under ground: next to no sky round the head and no roof the rain falls on.
+pub fn deep(c: Cover) -> bool {
+    c.open < 0.05 && c.roof == 0.0
+}
+
+/// How a sound from the open air is heard under `c`: its share of the volume (through the walls
+/// indoors, none deep under ground) and the low-pass it's muffled to (Hz).
+pub fn outdoors(c: Cover) -> (f32, f32) {
+    let heard = if deep(c) { 0.0 } else { THROUGH_WALLS + (1.0 - THROUGH_WALLS) * c.open };
+    (heard, muffle(c.open))
+}
+
 /// The wind is heard from this speed (m/s) and at full from that (a strong breeze to a gale).
 pub const WIND_HEARD: (f32, f32) = (1.5, 16.0);
 
@@ -121,6 +143,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn open_air_sounds_follow_the_cover() {
+        let open = Cover { open: 1.0, roof: 0.0, leaves: 0.0 };
+        let hut = Cover { open: 0.3, roof: 0.6, leaves: 0.0 };
+        let cave = Cover { open: 0.0, roof: 0.0, leaves: 0.0 };
+        assert_eq!(outdoors(open).0, 1.0);
+        assert!(outdoors(hut).0 < 0.6 && outdoors(hut).1 < 5000.0, "indoors: quieter, muffled");
+        assert_eq!(outdoors(cave).0, 0.0, "deep under ground: not heard");
+    }
+
+    #[test]
     fn thunder_comes_late_and_quiet_from_far() {
         assert!((thunder_delay(1000.0) - 2.915).abs() < 0.01);
         assert!(thunder_volume(STRIKE.1) < thunder_volume(STRIKE.0));
@@ -129,6 +161,8 @@ mod tests {
         assert!((strike_distance(1.0) - STRIKE.1).abs() < 0.5);
         // Evenly over the ground: half the strikes are past about 70% of the far edge.
         assert!(strike_distance(0.5) > STRIKE.1 * 0.7);
+        // Far rumbles are spaced out; near cracks always come.
+        assert!(!thunder_heard(1.0, 3000.0) && thunder_heard(THUNDER_GAP, 3000.0) && thunder_heard(0.5, 400.0));
     }
 
     #[test]

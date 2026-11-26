@@ -173,6 +173,12 @@ fn food_tile(ui: &mut Ui, k: usize) {
 
 const SHORTCUTS: [&str; 4] = ["inventory", "recipes", "stats", "advancements"];
 
+/// The max health the HUD shows, in the vitals' units: the engine's whole max (base's fed max with
+/// the health boost and any other modifier on it), or base's own while the engine's isn't known.
+pub fn shown_max(v: &Vitals, me: &abi::EntityState) -> f32 {
+    if me.max_health > 0.0 { me.max_health * HEALTH_SCALE } else { v.max_health }
+}
+
 pub fn register(r: &mut Registry) {
     // Health, stamina and experience as Ronald's sheet has them: the level on a badge, and beside
     // it the bars, each with its numbers in the vitals' units; the points waiting to be placed (P)
@@ -186,7 +192,7 @@ pub fn register(r: &mut Registry) {
             ui.row(S::row().size(BAR.0, BAR.1), |ui| {
                 ui.progress_bind("hud_health", S::default().size(BAR.0, BAR.1), |c| {
                     let (Some(v), Some(me)) = (vitals_of(c), c.player_state()) else { return -1.0 };
-                    bar_fill(me.health * HEALTH_SCALE / v.max_health.max(1.0), BAR_RIM)
+                    bar_fill(me.health * HEALTH_SCALE / shown_max(&v, &me).max(1.0), BAR_RIM)
                 });
                 ui.text_bind_styled(
                     S::default()
@@ -196,7 +202,7 @@ pub fn register(r: &mut Registry) {
                         let (Some(v), Some(me)) = (vitals_of(c), c.player_state()) else { return t.text("") };
                         t.set(
                             "hud.base.bar_value",
-                            &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)],
+                            &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(shown_max(&v, &me).round() as i64)],
                         );
                     },
                 );

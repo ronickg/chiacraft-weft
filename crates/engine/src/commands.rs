@@ -429,8 +429,9 @@ pub struct CommandDef {
 impl CommandDef {
     pub fn new(name: &str, usage: &str, alts: Vec<Alt>, handler: Option<(ModId, Callback)>, client: bool) -> CommandDef {
         let owners = vec![0; alts.len()];
-        // Commands on a player's own client are its own business.
-        let level = if client { weft_abi::permission::EVERYONE } else { weft_abi::permission::GAME_MASTER };
+        // chiacraft: game master for client commands too, the safe default (a client command can
+        // show what a player shouldn't see: gizmos, sounds); one meant for everyone says so.
+        let level = weft_abi::permission::GAME_MASTER;
         CommandDef { name: name.to_string(), usage: usage.to_string(), alts, handler, client, owners, branches: Vec::new(), level }
     }
 
@@ -724,7 +725,9 @@ fn complete_selector(c: &Content, partial: &str, players: &[String]) -> Vec<Stri
     suggestions
 }
 
-pub fn complete(c: &Content, line: &str, players: &[String], permission: u32) -> Completion {
+/// `owner`: the player is the world's owner, offered the owner's moderation commands whatever
+/// its level (chiacraft, `server::OWNER_MODERATION`).
+pub fn complete(c: &Content, line: &str, players: &[String], permission: u32, owner: bool) -> Completion {
     let from = line.rfind(' ').map_or(0, |i| i + 1);
     let partial = &line[from..];
     let done: Vec<&str> = line[..from].split_whitespace().collect();
@@ -733,7 +736,7 @@ pub fn complete(c: &Content, line: &str, players: &[String], permission: u32) ->
         let mut names: Vec<String> = c
             .commands
             .iter()
-            .filter(|d| d.level <= permission)
+            .filter(|d| d.level <= permission || (owner && crate::server::OWNER_MODERATION.contains(&d.name.as_str())))
             .map(|d| d.name.clone())
             .filter(|n| n.starts_with(partial))
             .collect();
@@ -812,7 +815,8 @@ mod tests {
             let d = CommandDef::new(name, "", parse_usage("").unwrap(), None, false);
             assert_eq!(d.level, weft_abi::permission::GAME_MASTER);
         }
+        // chiacraft: a client command too, unless it says otherwise.
         let d = CommandDef::new("x", "", parse_usage("").unwrap(), None, true);
-        assert_eq!(d.level, weft_abi::permission::EVERYONE);
+        assert_eq!(d.level, weft_abi::permission::GAME_MASTER);
     }
 }

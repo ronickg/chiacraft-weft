@@ -1,0 +1,59 @@
+# Ambient life's sprites make their sounds from where they are (notes/SYSTEMS.md, ambient life):
+# an eagle's cry from a circling bird, a gull call from the flock, an owl's hoot as it passes,
+# splashes where a fish leaves the water and falls back. Seed 1, creative (spectators get no word
+# from the server). Sound can't be heard in a script: read run.log's `ambient:` lines (every 10 s:
+# what flies, then "sounds: N cries, N gull calls, N hoots, N splashes") and the `where` markers.
+# Expect: eagles_and_gulls -> cries >= 1 over the 40 s (about one per 20 s) and gull calls in most
+# lines (about two per 10 s); owl -> hoots >= 1 (one per crossing, the first crossing at once);
+# fish -> splashes in every line, about twice the jumps; off -> no cries, gull calls or hoots
+# (the sky floor's biome may still have its own). A cost check too: "ms a frame" stays under 0.05.
+# Each line also gives the last sound's volume and muffle as the cover let it through: outside
+# "volume 1.00, muffle 20000 Hz" (splashes leaving the water 0.45); in_hut (a closed stone hut,
+# the gulls and eagles still overhead) -> about "volume 0.20, muffle 500 Hz" for the calls in it.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /season summer 1
+chat /weather clear 99999
+chat /time set 6000
+chat /tp 0.5 252 0.5
+wait 2
+loaded
+chat /tk fill -40 249 -40 40 249 40 stone
+chat /tk fill -40 250 -40 40 262 40 core:air
+# a pool 21x21, one deep, sunk in the floor beside the player
+chat /tk fill -10 248 -30 10 248 -10 stone
+chat /tk fill -10 249 -30 10 249 -10 base:water
+# a closed stone hut, 13x13 inside, roof at 254 (the cover's 7-block ring stays in its walls)
+chat /tk fill 18 250 18 32 254 32 stone
+chat /tk fill 19 250 19 31 253 31 core:air
+chat /tp 0.5 250 0.5
+wait 2
+# ---- eagles on a thermal and a gull flock
+chat /ambient force soar gull
+where eagles_and_gulls
+wait 42
+# ---- an owl crossing (night)
+chat /time set 18000
+chat /ambient force owl
+where owl
+wait 42
+# ---- fish jumping in the pool, many
+chat /time set 6000
+chat /ambient force fish busy
+where fish
+wait 32
+# ---- the gulls and eagles heard from inside the hut
+chat /ambient force soar gull
+chat /tp 25.5 250 25.5
+where in_hut
+wait 32
+chat /tp 0.5 250 0.5
+# ---- back to what the place has
+chat /ambient off
+where off
+wait 22
+chat /ambient
+where end
+quit

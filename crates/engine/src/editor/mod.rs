@@ -23,6 +23,8 @@ use crate::ui::{Align, Kind, Rect, Scrollbar, Style, Ui};
 
 const LIST_W: f32 = 146.0;
 const FORM_W: f32 = 310.0;
+/// The least the code and preview column takes beside the form; narrower, it goes under them.
+const RIGHT_MIN: f32 = 200.0;
 /// What the form's rows span: its width less its padding and scroll bar. Everything in it ends
 /// at the same right edge.
 const CONTENT_W: f32 = FORM_W - 26.0;
@@ -604,7 +606,19 @@ impl Screen for Editor {
                 .collect();
         }
         let tall = (cx.size.y - 70.0).clamp(160.0, 430.0);
-        let wide = (cx.size.x - 24.0).clamp(660.0, 960.0);
+        // Stacked (`narrow` below): the list and form shorter, so both rows fit the screen.
+        let stacked = (cx.size.x - 16.0).clamp(400.0, 960.0)
+            - 20.0
+            - LIST_W
+            - FORM_W
+            - 2.0 * (Scrollbar::HANDLE[0] + Scrollbar::OUTSIDE_GAP * 2.0)
+            - 24.0
+            < RIGHT_MIN;
+        let tall = if stacked { ((cx.size.y - 76.0) / 1.5).clamp(120.0, 430.0) } else { tall };
+        // As wide as the screen inside the background's padding allows, up to 960: a floor of 660
+        // passed a 640 GUI px screen (4K at 6x, 720p at 2x: the text-fit check, chiacraft 11-24),
+        // and 24 left the code and preview column 6 short of its field; its contents set the least.
+        let wide = (cx.size.x - 16.0).clamp(400.0, 960.0);
         let bg = if cx.in_game { "overlay" } else { "background" };
         ui.root_style(Style::default().stretch());
         ui.panel(bg, Style::default().grow().center().pad(8.0), |ui| {
@@ -640,7 +654,14 @@ impl Screen for Editor {
                     close_button(ui, 15.0);
                 });
                 let gap = Scrollbar::HANDLE[0] + Scrollbar::OUTSIDE_GAP * 2.0;
-                let right_w = wide - 20.0 - LIST_W - FORM_W - 2.0 * gap;
+                // Less 24 GUI px: the three columns came out 20 wider than their widths (the
+                // text-fit check at 960 GUI px, 1080p at 2x and 4K at 4x: the window 2 px off each
+                // side), what the scrolling list and form take beside their own.
+                let right_w = wide - 20.0 - LIST_W - FORM_W - 2.0 * gap - 24.0;
+                // A screen too narrow for three columns (640 GUI px: 4K at 6x, 720p at 2x) puts
+                // the code and the preview side by side under the list and the form; the screen
+                // scrolls (chiacraft 11-24, the text-fit check: the third column ran 6 px off).
+                let narrow = right_w < RIGHT_MIN;
                 ui.container(Style::row().gap(gap).w(wide - 20.0), |ui| {
                     self.list(ui, cx, tall);
                     ui.panel(
@@ -653,11 +674,20 @@ impl Screen for Editor {
                             .scroll(),
                         |ui| self.form(ui, cx, c),
                     );
-                    ui.container(Style::default().gap(6.0).w(right_w).h(tall), |ui| {
-                        self.code(ui, cx, right_w, (tall - 6.0) * 0.5);
-                        self.preview_panel(ui, cx, right_w, (tall - 6.0) * 0.5);
-                    });
+                    if !narrow {
+                        ui.container(Style::default().gap(6.0).w(right_w).h(tall), |ui| {
+                            self.code(ui, cx, right_w, (tall - 6.0) * 0.5);
+                            self.preview_panel(ui, cx, right_w, (tall - 6.0) * 0.5);
+                        });
+                    }
                 });
+                if narrow {
+                    let half = (wide - 20.0 - gap) * 0.5;
+                    ui.container(Style::row().gap(gap).w(wide - 20.0), |ui| {
+                        self.code(ui, cx, half, (tall - 6.0) * 0.5);
+                        self.preview_panel(ui, cx, half, (tall - 6.0) * 0.5);
+                    });
+                }
             });
         });
         if let Some(p) = s.borrow().picker {

@@ -189,16 +189,27 @@ fn pt_cached(world: vec3<f32>, n: vec3<f32>, dist: f32, u: vec2<f32>) -> vec4<f3
 
 // A surface met by a ray, lit as the world lights it: its block light, the sun through one more
 // ray, and its indirect light from the cache (the lightmap's sky light until the cache has it).
+// `light_on` with the sun as traced: its direct part not gated by the lightmap's sky light. The
+// world lets the sun in only where the sky light is high (`light_on`'s `open`), to keep its shadow
+// map's gaps out of caves; the traced shadow has no gaps, and with the gate the sun through a 2x2
+// roof hole never reached the cave floor (w41 cave_sky). The ambient-occlusion term is 1 here.
+fn pt_light_on(n: vec3<f32>, light: vec4<f32>, sun: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let c = light_on(n, light, 0.0, 1.0, pos, rel);
+    let sun_part = palette().sun * light_strength() * sun_facing(n) * sun;
+    LIGHT_SUN = sun_part;
+    return c + sun_part;
+}
+
 fn pt_lit(b: RtHit, l: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
     var s = 0.0;
     if dot(b.n, l) > 0.0 && light_strength() > 0.0 {
-        s = dot(rt_sun(b.rel, b.n, l, false), vec3(1.0 / 3.0));
+        s = dot(rt_sun(b.rel, b.n, l, false), vec3(1.0 / 3.0)) * models_shadow(b.rel, b.n) * cloud_shadow(b.rel);
     }
     let c = pt_cached(b.world, b.n, length(b.rel), u);
     if c.a > 0.5 {
-        return pt_albedo(b) * (light_on(b.n, vec4(0.0, b.light.yzw), s, 1.0, b.world, b.rel) + c.rgb);
+        return pt_albedo(b) * (pt_light_on(b.n, vec4(0.0, b.light.yzw), s, b.world, b.rel) + c.rgb);
     }
-    return pt_albedo(b) * light_on(b.n, b.light, s, 1.0, b.world, b.rel);
+    return pt_albedo(b) * pt_light_on(b.n, b.light, s, b.world, b.rel);
 }
 
 // Folds each cell's sums into its light (more samples this frame, a bigger step; never under 1/24,
@@ -240,6 +251,182 @@ fn cs_cache(@builtin(global_invocation_id) id: vec3<u32>) {
 
 const PT_SKY_T: f32 = 65504.0;
 
+// Two numbers 0..1 for pixel `px`, this frame, and a draw `salt` of its own (`pt_noise`'s hash with
+// the salt in the frame's word): each of the block lights' draws apart from the others.
+fn pt_rand(px: vec2<f32>, salt: u32) -> vec2<f32> {
+    var v = vec3<u32>(vec2<u32>(max(floor(px), vec2(0.0))), u32(scene.rt.y) ^ (salt * 0x9E3779B9u));
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v = v ^ (v >> vec3(16u));
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    return vec2<f32>(v.xy >> vec2(8u)) / 16777216.0;
+}
+
+// ---- block lights (M2; reports/Path tracing plan.md) ----
+//
+// The lightmap's block light stays the light's colour and reach (our grade); what tracing adds is
+// whether the light can be seen. Each pixel draws a few candidates from the light-giving blocks
+// that reach its cube (`pt_lights`, from the meshes, listed per cube on the CPU), each weighted by the light it gives there
+// by the lightmap's own falloff (its level less the blocks between), keeps one in proportion
+// (resampled importance sampling), and sends one shadow ray to it. Averaged over frames, that is the
+// share of the block light that reaches the surface: shadows behind pillars and furniture.
+
+const PT_LIGHT_CANDIDATES: u32 = 8u;
+// Half the size of a torch's flame and glow, blocks: what its shadows soften by.
+const PT_FLAME: f32 = 0.2;
+// The share of the lightmap's block light a shadow takes away. The rest stays: the light's further
+// bounces, which the lightmap's spread stands for and one traced bounce leaves out (all of it taken,
+// a block's side away from the torch came out near black in a stone cave, w59; 70 % read faint,
+// Ronald chose 90 %, 11-25).
+const PT_BLOCK_SHADOW: f32 = 0.9;
+// The projection's near plane (`world_render`'s perspective, 0.05): the primary test starts there.
+const PT_NEAR: f32 = 0.05;
+
+// Where the lights reaching cube `c` are in `pt_lights` (start, count); count 0 when none do.
+fn pt_light_find(c: vec3<i32>) -> vec2<u32> {
+    let slots = pt_lights[0];
+    var i = ((u32(c.x) * 73856093u) ^ (u32(c.y) * 19349663u) ^ (u32(c.z) * 83492791u)) & (slots - 1u);
+    for (var p = 0u; p < 32u; p++) {
+        let at = 2u + i * 4u;
+        let x = pt_lights[at];
+        if x == 0x80000000u {
+            return vec2(0u);
+        }
+        if x == u32(c.x) && pt_lights[at + 1u] == u32(c.y) && pt_lights[at + 2u] == u32(c.z) {
+            let v = pt_lights[at + 3u];
+            return vec2(v & 0xFFFFFu, v >> 20u);
+        }
+        i = (i + 1u) & (slots - 1u);
+    }
+    return vec2(0u);
+}
+
+// How much of the block light reaches a surface at `world` (`rel` camera relative) facing `ng`:
+// x 1 seen, 0 hidden, by one light drawn as above (1 when none is near); y 1 when a light was drawn
+// (else why not, for debug view 15: 0 no list for the cube, -1 none of the draws in reach, -2 no lights at all).
+fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: vec3<f32>, px: vec2<f32>) -> vec2<f32> {
+    if pt_lights[1] == 0u {
+        return vec2(1.0, -2.0);
+    }
+    let cell = vec3<i32>(floor(world + ng * 0.5));
+    let cube = cell >> vec3(4u);
+    let base = 2u + pt_lights[0] * 4u;
+    // The lights that reach into this cube (the table lists them per cube, strongest first).
+    let r = pt_light_find(cube);
+    let total = r.y;
+    if total == 0u {
+        return vec2(1.0, 0.0);
+    }
+    var chosen = vec3(0.0);
+    var own = false;
+    var w_sum = 0.0;
+    var found = false;
+    for (var k = 0u; k < PT_LIGHT_CANDIDATES; k++) {
+        // One of the `total` lights, each as likely.
+        let t = min(u32(pt_rand(px, 16u + k * 2u).x * f32(total)), total - 1u);
+        let l = pt_lights[base + r.x + t];
+        let lp = vec3<i32>(i32(l & 63u), i32((l >> 6u) & 63u), i32((l >> 12u) & 63u)) - 16 + cube * 16;
+        let e = f32(max((l >> 18u) & 15u, max((l >> 22u) & 15u, (l >> 26u) & 15u)));
+        let d = abs(lp - cell);
+        let level = e - f32(d.x + d.y + d.z);
+        if level <= 0.0 {
+            continue;
+        }
+        // Its weight over the chance of drawing it (1 in `total`).
+        let w = level * f32(total);
+        w_sum += w;
+        if pt_rand(px, 17u + k * 2u).x * w_sum < w {
+            // A point on the light, a new one each frame (the denoiser averages them): a torch's
+            // flame (bit 30) a small box above its middle, a glowing block its whole. The shadow's
+            // edge softens with its distance from what casts it.
+            let small = ((l >> 30u) & 1u) == 1u;
+            let j = vec3(pt_rand(px, 40u + k).xy, pt_rand(px, 48u + k).x) * 2.0 - 1.0;
+            chosen = vec3<f32>(lp) + select(vec3(0.5) + j * 0.45, vec3(0.5, 0.6, 0.5) + j * PT_FLAME, small);
+            own = all(lp == vec3<i32>(floor(world - ng * 0.5)));
+            found = true;
+        }
+    }
+    if !found {
+        return vec2(1.0, -1.0);
+    }
+    if own {
+        return vec2(1.0, 1.0);
+    }
+    var to = chosen - world;
+    // A light behind the face lights it only round a corner, as the lightmap spreads it: hidden.
+    // But one in the layer of the surface's own block (a fire in a hole in the floor, a lamp set in
+    // a wall) shines out of its open face over the surface, as the lightmap spreads it from there:
+    // its point is brought out to just over the face. Drawn inside its block, every point lay under
+    // the floor's plane, and the floor round the nave's fire pits kept a tenth of its light (w76).
+    let behind = -dot(to, ng);
+    if behind >= 0.0 {
+        if behind > 1.0 {
+            return vec2(0.0, 1.0);
+        }
+        to += ng * (behind + 0.05);
+    }
+    let dist = length(to);
+    let dir = to / max(dist, 1e-4);
+    let hit = rt_hit(rel + lift, dir, max(dist - 0.9, 0.0), 0.0);
+    return vec2(select(1.0, 0.0, hit.hit && !hit.clear), 1.0);
+}
+
+// ---- plain (`core:pt_plain`): vanilla's math, and only what tracing adds to it ----
+//
+// The world's pass without a pack (the engine's `world.wgsl`): the texel times its tint, its face's
+// shade and the lightmap's curve, multiplied in sRGB values as vanilla does; no grade, no haze, no
+// specular. Tracing adds two things: the sky level the lightmap's flood fill guesses becomes the
+// sky's share the surface sees (a ray that gets out counts whole, one that meets a surface counts
+// that surface's own sky light, so a wall over open ground stays as vanilla's and a cave's goes
+// dark by its shape), and the sun's shadow (a face the traced sun misses loses `PT_PLAIN_SUN` of
+// the daylight). The block light is shadowed as in the look's path. For Ronald's stage-1 compare
+// (ours plain against vanilla): PT that differs from vanilla only where tracing does.
+const PT_PLAIN_SUN: f32 = 0.3;
+
+fn pt_srgb_encode(l: vec3<f32>) -> vec3<f32> {
+    let c = max(l, vec3(0.0));
+    return select(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, c * 12.92, c <= vec3(0.0031308));
+}
+
+fn pt_srgb_decode(s: vec3<f32>) -> vec3<f32> {
+    let c = max(s, vec3(0.0));
+    return select(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, c <= vec3(0.04045));
+}
+
+// Vanilla's lightmap (`common.wgsl`) at `light` (sky, then the block light's channels, 0..1).
+fn pt_lightmap(light: vec4<f32>) -> vec3<f32> {
+    return lightmap(light, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
+}
+
+// The plain pixel at `at` (see above): `h` the surface met, `n` its normal, `ng` its face's, `sun`
+// the traced sun on it (0..1, 0 facing away), `albedo` the G-buffer's (linear, tinted).
+fn pt_plain(at: u32, px: vec2<f32>, h: RtHit, ng: vec3<f32>, lift: vec3<f32>, sun: f32, albedo: vec3<f32>) {
+    // The sky's share: one cosine ray a frame about the face (the denoisers average them).
+    let b = rt_hit(h.rel + lift, pt_cosine(ng, pt_noise(px)), 96.0, 2.0);
+    let access = select(1.0, clamp(b.light.x, 0.0, 1.0), b.hit);
+    let blk = h.light.yzw;
+    let none = pt_lightmap(vec4(0.0));
+    var light = mix(pt_lightmap(vec4(0.0, blk)), pt_lightmap(vec4(1.0, blk)), access);
+    // The sun's shadow on the daylight the surface sees.
+    let day = max(pt_lightmap(vec4(1.0, 0.0, 0.0, 0.0)) - none, vec3(0.0));
+    light -= day * access * PT_PLAIN_SUN * clamp(light_strength(), 0.0, 1.0) * (1.0 - clamp(sun, 0.0, 1.0));
+    // The block light, as much of it as reaches the surface.
+    let block = max(pt_lightmap(vec4(0.0, blk)) - none, vec3(0.0));
+    if max(block.r, max(block.g, block.b)) > 1e-4 {
+        let vis = pt_block_visibility(h.world, h.rel, ng, lift, px).x;
+        light -= block * ((1.0 - vis) * PT_BLOCK_SHADOW);
+    }
+    light = clamp(light, vec3(0.0), vec3(1.0)) * normal_shade(ng);
+    let surface = pt_srgb_decode(pt_srgb_encode(albedo) * light);
+    // The light alone for the denoisers (the surface over its albedo), no specular, no air.
+    pt_out[at] = vec4(surface / max(albedo, vec3(1e-4)), select(PT_SKY_T, max(b.t, 1e-3), b.hit));
+    pt_out[at + 1u] = vec4(0.0);
+    pt_out[at + 2u] = vec4(select(surface, vec3(0.0), pt.mode == 1u), 1.0);
+}
+
 @compute @workgroup_size(8, 8)
 fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     if id.x >= pt.size.x || id.y >= pt.size.y {
@@ -267,14 +454,43 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
         return;
     }
-    if dist > PT_REACH {
+    if dist > PT_REACH || pt.debug == 12u {
         return;
     }
     let v = -rel / dist;
-    let h = rt_hit(vec3(0.0), -v, dist * 1.1 + 2.0, 0.0);
+    // Out to the farthest hit the test below accepts: one past it fails either way (the same
+    // pixels traced), and the ray walks no further. The cubes' faces and quads alone: a distant
+    // tile it met would be no pixel traced either (the G-buffer has none), and the hidden ones
+    // under the cubes cost each ray their shader's asking. The world's `pt_takes` asks the same.
+    // From the near plane (the projection's 0.05), as the world draws: a face through the eye
+    // itself is clipped there, and traced from the eye it stopped every ray crossing it. A slab made
+    // a full block by the showcase import's full shapes stood against the nave's camera, and half
+    // the screen kept the world's pixel (debug 16 blue, the parity5 nave's seam, 11-25).
+    // And past a face met from behind (the world culls back faces, the rays don't): the eye on a
+    // block's corner starts the ray inside that block, and it met the block's inner faces first.
+    var h = rt_hit_mask(-v * PT_NEAR, -v, dist * 1.02 + 0.2 - PT_NEAR, 0.0, 3u);
+    for (var k = 0; k < 2; k++) {
+        let met = length(h.rel);
+        if !h.hit || h.clear || dot(h.n, v) >= 0.0 || met >= dist - 0.02 * dist - 0.15 {
+            break;
+        }
+        h = rt_hit_mask(h.rel - v * 0.01, -v, dist * 1.02 + 0.2 - met - 0.01, 0.0, 3u);
+    }
     // Terrain at the depth drawn there: anything else (water, glass, a model, a particle) keeps the
     // world's own pixel.
-    if !h.hit || h.clear || abs(h.t - dist) > 0.02 * dist + 0.15 {
+    if !h.hit || h.clear || abs(length(h.rel) - dist) > 0.02 * dist + 0.15 {
+        // Debug 16: why the trace kept the world's pixel: red no hit, green a clear pane, blue
+        // a hit nearer than the depth, yellow one farther (the nave's half-screen seam, 11-25).
+        if pt.debug == 16u {
+            var why = vec3(1.0, 0.0, 0.0);
+            if h.hit && h.clear {
+                why = vec3(0.0, 1.0, 0.0);
+            } else if h.hit {
+                why = select(vec3(1.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), length(h.rel) < dist);
+            }
+            pt_out[at] = vec4(why, 0.0);
+            pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
+        }
         return;
     }
     // The surface as the G-buffer has it (its shading normal, roughness, F0); the face's own normal
@@ -286,6 +502,23 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // reach met there has no G-buffer, and traced with no albedo a far peak came out black
     // (pt1_dark_peak_crop); it keeps the world's pixel, as the denoisers skip it.
     if dot(gb_n.xyz, gb_n.xyz) < 0.25 {
+        if pt.debug == 16u {
+            pt_out[at] = vec4(1.0, 0.0, 1.0, 0.0);
+            pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
+        }
+        return;
+    }
+    // Debug 8-12, timing only (a bench's probes): the trace stopped after its primary test (8), the
+    // sun's ray (9), the bounce and the cache (10), or with no specular ray (11); 12 before any ray, above; 13 the whole trace without the air's
+    // two `haze_lit`s. The picture they
+    // leave is no use.
+    if pt.debug == 8u {
+        return;
+    }
+    // Debug 16: grey where the trace runs (the reasons it doesn't are above).
+    if pt.debug == 16u {
+        pt_out[at] = vec4(0.2, 0.2, 0.2, 0.0);
+        pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
         return;
     }
     let ng = h.n;
@@ -299,10 +532,26 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     var sun = 0.0;
     if dot(ng, l) > 0.0 && light_strength() > 0.0 {
         sun = dot(rt_sun_soft(h.rel + lift, ng, l, false, PT_SUN_CONE, px, false), vec3(1.0 / 3.0));
+        // As the world's traced sun (`world.wgsl` `sun_shadow_near`): the models' shadows (mobs
+        // and players are not in the traced scene) and the clouds'. Without them a rainy day's
+        // ground stayed sunlit where the world's lay under its clouds (w33).
+        sun *= models_shadow(h.rel, n) * cloud_shadow(h.rel);
+    }
+    if pt.plain != 0u {
+        pt_plain(at, px, h, ng, lift, sun, albedo);
+        return;
     }
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
     // lightmap gives it (already lowered under cover) and as the open sky would give it.
-    let lit = light_on(n, h.light, sun, 1.0, h.world, h.rel);
+    let lit = pt_light_on(n, h.light, sun, h.world, h.rel);
+    if pt.debug == 9u {
+        pt_out[at] = vec4(lit, 1.0);
+        return;
+    }
+    // The lamps' and the sky's shares of it for the night's blue (`display`), kept before the calls
+    // below, which light the sky alone and set it to 1: traced, a fire-lit wall at night went
+    // white-blue where the world draws it orange (w12, the nave at 18000).
+    let share = NIGHT_SKY_SHARE;
     let dark = light_on(n, vec4(0.0), 0.0, 1.0, h.world, h.rel);
     let sky_part = max(light_on(n, vec4(h.light.x, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel) - dark, vec3(0.0));
     let sky_open = max(light_on(n, vec4(1.0, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel) - dark, vec3(0.0));
@@ -324,14 +573,35 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         // Above 0 on every traced pixel: the denoisers read diffuse's a > 0 as "traced".
         diffuse_t = max(b.t, 1e-3);
     }
-    let indirect = select(sky_open, bounce, b.hit);
+    // A ray that gets out brings the sky's light from its own way (`light_on`'s tops 1, sides 0.75,
+    // bottoms 0.5 about the ray), not the face's: the face's tilt is already in which rays get out,
+    // and with the face's own share a wall counted it twice. NVIDIA's cathedral, out of the sun at
+    // 07:00, came out near black against the world's 0.75 (parity5, 11-25: facade 18 % against 37 %).
+    var sky_way = sky_open;
+    if !b.hit {
+        sky_way = max(light_on(bdir, vec4(1.0, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel) - light_on(bdir, vec4(0.0), 0.0, 1.0, h.world, h.rel), vec3(0.0));
+    }
+    let indirect = select(sky_way, bounce, b.hit);
     var diffuse = lit - sky_part + indirect;
+    // The block light, shadowed: its share of the world's light, as much of it as reaches the
+    // surface (one light drawn among those near, one shadow ray; frames average it). The
+    // lightmap's block light keeps its colour and reach; the held light is not a block's.
+    let block = max(light_on(n, h.light, 0.0, 1.0, h.world, h.rel) - light_on(n, vec4(h.light.x, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel), vec3(0.0));
+    var block_vis = vec2(1.0, 0.0);
+    if max(block.r, max(block.g, block.b)) > 1e-4 {
+        block_vis = pt_block_visibility(h.world, h.rel, ng, lift, px);
+        diffuse -= block * ((1.0 - block_vis.x) * PT_BLOCK_SHADOW);
+    }
     // Into the cache: the indirect light found here (one pixel in four a frame).
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
         let i = pt_cache_find(pt_cell(h.world, ng, dist, pt_noise(px + vec2(7.0, 5.0))), true);
         if i >= 0 {
             pt_cache_add(u32(i), indirect);
         }
+    }
+    if pt.debug == 10u {
+        pt_out[at] = vec4(diffuse, 1.0);
+        return;
     }
     // Specular, where the texture has maps (F0 above 0), as the world's `mat_shine`: the sun's
     // highlight (GGX, Smith's visibility) and what lies the mirrored way, traced where smooth, the
@@ -361,7 +631,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         // mirror along the face or into it, where the groove and the block itself hide the sky. The
         // stone bricks' joints lit up as blue lines from the sky (pt1_rtxd_pt, the cathedral).
         let horizon = smoothstep(-0.05, 0.3, dot(r, ng));
-        if a < 0.5 && horizon > 0.0 {
+        if a < 0.5 && horizon > 0.0 && pt.debug != 11u {
             var dir = rt_cone(r, 0.01 + a * 0.5, px + vec2(17.0, 29.0));
             if dot(dir, ng) <= 0.0 {
                 dir = r;
@@ -384,7 +654,17 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     let edge = smoothstep(PT_REACH * 0.75, PT_REACH, dist);
     diffuse = mix(diffuse, lit, edge);
     specular *= 1.0 - edge;
-    if pt.debug != 0u && pt.debug != 7u {
+    // Rain on the ground as the world's pass has it (`rain_on_ground`: wet, darker, the sky's sheen,
+    // puddles): traced, the ground stayed dry and bright in the rain (w27). It is affine in the
+    // colour: its factor on both lights, what it adds into the specular.
+    if ground_wet() > 0.0 || scene.canopy.z > 0.0 {
+        let leafy = h.quad || h.tint == 2u; // (2: foliage, `world.wgsl` TINT_FOLIAGE)
+        let added = rain_on_ground(vec3(0.0), n, h.rel, h.world, h.light.x, leafy);
+        let k = rain_on_ground(vec3(1.0), n, h.rel, h.world, h.light.x, leafy) - added;
+        diffuse *= k;
+        specular = specular * k + added / max(s_alb, vec3(1e-3));
+    }
+    if (pt.debug != 0u && pt.debug < 7u) || pt.debug >= 14u {
         var out = vec3(0.0);
         switch pt.debug {
             case 1u: { out = albedo; }
@@ -393,25 +673,60 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 4u: { out = bounce; }
             case 5u: { out = specular * s_alb; }
             case 6u: { out = albedo * pt_cached(h.world, ng, dist, pt_noise(px + vec2(3.0, 11.0))).rgb; }
+            // 14: the lightmap's block light at the surface (as light, without the texture).
+            case 14u: { out = block; }
+            // 15: the traced block lights: green seen, red hidden; no light drawn: blue no list for
+            // the cube, cyan none in reach, magenta no lights at all; black no block light.
+            case 15u: {
+                if max(block.r, max(block.g, block.b)) > 1e-4 {
+                    if block_vis.y > 0.5 {
+                        out = select(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), block_vis.x > 0.5);
+                    } else if block_vis.y > -0.5 {
+                        out = vec3(0.0, 0.0, 1.0);
+                    } else if block_vis.y > -1.5 {
+                        out = vec3(0.0, 1.0, 1.0);
+                    } else {
+                        out = vec3(1.0, 0.0, 1.0);
+                    }
+                }
+            }
             default: {}
         }
         pt_out[at] = vec4(out, 0.0);
         pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
         return;
     }
-    // The air between the eye and the surface, as an affine map of the colour.
-    let air = haze_lit(vec3(0.0), h.rel, h.light.x);
-    let through = haze_lit(vec3(1.0), h.rel, h.light.x) - air;
-    let dif = through * diffuse;
-    let spe = through * specular;
+    // The picture's own (mode 0): the surface's light through the air as the world's pass puts it
+    // (`haze_lit` on the colour itself) and finished as it finishes it (`display`: the night's
+    // blue, or the LDR tone curve). As an affine map from white (`through`) the air's greying in
+    // the rain, which mixes each colour toward its own grey, was lost: the traced ground stayed
+    // warm where the world's went grey (w29). One call, where the map took two.
+    // Under a denoiser (mode 1) the air as that map: its light alone (`under`, which
+    // `fs_pt_finish` adds the denoised light to and finishes) and what it lets through.
+    NIGHT_SKY_SHARE = share;
+    var dif = diffuse;
+    var spe = specular;
+    var under: vec3<f32>;
+    if pt.mode == 1u {
+        let air = haze_lit(vec3(0.0), h.rel, h.light.x);
+        let through = haze_lit(vec3(1.0), h.rel, h.light.x) - air;
+        dif *= through;
+        spe *= through;
+        under = air;
+    } else {
+        let surface = diffuse * albedo + specular * s_alb;
+        // (Debug 13, timing only: without the air; a branch, as a `select` works out both.)
+        if pt.debug == 13u {
+            under = display(surface);
+        } else {
+            under = display(haze_lit(surface, h.rel, h.light.x));
+        }
+    }
+    // The light alone for the denoisers (with the air's share through it under one, mode 1).
     pt_out[at] = vec4(dif, diffuse_t);
     pt_out[at + 1u] = vec4(spe, specular_t);
-    // The picture's own (mode 0), or what the denoiser adds onto (1).
-    // The picture as the world's pass finishes it (`display`: the night's blue, or the LDR tone
-    // curve); under a denoiser (mode 1) the air's light alone, which `fs_pt_finish` adds the
-    // denoised light to and finishes.
-    let under = select(display(air + dif * albedo + spe * s_alb), air, pt.mode == 1u);
-    pt_out[at + 2u] = vec4(under, 1.0);
+    // The share rides in the kind (1 to 1.25: traced) for `fs_pt_finish`.
+    pt_out[at + 2u] = vec4(under, 1.0 + 0.25 * share);
 }
 
 struct PtOut {
@@ -458,5 +773,11 @@ fn fs_pt_finish(in: PtOut) -> @location(0) vec4<f32> {
         discard;
     }
     let light = textureLoad(textures[pt.light], vec2<i32>(px), 0).rgb;
+    // The pixel's sky share as `cs_trace` found it: left at 1, the whole denoised light went
+    // the night's blue, a fire's with it.
+    NIGHT_SKY_SHARE = clamp((kind.a - 1.0) * 4.0, 0.0, 1.0);
+    if pt.plain != 0u {
+        return vec4(kind.rgb + light, 0.0);
+    }
     return vec4(display(kind.rgb + light), 0.0);
 }

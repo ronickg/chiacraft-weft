@@ -1,0 +1,322 @@
+# Animal AI coverage, grazers and herds (Planner 11-25; table: notes/crew/plans/animals-coverage.md). Each part: a pad 200
+# blocks on, two species' groups at 30 % food and water, a pond in the middle. Expected per species: "plays graze" and
+# "plays drink" (anim log) or doing eat/drink in the where rows, food and water climbing; a herd's members within 16
+# blocks of one another (where rows); after the walk-in and `/animalprof hit`: "runs from" / "calls the alarm" lines,
+# or a big plant eater standing its ground ("charges"). Report per species: eat, drink, flee, holds together; the shot.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 86 528 16 110 560 core:air
+chat /tk fill -16 111 528 16 140 560 core:air
+chat /tk fill -16 70 561 16 100 576 core:air
+chat /time set 6000
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /tk fill -16 70 528 16 70 536 base:tall_grass
+chat /tk spawn animals:white_tailed_deer -8 70 536
+chat /tk spawn animals:white_tailed_deer -6 70 536
+chat /tk spawn animals:white_tailed_deer -4 70 536
+chat /tk spawn animals:red_deer 4 70 548
+chat /tk spawn animals:red_deer 6 70 548
+chat /tk spawn animals:red_deer 8 70 548
+wait 2
+chat /animalprof food 0.3
+chat /animalprof water 0.3
+chat /tp 0 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk mode creative
+chat /tp 0 70 558
+look 0 0
+wait 1
+hold core:forward 2
+chat /animalprof hit 2
+wait 5
+chat /animalprof where 64
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 0 82 558
+look 0 -38
+wait 2
+shot cov_grazers_1_white_tailed_deer.png
+chat /tick unfreeze
+wait 1
+chat /tp 200 90 544
+wait 4
+chat /tk fill 184 60 528 216 68 560 base:dirt
+chat /tk fill 184 69 528 216 69 560 base:grass
+chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 86 528 216 110 560 core:air
+chat /tk fill 184 111 528 216 140 560 core:air
+chat /tk fill 184 70 561 216 100 576 core:air
+chat /time set 6000
+chat /tk fill 199 69 543 201 69 545 base:water
+chat /tk fill 199 70 543 201 70 545 core:air
+wait 1
+chat /tk fill 184 70 528 216 70 536 base:tall_grass
+chat /tk spawn animals:reindeer 192 70 536
+chat /tk spawn animals:reindeer 194 70 536
+chat /tk spawn animals:reindeer 196 70 536
+chat /tk spawn animals:capybara 204 70 548
+chat /tk spawn animals:capybara 206 70 548
+chat /tk spawn animals:capybara 208 70 548
+wait 2
+chat /animalprof food 0.3
+chat /animalprof water 0.3
+chat /tp 200 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk mode creative
+chat /tp 200 70 558
+look 0 0
+wait 1
+hold core:forward 2
+chat /animalprof hit 2
+wait 5
+chat /animalprof where 64
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 200 82 558
+look 0 -38
+wait 2
+shot cov_grazers_2_reindeer.png
+chat /tick unfreeze
+wait 1
+chat /tp 400 90 544
+wait 4
+chat /tk fill 384 60 528 416 68 560 base:dirt
+chat /tk fill 384 69 528 416 69 560 base:grass
+chat /tk fill 384 70 528 416 85 560 core:air
+chat /tk fill 384 86 528 416 110 560 core:air
+chat /tk fill 384 111 528 416 140 560 core:air
+chat /tk fill 384 70 561 416 100 576 core:air
+chat /time set 6000
+chat /tk fill 399 69 543 401 69 545 base:water
+chat /tk fill 399 70 543 401 70 545 core:air
+wait 1
+chat /tk fill 384 70 528 416 70 536 base:tall_grass
+chat /tk spawn animals:protoceratops 392 70 536
+chat /tk spawn animals:protoceratops 394 70 536
+chat /tk spawn animals:protoceratops 396 70 536
+chat /tk spawn animals:psittacosaurus 404 70 548
+chat /tk spawn animals:psittacosaurus 406 70 548
+chat /tk spawn animals:psittacosaurus 408 70 548
+wait 2
+chat /animalprof food 0.3
+chat /animalprof water 0.3
+chat /tp 400 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk mode creative
+chat /tp 400 70 558
+look 0 0
+wait 1
+hold core:forward 2
+chat /animalprof hit 2
+wait 5
+chat /animalprof where 64
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 400 82 558
+look 0 -38
+wait 2
+shot cov_grazers_3_protoceratops.png
+chat /tick unfreeze
+wait 1
+chat /tp 600 90 544
+wait 4
+chat /tk fill 584 60 528 616 68 560 base:dirt
+chat /tk fill 584 69 528 616 69 560 base:grass
+chat /tk fill 584 70 528 616 85 560 core:air
+chat /tk fill 584 86 528 616 110 560 core:air
+chat /tk fill 584 111 528 616 140 560 core:air
+chat /tk fill 584 70 561 616 100 576 core:air
+chat /time set 6000
+chat /tk fill 599 69 543 601 69 545 base:water
+chat /tk fill 599 70 543 601 70 545 core:air
+wait 1
+chat /tk fill 584 70 528 616 70 536 base:tall_grass
+chat /tk spawn animals:gastonia 592 70 536
+chat /tk spawn animals:gastonia 594 70 536
+chat /tk spawn animals:pinacosaurus 604 70 548
+chat /tk spawn animals:pinacosaurus 606 70 548
+wait 2
+chat /animalprof food 0.3
+chat /animalprof water 0.3
+chat /tp 600 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk mode creative
+chat /tp 600 70 558
+look 0 0
+wait 1
+hold core:forward 2
+chat /animalprof hit 2
+wait 5
+chat /animalprof where 64
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 600 82 558
+look 0 -38
+wait 2
+shot cov_grazers_4_gastonia.png
+chat /tick unfreeze
+wait 1
+chat /tp 800 90 544
+wait 4
+chat /tk fill 784 60 528 816 68 560 base:dirt
+chat /tk fill 784 69 528 816 69 560 base:grass
+chat /tk fill 784 70 528 816 85 560 core:air
+chat /tk fill 784 86 528 816 110 560 core:air
+chat /tk fill 784 111 528 816 140 560 core:air
+chat /tk fill 784 70 561 816 100 576 core:air
+chat /time set 6000
+chat /tk fill 799 69 543 801 69 545 base:water
+chat /tk fill 799 70 543 801 70 545 core:air
+wait 1
+chat /tk fill 784 70 528 816 70 536 base:tall_grass
+chat /tk spawn animals:iguanodont 792 70 536
+chat /tk spawn animals:iguanodont 794 70 536
+chat /tk spawn animals:cedarosaurus 804 70 548
+chat /tk spawn animals:cedarosaurus 806 70 548
+wait 2
+chat /animalprof food 0.3
+chat /animalprof water 0.3
+chat /tp 800 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk mode creative
+chat /tp 800 70 558
+look 0 0
+wait 1
+hold core:forward 2
+chat /animalprof hit 2
+wait 5
+chat /animalprof where 64
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 800 82 558
+look 0 -38
+wait 2
+shot cov_grazers_5_iguanodont.png
+chat /tick unfreeze
+wait 1
+chat /tp 1000 90 544
+wait 4
+chat /tk fill 984 60 528 1016 68 560 base:dirt
+chat /tk fill 984 69 528 1016 69 560 base:grass
+chat /tk fill 984 70 528 1016 85 560 core:air
+chat /tk fill 984 86 528 1016 110 560 core:air
+chat /tk fill 984 111 528 1016 140 560 core:air
+chat /tk fill 984 70 561 1016 100 576 core:air
+chat /time set 6000
+chat /tk fill 999 69 543 1001 69 545 base:water
+chat /tk fill 999 70 543 1001 70 545 core:air
+wait 1
+chat /tk fill 984 70 528 1016 70 536 base:tall_grass
+chat /tk spawn animals:citipati 992 70 536
+chat /tk spawn animals:citipati 994 70 536
+wait 2
+chat /animalprof food 0.3
+chat /animalprof water 0.3
+chat /tp 1000 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk mode creative
+chat /tp 1000 70 558
+look 0 0
+wait 1
+hold core:forward 2
+chat /animalprof hit 2
+wait 5
+chat /animalprof where 64
+chat /tk mode spectator
+chat /tick freeze
+chat /tp 1000 82 558
+look 0 -38
+wait 2
+shot cov_grazers_6_citipati.png
+chat /tick unfreeze
+wait 1
+quit

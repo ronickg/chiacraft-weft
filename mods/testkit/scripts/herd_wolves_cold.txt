@@ -1,0 +1,91 @@
+# A hungry pack in the cold (Planner 11-25, the wolf follow-ups' fix 2; `notes/ECOLOGY.md`, part 6): every wolf feels cold,
+# not freezing (`/animalprof chill 1`, comfort::CHILL), on the ground and herd of `herd_wolves_far.txt`. Two wolves at 20 %
+# food (below needs::HUNTS_AT and a timid one's 25 %: at 28 % wolvesCold2's pair lay 70 s) on the far corner should hunt the herd, not go looking for warmth (choose.rs: a hungry
+# hunter bears a chill). A third, alone on a pad 95 blocks west at 70 % (too fed to hunt; 50 blocks off, the pair's chase came within its
+# kin's 16 blocks and it went with them, wolvesCold1), is the control: cold and not hungry, it should seek comfort.
+# Report from the log (`--log mod:animals=debug`): the CHILL and HUNTER lines, the wolves' "doing" in the where rows (the
+# pair: not comfort while hungry; the control: comfort), "seeks comfort" lines and whose, the "hunts", "joins", "gives up",
+# "eats N's kill" lines, kills and deaths by cause.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+chat /tk fill -4 70 528 4 70 536 core:air
+chat /tk fill -2 68 530 2 68 534 base:dirt
+chat /tk fill -2 69 530 2 69 534 base:water
+wait 2
+chat /tk spawn animals:white_tailed_deer 0 70 546
+chat /tk spawn animals:white_tailed_deer 2 70 547
+chat /tk spawn animals:white_tailed_deer -2 70 547
+chat /tk spawn animals:white_tailed_deer 1 70 549
+chat /tk spawn animals:white_tailed_deer -1 70 550
+chat /tk spawn animals:white_tailed_deer 3 70 550
+wait 2
+chat /tk spawn animals:grey_wolf 18 70 516
+chat /tk spawn animals:grey_wolf 19 70 515
+# The control's pad, built from beside it: from the herd 75 blocks off its blocks weren't loaded and the wolf
+# suffocated in the ground (wolvesCold2).
+chat /tp -75 90 552
+wait 4
+chat /tk fill -80 60 547 -70 69 557 base:dirt
+chat /tk fill -80 69 547 -70 69 557 base:grass
+chat /tk fill -80 70 547 -70 85 557 core:air
+wait 1
+chat /tk spawn animals:grey_wolf -75 70 552
+wait 2
+# Back by the herd: the /animalprof settings below reach 96 blocks round the player.
+chat /tp 0 90 544
+wait 1
+chat /anim log
+chat /animalprof chill 1
+chat /animalprof water 0.9
+chat /animalprof food 0.9
+chat /animalprof hunters 0.2
+chat /tp -75 70 552
+chat /animalprof hunter 0.7
+chat /tp 0 95 575
+wait 2
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+chat /animalprof senses
+look 0 -35
+wait 1
+shot herd_wolves_cold_1.png
+quit

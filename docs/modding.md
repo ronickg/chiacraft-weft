@@ -100,6 +100,24 @@ Each guide starts with the common case and goes on to the rare ones. The referen
 - [Debugging](debugging.md): logs, gizmos, reloads, crash reports
 - [Content editor methods](editor.md)
 
+## Command levels (chiacraft)
+
+Every chat command asks for a permission level, Minecraft's 0-4: **0** any player, **1** moderator (gets past protections, joins full worlds), **2** game master (changes the game: `/give`, `/tp`, `/time`, `/weather`, `/gamemode`, `/tk`, every debug command), **3** admin (rules, ticks, operators, bans, admission), **4** the host.
+
+- **One gate.** The level is declared when the command registers (`r.command(..).permission(permission::EVERYONE)`, `r.client_command(..)` the same), and the engine checks it where commands are dispatched: `Server::command` for server commands, `client_command_lines` for client ones (against the level the server gave the player). A mod never checks it itself, so it can't forget. A command that says nothing asks for **2**, client commands too (Weft's client commands asked for 0). A branch (`command_branch`) has its command's level.
+- **Refused:** the player reads `command.no_permission` in their language (engine en, ru, fr) and isn't offered the command by Tab or `/help`; the host's log has `refused /<cmd> for <name>: it asks for level N, they have M`.
+- **Who has which level.** On a world made with cheats on, the player on the hosting machine (single-player, a LAN or linked world hosted from a game) is **4**, like Minecraft's "allow cheats"; without cheats, 0. **The owner's moderation exception:** even without cheats the world's owner (the hosting player, or the account its certificate names) may use the ban and admission commands (`/ban`, `/tempban`, `/unban`, `/bans`, `/allow`, `/probation`, `/revoke`, `/achievementrule`, `/didrule`, `/banlist`; `server::OWNER_MODERATION`), so a host can always put out a troublemaker, but not `/op`, `/rule`, `/tick` or any level-2 command. It is an exception on those commands, not a level: mods asking `w.permission(player)` still read 0, and `/help` lists them. There is no `/kick`: `/tempban` does it. Tab offers them to the player whose world runs in their own game (single-player, LAN, hosted from a game); a certificate's owner joining a dedicated server isn't offered them but may still type them. Everyone else has the level saved for their key in the world's `ops` (`/op <who> [level]`, `/deop`; the dedicated server's console `op`), else 0.
+- **Testkit.** A script's own player is the host, so 4. In runs of several games in one world the host adds `--config testkit:op_joiners=true` and every joining player is made 4 (or the host's script runs `chat /op <name> 4`).
+- **Packages** (sandboxed wasm, `docs/sandboxed-mods.md`): a package's command is registered through the same `r.command(..).permission(level)` with the level its code declared (2 unless it says otherwise), so it goes through the same gate. A package can't change anyone's level.
+- **A mod's finer checks** (`w.permission(player)`), for parts of a command or things that aren't commands: `/mods resume` (3), `/portalfriends` (the world's owner only), a game master's extras at ruins and waystones.
+
+| level | commands |
+|---|---|
+| 0 | engine: `/help`, `/msg`, `/log`, `/music`. base: `/sethome`, `/home`, `/delhome`, `/homes`, `/back`, `/inspect`, `/skills`, `/warmth`, `/rename`, `/videocosts`, `/developer_menu` (client: the player's own look settings). animals: `/tribe`, `/tribeinvite`. portals: `/portalfriends`, `/portal_note` (the mod's own). packages: `/mods` (listing), `/client_mods`, `/packages_say` (the mod's own). |
+| 2 | engine: `/tp`, `/dim`, `/give`, `/time`, `/summon`, `/kill`, `/clear`, `/setblock`, `/insert`, `/block`, `/gamemode`, `/heal`, `/effect`, `/regions`, `/seed`, `/weather`, `/title`, `/say`, `/tellraw`, `/structure`, `/gizmo`, `/sounds`. base: `/advancements`, `/attribute`, `/fireflies`, `/litter`, `/growth`, `/impact`, `/knap`, `/xp`, `/ley`, `/gear`, `/ruin`, `/skill`, `/stone`, `/socket`, `/perk`, `/feed`, `/season`, `/spawncar`, `/waterholes`, `/waystone`, `/air`, `/rain`, `/windleaf`, `/ambience`, `/rot`. animals: `/anim`, `/boss`, `/drenkaun`, `/journal`, `/animalprof`, `/animal`, `/ambient`. testkit: `/tk`, `/regions`, `/compare`, `/probe`, `/tk_freeze`, `/gizmo probe`. testmod: all. |
+| 3 | engine: `/tick`, `/op`, `/deop`, `/rule`, `/ban`, `/tempban`, `/unban`, `/bans`, `/allow`, `/probation`, `/revoke`, `/achievementrule`, `/didrule`, `/banlist`. |
+| 4 | the server console (`stop`, `list`, `say`, `op`, `deop`), only on the hosting machine. |
+
 ## Getting help and community
 
 The [Discord server](https://discord.com/invite/zTEekbrc7U) is the best place to:

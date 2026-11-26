@@ -1660,13 +1660,21 @@ struct RtHit {
     lod: bool,
     // A translucent record (water, glass).
     clear: bool,
+    // A free quad (a plant's blade, a torch), not a cube's face.
+    quad: bool,
 }
 
 fn rt_miss() -> RtHit {
-    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false);
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false, false);
 }
 fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     return rt_miss();
+}
+fn rt_hit_mask(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32, mask: u32) -> RtHit {
+    return rt_miss();
+}
+fn rt_seen_through(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, mask: u32) -> bool {
+    return false;
 }
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
     return vec3(1.0);
@@ -1822,10 +1830,12 @@ struct RtHit {
     lod: bool,
     // A translucent record (water, glass).
     clear: bool,
+    // A free quad (a plant's blade, a torch), not a cube's face.
+    quad: bool,
 }
 
 fn rt_miss() -> RtHit {
-    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false);
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false, false);
 }
 
 // The first surface along `dir` (unit) from `rel` (camera relative), out to `t_max` blocks: through
@@ -1833,8 +1843,39 @@ fn rt_miss() -> RtHit {
 // reflection: the pack shades what comes back as it shades the world.
 // `blur`: mips more for the hit's colour (a rippled or rough mirror softens what it shows).
 fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
+    return rt_hit_mask(rel, dir, t_max, blur, 0xFFu);
+}
+
+// `rt_hit` through the instances of `mask` alone (`world_render::rt`'s MASK_*: 1 the cubes' faces,
+// 2 their free quads, 4 distant terrain): a path tracer's test of the surface the world drew skips
+// the distant tiles, whose hidden columns under the cubes each ask the shader.
+// Whether a ray along `dir` from `rel`, out to `t_max`, meets anything see-through that `rt_hit`
+// would stop at: a pane, water, or a cutout's solid texel (leaves, plants). The opaque faces are
+// culled (`RAY_FLAG_CULL_OPAQUE`), so the walk asks the shader only of the see-through records and
+// never decodes a hit: the world's shader asks it to learn, cheaply, whether the path tracer's
+// test of a face it drew will pass (`world.wgsl`'s `pt_takes`).
+fn rt_seen_through(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, mask: u32) -> bool {
     var rq: ray_query;
-    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_NONE, 0xFFu, 0.0, t_max, rel + g.cam_frac.xyz, dir));
+    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_CULL_OPAQUE | RAY_FLAG_TERMINATE_ON_FIRST_HIT, mask, 0.0, t_max, rel + g.cam_frac.xyz, dir));
+    while rayQueryProceed(&rq) {
+        let h = rayQueryGetCandidateIntersection(&rq);
+        let row = rt_inst[h.instance_custom_data];
+        if row.z == 2u || row.x == 0xFFFFFFFFu {
+            rayQueryConfirmIntersection(&rq);
+            continue;
+        }
+        let rec = row.w + h.primitive_index / 2u;
+        let texel = rt_texel(row.x, row.z, rec, h.primitive_index % 2u, h.barycentrics);
+        if texel.c.a >= 0.5 || (rec >= row.y && texel.tinted) {
+            rayQueryConfirmIntersection(&rq);
+        }
+    }
+    return rayQueryGetCommittedIntersection(&rq).kind != RAY_QUERY_INTERSECTION_NONE;
+}
+
+fn rt_hit_mask(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32, mask: u32) -> RtHit {
+    var rq: ray_query;
+    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_NONE, mask, 0.0, t_max, rel + g.cam_frac.xyz, dir));
     while rayQueryProceed(&rq) {
         let h = rayQueryGetCandidateIntersection(&rq);
         let row = rt_inst[h.instance_custom_data];
@@ -1866,6 +1907,7 @@ fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     out.rel = rel + dir * c.t;
     out.world = out.rel + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
     out.lod = row.z == 2u;
+    out.quad = row.z == 1u;
     out.albedo = vec4(0.5, 0.5, 0.5, 1.0);
     out.light = vec4(1.0, 0.0, 0.0, 0.0);
     out.n = -dir;
@@ -1981,7 +2023,7 @@ struct PtArgs {
     spec: u32,
     mode: u32,
     light: u32,
-    pad0: u32,
+    plain: u32,
     pad1: u32,
     pad2: u32,
 }
@@ -1990,6 +2032,7 @@ var<immediate> pt: PtArgs;
 @group(1) @binding(35) var<storage, read> pt_in: array<vec4<f32>>;
 const PT_CACHE: u32 = 1048576u;
 @group(1) @binding(36) var<storage, read_write> pt_cache: array<atomic<u32>>;
+@group(1) @binding(37) var<storage, read> pt_lights: array<u32>;
 ";
 
 /// The radiance cache's cells (`PT_CACHE` in `PT_DECLS`: change both), ten words each.
@@ -2001,6 +2044,7 @@ pub mod pt_bind {
     pub const OUT: u32 = 34;
     pub const IN: u32 = 35;
     pub const CACHE: u32 = 36;
+    pub const LIGHTS: u32 = 37;
 }
 
 /// The path tracer's push constants (`PT_DECLS`).
@@ -2019,7 +2063,9 @@ pub struct PtArgs {
     pub mode: u32,
     /// The denoised light (`texture_index`), for the finish.
     pub light: u32,
-    pub pad: [u32; 3],
+    /// chiacraft: 1 lights with vanilla's math (`core:pt_plain`, the pack's `pathtrace.wgsl`).
+    pub plain: u32,
+    pub pad: [u32; 2],
 }
 
 /// What goes in front of `rt_expand.wgsl` (ray tracing's scene, `world_render::rt`): the

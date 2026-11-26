@@ -29,6 +29,7 @@
 //! tap_once screen query  # the same, one click (a text field, a button that stays)
 //! tap_beside screen query 2.46  # one click that far right of the element, in its own widths (a row's button: rows have no ids)
 //! screen core:multiplayer  # opens a screen by name (an engine screen or a mod's)
+//! peek base:forge     # opens a screen, lets it lay out, closes it; one that won't open is noted, not a stop (the text-fit sweep, `fit_gen.py`)
 //! mark path           # writes the file (a signal to another copy's await_file)
 //! await_file path 120 # until the file exists, at most 120 s
 //! origin              # later via points are relative to where the player stands now
@@ -63,6 +64,12 @@
 //! screen name         # the top screen (`none` in the world)
 //! players 2           # at least 2 players in the world (the host's view)
 //! ```
+//!
+//! Command levels: the `op` step, the `block` and `players` conditions and the `entities` step
+//! ask the server through `/tk` (level 2), and testkit's own client commands (`/compare`,
+//! `/probe`, `/tk_freeze`) are level 2 too. A script's player is the host, level 4, on a world
+//! with cheats on; on a world made with cheats off (level 0) or as a joiner that isn't an operator
+//! they're refused and the step fails. Joiners: `--config testkit:op_joiners=true` on the host.
 //!
 //! `/tk time <ticks>` sets the world's whole clock (day 0 + ticks), so it also undoes a `/season`
 //! before it: set the time first, then the season (or use `/time set`, which keeps the day).
@@ -123,6 +130,7 @@ const COMMANDS: &[&str] = &[
     "quit",
     "await_ui",
     "screen",
+    "peek",
     "type_file",
     "close",
     "mark",
@@ -159,6 +167,7 @@ const NEED_ARGS: &[&str] = &[
     "expect",
     "until",
     "live",
+    "peek",
 ];
 
 /// Every problem the script has before it runs: unknown commands, missing arguments, conditions
@@ -645,6 +654,30 @@ async fn run_lines(t: T, src: String) -> R {
                     None => t.fail(format!("no UI element {query} on {screen}")),
                 }
                 t.frames(15).await?;
+            }
+            // Open, laid out (twice: bound texts fill in), closed; never a stop (the text-fit
+            // sweep opens screens that may want a block or a creature behind them).
+            "peek" => {
+                let name = rest.to_string();
+                if !t.c().menu_open(weft_sdk::Menu::generated(name.clone())) {
+                    t.note(format!("peek: no screen {name}"));
+                } else {
+                    let end = t.state().frame + 240;
+                    let want = name.clone();
+                    t.until(&format!("peek {name}"), Duration::from_secs(30), move |t| t.c().screen() == want || t.state().frame >= end)
+                        .await?;
+                    if t.c().screen() != name {
+                        t.note(format!("peek: {name} did not open"));
+                    }
+                    t.frames(20).await?;
+                    t.c().input_key("Escape", 0.0);
+                    t.frames(10).await?;
+                    // A screen Escape doesn't close (death, loading): closed outright.
+                    if t.c().screen() == name {
+                        t.c().menu_close();
+                        t.frames(10).await?;
+                    }
+                }
             }
             "screen" => {
                 let screen = weft_sdk::Menu::generated(rest.to_string());

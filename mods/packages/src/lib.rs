@@ -39,10 +39,12 @@ fn init(r: &mut Registry) {
     // `/mods` (slice 6), and `/client_mods`: what client halves cost the player's game a frame.
     sandboxed::register_command(r);
     client_half::register(r);
+    // Anyone's: the mod itself runs it to word its lines in the player's language.
     r.client_command("packages_say", "", |cmd| {
         let Some(text) = LINES.lock().unwrap_or_else(|e| e.into_inner()).pop_front() else { return };
         sandboxed::with_line(&text, |key, args| cmd.reply(key, args));
-    });
+    })
+    .permission(permission::EVERYONE);
 }
 
 /// Shows a line (`sandboxed::line_text`) in the player's chat, in their language: through

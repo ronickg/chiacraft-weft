@@ -432,7 +432,54 @@ fn sky_sun_mask(in: VOut) -> f32 {
     return smoothstep(0.86, 0.94, in.light.x) * cloud_shadow(in.rel);
 }
 
+// The pixel's sun shadow, once: `surface_light` and `mat_shine` both ask it for the same normal,
+// and traced it is a soft shadow's rays each time (the same rays: the same pixel, frame and normal).
+var<private> SHADOW_MEMO: vec4<f32> = vec4(0.0, 0.0, 0.0, -1.0);
+
+// Path traced (`scene.rt.x` 2): an opaque block face (`PT_CAND`) the path tracer will light again
+// (`pt_takes`) has its traced shadow and reflection thrown away, so they aren't traced here: the
+// sky's mask and the blurred guess stand in (Planner, 11-25: path tracing at 60 on an RTX 3060,
+// optimised, not downgraded). Leaves and plants keep theirs.
+var<private> PT_CAND: bool = false;
+// -1 not asked yet, 0 the world's pixel stays, 1 the path tracer takes it.
+var<private> PT_TAKES: i32 = -1;
+const PT_REACH_WORLD: f32 = 384.0;
+
+// Whether the path tracer takes this pixel: its own test (`cs_trace`) is one ray from the eye that
+// must meet terrain at this depth with nothing clear (water, glass) before it, within its reach.
+// Where it fails (a floor seen through a pane or the pool's water) the world's pixel stays, with
+// its rays: skipped there, those floors lost their shade (w18, the hall's pool). This face is
+// opaque and the nearest the world drew, so only something see-through on the way can fail it:
+// the ray asks for those alone (`rt_seen_through`), out past the face as far as the path tracer's
+// test reaches (w19: the whole `rt_hit` cost the world's pass 2.8 ms). Asked only where a ray
+// would be traced, once a pixel.
+fn pt_takes(in: VOut) -> bool {
+    if !PT_CAND {
+        return false;
+    }
+    if PT_TAKES < 0 {
+        let d = length(in.rel);
+        PT_TAKES = 0;
+        if d > 1e-3 && d <= PT_REACH_WORLD {
+            // From the near plane, as `cs_trace`'s own test (a face through the eye is clipped).
+            if !rt_seen_through(in.rel / d * 0.05, in.rel / d, d * 1.02 + 0.15, 3u) {
+                PT_TAKES = 1;
+            }
+        }
+    }
+    return PT_TAKES == 1;
+}
+
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
+    if SHADOW_MEMO.w >= 0.0 && all(SHADOW_MEMO.xyz == n) {
+        return SHADOW_MEMO.w;
+    }
+    let s = sun_shadow_once(in, n);
+    SHADOW_MEMO = vec4(n, s);
+    return s;
+}
+
+fn sun_shadow_once(in: VOut, n: vec3<f32>) -> f32 {
     let reach = fantasy_opt(OPT_SHADOW_REACH);
     if reach > 0.0 {
         let past = smoothstep(reach * 0.8, reach + 16.0, in.dist);
@@ -465,6 +512,9 @@ fn sun_shadow_near(in: VOut, n: vec3<f32>) -> f32 {
     // Deep under cover (a cave, a room): no sun to trace.
     if cover <= 0.0 {
         return 0.0;
+    }
+    if pt_takes(in) {
+        return cover;
     }
     let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, scene.rt.z > 0.5);
     let traced = min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
@@ -749,58 +799,9 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     if debug == 7u {
         return vec4(cloud_shadow(in.rel), select(0.0, 1.0, in.kind.y == 1u), SHADOW_DEBUG.x, lit.a);
     }
-    // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
-    // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
-    // after it stopped, Tester 2's after-rain shots, 11-05). Leaves and plants wet too, less: a
-    // little darker, a faint sheen.
-    let open_top = smoothstep(0.85, 1.0, in.light.x);
+    // Rain on the ground (`rain_on_ground`, look.wgsl: the path tracer's pixels take it too).
     let leafy = in.kind.z != 0u || in.kind.x == TINT_FOLIAGE;
-    // Neither where it snows or never rains (Bliss's noPuddleAreas, on its wetness and puddles both:
-    // as the rain's fog, `rain_fog_at`): dark-blue pools lay on the snow fields (lkwxA1).
-    let rains_here = rain_fog_at(in.pos.y);
-    let wet = ground_wet() * open_top * rains_here * select(smoothstep(0.3, 0.9, n.y), 0.45, leafy);
-    if wet > 0.0 {
-        let v = -normalize(in.rel);
-        // (Darker and glossier than in the rain alone: after it, in the sun, 0.7 and a 0.12 sheen
-        // read only 2-4 % darker than dry ground, PC shw_wet.)
-        let sheen = (0.04 + pow(1.0 - max(dot(n, v), 0.0), 4.0) * 0.3) * select(1.0, 0.35, leafy);
-        lit = vec4(lit.rgb * mix(1.0, select(0.58, 0.8, leafy), wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
-    }
-    // Puddles on flat open ground (the Recrafted study, item 4): they grow over minutes of rain
-    // (`scene.canopy.z`, the engine's) and dry slower than the ground after: a shower leaves a few
-    // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
-    // mirrored by Fresnel, and rings where the rain still falls on it.
-    let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top * rains_here;
-    // (None in the calm-and-dry pipelines, `DRY`.)
-    if !DRY && puddles > 0.01 && !leafy && n.y > 0.95 {
-        // In cells three blocks across, some hold a puddle (one hash each against a share that grows
-        // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
-        // that widens as it fills, edged in the blocks' own pixels.
-        // (A threshold on two octaves of value noise left none: in the shader the noise stayed
-        // near its middle, PC debug runs shpdd-shpdd3; with `hash3` picking the cells, one or two
-        // in the whole field where a fifth were due, shpd6. `puddle_hash` is a sine hash.)
-        let q = floor(in.pos.xz * 16.0) / 16.0;
-        let cell = vec2<i32>(floor(q / 3.0));
-        let pick = puddle_hash(cell, 1.0);
-        let middle = (vec2<f32>(cell) + 0.3 + 0.4 * vec2(puddle_hash(cell, 2.0), puddle_hash(cell, 3.0))) * 3.0;
-        let reach = mix(0.6, 1.5, puddles) * mix(0.7, 1.0, puddle_hash(cell, 4.0));
-        let wobble = (noise3(vec3(q * 0.9, 5.3)) - 0.5) * 0.5;
-        let pool = select(0.0, 1.0, pick < mix(0.12, 0.6, puddles)) * smoothstep(reach, reach - 0.12, length(q - middle) + wobble);
-        if pool > 0.0 {
-            let v = -normalize(in.rel);
-            let slope = rain_rings(in.pos.xz) * rain_amount();
-            let pn = normalize(vec3(-slope.x, 1.0, -slope.y));
-            let cos_v = max(dot(pn, v), 0.0);
-            let fresnel = 0.02 + 0.98 * pow(1.0 - cos_v, 5.0);
-            // A still mirror over darker ground: at Fresnel's few percent from eye height the film
-            // read as the wet ground round it (PC shpd4: puddles over a quarter of the field and
-            // none seen); a puddle shows by the sky in it.
-            let film = lit.rgb * 0.3 + sky_color(reflect(-v, pn)) * mix(0.3, 1.0, fresnel);
-            // (Its strength x where it rains, as Bliss's Puddle_shape x noPuddleAreas: the share of
-            // cells alone left full puddles on the snow plains, lkrdA3.)
-            lit = vec4(mix(lit.rgb, film, pool * rains_here), lit.a);
-        }
-    }
+    lit = vec4(rain_on_ground(lit.rgb, n, in.rel, in.pos, in.light.x, leafy), lit.a);
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
     return vec4(lit.rgb + glow, lit.a);
@@ -839,7 +840,13 @@ fn traced_view(rel: vec3<f32>, r_in: vec3<f32>, blur: f32, cone: f32, px: vec2<f
     if scene.rt.x > 0.5 && dot(h.n, light_dir()) > 0.0 {
         sun = min(sun, dot(rt_sun(h.rel, h.n, light_dir(), false), vec3(1.0 / 3.0)));
     }
+    // The night's blue (`display`) goes by this pixel's own sky share, which `light_on` sets for the
+    // surface it lights: kept, or a lamp-lit wall mirroring the skylit glass overhead took the glass's
+    // share and turned a periwinkle band at its own brightness (RT modes, hall at 23:00; w9_blueband,
+    // 11-25; the path tracer keeps it the same way).
+    let share = NIGHT_SKY_SHARE;
     let lit = albedo * light_on(h.n, h.light, sun, 1.0, h.world, h.rel);
+    NIGHT_SKY_SHARE = share;
     return haze_lit(lit, normalize(rel) * (length(rel) + h.t), h.light.x);
 }
 
@@ -883,7 +890,7 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     var sky = mix(light * 0.5, sky_seen, open * open);
     // Traced (`scene.rt.w`): what really lies that way, the room or the hills, off the screen too;
     // the rougher, the more it gives way to the blurred guess above.
-    if scene.rt.w > 0.5 && m.rough < 0.5 {
+    if scene.rt.w > 0.5 && m.rough < 0.5 && !pt_takes(in) {
         sky = mix(traced_view(in.rel + n * 0.01, r, m.rough * 6.0, 0.01 + m.rough * 0.5, in.clip.xy), sky, smoothstep(0.1, 0.5, m.rough));
     }
     // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
@@ -924,12 +931,6 @@ fn mirror_alpha(in: VOut, albedo: vec3<f32>) -> f32 {
     let ndv = max(dot(normalize(in.normal), -normalize(in.rel)), 0.0);
     let f = mat_fresnel(select(m.f0, albedo, m.metal > 0.5), ndv);
     return -luma(f) * smoothstep(0.55, 0.9, m.smoothness);
-}
-
-// 0..1 for puddle cell `c` and key `k`: a sine hash (the pack's `hash3` picked far too few cells,
-// PC shpd6).
-fn puddle_hash(c: vec2<i32>, k: f32) -> f32 {
-    return fract(sin(dot(vec2<f32>(c), vec2(12.9898, 78.233)) + k * 37.719) * 43758.5453);
 }
 
 // ---- water ----
@@ -1014,28 +1015,6 @@ fn wave_normal(pos: vec3<f32>, dist: f32, glance: f32) -> vec3<f32> {
     let hz = wave_height(p + vec2(0.0, e), t, detail);
     let k = mix(1.0, 0.5, smoothstep(24.0, 160.0, dist)) * mix(0.4, 1.0, smoothstep(0.05, 0.35, glance));
     return normalize(vec3(-(hx - h) / e * k, 1.0, -(hz - h) / e * k));
-}
-
-// Rain on water: each drop's ring spreads and fades in its own cell, at its own time. The slope
-// it gives the surface, on the texture's pixel grid.
-fn rain_rings(p: vec2<f32>) -> vec2<f32> {
-    let q = floor(p * 16.0) / 16.0 / 0.8;
-    let base = floor(q);
-    var slope = vec2(0.0);
-    for (var j = -1; j <= 1; j++) {
-        for (var i = -1; i <= 1; i++) {
-            let cell = vec2<i32>(base) + vec2(i, j);
-            let h = hash3(vec3(cell.x, 7, cell.y));
-            let k = hash3(vec3(cell.x, 13, cell.y));
-            let t = fract(scene.params.w * 0.9 + h * 7.31);
-            let v = q - (vec2<f32>(cell) + vec2(0.2 + 0.6 * h, 0.2 + 0.6 * k));
-            let d = length(v);
-            let x = d - t * 1.1;
-            let wave = sin(x * 26.0) * exp(-x * x * 70.0) * (1.0 - t) * (1.0 - t);
-            slope += v / max(d, 1e-3) * wave;
-        }
-    }
-    return slope * 0.3;
 }
 
 // How deep the water is under the surface at `pos` (world): blocks straight down to the first solid
@@ -1478,6 +1457,7 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
 
 @fragment
 fn fs_opaque(in: VOut) -> WorldOut {
+    PT_CAND = scene.rt.x > 1.5 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE;
     return world_out(in, opaque(in));
 }
 

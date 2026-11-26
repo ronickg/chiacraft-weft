@@ -76,9 +76,20 @@ value! {
         /// Wild ones of its kind within `KIN` (itself among them), and their middle.
         pub kin: u16,
         pub kin_mid: [f32; 3],
-        /// Its herd's or pack's leader among those kin: the lowest id, itself if it is lowest
-        /// (`animals_core::groups`, `group.rs`).
+        /// A hungry hunter's pack: itself and those kin below `needs::FULL`, who join its hunt
+        /// (`hunt::rally`); a full one lying by counted, a pack of 3 took on what 2 hunted
+        /// (ai1124_wolvesHollow1).
+        pub pack: u16,
+        /// A pack's member: where it last was with its kin (0s: never), and since when it has had
+        /// none within `KIN` (0: it has; `group::regroup`).
+        pub pack_at: [f32; 3],
+        pub alone_since: u64,
+        /// Its herd's or pack's leader (itself if it leads; `groups::keep_or_pick`, `group.rs`),
+        /// since when that leader has been out of `KIN` (0: it is near), and how many of its kin
+        /// lie resting (`groups::PACK_RESTS`: a leader stays by its resting pack).
         pub leader: u64,
+        pub leader_away: u64,
+        pub kin_resting: u16,
         /// A hungry hunter's nearest prey it can take with its kin near (0: none), and its mass.
         pub prey: u64,
         pub prey_kg: f32,
@@ -205,6 +216,21 @@ pub fn refresh(w: &World, id: u64, index: usize, kind: u32) {
 
 /// What `id` is to the others: its kept facts, or for one that keeps none (an egg, a farm
 /// animal, a player) worked out now. `None`: it is nothing to the food web.
+/// A tamed dog by its owner (`roles::SPARED_NEAR_OWNER`): wild hunters leave it be.
+fn spared(w: &World, t: u64, f: &Facts) -> bool {
+    if f.tamed == 0
+        || f.egg != 0
+        || !f
+            .species()
+            .is_some_and(|s| roles::spared_near_owner(s.name))
+    {
+        return false;
+    }
+    let (Some(o), Some(e)) = (crate::commands::owner(w, t), w.entity(t)) else { return false };
+    w.entity(o)
+        .is_some_and(|oe| dist2(oe.pos, e.pos) <= roles::SPARED_NEAR_OWNER * roles::SPARED_NEAR_OWNER)
+}
+
 pub fn facts(w: &World, id: u64) -> Option<Facts> {
     if let Some(f) = w.component(id, &FACTS).filter(|f| f.at != 0) {
         return Some(f);
@@ -348,6 +374,48 @@ fn aware_after(a: f32, s: Option<Sensed>, secs: f32) -> f32 {
     }
 }
 
+/// One of its kind as `groups::keep_or_pick` weighs it: whom it follows, whether it may lead
+/// (grown, above `groups::LEADER_WEAK`), its full health.
+fn kin_of(w: &World, t: u64, max: f32, health: f32) -> animals_core::groups::Kin {
+    let leads = w.component(t, &SENSES).map_or(0, |s| s.leader);
+    let fit = !crate::breeding::young(w, t) && health > max * animals_core::groups::LEADER_WEAK;
+    animals_core::groups::Kin { id: t, leads, fit, strength: max }
+}
+
+/// Its leader after this look (`groups::keep_or_pick`): the one it has kept while alive, wild,
+/// fit and not out of `KIN` for `groups::LEADER_LOST_SECS`; logged when it changes.
+fn lead_on(w: &World, id: u64, st: &EntityState, out: &mut Senses, mut kin: Vec<animals_core::groups::Kin>) -> u64 {
+    use animals_core::groups;
+    let now = w.game_time();
+    let cur = out.leader;
+    let mine = w.component(id, &FACTS).map_or(0, |f| f.kind);
+    kin.push(groups::Kin { id, leads: cur, ..kin_of(w, id, st.max_health, st.health) });
+    let ok = cur != 0
+        && (cur == id
+            || w.entity(cur).is_some_and(|e| {
+                let near = dist2(e.pos, st.pos) <= KIN * KIN;
+                if near {
+                    out.leader_away = 0;
+                } else if out.leader_away == 0 {
+                    out.leader_away = now.max(1);
+                }
+                e.health > 0.0
+                    && e.kind == mine
+                    && !crate::animal::tamed(w, cur)
+                    && kin_of(w, cur, e.max_health, e.health).fit
+                    && (near || (now.saturating_sub(out.leader_away) as f32) < groups::LEADER_LOST_SECS * 20.0)
+            }))
+        && (cur != id || kin.last().is_some_and(|k| k.fit));
+    let next = groups::keep_or_pick(id, cur, ok, &kin);
+    if next != cur {
+        out.leader_away = 0;
+        if cur != 0 {
+            weft_sdk::info!("animal {id} follows {next} now, not {cur}{}", if ok { "" } else { " (gone, away or weak)" });
+        }
+    }
+    next
+}
+
 /// One look round: the hunters it notices (seen in its field of view with nothing in between,
 /// heard on the move, smelled downwind) and players the same way, its awareness of each building
 /// up or fading; its kin within `KIN` (`HUDDLE_LOOK` for a herd in a blood moon); and a hungry
@@ -382,7 +450,9 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     // A skittish one notices sooner, a calm one later.
     let eyes = eyes * (1.0 + roles::SKITTISH * roles::lean(me.persona()[0]));
     let (mut kin, mut mid) = (1u16, [p.x, p.y, p.z]);
-    let mut leader = id;
+    let mut pack = 1u16;
+    let mut seen_kin: Vec<animals_core::groups::Kin> = Vec::new();
+    let mut resting = 0u16;
     let mut prey: Vec<(u64, f32, f64)> = Vec::new();
     // The hunters it senses, best first after the loop.
     let mut hunters: Vec<(Sensed, u64, Vec3, Vec3)> = Vec::new();
@@ -400,7 +470,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
             && f.tamed == 0
             && f.species()
                 .is_some_and(|h| h.takes_at_most(f.mass, me.mass));
-        let food = hungry && !family && !(f.egg != 0 && f.tamed != 0) && mine.takes_at_most(me.mass, f.mass);
+        let food = hungry && !family && !(f.egg != 0 && f.tamed != 0) && mine.takes_at_most(me.mass, f.mass) && !spared(w, t, &f);
         if !(kin_too || hunter || food) {
             continue;
         }
@@ -409,7 +479,11 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         if kin_too && d2 <= kin_r * kin_r {
             kin += 1;
             mid = [mid[0] + e.pos.x, mid[1] + e.pos.y, mid[2] + e.pos.z];
-            leader = animals_core::groups::leader([leader, t]);
+            seen_kin.push(kin_of(w, t, e.max_health, e.health));
+            resting += (crate::choose::doing(w, t) == crate::choose::Need::Rest as u8) as u16;
+            if hungry && mine.pack_prey().is_some() && hunting(w, t, mine, false) {
+                pack += 1;
+            }
         }
         if hunter {
             let d = d2.sqrt() as f32;
@@ -466,6 +540,11 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         if n.dim != dim || n.by == id || now >= n.at + perception::NOISE_TICKS {
             continue;
         }
+        // A fight its own kind makes (its pack's kill, two deer sparring) is nothing to run from:
+        // in the tick after their kill a pack ran from its own (wolvesPack6).
+        if !n.player && n.by != 0 && w.entity(n.by).is_some_and(|e| e.kind == st.kind) {
+            continue;
+        }
         let d = dist2(n.pos.map(f64::from), p).sqrt() as f32;
         let g = perception::gain(d, n.heard);
         if g <= 0.0 {
@@ -503,7 +582,17 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         players(w, id, st, out, mine, facing, field, secs, player_noise, full);
     }
     out.kin = kin;
-    out.leader = leader;
+    out.pack = pack;
+    if mine.pack_prey().is_some() && wild {
+        if kin >= animals_core::groups::GROUP {
+            out.pack_at = mid.map(|v| (v / kin as f64) as f32);
+            out.alone_since = 0;
+        } else if out.alone_since == 0 {
+            out.alone_since = w.game_time().max(1);
+        }
+    }
+    out.leader = if kin_r > 0.0 && wild { lead_on(w, id, st, out, seen_kin) } else { id };
+    out.kin_resting = resting;
     out.kin_mid = mid.map(|v| (v / kin as f64) as f32);
     // One adult of a herd at a time stands watch, the watch going round (by id and time).
     let herd = social == animals_core::biology::Social::Herd;
@@ -513,7 +602,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     }) as u8;
     let best = prey
         .into_iter()
-        .filter(|&(_, kg, _)| mine.takes_with(me.mass, kg, kin as u32))
+        .filter(|&(_, kg, _)| mine.takes_with(me.mass, kg, pack as u32))
         .min_by(|a, b| a.2.total_cmp(&b.2));
     (out.prey, out.prey_kg) = best.map_or((0, 0.0), |(t, kg, _)| (t, kg));
 }
@@ -694,6 +783,14 @@ pub fn herd_mid(w: &World, id: u64) -> Option<[f64; 3]> {
     (herd && s.kin >= 2).then(|| s.kin_mid.map(f64::from))
 }
 
+/// It heard its kind's alarm a moment ago (`alarm`, within `roles::ALARM_QUIET`) and is aware
+/// still: `hunt::wary` runs it off with them.
+pub fn alarmed(w: &World, id: u64) -> bool {
+    let now = w.game_time();
+    w.component(id, &SENSES)
+        .is_some_and(|s| s.alarm_at != 0 && now < s.alarm_at + roles::ALARM_QUIET && s.aware >= NOTICED)
+}
+
 /// It runs from `threat` at `pos`: it calls, and its wild kin within `roles::ALARM` blocks know at
 /// once (unless it ran on a call itself). How many heard.
 pub fn alarm(w: &World, id: u64, st: &EntityState, threat: u64, pos: [f32; 3]) -> u32 {
@@ -718,11 +815,15 @@ pub fn alarm(w: &World, id: u64, st: &EntityState, threat: u64, pos: [f32; 3]) -
     }
     let mut heard = 0;
     for o in w.entities_near(st.pos, roles::ALARM, Some(kind)) {
-        if o == id || crate::animal::tamed(w, o) {
+        // One on a hunt keeps at it, unless the alarm is of a hunter (wolvesPack5: a full wolf's
+        // alarm at the chase's noise sent its hunting pack running).
+        if o == id || crate::animal::tamed(w, o) || (threat == 0 && crate::hunt::on_hunt(w, o)) {
             continue;
         }
         if let Some(s) = w.component_mut(o, &SENSES) {
-            s.aware = s.aware.max(NOTICED);
+            // Past the mark by what fades before its next look (an alarm at exactly `NOTICED` faded
+            // to a stare: cov_grazers' herds never ran).
+            s.aware = s.aware.max(NOTICED + 0.5);
             s.threat = threat;
             s.threat_pos = pos;
             s.alarm_at = now.max(1);

@@ -355,6 +355,17 @@ fn reason_arg(reason: &str) -> Arg {
     if reason.is_empty() { Arg::Key("admission.no_reason".into()) } else { Arg::Text(reason.to_string()) }
 }
 
+/// How long is left, for showing: minutes under an hour (`true`, at least 1), else hours rounded
+/// up. The key that shows it takes `_min` for minutes.
+pub fn time_left(secs: u64) -> (bool, i64) {
+    if secs < 3600 { (true, secs.div_ceil(60).max(1) as i64) } else { (false, secs.div_ceil(3600) as i64) }
+}
+
+/// The key for `time_left`: `key` for hours, `key_min` for minutes.
+pub fn left_key(key: &str, minutes: bool) -> String {
+    if minutes { format!("{key}_min") } else { key.to_string() }
+}
+
 /// The verdict on `who`. `trusted`: the owner or an operator, who always get in. `lists`: the
 /// ban lists the world follows ([`Gate`] holds those). Bans come first, the world's own and then
 /// the lists it follows; a player on the allow list is never refused by
@@ -370,8 +381,8 @@ pub fn verdict(rules: &Rules, bans: &Bans, lists: &[BanList], who: &Who, trusted
     {
         return Verdict::Refuse(match b.until {
             Some(until) => {
-                let hours = until.saturating_sub(now).div_ceil(3600).max(1);
-                Msg::new("admission.banned_for", vec![Arg::Int(hours as i64), reason_arg(&b.reason)])
+                let (minutes, n) = time_left(until.saturating_sub(now));
+                Msg::new(&left_key("admission.banned_for", minutes), vec![Arg::Int(n), reason_arg(&b.reason)])
             }
             None => Msg::new("admission.banned", vec![reason_arg(&b.reason)]),
         });
@@ -868,6 +879,9 @@ mod tests {
         assert_eq!((m.key.as_str(), &m.args[0]), ("admission.banned_for", &Arg::Int(2)));
         assert_eq!(m.args[1], Arg::Key("admission.no_reason".into()));
         assert_eq!(verdict(&rules, &bans, &[], &bob, false, 1000 + 7200), Verdict::Admit);
+        // Under an hour left: in minutes.
+        let Verdict::Refuse(m) = verdict(&rules, &bans, &[], &bob, false, 1000 + 7200 - 1500) else { panic!("admitted") };
+        assert_eq!((m.key.as_str(), &m.args[0]), ("admission.banned_for_min", &Arg::Int(25)));
         // A ban beats the allow list; the owner is never banned out.
         let mut listed = Rules::default();
         listed
