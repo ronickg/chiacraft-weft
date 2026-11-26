@@ -363,6 +363,13 @@ def side_shot(x, name):
             "chat /tick unfreeze", "wait 1"]
 
 
+def low_shot(x, name, dz=6):
+    """At the ground, from the south-east, eye level about 0.5 above the grass: whether a body (or its bones) rests on
+    the block's top or sinks into it (Ronald on r6: "doesnt like fall half into the block")."""
+    return ["chat /tick freeze", f"chat /tp {x+3} 68.9 {Z+dz+3}", "look 45 -5", "wait 2", f"shot {name}.png",
+            "chat /tick unfreeze", "wait 1"]
+
+
 s = head("carcass", [
     "Carcasses (slices 1 and 2). Part 1: three hungry grey wolves and two fed white-tailed deer: the kill leaves a carcass",
     "(\"carcass N of white_tailed_deer\") that the pack's meal opens or takes to bones (\"carcass N of ... now Opened/Bones\").",
@@ -390,7 +397,7 @@ s += watch(x, 12) + carcass_rows(4) + shot(x, "cov_carcass_1_wolves", z_back=18,
 x = 200
 s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
 s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2"]
-s += ["chat /animalprof carcass"] + side_shot(x, "cov_carcass_2_killed")
+s += ["chat /animalprof carcass"] + side_shot(x, "cov_carcass_2_killed") + low_shot(x, "cov_carcass_2_low")
 s += spawns(x, [("turkey_vulture", 2, 10, -12)]) + ["chat /animalprof food 0.2"]
 s += ["chat /tk mode spectator", f"chat /tp {x} 90 {Z+20}", "wait 1"] + carcass_rows(10)
 s += shot(x, "cov_carcass_3_vultures", z_back=8, pitch=-35)
@@ -400,7 +407,7 @@ s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1
       "chat /tk mode spectator"]
 for n, days in enumerate([3, 2, 4]):
     s += [f"chat /tp {x} 75 {Z+6}", f"chat /animalprof carcass {days}", "wait 2", "chat /animalprof carcass"]
-    s += side_shot(x, f"cov_carcass_{4+n}_aged")
+    s += side_shot(x, f"cov_carcass_{4+n}_aged") + low_shot(x, f"cov_carcass_{4+n}_low")
 s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 4", "wait 2", "chat /animalprof carcass"]
 x = 600
 # On the grass south of the pond (r3's deer died in the pond's pit, below the knife's aim).
@@ -410,7 +417,7 @@ s += ["chat /tk mode creative", f"chat /tp {x} 70 {Z+10}", "look 0 -30", "wait 1
       # Standing 2 blocks south of it, looking down at it (a positive pitch looks up).
       f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "press core:use", "wait 4",
       "shot cov_carcass_8_skinning.png", "wait 9", "chat /animalprof carcass"]
-s += side_shot(x, "cov_carcass_9_skinned")
+s += side_shot(x, "cov_carcass_9_skinned") + low_shot(x, "cov_carcass_9_low")
 x = 1000
 # Slice 3: one of each body plan killed in a row, drawn as its plan's lying model in its own coat (a grey wolf's grey,
 # not a deer's brown), whole, then opened by 3 days' rot. West to east: a grey wolf, a golden eagle, a raptor, a yacare
@@ -425,4 +432,7 @@ s += row_shot + ["shot cov_carcass_10_plans_whole.png", "chat /tp " + f"{x-6} 72
                  "shot cov_carcass_11_wolf_close.png", "chat /tick unfreeze", "wait 1"]
 s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 3", "wait 2", "chat /animalprof carcass"]
 s += row_shot + ["shot cov_carcass_12_plans_opened.png", "chat /tick unfreeze", "wait 1"]
+# The row at the ground, from the south: every plan's opened body on the grass, none sunk.
+s += ["chat /tick freeze", f"chat /tp {x} 68.9 {Z+13}", "look 0 -4", "wait 2", "shot cov_carcass_13_plans_low.png",
+      "chat /tick unfreeze", "wait 1"]
 write("carcass", s)

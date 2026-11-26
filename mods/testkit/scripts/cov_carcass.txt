@@ -116,6 +116,13 @@ wait 2
 shot cov_carcass_2_killed.png
 chat /tick unfreeze
 wait 1
+chat /tick freeze
+chat /tp 203 68.9 553
+look 45 -5
+wait 2
+shot cov_carcass_2_low.png
+chat /tick unfreeze
+wait 1
 chat /tk spawn animals:turkey_vulture 210 70 532
 chat /tk spawn animals:turkey_vulture 212 70 532
 wait 2
@@ -182,6 +189,13 @@ wait 2
 shot cov_carcass_4_aged.png
 chat /tick unfreeze
 wait 1
+chat /tick freeze
+chat /tp 403 68.9 553
+look 45 -5
+wait 2
+shot cov_carcass_4_low.png
+chat /tick unfreeze
+wait 1
 chat /tp 400 75 550
 chat /animalprof carcass 2
 wait 2
@@ -193,6 +207,13 @@ wait 2
 shot cov_carcass_5_aged.png
 chat /tick unfreeze
 wait 1
+chat /tick freeze
+chat /tp 403 68.9 553
+look 45 -5
+wait 2
+shot cov_carcass_5_low.png
+chat /tick unfreeze
+wait 1
 chat /tp 400 75 550
 chat /animalprof carcass 4
 wait 2
@@ -202,6 +223,13 @@ chat /tp 403 72 554
 look 37 -22
 wait 2
 shot cov_carcass_6_aged.png
+chat /tick unfreeze
+wait 1
+chat /tick freeze
+chat /tp 403 68.9 553
+look 45 -5
+wait 2
+shot cov_carcass_6_low.png
 chat /tick unfreeze
 wait 1
 chat /tp 400 75 550
@@ -245,6 +273,13 @@ chat /tp 603 72 554
 look 37 -22
 wait 2
 shot cov_carcass_9_skinned.png
+chat /tick unfreeze
+wait 1
+chat /tick freeze
+chat /tp 603 68.9 553
+look 45 -5
+wait 2
+shot cov_carcass_9_low.png
 chat /tick unfreeze
 wait 1
 chat /tp 1000 90 544
@@ -313,6 +348,13 @@ chat /tp 1000 76 560
 look 0 -30
 wait 2
 shot cov_carcass_12_plans_opened.png
+chat /tick unfreeze
+wait 1
+chat /tick freeze
+chat /tp 1000 68.9 557
+look 0 -4
+wait 2
+shot cov_carcass_13_plans_low.png
 chat /tick unfreeze
 wait 1
 quit
