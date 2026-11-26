@@ -153,7 +153,7 @@ All in the inventory's 2 × 2, so no table is needed before the first axe.
 | Stone and flint (100) | stone axe, pick, knife, shovel | trees to 96 logs, stone, the furnace |
 | Bone and antler (50) | bone knife and awl; an antler flaker (better knapping grades) | hides, sinew, sewing (Survival's clothes) |
 | Fire and clay | the kiln, ground stone axe (tougher) | pottery, charcoal |
-| Copper (150) | native copper, cold-hammered | young sequoias (192 logs) |
+| Copper (170, `vitals::gear::COPPER_HARVEST`) | native copper, cold-hammered (`notes/COPPER.md`) | young sequoias (192 logs) |
 | Bronze (200) | casting | |
 | Iron (220), steel (300) | bloomery, forge | the grown sequoias |
 
