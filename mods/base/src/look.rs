@@ -50,7 +50,8 @@ pub static LOOK_LEAF_LIGHT: Config<f32> = Config::named("look_leaf_light");
 /// picture, 1 the sun's light alone, 2 the sky's alone, on white; with the mist's banks on
 /// (`look_mist_domes`), 3 the light they scatter alone, on black, 4 how much they hide (grey),
 /// 5 where along their march the sun reaches them (red the shadow map's light, green the clouds',
-/// blue how much mist).
+/// blue how much mist); 14 view 13's swatches with no clouds in the cloudy average (the clear
+/// sky's fill, against Bliss's capture 5).
 pub static LOOK_DEBUG: Config<f32> = Config::named("look_debug");
 /// The HDR world's sky light by day in the upper sky's own hue, as Bliss's: 0 the palette's fill as
 /// made, 1 all the way.
@@ -293,7 +294,7 @@ pub fn register(r: &mut Registry) {
     crate::developer::page(r.config(&LOOK_LEAF_SUN).float(1.0, 0.5, 4.0));
     crate::developer::page(r.config(&LOOK_LEAF_HOLES).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_LEAF_LIGHT).float(0.0, 0.0, 1.0));
-    crate::developer::page(r.config(&LOOK_DEBUG).float(0.0, 0.0, 13.0));
+    crate::developer::page(r.config(&LOOK_DEBUG).float(0.0, 0.0, 14.0));
     crate::developer::page(r.config(&LOOK_SKY_HUE).float(0.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_EXPOSURE_ABS).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_SPLIT_WARM).float(0.7, 0.0, 1.0));
