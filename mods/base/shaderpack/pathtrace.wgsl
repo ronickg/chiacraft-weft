@@ -618,7 +618,36 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     }
     // A point on the light, a new one each frame (as `pt_block_visibility`), and one shadow ray.
     let jit = vec3(pt_rand(px, 40u).xy, pt_rand(px, 48u).x) * 2.0 - 1.0;
-    var to = vec3<f32>(lp) + select(vec3(0.5) + jit * 0.45, vec3(0.5, 0.6, 0.5) + jit * PT_FLAME, small) - world;
+    var to = vec3<f32>(lp) + vec3(0.5, 0.6, 0.5) + jit * PT_FLAME - world;
+    var short = 0.9;
+    // How far the light is for its falloff: from the block's middle, as `pt_nee_target` and the
+    // 5-block match measure it (only which point the ray aims at moves to a face).
+    var mid = to;
+    if !small {
+        // A glowing block shines from its faces: one of the three facing this surface, drawn by
+        // how much of it faces it (so on average the whole block's light), a point on it, and
+        // the ray stopping at it. A face buried in the floor or ceiling then shades as it should
+        // and an open one lights even at a grazing look; aimed at a point inside the block, the
+        // ray's last stretch ran through the floor or ceiling beside lava in a pit or glowstone
+        // in a ceiling, which took the pit's light and cut hard wedges into the walls (s2i
+        // lava_glow).
+        let c = vec3<f32>(lp) + 0.5 - world;
+        mid = c;
+        let mb = -dot(c, ng);
+        if mb >= 0.0 {
+            mid += ng * (mb + 0.05);
+        }
+        let a = abs(c);
+        let u = pt_rand(px, 56u).x * (a.x + a.y + a.z);
+        var axis = vec3(0.0, 0.0, 1.0);
+        if u < a.x {
+            axis = vec3(1.0, 0.0, 0.0);
+        } else if u < a.x + a.y {
+            axis = vec3(0.0, 1.0, 0.0);
+        }
+        to = c - axis * sign(c) * 0.5 + (vec3(1.0) - axis) * jit * 0.48;
+        short = 0.03;
+    }
     let behind = -dot(to, ng);
     if behind >= 0.0 {
         to += ng * (behind + 0.05);
@@ -630,12 +659,12 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     if cs <= 0.0 {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
-    let hit = rt_hit(rel + lift, dir, max(dist - 0.9, 0.0), 0.0);
+    let hit = rt_hit(rel + lift, dir, max(dist - short, 0.0), 0.0);
     if hit.hit && !hit.clear {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
     let r2 = select(PT_NEE_R2_BLOCK, PT_NEE_R2_FLAME, small);
-    let f = one_off * chosen_s * cs * pt_nee_falloff(d2, r2, at_d);
+    let f = one_off * chosen_s * cs * pt_nee_falloff(select(d2, dot(mid, mid), !small), r2, at_d);
     return vec4(pt_nee_cap(f * ris * pt.emissive), 1.0);
 }
 
