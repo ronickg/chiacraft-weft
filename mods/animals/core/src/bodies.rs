@@ -79,7 +79,7 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     ("egg_ceratopsian_small", (0.26, 0.17)),
     ("nest", (0.9, 0.15)),
     // The pool of blood under an opened body (`source/carcass/build.py`).
-    ("carcass_gore", (1.5, 0.1)),
+    ("carcass_gore", (1.5, 0.15)),
     // A spot of blood a wounded animal leaves (`source/carcass/build.py`, `blood.rs`).
     ("blood_spot", (0.4, 0.05)),
     // The dead bodies per body plan, lying (`source/carcass/body.py`), at their reference animal's size.

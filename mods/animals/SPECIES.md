@@ -2840,7 +2840,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 |---|---|
 | how | wild |
 | diet | herbivore |
-| eats | leaves 40%, seeds 25%, fruit 10%, meat 15%, insects 10% |
+| eats | leaves 40%, seeds 25%, fruit 10%, meat 8%, insects 17% |
 | hunts | 0.0%-5% of its mass alone (0.04-4 kg); at home: kryptobaatar, gobipteryx |
 | a meal that fills it | 9 kg |
 | room by its prey | red_dunes 2, scrubland 2 (as many as 30% of their young a year feed, at most its crowd) |
