@@ -195,6 +195,8 @@ the deadline you feel.
 
 ### Timing it: the first 30 minutes (planned 11-22, runs parked)
 
+The brief for the player: `notes/FIRST_HOURS_TIMING_RUN.md` (11-26).
+
 The clock (`mods/base/src/first_clock.rs`, `vitals::first::CLOCK_STEPS`) notes, per player,
 the second of survival play each step first came true: `rock` (or `bone` in the bone lands),
 `edge` (a flake or splinter), `head`, `string`, `axe`, `fire` (a lit one within 4 blocks),
