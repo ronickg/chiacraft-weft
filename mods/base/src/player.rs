@@ -330,6 +330,7 @@ fn consume_grid(m: &MenuCtx) {
     if m.group("result").index_of(m.slot()).is_none() {
         return;
     }
+    crate::player_sounds::crafted(&m.world(), m.player());
     let grid = m.group("grid");
     let cells: Vec<ItemStack> = (0..grid.len()).map(|i| grid.get(i)).collect();
     let made = recipe_grid_output(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
