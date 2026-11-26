@@ -3856,6 +3856,7 @@ impl Client {
             // Filled in by `render` (`taa_frame`).
             taa: [0.0; 4],
             taa_prev: [[0.0; 4]; 4],
+            taa_prev_inv: [[0.0; 4]; 4],
             taa_frame: [self.taa_out as f32, crate::post::motion() as u32 as f32, self.motion_out as f32, 0.0],
             dlss: [crate::post::mip_bias(), 0.0, 0.0, 0.0],
             cloud_shadow: [0.0; 4],
@@ -4321,6 +4322,7 @@ impl Client {
             .frame(gpu, crate::settings::ground_map(), cam.pos, &self.world);
         let mut scene = self.scene(&cam, frame);
         (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
+        scene.taa_prev_inv = glam::Mat4::from_cols_array_2d(&scene.taa_prev).inverse().to_cols_array_2d();
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
         self.frame_camera = Some(FrameCamera {
             view: cam.view(),
@@ -4619,9 +4621,9 @@ fn evening_mist_floor(sun: [f32; 4]) -> f32 {
 }
 
 /// The values of the settings the shader pack reads (`Scene::options`).
-fn pack_options() -> [[f32; 4]; 20] {
-    let mut out = [[0.0; 4]; 20];
-    for (i, name) in crate::packs::pack_options().iter().enumerate().take(80) {
+fn pack_options() -> [[f32; 4]; 24] {
+    let mut out = [[0.0; 4]; 24];
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(96) {
         if let Some(id) = crate::config::by_name(name) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }

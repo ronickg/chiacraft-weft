@@ -471,6 +471,8 @@ const OPT_RAIN_MIRROR: u32 = 76u;
 // cave and its blue cave fog over what is seen there; 0 neither.
 const OPT_CAVE_FOG: u32 = 77u;
 const OPT_PCSS: u32 = 78u;
+const OPT_CONTACT_SUN: u32 = 79u;
+const OPT_SSAO: u32 = 80u;
 // How much of the sky's light's blue goes by day, with the chain. (The sun's light is already the
 // 4300 K of Ronald's profile through the air, `sun_kelvin_linear`, since 11-06.)
 const CHAIN_AMBIENT_GREY: f32 = 0.4;
@@ -1897,7 +1899,10 @@ fn shadow_pcss(index: u32, size: i32, texel: f32, depth: f32, rel: vec3<f32>, p:
         sum += d * b;
     }
     var radius = 5.0;
-    if count >= 0.9 {
+    // Test modes (`base:look_pcss` 2: the filter fixed at its smallest, no search; 3: the taps each
+    // from the point, not added up), to find what lit cave rock the 3x3 keeps dark (lksp_pcss2).
+    let mode = fantasy_opt(OPT_PCSS);
+    if count >= 0.9 && mode < 1.5 {
         let gap = (sum / count - z) * depth;
         radius = clamp(gap, 0.0, 35.0) / 35.0 * 25.0 + 5.0;
     }
@@ -1906,11 +1911,138 @@ fn shadow_pcss(index: u32, size: i32, texel: f32, depth: f32, rel: vec3<f32>, p:
     var lit = 0.0;
     for (var i = 0; i < 13; i++) {
         q += pcss_spiral(f32(i), 12.0, turn) * step;
+        if mode > 2.5 {
+            q = p + pcss_spiral(f32(i), 12.0, turn) * step * 2.5;
+        }
         let g = textureGather(0, textures[index], nearest_clamp, q / f32(size));
         let nearest = max(max(g.x, g.y), max(g.z, g.w));
         lit += select(0.0, 1.0, nearest <= z + bias);
     }
     return lit / 13.0;
+}
+
+// Bliss's screen-space contact shadows toward the sun (SSRT_Shadows, composite1.fsh; method only),
+// for the point at camera-relative `rel` drawn at pixel `frag`: 16 steps of 3 pixels across the
+// screen along the light's direction there (a jittered start), each reading the solid world's depth;
+// a step whose depth stands in front of the ray, within the ray's own depth over that step and
+// within 3.5 % of its distance, puts it in shade (0, else 1). Bliss marches this frame's depth before
+// it lights; our world is lit as it is drawn, so ours reads last frame's solid world (`scene.behind`,
+// copied after the world's pass) through last frame's camera (`taa_prev`, this frame's positions).
+// It reaches past the shadow map and over the far land, as Bliss's does over Distant Horizons.
+fn screen_contact(rel: vec3<f32>, frag: vec2<f32>) -> f32 {
+    if scene.behind.z < 0.5 || scene.taa.z < 0.5 {
+        return 1.0;
+    }
+    let dist = length(rel);
+    // The hand and what touches the eye.
+    if dist < 1.6 {
+        return 1.0;
+    }
+    let l = light_dir();
+    let depth_tex = textures[u32(scene.behind.y)];
+    let dims = vec2<f32>(textureDimensions(depth_tex));
+    let a = scene.taa_prev * vec4(rel, 1.0);
+    if a.w <= 0.06 {
+        return 1.0;
+    }
+    // A second point along the light, kept in front of the eye (the ray's line on the screen and its
+    // depth along it are the same from any two of its points).
+    let one = scene.taa_prev * vec4(rel + l, 1.0);
+    let dw = one.w - a.w;
+    var len = max(dist * 0.25, 1.0);
+    if dw < 0.0 {
+        len = min(len, 0.5 * (a.w - 0.06) / -dw);
+    }
+    let b = scene.taa_prev * vec4(rel + l * len, 1.0);
+    let pa = vec3((a.x / a.w * 0.5 + 0.5) * dims.x, (0.5 - a.y / a.w * 0.5) * dims.y, a.z / a.w);
+    let pb = vec3((b.x / b.w * 0.5 + 0.5) * dims.x, (0.5 - b.y / b.w * 0.5) * dims.y, b.z / b.w);
+    var d = pb - pa;
+    let px = max(abs(d.x), abs(d.y));
+    // The light along the look: no line across the screen to march.
+    if px < 1e-3 {
+        return 1.0;
+    }
+    d = d / px * 3.0;
+    let noise = fract(52.9829189 * fract(dot(frag + 5.588238 * scene.frame.w, vec2(0.06711056, 0.00583715))));
+    var p = pa + d * noise;
+    // In reverse depth: larger is nearer. The ray's depth over the step just taken, a hair widened.
+    var near_z = pa.z;
+    var far_z = pa.z;
+    for (var i = 0; i < 16; i++) {
+        if p.x < 0.0 || p.y < 0.0 || p.x >= dims.x || p.y >= dims.y || p.z <= 0.0 {
+            break;
+        }
+        let stored = textureLoad(depth_tex, vec2<i32>(p.xy), 0).r;
+        if stored > p.z && stored >= min(near_z, far_z) && stored <= max(near_z, far_z) {
+            let ray_lin = 0.05 / max(p.z, 1e-9);
+            let stored_lin = 0.05 / max(stored, 1e-9);
+            if abs(ray_lin - stored_lin) / ray_lin < 0.035 {
+                return 0.0;
+            }
+        }
+        near_z = far_z + far_z * 0.001;
+        far_z += d.z;
+        p += d;
+    }
+    return 1.0;
+}
+
+// Bliss's screen-space shade from the sky (SSAO, composite.fsh, indirect_effect 1; method only):
+// 7 taps on its spiral round the point drawn at `rel` (camera relative) facing `n`, a share of the
+// screen wide that shrinks with the distance (P11 / (3 x (1 + clamp(z^2 / 50, 0, 5))) x 0.3 of the
+// width), each the solid world there rebuilt in space; one inside the reach (squared z^2 x that
+// share x 10 / mix(4, 50, clamp(z^2 - 0.1))) closes the point in by how much it stands over the
+// face (dot of the way to it and n) and how near it is. 1 open, 0 closed in. Bliss works from this
+// frame's depth before it lights; ours from last frame's solid world (`scene.behind`) through last
+// frame's camera (`taa_prev`, and back with `taa_prev_inv`), as `screen_contact`; Bliss's half-size
+// pass and its denoiser are left to TAA.
+fn screen_ao(rel: vec3<f32>, n: vec3<f32>) -> f32 {
+    if scene.behind.z < 0.5 || scene.taa.z < 0.5 || length(rel) < 1.6 {
+        return 1.0;
+    }
+    let a = scene.taa_prev * vec4(rel, 1.0);
+    if a.w <= 0.06 {
+        return 1.0;
+    }
+    let depth_tex = textures[u32(scene.behind.y)];
+    let dims = vec2<f32>(textureDimensions(depth_tex));
+    let centre = vec2((a.x / a.w * 0.5 + 0.5) * dims.x, (0.5 - a.y / a.w * 0.5) * dims.y);
+    // The projection's vertical scale (gbufferProjection[1][1]): the length of its second row.
+    let p11 = length(vec3(scene.taa_prev[0][1], scene.taa_prev[1][1], scene.taa_prev[2][1]));
+    let z = a.w;
+    let dist = 1.0 + clamp(z * z / 50.0, 0.0, 5.0);
+    let share = p11 / (3.0 * dist);
+    let reach = z * z * share * 10.0 / mix(4.0, 50.0, clamp(z * z - 0.1, 0.0, 1.0));
+    let noise = fract(52.9829189 * fract(dot(centre + 5.588238 * scene.frame.w, vec2(0.06711056, 0.00583715))));
+    let facing = normalize(n);
+    var closed = 0.0;
+    var count = 0.0;
+    for (var i = 0; i < 7; i++) {
+        let q = centre + pcss_spiral(f32(i), 6.0, noise) * share * 0.3 * dims.x;
+        if q.x < 0.0 || q.y < 0.0 || q.x >= dims.x || q.y >= dims.y {
+            continue;
+        }
+        let stored = textureLoad(depth_tex, vec2<i32>(q), 0).r;
+        // The sky: open, far past any reach.
+        if stored <= 0.0 {
+            count += 1.0;
+            continue;
+        }
+        let ndc = vec2(q.x / dims.x * 2.0 - 1.0, 1.0 - q.y / dims.y * 2.0);
+        let h = scene.taa_prev_inv * vec4(ndc, stored, 1.0);
+        let v = h.xyz / h.w - rel;
+        let d2 = dot(v, v);
+        if d2 > 1e-5 {
+            if d2 < reach {
+                closed += clamp(dot(v * inverseSqrt(d2), facing), 0.0, 1.0) * clamp(1.0 - d2 / reach, 0.0, 1.0);
+            }
+            count += 1.0;
+        }
+    }
+    if count < 0.5 {
+        return 1.0;
+    }
+    return max(1.0 - closed / count, 0.0);
 }
 
 // How much of the sun reaches `rel` (camera relative) facing `n`: the near cascade's map (80 blocks
@@ -2609,7 +2741,16 @@ fn light_on_bliss(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec
     let l = min(max(light.x - 0.05, 0.0) * 1.06, 1.0);
     let curve = (pow(l, 15.0) * 2.0 + pow(l, 2.5)) * 0.5;
     let dir_y = n.y / max(abs(n.x) + abs(n.y) + abs(n.z), 1e-4) * 1.5;
-    let facing = max(pow(n.y * 0.5 + 0.5, 0.1) + dir_y, 0.2 + (1.0 - l) * 0.8);
+    var facing = max(pow(n.y * 0.5 + 0.5, 0.1) + dir_y, 0.2 + (1.0 - l) * 0.8);
+    // Bliss's SSAO (`base:look_ssao`): the sky's facing capped where the point is closed in, and the
+    // shade on all but the sun the darker of the blocks' corner shading and SSAO^6.
+    var shade = ao;
+    if fantasy_opt(OPT_SSAO) > 0.5 {
+        let s = screen_ao(rel, n);
+        let open = pow(1.0 - sqrt(1.0 - s), 2.0);
+        facing = min(facing, mix(0.95, 2.5, open));
+        shade = min(ao, pow(s, 6.0));
+    }
     var indirect = p.ambient * facing * curve * 0.7;
     var held = vec3(0.0);
     if !CALM {
@@ -2622,7 +2763,7 @@ fn light_on_bliss(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec
     let sun_part = p.sun * light_strength() * clamp((dot(n, light_dir()) * 255.0 - 15.0) / 240.0, 0.0, 1.0) * shadow;
     LIGHT_SUN = sun_part;
     NIGHT_SKY_SHARE = night_sky_share(indirect + sun_part, blocks);
-    let c = (indirect + blocks + floor_light) * ao + sun_part;
+    let c = (indirect + blocks + floor_light) * shade + sun_part;
     LIGHT_ALL = c;
     return c;
 }

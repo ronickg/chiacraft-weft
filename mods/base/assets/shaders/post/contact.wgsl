@@ -8,6 +8,10 @@ fn apply(p: PostPixel) -> vec4<f32> {
     if scene.rt.x > 2.5 {
         return p.color;
     }
+    // Bliss's SSAO in the pack's lighting (base's `look_ssao`, option 80; on the land lit from the sky, options 70 and 71, as `land_from_sky`) takes this shade's place.
+    if scene.frame.x > 0.5 && scene.frame_look.x > 0.5 && scene.options[17][2] > 0.5 && scene.options[17][3] > 0.5 && scene.options[20][0] > 0.5 {
+        return p.color;
+    }
     // Not on water (the world image's alpha, which the pack leaves at 0 for solid things and the
     // reflections before this keep): its surface closes nothing in, and on the Mac (MoltenVK, M3
     // Max) a pool's flat top seen at a slant took level stripes from this pass, 8 pixels a pair,

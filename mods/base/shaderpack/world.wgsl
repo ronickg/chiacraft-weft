@@ -480,6 +480,16 @@ fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
 }
 
 fn sun_shadow_once(in: VOut, n: vec3<f32>) -> f32 {
+    let s = sun_shadow_mapped_or_mask(in, n);
+    // Bliss's contact shadows toward the sun on top, the darker of the two (its min()), also past
+    // the map's reach and on the far land (`screen_contact`; `base:look_contact_sun`).
+    if s > 0.0 && land_from_sky() && fantasy_opt(OPT_CONTACT_SUN) > 0.5 {
+        return min(s, screen_contact(in.rel, in.clip.xy));
+    }
+    return s;
+}
+
+fn sun_shadow_mapped_or_mask(in: VOut, n: vec3<f32>) -> f32 {
     let reach = fantasy_opt(OPT_SHADOW_REACH);
     if reach > 0.0 {
         let past = smoothstep(reach * 0.8, reach + 16.0, in.dist);

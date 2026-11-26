@@ -154,5 +154,9 @@ fn far_ao(p: PostPixel, turn_in: f32) -> f32 {
 }
 
 fn low(p: PostPixel) -> vec4<f32> {
+    // Bliss's SSAO (base's `look_ssao`, option 80; on the land lit from the sky, options 70 and 71, as `land_from_sky`) in its place: nothing to work out.
+    if scene.frame.x > 0.5 && scene.frame_look.x > 0.5 && scene.options[17][2] > 0.5 && scene.options[17][3] > 0.5 && scene.options[20][0] > 0.5 {
+        return vec4(1.0, 0.0, 0.0, 1.0);
+    }
     return vec4(far_ao(p, -1.0), 0.0, 0.0, 1.0);
 }
