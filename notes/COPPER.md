@@ -54,8 +54,8 @@ and one anywhere else after the furnace. Copper's tier (item level 12, harvest 1
 - Malachite (green-stained stone in the dry lands and on beaches) and smelting it in a charcoal
   pit with bellows; the stone anvil; annealing; moulds and casting (bronze); `notes/CONTENT.md`
   tier 3 and `notes/CRAFTING.md` slice 11.
-- A note to settle: copper's harvest is 170 in `vitals::gear` and 150 in `vitals::felling` and
-  the notes (`FIRST_HOURS.md`, `CONTENT.md`).
+- Settled 11-26 (Planner): copper's harvest is one number, `vitals::gear::COPPER_HARVEST` 170,
+  which felling's copper tier reads; the notes say 170.
 
 ## Check
 

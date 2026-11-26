@@ -103,7 +103,7 @@ pub const TIERS: &[Tier] = &[
     Tier { harvest: 0, name: "wood, gold", logs: 56, speed: 2.0 },
     Tier { harvest: 50, name: "bone, antler", logs: 72, speed: 2.5 },
     Tier { harvest: 100, name: "flint, chert, obsidian, stone", logs: 96, speed: 2.91 },
-    Tier { harvest: 150, name: "copper", logs: 192, speed: 4.85 },
+    Tier { harvest: crate::gear::COPPER_HARVEST, name: "copper", logs: 192, speed: 4.85 },
     Tier { harvest: 200, name: "bronze, iron, wrought iron", logs: 512, speed: 6.79 },
     Tier { harvest: 300, name: "steel, diamond (old)", logs: 1536, speed: 7.76 },
     Tier { harvest: 400, name: "diamond", logs: 4096, speed: 8.0 },
@@ -226,6 +226,10 @@ mod tests {
         );
         assert_eq!(tier(220).harvest, 200);
         assert_eq!(tier(0).logs, TIERS[0].logs);
+        // Copper's row is a copper axe's own harvest (one number, `gear::COPPER_HARVEST`).
+        let copper = crate::gear::harvest(crate::gear::material("copper").unwrap().level());
+        assert_eq!(copper, crate::gear::COPPER_HARVEST);
+        assert_eq!(tier(copper).name, "copper");
         // The speed multiplier makes the engine's timer take the felling's seconds.
         let (f, one) = (felling(30, 100), log_secs(2.0, 2.91));
         assert!((one / speed(f, one) - seconds(f, one)).abs() < 1e-3);

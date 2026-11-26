@@ -245,6 +245,10 @@ pub const HARVEST_PER_LEVEL: f32 = 10.0;
 /// Base's iron ores are `mined_by` it.
 pub const IRON_ORE_HARVEST: u32 = 210;
 
+/// Copper's harvest (`harvest` at copper's level, 1 2: Bronze Age, first depth): the one number
+/// felling's copper tier (`felling::TIERS`) and the notes read (Planner, 11-26: the notes had 150).
+pub const COPPER_HARVEST: u32 = 170;
+
 /// The material whose pickaxe first breaks iron ore (`IRON_ORE_HARVEST` is its harvest).
 pub const IRON_ORE_PICK: &str = "bronze";
 

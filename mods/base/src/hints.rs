@@ -89,6 +89,19 @@ static ROCKS_TAG: Tag = Tag::named("rocks");
 static FLINT_TAG: Tag = Tag::named("flint");
 static BONE_TAG: Tag = Tag::named("bone");
 static NATIVE_COPPER_TAG: Tag = Tag::named("native_copper");
+/// Tools a player may hold (built ones carry `parts::PARTS` too): the logs hint waits while one is.
+static TOOL_TAGS: [Tag; 6] = [
+    Tag::named("tools/axe"),
+    Tag::named("tools/pickaxe"),
+    Tag::named("tools/shovel"),
+    Tag::named("tools/hoe"),
+    Tag::named("tools/sword"),
+    Tag::named("cutters"),
+];
+
+fn has_tag(tags: &[Tag], item: u32) -> bool {
+    item != 0 && tags.iter().any(|t| t.on_item(item))
+}
 static COPPER_INGOTS_TAG: Tag = Tag::named("ingots/copper");
 /// The evening the night hint was last shown (the day count; not saved).
 static NIGHT_SHOWN: Component<u32> = Component::named("hints_night_shown");
@@ -221,7 +234,11 @@ fn watch(w: &World) {
         if has(&FURNACE_TAG) {
             mark(w, id, RAW_MEAT);
         }
-        if st.age >= LOGS_AFTER * 20 && !logs {
+        // "Bare hands can't fell a tree": only with nothing in hand, or something that's no tool
+        // (Tester's cov_copper2: it came with a copper pickaxe in hand; Planner, 11-26).
+        let held = inv.get(w.selected_slot(id));
+        let tool_in_hand = crate::parts::PARTS.on_stack_own(&held).is_some() || has_tag(&TOOL_TAGS, held.item);
+        if st.age >= LOGS_AFTER * 20 && !logs && !tool_in_hand {
             once(w, id, LOGS);
         }
         if logs && !table {
