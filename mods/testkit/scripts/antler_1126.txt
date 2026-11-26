@@ -13,8 +13,8 @@
 # felling_axe_head work N (flaker F), grade G": the first with flaker 0, the second with flaker 6
 # and its work 6 more (grades roll with luck, so the work points are the check), "died" (none),
 # and the shots (ua_spawn, ua_taiga: antlers on the ground if any are in view; ua_hint: the antler
-# hint; ua_antler, ua_antler2: one on the pad, close; run 1's
-# was invisible, the tile is darker since).
+# hint; ua_antler2, ua_antler3: an antler and a bone on the pad, two
+# blocks out, from two pitches).
 # Yaw 0 faces -z; a negative pitch looks down.
 loaded
 idle
@@ -68,9 +68,6 @@ wait 1.5
 # 2. A shed antler off the ground.
 chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
 chat /tk set ~ ~ ~-1 base:shed_antler
-look 0 -45
-wait 1
-shot ua_antler.png
 aim_block 0 0 -1 0.05
 wait 0.5
 hold core:attack 0.5
@@ -94,11 +91,15 @@ tap base:knapping class:knap_stone
 until screen none within 5
 chat /tk inv me
 wait 1
-# 4. The antler on the pad beside a bone, close (its tile recoloured darker after run 1's ua_antler).
-chat /tk set ~ ~ ~-1 base:shed_antler
-chat /tk set ~1 ~ ~-1 base:loose_bone
-look 0 -45
-wait 1
+# 4. The antler beside a bone, two blocks out where the view's centre is (run 2: one block out they
+# sat under the hint box and the held rock), the toasts and chat faded first.
+chat /tk set ~ ~ ~-2 base:shed_antler
+chat /tk set ~1 ~ ~-2 base:loose_bone
+look 0 -38
+wait 8
 shot ua_antler2.png
+look 0 -60
+wait 1
+shot ua_antler3.png
 expect alive
 quit
