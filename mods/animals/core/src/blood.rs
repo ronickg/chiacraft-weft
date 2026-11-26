@@ -24,6 +24,9 @@ pub const SPOT_STEP: f64 = 1.0;
 /// Spots stay this long, seconds, shrinking as they dry to `SPOT_DRY` of their size, then go.
 pub const SPOT_LIFE_SECS: f32 = 300.0;
 pub const SPOT_DRY: f32 = 0.4;
+/// A fresh spot is drawn this many times its model's size (`blood_spot`, 0.4 blocks): cov_blood r1's read as specks a
+/// pixel or two across from 36 blocks up and barely showed from the ground.
+pub const SPOT_SCALE: f32 = 1.8;
 
 /// A hungry hunter smells or sees blood this many blocks off, and follows a trail while its bleeder is within
 /// `TRAIL_REACH` (further, it has run too far; the spots tell of a carcass only where it lies).
@@ -40,9 +43,9 @@ pub fn bleed_loss(max_health: f32, secs: f32) -> f32 {
     max_health * BLEED_RATE * secs
 }
 
-/// A spot's drawn size, 1 fresh to `SPOT_DRY` dried, at `age` seconds (`None`: gone).
+/// A spot's drawn size, `SPOT_SCALE` fresh to `SPOT_DRY` of that dried, at `age` seconds (`None`: gone).
 pub fn spot_size(age: f32) -> Option<f32> {
-    (age < SPOT_LIFE_SECS).then(|| 1.0 - (1.0 - SPOT_DRY) * (age / SPOT_LIFE_SECS).clamp(0.0, 1.0))
+    (age < SPOT_LIFE_SECS).then(|| SPOT_SCALE * (1.0 - (1.0 - SPOT_DRY) * (age / SPOT_LIFE_SECS).clamp(0.0, 1.0)))
 }
 
 #[cfg(test)]
@@ -58,8 +61,8 @@ mod tests {
         // The longest bleed takes under half: a light wound lives, a heavy one left low dies.
         let most = bleed_loss(100.0, BLEED_MAX_SECS);
         assert!(most > 40.0 && most < 50.0, "{most}");
-        assert_eq!(spot_size(0.0), Some(1.0));
-        assert!(spot_size(SPOT_LIFE_SECS * 0.5).is_some_and(|s| s < 1.0 && s > SPOT_DRY));
+        assert_eq!(spot_size(0.0), Some(SPOT_SCALE));
+        assert!(spot_size(SPOT_LIFE_SECS * 0.5).is_some_and(|s| s < SPOT_SCALE && s > SPOT_DRY * SPOT_SCALE));
         assert_eq!(spot_size(SPOT_LIFE_SECS), None);
         // A whole bleed leaves at most 60 spots.
         assert!(BLEED_MAX_SECS / SPOT_EVERY_SECS <= 60.0);

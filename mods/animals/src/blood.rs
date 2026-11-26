@@ -89,10 +89,11 @@ pub fn tick(w: &World, id: u64, st: &EntityState, secs: f32) {
         let at = st.pos.y;
         let yaw = (now.wrapping_mul(2_654_435_761) % 360) as f32;
         let spot = w.spawn_with(&SPOT, [st.pos.x, at + 0.01, st.pos.z], &Spawn::new().yaw(yaw));
-        if spot != 0
-            && let Some(o) = w.component_mut(spot, &SPOT_OF)
-        {
-            *o = [id, now];
+        if spot != 0 {
+            w.set_scale(spot, core::SPOT_SCALE);
+            if let Some(o) = w.component_mut(spot, &SPOT_OF) {
+                *o = [id, now];
+            }
         }
         (wd[1], wd[2], wd[3]) = (st.pos.x, st.pos.z, now as f64);
     }
