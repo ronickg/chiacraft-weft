@@ -244,21 +244,26 @@ fn watch(w: &World) {
         if has(&FURNACE_TAG) {
             mark(w, id, RAW_MEAT);
         }
-        // "Bare hands can't fell a tree": only with nothing in hand, or something that's no tool
-        // (Tester's cov_copper2: it came with a copper pickaxe in hand; Planner, 11-26).
-        let held = inv.get(w.selected_slot(id));
-        let tool_in_hand = crate::parts::PARTS.on_stack_own(&held).is_some() || has_tag(&TOOL_TAGS, held.item);
-        if st.age >= LOGS_AFTER * 20 && !logs && !tool_in_hand {
-            once(w, id, LOGS);
-        }
-        if logs && !table {
-            once(w, id, TABLE);
-        }
         // The way to the first axe, a step at a time.
         let flake = has(&crate::first::CUTTERS);
         let head = items
             .iter()
             .any(|&i| item_name(i) == "base:part_felling_axe_head");
+        // "Bare hands can't fell a tree. Look on the ground: rocks, flint…": only with nothing in
+        // hand or something that's no tool (Tester's cov_copper2: it came with a copper pickaxe in
+        // hand), and only before the ground's been found: a rock, flint, a bone, a flake or a head
+        // in the bag says it has (the antler run: it came with a rock in hand; Planner, 11-26).
+        let held = inv.get(w.selected_slot(id));
+        let tool_in_hand = crate::parts::PARTS.on_stack_own(&held).is_some() || has_tag(&TOOL_TAGS, held.item);
+        let found_the_ground = has(&ROCKS_TAG) || has(&FLINT_TAG) || has(&BONE_TAG) || flake || head;
+        if found_the_ground {
+            mark(w, id, LOGS);
+        } else if st.age >= LOGS_AFTER * 20 && !logs && !tool_in_hand {
+            once(w, id, LOGS);
+        }
+        if logs && !table {
+            once(w, id, TABLE);
+        }
         if has(&ROCKS_TAG) && has(&FLINT_TAG) && !flake {
             once(w, id, KNAP);
         }
