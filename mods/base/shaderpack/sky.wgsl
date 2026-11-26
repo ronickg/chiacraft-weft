@@ -1522,6 +1522,28 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
             }
             return vec4(p.ambient, 1.0);
         }
+        // For debug view 13 only: along the nine looks of the cloudy average, r the mean cloud shadow
+        // on the fog's steps (`bc_shadow`), g the fog's mean transmittance over its 1024 blocks, b
+        // the luma of its mean light / 0.122 (Bliss's units like the other swatches).
+        case 6u: {
+            if from_sky && look_debug() == 13u {
+                var sh = 0.0;
+                var through = 0.0;
+                var light = vec3(0.0);
+                let clear = bc_sky_read();
+                for (var i = 0; i < 9; i++) {
+                    let dir = atm_mean_dir(i, sun);
+                    for (var k = 0; k < 4; k++) {
+                        sh += bc_shadow(dir * (64.0 * pow(2.0, f32(k)))) / 36.0;
+                    }
+                    let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k), clear, clear, 1.0, false);
+                    through += fog.a / 9.0;
+                    light += fog.rgb / 9.0;
+                }
+                return vec4(sh, through, dot(light, vec3(0.2126, 0.7152, 0.0722)) / 0.122, 1.0);
+            }
+            return vec4(0.0);
+        }
         default: { return vec4(0.0); }
     }
 }
