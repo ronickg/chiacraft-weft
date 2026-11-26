@@ -200,13 +200,19 @@ fn pt_light_on(n: vec3<f32>, light: vec4<f32>, sun: f32, pos: vec3<f32>, rel: ve
     return c + sun_part;
 }
 
+// Whether the last bounce hit `pt_lit` lit found its cell in the cache (1) or fell back to its
+// lightmap (0), for debug view 23.
+var<private> PT_BOUNCE_CACHED: f32 = 0.0;
 fn pt_lit(b: RtHit, l: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
     var s = 0.0;
     if dot(b.n, l) > 0.0 && light_strength() > 0.0 {
         s = dot(rt_sun(b.rel, b.n, l, false), vec3(1.0 / 3.0)) * models_shadow(b.rel, b.n) * cloud_shadow(b.rel);
     }
     let c = pt_cached(b.world, b.n, length(b.rel), u);
-    if c.a > 0.5 {
+    PT_BOUNCE_CACHED = c.a;
+    // Debug view 24: the picture with the cache unread (each bounce hit lit from its lightmap, one
+    // bounce): against view 0, the cache's share, the light past the first bounce.
+    if c.a > 0.5 && pt.debug != 24u {
         return pt_albedo(b) * (pt_light_on(b.n, vec4(0.0, b.light.yzw), s, b.world, b.rel) + c.rgb);
     }
     return pt_albedo(b) * pt_light_on(b.n, b.light, s, b.world, b.rel);
@@ -1104,7 +1110,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         diffuse *= k;
         specular = specular * k + added / max(s_alb, vec3(1e-3));
     }
-    if (pt.debug != 0u && pt.debug < 7u) || pt.debug >= 14u {
+    if (pt.debug != 0u && pt.debug < 7u) || (pt.debug >= 14u && pt.debug != 24u) {
         var out = vec3(0.0);
         switch pt.debug {
             case 1u: { out = albedo; }
@@ -1123,6 +1129,13 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 21u: { out = PT_NEE_DBG; }
             // 22: the G-buffer's material: red F0 (times 10), green 1 - roughness, blue 1 where the
             // reflection ray is traced (roughness squared under 0.5).
+            // 23: the cache's reach: red where the bounce ray met a surface whose cell the cache
+            // holds, green where it met one it doesn't (lit from the lightmap), blue where it left to
+            // the sky; brighter with the pixel's own cell held.
+            case 23u: {
+                let own = 0.6 + 0.4 * pt_cached(h.world, ng, dist, pt_noise(px + vec2(3.0, 11.0))).a;
+                out = select(vec3(0.0, 0.0, 1.0), select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), PT_BOUNCE_CACHED > 0.5), b.hit) * own;
+            }
             case 22u: { out = vec3(min(luma(f0) * 10.0, 1.0), 1.0 - rough_p, select(0.0, 1.0, rough_p * rough_p < 0.5)); }
             // 15: the traced block lights: green seen, red hidden; no light drawn: blue no list for
             // the cube, cyan none in reach, magenta no lights at all; black no block light.
