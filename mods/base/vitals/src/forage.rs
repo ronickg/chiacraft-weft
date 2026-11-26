@@ -393,6 +393,82 @@ pub fn lushness(eats: impl Fn(Category) -> bool, biome: &str, air: f32, soil: f3
         .reduce(f32::max)
 }
 
+/// How much of a diet's food biome `biome` grew over the `days` days up to `day` (days since the world began), 0 to 1:
+/// each day's best rate among the plants that bring back what it eats, in that day's mean air and its ground's water
+/// from the rain that fell (`plants::soil_water`, `climate::spell` by `key`), fruit and seed only in their seasons,
+/// browse where it grows in its seasons; averaged. A dry spell lowers it, rain brings it back as the plants grow
+/// (`notes/ECOLOGY.md`, part 7: how many a place holds now). `calendar`: whether the dimension has seasons. `None`: it
+/// eats nothing that grows.
+#[allow(clippy::too_many_arguments)]
+pub fn recent_lushness(
+    eats: impl Fn(Category) -> bool,
+    biome: &str,
+    celsius: f32,
+    seasons: f32,
+    rain: [f32; 4],
+    calendar: bool,
+    key: u64,
+    day: u64,
+    days: u64,
+) -> Option<f32> {
+    let mine: Vec<&Source> = SOURCES.iter().filter(|s| eats(s.category)).collect();
+    if mine.is_empty() {
+        return None;
+    }
+    // A full window from the world's first day: the days before it are those a year on (their weather another run),
+    // so a fresh world's first spawns don't hang on one day's rain (cap_r1: the usual 53% on day 0, 64% by day 2).
+    let year = crate::calendar::YEAR_DAYS as u64;
+    let n = days.clamp(1, year);
+    let total: f32 = (0..n)
+        .map(|back| {
+            let d = if back <= day { day - back } else { day + year - back };
+            let of_year = (d % crate::calendar::YEAR_DAYS as u64) as f32;
+            let season = (of_year as u32 / crate::calendar::SEASON_DAYS) as usize;
+            let air = if calendar { crate::plants::mean_air(celsius, seasons, of_year + 0.5) } else { celsius };
+            let soil = crate::plants::soil_water(rain, celsius, seasons, calendar, key, d);
+            mine.iter()
+                .map(|s| match s.renews.and_then(crate::plants::of) {
+                    Some(p) if (s.found.is_empty() || s.found.contains(&biome)) && (!calendar || p.ripens >> season & 1 != 0) => {
+                        crate::plants::rate(p, air, soil)
+                    }
+                    Some(_) => 0.0,
+                    None if s.found.contains(&biome) && (!calendar || s.seasons >> season & 1 != 0) => BROWSE,
+                    None => 0.0,
+                })
+                .fold(0.0f32, f32::max)
+        })
+        .sum();
+    Some(total / n as f32)
+}
+
+/// What `recent_lushness` usually is over the same days: its mean over `USUAL_YEARS` other runs of the weather (rain
+/// keys from `key`), so a dry spell shows against it and a season's turn doesn't (a window over a season's start lags
+/// behind it the same way; the season's own mean, `season_lushness`, reads high against any one run of days, by up to
+/// a third in the savanna's rains).
+#[allow(clippy::too_many_arguments)]
+pub fn usual_lushness(
+    eats: impl Fn(Category) -> bool,
+    biome: &str,
+    celsius: f32,
+    seasons: f32,
+    rain: [f32; 4],
+    calendar: bool,
+    key: u64,
+    day: u64,
+    days: u64,
+) -> Option<f32> {
+    let runs: Vec<f32> = (1..=USUAL_YEARS)
+        .map(|k| {
+            let other = key.wrapping_add(k.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+            recent_lushness(&eats, biome, celsius, seasons, rain, calendar, other, day, days)
+        })
+        .collect::<Option<_>>()?;
+    Some(runs.iter().sum::<f32>() / runs.len() as f32)
+}
+
+/// Runs of the weather `usual_lushness` averages.
+pub const USUAL_YEARS: u64 = 8;
+
 /// How much of a diet's food biome `biome` grows through a season, 0 to 1: `lushness` on average
 /// over the season (`plants::season_rate_in`) in a biome of that mean, seasons and rain, or the
 /// browse found there then (`BROWSE`), whichever is more; fruit and seed only in the seasons they

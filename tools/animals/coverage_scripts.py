@@ -619,3 +619,84 @@ s = head("carcass_wall", [
 ]) + wall_part(600)
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass_wall", s)
+
+
+# Births in natural spawning (notes/ECOLOGY.md part 7: young come with their mother). r1 waited 8 minutes on the
+# engine's spawner at 14 carved pads and met nothing (its spots are on grass 20-45 blocks out, within 16 of the
+# player's height: the pits' walls); so part 1 has deer "met" by natural spawning on a pad (`/animalprof met`: their
+# spawn cause natural), in autumn, the white-tailed deer's breeding season, and part 2 the same out of season.
+s = [f"# {l}" for l in [
+    "Births in natural spawning. Part 1 (x 0, autumn, the white-tailed deer's breeding season): 24 white-tailed deer met",
+    "by natural spawning on a pad (`/animalprof met 24`: spawned with the natural cause, as the engine's spawner would). About",
+    "a third of the females (so 3 to 6 of the 24) should log \"wild white_tailed_deer N arrives with her K young (D days",
+    "old, P% grown)\" with K 1 to 3, each young \"born to N and 0 (wild)\"; the `/animalprof where` rows 10 s and 60 s",
+    "later mark those young \"(young, X from its mother N)\" with X small (a few blocks: they follow her). Part 2 (x 200,",
+    "spring, out of season): 24 more, and no \"arrives with her\" line and no young at all there. Shots: 1_mothers (from",
+    "above, ticks frozen, 5 s after they came: young beside their mothers), 1_mothers_low (low from the south-east), 3_out_of_season(_low).",
+]] + ["loaded", "idle", "chat /tk mode creative", "chat /tp 0 90 544", "wait 4", "idle", "chat /rule core:mob_spawning 0",
+      "chat /anim log"]
+# The herd shot at once, the player a spectator (r2's deer had fled the creative player by the shots, which saw
+# bare grass): from 6 up south of the ring of 24 (6 blocks round the pad's middle), and low from its south-east.
+def met_shots(x, name):
+    return ["chat /tk mode spectator", "wait 3", "chat /tick freeze", f"chat /tp {x} 76 {Z+10}", "look 0 -38", "wait 2",
+            f"shot cov_births_{name}.png", f"chat /tp {x+7} 70.6 {Z+7}", "look 45 -8", "wait 2",
+            f"shot cov_births_{name}_low.png", "chat /tick unfreeze", "wait 1"]
+
+
+s += pad(0) + ["chat /season autumn 5", f"chat /tp 0 70 {Z}", "wait 1", "chat /animalprof met 24"] + \
+    met_shots(0, "1_mothers") + ["wait 6", "chat /animalprof where 48", "wait 50", "chat /animalprof where 48",
+                                 "chat /tk mode creative"]
+s += pad(200) + ["chat /season spring 5", f"chat /tp 200 70 {Z}", "wait 1", "chat /animalprof met 24"] + \
+    met_shots(200, "3_out_of_season") + ["wait 6", "chat /animalprof where 48"]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("births", s)
+
+
+# Capacity by food (notes/ECOLOGY.md part 7): a wild plant eater's room follows its food over the last ten days
+# against what it usually is then (`needs::room_by_food`), so a dry spell thins a place and rain fills it back.
+# Ticks frozen with one white-tailed deer on the pad (`/animal room` asks for the nearest one's kind), the calendar
+# set to every other day of the year in turn.
+SWEEP = [(season, d) for season in ["spring", "summer", "autumn", "winter"] for d in range(1, 15, 2)]
+s = head("capacity", [
+    "Capacity by food. One white-tailed deer on the pad at x 0 (savanna on seed 1), ticks frozen; the calendar set to",
+    "every other day of the year, each followed by `/animal room`: \"room: white_tailed_deer at ... (<biome>, day D):",
+    "food N% (usual U%), ... room for R of C\". R is C whenever N is at least U; under it (a dry spell against the",
+    "usual for those days), R is about C x N/U (never under a quarter of C), and back to C once N comes back up. The",
+    "usual moves smoothly from day 0 on (r1: 53% on day 0, then 64% by day 2, from a one-day window). No shots.",
+]) + pad(0) + ["chat /tk spawn animals:white_tailed_deer 3 70 544", "wait 2", "chat /tick freeze"]
+for season, d in SWEEP:
+    s += [f"chat /season {season} {d}", "wait 0.5", "chat /animal room"]
+s += ["chat /tick unfreeze"]
+write("capacity", s)
+
+
+# Arrows into a carcass (Tester, pt_rain_8: 11 arrows after the kill shot the deer's body to nothing in 20 s, with no
+# line logged; carcasses, the gore pool and blood spots are invulnerable since).
+s = head("carcass_arrows", [
+    "Arrows and blows into a carcass. A white-tailed deer killed on the pad at x 0: \"carcass N of white_tailed_deer\".",
+    "Then 10 arrows shot into the body from 5 blocks: `/animalprof carcass` still lists \"carcass N ... Whole\" (not \"no",
+    "carcasses near\"); it is skinned with a knife: \"skins carcass N\", hide and venison in `/tk inv me`, the carcass",
+    "Opened. Then 10 sword blows into the opened body: still listed, Opened. (r1 skinned after the blows, which had",
+    "pushed the body 3 blocks from the knife.) Shots: 1_shot (the body with arrows round it), 2_skinned, 3_struck.",
+]) + pad(0) + [
+    "chat /tk mode survival", f"chat /tk spawn animals:white_tailed_deer 0 70 {Z}", "wait 0.2",
+    f"chat /tp 0 70 {Z+5}", "wait 0.2", "chat /animalprof kill", "wait 2", "chat /animalprof carcass",
+    "chat /tk put me 0 base:bow 1", "chat /tk put me 1 base:arrow 32", "key 1", "wait 1", "look 0 -12", "aim 8",
+]
+for _ in range(10):
+    s += ["hold core:use 1.2", "wait 0.5", "aim 8"]
+s += ["wait 3", "chat /animalprof carcass",
+      "chat /tick freeze", f"chat /tp 3 74 {Z+6}", "look 0 -40", "wait 2", "shot cov_carcass_arrows_1_shot.png",
+      "chat /tick unfreeze", "wait 1",
+      "chat /tk put me 3 base:knife 1", "key 4", f"chat /tp 0 70 {Z+2}", "look 0 -40", "wait 1", "aim 4", "wait 1",
+      "press core:use", "wait 12", "chat /animalprof carcass", "chat /tk inv me",
+      "chat /tick freeze", f"chat /tp 3 74 {Z+6}", "look 0 -40", "wait 2", "shot cov_carcass_arrows_2_skinned.png",
+      "chat /tick unfreeze", "wait 1",
+      "chat /tk put me 2 base:iron_sword 1", "key 3", f"chat /tp 0 70 {Z+2}", "wait 0.5", "aim 4"]
+for _ in range(10):
+    s += ["press core:attack", "wait 0.7"]
+s += ["wait 3", "chat /animalprof carcass",
+      "chat /tick freeze", f"chat /tp 3 74 {Z+6}", "look 0 -40", "wait 2", "shot cov_carcass_arrows_3_struck.png",
+      "chat /tick unfreeze", "wait 1"]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("carcass_arrows", s)

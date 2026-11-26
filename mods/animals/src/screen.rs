@@ -1187,10 +1187,16 @@ fn command(cmd: &mut ServerCommand) {
             let near = crate::forage::kind_near(&w, s, at);
             let crowd = crate::species::crowd_at(&w, s, at);
             let comes = animals_core::life::room_for(near, coming, crowd);
+            let (now, usual) = crate::forage::food_now(&w, s, at);
             let line = format!(
-                "room: {} at {at:?}: {near:.1} near, room for {}: a group of {coming} {}",
+                "room: {} at {at:?} ({}, day {}): food {:.0}% (usual {:.0}%), {near:.1} near, room for {} of {}: a group of {coming} {}",
                 s.name,
+                weft_sdk::name_of(weft_sdk::abi::entry_kind::BIOME, w.biome(at)),
+                w.day_time() / vitals::calendar::DAY_TICKS,
+                now * 100.0,
+                usual * 100.0,
                 crowd,
+                s.crowd_in(weft_sdk::name_of(weft_sdk::abi::entry_kind::BIOME, w.biome(at))),
                 if comes { "would come" } else { "is turned away" }
             );
             weft_sdk::info!("{line}");

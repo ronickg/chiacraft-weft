@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave,hit,carcass,blood,gash)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave,hit,carcass,blood,gash,met)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -393,6 +393,21 @@ pub fn init(r: &mut Registry) {
                 let dmg = e.max_health * cmd.float("value").unwrap_or(0.5) as f32;
                 w.damage(id, Damage::new(dmg, damage_cause::ATTACK).by(cmd.player()));
                 format!("GASH {id} for {dmg:.1} of {:.1}", e.max_health)
+            }
+            "met" => {
+                // `value` (12 by default) white-tailed deer met by natural spawning, 6 blocks round the player (their
+                // spawn cause natural, so mothers in season bring their young: `breeding::bring_young`), for the
+                // births check; the engine's own spawner is too rare to wait for.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let Some(s) = crate::species::SPECIES.iter().find(|s| s.name == "white_tailed_deer") else { return };
+                let n = cmd.float("value").unwrap_or(12.0).max(1.0) as u32;
+                let mut ids = Vec::new();
+                for k in 0..n {
+                    let a = k as f64 / n as f64 * std::f64::consts::TAU;
+                    let at = [me.pos.x + a.cos() * 6.0, me.pos.y, me.pos.z + a.sin() * 6.0];
+                    ids.push(w.spawn_with(s.kind, at, &Spawn::new().cause(abi::spawn_cause::NATURAL)));
+                }
+                format!("MET {n} white_tailed_deer: {ids:?}")
             }
             "blood" => {
                 // Every bleeding animal within 64 blocks (seconds left, health) and the spots of blood.

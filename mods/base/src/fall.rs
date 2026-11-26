@@ -132,7 +132,8 @@ pub fn quat(axis: [f32; 3], degrees: f32) -> [f32; 4] {
 
 /// `p` (world) turned `degrees` about `axis` through `pivot`.
 pub fn turn(p: [f64; 3], pivot: [f64; 3], axis: [f32; 3], degrees: f32) -> [f64; 3] {
-    let (s, c) = (degrees.to_radians() as f64).sin_cos();
+    // In f64 from the start: an f32 quarter turn left cos at -4e-8, a log 2e-8 off where it is laid.
+    let (s, c) = (degrees as f64).to_radians().sin_cos();
     let a = axis.map(|v| v as f64);
     let v = [p[0] - pivot[0], p[1] - pivot[1], p[2] - pivot[2]];
     let dot = a[0] * v[0] + a[1] * v[1] + a[2] * v[2];

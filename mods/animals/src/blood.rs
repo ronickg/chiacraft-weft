@@ -34,6 +34,7 @@ pub fn init(r: &mut Registry) {
         .size(sw, sh)
         .walk_speed(0.0)
         .passive()
+        .invulnerable()
         .unpushable()
         .model_file("blood_spot")
         .texture("carcass/bones")
