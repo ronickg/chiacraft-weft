@@ -485,6 +485,23 @@ const PT_RES_CAP: f32 = 64.0;
 const PT_RES_NEAR: f32 = 6.0;
 // The draws the pixel's reservoir stood for this frame (debug view 20).
 var<private> PT_RES_M: f32 = 0.0;
+// Debug view 21: for the pixel's first fresh draw, which of `pt_nee_target`'s tests pass (red in
+// reach, green not behind the face, blue facing it).
+var<private> PT_NEE_DBG: vec3<f32> = vec3(0.0);
+
+fn pt_nee_tests(world: vec3<f32>, n: vec3<f32>, ng: vec3<f32>, lamp: PtLamp) -> vec3<f32> {
+    let l = lamp.word;
+    let e = f32(max((l >> 18u) & 15u, max((l >> 22u) & 15u, (l >> 26u) & 15u)));
+    let small = ((l >> 30u) & 1u) == 1u;
+    let fade = pt_nee_fade(e, vec3<f32>(lamp.lp) + 0.5 - world);
+    var to = vec3<f32>(lamp.lp) + select(vec3(0.5), vec3(0.5, 0.6, 0.5), small) - world;
+    let behind = -dot(to, ng);
+    if behind >= 0.0 {
+        to += ng * (behind + 0.05);
+    }
+    let cs = pt_nee_cos(n, ng, normalize(to));
+    return vec3(select(0.0, 1.0, fade > 0.0), select(0.0, 1.0, behind <= 1.0), select(0.0, 1.0, cs > 0.0));
+}
 
 // The face a reservoir is for: its block's low 9 bits an axis, the face's way (1-6).
 fn pt_res_check(cell: vec3<i32>, ng: vec3<f32>) -> u32 {
@@ -506,8 +523,8 @@ fn pt_res_diff(theirs: u32, mine: u32) -> vec3<i32> {
 }
 
 // The lamps' light at a surface at `world` (`rel` camera relative), its shading normal `n` and
-// face's `ng`: rgb in the world's light units, a as `pt_block_visibility`'s y (1 a light drawn;
-// 0 no list for the cube, -1 none in reach, -2 no lights at all). `at`: the pixel whose reservoir
+// face's `ng`: rgb in the world's light units, a as `pt_block_visibility`'s y (1 lamps in the
+// list, drawn or none lighting this face; 0 no list for the cube, -2 no lights at all). `at`: the pixel whose reservoir
 // it keeps and reuses (`0xffffffff` none: the bounce's surface), `pix` that pixel.
 fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>, lift: vec3<f32>, px: vec2<f32>, at: u32, pix: vec2<i32>) -> vec4<f32> {
     let reuse = at != 0xffffffffu && (pt.flags & 2u) != 0u;
@@ -533,6 +550,9 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
             let l = pt_lights[base + r.x + t];
             let lamp = PtLamp(vec3<i32>(i32(l & 63u), i32((l >> 6u) & 63u), i32((l >> 12u) & 63u)) - 16 + cube * 16, l, f32(pt_lights[strengths + r.x + t]) * 0.25);
             m += 1.0;
+            if k == 0u && pt.debug == 21u {
+                PT_NEE_DBG = pt_nee_tests(world, n, ng, lamp) * select(1.0, 0.5, lamp.strength <= 0.0);
+            }
             let p = pt_nee_target(world, n, ng, lamp);
             if p <= 0.0 {
                 continue;
@@ -586,7 +606,11 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     }
     if !found || y_p <= 0.0 {
         PT_RES_M = m;
-        return vec4(0.0, 0.0, 0.0, select(-1.0, 0.0, total == 0u));
+        // Lamps in the list but none lighting this face (all behind it or out of reach): none of
+        // their light, not the lightmap's. The lightmap's floods round a wall, so falling back to
+        // it lit a wall's near face from a torch behind it (s2l wall); it stays only where the
+        // cube has no list (`0`).
+        return vec4(0.0, 0.0, 0.0, select(1.0, 0.0, total == 0u));
     }
     // The draws the chosen lamp stands for: this pixel's fresh ones, and each reused reservoir's
     // only where that lamp could light the reservoir's own surface (its block, this face). Counting
@@ -1027,6 +1051,8 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 19u: { out = direct; }
             // 20: the draws the lamps' reservoir stood for (ReSTIR): black 0, white `PT_RES_CAP`.
             case 20u: { out = vec3(PT_RES_M / PT_RES_CAP); }
+            // 21: the first fresh draw's tests (`PT_NEE_DBG`; half bright when its strength is 0).
+            case 21u: { out = PT_NEE_DBG; }
             // 15: the traced block lights: green seen, red hidden; no light drawn: blue no list for
             // the cube, cyan none in reach, magenta no lights at all; black no block light.
             case 15u: {

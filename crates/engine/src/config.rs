@@ -653,9 +653,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:rt_reflections", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // Path traced lighting over the traced scene (reports/Path tracing plan.md; M0: the sun and
         // one bounce on the terrain, with a shader pack that has `pathtrace.wgsl`); its debug views
-        // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends; 8-12 timing only: the trace stopped after its primary test, the sun, the bounce, with no specular ray, before any ray, without the air's haze; 14 the block light, 15 the traced block lights seen/hidden, 17-18 plain's sky share and sun, 19 the lamps' own light under `core:pt_emissive`, 20 the draws its reservoir stands for under `core:pt_restir`).
+        // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends; 8-12 timing only: the trace stopped after its primary test, the sun, the bounce, with no specular ray, before any ray, without the air's haze; 14 the block light, 15 the traced block lights seen/hidden, 17-18 plain's sky share and sun, 19 the lamps' own light under `core:pt_emissive`, 20 the draws its reservoir stands for under `core:pt_restir`, 21 which of a drawn lamp's tests pass).
         number("core:path_traced", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
-        number("core:pt_debug", ck::INT, 0.0, 0.0, 20.0, 1.0),
+        number("core:pt_debug", ck::INT, 0.0, 0.0, 21.0, 1.0),
         // chiacraft: path tracing lit with vanilla's math (texture x tint x face shade x the
         // lightmap's curve, no grade, no haze), its sky level the traced sky's share and the sun's
         // shadow: what tracing adds over vanilla, for the stage-1 compare (checks, no menu row).
