@@ -315,6 +315,8 @@ fn craft_result(m: &MenuCtx) {
     let made = recipe_grid_output(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
     // Food made of food is as far along as its stalest part, and nothing comes of spoiled food.
     let made = crate::survival::crafted(&cells, made, m.world().day_time());
+    // Clothes of hides as good as their worst hide (`clothing.rs`).
+    let made = crate::clothing::crafted(&cells, made);
     // An axe lashed by hand takes its parts from the grid (`first.rs`).
     let made = crate::first::finish(&m.world(), m.player(), &cells, made, None);
     // Nothing a blueprint not yet read teaches (`ruins.rs`).

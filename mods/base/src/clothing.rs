@@ -98,7 +98,34 @@ const INFLATE: [f32; 4] = [0.45, 0.3, 0.25, 0.35];
 /// through death.
 static DRESSED: Component<u8> = Component::named("base:dressed");
 
+/// A garment sewn of hides takes their quality (`base:hide_quality`, the worst one's: `vitals::clothing::sewn_quality`),
+/// which scales its warmth; anything else is made as it was.
+pub fn crafted(cells: &[ItemStack], made: ItemStack) -> ItemStack {
+    if made.is_empty() {
+        return made;
+    }
+    let name = item_name(made.item);
+    let hide = clothing::piece_of(name).is_some_and(|(m, _)| m.name == "fur" || m.name == "hide")
+        || clothing::cloak_of(name).is_some_and(|c| c.name != "wool_cloak");
+    if !hide {
+        return made;
+    }
+    let of_hide = cells
+        .iter()
+        .filter(|s| !s.is_empty() && (PELTS.on_item(s.item) || LEATHER.on_item(s.item) || base_api::HIDE_QUALITY.on_stack(s).is_some()))
+        .map(|s| base_api::HIDE_QUALITY.on_stack(s).unwrap_or(0));
+    match clothing::sewn_quality(of_hide) {
+        Some(q) => made.with(&base_api::HIDE_QUALITY, q),
+        None => made,
+    }
+}
+
+/// What a hide garment is sewn of: pelts and leather.
+static PELTS: Tag = Tag::named("pelts");
+static LEATHER: Tag = Tag::named("leather");
+
 pub fn register(r: &mut Registry) {
+    r.stack_component(&base_api::HIDE_QUALITY, 0);
     r.entity_component(&DRESSED, 0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
     r.edit(&PLAYER).attach(&DRESSED);
     r.entity_component(&base_api::MILESTONES, 0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);

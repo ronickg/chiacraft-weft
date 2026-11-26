@@ -1,24 +1,34 @@
 //! Paints the dead bodies' texture in sample coats, for `mods/animals/source/carcass/sheet.py --coats`:
 //! `cargo run -p animals_core --bin carcass_coats -- <body.png> <out dir> [species ...]` writes
 //! `<out>/<species>_<n>.png` (four wild individuals each, their genes drawn from the species' wild pool) through
-//! `coats::paint_dead`, as the game paints a carcass.
+//! `coats::paint_dead`, as the game paints a carcass; the first also at rot steps (`<species>_0_rot<k>.png`, `rot_tint`),
+//! for `sheet.py --rot`. `-- --gore <bones.png> <out dir>` writes the blood pool's texture at each rot step
+//! (`gore_rot<k>.png`, `gore_tint`).
 
-use animals_core::carcass::{COAT_RGB, UNDER_RGB, body_scale, plan_of};
+use animals_core::carcass::{COAT_RGB, ROT_STEPS, UNDER_RGB, body_scale, gore_tint, plan_of, rot_tint};
 use animals_core::coats::{paint_dead, sample, wild_pool};
 use animals_core::species::SPECIES;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--gore") {
+        let (Some(src), Some(out)) = (args.get(2), args.get(3)) else {
+            eprintln!("usage: carcass_coats --gore <bones.png> <out dir>");
+            std::process::exit(2);
+        };
+        let (tex, w, h) = read(src);
+        for k in 0..=ROT_STEPS {
+            let mut r = tex.clone();
+            gore_tint(&mut r, k);
+            write(&format!("{out}/gore_rot{k}.png"), &r, w, h);
+        }
+        return;
+    }
     let (Some(src), Some(out)) = (args.get(1), args.get(2)) else {
         eprintln!("usage: carcass_coats <body.png> <out dir> [species ...]");
         std::process::exit(2);
     };
-    let mut d = png::Decoder::new(std::io::BufReader::new(std::fs::File::open(src).expect("texture")));
-    d.set_transformations(png::Transformations::EXPAND | png::Transformations::ALPHA);
-    let mut r = d.read_info().expect("png");
-    let mut tex = vec![0; r.output_buffer_size().expect("size")];
-    let info = r.next_frame(&mut tex).expect("frame");
-    let (w, h) = (info.width as usize, info.height as usize);
+    let (tex, w, h) = read(src);
     let names: Vec<&str> = if args.len() > 3 {
         args[3..].iter().map(String::as_str).collect()
     } else {
@@ -46,15 +56,34 @@ fn main() {
             let Some(g) = sample(i, n % 2 == 0, &pool, &mut rng) else { continue };
             let mut rgba = tex.clone();
             paint_dead(&g, &mut rgba, w, h, scale, COAT_RGB, UNDER_RGB);
-            let path = format!("{out}/{name}_{n}.png");
-            let f = std::io::BufWriter::new(std::fs::File::create(&path).expect("out"));
-            let mut e = png::Encoder::new(f, w as u32, h as u32);
-            e.set_color(png::ColorType::Rgba);
-            e.set_depth(png::BitDepth::Eight);
-            e.write_header()
-                .and_then(|mut wr| wr.write_image_data(&rgba))
-                .expect("write");
-            println!("{path}");
+            write(&format!("{out}/{name}_{n}.png"), &rgba, w, h);
+            if n == 0 {
+                for k in [2, ROT_STEPS - 1, ROT_STEPS] {
+                    let mut r = rgba.clone();
+                    rot_tint(&mut r, k);
+                    write(&format!("{out}/{name}_0_rot{k}.png"), &r, w, h);
+                }
+            }
         }
     }
+}
+
+fn read(path: &str) -> (Vec<u8>, usize, usize) {
+    let mut d = png::Decoder::new(std::io::BufReader::new(std::fs::File::open(path).expect("texture")));
+    d.set_transformations(png::Transformations::EXPAND | png::Transformations::ALPHA);
+    let mut r = d.read_info().expect("png");
+    let mut tex = vec![0; r.output_buffer_size().expect("size")];
+    let info = r.next_frame(&mut tex).expect("frame");
+    (tex, info.width as usize, info.height as usize)
+}
+
+fn write(path: &str, rgba: &[u8], w: usize, h: usize) {
+    let f = std::io::BufWriter::new(std::fs::File::create(path).expect("out"));
+    let mut e = png::Encoder::new(f, w as u32, h as u32);
+    e.set_color(png::ColorType::Rgba);
+    e.set_depth(png::BitDepth::Eight);
+    e.write_header()
+        .and_then(|mut wr| wr.write_image_data(rgba))
+        .expect("write");
+    println!("{path}");
 }

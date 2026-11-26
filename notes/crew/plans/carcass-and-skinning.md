@@ -131,6 +131,27 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   feet and blazes land where they grow, its underside share, white and points zones), keeping the shared texture's
   painted light by its brightness. Offline: `cargo run -p animals_core --bin carcass_coats` then `sheet.py --coats`
   (jaguar rosettes, tabby and white cats, striped raptors, archived).
-- Left for later: vultures
-  fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
+- Rot drawn (Planner 11-26, "rot tint and flies" first of the four): the body's coat is repainted at each rot step
+  (`animals_core::carcass::rot_step`: 0 fresh, 1-5 through the bloat, 6 at remains), turning toward a dull green-black
+  as it bloats and a dry grey-brown at remains, bright texels darkening most (`rot_tint`, `BLOAT_RGB`, `DRY_RGB`,
+  `ROT_DARKEN`, pale bellies too, by `DRY_DARKEN` at remains), the opened flesh and ribs rotting with it, a dull
+  red-brown through the bloat and a dark dried brown at remains (`MEAT_ROT_RGB`, `MEAT_DRY_RGB`; Planner on
+  sheet_rot: the meat stayed fresh red, the bellies went mint); the blood pool under it too (`gore_tint`: darker
+  red-brown through the bloat, a dry dark stain under the remains' bones, gone with the pile; `has_gore`, synced as
+  `carcass_gore_rot`; offline `carcass_coats --gore`); blow flies dart over it while it bloats (`FLIES` over a deer-sized body, as many again per body as big
+  by area, `DRY_FLIES` of them at remains, none at bones), drawn on each client as short-lived particles
+  (`carcass_fly`). The step and the flies ride in the synced `Dead` (`carcass_genome`) with the genes, so a step
+  repaints the coat. `/animalprof carcass` lists both. Offline: `sheet.py --rot`. The golden eagle's coat now has its
+  coverts' paler mottling (living and dead: a plain brown read flat).
+- Vultures (Planner 11-26, second of the four): a carcass is eaten a mouthful at a time, each the eater's own
+  (`animals_core::carcass::bite_kg`: `MOUTHFUL` 3 % of its mass, no more than it still needs, at least
+  `MOUTHFUL_MIN_KG`; a turkey vulture 40 g, a wolf a kilo), one a chew, so a 1.4 kg vulture feeds four mouthfuls to
+  its 140 g meal; the fixed 0.5 kg bite filled it at once and took the rest off the body for nothing. Check:
+  cov_carcass_vultures (part 2 alone, watched 4 minutes).
+- Hide quality (Planner 11-26, fourth of the four): the skinned stack carries `base:hide_quality` (base_api, was
+  `animals:pelt_quality`), kept through tanning (`crafts.rs`: leather of one quality stacks alone) and sewing
+  (`clothing.rs` `crafted`, the crafting grid and the book: a garment as good as its worst hide, an unknown one as
+  good); fur and leather clothes and cloaks warm by `vitals::clothing::HIDE_WARMTH` (poor 0.85, good 1, perfect
+  1.15) in `survival/temperature.rs`. The tooltip (`tagged.base.hide_quality`, en and ru) gives stars and the warmth.
+- Left for later: species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.

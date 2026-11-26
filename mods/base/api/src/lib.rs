@@ -514,6 +514,9 @@ value! {
     pub struct Keeps { pub larder: u16, pub cold: u16 }
 }
 pub static KEEPS: Component<Keeps> = Component::named("base:keeps");
+/// A hide's quality from skinning (1 poor, 2 good, 3 perfect; the animals mod's carcasses), kept through tanning into
+/// leather and sewing into clothes, whose warmth it scales (`vitals::clothing::hide_warmth`); 0 or none: not known.
+pub static HIDE_QUALITY: Component<u32> = Component::named("base:hide_quality");
 /// A food stack's tick of making + `MADE_BASE` + 1 (0: not stamped yet; moved on by where it sat, `vitals::rot`), the second it came hot off the fire
 /// (gone once it cools, `vitals::food::HOT_FOR`), and how fresh it is now (`freshness`): stamped
 /// in a player's inventory as it ages, so stacks of a day stack and the tooltip can say it.

@@ -1,7 +1,8 @@
 # Carcasses (slices 1 and 2). Part 1: three hungry grey wolves and two fed white-tailed deer: the kill leaves a carcass
 # ("carcass N of white_tailed_deer") that the pack's meal opens or takes to bones ("carcass N of ... now Opened/Bones").
 # Part 2: a white-tailed deer killed by the player (no drops now: "skinning only"; drawn as the deer lying dead) and two hungry
-# turkey vultures: "smells carrion", "animal N eats 0.50 kg off carcass M", its look stepping down. Part 3: a white-tailed
+# turkey vultures: "smells carrion", "animal N eats 0.04 kg off carcass M" a few times each (a mouthful its size, one a
+# chew) until full, the body still whole (two 140 g meals off a 40 kg deer). Part 3: a white-tailed
 # deer (not a red deer: a Large animal's blow cap kept r1's alive) killed by the player, then aged by `/animalprof carcass <days>`: 3 days (opened), 5 (bones), 9 (a pile), 13 (gone).
 # Part 4: skinning: a white-tailed deer killed with one blow, the player with a (flint) knife uses its carcass: kneels, the camera
 # comes in beside them (shot 8 is taken mid-skin from the player's own camera), and after about 8 s "skinned carcass N
@@ -171,6 +172,16 @@ shot cov_carcass_3_vultures.png
 press core:hide_hud
 chat /tick unfreeze
 wait 1
+chat /tick freeze
+chat /tp 203 72 554
+look 37 -22
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_3_vultures_low.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
 chat /tp 400 90 544
 wait 4
 chat /tk fill 384 60 528 416 68 560 base:dirt
@@ -325,6 +336,16 @@ shot cov_carcass_9_low.png
 press core:hide_hud
 chat /tick unfreeze
 wait 1
+press core:inventory
+wait 1
+cursor 0.547 0.710
+wait 1
+shot cov_carcass_10_tooltip_slot2.png
+cursor 0.576 0.710
+wait 1
+shot cov_carcass_10_tooltip_slot3.png
+press core:inventory
+wait 1
 chat /tp 1000 90 544
 wait 4
 chat /tk fill 984 60 528 1016 68 560 base:dirt
@@ -477,8 +498,22 @@ press core:hide_hud
 wait 0.5
 shot cov_carcass_12_low_opened_pacu.png
 press core:hide_hud
+chat /tp 993.2 68.9 551.2
+look 39 -12
+wait 3
+press core:hide_hud
+wait 0.5
+shot cov_carcass_13_flies_wolf_frozen.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
+chat /tp 993.2 68.9 551.2
+look 39 -12
+wait 3
+press core:hide_hud
+wait 0.5
+shot cov_carcass_13_flies_wolf.png
+press core:hide_hud
 chat /tp 1000 75 550
 chat /animalprof carcass 2
 wait 2

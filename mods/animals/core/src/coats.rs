@@ -1355,11 +1355,14 @@ fn eagle(r: &Read, hawk: bool) -> Look {
         };
     }
     let base = mix([70.0, 52.0, 40.0], [112.0, 82.0, 58.0], tone);
+    let nape = mix([180.0, 132.0, 72.0], [214.0, 172.0, 104.0], tone);
     Look {
         name: if tone < 0.35 { "Dark brown".into() } else { "Brown, golden nape".into() },
         base,
         under: mix([112.0, 86.0, 64.0], [150.0, 114.0, 80.0], tone),
-        points: Some(mix([180.0, 132.0, 72.0], [214.0, 172.0, 104.0], tone)),
+        points: Some(nape),
+        // The wing coverts' paler tawny edges, mottling the brown (Planner on the carcass sheet: a plain brown read flat).
+        pattern: Some(Pattern { kind: "mottle", color: mix(base, nape, 0.45), amount: 0.5 }),
         ..Look::default()
     }
 }

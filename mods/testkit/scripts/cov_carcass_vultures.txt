@@ -1,0 +1,133 @@
+# Vultures alone (cov_carcass part 2, watched 4 minutes): a white-tailed deer killed by the player, two hungry turkey
+# vultures (food 0.2) come to it. Report each "animal N eats K kg off carcass M: food F of MAX" line: K about 0.04,
+# a few per vulture 30 s apart, F rising to full, then it leaves; the carcass rows' kg eaten (about 0.3 at most), the
+# body still whole; and the shots (3_vultures, 3_vultures_low): the vultures at or near the body.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 200 90 544
+wait 4
+chat /tk fill 184 60 528 216 68 560 base:dirt
+chat /tk fill 184 69 528 216 69 560 base:grass
+chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 86 528 216 110 560 core:air
+chat /tk fill 184 111 528 216 140 560 core:air
+chat /tk fill 184 70 561 216 100 576 core:air
+chat /time set 6000
+chat /tk fill 199 69 543 201 69 545 base:water
+chat /tk fill 199 70 543 201 70 545 core:air
+wait 1
+chat /tk spawn animals:white_tailed_deer 200 70 550
+wait 2
+chat /tk mode creative
+chat /tp 200 71 554
+look 0 -30
+wait 1
+chat /animalprof kill
+wait 2
+chat /animalprof carcass
+chat /tick freeze
+chat /tp 203 72 554
+look 37 -22
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_vultures_2_killed.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tick freeze
+chat /tp 203 68.9 553
+look 45 -5
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_vultures_2_low.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tk spawn animals:turkey_vulture 210 70 532
+chat /tk spawn animals:turkey_vulture 212 70 532
+wait 2
+chat /animalprof food 0.2
+chat /tk mode spectator
+chat /tp 200 90 564
+wait 1
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /animalprof carcass
+wait 10
+chat /tick freeze
+chat /tp 200 82 552
+look 0 -35
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_vultures_3_vultures.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tick freeze
+chat /tp 203 72 554
+look 37 -22
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_vultures_3_vultures_low.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+quit

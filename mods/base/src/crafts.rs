@@ -205,14 +205,21 @@ fn tick(b: &mut SystemBatch<Waiting>) {
         };
         let Some(out_item) = Item::lookup(c.output) else { continue };
         let out = output.get(0);
-        let fits = out.is_empty() || (out.item == out_item && out.count + st.count <= max_stack(out_item));
+        // A hide tanned keeps its quality from skinning (`base:hide_quality`): leather of one quality stacks alone.
+        let quality = base_api::HIDE_QUALITY.on_stack(&st);
+        let fits = out.is_empty()
+            || (out.item == out_item && base_api::HIDE_QUALITY.on_stack(&out) == quality && out.count + st.count <= max_stack(out_item));
         if !is(st.item, c.input) || !enough_with || !fits {
             s.done = 0.0;
             continue;
         }
         s.done = (s.done + ticks as f32 / (c.secs() * vitals::TICKS as f32)).min(1.0);
         if s.done >= 1.0 {
-            output.set(0, if out.is_empty() { ItemStack::new(out_item, st.count) } else { out.grow(st.count) });
+            let made = match quality {
+                Some(q) => ItemStack::new(out_item, st.count).with(&base_api::HIDE_QUALITY, q),
+                None => ItemStack::new(out_item, st.count),
+            };
+            output.set(0, if out.is_empty() { made } else { out.grow(st.count) });
             if let Some(g) = with {
                 g.set(0, g.get(0).shrink(st.count));
             }

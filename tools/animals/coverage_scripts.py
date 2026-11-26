@@ -374,7 +374,8 @@ s = head("carcass", [
     "Carcasses (slices 1 and 2). Part 1: three hungry grey wolves and two fed white-tailed deer: the kill leaves a carcass",
     "(\"carcass N of white_tailed_deer\") that the pack's meal opens or takes to bones (\"carcass N of ... now Opened/Bones\").",
     "Part 2: a white-tailed deer killed by the player (no drops now: \"skinning only\"; drawn as the deer lying dead) and two hungry",
-    "turkey vultures: \"smells carrion\", \"animal N eats 0.50 kg off carcass M\", its look stepping down. Part 3: a white-tailed",
+    "turkey vultures: \"smells carrion\", \"animal N eats 0.04 kg off carcass M\" a few times each (a mouthful its size, one a",
+    "chew) until full, the body still whole (two 140 g meals off a 40 kg deer). Part 3: a white-tailed",
     "deer (not a red deer: a Large animal's blow cap kept r1's alive) killed by the player, then aged by `/animalprof carcass <days>`: 3 days (opened), 5 (bones), 9 (a pile), 13 (gone).",
     "Part 4: skinning: a white-tailed deer killed with one blow, the player with a (flint) knife uses its carcass: kneels, the camera",
     "comes in beside them (shot 8 is taken mid-skin from the player's own camera), and after about 8 s \"skinned carcass N",
@@ -396,13 +397,22 @@ s += spawns(x, [("grey_wolf", 3, 8, -10)])
 # Hungrier than the hunters runs (r3's wolves rested 100 s at 30 %, and the part ended before their kill).
 s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.15"]
 s += watch(x, 12) + carcass_rows(4) + shot(x, "cov_carcass_1_wolves", z_back=18, pitch=-40)
+
+
+def vultures_part(x, p="cov_carcass", rows=10):
+    """Part 2: a white-tailed deer killed by the player, then two hungry turkey vultures at its carcass, each eating
+    mouthfuls of its own size (`animals_core::carcass::bite_kg`: about 40 g, one a chew) until full."""
+    out = pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
+    out += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2"]
+    out += ["chat /animalprof carcass"] + side_shot(x, f"{p}_2_killed") + low_shot(x, f"{p}_2_low")
+    out += spawns(x, [("turkey_vulture", 2, 10, -12)]) + ["chat /animalprof food 0.2"]
+    out += ["chat /tk mode spectator", f"chat /tp {x} 90 {Z+20}", "wait 1"] + carcass_rows(rows)
+    out += shot(x, f"{p}_3_vultures", z_back=8, pitch=-35) + side_shot(x, f"{p}_3_vultures_low")
+    return out
+
+
 x = 200
-s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
-s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2"]
-s += ["chat /animalprof carcass"] + side_shot(x, "cov_carcass_2_killed") + low_shot(x, "cov_carcass_2_low")
-s += spawns(x, [("turkey_vulture", 2, 10, -12)]) + ["chat /animalprof food 0.2"]
-s += ["chat /tk mode spectator", f"chat /tp {x} 90 {Z+20}", "wait 1"] + carcass_rows(10)
-s += shot(x, "cov_carcass_3_vultures", z_back=8, pitch=-35)
+s += vultures_part(x)
 x = 400
 s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
 s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
@@ -424,7 +434,13 @@ def skin_part(x, prefix="cov_carcass"):
         # r7's deer died 2 blocks west of the aim line and the use hit the grass: face the body itself (`aim`).
         f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "aim 6", "wait 1", "press core:use", "wait 4",
         f"shot {prefix}_8_skinning.png", "wait 9", "chat /animalprof carcass"] + \
-        side_shot(x, f"{prefix}_9_skinned") + low_shot(x, f"{prefix}_9_low")
+        side_shot(x, f"{prefix}_9_skinned") + low_shot(x, f"{prefix}_9_low") + [
+        # The hide's tooltip (its quality's stars, `tagged.base.hide_quality`): the inventory open, the cursor on the
+        # hotbar row's second and third slots (the knife in the first; the hide, then the venison, after it), at GUI
+        # scale 2 in 1280 x 720 (skin r3: the creative inventory, its palette on the left, the player's hotbar row
+        # at the bottom right). Not hidden with the HUD.
+        "press core:inventory", "wait 1", "cursor 0.547 0.710", "wait 1", f"shot {prefix}_10_tooltip_slot2.png",
+        "cursor 0.576 0.710", "wait 1", f"shot {prefix}_10_tooltip_slot3.png", "press core:inventory", "wait 1"]
 
 
 s += skin_part(x)
@@ -453,23 +469,41 @@ def plans_part(x, p="cov_carcass"):
                 f"chat /tp {x-8} 72.8 {Z+6}", "look 0 -89", "wait 2", f"shot {p}_{n+1}_wolf_above_{stage}.png"]
         for name, _, dx in PLANS:
             out += [f"chat /tp {x+dx+1.6} 68.9 {Z+7.8}", "look 39 -9", "wait 2", f"shot {p}_{n}_low_{stage}_{name}.png"]
+        if stage == "opened":
+            # Its flies close, ticks frozen (Planner on sheet_rot), then running.
+            out += [f"chat /tp {x-8+1.2} 68.9 {Z+7.2}", "look 39 -12", "wait 3", f"shot {p}_{n+1}_flies_wolf_frozen.png"]
         out += ["chat /tick unfreeze", "wait 1"]
+        if stage == "opened":
+            # Its flies (client particles, drawn with ticks running): the wolf at 3 days bloats, rot step 3.
+            out += [f"chat /tp {x-8+1.2} 68.9 {Z+7.2}", "look 39 -12", "wait 3", f"shot {p}_{n+1}_flies_wolf.png"]
     return out
 
 
 s += plans_part(x)
 # Every shot without the HUD (Planner on r7: the chat log covered half of each frame): F1 off, shoot, F1 on.
-s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") and "tooltip" not in l else [l])]
 write("carcass", s)
 
 # Part 4 alone, for the kneel and the skinning camera (Planner on r9: the kneeling player read as oversized boxes).
 s = head("carcass_skin", [
     "Skinning alone (cov_carcass part 4): a white-tailed deer killed with one blow, skinned with a flint knife. Shot 8:",
-    "mid-skin from the skinning camera (the player kneeling beside the body, the knife, the body on its pool); 9: after.",
+    "mid-skin from the skinning camera (the player kneeling beside the body, the knife, the body on its pool); 9: after;",
+    "10_tooltip_slot2/3: the inventory open, the cursor on the hotbar row's 2nd and 3rd slots: the hide's tooltip with its",
+    "stars (\"★★☆ Good hide\" or the like) in one of them.",
     "Report the \"skins carcass\" and \"skinned carcass\" lines and the shots.",
 ]) + skin_part(600, "cov_carcass_skin")
-s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") and "tooltip" not in l else [l])]
 write("carcass_skin", s)
+
+# Part 2 alone, longer, for the scavengers' mouthfuls (Planner 11-26: vultures filled after one 0.5 kg bite).
+s = head("carcass_vultures", [
+    "Vultures alone (cov_carcass part 2, watched 4 minutes): a white-tailed deer killed by the player, two hungry turkey",
+    "vultures (food 0.2) come to it. Report each \"animal N eats K kg off carcass M: food F of MAX\" line: K about 0.04,",
+    "a few per vulture 30 s apart, F rising to full, then it leaves; the carcass rows' kg eaten (about 0.3 at most), the",
+    "body still whole; and the shots (3_vultures, 3_vultures_low): the vultures at or near the body.",
+]) + vultures_part(200, "cov_carcass_vultures", rows=24)
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") and "tooltip" not in l else [l])]
+write("carcass_vultures", s)
 
 # Part 5 alone, for the body plans' looks (Planner on r10: the wolf read as standing; the bones and piles specks).
 s = head("carcass_plans", [
@@ -477,6 +511,10 @@ s = head("carcass_plans", [
     "row, then aged: whole, opened (3 days), bones (5), pile (9). Per stage: the row (_plans_), the wolf from straight",
     "above (_wolf_above_: legs out sideways flat on the ground, not under it), and each body close and low (_low_).",
     "Report whether each lies on its side (the caiman on its belly), rests on the ground, and is its own animal's shape.",
+    "Rot: whole fresh in its own coat; opened (3 days, bloating) duller and greener; bones and pile (remains) a dry",
+    "grey-brown. 13_flies_wolf: small dark flies darting over the opened wolf (ticks running). Report each carcass's",
+    "\"rot step\" and \"flies\" from the /animalprof carcass lines. The blood pool: under the opened bodies a darker",
+    "red-brown than r4's bright red, under the bones (remains) a dry dark brown-black stain, none under the pile.",
 ]) + plans_part(1000, "cov_carcass_plans")
-s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") and "tooltip" not in l else [l])]
 write("carcass_plans", s)
