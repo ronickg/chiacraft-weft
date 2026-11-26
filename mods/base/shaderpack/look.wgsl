@@ -50,7 +50,10 @@ fn rain_on_ground(c_in: vec3<f32>, n: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>,
     // wetter (roughness (1 - smoothness)^2), and the sun's highlight sharpens with it (`rain_sun`,
     // world.wgsl) and the screen's reflections take it up (`mirror_alpha`). Method only.
     if fantasy_opt(OPT_RAIN_DARK) < 0.5 {
-        let w = rain_smooth(sky, pos);
+        // Side faces half as smooth (Bliss's own (n.y / 2 + 1/2), from its puddles' shape): fully wet
+        // and mirror-smooth, a wall seen edge-on mirrored the bright sky as a flat pale slab, brighter
+        // than anything on the slope (lksp_rainconfw, lksp_wetfacesw; Planner 11-26: a roughness floor).
+        let w = rain_smooth(sky, pos) * clamp(n.y * 0.5 + 0.5, 0.0, 1.0);
         if w > 0.0 {
             let v = -normalize(rel);
             let rough = (1.0 - w) * (1.0 - w);
@@ -63,7 +66,11 @@ fn rain_on_ground(c_in: vec3<f32>, n: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>,
             let f = 0.02 + 0.98 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
             // As `mat_shine`: a rough face mirrors little (leaves and plants as the rest, as Bliss).
             let gloss = 1.0 - clamp(rough * 1.6, 0.0, 0.85);
-            c = mix(c, seen, f * gloss);
+            // A look mirrored down meets the land, not the sky: Bliss's screen reflections find it
+            // there; where ours find nothing the sky stood in, and greying it (above) alone left the
+            // pale slabs (lksp_wetfacesw). So the sky's share fades out below the horizon.
+            let open = smoothstep(-0.2, 0.02, r.y);
+            c = mix(c, seen, f * gloss * open);
         }
         return c;
     }
