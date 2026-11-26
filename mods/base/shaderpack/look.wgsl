@@ -412,6 +412,8 @@ const LAND_MOON: f32 = 0.00229;
 // with the chain. Ours were set for the per-hour exposures; under Bliss's one log curve the night
 // came out much brighter than Bliss's dark navy (lkmxC1), whose moon is 1/1250 of its sun.
 const OPT_CHAIN_NIGHT: u32 = 73u;
+// How strongly rain and snow are drawn over the Bliss look (`base:look_weather`, 1 as made).
+const OPT_WEATHER: u32 = 74u;
 // How much of the sky's light's blue goes by day, with the chain. (The sun's light is already the
 // 4300 K of Ronald's profile through the air, `sun_kelvin_linear`, since 11-06.)
 const CHAIN_AMBIENT_GREY: f32 = 0.4;
