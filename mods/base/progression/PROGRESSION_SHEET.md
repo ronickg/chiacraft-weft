@@ -263,7 +263,7 @@ A saddle (and barding) of an age carries a tame up to that age's reference level
 
 ## Biome bosses
 
-Each boss is a titan at its form's age (`animals_core::bosses`): its numbers from the curve like any creature's, a fight of 2-5 minutes for a same-age player, the cap and the floor against over-tier gear. Seconds to kill and its hits to down the player (grade 4), by the player's age. Forms with no offering are data for later ages.
+Each boss is a titan at its form's age (`animals_core::bosses`): its numbers from the curve like any creature's, a fight of 2-5 minutes for a same-age player, the cap and the floor against over-tier gear. Seconds to kill and its hits to down the player (grade 4), by the player's age. Forms with no offering are data for later ages. One blow takes at most 80 % of a player's max health before the player's armour (`PLAYER_BLOW`), so a player at full health lives through any one; the hits column is the curve's, before that cap.
 
 | boss | form | offering | level | health | armour | hit | Stone | Bronze | Iron | Steam | Stars |
 |---|---|---|---|---|---|---|---|---|---|---|---|

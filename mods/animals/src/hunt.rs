@@ -31,6 +31,8 @@ static WARY: Component<u64> = Component::named("animal_wary");
 static CHARGING: Component<u64> = Component::named("animal_charging");
 /// When it last stood its ground (`stands_ground`; not saved): a stand that begins is shown by a rear.
 static STOOD: Component<u64> = Component::named("animal_stood");
+/// What hurt it and it turns on, until when, and when it last struck (`turn_on`; not saved).
+static TURNED: Component<[u64; 3]> = Component::named("animal_turned_on");
 /// Until when it walks a prowl's leg (`prowl`; not saved).
 static PROWL: Component<u64> = Component::named("animal_prowl");
 /// The pack's leader it follows as they prowl (0: none), and its legs so far (`prowl`; not saved).
@@ -43,6 +45,10 @@ static SITE: Component<[f64; 3]> = Component::named("animal_site");
 /// The water a prowl last reached, `[x, z, until]`: not a leg's goal again until then
 /// (`needs::SITE_AGAIN_SECS`).
 static WATER_SEEN: Component<[f64; 3]> = Component::named("animal_water_seen");
+/// The prey it set off after and what that weighed then, `[id, kg as f32 bits]` (not saved): the
+/// dead can't be read at the kill, and its kind's grown mass fed hunters a young one's carcass as
+/// a grown one's (cov_hunters run 4: a 2.7 kg young capybara eaten as 50 kg).
+static PREY_KG: Component<[u64; 2]> = Component::named("animal_prey_kg");
 
 /// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
 /// a dust storm close both in (`base_api::sight`).
@@ -62,16 +68,20 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&WARY, 0u64, 0);
     r.entity_component(&CHARGING, 0u64, 0);
     r.entity_component(&STOOD, 0u64, 0);
+    r.entity_component(&TURNED, [0u64; 3], 0);
     r.entity_component(&PROWL, 0u64, 0);
     r.entity_component(&FOLLOW, [0u64; 2], 0);
     r.entity_component(&LAST, 0u64, 0);
     r.entity_component(&SITE, [0.0; 3], 0);
     r.entity_component(&WATER_SEEN, [0.0; 3], 0);
+    r.entity_component(&PREY_KG, [0u64; 2], 0);
     for s in &SPECIES {
+        r.edit(s.kind).attach(&PREY_KG);
         r.edit(s.kind).attach(&HUNT);
         r.edit(s.kind).attach(&WARY);
         r.edit(s.kind).attach(&CHARGING);
         r.edit(s.kind).attach(&STOOD);
+        r.edit(s.kind).attach(&TURNED);
         r.edit(s.kind).attach(&PROWL);
         r.edit(s.kind).attach(&FOLLOW);
         r.edit(s.kind).attach(&LAST);
@@ -87,8 +97,27 @@ pub fn init(r: &mut Registry) {
         for d in b.iter() {
             let Some(a) = w.component(d.source, &ANIMAL) else { continue };
             let Some(s) = a.species().filter(|s| s.hunts()) else { continue };
-            // The prey's own mass if it can still be read (its genes and growth), its kind's if not.
-            let Some(prey) = mass(&w, d.entity).or_else(|| kind_mass(d.kind, None)) else { continue };
+            // The prey's own mass if it can still be read (its genes and growth), else what it weighed
+            // when the killer set off after it, else its kind's.
+            // A pack's kill may be made by another than the one that set off after it (r12_hunters:
+            // utahraptor 117 hunted, 115 killed): its kin near who knew the prey's mass count too.
+            let knew = |o: u64| {
+                w.component(o, &PREY_KG)
+                    .filter(|p| p[0] == d.entity)
+                    .map(|p| f32::from_bits(p[1] as u32))
+            };
+            let Some(prey) = mass(&w, d.entity)
+                .or_else(|| knew(d.source))
+                .or_else(|| {
+                    let at = w.entity(d.source)?.pos;
+                    w.entities_near(at, animals_core::needs::KILL_SHARED * 4.0, None)
+                        .into_iter()
+                        .find_map(knew)
+                })
+                .or_else(|| kind_mass(d.kind, None))
+            else {
+                continue;
+            };
             let Some(at) = w.entity(d.source).map(|e| e.pos) else { continue };
             let kind = w.entity(d.source).map(|e| e.kind);
             let mut eaters = vec![d.source];
@@ -124,13 +153,16 @@ pub fn init(r: &mut Registry) {
                 eaters.extend(on_it);
             }
             let kg = animals_core::needs::share(prey, eaters.len());
+            let mut ate = 0.0;
             for &e in &eaters {
                 let (Some(a), Some(own)) = (w.component(e, &ANIMAL), mass(&w, e)) else { continue };
+                // A full meal is the most it eats of its share (`needs::fills`).
+                ate += kg.min(own * animals_core::needs::MEAL);
                 let max = a.stat(species::FOOD);
                 let meal = (max * animals_core::needs::fills(own, kg)).round().max(1.0) as u16;
                 animal::feed(&w, e, meal);
                 weft_sdk::info!(
-                    "{} {e} eats {}'s kill ({kg:.1} of {prey:.1} kg of {}): food {} of {max:.0}",
+                    "{} {e} eats {}'s kill ({kg:.3} of {prey:.3} kg of {}): food {} of {max:.0}",
                     s.name,
                     d.source,
                     name_of(abi::entry_kind::ENTITY, d.kind),
@@ -138,6 +170,8 @@ pub fn init(r: &mut Registry) {
                 );
                 w.component_mut(e, &HUNT).map(|h| *h = [0; 4]);
             }
+            // What they ate is gone off the body (`carcass`): a pack's meal opens it, or leaves bones.
+            crate::carcass::taken(&w, d.entity, d.pos, ate);
         }
     });
 }
@@ -364,6 +398,8 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     w.component_mut(id, &PROWL).map(|p| *p = 0);
     w.component_mut(id, &FOLLOW).map(|f| *f = [0; 2]);
     weft_sdk::info!("{} {id} hunts {} ({kg:.1} kg, a pack of {pack})", s.name, t);
+    w.component_mut(id, &PREY_KG)
+        .map(|p| *p = [t, kg.to_bits() as u64]);
     // A pack hunts what it finds together, prey it could take alone too (wolves run deer down
     // as a pack): in ai1124_wolves1b each of three wolves took its own deer alone while the
     // others lay by.
@@ -625,8 +661,61 @@ pub fn on_hunt(w: &World, id: u64) -> bool {
     w.component(id, &HUNT).is_some_and(|h| h[0] != 0)
 }
 
+/// `id` turns on `target`, which hurt it (`taming::hurt`, a big plant eater): it charges it for
+/// `roles::TURN_SECS`.
+pub fn turn_on(w: &World, id: u64, target: u64) {
+    let until = w.game_time() + (animals_core::roles::TURN_SECS * 20.0) as u64;
+    if let Some(c) = w.component_mut(id, &TURNED) {
+        *c = [target, until, 0];
+    }
+}
+
+/// Charging what hurt it now (`turn_on`).
+pub fn turned_on(w: &World, id: u64) -> bool {
+    w.component(id, &TURNED)
+        .is_some_and(|c| c[0] != 0 && w.game_time() < c[1])
+}
+
+/// The charge at what hurt it (`turn_on`): it runs at it and strikes within `roles::CHARGE`, until
+/// its time is up, the target is gone (dead, or a player out of the game's reach: a spectator)
+/// or farther than `roles::TURN_GIVES_UP`.
+fn turned(w: &World, id: u64, st: &EntityState) -> bool {
+    use animals_core::roles;
+    let Some(c) = w.component(id, &TURNED).filter(|c| c[0] != 0) else { return false };
+    let now = w.game_time();
+    let target = w
+        .entity(c[0])
+        .filter(|t| t.health > 0.0)
+        .filter(|_| w.game_mode(c[0]) != abi::game_mode::SPECTATOR);
+    let Some(t) = target.filter(|t| now < c[1] && dist2(t.pos, st.pos) < roles::TURN_GIVES_UP * roles::TURN_GIVES_UP) else {
+        if let Some(c) = w.component_mut(id, &TURNED) {
+            *c = [0; 3];
+        }
+        weft_sdk::info!("animal {id} lets {} go", c[0]);
+        return false;
+    };
+    crate::senses::face(w, id, st, [t.pos.x as f32, t.pos.y as f32, t.pos.z as f32]);
+    crate::anim::hold(w, id, crate::anim::Act::Charge);
+    if (now + id).is_multiple_of(10) || !w.navigating(id) {
+        crate::wild::wake(w, id);
+        w.navigate(id, t.pos, roles::CHARGE_SPEED);
+    }
+    if dist2(t.pos, st.pos) <= roles::CHARGE * roles::CHARGE && now >= c[2] + (roles::TURN_HIT_SECS * 20.0) as u64 {
+        w.damage(c[0], Damage::new(t.max_health * roles::CHARGE_HIT, damage_cause::ATTACK).by(id));
+        if let Some(c) = w.component_mut(id, &TURNED) {
+            c[2] = now;
+        }
+        weft_sdk::info!("animal {id} charges {} (it hurt it)", c[0]);
+    }
+    true
+}
+
 pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     let now = w.game_time();
+    // It turned on what hurt it: it charges, whatever else it notices.
+    if turned(w, id, st) {
+        return true;
+    }
     // Running already; else it looks round once in `senses::EVERY` ticks (a tame never does: it
     // trusts its owner to keep it safe).
     if w.component(id, &WARY).is_some_and(|until| now < until) {

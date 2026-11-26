@@ -777,7 +777,12 @@ gpu_struct! {
         pub sky_landing: [f32; 4],
         /// What the pack's look works out once a frame (`client::frame_look`, a pack whose sky
         /// has `fs_frame_look`; chiacraft): x the bindless index + 1 of its row of texels (0:
-        /// none this frame, each shader works them out itself), yzw unused.
+        /// none this frame, each shader works them out itself); y the sky light where the eye is,
+        /// 0..1, eased over a couple of seconds (for packs' light from the open sky in caves, as
+        /// Iris's `eyeBrightnessSmooth`); z 1 when its pass was drawn with the soft clouds' sky
+        /// entry (their `instance_index`), else 0; w the bindless index + 1 of the HDR world's
+        /// exposure texel the last frame wrote (`post::Post::exposure_last`; g the view's mean), 0
+        /// without.
         pub frame_look: [f32; 4],
         /// The last lightning flash where the player is (a weather with `lightning`, chiacraft):
         /// x seconds since it began (1e4 when none yet; real time, not the shaders' clock, which
@@ -830,7 +835,9 @@ gpu_struct! {
         /// bindless index + 1 of its count image (r the frames gathered in each pixel, g how far
         /// the pixel moved this frame in pixels: a gathered picture is softer where it moves, and
         /// a pack may sharpen it more there); 0 without. y 1 when the world's pass has the motion
-        /// image (`core:aa` 1): shaders skip their motion's work without it. zw unused.
+        /// image (`core:aa` 1): shaders skip their motion's work without it. z the motion image's
+        /// bindless index + 1 (`post::Post::motion_index`; its w the weather's cover), for the
+        /// screen effects after the world; 0 without. w unused.
         pub taa_frame: [f32; 4],
         /// Under the backend's upscaler (DLSS, `post::set_upscaling`): x the texture mip bias, in
         /// levels (NVIDIA's log2(render / output) - 1; 0 without), which a pack's world shader adds

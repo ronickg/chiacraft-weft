@@ -468,7 +468,10 @@ fn client(r: &mut Registry) {
             ui.text_styled(S::column().class("dim").max_w(170.0), "levels.base.after_legend", &[]);
             ui.text_bind_styled(S::column().class("dim").max_w(170.0), |c, t| {
                 let (Some(v), Some(me)) = (c.component(&VITALS), c.player_state()) else { return };
-                t.set("levels.base.now", &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)]);
+                t.set(
+                    "levels.base.now",
+                    &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(crate::hud::shown_max(&v, &me).round() as i64)],
+                );
             });
             ui.text_bind_styled(S::column().class("dim").max_w(170.0), |c, t| {
                 let Some(v) = c.component(&VITALS) else { return };

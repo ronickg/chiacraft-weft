@@ -78,6 +78,11 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     ("egg_dromaeosaur_large", (0.4, 0.77)),
     ("egg_ceratopsian_small", (0.26, 0.17)),
     ("nest", (0.9, 0.15)),
+    // A carcass's placeholder looks at a 70 kg deer's size (`carcass::REF_KG`, `source/carcass`): a ribcage
+    // 1.7 blocks long, a pile of bones.
+    ("carcass_bones", (1.1, 0.4)),
+    ("carcass_pile", (0.9, 0.2)),
+    ("carcass_gore", (1.5, 0.1)),
     // A bird's cup nest (`source/nest/cup.py`), scaled up for bigger birds' eggs.
     ("nest_cup", (0.44, 0.17)),
 ];

@@ -588,12 +588,21 @@ pub fn wild_clutch(w: &World, id: u64, index: usize, st: &EntityState) -> bool {
     if crate::animal::tamed(w, id) || a.female == 0 || breeding::young(w, id) {
         return false;
     }
-    if w.entities_near(st.pos, 32.0, Some(s.kind)).len() >= CROWDED || nest_near(w, st.pos.to_array(), 24.0).is_some() {
-        return false;
+    // Why a grown wild female doesn't nest now (round 3 of cov_taming: a psittacosaurus didn't,
+    // with no line to tell why).
+    let no = |why: &str| {
+        weft_sdk::debug!("{} {id} doesn't nest: {why}", s.kind_name());
+        false
+    };
+    if w.entities_near(st.pos, 32.0, Some(s.kind)).len() >= CROWDED {
+        return no("crowded");
+    }
+    if nest_near(w, st.pos.to_array(), 24.0).is_some() {
+        return no("a nest within 24 blocks");
     }
     let feet = st.pos.to_array().map(|v| v.floor() as i32);
     if w.block(feet) != AIR.id() || w.block([feet[0], feet[1] - 1, feet[2]]) == AIR.id() {
-        return false;
+        return no("not on open ground");
     }
     let at = [feet[0] as f64 + 0.5, feet[1] as f64, feet[2] as f64 + 0.5];
     // A bird builds its cup; the others an earthen scrape (Tester 2's second run, 11-06: a wild
@@ -607,8 +616,8 @@ pub fn wild_clutch(w: &World, id: u64, index: usize, st: &EntityState) -> bool {
         }
     }
     let mut r = coats::world_rng(w);
-    let Some(pool) = crate::evolution::pool_at(w, index, st.pos.to_array()) else { return false };
-    let Some(father) = coats::sample(index, false, &pool, &mut r) else { return false };
+    let Some(pool) = crate::evolution::pool_at(w, index, st.pos.to_array()) else { return no("no gene pool here") };
+    let Some(father) = coats::sample(index, false, &pool, &mut r) else { return no("no father in the pool") };
     let generation = w.component(id, &BREEDING).map_or(0, |b| b.generation) + 1;
     let n = s.litter().0 + w.random_below(s.litter().1 - s.litter().0 + 1);
     let young: Vec<Young> = (0..n)
@@ -746,7 +755,7 @@ fn place(u: &mut ItemUse) -> bool {
 pub fn hurry(w: &World, at: [f64; 3]) {
     // Nothing left: it hatches at its next step whatever the air (with a little left, an egg in
     // air too cool to develop never did, B7's playtest).
-    for id in eggs_near(w, at, 16.0) {
+    for id in eggs_near(w, at, crate::breeding::HURRY_NEAR) {
         if let Some(e) = w.component_mut(id, &EGG) {
             e.left = 0;
         }

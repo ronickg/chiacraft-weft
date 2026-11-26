@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave,hit,carcass)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -296,6 +296,54 @@ pub fn init(r: &mut Registry) {
                 w.damage(id, Damage::new(1e6, damage_cause::ATTACK).by(cmd.player()));
                 format!("KILL {id}")
             }
+            "hit" => {
+                // The player hits the wild animal nearest him (within 48 blocks) for `value` damage
+                // (2 by default): it runs or turns on him, as its kind does (the coverage checks).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let near = w
+                    .entities_near(me.pos, 48.0, None)
+                    .into_iter()
+                    .filter(|&id| {
+                        w.component(id, &crate::animal::ANIMAL)
+                            .is_some_and(|a| a.species != 0)
+                            && !crate::animal::tamed(&w, id)
+                    })
+                    .filter_map(|id| Some((crate::dist2(w.entity(id)?.pos, me.pos), id)))
+                    .min_by(|a, b| a.0.total_cmp(&b.0));
+                let Some((_, id)) = near else { return };
+                let dmg = cmd.float("value").unwrap_or(2.0) as f32;
+                w.damage(id, Damage::new(dmg, damage_cause::ATTACK).by(cmd.player()));
+                format!("HIT {id} for {dmg}")
+            }
+            "love" => {
+                // Every grown wild animal within `value` blocks (24 by default) falls in love,
+                // wild (untamed, unlike `/animal love`): pairs meet and mate, for the young's
+                // coverage check (mothers whose young follow them).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let n = crate::breeding::wild_love_near(&w, me.pos, cmd.float("value").unwrap_or(24.0));
+                format!("LOVE {n}")
+            }
+            "feed" => {
+                // The player feeds what he holds to every wild animal within `value` blocks (4 by
+                // default) that would take it from his hand now: a passive kind asking for food,
+                // a knock-out kind out cold (the coverage checks: the testkit's `aim` + use
+                // missed lying animals and placed the kibble on the ground). The same code as
+                // the right click (`taming::feed`, `knockout::feed`).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let r = cmd.float("value").unwrap_or(4.0);
+                let fed: Vec<String> = w
+                    .entities_near(me.pos, r, None)
+                    .into_iter()
+                    .filter(|&id| !crate::animal::tamed(&w, id))
+                    .filter(|&id| {
+                        let out = w.component(id, &crate::knockout::KNOCKOUT).is_some_and(|k| k.out != 0);
+                        (out && crate::knockout::feed(&w, id, cmd.player()))
+                            || (crate::taming::asking(&w, id) && crate::taming::feed(&w, id, cmd.player()))
+                    })
+                    .map(|id| id.to_string())
+                    .collect();
+                format!("FED {}", fed.join(" "))
+            }
             "fear" => {
                 // The fear of the ground where the player stands, and red deer's (and hares')
                 // reputation of him there.
@@ -321,6 +369,11 @@ pub fn init(r: &mut Registry) {
                 crate::senses::WIND_TEST.store(v.to_bits(), Relaxed);
                 format!("animals' wind toward {v}")
             }
+            "carcass" => {
+                // Every carcass within 64 blocks: its look, kg eaten of what can be, days aged (`value` days more first).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                crate::carcass::report(&w, me.pos, cmd.float("value").unwrap_or(0.0) as f32)
+            }
             "where" => {
                 // Every wild animal within `value` blocks (256 by default): where it is, what it is
                 // doing, its food, water and health, for runs that follow a herd's wanderings.
@@ -333,14 +386,20 @@ pub fn init(r: &mut Registry) {
                         let a = w.component(id, &crate::animal::ANIMAL).filter(|a| a.species != 0)?;
                         let e = w.entity(id)?;
                         Some(format!(
-                            "{id} {} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}/{:.0}",
+                            "{id} {} {}{} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}/{:.0}",
                             a.species()?.name,
+                            if a.female != 0 { "F" } else { "M" },
+                            crate::breeding::young_note(&w, id),
                             e.pos.x,
                             e.pos.y,
                             e.pos.z,
-                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
-                                .get(crate::choose::doing(&w, id) as usize)
-                                .unwrap_or(&"?"),
+                            // A young one's love goal is keeping by its mother (`breeding::behave`).
+                            match crate::choose::doing(&w, id) {
+                                1 if crate::breeding::young(&w, id) => "follow",
+                                d => ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
+                                    .get(d as usize)
+                                    .unwrap_or(&"?"),
+                            },
                             a.food as f32 / a.stat(crate::species::FOOD).max(1.0) * 100.0,
                             (1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0,
                             e.health,
@@ -423,9 +482,13 @@ pub fn init(r: &mut Registry) {
                                 .map(|f| f.persona().map(|v| format!("{v:.2}")).join("/"))
                                 .unwrap_or_default(),
                             crate::routines::activity_of(&w, id),
-                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
-                                .get(crate::choose::doing(&w, id) as usize)
-                                .unwrap_or(&"?"),
+                            // A young one's love goal is keeping by its mother (`breeding::behave`).
+                            match crate::choose::doing(&w, id) {
+                                1 if crate::breeding::young(&w, id) => "follow",
+                                d => ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
+                                    .get(d as usize)
+                                    .unwrap_or(&"?"),
+                            },
                             // Its walk, for a check that wandering moves it.
                             w.navigating(id) as u8,
                             e.moved,

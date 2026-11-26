@@ -98,6 +98,40 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // the engine's own shaders do, so it goes to the screen as it is, as with no pack.)
         if pass_.spare == 1u && scene.frame.x > 0.5 && scene.rt.x < 2.5 {
             color = vec4(finish_picture(hdr_light(color.rgb + sharpen_delta(first.scene, in.uv), in.uv, pass_)), 1.0);
+            // Debug view 10: the clouds' shadow map itself (r through, as grey) on the screen's left
+            // square, north up; red where the ground below the camera reads it.
+            if look_debug() == 10u && scene.cloud_shadow.x > 0.5 {
+                let sq = vec2(in.uv.x * 16.0 / 9.0, in.uv.y);
+                if sq.x <= 1.0 {
+                    let t = textures[u32(scene.cloud_shadow.x) - 1u];
+                    let v = textureSampleLevel(t, linear_clamp, sq, 0.0).r;
+                    let me = cloud_shadow_uv(vec3(0.0, -scene.eye.y + 64.0, 0.0));
+                    let dot_ = select(0.0, 1.0, length(sq - me) < 0.006);
+                    color = vec4(mix(vec3(v), vec3(1.0, 0.0, 0.0), dot_), 1.0);
+                }
+            }
+            // Debug view 13: the sky's two averages as Bliss's debug capture reads its own (bliss_tex4,
+            // 11-25), in its units (ours / 0.122): left the clouds' and fog's sky light (frame look texel 5,
+            // its skyGroundCol / 30, the sky straight down; / 0.122 is not its unit any more), right the cloudy one the land is lit by (texel 4, its
+            // averageSkyCol_Clouds / 30 after its normalize), each 64 px square at 270 px down,
+            // coded (log2(v) + 24) / 28 per channel through the screen's sRGB.
+            if look_debug() == 13u && scene.frame_look.x > 0.5 {
+                let q = in.clip.xy;
+                if q.y >= 270.0 && q.y < 334.0 && q.x < 132.0 && (q.x < 64.0 || q.x >= 68.0) {
+                    let t = textures[u32(scene.frame_look.x) - 1u];
+                    let v = select(textureLoad(t, vec2(4, 0), 0).rgb, textureLoad(t, vec2(5, 0), 0).rgb, q.x < 64.0) / 0.122;
+                    let e = clamp((log2(max(v, vec3(1e-12))) + 24.0) / 28.0, vec3(0.0), vec3(1.0));
+                    color = vec4(select(pow((e + 0.055) / 1.055, vec3(2.4)), e / 12.92, e <= vec3(0.04045)), 1.0);
+                }
+                // Swatches 3-5 as Bliss's capture 2: texels 6-8 (the map's clouds alone, fog alone,
+                // their alphas), log-coded like the others, 68 px apart.
+                if q.y >= 270.0 && q.y < 334.0 && q.x >= 136.0 && q.x < 336.0 && (q.x - 136.0) % 68.0 < 64.0 {
+                    let t = textures[u32(scene.frame_look.x) - 1u];
+                    let v = textureLoad(t, vec2(6 + i32((q.x - 136.0) / 68.0), 0), 0).rgb;
+                    let e = clamp((log2(max(v, vec3(1e-12))) + 24.0) / 28.0, vec3(0.0), vec3(1.0));
+                    color = vec4(select(pow((e + 0.055) / 1.055, vec3(2.4)), e / 12.92, e <= vec3(0.04045)), 1.0);
+                }
+            }
         }
     }
     return color;
@@ -113,7 +147,7 @@ fn fs_low(in: VOut) -> @location(0) vec4<f32> {
     return post_low(pass_.slot, px);
 }
 
-// The mist banks (`bank_march`, `OPT_MIST_DOMES`) over the world's image, before temporal
+// The one fog (`one_fog`: Bliss's fog and air) over the world's image, before temporal
 // anti-aliasing (the engine's pass before TAA, run while `core:ground_map` is on): marched once per
 // pixel to the depth there (the nearest surface, water's too; the sky to the march's far end). In
 // the world's and the sky's shaders each fragment drawn marched them, overdraw and what is seen
@@ -128,7 +162,11 @@ fn fs_pre_taa(in: VOut) -> @location(0) vec4<f32> {
     if scene.frame.x < 0.5 || in_liquid() || !open_sky() || scene.rt.x > 2.5 {
         return color;
     }
-    return vec4(bank_march(color.rgb, view_rel(in.uv, pass_)), color.a);
+    // Debug views 7, 11 and 12 without the fog (11: is a deck under it; 12: the clouds' layers).
+    if one_fog_on() && !in_liquid() && look_debug() != 7u && look_debug() != 11u && look_debug() != 12u {
+        return vec4(one_fog(color.rgb, view_rel(in.uv, pass_)), color.a);
+    }
+    return color;
 }
 
 // A copy of the world before what is seen through is drawn (`Post::copy_behind`): its color and
@@ -231,24 +269,38 @@ fn fs_exposure(in: VOut) -> @location(0) vec4<f32> {
     let pass_ = passes[in.pass_index];
     var sum = 0.0;
     var weight = 0.0;
+    // The rods' mean, Bliss's (deferred.vsh, method): over the middle 70 % of the view, evenly, the
+    // geometric mean of its blue-weighed luma (0.07 0.22 0.71) in its units, each sample capped at
+    // 0.08 before the mean (so a few bright lamps or stars do not blind the rods).
+    var rod_sum = 0.0;
     for (var j = 0; j < 8; j++) {
         for (var i = 0; i < 8; i++) {
             let uv = (vec2(f32(i), f32(j)) + 0.5) / 8.0;
             let w = 1.0 - 0.7 * smoothstep(0.1, 0.75, length(uv - vec2(0.5)));
-            sum += w * log(max(luma(bloom_tap(pass_.scene, uv)), 1e-5));
+            // Bliss's chain takes its own luma (Rec. 601, `bliss_luma`) for its exposure.
+            let px = bloom_tap(pass_.scene, uv);
+            sum += w * log(max(select(luma(px), bliss_luma(px), bliss_chain()), 1e-5));
             weight += w;
+            let rod_px = dot(bloom_tap(pass_.scene, 0.5 + (uv - 0.5) * 0.7), vec3(0.07, 0.22, 0.71)) * BLISS_UNITS;
+            rod_sum += log(clamp(rod_px, 1e-6, 0.08));
         }
     }
     let now = sum / weight;
     var eased = now;
+    var rod = exp(rod_sum / 64.0);
     if pass_.spare == 0u {
-        let before = textureLoad(textures[pass_.low - 1u], vec2(0, 0), 0).r;
+        let last = textureLoad(textures[pass_.low - 1u], vec2(0, 0), 0);
+        let before = last.r;
         if before == before && abs(before) < 50.0 {
             let tau = select(2.5, 0.8, now > before);
             eased = mix(before, now, 1.0 - exp(-pass_.strength / tau));
         }
+        // Eased as Bliss's, 0.985 of last frame's a frame at 60 fps (1.1 s), in light, not its log.
+        if last.b == last.b && last.b > 0.0 {
+            rod = mix(last.b, rod, 1.0 - exp(-pass_.strength / 1.1));
+        }
     }
-    return vec4(eased, exp(eased), 0.0, 1.0);
+    return vec4(eased, exp(eased), clamp(rod, 0.00003051757, 65000.0), 1.0);
 }
 
 // How much brighter or darker the view is taken for how bright it is (`mean`, the exposure's luma):
@@ -349,8 +401,27 @@ fn taa_motion_px(px: vec2<i32>, size: vec2<i32>) -> f32 {
     return textureLoad(t, at, 0).g;
 }
 
-// What the mist banks' bloomy fog takes of the glow where they hide all (Bliss's 1.25 x 0.75).
-const BANK_BLOOMY: f32 = 0.94;
+// Bliss's bloomy fog (composite3/11, method only): the glow's share where the fog hides what lies
+// behind, its BLOOMY_FOG 1.25 (Ronald's profile) x 0.75; in rain the fog's transmittance counts
+// half (mix(T, 0.5 T + 0.5, rain)) but the share doubles (x (1 + rain)), so a storm's land is
+// softened, not turned to milk. The air is not counted. (Bliss's x (1 - 0.3 purkinje) at night is
+// not built: our Purkinje shift has no 0..1 strength to read.)
+fn bloomy_fog(uv: vec2<f32>, pass_: Pass) -> f32 {
+    let rain = rain_amount();
+    let hidden = bank_hidden(view_rel(uv, pass_)) * (1.0 - 0.5 * rain);
+    var k = clamp(hidden * 1.25 * 0.75 * (1.0 + rain), 0.0, 1.0);
+    // Where a drop or flake lies, less of it (Bliss's composite3, method only: x clamp(1 - (drops x
+    // 5)^2)): its rain shows only as these clearer streaks through the bloomy fog. The drops' cover
+    // is the weather's motion w (x 2.5 there), where the land is lit from the physical sky.
+    if land_from_sky() && scene.taa_frame.z > 0.5 {
+        let m = textures[u32(scene.taa_frame.z) - 1u];
+        let size = vec2<i32>(textureDimensions(m));
+        let at = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2(0), size - vec2(1));
+        let drops = clamp(textureLoad(m, at, 0).w / 2.5, 0.0, 1.0);
+        k *= clamp(1.0 - pow(drops * 5.0, 2.0), 0.0, 1.0);
+    }
+    return k;
+}
 // The point the pixel at `uv` shows, camera relative: on the sky (depth 0), the march's far end.
 fn view_rel(uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     let size = vec2<i32>(textureDimensions(textures[pass_.depth]));
@@ -411,8 +482,38 @@ const GLARE_HDR: f32 = 0.02;
 // The land's lift in the evening twilight (`hdr_light`).
 const TWILIGHT_LAND_HDR: f32 = 1.55;
 
+// Bliss's chain before its curve (`bliss_chain`): the bloom as now (its bloomy fog mixed, its
+// bloom added), then its one exposure from the view's mean, at every hour.
+fn chain_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
+    var col = max(c, vec3(0.0));
+    var mean = EXPOSURE_REF;
+    if pass_.exposure != 0u {
+        let t = textureLoad(textures[pass_.exposure - 1u], vec2(0, 0), 0);
+        if t.g == t.g && t.g > 0.0 {
+            mean = t.g;
+        }
+        if t.b == t.b && t.b > 0.0 {
+            VIEW_ROD = t.b;
+        }
+    }
+    VIEW_MEAN = mean;
+    LAND_PIXEL = 1.0;
+    if pass_.bloom != 0u {
+        let glow = bloom_tap(pass_.bloom - 1u, uv);
+        col = mix(col, glow, bloomy_fog(uv, pass_) * fantasy_opt(OPT_BLOOM));
+        let r2 = dot(uv - vec2(0.5), uv - vec2(0.5));
+        let lb = mean * BLISS_UNITS;
+        let eye = pow(0.18 / log2(2.5 * lb + 1.045) * 0.62, 0.2);
+        col += glow * clamp(0.5 * eye, 0.0, 1.0) * (1.5 - 2.0 * r2) * fantasy_opt(OPT_BLOOM);
+    }
+    return col * bliss_exposure(mean);
+}
+
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.
 fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
+    if bliss_chain() {
+        return chain_light(c, uv, pass_);
+    }
     var col = max(c, vec3(0.0));
     // The sky a third more saturated by day (where nothing was drawn, depth 0): the curve's
     // shoulder takes colour out of a bright sky, and ours read grey-white where Bliss's is blue
@@ -477,8 +578,7 @@ fn hdr_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         col = mix(col, glow, clamp((kept + fog * 0.6) * fantasy_opt(OPT_BLOOM), 0.0, 0.8));
         // The mist banks' share too (`bank_hidden`), as Bliss's bloomy fog takes its fog's (its
         // BLOOMY_FOG 1.25 x 0.75: up to 0.94 of the glow where the mist hides all).
-        let banked = bank_hidden(view_rel(uv, pass_)) * (1.0 - 0.85 * rain_amount());
-        col = mix(col, glow, clamp(banked * BANK_BLOOMY * fantasy_opt(OPT_BLOOM), 0.0, 0.95));
+        col = mix(col, glow, bloomy_fog(uv, pass_) * fantasy_opt(OPT_BLOOM));
         let r2 = dot(uv - vec2(0.5), uv - vec2(0.5));
         // Bliss's E^0.2 follows its eye: a dark view it brings up gets more of the glow too (its
         // sunlit ravine's shade warm with the dirt's glow, 46 38 32 on the ceiling, where ours with

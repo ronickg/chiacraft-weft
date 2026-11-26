@@ -905,6 +905,12 @@ pub struct Client {
     /// Temporal anti-aliasing's count image this frame, bindless index + 1 (`Scene::taa_frame`),
     /// set by the app before `render` (`post::Post::taa_out`).
     pub taa_out: u32,
+    /// The last frame's exposure texel, bindless index + 1 (`Scene::frame_look.w`), set by the app
+    /// before `render` (`post::Post::exposure_last`).
+    pub exposure_last: u32,
+    /// The motion image this frame, bindless index + 1 (`Scene::taa_frame.z`), set by the app
+    /// before `render` (`post::Post::motion_index`).
+    pub motion_out: u32,
     /// The camera the last frame was drawn with, for the backend's upscaler (`upscale_camera`).
     pub frame_camera: Option<FrameCamera>,
     /// Seconds until the next dust piece from the block being hit.
@@ -930,6 +936,10 @@ pub struct Client {
     aurora: f32,
     /// How closed the canopy is where the player is (a mod's air, `air_flags::CANOPY_SHIFT`).
     canopy: f32,
+    /// The sky light where the eye is, 0..1 (its level / 15), eased over a couple of seconds
+    /// (`Scene::frame_look.y`): a pack dims what the open sky lights by it in a cave or under cover,
+    /// as Bliss does with Iris's `eyeBrightnessSmooth`.
+    eye_sky: f32,
     /// How wet the ground is where the player is, 0..1 (`weather_effects`, `Scene::canopy.y`).
     wet: f32,
     /// How far puddles have grown where the player is, 0..1 (`weather_effects`, `Scene::canopy.z`):
@@ -1295,6 +1305,8 @@ impl Client {
             behind: [0.0; 4],
             taa_last: None,
             taa_out: 0,
+            exposure_last: 0,
+            motion_out: 0,
             frame_camera: None,
             hit_dust: 0.0,
             sounds: Vec::new(),
@@ -1344,6 +1356,7 @@ impl Client {
             dust: 0.0,
             aurora: 0.0,
             canopy: 0.0,
+            eye_sky: 1.0,
             wet: 0.0,
             puddles: 0.0,
             snow_line: SNOW_LINE_NONE,
@@ -3654,6 +3667,12 @@ impl Client {
         self.aurora += (aurora - self.aurora).clamp(-dt / 20.0, dt / 20.0);
         let canopy = ((flags >> weft_abi::air_flags::CANOPY_SHIFT) & 255) as f32 / 255.0;
         self.canopy += (canopy - self.canopy).clamp(-dt / 10.0, dt / 10.0);
+        let eye = self.camera().pos.floor().as_ivec3();
+        let sky = self
+            .world
+            .light_loaded(eye)
+            .map_or(self.eye_sky, |l| weft_abi::light::sky(l) as f32 / 15.0);
+        self.eye_sky += (sky - self.eye_sky) * (1.0 - (-dt / 1.5).exp());
         // The ground wets as the rain comes (in about twenty seconds) and dries after it at the
         // pace the air there gives (a mod's `DRYING_SHIFT`; 0, about two minutes): it stayed wet
         // only as long as the rain fell, gone 25 s after (Tester 2's after-rain shots, 11-05).
@@ -3825,7 +3844,7 @@ impl Client {
             // Filled in by `render` (`taa_frame`).
             taa: [0.0; 4],
             taa_prev: [[0.0; 4]; 4],
-            taa_frame: [self.taa_out as f32, crate::post::motion() as u32 as f32, 0.0, 0.0],
+            taa_frame: [self.taa_out as f32, crate::post::motion() as u32 as f32, self.motion_out as f32, 0.0],
             dlss: [crate::post::mip_bias(), 0.0, 0.0, 0.0],
             cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
@@ -4422,6 +4441,8 @@ impl Client {
         // The sky readied this frame's soft clouds: their fields in the scene.
         (scene.soft_clouds, scene.prev_view_proj, scene.cloud_moved) = self.sky.soft.scene;
         scene.frame_look = self.sky.frame_look.scene;
+        scene.frame_look[1] = self.eye_sky;
+        scene.frame_look[3] = self.exposure_last as f32;
         scene.froxels = self.sky.froxels.scene;
         scene.cloud_shadow = self.sky.cloud_shadow.scene;
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));

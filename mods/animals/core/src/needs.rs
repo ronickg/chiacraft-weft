@@ -253,6 +253,11 @@ pub const DRINK_FLOOR: f32 = 0.35;
 /// presses (the square past about 0.25 and 0.36 of the way to empty).
 pub const LOVE: f32 = 0.5;
 pub const REST: f32 = 0.45;
+/// One in love now (its short `life::LOVE_TICKS`) goes to its mate even out of its hours: over a
+/// sleepy rest held (`REST` + `routines::SLEEPY`, at `KEEP_AT`: 0.96), under a parched or starving
+/// need (cov_young: jaguars put in love at noon slept through it and never mated, as a tame pair
+/// fed at their sleepy hours would).
+pub const IN_LOVE: f32 = 0.97;
 /// The air: cold or hot, and freezing or in a heatstroke.
 pub const UNEASY: f32 = 0.4;
 pub const SUFFERING: f32 = 0.85;
@@ -268,6 +273,7 @@ pub const KEEP_AT: f32 = 1.2;
 /// and died parched (ai1124_savanna8).
 pub const REST_YIELDS: f32 = 0.75;
 const _: () = assert!(REST_YIELDS * KEEP_AT < 1.0);
+const _: () = assert!(IN_LOVE > (REST + crate::routines::SLEEPY) * KEEP_AT && IN_LOVE < 1.0);
 
 /// A rest that scores `rest` against the most pressing of thirst and hunger, `pressing`: as it
 /// is, or under `pressing` once that drives it (`REST_YIELDS`).

@@ -845,7 +845,10 @@ impl WorldRenderer {
     /// The path tracer's light table, made again when the cubes' lights changed (at most every
     /// `LIGHTS_EVERY` frames), its buffer grown as needed.
     fn pt_lights_buffer(&mut self, gpu: &mut dyn Backend, frame: u64) -> BufferId {
-        let stale = self.pt_lights.as_ref().is_none_or(|l| self.lights_dirty && frame >= l.made + LIGHTS_EVERY);
+        let stale = self
+            .pt_lights
+            .as_ref()
+            .is_none_or(|l| self.lights_dirty && frame >= l.made + LIGHTS_EVERY);
         if stale {
             let words = if self.body_lights.is_empty() {
                 light_words(&self.cube_lights)
@@ -863,7 +866,8 @@ impl WorldRenderer {
                     l.destroy(gpu);
                 }
                 let cap = n.next_power_of_two();
-                self.pt_lights = Some(RtLights { buffer: gpu.create_buffer(cap * 4, usage::STORAGE, "path traced lights"), words: cap, made: 0 });
+                self.pt_lights =
+                    Some(RtLights { buffer: gpu.create_buffer(cap * 4, usage::STORAGE, "path traced lights"), words: cap, made: 0 });
             }
             let l = self.pt_lights.as_mut().unwrap();
             gpu.write_buffer(l.buffer, 0, bytemuck::cast_slice(&words));

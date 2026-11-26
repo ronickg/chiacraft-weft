@@ -126,7 +126,15 @@ fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
         Some(Feeling::Cold | Feeling::Hot) if !hunting => UNEASY,
         _ => 0.0,
     };
-    s[Need::Love as usize] = LOVE;
+    // In love now it goes to its mate even when sleepy (`needs::IN_LOVE`).
+    s[Need::Love as usize] = if w
+        .component(id, &crate::breeding::BREEDING)
+        .is_some_and(|b| b.love > 0 && b.growing == 0)
+    {
+        needs::IN_LOVE
+    } else {
+        LOVE
+    };
     // A sleepy rest still gives way to thirst or hunger that drives it (`needs::rest_under`).
     s[Need::Rest as usize] =
         needs::rest_under(REST + animals_core::routines::SLEEPY * (1.0 - active), s[Need::Drink as usize].max(s[Need::Eat as usize]));

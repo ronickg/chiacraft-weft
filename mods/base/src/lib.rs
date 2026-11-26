@@ -52,6 +52,7 @@ mod parts;
 mod plants3d;
 mod plants3d_files;
 mod player;
+mod player_sounds;
 mod recipes;
 mod redstone;
 mod ruins;
@@ -161,6 +162,7 @@ fn init(r: &mut Registry) {
     meteors::register(r);
     stars::register(r);
     sounds::register(r);
+    player_sounds::register(r);
     mobs::register(r);
     worldgen::register(r);
     weather::register(r);

@@ -207,7 +207,9 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             }
             if k.angry > 0 {
                 set(w, id, |k| k.angry = k.angry.saturating_sub(e as _));
-                let alive = w.entity(k.angry_at).is_some_and(|e| e.health > 0.0);
+                // A spectator is out of reach: anger at one ends (cov_bosses: a hit wyvern followed the
+                // spectating player off its pad, out of the shot).
+                let alive = w.entity(k.angry_at).is_some_and(|e| e.health > 0.0) && w.game_mode(k.angry_at) != abi::game_mode::SPECTATOR;
                 if alive {
                     crate::wake(w, id, index);
                     crate::commands::fight(w, id, st, k.angry_at);
@@ -318,6 +320,7 @@ fn bite(w: &World, id: u64, st: &EntityState) {
         k.bite = BITE_TICKS;
     });
     animal::feed(w, id, food.food);
+    weft_sdk::debug!("animal {id} bites, out cold: taming {:.0}%", progress * 100.0);
     if progress >= 1.0 {
         spill(w, id, st);
         set(w, id, |k| {
@@ -351,6 +354,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
         k.food = held.item;
         k.count += held.count;
     });
+    weft_sdk::debug!("animal {id}, out cold, given {} to eat", held.count);
     if !w.outside_survival(player) {
         inv.set(slot, ItemStack::EMPTY);
     }

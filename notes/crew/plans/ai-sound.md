@@ -285,3 +285,29 @@ Later (not picked): more music, loudness check, random volume + weather slider, 
 Sources: Minecraft wiki Sounds.json; Sound Physics Remastered; Audiokinetic / IESD loudness (-24 LUFS, -1 dBTP).
 
 Order: player sounds and interaction sounds first, then water steps, more block variants and own place/hit sounds. Same method (Stable Audio, picked for distinctness, SOURCES rows), no engine changes without asking Planner, levelled to -24 LUFS integrated and -1 dBTP. Each batch: a listening page, a Tester run, all-targets, then ready to merge.
+
+## Batch 4: player and use sounds (2026-11-25)
+
+`~/Coding/chiacraft-archive/sounds/ai-sound/2026-11-25-player/`: 135 candidates (spec.py), 81
+picks (pick.py: voiced sounds scored as calls, knocks by a clean hit over a quiet floor, loops by
+steadiness; the likeness filter; levelled to -24 LUFS / -1 dBTP with a limiter; the fire loops'
+tails crossfaded into their heads). Wired in `mods/base/src/player_sounds.rs` with no engine
+change (the hook survey: the player kind takes hurt and death through `sounds_on_entities`; HURT
+for fall and drowning, USE_ITEM for the end of eating, KEY for the swing, a per-player tick for
+water, landing, breath, chewing, the bow's draw, a tool used up and armour; the client's open menu
+for chests, furnace and inventory; a client scan for fires; one call each in doors, the crafting
+grid and the bow's shot). Drinking plays for stew, the only drink there is.
+
+## Batch 5: block variants, own place and hit, wading (2026-11-25)
+
+320 candidates (step, dig, place and hit for the 13 groups, 3 picks + 3 spares each; wading 5 + 3)
+on the PC (2.3 GB, under a minute of generation; Tester 2 told before and after). 161 picks in
+`~/Coding/chiacraft-archive/sounds/ai-sound/2026-11-25-blocks/` (`spec.py`, `pick.py`,
+`picks.tsv`, `scores.tsv`). New steps and digs also score for likeness to their group's old
+three. Levelling: these clips are under 0.4 s, so integrated LUFS is -inf (as the old files'); each
+pick is levelled by its loudest 50 ms to its group's old files (steps/digs to theirs, place to dig,
+hit to step, wading to the steps' mean), peaks at most -1 dBTP; 15 loud digs/places stay 2-4 dB
+under, held by the peak limit. Wired: `sounds.rs` reads 6 steps, 6 digs, own place/hit (pitch
+0.9-1.1, hit at 0.6 as before); `player_sounds.rs` plays `player.wade` (`step/water1-5`) every
+`WADE_TICKS` 8 while walking with the feet in water. No engine change. Check:
+`mods/testkit/scripts/ai_blocks.txt`.

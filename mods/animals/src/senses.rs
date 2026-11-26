@@ -216,6 +216,21 @@ pub fn refresh(w: &World, id: u64, index: usize, kind: u32) {
 
 /// What `id` is to the others: its kept facts, or for one that keeps none (an egg, a farm
 /// animal, a player) worked out now. `None`: it is nothing to the food web.
+/// A tamed dog by its owner (`roles::SPARED_NEAR_OWNER`): wild hunters leave it be.
+fn spared(w: &World, t: u64, f: &Facts) -> bool {
+    if f.tamed == 0
+        || f.egg != 0
+        || !f
+            .species()
+            .is_some_and(|s| roles::spared_near_owner(s.name))
+    {
+        return false;
+    }
+    let (Some(o), Some(e)) = (crate::commands::owner(w, t), w.entity(t)) else { return false };
+    w.entity(o)
+        .is_some_and(|oe| dist2(oe.pos, e.pos) <= roles::SPARED_NEAR_OWNER * roles::SPARED_NEAR_OWNER)
+}
+
 pub fn facts(w: &World, id: u64) -> Option<Facts> {
     if let Some(f) = w.component(id, &FACTS).filter(|f| f.at != 0) {
         return Some(f);
@@ -455,7 +470,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
             && f.tamed == 0
             && f.species()
                 .is_some_and(|h| h.takes_at_most(f.mass, me.mass));
-        let food = hungry && !family && !(f.egg != 0 && f.tamed != 0) && mine.takes_at_most(me.mass, f.mass);
+        let food = hungry && !family && !(f.egg != 0 && f.tamed != 0) && mine.takes_at_most(me.mass, f.mass) && !spared(w, t, &f);
         if !(kin_too || hunter || food) {
             continue;
         }
@@ -768,6 +783,14 @@ pub fn herd_mid(w: &World, id: u64) -> Option<[f64; 3]> {
     (herd && s.kin >= 2).then(|| s.kin_mid.map(f64::from))
 }
 
+/// It heard its kind's alarm a moment ago (`alarm`, within `roles::ALARM_QUIET`) and is aware
+/// still: `hunt::wary` runs it off with them.
+pub fn alarmed(w: &World, id: u64) -> bool {
+    let now = w.game_time();
+    w.component(id, &SENSES)
+        .is_some_and(|s| s.alarm_at != 0 && now < s.alarm_at + roles::ALARM_QUIET && s.aware >= NOTICED)
+}
+
 /// It runs from `threat` at `pos`: it calls, and its wild kin within `roles::ALARM` blocks know at
 /// once (unless it ran on a call itself). How many heard.
 pub fn alarm(w: &World, id: u64, st: &EntityState, threat: u64, pos: [f32; 3]) -> u32 {
@@ -798,7 +821,9 @@ pub fn alarm(w: &World, id: u64, st: &EntityState, threat: u64, pos: [f32; 3]) -
             continue;
         }
         if let Some(s) = w.component_mut(o, &SENSES) {
-            s.aware = s.aware.max(NOTICED);
+            // Past the mark by what fades before its next look (an alarm at exactly `NOTICED` faded
+            // to a stare: cov_grazers' herds never ran).
+            s.aware = s.aware.max(NOTICED + 0.5);
             s.threat = threat;
             s.threat_pos = pos;
             s.alarm_at = now.max(1);

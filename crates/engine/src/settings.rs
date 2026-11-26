@@ -211,6 +211,10 @@ pub fn renderer() -> String {
 pub fn soft_clouds() -> bool {
     number("core:soft_clouds") != 0.0
 }
+/// chiacraft: how many pixels each way one soft-cloud trace pixel stands for (`core:cloud_res`), live.
+pub fn cloud_res() -> u32 {
+    (number("core:cloud_res") as u32).clamp(1, 4)
+}
 pub fn fov() -> f32 {
     number("core:fov") as f32
 }
