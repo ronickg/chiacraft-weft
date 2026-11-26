@@ -409,6 +409,16 @@ fn pt_nee_falloff(d2: f32, r2: f32, at: f32) -> f32 {
     return min((at * at + r2) / (d2 + r2), PT_NEE_HOT);
 }
 
+// Over how many levels at the end of its reach a lamp's light fades out.
+const PT_NEE_FADE: f32 = 3.0;
+
+// How much of a light of level `e` reaches a surface `to` off its middle (1 well within the
+// lightmap's reach, 0 past it), by the surface's own distance in blocks along the axes.
+fn pt_nee_fade(e: f32, to: vec3<f32>) -> f32 {
+    let d = max(abs(to) - 0.5, vec3(0.0));
+    return clamp((e - (d.x + d.y + d.z)) / PT_NEE_FADE, 0.0, 1.0);
+}
+
 // The lamps' light within `PT_NEE_MAX`, its hue kept.
 fn pt_nee_cap(c: vec3<f32>) -> vec3<f32> {
     return c * min(1.0, PT_NEE_MAX / max(max(c.r, max(c.g, c.b)), 1e-4));
@@ -447,12 +457,14 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
         let l = pt_lights[base + r.x + t];
         let lp = vec3<i32>(i32(l & 63u), i32((l >> 6u) & 63u), i32((l >> 12u) & 63u)) - 16 + cube * 16;
         let e = f32(max((l >> 18u) & 15u, max((l >> 22u) & 15u, (l >> 26u) & 15u)));
-        let d = abs(lp - cell);
-        // Within the lightmap's reach of it, as the lists are made.
-        if e - f32(d.x + d.y + d.z) <= 0.0 {
+        let small = ((l >> 30u) & 1u) == 1u;
+        // Within the lightmap's reach of it, as the lists are made, faded out over its last
+        // `PT_NEE_FADE` levels by the surface's own distance: cut by whole blocks, each light's edge
+        // stood on the floor as a block-shaped step (s2e lava_glow).
+        let fade = pt_nee_fade(e, vec3<f32>(lp) + 0.5 - world);
+        if fade <= 0.0 {
             continue;
         }
-        let small = ((l >> 30u) & 1u) == 1u;
         let strength = f32(pt_lights[strengths + r.x + t]) * 0.25;
         var p: f32;
         if all(lp == vec3<i32>(floor(world - ng * 0.5))) {
@@ -473,14 +485,14 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
             if cs <= 0.0 {
                 continue;
             }
-            p = strength * e / 15.0 * cs * pt_nee_falloff(d2, r2, clamp(e - 1.0, 1.0, PT_NEE_AT));
+            p = strength * e / 15.0 * cs * pt_nee_falloff(d2, r2, clamp(e - 1.0, 1.0, PT_NEE_AT)) * fade;
         }
         let w = p * f32(total);
         w_sum += w;
         if pt_rand(px, 17u + k * 2u).x * w_sum < w {
             chosen = l;
             chosen_p = p;
-            chosen_s = strength;
+            chosen_s = strength * fade;
             found = true;
         }
     }
