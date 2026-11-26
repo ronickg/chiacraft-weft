@@ -381,7 +381,8 @@ s = head("carcass", [
     "of white_tailed_deer: K base:hide (quality Q), M animals:venison\" (Q at most 2 with flint), the hide and meat on the ground.",
     "Part 5 (x 1000): a grey wolf, a golden eagle, a raptor, a yacare caiman and a pacu killed in a row: each drawn as its",
     "body plan's own lying model (four-legged, bird, two-legged, reptile, fish) in its own coat, shot whole (10, 11: the",
-    "wolf close, grey) and opened after 3 days (12: meat and ribs on the upper side, guts beside it, a blood pool under).",
+    "wolf close, grey) and opened after 3 days (12: meat and ribs on the upper side, guts beside it, a blood pool under),",
+    "then its bones (14, 5 days) and pile (15, 9 days), each plan's own: a ribcage, skull, legs, a scrap of its hide.",
     "Report per part: the carcass, eats and skin lines, the `/animalprof carcass` rows, no hide or meat dropped at the kills,",
     "and the shots: the dead animal lying at its place, the ribcage and the bone pile sized to it, the kneel and the camera",
     "while skinning; anything floating, sunk, flickering or drawn wrong.",
@@ -448,6 +449,12 @@ s += ["chat /tick freeze"]
 for kind, dx in [("wolf", -8), ("eagle", -4), ("raptor", 0), ("caiman", 4), ("pacu", 8)]:
     s += [f"chat /tp {x+dx+2} 68.9 {Z+8.5}", "look 39 -8", "wait 2", f"shot cov_carcass_13_low_{kind}.png"]
 s += ["chat /tick unfreeze", "wait 1"]
+# Each plan's bones (2 days more: 5) and the pile they end in (4 more: 9), own models per plan since 11-26 (the fish,
+# rotting fastest, may be gone by then).
+for days, name in [(2, "14_plans_bones"), (4, "15_plans_pile")]:
+    s += [f"chat /tp {x} 75 {Z+6}", f"chat /animalprof carcass {days}", "wait 2", "chat /animalprof carcass"]
+    s += row_shot + [f"shot cov_carcass_{name}.png", f"chat /tp {x-6} 70.3 {Z+8.5}", "look 38 -18", "wait 2",
+                     f"shot cov_carcass_{name}_wolf.png", "chat /tick unfreeze", "wait 1"]
 # Every shot without the HUD (Planner on r7: the chat log covered half of each frame): F1 off, shoot, F1 on.
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass", s)

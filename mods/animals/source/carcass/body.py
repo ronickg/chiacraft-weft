@@ -198,10 +198,149 @@ fish_open = fish_body + [
     *guts(9, -6, 0.35),
 ]
 
+# ---- the bones (eaten or rotted to the bones) and the pile (a long while after: scattered, a skull and a few long
+# bones), per plan, in the same axes as its body. Bone, a little meat left on the fresher bones, and a scrap of the
+# animal's own hide (coat: the painter turns it to its colour), so a wolf's bones don't read as a deer's.
+def arch(name, z, x0, x1, top, w=2.0, foot=1.0):
+    """A rib on its side: up from the spine at x0, over at `top`, down at x1 to the ground; its parts each a little
+    inset from the next (no two faces in one plane)."""
+    return [b(f"{name}_a", (x0, foot, z - 0.25), (x0 + 2, top - 0.5, z + w + 0.25), BONE),
+            b(f"{name}_b", (x0 + 0.5, top - 2, z + 0.25), (x1 - 0.5, top, z + w - 0.25), BONE),
+            b(f"{name}_c", (x1 - 2, foot + 0.5, z - 0.25), (x1, top - 1, z + w + 0.25), BONE)]
+
+
+def long_bone(name, x0, x1, z, y=0.5, t=3.0, end=None):
+    """A leg's long bone lying out along x at z, `t` thick, with a knob at `end` (dark: a hoof or claw) or a plain
+    joint."""
+    out = [b(name, (x0, y, z), (x1, y + t, z + t), BONE)]
+    if end is not None:
+        out.append(b(f"{name}_end", (x1 - 0.5, y - 0.5 if y >= 1 else y + 0.5, z - 0.5), (x1 + 3.5, y + t + 0.5, z + t + 0.5), end))
+    return out
+
+
+def vertebrae(name, x0, x1, y0, y1, z0, z1, n, gap=0.75):
+    """A run of `n` vertebrae from z0 to z1 (a tail, a neck), each its own box with a gap between, narrowing toward z1."""
+    out, step = [], (z1 - z0) / n
+    for i in range(n):
+        s = 1 - 0.4 * i / max(n - 1, 1)
+        cx, cy = (x0 + x1) / 2, y0 + (y1 - y0) / 2
+        hx, hy = (x1 - x0) / 2 * s, (y1 - y0) / 2 * s
+        za, zb = sorted((z0 + i * step, z0 + (i + 1) * step - gap * (1 if step > 0 else -1)))
+        out.append(b(f"{name}{i}", (cx - hx, max(0.5, cy - hy), za), (cx + hx, cy + hy, zb), BONE))
+    return out
+
+
+quad_bones = [
+    b("spine", (-13, 0.5, -36), (-8, 5, 30), BONE),
+    *[p for i, z in enumerate(range(-30, 8, 6)) for p in arch(f"rib{i}", z, -12, 9, 19 - abs(z + 12) * 0.2)],
+    b("pelvis", (-12.5, 1, 24), (-1, 10, 36), BONE),
+    *vertebrae("neck", -12, -6, 1, 6, -37, -54, 4),
+    b("skull", (-12, 1.5, -68), (1, 12, -53), BONE),
+    b("snout", (-9, 2, -82), (-1.5, 8.5, -67.5), BONE),
+    b("jaw", (-0.5, 0.5, -80), (4, 3.5, -60), BONE),
+    *vertebrae("tail", -12, -7, 1, 5, 36.5, 52, 3),
+    *long_bone("fore_a", 6, 24, -26, end=DARK), *long_bone("fore_b", 4, 20, -19, y=0.75, t=2.5, end=DARK),
+    *long_bone("hind_a", 6, 30, 22, end=DARK), *long_bone("hind_b", 5, 26, 30, y=0.75, t=2.5, end=DARK),
+    b("meat_a", (-7, 1.25, -20), (4, 6, -4), MEAT),
+    b("meat_b", (-9, 5.25, 4), (-3, 8, 14), MEAT),
+    b("hide", (-30, 0.25, -12), (-15, 1.25, 14), under=(0, -20, 1)),
+]
+quad_pile = [
+    b("skull", (-6, 0.5, -6), (7, 10.5, 9), BONE),
+    b("snout", (-3, 1, -19), (4.5, 7.5, -5.5), BONE),
+    b("bone_a", (-26, 0.25, 12), (2, 3.25, 15), BONE),
+    b("bone_b", (10, 0.5, -22), (13, 3, 6), BONE),
+    b("bone_c", (-22, 0.75, -16), (-6, 3.25, -13.5), BONE),
+    b("pelvis", (14, 0.5, 12), (24, 6, 22), BONE),
+    *[b(f"rib{i}", (-20 + i * 3.5, 0.25 + (i % 2) * 0.25, 20 + i), (-18.5 + i * 3.5, 1.75 + (i % 2) * 0.25, 32 + i), BONE)
+      for i in range(4)],
+    b("hoof", (12.5, 0.25, -26), (15.5, 3.25, -22.5), DARK),
+    b("hide", (-30, 0.5, -10), (-18, 1.5, 6)),
+]
+bird_bones = [
+    b("keel", (-1.5, 0.5, -7.5), (2.5, 6.5, 6.5), BONE),
+    b("spine", (-8, 0.5, -12), (-4, 4, 14), BONE),
+    *[p for i, z in enumerate(range(-8, 8, 4)) for p in arch(f"rib{i}", z, -7, 3, 10, w=1.5, foot=1)],
+    *vertebrae("neck", -6, -2, 1, 4, -12.5, -22, 3, gap=0.5),
+    b("skull", (-5.5, 1, -28), (1.5, 7.5, -21.5), BONE),
+    b("bill", (-3, 2.5, -34), (0.5, 5.5, -27.5), DARK),
+    b("wing_a", (-14, 1.5, -5), (-3, 3, -3), BONE), b("wing_b", (-24, 0.5, -4.5), (-13.5, 1.75, -3.5), BONE),
+    b("leg_a", (4.5, 0.5, 4), (13, 2.5, 6), BONE), b("leg_b", (12.5, 1, 4.5), (15.5, 2, 9), DARK),
+    b("feather_a", (8, 0.25, -22), (18, 1.25, -16)), b("feather_b", (-20, 0.5, 6), (-12, 1.5, 11)),
+    b("feather_c", (10, 0.25, 16), (18, 1.25, 22)),
+]
+bird_pile = [
+    b("skull", (-3, 0.5, -3), (3, 5.5, 3.5), BONE), b("bill", (-1, 1.5, -9), (2, 4, -2.5), DARK),
+    b("keel", (6, 0.25, 0), (10, 3.5, 9), BONE), b("wing", (-14, 0.5, 6), (-4, 1.75, 7.5), BONE),
+    b("feather_a", (-12, 0.25, -14), (-4, 1.25, -8)), b("feather_b", (2, 0.25, 12), (10, 1.25, 18)),
+    b("feather_c", (12, 0.5, -12), (19, 1.5, -6)),
+]
+biped_bones = [
+    b("spine", (-9, 0.5, -16), (-4, 5, 16), BONE),
+    *[p for i, z in enumerate(range(-12, 8, 5)) for p in arch(f"rib{i}", z, -8, 7, 15 - abs(z + 2) * 0.25)],
+    b("pelvis", (-8.5, 1.5, 7), (4, 13, 16.5), BONE),
+    *vertebrae("neck", -8, -3, 1, 6, -16.5, -30, 4, gap=0.5),
+    b("skull", (-7.5, 1.5, -45), (2.5, 11, -29.5), BONE),
+    b("snout", (-5.5, 2, -57), (0.5, 8.5, -44.5), BONE),
+    b("teeth", (0.25, 2.5, -56), (1.25, 5.5, -40), BONE),
+    *vertebrae("tail", -8, -2, 1, 7, 16.5, 80, 9, gap=1),
+    *long_bone("thigh_a", 3, 22, 4, t=4), *long_bone("shin_a", 21.5, 36, 4.5, y=1, t=3, end=DARK),
+    *long_bone("thigh_b", 3.5, 20, 10.5, y=0.75, t=3.5), *long_bone("shin_b", 19.5, 32, 11, y=1.25, t=2.5, end=DARK),
+    b("arm", (5, 0.5, -15), (14, 2.5, -12.5), BONE), b("claw", (13.5, 1, -15.5), (17, 3, -12), DARK),
+    b("meat", (-6, 1.25, -8), (3, 6, 4), MEAT),
+    b("hide", (-20, 0.25, -6), (-10, 1.25, 12)),
+]
+biped_pile = [
+    b("skull", (-5, 0.5, -10), (4, 9.5, 5), BONE), b("snout", (-3, 1, -22), (2.5, 6.5, -9.5), BONE),
+    b("thigh", (6, 0.5, -6), (26, 4.5, -2), BONE), b("shin", (-24, 0.25, 8), (-6, 3.25, 11), BONE),
+    *vertebrae("tail", -2, 4, 0.5, 4.5, 10, 40, 5, gap=1.5),
+    b("claw", (26.5, 0.5, -7), (30, 3, -3.5), DARK),
+    b("hide", (10, 0.5, 8), (22, 1.5, 22)),
+]
+reptile_bones = [
+    b("spine", (-2.5, 0.5, -20), (2.5, 7, 20), BONE),
+    *[b(f"rib{i}_{s}", ((-12, 1, z) if s == "l" else (2, 1, z)), ((-2, 5, z + 2) if s == "l" else (12, 5, z + 2)), BONE)
+      for i, z in enumerate(range(-16, 14, 5)) for s in "lr"],
+    b("pelvis", (-7, 1, 13), (7, 6, 19.5), BONE),
+    b("skull", (-7, 0.5, -37), (7, 7, -20.5), BONE),
+    b("snout", (-5, 1, -55), (5, 4.5, -36.5), BONE),
+    *vertebrae("tail", -4, 4, 0.5, 6, 20.5, 86, 10, gap=1),
+    *[p for name, x0, x1, z in [("fl", 6, 22, -15), ("fr", -22, -6, -15), ("hl", 6, 24, 11), ("hr", -24, -6, 11)]
+      for p in [b(f"leg_{name}", (x0, 0.5, z), (x1, 3, z + 2.5), BONE),
+                b(f"foot_{name}", ((x1 - 0.5, 1, z - 1) if x0 > 0 else (x0 - 3.5, 1, z - 1)),
+                  ((x1 + 3.5, 3.5, z + 3.5) if x0 > 0 else (x0 + 0.5, 3.5, z + 3.5)), DARK)]],
+    b("meat", (-1.75, 1.25, -12), (1.75, 9, 2), MEAT),
+    b("hide", (-16, 0.25, 22), (-5, 1.25, 40), under=(1, 0.75, -1)),
+]
+reptile_pile = [
+    b("skull", (-6, 0.5, -10), (6, 6, 6), BONE), b("snout", (-4, 1, -26), (4, 4, -9.5), BONE),
+    *vertebrae("tail", -3, 3, 0.5, 4.5, 12, 48, 6, gap=1.5),
+    b("leg", (10, 0.25, -20), (26, 2.5, -17.5), BONE), b("foot", (25.5, 0.75, -21), (29, 3, -16.5), DARK),
+    b("hide", (-22, 0.5, 4), (-8, 1.5, 22), under=(1, 1, -1)),
+]
+fish_bones = [
+    b("skull", (-6, 0.5, -24), (6, 5, -14), BONE),
+    b("eye", (-3.5, 5, -21.5), (-1, 5.5, -19), DARK),
+    b("jaw", (-3, 1, -28.5), (3.5, 3.5, -23.5), BONE),
+    b("spine", (-1, 1, -14.5), (1.5, 2.75, 19), BONE),
+    *[b(f"rib{i}", (-7.5 + abs(z) * 0.1, 1.5, z), (7.5 - abs(z) * 0.1, 2.25, z + 1), BONE) for i, z in enumerate(range(-12, 14, 3))],
+    b("tail_top", (-9, 0.5, 19.5), (-1.5, 1.5, 27)), b("tail_low", (2, 0.75, 19.5), (9.5, 1.75, 27)),
+]
+fish_pile = [
+    b("skull", (-4, 0.5, -5), (4, 4, 2), BONE), b("jaw", (-2, 1, -9), (2.5, 3, -4.5), BONE),
+    b("spine", (4, 0.25, 4), (6, 1.75, 22), BONE),
+    *[b(f"rib{i}", (0.5, 0.75, z), (10, 1.25, z + 1), BONE) for i, z in enumerate(range(7, 20, 4))],
+]
+
 MODELS = [("carcass_quadruped", quad), ("carcass_quadruped_open", quad_open), ("carcass_bird", bird),
           ("carcass_bird_open", bird_open), ("carcass_biped", biped), ("carcass_biped_open", biped_open),
           ("carcass_reptile", reptile), ("carcass_reptile_open", reptile_open), ("carcass_fish", fish),
-          ("carcass_fish_open", fish_open)]
+          ("carcass_fish_open", fish_open),
+          ("carcass_quadruped_bones", quad_bones), ("carcass_quadruped_pile", quad_pile),
+          ("carcass_bird_bones", bird_bones), ("carcass_bird_pile", bird_pile),
+          ("carcass_biped_bones", biped_bones), ("carcass_biped_pile", biped_pile),
+          ("carcass_reptile_bones", reptile_bones), ("carcass_reptile_pile", reptile_pile),
+          ("carcass_fish_bones", fish_bones), ("carcass_fish_pile", fish_pile)]
 APART = 400  # units each model is painted apart from the next (so none shades another)
 
 
@@ -258,6 +397,7 @@ def main():
             os.remove(anim)
     print(f"{len(MODELS)} models, texture {w}x{h}")
     subprocess.run([sys.executable, os.path.join(HERE, "sheet.py"), *sys.argv[1:]], check=False)
+    subprocess.run([sys.executable, os.path.join(HERE, "sheet.py"), "--bones", *sys.argv[1:]], check=False)
 
 
 if __name__ == "__main__":
