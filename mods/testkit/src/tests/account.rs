@@ -27,7 +27,7 @@ pub async fn account(t: T) -> R {
     t.screen("core:profile").await?;
     t.frames(2).await?;
     t.shot("profile").await?;
-    t.laid_out(&["text:from your account's 24 words", "text:Copy Key", "text:Account and Words"]);
+    t.laid_out(&["text:Your key: worlds know you by it", "text:Copy Key", "text:Account and Words"]);
     let needs_backup = shown(&t, "aren't written down");
 
     t.click_until_screen("text:Account and Words", "core:account")
