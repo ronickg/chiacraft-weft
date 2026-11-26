@@ -9,8 +9,8 @@ fn apply(p: PostPixel) -> vec4<f32> {
     if scene.rt.x > 2.5 {
         return p.color;
     }
-    // Bliss's SSAO in the pack's lighting (base's `look_ssao`, option 80; on the land lit from the sky, options 70 and 71, as `land_from_sky`) takes this shade's place.
-    if scene.frame.x > 0.5 && scene.frame_look.x > 0.5 && scene.options[17][2] > 0.5 && scene.options[17][3] > 0.5 && scene.options[20][0] > 0.5 {
+    // Bliss's SSAO in the pack's lighting (base's `look_ssao`, option 81; on the land lit from the sky, options 70 and 71, as `land_from_sky`) takes this shade's place.
+    if scene.frame.x > 0.5 && scene.frame_look.x > 0.5 && scene.options[17][2] > 0.5 && scene.options[17][3] > 0.5 && scene.options[20][1] > 0.5 {
         return p.color;
     }
     var keep: f32;

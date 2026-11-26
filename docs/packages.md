@@ -58,6 +58,7 @@ base = "*"
 | `unbreakable` | `true` for bedrock-like blocks | `false` |
 | `light` | light it gives, 0 to 15 | 0 |
 | `light_color` | coloured light instead, `[r, g, b]` each 0 to 15 (`[15, 9, 4]` a fire's orange) | |
+| `light_strength` | how strongly path tracing's traced light shines from it, 1 a torch's (0.25 to 3.75) | fire 2.5, lava 2, glowstone 1.5, the rest 1 |
 | `sound` | sound group: `stone`, `wood`, `grass`, `gravel`, `sand`, `glass`, `cloth` (base's), or `mod:group` | |
 | `mineable` | tool class that mines it fast: `pickaxe`, `axe`, `shovel` | |
 | `tool_level` | tool level needed for it to drop anything | |

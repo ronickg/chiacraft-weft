@@ -171,6 +171,9 @@ pub const RULES: &[Rule] = &[
     r(&["base:oak_wood", "base:birch_wood", "base:spruce_wood"], 0, Shared, Wood, Made),
     r(&["base:oak_log_hollow", "base:birch_log_hollow", "base:spruce_log_hollow"], 0, Shared, Wood, Made),
     r(&["base:oak_door"], 0, Shared, Building, Made),
+    // fences.rs: keeping animals off a field (crop raids)
+    r(&["base:fence", "base:fence_gate"], 0, Shared, Building, Made),
+    r(&["base:scarecrow"], 0, Shared, Building, Made),
     n(
         &["base:shield"],
         2,
@@ -217,12 +220,12 @@ pub const RULES: &[Rule] = &[
     ),
     n(&["base:campfire"], 0, Shared, Technical, Not, "a laid campfire, lit"),
     n(
-        &["base:loose_rock", "base:loose_flint", "base:loose_tektite", "base:fallen_branch", "base:loose_bone"],
+        &["base:loose_rock", "base:loose_flint", "base:loose_tektite", "base:fallen_branch", "base:loose_bone", "base:shed_antler"],
         0,
         Shared,
         Ground,
         Not,
-        "picked up as a rock, flint, tektite, sticks or a bone",
+        "picked up as a rock, flint, tektite, sticks, a bone or an antler (the deer lands', `vitals::first::ANTLER_LANDS`)",
     ),
     n(&["base:coal_ore", "base:banded_clay_coal_ore"], 0, Shared, Ground, Not, "breaks into coal"),
     n(
@@ -449,6 +452,8 @@ pub const RULES: &[Rule] = &[
     r(&["base:coal", "base:coal_block"], 0, Shared, Material, Made),
     // Copper, tin and bronze (`metals.rs`): the Bronze Age's; steel the Iron Age's.
     r(&["base:raw_copper", "base:copper_ingot", "base:raw_tin", "base:tin_ingot", "base:bronze_ingot"], 1, Tech, Material, Made),
+    // a shed antler (`vitals::first::ANTLER_LANDS`): the antler part material, and the flaker
+    n(&["base:antler"], 0, Shared, Material, Made, "a shed antler off the ground: the antler material, and in the bag a pressure flaker"),
     // native copper, the copper tier's first step (vitals::first::COPPER_LANDS): a Stone Age find,
     // picked up by hand (the Old Copper Complex hammered it before any smelting); what's hammered
     // from it is copper, the Bronze Age's (its parts by `MATERIALS`)
@@ -964,7 +969,7 @@ pub const MATERIALS: &[MaterialTag] = &[
     mt("tektite", "base:tektite"),
     mt("obsidian", ""),
     mt("bone", "base:bone"),
-    mt("antler", ""),
+    mt("antler", "base:antler"),
     mt("stone", "base:cobblestone"),
     mt("diamond", "base:diamond"),
     mt("copper", "base:copper_ingot"),

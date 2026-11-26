@@ -180,6 +180,9 @@ fn block(r: &mut Registry, id: &str, d: &BlockDef, code: Option<&std::sync::Arc<
     if let Some([r, g, bl]) = d.light_color {
         b = b.light_rgb(r, g, bl);
     }
+    if let Some(s) = d.light_strength {
+        b = b.set(&weft_sdk::LIGHT_STRENGTH, s);
+    }
     if let Some(s) = &d.sound {
         b = b.sound_group(&sound_group(s));
     }

@@ -27,6 +27,7 @@ mod fall;
 mod farming;
 mod felled;
 mod felling;
+pub mod fences;
 mod firebed;
 mod fireflies;
 mod first;
@@ -205,6 +206,7 @@ fn init(r: &mut Registry) {
     // ships (assembly, vehicles), the music player, the woodcutter, storage sorting, the target
     // info panel. Cutting one is deleting its file, its `mod` line and its line here.
     doors::register(r);
+    fences::register(r);
     effects::register(r);
     assembly::register(r);
     vehicles::register(r);

@@ -14,6 +14,26 @@
     }
    }
   },
+  "animation.bow.hold.first_person": {
+   "loop": true,
+   "animation_length": 0.05,
+   "bones": {
+    "mainArm": {
+     "rotation": [
+      -70,
+      8,
+      0
+     ]
+    },
+    "arrow": {
+     "scale": [
+      0,
+      0,
+      0
+     ]
+    }
+   }
+  },
   "animation.bow.use": {
    "loop": "hold_on_last_frame",
    "animation_length": 1.0,

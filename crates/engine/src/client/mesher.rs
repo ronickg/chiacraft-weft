@@ -38,19 +38,21 @@ pub struct Mesh {
     pub faces: [Vec<[u32; 4]>; 4],
     pub quads: [Vec<[u32; 8]>; 4],
     /// The cube's blocks that give light (`emitter`): where in the cube (x, y << 4, z << 8) and
-    /// their light per channel (r << 12, g << 16, b << 20, 0-15), for the path tracer's traced
+    /// their light per channel (r << 12, g << 16, b << 20, 0-15), and (chiacraft) how strongly it
+    /// shines in quarters (`Content::light_strength`, << 25, 1-15), for the path tracer's traced
     /// block light (`world_render::rt`'s `RtLights`).
     pub lights: Vec<u32>,
 }
 
 /// A cell's light (`[r, g, b]`) at `x y z` in its cube as `Mesh::lights` holds it, or None.
-fn emitter(light: [u8; 3], x: i32, y: i32, z: i32) -> Option<u32> {
+fn emitter(light: [u8; 3], strength: impl FnOnce() -> f32, x: i32, y: i32, z: i32) -> Option<u32> {
     let [r, g, b] = light;
     if r == 0 && g == 0 && b == 0 {
         return None;
     }
     let l = |v: u8| u32::from(v.min(15));
-    Some(x as u32 | (y as u32) << 4 | (z as u32) << 8 | l(r) << 12 | l(g) << 16 | l(b) << 20)
+    let q = (strength() * 4.0).round().clamp(1.0, 15.0) as u32;
+    Some(x as u32 | (y as u32) << 4 | (z as u32) << 8 | l(r) << 12 | l(g) << 16 | l(b) << 20 | q << 25)
 }
 
 /// The layer a face's pictures over its first go in (`Content::layers`): drawn after the opaque
@@ -165,7 +167,7 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
                     // The cell's light as the lightmap takes it (`CellLayout::light`, all its
                     // parts): a resident's own state gave none for a torch (w55).
                     mesh.lights
-                        .extend(emitter(layout.light(c, states[i]).light, x, y, z));
+                        .extend(emitter(layout.light(c, states[i]).light, || c.light_strength(states[i]), x, y, z));
                     for &part in &layout.covers {
                         let (owner, resident) = part.owner(glam::IVec3::new(x, y, z));
                         if (owner.cmplt(glam::IVec3::ZERO).any() || owner.cmpge(glam::IVec3::splat(16)).any())
@@ -177,7 +179,7 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
                 } else {
                     draw_block(c, n, ctm, &looks, &opaque, &leafy, &mut mesh, x, y, z, Part::aligned(states[i]));
                     mesh.lights
-                        .extend(emitter(c.tight[states[i] as usize].light, x, y, z));
+                        .extend(emitter(c.tight[states[i] as usize].light, || c.light_strength(states[i]), x, y, z));
                 }
             }
         }

@@ -23,6 +23,9 @@ pub enum Ground {
     /// A lump of native copper (the copper lands' own, `COPPER_LANDS`): soft enough to hammer
     /// cold into a head on a stone with a rock, the copper tier's first step.
     Copper,
+    /// A shed antler (the deer lands' own, `ANTLER_LANDS`): the antler material, and a pressure
+    /// flaker that makes knapped flint finer (`FLAKER_POINTS`).
+    Antler,
 }
 
 impl Ground {
@@ -34,6 +37,7 @@ impl Ground {
             Ground::Branch => "fallen_branch",
             Ground::Bone => "loose_bone",
             Ground::Copper => "loose_copper",
+            Ground::Antler => "shed_antler",
         }
     }
 }
@@ -70,6 +74,36 @@ pub const COPPER: f32 = 0.0003;
 /// The walk round a place in the copper lands that should turn up a lump, blocks.
 pub const COPPER_LOOK: i32 = 64;
 
+/// The deer lands (11-26, `notes/FIRST_HOURS.md` "What comes after": bone and antler, an antler
+/// flaker): where the deer live (`animals_core`'s white-tailed and red deer and the reindeer,
+/// `animals_core::needs::antler_lands_are_the_deers`), a buck sheds his antlers each late winter and they lie on the
+/// forest floor until gnawed (shed hunters find a few a day's walk in good deer country).
+pub const ANTLER_LANDS: [&str; 9] = [
+    "base:plains",
+    "base:savanna",
+    "base:forest",
+    "base:old_growth_forest",
+    "base:birch_forest",
+    "base:sequoia_grove",
+    "base:mountains",
+    "base:taiga",
+    "base:snowy_plains",
+];
+/// The share of open columns there with a shed antler: about one within an `ANTLER_LOOK` walk
+/// (`antler_lands_have_some`), a find, rarer than native copper.
+pub const ANTLER: f32 = 0.0002;
+/// The walk round a place in the deer lands that should turn up an antler, blocks.
+pub const ANTLER_LOOK: i32 = 64;
+/// An antler in the bag is a pressure flaker (an antler tine pressed along the edge takes off
+/// fine flakes; with a soft billet, the way the best flint work was done): a flint head knapped
+/// while one is in the bag scores this much more work (`crafting::grades`), by hand or from
+/// memory, up to the most work gives. With flint's 24 and the hand's 20 at skill 0: 44, Sound,
+/// and 50, Good, with it.
+pub const FLAKER_POINTS: u32 = 6;
+
+/// Every loose thing in the order a roll is split (`ground_at`).
+pub const GROUNDS: [Ground; 6] = [Ground::Rock, Ground::Flint, Ground::Branch, Ground::Bone, Ground::Copper, Ground::Antler];
+
 /// Within this many blocks of the world's spawn the ground has `NEAR_SPAWN_TIMES` as much of
 /// everything, so the first minutes always have it at hand (`spawn_has_enough`).
 pub const NEAR_SPAWN: i32 = 32;
@@ -87,10 +121,12 @@ pub const OPEN_SHARE: f32 = 0.5;
 /// a tree's crown, `from_spawn` its distance from the world's spawn in blocks.
 /// In the bone lands (`bony`) there are no rocks or flint, and bones instead; native copper only
 /// in the copper lands (`coppery`, which can be bone lands too: the snowy plains).
-pub fn ground_chance(g: Ground, stony: bool, crown: bool, bony: bool, coppery: bool, from_spawn: f32) -> f32 {
+pub fn ground_chance(g: Ground, stony: bool, crown: bool, bony: bool, coppery: bool, antlered: bool, from_spawn: f32) -> f32 {
     let base = match g {
         Ground::Copper if !coppery => 0.0,
         Ground::Copper => COPPER * if stony { STONY } else { 1.0 },
+        Ground::Antler if !antlered => 0.0,
+        Ground::Antler => ANTLER,
         Ground::Rock | Ground::Flint if bony => 0.0,
         Ground::Bone if !bony => 0.0,
         Ground::Rock => ROCK * if stony { STONY } else { 1.0 },
@@ -113,10 +149,10 @@ pub const MOST: f32 = 0.125;
 
 /// Which of the ground's things a column gets for a roll `u` (0..1), if any: rock first, then
 /// flint, then a branch, then bones, then native copper, each its own share of the roll.
-pub fn ground_at(u: f32, stony: bool, crown: bool, bony: bool, coppery: bool, from_spawn: f32) -> Option<Ground> {
+pub fn ground_at(u: f32, stony: bool, crown: bool, bony: bool, coppery: bool, antlered: bool, from_spawn: f32) -> Option<Ground> {
     let mut at = 0.0;
-    for g in [Ground::Rock, Ground::Flint, Ground::Branch, Ground::Bone, Ground::Copper] {
-        at += ground_chance(g, stony, crown, bony, coppery, from_spawn);
+    for g in GROUNDS {
+        at += ground_chance(g, stony, crown, bony, coppery, antlered, from_spawn);
         if u < at {
             return Some(g);
         }
@@ -338,15 +374,17 @@ mod tests {
         let area = std::f32::consts::PI * (SPAWN_LOOK * SPAWN_LOOK) as f32 * OPEN_SHARE;
         for (g, least) in SPAWN_LEAST {
             // A plains spawn: open ground, few crowns (branches by the open chance).
-            let expect = area * ground_chance(g, false, false, false, false, 0.0);
+            let expect = area * ground_chance(g, false, false, false, false, false, 0.0);
             assert!(expect >= least, "{g:?}: {expect:.1} expected within {SPAWN_LOOK}, want {least}");
         }
         // Flint stays rarer than rock everywhere, and far from the spawn the ground is thinner.
         assert!(
-            ground_chance(Ground::Flint, true, false, false, false, 500.0) < ground_chance(Ground::Rock, true, false, false, false, 500.0)
+            ground_chance(Ground::Flint, true, false, false, false, false, 500.0)
+                < ground_chance(Ground::Rock, true, false, false, false, false, 500.0)
         );
         assert!(
-            ground_chance(Ground::Rock, false, false, false, false, 500.0) < ground_chance(Ground::Rock, false, false, false, false, 0.0)
+            ground_chance(Ground::Rock, false, false, false, false, false, 500.0)
+                < ground_chance(Ground::Rock, false, false, false, false, false, 0.0)
         );
     }
 
@@ -356,14 +394,14 @@ mod tests {
     #[test]
     fn bone_lands_have_enough() {
         let area = std::f32::consts::PI * (SPAWN_LOOK * SPAWN_LOOK) as f32 * OPEN_SHARE;
-        let bones = area * ground_chance(Ground::Bone, false, false, true, false, 500.0);
+        let bones = area * ground_chance(Ground::Bone, false, false, true, false, false, 500.0);
         assert!(bones >= 3.0, "{bones:.1} bones expected within {SPAWN_LOOK}");
-        let branches = area * ground_chance(Ground::Branch, false, false, true, false, 500.0);
+        let branches = area * ground_chance(Ground::Branch, false, false, true, false, false, 500.0);
         assert!(branches >= 0.4, "{branches:.1} open branches");
         for g in [Ground::Rock, Ground::Flint] {
-            assert_eq!(ground_chance(g, true, true, true, false, 0.0), 0.0);
+            assert_eq!(ground_chance(g, true, true, true, false, false, 0.0), 0.0);
         }
-        assert_eq!(ground_chance(Ground::Bone, true, true, false, false, 0.0), 0.0);
+        assert_eq!(ground_chance(Ground::Bone, true, true, false, false, false, 0.0), 0.0);
         assert_eq!(BONE_LANDS.len(), 3);
     }
 
@@ -372,13 +410,27 @@ mod tests {
     #[test]
     fn copper_lands_have_some() {
         let area = std::f32::consts::PI * (COPPER_LOOK * COPPER_LOOK) as f32 * OPEN_SHARE;
-        let lumps = area * ground_chance(Ground::Copper, false, false, false, true, 500.0);
+        let lumps = area * ground_chance(Ground::Copper, false, false, false, true, false, 500.0);
         assert!((1.5..=6.0).contains(&lumps), "{lumps:.1} lumps expected within {COPPER_LOOK}");
-        assert_eq!(ground_chance(Ground::Copper, true, true, true, false, 0.0), 0.0);
+        assert_eq!(ground_chance(Ground::Copper, true, true, true, false, false, 0.0), 0.0);
         const { assert!(COPPER < FLINT / 2.0) };
         // The bone lands' cold north has copper too (the Copper Inuit's).
-        assert!(ground_chance(Ground::Copper, false, false, true, true, 500.0) > 0.0);
+        assert!(ground_chance(Ground::Copper, false, false, true, true, false, 500.0) > 0.0);
         assert_eq!(Ground::Copper.block(), "loose_copper");
+    }
+
+    /// A walk round a place in the deer lands, far from the spawn, turns up an antler or so;
+    /// outside them none; rarer than native copper.
+    #[test]
+    fn antler_lands_have_some() {
+        let area = std::f32::consts::PI * (ANTLER_LOOK * ANTLER_LOOK) as f32 * OPEN_SHARE;
+        let antlers = area * ground_chance(Ground::Antler, false, false, false, false, true, 500.0);
+        assert!((0.8..=4.0).contains(&antlers), "{antlers:.1} antlers expected within {ANTLER_LOOK}");
+        assert_eq!(ground_chance(Ground::Antler, true, true, true, true, false, 0.0), 0.0);
+        const { assert!(ANTLER < COPPER) };
+        // The flaker lifts a skill-0 hand-knapped flint head a grade (Sound to Good).
+        let hand = HEAD_MATERIAL_POINTS + 10 + BY_HAND_BONUS;
+        assert_eq!((hand / 10, (hand + FLAKER_POINTS) / 10), (4, 5));
     }
 
     #[test]
@@ -386,10 +438,10 @@ mod tests {
         for stony in [false, true] {
             for crown in [false, true] {
                 for bony in [false, true] {
-                    for coppery in [false, true] {
-                        let sum: f32 = [Ground::Rock, Ground::Flint, Ground::Branch, Ground::Bone, Ground::Copper]
+                    for (coppery, antlered) in [(false, false), (true, false), (false, true), (true, true)] {
+                        let sum: f32 = GROUNDS
                             .iter()
-                            .map(|&g| ground_chance(g, stony, crown, bony, coppery, 0.0))
+                            .map(|&g| ground_chance(g, stony, crown, bony, coppery, antlered, 0.0))
                             .sum();
                         assert!(sum <= MOST, "{sum}");
                     }
@@ -400,14 +452,14 @@ mod tests {
 
     #[test]
     fn rolls_split_in_order() {
-        let r = ground_chance(Ground::Rock, false, true, false, false, 900.0);
-        assert_eq!(ground_at(0.0, false, true, false, false, 900.0), Some(Ground::Rock));
-        assert_eq!(ground_at(r + 1e-6, false, true, false, false, 900.0), Some(Ground::Flint));
-        assert_eq!(ground_at(0.99, false, true, false, false, 900.0), None);
+        let r = ground_chance(Ground::Rock, false, true, false, false, false, 900.0);
+        assert_eq!(ground_at(0.0, false, true, false, false, false, 900.0), Some(Ground::Rock));
+        assert_eq!(ground_at(r + 1e-6, false, true, false, false, false, 900.0), Some(Ground::Flint));
+        assert_eq!(ground_at(0.99, false, true, false, false, false, 900.0), None);
         // In the bone lands the roll goes to the branch first, then bones.
-        let b = ground_chance(Ground::Branch, false, true, true, false, 900.0);
-        assert_eq!(ground_at(0.0, false, true, true, false, 900.0), Some(Ground::Branch));
-        assert_eq!(ground_at(b + 1e-6, false, true, true, false, 900.0), Some(Ground::Bone));
+        let b = ground_chance(Ground::Branch, false, true, true, false, false, 900.0);
+        assert_eq!(ground_at(0.0, false, true, true, false, false, 900.0), Some(Ground::Branch));
+        assert_eq!(ground_at(b + 1e-6, false, true, true, false, false, 900.0), Some(Ground::Bone));
     }
 
     #[test]

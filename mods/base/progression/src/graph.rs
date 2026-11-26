@@ -108,6 +108,8 @@ const RECIPES_LIST: &[Recipe] = &[
     b("base:stick", 2.0, &[("base:fallen_branch", 1.0)], Needs::Hand, 6.0),
     // the bone lands' way in (vitals::first::BONE_LANDS)
     b("base:bone", 1.0, &[("base:loose_bone", 1.0)], Needs::Hand, 10.0),
+    // A shed antler, a find in the deer lands: about one in a 64-block walk.
+    b("base:antler", 1.0, &[("base:shed_antler", 1.0)], Needs::Hand, 240.0),
     b("base:plant_fibre", 1.0, &[("base:tall_grass", 1.0)], CUTTER, 1.0),
     b("base:oak_bark", 1.0, &[("base:oak_log", 1.0)], AXE, 5.0),
     c("base:sharp_flake", 1.0, &[("base:flint", 1.0)], Hand),
@@ -397,6 +399,10 @@ const RECIPES_LIST: &[Recipe] = &[
     // doors.rs, assembly.rs, redstone.rs, woodcutter.rs; `content::RULES`).
     c("base:shield", 1.0, &[("#planks", 6.0), ("base:iron_ingot", 1.0)], Table),
     c("base:oak_door", 3.0, &[("base:oak_planks", 6.0)], Table),
+    // fences.rs
+    c("base:fence", 3.0, &[("#planks", 4.0), ("base:stick", 2.0)], Table),
+    c("base:fence_gate", 1.0, &[("#planks", 2.0), ("base:stick", 4.0)], Table),
+    c("base:scarecrow", 1.0, &[("base:plant_fibre", 2.0), ("base:stick", 3.0)], Table),
     c("base:oak_wood", 4.0, &[("base:oak_log", 4.0)], Hand),
     c("base:birch_wood", 4.0, &[("base:birch_log", 4.0)], Hand),
     c("base:spruce_wood", 4.0, &[("base:spruce_log", 4.0)], Hand),

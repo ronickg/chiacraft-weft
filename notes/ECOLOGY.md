@@ -544,8 +544,17 @@ and cactus.**
     seasons stored; placeholder pictures until Chiacraft's art.
   - **The grass top** turned four ways at random (`grass_top.ctm`); tall grass's variant waits on
     a check of Weft's random CTM on plants.
-  - **Next:** trees grown from branches (the Animal models session's `branchy`), a bloom look,
-    moss, boulders and coarse ground by noise and slope.
+  - **Blooms:** seven trees bloom in their real season (`vitals::wild::BLOOMS`: dogwood, umbrella
+    thorn, mesquite, creosote, willow, golden ipê, wild cherry), their leaves swapped for a
+    `_bloom` look.
+  - **Moss on rock and wood** (11-26): in the woods and the wet, a moss carpet on the shaded
+    north faces of boulders, fallen trunks, logs and scree, fewer on their tops and the other
+    faces (`vitals::wild::MOSS_*`).
+  - **Slopes:** coarse dirt where the ground falls two blocks (`COARSE_SLOPE`), gravel from three
+    (as before), loose stones (scree) at the foot of a rise of three (`SCREE`); boulders by biome
+    (`BOULDERS`).
+  - **Next:** trees grown from branches are built (`TREE_STYLE` "branched") but the default stays
+    "simple" (Ronald, 11-05) until a look and a perf check; boulders gathered in clusters by noise.
 - **Looks:** a grazed tuft shows bitten down (`<plant>_grazed`), a ripe seed head its fruit or
   seed (`<plant>_ripe`).
 - **Grown plants rest:** a plant at its last age returns from its growth step before reading the
@@ -812,6 +821,17 @@ and cactus.**
   (`life::mother_share`: a white-tailed deer's litter of 1-3, 33%; a grey wolf's of 2-8, 13%), so a quarter of the
   ones met in season are still young (`YOUNG_SHARE`). Spawned by a command, a share still come
   alone. Egg layers' young come from their nests. Check: `cov_births`.
+- **Thin in a drought, back after rain (2026-11-26, branch claude/animals-capacity):** a plant
+  eater's food at a place is what its plants grew over the last 10 days of that place's own weather
+  (`vitals::forage::recent_lushness`: each day's growth from its mean air and soil water, browse
+  where only browse is in season), not the season's average. Spawning comes as often as that, a
+  wild one arrives as fed as that, and hunters' prey reads the same. Its room is its crowd times
+  that food against what those same days usually give (`usual_lushness`: the mean over 8 other runs
+  of the weather; `needs::room_by_food`, never under a quarter, `ROOM_FLOOR`), so a dry spell turns
+  groups away and the place fills back in once rain has grown it again; a season's turn alone
+  doesn't. Offline, a white-tailed deer's room of 20 on the plains and a capybara's on the
+  savanna fall to 11-17 in a dry spell and stay at 20 otherwise. `/animal room` shows food now,
+  usual and room. Check: `cov_capacity`.
 
 
 - **Capacity:** a place's capacity for a species is how much of its food categories the
@@ -847,11 +867,18 @@ and cactus.**
   dung, rotten flesh, leaves, saplings, wheat and seeds (`vitals::soil::COMPOSTS`). Full, it
   rots into compost in about 23 minutes, the weeks hot compost takes, at the growing pace.
 - **Carcasses:** a kill's drops stay where it fell.
+- **Bodies and dung into the soil (2026-11-26, branch claude/animals-rot):** a carcass that rots
+  away (`carcass.rs`, its bones and pile, eaten or not) feeds the ground where it lay: farmland
+  within 2 blocks gets a fertility level for every 20 kg left of it (`vitals::soil::RICH_KG`,
+  `rotted_levels`: an uneaten deer 3, as compost; a fox 1; a mouse none), and grazed grass there
+  grows back at once, as a bison's carcass leaves a patch of taller, richer grass on the prairie
+  (Towne 2000). A dung pat rotting gives farmland under and beside it a level (`PAT_FEEDS`), as
+  the dung used on it would. Both through `base_api::grow::enrich`. Check: `cov_carcass_rot`.
 - **Seen in the game:** the bin filling, its top turning to dirt.
 - **Not yet:**
-  - food and carcasses on the ground rotting away: the engine clears every item after 5
-    minutes (`ITEM_LIFETIME`), so this needs a per-item lifetime in the engine first (Upstream);
-  - scavengers eat food and carrion off the ground (part 5), but our species leave no carcass yet;
+  - food on the ground rotting: the engine still clears every item after 5 minutes
+    (`ITEM_LIFETIME`), so it vanishes before it would spoil; carcasses are entities and rot
+    (above);
   - the generated art for dung, compost and the bin (placeholders now, `notes/STYLE.md`).
 
 
