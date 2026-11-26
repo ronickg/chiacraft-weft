@@ -38,8 +38,12 @@ static COPPER_INGOTS: Tag = Tag::named("ingots/copper");
 /// with any copper part).
 fn copper_in(s: &ItemStack) -> bool {
     let copper = crafting::code("copper");
-    [&NATIVE_COPPER, &COPPER_RAW, &COPPER_INGOTS].iter().any(|t| t.on_item(s.item))
-        || crate::parts::PART.on_stack_own(s).is_some_and(|p| p.material == copper)
+    [&NATIVE_COPPER, &COPPER_RAW, &COPPER_INGOTS]
+        .iter()
+        .any(|t| t.on_item(s.item))
+        || crate::parts::PART
+            .on_stack_own(s)
+            .is_some_and(|p| p.material == copper)
         || crate::parts::PARTS
             .on_stack_own(s)
             .is_some_and(|p| p.materials[..(p.n as usize).min(4)].contains(&copper))
@@ -48,7 +52,12 @@ fn copper_in(s: &ItemStack) -> bool {
 /// A tool whose working part (a head or blade) is copper.
 fn copper_tool(s: &ItemStack) -> bool {
     let Some(p) = crate::parts::PARTS.on_stack_own(s) else { return false };
-    let Some(kind) = crafting::KINDS.iter().find(|k| crafting::code(k.id) == p.kind) else { return false };
+    let Some(kind) = crafting::KINDS
+        .iter()
+        .find(|k| crafting::code(k.id) == p.kind)
+    else {
+        return false;
+    };
     let working = crafting::code(kind.working());
     (0..(p.n as usize).min(4)).any(|i| p.slots[i] == working && p.materials[i] == crafting::code("copper"))
 }

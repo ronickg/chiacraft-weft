@@ -292,9 +292,8 @@ pub const HEAD_FROM_BOOK_SECS: f32 = 8.0;
 /// bone lands; the fire is a lit one within `CLOCK_FIRE_REACH` blocks) ...
 /// `copper` is any copper in the bag (a native lump, raw ore, an ingot, a head), `copper_tool` a
 /// tool whose working part is copper: the copper tier's first steps, past the half hour.
-pub const CLOCK_STEPS: [&str; 14] = [
-    "rock", "bone", "edge", "head", "string", "axe", "fire", "logs", "planks", "table", "pickaxe", "stone", "copper", "copper_tool",
-];
+pub const CLOCK_STEPS: [&str; 14] =
+    ["rock", "bone", "edge", "head", "string", "axe", "fire", "logs", "planks", "table", "pickaxe", "stone", "copper", "copper_tool"];
 /// ... the summary logged at half an hour of play (Ronald, 11-05: "B: about 13-15 min" to the
 /// first axe; OVERVIEW: "the first 30 minutes timed") ...
 pub const CLOCK_REPORT_SECS: u32 = 1800;
@@ -343,8 +342,12 @@ mod tests {
             assert!(expect >= least, "{g:?}: {expect:.1} expected within {SPAWN_LOOK}, want {least}");
         }
         // Flint stays rarer than rock everywhere, and far from the spawn the ground is thinner.
-        assert!(ground_chance(Ground::Flint, true, false, false, false, 500.0) < ground_chance(Ground::Rock, true, false, false, false, 500.0));
-        assert!(ground_chance(Ground::Rock, false, false, false, false, 500.0) < ground_chance(Ground::Rock, false, false, false, false, 0.0));
+        assert!(
+            ground_chance(Ground::Flint, true, false, false, false, 500.0) < ground_chance(Ground::Rock, true, false, false, false, 500.0)
+        );
+        assert!(
+            ground_chance(Ground::Rock, false, false, false, false, 500.0) < ground_chance(Ground::Rock, false, false, false, false, 0.0)
+        );
     }
 
     /// A place in the bone lands, far from the spawn, has bones enough for the way in (a hammer
