@@ -335,7 +335,16 @@ pub const RULES: &[Rule] = &[
     r(&["base:oak_bark"], 0, Shared, Material, Made),
     // ---- the first tools and fire (vitals::first)
     r(
-        &["base:rock", "base:flint", "base:tektite", "base:stick", "base:plant_fibre", "base:sharp_flake", "base:bone_splinter", "base:bone_needle"],
+        &[
+            "base:rock",
+            "base:flint",
+            "base:tektite",
+            "base:stick",
+            "base:plant_fibre",
+            "base:sharp_flake",
+            "base:bone_splinter",
+            "base:bone_needle",
+        ],
         0,
         Shared,
         Material,
