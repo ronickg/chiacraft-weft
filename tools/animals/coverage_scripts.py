@@ -380,9 +380,10 @@ s = head("carcass", [
     "comes in beside them (shot 8 is taken mid-skin from the player's own camera), and after about 8 s \"skinned carcass N",
     "of white_tailed_deer: K base:hide (quality Q), M animals:venison\" (Q at most 2 with flint), the hide and meat on the ground.",
     "Part 5 (x 1000): a grey wolf, a golden eagle, a raptor, a yacare caiman and a pacu killed in a row: each drawn as its",
-    "body plan's own lying model (four-legged, bird, two-legged, reptile, fish) in its own coat, shot whole (10, 11: the",
-    "wolf close, grey) and opened after 3 days (12: meat and ribs on the upper side, guts beside it, a blood pool under),",
-    "then its bones (14, 5 days) and pile (15, 9 days), each plan's own: a ribcage, skull, legs, a scrap of its hide.",
+    "body plan's own lying model (four-legged, bird, two-legged, reptile, fish) in its own coat, shot whole (10), opened",
+    "after 3 days (12: meat and ribs on the upper side, guts beside it, a blood pool under), its bones (14, 5 days) and",
+    "pile (15, 9 days: a ribcage, skull, legs, a scrap of its hide); each stage as the row, the wolf from straight above",
+    "(11, 13, 15, 16_wolf_above: legs out sideways flat on the ground) and each body close and low (_low_<stage>_<plan>).",
     "Report per part: the carcass, eats and skin lines, the `/animalprof carcass` rows, no hide or meat dropped at the kills,",
     "and the shots: the dead animal lying at its place, the ribcage and the bone pile sized to it, the kneel and the camera",
     "while skinning; anything floating, sunk, flickering or drawn wrong.",
@@ -428,33 +429,34 @@ def skin_part(x, prefix="cov_carcass"):
 
 s += skin_part(x)
 x = 1000
-# Slice 3: one of each body plan killed in a row, drawn as its plan's lying model in its own coat (a grey wolf's grey,
-# not a deer's brown), whole, then opened by 3 days' rot. West to east: a grey wolf, a golden eagle, a raptor, a yacare
-# caiman, a pacu (on the grass).
-s += pad(x) + ["chat /tk mode creative"]
-for kind, dx in [("grey_wolf", -8), ("golden_eagle", -4), ("raptor", 0), ("yacare_caiman", 4), ("pacu", 8)]:
-    s += [f"chat /tk spawn animals:{kind} {x+dx} 70 {Z+6}", "wait 1", f"chat /tp {x+dx} 70 {Z+9}", "wait 1",
-          "chat /animalprof kill", "wait 1"]
-s += ["chat /tk mode spectator", "wait 2", "chat /animalprof carcass"]
-row_shot = ["chat /tick freeze", f"chat /tp {x} 76 {Z+16}", "look 0 -30", "wait 2"]
-# The wolf close, from its south-east, low (r7's 11 had it at the frame's top edge behind the chat; r9's, from 40 degrees
-# above, had its legs splayed toward the camera read as standing).
-s += row_shot + ["shot cov_carcass_10_plans_whole.png", f"chat /tp {x-6} 70.3 {Z+8.5}", "look 38 -18", "wait 2",
-                 "shot cov_carcass_11_wolf_close.png", "chat /tick unfreeze", "wait 1"]
-s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 3", "wait 2", "chat /animalprof carcass"]
-s += row_shot + ["shot cov_carcass_12_plans_opened.png", "chat /tick unfreeze", "wait 1"]
-# Each plan's opened body at the ground, close, from its south-east: on the grass, none sunk (r7's one shot of the row
-# from 7 blocks had them tiny behind the chat).
-s += ["chat /tick freeze"]
-for kind, dx in [("wolf", -8), ("eagle", -4), ("raptor", 0), ("caiman", 4), ("pacu", 8)]:
-    s += [f"chat /tp {x+dx+2} 68.9 {Z+8.5}", "look 39 -8", "wait 2", f"shot cov_carcass_13_low_{kind}.png"]
-s += ["chat /tick unfreeze", "wait 1"]
-# Each plan's bones (2 days more: 5) and the pile they end in (4 more: 9), own models per plan since 11-26 (the fish,
-# rotting fastest, may be gone by then).
-for days, name in [(2, "14_plans_bones"), (4, "15_plans_pile")]:
-    s += [f"chat /tp {x} 75 {Z+6}", f"chat /animalprof carcass {days}", "wait 2", "chat /animalprof carcass"]
-    s += row_shot + [f"shot cov_carcass_{name}.png", f"chat /tp {x-6} 70.3 {Z+8.5}", "look 38 -18", "wait 2",
-                     f"shot cov_carcass_{name}_wolf.png", "chat /tick unfreeze", "wait 1"]
+PLANS = [("wolf", "grey_wolf", -8), ("eagle", "golden_eagle", -4), ("raptor", "raptor", 0), ("caiman", "yacare_caiman", 4),
+         ("pacu", "pacu", 8)]
+
+
+def plans_part(x, p="cov_carcass"):
+    """Slice 3: one of each body plan killed in a row, drawn as its plan's lying model in its own coat (a grey wolf's
+    grey, not a deer's brown): whole, opened by 3 days' rot, its bones (5 days) and pile (9 days; the fish, rotting
+    fastest, may be gone). West to east: a grey wolf, a golden eagle, a raptor, a yacare caiman, a pacu (on the grass).
+    Each stage shot as the row, each body close and low from its south-east (r7's and r10's row shots had them as
+    specks), and the wolf from straight above (r9's and r10's low shots from its belly side had its legs, lying out
+    toward the camera, read as standing)."""
+    out = pad(x) + ["chat /tk mode creative"]
+    for _, kind, dx in PLANS:
+        out += [f"chat /tk spawn animals:{kind} {x+dx} 70 {Z+6}", "wait 1", f"chat /tp {x+dx} 70 {Z+9}", "wait 1",
+                "chat /animalprof kill", "wait 1"]
+    out += ["chat /tk mode spectator", "wait 2", "chat /animalprof carcass"]
+    for days, n, stage in [(0, 10, "whole"), (3, 12, "opened"), (2, 14, "bones"), (4, 15, "pile")]:
+        if days:
+            out += [f"chat /tp {x} 75 {Z+6}", f"chat /animalprof carcass {days}", "wait 2", "chat /animalprof carcass"]
+        out += ["chat /tick freeze", f"chat /tp {x} 76 {Z+16}", "look 0 -30", "wait 2", f"shot {p}_{n}_plans_{stage}.png",
+                f"chat /tp {x-8} 72.8 {Z+6}", "look 0 -89", "wait 2", f"shot {p}_{n+1}_wolf_above_{stage}.png"]
+        for name, _, dx in PLANS:
+            out += [f"chat /tp {x+dx+1.6} 68.9 {Z+7.8}", "look 39 -9", "wait 2", f"shot {p}_{n}_low_{stage}_{name}.png"]
+        out += ["chat /tick unfreeze", "wait 1"]
+    return out
+
+
+s += plans_part(x)
 # Every shot without the HUD (Planner on r7: the chat log covered half of each frame): F1 off, shoot, F1 on.
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass", s)
@@ -467,3 +469,13 @@ s = head("carcass_skin", [
 ]) + skin_part(600, "cov_carcass_skin")
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass_skin", s)
+
+# Part 5 alone, for the body plans' looks (Planner on r10: the wolf read as standing; the bones and piles specks).
+s = head("carcass_plans", [
+    "Body plans alone (cov_carcass part 5): a grey wolf, a golden eagle, a raptor, a yacare caiman and a pacu killed in a",
+    "row, then aged: whole, opened (3 days), bones (5), pile (9). Per stage: the row (_plans_), the wolf from straight",
+    "above (_wolf_above_: legs out sideways flat on the ground, not under it), and each body close and low (_low_).",
+    "Report whether each lies on its side (the caiman on its belly), rests on the ground, and is its own animal's shape.",
+]) + plans_part(1000, "cov_carcass_plans")
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("carcass_plans", s)
