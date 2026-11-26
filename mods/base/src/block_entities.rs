@@ -139,15 +139,28 @@ fn room_for(output: ItemStack, out: ItemStack) -> u32 {
     room / out.count.max(1)
 }
 
+/// Raw ore of a metal that melts only in a hot fire (`vitals::smelt::HOT_METALS`: copper, so
+/// raw copper, malachite and native copper; `metal_tags_are_the_hot_metals`).
+static HOT_ORES: [Tag; 1] = [Tag::named("raw_ores/copper")];
+
+fn needs_heat(item: u32) -> bool {
+    item != 0 && HOT_ORES.iter().any(|t| t.on_item(item))
+}
+
 /// `ticks` of one furnace at once (its area was unloaded, the time jumped): it smelts while
 /// input, room and fuel last, lighting fuel as it goes, then the fire burns down and the
 /// progress cools, as tick by tick.
-fn catch_up(w: &World, id: u64, s: &mut Smelting, ticks: u32) {
+fn catch_up(w: &World, id: u64, pos: BlockPos, s: &mut Smelting, ticks: u32) {
     let inv = w.inventory(id);
     let (input_slot, fuel_slot, output_slot) = (inv.group("input"), inv.group("fuel"), inv.group("output"));
     let (input, fuel, output) = (input_slot.get(0), fuel_slot.get(0), output_slot.get(0));
     let mut idle = ticks as u64;
-    if let Some((out, time)) = (!input.is_empty())
+    // Copper away from a hot fire waits, as tick by tick (its fuel hot and bellows beside).
+    let hot_enough = || {
+        let fuel_ticks = FUEL.on_stack_item(&fuel).unwrap_or(0).max(s.burn_max);
+        !needs_heat(input.item) || vitals::smelt::hot(fuel_ticks, crate::casting::bellows_beside(w, pos))
+    };
+    if let Some((out, time)) = (!input.is_empty() && hot_enough())
         .then(|| recipe_process(&crate::recipes::SMELTING, input.item))
         .flatten()
     {
@@ -194,8 +207,8 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
         let Some(st) = w.entity(id) else { continue };
         if ticks > 1 {
             let was_lit = s.burn > 0;
-            catch_up(&w, id, s, ticks);
             let pos = st.block_pos();
+            catch_up(&w, id, pos, s, ticks);
             if (s.burn > 0) != was_lit && FURNACE.is(w.block(pos)) {
                 w.prop_set(pos, "lit", if s.burn > 0 { "true" } else { "false" });
             }
@@ -218,14 +231,25 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
             .then(|| recipe_process(&crate::recipes::SMELTING, input.item))
             .flatten();
         let fits = recipe.is_some_and(|(out, _)| room_for(output, out) > 0);
-        if s.burn == 0 && fits {
-            if let Some(ticks) = FUEL.on_stack_item(&fuel) {
-                s.burn = ticks;
-                s.burn_max = ticks;
-                fuel_slot.set(0, consume_one(fuel));
-            }
+        // Copper melts only in a hot fire (`vitals::smelt`): it lights only hot fuel with bellows
+        // beside, and cooks only while that burns.
+        let needs = fits && needs_heat(input.item);
+        let bellows = needs && crate::casting::bellows_beside(&w, pos);
+        if s.burn == 0
+            && fits
+            && let Some(ticks) = FUEL
+                .on_stack_item(&fuel)
+                .filter(|&t| !needs || vitals::smelt::hot(t, bellows))
+        {
+            s.burn = ticks;
+            s.burn_max = ticks;
+            fuel_slot.set(0, consume_one(fuel));
         }
-        if s.burn > 0 && fits {
+        let warm = !needs || vitals::smelt::hot(s.burn_max, bellows);
+        if needs && !(s.burn > 0 && warm) && w.day_time() % 20 == 0 {
+            crate::hints::copper_too_cold(&w, pos);
+        }
+        if s.burn > 0 && fits && warm {
             let (out, time) = recipe.unwrap();
             let q = abi::Query { entity: id, item: input.item, ..query() };
             s.cook_max = w
@@ -251,6 +275,17 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
         let lit = s.burn > 0;
         if lit != was_lit && FURNACE.is(w.block(pos)) {
             w.prop_set(pos, "lit", if lit { "true" } else { "false" });
+        }
+    }
+}
+
+#[cfg(test)]
+mod heat_tests {
+    #[test]
+    fn metal_tags_are_the_hot_metals() {
+        assert_eq!(super::HOT_ORES.len(), vitals::smelt::HOT_METALS.len());
+        for (t, m) in super::HOT_ORES.iter().zip(vitals::smelt::HOT_METALS) {
+            assert!(t.name().ends_with(&format!("raw_ores/{m}")));
         }
     }
 }

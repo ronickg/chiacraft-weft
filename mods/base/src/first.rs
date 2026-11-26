@@ -30,6 +30,11 @@ pub static FALLEN_BRANCH: Block = Block::named("fallen_branch");
 pub static LOOSE_BONE: Block = Block::named("loose_bone");
 pub static BONE: Item = Item::named("bone");
 pub static BONE_SPLINTER: Item = Item::named("bone_splinter");
+/// Native copper (the copper lands', `vitals::first::COPPER_LANDS`): a lump on the ground, put
+/// down on stone and hammered cold into a head on the knapping screen (`knapping.rs`), or melted
+/// in the furnace as raw copper is.
+pub static LOOSE_COPPER: Block = Block::named("loose_copper");
+pub static NATIVE_COPPER: Item = Item::named("native_copper");
 
 static LEAVES: Tag = Tag::named("leaves");
 /// Edges that cut fibre plants (a flake; a knife later).
@@ -68,6 +73,18 @@ pub fn register(r: &mut Registry) {
             ([5.0, 0.0, 11.0], [12.0, 1.0, 12.5]),
         ],
     );
+    // A lump of native copper, flattened and knobbly (its tiles drawn from the nodule's until Art
+    // paints them).
+    loose(
+        r,
+        &LOOSE_COPPER,
+        &[],
+        "stone",
+        "native_copper",
+        &[([4.0, 0.0, 5.0], [11.0, 2.5, 11.0]), ([10.0, 0.0, 7.0], [13.0, 1.5, 10.0]), ([5.0, 0.0, 3.0], [8.0, 1.5, 5.0])],
+    );
+    r.loot(&LOOSE_COPPER)
+        .pool(Pool::new().item("native_copper"));
     r.loot(&LOOSE_BONE).pool(Pool::new().item("bone"));
     r.loot(&LOOSE_ROCK).pool(Pool::new().item("rock"));
     r.loot(&LOOSE_FLINT).pool(Pool::new().item("flint"));
@@ -96,6 +113,13 @@ pub fn register(r: &mut Registry) {
     // A bone is a hammer and a core (`strike`), and still the ingredient it was (`items.rs`).
     r.item(&BONE)
         .tag("bone")
+        .on_use(strike)
+        .tab(&crate::tabs::INGREDIENTS);
+    // Native copper: put down and struck (`strike`), and raw copper to the furnace (its tag, the
+    // smelting recipe `#raw_ores/copper` -> an ingot).
+    r.item(&NATIVE_COPPER)
+        .tag("native_copper")
+        .tag("raw_ores/copper")
         .on_use(strike)
         .tab(&crate::tabs::INGREDIENTS);
     r.item(&BONE_SPLINTER)
@@ -191,7 +215,8 @@ fn strike(u: &mut ItemUse) -> bool {
     // The stone itself, or the top of what it lies on: a small thing on the ground is easy to aim
     // past (PC run fh4_axe: the ray passed over the nodule to the ground under it).
     let above = aimed.above();
-    let loose = |q: BlockPos| LOOSE_FLINT.is(w.block(q)) || LOOSE_ROCK.is(w.block(q)) || LOOSE_BONE.is(w.block(q));
+    let loose =
+        |q: BlockPos| LOOSE_FLINT.is(w.block(q)) || LOOSE_ROCK.is(w.block(q)) || LOOSE_BONE.is(w.block(q)) || LOOSE_COPPER.is(w.block(q));
     let p = if loose(aimed) {
         aimed
     } else if face == Dir::Up.face() && loose(above) {
@@ -202,15 +227,21 @@ fn strike(u: &mut ItemUse) -> bool {
     let state = w.block(p);
     let flint = LOOSE_FLINT.is(state);
     let bone = LOOSE_BONE.is(state);
+    let copper = LOOSE_COPPER.is(state);
     let player = u.entity();
     let at = p.center().offset(0.0, -0.3, 0.0);
     // Sneaking: crouched (the held keys aren't on the server any more).
     let sneaking = w
         .entity(player)
         .is_some_and(|e| e.pose == abi::pose::CROUCH);
-    weft_sdk::info!("first: strike at {p:?}, flint {flint}, bone {bone}, sneaking {sneaking}");
-    if sneaking && (flint || bone) {
+    weft_sdk::info!("first: strike at {p:?}, flint {flint}, bone {bone}, copper {copper}, sneaking {sneaking}");
+    if sneaking && (flint || bone || copper) {
         crate::knapping::open(&w, player, p);
+        return true;
+    }
+    // Copper bends, it gives no flake: a dull knock (`hint.base.native_copper` says to sneak).
+    if copper {
+        w.play_sound(&STRIKE, at, 0.6);
         return true;
     }
     // Too soon after the last strike: a knock, nothing more.
@@ -280,6 +311,8 @@ fn put_down(u: &mut ItemUse, p: BlockPos, face: u32) -> bool {
     let s = u.stack();
     let block = if s.item == FLINT.id() {
         LOOSE_FLINT.id()
+    } else if s.item == NATIVE_COPPER.id() {
+        LOOSE_COPPER.id()
     } else if s.item == BONE.id() {
         LOOSE_BONE.id()
     } else {
@@ -379,5 +412,6 @@ pub fn ground_block(g: Ground) -> u32 {
         Ground::Flint => LOOSE_FLINT.id(),
         Ground::Branch => FALLEN_BRANCH.id(),
         Ground::Bone => LOOSE_BONE.id(),
+        Ground::Copper => LOOSE_COPPER.id(),
     }
 }

@@ -15,7 +15,7 @@ use vitals::effects::Effect;
 use weft_sdk::*;
 
 /// The hints, by their bit in `SEEN`: `hint.base.<name>` in the lang files.
-const HINTS: [&str; 17] = [
+const HINTS: [&str; 21] = [
     "logs",
     "table",
     "night",
@@ -33,6 +33,10 @@ const HINTS: [&str; 17] = [
     "tree",
     "tree_far",
     "knap_bone",
+    "native_copper",
+    "copper_ore",
+    "copper_heat",
+    "casting",
 ];
 const LOGS: u32 = 0;
 const TABLE: u32 = 1;
@@ -54,6 +58,14 @@ const TREE: u32 = 14;
 const TREE_FAR: u32 = 15;
 /// The bone lands' way in (`vitals::first::BONE_LANDS`): a bone in the bag and no edge yet.
 const KNAP_BONE: u32 = 16;
+/// The copper tier's first steps (`notes/COPPER.md`): native copper in the bag (hammer it cold),
+/// and raw copper ore with no furnace or ingot yet (melt it).
+const NATIVE_COPPER: u32 = 17;
+const COPPER_ORE: u32 = 18;
+/// Copper's smelt and casting (`notes/COPPER.md`, slice 2): copper in a furnace that isn't hot
+/// (to whoever stands near), and a copper ingot in the bag (cast it in a mould).
+const COPPER_HEAT: u32 = 19;
+const CASTING: u32 = 20;
 
 /// Seconds played before the first hint, that bare hands can't fell a tree (`first.rs`).
 const LOGS_AFTER: u64 = 20;
@@ -82,6 +94,22 @@ static CAMPFIRE_TAG: Tag = Tag::named("campfires");
 static ROCKS_TAG: Tag = Tag::named("rocks");
 static FLINT_TAG: Tag = Tag::named("flint");
 static BONE_TAG: Tag = Tag::named("bone");
+static NATIVE_COPPER_TAG: Tag = Tag::named("native_copper");
+static RAW_COPPER_TAG: Tag = Tag::named("raw_ores/copper");
+/// Tools a player may hold (built ones carry `parts::PARTS` too): the logs hint waits while one is.
+static TOOL_TAGS: [Tag; 6] = [
+    Tag::named("tools/axe"),
+    Tag::named("tools/pickaxe"),
+    Tag::named("tools/shovel"),
+    Tag::named("tools/hoe"),
+    Tag::named("tools/sword"),
+    Tag::named("cutters"),
+];
+
+fn has_tag(tags: &[Tag], item: u32) -> bool {
+    item != 0 && tags.iter().any(|t| t.on_item(item))
+}
+static COPPER_INGOTS_TAG: Tag = Tag::named("ingots/copper");
 /// The evening the night hint was last shown (the day count; not saved).
 static NIGHT_SHOWN: Component<u32> = Component::named("hints_night_shown");
 /// Game hours before sunset the night hint comes (the sunset by the calendar's daylight: 18:00 at
@@ -213,7 +241,11 @@ fn watch(w: &World) {
         if has(&FURNACE_TAG) {
             mark(w, id, RAW_MEAT);
         }
-        if st.age >= LOGS_AFTER * 20 && !logs {
+        // "Bare hands can't fell a tree": only with nothing in hand, or something that's no tool
+        // (Tester's cov_copper2: it came with a copper pickaxe in hand; Planner, 11-26).
+        let held = inv.get(w.selected_slot(id));
+        let tool_in_hand = crate::parts::PARTS.on_stack_own(&held).is_some() || has_tag(&TOOL_TAGS, held.item);
+        if st.age >= LOGS_AFTER * 20 && !logs && !tool_in_hand {
             once(w, id, LOGS);
         }
         if logs && !table {
@@ -235,6 +267,21 @@ fn watch(w: &World) {
         }
         if head && !logs {
             once(w, id, LASH);
+        }
+        // Copper: a native lump hammers cold; raw ore wants the furnace.
+        if has(&NATIVE_COPPER_TAG) {
+            once(w, id, NATIVE_COPPER);
+        }
+        // Raw copper or malachite (native copper has its own hint).
+        if items
+            .iter()
+            .any(|&i| RAW_COPPER_TAG.on_item(i) && !NATIVE_COPPER_TAG.on_item(i))
+            && !has(&COPPER_INGOTS_TAG)
+        {
+            once(w, id, COPPER_ORE);
+        }
+        if has(&COPPER_INGOTS_TAG) {
+            once(w, id, CASTING);
         }
         if !logs && !seen(w, id, TREE) && has(&AXES_TAG) {
             mark(w, id, TREE);
@@ -378,6 +425,20 @@ fn client(r: &mut Registry) {
         // thin small line mid-screen").
         c.screen_text_plated(0.5, HINT_Y, key, &args, 0xf4ead800 | (alpha * 255.0) as u32, 1.0, width);
     });
+}
+
+/// Copper in the furnace at `pos` that isn't hot enough to melt (`block_entities.rs`): why, to
+/// whoever stands within `vitals::smelt::HEAT_HINT_REACH`.
+pub fn copper_too_cold(w: &World, pos: BlockPos) {
+    let r2 = vitals::smelt::HEAT_HINT_REACH * vitals::smelt::HEAT_HINT_REACH;
+    let at = [pos.x as f64 + 0.5, pos.y as f64 + 0.5, pos.z as f64 + 0.5];
+    for p in w.players() {
+        let Some(e) = w.entity(p) else { continue };
+        let d = [e.pos.x - at[0], e.pos.y - at[1], e.pos.z - at[2]];
+        if d[0] * d[0] + d[1] * d[1] + d[2] * d[2] <= r2 {
+            once(w, p, COPPER_HEAT);
+        }
+    }
 }
 
 /// A fire lit by `player` (`firebed.rs`): the night hint has done its work, as for one placed.

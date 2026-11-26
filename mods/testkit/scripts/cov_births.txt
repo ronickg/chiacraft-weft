@@ -1,0 +1,93 @@
+# Births in natural spawning. Part 1 (x 0, autumn, the white-tailed deer's breeding season): 24 white-tailed deer met
+# by natural spawning on a pad (`/animalprof met 24`: spawned with the natural cause, as the engine's spawner would). About
+# a third of the females (so 3 to 6 of the 24) should log "wild white_tailed_deer N arrives with her K young (D days
+# old, P% grown)" with K 1 to 3, each young "born to N and 0 (wild)"; the `/animalprof where` rows 10 s and 60 s
+# later mark those young "(young, X from its mother N)" with X small (a few blocks: they follow her). Part 2 (x 200,
+# spring, out of season): 24 more, and no "arrives with her" line and no young at all there. Shots: 1_mothers (from
+# above, ticks frozen, 5 s after they came: young beside their mothers), 1_mothers_low (low from the south-east), 3_out_of_season(_low).
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 86 528 16 110 560 core:air
+chat /tk fill -16 111 528 16 140 560 core:air
+chat /tk fill -16 70 561 16 100 576 core:air
+chat /time set 6000
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /season autumn 5
+chat /tp 0 70 544
+wait 1
+chat /animalprof met 24
+chat /tk mode spectator
+wait 3
+chat /tick freeze
+chat /tp 0 76 554
+look 0 -38
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_births_1_mothers.png
+press core:hide_hud
+chat /tp 7 70.6 551
+look 45 -8
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_births_1_mothers_low.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+wait 6
+chat /animalprof where 48
+wait 50
+chat /animalprof where 48
+chat /tk mode creative
+chat /tp 200 90 544
+wait 4
+chat /tk fill 184 60 528 216 68 560 base:dirt
+chat /tk fill 184 69 528 216 69 560 base:grass
+chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 86 528 216 110 560 core:air
+chat /tk fill 184 111 528 216 140 560 core:air
+chat /tk fill 184 70 561 216 100 576 core:air
+chat /time set 6000
+chat /tk fill 199 69 543 201 69 545 base:water
+chat /tk fill 199 70 543 201 70 545 core:air
+wait 1
+chat /season spring 5
+chat /tp 200 70 544
+wait 1
+chat /animalprof met 24
+chat /tk mode spectator
+wait 3
+chat /tick freeze
+chat /tp 200 76 554
+look 0 -38
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_births_3_out_of_season.png
+press core:hide_hud
+chat /tp 207 70.6 551
+look 45 -8
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_births_3_out_of_season_low.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+wait 6
+chat /animalprof where 48
+quit

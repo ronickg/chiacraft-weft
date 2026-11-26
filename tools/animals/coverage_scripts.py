@@ -433,13 +433,20 @@ def skin_part(x, prefix="cov_carcass"):
         # Standing 2 blocks south of it, looking down at it (a positive pitch looks up).
         # r7's deer died 2 blocks west of the aim line and the use hit the grass: face the body itself (`aim`).
         f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "aim 6", "wait 1", "press core:use", "wait 4",
-        f"shot {prefix}_8_skinning.png", "wait 9", "chat /animalprof carcass"] + \
+        # The hide and meat tossed from the body toward the skinner as it ends (the deer's 8.1 s with flint), held in
+        # the air and landing (ticks frozen for each shot), then picked up 1.25 s later; looking down at the body and the
+        # ground before the player (r4's level view after the skinning camera saw only the wall).
+        # r4b's 8b, frozen 1.2 s after the end, came after the half-second toss had landed: 0.6 s sooner.
+        f"shot {prefix}_8_skinning.png", "wait 3.4", "look 0 -50", "wait 0.5", "chat /tick freeze", f"shot {prefix}_8b_off.png",
+        "chat /tick unfreeze", "wait 0.4", "chat /tick freeze", f"shot {prefix}_8c_off.png", "chat /tick unfreeze",
+        "wait 4", "chat /animalprof carcass"] + \
         side_shot(x, f"{prefix}_9_skinned") + low_shot(x, f"{prefix}_9_low") + [
         # The hide's tooltip (its quality's stars, `tagged.base.hide_quality`): the inventory open, the cursor on the
         # hotbar row's second and third slots (the knife in the first; the hide, then the venison, after it), at GUI
         # scale 2 in 1280 x 720 (skin r3: the creative inventory, its palette on the left, the player's hotbar row
         # at the bottom right). Not hidden with the HUD.
-        "press core:inventory", "wait 1", "cursor 0.547 0.710", "wait 1", f"shot {prefix}_10_tooltip_slot2.png",
+        # The inventory listed (pt_rain_5: the venison never reached it), then opened.
+        "chat /tk inv me", "press core:inventory", "wait 1", "cursor 0.547 0.710", "wait 1", f"shot {prefix}_10_tooltip_slot2.png",
         "cursor 0.576 0.710", "wait 1", f"shot {prefix}_10_tooltip_slot3.png", "press core:inventory", "wait 1"]
 
 
@@ -488,7 +495,8 @@ write("carcass", s)
 s = head("carcass_skin", [
     "Skinning alone (cov_carcass part 4): a white-tailed deer killed with one blow, skinned with a flint knife. Shot 8:",
     "mid-skin from the skinning camera (the player kneeling beside the body, the knife, the body on its pool); 9: after;",
-    "10_tooltip_slot2/3: the inventory open, the cursor on the hotbar row's 2nd and 3rd slots: the hide's tooltip with its",
+    "8b_off/8c_off (as the skinning ends): the hide and meat flying from the body toward the player and landing by them,",
+    "before they are picked up (1.25 s later). 10_tooltip_slot2/3: the inventory open, the cursor on the hotbar row's 2nd and 3rd slots: the hide's tooltip with its",
     "stars (\"★★☆ Good hide\" or the like) in one of them.",
     "Report the \"skins carcass\" and \"skinned carcass\" lines and the shots.",
 ]) + skin_part(600, "cov_carcass_skin")
@@ -570,3 +578,75 @@ s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1
 s += ["chat /animalprof where 96", "chat /animalprof blood"]
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("blood", s)
+
+
+def wall_part(x, p="cov_carcass_wall"):
+    """A deer killed pressed against a stone wall (pt_rain_4: its carcass lay half in the wall, out of the knife's reach),
+    and one in a corner: each carcass laid clear of the stone (`animals_core::carcass::clear_spot`), then the first
+    skinned with a flint knife from the open side."""
+    out = pad(x) + [
+        "chat /tk mode creative",
+        # A wall 3 high along the deer's north side (z Z+1 to Z+3: its south face at Z+4), and one along the second
+        # deer's east side (x+7, x+8) to make a corner.
+        f"chat /tk fill {x-5} 70 {Z+1} {x+8} 72 {Z+3} base:stone",
+        f"chat /tk fill {x+7} 70 {Z+1} {x+8} 72 {Z+8} base:stone",
+        # Spawned at the wall (a deer's middle 0.5 from it, its own box clear; a lying deer's 1.4 reaches 0.2 into it).
+        f"chat /tk spawn animals:white_tailed_deer {x} 70 {Z+4}", "wait 0.2", f"chat /tp {x} 70 {Z+8}", "wait 0.2",
+        "chat /animalprof kill", "wait 1",
+        f"chat /tk spawn animals:white_tailed_deer {x+6} 70 {Z+4}", "wait 0.2", f"chat /tp {x+5} 70 {Z+8}", "wait 0.2",
+        "chat /animalprof kill", "wait 2", "chat /animalprof carcass",
+        # Both bodies at the wall, from above and low from the south.
+        "chat /tick freeze", f"chat /tp {x+3} 76 {Z+10}", "look 0 -45", "wait 2", f"shot {p}_1_laid.png",
+        f"chat /tp {x+3} 68.9 {Z+9}", "look 0 -8", "wait 2", f"shot {p}_2_low.png", "chat /tick unfreeze", "wait 1",
+        # The first skinned from the open side: the knife reaches it.
+        "chat /tk put me 0 base:knife 1", "key 1", "wait 1",
+        f"chat /tp {x} 70 {Z+7}", "look 0 -40", "wait 1", "aim 6", "wait 1", "press core:use", "wait 4",
+        f"shot {p}_3_skinning.png", "wait 8", "chat /animalprof carcass", "chat /tk inv me",
+        "chat /tick freeze", f"chat /tp {x+3} 76 {Z+10}", "look 0 -45", "wait 2", f"shot {p}_4_skinned.png",
+        "chat /tick unfreeze", "wait 1",
+    ]
+    return out
+
+
+s = head("carcass_wall", [
+    "Carcasses at a wall (Planner, from pt_rain_4: a deer that died against a stone wall left its carcass inside the",
+    "wall's block, where the knife could not reach it). A white-tailed deer killed pressed to a stone wall's south face,",
+    "one more in a corner (a wall north and east of it). Each gets \"carcass of N moved out of the blocks at ... to ...\"",
+    "(z at least 0.7 south of the wall face, the corner one also 0.7 west of the east wall) and its \"carcass N of",
+    "white_tailed_deer\" line at the new place. Then the first is skinned with a flint knife from the south: \"skins",
+    "carcass\" and \"skinned carcass N\" with its hide and venison. Shots: 1_laid (from above) and 2_low: both bodies",
+    "lying whole on the grass beside the stone, none of either inside it; 3_skinning (the kneel); 4_skinned.",
+]) + wall_part(600)
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("carcass_wall", s)
+
+
+# Births in natural spawning (notes/ECOLOGY.md part 7: young come with their mother). r1 waited 8 minutes on the
+# engine's spawner at 14 carved pads and met nothing (its spots are on grass 20-45 blocks out, within 16 of the
+# player's height: the pits' walls); so part 1 has deer "met" by natural spawning on a pad (`/animalprof met`: their
+# spawn cause natural), in autumn, the white-tailed deer's breeding season, and part 2 the same out of season.
+s = [f"# {l}" for l in [
+    "Births in natural spawning. Part 1 (x 0, autumn, the white-tailed deer's breeding season): 24 white-tailed deer met",
+    "by natural spawning on a pad (`/animalprof met 24`: spawned with the natural cause, as the engine's spawner would). About",
+    "a third of the females (so 3 to 6 of the 24) should log \"wild white_tailed_deer N arrives with her K young (D days",
+    "old, P% grown)\" with K 1 to 3, each young \"born to N and 0 (wild)\"; the `/animalprof where` rows 10 s and 60 s",
+    "later mark those young \"(young, X from its mother N)\" with X small (a few blocks: they follow her). Part 2 (x 200,",
+    "spring, out of season): 24 more, and no \"arrives with her\" line and no young at all there. Shots: 1_mothers (from",
+    "above, ticks frozen, 5 s after they came: young beside their mothers), 1_mothers_low (low from the south-east), 3_out_of_season(_low).",
+]] + ["loaded", "idle", "chat /tk mode creative", "chat /tp 0 90 544", "wait 4", "idle", "chat /rule core:mob_spawning 0",
+      "chat /anim log"]
+# The herd shot at once, the player a spectator (r2's deer had fled the creative player by the shots, which saw
+# bare grass): from 6 up south of the ring of 24 (6 blocks round the pad's middle), and low from its south-east.
+def met_shots(x, name):
+    return ["chat /tk mode spectator", "wait 3", "chat /tick freeze", f"chat /tp {x} 76 {Z+10}", "look 0 -38", "wait 2",
+            f"shot cov_births_{name}.png", f"chat /tp {x+7} 70.6 {Z+7}", "look 45 -8", "wait 2",
+            f"shot cov_births_{name}_low.png", "chat /tick unfreeze", "wait 1"]
+
+
+s += pad(0) + ["chat /season autumn 5", f"chat /tp 0 70 {Z}", "wait 1", "chat /animalprof met 24"] + \
+    met_shots(0, "1_mothers") + ["wait 6", "chat /animalprof where 48", "wait 50", "chat /animalprof where 48",
+                                 "chat /tk mode creative"]
+s += pad(200) + ["chat /season spring 5", f"chat /tp 200 70 {Z}", "wait 1", "chat /animalprof met 24"] + \
+    met_shots(200, "3_out_of_season") + ["wait 6", "chat /animalprof where 48"]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("births", s)

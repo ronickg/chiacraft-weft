@@ -232,6 +232,10 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             catch_up(w, id, index, a, away, st.pos.to_array());
         }
         crate::coats::upkeep(w, id, index, a, st.pos.to_array());
+        if new && w.component(id, &crate::breeding::MET) == Some(2) {
+            w.set_component(id, &crate::breeding::MET, 0);
+            crate::breeding::bring_young(w, id, index, a, st.pos.to_array());
+        }
         crate::breeding::upkeep(w, id, index, a);
         // What changes slowly, once in `SLOW` ticks (staggered; every time it ticks while resting):
         // its age, size and stats. Each read its genes, and they were most of a crowd's upkeep.
@@ -367,9 +371,21 @@ fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
         );
     }
     let in_season = crate::breeding::season_bit(w).is_none_or(|bit| s.bio.breeds & bit != 0);
-    if in_season && w.random_below(100) < YOUNG_PERCENT {
+    // Met by natural spawning, the young come with their mother (`breeding::bring_young`, once her genes are drawn);
+    // a live-bearer's, that is: an egg-layer's hatch at the nest. Spawned any other way, a share come alone.
+    if w.component(id, &crate::breeding::MET) == Some(1) {
+        let (lo, hi) = s.litter();
+        let mother = a.female != 0
+            && s.gestation() > 0
+            && !s.in_water()
+            && in_season
+            && (w.random_below(10_000) as f32) < life::mother_share((lo + hi) as f32 / 2.0) * 10_000.0;
+        w.set_component(id, &crate::breeding::MET, if mother { 2 } else { 0 });
+        return;
+    }
+    if in_season && (w.random_below(10_000) as f32) < life::YOUNG_SHARE * 10_000.0 {
         // Born this season, up to most of the way grown.
-        let age = s.growth() as u64 * w.random_below(80) as u64 / 100;
+        let age = (s.growth() as f32 * life::YOUNG_GROWN_MAX * w.random_below(1000) as f32 / 1000.0) as u64;
         let growing = (s.growth() as u64 - age) as u32;
         a.born = life::birth(w.game_time(), age);
         a.stage = life::stage(s, growing, BABY);
@@ -379,8 +395,6 @@ fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
     }
 }
 
-/// The share of wild ones met in their breeding season that are young.
-const YOUNG_PERCENT: u32 = 25;
 use animals_core::needs::ARRIVES_FED;
 
 /// Its area was away (unloaded) for `away` ticks, and life went on there (`notes/ANIMALS.md`,

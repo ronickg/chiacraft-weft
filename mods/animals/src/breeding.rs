@@ -97,11 +97,27 @@ pub fn unpack(a: &[u32; 10], more: &More) -> Option<Genome> {
     (g.species != 0).then_some(g)
 }
 
+/// How it came (not saved): 1 by natural spawning, 2 a mother so met who brings her young on her first upkeep, once her
+/// genes are drawn (`bring_young`); 0 otherwise or done.
+pub static MET: Component<u8> = Component::named("animal_met");
+
 pub fn init(r: &mut Registry) {
     r.entity_component(&BREEDING, Breeding::default(), component_flags::SAVE | component_flags::SYNC_MENU);
+    r.entity_component(&MET, 0u8, 0);
     for s in &SPECIES {
         r.edit(s.kind).attach(&BREEDING);
+        r.edit(s.kind).attach(&MET);
     }
+    // Met by natural spawning (`animal::arrive` reads it on its first upkeep): marked as it is asked about, made and
+    // not yet seen (the event that it came could reach the mod after its first upkeep).
+    r.before_event(&actions::SPAWN, |q| {
+        let w = q.world();
+        let (id, cause) = (q.entity(), q.query().cause);
+        if cause == abi::spawn_cause::NATURAL && w.component(id, &crate::animal::ANIMAL).is_some() {
+            w.set_component(id, &MET, 1);
+        }
+        Verdict::Abstain
+    });
     // Counted for `/animal census`: deaths other than of old age (counted in `animal::old_age`).
     // (By its kind: its components are gone by the time the event comes.)
     r.on_event(&actions::DIE, |b| {
@@ -506,15 +522,70 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
     weft_sdk::info!("animal {id}: {n} {what}");
 }
 
+/// Wild mother `id` met by natural spawning in her breeding season (`MET` 2) comes with her litter (`notes/ECOLOGY.md`,
+/// part 7): her young, of her genes and a father's drawn from the place's pool, born together this season and up to
+/// `life::YOUNG_GROWN_MAX` grown, around her and following her.
+pub fn bring_young(w: &World, id: u64, index: usize, a: &Animal, pos: [f64; 3]) {
+    let s = &SPECIES[index];
+    let (Some(mother), Some(pool)) = (w.component(id, &GENOME), crate::evolution::pool_at(w, index, pos)) else { return };
+    let mut r = coats::world_rng(w);
+    let Some(father) = coats::sample(index, false, &pool, &mut r) else { return };
+    let n = life::litter(s, w.random_below(u32::MAX));
+    let age = (s.growth() as f32 * life::YOUNG_GROWN_MAX * w.random_below(1000) as f32 / 1000.0) as u64;
+    let growing = (s.growth() as u64).saturating_sub(age) as u32;
+    let mut brought = 0;
+    for k in 0..n {
+        let Some(genome) = coats::breed(&mother, &father, &mut r) else { continue };
+        let y = Young {
+            index,
+            genome,
+            mother: id,
+            father: 0,
+            generation: 1,
+            dam: mother,
+            sire: father,
+            wild: life::wild_points(&a.wild, &a.wild, |n| w.random_below(n)),
+        };
+        let angle = k as f64 / n as f64 * std::f64::consts::TAU;
+        let at = [pos[0] + angle.cos() * 0.8, pos[1], pos[2] + angle.sin() * 0.8];
+        let young = make(w, at, &y, None);
+        if young == 0 {
+            continue;
+        }
+        brought += 1;
+        if let Some(ya) = w.component_mut(young, &ANIMAL) {
+            ya.born = life::birth(w.game_time(), age);
+            ya.stage = life::stage(s, growing, animal::BABY);
+        }
+        if let Some(b) = w.component_mut(young, &BREEDING) {
+            b.growing = growing;
+        }
+    }
+    weft_sdk::info!(
+        "wild {} {id} arrives with her {brought} young ({:.1} days old, {:.0}% grown)",
+        s.name,
+        age as f64 / life::DAY as f64,
+        age as f64 / s.growth().max(1) as f64 * 100.0
+    );
+}
+
 /// A young one comes into the world at `at`: its genes, its stats from its parents', growing
 /// up from now, its owner's (and wandering after its mother) if its mother was someone's.
 pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 {
+    let id = make(w, at, y, owner);
+    if id != 0 {
+        count(&BORN, y.index);
+    }
+    id
+}
+
+/// `born`'s young one, not counted as a birth (`bring_young`'s came born).
+fn make(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 {
     let s = &SPECIES[y.index];
     let id = w.spawn(s.kind, at);
     if id == 0 {
         return 0;
     }
-    count(&BORN, y.index);
     if let Some(g) = w.component_mut(id, &GENOME) {
         *g = y.genome;
     }

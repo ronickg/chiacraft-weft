@@ -805,7 +805,13 @@ and cactus.**
   - **Standing water:** capacity ignores it, so a swamp feeds more in its dry season than the
     number says;
   - **Hunters:** built 2026-11-05, below (part 6, "Hunters' room by their prey");
-  - **Young without mothers:** young aren't spawned with a mother; they come in their groups.
+- **Young with their mothers (2026-11-26, branch claude/animals-births):** met by natural spawning
+  in her breeding season, a grown female of a live-bearing kind comes with her litter
+  (`breeding::bring_young`; `/animalprof met` spawns deer with the natural cause for checks): her genes and a father's from the place's pool, all born together up
+  to 80% grown, around her and following her. How many mothers do so is set by the litter size
+  (`life::mother_share`: a white-tailed deer's litter of 1-3, 33%; a grey wolf's of 2-8, 13%), so a quarter of the
+  ones met in season are still young (`YOUNG_SHARE`). Spawned by a command, a share still come
+  alone. Egg layers' young come from their nests. Check: `cov_births`.
 
 
 - **Capacity:** a place's capacity for a species is how much of its food categories the

@@ -47,6 +47,7 @@ pub mod ruins;
 pub mod sheet;
 pub mod shelter;
 pub mod skills;
+pub mod smelt;
 pub mod sockets;
 pub mod soil;
 pub mod stamina;
