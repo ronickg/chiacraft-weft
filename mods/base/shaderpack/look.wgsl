@@ -445,6 +445,9 @@ const OPT_WEATHER: u32 = 74u;
 const OPT_RAIN_DARK: u32 = 75u;
 // With Bliss's rain, the screen's reflections on the wet ground (`base:look_rain_mirror`, 1 as made).
 const OPT_RAIN_MIRROR: u32 = 76u;
+// Bliss's caves (`base:look_cave_fog`, 1 as made): its fog and air's light gone with the eye in a
+// cave and its blue cave fog over what is seen there; 0 neither.
+const OPT_CAVE_FOG: u32 = 77u;
 // How much of the sky's light's blue goes by day, with the chain. (The sun's light is already the
 // 4300 K of Ronald's profile through the air, `sun_kelvin_linear`, since 11-06.)
 const CHAIN_AMBIENT_GREY: f32 = 0.4;
@@ -3147,6 +3150,15 @@ fn eye_sky_k() -> f32 {
     }
     return pow(clamp(scene.frame_look.y, 0.0, 1.0), 3.0) * 0.99 + 0.01;
 }
+// How much the eye is in a cave, 0..1 (the engine's: no sky light at the eye for ten seconds, eased
+// in over three and out over one, `scene.cloud_shadow.z`; Bliss's OLD_CAVE_DETECTION), with the
+// HDR world and `base:look_cave_fog`.
+fn cave_k() -> f32 {
+    if scene.frame.x < 0.5 || fantasy_opt(OPT_CAVE_FOG) < 0.5 {
+        return 0.0;
+    }
+    return clamp(scene.cloud_shadow.z, 0.0, 1.0);
+}
 // Our value noise with the spread of Bliss's fog noise (a linear map, matching its percentiles
 // within 0.01).
 fn fog_noise(q: vec3<f32>) -> f32 {
@@ -3222,6 +3234,9 @@ fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_f
     let gale = storm();
     let gale_floor = fog_floor(dir * span);
     let gale_tint = mix(vec3(1.0, 1.0, 1.03), vec3(0.95, 0.68, 0.42), clamp(scene.ground.z, 0.0, 1.0));
+    // In a cave the fog is gone and the air's light with it (Bliss's inACave on its fog's density and
+    // its Atmosphere term; the air still dims what lies behind).
+    let open = 1.0 - cave_k();
     for (var i = 0u; i < n; i++) {
         let u = (f32(i) + jitter) / f32(n);
         let t = span * (pow(e, u) - 1.0) / (e - 1.0);
@@ -3237,7 +3252,7 @@ fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_f
         } else {
             lit *= cloud_shadow(dir * t);
         }
-        let d = bliss_fog_density(at);
+        let d = bliss_fog_density(at) * open;
         // A storm's dust or blowing snow (ours: Bliss has none), in the same march, its own colour.
         var ds = 0.0;
         if gale > 0.0 {
@@ -3259,8 +3274,8 @@ fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_f
         let a_kept = exp(-ext * step);
         let light = sun * lit * sun_phase * (ray_phase * r_k + vec3(sun_phase * m_k));
         let held = (1.0 - a_kept) / max(ext, vec3(1e-9)) * air_through * through;
-        air += light * held;
-        air_k += ext * eye_k * held;
+        air += light * held * open;
+        air_k += ext * eye_k * held * open;
         air_through *= a_kept;
         air_grey *= dot(a_kept, vec3(1.0 / 3.0));
         if through < 1e-5 {
@@ -3308,7 +3323,19 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let body = clamp((0.4 - noise3(q / vec3(36.0, 18.0, 36.0))) * 2.0, 0.0, 1.0);
         return vec3(body, bliss_fog_density(eye + rel) * 8.0, 0.0);
     }
-    return c * through + f.rgb;
+    // Bliss's cave fog (composite3's CAVE_FOG, method only), over the picture before the fog: its
+    // colour (0.1, 0.2, 0.5) in its units (ours x BLISS_UNITS), none at the eye and all at the render
+    // distance by 1 - (1 - (1 - d / far)^2)^2 (Ronald's CaveFogFallOff 2), and mostly looking down
+    // (exp(-7 (y / 2 + 1 / 2))), x how much the eye is in a cave.
+    let cave = cave_k();
+    var lit = c;
+    if cave > 0.0 {
+        let near = 1.0 - max(1.0 - dist / max(scene.params.y, 1.0), 0.0);
+        let k = 1.0 - pow(1.0 - pow(1.0 - near, 2.0), 2.0);
+        let look = exp(-7.0 * clamp(dir.y * 0.5 + 0.5, 0.0, 1.0)) * 0.999 + 0.001;
+        lit += vec3(0.1, 0.2, 0.5) / BLISS_UNITS * k * look * cave;
+    }
+    return lit * through + f.rgb;
 }
 
 // The mist as a volume (`client::froxels`, `core:froxels`): the view cut into cells an eighth of
