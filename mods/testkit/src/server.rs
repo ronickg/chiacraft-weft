@@ -164,7 +164,8 @@ pub fn register(r: &mut Registry) {
     r.entity_effect(&LIT).unseen().light_rgb(0, 15, 0);
     r.block(&PEDESTAL)
         .texture("varied")
-        .inventory(1).shown_slots(&[0])
+        .inventory(1)
+        .shown_slots(&[0])
         .no_item();
     r.storage(&STASH, 54);
     // What an edit sets wins, the rest stays; the testmod ones load after or before this mod
@@ -567,14 +568,18 @@ const OPS: &[(&str, &str, Run)] = &[
             .collect::<Vec<_>>()
             .join(" "))
     }),
+    ("game_time", "", |w, _, _, _| Ok(w.game_time().to_string())),
     ("last_said", "", |_, _, _, _| Ok(LAST_SAID.lock().unwrap().clone())),
     // Every change in a box for some ticks; `traced` gives what it saw.
     ("traced", "", |_, _, _, _| {
-        Ok(TRACE
-            .lock()
-            .unwrap()
-            .take()
-            .map_or(String::new(), |t| t.lines.join("\n")))
+        let mut trace = TRACE.lock().unwrap();
+        if trace.as_ref().is_some_and(|t| t.left > 0) {
+            Ok("pending".to_owned())
+        } else {
+            Ok(trace
+                .take()
+                .map_or_else(String::new, |t| t.lines.join("\n")))
+        }
     }),
     ("trace", "<a:pos> <b:pos> <ticks:int>", |w, cmd, _, _| {
         let (a, b) = (pos(cmd, "a")?, pos(cmd, "b")?);
@@ -814,7 +819,9 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(String::new())
     }),
     ("group", "@owner <name:word>", |w, cmd, _, _| {
-        let g = w.inventory(inventory_owner(w, cmd)?).group(word(cmd, "name")?);
+        let g = w
+            .inventory(inventory_owner(w, cmd)?)
+            .group(word(cmd, "name")?);
         Ok(format!("{} {}", g.len(), (0..g.len()).filter(|&i| !g.get(i).is_empty()).count()))
     }),
     // How many players the world has (scripts: `until players 2`).
@@ -853,14 +860,22 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(String::new())
     }),
     ("block_instance", "<pos:pos> [body:int]", |w, cmd, _, _| {
-        let local = w.in_space(int(cmd, "body").unwrap_or(0)).ok_or("space missing")?;
+        let local = w
+            .in_space(int(cmd, "body").unwrap_or(0))
+            .ok_or("space missing")?;
         let id = local.block_instance(pos(cmd, "pos")?);
         Ok(id.to_string())
     }),
     ("block_pos", "<id:int> [body:int]", |w, cmd, _, _| {
-        let local = w.in_space(int(cmd, "body").unwrap_or(0)).ok_or("space missing")?;
-        let cell = local.block_location(int(cmd, "id")?).ok_or("block instance missing")?;
-        let p = local.point_in(0, cell.center()).ok_or("world space missing")?;
+        let local = w
+            .in_space(int(cmd, "body").unwrap_or(0))
+            .ok_or("space missing")?;
+        let cell = local
+            .block_location(int(cmd, "id")?)
+            .ok_or("block instance missing")?;
+        let p = local
+            .point_in(0, cell.center())
+            .ok_or("world space missing")?;
         Ok(format!("{} {} {}", p.x, p.y, p.z))
     }),
     ("slot", "@owner <index:int>", |w, cmd, _, _| Ok(stack_text(w.inventory(owner(w, cmd)?).get(int(cmd, "index")?)))),
@@ -921,7 +936,9 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(entity.to_string())
     }),
     ("drop_stack", "@owner <index:int> <pos:pos>", |w, cmd, _, _| {
-        let stack = w.inventory(inventory_owner(w, cmd)?).get(int(cmd, "index")?);
+        let stack = w
+            .inventory(inventory_owner(w, cmd)?)
+            .get(int(cmd, "index")?);
         let p = pos(cmd, "pos")?;
         Ok(w.spawn_item([p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], stack)
             .to_string())
@@ -1234,9 +1251,12 @@ const OPS: &[(&str, &str, Run)] = &[
         w.teleport(rider, None, [e.pos.x, e.pos.y + cmd.float("h").unwrap_or(0.0) + 0.05, e.pos.z]);
         Ok(String::new())
     }),
-    ("navigate", "@owner <to:pos>", |w, cmd, _, _| {
+    ("navigate", "@owner <to:pos> [frame:int]", |w, cmd, _, _| {
         let p = pos(cmd, "to")?;
-        Ok((w.navigate(owner(w, cmd)?, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0) as u32).to_string())
+        let id = owner(w, cmd)?;
+        let frame = cmd.int("frame").unwrap_or(0) as u64;
+        let space = w.in_space(frame).ok_or("navigation space not loaded")?;
+        Ok((space.navigate(id, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0) as u32).to_string())
     }),
     ("navigate_by", "@owner <dx:int> <dy:int> <dz:int>", |w, cmd, _, _| {
         // `navigate` to where the walker stands now plus a step, read here in the same tick: on a

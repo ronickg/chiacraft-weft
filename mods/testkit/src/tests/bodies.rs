@@ -15,7 +15,7 @@ async fn spawn(t: &T, kind: &str, p: [i32; 3]) -> Result<u64, String> {
 }
 
 /// Server position of an entity (`me`: the player as the server last heard).
-async fn pos_of(t: &T, id: &str) -> Result<[f64; 3], String> {
+pub(super) async fn pos_of(t: &T, id: &str) -> Result<[f64; 3], String> {
     let line = t.op(&format!("entity {id}")).await?;
     let v: Vec<f64> = line
         .split_whitespace()
@@ -76,7 +76,10 @@ pub async fn body_chest(t: T) -> R {
     t.check(chest != "0", "the chest on the skiff owns block data");
     let block_pos = |t: T, body: u64, chest: String| async move {
         let text = t.op(&format!("block_pos {chest} {body}")).await?;
-        let values: Vec<f64> = text.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+        let values: Vec<f64> = text
+            .split_whitespace()
+            .filter_map(|s| s.parse().ok())
+            .collect();
         <[f64; 3]>::try_from(values).map_err(|_| format!("bad block position {text}"))
     };
     t.op(&format!("put {chest} 0 base:cobblestone 7")).await?;
@@ -379,11 +382,9 @@ pub async fn skiff_smooth(t: T) -> R {
     let (mut turns, mut dir, mut jump, mut slip, mut longest, mut before) = (0, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
     let (mut last, mut rel) = (x(&t, skiff), x(&t, idol) - x(&t, skiff));
     let start = std::time::Instant::now();
-    let mut frame = start;
     while start.elapsed().as_secs_f64() < 3.5 {
         t.frames(1).await?;
-        let dt = frame.elapsed().as_secs_f64();
-        frame = std::time::Instant::now();
+        let dt = t.state().dt as f64;
         longest = longest.max(dt);
         let (now, now_rel) = (x(&t, skiff), x(&t, idol) - x(&t, skiff));
         let d = now - last;

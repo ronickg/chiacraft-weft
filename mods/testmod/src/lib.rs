@@ -471,6 +471,15 @@ fn init(r: &mut Registry) {
         .replaces("#stone_ore_replaceables")
         .replaces_with("basalt", &BASALT_TIN_ORE)
         .exposed(0.5);
+    static LOD_PLAIN: Dimension = Dimension::named("lod_plain");
+    r.terrain(&LOD_PLAIN).stone("base:stone").base_height(7.0);
+    r.dimension(&LOD_PLAIN)
+        .bare()
+        .height_cubes(-1, 4)
+        .sky_above(1)
+        .no_block_updates()
+        .spawn_point(|_| [0, 8, 0].into());
+
     r.terrain(&MARS)
         .stone("basalt")
         .base_height(60.0)
@@ -684,8 +693,15 @@ fn energy_gizmos(w: &World, owners: &[Holder]) {
     for &owner in owners {
         if let (Some(pos), Some(e)) = (w.block_location(owner.entity), w.component(owner, &ENERGY)) {
             let args = [Arg::Int(e.stored as i64), Arg::Int(e.capacity as i64)];
-            w.draw_text(Some(&ENERGY_GIZMOS), [pos.x as f64 + 0.5, pos.y as f64 + 1.3, pos.z as f64 + 0.5], "testmod.energy_label", &args, 0x60FF60FF, 1.0)
-                .ticks(11);
+            w.draw_text(
+                Some(&ENERGY_GIZMOS),
+                [pos.x as f64 + 0.5, pos.y as f64 + 1.3, pos.z as f64 + 0.5],
+                "testmod.energy_label",
+                &args,
+                0x60FF60FF,
+                1.0,
+            )
+            .ticks(11);
         }
     }
 }
