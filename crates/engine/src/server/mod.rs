@@ -138,7 +138,7 @@ pub struct Player {
     announced: FxHashSet<IVec3>,
     to_send_far: Vec<IVec3>,
     known: FxHashSet<u64>,
-    known_blocks: FxHashMap<u64, crate::net::BlockView>,
+    known_blocks: FxHashMap<u64, (crate::net::BlockView, bool)>,
     joined: bool,
     arrival: Option<player_file::Arrival>,
     sent_cracks: Vec<crate::net::Crack>,

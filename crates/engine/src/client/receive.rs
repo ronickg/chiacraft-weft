@@ -184,7 +184,7 @@ impl Client {
                     self.showing_blocks
                         .entry(view.id)
                         .and_modify(|block| block.view = view)
-                        .or_insert_with(|| super::ClientBlock { view, shown: Vec::new() });
+                        .or_insert_with(|| super::ClientBlock { view, shown: Vec::new(), animation_target: 0.0, animation_pose: None });
                 }
             }
             ToClient::Despawn(ids) => {

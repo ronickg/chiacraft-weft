@@ -41,8 +41,9 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// 25: Weft's protocol 24 merged in at the 11-22 sync (its clock, weather field, sites, skins,
 /// bodies; peers must agree on deterministic terrain and weather as well as the wire format),
 /// with ours on top (`ToClient::Clock`'s day rate, `ShapeField::scale`). 26: Weft's block-entity
-/// rework (27e103032: block views instead of block entities, its protocol 27).
-pub const PROTOCOL: u32 = 26;
+/// rework (27e103032: block views instead of block entities, its protocol 27). 27: Weft's block
+/// animations (be14c5a8d: a block's animated model and clip, its protocol 28).
+pub const PROTOCOL: u32 = 27;
 pub const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its

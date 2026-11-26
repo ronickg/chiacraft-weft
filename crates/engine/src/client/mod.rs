@@ -706,6 +706,8 @@ const MAX_BUDGET: f64 = 0.005;
 pub(crate) struct ClientBlock {
     pub view: crate::net::BlockView,
     pub shown: Vec<ItemStack>,
+    animation_target: f32,
+    animation_pose: Option<f32>,
 }
 
 pub struct Client {
@@ -3175,6 +3177,11 @@ impl Client {
         if let Some(block) = self.showing_blocks.get_mut(&id) {
             if comp == shown {
                 block.shown = Vec::<ItemStack>::from_bytes(bytes).unwrap_or_default();
+            } else if Some(comp) == c.components.id(weft_abi::comp::block::ANIMATION_PROGRESS) {
+                block.animation_target = f32::from_bytes(bytes)
+                    .filter(|v| v.is_finite())
+                    .unwrap_or_default()
+                    .clamp(0.0, 1.0);
             }
             return;
         }
@@ -4512,6 +4519,11 @@ impl Client {
                 .map(|(f, pos, progress)| entity_render::Crack { pos, progress, place: self.frame_place(f), part: self.breaking_part }),
         );
         let s = crate::diag::span("render/entities");
+        let body_tick = self.anim_tick();
+        let target = self
+            .target
+            .filter(|_| !self.hide_gui)
+            .map(|h| (h, self.frame_place(h.frame)));
         self.entity_render.draw(
             gpu,
             list,
@@ -4519,6 +4531,8 @@ impl Client {
             &cam,
             self.ticks(),
             &self.entities,
+            &mut self.showing_blocks,
+            body_tick,
             me,
             shadow_me,
             hand,
@@ -4527,9 +4541,7 @@ impl Client {
             &|p: IVec3| self.world.biome_at(p),
             &scene,
             scene_buf,
-            self.target
-                .filter(|_| !self.hide_gui)
-                .map(|h| (h, self.frame_place(h.frame))),
+            target,
             self.placement_preview
                 .filter(|(frame, _, _)| self.target.is_some_and(|hit| hit.frame == *frame))
                 .map(|(_, p, part)| (p, part)),

@@ -720,12 +720,7 @@ impl Entities {
         for (comp, value) in comps {
             self.comps.insert((id, comp), value);
         }
-        if !kind.shown_slots.is_empty()
-            || kind
-                .values
-                .iter()
-                .any(|(comp, _)| c.game.components[*comp as usize].flags & weft_abi::component_flags::SYNC_WATCHERS != 0)
-        {
+        if !kind.watched.is_empty() {
             self.public_blocks.insert(id);
         }
         if c.game

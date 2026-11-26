@@ -878,7 +878,12 @@ const OPS: &[(&str, &str, Run)] = &[
             .ok_or("world space missing")?;
         Ok(format!("{} {} {}", p.x, p.y, p.z))
     }),
-    ("slot", "@owner <index:int>", |w, cmd, _, _| Ok(stack_text(w.inventory(owner(w, cmd)?).get(int(cmd, "index")?)))),
+    ("slot", "@owner <index:int>", |w, cmd, _, _| {
+        Ok(stack_text(
+            w.inventory(inventory_owner(w, cmd)?)
+                .get(int(cmd, "index")?),
+        ))
+    }),
     // Into the hand: the player's own stack of `item` swapped into the selected hotbar slot, as a
     // player would drag it there (nothing made). Scripts can't know where a pickup landed.
     ("hand", "@owner <item:item>", |w, cmd, _, _| {
