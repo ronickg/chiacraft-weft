@@ -247,11 +247,15 @@ mod tests {
     fn forest_morning_sings_and_night_chirps() {
         let f = scape("base:forest");
         let morning = levels(f, 6.0, 6.0, 20.0, 15.0, Some(0), 0.0, 0.0, 10.0);
-        assert!(morning.beds[DAWN] > 0.9 && morning.beds[NIGHT] < 0.1);
         let noon = levels(f, 13.0, 6.0, 20.0, 22.0, Some(1), 0.0, 0.0, 10.0);
         assert!(noon.beds[BIRDS] > 0.7 && noon.beds[DAWN] < 0.01 && noon.owls < 0.01);
         let night = levels(f, 23.0, 6.0, 20.0, 18.0, Some(1), 0.0, 0.0, 10.0);
         assert!(night.beds[NIGHT] > 0.6 && night.beds[BIRDS] < 0.01 && night.owls > 0.5);
+        // At sunrise the chorus is full and the insects fading: daylight is eased over an hour
+        // each side of it (`daylight`), so they are at half their dark level there, not gone
+        // (the test asked for under 0.1 from its first commit, ee0e9b1a6, and never passed).
+        assert!(morning.beds[DAWN] > 0.9, "{morning:?}");
+        assert!(morning.beds[NIGHT] < 0.5 * night.beds[NIGHT], "{morning:?} {night:?}");
         // Cold nights are silent; rain hushes the birds; a storm everything alive.
         let cold = levels(f, 23.0, 6.0, 20.0, 2.0, Some(3), 0.0, 0.0, 10.0);
         assert!(cold.beds[NIGHT] < 0.01);

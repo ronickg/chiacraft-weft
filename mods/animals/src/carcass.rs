@@ -240,6 +240,7 @@ pub fn init(r: &mut Registry) {
         .size(gw, gh)
         .walk_speed(0.0)
         .passive()
+        .invulnerable()
         .unpushable()
         .model_file("carcass_gore")
         .texture("carcass/bones")
@@ -260,6 +261,9 @@ pub fn init(r: &mut Registry) {
                 .size(w, h)
                 .walk_speed(0.0)
                 .passive()
+                // Arrows and blows don't kill a body (pt_rain_8: 11 arrows after the kill shot it to nothing in 20 s,
+                // with no line logged); it goes by skinning, rot and scavengers.
+                .invulnerable()
                 .unpushable()
                 .model_file(&model)
                 .texture("carcass/body");

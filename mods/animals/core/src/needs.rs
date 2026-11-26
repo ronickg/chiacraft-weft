@@ -41,6 +41,24 @@ pub fn share(kg: f32, eaters: usize) -> f32 {
     kg / eaters.max(1) as f32
 }
 
+/// A place's food now (`notes/ECOLOGY.md`, part 7): what its plants grew over the last `FOOD_DAYS` days of its real
+/// weather (`vitals::forage::recent_lushness`), so a dry spell thins it and rain brings it back as the grass regrows.
+/// Natural spawning comes as often as it (with `SPAWN_FLOOR`), and wild ones arrive as fed as it.
+pub const FOOD_DAYS: u64 = 10;
+/// A plant eater's room at a place (`Species::crowd_in`) follows its food now against the season's usual
+/// (`room_by_food`): in a drought down to `ROOM_FLOOR` of it, so fewer come, fewer are born and the rest die of want
+/// until the rain brings it back; never above the usual.
+pub const ROOM_FLOOR: f32 = 0.25;
+
+/// A plant eater's room, `crowd` in a usual season, where its food grew `now` against the season's `usual`
+/// (`ROOM_FLOOR` of it at least, at least one).
+pub fn room_by_food(crowd: u32, now: f32, usual: f32) -> u32 {
+    if usual <= 0.0 {
+        return crowd;
+    }
+    ((crowd as f32 * (now / usual).clamp(ROOM_FLOOR, 1.0)).round() as u32).max(1)
+}
+
 /// Share of its food a wild one has when it arrives where nothing it eats grows this season (a
 /// plant eater), or where its prey are thinnest (a hunter); the rest comes with the place's food.
 pub const ARRIVES_FED: f32 = 0.3;
@@ -511,6 +529,16 @@ mod healing {
         assert!((half - 0.5).abs() < 1e-4, "{half}");
         assert_eq!(heal_share(HEAL_THIN, 1.0, 60.0), 0.0);
         assert_eq!(heal_share(0.0, 1.0, 60.0), 0.0);
+    }
+
+    #[test]
+    fn a_drought_shrinks_the_room() {
+        assert_eq!(room_by_food(20, 0.6, 0.6), 20);
+        assert_eq!(room_by_food(20, 0.9, 0.6), 20);
+        assert_eq!(room_by_food(20, 0.3, 0.6), 10);
+        assert_eq!(room_by_food(20, 0.0, 0.6), 5);
+        assert_eq!(room_by_food(2, 0.0, 0.6), 1);
+        assert_eq!(room_by_food(20, 0.0, 0.0), 20);
     }
 }
 

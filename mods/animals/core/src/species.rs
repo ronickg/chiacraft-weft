@@ -3134,8 +3134,10 @@ pub static SPECIES: [Species; 46] = [
         subfamily: "Citipatiinae",
         size: Size::Medium,
         // An omnivore or a plant eater (its beak; inference): leaves and seeds, fruit, small animals
-        // and insects.
-        eats: &[(Leaves, 0.4), (Seeds, 0.25), (Fruit, 0.1), (Meat, 0.15), (Insects, 0.1)],
+        // and insects. Meat a small share (8%): its prey is small (a Gobipteryx, a Kryptobaatar),
+        // and at 15% a pair ate the red dunes' Gobipteryx out (161% of their young a year,
+        // `hunters_never_eat_their_prey_out`).
+        eats: &[(Leaves, 0.4), (Seeds, 0.25), (Fruit, 0.1), (Meat, 0.08), (Insects, 0.17)],
         // A lizard (50 g) to a Kryptobaatar or a hatchling.
         prey: (0.0004, 0.05),
         //     health stamina food damage speed weight oxygen torpor fortitude
