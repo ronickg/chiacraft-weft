@@ -17,6 +17,10 @@ macro_rules! shared {
 }
 
 shared! {
+    atmosphere_flags {
+        RAIN_MEDIA = 1,
+        DENSE_CLOUD_CELLS = 2,
+    }
     rain_cover {
         CELL = 4,
         CUBES = 16,
@@ -630,7 +634,7 @@ wgsl_types! {
     f32 => "f32", 4, 4, u32 => "u32", 4, 4, i32 => "i32", 4, 4,
     [f32; 2] => "vec2<f32>", 8, 8, [f32; 3] => "vec3<f32>", 16, 12, [f32; 4] => "vec4<f32>", 16, 16,
     [u32; 4] => "vec4<u32>", 16, 16, [i32; 4] => "vec4<i32>", 16, 16,
-    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96, [[f32; 4]; 8] => "array<vec4<f32>, 8>", 16, 128, [[f32; 4]; 12] => "array<vec4<f32>, 12>", 16, 192,
+    [[f32; 4]; 3] => "array<vec4<f32>, 3>", 16, 48, [[f32; 4]; 4] => "mat4x4<f32>", 16, 64, [[f32; 4]; 6] => "array<vec4<f32>, 6>", 16, 96, [[f32; 4]; 8] => "array<vec4<f32>, 8>", 16, 128, [[f32; 4]; 12] => "array<vec4<f32>, 12>", 16, 192, [[f32; 4]; 16] => "array<vec4<f32>, 16>", 16, 256, [[f32; 4]; 20] => "array<vec4<f32>, 20>", 16, 320,
     GpuSky => "Sky", 16, core::mem::size_of::<GpuSky>(),
 }
 
@@ -730,10 +734,11 @@ gpu_struct! {
         /// when full, only by day when new), w the light it gives: its phase times how high it
         /// stands, 0 below the horizon. For packs' night light and moon shadows.
         pub moon: [f32; 4],
-        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 48
-        /// at most (16 before chiacraft's fantasy settings, 32 until its leaf light), four to a row
-        /// in that order (`packs::pack_options`); 0 for one not found.
-        pub options: [[f32; 4]; 12],
+        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 80
+        /// at most (16 before chiacraft's fantasy settings, 32 until its leaf light, 48 until its
+        /// Bliss-match settings, 64 until its shadow reach), four to a row in that order (`packs::pack_options`); 0 for one
+        /// not found.
+        pub options: [[f32; 4]; 20],
         /// The light the player holds (a torch, a lantern), for packs' dynamic light: xyz where it
         /// is (camera relative, by the hand), w unused.
         pub hand: [f32; 4],
@@ -772,7 +777,12 @@ gpu_struct! {
         pub sky_landing: [f32; 4],
         /// What the pack's look works out once a frame (`client::frame_look`, a pack whose sky
         /// has `fs_frame_look`; chiacraft): x the bindless index + 1 of its row of texels (0:
-        /// none this frame, each shader works them out itself), yzw unused.
+        /// none this frame, each shader works them out itself); y the sky light where the eye is,
+        /// 0..1, eased over a couple of seconds (for packs' light from the open sky in caves, as
+        /// Iris's `eyeBrightnessSmooth`); z 1 when its pass was drawn with the soft clouds' sky
+        /// entry (their `instance_index`), else 0; w the bindless index + 1 of the HDR world's
+        /// exposure texel the last frame wrote (`post::Post::exposure_last`; g the view's mean), 0
+        /// without.
         pub frame_look: [f32; 4],
         /// The last lightning flash where the player is (a weather with `lightning`, chiacraft):
         /// x seconds since it began (1e4 when none yet; real time, not the shaders' clock, which
@@ -824,7 +834,9 @@ gpu_struct! {
         /// bindless index + 1 of its count image (r the frames gathered in each pixel, g how far
         /// the pixel moved this frame in pixels: a gathered picture is softer where it moves, and
         /// a pack may sharpen it more there); 0 without. y 1 when the world's pass has the motion
-        /// image (`core:aa` 1): shaders skip their motion's work without it. zw unused.
+        /// image (`core:aa` 1): shaders skip their motion's work without it. z the motion image's
+        /// bindless index + 1 (`post::Post::motion_index`; its w the weather's cover), for the
+        /// screen effects after the world; 0 without. w unused.
         pub taa_frame: [f32; 4],
         /// Under the backend's upscaler (DLSS, `post::set_upscaling`): x the texture mip bias, in
         /// levels (NVIDIA's log2(render / output) - 1; 0 without), which a pack's world shader adds
@@ -849,6 +861,13 @@ gpu_struct! {
         pub lightning_start: [[f32; 4]; 3],
         /// Channel ends relative to the camera, with w set for ground strikes.
         pub lightning_end: [[f32; 4]; 3],
+        // chiacraft's, after upstream's.
+        /// The ground's height about the camera (`client::ground_map`, `core:ground_map`): x its
+        /// picture's bindless index + 1 (0: none), y the blocks a texel covers, zw the picture's
+        /// corner x and z from the camera (blocks). Each texel: rg the top of the ground under the
+        /// open sky (leaves left out) + 2048 as 16 bits, high byte first; b 1 over a liquid; a 1
+        /// where known.
+        pub ground_map: [f32; 4],
     }
 }
 
@@ -1571,15 +1590,22 @@ pub fn prelude(shader: &str, common: &str) -> String {
         s.push_str(MAT_AT);
         s.push_str(if RT_PRELUDE.load(std::sync::atomic::Ordering::Relaxed) { RT_SUN } else { RT_SUN_OFF });
     }
+    // The ground map (`core:ground_map`) in the world shader only while it is on, so a pack can
+    // leave out what reads it (chiacraft's mist banks); the other shaders always have it.
+    let ground = shader != "world.wgsl" || GROUND_PRELUDE.load(std::sync::atomic::Ordering::Relaxed);
+    s.push_str(if ground { GROUND_MAP_ON } else { GROUND_MAP_OFF });
     s.push_str(CALM_OFF);
     s.push_str(DRY_OFF);
     s.push_str(common);
     s.push('\n');
-    if matches!(shader, "sky.wgsl" | "world.wgsl") {
+    let has_cloud_cache = matches!(shader, "sky.wgsl" | "world.wgsl");
+    s.push_str(&format!("const HAS_CLOUD_CACHE: bool = {has_cloud_cache};\n"));
+    if has_cloud_cache {
         s.push_str(include_str!("../assets/shaders/atmosphere-cache.wgsl"));
     } else {
         s.push_str(
-            "fn cloud_cache_value(view: Scene, cell: vec2<i32>, band: i32) -> u32 { return 0xffffffffu; }
+            "fn cloud_packed_cell(view: Scene, cell: vec2<i32>, band: i32) -> u32 { return 0xffffffffu; }
+             fn cloud_cache_value(view: Scene, cell: vec2<i32>, band: i32) -> u32 { return 0xffffffffu; }
              fn rain_exposed(view: Scene, rel: vec3<f32>) -> bool { return true; }\n",
         );
     }
@@ -1587,6 +1613,17 @@ pub fn prelude(shader: &str, common: &str) -> String {
 }
 
 static RT_PRELUDE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static GROUND_PRELUDE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+/// Whether the world shader composed next has the ground map (`core:ground_map`): `GROUND_MAP_ON`
+/// true, or false so a pack's code behind it is left out of the world's pipelines. Code a uniform
+/// branch skips still weighs on the shader: chiacraft's mist banks, off, cost the world pass about
+/// 0.14 ms at Max on the PC (lst_am_nobanks, 11-24).
+pub fn set_ground_prelude(on: bool) {
+    GROUND_PRELUDE.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+pub const GROUND_MAP_ON: &str = "const GROUND_MAP_ON: bool = true;\n";
+pub const GROUND_MAP_OFF: &str = "const GROUND_MAP_ON: bool = false;\n";
 
 /// Whether the world shader composed next traces its sun shadows (`core:rt_shadows` on a GPU
 /// with ray queries): its prelude then has the scene's bindings and `rt_sun` traces; without, the
@@ -1623,13 +1660,21 @@ struct RtHit {
     lod: bool,
     // A translucent record (water, glass).
     clear: bool,
+    // A free quad (a plant's blade, a torch), not a cube's face.
+    quad: bool,
 }
 
 fn rt_miss() -> RtHit {
-    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false);
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false, false);
 }
 fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     return rt_miss();
+}
+fn rt_hit_mask(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32, mask: u32) -> RtHit {
+    return rt_miss();
+}
+fn rt_seen_through(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, mask: u32) -> bool {
+    return false;
 }
 fn rt_sun(rel: vec3<f32>, n: vec3<f32>, l: vec3<f32>, plant: bool) -> vec3<f32> {
     return vec3(1.0);
@@ -1785,10 +1830,12 @@ struct RtHit {
     lod: bool,
     // A translucent record (water, glass).
     clear: bool,
+    // A free quad (a plant's blade, a torch), not a cube's face.
+    quad: bool,
 }
 
 fn rt_miss() -> RtHit {
-    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false);
+    return RtHit(false, 0.0, vec3(0.0), vec3(0.0), vec3(0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), 0u, 0u, false, false, false);
 }
 
 // The first surface along `dir` (unit) from `rel` (camera relative), out to `t_max` blocks: through
@@ -1796,8 +1843,39 @@ fn rt_miss() -> RtHit {
 // reflection: the pack shades what comes back as it shades the world.
 // `blur`: mips more for the hit's colour (a rippled or rough mirror softens what it shows).
 fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
+    return rt_hit_mask(rel, dir, t_max, blur, 0xFFu);
+}
+
+// `rt_hit` through the instances of `mask` alone (`world_render::rt`'s MASK_*: 1 the cubes' faces,
+// 2 their free quads, 4 distant terrain): a path tracer's test of the surface the world drew skips
+// the distant tiles, whose hidden columns under the cubes each ask the shader.
+// Whether a ray along `dir` from `rel`, out to `t_max`, meets anything see-through that `rt_hit`
+// would stop at: a pane, water, or a cutout's solid texel (leaves, plants). The opaque faces are
+// culled (`RAY_FLAG_CULL_OPAQUE`), so the walk asks the shader only of the see-through records and
+// never decodes a hit: the world's shader asks it to learn, cheaply, whether the path tracer's
+// test of a face it drew will pass (`world.wgsl`'s `pt_takes`).
+fn rt_seen_through(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, mask: u32) -> bool {
     var rq: ray_query;
-    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_NONE, 0xFFu, 0.0, t_max, rel + g.cam_frac.xyz, dir));
+    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_CULL_OPAQUE | RAY_FLAG_TERMINATE_ON_FIRST_HIT, mask, 0.0, t_max, rel + g.cam_frac.xyz, dir));
+    while rayQueryProceed(&rq) {
+        let h = rayQueryGetCandidateIntersection(&rq);
+        let row = rt_inst[h.instance_custom_data];
+        if row.z == 2u || row.x == 0xFFFFFFFFu {
+            rayQueryConfirmIntersection(&rq);
+            continue;
+        }
+        let rec = row.w + h.primitive_index / 2u;
+        let texel = rt_texel(row.x, row.z, rec, h.primitive_index % 2u, h.barycentrics);
+        if texel.c.a >= 0.5 || (rec >= row.y && texel.tinted) {
+            rayQueryConfirmIntersection(&rq);
+        }
+    }
+    return rayQueryGetCommittedIntersection(&rq).kind != RAY_QUERY_INTERSECTION_NONE;
+}
+
+fn rt_hit_mask(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32, mask: u32) -> RtHit {
+    var rq: ray_query;
+    rayQueryInitialize(&rq, rt_scene, RayDesc(RAY_FLAG_NONE, mask, 0.0, t_max, rel + g.cam_frac.xyz, dir));
     while rayQueryProceed(&rq) {
         let h = rayQueryGetCandidateIntersection(&rq);
         let row = rt_inst[h.instance_custom_data];
@@ -1829,6 +1907,7 @@ fn rt_hit(rel: vec3<f32>, dir: vec3<f32>, t_max: f32, blur: f32) -> RtHit {
     out.rel = rel + dir * c.t;
     out.world = out.rel + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
     out.lod = row.z == 2u;
+    out.quad = row.z == 1u;
     out.albedo = vec4(0.5, 0.5, 0.5, 1.0);
     out.light = vec4(1.0, 0.0, 0.0, 0.0);
     out.n = -dir;
@@ -1944,7 +2023,7 @@ struct PtArgs {
     spec: u32,
     mode: u32,
     light: u32,
-    pad0: u32,
+    plain: u32,
     pad1: u32,
     pad2: u32,
 }
@@ -1953,6 +2032,7 @@ var<immediate> pt: PtArgs;
 @group(1) @binding(35) var<storage, read> pt_in: array<vec4<f32>>;
 const PT_CACHE: u32 = 1048576u;
 @group(1) @binding(36) var<storage, read_write> pt_cache: array<atomic<u32>>;
+@group(1) @binding(37) var<storage, read> pt_lights: array<u32>;
 ";
 
 /// The radiance cache's cells (`PT_CACHE` in `PT_DECLS`: change both), ten words each.
@@ -1964,6 +2044,7 @@ pub mod pt_bind {
     pub const OUT: u32 = 34;
     pub const IN: u32 = 35;
     pub const CACHE: u32 = 36;
+    pub const LIGHTS: u32 = 37;
 }
 
 /// The path tracer's push constants (`PT_DECLS`).
@@ -1982,7 +2063,9 @@ pub struct PtArgs {
     pub mode: u32,
     /// The denoised light (`texture_index`), for the finish.
     pub light: u32,
-    pub pad: [u32; 3],
+    /// chiacraft: 1 lights with vanilla's math (`core:pt_plain`, the pack's `pathtrace.wgsl`).
+    pub plain: u32,
+    pub pad: [u32; 2],
 }
 
 /// What goes in front of `rt_expand.wgsl` (ray tracing's scene, `world_render::rt`): the

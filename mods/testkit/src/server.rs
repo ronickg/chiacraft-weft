@@ -9,6 +9,8 @@ use weft_sdk::*;
 
 /// How many of each event arrived since `events reset`, in `EVENT_NAMES` order.
 static COUNTS: [AtomicU32; 8] = [const { AtomicU32::new(0) }; 8];
+/// The most a fall did since `fell reset` (f32 bits), as the server dealt it.
+static FELL: AtomicU32 = AtomicU32::new(0);
 const EVENT_NAMES: [&str; 8] =
     ["block_broken", "block_placed", "item_picked_up", "entity_died", "entity_hurt", "player_joined", "item_used", "smelted"];
 
@@ -35,6 +37,9 @@ static LIT: EntityEffect = EntityEffect::named("lit");
 /// Shows what is in its one slot.
 static PEDESTAL: Block = Block::named("pedestal");
 pub static COUNT_MARKS: Config<bool> = Config::named("count_marks");
+/// Every player who joins becomes an operator (level 4), for scripted runs of several games in
+/// one world: the host passes `--config testkit:op_joiners=true`, its own player already is one.
+pub static OP_JOINERS: Config<bool> = Config::named("op_joiners");
 pub static PROTECT_GOLD: Config<bool> = Config::named("protect_gold");
 pub static HALF_DAMAGE: Config<bool> = Config::named("half_damage");
 /// Mobs may not attack while it is on.
@@ -80,6 +85,8 @@ static PLACED: std::sync::Mutex<Vec<(u32, BlockPos)>> = std::sync::Mutex::new(Ve
 /// Fired by `after` timers; counted.
 static RANG: Event<u64> = Event::named("rang");
 static RINGS: AtomicU32 = AtomicU32::new(0);
+/// Which holders' timers rang (`after`'s kinds, a bit each: player, dim, block, body cell).
+static RANG_KINDS: AtomicU32 = AtomicU32::new(0);
 /// A key whose presses reach the server (`on_server`); `/tk pings` counts them (`extend::key_to_server`).
 static PING: Key = Key::named("ping");
 static PINGS: AtomicU32 = AtomicU32::new(0);
@@ -249,6 +256,7 @@ pub fn register(r: &mut Registry) {
     r.edit(&GEAR).group("extra", Slots::row(2));
     r.edit(&PLAYER).attach_storage(&STASH);
     r.config(&COUNT_MARKS).bool(false).world();
+    r.config(&OP_JOINERS).bool(false).server();
     // While the rule is on, every marked pig counts up once a tick.
     r.system(&MARK, |b| {
         if !COUNT_MARKS.get() {
@@ -292,6 +300,9 @@ pub fn register(r: &mut Registry) {
     r.before_event(&actions::USE_ITEM, |_| if NO_USE.get() { Verdict::Deny } else { Verdict::Abstain });
     r.on_event(&RANG, |b| {
         RINGS.fetch_add(b.len() as u32, Ordering::Relaxed);
+        for v in b.iter() {
+            RANG_KINDS.fetch_or(1u32 << (*v).min(31) as u32, Ordering::Relaxed);
+        }
     });
     r.on_event(&FEATURE_PLACED, |b| {
         PLACED
@@ -335,7 +346,19 @@ pub fn register(r: &mut Registry) {
     r.on_event(&actions::PICKUP_ITEM, |b| count(2, b.len()));
     r.on_event(&actions::DIE, |b| count(3, b.len()));
     r.on_event(&actions::HURT, |b| count(4, b.len()));
+    r.on_event(&actions::HURT, |b| {
+        for h in b.iter().filter(|h| h.cause == abi::damage_cause::FALL) {
+            FELL.fetch_max(h.amount.max(0.0).to_bits(), Ordering::Relaxed);
+        }
+    });
     r.on_event(&PLAYER_JOINED, |b| count(5, b.len()));
+    r.on_event(&PLAYER_JOINED, |b| {
+        if OP_JOINERS.get() {
+            for p in b.iter() {
+                b.world().set_permission(p.player, permission::OWNER);
+            }
+        }
+    });
     r.on_event(&actions::USE_ITEM, |b| count(6, b.len()));
     r.on_event(&SMELTED, |b| count(7, b.len()));
     // A mob walks where a test says for a while, after its own AI had its say.
@@ -1118,6 +1141,20 @@ const OPS: &[(&str, &str, Run)] = &[
         }
         Err("not found".into())
     }),
+    ("debug_at", "<block:block>", |_, cmd, _, _| {
+        // Where the debug world (`core:debug_blocks`) puts a block's first state: every state but
+        // air, in id order, on a square grid two blocks apart at y 1. Our states fill a grid far
+        // wider than any search around its corner.
+        let want = block_of(id(cmd, "block")?);
+        let n = (1..)
+            .take_while(|&s| !name_of(ek::BLOCK, s).is_empty())
+            .count() as u32;
+        let side = (n as f64).sqrt().ceil() as u32;
+        let s = (1..=n)
+            .find(|&s| block_of(s) == want)
+            .ok_or("no such block state")?;
+        Ok(format!("{} 1 {}", (s - 1) % side * 2, (s - 1) / side * 2))
+    }),
     ("census", "<r:int> <blocks:word>", |w, cmd, _, me| {
         // How many of each block (`a,b`) lie within `r` of the player.
         let r: i32 = int(cmd, "r")?;
@@ -1186,6 +1223,15 @@ const OPS: &[(&str, &str, Run)] = &[
         let p = pos(cmd, "to")?;
         Ok((w.navigate(owner(w, cmd)?, [p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], 1.0) as u32).to_string())
     }),
+    ("navigate_by", "@owner <dx:int> <dy:int> <dz:int>", |w, cmd, _, _| {
+        // `navigate` to where the walker stands now plus a step, read here in the same tick: on a
+        // flying deck, a point read a round trip earlier had moved off it (CI's slow frames).
+        let id = owner(w, cmd)?;
+        let p = w.entity(id).ok_or("no such entity")?.pos;
+        let (dx, dy, dz) = (int::<i32>(cmd, "dx")?, int::<i32>(cmd, "dy")?, int::<i32>(cmd, "dz")?);
+        let to = [p.x.floor() + dx as f64 + 0.5, p.y.floor() + dy as f64, p.z.floor() + dz as f64 + 0.5];
+        Ok((w.navigate(id, to, 1.0) as u32).to_string())
+    }),
     ("structure", "<name:word> <r:int>", |w, cmd, _, me| {
         Ok(w.structure_near(word(cmd, "name")?, me, int(cmd, "r")?)
             .map_or("none".into(), |a| format!("{} {} {}", a.x, a.y, a.z)))
@@ -1194,15 +1240,16 @@ const OPS: &[(&str, &str, Run)] = &[
     // ones that fired.
     ("after", "<ticks:int> [on:word] [body:int]", |w, cmd, player, me| {
         let body = int::<u64>(cmd, "body").ok();
-        let on = match cmd.text("on") {
-            Some("dim") => Holder::NONE,
-            Some("block") if body.is_some() => Holder::from([0, 1, 0]),
-            Some("block") => Holder::from([me[0], me[1] - 1, me[2]]),
-            _ => Holder::entity(player),
+        // The timer carries its kind (0 player, 1 dimension, 2 terrain cell, 3 body cell): `rang`.
+        let (on, kind) = match cmd.text("on") {
+            Some("dim") => (Holder::NONE, 1),
+            Some("block") if body.is_some() => (Holder::from([0, 1, 0]), 3),
+            Some("block") => (Holder::from([me[0], me[1] - 1, me[2]]), 2),
+            _ => (Holder::entity(player), 0),
         };
         w.in_space(body.unwrap_or(0))
             .ok_or("no space")?
-            .timer(on, int(cmd, "ticks")?, &RANG, player);
+            .timer(on, int(cmd, "ticks")?, &RANG, kind);
         Ok(String::new())
     }),
     ("assemble_one", "<pos:pos>", |w, cmd, player, _| {
@@ -1212,6 +1259,16 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(w.assembly_select(player, None, true).to_string())
     }),
     ("rings", "", |_, _, _, _| Ok(RINGS.load(Ordering::Relaxed).to_string())),
+    // Which kinds of timer have rung: "player dim block body".
+    ("rang", "", |_, _, _, _| {
+        let k = RANG_KINDS.load(Ordering::Relaxed);
+        let names = ["player", "dim", "block", "body"];
+        Ok((0..4)
+            .filter(|i| k & (1 << i) != 0)
+            .map(|i| names[i])
+            .collect::<Vec<_>>()
+            .join(" "))
+    }),
     ("edited", "", |w, _, player, _| {
         let i = EDITED.id();
         let b = EDITED_BIOME.id();
@@ -1312,6 +1369,11 @@ const OPS: &[(&str, &str, Run)] = &[
         let id = cmd.int("id").map_or(player, |i| i as u64);
         Ok(w.entity(id)
             .map_or("none".into(), |e| format!("{}", e.health)))
+    }),
+    ("gametime", "", |w, _, _, _| {
+        // Ticks the game has run: what redstone and other timers count, which a slow CI frame's
+        // script clock can fall behind.
+        Ok(w.game_time().to_string())
     }),
     ("time", "<ticks:int>", |w, cmd, _, _| {
         w.set_day_time(int(cmd, "ticks")?);
@@ -1454,6 +1516,12 @@ const OPS: &[(&str, &str, Run)] = &[
                 .map_or("none".into(), |v| v.to_string())),
         }
     }),
+    ("fell", " | reset", |_, cmd, _, _| {
+        if cmd.given("reset") {
+            FELL.store(0, Ordering::Relaxed);
+        }
+        Ok(f32::from_bits(FELL.load(Ordering::Relaxed)).to_string())
+    }),
     ("events", " | reset", |_, cmd, _, _| {
         if cmd.given("reset") {
             COUNTS.iter().for_each(|c| c.store(0, Ordering::Relaxed));
@@ -1507,12 +1575,15 @@ const OPS: &[(&str, &str, Run)] = &[
             .collect::<Vec<_>>()
             .join(" "))
     }),
-    ("break", "<pos:pos> [tool:word]", |w, cmd, player, _| {
+    // `at_block`: the loot falls where the block was, not at the player's feet (Weft drops a
+    // player's mining at their feet since the 11-22 sync).
+    ("break", "<pos:pos> [tool:word] [drop:word(at_block)]", |w, cmd, player, _| {
         let tool = match cmd.text("tool") {
             Some(t) => tool_stack(w, player, t)?,
             None => ItemStack::EMPTY,
         };
-        Ok((w.break_block(pos(cmd, "pos")?, tool, player, true) as u32).to_string())
+        let by = if cmd.text("drop").is_some() { 0 } else { player };
+        Ok((w.break_block(pos(cmd, "pos")?, tool, by, true) as u32).to_string())
     }),
     // A melee hit's damage with what `item` makes of the player having fallen `fall` blocks.
     ("attack_damage", "<item:item> <fall:float>", |w, cmd, player, _| {

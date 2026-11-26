@@ -1,0 +1,67 @@
+# Wounded deer heal while fed and watered, and not while thirsty (`animal::heal`,
+# `animals_core::needs::heals`: food 60 % or more, water 50 % or more, unhurt 10 s, the whole health
+# in a game day of 1200 s). Seed 1's savanna as `herd_pit.txt`: flat grass, the pond 10 blocks
+# north. Two groups: four deer fed and watered (90 %), and, later, the same deer at 20 % water.
+# Report: each deer's health in the `/animalprof where` rows. In the first 120 s after the wound
+# (to 50 %) each should rise about 5 % of its most a minute (from about half to about 60 % in
+# 2 min, the 10 s after the wound aside; the rows show points, rounded); after `water 0.2` it should hold still till they've drunk
+# back over 50 %. Any deer whose health falls, or that dies, and its last lines.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+chat /tk fill -4 70 528 4 70 536 core:air
+chat /tk fill -2 68 530 2 68 534 base:dirt
+chat /tk fill -2 69 530 2 69 534 base:water
+wait 2
+chat /tk spawn animals:white_tailed_deer 0 70 548
+chat /tk spawn animals:white_tailed_deer 1 70 549
+chat /tk spawn animals:white_tailed_deer -1 70 549
+chat /tk spawn animals:white_tailed_deer 2 70 548
+wait 3
+chat /anim log
+chat /animalprof water 0.9
+chat /animalprof food 0.9
+chat /tp 0 90 572
+wait 2
+chat /animalprof where
+chat /animalprof wound 0.5
+wait 1
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 30
+chat /animalprof where
+wait 30
+chat /animalprof where
+wait 30
+chat /animalprof where
+chat /animalprof wound 0.5
+chat /animalprof water 0.2
+chat /animalprof food 0.9
+wait 1
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 15
+chat /animalprof where
+wait 30
+chat /animalprof where
+wait 30
+chat /animalprof where
+chat /animalprof senses
+quit

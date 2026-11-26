@@ -112,7 +112,13 @@ fn id(name: &str) -> u32 {
     config::by_name(name).unwrap_or(u32::MAX)
 }
 
+/// No setting before the content is frozen (unit tests, early startup): 0, as an unknown one.
+/// Ours read settings where upstream's read none (`max_gui_scale`: touch controls), and
+/// `config::by_name` and `config::get` ask the frozen content.
 fn number(name: &str) -> f64 {
+    if crate::content::try_content().is_none() {
+        return 0.0;
+    }
     config::get(id(name))
 }
 
@@ -204,6 +210,10 @@ pub fn renderer() -> String {
 /// chiacraft: our soft clouds (`core:soft_clouds`).
 pub fn soft_clouds() -> bool {
     number("core:soft_clouds") != 0.0
+}
+/// chiacraft: how many pixels each way one soft-cloud trace pixel stands for (`core:cloud_res`), live.
+pub fn cloud_res() -> u32 {
+    (number("core:cloud_res") as u32).clamp(1, 4)
 }
 pub fn fov() -> f32 {
     number("core:fov") as f32
@@ -353,6 +363,21 @@ pub fn upscale_standin() -> bool {
     number("core:upscale_standin") != 0.0
 }
 
+/// The world's opaque depth prepass while it traces (`core:depth_prepass`), live.
+pub fn depth_prepass() -> bool {
+    number("core:depth_prepass") > 0.5
+}
+
+/// Named GPU timestamps for a finer bench split (`core:gpu_probes`), live.
+pub fn gpu_probes() -> bool {
+    number("core:gpu_probes") > 0.5
+}
+
+/// NVIDIA Reflex's low-latency mode (`core:reflex`: 0 off, 1 on, 2 with boost), live.
+pub fn reflex() -> u32 {
+    number("core:reflex").clamp(0.0, 2.0) as u32
+}
+
 /// Ray Reconstruction with DLSS (`core:dlss_rr`), live.
 pub fn dlss_rr() -> bool {
     number("core:dlss_rr") != 0.0
@@ -405,6 +430,11 @@ pub fn taa_blend() -> f32 {
 /// The mist as a volume for packs that have one (`client::froxels`), live.
 pub fn froxels() -> bool {
     number("core:froxels") != 0.0
+}
+
+/// The ground's height about the camera for packs (`client::ground_map`), live.
+pub fn ground_map() -> bool {
+    number("core:ground_map") != 0.0
 }
 
 /// Pixels a mist volume cell covers each way: 8 (`core:froxels` 1), 4 (2, ultra).

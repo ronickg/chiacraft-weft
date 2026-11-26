@@ -236,7 +236,7 @@ fn screen(ui: &mut Ui) {
     let Some(k) = view() else { return };
     let head = &KNAPPED[k.shape as usize % KNAPPED.len()];
     let ended = k.broken != 0 || k.done != 0;
-    crate::window::window_titled(ui, S::column().pad(7.0).gap(5.0), "knapping.base.title", &[], |ui| {
+    crate::window::window_titled(ui, S::column().pad(crate::window::WINDOW_PAD).gap(5.0), "knapping.base.title", &[], |ui| {
         ui.row(S::row().gap(1.0).self_align(abi::ui_align::CENTER), |ui| {
             for (i, h) in KNAPPED.iter().enumerate() {
                 let picked = i as u32 == k.shape;

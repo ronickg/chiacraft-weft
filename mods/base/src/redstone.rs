@@ -189,6 +189,7 @@ pub fn register(r: &mut Registry) {
     {
         let top = if sticky { "piston_top_sticky" } else { "piston_top" };
         r.block(piston)
+            .texture("piston_side")
             .facing(Facings::ALL, Toward::Player)
             .default_facing(Dir::Up)
             .signal_piston(name, sticky)
@@ -225,6 +226,7 @@ pub fn register(r: &mut Registry) {
             .tab(&crate::tabs::REDSTONE);
         // What the head looks like on its way; out, it is the piston's own.
         r.block(head)
+            .texture(top)
             .facing(Facings::ALL, Toward::Player)
             .signal_piston_head()
             // The short one is what moves while it is inside the piston.
@@ -271,6 +273,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::REDSTONE);
 
     r.block(&FLOATER)
+        .texture("floater_side")
         .facing(Facings::ALL, Toward::Away)
         .signal_floater(false)
         .states(|p, s| {
@@ -427,6 +430,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::REDSTONE);
 
     r.block(&OBSERVER)
+        .texture("observer_side")
         // It looks where the player looks, the way it was placed.
         .facing(Facings::ALL, Toward::Away)
         .signal_observer()
@@ -495,8 +499,10 @@ pub fn register(r: &mut Registry) {
         .opens(&DISPENSER_MENU);
     r.menu(&DISPENSER_MENU)
         .group("dispenser", Slots::chest(1).holder())
+        // Its screen (ours, not the default one) draws the player's slots: the menu must have them.
+        .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0), &[], |ui| {
+            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0), &[], |ui| {
                 ui.group("dispenser");
                 ui.player_inventory(true);
             });

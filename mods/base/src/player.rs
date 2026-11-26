@@ -16,6 +16,13 @@ static HUD_ATTACK: HudElement = HudElement::named("attack_indicator");
 /// piece's shell and slot (`vitals::gear::armour`), carried by each piece built from parts
 /// (`parts::ARMOUR_OF`). A worn-out piece stops nothing.
 pub fn armor_of(w: &World, entity: u64) -> (f32, f32) {
+    armor_against(w, entity, 0)
+}
+
+/// `armor_of` against `foe` (0: none): each piece's armour counts as much as the foe lets gear of
+/// its item level count (`base_api::chains::GEAR_COUNTS`: a big creature caps over-tier armour as
+/// it caps over-tier weapons). Health from armour is never capped: it's the player's, not the hit's.
+pub fn armor_against(w: &World, entity: u64, foe: u64) -> (f32, f32) {
     let Some(worn) = w.inventory(entity).find_group(EQUIPMENT_GROUP) else { return (0.0, 0.0) };
     (0..worn.len())
         .filter_map(|i| {
@@ -24,9 +31,16 @@ pub fn armor_of(w: &World, entity: u64) -> (f32, f32) {
             if crate::parts::broken(&s) {
                 return None;
             }
-            crate::parts::ARMOUR_OF
-                .on_stack_own(&s)
-                .map(|a| (a.armour, a.health))
+            let a = crate::parts::ARMOUR_OF.on_stack_own(&s)?;
+            let counts = match (foe, base_api::ITEM_LEVEL.on_stack(&s)) {
+                (0, _) | (_, None) => 1.0,
+                (_, Some(level)) => {
+                    let q = abi::Query { entity, other: foe, amount: level as f64, ..abi::Query::DEFAULT };
+                    w.chain_compute(&base_api::chains::GEAR_COUNTS, 1.0, &q)
+                        .clamp(0.0, 1.0) as f32
+                }
+            };
+            Some((a.armour * counts, a.health))
         })
         .fold((0.0, 0.0), |t, a| (t.0 + a.0, t.1 + a.1))
 }
@@ -83,7 +97,7 @@ pub fn register(r: &mut Registry) {
         if !armor_applies(q.cause) {
             return;
         }
-        let (armour, _) = armor_of(&m.world(), q.entity);
+        let (armour, _) = armor_against(&m.world(), q.entity, q.other);
         m.value *= 1.0 - vitals::combat::armour_cut(armour, m.value as f32) as f64;
     });
     r.on_event(&actions::HURT, |b| {
@@ -178,7 +192,7 @@ pub fn register(r: &mut Registry) {
             ];
             // The recipe book beside it, hand recipes only (`book.rs`).
             ui.row(S::row().gap(4.0), |ui| {
-                crate::window::family_window(ui, S::column().pad(7.0).gap(5.0), None, &tabs, |ui| {
+                crate::window::family_window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(5.0), None, &tabs, |ui| {
                     ui.row(S::row().gap(1.0), |ui| {
                         // Armor, and the clothes worn under it beside, the cloak under them.
                         ui.column(S::column(), |ui| {
@@ -195,7 +209,8 @@ pub fn register(r: &mut Registry) {
                         ui.player_model(51.0, 72.0);
                         ui.spacer();
                         ui.column(S::column().gap(2.0).stretch(), |ui| {
-                            ui.text_styled(S::default().no_wrap(), "window.base.crafting", &[]);
+                            // A heading at 2x, as every window's (`UI Style Guide.md`, type scale).
+                            ui.text_styled(S::default().no_wrap().scale(2.0), "window.base.crafting", &[]);
                             ui.row(S::row().gap(4.0), |ui| {
                                 ui.group("grid");
                                 ui.recipe_arrow();
@@ -264,17 +279,25 @@ pub fn register(r: &mut Registry) {
         .screen(|ui| {
             // The recipe book beside it: every recipe, from the bag and the chests near the table.
             ui.row(S::row().gap(4.0), |ui| {
-                crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
-                    ui.row(S::row().gap(8.0), |ui| {
-                        ui.spacer();
-                        ui.group("grid");
-                        ui.recipe_arrow();
-                        ui.group("result");
-                        ui.spacer();
-                    });
-                    crate::parts::ui(ui);
-                    ui.player_inventory(true);
-                });
+                crate::window::window(
+                    ui,
+                    S::column()
+                        .pad(crate::window::WINDOW_PAD)
+                        .gap(4.0)
+                        .stretch(),
+                    &[],
+                    |ui| {
+                        ui.row(S::row().gap(8.0), |ui| {
+                            ui.spacer();
+                            ui.group("grid");
+                            ui.recipe_arrow();
+                            ui.group("result");
+                            ui.spacer();
+                        });
+                        crate::parts::ui(ui);
+                        ui.player_inventory(true);
+                    },
+                );
                 crate::book::book(ui, crate::book::Station::Table);
             });
         });
@@ -294,6 +317,9 @@ fn craft_result(m: &MenuCtx) {
     let made = crate::survival::crafted(&cells, made, m.world().day_time());
     // An axe lashed by hand takes its parts from the grid (`first.rs`).
     let made = crate::first::finish(&m.world(), m.player(), &cells, made, None);
+    // Nothing a blueprint not yet read teaches (`ruins.rs`).
+    let made =
+        if !made.is_empty() && crate::ruins::craft_locked(&m.world(), m.player(), made.item).is_some() { ItemStack::EMPTY } else { made };
     m.group("result").set(0, made);
 }
 
@@ -304,6 +330,7 @@ fn consume_grid(m: &MenuCtx) {
     if m.group("result").index_of(m.slot()).is_none() {
         return;
     }
+    crate::player_sounds::crafted(&m.world(), m.player());
     let grid = m.group("grid");
     let cells: Vec<ItemStack> = (0..grid.len()).map(|i| grid.get(i)).collect();
     let made = recipe_grid_output(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());

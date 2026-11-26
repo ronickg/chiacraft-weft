@@ -169,7 +169,12 @@ pub async fn edits(t: T) -> R {
     let gear = Menu::lookup("testkit:gear").unwrap_or(u32::MAX);
     t.until("the edited menu open", Duration::from_secs(5), |t| t.c().menu().is_some_and(|m| m.kind == gear))
         .await?;
-    t.check_eq(t.c().menu().map(|m| m.slots), Some(43), "the slots of a menu an edit added a group to");
+    // (Weft's four pieces make 43; a game's own equipment slots, chiacraft's clothing, count too.)
+    let worn = t
+        .c()
+        .displayed(t.c().player(), DisplaySource::Equipment)
+        .len() as u32;
+    t.check_eq(t.c().menu().map(|m| m.slots), Some(36 + 2 + worn + 1), "the slots of a menu an edit added a group to");
     t.c().menu_close();
     t.no_screen().await
 }
@@ -208,18 +213,45 @@ pub async fn entity_modify(t: T) -> R {
     let near = t
         .op(&format!("spawn base:pig {} {} {}", f[0] + 1, f[1], f[2] - 3))
         .await?;
-    t.secs(0.5).await?;
-    let x = |s: String| {
-        s.split_whitespace()
-            .nth(1)
-            .and_then(|v| v.parse::<f64>().ok())
-            .unwrap_or(f64::NAN)
+    // Held still until the hit, and measured away from the one hit: spawned pigs wander off at
+    // once, the same way each run, and read along x alone the push came out at 0.12 of 1.14. The
+    // hit comes by game ticks, just after the hold ends (by the script clock it fell before or
+    // after), and the push is its farthest in the half second after, sampled each frame.
+    let tick = |t: T| async move { Ok::<u64, String>(t.op("gametime").await?.parse().unwrap_or(0)) };
+    let held = tick(t.clone()).await?;
+    t.op(&format!("drive {hit} 0 0 10")).await?;
+    // The pig beside stays held through the measure: as a player standing still, so the push
+    // carries it as it would one, and its herd's pull (it walked back to the other pig in 5 of 8
+    // runs, peaking at 0.45 or 0.65) isn't measured.
+    t.op(&format!("drive {near} 0 0 60")).await?;
+    while tick(t.clone()).await? < held + 12 {
+        t.frames(1).await?;
+    }
+    let xz = |s: String| {
+        let v: Vec<f64> = s
+            .split_whitespace()
+            .skip(1)
+            .take(3)
+            .map(|v| v.parse::<f64>().unwrap_or(f64::NAN))
+            .collect();
+        (v.first().copied().unwrap_or(f64::NAN), v.get(2).copied().unwrap_or(f64::NAN))
     };
-    let before = x(t.op(&format!("entity {near}")).await?);
+    let target = xz(t.op(&format!("entity {hit}")).await?);
+    let before = xz(t.op(&format!("entity {near}")).await?);
+    let (dx, dz) = (before.0 - target.0, before.1 - target.1);
+    let d = (dx * dx + dz * dz).sqrt().max(0.1);
     t.op(&format!("hit_falling {hit} 5")).await?;
-    t.secs(0.5).await?;
-    let after = x(t.op(&format!("entity {near}")).await?);
-    t.probe("the pig beside is thrown back", (after - before) as f32, after - before > 0.8);
+    let (mut away, mut seen) = (f64::NEG_INFINITY, Vec::new());
+    let end = crate::runner::script_clock() + Duration::from_secs_f32(0.5);
+    while crate::runner::script_clock() < end {
+        let now = xz(t.op(&format!("entity {near}")).await?);
+        let a = ((now.0 - before.0) * dx + (now.1 - before.1) * dz) / d;
+        seen.push(format!("{a:.2}"));
+        away = away.max(a);
+        t.frames(1).await?;
+    }
+    t.note(format!("{d:.2} apart at the hit; away each frame: {}", seen.join(" ")));
+    t.probe("the pig beside is thrown back", away as f32, away > 0.8);
     Ok(())
 }
 
@@ -520,7 +552,10 @@ pub async fn lod_columns(t: T) -> R {
 pub async fn crater_saved(t: T) -> R {
     t.world(8).await?;
     t.idle().await?;
-    t.op("mode creative").await?;
+    // Spectator: in creative without flight the player fell into the crater. On CI (software
+    // Vulkan) the ~40 s from the fill to the check took them hundreds of blocks down, and the gold
+    // block was no longer loaded (an unloaded block reads as air).
+    t.op("mode spectator").await?;
     let f = t.feet();
     t.op("crater_fast 600").await?;
     t.op("look").await?;
@@ -904,7 +939,11 @@ pub async fn persistence(t: T) -> R {
         }
         t.secs(0.25).await?;
     }
-    t.check_eq(now, rings + 4, "timers on the player, dimension, terrain cell and body cell survived the reload");
+    let rang = t.op("rang").await?;
+    t.check(
+        now == rings + 4,
+        format!("timers on the player, dimension, terrain cell and body cell survived the reload: {} of 4 ({rang})", now - rings),
+    );
     let rule = t.cmd("/rule testkit:count_marks").await?;
     t.check(rule.contains("true"), format!("the world's setting after reload: {rule}"));
     t.cmd("/rule testkit:count_marks 0").await?;
@@ -1023,12 +1062,18 @@ pub async fn dimensions(t: T) -> R {
     t.cmd("/dim core:debug_blocks").await?;
     t.secs(0.5).await?;
     t.loaded().await?;
-    let at = t.op("find 160 base:water").await?;
+    // Where the grid puts water (ours is hundreds of blocks wide), and there to look.
+    let at = t.op("debug_at base:water").await?;
     let w: Vec<i32> = at
         .split_whitespace()
         .filter_map(|v| v.parse().ok())
         .collect();
     let [x, y, z] = w[..] else { return Err(format!("no water among the debug blocks: {at}")) };
+    t.cmd(&format!("/tp {} {} {}", x as f64 + 0.5, y + 2, z as f64 + 3.5))
+        .await?;
+    t.loaded().await?;
+    let there = t.block([x, y, z]).await?;
+    t.check(there.starts_with("base:water"), format!("water where the grid puts it: {there}"));
     t.secs(1.0).await?;
     t.check_eq(t.block([x + 1, y, z]).await?, "core:air".to_string(), "debug water does not flow");
     t.cmd(&format!("/setblock {} {y} {z} base:stone", x + 1))
@@ -1059,7 +1104,7 @@ pub async fn dimensions(t: T) -> R {
         .collect();
     t.check(spawned.is_empty(), format!("nothing spawns among the debug blocks: {spawned:?}"));
     // Lava is drawn solid: blocks behind ice do not show through it.
-    let at = t.op("find 200 base:lava").await?;
+    let at = t.op("debug_at base:lava").await?;
     let l: Vec<i32> = at
         .split_whitespace()
         .filter_map(|v| v.parse().ok())
@@ -1218,6 +1263,11 @@ pub async fn worldgen(t: T) -> R {
             .await?;
         t.secs(0.5).await?;
         t.loaded().await?;
+        // Straight away: a pig left alone wanders off (on CI, seconds of slow frames later).
+        let near = t
+            .op(&format!("near {} {} {} 8", hx + 1, hy + 1, hz + 1))
+            .await?;
+        t.check(near.contains("base:pig"), format!("the template's pig is there: {near}"));
         t.check_eq(t.block([hx, hy, hz]).await?, "base:bricks".to_string(), "the hub in the palette's block");
         let roof = t.block([hx, hy + 3, hz]).await?;
         t.check(roof.starts_with("base:bricks_slab"), format!("its roof the slabs made of it: {roof}"));
@@ -1232,10 +1282,6 @@ pub async fn worldgen(t: T) -> R {
             .filter_map(|e| e.rsplit(':').next()?.parse::<u32>().ok())
             .sum();
         t.check_eq(diamonds, 3, &format!("the chest filled from its loot table: {inv}"));
-        let near = t
-            .op(&format!("near {} {} {} 4", hx + 1, hy + 1, hz + 1))
-            .await?;
-        t.check(near.contains("base:pig"), format!("the template's pig is there: {near}"));
         let placed = t.op("placed").await?;
         t.check(placed.contains(&format!("testmod:outpost {hx} {hy} {hz}")), format!("FEATURE_PLACED told of it: {placed}"));
     }

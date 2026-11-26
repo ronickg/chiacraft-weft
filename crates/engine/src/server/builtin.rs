@@ -294,7 +294,7 @@ fn help(s: &mut Server, x: &Ctx) -> Vec<Msg> {
         None => c
             .commands
             .iter()
-            .filter(|d| d.level <= s.permission_of(x.pi))
+            .filter(|d| s.may_run(x.pi, d))
             .flat_map(|d| say("usage_line", vec![text(&d.name), text(&short_usage(&d.usage))]))
             .collect(),
     }
@@ -537,6 +537,11 @@ fn set_level(s: &mut Server, x: &Ctx, level: u32) -> Vec<Msg> {
     let mut lines = Vec::new();
     for (_, id) in x.targets(s, "who") {
         if let Some(pi) = s.players.iter().position(|p| p.joined && p.entity == id) {
+            // chiacraft: nor changes anyone above itself (an admin can't deop the world's owner).
+            if s.permission_of(pi) > own {
+                lines.extend(say("op.above", vec![text(&s.players[pi].identity.name), int(own)]));
+                continue;
+            }
             s.set_permission(pi, level);
             lines.extend(say("op.done", vec![text(&s.players[pi].identity.name), int(level)]));
         }

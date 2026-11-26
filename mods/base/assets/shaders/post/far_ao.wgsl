@@ -12,6 +12,20 @@ fn apply(p: PostPixel) -> vec4<f32> {
         // over: four rings evenly turned, 28 samples, so no pattern is left either.
         keep = (far_ao(p, 0.0) + far_ao(p, 0.25) + far_ao(p, 0.5) + far_ao(p, 0.75)) * 0.25;
     }
+    // With base's `look_ao_power` (option 41, read raw: Bliss's strength) the shade falls on the
+    // land, not on the haze in front of it, as Bliss's falls on the sky's light before its fog:
+    // each colour shaded only by the share of it the air lets through (the pack's clear-air veil,
+    // `haze_veil`, its Rayleigh part, restated here: the engine's own post.wgsl, compiled before
+    // the pack's, has none of the pack's functions). Darkening it all, the shade's blue went with
+    // it (lsK, 11-22: 5 10 29 at noon against Bliss's 0 19 65).
+    if scene.options[10][1] > 0.0 && keep < 1.0 {
+        let pos = post_position(p, p.uv);
+        let dist = length(pos);
+        let thin = exp(-max(pos.y, 0.0) / 90.0);
+        let rayleigh = vec3(0.35, 0.6, 1.0) * 3.4e-4 * 1.6 * mix(0.45, 1.0, thin);
+        let through = exp(-rayleigh * dist * smoothstep(90.0, 450.0, dist));
+        return vec4(p.color.rgb * (vec3(1.0) - (1.0 - keep) * through), p.color.a);
+    }
     return vec4(p.color.rgb * keep, p.color.a);
 }
 

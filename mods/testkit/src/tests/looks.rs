@@ -106,6 +106,11 @@ pub async fn texture_reload(t: T) -> R {
         .await?;
     t.c().set_look(0.0, 0.0);
     t.settled().await?;
+    // Time stands still and the GUI is off between the grabs: on CI "plain" and "back" are ~30 s
+    // of game apart (~3 s on a GPU), and the clock, vitals and the hour's light change meanwhile.
+    t.cmd("/tick freeze").await?;
+    t.press("core:hide_hud");
+    t.frames(3).await?;
     let plain = t.grab().await?;
     let pack = format!("{}/resourcepacks/testkit_reload", t.c().run_dir());
     let file = format!("{pack}/base/textures/block/dirt.png");
@@ -124,9 +129,11 @@ pub async fn texture_reload(t: T) -> R {
     let blue = reload(Some([40, 40, 200])).await?;
     weft_sdk::settings::RESOURCE_PACKS.set("");
     let back = reload(None).await?;
+    t.press("core:hide_hud");
+    t.cmd("/tick unfreeze").await?;
     t.check(T::differ(&plain, &red) > 0.2, "the pack's dirt shows after a reload");
     t.check(T::differ(&red, &blue) > 0.2, "a changed file shows after the next reload");
-    t.check(T::differ(&plain, &back) < 0.01, "without the pack the dirt is back");
+    t.check(T::differ(&plain, &back) < 0.01, format!("without the pack the dirt is back: {:.4}", T::differ(&plain, &back)));
     Ok(())
 }
 
@@ -188,14 +195,15 @@ pub async fn broken_shader_pack(t: T) -> R {
     let dir = format!("{}/shaderpacks/testkit_sepia", t.c().run_dir());
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let world = include_str!("../../../../crates/engine/assets/shaders/world.wgsl");
-    let ending = "    return vec4(mix(lit.rgb, scene.fog_color.rgb, fog), lit.a);";
+    // (Ours fogs as vanilla and Distant Horizons do: `fogged` and `plain_fog`, chiacraft stage 1.)
+    let ending = "    return vec4(fogged(lit.rgb, plain_fog(in.dist)), lit.a);";
     t.check(world.contains(ending), "the world shader still ends its shading like this");
     // Packs are copies of it, from whenever they were made: four words a texture since Weft
     // 26.11.2 (chiacraft's pack world.wgsl reads it so too).
     t.check(world.contains("tex_info[name * 4u]"), "the texture table still reads as packs read it");
     let sepia = world.replace(
         ending,
-        "    let y = dot(mix(lit.rgb, scene.fog_color.rgb, fog), vec3(0.3, 0.59, 0.11));
+        "    let y = dot(fogged(lit.rgb, plain_fog(in.dist)), vec3(0.3, 0.59, 0.11));
     return vec4(vec3(y * 1.2, y, y * 0.75), lit.a);",
     );
     std::fs::write(format!("{dir}/world.wgsl"), sepia).map_err(|e| e.to_string())?;
@@ -295,12 +303,20 @@ pub async fn models(t: T) -> R {
     t.frames(3).await?;
     t.press("core:use");
     t.secs(1.5).await?;
-    let a = t.grab().await?;
-    t.secs(0.3).await?;
-    let b = t.grab().await?;
     // Below the horizon: clouds drift up there.
     let ground = |f: &[u8]| f[f.len() / 4 / 3 * 4..].to_vec();
-    t.check(T::differ(&ground(&a), &ground(&b)) == 0.0, "the bow holds its last frame");
+    // Two grabs 0.3 s apart the same (the idle, a 3 s loop, never is). The bow starts a round
+    // trip after the press: on CI that was over a second, and 1.5 s on it still moved.
+    // Near nothing rather than nothing: under load (--jobs 2) no two grabs in 8 s were the same.
+    let (mut least, mut a) = (f64::MAX, t.grab().await?);
+    let end = crate::runner::script_clock() + Duration::from_secs(8);
+    while least > 0.0001 && crate::runner::script_clock() < end {
+        t.secs(0.3).await?;
+        let b = t.grab().await?;
+        least = least.min(T::differ(&ground(&a), &ground(&b)));
+        a = b;
+    }
+    t.check(least <= 0.0001, format!("the bow holds its last frame: {least:.5}"));
     t.shot("idol_bow").await?;
     // A mod has it play one action as another for a while.
     t.op(&format!("action {idol}")).await?;
@@ -316,9 +332,14 @@ pub async fn models(t: T) -> R {
     t.frames(3).await?;
     let a = t.grab().await?;
     t.op("action me wave").await?;
-    t.secs(0.5).await?;
-    let b = t.grab().await?;
-    t.check(T::differ(&a, &b) > 0.002, "the first person hand waves");
+    // The most it moved over two seconds: the wave starts a round trip after the op, and one grab
+    // half a second on missed it on a loaded PC (--jobs 2).
+    let (mut moved, end) = (0.0f64, crate::runner::script_clock() + Duration::from_secs(2));
+    while moved <= 0.002 && crate::runner::script_clock() < end {
+        t.secs(0.1).await?;
+        moved = moved.max(T::differ(&a, &t.grab().await?));
+    }
+    t.check(moved > 0.002, format!("the first person hand waves: {moved:.4}"));
     Ok(())
 }
 
@@ -358,7 +379,25 @@ pub async fn rich_text(t: T) -> R {
 pub async fn sky(t: T) -> R {
     t.world(5).await?;
     t.op("mode creative").await?;
-    t.c().set_look(0.0, 89.0);
+    // A clear sky: no rain clouds, no mist (base's `/air`) over the sunset.
+    t.cmd("/weather clear").await?;
+    t.cmd("/air 0").await?;
+    // No clouds: one over the sun or the sunset hides what is checked (a cloud fog ending at 0).
+    t.c().environment(
+        &Environment::new("test_sky")
+            .priority(100)
+            .cloud_fog(0.0, 0.0),
+    );
+    // Base's sun and moon go round a path leaned 35° to the south (`mods/base/src/lib.rs`): noon
+    // stands 55° up, not overhead. The look toward a body `turn` round that path (0 rising in the
+    // east, a quarter at its height); yaw 0 faces -z (north).
+    let toward = |turn: f64| {
+        let (a, lean) = (turn * std::f64::consts::TAU, 35f64.to_radians());
+        let (x, y, z) = (a.cos(), a.sin() * lean.cos(), a.sin() * lean.sin());
+        ((-x).atan2(-z).to_degrees() as f32, y.asin().to_degrees() as f32)
+    };
+    let (yaw, pitch) = toward(0.25);
+    t.c().set_look(yaw, pitch);
     // Without the GUI: a popup's letters (a level up) would count as stars.
     t.press("core:hide_hud");
     t.frames(4).await?;
@@ -366,7 +405,7 @@ pub async fn sky(t: T) -> R {
     t.op("time 6000").await?;
     t.secs(0.6).await?;
     let noon = t.shot("noon").await?;
-    t.probe("the sun overhead", noon.share(0.45, 0.40, 0.55, 0.57, bright), noon.share(0.45, 0.40, 0.55, 0.57, bright) > 0.5);
+    t.probe("the sun at its height", noon.share(0.45, 0.40, 0.55, 0.57, bright), noon.share(0.45, 0.40, 0.55, 0.57, bright) > 0.5);
     // A star is a speck: bright with sky a little way off on every side, which a cloud isn't.
     let specks = |shot: &crate::runner::Shot| {
         let (sx, sy) = (1.0 / 1600.0, 1.0 / 900.0);
@@ -382,27 +421,44 @@ pub async fn sky(t: T) -> R {
         n
     };
     t.check_eq(specks(&noon), 0, "no stars by day");
+    // The moon lags the day: a turn every 8/7 days, full (opposite the sun) on day 0. At day 0's
+    // midnight it is (18000 / 27429 + 0.5) round: a little past rising, high in the south-east.
     t.op("time 18000").await?;
+    let (yaw, pitch) = toward((18000.0 / (24000.0 * 8.0 / 7.0) + 0.5f64).rem_euclid(1.0));
+    t.c().set_look(yaw, pitch);
     t.secs(0.6).await?;
     let night = t.shot("midnight").await?;
     let moon = night.share(0.45, 0.42, 0.55, 0.56, |c| c.iter().all(|&v| v > 150));
-    t.probe("the moon overhead", moon, moon > 0.4);
+    // Our moon (`moon_phases`) has dark seas: about a third of it is bright.
+    t.probe("the moon where its path puts it", moon, moon > 0.2);
     let stars = night.share(0.0, 0.0, 1.0, 0.3, |c| c.iter().all(|&v| v > 60));
     t.probe("stars at night", stars, stars > 0.0005);
     // Looking at the sunset and away from it, at the equinox: the day's length follows the
     // seasons, and a new world starts in late winter, when the sun has set long before 12400.
     // `time` keeps the day, so this is day 7 at 12100, just as its 12 hour day ends.
-    t.op("time 180100").await?;
-    t.c().set_look(90.0, 8.0);
-    t.secs(0.6).await?;
-    let west = t.shot("sunset").await?;
+    // Our sun still stood 15° up at 12100 (Tester 2, 11-24): on toward its setting, a quarter
+    // hour at a time, until the west warms.
     let warm = |c: probe::C| c[0] > 170 && c[0] as i32 > c[2] as i32 + 50;
+    t.c().set_look(90.0, 8.0);
+    let mut west = None;
+    for step in 0..12 {
+        t.op(&format!("time {}", 180100 + step * 250)).await?;
+        t.secs(0.6).await?;
+        let shot = t.shot("sunset").await?;
+        let found = shot.share(0.0, 0.3, 1.0, 0.5, warm) > 0.05;
+        west = Some(shot);
+        if found {
+            break;
+        }
+    }
+    let west = west.ok_or("no sunset shot")?;
     t.c().set_look(-90.0, 8.0);
     t.secs(0.6).await?;
     let east = t.shot("sunset_back").await?;
     let (w, e) = (west.share(0.0, 0.3, 1.0, 0.5, warm), east.share(0.0, 0.3, 1.0, 0.5, warm));
     t.note(format!("warm sky: toward the sunset {w:.3}, away {e:.3}"));
     t.check(w > e + 0.02, format!("a sunset on its side: {w:.3}, away {e:.3}"));
+    t.c().clear_environment("test_sky");
     t.press("core:hide_hud");
     Ok(())
 }
@@ -540,7 +596,7 @@ pub async fn attack_indicator(t: T) -> R {
     t.cmd("/gear sword wrought_iron slot=0").await?;
     t.c().select_slot(0);
     // A swing that hits nothing spends the charge; looking down, nothing bright is behind the bar.
-    t.op("attr_mod me core:block_reach no_reach 0 -10 0")
+    t.op("attr_mod me core:block_reach no_reach core:add -10 0")
         .await?;
     t.c().set_look(0.0, -40.0);
     t.secs(1.0).await?;
@@ -552,6 +608,11 @@ pub async fn attack_indicator(t: T) -> R {
     t.check(rest.share(x0, y0, x1, y1, fill) < 0.01, "nothing under the crosshair when charged");
     let center = rest.share(0.497, 0.494, 0.503, 0.506, |c| c.iter().all(|&v| v > 150));
     t.probe("the crosshair in the middle of the window", center, center > 0.1);
+    // A tenth of its speed (about 6 s to charge): on CI the second shot came 0.75 s after the press,
+    // past the sword's 0.6 s (0.087, then 0.000). Set after the charged shot: long idle stays charged.
+    t.op("attr_mod me core:attack_speed slow_swing core:add -0.9 0")
+        .await?;
+    t.frames(3).await?;
     t.press("core:attack");
     t.secs(0.15).await?;
     let early = t.shot("charging").await?.share(x0, y0, x1, y1, fill);
@@ -560,8 +621,14 @@ pub async fn attack_indicator(t: T) -> R {
     t.note(format!("indicator filled: {early:.3}, later {later:.3}"));
     t.check(later > 0.02, format!("the indicator shows while charging: {later:.3}"));
     t.check(later > early, format!("and fills: {early:.3}, then {later:.3}"));
-    t.secs(0.6).await?;
-    t.check(t.shot("charged_again").await?.share(x0, y0, x1, y1, fill) < 0.01, "and is gone once charged");
+    let end = crate::runner::script_clock() + Duration::from_secs(12);
+    let mut gone = false;
+    while !gone && crate::runner::script_clock() < end {
+        t.secs(0.5).await?;
+        gone = t.shot("charged_again").await?.share(x0, y0, x1, y1, fill) < 0.01;
+    }
+    t.check(gone, "and is gone once charged");
+    t.op("attr_rm me core:attack_speed slow_swing").await?;
     t.op("attr_rm me core:block_reach no_reach").await?;
     Ok(())
 }
@@ -622,12 +689,26 @@ pub async fn block_dust_scatters(t: T) -> R {
     t.secs(0.3).await?;
     // Darker than the sky and any cloud.
     let piece = |c: probe::C| c.iter().all(|&v| v < 170);
-    let sides = |s: &crate::runner::Shot| [s.share(0.30, 0.3, 0.42, 0.7, piece), s.share(0.58, 0.3, 0.70, 0.7, piece)];
+    // Wide: at 3.6 blocks a second they leave a narrow strip within half a second, and fall.
+    // Clear of the HUD at the edges and the chat line at the bottom.
+    let sides = |s: &crate::runner::Shot| [s.share(0.12, 0.22, 0.42, 0.82, piece), s.share(0.58, 0.22, 0.88, 0.82, piece)];
     let before = sides(&t.shot("before").await?);
-    t.op(&format!("break {} {} {}", b[0], b[1], b[2])).await?;
-    t.secs(0.25).await?;
-    let shot = t.shot("after").await?;
-    let after = sides(&shot);
+    // Not waiting for the op's answer: it came a CI frame or two after the block change and its
+    // dust, and pieces live 0.2 to 1 s of frame time (none left in any shot).
+    t.c()
+        .run_command(&format!("/tk break {} {} {}", b[0], b[1], b[2]));
+    t.until("the block gone on the client", Duration::from_secs(5), |t| t.c().block(b) == Some(0))
+        .await?;
+    let end = crate::runner::script_clock() + Duration::from_secs_f32(0.6);
+    let mut after = [0f32; 2];
+    let shot = loop {
+        let shot = t.shot("after").await?;
+        let s = sides(&shot);
+        after = [after[0].max(s[0]), after[1].max(s[1])];
+        if crate::runner::script_clock() >= end {
+            break shot;
+        }
+    };
     t.note(format!("pieces at the sides: {before:?} then {after:?}"));
     t.check(after[0] > before[0] + 0.0005, format!("pieces on the left: {before:?} then {after:?}"));
     t.check(after[1] > before[1] + 0.0005, format!("pieces on the right: {before:?} then {after:?}"));
@@ -692,6 +773,8 @@ pub async fn light_by_day(t: T) -> R {
     t.c()
         .teleport([f[0] as f64 + 0.5, f[1] as f64 + 7.0, f[2] as f64 - 2.0]);
     t.c().set_look(0.0, -60.0);
+    // No HUD: on CI the test runs past base's first hint, whose box covers the probed snow.
+    t.press("core:hide_hud");
     t.secs(0.4).await?;
     let spot = t
         .on_screen([f[0] as f64 + 0.5, f[1] as f64 + 1.0, f[2] as f64 - 5.5])
@@ -709,6 +792,7 @@ pub async fn light_by_day(t: T) -> R {
     let lit = beside(&t.shot("lamp").await?);
     t.note(format!("snow {plain:?}, beside a blue lamp {lit:?}"));
     t.probe("how much bluer the snow is than red, by a blue lamp at noon", lit[2] - lit[0], lit[2] - lit[0] > 12.0);
+    t.press("core:hide_hud");
     Ok(())
 }
 
@@ -744,8 +828,20 @@ pub async fn ctm_any_model(t: T) -> R {
     let base_model = format!("{pack}/base/models/block/grass.json");
     std::fs::create_dir_all(std::path::Path::new(&base_model).parent().unwrap()).map_err(|e| e.to_string())?;
     std::fs::write(&base_model, whole(r#""north":{},"south":{},"east":{},"west":{},"up":{},"down":{}"#)).map_err(|e| e.to_string())?;
-    write("textures/block/varied.ctm", "method = vertical\ntiles = colors/red colors/green colors/blue colors/yellow\n")?;
-    write("textures/block/varied_cube.ctm", "method = random\ntiles = shapes/thin <default>\nhides_neighbors = false\n")?;
+    // A texture's rules sit in its own folder (`textures/<name>/<last>.ctm`, Weft 310cf6d88),
+    // and a tile without a namespace is in that folder, so these name theirs in full. This test
+    // still wrote the old flat path and short names there: a Weft bug.
+    write(
+        "textures/block/varied/varied.ctm",
+        "method = vertical\ntiles = testkit:block/colors/red testkit:block/colors/green testkit:block/colors/blue testkit:block/colors/yellow\n",
+    )?;
+    // `<default>` is gone (Weft 5cb6b2304): it named a missing file, and a folder's tile 0 is now
+    // the plain picture, so the cube had the magenta checker. The pack carries the cube's own
+    // picture as `0`, listed first.
+    let plain = format!("{pack}/testkit/textures/block/varied_cube/0.png");
+    std::fs::create_dir_all(std::path::Path::new(&plain).parent().unwrap()).map_err(|e| e.to_string())?;
+    std::fs::write(&plain, include_bytes!("../../assets/textures/block/varied_cube.png")).map_err(|e| e.to_string())?;
+    write("textures/block/varied_cube/varied_cube.ctm", "method = random\ntiles = 0 testkit:block/shapes/thin\nhides_neighbors = false\n")?;
     let face = r##"{"texture":"#unwrap","uv":[0.25,0.25,1.25,1.25]}"##;
     write(
         "models/block/shapes/thin.json",

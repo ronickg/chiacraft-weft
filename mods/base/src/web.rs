@@ -133,7 +133,7 @@ pub fn register(r: &mut Registry) {
     });
     // A tab beside the inventory's own (Stats, Advancements).
     r.screen_part(&Menu::named(crate::window::FAMILY), "tabs", 5, |ui| {
-        ui.button("web.base.tab", S::default().class("tab").h(13.0).pad(2.0), |c| {
+        ui.button("web.base.tab", S::default().class("tab").h(13.0).pad_xy(5.0, 2.0), |c| {
             open_on_home(c);
             c.client().menu_open(&SCREEN);
         });
@@ -175,7 +175,7 @@ fn screen(ui: &mut Ui) {
             c.client().menu_open(&crate::advancements::SCREEN);
         }),
     ];
-    crate::window::window_titled(ui, S::row().pad(6.0).gap(6.0), "web.base.title", &tabs, |ui| {
+    crate::window::window_titled(ui, S::row().pad(crate::window::WINDOW_PAD).gap(6.0), "web.base.title", &tabs, |ui| {
         sidebar(ui, &s, points, v.refund);
         ui.column(S::column().gap(3.0), |ui| {
             ui.row(S::row().gap(3.0).center(), |ui| {
@@ -195,9 +195,14 @@ fn screen(ui: &mut Ui) {
                         .tooltip("web.base.zoom_in_tip"),
                     |c| change(c, |v| v.zoom = (v.zoom + 1).min(ZOOMS.len() - 1)),
                 );
-                ui.button("web.base.centre", S::default().h(12.0).pad(2.0).tooltip("web.base.centre_tip"), |c| {
-                    change(c, |v| v.centre = (0.0, 0.0))
-                });
+                ui.button(
+                    "web.base.centre",
+                    S::default()
+                        .h(12.0)
+                        .pad_xy(5.0, 2.0)
+                        .tooltip("web.base.centre_tip"),
+                    |c| change(c, |v| v.centre = (0.0, 0.0)),
+                );
             });
             ui.panel("well", S::column().size(VIEW_W, VIEW_H), |ui| {
                 web(ui, &s, points, &v);
@@ -478,7 +483,7 @@ fn picker(ui: &mut Ui, c: &ClientView, socket: u16) {
             );
         }
         ui.spacer();
-        ui.button("web.base.pick_cancel", S::default().h(12.0).pad(2.0), |c| change(c, |v| v.picking = None));
+        ui.button("web.base.pick_cancel", S::default().h(12.0).pad_xy(5.0, 2.0), |c| change(c, |v| v.picking = None));
     });
 }
 

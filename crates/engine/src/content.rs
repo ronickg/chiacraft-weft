@@ -3624,7 +3624,16 @@ fn freeze_commands(mods: &[ModMeta], games: &mut [crate::registry::RawGame], err
         .chain(
             crate::app::CLIENT_COMMANDS
                 .iter()
-                .map(|c| (c.0, c.1, abi::permission::EVERYONE, true)),
+                // chiacraft: what this client draws or hears of the world (gizmos, sounds near
+                // by) is a game master's; the log and the next song are anyone's.
+                .map(|c| {
+                    (
+                        c.0,
+                        c.1,
+                        if matches!(c.0, "gizmo" | "sounds") { abi::permission::GAME_MASTER } else { abi::permission::EVERYONE },
+                        true,
+                    )
+                }),
         );
     for (name, usage, level, client) in engine_commands {
         let alts = crate::commands::parse_usage(usage).expect("engine command usage");

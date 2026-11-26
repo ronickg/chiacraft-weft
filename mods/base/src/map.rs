@@ -10,6 +10,9 @@
 //! Woken waystones nearby give off a slow rise of light, seen only by the players who woke them.
 //! The minimap in the HUD's top right corner draws the same picture small round the player
 //! (`MINIMAP_ON` in the settings, N for its zoom), painted again as the player moves or turns.
+//! Both mark the creatures the player can see round them (`creatures`: within
+//! `vitals::waystones::MARK_RADIUS`, not behind a hill or a wall), hostile mobs red, wild animals
+//! cream, the player's own tames green (`MARKS_ON` in the settings).
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Condvar, Mutex};
@@ -26,6 +29,10 @@ pub static SCREEN: Menu = Menu::named("map");
 /// The minimap (the HUD's top right), its setting and its zoom key.
 static MINIMAP: HudElement = HudElement::named("minimap");
 pub static MINIMAP_ON: Config<bool> = Config::named("minimap");
+/// The creatures on the minimap and the map.
+pub static MARKS_ON: Config<bool> = Config::named("map_creatures");
+/// Hostile mobs (`mobs.rs` tags them).
+static HOSTILE: Tag = Tag::named("hostile");
 static MINI_ZOOM: Key = Key::named("minimap_zoom");
 const MINI_IMAGE: &str = "dyn:base:minimap";
 static OPEN_KEY: Key = Key::named("map");
@@ -88,8 +95,9 @@ fn work() -> Shared {
     w
 }
 
-/// A tile's colours: each `TILE_PX_BLOCKS` square's biome or water, lit from the north-west by
-/// the slope.
+/// A tile's colours: what tops each `TILE_PX_BLOCKS` square (`land::top`: grass, sand, snow, a
+/// rock face, water) tinted by its biome (`vitals::waystones::ground_colour`), lit from the
+/// north-west by the slope.
 fn tile_colours(seed: u64, tx: i32, tz: i32) -> Colours {
     let f = l::fields(seed);
     let mut out: Colours = Box::new([[0; 3]; TPX * TPX]);
@@ -98,10 +106,8 @@ fn tile_colours(seed: u64, tx: i32, tz: i32) -> Colours {
     for pz in 0..TPX {
         for px in 0..TPX {
             let (x, z) = (tx * n::TILE + px as i32 * step, tz * n::TILE + pz as i32 * step);
-            let h = h_at(x, z);
-            let biome = l::overworld_biome(&f, x * 16, z * 16);
-            let sea = matches!(biome, "ocean" | "coral_reef" | "lagoon");
-            let c = if h < base_api::SEA && !sea { n::WATER } else { n::biome_colour(biome) };
+            let (h, biome, top) = l::top(&f, x, z);
+            let c = n::ground_colour(top.name(), biome);
             let shade = if h < base_api::SEA { 0 } else { ((h - h_at(x - step, z - step)) * 7).clamp(-28, 28) };
             out[pz * TPX + px] = c.map(|v| (v as i32 + shade).clamp(0, 255) as u8);
         }
@@ -167,6 +173,11 @@ struct State {
     mini_zoom: usize,
     mini_painted: Option<(Instant, (i32, i32), i32)>,
     mini_shown: bool,
+    /// The creatures seen round the player (block x, z, what), and when they were looked for.
+    marks: Vec<(i32, i32, n::Mark)>,
+    marks_at: Option<Instant>,
+    /// What the minimap's dots were painted from (`marks_sig`).
+    mini_marks: u64,
     /// When M last closed the map: the same press reaches the world's binding once the screen is
     /// gone, and must not open it again (PC look wm_look1).
     closed_by_key: Option<Instant>,
@@ -187,6 +198,9 @@ static STATE: Mutex<State> = Mutex::new(State {
     mini_zoom: n::MINI_ZOOM_START,
     mini_painted: None,
     mini_shown: false,
+    marks: Vec::new(),
+    marks_at: None,
+    mini_marks: 0,
     closed_by_key: None,
 });
 
@@ -221,6 +235,8 @@ pub fn register(r: &mut Registry) {
         s.atlas = a;
         s.seed = seed;
         s.painted = None;
+        // The minimap too, at once: a fresh atlas is new land (it waited up to 2 s before).
+        s.mini_painted = None;
     });
     r.client_packet(&OPEN, |c, cell| {
         STATE.lock().unwrap().from = Some((cell.i, cell.j));
@@ -228,6 +244,9 @@ pub fn register(r: &mut Registry) {
     });
     r.client_frame(frame);
     r.config(&MINIMAP_ON).bool(true);
+    r.config(&MARKS_ON).bool(true);
+    // Whose tame a creature is, for the tames' own colour (`base_api::TAME_OF`; animals keeps it).
+    r.entity_component(&base_api::TAME_OF, 0u64, component_flags::SYNC_WATCHERS);
     r.key(&MINI_ZOOM, "N").on_client(|_| {
         let mut s = STATE.lock().unwrap();
         s.mini_zoom = (s.mini_zoom + 1) % n::MINI_ZOOMS.len();
@@ -409,20 +428,35 @@ fn minimap(c: &Client, seed: u64, now: Instant) {
     let zoom = n::MINI_ZOOMS[s.mini_zoom];
     let at = (me.pos.x.floor() as i32, me.pos.z.floor() as i32);
     let facing = (me.yaw.to_degrees() / 15.0).round() as i32;
+    let due = s
+        .mini_painted
+        .is_none_or(|(t, _, _)| now.duration_since(t).as_secs_f32() >= n::MINI_REPAINT_SECS);
+    if !due {
+        return;
+    }
+    // The creatures, looked for at the minimap's pace: a dot that moved a pixel paints it again.
+    drop(s);
+    let marks = refresh_marks(c, now);
+    let sig = marks_sig(&marks, zoom);
+    let mut s = STATE.lock().unwrap();
     let stale = match s.mini_painted {
         None => true,
         Some((t, p, f)) => {
-            now.duration_since(t).as_secs_f32() >= n::MINI_REPAINT_SECS
-                && ((p.0 - at.0).abs() >= zoom || (p.1 - at.1).abs() >= zoom || f != facing || now.duration_since(t).as_secs_f32() >= 2.0)
+            (p.0 - at.0).abs() >= zoom
+                || (p.1 - at.1).abs() >= zoom
+                || f != facing
+                || sig != s.mini_marks
+                || now.duration_since(t).as_secs_f32() >= 2.0
         }
     };
     if !stale {
         return;
     }
     s.mini_painted = Some((now, at, facing));
+    s.mini_marks = sig;
     s.mini_shown = true;
     drop(s);
-    let mut img = picture(c, seed, side, at, zoom, false);
+    let mut img = picture(c, seed, side, at, zoom, false, &marks);
     // Round: clear outside the circle that fills the square (the ring's inner edge covers its steps).
     let r = side as f32 / 2.0;
     for y in 0..side {
@@ -484,14 +518,15 @@ fn paint(c: &Client) {
         s.painted = Some(Instant::now());
         (centre(&view, &s), n::ZOOMS[s.zoom])
     };
-    let img = picture(c, seed, n::MAP_PX as usize, centre, zoom, true);
+    let marks = refresh_marks(c, Instant::now());
+    let img = picture(c, seed, n::MAP_PX as usize, centre, zoom, true, &marks);
     c.set_image(IMAGE, n::MAP_PX, n::MAP_PX, &img);
 }
 
 /// The chart `side` pixels a side round block `centre` at `zoom` blocks a pixel: the explored land
 /// over parchment, its edge inked if `edge`, the ley lines with the rod or ley sight, the woken
-/// waystones and the player's arrow. RGBA.
-fn picture(c: &Client, seed: u64, side: usize, centre: (i32, i32), zoom: i32, edge: bool) -> Vec<u8> {
+/// waystones, the creatures seen (`marks`) and the player's arrow. RGBA.
+fn picture(c: &Client, seed: u64, side: usize, centre: (i32, i32), zoom: i32, edge: bool, marks: &[(i32, i32, n::Mark)]) -> Vec<u8> {
     let view = c.view();
     let (atlas_woken, me) = (STATE.lock().unwrap().atlas.woken.clone(), view.player_state());
     let mut img = vec![255u8; side * side * 4];
@@ -575,6 +610,55 @@ fn picture(c: &Client, seed: u64, side: usize, centre: (i32, i32), zoom: i32, ed
             }
         }
     }
+    // The creatures the player sees: a dot each, rimmed dark. One the arrow would cover (a tame
+    // at heel) is moved out to just past the arrow's tip, the way it lies from the player (Planner
+    // 11-22, run mm1122_b: the tame wolf hid under the arrow).
+    let me_px = me.map(|st| place_in(side as f32, centre, zoom, st.pos.x.floor() as i32, st.pos.z.floor() as i32));
+    // Tames last, over the others; a dot moved out turns round the arrow until it is clear of
+    // those already placed (a tame and a zombie in one line from the player met at one spot and
+    // the zombie's covered the tame's: run mm1122_c).
+    let mut order: Vec<&(i32, i32, n::Mark)> = marks.iter().collect();
+    order.sort_by_key(|m| m.2 == n::Mark::Tame);
+    let mut placed: Vec<(f32, f32)> = Vec::new();
+    let apart = (n::MARK_DOT + 2) as f32;
+    for &&(x, z, mark) in &order {
+        let (mut px, mut pz) = place_in(side as f32, centre, zoom, x, z);
+        if let Some((ax, az)) = me_px {
+            let (dx, dz) = (px - ax, pz - az);
+            let d = dx.hypot(dz);
+            if d < n::MARK_CLEAR {
+                // Straight on the player: to the right of the arrow.
+                let a0 = if d < 0.5 { 0.0 } else { dz.atan2(dx) };
+                let step = (apart / n::MARK_CLEAR).asin() * 1.2;
+                let free = (0..24)
+                    .map(|k| a0 + step * ((k + 1) / 2) as f32 * if k % 2 == 0 { 1.0 } else { -1.0 })
+                    .map(|a| (ax + a.cos() * n::MARK_CLEAR, az + a.sin() * n::MARK_CLEAR))
+                    .find(|&(qx, qz)| {
+                        placed
+                            .iter()
+                            .all(|&(ox, oz)| (qx - ox).hypot(qz - oz) >= apart)
+                    });
+                (px, pz) = free.unwrap_or((ax + a0.cos() * n::MARK_CLEAR, az + a0.sin() * n::MARK_CLEAR));
+            }
+        }
+        placed.push((px, pz));
+        let (px, pz) = (px.floor() as i32, pz.floor() as i32);
+        let (fill, rim) = (n::MARK_DOT / 2, n::MARK_DOT / 2 + 1);
+        for dz in -rim..=rim {
+            for dx in -rim..=rim {
+                if dx.abs() == rim && dz.abs() == rim {
+                    continue;
+                }
+                let (x, y) = (px + dx, pz + dz);
+                if !(0..side as i32).contains(&x) || !(0..side as i32).contains(&y) {
+                    continue;
+                }
+                let o = (y as usize * side + x as usize) * 4;
+                let inside = dx.abs() <= fill && dz.abs() <= fill;
+                img[o..o + 3].copy_from_slice(&if inside { mark.colour() } else { n::MARK_RIM });
+            }
+        }
+    }
     // The player: an arrow the way they face.
     if let Some(st) = me {
         let (px, pz) = place_in(side as f32, centre, zoom, st.pos.x.floor() as i32, st.pos.z.floor() as i32);
@@ -599,6 +683,105 @@ fn picture(c: &Client, seed: u64, side: usize, centre: (i32, i32), zoom: i32, ed
         }
     }
     img
+}
+
+// ------------------------------------------------------------------ the creatures seen
+
+/// The creatures seen now, looked for again once `MINI_REPAINT_SECS` passed (the minimap and an
+/// open map share them); none with the setting off.
+fn refresh_marks(c: &Client, now: Instant) -> Vec<(i32, i32, n::Mark)> {
+    let mut s = STATE.lock().unwrap();
+    if !MARKS_ON.get() {
+        s.marks.clear();
+        return Vec::new();
+    }
+    if s.marks_at
+        .is_some_and(|t| now.duration_since(t).as_secs_f32() < n::MINI_REPAINT_SECS)
+    {
+        return s.marks.clone();
+    }
+    s.marks_at = Some(now);
+    drop(s);
+    let marks = creatures(c);
+    STATE.lock().unwrap().marks = marks.clone();
+    marks
+}
+
+/// The creatures the player sees: within `MARK_RADIUS`, their eyes in sight of the player's (no
+/// opaque block the client has between), the nearest `MARK_MAX`. Other players, items and
+/// arrows (no spawn category) aren't marked.
+fn creatures(c: &Client) -> Vec<(i32, i32, n::Mark)> {
+    let view = c.view();
+    let Some(me) = view.player_state() else { return Vec::new() };
+    let mine = view.player();
+    let eye = [me.pos.x, me.pos.y + me.size.eye as f64, me.pos.z];
+    let r2 = n::MARK_RADIUS * n::MARK_RADIUS;
+    // Known, within the radius, marked, in sight: logged when they change, for the runs.
+    let mut counts = [0usize; 4];
+    let mut near: Vec<(f64, [f64; 3], n::Mark)> = Vec::new();
+    for id in c.entities() {
+        let Some(st) = c.entity(id) else { continue };
+        counts[0] += 1;
+        if st.kind == PLAYER.id() {
+            continue;
+        }
+        let at = [st.pos.x, st.pos.y + st.size.eye.max(0.2) as f64, st.pos.z];
+        let d2 = (0..3).map(|k| (at[k] - eye[k]).powi(2)).sum::<f64>();
+        if d2 > r2 {
+            continue;
+        }
+        let category = comps::entity::CATEGORY
+            .on_id(st.kind)
+            .map_or("", |t| t.as_str());
+        // The kind's category is folded into the kind when it is built and may not read back
+        // (PC run mm1122_a: no dots at all): the `hostile` tag the mobs carry decides too, and a
+        // living thing (some health, not an item) is a creature.
+        let hostile = HOSTILE.on_entity(st.kind) || category == "core:hostile";
+        let creature = category == "core:passive" || (st.kind != ITEM.id() && st.health > 0.0 && st.max_health > 0.0);
+        let tame = view.component_of(id, &base_api::TAME_OF) == Some(mine);
+        if let Some(mark) = n::Mark::of(hostile, creature, tame) {
+            near.push((d2, at, mark));
+        }
+        counts[1] += 1;
+    }
+    counts[2] = near.len();
+    near.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut opaque: HashMap<u32, bool> = HashMap::new();
+    let mut out = Vec::new();
+    for (_, at, mark) in near {
+        let seen = n::clear_line(eye, at, |b| {
+            c.block(b).is_some_and(|state| {
+                *opaque
+                    .entry(state)
+                    .or_insert_with(|| block_info(state).is_some_and(|i| i.opaque()))
+            })
+        });
+        if seen {
+            out.push((at[0].floor() as i32, at[2].floor() as i32, mark));
+            if out.len() >= n::MARK_MAX {
+                break;
+            }
+        }
+    }
+    counts[3] = out.len();
+    static LOGGED: Mutex<[usize; 4]> = Mutex::new([0; 4]);
+    let mut last = LOGGED.lock().unwrap();
+    if *last != counts {
+        *last = counts;
+        weft_sdk::info!("map: creatures {} known, {} near, {} marked, {} in sight", counts[0], counts[1], counts[2], counts[3]);
+    }
+    out
+}
+
+/// The dots' places at `zoom` and their kinds, hashed: what the minimap was painted with.
+fn marks_sig(marks: &[(i32, i32, n::Mark)], zoom: i32) -> u64 {
+    let mut h = 0xcbf2_9ce4_8422_2325u64;
+    for &(x, z, m) in marks {
+        for v in [x.div_euclid(zoom) as i64, z.div_euclid(zoom) as i64, m as i64] {
+            h = (h ^ v as u64).wrapping_mul(0x100_0000_01b3);
+        }
+    }
+    h ^ marks.len() as u64
 }
 
 /// The blank parchment's grain at a coarse cell.
@@ -640,9 +823,14 @@ fn screen(ui: &mut Ui) {
                         .tooltip("map.base.zoom_in_tip"),
                     |c| change(c, |s| s.zoom = s.zoom.saturating_sub(1)),
                 );
-                ui.button("map.base.centre", S::default().h(12.0).pad(2.0).tooltip("map.base.centre_tip"), |c| {
-                    change(c, |s| s.pan = (0, 0))
-                });
+                ui.button(
+                    "map.base.centre",
+                    S::default()
+                        .h(12.0)
+                        .pad_xy(5.0, 2.0)
+                        .tooltip("map.base.centre_tip"),
+                    |c| change(c, |s| s.pan = (0, 0)),
+                );
             });
             ui.panel("well", S::column().size(VIEW, VIEW), |ui| {
                 ui.image(IMAGE, VIEW, VIEW);
@@ -685,6 +873,9 @@ fn screen(ui: &mut Ui) {
                 "map.base.known",
                 &[Arg::Int(tiles as i64 * (n::TILE * n::TILE) as i64 / 10_000), Arg::Int(woken.len() as i64)],
             );
+            if MARKS_ON.get() {
+                ui.text_styled(S::default().class("dim").w(SIDE_W), "map.base.creatures", &[Arg::Int(n::MARK_RADIUS as i64)]);
+            }
             if let Some(f) = from {
                 ui.text_styled(S::default().class("title").w(SIDE_W), "map.base.travel_title", &[]);
                 let mut others: Vec<(i64, (i32, i32), ley::Node)> = woken

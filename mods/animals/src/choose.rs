@@ -38,7 +38,12 @@ pub enum Need {
     Watch,
     /// A curious one coming to look at a player standing still (`senses::investigate`).
     Investigate,
+    /// A herd on the dry season's migration, its leader and its members (`migrate::goal`).
+    Migrate,
 }
+
+/// How many needs there are, and so scores (index `Need as usize`, 0 unused).
+const NEEDS: usize = Need::Migrate as usize + 1;
 
 /// The need whose goal took the turn last tick (0: none; not saved).
 static DOING: Component<u8> = Component::named("animal_doing");
@@ -72,42 +77,89 @@ impl Band {
 }
 
 /// How pressing each need is for `id` now, by need (index `Need as usize`).
-fn scores(w: &World, id: u64, doing: u8) -> [f32; 10] {
-    let mut s = [0.0f32; 10];
+fn scores(w: &World, id: u64, doing: u8) -> [f32; NEEDS] {
+    let mut s = [0.0f32; NEEDS];
     let at = |n: Need| doing == n as u8;
     let mut active = 1.0;
+    // A wild hunter hungry enough to hunt (`needs::HUNTS_AT`) bears a chill or the heat: its hunt
+    // comes first, unless the weather would harm it.
+    let mut hunting = false;
     if let Some(a) = w.component(id, &ANIMAL) {
+        hunting = a.species().is_some_and(|s| s.hunts())
+            && (a.food as f32) < a.stat(crate::species::FOOD) * needs::HUNTS_AT
+            && !crate::animal::tamed(w, id);
         // Out of its hours it is sleepy (`animals_core::routines`).
         active = (a.species as usize)
             .checked_sub(1)
             .map_or(1.0, |i| crate::routines::activity(w, i));
         let fed = a.food as f32 / a.stat(crate::species::FOOD).max(1.0);
-        s[Need::Eat as usize] = needs::hunger_score(fed, at(Need::Eat));
+        // A herd member does as its leader does: drinks and grazes with it from more left
+        // (`groups::JOIN_DRINK`, `JOIN_EAT`).
+        let lead = crate::group::leader_doing(w, id);
+        let eat_from = if lead == Some(Need::Eat as u8) { animals_core::groups::JOIN_EAT } else { needs::HUNGRY };
+        s[Need::Eat as usize] = needs::hunger_score_from(fed, eat_from, at(Need::Eat));
+        // Going with the herd pulls harder than the need alone (`groups::JOIN_PULL`).
+        if lead == Some(Need::Eat as u8) && fed < animals_core::groups::JOIN_EAT {
+            s[Need::Eat as usize] = s[Need::Eat as usize].max(animals_core::groups::JOIN_PULL);
+        }
         // A plant eater drinks at dawn and dusk from more water left (`routines::DRINKS_AT`), as
         // its drink goal does.
         let dusk = a.species().is_some_and(|s| s.forages_wild()) && animals_core::routines::drinking_hour(crate::routines::hour(w));
         let start = if dusk { animals_core::routines::DRINKS_AT } else { needs::THIRSTY };
+        let start = if lead == Some(Need::Drink as u8) { start.max(animals_core::groups::JOIN_DRINK) } else { start };
         s[Need::Drink as usize] = needs::thirst_score_from(1.0 - a.thirst, start, at(Need::Drink));
+        if lead == Some(Need::Drink as u8) && 1.0 - a.thirst < animals_core::groups::JOIN_DRINK {
+            s[Need::Drink as usize] = s[Need::Drink as usize].max(animals_core::groups::JOIN_PULL);
+        }
+        // Grazing with its herd doesn't pull it from water it is driven to: thirst past
+        // `memory::DRIVEN` goes first (ai1124_pit8: a deer whose leader grazed ate 80 s at the
+        // pond, 1-4 blocks from it, as its water fell 13 to 9 %, `JOIN_PULL` 0.85 over its thirst): it scores its own hunger.
+        if lead == Some(Need::Eat as u8) && s[Need::Drink as usize] >= animals_core::memory::DRIVEN {
+            s[Need::Eat as usize] = needs::hunger_score(fed, at(Need::Eat));
+        }
     }
     s[Need::Comfort as usize] = match w
         .component(id, &BODY)
         .and_then(|b| FEELINGS.get(b.feel as usize).copied())
     {
         Some(Feeling::Freezing | Feeling::Heatstroke) => SUFFERING,
-        Some(Feeling::Cold | Feeling::Hot) => UNEASY,
+        Some(Feeling::Cold | Feeling::Hot) if !hunting => UNEASY,
         _ => 0.0,
     };
-    s[Need::Love as usize] = LOVE;
-    s[Need::Rest as usize] = REST + animals_core::routines::SLEEPY * (1.0 - active);
+    // In love now it goes to its mate even when sleepy (`needs::IN_LOVE`).
+    s[Need::Love as usize] = if w
+        .component(id, &crate::breeding::BREEDING)
+        .is_some_and(|b| b.love > 0 && b.growing == 0)
+    {
+        needs::IN_LOVE
+    } else {
+        LOVE
+    };
+    // A sleepy rest still gives way to thirst or hunger that drives it (`needs::rest_under`).
+    s[Need::Rest as usize] =
+        needs::rest_under(REST + animals_core::routines::SLEEPY * (1.0 - active), s[Need::Drink as usize].max(s[Need::Eat as usize]));
     s[Need::Wander as usize] = WANDER;
     s[Need::Watch as usize] = animals_core::roles::WATCH;
     s[Need::Investigate as usize] = animals_core::roles::INVESTIGATE;
+    // A herd on the move, its leader and those whose leader is on it, goes on above a daytime rest
+    // (`groups::MIGRATE_PULL`), but a thirsty one drinks first (`groups::migrate_pull`).
+    if crate::migrate::migrating(w, id) || crate::group::leader_doing(w, id) == Some(Need::Migrate as u8) {
+        s[Need::Migrate as usize] = animals_core::groups::migrate_pull(s[Need::Drink as usize]);
+    }
     // Staying put outranks what would move it, and nothing else.
     s[Need::Hold as usize] = s[Need::Comfort as usize]
         .max(s[Need::Drink as usize])
         .max(s[Need::Eat as usize])
         + WANDER;
-    if let Some(v) = s.get_mut(doing as usize).filter(|_| doing != 0) {
+    // A meal held on gives way to thirst past `memory::DRIVEN`: grazing is a mouthful in ten
+    // seconds, a drink fills it in a few, and thirst kills first (ai1124_pit6b: a deer out of a
+    // pit at 16 % food and 13 % water grazed 90 s six blocks from the pond, its water falling to
+    // 9 %, the meal's `KEEP_AT` above its thirst till it was nearly dry).
+    let thirst_breaks_in = doing == Need::Eat as u8 && s[Need::Drink as usize] >= animals_core::memory::DRIVEN;
+    if let Some(v) = s
+        .get_mut(doing as usize)
+        .filter(|_| doing != 0 && !thirst_breaks_in)
+    {
         *v *= KEEP_AT;
     }
     s
@@ -118,7 +170,7 @@ impl Goal for Band {
         let doing = w.component(id, &DOING).unwrap_or(0);
         let s = scores(w, id, doing);
         // Most pressing first; a tie keeps the list's order.
-        let mut order: [usize; 10] = std::array::from_fn(|i| i);
+        let mut order: [usize; NEEDS] = std::array::from_fn(|i| i);
         let order = &mut order[..self.goals.len()];
         order.sort_by(|&a, &b| s[self.goals[b].0 as usize].total_cmp(&s[self.goals[a].0 as usize]));
         let mut took = 0u8;

@@ -27,6 +27,9 @@ pub static OFFERING: Item = Item::named("forest_offering");
 pub static HEARTSEED: Item = Item::named("warden_heartseed");
 pub static ANTLER: Item = Item::named("warden_antler");
 pub static BARK: Item = Item::named("warden_bark");
+/// Its Iron form's offering and the Iron Age key's part it drops (11-23, `animals_core::bosses`).
+pub static IRON_OFFERING: Item = Item::named("heartwood_offering");
+pub static HEARTWOOD: Item = Item::named("warden_heartwood");
 
 static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
 static BUILDING: CreativeTab = CreativeTab::named("base:building");
@@ -75,8 +78,12 @@ pub fn init(r: &mut Registry) {
     r.item(&HEARTSEED).tab(&INGREDIENTS);
     r.item(&ANTLER).tab(&INGREDIENTS);
     r.item(&BARK).tab(&INGREDIENTS);
+    r.item(&IRON_OFFERING).tab(&INGREDIENTS);
+    r.item(&HEARTWOOD).tab(&INGREDIENTS);
     // The forest's offerings: what an old wood gives.
     r.shapeless(&CRAFTING, "forest_offering", 1, &["base:acorn", "base:mushroom_red", "base:berries", "base:moss_block"], 0);
+    // The Iron form's: the forest offering bound with iron and its own bark (a player who beat it).
+    r.shapeless(&CRAFTING, "heartwood_offering", 1, &["animals:forest_offering", "base:iron_ingot", "animals:warden_bark"], 0);
     r.block(&ALTAR)
         .texture("drenkaun_altar_side")
         .top("drenkaun_altar_top")

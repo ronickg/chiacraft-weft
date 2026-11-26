@@ -81,6 +81,9 @@ const TABLE: &[(&str, f64, f64, f64)] = &[
     // at 1280x720, scaled by the pixels). Only while path tracing runs; nothing without it, which a
     // player's own measuring shows.
     ("pt_denoiser", 1.0, 1.1, f64::NAN),
+    // The mist's banks walked per pixel (11-24): an estimate until the PC's bench at Max, 16 steps
+    // a pixel each with a noise, a ground-map read and the shadow maps' taps, where there is mist.
+    ("mist_banks", 1.0, 0.4, f64::NAN),
 ];
 
 /// The 5090 at 1920x1080 against this machine: the pixels the world is drawn at, and how much
@@ -172,6 +175,38 @@ fn estimate(window: [u32; 2], key: &str, value: f64) -> Option<f64> {
 
 /// What `key` at `value` costs over its cheapest here: measured, else estimated.
 pub fn cost(window: [u32; 2], key: &str, value: f64) -> Cost {
+    // A feature's row (`video.rs`' `FEATURES`): its parts' costs at that step over its Low step's,
+    // measured when every part was.
+    if let Some(low) = crate::video::feature_parts(key, 0) {
+        let Some(at) = (value >= 0.0)
+            .then(|| crate::video::feature_parts(key, value as usize))
+            .flatten()
+        else {
+            return Cost::None;
+        };
+        let (mut ms, mut all_measured, mut any) = (0.0, true, false);
+        for (parts, sign) in [(at, 1.0), (low, -1.0)] {
+            for (k, v) in parts {
+                match cost(window, k, v) {
+                    Cost::Measured(m) => {
+                        ms += sign * m;
+                        any = true;
+                    }
+                    Cost::Estimate(m) => {
+                        ms += sign * m;
+                        any = true;
+                        all_measured = false;
+                    }
+                    Cost::None => {}
+                }
+            }
+        }
+        return match (any, all_measured) {
+            (false, _) => Cost::None,
+            (true, true) => Cost::Measured(ms.max(0.0)),
+            (true, false) => Cost::Estimate(ms.max(0.0)),
+        };
+    }
     if let Some(ms) = measured(window, key, value) {
         return Cost::Measured(ms);
     }
@@ -407,7 +442,7 @@ pub fn top_line(ui: &mut Ui, screen: &'static Menu, rows: fn() -> Vec<Measured>,
                 _ => t.set("video.base.cost.now", &[Arg::Text(&gpu), Arg::Text(&fps), Arg::Text(&frame)]),
             }
         });
-        ui.button("video.base.cost.measure", S::default().h(12.0).pad(2.0), move |_| {
+        ui.button("video.base.cost.measure", S::default().h(12.0).pad_xy(5.0, 2.0), move |_| {
             start(rows(), window());
         });
         ui.text_bind_styled(S::default().class("dim").max_w(120.0), move |_, t| match progress() {
@@ -422,11 +457,11 @@ pub fn top_line(ui: &mut Ui, screen: &'static Menu, rows: fn() -> Vec<Measured>,
     if !OFFERED.get() {
         ui.row(S::row().gap(3.0).center(), move |ui| {
             ui.text_styled(S::default().class("dim").max_w(250.0), "video.base.cost.offer", &[]);
-            ui.button("video.base.cost.measure_now", S::default().h(12.0).pad(2.0), move |c| {
+            ui.button("video.base.cost.measure_now", S::default().h(12.0).pad_xy(5.0, 2.0), move |c| {
                 start(rows(), window());
                 c.client().menu_open(screen);
             });
-            ui.button("video.base.cost.not_now", S::default().h(12.0).pad(2.0), move |c| {
+            ui.button("video.base.cost.not_now", S::default().h(12.0).pad_xy(5.0, 2.0), move |c| {
                 OFFERED.set(true);
                 c.client().menu_open(screen);
             });
@@ -436,7 +471,7 @@ pub fn top_line(ui: &mut Ui, screen: &'static Menu, rows: fn() -> Vec<Measured>,
 
 pub fn register(r: &mut Registry, all: fn(Tab) -> Vec<Measured>) {
     r.text_config(&COSTS, "");
-    r.config(&OFFERED).bool(false);
+    crate::developer::video(r.config(&OFFERED).bool(false));
     r.client_frame(frame);
     // For a script or a curious player: `/videocosts video|extra|fantasy|dlss|all`, the
     // costs in the log (`video cost: <key> <value> <ms>`).
@@ -457,5 +492,6 @@ pub fn register(r: &mut Registry, all: fn(Tab) -> Vec<Measured>) {
         let secs = sweep_secs(&rows).ceil() as i64;
         start(rows, window());
         cmd.reply("video.base.cost.started", &[Arg::Int(secs)]);
-    });
+    })
+    .permission(permission::EVERYONE);
 }

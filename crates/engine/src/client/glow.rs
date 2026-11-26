@@ -56,6 +56,15 @@ pub struct Glow {
     pub cubes: FxHashSet<IVec3>,
     /// A cube it reaches (or could, once loaded) changed: filled out again though no source moved.
     stale: bool,
+    /// Counts changes to `sources` (the path tracer's light table takes them).
+    pub epoch: u64,
+}
+
+impl Glow {
+    /// The sources drawn: the cell each is in and its light.
+    pub fn sources(&self) -> &[(IVec3, [u8; 3])] {
+        &self.sources
+    }
 }
 
 impl Glow {
@@ -107,6 +116,7 @@ impl ClientWorld {
         self.glow.cubes = lit.keys().map(|p| cube_of(*p)).collect();
         self.glow.cells = lit;
         self.glow.sources = cells;
+        self.glow.epoch += 1;
         self.relit(changed.into_iter().collect());
     }
 

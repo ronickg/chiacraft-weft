@@ -313,6 +313,17 @@ impl Species {
     pub fn eats(&self, c: Category) -> bool {
         self.eats.iter().any(|&(k, _)| k == c)
     }
+    /// How full a food fills it: its share of the diet against its main food's (1 for the main
+    /// food). A top-up food is eaten only below this: insects, a tenth of a coyote's diet, fill a
+    /// coyote to a sixth (cov_hunters: one grazed insects from 28 to 90 % and never hunted; real
+    /// coyotes live on rodents and deer, insects a summer extra: Bekoff and Gese 2003).
+    pub fn fills_to(&self, c: Category) -> f32 {
+        let most = self.eats.iter().map(|&(_, p)| p).fold(0.0f32, f32::max);
+        self.eats
+            .iter()
+            .find(|&&(k, _)| k == c)
+            .map_or(0.0, |&(_, p)| if most > 0.0 { p / most } else { 1.0 })
+    }
     /// Whether a wild one gets hungry and forages (`notes/ECOLOGY.md`, part 5): mostly a plant
     /// eater, whose food the world grows.
     pub fn forages_wild(&self) -> bool {
@@ -404,7 +415,7 @@ impl Species {
     }
     /// Whether it lives on the dead: half its diet or more carrion (the vulture). It gets hungry in
     /// the wild, smells carrion from afar (`needs::SCENT`), takes a carcass's meat as carrion and
-    /// rotten flesh without harm, and never starves in the wild (`needs::STARVES_SECS`).
+    /// rotten flesh without harm, and never starves in the wild (`needs::FAST_DAYS`).
     pub fn scavenges(&self) -> bool {
         self.eats
             .iter()
@@ -456,7 +467,10 @@ impl Species {
         if !self.hunts() {
             return stocked;
         }
-        hunter_room_cached(self.name, biome).map_or(stocked, |room| room.clamp(1, stocked))
+        // An omnivore that forages (Citipati) eats more plants where prey is short: its prey's
+        // room never leaves it under a pair.
+        let least = if self.forages_wild() { 2 } else { 1 };
+        hunter_room_cached(self.name, biome).map_or(stocked, |room| room.clamp(least, stocked))
     }
     /// Its crowd in `biome` by the biome's stocking alone (a plant eater's; others' as they are).
     pub fn stocked_in(&self, biome: &str) -> u32 {

@@ -1,0 +1,358 @@
+# Animal AI coverage, hunters other than wolves. Each part: hungry hunters (30 % food, `/animalprof hunters 0.3`) and
+# fed prey (90 %) on a pad. Expected per hunter: "hunts" (whom, a pack of N), stalking ("breaks cover and charges" for
+# ambushers) or a chase, then a kill ("eats N's kill", each pack member's share) or "gives up on"; prey "runs from".
+# The last two parts' ponds are 5 x 5 and 2 deep for the crocodiles. Report per hunter: hunts, stalk/ambush, chase, kill, share,
+# gives up (each with its log line or none); the shot.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 86 528 16 110 560 core:air
+chat /tk fill -16 111 528 16 140 560 core:air
+chat /tk fill -16 70 561 16 100 576 core:air
+chat /time set 6000
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /tk spawn animals:jaguar 10 70 532
+chat /tk spawn animals:white_tailed_deer -8 70 550
+chat /tk spawn animals:white_tailed_deer -6 70 550
+chat /tk spawn animals:white_tailed_deer -4 70 550
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /animalprof hunters 0.3
+chat /tp 0 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tick freeze
+chat /tp 0 82 558
+look 0 -38
+wait 2
+shot cov_hunters_1_jaguar.png
+chat /tick unfreeze
+wait 1
+chat /tp 200 90 544
+wait 4
+chat /tk fill 184 60 528 216 68 560 base:dirt
+chat /tk fill 184 69 528 216 69 560 base:grass
+chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 86 528 216 110 560 core:air
+chat /tk fill 184 111 528 216 140 560 core:air
+chat /tk fill 184 70 561 216 100 576 core:air
+chat /time set 6000
+chat /tk fill 199 69 543 201 69 545 base:water
+chat /tk fill 199 70 543 201 70 545 core:air
+wait 1
+chat /tk spawn animals:coyote 210 70 532
+chat /tk spawn animals:coyote 212 70 532
+chat /tk spawn animals:hare 192 70 550
+chat /tk spawn animals:hare 194 70 550
+chat /tk spawn animals:hare 196 70 550
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /animalprof hunters 0.3
+chat /tp 200 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tick freeze
+chat /tp 200 82 558
+look 0 -38
+wait 2
+shot cov_hunters_2_coyote.png
+chat /tick unfreeze
+wait 1
+chat /tp 400 90 544
+wait 4
+chat /tk fill 384 60 528 416 68 560 base:dirt
+chat /tk fill 384 69 528 416 69 560 base:grass
+chat /tk fill 384 70 528 416 85 560 core:air
+chat /tk fill 384 86 528 416 110 560 core:air
+chat /tk fill 384 111 528 416 140 560 core:air
+chat /tk fill 384 70 561 416 100 576 core:air
+chat /time set 6000
+chat /tk fill 399 69 543 401 69 545 base:water
+chat /tk fill 399 70 543 401 70 545 core:air
+wait 1
+chat /tk spawn animals:red_fox 410 70 532
+chat /tk spawn animals:arctic_fox 412 70 534
+chat /tk spawn animals:wood_mouse 392 70 550
+chat /tk spawn animals:wood_mouse 394 70 550
+chat /tk spawn animals:wood_mouse 396 70 550
+chat /tk spawn animals:field_vole 398 70 552
+chat /tk spawn animals:field_vole 400 70 552
+chat /tk spawn animals:field_vole 402 70 552
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /animalprof hunters 0.3
+chat /tp 400 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tick freeze
+chat /tp 400 82 558
+look 0 -38
+wait 2
+shot cov_hunters_3_red_fox.png
+chat /tick unfreeze
+wait 1
+chat /tp 600 90 544
+wait 4
+chat /tk fill 584 60 528 616 68 560 base:dirt
+chat /tk fill 584 69 528 616 69 560 base:grass
+chat /tk fill 584 70 528 616 85 560 core:air
+chat /tk fill 584 86 528 616 110 560 core:air
+chat /tk fill 584 111 528 616 140 560 core:air
+chat /tk fill 584 70 561 616 100 576 core:air
+chat /time set 6000
+chat /tk fill 599 69 543 601 69 545 base:water
+chat /tk fill 599 70 543 601 70 545 core:air
+wait 1
+chat /tk spawn animals:raptor 610 70 532
+chat /tk spawn animals:velociraptor_osmolskae 612 70 534
+chat /tk spawn animals:kryptobaatar 592 70 550
+chat /tk spawn animals:kryptobaatar 594 70 550
+chat /tk spawn animals:kryptobaatar 596 70 550
+chat /tk spawn animals:priscagama 598 70 552
+chat /tk spawn animals:priscagama 600 70 552
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /animalprof hunters 0.3
+chat /tp 600 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tick freeze
+chat /tp 600 82 558
+look 0 -38
+wait 2
+shot cov_hunters_4_raptor.png
+chat /tick unfreeze
+wait 1
+chat /tp 800 90 544
+wait 4
+chat /tk fill 784 60 528 816 68 560 base:dirt
+chat /tk fill 784 69 528 816 69 560 base:grass
+chat /tk fill 784 70 528 816 85 560 core:air
+chat /tk fill 784 86 528 816 110 560 core:air
+chat /tk fill 784 111 528 816 140 560 core:air
+chat /tk fill 784 70 561 816 100 576 core:air
+chat /time set 6000
+chat /tk fill 799 69 543 801 69 545 base:water
+chat /tk fill 799 70 543 801 70 545 core:air
+wait 1
+chat /tk spawn animals:utahraptor 808 70 532
+chat /tk spawn animals:utahraptor 810 70 532
+chat /tk spawn animals:utahraptor 812 70 532
+chat /tk spawn animals:psittacosaurus 792 70 550
+chat /tk spawn animals:psittacosaurus 794 70 550
+chat /tk spawn animals:psittacosaurus 796 70 550
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /animalprof hunters 0.3
+chat /tp 800 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tick freeze
+chat /tp 800 82 558
+look 0 -38
+wait 2
+shot cov_hunters_5_utahraptor.png
+chat /tick unfreeze
+wait 1
+chat /tp 1000 90 544
+wait 4
+chat /tk fill 984 60 528 1016 68 560 base:dirt
+chat /tk fill 984 69 528 1016 69 560 base:grass
+chat /tk fill 984 70 528 1016 85 560 core:air
+chat /tk fill 984 86 528 1016 110 560 core:air
+chat /tk fill 984 111 528 1016 140 560 core:air
+chat /tk fill 984 70 561 1016 100 576 core:air
+chat /time set 6000
+chat /tk fill 998 68 542 1002 69 546 base:water
+chat /tk fill 998 70 542 1002 70 546 core:air
+wait 1
+chat /tk spawn animals:crocodyliform 1002 70 544
+chat /tk spawn animals:capybara 992 70 550
+chat /tk spawn animals:capybara 994 70 550
+chat /tk spawn animals:capybara 996 70 550
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /animalprof hunters 0.3
+chat /tp 1000 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tick freeze
+chat /tp 1000 82 558
+look 0 -38
+wait 2
+shot cov_hunters_6_crocodyliform.png
+chat /tick unfreeze
+wait 1
+chat /tp 1200 90 544
+wait 4
+chat /tk fill 1184 60 528 1216 68 560 base:dirt
+chat /tk fill 1184 69 528 1216 69 560 base:grass
+chat /tk fill 1184 70 528 1216 85 560 core:air
+chat /tk fill 1184 86 528 1216 110 560 core:air
+chat /tk fill 1184 111 528 1216 140 560 core:air
+chat /tk fill 1184 70 561 1216 100 576 core:air
+chat /time set 6000
+chat /tk fill 1198 68 542 1202 69 546 base:water
+chat /tk fill 1198 70 542 1202 70 546 core:air
+wait 1
+chat /tk spawn animals:yacare_caiman 1198 70 544
+chat /tk spawn animals:spectacled_caiman 1202 70 546
+chat /tk spawn animals:pacu 1198 68 542
+chat /tk spawn animals:pacu 1200 68 542
+chat /tk spawn animals:hare 1192 70 550
+chat /tk spawn animals:hare 1194 70 550
+chat /tk spawn animals:hare 1196 70 550
+wait 2
+chat /animalprof food 0.9
+chat /animalprof water 0.9
+chat /animalprof hunters 0.3
+chat /tp 1200 72 544
+chat /animal hurry
+wait 2
+chat /time set 18000
+chat /tp 1200 95 574
+wait 1
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /animalprof where 64
+wait 10
+chat /tk fill 1190 70 534 1190 70 534 base:glowstone
+chat /tk fill 1200 70 532 1200 70 532 base:glowstone
+chat /tk fill 1210 70 534 1210 70 534 base:glowstone
+chat /tk fill 1188 70 544 1188 70 544 base:glowstone
+chat /tk fill 1212 70 544 1212 70 544 base:glowstone
+chat /tk fill 1190 70 554 1190 70 554 base:glowstone
+chat /tk fill 1200 70 556 1200 70 556 base:glowstone
+chat /tk fill 1210 70 554 1210 70 554 base:glowstone
+chat /tick freeze
+chat /tp 1200 82 558
+look 0 -38
+wait 2
+shot cov_hunters_7_yacare_caiman.png
+chat /tick unfreeze
+wait 1
+quit

@@ -202,16 +202,20 @@ impl Running {
         self.input.key_up(k);
         self.input.key_down(k);
         let until = Instant::now() + Duration::from_secs_f32(secs.max(0.05));
-        self.mod_held.retain(|(h, _)| *h != k);
-        self.mod_held.push((k, until));
+        self.mod_held.retain(|(h, _, _)| *h != k);
+        // Down through the next frame's start at least: a mod whose frame hook runs before the
+        // one that pressed it (base's `on_client` keys, by the edge of held) sees it then. Let go
+        // by time alone, a frame longer than the hold (CI, software Vulkan) never showed it them.
+        self.mod_held.push((k, until, self.frame_no + 1));
     }
 
     /// Releases keys mods held down once their time is up.
     pub(super) fn release_mod_keys(&mut self) {
         let now = Instant::now();
+        let frame = self.frame_no;
         let input = &mut self.input;
-        self.mod_held.retain(|(k, at)| {
-            if now >= *at {
+        self.mod_held.retain(|(k, at, through)| {
+            if now >= *at && frame > *through {
                 input.key_up(*k);
                 false
             } else {
@@ -647,6 +651,31 @@ pub unsafe extern "C" fn client_menu(c: *mut abi::ClientCtx, out: *mut abi::Open
             }
             None => 0,
         }
+    }
+}
+
+pub unsafe extern "C" fn client_menu_group(c: *mut abi::ClientCtx, name: Str, out: *mut abi::SlotGroup) -> u32 {
+    unsafe {
+        let Some(m) = client(c).and_then(|cl| cl.menu.as_ref()) else { return 0 };
+        let game = &crate::content::content().game;
+        let Some((group, start, len)) = game.menus[m.kind as usize].group(&game.player_layout, name.as_str()) else { return 0 };
+        *out = abi::SlotGroup { start, len, cols: group.span(&game.player_layout).2 };
+        1
+    }
+}
+
+pub unsafe extern "C" fn client_menu_move(c: *mut abi::ClientCtx, window: u32, moves: abi::Slice<abi::ItemMove<u32>>) -> u32 {
+    if moves.len == 0 || moves.len > abi::MAX_ITEM_MOVES {
+        return 0;
+    }
+    unsafe {
+        let Some(g) = run(c).and_then(|r| r.game.as_mut()) else { return 0 };
+        if !g.client.menu.as_ref().is_some_and(|m| m.window == window) {
+            return 0;
+        }
+        g.client
+            .send(crate::net::ToServer::MenuMove { window, moves: moves.as_slice().to_vec() });
+        1
     }
 }
 

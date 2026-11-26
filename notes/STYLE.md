@@ -47,6 +47,54 @@ and fire. Nights are dark by design, and torches light the way (Ronald, 11-04: h
 to carry a torch, which lights the ground about them as they move). So the night is not
 brightened; a held torch, lantern or campfire is the light, warm with a slight flicker.
 
+### The look is always on (Ronald, 11-24)
+
+"something I want the shader and bliss, whatever, like shadows, everything, it should be actually
+like on by default. You'll just have different like settings, for how strong it is, etc. But I
+don't want it to be off by default. Like our game will just look like this."
+
+So a fresh install starts with the chiacraft pack, the Bliss look, the shadows and the look's
+effects on. The presets and the Video rows set how strong or how detailed each part is, never
+whether it is there. "Off" is a default nowhere (a player may still pick it in a row).
+
+The Bliss match switch goes: its fitted values (`look.rs` `BLISS_MATCH`) become the knobs' as-made
+values, so the game looks like that with nothing chosen; each knob keeps its own Extra row.
+
+What each preset sets (the pack side; `mods/base/src/video.rs` wires it). "1" is a part's low form
+(fewer steps, lower resolution), "2" its full one.
+
+| part | setting | Phone | Low | Medium | High | Ultra | Max |
+|---|---|---|---|---|---|---|---|
+| the pack | `core:shader_pack` | chiacraft | chiacraft | chiacraft | chiacraft | chiacraft | chiacraft |
+| the Bliss look (21 knobs) | `BLISS_MATCH` values | on | on | on | on | on | on |
+| sun shadows | `core:shadows` / `shadow_size` | 1 / 1024 | 1 / 1024 | 1 / 1024 | 2 / 2048 | 2 / 4096 | 2 / 4096, traced where the GPU can |
+| shadows' reach (blocks) | `base:look_shadow_reach` | 64 | 64 | 96 | 128 | 128 | 128 |
+| HDR world (the look's light and tone) | `core:hdr_world` | on | on | on | on | on | on |
+| reflections | `base:fx_reflect` | 1 | 1 | 1 | 2 | 2 | 2 |
+| contact shadows | `base:fx_contact` | 1 | 1 | 1 | 1 | 2 | 2 |
+| light in the air | `base:fx_volume`, `core:froxels` | 1, 1 | 1, 1 | 1, 1 | 2, 2 | 2, 2 | 2, 2 |
+| light shafts | `base:fx_shafts` | 1 | 1 | 1 | 1 | 2 | 2 |
+| bloom | `base:fx_bloom` | 1 | 1 | 1 | 1 | 1 | 1 |
+| far shade from the sky | `base:fx_far_ao` | 1 | 1 | 1 | 2 | 2 | 2 |
+| soft clouds and their shadows | `core:soft_clouds`, `core:cloud_shadows` | on | on | on | on | on | on |
+| mist banks | `base:look_mist_domes`, `core:ground_map` | on (low march) | on (low march) | on (low march) | on | on | on |
+| leaves' holes | `base:look_leaf_holes` | 1 | 1 | 1 | 1 | 1 | 1 |
+
+Render scale, view and distant terrain stay as the presets have them: they set detail, not the look.
+
+Still to build or measure before the low end can carry it: the mist banks' low march (the
+half-resolution march, parked 11-24), and the cost on Phone and Low of the HDR world, the 1024 map
+and the low effects (one bench each, on the Pixel and a low Mac preset). Until a part's low form
+exists, Low and Phone run its full form, not none.
+
+The land's light as made (11-24, against Bliss's auto-exposed matrix refs): auto exposure on,
+exposure in Bliss's units (`base:look_exposure_abs` 1), bloom added on top (`base:look_bloom_add`
+1), the sky's fill at 1.0 (`base:look_fill`). With those the cave, arch, overhang, forest and noon
+vista sit within about 10 luma of Bliss's in the shade and the light (PC lkauto1; sheets in the
+archive's `tester-2/2026-11-24/live/matrix/`). Compare mode pins the exposure, which Bliss's refs do
+not: compare with `base:look_auto_exposure 1`. Left: the hue. Our shade on stone reads blue-grey
+where Bliss's is a warm grey, and our sunlit dirt and grass are more saturated.
+
 ## The HUD and screens: the style brief
 
 Ronald's reference sheets (`notes/ui-reference/`, eight sheets: panels and frames, inventory
@@ -142,8 +190,9 @@ draws them.
 | Small icons | `icon_close`, `icon_cycle`, `icon_settings`, LEDs | 16x16, 6x6 |
 | Title bar grip, background behind screens | `titlebar_grip`, `background`, `overlay` | 16x6, tiled |
 
-**Main menu**: `logo`, menu icons (`menu_singleplayer`, `menu_multiplayer`, `menu_settings`,
-`menu_mods`, 9x9), the news panel, the background.
+**Main menu**: `logo`, menu icons (`menu_singleplayer`, `menu_multiplayer`, `menu_mods`,
+`menu_settings`, `menu_quit`, `menu_editor`: 16x16, drawn at 2x beside the 2x labels; style 1,
+11-24), the news panel, the background.
 
 **The animals' own** (later, to match): the animal screen (stats, wild and tamed points, bond,
 food), taming bars and bubbles, the spyglass view, the breeding and egg readouts.

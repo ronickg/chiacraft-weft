@@ -117,6 +117,8 @@ Harvest, uses and speed are a working part's at Sound, from its material's level
   - stave `short_stave`: 280 cm³, stat ×1, speed ×1.15, damage ×0.85, reach +0
   - grip `grip`: 40 cm³, stat ×1, speed ×1, damage ×1, reach +0
   - string `bowstring`: 2 cm³, stat ×1, speed ×1, damage ×1, reach +0
+- **arrow** (Shoot, damage 0): head (Working)
+  - head `arrowhead`: 2 cm³, stat ×1, speed ×1, damage ×1, reach +0
 - **helmet** (Guard, damage 0): shell (Working), fastening (Fitting), lining (Lining)
   - shell `helmet_shell`: 300 cm³, stat ×1, speed ×1, damage ×1, reach +0
   - fastening `straps`: 10 cm³, stat ×1, speed ×1, damage ×1, reach +0

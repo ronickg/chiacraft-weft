@@ -127,10 +127,29 @@ The game's icons are 32 × 32 (the "A2" set, merged 2026-11-03). Earlier ways, k
 sheets of 16 items cut and shrunk smoothly to 48 × 48 (`gen_items.sh`, `items_style.txt`,
 `icons.py`), and the item lab's prompt rounds (`notes/ui-codex/lab/`, where the exact grid with
 its guide image won). Don't "clean" generated pixel art (grid guessing, palette cuts): it mangled
-the icons. Items stay flat pictures, as in Minecraft; 3D held models are set aside
+the icons (the one cleanup kept is `pixfix`, orphan speckle and the outline, which
+`art.py` runs on every item cut since 11-22). Items stay flat pictures, as in Minecraft; 3D held models are set aside
 (`mods/base/source/items/`).
 
+**A part made in many materials** (approved by Ronald 11-23, the arrowheads: "arrows lgtm"):
+generate one drawing per family whose members share a shape (knapped stone, bone, forged metal,
+gem), turn it into a shade map (red = ramp step × 36, what `stack_look` reads), and paint it with
+each member's ramp in code; a family's map uses only the steps that rise in every member's ramp.
+Where a member's ramp makes it read as something else (wrought iron's beige read as bone, chert
+was flint's twin, a grey obsidian read as flint), give that member its own 8 colours in the
+painting rather than changing the shared ramp. The same part smaller (an arrow's head, 8 px) is the
+loose drawing shrunk in code, edge pixels its darkest shade; generating it small gave 5 px smudges.
+Worked example: `chiacraft-archive/images/art/2026-11-23/arrowheads/process.py`.
+
 ## UI parts (the kit)
+
+**Screens, not just parts: spacing and type scale.** Before a UI sheet goes to Ronald, check every
+screen against the UI guide's "Spacing and type scale" (`guides/6 UI/UI Style Guide.md`, Ronald
+11-24: "shouldn't there be some more like padding and stuff? ... compare to like other UIs like
+Valheim"): content 10 GUI inside a menu window's rail and 7.5 inside a game window's, even on all
+four sides; about 8 from a heading to its content; groups 8-12 apart; three text sizes (title 3x,
+label 2x, body 1x), a label the size of the buttons beside it; tabs in one row on the frame; corner
+icons inside the margin. Measure these in the shot at full size; they were the review's findings.
 
 UI parts come from the master prompt below, run through Codex (`notes/ui-codex/gen.sh NAME
 request.txt`, which attaches `approved_parts.png` and Ronald's two mockups,

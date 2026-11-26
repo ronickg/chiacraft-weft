@@ -1215,17 +1215,31 @@ mod tests {
     fn taking_and_refunding() {
         let mut t: Taken = [0; WORDS];
         let low = [0; COUNT];
+        // From the start the road runs through the group's gate (and a junction where regions
+        // share one) to the island's entry (the islands web, 11-05).
+        let gate = gate_id(Skill::Melee.group());
         let entry = id(Skill::Melee, 0);
-        assert_eq!(can_take(&t, id(Skill::Melee, 1), &low, 5), Err(Refusal::NotNextTo));
-        assert_eq!(can_take(&t, entry, &low, 0), Err(Refusal::NoPoints));
+        assert_eq!(can_take(&t, entry, &low, 5), Err(Refusal::NotNextTo));
+        assert_eq!(can_take(&t, gate, &low, 0), Err(Refusal::NoPoints));
+        assert!(can_take(&t, gate, &low, 1).is_ok());
+        set(&mut t, gate, true);
+        let road: Vec<u16> = web()
+            .next_to(entry)
+            .iter()
+            .copied()
+            .filter(|&o| o >= JUNCTION_FROM && web().next_to(o).contains(&gate))
+            .collect();
+        for &j in &road {
+            set(&mut t, j, true);
+        }
         assert!(can_take(&t, entry, &low, 1).is_ok());
         set(&mut t, entry, true);
         set(&mut t, id(Skill::Melee, 1), true);
         set(&mut t, id(Skill::Melee, 3), true);
         assert_eq!(can_take(&t, id(Skill::Melee, 5), &low, 1), Err(Refusal::Skill));
-        assert!(!can_refund(&t, entry));
+        assert!(!can_refund(&t, entry) && !can_refund(&t, gate));
         assert!(can_refund(&t, id(Skill::Melee, 3)));
         assert!((times(&t, Family::MeleeDamage) - 1.06).abs() < 1e-5);
-        assert_eq!(count(&t), 3);
+        assert_eq!(count(&t), 4 + road.len() as u32);
     }
 }

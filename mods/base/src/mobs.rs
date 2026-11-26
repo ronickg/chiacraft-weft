@@ -7,10 +7,38 @@ use base_api::entities::*;
 use base_api::items::{ARROW as ARROW_ITEM, BOW, EGG};
 /// Ticks of whatever a mob counts: a skeleton's reload, a chicken's next egg.
 static FUSE: Component<u32> = Component::named("fuse");
+/// A player's arrow on the curve (`vitals::gear::arrow_hit`): its hit at full draw (the bow's
+/// times and the web's ranged damage in it), its item level (what an over-tier cap reads) and who
+/// shot it. A skeleton's arrow has none: it hits for its row's hit (below).
+static ARROW_SHOT: Component<[f64; 3]> = Component::named("arrow_shot");
+/// A full draw's speed, blocks a tick (vanilla's 3): an arrow hits by its speed over this.
+const FULL_SPEED: f64 = 3.0;
 /// Ours: vanilla's creeper (upstream removed it).
 pub static CREEPER: EntityKind = EntityKind::named("creeper");
 
 use base_api::entities::COW;
+
+/// The mobs `vitals::mobs` gives numbers, by their row's name.
+static MOB_KINDS: [(&EntityKind, &str); 4] = [(&ZOMBIE, "zombie"), (&SPIDER, "spider"), (&SKELETON, "skeleton"), (&CREEPER, "creeper")];
+
+/// "player", or a mob's row name, for the night checks' log lines.
+fn fighter(w: &World, id: u64) -> Option<&'static str> {
+    if w.players_iter().any(|p| p == id) {
+        return Some("player");
+    }
+    let kind = w.entity(id)?.kind;
+    MOB_KINDS
+        .iter()
+        .find(|(k, _)| k.id() == kind)
+        .map(|(_, n)| *n)
+}
+
+/// A mob's numbers on the curve (`vitals::mobs`).
+fn curve(name: &str) -> vitals::combat::Stats {
+    vitals::mobs::mob(name)
+        .map(|m| m.stats())
+        .expect("a row in vitals::mobs")
+}
 
 pub fn register(r: &mut Registry) {
     // The engine's player kind, drawn as the same humanoid as the zombie.
@@ -27,11 +55,13 @@ pub fn register(r: &mut Registry) {
         .sound("hurt")
         .sound("death")
         .size(0.6, 1.95)
-        .max_health(20.0)
+        .max_health(curve("zombie").health)
         .walk_speed(2.6)
         .hostile()
         .burns_in_sun()
-        .attack_damage(3.0)
+        .attack_damage(curve("zombie").hit)
+        // Its band's seconds between hits (`vitals::combat::Band::interval`).
+        .attack_speed(1.0 / curve("zombie").interval)
         .reach(1.3)
         .goals(hostile(ai::Goals::new().aggressive(35.0)));
     r.entity(&SPIDER)
@@ -41,10 +71,12 @@ pub fn register(r: &mut Registry) {
         .sound("hurt")
         .sound("death")
         .size(1.3, 0.9)
-        .max_health(16.0)
+        .max_health(curve("spider").health)
         .walk_speed(3.6)
         .hostile()
-        .attack_damage(2.0)
+        .attack_damage(curve("spider").hit)
+        // Its band's seconds between hits (`vitals::combat::Band::interval`).
+        .attack_speed(1.0 / curve("spider").interval)
         // Vanilla's reach goes by a mob's width: a body this wide stops further off.
         .reach(2.4)
         // In daylight it only fights back.
@@ -54,6 +86,90 @@ pub fn register(r: &mut Registry) {
                 .neutral(),
         ));
     r.entity_component(&FUSE, 0u32, 0);
+    r.entity_component(&ARROW_SHOT, [0.0; 3], 0);
+    r.edit(&ARROW).attach(&ARROW_SHOT);
+    // A skeleton's arrow hits for its row's hit (`vitals::mobs`), not by its speed: set first, so
+    // armour and the rest still apply.
+    r.modify(&chain::DAMAGE, &phase::BASE, |m| {
+        let q = *m.query();
+        if q.cause != damage_cause::PROJECTILE {
+            return;
+        }
+        if m.world()
+            .entity(q.other)
+            .is_some_and(|e| e.kind == SKELETON.id())
+        {
+            // In the head, half as much again, as every arrow (`PROJECTILE_DAMAGE` above).
+            let head = if q.part == hitbox_part::HEAD { 2.0 } else { 1.0 };
+            m.value = curve("skeleton").hit as f64 * head;
+        }
+    });
+    // One line per hit between a player and a mob, and per death of either (night checks:
+    // `mods/testkit/scripts/night_survival.txt`).
+    r.on_event(&actions::HURT, |b| {
+        let w = b.world();
+        for h in b.iter() {
+            let (Some(target), Some(by)) = (fighter(&w, h.entity), fighter(&w, h.source)) else { continue };
+            if (target == "player") == (by == "player") {
+                continue;
+            }
+            let (health, max) = w
+                .entity(h.entity)
+                .map_or((0.0, 0.0), |e| (e.health, e.max_health));
+            weft_sdk::info!(
+                "mob_fight: {by} {} hit {target} {} for {:.2} (cause {}), health {health:.1}/{max:.1}",
+                h.source,
+                h.entity,
+                h.amount,
+                h.cause
+            );
+        }
+    });
+    r.on_event(&actions::DIE, |b| {
+        let w = b.world();
+        for d in b.iter() {
+            let who = if w.players_iter().any(|p| p == d.entity) {
+                Some("player")
+            } else {
+                MOB_KINDS
+                    .iter()
+                    .find(|(k, _)| k.id() == d.kind)
+                    .map(|(_, n)| *n)
+            };
+            if let Some(who) = who {
+                weft_sdk::info!("mob_fight: {who} {} died (cause {}, by {})", d.entity, d.cause, d.source);
+            }
+        }
+    });
+    // Over-tier armour against them counts at most their size's cap (`base_api::chains::GEAR_COUNTS`).
+    r.modify(&base_api::chains::GEAR_COUNTS, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        let Some(kind) = m.world().entity(q.other).map(|e| e.kind) else { return };
+        let Some(mob) = MOB_KINDS
+            .iter()
+            .find(|(k, _)| k.id() == kind)
+            .and_then(|(_, n)| vitals::mobs::mob(n))
+        else {
+            return;
+        };
+        m.value *= vitals::combat::cap_share(mob.size(), q.amount as f32, mob.level()) as f64;
+    });
+    // Their armour (`vitals::mobs`), through the same formula as the player's and the animals'.
+    r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        if !crate::player::armor_applies(q.cause) {
+            return;
+        }
+        let Some(kind) = m.world().entity(q.entity).map(|e| e.kind) else { return };
+        let Some(mob) = MOB_KINDS
+            .iter()
+            .find(|(k, _)| k.id() == kind)
+            .and_then(|(_, n)| vitals::mobs::mob(n))
+        else {
+            return;
+        };
+        m.value *= 1.0 - vitals::combat::armour_cut(mob.stats().armour, m.value as f32) as f64;
+    });
     // Ours: the creeper stays (upstream removed it; our blood moon sends creepers, `events.rs`).
     // Its look: `models/creeper.geo.json` (vanilla's layout, 64 x 32) and `textures/entity/creeper.png`.
     r.entity(&CREEPER)
@@ -61,7 +177,7 @@ pub fn register(r: &mut Registry) {
         .sound("death")
         .tag("hostile")
         .size(0.6, 1.7)
-        .max_health(20.0)
+        .max_health(curve("creeper").health)
         .walk_speed(2.5)
         .hostile()
         .attach(&FUSE)
@@ -76,7 +192,7 @@ pub fn register(r: &mut Registry) {
         .tag("immune_effect/base:regeneration")
         .equipment()
         .size(0.6, 1.99)
-        .max_health(20.0)
+        .max_health(curve("skeleton").health)
         .walk_speed(2.5)
         .hostile()
         .burns_in_sun()
@@ -95,15 +211,25 @@ pub fn register(r: &mut Registry) {
     // Drawn as long as the use button is held, shot when it is let go (upstream's). The bow itself
     // is ours, a tool of parts (`parts.rs`), so this only adds the drawing and shooting.
     r.edit(&BOW).use_until_released().on_release(shoot_bow);
-    // An arrow in the head hurts half as much again, a bow's critical hit: `part` is the part
-    // of the hitbox it went into.
+    // A player's arrow hits on the curve (`vitals::gear::arrow_hit`) by its speed, as vanilla's
+    // does by its own: less drawn, less. Its item level counts against a big creature at most its
+    // size's cap over it, as a blade's (`base_api::chains::GEAR_COUNTS`). In the head it hurts
+    // twice as much, a bow's critical hit: `part` is the part of the hitbox it went into.
     r.modify(&chain::PROJECTILE_DAMAGE, &phase::MULTIPLY, |m| {
         let q = *m.query();
-        let arrow = m
-            .world()
-            .entity(q.entity)
-            .is_some_and(|e| e.kind == ARROW.id());
-        if arrow && q.part == hitbox_part::HEAD {
+        let w = m.world();
+        if !w.entity(q.entity).is_some_and(|e| e.kind == ARROW.id()) {
+            return;
+        }
+        if let Some([hit, level, owner]) = w.component(q.entity, &ARROW_SHOT).filter(|a| a[0] > 0.0) {
+            let counts = w.chain_compute(
+                &base_api::chains::GEAR_COUNTS,
+                1.0,
+                &abi::Query { entity: owner as u64, other: q.other, amount: level, ..abi::Query::DEFAULT },
+            );
+            m.value = hit * (q.amount / FULL_SPEED) * counts;
+        }
+        if q.part == hitbox_part::HEAD {
             m.value *= 2.0;
         }
     });
@@ -171,20 +297,20 @@ pub fn register(r: &mut Registry) {
         .passive()
         .goals(passive());
     // Vanilla amounts; meat comes out cooked when the animal burns.
-    r.loot(&ZOMBIE)
-        .pool(Pool::new().items("rotten_flesh", 0, 2));
-    r.loot(&SPIDER)
-        .pool(Pool::new().items("string", 0, 2))
-        .pool(
-            Pool::new()
-                .when(Cond::killed_by_player())
-                .when(Cond::chance(0.33))
-                .item("spider_eye"),
-        );
-    r.loot(&CREEPER).pool(Pool::new().items("gunpowder", 0, 2));
-    r.loot(&SKELETON)
-        .pool(Pool::new().items("arrow", 0, 2))
-        .pool(Pool::new().items("bone", 0, 2));
+    // The hostile ones' from `vitals::mobs::LOOT` (the loot check prices them); a chance roll only
+    // when a player killed it.
+    for (kind, mob) in [(&ZOMBIE, "zombie"), (&SPIDER, "spider"), (&CREEPER, "creeper"), (&SKELETON, "skeleton")] {
+        let mut table = r.loot(kind);
+        for &(_, item, lo, hi, chance) in vitals::mobs::LOOT.iter().filter(|l| l.0 == mob) {
+            let pool = Pool::new().items(item, lo, hi);
+            table = table.pool(if chance < 1.0 {
+                pool.when(Cond::killed_by_player())
+                    .when(Cond::chance(chance))
+            } else {
+                pool
+            });
+        }
+    }
     r.loot(&SHEEP).pool(Pool::new().item("wool")).pool(
         Pool::new().entry(
             Entry::item("mutton")
@@ -322,7 +448,7 @@ fn skeleton() -> ai::Goals {
 fn shoot_bow(u: &mut ItemUse) -> bool {
     let (w, id) = (u.world(), u.entity());
     let t = u.held_ticks() as f32 / 20.0;
-    let power = ((t * t + t * 2.0) / 3.0).min(1.0) as f64;
+    let power = vitals::gear::draw_power(t) as f64;
     if power < 0.1 {
         return false;
     }
@@ -334,8 +460,19 @@ fn shoot_bow(u: &mut ItemUse) -> bool {
     }
     let Some(s) = w.entity(id) else { return false };
     // Three blocks a tick at full draw.
-    let v = look_dir(s.yaw, s.pitch) * (power * 3.0 * 20.0);
-    w.spawn_with(
+    let v = look_dir(s.yaw, s.pitch) * (power * FULL_SPEED * 20.0);
+    // Its hit at full draw: the arrow's level (a plain one is flint-tipped), the bow's times (its
+    // power over a Sound yew bow's), the web's ranged damage.
+    let level = arrow
+        .and_then(|slot| base_api::ITEM_LEVEL.on_stack(&inv.get(slot)))
+        .unwrap_or(vitals::gear::ARROW_LEVEL);
+    let bow_times = crate::parts::BOW_POWER
+        .on_stack(&u.stack())
+        .zip(crafting::kinds::kind("bow"))
+        .map_or(1.0, |(d, k)| d / k.damage);
+    let web = base_api::skills::times(&w, id, base_api::skills::Family::RangedDamage);
+    let hit = vitals::gear::arrow_hit(level, bow_times) * web;
+    let shot = w.spawn_with(
         &ARROW,
         s.eye(),
         &Spawn::new()
@@ -344,6 +481,8 @@ fn shoot_bow(u: &mut ItemUse) -> bool {
             .inherit_velocity()
             .yaw(s.yaw),
     );
+    w.set_component(shot, &ARROW_SHOT, [hit as f64, level as f64, id as f64]);
+    crate::player_sounds::bow_shot(&w, id);
     if !creative {
         if let Some(slot) = arrow {
             inv.set(slot, consume_one(inv.get(slot)));

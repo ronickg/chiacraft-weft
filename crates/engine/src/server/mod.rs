@@ -524,6 +524,11 @@ fn run(
     server.shutdown();
 }
 
+/// chiacraft: the moderation commands the world's owner may always use, cheats or not: bans and
+/// who gets in (`server::admission`). Not `/op`, `/rule`, `/tick` or any game command.
+pub(crate) const OWNER_MODERATION: &[&str] =
+    &["ban", "tempban", "unban", "bans", "allow", "probation", "revoke", "achievementrule", "didrule", "banlist"];
+
 impl Server {
     /// A line typed into a dedicated server. The answers go to the log, which is what it shows.
     fn console(&mut self, line: &str) {
@@ -1213,6 +1218,7 @@ impl Server {
             .enumerate()
             .map(|(dim, tops)| {
                 let dim = dim as u32;
+                tops.finish_checks(c, dim, seed);
                 let all = tops.finish_rebuild(c, dim, seed);
                 let cols = if all { tops.columns.values().cloned().collect() } else { tops.take_changed() };
                 (dim, all, cols)
@@ -1348,6 +1354,13 @@ impl Server {
         }
     }
 
+    /// chiacraft: whether player `pi` may run `def`: its level, or the world's owner on a world
+    /// without cheats using a moderation command (`OWNER_MODERATION`), so a host can always put
+    /// out a troublemaker.
+    pub(crate) fn may_run(&self, pi: usize, def: &crate::commands::CommandDef) -> bool {
+        self.permission_of(pi) >= def.level || (OWNER_MODERATION.contains(&def.name.as_str()) && self.is_world_owner(pi))
+    }
+
     pub(crate) fn permission_of(&self, pi: usize) -> u32 {
         let p = &self.players[pi];
         self.dims[p.dim as usize]
@@ -1463,7 +1476,14 @@ impl Server {
         if def.client {
             return vec![Msg::new("command.client_only", vec![Arg::Text(name.to_string())])];
         }
-        if self.permission_of(pi) < def.level {
+        if !self.may_run(pi, def) {
+            // chiacraft: the host's log notes every refusal.
+            log::info!(
+                "refused /{name} for {}: it asks for level {}, they have {}",
+                self.players[pi].identity.name,
+                def.level,
+                self.permission_of(pi)
+            );
             return vec![Msg::new("command.no_permission", vec![Arg::Text(name.to_string()), Arg::Int(def.level as i64)])];
         }
         let (dim, entity) = (self.players[pi].dim, self.players[pi].entity);

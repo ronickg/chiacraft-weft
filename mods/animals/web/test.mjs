@@ -65,7 +65,8 @@ console.log("Genes and breeding");
   // (Each young has a 1% chance per gene of a mutation: `breed`.)
   const notOrange = sons.filter(k => locus(k, "O").alleles[0] !== "O").length / sons.length;
   check("an orange mother's sons orange (but for mutations)", notOrange <= 0.03, `${(notOrange * 100).toFixed(1)}% of ${sons.length} sons not`);
-  check("her daughters by a black father all tortoiseshell", daughters.every(k => k.look.patches), `${daughters.filter(k => k.look.patches).length} of ${daughters.length}`);
+  const notTortie = daughters.filter(k => !k.look.patches).length / daughters.length;
+  check("her daughters by a black father tortoiseshell (but for mutations)", notTortie <= 0.03, `${daughters.filter(k => k.look.patches).length} of ${daughters.length}`);
   check("no tortoiseshell male", young.filter(k => !k.female && k.look.patches).length === 0);
 }
 {
@@ -120,8 +121,8 @@ console.log("Genomes, scars, looks");
   }
 }
 console.log("Over time");
-function sim(name, extra) {
-  call({ op: "sim_reset", seed: s() });
+function sim(name, extra, seed) {
+  call({ op: "sim_reset", seed: seed ?? s() });
   call(Object.assign({ op: "sim_settings" }, extra || {}));
   call({ op: "sim_wild", species: idx(name), female: true });
   return call({ op: "sim_wild", species: idx(name), female: false });
@@ -151,7 +152,11 @@ for (const name of ["cat", "raptor", "wyvern"]) {
   check(`${name}: generation 1`, grown.every(a => a.generation === 1));
 }
 {
-  let st = sim("cat", { auto: true, cap: 40 });
+  // Seeded by themselves (as the evolution checks), so checks added before them don't shuffle
+  // their luck: two wild cats of any age, a seed where the old male turned elder before they
+  // ever mated (one in twenty), failed every check below (11-22). The simulator's seeds 2k and
+  // 2k + 1 are one run.
+  let st = sim("cat", { auto: true, cap: 40 }, 2000);
   for (let d = 0; d < 200; d++) st = call({ op: "sim_advance", ticks: DAY });
   const alive = st.animals.filter(a => !a.died).length;
   // Breeding slows past the room, and the crowded die of want: it settles near the room.
@@ -161,7 +166,7 @@ for (const name of ["cat", "raptor", "wyvern"]) {
   check("the crowded die of want, the old and young first", want.length > 0, `${want.length} died of want, ${frail} of them old or young`);
   // Old age as the game has it: each lives its species' lifespan, give or take a fifth, and is
   // an elder (past breeding) for the last fifth of an average life.
-  st = sim("cat", { auto: true, cap: 60, lifespan: "game" });
+  st = sim("cat", { auto: true, cap: 60, lifespan: "game" }, 2010);
   const span = sp("cat").lifespan / DAY;
   let peak = 0, gens = 0, elders = 0;
   for (let d = 0; d < 365; d++) {
@@ -235,7 +240,9 @@ for (const x of species) {
     for (let i = 0; i < 4; i++) st = call({ op: "sim_wild", species: x.index, female: i % 2 === 0 });
     for (let d = 0; d < days; d++) {
       st = call({ op: "sim_advance", ticks: DAY });
-      peak = Math.max(peak, st.animals.filter(a => !a.died).length);
+      // Hatched ones: a clutch laid near the room is eggs, not yet a flood (a crocodyliform's
+      // took a peak one over three rooms).
+      peak = Math.max(peak, st.animals.filter(a => !a.died && !a.egg).length);
     }
     return { alive: st.animals.filter(a => !a.died).length, peak, gens: Math.max(...st.animals.map(a => a.generation)) };
   });

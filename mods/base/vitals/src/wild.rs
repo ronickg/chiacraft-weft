@@ -329,7 +329,8 @@ pub const AGARICS: &[&str] = &["base:forest", "base:old_growth_forest", "base:bi
 /// Where the berry bush (blueberries) grows: the forests' floor.
 pub const FORESTS: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest", "base:taiga"];
 pub const WETLANDS: &[&str] = &["base:swamp", "base:savanna"];
-/// Foxfire: the damp forests, where wood rots on the floor.
+/// Foxfire: the damp forests, where wood rots on the floor, and the sequoia grove's fallen
+/// wood (Ronald, 11-24: "Keep foxfire").
 pub const FOXFIRE_WOODS: &[&str] = &[
     "base:forest",
     "base:old_growth_forest",
@@ -463,8 +464,10 @@ pub fn of(block: &str) -> Option<&'static Wild> {
 }
 
 /// A plant's cover in one biome where it isn't its usual (`Wild::cover`): reeds in the swamp at
-/// 4%, leaving its shore to the wild rice (spring's grain and the capybaras' food) and the cattails.
-pub const COVER_IN: [(&str, &str, f32); 1] = [("base:reed", "base:swamp", 0.04)];
+/// 4%, leaving its shore to the wild rice (spring's grain and the capybaras' food) and the cattails;
+/// cottongrass in the taiga at 6%, in its bogs rather than over the open tundra, leaving its floor
+/// room for the berries, the mushrooms and the glowing ones (`MOST`).
+pub const COVER_IN: [(&str, &str, f32); 2] = [("base:reed", "base:swamp", 0.04), ("base:cottongrass", "base:taiga", 0.06)];
 
 /// `p`'s cover in `biome`: its own, unless `COVER_IN` gives that biome another.
 pub fn cover_in(p: &Wild, biome: &str) -> f32 {

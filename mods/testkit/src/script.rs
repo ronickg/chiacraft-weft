@@ -27,7 +27,9 @@
 //! leave               # leave the world for the title screen
 //! tap screen query    # once `screen` is open, clicks the element `query` (`id:x`, `text:x`) until it closes or the element goes
 //! tap_once screen query  # the same, one click (a text field, a button that stays)
+//! tap_beside screen query 2.46  # one click that far right of the element, in its own widths (a row's button: rows have no ids)
 //! screen core:multiplayer  # opens a screen by name (an engine screen or a mod's)
+//! peek base:forge     # opens a screen, lets it lay out, closes it; one that won't open is noted, not a stop (the text-fit sweep, `fit_gen.py`)
 //! mark path           # writes the file (a signal to another copy's await_file)
 //! await_file path 120 # until the file exists, at most 120 s
 //! origin              # later via points are relative to where the player stands now
@@ -40,6 +42,12 @@
 //! expect <condition>  # checks it now; a miss fails the run (with its line) and the script goes on
 //! until <condition> [within 30]  # waits for it, seconds; not in time stops the run
 //! op trace 0 4 0 9 6 9 40   # a testkit server operation (`/tk`), its answer into the log
+//! respawn             # back from the death screen (the server ignores it while alive)
+//! aim 8               # face the nearest living creature within 8 blocks (its middle), if any
+//! live cmd.txt 20     # runs each line later appended to cmd.txt as a step (results in cmd.txt.out),
+//!                     # until a `quit` line, a `stop` file beside it or 20 minutes with no new line
+//! reload_pack dir     # copies dir's .wgsl and pack.cfg into the shader pack in use (only a variant,
+//!                     # `chiacraft_<x>`, never chiacraft itself) and reloads it
 //! quit
 //! ```
 //!
@@ -56,6 +64,12 @@
 //! screen name         # the top screen (`none` in the world)
 //! players 2           # at least 2 players in the world (the host's view)
 //! ```
+//!
+//! Command levels: the `op` step, the `block` and `players` conditions and the `entities` step
+//! ask the server through `/tk` (level 2), and testkit's own client commands (`/compare`,
+//! `/probe`, `/tk_freeze`) are level 2 too. A script's player is the host, level 4, on a world
+//! with cheats on; on a world made with cheats off (level 0) or as a joiner that isn't an operator
+//! they're refused and the step fails. Joiners: `--config testkit:op_joiners=true` on the host.
 //!
 //! `/tk time <ticks>` sets the world's whole clock (day 0 + ticks), so it also undoes a `/season`
 //! before it: set the time first, then the season (or use `/time set`, which keeps the day).
@@ -92,6 +106,8 @@ const COMMANDS: &[&str] = &[
     "chat",
     "say_config",
     "set_config",
+    "compare",
+    "hour",
     "shot",
     "bench",
     "bench_bg",
@@ -101,6 +117,7 @@ const COMMANDS: &[&str] = &[
     "leave",
     "tap",
     "tap_once",
+    "tap_beside",
     "origin",
     "where",
     "entities",
@@ -113,12 +130,17 @@ const COMMANDS: &[&str] = &[
     "quit",
     "await_ui",
     "screen",
+    "peek",
     "type_file",
     "close",
     "mark",
     "await_file",
     "chatf",
     "op",
+    "respawn",
+    "aim",
+    "live",
+    "reload_pack",
 ];
 /// Commands that mean nothing without an argument.
 const NEED_ARGS: &[&str] = &[
@@ -132,15 +154,20 @@ const NEED_ARGS: &[&str] = &[
     "chat",
     "say_config",
     "set_config",
+    "compare",
+    "hour",
     "shot",
     "host",
     "join",
     "open",
     "tap",
     "tap_once",
+    "tap_beside",
     "via",
     "expect",
     "until",
+    "live",
+    "peek",
 ];
 
 /// Every problem the script has before it runs: unknown commands, missing arguments, conditions
@@ -405,6 +432,7 @@ async fn run_lines(t: T, src: String) -> R {
     let started = Instant::now();
     let mut via: Vec<[f64; 5]> = Vec::new();
     let mut origin = [0.0f64; 3];
+    let mut compare_on = false;
     for (n, line) in src.lines().enumerate() {
         let line = line.split('#').next().unwrap_or("").trim();
         if line.is_empty() {
@@ -425,6 +453,27 @@ async fn run_lines(t: T, src: String) -> R {
             "loaded" => {
                 t.loaded().await?;
                 weft_sdk::info!("script: loaded at {:.2} s", started.elapsed().as_secs_f32());
+                // `--config testkit:compare_mode=1`: compare mode from the first load on.
+                if crate::compare::COMPARE_MODE.get() && !compare_on {
+                    compare_on = true;
+                    weft_sdk::info!("script: {}", crate::compare::apply(&t.c(), true, ""));
+                }
+            }
+            // `compare on [overrides]` / `compare off`: compare mode (`compare.rs`).
+            "compare" => {
+                let (state, overrides) = rest.split_once(' ').unwrap_or((rest, ""));
+                compare_on = state == "on";
+                weft_sdk::info!("script: {}", crate::compare::apply(&t.c(), compare_on, overrides));
+            }
+            // `hour 18`: the clock to that hour and frozen there, the sky settled (`/time set`,
+            // a second, `/tick freeze`, 8 s): the hour-shot recipe in one step.
+            "hour" => {
+                t.c().say("/tick unfreeze");
+                t.c()
+                    .say(&format!("/time set {}", crate::compare::hour_ticks(num(0, 12.0))));
+                t.secs(1.0).await?;
+                t.c().say("/tick freeze");
+                t.secs(8.0).await?;
             }
             "idle" => {
                 t.idle().await?;
@@ -576,6 +625,60 @@ async fn run_lines(t: T, src: String) -> R {
                 t.click_ui(query, 0);
                 t.frames(15).await?;
             }
+            // One click beside an element, `k` of its own widths from its left edge, across its
+            // middle: a settings row's ‹ › buttons, which carry no id of their own, from its label.
+            "tap_beside" => {
+                let mut w = rest.split_whitespace();
+                let screen = w
+                    .next()
+                    .ok_or("tap_beside: a screen, an element and a width")?
+                    .to_string();
+                let k: f32 = rest
+                    .rsplit(' ')
+                    .next()
+                    .and_then(|v| v.parse().ok())
+                    .ok_or("tap_beside: a width last")?;
+                let query = rest[screen.len()..rest.len() - rest.rsplit(' ').next().unwrap_or("").len()]
+                    .trim()
+                    .to_string();
+                let name = screen.clone();
+                t.until(&format!("screen {screen}"), Duration::from_secs(60), move |t| t.c().screen() == name)
+                    .await?;
+                t.frames(15).await?;
+                match t.c().ui_rect(&query) {
+                    Some(r) => {
+                        t.c().input_cursor(r.x + r.w * k, r.y + r.h / 2.0);
+                        t.frames(2).await?;
+                        t.c().input_click(0, 0.0);
+                    }
+                    None => t.fail(format!("no UI element {query} on {screen}")),
+                }
+                t.frames(15).await?;
+            }
+            // Open, laid out (twice: bound texts fill in), closed; never a stop (the text-fit
+            // sweep opens screens that may want a block or a creature behind them).
+            "peek" => {
+                let name = rest.to_string();
+                if !t.c().menu_open(weft_sdk::Menu::generated(name.clone())) {
+                    t.note(format!("peek: no screen {name}"));
+                } else {
+                    let end = t.state().frame + 240;
+                    let want = name.clone();
+                    t.until(&format!("peek {name}"), Duration::from_secs(30), move |t| t.c().screen() == want || t.state().frame >= end)
+                        .await?;
+                    if t.c().screen() != name {
+                        t.note(format!("peek: {name} did not open"));
+                    }
+                    t.frames(20).await?;
+                    t.c().input_key("Escape", 0.0);
+                    t.frames(10).await?;
+                    // A screen Escape doesn't close (death, loading): closed outright.
+                    if t.c().screen() == name {
+                        t.c().menu_close();
+                        t.frames(10).await?;
+                    }
+                }
+            }
             "screen" => {
                 let screen = weft_sdk::Menu::generated(rest.to_string());
                 if !t.c().menu_open(screen) {
@@ -673,6 +776,18 @@ async fn run_lines(t: T, src: String) -> R {
                     t.secs(0.25).await?;
                 }
             }
+            "respawn" => t.c().respawn(),
+            "aim" => aim(&t, num(0, 8.0)),
+            "live" => {
+                let (file, mins) = rest.split_once(' ').unwrap_or((rest, ""));
+                live(&t, file.trim(), mins.trim().parse().unwrap_or(20.0)).await?;
+            }
+            "reload_pack" => {
+                let msg = reload_pack(&t, rest)?;
+                weft_sdk::info!("script: {msg}");
+                // The engine holds the reload until the world is settled; then the pipelines build.
+                t.secs(3.0).await?;
+            }
             "quit" => return Ok(()),
             _ => t.fail(format!("unknown script line '{line}'")),
         }
@@ -682,9 +797,133 @@ async fn run_lines(t: T, src: String) -> R {
     Ok(())
 }
 
+/// The live mode (`live <file> [minutes]`): the game stays open and each line appended to `file`
+/// runs as a script step, its result appended to `<file>.out` (`> line`, then `ok` or `err ...`).
+/// A failing line is reported and the next one runs. It ends on a `quit` line or after `mins`
+/// minutes with no new line, and the script goes on with its next step (a `quit`, for the run to
+/// end). Lines already in the file when it starts are skipped: only new ones run. For tuning a
+/// look by hand on the PC without a launch per change (Planner, 11-23).
+async fn live(t: &T, file: &str, mins: f32) -> R {
+    use std::io::Write;
+    let out_path = format!("{file}.out");
+    let say = |msg: &str| {
+        weft_sdk::info!("live: {msg}");
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&out_path)
+        {
+            let _ = writeln!(f, "{msg}");
+        }
+    };
+    let mut seen = std::fs::metadata(file).map(|m| m.len()).unwrap_or(0);
+    let mut last = Instant::now();
+    let idle = Duration::from_secs_f32(mins.max(0.5) * 60.0);
+    say(&format!("ready: reading {file} from byte {seen}, {mins} min idle ends it"));
+    loop {
+        t.secs(0.5).await?;
+        if last.elapsed() > idle {
+            say("idle: no new line, live mode ends");
+            return Ok(());
+        }
+        // A `stop` file beside the command file ends it too (Tester 2's way to stop a live game).
+        if std::path::Path::new(file).with_file_name("stop").exists() {
+            say("stop: the stop file is there, live mode ends");
+            return Ok(());
+        }
+        let Ok(text) = std::fs::read(file) else { continue };
+        if (text.len() as u64) < seen {
+            // The file was replaced: from its start.
+            seen = 0;
+        }
+        let new = &text[seen as usize..];
+        // Whole lines only: a line still being written waits for its newline.
+        let Some(end) = new.iter().rposition(|&b| b == b'\n') else { continue };
+        let lines = String::from_utf8_lossy(&new[..=end]).into_owned();
+        seen += end as u64 + 1;
+        last = Instant::now();
+        for line in lines.lines() {
+            let l = line.split('#').next().unwrap_or("").trim();
+            if l.is_empty() {
+                continue;
+            }
+            say(&format!("> {l}"));
+            if l == "quit" {
+                say("quit: live mode ends");
+                return Ok(());
+            }
+            if let Some(bad) = preflight(l).first() {
+                say(&format!("err {bad}"));
+                continue;
+            }
+            let step: std::pin::Pin<Box<dyn std::future::Future<Output = R>>> = Box::pin(run_lines(t.clone(), l.to_string()));
+            match step.await {
+                Ok(()) => say("ok"),
+                Err(e) => say(&format!("err {e}")),
+            }
+            last = Instant::now();
+        }
+    }
+}
+
+/// `reload_pack <dir>`: the pack files in `dir` (`*.wgsl`, `pack.cfg`) over the shader pack in use,
+/// then a reload. Only a variant (`chiacraft_<x>`, `--shader-pack chiacraft_live`): chiacraft's
+/// own folder is the game's, written again at each start.
+fn reload_pack(t: &T, dir: &str) -> Result<String, String> {
+    let pack = weft_sdk::settings::SHADER_PACK.get();
+    if !pack.starts_with("chiacraft_") {
+        return Err(format!("reload_pack: the pack in use is '{pack}', not a variant (run with --shader-pack chiacraft_live)"));
+    }
+    let to = std::path::Path::new(&t.c().run_dir())
+        .join("shaderpacks")
+        .join(&pack);
+    let mut n = 0;
+    for e in std::fs::read_dir(dir)
+        .map_err(|e| format!("reload_pack: {dir}: {e}"))?
+        .flatten()
+    {
+        let p = e.path();
+        let name = e.file_name().to_string_lossy().into_owned();
+        if name.ends_with(".wgsl") || name == "pack.cfg" {
+            std::fs::copy(&p, to.join(&name)).map_err(|e| format!("reload_pack: {name}: {e}"))?;
+            n += 1;
+        }
+    }
+    t.c().reload_assets();
+    Ok(format!("reload_pack: {n} file(s) from {dir} into {}, reloading", to.display()))
+}
+
 /// Every entity within `r` blocks, one line each: where the server has it and where this client
 /// does (or that it doesn't), the client's block under its feet and light there. For "the server
 /// has it, the client draws nothing".
+/// Faces the nearest living creature within `r` the client knows (more than 1 health at most:
+/// not items, arrows or graves), at its middle: a scripted fighter's aim.
+fn aim(t: &T, r: f32) {
+    let me = t.state().pos;
+    let eye = me + weft_sdk::Vec3 { x: 0.0, y: 1.62, z: 0.0 };
+    let c = t.c();
+    let Some(at) = c
+        .entities()
+        .into_iter()
+        .filter_map(|id| c.entity(id))
+        .filter(|e| e.max_health > 1.0 && e.health > 0.0)
+        .map(|e| e.pos + weft_sdk::Vec3 { x: 0.0, y: e.size.height as f64 * 0.5, z: 0.0 })
+        .filter(|p| (*p - me).length_squared() <= (r as f64).powi(2))
+        .min_by(|a, b| {
+            (*a - me)
+                .length_squared()
+                .total_cmp(&(*b - me).length_squared())
+        })
+    else {
+        return;
+    };
+    let d = at - eye;
+    // Yaw 0 faces -z, 90 faces -x; a positive pitch looks up.
+    let yaw = (-d.x).atan2(-d.z).to_degrees();
+    let pitch = d.y.atan2((d.x * d.x + d.z * d.z).sqrt()).to_degrees();
+    c.set_look(yaw as f32, pitch as f32);
+}
+
 async fn entities(t: &T, r: f32) -> R {
     let me = t.state().pos;
     let near = t

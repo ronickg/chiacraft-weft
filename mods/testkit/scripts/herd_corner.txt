@@ -1,0 +1,53 @@
+# Deer at the south-west corner of `herd_savanna_winter.txt`'s flattened ground, where savanna20's
+# deer 95 stood 90 s unable to walk even 2 blocks to food and died of thirst 15-20 blocks from the
+# pond. The same ground at the game's own pace; two deer at its spots (-15 70 552, -18 70 554),
+# water 30 %, so they make for the pond. `/animalprof cave` logs the blocks round each (17 x 17,
+# from 3 under its feet: '#' solid, '~' water, '.' open, 'A' the deer) at the start and the end.
+# Report: each deer's place in the where rows, whether it reaches the pond (drinks) or stands
+# still, its "can't reach" lines, and the two ANIMAL_CAVE dumps (the layers at its feet and the
+# one under them, and the rows south and west of it).
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season winter 1
+chat /time set 6000
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+chat /tk fill ~-4 ~ ~-10 ~4 ~ ~-2 core:air
+chat /tk fill ~-2 ~-2 ~-8 ~2 ~-2 ~-4 base:dirt
+chat /tk fill ~-2 ~-1 ~-8 ~2 ~-1 ~-4 base:water
+wait 3
+chat /tk spawn animals:white_tailed_deer -15 70 552
+chat /tk spawn animals:white_tailed_deer -18 70 554
+chat /tk spawn animals:white_tailed_deer -19 70 548
+wait 2
+chat /anim log
+chat /animalprof food 1
+chat /animalprof water 0.3
+chat /tp 0 90 572
+wait 2
+chat /animalprof cave 60
+chat /animalprof where
+wait 5
+chat /animalprof where
+wait 5
+chat /animalprof where
+wait 5
+chat /animalprof where
+wait 5
+chat /animalprof where
+wait 5
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+chat /animalprof cave 60
+quit

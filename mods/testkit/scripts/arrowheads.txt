@@ -1,0 +1,244 @@
+# Arrows of other heads (vitals::gear::arrow_level), written by tools/progression/gen_arrowheads.py.
+# Read run.log: `floor:` lines (utahraptor) and `mob_fight:` lines (zombie), `stagger:` breaks.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /tk attr_mod me core:max_health testkit:hp core:add 200 0
+chat /tk mode spectator
+chat /tp 0.5 205 -0.5
+wait 2
+loaded
+chat /tk fill -6 196 -5 6 199 7 stone
+chat /tk fill -1 197 0 1 199 2 core:air
+chat /tk fill -6 200 -5 6 208 7 core:air
+chat /tk fill -6 209 -5 6 209 7 stone
+chat /tk fill 0 200 -2 0 205 -2 stone
+chat /tp 0.5 206 -1.5
+wait 1
+loaded
+chat /tk mode survival
+chat /tp 0.5 206 -1.5
+# ---- A0_flint_raptor: yew bow, flint arrows, 1.2 s draws, at animals:utahraptor
+chat /kill @e[type=animals:utahraptor]
+chat /kill @e[type=base:zombie]
+chat /kill @e[type=base:arrow]
+wait 1
+chat /gear bow yew slot=0
+chat /gear arrow flint 32 slot=1
+chat /tk heal
+chat /tk spawn animals:utahraptor 0 197 1
+wait 1
+aim 12
+chat /animal level 0
+chat /animal age 30
+wait 0.5
+where A0_flint_raptor_start
+entities 10
+shot ranged_A0_flint_raptor_start.png
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+shot ranged_A0_flint_raptor_end.png
+# ---- A1_bronze_raptor: yew bow, bronze arrows, 1.2 s draws, at animals:utahraptor
+chat /kill @e[type=animals:utahraptor]
+chat /kill @e[type=base:zombie]
+chat /kill @e[type=base:arrow]
+wait 1
+chat /gear bow yew slot=0
+chat /gear arrow bronze 32 slot=1
+chat /tk heal
+chat /tk spawn animals:utahraptor 0 197 1
+wait 1
+aim 12
+chat /animal level 0
+chat /animal age 30
+wait 0.5
+where A1_bronze_raptor_start
+entities 10
+shot ranged_A1_bronze_raptor_start.png
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+shot ranged_A1_bronze_raptor_end.png
+# ---- A2_flint_zombie: yew bow, flint arrows, 1.2 s draws, at base:zombie
+chat /kill @e[type=animals:utahraptor]
+chat /kill @e[type=base:zombie]
+chat /kill @e[type=base:arrow]
+wait 1
+chat /gear bow yew slot=0
+chat /gear arrow flint 32 slot=1
+chat /tk heal
+chat /tk spawn base:zombie 0 197 1
+wait 1
+wait 0.5
+where A2_flint_zombie_start
+entities 10
+shot ranged_A2_flint_zombie_start.png
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+shot ranged_A2_flint_zombie_end.png
+# ---- A3_bronze_zombie: yew bow, bronze arrows, 1.2 s draws, at base:zombie
+chat /kill @e[type=animals:utahraptor]
+chat /kill @e[type=base:zombie]
+chat /kill @e[type=base:arrow]
+wait 1
+chat /gear bow yew slot=0
+chat /gear arrow bronze 32 slot=1
+chat /tk heal
+chat /tk spawn base:zombie 0 197 1
+wait 1
+wait 0.5
+where A3_bronze_zombie_start
+entities 10
+shot ranged_A3_bronze_zombie_start.png
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tp 0.5 206 -1.5
+aim 12
+hold core:use 1.2
+wait 0.3
+chat /tk heal
+entities 10
+shot ranged_A3_bronze_zombie_end.png
+quit

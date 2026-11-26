@@ -73,7 +73,7 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
 | base:toadstool | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
-| base:cooked_dryads_saddle | fungi | 75 | 8 | 2 | 4 | 0 | 2 | 68 | 4 min | 2 + 2 | hot when cooked |
+| base:cooked_dryads_saddle | fungi | 75 | 8 | 2 | 2 | 0 | 2 | 68 | 4 min | 2 + 2 | hot when cooked |
 | animals:venison | meat | 200 | 20 | 44 | 0 | 5 | 0 | 147 | 27 min | 2 + 2 | raw |
 | animals:cooked_venison | meat | 150 | 15 | 45 | 0 | 5 | 0 | 98 | 24 min | 4 + 4 | hot when cooked |
 | animals:hare | meat | 150 | 15 | 33 | 0 | 3 | 0 | 109 | 20 min | 2 + 2 | raw |
@@ -126,6 +126,29 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | animals:pacu (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | base:pumpkin_slice (8) | base:dried_berries | - | - | 112 |
 | base:melon_slice (4) | base:dried_berries | - | - | 112 |
+
+## Where food keeps
+
+Rot by place (`vitals::rot`): the keeps above are for a cool larder at 15 °C. Elsewhere food spoils 2.5 times faster per 10 °C warmer, at most x4, and x0.05 frozen (below -2 °C). Snow or ice next to a chest holds it at 0 °C (an ice house); underground it keeps at the year's mean; in a room at the room's air; carried, at the air the player feels. A chest's food is aged once a game hour (1000 ticks), a player's every second. The world's difficulty `keep` applies on top. Days in total (fresh + stale):
+
+| air | rate | porkchop | bread | apple |
+|---|---|---|---|---|
+| 35 °C, desert noon | x4.00 | 1.0 | 2.5 | 10.0 |
+| 25 °C, summer day | x2.50 | 1.6 | 4.0 | 16.0 |
+| 15 °C, larder (as tuned) | x1.00 | 4.0 | 10.0 | 40.0 |
+| 10 °C, temperate cellar | x0.63 | 6.3 | 15.8 | 63.2 |
+| 0 °C, snow or ice store | x0.25 | 15.8 | 39.5 | 158.1 |
+| -5 °C, frozen | x0.05 | 80.0 | 200.0 | 800.0 |
+
+Carcasses (for Animals' wave two): a body ages as its raw meat at its spot's air: fresh while the meat is fresh, bloated while it's stale, remains for 1 more life, bones for 1 more, then gone.
+
+| stage | meat | hide | bones |
+|---|---|---|---|
+| fresh | x1.0 | x1.0 | x1.0 |
+| bloated | x1.0 | x1.0 | x1.0 |
+| remains | x0.5 | x0.0 | x1.0 |
+| bones | x0.0 | x0.0 | x1.0 |
+| gone | x0.0 | x0.0 | x0.0 |
 
 ## Clothing
 
@@ -318,7 +341,7 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:sapling | oak | 5, 18-28, 38 | Moderate | hardy | - | the game's | plains (su au), forest (su), old_growth_forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:grazed_grass | prairie grass | 5, 15-30, 40 | Moderate | hardy | 18 | 7 | plains (su au), forest (su au), old_growth_forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:dung_pat | a cow pat (dung beetles, fungi) | 5, 20-30, 42 | Moderate | hardy | 45 | 14 | plains (su au), forest (su), old_growth_forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
-| base:sedge | sedges | -1, 8-22, 32 | Moderate | hardy | 18 | 7 | plains (sp su au), forest (sp su au), old_growth_forest (su au), birch_forest (su au), taiga (su), snowy_plains (su), savanna (au), tropical_forest (au), mountains (su au), ocean (sp su au wi), coral_reef (au), lagoon (au), beach (au wi), floodplain (au), fern_forest (su au), crags (su au wi) |
+| base:sedge | sedges | -1, 8-30, 38 | Moderate | hardy | 18 | 7 | plains (sp su au), forest (sp su au), old_growth_forest (su au), birch_forest (su au), taiga (su), snowy_plains (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), mountains (su au), ocean (sp su au wi), coral_reef (su au), lagoon (su au), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au wi) |
 | base:cottongrass | cottongrass (Eriophorum) | -2, 6-16, 25 | Moderate | hardy | 18 | 7 | plains (sp au), forest (sp su au wi), old_growth_forest (sp su au), birch_forest (su au), taiga (su), snowy_plains (su), mountains (sp su au), sequoia_grove (wi), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
 | base:reindeer_lichen | reindeer lichen (Cladonia) | 0, 5-15, 25 | Dry | hardy | 3650 | 301 | plains (sp au), forest (sp su au), old_growth_forest (sp su au), birch_forest (sp su au), taiga (su au), snowy_plains (su), mountains (sp su au), sequoia_grove (sp su au wi), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (au wi), fern_forest (sp su au), crags (sp au wi) |
 | base:dune_grass | American beachgrass (Ammophila breviligulata) | 5, 18-26, 35 | Dry | hardy | 30 | 10 | plains (sp su au), forest (su au), old_growth_forest (su), birch_forest (su), taiga (su), desert (sp au wi), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), coral_reef (sp su au wi), lagoon (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au wi), fern_forest (su au), crags (sp su au) |
@@ -337,7 +360,7 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:mushroom_brown | forest mushrooms | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), old_growth_forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:mushroom_red | fly agaric | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), old_growth_forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:water_hyacinth | water hyacinth | 12, 25-30, 38 | Wet | -1 °C | 10 | 5 | plains (su), forest (su), old_growth_forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), sequoia_grove (su), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
-| base:foxfire | honey fungus and bitter oyster mycelium | 5, 20-25, 30 | Moderate | hardy | 30 | 10 | plains (su au), forest (su), old_growth_forest (su), birch_forest (su), taiga (su), savanna (au), swamp (au), tropical_forest (au), mountains (su), ocean (sp su au wi), coral_reef (au), lagoon (au), beach (au), floodplain (au), fern_forest (su), crags (su au) |
+| base:foxfire | honey fungus and bitter oyster mycelium | 5, 20-25, 30 | Dry | hardy | 30 | 10 | plains (sp su au), forest (su), old_growth_forest (su), birch_forest (su), taiga (su), desert (sp wi), savanna (sp au wi), swamp (sp au wi), tropical_forest (sp au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), coral_reef (sp au wi), lagoon (sp au wi), beach (sp su au wi), red_dunes (sp au), scrubland (sp su au), floodplain (sp au), fern_forest (su au), crags (sp su au) |
 | base:glow_mycena | Mycena chlorophos | 18, 24-28, 32 | Wet | -1 °C | 8 | 4 | plains (su), desert (sp au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (su), coral_reef (sp su au wi), lagoon (sp su au wi), beach (su), red_dunes (su), scrubland (su), floodplain (sp su au), crags (su) |
 | base:goblins_gold | goblin's gold moss (Schistostega pennata) | 0, 10-18, 25 | Moderate | hardy | 60 | 17 | plains (au), forest (sp su au), old_growth_forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (au wi) |
 | base:mesquite_sapling | mesquite | 12, 25-38, 48 | Dry | -15 °C | - | the game's | plains (su), forest (su), old_growth_forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
@@ -384,7 +407,7 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | block | grows | ground | gives | cover | found in |
 |---|---|---|---|---|---|
 | base:sedge | Tuft | Soil | - | 12.0% | snowy_plains, taiga, swamp |
-| base:cottongrass | Tuft | Soil | - | 8.0% | snowy_plains, taiga |
+| base:cottongrass | Tuft | Soil | - | 8.0% | snowy_plains, taiga (6.0%) |
 | base:reindeer_lichen | Tuft | Soil | - | 5.0% | snowy_plains, taiga, mountains |
 | base:clover | Tuft | Soil | - | 3.0% | plains, forest, birch_forest, mountains |
 | base:berry_bush | Bush | Soil | base:berries | 0.4% | forest, old_growth_forest, birch_forest, taiga |
@@ -610,3 +633,14 @@ Dung pats: a grazer drops one every 100 mouthfuls where it stands on the ground,
 | 75 | 4199 | 126982 |
 | 99 | 6275 | 251114 |
 | 100 | 6367 | 257389 |
+
+## Hostile mobs
+
+Base's night mobs on the one curve (`vitals::mobs`), like the animals: a size class from a real body's mass, a role, and the start of their home age, tweaked within x0.75-x1.25 with a reason. Health and hit in engine points; armour cuts a hit by armour / (armour + 5 x hit). Their hits are priced against a fresh player (base health, no armour) (`vitals::mobs::MEETS`): their size's hits to down that player, times their role's hit. The last column is the hits that down the home age's reference in its armour (at least 12).
+
+| mob | kg | size | role | level | health | armour | hit | every | armoured hits | tweaks |
+|---|---|---|---|---|---|---|---|---|---|---|
+| zombie | 70 | medium | hunter | 0 | 24.3 | 3.3 | 3.00 | 1.2 s | 26.2 |  |
+| spider | 40 | medium | hunter | 0 | 19.4 | 3.3 | 3.00 | 1.2 s | 26.2 | Health x0.8 (light and fast: a leg-span of 1.3 m on a small body) |
+| skeleton | 30 | medium | hunter | 0 | 19.4 | 3.3 | 2.40 | 1.2 s | 38.3 | Health x0.8 (bones only, it breaks easily); Hit x0.8 (it shoots from range, never in reach) |
+| creeper | 50 | medium | prey | 0 | 18.9 | 3.3 | 1.25 | 1.2 s | 101.2 |  |

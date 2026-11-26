@@ -216,8 +216,8 @@ fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
 
 // ---- soft clouds (`core:soft_clouds`; the engine's `client/soft_clouds.rs`) ----
 // Ronald, 11-05: "Both, a setting" (blocky by default), then "Soft clouds first", storms first.
-// Traced at a quarter of the pixels each way (`fs_cloud_trace`), blended over frames
-// (`fs_cloud_resolve`), drawn by `fs_clouds`. The method after Horizon Zero Dawn's (Schneider 2015)
+// Traced at half the pixels each way (`fs_cloud_trace`, `core:cloud_res`), blended over frames
+// only without TAA (`fs_cloud_resolve`), drawn by `fs_clouds`. The method after Horizon Zero Dawn's (Schneider 2015)
 // and Photon's: masses from a slow coverage field, billows remapped into it, detail that only wears
 // their edges, a light march that doubles each step, scattering in octaves. Our own code: Photon's
 // licence allows learning from it, not reuse (the Researcher's notes, side-session-notes
@@ -269,7 +269,9 @@ fn soft_cover(s: Sky, at: vec2<f32>) -> f32 {
     // 11-06).
     // Clear days from 0.32 (0.40 before, cover B): in Bliss's own world at noon its sky is mostly open
     // blue with a few masses, ours still a dense even layer (Planner's d1 sheet, 11-06).
-    return clamp(mix(0.32, 0.8, wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
+    // With the chain rain at 0.88: at 0.8 a rainy noon looked up through a blue gap overhead where
+    // Bliss's rain is one warm grey cover with a few breaks for its shafts (lkmxK1 rain ground).
+    return clamp(mix(0.32, select(0.8, 0.88, bliss_chain()), wet) + (field - 0.5) * mix(0.35, 0.5, wet), 0.0, 1.0);
 }
 
 // The cloud's density at `at` (its frame, blocks) and `a` (0 at the layer's underside, 1 at its
@@ -391,7 +393,10 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     // against its blue sky, ours stood bright white over the dark land (PC shnt0, 11-06).
     if scene.frame.x > 0.5 {
         // (0.2: at 0.4 they still stood brighter than the sky, Bliss's darker than it; PC shnt2.)
-        sun *= mix(1.0, 0.2, smoothstep(-0.12, -0.3, scene.sun.y));
+        // (With the chain 0.06: under Bliss's one curve they stood bright white-blue over the navy
+        // sky, lit as a full moon at day strength, where Bliss's are barely lighter than its sky;
+        // Planner on lkmxG1, 11-25.)
+        sun *= mix(1.0, select(0.2, 0.06, bliss_chain()), smoothstep(-0.12, -0.3, scene.sun.y));
     }
     // In the HDR world half its colour on the clouds: they stood gold-orange toward the 08:00 sun
     // where Bliss's are cream-white with silver edges (PC shcl1).
@@ -408,7 +413,9 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         sun = mix(sun, vec3(luma(sun)) * vec3(1.06, 0.98, 0.86), away * low_sun * 0.75);
     }
     // Rain darkens the clouds' albedo and keeps their shapes (Photon: ×0.66); a storm's more.
-    let albedo = mix(1.0, 0.66, s.axes[0].x) * mix(1.0, 0.6, storm);
+    // With the chain 0.4: the rain sky stood at twice the land's brightness where Bliss's dark deck
+    // is about 1.4 times it (lkmxK1 rain vista: sky 191 195 201 against Bliss's 124 117 102).
+    let albedo = mix(1.0, select(0.66, 0.4, bliss_chain()), s.axes[0].x) * mix(1.0, 0.6, storm);
     var through = 1.0;
     var light = vec3(0.0);
     for (var i = 0; i < steps; i++) {
@@ -448,14 +455,20 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
         // The sky's light from above, brighter on the tops; under a storm the bellies darker.
         // Grey-blue shaded bases, bright tops: evenly lit, a clear day's read as flat white cut-outs.
         let ambient = mix(p.horizon * 0.3 + p.ambient * 0.25, p.ambient * 1.2 + p.horizon * 0.2, smoothstep(0.0, 0.8, a)) * mix(1.0, 0.55, s.axes[0].y * (1.0 - a)) * mix(1.0, 0.72, cloud_low_sun()) * select(1.0, CLOUD_SKY_HDR, scene.frame.x > 0.5);
-        var c = (sun * direct * powder * 0.9 + ambient) * albedo;
+        // With the chain at night the sky's light on them at 0.4: lit by their sky alone they still
+        // stood well above it, white-blue over the navy, where Bliss's are barely lighter than its
+        // sky (lkmxI1 night clouds; the moon's light cut to 0.06 moved them little).
+        let night_amb = select(1.0, mix(1.0, 0.4, smoothstep(-0.12, -0.3, scene.sun.y)), bliss_chain());
+        var c = (sun * direct * powder * 0.9 + ambient * night_amb) * albedo;
         if scene.frame.x > 0.5 {
             // In the HDR world bright undersides, as Bliss's: the light scattered many times inside
             // (its slow lobe, falling off a third as fast) and more of the sky's from below. Seen
             // from under them, ours went steel grey and purple with darker bellies (PC shcl1, the
             // first pass), where Bliss's are cream.
             let deep = exp(-od * 0.12) * (1.0 - exp(-sigma * 8.0) * 0.5);
-            c += (sun * deep * 0.35 + (p.horizon * 0.25 + p.ambient * 0.45) * (1.0 - smoothstep(0.0, 0.6, a))) * albedo;
+            // (The night's cut on this sky light too: without it the 0.4 above moved them little,
+            // lkmxK1 night clouds still white-blue over Bliss's darker-than-sky ones.)
+            c += (sun * deep * 0.35 + (p.horizon * 0.25 + p.ambient * 0.45) * night_amb * (1.0 - smoothstep(0.0, 0.6, a))) * albedo;
         }
         // In the HDR world a silver rim: the thin edges of a cloud before the sun, where the light
         // has crossed little of it, glow white-gold toward the eye (Bliss's and Photon's bright rims, a wide lobe: at g 0.9 and a
@@ -476,14 +489,14 @@ fn soft_march(s: Sky, dir: vec3<f32>, far_in: f32, dither: f32) -> vec4<f32> {
     return vec4(light, through);
 }
 
-// The trace: one look per quarter-target pixel, at a sub-pixel that moves each frame (16 places),
+// The trace: one look per trace pixel, at a sub-pixel that moves each frame (16 places),
 // dithered along the look; it stops at the world (its depth's copy).
 @fragment
 fn fs_cloud_trace(in: CloudOut) -> @location(0) vec4<f32> {
     let s = sky[in.index];
     let n = u32(scene.cloud_moved.w);
     let px = vec2(dpdx(in.at.x), dpdy(in.at.y));
-    // A Bayer order through the 4 × 4 pixels this one stands for.
+    // A Bayer order through 4 × 4 places in the pixels this one stands for.
     let bayer = array<u32, 16>(0u, 8u, 2u, 10u, 12u, 4u, 14u, 6u, 3u, 11u, 1u, 9u, 15u, 7u, 13u, 5u);
     let b = bayer[n % 16u];
     let sub = (vec2(f32(b % 4u), f32(b / 4u)) + 0.5) / 4.0 - 0.5;
@@ -504,6 +517,13 @@ fn fs_cloud_trace(in: CloudOut) -> @location(0) vec4<f32> {
     if !open_sky() || in_liquid() {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
+    // Where the land is lit from the physical sky, Bliss's three layers (`bc_clouds`), to the world's
+    // depth or, on the sky, distant terrain's far end; lit by the land's sun and the clear sky.
+    if land_from_sky() {
+        let reach = select(BC_SKY_FAR, far, far < SOFT_REACH);
+        let dither_x = fract(unit(hash(u32(in.clip.x) * 7411u + u32(in.clip.y) * 3301u)) + f32(n) * 0.754878);
+        return bc_clouds(dir, reach, vec2(dither_x, dither), palette().sun, bc_sky_read());
+    }
     return soft_march(s, dir, far, dither);
 }
 
@@ -517,6 +537,10 @@ fn soft_distance(s: Sky, dir: vec3<f32>) -> f32 {
 
 // The resolve: this frame's trace blended into last frame's clouds where they stood then
 // (reprojected: the camera's move and the wind's), held to what this frame's neighbourhood allows.
+// Only without temporal anti-aliasing: with it each frame's trace goes through alone, its jitter
+// averaged by the world's TAA at full size, as Bliss's clouds are (deferred2, half size, no history
+// of their own). Our own history averaged the jittered sub-pixels into one trace texel, a box blur,
+// and the clouds came out about half as sharp as Bliss's (lkcb1, 11-25).
 @fragment
 fn fs_cloud_resolve(in: CloudOut) -> @location(0) vec4<f32> {
     let s = sky[in.index];
@@ -524,7 +548,7 @@ fn fs_cloud_resolve(in: CloudOut) -> @location(0) vec4<f32> {
     let at = vec2<i32>(in.clip.xy);
     let size = vec2<i32>(textureDimensions(textures[trace]));
     let now = textureLoad(textures[trace], at, 0);
-    if scene.soft_clouds.w < 0.5 || scene.soft_clouds.y < 0.5 {
+    if scene.soft_clouds.w < 0.5 || scene.soft_clouds.y < 0.5 || scene.taa_frame.x > 0.5 {
         return now;
     }
     let dir = normalize(mat(sky[0]) * in.at);
@@ -566,6 +590,14 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     let seen = soft_distance(s, dir);
     let rel = dir * seen;
     var color = c.rgb / alpha_cloud;
+    sky_seen = 1.0;
+    // Bliss's: no hand-over to the sky's colour, no rain mist, no fade (its far ones are lit by the
+    // sky alone, `bc_clouds`); the fog's march lays its air over them as over the sky.
+    if land_from_sky() {
+        color = display(rainbow_on(color, dir));
+        let clip_b = scene.view_proj * vec4(rel, 1.0);
+        return CloudPixel(vec4(color * alpha_cloud, alpha_cloud), clip_b.z / clip_b.w);
+    }
     // Toward the far end they hand over to the sky.
     let dist = length(rel.xz) / SOFT_REACH;
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.45, 1.0, dist));
@@ -576,7 +608,7 @@ fn soft_pixel(in: CloudOut, s: Sky, dir: vec3<f32>) -> CloudPixel {
     // were the default, PC shf2_rain).
     let misted = rain_amount() * (1.0 - smoothstep(0.02, 0.22, dir.y));
     color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
-    color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
+    color = display(fog_through_sky(rainbow_on(color, dir), dir * 220.0, 1.0));
     // In the HDR world the far ones thin out into the haze from about half the reach: handed over
     // to the sky's horizon colour at full cover, they stood as a flat grey belt above the horizon
     // where Bliss's far sky is open haze with a few far clouds (the stage 2 sheet, noon).
@@ -738,6 +770,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         // the Researcher's weather findings, 11-05); the bellies still darken (`dark`).
         let albedo = max(s.color.rgb / max(dimmed, vec3(0.005)), vec3(0.55, 0.58, 0.64) * scene.weather.w);
         color = albedo * light / alpha_cloud;
+        sky_seen = 1.0;
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(mix(0.3, 0.15, wet), mix(1.0, 0.85, wet), dist));
         // The rainbow stands in the falling rain under the clouds, in front of them: drawn in the sky
         // alone, the shower's clouds hid it (the after-rain check from under the clouds, 11-05).
@@ -749,7 +782,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z))), misted);
         // A lightning flash glows inside the deck; its bolt hangs under the deck, in front of it.
         color += lightning_in_clouds(dir) * albedo + lightning_bolt(dir);
-        color = display(fog_through(rainbow_on(color, dir), dir * 220.0, 1.0));
+        color = display(fog_through_sky(rainbow_on(color, dir), dir * 220.0, 1.0));
     } else {
         color = mix(s.color.rgb * light / alpha_cloud, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
     }
@@ -773,7 +806,7 @@ fn star_look(star: u32, uv: vec2<f32>, dir: vec3<f32>) -> vec4<f32> {
     let shape = 1.0;
     let speed = 2.0 + 3.0 * unit(star * 9u + 7u);
     let twinkle = 1.0 - (0.08 + 0.2 * (1.0 - clamp(dir.y, 0.0, 1.0))) * (0.5 + 0.5 * sin(scene.params.w * speed + unit(star * 9u + 8u) * 40.0));
-    let dark = smoothstep(0.05, -0.18, scene.sun.y);
+    let dark = night_sky_dark(0.05, -0.18);
     let needs = 1.0 - (0.25 + 0.75 * bright);
     let shows = smoothstep(needs, needs + 0.15, dark);
     return vec4(tint, shape * (1.0 + 1.6 * bright) * twinkle * shows);
@@ -782,7 +815,7 @@ fn star_look(star: u32, uv: vec2<f32>, dir: vec3<f32>) -> vec4<f32> {
 // The Milky Way: a faint band across the night, fixed among the stars (it turns with the sky, as the
 // sun does), mottled, with dark lanes along its middle; washed out by a bright moon and haze low down.
 fn milky_way(dir: vec3<f32>) -> vec3<f32> {
-    let dark = smoothstep(-0.08, -0.25, scene.sun.y);
+    let dark = night_sky_dark(-0.08, -0.25);
     if dark <= 0.0 || dir.y <= 0.0 {
         return vec3(0.0);
     }
@@ -826,7 +859,7 @@ fn aurora(dir: vec3<f32>) -> vec3<f32> {
     // An aurora storm (a sky event) reaches further and burns brighter; where it reaches comes with
     // the biomes' aurora shares the base mod widens for it.
     let storm = sky_event(4.0);
-    let strength = max(scene.ground.w, storm * 0.6) * mix(1.0, 2.2, storm) * smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount()) * (1.0 - scene.weather.z);
+    let strength = max(scene.ground.w, storm * 0.6) * mix(1.0, 2.2, storm) * smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount()) * (1.0 - air_mist());
     if strength <= 0.0 || dir.y <= 0.02 {
         return vec3(0.0);
     }
@@ -870,7 +903,7 @@ fn meteors(dir: vec3<f32>) -> vec3<f32> {
 
 // Pixel streaks across the night sky: `rate` the share of slots that hold one (0..1), on clock `t`.
 fn streaks(dir: vec3<f32>, rate: f32, t: f32) -> vec3<f32> {
-    let dark = smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount());
+    let dark = night_sky_dark(-0.1, -0.25) * (1.0 - rain_amount());
     if dark <= 0.0 || dir.y <= 0.05 {
         return vec3(0.0);
     }
@@ -999,7 +1032,20 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         return vec4(scene.fog_color.rgb, 1.0);
     }
     if open_sky() && !in_liquid() {
-        var c = sky_color(dir) + milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir) + fireball(dir) + lightning_bolt(dir);
+        sky_seen = 1.0;
+        // The night sky's own lights (ours; Bliss has none of them) were set against the engine's
+        // star at the screen's white: with the land lit from the physical sky they keep their place
+        // against Bliss's stars (10 / 41 at a star's peak), as the stars took (lkmxS1's night
+        // clouds: the Milky Way and the aurora stood out bright over Bliss's dark navy).
+        // With Bliss's night (Ronald: "nearly one to one", delete extra layers) none of them: its
+        // night is an even navy with its stars and moon alone (lkmoon1: our Milky Way a wide pink
+        // band across Bliss's empty sky).
+        let night_lights = select(1.0, 0.0, land_from_sky());
+        var c = sky_color(dir) + (milky_way(dir) + aurora(dir) + meteors(dir) + shooting_stars(dir)) * night_lights + fireball(dir) + lightning_bolt(dir);
+        if land_from_sky() {
+            let m = bliss_moon(dir);
+            c += bliss_stars(dir) * m.a + m.rgb;
+        }
         // The rainbow in the rain, in front of the high cirrus.
         c = rainbow_on(cirrus(c, dir), dir);
         if dir.y < 0.0 {
@@ -1007,7 +1053,10 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
             c *= 1.0 - s.uv.x * smoothstep(0.0, 0.08, -dir.y);
         }
         // The fog on the land hides the horizon and fades upward.
-        c = fog_through(c, dir * 220.0, 1.0);
+        // With `OPT_HORIZON_LIFT` the haze only lightens the sky, as Bliss's brightens to the horizon:
+        // lit dimmer than the sky away from the sun, it drew a grey band above the land.
+        let hazed = fog_through_sky(c, dir * 220.0, 1.0);
+        c = mix(hazed, max(hazed, c), clamp(fantasy_opt(OPT_HORIZON_LIFT), 0.0, 1.0));
         // A held torch's glow in the mist goes on over the sky (`haze_lit` gives it the land's).
         c += held_in_fog(dir * 48.0, 1.0);
         return vec4(display(c), 1.0);
@@ -1020,12 +1069,78 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
     return vec4(mix(s.color.rgb, scene.fog_color.rgb, clamp(0.0625 / dir.y, 0.0, 1.0)), 1.0);
 }
 
+// Bliss's stars (stars.glsl and composite1, method only), where the land is lit from the physical
+// sky, in place of the engine's star quads: a field over the look scaled 300 times, one cell in a
+// hundred a star (a hash over the cell's corner, the top 1 % stretched to 0..1), blended between the
+// four corners across the look's x and y, then exp(-20 (1 - s)): sharp points that a pixel mostly
+// misses the peak of, so most stars faint and few bright (lkmxBF1's night: 474 stars 50 over the
+// sky round them against Bliss's 32). x 10 in its sky's units (/ 41 in ours) x clamp(-2 sun.y),
+// turned with the day about the x-y plane, and darkened low as its ground darkens the sky.
+fn bliss_star_hash(p_in: vec3<f32>) -> f32 {
+    var p = fract(p_in * 0.1031);
+    p += dot(p, p.zyx + 31.32);
+    return fract((p.x + p.y) * p.z);
+}
+fn bliss_star_cell(p: vec3<f32>) -> f32 {
+    return clamp(bliss_star_hash(p) / 0.01 - 0.99 / 0.01, 0.0, 1.0);
+}
+fn bliss_stars(dir: vec3<f32>) -> vec3<f32> {
+    let night = clamp(-2.0 * normalize(scene.sun.xyz).y, 0.0, 1.0);
+    if night <= 0.0 {
+        return vec3(0.0);
+    }
+    let a = 2.39996 - day_ticks() / 24000.0;
+    var o = dir;
+    o = vec3(o.x * cos(a) + o.y * sin(a), -o.x * sin(a) + o.y * cos(a), o.z);
+    let q = o * 300.0;
+    let f = fract(q.xy);
+    let b = floor(q);
+    let v = bliss_star_cell(b) * (1.0 - f.x) * (1.0 - f.y) + bliss_star_cell(b + vec3(0.0, 1.0, 0.0)) * (1.0 - f.x) * f.y
+        + bliss_star_cell(b + vec3(1.0, 0.0, 0.0)) * f.x * (1.0 - f.y) + bliss_star_cell(b + vec3(1.0, 1.0, 0.0)) * f.x * f.y;
+    let star = exp(max(1.0 - v, 0.0) * -20.0);
+    let ground = 1.0 - exp2(-50.0 * pow(clamp(dir.y + 0.025, 0.0, 1.0), 2.0));
+    return vec3(star * 10.0 / BLISS_UNITS * night * ground);
+}
+
+// Bliss's moon (sky_gradient.glsl drawMoon, called in composite1, method only), with the land lit
+// from the physical sky: no picture (its RESOURCEPACK_SKY 0 drops the pack's moon) but a disc about
+// 2° across, exp(1 - 1000 (1 - cos)) - 1.5, lit by its phase's light vector through a mock normal, x
+// the land's direct light x 20, plus a faint 0.004 rim; the stars hidden behind it (rgb, a: how
+// much of the stars is left). Its light is the one that lights the land (`light_dir`), the disc
+// drawn opposite it. Ours drew the pack's square moon picture, twice the size, with a wide glow
+// (lkmoon1). The phase from the moon's light (`moon_light`), waning side only: the engine sends
+// how full it is, not which side.
+fn bliss_moon(dir: vec3<f32>) -> vec4<f32> {
+    let l = -normalize(light_dir());
+    let shape = clamp(exp(1.0 - 1000.0 * dot(l + dir, dir)) - 1.5, 0.0, 25.0);
+    if shape <= 0.0 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let shape2 = pow(exp(shape * -10.0), 0.15) * 255.0;
+    let n = vec3((l.x + dir.x) * shape2, (l.y + dir.y) * shape2, -dot(l, dir) * 15.0);
+    let k = u32(clamp(round(acos(clamp(2.0 * moon_light() - 1.0, -1.0, 1.0)) * 4.0 / 3.14159), 0.0, 4.0));
+    var ph = vec3(-1.0, -0.5, 1.0);
+    switch k {
+        case 1u: { ph = vec3(-1.0, -0.5, 0.35); }
+        case 2u: { ph = vec3(-1.0, -0.5, 0.2); }
+        case 3u: { ph = vec3(-1.0, -0.5, 0.1); }
+        case 4u: { ph = vec3(1.0, 0.25, -1.0); }
+        default: {}
+    }
+    let sun = normalize(scene.sun.xyz);
+    let moon_k = scene.moon.w * mix(1.0, 0.12, smoothstep(0.5, 1.0, blood_moon()));
+    let c = land_sun(sun, moon_k) * 20.0;
+    let lit = shape * pow(clamp(dot(n, ph) / 5.0, 0.0, 1.5), 5.0) * c + clamp(shape * 4.0 * pow(shape2 / 200.0, 2.0), 0.0, 1.0) * 0.004 / BLISS_UNITS;
+    let ground = 1.0 - exp2(-50.0 * pow(clamp(dir.y + 0.025, 0.0, 1.0), 2.0));
+    return vec4(lit * ground, max(1.0 - shape * 5.0, 0.0));
+}
+
 // A soft high layer of thin cloud, far above the blocky ones (Research round 15, rec. 2 slice 4:
 // Bliss's altostratus plane at y 2000): wisps on a plane, drifting slowly with the wind, lit by the
 // sky and taking the sunset's colours and the moon's light, thicker under rain. Behind the blocky
 // clouds it gives the sky depth.
 fn cirrus(c: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
-    if dir.y <= 0.02 {
+    if dir.y <= 0.02 || fantasy_opt(OPT_CIRRUS_OFF) > 0.5 {
         return c;
     }
     let p = palette();
@@ -1174,6 +1289,13 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         let star = star_look(in.star, in.uv, dir);
         rgb *= star.rgb;
         a *= star.a;
+        // With the land lit from the physical sky, Bliss's stars (composite1, method only): 10 at a
+        // star's peak in its sky's units (/ 41 in ours), x clamp(-2 sun.y), in place of the engine's
+        // star at the screen's white (4-10 x Bliss's: lkmxS1's night stars stood out bright).
+        // (In its place, `bliss_stars` in the sky's gradient.)
+        if land_from_sky() {
+            discard;
+        }
     }
     if open_sky() && !in_liquid() {
         // Bodies shine through the tone curve; stars dim in the haze low down.
@@ -1185,8 +1307,19 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // branch, and every other moon kept vanilla's square picture, which by day went white
         // through the curve as a big white square or, low down, a skewed one (Tester 2's
         // "square sun", 11-05: the moon of summer day 5, up by day).
-        let is_sun = s.ids.y == SKY_BODY && dot(s.axes[0].xyz, scene.sun.xyz) > 0.9995;
-        let is_moon = s.ids.y == SKY_BODY && !is_sun && dot(s.axes[0].xyz, scene.moon.xyz) > 0.9995;
+        // Whichever of the two the body stands nearer, within 8°: the sky draws its bodies at the
+        // smoothed clock (`smooth_time`, which runs on between the server's time updates) and
+        // `scene.sun` follows the world's ticks, so the two drift apart by a degree or more; a match
+        // within 1.8° missed the sun now and then, and its quad fell back to the square picture, a
+        // tilted white square round a noon sun (Planner, 11-25, ambient life's look-up shots).
+        let to_sun = dot(s.axes[0].xyz, normalize(scene.sun.xyz));
+        let to_moon = dot(s.axes[0].xyz, normalize(scene.moon.xyz));
+        let is_sun = s.ids.y == SKY_BODY && to_sun > 0.99 && to_sun >= to_moon;
+        let is_moon = s.ids.y == SKY_BODY && !is_sun && to_moon > 0.99;
+        // Bliss's moon (`bliss_moon`, in the gradient) in place of the body's picture.
+        if is_moon && land_from_sky() {
+            discard;
+        }
         if is_moon {
             let m = moon_body(s, local);
             rgb = m.rgb;
@@ -1207,8 +1340,19 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             // what the screen's white could hold here), so the bloom spreads a wide glare round it
             // as Bliss's low sun has, and the curve keeps the disc itself white-gold.
             let hot = select(1.0, 16.0, scene.frame.x > 0.5);
-            rgb = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g) * (disc * mix(3.0, 1.5, g) * hot + halo);
-            shape = smoothstep(0.0, 0.004, disc + halo);
+            // With `OPT_SUN_DISC` as Bliss's: the disc near white at any height (a sun bright enough
+            // to glare reads white; only its glow takes the low sun's gold) and the glow twice as
+            // wide. Deep orange at 16 times the screen's white, ours clipped to a yellow-green blob.
+            let soft = clamp(fantasy_opt(OPT_SUN_DISC), 0.0, 1.0);
+            let wide = exp(-r * 3.0) * (1.0 - smoothstep(0.7, 1.0, r)) * 0.9;
+            let glow = mix(halo, wide, soft);
+            let core = mix(mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g), mix(vec3(1.0, 0.97, 0.92), vec3(1.0, 0.86, 0.68), g), soft);
+            let ring = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g);
+            rgb = core * disc * mix(3.0, 1.5, g) * hot + ring * glow;
+            shape = smoothstep(0.0, 0.004, disc + glow);
+            // Before sunrise (`OPT_DAWN_SKY`) none of it under the horizon: from a high eye the land's
+            // edge lies a few degrees down, and the sun 3.5° under the horizon showed over it.
+            shape *= 1.0 - dawn_sky() * (1.0 - smoothstep(-0.012, 0.004, dir.y));
         }
         // A blood moon: copper, then a deep red disc, dimmer in totality.
         if is_moon && blood_moon() > 0.0 {
@@ -1282,13 +1426,165 @@ fn fs_froxel_sum(in: CloudOut) -> @location(0) vec4<f32> {
 // a member a texel (`look.wgsl`'s `palette`).
 @fragment
 fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
+    // Rows 1-64: the physical sky's view (`atm_sky`), in the HDR world with it on.
+    if in.clip.y > 1.0 {
+        if scene.frame.x < 0.5 || fantasy_opt(OPT_SKY_PHYS) < 0.5 || in.clip.x > 128.0 || in.clip.y > 65.0 {
+            return vec4(0.0);
+        }
+        let dir = atm_dir_of(in.clip.x, in.clip.y - 1.0);
+        return vec4(atm_sky(dir, normalize(scene.sun.xyz), normalize(scene.moon.xyz), scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y)), 1.0);
+    }
     let p = palette_made();
+    // The land's sun and the sky's light from the same air as the sky, Bliss's (`land_sun`,
+    // `land_ambient`), where the HDR chain draws the physical sky.
+    let from_sky = land_from_sky();
+    let sun = normalize(scene.sun.xyz);
+    let moon_k = scene.moon.w * mix(1.0, 0.12, smoothstep(0.5, 1.0, blood_moon()));
     switch u32(in.clip.x) {
         case 0u: { return vec4(p.zenith, 1.0); }
         case 1u: { return vec4(p.horizon, 1.0); }
         case 2u: { return vec4(p.glow, 1.0); }
-        case 3u: { return vec4(p.sun, 1.0); }
-        case 4u: { return vec4(p.ambient, 1.0); }
+        case 3u: { return vec4(select(p.sun, land_sun(sun, moon_k), from_sky), 1.0); }
+        case 4u: {
+            if from_sky {
+                let moon = normalize(scene.moon.xyz);
+                let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
+                var sum = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
+                    let dir = atm_mean_dir(i, sun);
+                    let a = atm_march(dir, sun, moon, sky_k, ATM_FLOOR, 4, 2);
+                    sum += a.light;
+                }
+                var mean = sum / 9.0;
+                // In rain the average Bliss settles on (`atm_rain_mean`).
+                if rain_amount() > 0.0 {
+                    mean = atm_rain_mean(sun, moon, sky_k);
+                }
+                var wet: array<vec3<f32>, 9>;
+                var clear = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
+                    let dir = atm_mean_dir(i, sun);
+                    let a = atm_march(dir, sun, moon, sky_k, atm_background(mean), 4, 2);
+                    wet[i] = atm_rain(a.light, dir, a.through, mean);
+                    clear += wet[i];
+                }
+                // Bliss averages its sky with the clouds in it (deferred.vsh's skyCloudsFromTex,
+                // method only): an overcast sky's light is the decks' grey-white, not the clear
+                // air's blue behind them. The soft clouds marched along the same nine looks (this
+                // pass is drawn with their entry, `frame_look.z`), lit by this frame's sun and the
+                // clear sky's light (the palette set here: this pass may not read its own target).
+                // Without them the land under rain and snow, and the caves, took the clear sky's
+                // blue (lkmxS1: dark blue snow at noon, blue cave stone, a blue rain vista).
+                if scene.frame_look.z > 0.5 {
+                    let s = sky[in.index];
+                    let k = mix(1.0, clamp(fantasy_opt(OPT_CHAIN_NIGHT), 0.0, 1.0), smoothstep(-0.04, -0.2, scene.sun.y));
+                    PAL = Palette(p.zenith * k, p.horizon * k, p.glow * k, land_sun(sun, moon_k), land_ambient(clear / 9.0));
+                    PAL_READ = true;
+                    // And the fog over both, as in Bliss's map (deferred.fsh: GetVolumetricFog 1024 blocks
+                    // along each look, lit by the same sun and sky light as its clouds, its air by the
+                    // cloudy average, here this frame's clear one: this pass may not read its own
+                    // target): in rain its deep, sunlit fog is what turns the cloudy average, and so
+                    // the land's light, warm grey (Bliss's rain ground INDIRECT, 1 : 0.73 : 0.39).
+                    // The fog's air is lit by the cloudy average itself, x 5 (deferred.fsh's
+                    // GetVolumetricFog(..., averageSkyCol_Clouds * 5): last frame's, so over frames it
+                    // settles where the two agree; `land_ambient` is that x 5 in ours). Settled here in
+                    // four rounds from the clear average, the clouds marched once. Lit by the clear
+                    // one alone, a rain's map stayed a dark blue-grey where Bliss's settles warm
+                    // (lkmxE2d: the sun's share 0.016 under the deck, the map's air all the light).
+                    let ground = bc_ground_sky(sun, moon, sky_k, select(clear / 9.0, mean, rain_amount() > 0.0));
+                    // The map's clouds and fog take its light source x 2 (deferred.fsh's suncol * 2.0);
+                    // the screen's take its stored copy / 80 (composite2: x 150 / 80 = x 1.875), which
+                    // `land_sun` is: so x 2 / 1.875 here.
+                    let map_sun = land_sun(sun, moon_k) * (2.0 / 1.875);
+                    var cl: array<vec4<f32>, 9>;
+                    for (var i = 0; i < 9; i++) {
+                        if i == ATM_MEAN_SKIP { continue; }
+                        cl[i] = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), map_sun, ground);
+                    }
+                    var amb = land_ambient(clear / 9.0);
+                    var cloudy = vec3(0.0);
+                    for (var k = 0; k < 4; k++) {
+                        cloudy = vec3(0.0);
+                        for (var i = 0; i < 9; i++) {
+                            if i == ATM_MEAN_SKIP { continue; }
+                            let dir = atm_mean_dir(i, sun);
+                            let fog = fog_march(dir, 1024.0, 0.5, map_sun, ground, amb, 1.0, false);
+                            cloudy += (wet[i] * cl[i].a + cl[i].rgb) * fog.a + fog.rgb;
+                        }
+                        amb = land_ambient(cloudy / 9.0);
+                    }
+                    return vec4(amb, 1.0);
+                }
+                return vec4(land_ambient(clear / 9.0), 1.0);
+            }
+            return vec4(p.ambient, 1.0);
+        }
+        // The clouds' and the fog's sky light: the sky straight down (Bliss's skyGroundCol / 30, `bc_ground_sky`; `bc_sky_read`).
+        case 5u: {
+            if from_sky {
+                let moon = normalize(scene.moon.xyz);
+                let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
+                var sum = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
+                    sum += atm_march(atm_mean_dir(i, sun), sun, moon, sky_k, ATM_FLOOR, 4, 2).light;
+                }
+                let mean = sum / 9.0;
+                var clear = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
+                    let dir = atm_mean_dir(i, sun);
+                    let a = atm_march(dir, sun, moon, sky_k, atm_background(mean), 4, 2);
+                    clear += atm_rain(a.light, dir, a.through, mean);
+                }
+                // In rain the average Bliss settles on (`atm_rain_mean`) lights it.
+                if rain_amount() > 0.0 {
+                    return vec4(bc_ground_sky(sun, moon, sky_k, atm_rain_mean(sun, moon, sky_k)), 1.0);
+                }
+                return vec4(bc_ground_sky(sun, moon, sky_k, clear / 9.0), 1.0);
+            }
+            return vec4(p.ambient, 1.0);
+        }
+        // For debug view 13 only, laid out as Bliss's capture 2 swatches: along the nine looks of the
+        // cloudy average, 6 the clouds' light alone and 7 the fog's alone, in Bliss's raw units (x 12.3,
+        // as `land_ambient` takes the mean); 8 the clouds' and the fog's mean transmittance and, where
+        // Bliss has its atmosphereAlpha, our mean cloud shadow on the fog's steps.
+        case 6u, 7u, 8u: {
+            if from_sky && look_debug() == 13u {
+                let moon = normalize(scene.moon.xyz);
+                let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
+                var mean = atm_mean(sun, moon, sky_k);
+                var clear = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
+                    let dir = atm_mean_dir(i, sun);
+                    let a = atm_march(dir, sun, moon, sky_k, atm_background(mean), 4, 2);
+                    clear += atm_rain(a.light, dir, a.through, mean);
+                }
+                mean = select(clear / 9.0, atm_rain_mean(sun, moon, sky_k), rain_amount() > 0.0);
+                var cl_rgb = vec3(0.0);
+                var fog_rgb = vec3(0.0);
+                var alphas = vec3(0.0);
+                for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
+                    let dir = atm_mean_dir(i, sun);
+                    let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k) * (2.0 / 1.875), bc_ground_sky(sun, moon, sky_k, mean));
+                    let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k) * (2.0 / 1.875), bc_ground_sky(sun, moon, sky_k, mean), land_ambient(mean), 1.0, false);
+                    var sh = 0.0;
+                    for (var k = 0; k < 4; k++) {
+                        sh += bc_shadow_of(dir * (64.0 * pow(2.0, f32(k))), true) / 4.0;
+                    }
+                    cl_rgb += cl.rgb / 9.0;
+                    fog_rgb += fog.rgb / 9.0;
+                    alphas += vec3(cl.a, fog.a, sh) / 9.0;
+                }
+                let x = u32(in.clip.x);
+                return vec4(select(select(alphas, fog_rgb * 12.3, x == 7u), cl_rgb * 12.3, x == 6u), 1.0);
+            }
+            return vec4(0.0);
+        }
         default: { return vec4(0.0); }
     }
 }

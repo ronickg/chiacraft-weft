@@ -15,11 +15,12 @@
 //! order.
 
 pub mod body;
-mod breath;
+pub mod breath;
 mod camp;
 mod food;
 mod health;
 mod load;
+mod rot;
 mod shelter;
 mod stamina;
 mod temperature;
@@ -34,7 +35,8 @@ use weft_sdk::*;
 
 pub use breath::MAX_AIR;
 pub use camp::REST_SECS;
-pub(crate) use food::{crafted, life_used, made_for, spoiled};
+pub(crate) use food::{crafted, life_used, made_for, spoiled, stamp};
+pub(crate) use rot::LARDER;
 
 /// A tick, in seconds.
 const DT: f32 = 1.0 / 20.0;
@@ -63,8 +65,10 @@ pub fn register(r: &mut Registry) {
         component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
     r.edit(&PLAYER).attach(&VITALS);
+    health::register(r);
     r.world_tick(tick);
     food::register(r);
+    rot::register(r);
     temperature::register(r);
     stamina::register(r);
     body::register(r);
@@ -170,7 +174,8 @@ fn tick(w: &World) {
         food::effects(v, &s, capacity);
         body::tick(v, &stats);
         if pulse {
-            food::age(w, id);
+            // Carried food ages by the air one feels (`rot.rs`), then is stamped and marked.
+            rot::carried(w, id, v.outside);
             load::weigh(w, id, v, &stats);
         }
         let mods = effects::combine(v.effects());

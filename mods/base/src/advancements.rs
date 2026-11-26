@@ -311,44 +311,50 @@ fn client(r: &mut Registry) {
         let tabs: [crate::window::Tab; 1] = [("window.base.tab.stats", |c| {
             c.client().menu_open(&crate::levels::SCREEN);
         })];
-        crate::window::family_window(ui, S::column().pad(8.0).gap(6.0), Some("advancements.base.title"), &tabs, |ui| {
-            ui.row(S::row().gap(8.0), |ui| {
-                ui.spacer();
-                ui.text_bind_styled(S::column().class("dim").no_wrap(), |v, out| {
-                    let done = v
-                        .component(&ADVANCEMENTS)
-                        .map_or(0, |a| a.done.count_ones());
-                    out.set("advancements.base.progress", &[Arg::Int(done as i64), Arg::Int(ALL.len() as i64)]);
-                });
-            });
-            ui.panel("well", S::column().pad(6.0).gap(6.0), |ui| {
-                for (g, group) in GROUPS.iter().enumerate() {
-                    ui.row(S::row(), |ui| {
-                        ui.text_styled(S::column().w(90.0).no_wrap(), &format!("advancements.base.group.{group}"), &[]);
-                        for (n, (i, adv)) in ALL
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, a)| a.group == g)
-                            .enumerate()
-                        {
-                            let made = done & (1 << i) != 0;
-                            if n > 0 {
-                                ui.image(if made { "base:gui/advancement_line_done" } else { "base:gui/advancement_line" }, 6.0, 2.0);
-                            }
-                            let (title, desc) = (format!("advancement.base.{}", adv.id), format!("advancement.base.{}.desc", adv.id));
-                            let status = if made { "advancements.base.done" } else { "advancements.base.locked" };
-                            let tile = S::row()
-                                .size(26.0, 26.0)
-                                .center()
-                                .tooltip_args("advancements.base.tip", &[Arg::Key(&title), Arg::Key(&desc), Arg::Key(status)]);
-                            ui.panel(if made { "advancement_tile_done" } else { "advancement_tile" }, tile, |ui| {
-                                ui.item(adv.icon.id(), 1, S::default());
-                            });
-                        }
+        crate::window::family_window(
+            ui,
+            S::column().pad(crate::window::WINDOW_PAD).gap(6.0),
+            Some("advancements.base.title"),
+            &tabs,
+            |ui| {
+                ui.row(S::row().gap(8.0), |ui| {
+                    ui.spacer();
+                    ui.text_bind_styled(S::column().class("dim").no_wrap(), |v, out| {
+                        let done = v
+                            .component(&ADVANCEMENTS)
+                            .map_or(0, |a| a.done.count_ones());
+                        out.set("advancements.base.progress", &[Arg::Int(done as i64), Arg::Int(ALL.len() as i64)]);
                     });
-                }
-            });
-        });
+                });
+                ui.panel("well", S::column().pad(6.0).gap(6.0), |ui| {
+                    for (g, group) in GROUPS.iter().enumerate() {
+                        ui.row(S::row(), |ui| {
+                            ui.text_styled(S::column().w(90.0).no_wrap(), &format!("advancements.base.group.{group}"), &[]);
+                            for (n, (i, adv)) in ALL
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, a)| a.group == g)
+                                .enumerate()
+                            {
+                                let made = done & (1 << i) != 0;
+                                if n > 0 {
+                                    ui.image(if made { "base:gui/advancement_line_done" } else { "base:gui/advancement_line" }, 6.0, 2.0);
+                                }
+                                let (title, desc) = (format!("advancement.base.{}", adv.id), format!("advancement.base.{}.desc", adv.id));
+                                let status = if made { "advancements.base.done" } else { "advancements.base.locked" };
+                                let tile = S::row()
+                                    .size(26.0, 26.0)
+                                    .center()
+                                    .tooltip_args("advancements.base.tip", &[Arg::Key(&title), Arg::Key(&desc), Arg::Key(status)]);
+                                ui.panel(if made { "advancement_tile_done" } else { "advancement_tile" }, tile, |ui| {
+                                    ui.item(adv.icon.id(), 1, S::default());
+                                });
+                            }
+                        });
+                    }
+                });
+            },
+        );
     });
     r.key(&OPEN, "L").on_client(|c| {
         c.menu_open(&SCREEN);

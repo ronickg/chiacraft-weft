@@ -1,7 +1,7 @@
 //! The layers of a biome's vegetation under and between its trees (`notes/VEGETATION.md`): the
 //! floor the ground shows, ferns, shrubs, and young trees, each biome's from the real place its
 //! climate comes from (`notes/ECOLOGY.md`, "Each biome's real place"). Base sets them on its
-//! biomes as components (`mods/base/src/worldgen.rs`), so another mod sets its own the same way.
+//! biomes as components (`mods/base/src/worldgen/mod.rs`), so another mod sets its own the same way.
 //! The canopy is `TREES` and `STAND_TREES`; the grass is `forage::GRASS_COVER`; the wild plants
 //! and flowers are `wild`.
 
@@ -181,8 +181,11 @@ mod tests {
     #[test]
     fn layers_leave_room() {
         for l in &LAYERS {
-            // Floor patches up to twice their cover under crowns; under half the soil.
-            assert!(l.floor_cover * 2.0 < 0.5, "{}: floor patches too thick", l.biome);
+            // Floor patches are twice their cover under crowns, where a closed forest's litter may
+            // take all the soil (the tropical forest's nearly all), and half in the open, where
+            // they leave the grass most of it.
+            assert!((0.0..=1.0).contains(&l.floor_cover), "{}: floor cover {}", l.biome, l.floor_cover);
+            assert!(l.floor_cover * 0.5 < 0.5, "{}: floor patches too thick in the open", l.biome);
             // Ferns round trunks are three times as thick; still under half the bare soil.
             assert!(l.ferns * 3.0 < 0.5, "{}: ferns too thick", l.biome);
             assert!((0.0..=0.5).contains(&l.shrubs), "{}: shrubs", l.biome);

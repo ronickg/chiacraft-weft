@@ -93,7 +93,12 @@ fn far_ao(p: PostPixel, turn_in: f32) -> f32 {
     let c0 = scene.view_proj * vec4(pos, 1.0);
     let c1 = scene.view_proj * vec4(pos + scene.right.xyz, 1.0);
     let per_block = max(length(c1.xy / c1.w - c0.xy / c0.w) * 0.5, 1e-5);
-    let ring = FAR_AO_RADIUS * 2.0 / per_block;
+    let wide = FAR_AO_RADIUS * 2.0 / per_block;
+    // At Bliss's strength (`base:look_ao_power`) the ring no wider than 8 blocks: grown with the
+    // distance, a far hill's foot took a soft dark blot tens of blocks wide (lsK ao4/ao6, 11-22).
+    let power = scene.options[10][1];
+    let shrink = select(1.0, min(1.0, 8.0 / wide), power > 0.0);
+    let ring = wide * shrink;
     // Start turned by a 4x4 ordered pattern over this half-size image (2x2 at Low), the same every
     // frame: the full-size part averages each block by depth, so every turn meets in a pixel.
     let cheap = p.strength < 0.75;
@@ -113,7 +118,7 @@ fn far_ao(p: PostPixel, turn_in: f32) -> f32 {
         // A Vogel spiral: evenly over the disc.
         let r = sqrt((f32(i) + 0.5) / f32(FAR_AO_SAMPLES));
         let a = (f32(i) * 2.3999632 + turn * 6.2831853);
-        let at = p.uv + vec2(cos(a) * aspect, sin(a)) * r * FAR_AO_RADIUS;
+        let at = p.uv + vec2(cos(a) * aspect, sin(a)) * r * FAR_AO_RADIUS * shrink;
         if at.x < 0.0 || at.x > 1.0 || at.y < 0.0 || at.y > 1.0 || post_depth(p, at) <= 0.0 {
             continue;
         }
@@ -132,6 +137,14 @@ fn far_ao(p: PostPixel, turn_in: f32) -> f32 {
         }
     }
     var ao = 1.0 - clamp(closed / f32(FAR_AO_SAMPLES) * FAR_AO_STRENGTH, 0.0, 0.8);
+    // Or as strong as Bliss's (`base:look_ao_power`, the shader pack's option 41, read raw: 0 as
+    // made): what is left open to the sky raised to that power (Bliss's SSAO^6 on the sky light,
+    // `composite1.fsh:1180-1188`), so a gap half closed in goes near black. Its crown interiors, the
+    // ground between crowns and the shaded sides went navy-black where ours stayed lit (controlled
+    // frames, 11-22: noon shade 0 19 65 against ours 15 32 67).
+    if power > 0.0 {
+        ao = pow(clamp(1.0 - closed / f32(FAR_AO_SAMPLES), 0.0, 1.0), power);
+    }
     // The sky's light only: a face the sun reaches keeps most of its light (the sun's), by day.
     let sun = scene.sun;
     let day = smoothstep(0.0, 0.15, sun.y);

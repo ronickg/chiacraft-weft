@@ -223,7 +223,10 @@ pub async fn no_block_into_mob(t: T) -> R {
         .await?;
     t.fill(add(spot, [1, 0, 0]), add(spot, [1, 2, 0]), "stone")
         .await?;
-    t.op(&format!("spawn base:pig {}", at(spot))).await?;
+    let pig = t.op(&format!("spawn base:pig {}", at(spot))).await?;
+    // Held in its nook: on CI the click came seconds after the spawn, time for the pig to walk
+    // out of the open side, and the stone then rightly went into the empty nook.
+    t.op(&format!("drive {pig} 0 0 200")).await?;
     t.op("put me 0 stone 1").await?;
     t.c().select_slot(0);
     t.secs(0.2).await?;
@@ -231,7 +234,8 @@ pub async fn no_block_into_mob(t: T) -> R {
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check_eq(t.block(spot).await?, "core:air".to_string(), "no stone in the pig");
+    let (got, pig_at) = (t.block(spot).await?, t.op(&format!("entity {pig}")).await?);
+    t.check(got == "core:air", format!("no stone in the pig: got {got:?}, pig at {pig_at}"));
     Ok(())
 }
 

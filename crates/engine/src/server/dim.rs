@@ -196,6 +196,10 @@ pub enum DimEvent {
 /// Path searches a region does per tick at most (in parallel); more wait for the next tick (a
 /// spawned crowd all starting to walk at once).
 const PATHS_PER_TICK: usize = 128;
+/// Walking faster than this share of its speed (a chase or a flight at 1.6 and up; not a pack
+/// keeping up at 1.3, so a crowd walking along pays nothing), a mob's path is looked for
+/// again after 5 ticks instead of 20 when its target moves (`navigation`).
+const SPRINT_PATHS: f32 = 1.5;
 
 pub struct Dim {
     pub id: u32,
@@ -2506,7 +2510,12 @@ impl Dim {
             let e = &mut list[i];
             let nav = e.nav.as_mut().unwrap();
             nav.path = path;
-            (nav.next, nav.repath, nav.found_for, nav.stuck) = (1, e.age + 20, Some(nav.target), 0);
+            // The stuck count goes on across a new path: a path that ends short of its target
+            // asks for one every 20 ticks, which reset it and so walked in place for good.
+            // A sprinting chaser (or one running away) looks again a quarter second on, not a
+            // second: a deer turning hard was a second's run off the end of its hunter's path.
+            let again = if nav.speed > SPRINT_PATHS { 5 } else { 20 };
+            (nav.next, nav.repath, nav.found_for) = (1, e.age + again, Some(nav.target));
         }
         for e in list.iter_mut().filter(|e| walks(e)) {
             let frame = e.nav.as_ref().and_then(|n| n.frame);
@@ -4241,9 +4250,13 @@ impl Dim {
 
     pub fn timer_at(&mut self, space_id: u64, p: IVec3, delay: u32, event: u32, data: &[u8]) {
         let at = self.time + delay.max(1) as u64;
-        self.space_mut(space_id)
+        let space = self.space_mut(space_id);
+        space
             .scheduled
             .push(Reverse((at, p.to_array(), event, data.into())));
+        // Saved with its cube: a cube saved before and untouched since is not saved again, and
+        // its timer was lost on a reload (Weft bug).
+        space.modified.insert(cube_of(p));
     }
 
     /// Someone here would see a gizmo of `group` (empty: anyone).

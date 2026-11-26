@@ -8,6 +8,7 @@ pub mod frame_look;
 pub mod froxels;
 pub mod gizmo;
 pub mod glow;
+pub mod ground_map;
 mod lightning;
 pub mod lod;
 pub mod looks;
@@ -754,6 +755,8 @@ pub struct Client {
     shadow_index: u32,
     /// The far cascade: map, light, scene buffers and bindless index, as the near one's.
     shadow_far_map: Option<weft_render::TextureId>,
+    /// The ground's height about the camera for packs (`core:ground_map`, chiacraft's mist).
+    ground_map: ground_map::GroundMap,
     shadow_far: (glam::Mat4, bool),
     shadow_far_bufs: Vec<BufferId>,
     shadow_far_index: u32,
@@ -889,6 +892,9 @@ pub struct Client {
     /// particles, then cracks, gizmo fills and the hand.
     late: CommandList,
     hand_late: CommandList,
+    /// What is drawn over the path tracer's composite (`over_pt`): the blended particles, the
+    /// weather, the hand and the overlays, none of which write the depth its test reads.
+    over_pt: CommandList,
     /// The world's copy for what is seen through (`gpu_layout::Scene::behind`), set by the app each
     /// frame. What is drawn after the opaque world goes into `render`'s `after` list, which the app
     /// puts after the occlusion's depth (and after the copy, with it on).
@@ -899,6 +905,12 @@ pub struct Client {
     /// Temporal anti-aliasing's count image this frame, bindless index + 1 (`Scene::taa_frame`),
     /// set by the app before `render` (`post::Post::taa_out`).
     pub taa_out: u32,
+    /// The last frame's exposure texel, bindless index + 1 (`Scene::frame_look.w`), set by the app
+    /// before `render` (`post::Post::exposure_last`).
+    pub exposure_last: u32,
+    /// The motion image this frame, bindless index + 1 (`Scene::taa_frame.z`), set by the app
+    /// before `render` (`post::Post::motion_index`).
+    pub motion_out: u32,
     /// The camera the last frame was drawn with, for the backend's upscaler (`upscale_camera`).
     pub frame_camera: Option<FrameCamera>,
     /// Seconds until the next dust piece from the block being hit.
@@ -924,6 +936,10 @@ pub struct Client {
     aurora: f32,
     /// How closed the canopy is where the player is (a mod's air, `air_flags::CANOPY_SHIFT`).
     canopy: f32,
+    /// The sky light where the eye is, 0..1 (its level / 15), eased over a couple of seconds
+    /// (`Scene::frame_look.y`): a pack dims what the open sky lights by it in a cave or under cover,
+    /// as Bliss does with Iris's `eyeBrightnessSmooth`.
+    eye_sky: f32,
     /// How wet the ground is where the player is, 0..1 (`weather_effects`, `Scene::canopy.y`).
     wet: f32,
     /// How far puddles have grown where the player is, 0..1 (`weather_effects`, `Scene::canopy.z`):
@@ -960,6 +976,9 @@ pub struct Client {
     told_mining: Option<(u64, IVec3, crate::world::placement::Part)>,
     /// What the server says this player may do (`abi::permission`).
     pub permission: u32,
+    /// chiacraft: the world runs in this process, so this player is its owner (for offering the
+    /// owner's moderation commands, `server::OWNER_MODERATION`; the server decides).
+    pub local_host: bool,
     /// Seconds since it died, while it is.
     dead_for: Option<f32>,
     pub components: FxHashMap<u32, Vec<u8>>,
@@ -1230,6 +1249,7 @@ impl Client {
             shadow: (glam::Mat4::IDENTITY, false),
             shadow_index: 0,
             shadow_far_map: None,
+            ground_map: Default::default(),
             shadow_far: (glam::Mat4::IDENTITY, false),
             shadow_far_bufs: Vec::new(),
             shadow_far_index: 0,
@@ -1281,9 +1301,12 @@ impl Client {
             frames: Vec::new(),
             late: CommandList::default(),
             hand_late: CommandList::default(),
+            over_pt: CommandList::default(),
             behind: [0.0; 4],
             taa_last: None,
             taa_out: 0,
+            exposure_last: 0,
+            motion_out: 0,
             frame_camera: None,
             hit_dust: 0.0,
             sounds: Vec::new(),
@@ -1325,6 +1348,7 @@ impl Client {
             moved_over: 0.0,
             dead: false,
             permission: 0,
+            local_host: false,
             fog: 0.0,
             wind: Vec2::ZERO,
             snow_cover: 0.0,
@@ -1332,6 +1356,7 @@ impl Client {
             dust: 0.0,
             aurora: 0.0,
             canopy: 0.0,
+            eye_sky: 1.0,
             wet: 0.0,
             puddles: 0.0,
             snow_line: SNOW_LINE_NONE,
@@ -2689,6 +2714,10 @@ impl Client {
         self.render.update_solid(gpu, &self.world, center);
         drop(p);
         self.world.set_eye(center.y);
+        let (bodies, epoch) = self.world.body_glow();
+        let entities = self.world.glow.sources();
+        self.render
+            .set_body_lights(bodies.iter().chain(entities.iter().map(|(p, l)| (p, l))), epoch + self.world.glow.epoch);
         // Edits and what is around the player go right away.
         let p = crate::diag::part("uploads near (no budget)");
         let (now, later) = self.world.take_meshes(center);
@@ -3236,8 +3265,17 @@ impl Client {
                 .unwrap_or(c.game.entities[c.game.player_kind as usize].size());
         } else if comp == game_mode {
             let mode = crate::world::GameMode(u32::from_bytes(bytes).unwrap_or(0) as u16);
+            let always = crate::tag_bits::game_mode::ALWAYS_FLY;
+            let was_always = self.mode.has(always);
             self.mode = mode;
-            self.player.flying = mode.has(crate::tag_bits::game_mode::ALWAYS_FLY) || (self.can_fly() && self.player.flying);
+            // Flight that comes with the mode starts here. Flight a mode allows (CAN_FLY) arrives
+            // with the attributes a tick later, which also end it when the new mode takes it away:
+            // ended here, it undid flying started between the two (chiacraft, Weft bug).
+            if mode.has(always) {
+                self.player.flying = true;
+            } else if was_always && !self.can_fly() {
+                self.player.flying = false;
+            }
             self.player.noclip = mode.has(crate::tag_bits::game_mode::NOCLIP);
             self.player.fly_speed = 1.0;
         } else if comp == permission {
@@ -3548,6 +3586,7 @@ impl Client {
         if let Some(t) = self.shadow_far_map.take() {
             gpu.destroy_texture(t);
         }
+        self.ground_map.destroy(gpu);
         self.shadow_far_drawn = None;
         for b in self.shadow_far_bufs.drain(..) {
             gpu.destroy_buffer(b);
@@ -3597,7 +3636,10 @@ impl Client {
         // falls comes once it is more than half there, over FALLS_SECS, and stops first. Both
         // went from nothing to all in five seconds, the moment the spell began (Ronald, 11-06:
         // "it like change in 2 seconds from clear to rain").
-        self.gloom += (share - self.gloom).clamp(-dt / GLOOM_SECS, dt / GLOOM_SECS);
+        // Under `--test`, upstream's five seconds: its checks wait for the weather's look, and
+        // ninety took minutes at CI's frame rates (the client counts a quarter second a frame).
+        let gather = if crate::app::api::launch_options().contains_key("test") { 5.0 } else { GLOOM_SECS };
+        self.gloom += (share - self.gloom).clamp(-dt / gather, dt / gather);
         let none = weft_abi::WeatherLook::default();
         let to = weather.look;
         let sky = |clear: f32, rain: f32| clear + (rain - clear) * self.gloom;
@@ -3625,6 +3667,12 @@ impl Client {
         self.aurora += (aurora - self.aurora).clamp(-dt / 20.0, dt / 20.0);
         let canopy = ((flags >> weft_abi::air_flags::CANOPY_SHIFT) & 255) as f32 / 255.0;
         self.canopy += (canopy - self.canopy).clamp(-dt / 10.0, dt / 10.0);
+        let eye = self.camera().pos.floor().as_ivec3();
+        let sky = self
+            .world
+            .light_loaded(eye)
+            .map_or(self.eye_sky, |l| weft_abi::light::sky(l) as f32 / 15.0);
+        self.eye_sky += (sky - self.eye_sky) * (1.0 - (-dt / 1.5).exp());
         // The ground wets as the rain comes (in about twenty seconds) and dries after it at the
         // pace the air there gives (a mod's `DRYING_SHIFT`; 0, about two minutes): it stayed wet
         // only as long as the rain fell, gone 25 s after (Tester 2's after-rain shots, 11-05).
@@ -3772,9 +3820,10 @@ impl Client {
             cloud_cache: [0; 4],
             atmosphere_cache: [0; 4],
             rain_cover: [0.0; 4],
+            ground_map: self.ground_map.scene,
             lightning_start,
             lightning_end,
-            weather: [self.wind.x, self.wind.y, self.fog, self.thunder()],
+            weather: [self.wind.x, self.wind.y, self.fog.max(evening_mist_floor(self.sun())), self.thunder()],
             eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, self.moon_light()],
             ground: [self.snow_cover, self.snowing, self.dust, self.aurora],
             behind: self.behind,
@@ -3795,7 +3844,7 @@ impl Client {
             // Filled in by `render` (`taa_frame`).
             taa: [0.0; 4],
             taa_prev: [[0.0; 4]; 4],
-            taa_frame: [self.taa_out as f32, crate::post::motion() as u32 as f32, 0.0, 0.0],
+            taa_frame: [self.taa_out as f32, crate::post::motion() as u32 as f32, self.motion_out as f32, 0.0],
             dlss: [crate::post::mip_bias(), 0.0, 0.0, 0.0],
             cloud_shadow: [0.0; 4],
             prev_view_proj: [[0.0; 4]; 4],
@@ -3826,7 +3875,15 @@ impl Client {
                 _ => [0.0; 4],
             },
             rt: [
-                self.render.rt_traced() as u32 as f32,
+                // 1 traced shadows; 2 also path traced, whose pass lights the terrain again (the
+                // world's shader leaves its rays there to it, `world.wgsl`'s `pt_takes`).
+                if !self.render.rt_traced() {
+                    0.0
+                } else if shadow_setting("core:path_traced", 0.0) > 0.5 && self.render.pt_ready() {
+                    2.0
+                } else {
+                    1.0
+                },
                 (self.render.rt_frame_no() % (1 << 24)) as f32,
                 (shadow_setting("core:rt_shadows", 0.0) > 1.5) as u32 as f32,
                 self.render.rt_reflects() as u32 as f32,
@@ -3998,6 +4055,18 @@ impl Client {
         self.render.rt_reload
     }
 
+    /// The opaque cubes' depth into `depth` before the world's pass (`WorldRenderer::depth_prepass`),
+    /// when this frame's draw is set for it: true, and the world's pass keeps that depth.
+    pub fn depth_prepass(&self, list: &mut weft_render::CommandList, depth: weft_render::TextureId) -> bool {
+        self.render.depth_prepass(list, depth)
+    }
+
+    /// What `render` left to draw over the path tracer's composite (the blended particles, the
+    /// weather, the hand and the overlays), swapped for `spare` (handed back cleared next frame).
+    pub fn swap_over_pt(&mut self, spare: CommandList) -> CommandList {
+        std::mem::replace(&mut self.over_pt, spare)
+    }
+
     /// Path traced lighting (`core:path_traced`, `WorldRenderer::path_trace`), after the world's
     /// pass into `target` (the world's image, its size `size`) and before the effects: first the
     /// G-buffer pass (`WorldRenderer::gbuffer_pass`), then the traced light.
@@ -4013,7 +4082,9 @@ impl Client {
         if shadow_setting("core:path_traced", 0.0) > 0.5 {
             let debug = shadow_setting("core:pt_debug", 0.0) as u32;
             // The G-buffer (albedo, normal and roughness, spec) the denoisers read: `render.gb_images`.
+            crate::diag::probe(list, "pt_before");
             self.render.gbuffer_pass(gpu, list, depth, size);
+            crate::diag::probe(list, "pt_gbuffer");
             self.render
                 .path_trace(gpu, list, slot, depth, target, size, debug, false);
         }
@@ -4225,6 +4296,9 @@ impl Client {
         // Ray tracing's scene (`core:rt_shadows`): this frame's builds and its TLAS, before the
         // world's draws that bind it (`app` switched the world shader before this, `rt_switch`).
         self.render.rt_frame(gpu, early, frame.slot, &cam);
+        // The ground's height for the pack (chiacraft's mist banks), before the scene reads it.
+        self.ground_map
+            .frame(gpu, crate::settings::ground_map(), cam.pos, &self.world);
         let mut scene = self.scene(&cam, frame);
         (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
@@ -4359,6 +4433,8 @@ impl Client {
         // The sky readied this frame's soft clouds: their fields in the scene.
         (scene.soft_clouds, scene.prev_view_proj, scene.cloud_moved) = self.sky.soft.scene;
         scene.frame_look = self.sky.frame_look.scene;
+        scene.frame_look[1] = self.eye_sky;
+        scene.frame_look[3] = self.exposure_last as f32;
         scene.froxels = self.sky.froxels.scene;
         scene.cloud_shadow = self.sky.cloud_shadow.scene;
         gpu.mapped(scene_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
@@ -4420,17 +4496,22 @@ impl Client {
         );
         drop(s);
         let s = crate::diag::span("render/particles and weather");
-        self.particles.draw(list, &mut late, scene_buf);
+        // The blended particles and the weather into `over_pt`, then the hand and the overlays: the
+        // app draws them after the path tracer's composite, which drew over them (rain, a torch's
+        // smoke, the cracks, the outline: they write no depth, so its test took their pixels).
+        let mut over = std::mem::take(&mut self.over_pt);
+        over.clear();
+        self.particles.draw(list, &mut over, scene_buf);
         self.weather_render
-            .draw(gpu, &mut late, frame, &cam, scene_buf, &self.world, weather, weather_ticks, self.frame_dt);
+            .draw(gpu, &mut over, frame, &cam, scene_buf, &self.world, weather, weather_ticks, self.frame_dt);
         drop(s);
         self.sky.draw_overlay(&mut hand_late, scene_buf);
         // Drawn by the app once the solid world's depth was taken for the next frame's occlusion
         // culling (upstream 85f85db9a): the sky, clouds, translucent things, particles, weather and
         // the hand hide nothing behind them for good. With the copy, after the copy.
         after.append(&mut late);
-        after.append(&mut hand_late);
-        (self.late, self.hand_late) = (late, hand_late);
+        over.append(&mut hand_late);
+        (self.late, self.hand_late, self.over_pt) = (late, hand_late, over);
         after.push(weft_render::Cmd::Mark);
         world_depth.is_some()
     }
@@ -4492,10 +4573,34 @@ fn smoothstep(a: f32, b: f32, x: f32) -> f32 {
 const FAR_TERRAIN_WAIT: u32 = 10;
 const FAR_DEPTH: f32 = 1200.0;
 
+/// The mist the pack's evening layer brings with it (chiacraft, `base:look_evening_mist`, 0 as made
+/// and then none): as much as `/air` 0.3 a step (up to 3) with the sun low in the west, as Bliss's evening fog has
+/// its own amount whatever the weather. Only what the shaders see (`Scene::weather`); the air's own
+/// mist, and play, are untouched. Without it the layer drew nothing on a clear evening (lsAD_mist).
+/// The same window as the pack's `evening_mist`.
+fn evening_mist_floor(sun: [f32; 4]) -> f32 {
+    let get = |name: &str| crate::config::by_name(name).map_or(0.0, |id| (crate::config::get(id) as f32).clamp(0.0, 3.0));
+    let (k, dawn) = (get("base:look_evening_mist"), get("base:look_mist_clock"));
+    if k <= 0.0 && dawn <= 0.0 {
+        return 0.0;
+    }
+    let ss = |a: f32, b: f32, x: f32| {
+        let t = ((x - a) / (b - a)).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    };
+    let (x, y) = (sun[0], sun[1]);
+    // The mist clock (`base:look_mist_clock`): a dawn mist every morning, whatever the air, from the
+    // sun 14° under the horizon to burnt off by 25° up, 0.1 at 1 (our dampest dawn mist), as
+    // Bliss's morning mist comes by the clock. The pack does not take it out of the air's mist
+    // (`air_mist`), so it lies as the dawn mist does.
+    let morning = 0.1 * dawn * ss(-0.1, 0.1, x) * ss(-0.25, -0.1, y) * (1.0 - ss(0.2, 0.42, y));
+    0.3 * k * ss(0.1, -0.1, x) * (1.0 - ss(0.03, 0.3, y)) * ss(-0.2, -0.05, y) + morning
+}
+
 /// The values of the settings the shader pack reads (`Scene::options`).
-fn pack_options() -> [[f32; 4]; 12] {
-    let mut out = [[0.0; 4]; 12];
-    for (i, name) in crate::packs::pack_options().iter().enumerate().take(48) {
+fn pack_options() -> [[f32; 4]; 20] {
+    let mut out = [[0.0; 4]; 20];
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(80) {
         if let Some(id) = crate::config::by_name(name) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }
@@ -4713,6 +4818,7 @@ fn step_player(p: &mut LocalPlayer, input: &Input, block: &impl physics::Cells, 
         jump_boost: if sprint { forward * 0.2 } else { DVec3::ZERO },
         swim: jump,
         careful: sneak,
+        drop_guard: 0.0,
         sprint: swimming,
         swim_look: swimming.then(|| (p.pitch as f64).sin()),
         climb: p.climb,

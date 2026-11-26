@@ -26,7 +26,8 @@ Every image is also kept for good in the archive (ART_ARCHIVE, default
 game texture an install replaces. Nothing is ever deleted from it.
 
 Options: --ref "07,16" (reference sheets by number or name part, comma-separated), --no-ref, --dir (default run/art/, kept out of git), --green (purple or pink things, so the background
-can be keyed), --pale (pale things whose outline may be light), --tries N (default 3). Output in --dir: NAME.png (as generated), NAME_px.png (the exact sprite),
+can be keyed), --pale (pale things whose outline may be light), --tries N (default 3). Output in --dir: NAME.png (as generated), NAME_px.png (the sprite: the exact cut, and for items pixfix's cleanup of
+orphan pixels and the outline; --no-fix skips it, NAME_raw_px.png keeps the cut before it),
 NAME_checks.json (every try's numbers), failed tries as NAME__tryK.png.
 """
 import argparse
@@ -444,6 +445,92 @@ def snap(path, w, h, full, green=False):
     return out
 
 
+def pixfix(sprite, pale=False, near=18.0, speck=64.0, dark=0.42, green=False):
+    """The item cut's one cleanup (Ronald via Planner, 11-22, after the pickaxe colouring test, row E2):
+    1. an orphan, a pixel with no 4-neighbour within `near` RGB of its color but one within `speck`
+       (a speckle of the same material), takes its neighbours' most common color, unless it is one of
+       the icon's brightest (a deliberate highlight or glint); a lone pixel of another material (a
+       1 px gold band on a leather handle, a rivet) is a detail and stays;
+    2. the silhouette's edge (a pixel touching the background or the canvas side) becomes an unbroken
+       dark outline: the darkest nearby color of the same material (within 2 px, close in hue), or the
+       icon's own darkest color of that hue anywhere; when it has none dark enough, that darkest color
+       taken down to `dark` of the icon's brightness, one new outline shade per material);
+    3. on magenta, edge pixels tinted by the key (a pink fringe from the cut) go.
+    `pale` things (paper, feathers) keep their light edges. Palette, shapes and every other pixel stay
+    as drawn: this is not the palette cut or grid guessing that mangled icons before."""
+    import numpy as np
+    a = sprite.astype(float).copy()
+    h, w = a.shape[:2]
+    if not green:  # the key's pink fringe: magenta-tinted pixels at the edge
+        r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        pink = (a[..., 3] > 0) & (r > 120) & (b > 80) & (g < 0.62 * np.minimum(r, b))
+        a[pink, 3] = 0
+    op = a[..., 3] > 0
+    if not op.any():
+        return sprite
+    lum = 0.3 * a[..., 0] + 0.59 * a[..., 1] + 0.11 * a[..., 2]
+    bright = np.percentile(lum[op], 95)
+    N4 = ((0, 1), (0, -1), (1, 0), (-1, 0))
+    src = a.copy()
+    for y in range(h):
+        for x in range(w):
+            if not op[y, x] or lum[y, x] >= bright:
+                continue
+            ns = [src[y + dy, x + dx, :3] for dy, dx in N4
+                  if 0 <= y + dy < h and 0 <= x + dx < w and op[y + dy, x + dx]]
+            dist = [np.sqrt(((n - src[y, x, :3]) ** 2).sum()) for n in ns]
+            if len(ns) < 2 or min(dist) <= near or min(dist) > speck:
+                continue
+            ns = [n for n, d in zip(ns, dist) if d <= speck]
+            groups = []  # the neighbours clustered within `near`: the biggest group's first color wins
+            for n in ns:
+                for g in groups:
+                    if np.sqrt(((g[0] - n) ** 2).sum()) <= near:
+                        g.append(n)
+                        break
+                else:
+                    groups.append([n])
+            a[y, x, :3] = max(groups, key=len)[0]
+    if pale:
+        return a.astype(np.uint8)
+    lum = 0.3 * a[..., 0] + 0.59 * a[..., 1] + 0.11 * a[..., 2]
+    inner = np.median(lum[op])
+    limit = max(dark * inner, 40.0)
+
+    def hue(c):
+        m = c.max()
+        return c / m if m > 0 else c
+
+    out = a.copy()
+    for y in range(h):
+        for x in range(w):
+            if not op[y, x]:
+                continue
+            edge = any(not (0 <= y + dy < h and 0 <= x + dx < w) or not op[y + dy, x + dx] for dy, dx in N4)
+            if not edge or lum[y, x] <= limit:
+                continue
+            best = None
+            for rad in (2, max(h, w)):  # near first, then anywhere in the icon
+                if best:
+                    break
+                for yy in range(max(0, y - rad), min(h, y + rad + 1)):
+                    for xx in range(max(0, x - rad), min(w, x + rad + 1)):
+                        if op[yy, xx] and lum[yy, xx] <= limit and \
+                                np.abs(hue(a[yy, xx, :3]) - hue(a[y, x, :3])).max() < 0.25 and \
+                                (best is None or lum[yy, xx] < lum[best]):
+                            best = (yy, xx)
+            if best:
+                out[y, x, :3] = a[best][:3]
+                continue
+            # nothing dark enough of this hue: the icon's darkest color of the hue, darkened once to
+            # the limit, so a material gets one outline shade (not a new color per pixel)
+            same = [(lum[yy, xx], yy, xx) for yy in range(h) for xx in range(w)
+                    if op[yy, xx] and np.abs(hue(a[yy, xx, :3]) - hue(a[y, x, :3])).max() < 0.25]
+            l0, yy, xx = min(same)
+            out[y, x, :3] = np.round(a[yy, xx, :3] * (limit / max(l0, 1)))
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
 def vertical_runs(sprite, longest=6):
     """Straight vertical edges (an opaque pixel with nothing to its right, `longest`+ px down one
     column): a tool's working part cut flat against the canvas side, which Ronald rejects."""
@@ -541,7 +628,13 @@ def make(a):
         shutil.copy(os.path.join(a.dir, f"{a.name}__try{made[0]}.png"), out)
     from PIL import Image
     pxp = os.path.join(a.dir, a.name + "_px.png")
-    Image.fromarray(snap(out, w, h, full, a.green)).save(pxp)
+    sprite = snap(out, w, h, full, a.green)
+    if a.kind == "item" and not full and not getattr(a, "no_fix", False):
+        raw = os.path.join(a.dir, a.name + "_raw_px.png")  # the exact cut, before the cleanup
+        Image.fromarray(sprite).save(raw)
+        archive(raw, f"{a.name}__raw_px", "cut")
+        sprite = pixfix(sprite, a.pale, green=bool(a.green))
+    Image.fromarray(sprite).save(pxp)
     archive(pxp, f"{a.name}__px", "cut")
     passed = tries and tries[-1].get("passed")
     return f"{a.name}: {'passed' if passed else 'FAILED the checks'} after {len(tries)} tr{'y' if len(tries) == 1 else 'ies'} {tries[-1] if tries else ''}"
@@ -563,7 +656,7 @@ def install(a):
 def main():
     if len(sys.argv) > 2 and sys.argv[1] == "batch":
         jobs = json.load(open(sys.argv[2]))
-        base = dict(what="", ref="", no_ref=False, type="", guide_only=False, cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3, like="", diagonal=False, key="",
+        base = dict(what="", ref="", no_ref=False, type="", guide_only=False, cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3, like="", diagonal=False, key="", no_fix=False,
                     dir=SCRATCH, mod="base")
         # Two at a time by default (the crew's rule for batch scripts on the Mac); ART_JOBS overrides.
         with ThreadPoolExecutor(int(os.environ.get("ART_JOBS", "2"))) as ex:
@@ -601,6 +694,7 @@ def main():
     ap.add_argument("--key", default="", help="another style key of ours (approved art) instead of the kind's Our key.png")
     ap.add_argument("--like", default="", help="our own drawing(s), comma-separated paths, to match in shape (a chosen design)")
     ap.add_argument("--tries", type=int, default=3)
+    ap.add_argument("--no-fix", action="store_true", help="items: keep the exact cut, without pixfix's orphan and outline cleanup")
     ap.add_argument("--dir", default=SCRATCH)
     ap.add_argument("--mod", default="base", help="install: the mod whose texture it replaces")
     a = ap.parse_args()

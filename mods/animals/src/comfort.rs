@@ -19,6 +19,14 @@ use crate::species::{self, SPECIES};
 static FREEZE: DamageCause = DamageCause::named("base:freeze");
 static HEAT: DamageCause = DamageCause::named("base:heat");
 
+/// Whether damage of `cause` comes from its own body (starving, thirst, the cold, the heat), not
+/// from anything round it: it doesn't make it run (`taming::hurt`) or fear the place
+/// (`memory`). A parched deer hurt by its thirst at the pool's edge fled from it again and again
+/// and marked the pool as feared, and died 130 blocks off (ai1124_savanna6).
+pub fn bodily(cause: u32) -> bool {
+    cause == damage_cause::STARVE || cause == crate::drink::THIRST.id() || cause == FREEZE.id() || cause == HEAT.id()
+}
+
 value! {
     #[derive(Default)]
     /// How its body is (once a second), sent to whoever has its screen open.
@@ -58,6 +66,9 @@ const FIRE_LOOK: i32 = 16;
 /// Places tried for a better one, and degrees better it must be to go.
 const TRIES: u32 = 12;
 const BETTER: f32 = 1.5;
+/// A test's chill (`/animalprof chill 1`): every warm-blooded hunter feels cold, not freezing,
+/// whatever the air (`herd_wolves_cold.txt`).
+pub static CHILL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// A tame's health lost to the cold or heat stops at this share of its max.
 const TAME_FLOOR: f32 = 0.1;
 
@@ -113,6 +124,8 @@ pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState, secs: f32) -> f3
         let core = temperature::step_core(start, body.target(air), secs, mass);
         (core, temperature::feeling(core), 1.0)
     };
+    let feeling =
+        if !s.bio.cold_blooded && s.hunts() && CHILL.load(std::sync::atomic::Ordering::Relaxed) { Feeling::Cold } else { feeling };
     let feel = FEELINGS.iter().position(|&f| f == feeling).unwrap_or(0);
     let condition = condition(a);
     if let Some(b) = w.component_mut(id, &BODY) {
@@ -156,7 +169,17 @@ pub fn speed(w: &World, id: u64) -> f32 {
 /// shade, into water, by a fire, under a roof) and rests there; it takes the turn while it does.
 pub fn seek(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(b) = w.component(id, &BODY) else { return false };
-    let uneasy = matches!(FEELINGS.get(b.feel as usize), Some(Feeling::Cold | Feeling::Freezing | Feeling::Hot | Feeling::Heatstroke));
+    let feeling = FEELINGS.get(b.feel as usize).copied();
+    // A wild hunter hungry enough to hunt bears a chill or the heat, as the band scores it
+    // (`choose.rs`): run as the band's last resort, every goal above passing, a wolf at 30 % went
+    // looking for warmth 2 s before its hunt (wolvesCold1).
+    let bears = matches!(feeling, Some(Feeling::Cold | Feeling::Hot))
+        && w.component(id, &ANIMAL).is_some_and(|a| {
+            a.species().is_some_and(|s| s.hunts())
+                && (a.food as f32) < a.stat(species::FOOD) * animals_core::needs::HUNTS_AT
+                && !animal::tamed(w, id)
+        });
+    let uneasy = !bears && matches!(feeling, Some(Feeling::Cold | Feeling::Freezing | Feeling::Hot | Feeling::Heatstroke));
     let Some(seek) = w.component(id, &SEEK) else { return false };
     if !uneasy {
         if seek[3] > 0.0 {

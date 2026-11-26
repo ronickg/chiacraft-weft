@@ -1,0 +1,5 @@
+# One crust over 3 x 3 blocks (plates cross the block edges), so a dried pond shows no grid.
+method = repeat
+tiles = 0-8
+width = 3
+height = 3

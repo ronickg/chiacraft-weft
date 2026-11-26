@@ -1,0 +1,25 @@
+# The render scale row's Auto (Planner 11-24: the High preset's Auto reached core:render_scale as 0
+# and the engine drew the world at a quarter of the pixels). Run with `-- --fake-gpu discrete` so the
+# first start picks a preset (High). On the title the waiting value goes to the engine: run.log says
+# "render scale Auto is 1 on this 1280x720 window". Then Medium (67%) and High (Auto) again, each
+# taken on the title: "render scale 0.67 from the last game", then Auto and "render scale 1 ...".
+loaded
+idle
+leave
+wait 3
+screen base:video
+wait 1.5
+shot rs_01_detected.png
+tap_once base:video text:Medium
+wait 1
+shot rs_02_medium.png
+key Escape
+wait 2
+screen base:video
+wait 1.5
+tap_once base:video text:High
+wait 1
+shot rs_03_high.png
+key Escape
+wait 2
+quit

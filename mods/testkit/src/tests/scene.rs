@@ -404,7 +404,12 @@ async fn loot_tables(t: &T) -> R {
     );
     let grass = counts(&t.op("loot base:tall_grass 4000").await?);
     let seeds = grass.get("base:wheat_seeds").copied().unwrap_or(0);
-    t.check((380..=620).contains(&seeds), format!("seeds from 4000 tall grass: {seeds} (vanilla 12.5%: 500)"));
+    // Our chance (`vitals::crops`), not vanilla's 12.5%: within a quarter of its share.
+    let want = 4000.0 * vitals::crops::WHEAT_SEED_CHANCE as f64;
+    t.check(
+        (seeds as f64 - want).abs() <= want * 0.25 + 10.0,
+        format!("seeds from 4000 tall grass: {seeds} (chance {}: {want:.0})", vitals::crops::WHEAT_SEED_CHANCE),
+    );
     let stone = counts(&t.op("loot base:stone 10").await?);
     t.check_eq(stone.get("base:cobblestone").copied(), Some(10), "drops() is a one entry table, broken by the world");
     t.check_eq(t.op("loot base:stone 10 mined").await?, String::new(), "stone mined by hand drops nothing");
@@ -420,17 +425,21 @@ async fn loot_tables(t: &T) -> R {
     Ok(())
 }
 
-/// Harvest levels: iron ore needs a stone pickaxe; tiers are numbers, so the test mod's steel
+/// Harvest levels: iron ore needs a bronze pickaxe (`vitals::gear::IRON_ORE_HARVEST`, Ronald 11-23:
+/// copper's 170 is short); tiers are numbers, so the test mod's steel
 /// pickaxe (250) mines its reinforced stone (250) and what iron (200) does, not obsidian (300).
 /// Base's pickaxes are built from parts (`/gear`, held): a bone head harvests 80, ground stone 100,
-/// bronze 210 (`vitals::gear::harvest`).
+/// bronze 210 (`vitals::gear::harvest`). Broken with the loot at the block: a player's mining
+/// drops at their feet, two plots away.
 async fn tool_tiers(t: &T, o: [i32; 3]) -> R {
     let mut drops = 0;
     for (i, (block, tool, gets)) in [
         ("stone", "stick", false),
         ("stone", "pickaxe bone", true),
         ("iron_ore", "pickaxe bone", false),
-        ("iron_ore", "pickaxe stone", true),
+        ("iron_ore", "pickaxe stone", false),
+        ("iron_ore", "pickaxe copper", false),
+        ("iron_ore", "pickaxe bronze", true),
         ("diamond_ore", "pickaxe stone", false),
         ("testmod:reinforced_stone", "pickaxe bronze", false),
         ("testmod:reinforced_stone", "testmod:steel_pickaxe", true),
@@ -440,20 +449,20 @@ async fn tool_tiers(t: &T, o: [i32; 3]) -> R {
     .into_iter()
     .enumerate()
     {
-        let p = add(o, [i as i32 * 2 - 8, 0, 0]);
+        let p = add(o, [i as i32 * 2 - 12, 0, 0]);
         t.set(p, block).await?;
         if tool.contains(' ') {
             t.cmd(&format!("/gear {tool} slot=0")).await?;
             t.c().select_slot(0);
             t.frames(2).await?;
-            t.op(&format!("break {} held", at(p))).await?;
+            t.op(&format!("break {} held at_block", at(p))).await?;
         } else {
-            t.op(&format!("break {} {tool}", at(p))).await?;
+            t.op(&format!("break {} {tool} at_block", at(p))).await?;
         }
         t.frames(5).await?;
         drops += gets as usize;
         t.check_eq(
-            count_at(t, "core:item", o, 10.0).await?,
+            count_at(t, "core:item", o, 12.5).await?,
             drops,
             &format!("{tool} on {block}: {}", if gets { "drops" } else { "nothing" }),
         );

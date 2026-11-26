@@ -148,6 +148,58 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
     })
 }
 
+/// Every screen `named` opens by name: the engine's own (a mod's of the same name replaces it).
+pub const ENGINE_SCREENS: &[&str] = &[
+    "core:title",
+    "core:loading",
+    "core:pause",
+    "core:settings",
+    "core:video",
+    "core:accessibility",
+    "core:chat_settings",
+    "core:sound",
+    "core:language",
+    "core:controls",
+    crate::controller::SCREEN,
+    "core:mod_settings",
+    "core:worlds",
+    "core:create_world",
+    "core:chat",
+    "core:death",
+    "core:multiplayer",
+    "core:resource_packs",
+    "core:shader_packs",
+    "core:world_rules",
+    "core:hud_editor",
+    "core:touch_buttons",
+    "core:debug_options",
+    "core:tags",
+    "core:mods",
+    "core:disabled_mods",
+    "core:editor",
+    "core:profile",
+    "core:account",
+    "core:finder",
+    "core:achievements",
+    "core:admission",
+];
+
+/// Every screen a name opens: the engine's and every mod menu with a screen, sorted. The text-fit
+/// sweep must open each (`ui::audit`: a screen it never laid out fails the run).
+pub fn all_names() -> Vec<String> {
+    let mut out: Vec<String> = ENGINE_SCREENS.iter().map(|s| s.to_string()).collect();
+    if let Some(c) = crate::content::try_content() {
+        for (name, &m) in c.game.catalog.ids(ek::MENU).iter() {
+            if c.game.menus[m as usize].screen.is_some() {
+                out.push(name.to_string());
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
 /// An engine screen; they always exist.
 pub fn engine(name: &str) -> Box<dyn Screen> {
     named(name).unwrap_or_else(|| panic!("no screen {name}"))
@@ -163,6 +215,31 @@ pub fn parts(ui: &mut Ui, cx: &BuildCx, screen: &str, area: &str) {
     ui.container(Style::default().gap(4.0).stretch(), |ui| {
         crate::client::modui::parts(ui, cx.lang, Some(cx.input), cx.client, screen, area);
     });
+}
+
+/// A menu screen's mods' parts, their plain buttons labelled like the screen's own (style 1: the
+/// title's labels at 2x on every menu button, the pause menu's Advancements too; chiacraft 11-24).
+pub fn menu_parts(ui: &mut Ui, cx: &BuildCx, screen: &str, area: &str) {
+    let from = ui.nodes.len();
+    parts(ui, cx, screen, area);
+    let class = button_text(cx);
+    if class == "button" {
+        return;
+    }
+    for b in from..ui.nodes.len() {
+        if !matches!(&ui.nodes[b].kind, Kind::Button { class, .. } if class == "button") {
+            continue;
+        }
+        for t in ui.nodes[b].children.clone() {
+            let plain = matches!(&ui.nodes[t].kind, Kind::Text(n) if n.class == "default" || n.class == "button");
+            if plain {
+                if let Kind::Text(n) = &mut ui.nodes[t].kind {
+                    n.class = class.to_string();
+                }
+                big_label(ui, t, class);
+            }
+        }
+    }
 }
 
 /// A mod's name as players see it: `mod.<id>.name` from the language files, else its id.
@@ -182,23 +259,40 @@ impl Screen for Profile {
     }
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
-        frame(ui, cx, "profile.title", |ui| {
-            ui.panel(
-                "panel",
-                Style {
-                    max_h: (cx.size.y - 64.0).max(100.0),
-                    ..Style::default()
-                        .pad(8.0)
-                        .gap(8.0)
-                        .w(340.0_f32.min(cx.size.x - 24.0))
+        // Style 1: the menu window holds it all (no inner frame), labels at 2x like the buttons,
+        // a label 2 over its field and 8 to the next group, fields 22 tall (`UI Style Guide.md`).
+        let framed = cx.look.texture("menu_panel", "").is_some();
+        let (pair, group, field_h) = if framed { (2.0, 8.0, 22.0) } else { (5.0, 5.0, 20.0) };
+        window(ui, cx, "profile.title", 6.0, |ui| {
+            let mut outer = Style::default()
+                .gap(8.0)
+                .w(340.0_f32.min(cx.size.x - 24.0))
+                .stretch();
+            outer.max_h = (cx.size.y - 64.0).max(100.0);
+            // In the window, under its heading: the screen less the window's margins, rails and
+            // heading.
+            let outer = if framed {
+                let mut o = outer
+                    .w((380.0 + crate::ui::Scrollbar::ROOM).min(cx.size.x - 64.0))
+                    .min_h(60.0);
+                o.max_h = (cx.size.y - 104.0).max(100.0);
+                o
+            } else {
+                outer.pad(8.0)
+            };
+            ui.with(Kind::Container { class: (!framed).then(|| "panel".to_string()) }, outer, |ui| {
+                ui.container(
+                    Style::default()
+                        .gap(group)
                         .stretch()
-                },
-                |ui| {
-                    ui.container(Style::default().gap(8.0).stretch().scroll(), |ui| {
+                        .scroll()
+                        .snap_rows(framed),
+                    |ui| {
                         ui.container(Style::row().gap(12.0).stretch(), |ui| {
                             ui.add(Kind::Custom { tag: crate::client::modui::TAG_ENTITY, data: 0 }, Style::default().size(94.0, 120.0));
-                            ui.container(Style::default().grow().gap(5.0).stretch(), |ui| {
-                                label(ui, cx, "profile.name", &[], "default");
+                            ui.container(Style::default().grow().gap(pair).stretch(), |ui| {
+                                let t = label(ui, cx, "profile.name", &[], "default");
+                                field_label(ui, cx, t);
                                 let input = ui.add(
                                     Kind::Input {
                                         value: crate::settings::name(),
@@ -207,17 +301,26 @@ impl Screen for Profile {
                                         on_change: Some(Rc::new(|_: &mut Ctx, v: &str| crate::settings::set_text("name", v))),
                                         area: None,
                                     },
-                                    Style::default().h(20.0).stretch(),
+                                    Style::default().h(field_h).stretch(),
                                 );
                                 ui.set_id(input, "profile_name");
+                                if framed {
+                                    // To the next group: 8 in all, two pair gaps and this.
+                                    ui.container(Style::default().h(group - 2.0 * pair), |_| {});
+                                }
                                 let dir = cx.settings.run_dir.join("skins");
                                 let b = icon_button(ui, cx, "button", "icon_folder", "profile.change_skin", &[], 120.0, move |_| {
                                     crate::packs::open_folder(&dir);
                                 });
                                 ui.set_id(b, "change_skin");
                                 ui.nodes[b].tooltip = Some(cx.t("profile.skin_hint", &[]));
-                                label(ui, cx, "config.core.skin_model", &[], "default");
-                                ui.container(Style::row().stretch(), |ui| {
+                                if framed {
+                                    // To the next group: 8 in all, two pair gaps and this.
+                                    ui.container(Style::default().h(group - 2.0 * pair), |_| {});
+                                }
+                                let t = label(ui, cx, "config.core.skin_model", &[], "default");
+                                field_label(ui, cx, t);
+                                ui.container(Style::row().gap(if framed { 4.0 } else { 0.0 }).stretch(), |ui| {
                                     for (slim, key) in [(false, "classic"), (true, "slim")] {
                                         let b = button(ui, cx, &format!("config.core.skin_model.{key}"), &[], 0.0, move |_| {
                                             crate::settings::set("skin_model", slim as u32 as f64);
@@ -233,7 +336,8 @@ impl Screen for Profile {
                                 });
                             });
                         });
-                        label(ui, cx, "profile.visibility", &[], "default");
+                        let t = label(ui, cx, "profile.visibility", &[], "default");
+                        field_label(ui, cx, t);
                         for (name, key) in [("first_person_model", "profile.first_person"), ("show_avatars", "profile.other_models")] {
                             let id = crate::config::by_name(&format!("core:{name}")).unwrap();
                             let b = ui.button(
@@ -244,7 +348,9 @@ impl Screen for Profile {
                                 }),
                                 |ui| {
                                     let label = label(ui, cx, key, &[], "default");
+                                    field_label(ui, cx, label);
                                     ui.nodes[label].style.grow = 1.0;
+                                    ui.nodes[label].style.w = crate::ui::Len::Px(0.0);
                                     ui.panel("button", Style::default().size(17.0, 17.0).center(), |ui| {
                                         ui.text_bound(
                                             "default",
@@ -264,23 +370,56 @@ impl Screen for Profile {
                             crate::mods_screen::separator(ui);
                         }
                         config_rows(ui, cx, "core:profile", &["core:skin_model", "core:first_person_model", "core:show_avatars"]);
-                        // The key comes from the account's 24 words (chiacraft): the account and its words.
+                        // The key worlds know the player by, from the account's 24 words (chiacraft):
+                        // shown and copied here, the account and its words below.
+                        let key = crate::net::p2p::player_key(&cx.settings.run_dir);
+                        let t = label(ui, cx, "profile.key", &[], "default");
+                        field_label(ui, cx, t);
+                        ui.text(text::plain(if key.is_empty() { "-" } else { &key }), "dim");
+                        // Style 1: the three account buttons as two even rows across the window
+                        // (a ragged stack of 120 and 160 wide ones before).
+                        let row = if framed { Style::row().gap(6.0).stretch() } else { Style::default().gap(group) };
+                        let even = |ui: &mut Ui, b: NodeId| {
+                            if framed {
+                                ui.nodes[b].style.grow = 1.0;
+                                ui.nodes[b].style.w = crate::ui::Len::Px(0.0);
+                            }
+                        };
+                        ui.container(row, |ui| {
+                            let b = button(ui, cx, "profile.copy", &[], 120.0, move |_| {
+                                crate::clipboard::set(&key);
+                            });
+                            even(ui, b);
+                            let b =
+                                button(ui, cx, "profile.account", &[], 160.0, |c| c.requests.push(Request::Screen("core:account".into())));
+                            even(ui, b);
+                        });
                         if chiacraft_account::current().is_some_and(|s| s.needs_backup()) {
                             label(ui, cx, "profile.account_backup", &[], "dim");
                         }
-                        button(ui, cx, "profile.account", &[], 160.0, |c| c.requests.push(Request::Screen("core:account".into())));
                         // What worlds signed for this account (chiacraft, phase 4).
                         let n = crate::chiacraft::achievements::load().credentials.len();
                         let id = button(ui, cx, "profile.achievements", &[Arg::Int(n as i64)], 160.0, |c| {
                             c.requests.push(Request::Screen("core:achievements".into()))
                         });
+                        if framed {
+                            ui.nodes[id].style = ui.nodes[id].style.self_align(crate::ui::Align::Stretch);
+                        }
                         ui.set_id(id, "achievements");
+                    },
+                );
+                if framed {
+                    // Done under it all, centred like every menu window's (a group below).
+                    ui.container(Style::default().h(0.0), |_| {});
+                    ui.container(Style::row().justify(Justify::Center).stretch(), |ui| {
+                        back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
                     });
+                } else {
                     ui.container(Style::row().justify(Justify::End), |ui| {
                         back_button(ui, cx, "menu.done", &[], 80.0, |c| c.requests.push(Request::Close));
                     });
-                },
-            );
+                }
+            });
         });
     }
 }
@@ -349,22 +488,43 @@ pub fn label(ui: &mut Ui, cx: &BuildCx, key: &str, args: &[Arg], class: &str) ->
 /// A button whose text `text` says each frame (a choice going round).
 pub fn bound_button(
     ui: &mut Ui,
+    cx: &BuildCx,
     width: f32,
     text: impl Fn() -> (String, Vec<Arg>) + 'static,
     action: impl Fn(&mut Ctx) + 'static,
 ) -> NodeId {
+    let class = button_text(cx);
     ui.button("button", Style::default().min_w(width).min_h(20.0).pad_xy(6.0, 4.0), Rc::new(action), |ui| {
-        ui.text_bound("button", Box::new(move |_: &Ctx| text()));
+        let t = ui.text_bound(class, Box::new(move |_: &Ctx| text()));
+        big_label(ui, t, class);
     })
+}
+
+/// The text class of a menu button's label: style 1's outlined one (`color.menu_button*`, the
+/// title's) when the look has it.
+fn button_text(cx: &BuildCx) -> &'static str {
+    if cx.look.has_text("menu_button") { "menu_button" } else { "button" }
+}
+
+/// A button label at twice the font where the button has room (style 1, Planner 11-24: the title's
+/// labels on every menu button), else at the font's own size (a narrow button keeps its width).
+fn big_label(ui: &mut Ui, t: NodeId, class: &str) {
+    if let Some(t) = ui.text_mut(t) {
+        t.wrap = false;
+        t.center = true;
+        if class == "menu_button" {
+            t.fit = 2.0;
+        }
+    }
+    ui.nodes[t].style = ui.nodes[t].style.self_align(crate::ui::Align::Stretch);
 }
 
 pub fn button(ui: &mut Ui, cx: &BuildCx, key: &str, args: &[Arg], width: f32, action: impl Fn(&mut Ctx) + 'static) -> NodeId {
     let spans = cx.t(key, args);
+    let class = button_text(cx);
     ui.button("button", Style::default().min_w(width).min_h(20.0).pad_xy(6.0, 4.0), Rc::new(action), |ui| {
-        let t = ui.text(spans, "button");
-        if let Some(t) = ui.text_mut(t) {
-            t.wrap = false;
-        }
+        let t = ui.text(spans, class);
+        big_label(ui, t, class);
     })
 }
 
@@ -404,11 +564,118 @@ pub fn icon_button(
     let icon = cx.look.texture(icon, "");
     ui.button(class, Style::default().min_w(width).min_h(20.0).pad_xy(6.0, 4.0), Rc::new(action), |ui| {
         if let Some(texture) = icon {
-            ui.add(Kind::Image { texture, color: 0xFFFFFFFF }, Style::default().w(9.0).h(9.0).at(-1.0, 6.0, [0.0, 0.5]));
+            // Halfway down the button, whatever height its label makes it.
+            ui.add(
+                Kind::Image { texture, color: 0xFFFFFFFF },
+                Style::default()
+                    .w(9.0)
+                    .h(9.0)
+                    .at_from([0.0, 0.5], -1.0, 0.0, [0.0, 0.5]),
+            );
         }
-        let t = ui.text(spans, "button");
+        // A plain button's label as every menu button's (style 1: 2x where it fits, Planner 11-24).
+        let label = if class == "button" { button_text(cx) } else { "button" };
+        let t = ui.text(spans, label);
+        if label == "button" {
+            if let Some(t) = ui.text_mut(t) {
+                t.wrap = false;
+            }
+        } else {
+            big_label(ui, t, label);
+        }
+    })
+}
+
+/// The title menu's buttons (chiacraft, style 1, 11-24): this tall, their labels at twice the font
+/// (the mock's: 26 GUI pixels with 7 between, `reports/UI craft.md`).
+const TITLE_BUTTON: f32 = 26.0;
+
+/// A GUI texture's size in GUI pixels: its `.gui`'s `size` when it has one (the title's icons are
+/// drawn at twice their pixels, one icon pixel a font pixel of the 2x labels), else one of its
+/// pixels a UI pixel (half a GUI pixel), the one pixel grid of the font and the frames.
+fn texture_gui_size(cx: &BuildCx, texture: &str) -> Option<[f32; 2]> {
+    let declared = cx.assets.read(texture, "textures", "gui").and_then(|b| {
+        let src = String::from_utf8_lossy(&b).into_owned();
+        let n: Vec<f32> = crate::kv::get(&src, "size")?
+            .split_whitespace()
+            .filter_map(|v| v.parse().ok())
+            .collect();
+        (n.len() == 2).then(|| [n[0], n[1]])
+    });
+    declared.or_else(|| {
+        cx.assets
+            .read(texture, "textures", "png")
+            .and_then(|b| crate::assets::decode_png(&b))
+            .map(|i| [i.width as f32 / 2.0, i.height as f32 / 2.0])
+    })
+}
+
+/// A title menu button: `TITLE_BUTTON` tall, the icon (if the look has it) at its own pixels at
+/// the left edge, the label at twice the font in the middle of the room right of the icon (as in
+/// style 1's mock: a long label clears the icon).
+#[allow(clippy::too_many_arguments)]
+fn title_button(
+    ui: &mut Ui,
+    cx: &BuildCx,
+    class: &str,
+    icon: &str,
+    key: &str,
+    args: &[Arg],
+    width: f32,
+    action: impl Fn(&mut Ctx) + 'static,
+) -> NodeId {
+    let spans = cx.t(key, args);
+    let icon = cx.look.texture(icon, "").map(|t| {
+        let size = texture_gui_size(cx, &t).unwrap_or([9.0, 9.0]);
+        (t, size)
+    });
+    let mut style = Style::default()
+        .min_w(width)
+        .min_h(TITLE_BUTTON)
+        .pad_xy(6.0, 4.0);
+    if let Some((_, size)) = &icon {
+        style.pad[0] = style_left(*size);
+    }
+    ui.button(class, style, Rc::new(action), |ui| {
+        if let Some((texture, size)) = icon {
+            ui.add(
+                Kind::Image { texture, color: 0xFFFFFFFF },
+                Style::default()
+                    .w(size[0])
+                    .h(size[1])
+                    .at_from([0.0, 0.5], 6.0 - style_left(size), 0.0, [0.0, 0.5]),
+            );
+        }
+        // Its own text class: style 1's labels are outlined and shadowed (`color.menu_button*`).
+        let t = ui.text(spans, "menu_button");
         if let Some(t) = ui.text_mut(t) {
             t.wrap = false;
+            t.scale = 2.0;
+        }
+    })
+}
+
+/// A title button's left padding with an icon `size` wide: the icon 6 GUI pixels in, the label's
+/// room 4 past it (`at` counts from the padding, so the icon goes back by it). With the 16 GUI
+/// icons that leaves 112 for the label, Russian's longest (Одиночная игра) 109.
+fn style_left(size: [f32; 2]) -> f32 {
+    6.0 + size[0] + 4.0
+}
+
+/// The title's small square buttons (profile, editor): `TITLE_SQUARE` a side, one picture at
+/// `size` GUI pixels in the middle.
+const TITLE_SQUARE: f32 = 24.0;
+
+fn title_square(ui: &mut Ui, picture: Option<String>, size: [f32; 2], action: impl Fn(&mut Ctx) + 'static) -> NodeId {
+    ui.button("button_secondary", Style::default().w(TITLE_SQUARE).h(TITLE_SQUARE), Rc::new(action), |ui| {
+        if let Some(texture) = picture {
+            ui.add(
+                Kind::Image { texture, color: 0xFFFFFFFF },
+                Style::default()
+                    .w(size[0])
+                    .h(size[1])
+                    .at_from([0.5, 0.5], 0.0, 0.0, [0.5, 0.5]),
+            );
         }
     })
 }
@@ -430,6 +697,12 @@ pub fn title(ui: &mut Ui, cx: &BuildCx, key: &str) {
 
 /// Full-screen dimmed column with a title, used by most menus.
 pub fn frame(ui: &mut Ui, cx: &BuildCx, key: &str, f: impl FnOnce(&mut Ui)) {
+    // Style 1 (batch 3, Planner 11-24): every menu still built on Weft's frame gets the menu window,
+    // its own frames inside it sunken wells (`fit_into_window`).
+    if framed_menu(cx) {
+        window(ui, cx, key, 6.0, f);
+        return;
+    }
     let bg = if cx.in_game { "overlay" } else { "background" };
     ui.root_style(Style::default().stretch());
     ui.panel(bg, Style::default().grow().center().pad(12.0).gap(10.0), |ui| {
@@ -445,6 +718,129 @@ pub fn frame(ui: &mut Ui, cx: &BuildCx, key: &str, f: impl FnOnce(&mut Ui)) {
     });
 }
 
+/// The inside of a style 1 menu window, GUI pixels from the panel's box (`UI Style Guide.md`,
+/// "Spacing", chiacraft 11-24): its rail is 10 thick, then 10 to the content at the sides and the
+/// bottom; at the top 8 to the heading's line, whose 3x glyphs start a little below it.
+const WINDOW_PAD: [f32; 4] = [20.0, 18.0, 20.0, 20.0];
+
+/// A menu window in style 1 (chiacraft, Planner 11-24): the title's framed panel (`menu_panel`,
+/// corner plates, nearly opaque) centred on the screen, its heading inside at 3x in the title
+/// colour (2x or 1x where that is too wide), then what `f` adds, `gap` apart, with even margins
+/// (`WINDOW_PAD`). Its one-line fields write at 2x. No taller than the screen: a scrolling list in
+/// it gives way. Without `menu_panel` in the look, Weft's `frame`. Returns whether it drew the
+/// panel (the caller's own inner panels then go).
+pub fn window(ui: &mut Ui, cx: &BuildCx, key: &str, gap: f32, f: impl FnOnce(&mut Ui)) -> bool {
+    if cx.look.texture("menu_panel", "").is_none() {
+        frame(ui, cx, key, f);
+        return false;
+    }
+    ui.input_scale = 2.0;
+    let bg = if cx.in_game { "overlay" } else { "background" };
+    ui.root_style(Style::default().stretch());
+    ui.panel(bg, Style::default().grow().center().pad(12.0), |ui| {
+        let mut style = Style::default().center().gap(gap);
+        style.pad = WINDOW_PAD;
+        style.max_h = (cx.size.y - 24.0).max(80.0);
+        let panel = ui.panel("menu_panel", style, |ui| {
+            let t = label(ui, cx, key, &[], "title");
+            if let Some(text) = ui.text_mut(t) {
+                text.wrap = false;
+                text.center = true;
+                text.fit = 3.0;
+            }
+            ui.nodes[t].style = ui.nodes[t].style.self_align(crate::ui::Align::Stretch);
+            f(ui);
+        });
+        fit_into_window(ui, cx, panel);
+    });
+    true
+}
+
+/// What a screen built for Weft's frame becomes inside style 1's window (batch 3, Planner 11-24):
+/// its own frames (`panel`) sunken `well`s, so no frame sits in a frame; its one-line fields at
+/// least 22 tall for their 2x text; a list that filled the frame's room (`h(0).grow()`) as tall
+/// as it holds and stopping at whole rows (`window_list`).
+fn fit_into_window(ui: &mut Ui, cx: &BuildCx, panel: NodeId) {
+    let well = cx.look.texture("well", "").is_some();
+    let mut stack: Vec<NodeId> = ui.nodes[panel].children.clone();
+    while let Some(id) = stack.pop() {
+        stack.extend(ui.nodes[id].children.iter().copied());
+        let node = &mut ui.nodes[id];
+        match &mut node.kind {
+            Kind::Container { class: Some(class) } if well && class == "panel" => *class = "well".into(),
+            Kind::Input { area: None, .. } => {
+                if let crate::ui::Len::Px(h) = node.style.h
+                    && h < 22.0
+                {
+                    node.style.h = crate::ui::Len::Px(22.0);
+                }
+            }
+            _ => {}
+        }
+        if node.style.scroll && node.style.h == crate::ui::Len::Px(0.0) && node.style.grow > 0.0 {
+            node.style = window_list(node.style, true);
+        }
+    }
+}
+
+/// A label over a field or a slider in a menu: at 2x in style 1, the size of the buttons round it
+/// (the type scale in `UI Style Guide.md`: no 1x label beside 2x buttons, Planner 11-24), else as
+/// it was. Left-aligned, across its column.
+pub fn field_label(ui: &mut Ui, cx: &BuildCx, t: NodeId) {
+    if !cx.look.has_text("menu_button") {
+        return;
+    }
+    if let Some(text) = ui.text_mut(t) {
+        text.wrap = false;
+        text.fit = 2.0;
+    }
+    ui.nodes[t].style = ui.nodes[t].style.self_align(crate::ui::Align::Stretch);
+}
+
+/// A list that fills the room left in Weft's `frame` (`h(0).grow()`), in a style 1 window instead
+/// as tall as what it holds: the window has no height to share out, and a scrolling list in it
+/// gives way when the window would pass the screen (as Settings' list).
+pub fn window_list(mut style: Style, framed: bool) -> Style {
+    if framed {
+        style.h = crate::ui::Len::Auto;
+        style.grow = 0.0;
+        style.snap_rows = style.scroll;
+    }
+    style
+}
+
+/// Whether menus draw style 1's window (`menu_panel` in the look).
+pub fn framed_menu(cx: &BuildCx) -> bool {
+    cx.look.texture("menu_panel", "").is_some()
+}
+
+/// A section's heading in a menu (a list's name, a field's label): 2x in style 1 like the buttons
+/// round it (`field_label`), else as it was.
+pub fn heading(ui: &mut Ui, cx: &BuildCx, key: &str) -> NodeId {
+    let t = label(ui, cx, key, &[], "default");
+    field_label(ui, cx, t);
+    t
+}
+
+/// A group's room in a style 1 window: the window's own gap plus this makes 12 between groups
+/// (Done under a list), against 6 inside one (`UI Style Guide.md`, "Spacing"). Nothing in Weft's.
+pub fn group_gap(ui: &mut Ui, cx: &BuildCx) {
+    if cx.look.texture("menu_panel", "").is_some() {
+        ui.container(Style::default().h(0.0), |_| {});
+    }
+}
+
+/// A heading line inside a style 1 window (the language now in use, a list's name): 2x like the
+/// labels, centred, one line.
+pub fn line_2x(ui: &mut Ui, cx: &BuildCx, t: NodeId) {
+    field_label(ui, cx, t);
+    if cx.look.has_text("menu_button")
+        && let Some(text) = ui.text_mut(t)
+    {
+        text.center = true;
+    }
+}
+
 // ---------------------------------------------------------------- title
 
 pub struct Title;
@@ -454,87 +850,115 @@ impl Screen for Title {
         "core:title"
     }
 
-    /// The menu down a bar on the left under the logo, the rest of the window for whatever packs
-    /// and mods show there (`menu.news`, the `side` place).
+    /// The menu in a framed `menu_panel` on the left, the logo at its top and the buttons right under
+    /// it, centred down the window (chiacraft, 11-23: Ronald's style 1, not a bar to the bottom);
+    /// the rest of the window for whatever packs and mods show there (`menu.news`, the `side` place).
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         ui.root_style(Style::default().stretch());
         ui.panel("background", Style::row().grow().stretch(), |ui| {
-            ui.panel("sidebar", Style::default().w(180.0).pad(12.0).gap(4.0).stretch(), |ui| {
-                // The `logo` texture across the bar: whole multiples of its pixels while it fits.
-                if let Some(logo) = cx.look.texture("logo", "") {
-                    let size = cx
-                        .assets
-                        .read(&logo, "textures", "png")
-                        .and_then(|b| crate::assets::decode_png(&b))
-                        .map_or([1.0, 1.0], |i| [i.width as f32, i.height as f32]);
-                    let k = if size[0] <= 156.0 { (156.0 / size[0]).floor() } else { 156.0 / size[0] };
-                    ui.add(Kind::Image { texture: logo, color: 0xFFFFFFFF }, Style::default().w(size[0] * k).h(size[1] * k));
-                }
-                ui.spacer();
-                // The first way in is the main button, the rest `button_secondary` (the engine's own
-                // is a copy of its button; base's is the dark one).
-                icon_button(ui, cx, "button", "menu_singleplayer", "menu.singleplayer", &[], 156.0, |c| open(c, "core:worlds"));
-                // The profile is a square beside Multiplayer: the face of the player's skin.
-                ui.container(Style::row().gap(4.0).stretch(), |ui| {
-                    let mp = icon_button(ui, cx, "button_secondary", "menu_multiplayer", "menu.multiplayer", &[], 132.0, |c| {
-                        open(c, "core:multiplayer")
-                    });
-                    ui.nodes[mp].style.grow = 1.0;
-                    // The player's face from their skin, or with no skin yet the Singleplayer
-                    // figure (the face of a skin that isn't there was a blank square: Tester's
-                    // audit, 11-04).
-                    let skin = cx.settings.run_dir.join("skins").join("skin.png");
-                    let face = if skin.exists() { Some(face_texture(cx)) } else { cx.look.texture("menu_singleplayer", "") };
-                    let p = ui.button(
-                        "button_secondary",
-                        Style::default().w(20.0).h(20.0),
-                        Rc::new(|c: &mut Ctx| open(c, "core:profile")),
-                        |ui| {
-                            if let Some(face) = face {
-                                ui.add(
-                                    Kind::Image { texture: face, color: 0xFFFFFFFF },
-                                    Style::default().w(8.0).h(8.0).at(6.0, 6.0, [0.0, 0.0]),
-                                );
+            ui.container(
+                Style::default()
+                    .pad(16.0)
+                    .justify(Justify::Center)
+                    .stretch(),
+                |ui| {
+                    // The title's own heavier frame (`menu_panel`) when the look has one, else the windows' `panel`.
+                    let frame = if cx.look.texture("menu_panel", "").is_some() { "menu_panel" } else { "panel" };
+                    // Style 1's proportions (11-24, `reports/UI craft.md`): 188 wide and about 260
+                    // tall, the logo near the top frame, the buttons 77% of the width.
+                    // The rail is 10 thick: 10 more above the logo and below the last row (it
+                    // touched the top frame, Planner 11-24); 12 at the sides with the column's 6.
+                    let mut style = Style::default().w(188.0).gap(7.0);
+                    style.pad = [16.0, 20.0, 16.0, 20.0];
+                    ui.panel(frame, style, |ui| {
+                        // The `logo` texture across the bar: whole multiples of its pixels while it fits.
+                        if let Some(logo) = cx.look.texture("logo", "") {
+                            let size = cx
+                                .assets
+                                .read(&logo, "textures", "png")
+                                .and_then(|b| crate::assets::decode_png(&b))
+                                .map_or([1.0, 1.0], |i| [i.width as f32, i.height as f32]);
+                            let k = if size[0] <= 156.0 { (156.0 / size[0]).floor() } else { 156.0 / size[0] };
+                            ui.add(Kind::Image { texture: logo, color: 0xFFFFFFFF }, Style::default().w(size[0] * k).h(size[1] * k));
+                        }
+                        // The buttons in a narrower column than the logo, its width fixed: the
+                        // version line under them wraps instead of widening every button past the
+                        // rail (Planner 11-24, after the version text grew).
+                        let mut column = Style::default().gap(7.0).stretch().w(156.0);
+                        column.pad = [6.0, 0.0, 6.0, 0.0];
+                        ui.container(column, |ui| {
+                            // Style 1's own button classes, cut at the buttons' height so their bands never
+                            // stretch (`menu_main`, `menu_item`), when the look has them.
+                            let (main, item) = if cx.look.texture("menu_item", "").is_some() {
+                                ("menu_main", "menu_item")
+                            } else {
+                                ("button", "button_secondary")
+                            };
+                            // The first way in is the main button, the rest `button_secondary` (the engine's own
+                            // is a copy of its button; base's is the dark one). Style 1 (11-24): every button
+                            // the panel's width, `TITLE_BUTTON` tall, labels at twice the font, icons at their
+                            // own pixels; the profile and the editor are small squares at the bottom.
+                            title_button(ui, cx, main, "menu_singleplayer", "menu.singleplayer", &[], 144.0, |c| open(c, "core:worlds"));
+                            title_button(ui, cx, item, "menu_multiplayer", "menu.multiplayer", &[], 144.0, |c| open(c, "core:multiplayer"));
+                            // After the first play session, until the words are written down (chiacraft).
+                            if chiacraft_account::current().is_some_and(|s| s.wants_backup()) {
+                                button(ui, cx, "menu.write_words", &[], 144.0, |c| open(c, "core:account"));
                             }
-                        },
-                    );
-                    ui.nodes[p].tooltip = Some(cx.t("menu.profile", &[]));
-                    ui.set_id(p, "profile");
-                });
-                // After the first play session, until the words are written down (chiacraft).
-                if chiacraft_account::current().is_some_and(|s| s.wants_backup()) {
-                    button(ui, cx, "menu.write_words", &[], 156.0, |c| open(c, "core:account"));
-                }
-                // The editor is a square beside Mods (chiacraft: both secondary buttons).
-                ui.container(Style::row().gap(4.0).stretch(), |ui| {
-                    let mods = icon_button(ui, cx, "button_secondary", "menu_mods", "menu.mods", &[Arg::Int(cx.mods as i64)], 132.0, |c| {
-                        open(c, "core:mods")
+                            title_button(ui, cx, item, "menu_mods", "menu.mods", &[Arg::Int(cx.mods as i64)], 144.0, |c| {
+                                open(c, "core:mods")
+                            });
+                            title_button(ui, cx, item, "menu_settings", "menu.settings", &[], 144.0, |c| open(c, "core:settings"));
+                            parts(ui, cx, "core:title", "buttons");
+                            // Quit: the secondary's look (no red Quit), with its door.
+                            let quit = if item == "button_secondary" { "button_quit" } else { item };
+                            title_button(ui, cx, quit, "menu_quit", "menu.quit", &[], 144.0, |c| c.requests.push(Request::Quit));
+                            // The bottom row: the version, then the profile (the face of the player's
+                            // skin) and the editor as small squares.
+                            ui.container(
+                                Style::row()
+                                    .gap(4.0)
+                                    .stretch()
+                                    .align(crate::ui::Align::Center),
+                                |ui| {
+                                    let v = label(
+                                        ui,
+                                        cx,
+                                        "menu.version",
+                                        &[Arg::Text(env!("CARGO_PKG_VERSION").into()), Arg::Int(cx.mods as i64)],
+                                        "dim",
+                                    );
+                                    ui.nodes[v].style.grow = 1.0;
+                                    // The player's face from their skin, or with no skin yet the Singleplayer
+                                    // figure (the face of a skin that isn't there was a blank square: Tester's
+                                    // audit, 11-04).
+                                    let skin = cx.settings.run_dir.join("skins").join("skin.png");
+                                    let (face, size) = if skin.exists() {
+                                        (Some(face_texture(cx)), [16.0, 16.0])
+                                    } else {
+                                        let t = cx.look.texture("menu_singleplayer", "");
+                                        let size = t
+                                            .as_deref()
+                                            .and_then(|t| texture_gui_size(cx, t))
+                                            .unwrap_or([9.0, 9.0]);
+                                        (t, size)
+                                    };
+                                    let p = title_square(ui, face, size, |c: &mut Ctx| open(c, "core:profile"));
+                                    ui.nodes[p].tooltip = Some(cx.t("menu.profile", &[]));
+                                    ui.set_id(p, "profile");
+                                    let icon = cx.look.texture("menu_editor", "");
+                                    let size = icon
+                                        .as_deref()
+                                        .and_then(|t| texture_gui_size(cx, t))
+                                        .unwrap_or([9.0, 9.0]);
+                                    let e = title_square(ui, icon, size, |c: &mut Ctx| open(c, "core:editor"));
+                                    ui.nodes[e].tooltip = Some(cx.t("menu.editor", &[]));
+                                    ui.set_id(e, "editor");
+                                },
+                            );
+                        });
                     });
-                    ui.nodes[mods].style.grow = 1.0;
-                    let icon = cx.look.texture("menu_editor", "");
-                    let e = ui.button(
-                        "button_secondary",
-                        Style::default().w(20.0).h(20.0),
-                        Rc::new(|c: &mut Ctx| open(c, "core:editor")),
-                        |ui| {
-                            if let Some(texture) = icon {
-                                ui.add(Kind::Image { texture, color: 0xFFFFFFFF }, Style::default().w(9.0).h(9.0).at(5.5, 5.5, [0.0, 0.0]));
-                            }
-                        },
-                    );
-                    ui.nodes[e].tooltip = Some(cx.t("menu.editor", &[]));
-                    ui.set_id(e, "editor");
-                });
-                icon_button(ui, cx, "button_secondary", "menu_settings", "menu.settings", &[], 156.0, |c| open(c, "core:settings"));
-                parts(ui, cx, "core:title", "buttons");
-                ui.add(Kind::Container { class: None }, Style::default().h(6.0));
-                let quit = button(ui, cx, "menu.quit", &[], 156.0, |c| c.requests.push(Request::Quit));
-                if let Kind::Button { class, .. } = &mut ui.nodes[quit].kind {
-                    *class = "button_quit".into();
-                }
-                ui.add(Kind::Container { class: None }, Style::default().h(6.0));
-                label(ui, cx, "menu.version", &[Arg::Text(env!("CARGO_PKG_VERSION").into()), Arg::Int(cx.mods as i64)], "dim");
-            });
+                },
+            );
             ui.container(
                 Style::default()
                     .grow()
@@ -568,23 +992,29 @@ impl Screen for Pause {
         true
     }
 
+    /// In style 1 the buttons sit in the title's panel under the heading (`window`; chiacraft,
+    /// Planner 11-24: they floated over the world); else as Weft draws them.
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
-        frame(ui, cx, "menu.paused", |ui| {
-            back_button(ui, cx, "menu.resume", &[], 200.0, |c| c.requests.push(Request::Close));
-            // Back to your own world from a visit elsewhere (chiacraft).
-            if let Some(home) = cx.home {
-                button(ui, cx, "menu.return_home", &[Arg::Text(home.to_string())], 200.0, |c| c.requests.push(Request::ReturnHome));
-            }
-            button(ui, cx, "menu.multiplayer", &[], 200.0, |c| open(c, "core:multiplayer"));
-            // Who may come into your world (chiacraft): only in a world this game runs.
-            if cx.in_game && !cx.remote {
-                button(ui, cx, "menu.admission", &[], 200.0, |c| open(c, "core:admission"));
-            }
-            button(ui, cx, "menu.settings", &[], 200.0, |c| open(c, "core:settings"));
-            parts(ui, cx, "core:pause", "buttons");
-            button(ui, cx, "menu.save_quit", &[], 200.0, |c| c.requests.push(Request::LeaveWorld));
-        });
+        // 8 GUI between the buttons: their parts reach 2 past the box each side (`outset`), so 4
+        // show between them (Planner 11-24: they touched).
+        window(ui, cx, "menu.paused", 8.0, |ui| pause_buttons(ui, cx));
     }
+}
+
+fn pause_buttons(ui: &mut Ui, cx: &BuildCx) {
+    back_button(ui, cx, "menu.resume", &[], 200.0, |c| c.requests.push(Request::Close));
+    // Back to your own world from a visit elsewhere (chiacraft).
+    if let Some(home) = cx.home {
+        button(ui, cx, "menu.return_home", &[Arg::Text(home.to_string())], 200.0, |c| c.requests.push(Request::ReturnHome));
+    }
+    button(ui, cx, "menu.multiplayer", &[], 200.0, |c| open(c, "core:multiplayer"));
+    // Who may come into your world (chiacraft): only in a world this game runs.
+    if cx.in_game && !cx.remote {
+        button(ui, cx, "menu.admission", &[], 200.0, |c| open(c, "core:admission"));
+    }
+    button(ui, cx, "menu.settings", &[], 200.0, |c| open(c, "core:settings"));
+    menu_parts(ui, cx, "core:pause", "buttons");
+    button(ui, cx, "menu.save_quit", &[], 200.0, |c| c.requests.push(Request::LeaveWorld));
 }
 
 // ---------------------------------------------------------------- settings
@@ -622,7 +1052,9 @@ impl Screen for ModSettings {
             .filter(|ns| *ns != "core")
             .collect();
         namespaces.dedup();
-        frame(ui, cx, "settings.mods", |ui| {
+        // Style 1: the menu window, its mods a column of menu buttons 6 apart and Done a group
+        // apart below (`UI Style Guide.md`, "Spacing").
+        window(ui, cx, "settings.mods", 6.0, |ui| {
             if namespaces.is_empty() {
                 label(ui, cx, "settings.mods.none", &[], "dim");
             }
@@ -634,7 +1066,8 @@ impl Screen for ModSettings {
                         .push(Request::Open(Box::new(ConfigScreen { shown: Shown::Mod(ns.clone()) })))
                 });
             }
-            back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            group_gap(ui, cx);
+            back_button(ui, cx, "menu.done", &[], 220.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -686,6 +1119,11 @@ fn settings_links(cx: &BuildCx) -> Vec<(&'static str, &'static str)> {
     v
 }
 
+/// Style 1's slider rows: the name's and the value's least widths, columns that grow to the
+/// widest in the list (`Ui::layout`).
+const SLIDER_NAME_W: f32 = 96.0;
+const SLIDER_VALUE_W: f32 = 36.0;
+
 /// A setting's row: a toggle or a choice as a button, a number as a label over a slider; locked
 /// (shown, not changed) when the server has its say or the world's rules are fixed.
 fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, rules_locked: bool) {
@@ -734,6 +1172,8 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
         ck::BOOL | ck::CHOICE => {
             let (key2, d2, show) = (key.clone(), d.clone(), show.clone());
             let (kind, count) = (d.kind, d.choices.len().max(1) as f64);
+            // Labelled like every menu button (style 1: 2x where it fits; World Rules' rows).
+            let class = button_text(cx);
             let b = ui.button(
                 "button",
                 Style::default().min_h(20.0).pad_xy(6.0, 4.0).stretch(),
@@ -744,12 +1184,13 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
                 }),
                 |ui| {
                     let (k, d3, show) = (key2.clone(), d2.clone(), show.clone());
-                    ui.text_bound(
-                        "button",
+                    let t = ui.text_bound(
+                        class,
                         Box::new(move |_: &Ctx| {
                             ("settings.config_value".into(), vec![Arg::Key(k.clone()), show(&d3, &k, crate::config::get(id))])
                         }),
                     );
+                    big_label(ui, t, class);
                 },
             );
             if let Kind::Button { enabled, .. } = &mut ui.nodes[b].kind {
@@ -757,64 +1198,89 @@ fn config_row(ui: &mut Ui, cx: &BuildCx, id: u32, d: &crate::config::ConfigDef, 
             }
             b
         }
+        // Style 1 writes the label at 2x on the slider itself, as Minecraft and Valheim do: a row
+        // as tall as a button, so Sound's six fit at 720p (Planner 11-24: the last one was cut in
+        // half by the scroll edge). A locked one keeps the label alone.
         _ => ui.container(Style::default().gap(2.0).stretch(), |ui| {
+            let inside = cx.look.has_text("menu_button") && !locked;
             // Where a slider applied when let go is being dragged to, shown
             // meanwhile.
             let dragged: Rc<std::cell::Cell<Option<f64>>> = Rc::default();
             let (k, d2, show, shown) = (key.clone(), d.clone(), show.clone(), dragged.clone());
-            ui.text_bound(
-                "default",
-                Box::new(move |_: &Ctx| {
-                    let v = shown.get().unwrap_or_else(|| crate::config::get(id));
-                    ("settings.config_value".into(), vec![Arg::Key(k.clone()), show(&d2, &k, v)])
-                }),
-            );
+            let value = move |_: &Ctx| {
+                let v = shown.get().unwrap_or_else(|| crate::config::get(id));
+                ("settings.config_value".into(), vec![Arg::Key(k.clone()), show(&d2, &k, v)])
+            };
+            if !inside {
+                let t = ui.text_bound("default", Box::new(value.clone()));
+                field_label(ui, cx, t);
+            }
             if !locked {
-                let range = (d.max - d.min).max(1e-9);
-                let unit = if d.kind == weft_abi::config_kind::INT { 1.0 } else { range / 100.0 };
-                let steps = d.steps(unit);
-                let definition = d.clone();
-                let at = move |f: f32| {
-                    if definition.logarithmic {
-                        definition.slider_value(f)
+                let add_slider = move |ui: &mut Ui, style: Style| {
+                    let range = (d.max - d.min).max(1e-9);
+                    let unit = if d.kind == weft_abi::config_kind::INT { 1.0 } else { range / 100.0 };
+                    let steps = d.steps(unit);
+                    let definition = d.clone();
+                    let at = move |f: f32| {
+                        if definition.logarithmic {
+                            definition.slider_value(f)
+                        } else {
+                            let n = steps.max(1) as f64;
+                            definition.min + (f as f64 * n).round() / n * range
+                        }
+                    };
+                    let apply = d.clone();
+                    let set: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| crate::config::set(id, apply.slider_value(f)));
+                    let (on_change, on_release) = if d.flags & crate::tag_bits::config::ON_RELEASE != 0 {
+                        let (show, done) = (dragged.clone(), dragged.clone());
+                        let preview = at.clone();
+                        let shown: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| show.set(Some(preview(f))));
+                        let apply: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| {
+                            done.set(None);
+                            crate::config::set(id, at(f));
+                        });
+                        (shown, Some(apply))
                     } else {
-                        let n = steps.max(1) as f64;
-                        definition.min + (f as f64 * n).round() / n * range
-                    }
-                };
-                let apply = d.clone();
-                let set: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| crate::config::set(id, apply.slider_value(f)));
-                let (on_change, on_release) = if d.flags & crate::tag_bits::config::ON_RELEASE != 0 {
-                    let (show, done) = (dragged.clone(), dragged.clone());
-                    let preview = at.clone();
-                    let shown: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| show.set(Some(preview(f))));
-                    let apply: Rc<dyn Fn(&mut Ctx, f32)> = Rc::new(move |_: &mut Ctx, f: f32| {
-                        done.set(None);
-                        crate::config::set(id, at(f));
+                        (set, None)
+                    };
+                    let step = d.clone();
+                    let step_value = d.logarithmic.then(|| {
+                        Box::new(move |fraction: f32, by: f32| {
+                            let value = step.fit(step.slider_value(fraction) + by as f64 * step.slider_step());
+                            step.slider_position(value)
+                        }) as Box<dyn Fn(f32, f32) -> f32>
                     });
-                    (shown, Some(apply))
-                } else {
-                    (set, None)
+                    let definition = d.clone();
+                    let thumb = crate::ui::slider::Thumb { value: 0.0, change: Some(on_change), release: on_release };
+                    let mut slider = crate::ui::slider::Slider::new(vec![thumb]);
+                    slider.binding = Some((
+                        vec![0.0],
+                        Box::new(move |_, values| {
+                            values[0] = definition.slider_position(crate::config::get(id));
+                        }),
+                    ));
+                    slider.steps = steps;
+                    slider.step_value = step_value;
+                    ui.add(Kind::Slider(slider), style);
                 };
-                let step = d.clone();
-                let step_value = d.logarithmic.then(|| {
-                    Box::new(move |fraction: f32, by: f32| {
-                        let value = step.fit(step.slider_value(fraction) + by as f64 * step.slider_step());
-                        step.slider_position(value)
-                    }) as Box<dyn Fn(f32, f32) -> f32>
-                });
-                let definition = d.clone();
-                let thumb = crate::ui::slider::Thumb { value: 0.0, change: Some(on_change), release: on_release };
-                let mut slider = crate::ui::slider::Slider::new(vec![thumb]);
-                slider.binding = Some((
-                    vec![0.0],
-                    Box::new(move |_, values| {
-                        values[0] = definition.slider_position(crate::config::get(id));
-                    }),
-                ));
-                slider.steps = steps;
-                slider.step_value = step_value;
-                ui.add(Kind::Slider(slider), Style::default().h(20.0).stretch());
+                if inside {
+                    // Style 1: three cells, the setting's name | the slider | its value, so the
+                    // knob never reaches the words (Ronald 11-24, a knob over "Quality: 4"). Names
+                    // and values are columns (`Ui::layout`): as wide as the widest in the list.
+                    let class = button_text(cx);
+                    ui.container(Style::row().gap(6.0).center().stretch(), |ui| {
+                        let k2 = key.clone();
+                        let name = ui.text_bound(class, Box::new(move |_: &Ctx| ("mods.plain".into(), vec![Arg::Key(k2.clone())])));
+                        big_label(ui, name, class);
+                        ui.nodes[name].style = ui.nodes[name].style.w(SLIDER_NAME_W);
+                        add_slider(ui, Style::default().h(20.0).grow());
+                        let v = ui.text_bound(class, Box::new(move |c: &Ctx| ("mods.plain".into(), vec![value(c).1[1].clone()])));
+                        big_label(ui, v, class);
+                        ui.nodes[v].style = ui.nodes[v].style.w(SLIDER_VALUE_W);
+                    });
+                } else {
+                    add_slider(ui, Style::default().h(20.0).stretch());
+                }
             }
         }),
     };
@@ -888,21 +1354,25 @@ impl Screen for ConfigScreen {
         };
         // Rules a world was made with locked stay as they are while it is played.
         let rules_locked = matches!(shown, Shown::World) && cx.in_game && crate::config::get(c.game.rules_locked) != 0.0;
-        frame(ui, cx, title, |ui| {
+        let framed = cx.look.texture("menu_panel", "").is_some();
+        window(ui, cx, title, 6.0, |ui| {
             if let Shown::Mod(ns) = shown {
                 label(ui, cx, "settings.mods.of", &[Arg::Name(text::Name::Mod(ns.to_string()))], "default");
             }
-            let list = ui.panel(
-                "panel",
+            // In style 1's window the list needs no frame of its own.
+            let list = ui.with(
+                Kind::Container { class: (!framed).then(|| "panel".to_string()) },
+                // As tall as what it holds, up to the room there is (then it scrolls: a scrolling
+                // node gives way when the column is too tall), so a short page leaves no empty
+                // half (chiacraft, Planner 11-24).
                 Style::default()
-                    .pad(8.0)
+                    .pad(if framed { 0.0 } else { 8.0 })
                     .gap(6.0)
                     .stretch()
-                    .w(320.0)
-                    .h(0.0)
-                    .grow()
+                    .w(if framed { 320.0 + crate::ui::Scrollbar::ROOM } else { 320.0 })
                     .min_h(40.0)
-                    .scroll(),
+                    .scroll()
+                    .snap_rows(framed),
                 |ui| {
                     let mut listed: Vec<_> = c
                         .game
@@ -920,14 +1390,18 @@ impl Screen for ConfigScreen {
                             return;
                         }
                         for pair in settings_links(cx).chunks(2) {
-                            ui.container(Style::row().gap(6.0).stretch(), |ui| {
+                            // Centred in style 1's list, which is wider by a scrollbar's room
+                            // that a short page doesn't use.
+                            let row = Style::row().gap(6.0).stretch();
+                            let row = if framed { row.justify(crate::ui::Justify::Center) } else { row };
+                            ui.container(row, |ui| {
                                 for &(key, screen) in pair {
                                     let width = if pair.len() == 1 { 300.0 } else { 147.0 };
                                     button(ui, cx, key, &[], width, move |c| open(c, screen));
                                 }
                             });
                         }
-                        parts(ui, cx, "core:settings", "buttons");
+                        menu_parts(ui, cx, "core:settings", "buttons");
                     };
                     for (id, d) in listed {
                         if d.order >= LINKS_AT {
@@ -967,9 +1441,19 @@ impl Screen for LanguageScreen {
             .iter()
             .find(|l| l.0 == cx.lang.code)
             .map_or(cx.lang.code.clone(), |l| l.1.clone());
-        frame(ui, cx, "settings.language", |ui| {
-            label(ui, cx, "settings.language.current", &[Arg::Text(current)], "default");
-            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(240.0), |ui| {
+        // Style 1: the menu window, the language in use on a 2x line, the languages as menu
+        // buttons 6 apart with no frame of their own (scrolling when there are many), Done a
+        // group apart.
+        let framed = cx.look.texture("menu_panel", "").is_some();
+        let class = button_text(cx);
+        window(ui, cx, "settings.language", 6.0, |ui| {
+            let t = label(ui, cx, "settings.language.current", &[Arg::Text(current)], "default");
+            line_2x(ui, cx, t);
+            let list = Style::default()
+                .stretch()
+                .w(if framed { 240.0 + crate::ui::Scrollbar::ROOM } else { 240.0 });
+            let list = if framed { list.gap(6.0).min_h(26.0).scroll().snap_rows(true) } else { list.pad(8.0).gap(4.0) };
+            ui.with(Kind::Container { class: (!framed).then(|| "panel".to_string()) }, list, |ui| {
                 for (code, name) in cx.languages {
                     let code = code.clone();
                     let selected = code == cx.lang.code;
@@ -980,7 +1464,8 @@ impl Screen for LanguageScreen {
                             crate::settings::set_text("language", &code);
                         }),
                         |ui| {
-                            ui.text(text::plain(name), "button");
+                            let t = ui.text(text::plain(name), class);
+                            big_label(ui, t, class);
                         },
                     );
                     if let Kind::Button { selected: sel, .. } = &mut ui.nodes[b].kind {
@@ -988,7 +1473,8 @@ impl Screen for LanguageScreen {
                     }
                 }
             });
-            back_button(ui, cx, "menu.done", &[], 200.0, |c| c.requests.push(Request::Close));
+            group_gap(ui, cx);
+            back_button(ui, cx, "menu.done", &[], 240.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -1120,55 +1606,60 @@ impl Screen for Controls {
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         let conflicts = cx.input.conflicts();
         let waiting = self.waiting.clone();
-        frame(ui, cx, "controls.title", |ui| {
-            let list = ui.panel(
-                "panel",
-                Style::default()
-                    .pad(8.0)
-                    .gap(3.0)
-                    .stretch()
-                    .w(420.0)
-                    .h(0.0)
-                    .grow()
-                    .min_h(60.0)
-                    .scroll(),
-                |ui| {
-                    config_rows(ui, cx, "core:controls", &[]);
-                    for b in &cx.input.binds {
-                        let name = text::Name::Key(b.action.clone());
-                        let clash: Vec<String> = conflicts
-                            .iter()
-                            .filter_map(|(x, y)| {
-                                if *x == b.action {
-                                    Some(y.clone())
-                                } else if *y == b.action {
-                                    Some(x.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        ui.container(Style::row().gap(6.0).self_align(crate::ui::Align::Stretch), |ui| {
-                            let n = ui.text(name.spans(cx.lang, Some(cx.input)), "default");
-                            ui.nodes[n].style.grow = 1.0;
-                            if !clash.is_empty() {
-                                let names: Vec<String> = clash
-                                    .iter()
-                                    .map(|c| text::Name::Key(c.clone()).text(cx.lang))
-                                    .collect();
-                                ui.text(cx.t("controls.conflict", &[Arg::Text(names.join(", "))]), "default");
+        // Style 1: the menu window with the list straight on it (no frame of its own, a
+        // scrollbar's room at its right), the actions' names at 2x like their keys, 4 between
+        // rows; Reset and Done a group below.
+        let framed = cx.look.texture("menu_panel", "").is_some();
+        window(ui, cx, "controls.title", 6.0, |ui| {
+            let style = Style::default()
+                .stretch()
+                .w(if framed { 440.0 + crate::ui::Scrollbar::ROOM } else { 420.0 })
+                .h(0.0)
+                .grow()
+                .min_h(60.0)
+                .scroll();
+            let style = window_list(style, framed);
+            let style = if framed { style.gap(4.0) } else { style.pad(8.0).gap(3.0) };
+            let list = ui.with(Kind::Container { class: (!framed).then(|| "panel".to_string()) }, style, |ui| {
+                config_rows(ui, cx, "core:controls", &[]);
+                for b in &cx.input.binds {
+                    let name = text::Name::Key(b.action.clone());
+                    let clash: Vec<String> = conflicts
+                        .iter()
+                        .filter_map(|(x, y)| {
+                            if *x == b.action {
+                                Some(y.clone())
+                            } else if *y == b.action {
+                                Some(x.clone())
+                            } else {
+                                None
                             }
-                            for slot in 0..crate::input::SLOTS {
-                                bind_cell(ui, cx, &b.action, slot, b.keys[slot], waiting.as_ref());
-                            }
-                        });
-                    }
-                },
-            );
+                        })
+                        .collect();
+                    ui.container(Style::row().gap(6.0).self_align(crate::ui::Align::Stretch), |ui| {
+                        let n = ui.text(name.spans(cx.lang, Some(cx.input)), "default");
+                        field_label(ui, cx, n);
+                        ui.nodes[n].style.grow = 1.0;
+                        ui.nodes[n].style.w = crate::ui::Len::Px(0.0);
+                        if !clash.is_empty() {
+                            let names: Vec<String> = clash
+                                .iter()
+                                .map(|c| text::Name::Key(c.clone()).text(cx.lang))
+                                .collect();
+                            ui.text(cx.t("controls.conflict", &[Arg::Text(names.join(", "))]), "default");
+                        }
+                        for slot in 0..crate::input::SLOTS {
+                            bind_cell(ui, cx, &b.action, slot, b.keys[slot], waiting.as_ref());
+                        }
+                    });
+                }
+            });
             ui.set_id(list, "controls");
+            group_gap(ui, cx);
             ui.container(Style::row().gap(6.0), |ui| {
-                button(ui, cx, "controls.reset", &[], 120.0, |c| c.requests.push(Request::ResetBinds));
-                back_button(ui, cx, "menu.done", &[], 120.0, |c| c.requests.push(Request::Close));
+                let w = if framed { 150.0 } else { 120.0 };
+                button(ui, cx, "controls.reset", &[], w, |c| c.requests.push(Request::ResetBinds));
+                back_button(ui, cx, "menu.done", &[], w, |c| c.requests.push(Request::Close));
             });
         });
     }
@@ -1181,7 +1672,11 @@ fn bind_cell(ui: &mut Ui, cx: &BuildCx, action: &str, slot: usize, binding: Opti
     let a = action.to_string();
     let cell = ui.button(
         if toggled { "bind_toggle" } else { "button" },
-        Style::default().w(90.0).h(20.0).pad_xy(4.0, 0.0),
+        // Style 1: wide enough for "Middle Button" at 2x.
+        Style::default()
+            .w(if framed_menu(cx) { 110.0 } else { 90.0 })
+            .h(20.0)
+            .pad_xy(4.0, 0.0),
         Rc::new(move |c: &mut Ctx| {
             if let Some(s) = c.screen::<Controls>() {
                 (s.waiting, s.first, s.modifier) = (Some((a.clone(), slot)), None, None);
@@ -1189,7 +1684,10 @@ fn bind_cell(ui: &mut Ui, cx: &BuildCx, action: &str, slot: usize, binding: Opti
             c.requests.push(Request::Rebuild);
         }),
         |ui| {
-            ui.text(text::plain(&shown), "button");
+            // A key's name at 2x where it fits the cell (style 1), else 1x.
+            let class = button_text(cx);
+            let t = ui.text(text::plain(&shown), class);
+            big_label(ui, t, class);
         },
     );
     if let Kind::Button { selected, .. } = &mut ui.nodes[cell].kind {

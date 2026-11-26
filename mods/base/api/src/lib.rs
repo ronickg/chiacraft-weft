@@ -8,6 +8,8 @@ use weft_sdk::*;
 
 /// Shared components, their value types, and food-item helpers.
 pub mod components;
+/// The cover over the listener's head, for sounds from the open air.
+pub mod hearing;
 
 /// Events emitted by the base game.
 pub mod events;
@@ -506,10 +508,25 @@ value! {
     pub struct Nutrition { pub units: u16, pub protein: u16, pub energy: u16, pub fat: u16, pub greens: u16, pub water: u16 }
 }
 pub static NUTRITION: Component<Nutrition> = Component::named("base:nutrition");
-/// A food stack's day of making + 1 (0: not stamped yet), the second it came hot off the fire
+value! {
+    /// Game days a food keeps (fresh and stale) in a cool larder and on snow or ice
+    /// (`vitals::rot`): shown in its tooltip, so it says where it keeps best.
+    pub struct Keeps { pub larder: u16, pub cold: u16 }
+}
+pub static KEEPS: Component<Keeps> = Component::named("base:keeps");
+/// A food stack's tick of making + `MADE_BASE` + 1 (0: not stamped yet; moved on by where it sat, `vitals::rot`), the second it came hot off the fire
 /// (gone once it cools, `vitals::food::HOT_FOR`), and how fresh it is now (`freshness`): stamped
 /// in a player's inventory as it ages, so stacks of a day stack and the tooltip can say it.
 pub static MADE: Component<u32> = Component::named("base:made");
+/// Ticks a making stamp counts from ahead of the clock, so food that ages faster than the clock
+/// (a hot chest, `vitals::rot`) can get older than the world itself: 1000 game days, more than the
+/// longest-keeping food's whole life at the fastest rate (Tester's rot1125a, 11-25: hot chests
+/// stopped at the world's age).
+pub const MADE_BASE: u64 = 1000 * vitals::calendar::DAY_TICKS;
+/// The making stamp (`MADE`) of food made at day time `now` (never 0, which is unstamped).
+pub fn made_stamp(now: u64) -> u64 {
+    now + MADE_BASE + 1
+}
 pub static HOT: Component<u32> = Component::named("base:hot");
 pub static FRESHNESS: Component<u8> = Component::named("base:freshness");
 /// A stew's ingredients (`vitals::meals::pack`), and what it holds, shown in its tooltip; both on
@@ -544,8 +561,10 @@ pub fn food_age(stack: &ItemStack, now: u64) -> (f32, bool) {
     if made == 0 {
         return (0.0, false);
     }
-    let days = (now / vitals::calendar::DAY_TICKS).saturating_sub(made as u64 - 1);
-    (days as f32 * vitals::DAY_SECS, false)
+    // The tick of making past `MADE_BASE`, moved on by where the food sat (`vitals::rot`, base's
+    // `survival/rot.rs`).
+    let ticks = made_stamp(now).saturating_sub(made as u64);
+    (ticks as f32 / vitals::TICKS as f32, false)
 }
 
 /// Eating for `.on_use`: the food goes into the stomach (`vitals::food::FOODS` knows it by the
@@ -660,6 +679,12 @@ pub fn hint(w: &World, player: u64, key: &str, args: &[i64]) {
 /// is `vitals::ley`: `ley::strength(w.seed(), x, z)` is what magic, mana and machines draw on.
 pub static LEY_SIGHT: Component<f32> = Component::named("base:ley_sight");
 
+/// Whose tame a creature is, as its watchers' clients may know: the owner's player entity while
+/// that player is in the world, 0 otherwise. Base registers it (sent to every watcher) and its map
+/// marks the local player's tames in their own colour; a mod with tames attaches it to its kinds
+/// and keeps it (animals: `animal::mark_owner`).
+pub static TAME_OF: Component<u64> = Component::named("base:tame_of");
+
 /// Things a player has done that other mods know of and the base game's advancements read
 /// (`advancements.rs`, the "Surviving" group): a bit each (`milestones`), kept through death.
 pub static MILESTONES: Component<u32> = Component::named("base:milestones");
@@ -721,6 +746,38 @@ pub static ARMOR: Component<Armor> = Component::named("armor");
 /// on today's tools as their item's, on a tool built from parts as its stack's. Against a big
 /// creature it counts at most its size's cap over the creature (`vitals::combat::Band::cap`).
 pub static ITEM_LEVEL: Component<f32> = Component::named("base:item_level");
+/// A saddle's fitting (`vitals::gear::SADDLE_FITTINGS`' index; 0 or none: plain leather). Base's
+/// assembly row fits one (`parts.rs`); the animals mod reads it when it saddles a tame. Items
+/// tagged `saddle` take it.
+pub static SADDLE_FIT: Component<u32> = Component::named("base:saddle_fit");
+/// The tag every saddle item carries, for the assembly row.
+pub const SADDLE_TAG: &str = "saddle";
+
+/// A saddle stack of `item` fitted with `fit` (`vitals::gear::SADDLE_FITTINGS`' index): its fitting
+/// and its item level on it. Fitting in base's assembly row and unsaddling a tame both make it.
+pub fn saddle_stack(item: u32, fit: u32) -> ItemStack {
+    ItemStack::new(item, 1)
+        .with(&SADDLE_FIT, fit)
+        .with(&ITEM_LEVEL, vitals::gear::saddle_level(fit))
+}
+
+/// A saddle stack's fitting (0: plain).
+pub fn saddle_fit(stack: &ItemStack) -> u32 {
+    SADDLE_FIT.on_stack(stack).unwrap_or(0)
+}
+
+/// An arrow's head: its place in `vitals::gear::ARROWHEADS` plus one (none or 0: a plain
+/// flint-tipped arrow). Base's assembly row makes them (`parts::fletched`); a bow reads the arrow's
+/// `ITEM_LEVEL`.
+pub static ARROW_HEAD: Component<u32> = Component::named("base:arrow_head");
+
+/// `count` arrows headed with `vitals::gear::ARROWHEADS[head]`: the head and its item level on
+/// them (base's `parts` adds the look).
+pub fn arrow_stack(head: u32, count: u32) -> ItemStack {
+    ItemStack::new(items::ARROW.id(), count)
+        .with(&ARROW_HEAD, head + 1)
+        .with(&ITEM_LEVEL, vitals::gear::arrow_level(head))
+}
 
 /// Clothes' slots, head to feet, worn under armor (`vitals::clothing`); armor's are in `slots`.
 pub static HAT: EquipmentSlot = EquipmentSlot::named("base:hat");

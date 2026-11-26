@@ -1120,6 +1120,12 @@ pub fn track_fall(fall: &mut f32, dy: f64, on_ground: bool, safe: bool) -> Optio
         return None;
     }
     if on_ground {
+        // The move that lands counts too: a client sends one a frame, and at a few frames a
+        // second its last was a fifth of the fall (12 blocks counted as 9). Only while falling
+        // already, so a step down a slope stays no fall.
+        if *fall > 0.0 && dy < 0.0 {
+            *fall += (-dy) as f32;
+        }
         return Some(std::mem::take(fall)).filter(|&f| f > 0.0);
     }
     if dy < 0.0 {
@@ -1232,6 +1238,10 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl physics::Cel
         ctl.ground = target * (1.0 - 0.6 * 0.91);
         ctl.air = if e.sprinting { 0.026 } else { 0.02 };
         ctl.careful = sneak;
+        // A mob doesn't walk off a drop deeper than it falls unharmed (`Control::drop_guard`).
+        if !e.player {
+            ctl.drop_guard = (e.safe_fall as f64).max(1.0);
+        }
         if w.has(weft_abi::walk::JUMP) {
             ctl.jump = physics::JUMP * e.jump_mul as f64;
             ctl.swim = true;

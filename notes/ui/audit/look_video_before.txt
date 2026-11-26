@@ -1,0 +1,25 @@
+# The Video screen before the presets/feature rows/Developer split (Ronald 11-24), for the sheet's
+# before column: run on dev with `-- --run-dir <name> --fake-gpu discrete` (dev's first start
+# picks a preset only for a pretended GPU in a script). Shots: the world, the Video screen and
+# its Extra quality tab.
+loaded
+idle
+wait 8
+look 30 -5
+wait 3
+shot fs_01_world.png
+screen base:video
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot fs_02_video.png
+key Escape
+wait 1
+screen base:video_extra
+wait 1.5
+cursor 0.02 0.02
+wait 0.5
+shot fs_05_developer.png
+key Escape
+wait 1
+quit

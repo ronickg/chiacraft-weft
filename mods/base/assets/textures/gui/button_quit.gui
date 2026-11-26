@@ -1,3 +1,7 @@
 scaling = nine_slice
-border = 1.5
-size = 32 10
+border = 6 10 6 10
+size = 52 24
+outset = 2
+middle = tile
+# How far the drawn frame comes into the box (GUI px): text keeps clear of it (ui::audit).
+inset = 3

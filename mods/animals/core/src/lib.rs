@@ -5,6 +5,7 @@
 
 use std::sync::Mutex;
 
+pub mod ambient;
 pub mod balance;
 pub mod biology;
 pub mod bodies;
@@ -13,6 +14,7 @@ pub mod coats;
 pub mod danger;
 pub mod eggs;
 pub mod evolution;
+pub mod groups;
 pub mod hides;
 pub mod journal;
 pub mod life;
@@ -20,6 +22,7 @@ pub mod meat;
 pub mod memory;
 pub mod needs;
 pub mod nests;
+pub mod parts;
 pub mod perception;
 pub mod roles;
 pub mod routines;

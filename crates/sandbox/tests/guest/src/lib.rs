@@ -22,7 +22,7 @@ thread_local! {
 }
 
 fn init(r: &mut Registry) {
-    r.entity_component(&COUNTER, Counter { n: 5, spare: 0, last: 0 }, component_flags::SAVE | component_flags::KEEP);
+    r.entity_component(&COUNTER, Counter { n: 5, spare: 0, last: 0 }, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
     r.attach(&PLAYER, &COUNTER);
     r.command("probe", "<action:word> [n:int]", |cmd| {
         CALLS.with(|c| c.set(c.get() + 1));

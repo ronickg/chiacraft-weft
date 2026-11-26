@@ -117,12 +117,24 @@ pub async fn vetoes_and_timers(t: T) -> R {
     t.until("ate", Duration::from_secs(5), |t| t.c().inventory_slot(1).count == 1)
         .await?;
     let before: u32 = t.op("rings").await?.parse().unwrap_or(0);
-    t.op("after 30").await?;
-    t.op("after 20").await?;
-    t.secs(0.5).await?;
-    t.check_eq(t.op("rings").await?, before.to_string(), "not before it is due");
-    t.secs(1.5).await?;
-    t.check_eq(t.op("rings").await?, (before + 2).to_string(), "both timers fired");
+    let tick = |t: T| async move { Ok::<u64, String>(t.op("gametime").await?.parse().unwrap_or(0)) };
+    // Timers count game ticks, so they are judged by the game's tick: on CI two ops and 0.5 s
+    // of script clock came after both a 20- and a 30-tick timer had rung.
+    let set_at = tick(t.clone()).await?;
+    t.op("after 80").await?;
+    t.op("after 60").await?;
+    let early = t.op("rings").await?;
+    // Read after the rings, so the rings were read before this tick.
+    if tick(t.clone()).await? < set_at + 60 {
+        t.check_eq(early.clone(), before.to_string(), "not before it is due");
+    }
+    let (want, end) = ((before + 2).to_string(), crate::runner::script_clock() + Duration::from_secs(15));
+    let mut rings = early;
+    while rings != want && crate::runner::script_clock() < end {
+        t.secs(0.25).await?;
+        rings = t.op("rings").await?;
+    }
+    t.check_eq(rings, want, "both timers fired");
     Ok(())
 }
 

@@ -30,6 +30,9 @@ pub static OFFERING: Item = Item::named("mountain_offering");
 pub static SUMMIT: Item = Item::named("summit_stone");
 pub static HORN: Item = Item::named("borkon_horn");
 pub static FLEECE: Item = Item::named("height_fleece");
+/// Its Iron form's offering and the Iron Age key's part it drops (11-23, `animals_core::bosses`).
+pub static IRON_OFFERING: Item = Item::named("peak_offering");
+pub static LODESTONE: Item = Item::named("summit_lodestone");
 
 static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
 static BUILDING: CreativeTab = CreativeTab::named("base:building");
@@ -88,8 +91,12 @@ pub fn init(r: &mut Registry) {
     r.item(&SUMMIT).tab(&INGREDIENTS);
     r.item(&HORN).tab(&INGREDIENTS);
     r.item(&FLEECE).tab(&INGREDIENTS);
+    r.item(&IRON_OFFERING).tab(&INGREDIENTS);
+    r.item(&LODESTONE).tab(&INGREDIENTS);
     // The heights' offerings: their flowers, wool, and the dwarves' gold.
     r.shapeless(&CRAFTING, "mountain_offering", 1, &["base:edelweiss", "base:gentian", "base:wool", "base:gold_ingot"], 0);
+    // The Iron form's: the mountain offering bound with iron and its own fleece.
+    r.shapeless(&CRAFTING, "peak_offering", 1, &["animals:mountain_offering", "base:iron_ingot", "animals:height_fleece"], 0);
     r.block(&ALTAR)
         .texture("borkon_altar_side")
         .top("borkon_altar_top")

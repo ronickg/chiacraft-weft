@@ -12,6 +12,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::assets::Assets;
 
 pub const FALLBACK: &str = "en_us";
+/// The pseudo-locale: every English string 40% longer, accented and bracketed (`[Ŝàvé ŵôŕłð ~~]`),
+/// so the text-fit check (`ui::audit`) sees how screens hold a long language and which text
+/// isn't a translation (it shows unbracketed). Not listed with the languages; set it by
+/// `core:language`.
+pub const PSEUDO: &str = "en_xa";
 
 pub struct Lang {
     pub code: String,
@@ -40,10 +45,59 @@ fn load_code(assets: &Assets, code: &str) -> FxHashMap<String, String> {
     map
 }
 
+/// A pseudo-locale value: letters accented, each line bracketed and 40% longer, template tags
+/// (`{0}`, `{#rrggbb}`, `{key:...}`) and literal braces kept as they are. Colors and the
+/// language's name stay English.
+fn pseudo(key: &str, v: &str) -> String {
+    if key.starts_with("color.") || key == "language.name" || v.trim().is_empty() {
+        return v.to_string();
+    }
+    const FROM: &str = "aceinouyAEIOUCNSZswrdl";
+    const TO: [char; 22] = ['à', 'ç', 'é', 'î', 'ñ', 'ô', 'ü', 'ÿ', 'À', 'É', 'Î', 'Ô', 'Ü', 'Ç', 'Ñ', 'Ŝ', 'Ž', 'ŝ', 'ŵ', 'ŕ', 'ð', 'ł'];
+    let line = |l: &str| {
+        let (mut out, mut letters, mut chars) = (String::from("["), 0usize, l.chars().peekable());
+        while let Some(c) = chars.next() {
+            if c == '{' {
+                out.push(c);
+                if chars.peek() == Some(&'{') {
+                    out.push(chars.next().unwrap());
+                    continue;
+                }
+                for t in chars.by_ref() {
+                    out.push(t);
+                    if t == '}' {
+                        break;
+                    }
+                }
+                continue;
+            }
+            if c.is_alphabetic() {
+                letters += 1;
+            }
+            out.push(FROM.find(c).map_or(c, |i| TO[i]));
+        }
+        let pad = (letters * 2).div_ceil(5);
+        if pad > 0 {
+            out.push(' ');
+            out.extend(std::iter::repeat_n('~', pad));
+        }
+        out.push(']');
+        out
+    };
+    v.split('\n').map(line).collect::<Vec<_>>().join("\n")
+}
+
 impl Lang {
     pub fn load(assets: &Assets, code: &str, dev: bool) -> Lang {
         let fallback = load_code(assets, FALLBACK);
-        let entries = if code == FALLBACK { FxHashMap::default() } else { load_code(assets, code) };
+        let entries = match code {
+            FALLBACK => FxHashMap::default(),
+            PSEUDO => fallback
+                .iter()
+                .map(|(k, v)| (k.clone(), pseudo(k, v)))
+                .collect(),
+            _ => load_code(assets, code),
+        };
         Lang { code: code.to_string(), entries, fallback, dev, reported: RefCell::new(FxHashSet::default()) }
     }
 

@@ -673,10 +673,11 @@ pub fn register(r: &mut Registry) {
         .tag("ores")
         .tag("ores/coal")
         .tab(&crate::tabs::NATURAL);
+    // Iron is the Iron Age's: a bronze pickaxe or better (`vitals::gear::IRON_ORE_HARVEST`).
     r.block(&IRON_ORE)
         .sound_group("stone")
         .hardness(3.0)
-        .mined_by("pickaxe", tool_tier::STONE)
+        .mined_by("pickaxe", vitals::gear::IRON_ORE_HARVEST)
         .drops("raw_iron", 1)
         .tag("ores")
         .tag("ores/iron")
@@ -694,8 +695,8 @@ pub fn register(r: &mut Registry) {
     // its host rock's own look.
     for (block, texture, drop, tier, kind) in [
         (&BANDED_CLAY_COAL_ORE, "banded_clay_coal_ore", "coal", 0, "coal"),
-        (&RED_SANDSTONE_IRON_ORE, "red_sandstone_iron_ore", "raw_iron", tool_tier::STONE, "iron"),
-        (&GRANITE_IRON_ORE, "granite_iron_ore", "raw_iron", tool_tier::STONE, "iron"),
+        (&RED_SANDSTONE_IRON_ORE, "red_sandstone_iron_ore", "raw_iron", vitals::gear::IRON_ORE_HARVEST, "iron"),
+        (&GRANITE_IRON_ORE, "granite_iron_ore", "raw_iron", vitals::gear::IRON_ORE_HARVEST, "iron"),
         (&GRANITE_GOLD_ORE, "granite_gold_ore", "raw_gold", tool_tier::STONE, "gold"),
     ] {
         r.block(block)
@@ -1313,6 +1314,8 @@ fn branch(r: &mut Registry, wood: &str) {
     let sides = ["n", "s", "e", "w", "u", "d"];
     let mut b = r
         .block(Block::generated(name))
+        // Its faces come from the states; this is its particles' and fallback picture.
+        .texture(&bark)
         .sound_group("wood")
         .hardness(0.8)
         .mined_by("axe", tool_tier::HAND)

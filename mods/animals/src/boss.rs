@@ -228,6 +228,15 @@ pub fn init(r: &mut Registry) {
         let Some(def) = def_of(&w, q.entity) else { return };
         m.value = hurt(def, &w, q.entity, q.other, q.cause, m.value as f32) as f64;
     });
+    // Over-tier armour against a boss counts at most the titan's cap over its form's level
+    // (`base_api::chains::GEAR_COUNTS`), as a weapon does in `hurt`.
+    r.modify(&base_api::chains::GEAR_COUNTS, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        let w = m.world();
+        let (Some(def), Some(c)) = (def_of(&w, q.other), w.component(q.other, &WARDEN)) else { return };
+        let level = data(def).level(form_of(def, &c));
+        m.value *= vitals::combat::cap_share(bosses::SIZE, q.amount as f32, level) as f64;
+    });
     r.text_place(&BAR)
         .at(0.5, 0.0, 0.0, 30.0)
         .scale(1.2)
@@ -327,6 +336,7 @@ pub fn rise(def: &'static Def, w: &World, player: u64, at: [i32; 3], form: &Form
     crate::anim::clear(w, id);
     w.action_play(id, "rise", false);
     burst(w, spot, def.dust.id(), 40, 1.5);
+    crate::voices::boss_call(w, def.name, "summon", spot);
     for p in w.entities_near(spot, SIGHT, Some(&PLAYER)) {
         w.title(&format!("title.animals.{}", def.name), &[])
             .to(p)
@@ -441,6 +451,7 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
                     w.navigate(id, st.pos, 0.0);
                     crate::anim::clear(w, id);
                     w.action_play(id, &format!("{}_tell", b.attacks[i].name), false);
+                    crate::voices::boss_call(w, def.name, "attack", st.pos.to_array());
                     go(&mut c, WINDUP);
                 }
                 // Close enough: it stops and turns to them rather than walk into them (PC look
@@ -493,6 +504,7 @@ pub fn fight(def: &'static Def, w: &World, id: u64, st: &EntityState) -> bool {
                     burst(w, (def.head)(st), def.bits.id(), 20, 1.0);
                     crate::anim::clear(w, id);
                     w.action_play(id, "stunned", true);
+                    crate::voices::boss_call(w, def.name, "stunned", st.pos.to_array());
                     go(&mut c, STUNNED);
                 }
             }
@@ -664,9 +676,20 @@ pub fn land(def: &Def, w: &World, id: u64, a: &Attack, hit: f32, hits: Vec<(u64,
         if e == id || spared(w, e) {
             continue;
         }
+        // One blow never kills a player from full health (`bosses::PLAYER_BLOW`); the player's armour
+        // takes its share of what is left in the damage step.
+        let hit = if w.players_iter().any(|p| p == e) {
+            w.entity(e)
+                .map_or(hit, |p| hit.min(p.max_health * animals_core::bosses::PLAYER_BLOW))
+        } else {
+            hit
+        };
         w.damage(e, Damage::new(hit, damage_cause::ATTACK).by(id));
         w.push(e, push);
-        weft_sdk::info!("{} {id}: {} hits {e} for {hit:.1}", def.name, a.name);
+        let left = w
+            .entity(e)
+            .map_or(String::new(), |t| format!(" (health {:.1}/{:.1} after)", t.health, t.max_health));
+        weft_sdk::info!("{} {id}: {} hits {e} for {hit:.1}{left}", def.name, a.name);
     }
 }
 

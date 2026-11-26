@@ -102,12 +102,14 @@ pub async fn hud_editor(t: T) -> R {
     let Rect { x, y, w, h } = rect(&t, "core:hotbar").ok_or("no hotbar in the editor")?;
     t.c().input_cursor(x + w / 2.0, y + h / 2.0);
     t.frames(3).await?;
-    t.c().input_click(0, 0.4);
+    // Held for seconds: a CI frame (software Vulkan) can take a good part of one, and a 0.4 s
+    // press had let go before the cursor moved. Dropped once it lets go.
+    t.c().input_click(0, 2.0);
     t.frames(3).await?;
     t.c().input_cursor(0.25, 0.2);
     t.frames(4).await?;
     t.shot("dragging").await?;
-    t.secs(0.5).await?;
+    t.secs(2.0).await?;
     let moved = rect(&t, "core:hotbar").ok_or("no hotbar after the drag")?;
     t.check(
         (moved.x + moved.w / 2.0 - 0.25).abs() < 0.02 && (moved.y + moved.h / 2.0 - 0.2).abs() < 0.02,
@@ -135,6 +137,23 @@ pub async fn hud_editor(t: T) -> R {
     t.screen("core:hud_editor").await?;
     t.frames(3).await?;
     t.check(t.click_ui("text:Reset all", 0), "reset all");
+    t.secs(0.3).await?;
+    // Weft asks first now: the question's own Reset all, 90 units left of its Cancel (two 84
+    // wide buttons 6 apart; a unit is a twentieth of a button's height). A close only cancelled
+    // the question, and the editor stayed open.
+    let Rect { x, y, w, h } = t.c().ui_rect("text:Cancel").ok_or("no reset question")?;
+    let unit = t
+        .c()
+        .ui_rect("id:hud_reset_all")
+        .ok_or("no Reset all button")?
+        .h
+        / 20.0;
+    let shot = t.shot("reset_question").await?;
+    let aspect = shot.w as f32 / shot.h.max(1) as f32;
+    t.c()
+        .input_cursor(x + w / 2.0 - 90.0 * unit / aspect, y + h / 2.0);
+    t.frames(3).await?;
+    t.c().input_click(0, 0.0);
     t.secs(0.3).await?;
     t.c().menu_close();
     t.no_screen().await?;
@@ -256,8 +275,14 @@ pub async fn inventory_crafting(t: T) -> R {
         .await
         .map_err(|e| {
             let c = t.c();
+            // Where the log went: every slot of the menu holding something.
+            let filled: Vec<String> = (0..c.menu().map_or(0, |m| m.slots))
+                .filter(|&i| !c.menu_slot(i).is_empty())
+                .map(|i| format!("{i}:{}x{}", c.menu_slot(i).item, c.menu_slot(i).count))
+                .collect();
+            let at = c.ui_rect("slot:0");
             format!(
-                "{e} (cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})",
+                "{e} (filled {filled:?}, slot:0 at {at:?}, cursor {:?}, grid {:?} {:?} {:?} {:?}, result {:?})",
                 c.cursor_stack(),
                 c.menu_slot(0),
                 c.menu_slot(1),
@@ -357,22 +382,41 @@ pub async fn creative_inventory(t: T) -> R {
     t.screen("core:menu").await?;
     t.shot("tab").await?;
     let stone = id("base:bricks");
-    if t.click_ui(&format!("item:{stone}"), 0) {
+    // Found by searching: the palette scrolls, and base's bricks are below its first rows (the
+    // click landed outside the grid's view).
+    t.click_settled("id:creative_search", 0).await?;
+    t.c().input_type("bricks");
+    t.frames(4).await?;
+    if t.c().ui_rect(&format!("item:{stone}")).is_some() {
+        t.click_settled(&format!("item:{stone}"), 0).await?;
         t.until("bricks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == stone)
             .await?;
         t.click_ui(&t.hotbar(0), 0);
         t.until("bricks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(0).item == stone)
             .await?;
-        // A number key over an entry: a stack of it in that hotbar slot.
-        let Rect { x, y, w, h } = t
-            .c()
-            .ui_rect(&format!("item:{stone}"))
-            .ok_or("no bricks entry")?;
-        t.c().input_cursor(x + w / 2.0, y + h / 2.0);
-        t.frames(3).await?;
-        t.press("core:hotbar5");
-        t.until("bricks by the number key", Duration::from_secs(5), |t| t.c().inventory_slot(4).count == 64)
-            .await?;
+        // A number key over an entry: a stack of it in that hotbar slot. The entry is read once it
+        // has a size: the palette lays out again after the hotbar click, and read in between it
+        // was all zeros (under --jobs 2 the pointer went to 0 0, hovering nothing).
+        let entry = format!("item:{stone}");
+        let mut got = false;
+        // Pressed again until it lands (a second press gives the same stack): under load a press
+        // was let go before the screen read it.
+        for _ in 0..4 {
+            t.until("the bricks entry laid out", Duration::from_secs(5), |t| t.c().ui_rect(&entry).is_some_and(|r| r.w > 0.0))
+                .await?;
+            let Rect { x, y, w, h } = t.c().ui_rect(&entry).ok_or("no bricks entry")?;
+            t.c().input_cursor(x + w / 2.0, y + h / 2.0);
+            t.frames(3).await?;
+            t.press("core:hotbar5");
+            got = t
+                .until("bricks by the number key", Duration::from_secs(2), |t| t.c().inventory_slot(4).count == 64)
+                .await
+                .is_ok();
+            if got {
+                break;
+            }
+        }
+        t.check(got, "bricks by the number key");
     }
     t.c().menu_close();
     t.no_screen().await?;
@@ -512,17 +556,29 @@ pub async fn text_on_screen(t: T) -> R {
         ["before".to_string(), "two".to_string(), "after".to_string()],
         "a line replaced where it stands",
     );
-    t.c().hint("short", &[]).times(0.0, 0.2, 0.0);
-    t.frames(2).await?;
-    t.check(seen(&t, "text:short").is_some(), "the client's own hint");
-    t.secs(0.4).await?;
-    t.check(seen(&t, "text:short").is_none(), "times are kept");
+    // Own times against the place's (a hint 3 s, a chat line 10 s), by script time: the HUD fades
+    // by real time, and on CI (software Vulkan) a frame can take up to a second, past 0.2 s.
+    t.c().hint("own_hint", &[]).times(0.0, 10.0, 0.0);
+    let shown = t
+        .until("the hint", Duration::from_secs(3), |t| t.c().ui_rect("text:own_hint").is_some())
+        .await
+        .is_ok();
+    t.check(shown, "the client's own hint");
+    t.secs(4.0).await?;
+    t.frames(1).await?;
+    t.check(seen(&t, "text:own_hint").is_some(), "times are kept (past a hint's 3 s)");
 
-    t.c().chat("short_line", &[]).times(0.0, 0.2, 0.0);
-    t.frames(2).await?;
-    t.check(seen(&t, "text:short_line").is_some(), "a line with its own times");
-    t.secs(0.4).await?;
-    t.check(seen(&t, "text:short_line").is_none(), "the HUD follows a chat line's times");
+    t.c().chat("own_line", &[]).times(0.0, 3.0, 0.0);
+    let shown = t
+        .until("the line", Duration::from_secs(3), |t| t.c().ui_rect("text:own_line").is_some())
+        .await
+        .is_ok();
+    t.check(shown, "a line with its own times");
+    let gone = t
+        .until("the line to go", Duration::from_secs(5), |t| t.c().ui_rect("text:own_line").is_none())
+        .await
+        .is_ok();
+    t.check(gone, "the HUD follows a chat line's times (gone before the chat's 10 s)");
 
     t.cmd("/tellraw @a {#55ff55}green").await?;
     t.check_eq(line(&t, 0), "green".to_string(), "/tellraw formats");
@@ -815,20 +871,37 @@ pub async fn inventory_hotkeys(t: T) -> R {
         .parse()
         .map_err(|_| "no hotbar".to_string())?;
     let menu = |i: u32| hot - 27 + (i - 9);
-    let hover = |inv: u32| -> R {
-        let slot = menu(inv);
-        let Some(Rect { x, y, w, h }) = t.c().ui_rect(&format!("slot:{slot}")) else { return Err(format!("no slot {slot}")) };
-        t.c().input_cursor(x + w / 2.0, y + h / 2.0);
+    // A slot's middle, once laid out: an inventory change rebuilds the screen (base's recipe book
+    // beside it counts what is carried), and a rect read before the next layout is all zeros, which
+    // aimed the mouse at the window's corner (a sweep step or a click missed now and then).
+    let laid_out = async |slot: u32| -> Result<(f32, f32), String> {
+        let q = format!("slot:{slot}");
+        t.until("the slot laid out", Duration::from_secs(5), |t| t.c().ui_rect(&q).is_some_and(|r| r.w > 0.0 && r.h > 0.0))
+            .await
+            .map_err(|_| format!("no laid-out slot {slot}"))?;
+        let Rect { x, y, w, h } = t.c().ui_rect(&q).ok_or(format!("no slot {slot}"))?;
+        Ok((x + w / 2.0, y + h / 2.0))
+    };
+    // A click at a menu slot's middle (`click_ui`, once the slot is laid out).
+    let click = async |slot: u32, button: u32| -> R {
+        let (x, y) = laid_out(slot).await?;
+        t.c().input_cursor(x, y);
+        t.c().input_click(button, 0.0);
         Ok(())
     };
-    hover(9)?;
+    let hover = async |inv: u32| -> R {
+        let (x, y) = laid_out(menu(inv)).await?;
+        t.c().input_cursor(x, y);
+        Ok(())
+    };
+    hover(9).await?;
     t.frames(3).await?;
     t.press("core:hotbar3");
     t.secs(0.3).await?;
     t.check_eq(t.slot("me", 2).await?.0, "base:stone".to_string(), "number key 3 moved the stack to hotbar slot 3");
     t.check_eq(t.slot("me", 9).await?.1, 0, "and emptied the slot it was in");
 
-    hover(10)?;
+    hover(10).await?;
     t.frames(3).await?;
     t.c().input_click(0, 0.0);
     t.frames(4).await?;
@@ -838,20 +911,33 @@ pub async fn inventory_hotkeys(t: T) -> R {
     t.c().input_click(0, 0.0);
     t.secs(0.3).await?;
 
-    t.c().input_key("ShiftLeft", 1.0);
-    hover(20)?;
+    // Shift and the button held well past the sweep, then let go once it has landed: a fixed
+    // real-time hold ran out before a frame-counted sweep reached the second slot at low fps.
+    t.c().input_key("ShiftLeft", 30.0);
+    hover(20).await?;
     t.frames(3).await?;
-    t.c().input_click(0, 0.6);
+    t.c().input_click(0, 30.0);
     t.frames(3).await?;
-    hover(21)?;
-    t.secs(0.8).await?;
-    t.check(t.slot("me", 20).await?.1 == 0 && t.slot("me", 21).await?.1 == 0, "shift-sweeping moved both cobblestone stacks to the hotbar");
+    hover(21).await?;
+    let (c20, c21) = (menu(20), menu(21));
+    let swept = t
+        .until("both cobblestone stacks moved", Duration::from_secs(10), |t| {
+            t.c().menu_slot(c20).count == 0 && t.c().menu_slot(c21).count == 0
+        })
+        .await
+        .is_ok();
+    t.c().input_release_all();
+    t.frames(3).await?;
+    t.check(
+        swept && t.slot("me", 20).await?.1 == 0 && t.slot("me", 21).await?.1 == 0,
+        "shift-sweeping moved both cobblestone stacks to the hotbar",
+    );
     t.secs(0.5).await?;
 
     // The drop keys over a slot: one, then with Ctrl the rest.
     t.op("put me 12 stick 5").await?;
     t.secs(0.2).await?;
-    hover(12)?;
+    hover(12).await?;
     t.frames(3).await?;
     t.press("core:drop");
     t.secs(0.3).await?;
@@ -865,16 +951,23 @@ pub async fn inventory_hotkeys(t: T) -> R {
         t.op(&format!("put me {s} sand 1")).await?;
     }
     t.secs(0.2).await?;
-    hover(13)?;
+    hover(13).await?;
     t.frames(3).await?;
-    t.c().input_click(0, 1.0);
-    t.frames(4).await?;
-    hover(14)?;
-    t.frames(4).await?;
-    hover(15)?;
-    t.secs(1.0).await?;
-    t.check_eq(t.c().cursor_stack().count, 3, "sweeping on with the stack picked up gathered the sand");
-    hover(13)?;
+    t.c().input_click(0, 30.0);
+    t.until("the sand of slot 13 picked up", Duration::from_secs(5), |t| t.c().cursor_stack().count == 1)
+        .await?;
+    // Held on: each slot swept over gives its sand.
+    for (slot, n) in [(14, 2), (15, 3)] {
+        hover(slot).await?;
+        let took = t
+            .until("the swept sand", Duration::from_secs(5), |t| t.c().cursor_stack().count == n)
+            .await
+            .is_ok();
+        t.check(took, format!("swept onto slot {slot}, its sand joined the cursor"));
+    }
+    t.c().input_release_all();
+    t.frames(3).await?;
+    hover(13).await?;
     t.frames(3).await?;
     t.c().input_click(0, 0.0);
     t.secs(0.3).await?;
@@ -883,15 +976,20 @@ pub async fn inventory_hotkeys(t: T) -> R {
     for s in 0..9 {
         t.op(&format!("put me {s} dirt 1")).await?;
     }
-    t.op("put me 37 iron_chestplate 1").await?;
+    // Gear is built from parts here (no base:iron_chestplate): /gear makes a worn one.
+    t.cmd("/gear chestplate wrought_iron slot=37").await?;
     t.secs(0.3).await?;
-    let plate = id("base:iron_chestplate");
+    let worn = t.slot("me", 37).await?.0;
+    if worn.is_empty() {
+        return Err("/gear put no chestplate in slot 37".into());
+    }
+    let plate = id(&worn);
     let at = (0..64)
         .find(|&i| t.c().menu_slot(i).item == plate)
         .ok_or("no chestplate in the menu")?;
     t.c().input_key("ShiftLeft", 0.5);
     t.frames(1).await?;
-    t.click_ui(&format!("slot:{at}"), 0);
+    click(at, 0).await?;
     t.secs(0.4).await?;
     let now = (0..64).find(|&i| t.c().menu_slot(i).item == plate);
     t.check(now.is_some_and(|i| i != at), format!("the chestplate left its slot {at} for {now:?}"));
@@ -903,7 +1001,7 @@ pub async fn inventory_hotkeys(t: T) -> R {
     t.op("put me 13 sand 2").await?;
     t.secs(0.3).await?;
     for (slot, item) in [(12, "base:stick"), (13, "base:sand")] {
-        hover(slot)?;
+        hover(slot).await?;
         t.frames(3).await?;
         t.press("core:trash");
         t.secs(0.3).await?;
@@ -914,14 +1012,16 @@ pub async fn inventory_hotkeys(t: T) -> R {
     t.check(!(0..slots).any(|i| t.c().menu_slot(i).item == id("base:stick")), "the sticks gone for the sand");
 
     t.op("put me 12 stick 5").await?;
-    t.until("sticks in inventory", Duration::from_secs(5), |t| t.c().menu_slot(12).count == 5)
+    // Menu slots are not inventory slots here (the clothes come first): player slot 12 is `menu(12)`.
+    let m12 = menu(12);
+    t.until("sticks in inventory", Duration::from_secs(5), |t| t.c().menu_slot(m12).count == 5)
         .await?;
-    t.click_ui("slot:12", 1);
+    click(m12, 1).await?;
     t.until("half the sticks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().count == 3)
         .await?;
     let trash = slots - 1;
     for count in 1..=2 {
-        t.click_ui(&format!("slot:{trash}"), 1);
+        click(trash, 1).await?;
         t.until("one stick added to trash", Duration::from_secs(5), |t| {
             t.c().menu_slot(trash).item == id("base:stick")
                 && t.c().menu_slot(trash).count == count
@@ -930,12 +1030,12 @@ pub async fn inventory_hotkeys(t: T) -> R {
         .await?;
     }
 
-    t.click_ui("slot:12", 0);
+    click(m12, 0).await?;
     t.frames(3).await?;
-    t.click_ui("slot:12", 0);
+    click(m12, 0).await?;
     t.until("whole stack picked up again", Duration::from_secs(5), |t| t.c().cursor_stack().count == 3)
         .await?;
-    t.check(t.c().menu_slot(12).is_empty(), "the second left click emptied the slot");
+    t.check(t.c().menu_slot(m12).is_empty(), "the second left click emptied the slot");
     Ok(())
 }
 
@@ -945,12 +1045,19 @@ pub async fn inventory_hotkeys(t: T) -> R {
 /// in the second slot, and a right click clears it.
 pub async fn rebind(t: T) -> R {
     t.flat().await?;
+    // H: K, Weft's, opens base's skills (`mods/base/src/web.rs`), and the screen it opened
+    // stopped the walks.
     // `keys`: (key, seconds held, seconds before the next one).
     let bind = async |keys: &[(&str, f32, f32)]| -> R {
-        t.c().menu_open(&screens::CONTROLS);
-        t.screen("core:controls").await?;
+        t.open_screen("core:controls", |t| {
+            t.c().menu_open(&screens::CONTROLS);
+        })
+        .await?;
         t.frames(2).await?;
         t.click_ui("id:bind:core:forward:0", 0);
+        // A click acts when the button comes up, a frame or two on: by the script clock alone a CI
+        // frame (over 0.2 s) let the Escape below land first, nothing waiting, and it closed Controls.
+        t.frames(3).await?;
         t.secs(0.2).await?;
         for &(key, held, after) in keys {
             t.c().input_key(key, held);
@@ -976,14 +1083,14 @@ pub async fn rebind(t: T) -> R {
     t.c().menu_close();
     t.no_screen().await?;
     let k = {
-        bind(&[("KeyK", 0.0, 0.0)]).await?;
-        walked(&["KeyK"]).await?
+        bind(&[("KeyH", 0.0, 0.0)]).await?;
+        walked(&["KeyH"]).await?
     };
     let (alone, chord) = {
-        bind(&[("ControlLeft", 0.5, 0.1), ("KeyK", 0.0, 0.5)]).await?;
-        t.check(t.c().ui_rect("text:Ctrl+K").is_some(), "the entry shows Ctrl+K");
+        bind(&[("ControlLeft", 0.5, 0.1), ("KeyH", 0.0, 0.5)]).await?;
+        t.check(t.c().ui_rect("text:Ctrl+H").is_some(), "the entry shows Ctrl+H");
         t.shot("chord").await?;
-        (walked(&["KeyK"]).await?, walked(&["ControlLeft", "KeyK"]).await?)
+        (walked(&["KeyH"]).await?, walked(&["ControlLeft", "KeyH"]).await?)
     };
     let shift = {
         bind(&[("ShiftRight", 0.1, 0.3)]).await?;
@@ -991,6 +1098,7 @@ pub async fn rebind(t: T) -> R {
     };
     bind(&[("KeyW", 0.0, 0.0)]).await?;
     t.click_ui("id:bind:core:forward:1", 0);
+    t.frames(3).await?;
     t.secs(0.2).await?;
     t.c().input_key("KeyJ", 0.05);
     t.secs(0.1).await?;
@@ -1002,8 +1110,8 @@ pub async fn rebind(t: T) -> R {
     t.check(t.c().ui_rect("text:J*2").is_none(), "a right click clears it");
     t.c().menu_close();
     t.no_screen().await?;
-    t.check(k > 1.0, format!("K walks after rebinding forward to it (moved {k:.2})"));
-    t.check(alone < 0.2 && chord > 1.0, format!("bound to Ctrl+K, K alone moved {alone:.2} and Ctrl+K {chord:.2}"));
+    t.check(k > 1.0, format!("H walks after rebinding forward to it (moved {k:.2})"));
+    t.check(alone < 0.2 && chord > 1.0, format!("bound to Ctrl+H, H alone moved {alone:.2} and Ctrl+H {chord:.2}"));
     t.check(shift > 1.0, format!("a right Shift let go of alone is the key (moved {shift:.2})"));
     Ok(())
 }

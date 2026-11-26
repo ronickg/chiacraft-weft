@@ -50,28 +50,38 @@ pub fn register(r: &mut Registry) {
         )
         .group("output", Slots::single().output().holder())
         .recipes(&crate::recipes::SMELTING)
+        // Raw ore a blueprint not yet read teaches to smelt goes back (`ruins.rs`).
+        .on_change(crate::ruins::furnace_changed)
         .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
-                ui.row(S::row().gap(8.0), |ui| {
-                    ui.spacer();
-                    ui.column(S::column().gap(2.0), |ui| {
-                        ui.group("input");
-                        ui.progress_bind_dir("flame", S::default().size(14.0, 14.0), abi::ui_dir::UP, |c| {
-                            c.menu_component(&SMELTING)
-                                .map_or(0.0, |s| ratio(s.burn, s.burn_max))
+            crate::window::window(
+                ui,
+                S::column()
+                    .pad(crate::window::WINDOW_PAD)
+                    .gap(4.0)
+                    .stretch(),
+                &[],
+                |ui| {
+                    ui.row(S::row().gap(8.0), |ui| {
+                        ui.spacer();
+                        ui.column(S::column().gap(2.0), |ui| {
+                            ui.group("input");
+                            ui.progress_bind_dir("flame", S::default().size(14.0, 14.0), abi::ui_dir::UP, |c| {
+                                c.menu_component(&SMELTING)
+                                    .map_or(0.0, |s| ratio(s.burn, s.burn_max))
+                            });
+                            ui.group("fuel");
                         });
-                        ui.group("fuel");
+                        ui.recipe_arrow_bind(|c| {
+                            c.menu_component(&SMELTING)
+                                .map_or(0.0, |s| ratio(s.cook, s.cook_max))
+                        });
+                        ui.group("output");
+                        ui.spacer();
                     });
-                    ui.recipe_arrow_bind(|c| {
-                        c.menu_component(&SMELTING)
-                            .map_or(0.0, |s| ratio(s.cook, s.cook_max))
-                    });
-                    ui.group("output");
-                    ui.spacer();
-                });
-                ui.player_inventory(true);
-            });
+                    ui.player_inventory(true);
+                },
+            );
         });
 
     r.block(&CHEST)
@@ -86,12 +96,15 @@ pub fn register(r: &mut Registry) {
         .hardness(2.5)
         .mined_by("axe", tool_tier::HAND)
         .tab(&crate::tabs::FUNCTIONAL)
-        .entity(|e| e.inventory(27))
+        // Its food rots by its place (`survival/rot.rs`).
+        .entity(|e| e.attach(&crate::survival::LARDER).inventory(27))
         .opens(&CHEST_MENU);
     r.menu(&CHEST_MENU)
         .group("chest", Slots::chest(3).holder())
+        // Its screen (ours, not the default one) draws the player's slots: the menu must have them.
+        .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0), &[], |ui| {
+            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0), &[], |ui| {
                 ui.group("chest");
                 ui.player_inventory(true);
             });
@@ -103,7 +116,7 @@ pub fn register(r: &mut Registry) {
 fn cooked(w: &World, out: ItemStack) -> ItemStack {
     let Some(f) = vitals::food::find(item_name(out.item)).map(|f| &vitals::food::FOODS[f]) else { return out };
     let now = w.day_time();
-    let made = out.with(&base_api::MADE, (now / vitals::calendar::DAY_TICKS) as u32 + 1);
+    let made = out.with(&base_api::MADE, crate::survival::stamp(now));
     if f.meal == vitals::food::Meal::Cooked {
         made.with(&base_api::HOT, (now / 20) as u32)
             .with(&base_api::FRESHNESS, base_api::freshness::HOT)

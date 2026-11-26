@@ -396,6 +396,40 @@ pub fn floor_take(size: Size, max_health: f32, budget: f32, secs: f32, hit: f32)
     (took, have - took, hit - took)
 }
 
+// ------------------------------------------------------------------ stagger
+
+/// Stagger, for creatures with a rate floor (large, huge, titan; Ronald 11-22: option B, as the
+/// bosses have it): what spills over the floor plus this share of what it took. A same-age fight
+/// gathers this share of its health, so it breaks parts too (Planner's recommendation, taken).
+pub const STAGGER_SHARE: f32 = 0.5;
+/// Its breaks, at these shares of its max health in stagger: each drops one more of its own loot
+/// (Ronald 11-22: an extra of the animal's existing loot, no new items).
+pub const BREAKS: [f32; 2] = [0.2, 0.4];
+/// A knockdown each time this share of its max health more has gathered: it lies down
+/// `KNOCK_SECS`, and can't be knocked down again for `KNOCK_REST` after it stands (an over-tier
+/// player gathers stagger fast, and mustn't hold it down the whole fight).
+pub const KNOCK_AT: f32 = 0.25;
+pub const KNOCK_SECS: f32 = 3.0;
+pub const KNOCK_REST: f32 = 12.0;
+
+/// Whether a creature of `size` staggers: those with a rate floor.
+pub fn staggers(size: Size) -> bool {
+    size.band().floor.is_some()
+}
+
+/// The stagger a hit adds: what spilled over the floor, and `STAGGER_SHARE` of what it took.
+pub fn stagger_gain(took: f32, over: f32) -> f32 {
+    over + took * STAGGER_SHARE
+}
+
+/// Breaks reached at `stagger` on a creature of `max_health`, of `BREAKS`.
+pub fn breaks_at(stagger: f32, max_health: f32) -> usize {
+    BREAKS
+        .iter()
+        .filter(|&&b| stagger >= b * max_health)
+        .count()
+}
+
 /// A same-age reference player of `age` against a creature of `size` and `role` at `level`.
 pub fn reference_fight(age: Age, size: Size, role: Role, level: f32) -> Fight {
     fight(Player::of(age), size, level, derive(size, role, level))

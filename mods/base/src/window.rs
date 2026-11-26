@@ -8,6 +8,13 @@ use weft_sdk::*;
 /// and below it, the same at the sides.
 const TAB_H: f32 = 13.0;
 const TAB_PAD: f32 = 2.0;
+/// Room either side of a tab's name (Ronald, 11-25: small buttons' text needed more).
+const TAB_PAD_X: f32 = 5.0;
+
+/// A window's padding, GUI pixels: the frame's rail is 4.5 of them, so content sits 7.5 inside
+/// it, the margin for slot windows in `UI Style Guide.md` ("Spacing"); 7 left it 2.5 from the
+/// rail (Planner 11-24, against Minecraft's, Hytale's and Vintage Story's).
+pub const WINDOW_PAD: f32 = 12.0;
 
 /// A tab beside the title: its label and what a click does (open another screen).
 pub type Tab = (&'static str, fn(&ClientView));
@@ -39,28 +46,32 @@ fn framed(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], family: bool, bo
     ui.column(S::column().stretch().gap(-1.5), |ui| {
         ui.row(S::row().gap(2.0).pad(0.0), |ui| {
             ui.row(S::row().w(6.0), |_| {});
-            ui.panel("tab_pressed", S::row().pad(TAB_PAD).h(TAB_H).center(), |ui| match title {
+            ui.panel("tab_pressed", S::row().pad_xy(TAB_PAD_X, TAB_PAD).h(TAB_H).center(), |ui| match title {
                 Some(key) => ui.text_styled(S::default().no_wrap(), key, &[]),
                 None => ui.title(),
             });
             for &(key, open) in tabs {
-                ui.button(key, S::default().class("tab").h(TAB_H).pad(TAB_PAD), move |c| open(c));
+                ui.button(
+                    key,
+                    S::default()
+                        .class("tab")
+                        .h(TAB_H)
+                        .pad_xy(TAB_PAD_X, TAB_PAD),
+                    move |c| open(c),
+                );
             }
             if family {
-                ui.screen_parts(FAMILY, "tabs");
+                // Beside the window's own, in the same row (a column of them stood a row higher).
+                ui.screen_parts_in(FAMILY, "tabs", S::row().gap(2.0));
             }
             ui.spacer();
-            // (a button's padding of 0 means the engine's own; half a GUI pixel is none here)
-            ui.button(
-                "window.base.close",
-                S::default()
-                    .class("close")
-                    .size(7.0, 7.0)
-                    .pad(0.5)
-                    .tooltip("window.base.close_tip"),
-                |c| c.client().menu_close(),
-            );
-            ui.row(S::row().w(4.0), |_| {});
+            // A menu has the engine's X in its corner (`game_screens`); a screen of the family
+            // (stats, advancements) its own, the same picture (the bare `close` frame read as a
+            // stray square beside the tabs, Planner 11-24).
+            if title.is_some() {
+                ui.icon_button("base:gui/icon_close", 8.0, 8.0, S::default().tooltip("window.base.close_tip"), |c| c.client().menu_close());
+                ui.row(S::row().w(4.0), |_| {});
+            }
         });
         ui.panel("panel", s, body);
     });

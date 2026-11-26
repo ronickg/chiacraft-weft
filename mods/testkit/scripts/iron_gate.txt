@@ -1,0 +1,47 @@
+# Iron ore takes a bronze pickaxe (vitals::gear::IRON_ORE_HARVEST 210; Ronald 11-23, "A: bronze
+# pickaxe"). One iron ore block at the player's feet, one block north (yaw 0 faces -z), broken
+# three times in survival: with a flint pickaxe (harvest 100) and a copper one (170) it breaks but
+# drops nothing; with a bronze one (210) it drops raw iron. One copy, a fresh world.
+# Passes when the last `until chat base:raw_iron` meets; the first two `/tk inv me` lines must have
+# no raw_iron (read them in run.log).
+loaded
+idle
+chat /tk mode survival
+until mode survival within 10
+chat /tk fill ~-3 ~-1 ~-3 ~3 ~-1 ~3 base:stone
+chat /tk fill ~-3 ~ ~-3 ~3 ~3 ~3 core:air
+look 0 -50
+# A. Flint: breaks, no drop.
+chat /tk set ~ ~ ~-1 base:iron_ore
+until block ~ ~ ~-1 base:iron_ore within 10
+chat /gear pickaxe flint slot=0
+wait 1
+hold core:attack 12
+until block ~ ~ ~-1 core:air within 5
+wait 2
+chat /tk inv me
+wait 1
+shot iron_gate_flint.png
+# B. Copper: breaks, no drop.
+chat /tk set ~ ~ ~-1 base:iron_ore
+until block ~ ~ ~-1 base:iron_ore within 10
+chat /gear pickaxe copper slot=0
+wait 1
+hold core:attack 10
+until block ~ ~ ~-1 core:air within 5
+wait 2
+chat /tk inv me
+wait 1
+shot iron_gate_copper.png
+# C. Bronze: raw iron.
+chat /tk set ~ ~ ~-1 base:iron_ore
+until block ~ ~ ~-1 base:iron_ore within 10
+chat /gear pickaxe bronze slot=0
+wait 1
+hold core:attack 6
+until block ~ ~ ~-1 core:air within 5
+wait 2
+chat /tk inv me
+until chat base:raw_iron within 5
+shot iron_gate_bronze.png
+quit

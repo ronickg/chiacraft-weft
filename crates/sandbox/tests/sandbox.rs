@@ -220,6 +220,11 @@ fn registers_in_order() {
             Hook::Question(Question::BreakBlock),
             Hook::Modify { chain: Chain::Damage, stage: 200 },
             Hook::WorldTick,
+            // 1.2: the package's own block, item and channel.
+            Hook::BlockUse("probe:bell".into()),
+            Hook::BlockScheduled("probe:bell".into()),
+            Hook::ItemUse("probe:wand".into()),
+            Hook::Channel("probe:pings".into()),
         ]
     );
 }

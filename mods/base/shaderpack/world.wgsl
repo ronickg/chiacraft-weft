@@ -418,7 +418,82 @@ const SUN_CONE: f32 = 0.012;
 // On, +11 ms Ultra at 1080p).
 const RT_REACH: f32 = 256.0;
 
+// Past the shadows' reach (`OPT_SHADOW_REACH`, Bliss's shadow distance in the Bliss match): open
+// to the sky (sky light 14 or more, as under one layer of leaves) in full sun, under cover none,
+// faded in over the reach's last fifth, as Bliss's map fades into its lightmap mask. No map or ray
+// is asked out there.
+fn sky_sun_mask(in: VOut) -> f32 {
+    // Where the land is lit from the physical sky, Bliss's fallback past its map: clamp((L - 0.8) x
+    // 25) on its offset lightmap (composite1.fsh, method only).
+    if land_from_sky() {
+        let l = min(max(in.light.x - 0.05, 0.0) * 1.06, 1.0);
+        return clamp((l - 0.8) * 25.0, 0.0, 1.0) * cloud_shadow(in.rel);
+    }
+    return smoothstep(0.86, 0.94, in.light.x) * cloud_shadow(in.rel);
+}
+
+// The pixel's sun shadow, once: `surface_light` and `mat_shine` both ask it for the same normal,
+// and traced it is a soft shadow's rays each time (the same rays: the same pixel, frame and normal).
+var<private> SHADOW_MEMO: vec4<f32> = vec4(0.0, 0.0, 0.0, -1.0);
+
+// Path traced (`scene.rt.x` 2): an opaque block face (`PT_CAND`) the path tracer will light again
+// (`pt_takes`) has its traced shadow and reflection thrown away, so they aren't traced here: the
+// sky's mask and the blurred guess stand in (Planner, 11-25: path tracing at 60 on an RTX 3060,
+// optimised, not downgraded). Leaves and plants keep theirs.
+var<private> PT_CAND: bool = false;
+// -1 not asked yet, 0 the world's pixel stays, 1 the path tracer takes it.
+var<private> PT_TAKES: i32 = -1;
+const PT_REACH_WORLD: f32 = 384.0;
+
+// Whether the path tracer takes this pixel: its own test (`cs_trace`) is one ray from the eye that
+// must meet terrain at this depth with nothing clear (water, glass) before it, within its reach.
+// Where it fails (a floor seen through a pane or the pool's water) the world's pixel stays, with
+// its rays: skipped there, those floors lost their shade (w18, the hall's pool). This face is
+// opaque and the nearest the world drew, so only something see-through on the way can fail it:
+// the ray asks for those alone (`rt_seen_through`), out past the face as far as the path tracer's
+// test reaches (w19: the whole `rt_hit` cost the world's pass 2.8 ms). Asked only where a ray
+// would be traced, once a pixel.
+fn pt_takes(in: VOut) -> bool {
+    if !PT_CAND {
+        return false;
+    }
+    if PT_TAKES < 0 {
+        let d = length(in.rel);
+        PT_TAKES = 0;
+        if d > 1e-3 && d <= PT_REACH_WORLD {
+            // From the near plane, as `cs_trace`'s own test (a face through the eye is clipped).
+            if !rt_seen_through(in.rel / d * 0.05, in.rel / d, d * 1.02 + 0.15, 3u) {
+                PT_TAKES = 1;
+            }
+        }
+    }
+    return PT_TAKES == 1;
+}
+
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
+    if SHADOW_MEMO.w >= 0.0 && all(SHADOW_MEMO.xyz == n) {
+        return SHADOW_MEMO.w;
+    }
+    let s = sun_shadow_once(in, n);
+    SHADOW_MEMO = vec4(n, s);
+    return s;
+}
+
+fn sun_shadow_once(in: VOut, n: vec3<f32>) -> f32 {
+    let reach = fantasy_opt(OPT_SHADOW_REACH);
+    if reach > 0.0 {
+        let past = smoothstep(reach * 0.8, reach + 16.0, in.dist);
+        if past >= 1.0 {
+            return sky_sun_mask(in);
+        }
+        if past > 0.0 {
+            return mix(sun_shadow_near(in, n), sky_sun_mask(in), past);
+        }
+    }
+    return sun_shadow_near(in, n);
+}
+
+fn sun_shadow_near(in: VOut, n: vec3<f32>) -> f32 {
     // Traced (`core:rt_shadows`, a GPU with ray queries): one ray toward the light through the
     // cubes and the distant terrain, by the leaves' holes, so no texels and no acne; still never
     // deep under cover. Its colour through stained glass is kept for later (`rt_sun`'s rgb); here
@@ -431,10 +506,15 @@ fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
         return 0.0;
     }
     let c = min(canopy(), 1.0);
-    let cover = smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x);
+    // (Where the land is lit from the physical sky, no sky-light gate: Bliss's sun is its shadow's
+    // alone, lighting cave mouths and overhangs the map or the ray reaches.)
+    let cover = select(smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x), 1.0, land_from_sky());
     // Deep under cover (a cave, a room): no sun to trace.
     if cover <= 0.0 {
         return 0.0;
+    }
+    if pt_takes(in) {
+        return cover;
     }
     let t = rt_sun_soft(in.rel, n, light_dir(), in.kind.z != 0u, SUN_CONE, in.clip.xy, scene.rt.z > 0.5);
     let traced = min(dot(t, vec3(1.0 / 3.0)), cover) * models_shadow(in.rel, n) * cloud_shadow(in.rel);
@@ -445,6 +525,8 @@ fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     return mix(traced, sun_shadow_mapped(in, n), fade);
 }
 
+// Debug view 7's: the sun map's coverage, the clouds' shadow, the map's own shadow (`sun_shadow_mapped`).
+var<private> SHADOW_DEBUG: vec3<f32> = vec3(0.0);
 fn sun_shadow_mapped(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
     // A plant's blade asks the map from most of a block toward the sun: the blades round it, as
@@ -456,6 +538,13 @@ fn sun_shadow_mapped(in: VOut, n: vec3<f32>) -> f32 {
     // Under a forest's canopy the map's gaps let the sun through where the leaves cut the sky light
     // (`light_on`'s sunflecks).
     let c = min(canopy(), 1.0);
+    // Where the land is lit from the physical sky, Bliss's: the map's own, its lightmap fallback
+    // where the map isn't, with no sky-light gate (its cave walls took 3 % of the sun under ours).
+    if land_from_sky() {
+        let l = min(max(in.light.x - 0.05, 0.0) * 1.06, 1.0);
+        SHADOW_DEBUG = vec3(mapped.y, cloud_shadow(in.rel), mapped.x);
+        return mix(clamp((l - 0.8) * 25.0, 0.0, 1.0), mapped.x, mapped.y) * cloud_shadow(in.rel);
+    }
     return mix(sky, min(mapped.x, smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x)), mapped.y) * cloud_shadow(in.rel);
 }
 
@@ -509,10 +598,36 @@ fn leaf_sss(in: VOut, col: vec3<f32>) -> vec3<f32> {
     return palette().sun * light_strength() * depth * absorb * phase * open * leaf_light();
 }
 
+// Bliss's sun highlight on a surface with no material maps (specular.glsl, method only; Ronald's
+// profile, Sun_specular_Strength 10, with vanilla textures: roughness 1, F0 0.02): GGX with D 1/pi,
+// Schlick's Fresnel by Bliss's exponent, its visibility 1 / (LH^2 x 0.75 + 0.25), x n . l x 10 on
+// the sun that reached the face (`LIGHT_SUN`), not by the albedo: a faint sheen with the sun
+// behind, a strong untextured one on faces seen against a low sun (the gap list's lighting 17).
+fn bliss_sun_sheen(n: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let l = light_dir();
+    let v = -normalize(rel + vec3(0.0, 1e-6, 0.0));
+    let h = normalize(l + v);
+    let lh = clamp(dot(l, h), 0.0, 1.0);
+    let f = 0.02 + 0.98 * exp2((-5.55473 * lh - 6.98316) * lh);
+    let vis = 1.0 / (lh * lh * 0.75 + 0.25);
+    let ndl = clamp((dot(n, l) * 255.0 - 15.0) / 240.0, 0.0, 1.0);
+    return LIGHT_SUN * ndl * (1.0 / 3.14159) * f * vis * 10.0;
+}
+
 // `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
 fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
     var light = paint * light_on(n, in.light, shadow, ao, in.pos, in.rel);
+    // Where the land is lit from the physical sky, leaves and plants as any block, as Ronald's Bliss
+    // (SSS type 3 with no LabPBR pack: no light through them, no extra sun, no hold-back), apart
+    // from the leaf light setting (`leaf_sss`, off as made): the crowns' back-light and leaf-sun
+    // extra lit them where Bliss's stay plain (the gap list's lighting 14).
+    if land_from_sky() {
+        if LEAF_CUBE {
+            LEAF_SHADOW = shadow;
+        }
+        return light;
+    }
     // Leaves and plants let some sun through when it is behind them.
     // In the HDR world the light through leaves (`leaf_through`), the curve rolling its brights off
     // (the screen's hold-back below was for today's look).
@@ -530,7 +645,10 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
         if k_sun != 1.0 && in.kind.z == 0u {
             let c_open = min(canopy(), 1.0);
             let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), in.light.x);
-            light += paint * palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
+            let extra = palette().sun * light_strength() * sun_facing(n) * shadow * open * (k_sun - 1.0);
+            light += paint * extra;
+            LIGHT_SUN += extra;
+            LIGHT_ALL += extra;
         }
         // A leaf cube's light through it is `leaf_sss`'s (`shade_soft_lit`), from its colour, and
         // only with the leaf light on; off, none, as Ronald's Bliss (no SSS). With `leaf_through`'s
@@ -614,7 +732,10 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         albedo = vec4(mix(albedo.rgb, vec3(0.86, 0.9, 0.95), snow), albedo.a);
     }
     var light = surface_light(in, n, mix(in.color, vec3(1.0), snow), ao);
-    if in.glow != 0xffffffffu {
+    // (Not where the land is lit from the physical sky: Ronald's Bliss has no emissive boost, EMISSIVE
+    // type 3 with no LabPBR pack, and a lamp's face takes only its own block light, Bliss's steep
+    // curve x its autoBrightness; the gap list's lighting 16.)
+    if in.glow != 0xffffffffu && !land_from_sky() {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
         light = max(light, select(pow(in.tint, vec3(2.2)), vec3(1.0), in.overlay != 0u) * e * 1.7);
     }
@@ -624,12 +745,15 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
         if mat.has {
             lit = vec4(lit.rgb * (1.0 - 0.5 * mat.metal) + mat_shine(in, mat, n, albedo.rgb, light), lit.a);
             lit = vec4(lit.rgb + mat_through(in, mat, albedo.rgb), lit.a);
+        } else if land_from_sky() {
+            lit = vec4(lit.rgb + bliss_sun_sheen(n, in.rel), lit.a);
         }
         // A low sun full on a bright, saturated yellow-green (the birch's untinted leaves, whose
         // own picture is that green, so `surface_light` never sees them as leaves): some of its
         // colour and brightness held back while the sun is under about 45°. A leaf by the eye at
         // 18:00 stayed lime, 3.5 % of the frame (PC sh3c). By colour, as no flag marks them.
-        let low = 1.0 - smoothstep(0.5, 0.72, scene.sun.y);
+        // (Not where the land is lit from the physical sky: Bliss has no such cut.)
+        let low = select(1.0 - smoothstep(0.5, 0.72, scene.sun.y), 0.0, land_from_sky());
         let c = lit.rgb;
         if low > 0.0 && c.g > c.r && c.r > c.b {
             let sat = (c.g - c.b) / max(c.g, 1e-4);
@@ -654,53 +778,30 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     } else {
         lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
     }
-    // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
-    // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
-    // after it stopped, Tester 2's after-rain shots, 11-05). Leaves and plants wet too, less: a
-    // little darker, a faint sheen.
-    let open_top = smoothstep(0.85, 1.0, in.light.x);
+    // The debug view: the sun's or the sky's light alone, on white (`look_debug` 1 and 2; 3 to 5 are
+    // the mist banks', `bank_march`).
+    let debug = look_debug();
+    if debug == 1u || debug == 2u {
+        return vec4(select(LIGHT_ALL - LIGHT_SUN, LIGHT_SUN, debug == 1u), lit.a);
+    }
+    // 7: where the sun's light is cut: r the clouds' shadow here, g 1 on distant terrain (`fs_lod`),
+    // b the sun map's coverage where the map was asked (`SHADOW_DEBUG`).
+    // 8: the weather's values about the player: r its snow cover, g its snowing, b the puddles.
+    // 9: where the clouds' shadow map is read for this point: rg its uv, b 1 past the map.
+    if debug == 9u {
+        let uv = cloud_shadow_uv(in.rel);
+        let past = select(0.0, 1.0, any(uv < vec2(0.0)) || any(uv > vec2(1.0)));
+        return vec4(clamp(uv, vec2(0.0), vec2(1.0)), past, lit.a);
+    }
+    if debug == 8u {
+        return vec4(clamp(scene.ground.x, 0.0, 1.0), clamp(scene.ground.y, 0.0, 1.0), clamp(scene.canopy.z, 0.0, 1.0), lit.a);
+    }
+    if debug == 7u {
+        return vec4(cloud_shadow(in.rel), select(0.0, 1.0, in.kind.y == 1u), SHADOW_DEBUG.x, lit.a);
+    }
+    // Rain on the ground (`rain_on_ground`, look.wgsl: the path tracer's pixels take it too).
     let leafy = in.kind.z != 0u || in.kind.x == TINT_FOLIAGE;
-    let wet = ground_wet() * open_top * select(smoothstep(0.3, 0.9, n.y), 0.45, leafy);
-    if wet > 0.0 {
-        let v = -normalize(in.rel);
-        // (Darker and glossier than in the rain alone: after it, in the sun, 0.7 and a 0.12 sheen
-        // read only 2-4 % darker than dry ground, PC shw_wet.)
-        let sheen = (0.04 + pow(1.0 - max(dot(n, v), 0.0), 4.0) * 0.3) * select(1.0, 0.35, leafy);
-        lit = vec4(lit.rgb * mix(1.0, select(0.58, 0.8, leafy), wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
-    }
-    // Puddles on flat open ground (the Recrafted study, item 4): they grow over minutes of rain
-    // (`scene.canopy.z`, the engine's) and dry slower than the ground after: a shower leaves a few
-    // small ones, a long rain many and wide. A film of water: the ground under it dark, the sky
-    // mirrored by Fresnel, and rings where the rain still falls on it.
-    let puddles = clamp(scene.canopy.z, 0.0, 1.0) * open_top;
-    // (None in the calm-and-dry pipelines, `DRY`.)
-    if !DRY && puddles > 0.01 && !leafy && n.y > 0.95 {
-        // In cells three blocks across, some hold a puddle (one hash each against a share that grows
-        // with the rain: a shower a few, a long rain most), a round pool about a jittered middle
-        // that widens as it fills, edged in the blocks' own pixels.
-        // (A threshold on two octaves of value noise left none: in the shader the noise stayed
-        // near its middle, PC debug runs shpdd-shpdd3; with `hash3` picking the cells, one or two
-        // in the whole field where a fifth were due, shpd6. `puddle_hash` is a sine hash.)
-        let q = floor(in.pos.xz * 16.0) / 16.0;
-        let cell = vec2<i32>(floor(q / 3.0));
-        let pick = puddle_hash(cell, 1.0);
-        let middle = (vec2<f32>(cell) + 0.3 + 0.4 * vec2(puddle_hash(cell, 2.0), puddle_hash(cell, 3.0))) * 3.0;
-        let reach = mix(0.6, 1.5, puddles) * mix(0.7, 1.0, puddle_hash(cell, 4.0));
-        let wobble = (noise3(vec3(q * 0.9, 5.3)) - 0.5) * 0.5;
-        let pool = select(0.0, 1.0, pick < mix(0.12, 0.6, puddles)) * smoothstep(reach, reach - 0.12, length(q - middle) + wobble);
-        if pool > 0.0 {
-            let v = -normalize(in.rel);
-            let slope = rain_rings(in.pos.xz) * rain_amount();
-            let pn = normalize(vec3(-slope.x, 1.0, -slope.y));
-            let cos_v = max(dot(pn, v), 0.0);
-            let fresnel = 0.02 + 0.98 * pow(1.0 - cos_v, 5.0);
-            // A still mirror over darker ground: at Fresnel's few percent from eye height the film
-            // read as the wet ground round it (PC shpd4: puddles over a quarter of the field and
-            // none seen); a puddle shows by the sky in it.
-            let film = lit.rgb * 0.3 + sky_color(reflect(-v, pn)) * mix(0.3, 1.0, fresnel);
-            lit = vec4(mix(lit.rgb, film, pool), lit.a);
-        }
-    }
+    lit = vec4(rain_on_ground(lit.rgb, n, in.rel, in.pos, in.light.x, leafy), lit.a);
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
     return vec4(lit.rgb + glow, lit.a);
@@ -739,7 +840,13 @@ fn traced_view(rel: vec3<f32>, r_in: vec3<f32>, blur: f32, cone: f32, px: vec2<f
     if scene.rt.x > 0.5 && dot(h.n, light_dir()) > 0.0 {
         sun = min(sun, dot(rt_sun(h.rel, h.n, light_dir(), false), vec3(1.0 / 3.0)));
     }
+    // The night's blue (`display`) goes by this pixel's own sky share, which `light_on` sets for the
+    // surface it lights: kept, or a lamp-lit wall mirroring the skylit glass overhead took the glass's
+    // share and turned a periwinkle band at its own brightness (RT modes, hall at 23:00; w9_blueband,
+    // 11-25; the path tracer keeps it the same way).
+    let share = NIGHT_SKY_SHARE;
     let lit = albedo * light_on(h.n, h.light, sun, 1.0, h.world, h.rel);
+    NIGHT_SKY_SHARE = share;
     return haze_lit(lit, normalize(rel) * (length(rel) + h.t), h.light.x);
 }
 
@@ -783,7 +890,7 @@ fn mat_shine(in: VOut, m_in: Mat, n: vec3<f32>, albedo: vec3<f32>, light: vec3<f
     var sky = mix(light * 0.5, sky_seen, open * open);
     // Traced (`scene.rt.w`): what really lies that way, the room or the hills, off the screen too;
     // the rougher, the more it gives way to the blurred guess above.
-    if scene.rt.w > 0.5 && m.rough < 0.5 {
+    if scene.rt.w > 0.5 && m.rough < 0.5 && !pt_takes(in) {
         sky = mix(traced_view(in.rel + n * 0.01, r, m.rough * 6.0, 0.01 + m.rough * 0.5, in.clip.xy), sky, smoothstep(0.1, 0.5, m.rough));
     }
     // A rough surface mirrors little (its lobe is spread over the whole sky's dimmer average).
@@ -826,12 +933,6 @@ fn mirror_alpha(in: VOut, albedo: vec3<f32>) -> f32 {
     return -luma(f) * smoothstep(0.55, 0.9, m.smoothness);
 }
 
-// 0..1 for puddle cell `c` and key `k`: a sine hash (the pack's `hash3` picked far too few cells,
-// PC shpd6).
-fn puddle_hash(c: vec2<i32>, k: f32) -> f32 {
-    return fract(sin(dot(vec2<f32>(c), vec2(12.9898, 78.233)) + k * 37.719) * 43758.5453);
-}
-
 // ---- water ----
 
 // The surface as heights (blocks): layers of smooth noise, each stretched into long crests and
@@ -869,7 +970,42 @@ fn wave_height(p: vec2<f32>, t: f32, detail: f32) -> f32 {
 // The surface's normal at `pos` (world) seen from `dist` blocks, per pixel. The slope is taken over
 // a step that widens with distance, which smooths the far ripples away instead of letting them
 // shimmer (Bliss's way), and flattens them a little more at a glancing look.
+// Bliss's water height (waterBump.glsl's getWaterHeightmap, method only), where the land is lit
+// from the physical sky: three taps of its smooth noise (`bc_b`, its texture's blue channel, cells
+// 23.4 of its 512 texels), each turned by the golden angle from the one before, at tiles of 48 x 12,
+// 12 x 48 and 32 x 32 blocks (cells about 2.2, 0.55 and 1.5 blocks), sliding 0.035 of a tile a
+// second; a 600-block tile (cells 27 blocks) of the same noise, at least 0.1, shifts them by half
+// itself and scales the sum / 60: calm patches and rough ones.
+fn wave_bliss_height(p_in: vec2<f32>, t: f32) -> f32 {
+    let cell = 23.4 / 512.0;
+    let large = max(bc_b(p_in / 600.0, cell), 0.1);
+    let a = 2.39996;
+    let rot = mat2x2<f32>(cos(a), sin(a), -sin(a), cos(a));
+    var p = p_in;
+    var sum = 0.0;
+    let tiles = array<vec2<f32>, 3>(vec2(48.0, 12.0), vec2(12.0, 48.0), vec2(32.0, 32.0));
+    for (var i = 0; i < 3; i++) {
+        p = rot * p;
+        sum += bc_b(p / tiles[i] + vec2(large * 0.5 + t * 0.035), cell);
+    }
+    return sum / 60.0 * large;
+}
+// Its normal (getWaveNormal and the water's x 10, all_translucent.fsh): forward differences over a
+// step of dist / 224 (at most 3) + 0.15, the slopes made ten times steeper.
+fn wave_bliss_normal(pos: vec3<f32>, dist: f32) -> vec3<f32> {
+    let t = scene.params.w;
+    let e = min(dist / 224.0, 3.0) + 0.15;
+    let h = wave_bliss_height(pos.xz, t);
+    let dx = (wave_bliss_height(pos.xz + vec2(e, 0.0), t) - h) / e;
+    let dz = (wave_bliss_height(pos.xz + vec2(0.0, e), t) - h) / e;
+    let w = normalize(vec3(dx, dz, 1.0 - pow(abs(dx + dz), 2.0)));
+    let b = w * 10.0 + vec3(0.0, 0.0, -9.0);
+    return normalize(vec3(-b.x, b.z, -b.y));
+}
 fn wave_normal(pos: vec3<f32>, dist: f32, glance: f32) -> vec3<f32> {
+    if land_from_sky() {
+        return wave_bliss_normal(pos, dist);
+    }
     let t = scene.params.w;
     let p = pos.xz;
     let detail = 1.0 - smoothstep(16.0, 56.0, dist);
@@ -879,28 +1015,6 @@ fn wave_normal(pos: vec3<f32>, dist: f32, glance: f32) -> vec3<f32> {
     let hz = wave_height(p + vec2(0.0, e), t, detail);
     let k = mix(1.0, 0.5, smoothstep(24.0, 160.0, dist)) * mix(0.4, 1.0, smoothstep(0.05, 0.35, glance));
     return normalize(vec3(-(hx - h) / e * k, 1.0, -(hz - h) / e * k));
-}
-
-// Rain on water: each drop's ring spreads and fades in its own cell, at its own time. The slope
-// it gives the surface, on the texture's pixel grid.
-fn rain_rings(p: vec2<f32>) -> vec2<f32> {
-    let q = floor(p * 16.0) / 16.0 / 0.8;
-    let base = floor(q);
-    var slope = vec2(0.0);
-    for (var j = -1; j <= 1; j++) {
-        for (var i = -1; i <= 1; i++) {
-            let cell = vec2<i32>(base) + vec2(i, j);
-            let h = hash3(vec3(cell.x, 7, cell.y));
-            let k = hash3(vec3(cell.x, 13, cell.y));
-            let t = fract(scene.params.w * 0.9 + h * 7.31);
-            let v = q - (vec2<f32>(cell) + vec2(0.2 + 0.6 * h, 0.2 + 0.6 * k));
-            let d = length(v);
-            let x = d - t * 1.1;
-            let wave = sin(x * 26.0) * exp(-x * x * 70.0) * (1.0 - t) * (1.0 - t);
-            slope += v / max(d, 1e-3) * wave;
-        }
-    }
-    return slope * 0.3;
 }
 
 // How deep the water is under the surface at `pos` (world): blocks straight down to the first solid
@@ -978,6 +1092,44 @@ fn caustics(p: vec2<f32>) -> f32 {
     return pow(a, 6.0) + 0.5 * pow(b, 8.0);
 }
 
+// The water's body lit as Bliss's (fogBehindTranslucent_pass's water march, method only), where the
+// land is lit from the physical sky: its light scattered back between the surface and the floor,
+// `way` blocks of water seen through. Two steps spaced 11^u along twice that way, at most 12 blocks,
+// each lit by the sky's average with its clouds (the land's ambient, x Bliss's lightmap curve
+// (1 - (1 - L)^0.5)^3 and its 0.3 v.y + 0.7) dimmed by the water above it, and by the land's sun
+// through the surface's shadow, its fog's phase x 5 (`bank_phase`) and the water toward the sun (x
+// 1.1); scattered by its dirt (0.24 x 0.7 / pi) and taken away again on the way out, each step
+// summed in closed form. Its colour is the dirt's and the water's: a cyan-teal, bright toward the sun.
+// Replaced on this path: the shallow teal, the navy deep, the biome tint, the texture's pattern, the
+// grey mix and `water_body`.
+fn water_body_bliss(rel: vec3<f32>, way: f32, shadow: f32, sky_light: f32, px: vec2<f32>) -> vec3<f32> {
+    let p = palette();
+    let eps = vec3(0.2629, 0.0565, 0.01011) + 0.24 * vec3(0.65, 0.85, 1.05);
+    let scatter = 0.24 * 0.7 / 3.14;
+    let look = normalize(rel);
+    let len = min(2.0 * way, 12.0);
+    let end_depth = len * abs(look.y);
+    let sun_depth = end_depth / max(abs(light_dir().y), 0.05);
+    let lm = clamp(sky_light, 0.0, 1.0);
+    let ambient = max(p.ambient * pow(1.0 - pow(1.0 - lm, 0.5), 3.0) * (look.y * 0.3 + 0.7), vec3(0.0));
+    let sun = p.sun * light_strength() * shadow * bank_phase(dot(look, light_dir()));
+    let dither = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
+    var out = vec3(0.0);
+    var through = vec3(1.0);
+    for (var i = 0; i < 2; i++) {
+        let u = (f32(i) + dither) / 2.0;
+        let d = (pow(11.0, u) / 11.0 - 1.0 / 11.0) / (1.0 - 1.0 / 11.0);
+        let dd = pow(11.0, u) * log(11.0) / 2.0 / 10.0;
+        let indirect = max(ambient * exp(-end_depth * d * eps), vec3(0.01, 0.2, 0.4) * 0.03 / BLISS_UNITS * exp(-end_depth * d * eps));
+        let direct = sun * exp(-sun_depth * d * eps * 1.1);
+        let light = (indirect + direct) * scatter;
+        let step = exp(-eps * dd * len);
+        out += (light - light * step) / eps * through;
+        through *= step;
+    }
+    return out;
+}
+
 // What is seen through the surface at this pixel, as it reaches the screen: the bottom (or what
 // stands in the water) bent by the waves (glass-like refraction, index 1.33), its colors taken away
 // with depth (red first), light from the scattering water in their place, caustics on the bottom
@@ -986,7 +1138,10 @@ fn water_under(in: VOut, n: vec3<f32>, v: vec3<f32>, scatter: vec3<f32>, shadow:
     let size = vec2<f32>(textureDimensions(textures[u32(scene.behind.x)]));
     let uv = in.clip.xy / size;
     let straight = behind_at(uv, size);
-    let deep = display(scatter);
+    var deep = display(scatter);
+    if land_from_sky() {
+        deep = display(water_body_bliss(in.rel, 12.0, shadow, in.light.x, in.clip.xy));
+    }
     if straight.w < 0.0 {
         return vec4(deep, 8.0);
     }
@@ -1004,8 +1159,30 @@ fn water_under(in: VOut, n: vec3<f32>, v: vec3<f32>, scatter: vec3<f32>, shadow:
         }
     }
     let bottom = behind_color(at);
-    let gone = exp(-vec3(0.42, 0.11, 0.07) * through);
-    var seen = bottom * gone + deep * (vec3(1.0) - gone);
+    var gone = exp(-vec3(0.42, 0.11, 0.07) * through);
+    var fill = deep;
+    // Bliss's: the floor absorbed (below) and the body's own light added (`water_body_bliss`).
+    if land_from_sky() {
+        let coef = vec3(0.263, 0.0565, 0.0101) + 0.15 * vec3(0.65, 0.85, 1.05);
+        let d = 2.0 * through * max(abs(v.y), 0.05);
+        let floor_t = mix(exp(-2.0 * coef * d), exp(-8.0 * coef), 1.0 - exp(-0.1 * d));
+        var seen_b = bottom * floor_t + display(water_body_bliss(in.rel, through, shadow, in.light.x, in.clip.xy));
+        let floor_world_b = in.pos + (straight.xyz - in.rel);
+        seen_b += bottom * floor_t * caustics(floor_world_b.xz) * light_strength() * shadow * exp(-through * 0.25) * smoothstep(0.1, 0.8, through) * 0.9;
+        return vec4(seen_b, through);
+    }
+    // As Bliss's (`OPT_WATER_ABSORB`): water's own coefficients and its dirt's, per block, over
+    // twice the depth the view goes down (outdoors), never darker than a floor of eight blocks'
+    // worth; the body's own light only as much as the water held (up to 12 blocks of it).
+    let absorb = max(fantasy_opt(OPT_WATER_ABSORB), 0.0);
+    if absorb > 0.0 {
+        let coef = (vec3(0.263, 0.0565, 0.0101) + 0.15 * vec3(0.65, 0.85, 1.05)) * absorb;
+        let d = 2.0 * through * max(abs(v.y), 0.05);
+        gone = mix(exp(-2.0 * coef * d), exp(-8.0 * coef), 1.0 - exp(-0.1 * d));
+        let l = min(through, 12.0);
+        fill = deep * (vec3(1.0) - exp(-coef * l));
+    }
+    var seen = bottom * gone + fill * (vec3(1.0) - gone);
     // The sun's light focused by the waves onto the bottom, less as it goes deeper.
     let floor_world = in.pos + (straight.xyz - in.rel);
     let lightning = caustics(floor_world.xz) * light_strength() * shadow * exp(-through * 0.25) * smoothstep(0.1, 0.8, through);
@@ -1045,10 +1222,8 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
         let sky = mix(0.6, 2.4, window) * mix(0.15, 1.0, brightness_curve(in.light.x));
         return WaterLit(underwater_color() * sky, vec3(0.0), 1.0);
     }
-    if (top && v.y <= 0.0) || in_liquid() {
-        let l = shade_soft_lit(in, albedo, far_soft(in));
-        return WaterLit(l.rgb, vec3(0.0), l.a);
-    }
+    // (Seen from under its top or from inside a liquid it is lit as glass: `water_plain`, in
+    // `translucent`, which shares the glass's one copy of the lighting.)
     var n = normalize(in.normal);
     var depth = 3.0;
     var shore = 1.0;
@@ -1101,7 +1276,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     let scatter_raw = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
     // The water's own colour 40 % toward grey: at a slant ours read 0.31 saturation against Bliss's
     // 0.10-0.19 (Terrain's water sheet; Water 12).
-    let scatter = mix(vec3(luma(scatter_raw)), scatter_raw, 0.6);
+    let scatter = mix(vec3(luma(scatter_raw)), scatter_raw, 0.6) * water_body();
     // How much of the bottom shows: the way through the water to it, longer at a slant; never all
     // of it, so even the shallowest water tints what lies under it.
     let through = exp(-0.28 * depth / max(v.y, 0.2)) * 0.82;
@@ -1111,18 +1286,22 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     // our lake's water 0.45 mean brightness against Bliss's 0.62).
     // (Tipped down by less now, 0.85 of the ripple's lift where it was half: halved, it mirrored the
     // palest band of the sky everywhere, where Bliss's open water mirrors a deeper blue.)
-    var refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    // (The sky as seen: `sky_seen`.)
+    sky_seen = 1.0;
+    var refl = sky_color(normalize(vec3(r.x, max(r.y * water_sky_lift(), 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    sky_seen = 0.0;
     // Traced (`scene.rt.w`): the shore, the trees and what is under a roof, off the screen too, out to
     // the near land; the far water keeps the sky's guess.
     if scene.rt.w > 0.5 && in.dist < 256.0 {
         // The ripples' tilt a third as strong for the ray, and what it meets a little blurred: at
         // full tilt a sharp stained window broke into a loud mosaic across the pool (rtr2_rt).
-        let rn = normalize(mix(n, vec3(0.0, 1.0, 0.0), 0.65));
+        // (Bliss's screen reflections take the full normal.)
+        let rn = select(normalize(mix(n, vec3(0.0, 1.0, 0.0), 0.65)), n, land_from_sky());
         let rr = reflect(-v, rn);
         let traced = traced_view(in.rel + vec3(0.0, 0.02, 0.0), normalize(vec3(rr.x, max(rr.y, 0.02), rr.z)), 1.5, 0.04, in.clip.xy);
         // As much as the screen's reflections gave it: Fresnel's share and a little more, the body
         // below being dark (`post/reflect.wgsl`'s amount), less looking steeply down.
-        let amount = min(fresnel + 0.15 * (1.0 - smoothstep(0.5, 0.9, ndv)), 0.97);
+        let amount = min(fresnel + 0.15 * (1.0 - smoothstep(0.5, 0.9, ndv)) * (1.0 - water_mirror()), 0.97);
         refl = mix(traced * amount / max(fresnel, 1e-3), refl, smoothstep(160.0, 256.0, in.dist));
     }
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
@@ -1140,17 +1319,31 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
     let ds = nh * nh * (a2s - 1.0) + 1.0;
     let near = 1.0 - smoothstep(12.0, 40.0, in.dist);
     let sparkle = a2s / (3.14159 * ds * ds) * 0.02 * near;
-    let glint = palette().sun * light_strength() * min(spec + sparkle, mix(40.0, 1.5, golden())) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
+    var glint = palette().sun * light_strength() * min(spec + sparkle, mix(40.0, 1.5, golden())) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
+    // Bliss's sun on water (all_translucent's WATER_SUN_SPECULAR, method only): its direct light (the
+    // sun x n.l x the shadows) x one GGX at roughness 0.035 (^2.5, as its GGX takes it) from 0.02,
+    // Schlick in its exp2 form, its visibility term; no cap, no sparkle lobe, no horizon fade: a very
+    // bright, narrow path that the bloom spreads.
+    if land_from_sky() {
+        let r = pow(0.035, 2.5);
+        let lh = clamp(dot(hv, l), 0.0, 1.0);
+        let nl = clamp(dot(n, l), 0.0, 1.0);
+        let den = nh * nh * r - nh * nh + 1.0;
+        let d_ggx = r / (3.14159265 * den * den);
+        let f_ggx = 0.02 + 0.98 * exp2((-5.55473 * lh - 6.98316) * lh);
+        let k2 = 0.25 * r;
+        glint = palette().sun * light_strength() * nl * shadow * (nl * d_ggx * f_ggx / (lh * lh * (1.0 - k2) + k2));
+    }
     // Foam where it laps the land, in a wobbling line on the pixel grid.
     let px = floor(in.pos.xz * 16.0) / 16.0;
     let wobble = noise3(vec3(px.x * 2.0, scene.params.w * 0.6, px.y * 2.0));
-    let foam = (1.0 - smoothstep(0.06, 0.22 + 0.16 * wobble, shore)) * 0.7;
+    let foam = (1.0 - smoothstep(0.06, 0.22 + 0.16 * wobble, shore)) * 0.7 * clamp(fantasy_opt(OPT_WATER_FOAM), 0.0, 1.0);
     // With the world's copy (`scene.behind`, drawn in the see-through pass): what lies under the
     // surface itself, bent by the waves, tinted by the true depth, with caustics, and foam wherever
     // the water meets something. Opaque from here: the water does its own mixing.
     if see_through && top && scene.behind.z > 0.5 {
         let under = water_under(in, n, v, scatter, shadow);
-        let foam_all = max(foam, (1.0 - smoothstep(0.05, 0.3 + 0.1 * wobble, under.w)) * 0.6);
+        let foam_all = max(foam, (1.0 - smoothstep(0.05, 0.3 + 0.1 * wobble, under.w)) * 0.6 * clamp(fantasy_opt(OPT_WATER_FOAM), 0.0, 1.0));
         let surface = refl * fresnel + glint + (lit * 0.9 + vec3(0.03)) * foam_all;
         var below = under.rgb * (1.0 - fresnel) * (1.0 - foam_all);
         // The bottom seen through the water lies under the same air as the surface: veiled by it too
@@ -1166,9 +1359,13 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> WaterLit {
         }
         return WaterLit(surface, below, 1.0);
     }
+    var body = scatter * (1.0 - through);
+    if land_from_sky() {
+        body = water_body_bliss(in.rel, depth, shadow, in.light.x, in.clip.xy);
+    }
     let lost = (1.0 - fresnel) * through;
     let a = clamp(max(1.0 - lost, max(luma(glint), foam)), 0.02, 1.0);
-    let c = (refl * fresnel + scatter * (1.0 - fresnel) * (1.0 - through) + glint + (lit * 0.9 + vec3(0.03)) * foam) / a;
+    let c = (refl * fresnel + body * (1.0 - fresnel) + glint + (lit * 0.9 + vec3(0.03)) * foam) / a;
     return WaterLit(c, vec3(0.0), a);
 }
 
@@ -1260,6 +1457,7 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
 
 @fragment
 fn fs_opaque(in: VOut) -> WorldOut {
+    PT_CAND = scene.rt.x > 1.5 && in.kind.z == 0u && in.kind.x != TINT_FOLIAGE;
     return world_out(in, opaque(in));
 }
 
@@ -1453,34 +1651,59 @@ fn fs_cutout_fade(in: VOut) -> WorldOut {
     return world_out(in, vec4(shade(in, albedo).rgb, SOLID_ALPHA));
 }
 
-fn translucent(in: VOut) -> vec4<f32> {
+// A see-through face's picture, before it is lit.
+fn translucent_albedo(in: VOut) -> vec4<f32> {
     let du = dpdx(in.uv) * mip_scale();
     let dv = dpdy(in.uv) * mip_scale();
     let nuv = nearest_uv(in.size, in.uv, du, dv);
-    let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
-    // Water and glass each lit, then one haze for both (one copy of it in the shader, as for distant
-    // terrain in `lod_color`; Android port, 11-06). The same colours.
-    var pre: vec3<f32>;
-    var below = vec3(0.0);
-    var a: f32;
-    if in.kind.x == TINT_WATER {
-        let wl = water(in, albedo, true);
-        pre = wl.pre;
-        below = wl.below;
-        a = wl.a;
-    } else {
-        let l = shade_soft_lit(in, albedo, far_soft(in));
-        pre = l.rgb;
-        a = l.a;
-        // Glass with a material (the showcase's): what it mirrors isn't let through, so its share
-        // of the pixel grows by its Fresnel, the more the glossier (a clear pane mirrors the sky
-        // at a glancing look instead of fading with its alpha).
+    return with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+}
+// Water lit as glass is (`water`'s plain case): seen from under its top or with the eye in a liquid,
+// and not one of the faces `water` hides or shows from below.
+fn water_plain(in: VOut) -> bool {
+    let v = -normalize(in.rel);
+    if !CALM && in_water() && (abs(in.normal.y) <= 0.5 || v.y < 0.0) {
+        return false;
+    }
+    return (in.normal.y > 0.5 && v.y <= 0.0) || in_liquid();
+}
+// Glass (anything see-through but water, and `water_plain`'s water) lit: its colour before the
+// haze, and its alpha.
+fn glass_lit(in: VOut, albedo: vec4<f32>, glass: bool) -> vec4<f32> {
+    let l = shade_soft_lit(in, albedo, far_soft(in));
+    var a = l.a;
+    // Glass with a material (the showcase's): what it mirrors isn't let through, so its share
+    // of the pixel grows by its Fresnel, the more the glossier (a clear pane mirrors the sky
+    // at a glancing look instead of fading with its alpha).
+    if glass {
         let m = shade_mat(in, albedo.rgb);
         if m.has {
             let ndv = max(dot(normalize(in.normal), -normalize(in.rel)), 0.0);
             let f = luma(mat_fresnel(m.f0, ndv)) * (1.0 - clamp(m.rough * 1.6, 0.0, 0.85));
             a = a + (1.0 - a) * f;
         }
+    }
+    return vec4(l.rgb, a);
+}
+fn translucent(in: VOut) -> vec4<f32> {
+    let albedo = translucent_albedo(in);
+    // Water and glass each lit, then one haze for both (one copy of it in the shader, as for distant
+    // terrain in `lod_color`; Android port, 11-06). The same colours.
+    var pre: vec3<f32>;
+    var below = vec3(0.0);
+    var a: f32;
+    // (One copy of the glass's lighting for glass and `water_plain`'s water: two made the shader
+    // much slower to compile.)
+    let is_water = in.kind.x == TINT_WATER;
+    if is_water && !water_plain(in) {
+        let wl = water(in, albedo, true);
+        pre = wl.pre;
+        below = wl.below;
+        a = wl.a;
+    } else {
+        let g = glass_lit(in, albedo, !is_water);
+        pre = g.rgb;
+        a = g.a;
     }
     return vec4(below + display(haze_lit(pre, in.rel, in.light.x)), a);
 }
@@ -1498,6 +1721,16 @@ fn fs_translucent_fade(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     return translucent(in);
+}
+
+// A face's upper layers (a grass side's overlay; `mesher::UPPER`): what `fs_translucent` draws
+// for them, without its water. Water is one layer and a liquid, never an upper one, so the
+// picture is the same; the engine builds these pipelines apart from the translucent ones, and
+// with the water's code each took as long to compile (NVIDIA about 42 s each, 6 per pack load).
+@fragment
+fn fs_layers(in: VOut) -> @location(0) vec4<f32> {
+    let g = glass_lit(in, translucent_albedo(in), true);
+    return vec4(display(haze_lit(g.rgb, in.rel, in.light.x)), g.a);
 }
 
 // Distances (blocks) over which distant terrain's textures give way to their average color.
@@ -1576,7 +1809,16 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
 // power from 0.04, as the screen's reflections (`post/reflect.wgsl`). Muted navy water as Bliss's
 // in its own world, not a pale mirror (Far view, 11-06).
 fn water_fresnel(ndv: f32) -> f32 {
-    return 0.04 + 0.96 * pow(1.0 - clamp(ndv, 0.0, 1.0), 4.0);
+    let c = 1.0 - clamp(ndv, 0.0, 1.0);
+    // Bliss's (`OPT_WATER_MIRROR`): a fifth power from 0.02.
+    return mix(0.04 + 0.96 * pow(c, 4.0), 0.02 + 0.98 * pow(c, 5.0), water_mirror());
+}
+fn water_mirror() -> f32 {
+    return clamp(fantasy_opt(OPT_WATER_MIRROR), 0.0, 1.0);
+}
+// The rise the mirrored sky is taken at: `WATER_SKY_LIFT`, or all of it with Bliss's mirror.
+fn water_sky_lift() -> f32 {
+    return mix(WATER_SKY_LIFT, 1.0, water_mirror());
 }
 // Deep water's colour (what its body sends back, times the light), near and far alike: a navy
 // (was a murky teal, (0.022, 0.072, 0.066) near and (0.014, 0.045, 0.045) far).
@@ -1593,9 +1835,11 @@ fn far_water_lit(in: VOut) -> vec3<f32> {
     // The clouds' shadow here once (it was asked twice, for the light and the glint).
     let clouds = cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, clouds, 1.0, in.pos, in.rel);
-    let deep = WATER_DEEP * lit;
+    let deep = WATER_DEEP * lit * water_body();
     let r = reflect(-v, n);
-    let refl = sky_color(normalize(vec3(r.x, max(r.y * WATER_SKY_LIFT, 0.02), r.z)));
+    sky_seen = 1.0;
+    let refl = sky_color(normalize(vec3(r.x, max(r.y * water_sky_lift(), 0.02), r.z)));
+    sky_seen = 0.0;
     let l = light_dir();
     let hv = normalize(l + v + vec3(0.0, 1e-4, 0.0));
     let nh = max(dot(n, hv), 0.0);

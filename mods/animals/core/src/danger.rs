@@ -232,9 +232,14 @@ pub const BOND: f32 = 0.05;
 /// Its hits still go through the target's over-tier cap and rate floor (`combat::fight`), so a
 /// pack of star-age tames can't melt a titan either.
 pub fn tame(s: &Species, level: u32, saddle: Option<Age>, bonus: f32) -> Option<Stats> {
+    tame_with(s, level, saddle.map(|a| a.reference()), bonus)
+}
+
+/// The same with a saddle of item level `saddle` (`vitals::gear::saddle_level`: a fitted one's).
+pub fn tame_with(s: &Species, level: u32, saddle: Option<f32>, bonus: f32) -> Option<Stats> {
     let d = danger(s.name)?;
     let own = d.area_level(level);
-    let at = saddle.map_or(own, |a| own.max(a.reference()));
+    let at = saddle.map_or(own, |l| own.max(l));
     let times = bonus.clamp(1.0, TAME_CEILING);
     let m = mass_times(s);
     let mut st = combat::derive(size(s), d.role, at);

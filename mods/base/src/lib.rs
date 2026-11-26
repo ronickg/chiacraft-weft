@@ -2,6 +2,7 @@
 //! engine knows about stone, water or zombies.
 
 mod advancements;
+mod ambience;
 mod assembly;
 mod beds;
 mod block_entities;
@@ -15,6 +16,7 @@ mod cooking;
 mod crafts;
 mod crops;
 mod death;
+mod developer;
 mod discovery;
 mod dlss;
 mod doors;
@@ -51,8 +53,10 @@ mod parts;
 mod plants3d;
 mod plants3d_files;
 mod player;
+mod player_sounds;
 mod recipes;
 mod redstone;
+mod ruins;
 mod seasons;
 mod shaderpack;
 mod showcase;
@@ -66,6 +70,7 @@ mod target_info;
 mod vehicles;
 mod video;
 mod video_costs;
+mod waterholes;
 mod waystones;
 mod weather;
 mod weather_sound;
@@ -159,11 +164,14 @@ fn init(r: &mut Registry) {
     meteors::register(r);
     stars::register(r);
     sounds::register(r);
+    player_sounds::register(r);
     mobs::register(r);
     worldgen::register(r);
     weather::register(r);
     snow::register(r);
+    waterholes::register(r);
     weather_sound::register(r);
+    ambience::register(r);
     seasons::register(r);
     growth::register(r);
     farming::register(r);
@@ -171,6 +179,7 @@ fn init(r: &mut Registry) {
     wind_life::register(r);
     ley::register(r);
     waystones::register(r);
+    ruins::register(r);
     map::register(r);
     felling::register(r);
     fall::register(r);

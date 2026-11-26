@@ -509,11 +509,27 @@ pub struct WorldRenderer {
     /// The radiance cache (`pathtrace.wgsl`'s `pt_cache`, `gpu_layout::PT_CACHE` cells), made zeroed
     /// with the first traced frame.
     pt_cache: Option<BufferId>,
+    /// Each meshed world cube's light-giving blocks (`Mesh::lights`), kept whether or not anything
+    /// traces, and whether they changed since the GPU's table (`rt::RtLights`) was made.
+    cube_lights: FxHashMap<IVec3, Vec<u32>>,
+    /// Lights that are not the meshes' blocks (`set_body_lights`: bodies' and entities', such as
+    /// torches, whose own cell the meshes see as air) by cube, as `Mesh::lights` holds them, and
+    /// the change count taken.
+    body_lights: FxHashMap<IVec3, Vec<u32>>,
+    body_epoch: u64,
+    lights_dirty: bool,
+    pt_lights: Option<rt::RtLights>,
     /// The path tracer's G-buffer (`rt.rs` `gbuffer_pass`): its pipelines (faces opaque, faces
     /// cutout, quads opaque, quads cutout), the last `draw`'s opaque and cutout table draws (kind,
     /// layer, page, group, first, draws) with its frame slot (the CPU-made runs before
     /// `translucent` are drawn again too), and its images (albedo, normal, spec) at the world's size.
     gb_pipes: Option<[PipelineId; 4]>,
+    /// The opaque depth prepass (`rt.rs` `depth_prepass`, `core:depth_prepass`, while the world's
+    /// shader traces): depth alone for faces opaque, faces cutout, quads opaque, quads cutout,
+    /// then the world's own entries for the same four where the depth equals theirs, written no
+    /// more. `prepass_now`: this frame's `draw` drew with the second four.
+    pre_pipes: Option<[PipelineId; 8]>,
+    prepass_now: bool,
     gb_draws: Vec<(u8, u8, u32, u32, u32, u32)>,
     gb_draws_slot: usize,
     pub gb_images: Option<(TextureId, TextureId, TextureId, (u32, u32))>,
@@ -525,6 +541,8 @@ pub struct WorldRenderer {
     pt_light_image: Option<(TextureId, (u32, u32))>,
     /// The setting changed: the app composes the world shader again (`reload_shaders`).
     pub rt_reload: bool,
+    /// Whether the world shader was composed with the ground map (`gpu_layout::set_ground_prelude`).
+    ground_compiled: bool,
     /// Distant terrain quads drawn, before the occlusion test.
     pub lod_drawn: u64,
 }
@@ -587,9 +605,17 @@ impl WorldRenderer {
         let rt_pack = crate::packs::pack_uses("world.wgsl", "rt_sun");
         let mut rt_compiled = rt_expand.is_some() && rt::rt_setting() && rt_pack;
         crate::gpu_layout::set_rt_prelude(rt_compiled);
+        let ground_compiled = crate::settings::ground_map();
+        crate::gpu_layout::set_ground_prelude(ground_compiled);
+        let started = std::time::Instant::now();
+        let mut calm = [None, None];
         let made = world_shader(assets)
             .map_err(|e| e.0)
-            .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, s, slots)));
+            .and_then(|(s, slots)| {
+                calm = Self::calm_shaders(assets);
+                Self::warm(gpu, &s, &calm);
+                Ok((Self::pipelines(gpu, &s)?, s, slots))
+            });
         let made = match made {
             Err(e) if rt_compiled => {
                 log::error!("world shader with traced shadows: {e}; without them");
@@ -704,14 +730,26 @@ impl WorldRenderer {
             pt_pipes: if rt_compiled { rt::pt_pipelines(gpu, assets) } else { None },
             pt_out: Vec::new(),
             pt_cache: None,
+            cube_lights: FxHashMap::default(),
+            body_lights: FxHashMap::default(),
+            body_epoch: u64::MAX,
+            lights_dirty: false,
+            pt_lights: None,
             gb_pipes: if rt_compiled { rt::gb_pipelines(gpu, &shader) } else { None },
+            pre_pipes: if rt_compiled { rt::pre_pipelines(gpu, &shader) } else { None },
+            prepass_now: false,
             gb_draws: Vec::new(),
             gb_draws_slot: 0,
             gb_images: None,
             pt_images: None,
             pt_light_image: None,
             rt_reload: false,
-            calm_sets: [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)],
+            ground_compiled,
+            calm_sets: {
+                let sets = [Self::calm_pipes(gpu, calm[0].as_ref()), Self::calm_pipes(gpu, calm[1].as_ref())];
+                log::info!("world shader ready in {:.1} s", started.elapsed().as_secs_f32());
+                sets
+            },
             calm_level: 0,
             lod_drawn: 0,
         })
@@ -721,21 +759,89 @@ impl WorldRenderer {
     /// the pack uses it: the same draws, the shader without the paths that do nothing in a calm
     /// scene. Shadows and depth-only passes keep the plain ones.
     /// `dry`: with `DRY` true as well (`gpu_layout::DRY_OFF`).
-    fn calm_pipes(gpu: &mut dyn Backend, assets: &crate::assets::Assets, dry: bool) -> Option<ColorPipes> {
-        let snippets = crate::shaders::snippets(assets, &HOOK);
-        let s = crate::packs::compose_calm(assets, "world.wgsl", &[(&HOOK, &snippets)], dry)?;
-        let (face, quad, lod) = Self::pipelines(gpu, &s)
+    fn calm_pipes(gpu: &mut dyn Backend, s: Option<&Shader>) -> Option<ColorPipes> {
+        let s = s?;
+        let (face, quad, lod) = Self::pipelines(gpu, s)
             .map_err(|e| log::error!("calm world pipelines: {e}"))
             .ok()?;
         Some(ColorPipes {
             face,
             quad,
             lod,
-            lod_open: Self::lod_open_pipeline(gpu, &s, "fs_lod_open"),
-            lod_end: Self::lod_open_pipeline(gpu, &s, "fs_lod_end"),
-            cutout_split: Self::cutout_split_pipelines(gpu, &s),
-            fade: Self::fade_pipelines(gpu, &s),
+            lod_open: Self::lod_open_pipeline(gpu, s, "fs_lod_open"),
+            lod_end: Self::lod_open_pipeline(gpu, s, "fs_lod_end"),
+            cutout_split: Self::cutout_split_pipelines(gpu, s),
+            fade: Self::fade_pipelines(gpu, s),
         })
+    }
+
+    /// The world shader with `CALM` true, then with `CALM` and `DRY` (`packs::compose_calm`), where
+    /// the pack uses them: what `calm_pipes` makes its sets from.
+    fn calm_shaders(assets: &crate::assets::Assets) -> [Option<Shader>; 2] {
+        let snippets = crate::shaders::snippets(assets, &HOOK);
+        [false, true].map(|dry| crate::packs::compose_calm(assets, "world.wgsl", &[(&HOOK, &snippets)], dry))
+    }
+
+    /// Compiles every pipeline the world shader and its calm sets get (`pipelines`,
+    /// `lod_open_pipeline`, `fade_pipelines`, `shadow_pipelines`, `lod_shadow_pipeline`,
+    /// `calm_pipes`) in one batch, in parallel where the backend can (`Backend::warm_pipelines`),
+    /// before they are made one by one from the warm cache. A shader pack's on Metal (MoltenVK):
+    /// 40 s and more one at a time, the first time its source is seen. Only a speed-up: a pipeline
+    /// left out here, or made differently, is compiled when it is made, as before.
+    fn warm(gpu: &mut dyn Backend, shader: &Shader, calm: &[Option<Shader>; 2]) {
+        let depth_write = Some(DepthState { write: true, compare: Compare::GreaterEqual });
+        let depth_read = Some(DepthState { write: crate::packs::translucent_depth(), compare: Compare::GreaterEqual });
+        let layer_depth = Some(DepthState { write: false, compare: Compare::GreaterEqual });
+        let cutout = if std::env::var_os("WEFT_NO_ALPHA_TEST").is_some() { "fs_opaque" } else { "fs_cutout" };
+        let desc = |shader, vertex, fragment: Option<&'static str>, color: bool, depth, blend, cull_back| PipelineDesc {
+            label: "world (warming)",
+            shader,
+            vertex,
+            fragment,
+            color: color.then(crate::post::world_format),
+            depth,
+            blend,
+            cull_back,
+            topology: Topology::Triangles,
+            motion: color && crate::post::motion(),
+        };
+        let mut descs = Vec::new();
+        for s in std::iter::once(shader).chain(calm.iter().flatten()) {
+            let layers = if s.module.entry_points.iter().any(|e| e.name == "fs_layers") { "fs_layers" } else { "fs_translucent" };
+            for vs in ["vs_face", "vs_quad"] {
+                descs.push(desc(s, vs, Some("fs_opaque"), true, depth_write, Blend::None, true));
+                descs.push(desc(s, vs, Some(cutout), true, depth_write, Blend::None, true));
+                descs.push(desc(s, vs, Some("fs_translucent"), true, depth_read, Blend::Alpha, true));
+                descs.push(desc(s, vs, Some(layers), true, layer_depth, Blend::Alpha, true));
+            }
+            descs.push(desc(s, "vs_lod", Some("fs_lod"), true, depth_write, Blend::None, true));
+            for entry in ["fs_lod_open", "fs_lod_end"] {
+                if crate::packs::pack_uses("world.wgsl", entry) && !(entry == "fs_lod_end" && cfg!(target_os = "android")) {
+                    descs.push(desc(s, "vs_lod", Some(entry), true, depth_write, Blend::None, true));
+                }
+            }
+            if ["fs_opaque_fade", "fs_cutout_fade", "fs_translucent_fade"]
+                .iter()
+                .all(|e| crate::packs::pack_uses("world.wgsl", e))
+            {
+                for vs in ["vs_face", "vs_quad"] {
+                    descs.push(desc(s, vs, Some("fs_opaque_fade"), true, depth_write, Blend::None, true));
+                    descs.push(desc(s, vs, Some("fs_cutout_fade"), true, depth_write, Blend::None, true));
+                    descs.push(desc(s, vs, Some("fs_translucent_fade"), true, depth_read, Blend::Alpha, true));
+                }
+            }
+        }
+        // Shadows and depth-only passes come from the plain shader alone.
+        if crate::packs::sun_shadows() {
+            for vs in ["vs_face", "vs_quad"] {
+                descs.push(desc(shader, vs, None, false, depth_write, Blend::None, false));
+                descs.push(desc(shader, vs, Some("fs_shadow"), false, depth_write, Blend::None, false));
+            }
+            if crate::packs::pack_uses("world.wgsl", "fs_lod_shadow") {
+                descs.push(desc(shader, "vs_lod", Some("fs_lod_shadow"), false, depth_write, Blend::None, false));
+            }
+        }
+        gpu.warm_pipelines(&descs);
     }
 
     /// Trades the colour pipelines in use with `set`'s.
@@ -908,6 +1014,13 @@ impl WorldRenderer {
     // Android backend when upstream's came in (Weft sync 11-22); no split until the backend has it.
     fn cutout_split_pipelines(_gpu: &mut dyn Backend, _shader: &Shader) -> Option<[PipelineId; 4]> {
         None
+    }
+
+    /// With this frame's depth prepass (`prepass_now`), the pipeline of a run of `kind` (0 faces, 1
+    /// quads) and `layer` (0 opaque, 1 cutout): the world's own entry, where the depth equals its own.
+    fn equal_pipe(&self, kind: u8, layer: u8) -> Option<PipelineId> {
+        let p = self.pre_pipes.filter(|_| self.prepass_now)?;
+        (kind < 2 && layer < 2).then(|| p[4 + kind as usize * 2 + layer as usize])
     }
 
     /// The two passes of a run of `kind` (0 faces, 1 quads) and `layer` (1 cutout) when cutout
@@ -1237,6 +1350,12 @@ impl WorldRenderer {
         }
     }
 
+    /// `core:ground_map` turned on or off since the world shader was composed (`reload_shaders`
+    /// composes it again with or without it).
+    pub fn ground_switch(&self) -> bool {
+        crate::settings::ground_map() != self.ground_compiled
+    }
+
     /// Recompiles the world shader; keeps the old pipelines when the new source has errors.
     pub fn reload_shaders(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, assets: &crate::assets::Assets) {
         self.occlusion.reload(gpu, assets);
@@ -1245,10 +1364,17 @@ impl WorldRenderer {
         let rt = self.rt_wanted && self.rt.is_some() && self.rt_pack;
         crate::gpu_layout::set_rt_prelude(rt);
         self.rt_reload = false;
+        self.ground_compiled = crate::settings::ground_map();
+        crate::gpu_layout::set_ground_prelude(self.ground_compiled);
+        let started = std::time::Instant::now();
+        let mut calm = [None, None];
         match world_shader(assets)
             .map_err(|e| e.0)
-            .and_then(|(s, slots)| Ok((Self::pipelines(gpu, &s)?, slots)))
-        {
+            .and_then(|(s, slots)| {
+                calm = Self::calm_shaders(assets);
+                Self::warm(gpu, &s, &calm);
+                Ok((Self::pipelines(gpu, &s)?, slots))
+            }) {
             Ok(((f, q, l), slots)) => {
                 self.drop_calm(gpu);
                 for p in self
@@ -1269,10 +1395,14 @@ impl WorldRenderer {
                 for p in self.gb_pipes.take().into_iter().flatten() {
                     gpu.destroy_pipeline(p);
                 }
+                for p in self.pre_pipes.take().into_iter().flatten() {
+                    gpu.destroy_pipeline(p);
+                }
                 if rt {
                     self.pt_pipes = rt::pt_pipelines(gpu, assets);
                     if let Ok((s, _)) = world_shader(assets) {
                         self.gb_pipes = rt::gb_pipelines(gpu, &s);
+                        self.pre_pipes = rt::pre_pipelines(gpu, &s);
                     }
                 }
                 for p in self
@@ -1301,8 +1431,8 @@ impl WorldRenderer {
                 self.tex_shader = shader_table(gpu, crate::content::content(), textures, &slots);
                 self.solid
                     .set_on(gpu, crate::packs::pack_uses("world.wgsl", "solid_at"));
-                self.calm_sets = [Self::calm_pipes(gpu, assets, false), Self::calm_pipes(gpu, assets, true)];
-                log::info!("world shader reloaded");
+                self.calm_sets = [Self::calm_pipes(gpu, calm[0].as_ref()), Self::calm_pipes(gpu, calm[1].as_ref())];
+                log::info!("world shader reloaded in {:.1} s", started.elapsed().as_secs_f32());
             }
             Err(e) => log::error!("world shader: {e}"),
         }
@@ -1342,6 +1472,9 @@ impl WorldRenderer {
 
     pub fn remove(&mut self, key: MeshKey) {
         self.terrain_epoch += 1;
+        if key.0 == 0 && self.cube_lights.remove(&key.1).is_some() {
+            self.lights_dirty = true;
+        }
         if let Some(rt) = &mut self.rt {
             rt.mesh_changed(key);
         }
@@ -1386,7 +1519,13 @@ impl WorldRenderer {
         if let Some(b) = self.pt_cache.take() {
             gpu.destroy_buffer(b);
         }
+        if let Some(l) = self.pt_lights.take() {
+            l.destroy(gpu);
+        }
         for p in self.gb_pipes.take().into_iter().flatten() {
+            gpu.destroy_pipeline(p);
+        }
+        for p in self.pre_pipes.take().into_iter().flatten() {
             gpu.destroy_pipeline(p);
         }
         if let Some((a, b, c, _)) = self.gb_images.take() {
@@ -1637,10 +1776,38 @@ impl WorldRenderer {
         }
     }
 
+    /// Takes lights that are not the meshes' blocks into the path tracer's light table when they
+    /// changed (`epoch`): the cells bodies light (`World::body_glow`) and the entities' (`Glow`'s
+    /// sources: torches, which are block entities, and lights in hand).
+    pub fn set_body_lights<'a>(&mut self, cells: impl Iterator<Item = (&'a IVec3, &'a [u8; 3])>, epoch: u64) {
+        if epoch == self.body_epoch {
+            return;
+        }
+        self.body_epoch = epoch;
+        self.body_lights.clear();
+        for (&p, &[r, g, b]) in cells {
+            let l = p & 15;
+            // Bit 24: a small light (a torch's flame, a light in hand), not a whole glowing block.
+            let w = l.x as u32
+                | (l.y as u32) << 4
+                | (l.z as u32) << 8
+                | u32::from(r.min(15)) << 12
+                | u32::from(g.min(15)) << 16
+                | u32::from(b.min(15)) << 20
+                | 1 << 24;
+            self.body_lights.entry(p >> 4).or_default().push(w);
+        }
+        self.lights_dirty = true;
+    }
+
     pub fn upload(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, key: MeshKey, mesh: &Mesh) {
         self.remove(key);
         if mesh.is_empty() {
             return;
+        }
+        if key.0 == 0 && !mesh.lights.is_empty() {
+            self.cube_lights.insert(key.1, mesh.lights.clone());
+            self.lights_dirty = true;
         }
         self.terrain_epoch += 1;
         let began = std::time::Instant::now();
@@ -2189,8 +2356,12 @@ impl WorldRenderer {
         // then shade, so each pixel of leaves is shaded once.
         let mut steps: Vec<(PipelineId, BufferId, usize, bool)> = Vec::with_capacity(groups.len() + 4);
         let mut depth_laid = false;
+        // With the depth prepass (`depth_prepass`), the opaque and cutout cubes shaded where their
+        // depth is already laid: each pixel once.
+        self.prepass_now = self.pre_pipes.is_some() && self.rt_traced() && crate::settings::depth_prepass();
         for (i, &(kind, layer, page, ..)) in groups.iter().enumerate() {
             let (pipe, buf) = self.pipe_of(kind, layer, page);
+            let pipe = self.equal_pipe(kind, layer).unwrap_or(pipe);
             match self.split_of(kind, layer) {
                 Some((_, shade)) => {
                     if !depth_laid {
@@ -2274,6 +2445,7 @@ impl WorldRenderer {
                 list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count });
             }
             let pipe = self.split_of(kind, layer).map_or(pipe, |s| s.1);
+            let pipe = self.equal_pipe(kind, layer).unwrap_or(pipe);
             self.bind_run(list, pipe, buf, obuf);
             list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count });
         }

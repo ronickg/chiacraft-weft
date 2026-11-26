@@ -160,6 +160,8 @@ pub struct S {
     pub grow: f32,
     pub gap: f32,
     pub pad: f32,
+    /// Left and right padding instead of `pad` (`S::pad_xy`).
+    pub pad_x: Option<f32>,
     pub row: bool,
     pub align: u32,
     pub justify: u32,
@@ -198,6 +200,7 @@ impl Default for S {
             grow: 0.0,
             gap: 0.0,
             pad: 0.0,
+            pad_x: None,
             row: false,
             align: abi::ui_align::START,
             justify: abi::ui_justify::START,
@@ -314,6 +317,13 @@ impl S {
     }
     pub fn pad(mut self, p: f32) -> S {
         self.pad = p;
+        self.pad_x = None;
+        self
+    }
+    /// `x` left and right, `y` above and below.
+    pub fn pad_xy(mut self, x: f32, y: f32) -> S {
+        self.pad = y;
+        self.pad_x = Some(x);
         self
     }
     pub fn size(mut self, w: f32, h: f32) -> S {
@@ -365,6 +375,12 @@ pub struct Ui {
 impl Ui {
     pub(crate) fn from_raw(ui: *mut abi::UiCtx, client: *mut abi::ClientCtx) -> Ui {
         Ui { raw: ui, client: ClientView { raw: client } }
+    }
+
+    /// The recipe currently being built, in a recipe layout or an `entry` part of the viewer.
+    pub fn recipe(&self) -> Option<crate::RecipeView> {
+        let (mut kind, mut recipe) = (Str::new(""), 0);
+        unsafe { ((host().ui_recipe)(self.raw, &mut kind, &mut recipe) != 0).then(|| crate::RecipeView::named(kind.as_str(), recipe)) }
     }
 }
 
@@ -418,7 +434,10 @@ fn node(kind: u32, s: S) -> Node {
         scale: s.scale,
         grow: s.grow,
         gap: s.gap,
-        pad: [s.pad; 4],
+        pad: match s.pad_x {
+            Some(x) => [x, s.pad, x, s.pad],
+            None => [s.pad; 4],
+        },
         row: s.row as u32,
         align: s.align,
         justify: s.justify,
@@ -506,7 +525,13 @@ impl Ui {
     /// What mods add to place `area` of a screen or HUD element (`Registry::screen_part`). A screen of your own
     /// that replaces an engine one (`core:title`) keeps other mods' buttons by building its places.
     pub fn screen_parts(&mut self, screen: &str, area: &str) {
-        let mut n = node(k::SCREEN_PARTS, S::default());
+        self.screen_parts_in(screen, area, S::default())
+    }
+
+    /// `screen_parts` laid out by `s`: `S::row()` for a row of tabs (chiacraft: other mods' tabs
+    /// stacked in a column beside the inventory's own, a row too high, Planner 11-24).
+    pub fn screen_parts_in(&mut self, screen: &str, area: &str, s: S) {
+        let mut n = node(k::SCREEN_PARTS, s);
         n.class = Str::new(screen);
         n.text = Str::new(area);
         self.leaf(n)

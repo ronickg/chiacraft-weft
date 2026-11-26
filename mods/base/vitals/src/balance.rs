@@ -337,7 +337,8 @@ mod tests {
             assert_eq!(crate::levels::total_to(level) + into, xp);
         }
         assert_eq!(crate::levels::level_of(20).0, 2);
-        assert_eq!(crate::levels::after_death(crate::levels::total_to(5) + 100, 0.25), crate::levels::total_to(5) + 75);
+        // 60 into level 5 (its width is 95): a quarter of it goes, the level stays.
+        assert_eq!(crate::levels::after_death(crate::levels::total_to(5) + 60, 0.25), crate::levels::total_to(5) + 45);
     }
 
     #[test]

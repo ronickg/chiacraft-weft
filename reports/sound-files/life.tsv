@@ -1,0 +1,8 @@
+# Ambient life's calls and splashes (mods/animals/src/ambient.rs). python3 -I sfx.py life.tsv mods/animals/assets/sounds
+ambient/eagle1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/616926_TRP_210227_red_tailed_hawk_eq_isolated_calls_roof_77.mp3	hit:0	2.2	-3
+ambient/eagle2.ogg	~/Coding/chiacraft-archive/references/sound/freesound/616926_TRP_210227_red_tailed_hawk_eq_isolated_calls_roof_77.mp3	hit:1	2.2	-3
+ambient/eagle3.ogg	~/Coding/chiacraft-archive/references/sound/freesound/575524_1888software_red_tailed_hawk.mp3	hit:0	2.2	-3
+ambient/splash1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/507092_paulprit_fish_jumping_splash_1.mp3	copy	1.5	-6
+ambient/splash2.ogg	~/Coding/chiacraft-archive/references/sound/freesound/507091_paulprit_fish_jumping_splash_2.mp3	hit:0	1.2	-6
+ambient/splash3.ogg	~/Coding/chiacraft-archive/references/sound/freesound/50623_vibe_crc_water_splash_10shots.mp3	hit:0	1.0	-6
+ambient/splash4.ogg	~/Coding/chiacraft-archive/references/sound/freesound/50623_vibe_crc_water_splash_10shots.mp3	hit:3	1.0	-6

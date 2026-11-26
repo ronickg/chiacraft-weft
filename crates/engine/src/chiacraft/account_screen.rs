@@ -84,7 +84,7 @@ impl Screen for Account {
                         crate::chiacraft::did::watch(cx.settings);
                     }
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(360.0), |ui| {
-                        label(ui, cx, "account.did.title", &[], "default");
+                        crate::screens::heading(ui, cx, "account.did.title");
                         match did
                             .as_ref()
                             .and_then(|d| d.launcher_id())
@@ -174,7 +174,7 @@ impl Screen for Account {
                     }
 
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(360.0), |ui| {
-                        label(ui, cx, "account.restore_title", &[], "default");
+                        crate::screens::heading(ui, cx, "account.restore_title");
                         label(ui, cx, "account.restore_hint", &[], "dim");
                         let input = ui.add(Kind::input("", 400), Style::default().h(18.0).w(344.0));
                         ui.set_id(input, "restore_words");

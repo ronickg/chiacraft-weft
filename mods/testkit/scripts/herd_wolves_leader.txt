@@ -1,0 +1,103 @@
+# A pack's leader stays leader (Planner 11-25, after wolvesRegroup3: a stray with the lowest id rejoined a pair and took over,
+# then wandered off while the pair rested, and the three disagreed who led). The set-up of `herd_wolves_regroup.txt`: a grown
+# stray spawned first (so the lowest id) 80 blocks east, then two wolves that kill a deer and lie resting. Expected: the stray
+# howls, walks back, and on arriving follows the pair's leader ("animal <stray> follows <leader> now, not <stray>"); the pair's
+# leader and its follower never change leader; once all three are together they keep within 16 blocks of one another, and a
+# leader awake while the others rest stays by them ("keeps by its resting pack" at debug). The senses dump at the end is taken
+# next to the pack so all three show: the same lead for each, kin 3.
+# Report from the log (`--log mod:animals=debug`): every "follows ... now, not" line, every "howls for its pack" and "heads for
+# its pack" line, "keeps by its resting pack" lines (how many, whose), each where row's positions and doing (the spread of the
+# three), and the final senses rows' kin and lead per wolf.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+chat /tk mode spectator
+chat /tp 40 90 544
+wait 4
+chat /tk fill -20 68 538 86 68 550 base:dirt
+chat /tk fill -20 69 538 86 69 550 base:grass
+chat /tk fill -20 70 538 86 78 550 core:air
+wait 1
+chat /tk spawn animals:grey_wolf 80 70 544
+wait 2
+chat /tp 80 72 546
+chat /animal age 4
+chat /tp 0 72 540
+wait 2
+chat /tk spawn animals:white_tailed_deer 2 70 540
+chat /tk spawn animals:grey_wolf 0 70 540
+chat /tk spawn animals:grey_wolf -6 70 544
+wait 2
+chat /anim log
+chat /tp 0 72 540
+chat /animalprof hunter 0.3
+chat /tp -6 72 544
+chat /animalprof hunter 0.3
+chat /tp 0 72 540
+chat /animalprof bite 1000
+wait 1
+chat /tp 40 95 544
+wait 2
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /tp 5 80 538
+wait 2
+chat /animalprof where
+chat /animalprof senses
+quit

@@ -286,6 +286,21 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
     }),
     // What this client hears now, most important first (also in the log, for scripts).
     ("sounds", "[which:word]", |r, args| match &r.audio {
+        // What has no sound, with or without a sound device (chiacraft; the testkit's `sounds`).
+        _ if args.text("which") == Some("check") => {
+            let c = crate::audio::sound_check(&r.assets);
+            let list = |v: &[String]| if v.is_empty() { "-".to_string() } else { v.join(" ") };
+            log::info!(
+                "sound check: silent blocks [{}] silent kinds [{}] missing files [{}]",
+                list(&c.silent_blocks),
+                list(&c.silent_kinds),
+                list(&c.missing)
+            );
+            vec![Msg::new(
+                "command.sounds.check",
+                vec![Arg::Text(list(&c.silent_blocks)), Arg::Text(list(&c.silent_kinds)), Arg::Text(list(&c.missing))],
+            )]
+        }
         Some(a) if args.text("which") == Some("recent") => {
             // The last sounds started, newest first (also in the log): one-shots that already ended.
             let mut out = Vec::new();
@@ -359,6 +374,8 @@ pub(crate) struct Running {
     world_list: CommandList,
     /// What is drawn over the world after its depth was taken (`Client::render`).
     after_list: CommandList,
+    /// The client's draws over the path tracer's composite (`Client::swap_over_pt`), kept for reuse.
+    over_list: CommandList,
     input: Input,
     touches: crate::touch::Touches,
     /// The phone's keyboard is up (`soft_keyboard`).
@@ -370,6 +387,8 @@ pub(crate) struct Running {
     assets: Assets,
     textures: GameTextures,
     ui: UiRenderer,
+    /// `--ui-audit`: the text-fit check after each screen's layout (`ui::audit`).
+    audit: Option<crate::ui::audit::Insets>,
     post: crate::post::Post,
     /// The screen shaders the local player's effects turned on (`EntityEffectDef::screen`).
     audio: Option<crate::audio::Audio>,
@@ -452,7 +471,7 @@ pub(crate) struct Running {
     /// Image id the pending screenshot is stored under for mods.
     shot_image: Option<u64>,
     /// Keys mods hold down, released at the given time.
-    mod_held: Vec<(Key, Instant)>,
+    mod_held: Vec<(Key, Instant, u64)>,
     /// What mods draw this frame (`Host::client_draw`).
     mod_gizmos: Vec<crate::net::GizmoShape>,
     /// Sounds of the UI and of mods' client code, played after this frame's world sounds.
@@ -661,7 +680,14 @@ impl App {
         let (mut gpu, renderer) = gpu.ok_or_else(|| failed.join("; "))?;
 
         let mut roots: Vec<(String, PathBuf)> = vec![("core".into(), core_assets)];
-        roots.extend(mods.iter().map(|m| (m.id.clone(), m.assets.clone())));
+        // The content's mods, data packages among them (chiacraft): the code mods alone left a
+        // package's lang and textures out until the content was built again.
+        roots.extend(
+            content()
+                .mods
+                .iter()
+                .map(|m| (m.id.clone(), m.assets.clone())),
+        );
         let packs_now = (crate::settings::resource_packs(), crate::settings::shader_pack());
         let packs = crate::packs::enabled(&self.opts.run_dir, &crate::settings::resource_packs());
         crate::packs::set_shader_pack(
@@ -717,6 +743,7 @@ impl App {
             ("core:gpu_dlss_rr_models", weft_render::UpscalerInfo::model_bits(&upscaler.rr_models) as f64),
             ("core:gpu_dlss5", upscaler.neural as u8 as f64),
             ("core:gpu_frame_gen", upscaler.frame_gen as f64),
+            ("core:gpu_reflex", upscaler.low_latency as u8 as f64),
         ] {
             if let Some(id) = crate::config::by_name(name) {
                 crate::config::put(id, v);
@@ -724,6 +751,9 @@ impl App {
         }
         if let Some(id) = crate::config::by_name("core:gpu_dlss") {
             crate::config::put_text(id, &upscaler.name);
+        }
+        if let Some(id) = crate::config::by_name("core:gpu_frame_gen_why") {
+            crate::config::put_text(id, &upscaler.frame_gen_why);
         }
         if !upscaler.name.is_empty() {
             log::info!("upscaler: {} (core:dlss picks the mode)", upscaler.name);
@@ -742,6 +772,7 @@ impl App {
             last_button: None,
             world_list: CommandList::default(),
             after_list: CommandList::default(),
+            over_list: CommandList::default(),
             input,
             touches: Default::default(),
             keyboard: false,
@@ -752,6 +783,9 @@ impl App {
             assets,
             textures,
             ui,
+            audit: api::launch_options()
+                .contains_key("ui-audit")
+                .then(Default::default),
             post,
             audio: crate::audio::Audio::new().map(|mut a| {
                 a.muted = self.opts.automated;
@@ -990,7 +1024,19 @@ impl Running {
 
     /// A screen's tree, with a fallback close icon when it has no control to leave it.
     fn build_screen(&self, s: &mut dyn Screen, ui: &mut Ui, depth: usize) {
-        s.build(ui, &self.build_cx());
+        let cx = self.build_cx();
+        s.build(ui, &cx);
+        // chiacraft (style 1, 11-24): out of a world, windows draw as `menu_window` when the look
+        // has one (its inside see-through over the title's world; in a world they stay `panel`).
+        if !cx.in_game && cx.look.texture("menu_window", "").is_some() {
+            for node in ui.nodes.iter_mut() {
+                if let Kind::Container { class: Some(class) } = &mut node.kind
+                    && class == "panel"
+                {
+                    *class = "menu_window".into();
+                }
+            }
+        }
         scroll_when_taller(ui);
         if s.escape_closes() && !ui.has_close && (depth > 1 || self.game.is_some()) {
             ui.container(Style::default().at_from([1.0, 0.0], -4.0, 4.0, [1.0, 0.0]), |ui| screens::close_button(ui, 16.0));
@@ -1498,6 +1544,7 @@ impl Running {
                 self.world_dir = Some(dir);
                 // The synced settings the player changes here are this world's.
                 crate::config::playing_in(Some(server.configs.clone()));
+                client.local_host = true;
                 self.game = Some(Game { client, server: Some(server), world, identity });
                 self.host_if_listed();
                 self.hud.invalidate();
@@ -2522,6 +2569,12 @@ impl Running {
             .first()
             .and_then(|n| content().commands.iter().find(|d| d.client && d.name == *n))?;
         let g = self.game.as_ref()?;
+        // chiacraft: client commands ask for their level like the server's, against the level
+        // the server gave this player.
+        if g.client.permission < def.level {
+            log::info!("refused /{} here: it asks for level {}, this player has {}", def.name, def.level, g.client.permission);
+            return Some(vec![Msg::new("command.no_permission", vec![Arg::Text(def.name.clone()), Arg::Int(def.level as i64)])]);
+        }
         let p = &g.client.player;
         let here = crate::commands::Origin { pos: p.pos, yaw: p.yaw, pitch: p.pitch };
         let players = g.client.players.clone();
@@ -2821,7 +2874,9 @@ impl ApplicationHandler for App {
                     MouseScrollDelta::PixelDelta(p) => (p.y / 40.0) as f32,
                 });
             }
-            WindowEvent::CursorMoved { position, .. } => {
+            // Scripted and test runs place the cursor themselves: the desktop's pointer passing
+            // over the window (two `--jobs` windows side by side) moved it off what they hover.
+            WindowEvent::CursorMoved { position, .. } if !self.opts.automated => {
                 r.input.cursor = Vec2::new(position.x as f32, position.y as f32);
             }
             WindowEvent::RedrawRequested => {
@@ -2880,6 +2935,12 @@ struct UiCallbacks {
 
 /// One frame. Returns true when the app should quit.
 fn frame(r: &mut Running, opts: &Options, now: Instant) -> bool {
+    // NVIDIA Reflex: the frame starts here (it may sleep first, so input is read as late as it
+    // can be), in the mode the settings say; the backend marks its submit and present itself.
+    r.gpu.set_low_latency(crate::settings::reflex());
+    r.gpu
+        .latency_mark(weft_render::LatencyMark::SimulationStart);
+    report_latency(r);
     r.retired = None;
     let dt = (now - r.last).as_secs_f64();
     r.last = now;
@@ -2951,6 +3012,7 @@ fn frame(r: &mut Running, opts: &Options, now: Instant) -> bool {
     let text_unit = layout_uis(r, scale);
     let t = Instant::now();
     r.prof[1] = (t.duration_since(now).as_secs_f32() * 1000.0 - r.prof[1]).max(0.0);
+    r.gpu.latency_mark(weft_render::LatencyMark::SimulationEnd);
     let Some(info) = r.gpu.begin_frame() else { return false };
     let t2 = Instant::now();
     r.prof[2] = t2.duration_since(t).as_secs_f32() * 1000.0;
@@ -3007,6 +3069,21 @@ fn frame(r: &mut Running, opts: &Options, now: Instant) -> bool {
     }
     count_fps(r);
     false
+}
+
+/// Reflex's measured PC latency into `core:gpu_latency_ms` (the DLSS tab shows it) and, every
+/// 10 s while it runs, the log.
+fn report_latency(r: &mut Running) {
+    let Some(ms) = r.gpu.latency_ms() else { return };
+    if let Some(id) = crate::config::by_name("core:gpu_latency_ms") {
+        crate::config::put(id, ms as f64);
+    }
+    static LAST: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
+    let mut last = LAST.lock().unwrap();
+    if last.is_none_or(|t| t.elapsed() > Duration::from_secs(10)) {
+        *last = Some(Instant::now());
+        log::info!("reflex: PC latency {ms:.1} ms (frame start to GPU done, mean of the last frames), mode {}", crate::settings::reflex());
+    }
 }
 
 /// A phone's keyboard comes up while a text field has the focus (the chat) and goes away after.
@@ -3495,10 +3572,31 @@ fn layout_uis(r: &mut Running, scale: f32) -> f32 {
         for (ui, size) in uis {
             if ui.dirty || ui.size != size || ui.text_unit != text_unit {
                 ui.text_unit = text_unit;
+                let look = &r.look;
+                ui.keep_off_frames(&mut |class| {
+                    let v: Vec<f32> = look
+                        .sidecar(class, "inset")?
+                        .split_whitespace()
+                        .filter_map(|x| x.parse().ok())
+                        .collect();
+                    match v.as_slice() {
+                        [a] => Some([*a; 4]),
+                        [l, t, r, b] => Some([*l, *t, *r, *b]),
+                        _ => None,
+                    }
+                });
                 ui.layout(size, &r.ui.font);
                 ui.dirty = false;
                 r.quads_dirty = true;
             }
+        }
+    }
+    // The text-fit check: each screen as laid out, its faults once each (`ui::audit`).
+    if let Some(insets) = r.audit.as_mut() {
+        let window = r.gpu.surface_size();
+        for (screen, ui) in &r.screens {
+            let faults = crate::ui::audit::check(ui, [screen_size.x, screen_size.y], &mut |class| insets.get(&r.look, &r.assets, class));
+            insets.log(screen.name(), &faults, &r.lang.code, scale, window);
         }
     }
     text_unit
@@ -3867,9 +3965,9 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
         let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
-        // `core:rt_shadows` changed: the world shader composed again, tracing or not, before
-        // anything of this frame is drawn with it.
-        if g.client.rt_switch(&mut *r.gpu) {
+        // `core:rt_shadows` or `core:ground_map` changed: the world shader composed again, tracing
+        // or not, with the ground map or not, before anything of this frame is drawn with it.
+        if g.client.rt_switch(&mut *r.gpu) || g.client.render.ground_switch() {
             g.client
                 .render
                 .reload_shaders(&mut *r.gpu, &r.textures, &r.assets);
@@ -3899,6 +3997,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     if let Some(g) = &mut r.game {
         // Where this frame's gathering writes its count and motion, for the effects' sharpening.
         g.client.taa_out = r.post.taa_out(world_info.width, world_info.height);
+        g.client.exposure_last = r.post.exposure_last();
+        g.client.motion_out = r.post.motion_index();
         let s = crate::diag::span("client render");
         atmosphere = g
             .client
@@ -3917,11 +4017,20 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         drop(s);
     }
     r.list.push(Cmd::Mark);
+    // The opaque cubes' depth first while the world traces (`core:depth_prepass`): the world's pass
+    // then keeps it and shades each of their pixels once.
+    let prepass = r
+        .game
+        .as_ref()
+        .is_some_and(|g| g.client.depth_prepass(&mut r.list, r.depth.0));
+    if prepass {
+        crate::diag::probe(&mut r.list, "depth_prepass");
+    }
     r.list.push(Cmd::BeginPass {
         // A depth of -1: no surface wrote its own motion there (`taa.wgsl`).
         motion: motion.map(|m| (m, Some([0.0, 0.0, -1.0, 0.0]))),
         color: Some((world_target, Some(clear))),
-        depth: Some((r.depth.0, Some(0.0))),
+        depth: Some((r.depth.0, if prepass { None } else { Some(0.0) })),
     });
     r.list.append(&mut world);
     r.list.push(Cmd::EndPass);
@@ -3963,6 +4072,22 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     if let (Some(g), Target::Texture(_)) = (&mut r.game, world_target) {
         g.client
             .path_trace(&mut *r.gpu, &mut r.list, info.slot, r.depth.0, world_target, (world_info.width, world_info.height));
+    }
+    // Over the path tracer's composite (or straight after the pass above without it): the blended
+    // particles, the weather, the hand and the overlays, which write no depth for its test.
+    if let Some(g) = &mut r.game {
+        let mut over = g.client.swap_over_pt(std::mem::take(&mut r.over_list));
+        if !over.cmds.is_empty() {
+            r.list.push(Cmd::BeginPass {
+                motion: motion.map(|m| (m, None)),
+                color: Some((world_target, None)),
+                depth: Some((r.depth.0, None)),
+            });
+            r.list.append(&mut over);
+            r.list.push(Cmd::EndPass);
+        }
+        over.clear();
+        r.over_list = over;
     }
     if post {
         let scene = r

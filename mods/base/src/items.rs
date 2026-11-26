@@ -100,6 +100,14 @@ pub fn register(r: &mut Registry) {
             .use_ticks(32)
             .on_use(base_api::eat)
             .tab(&crate::tabs::FOOD);
+        // How long it keeps and where it keeps best (`vitals::rot`): in its tooltip.
+        let life = f.keeps.0 + f.keeps.1;
+        let i = if life > 0.0 {
+            let days = |d: f32| d.round().min(u16::MAX as f32) as u16;
+            i.set(&base_api::KEEPS, base_api::Keeps { larder: days(life), cold: days(vitals::rot::days_at(f.keeps, vitals::rot::ICE_C)) })
+        } else {
+            i
+        };
         let i = if tag.starts_with("cooked_meat/") { i.tag("cooked_meat") } else { i };
         // Dried, smoked or salted (`vitals::preserve`).
         let i = if vitals::preserve::PRODUCTS.contains(&f.name) { i.tag("preserved") } else { i };

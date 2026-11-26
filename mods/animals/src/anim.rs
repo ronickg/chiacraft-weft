@@ -239,6 +239,10 @@ pub fn hold(w: &World, id: u64, a: Act) {
 /// state (`/anim <clip> hold`).
 pub fn hold_for(w: &World, id: u64, a: Act, ticks: u64) {
     let Some(h) = w.component(id, &HELD) else { return };
+    // Nor a held state in the air (round 2 of cov_birds: stare and graze asked of `_fly` looks).
+    if crate::birds::flying(w, id) {
+        return;
+    }
     let now = w.game_time();
     let until = now + ticks;
     if h[STATE] & CODE == a.code() {
@@ -275,6 +279,15 @@ pub fn hold_for(w: &World, id: u64, a: Act, ticks: u64) {
     });
 }
 
+/// `id` takes off (`birds::take_off`, `lift`): what it held or played on the ground stops before
+/// its flying look comes on, which has only its wingbeat (round 2 of cov_birds: an alarm played
+/// as it bolted was asked of the `_fly` look).
+pub fn take_off(w: &World, id: u64) {
+    clear(w, id);
+    w.action_stop(id);
+    edit(w, id, |c| c[BUSY] = 0);
+}
+
 /// `id` holds nothing: back to its idle, walk and run.
 pub fn clear(w: &World, id: u64) {
     let Some(h) = w.component(id, &HELD) else { return };
@@ -294,8 +307,14 @@ pub fn act(w: &World, id: u64, a: Act) {
 /// roar), as `act`.
 pub fn play(w: &World, id: u64, clip: &str, secs: f32) {
     let Some(h) = w.component(id, &HELD) else { return };
+    // A bird in the air is its flying look, which has its wingbeat only (cov_birds: 13 "no clip
+    // for action" of groom, alarm, look... on the `_fly` models).
+    if crate::birds::flying(w, id) {
+        return;
+    }
     log(id, "plays", clip);
     w.action_play(id, clip, false);
+    crate::voices::on_clip(w, id, clip);
     let busy = w.game_time() + (secs * 20.0).ceil() as u64;
     edit(w, id, |c| {
         // A held clip is cut by this one: it comes back after.
@@ -377,6 +396,19 @@ fn idle_life(w: &World, id: u64, h: [u64; 4]) {
         return;
     }
     if now < h[IDLE_NEXT] || now < h[BUSY] || w.navigating(id) {
+        return;
+    }
+    // Fish have no idle clips (cov_small: sniff, groom, look... asked of trout, pacu, lungfish).
+    if w.component(id, &crate::animal::ANIMAL)
+        .and_then(|a| a.species())
+        .is_some_and(|s| s.in_water())
+    {
+        return;
+    }
+    // Out cold, it lies still (cov_taming: knocked-out raptors groomed and scratched).
+    if w.component(id, &crate::knockout::KNOCKOUT)
+        .is_some_and(|k| k.out != 0)
+    {
         return;
     }
     let a = idle_act(w, id);

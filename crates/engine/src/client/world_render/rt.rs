@@ -212,6 +212,157 @@ pub(super) fn gb_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[Pi
     Some([made[0], made[1], made[2], made[3]])
 }
 
+/// The opaque depth prepass's pipelines (`WorldRenderer::pre_pipes`): depth alone for faces opaque,
+/// faces cutout (`fs_cutout_depth`, cut as `fs_cutout` cuts), quads opaque, quads cutout; then
+/// `fs_opaque` and `fs_cutout` for the same, tested Equal and writing no depth. The same vertex
+/// entries as the world's pass, so the depths match exactly (as the G-buffer's Equal already
+/// relies on). None without the pack's `fs_cutout_depth`.
+pub(super) fn pre_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 8]> {
+    if !crate::packs::pack_uses("world.wgsl", "fs_cutout_depth") {
+        return None;
+    }
+    let lay = Some(DepthState { write: true, compare: Compare::GreaterEqual });
+    let equal = Some(DepthState { write: false, compare: Compare::Equal });
+    let mut made = Vec::with_capacity(8);
+    for (label, vs, fs, depth, color) in [
+        ("faces depth", "vs_face", None, lay, false),
+        ("faces cutout depth", "vs_face", Some("fs_cutout_depth"), lay, false),
+        ("quads depth", "vs_quad", None, lay, false),
+        ("quads cutout depth", "vs_quad", Some("fs_cutout_depth"), lay, false),
+        ("faces opaque on depth", "vs_face", Some("fs_opaque"), equal, true),
+        ("faces cutout on depth", "vs_face", Some("fs_cutout"), equal, true),
+        ("quads opaque on depth", "vs_quad", Some("fs_opaque"), equal, true),
+        ("quads cutout on depth", "vs_quad", Some("fs_cutout"), equal, true),
+    ] {
+        let desc = PipelineDesc {
+            label,
+            shader,
+            vertex: vs,
+            fragment: fs,
+            color: color.then(crate::post::world_format),
+            depth,
+            blend: Blend::None,
+            cull_back: true,
+            topology: Topology::Triangles,
+            motion: color && crate::post::motion(),
+        };
+        match gpu.create_pipeline(&desc) {
+            Ok(p) => made.push(p),
+            Err(e) => {
+                log::error!("depth prepass: {}", e.0);
+                for p in made {
+                    gpu.destroy_pipeline(p);
+                }
+                return None;
+            }
+        }
+    }
+    made.try_into().ok()
+}
+
+/// The light-giving blocks for the path tracer (`pathtrace.wgsl`'s `pt_lights`, binding 37): a hash
+/// table from a cube's coordinate to the lights that reach into it, then the lists. Words: [0] the
+/// table's slots (a power of two), [1] the lights listed; then 4 a slot (x, y, z, start | count <<
+/// 20; x `i32::MIN` empty); then the lights, each its place from the cube's corner plus 16 (6 bits
+/// an axis, the light may be in a cube next to it), its light per channel (4 bits each) and bit 30
+/// when it is a small light (an entity's: a torch's flame), not a whole glowing block.
+///
+/// A cube's list holds only lights whose level is left above 0 somewhere in it (the lightmap's
+/// falloff, a level a block), strongest there first, at most `LIGHTS_PER_CUBE`: drawing among all
+/// the lights of the 27 cubes round found none in reach. Dim glowing plants and lava made some 60
+/// a cube, 1600 round each pixel, and a torch was all but never drawn (w50, w52).
+pub struct RtLights {
+    buffer: BufferId,
+    words: u64,
+    /// The frame it was last made (made again at most every `LIGHTS_EVERY` frames).
+    made: u64,
+}
+
+const LIGHTS_EVERY: u64 = 15;
+
+/// chiacraft: `core:pt_plain`, the path tracer lighting with vanilla's math (the pack's
+/// `pathtrace.wgsl`): 1 on.
+fn pt_plain() -> u32 {
+    u32::from(crate::config::by_name("core:pt_plain").map_or(0.0, crate::config::get) > 0.5)
+}
+const LIGHTS_PER_CUBE: usize = 48;
+const LIGHTS_MAX: usize = 1 << 20;
+
+/// The table's hash of a cube coordinate (`pt_light_find` in `pathtrace.wgsl`: the same).
+fn light_hash(c: IVec3) -> u32 {
+    (c.x as u32).wrapping_mul(73856093) ^ (c.y as u32).wrapping_mul(19349663) ^ (c.z as u32).wrapping_mul(83492791)
+}
+
+/// The table's words for `lights` (see `RtLights`): each cube's own lights and its neighbours'
+/// that reach into it.
+fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
+    // Every cube a light may reach: those with lights and the 26 round each.
+    let mut targets: rustc_hash::FxHashSet<IVec3> = rustc_hash::FxHashSet::default();
+    for &c in lights.keys() {
+        for d in 0..27 {
+            targets.insert(c + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1));
+        }
+    }
+    let mut lists: Vec<(IVec3, Vec<u32>)> = Vec::new();
+    let mut near: Vec<(i32, u32)> = Vec::new();
+    for &t in &targets {
+        near.clear();
+        let lo = t * 16;
+        let hi = lo + IVec3::splat(15);
+        for d in 0..27 {
+            let n = t + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1);
+            let Some(l) = lights.get(&n) else { continue };
+            for &w in l {
+                let p = n * 16 + IVec3::new((w & 15) as i32, (w >> 4 & 15) as i32, (w >> 8 & 15) as i32);
+                let e = ((w >> 12) & 15).max((w >> 16) & 15).max((w >> 20) & 15) as i32;
+                // Its level at the cube's nearest block.
+                let gap = (lo - p).max(IVec3::ZERO) + (p - hi).max(IVec3::ZERO);
+                let level = e - (gap.x + gap.y + gap.z);
+                if level > 0 {
+                    let o = (p - lo + IVec3::splat(16)).as_uvec3();
+                    near.push((level, o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18 | (w >> 24 & 1) << 30));
+                }
+            }
+        }
+        if near.is_empty() {
+            continue;
+        }
+        near.sort_unstable_by_key(|n| std::cmp::Reverse(n.0));
+        near.truncate(LIGHTS_PER_CUBE);
+        lists.push((t, near.iter().map(|n| n.1).collect()));
+    }
+    let slots = (lists.len() * 2).next_power_of_two().max(1024);
+    let mut table = vec![0u32; slots * 4];
+    for i in 0..slots {
+        table[i * 4] = i32::MIN as u32;
+    }
+    let mut out: Vec<u32> = Vec::new();
+    for (c, l) in &lists {
+        if out.len() + l.len() > LIGHTS_MAX {
+            break;
+        }
+        let start = out.len() as u32;
+        out.extend_from_slice(l);
+        let mut i = light_hash(*c) as usize & (slots - 1);
+        while table[i * 4] != i32::MIN as u32 {
+            i = (i + 1) & (slots - 1);
+        }
+        table[i * 4..i * 4 + 4].copy_from_slice(&[c.x as u32, c.y as u32, c.z as u32, start | (l.len() as u32) << 20]);
+    }
+    let mut words = Vec::with_capacity(2 + table.len() + out.len());
+    words.push(slots as u32);
+    words.push(out.len() as u32);
+    words.extend_from_slice(&table);
+    words.extend_from_slice(&out);
+    words
+}
+
+impl RtLights {
+    pub(super) fn destroy(self, gpu: &mut dyn Backend) {
+        gpu.destroy_buffer(self.buffer);
+    }
+}
+
 impl RtScene {
     /// The expansion's pipeline (`expand_pipeline`), made with the world's other pipelines.
     pub(super) fn expand_pipeline(gpu: &mut dyn Backend, assets: &crate::assets::Assets) -> Option<PipelineId> {
@@ -482,6 +633,7 @@ impl WorldRenderer {
         }
         let (diffuse, specular, _) = self.pt_images.unwrap();
         use crate::gpu_layout::{PT_CACHE, PT_CACHE_BYTES, pt_bind};
+        let lights = self.pt_lights_buffer(gpu, self.rt_frame_no());
         let cache = match self.pt_cache {
             Some(c) => c,
             None => {
@@ -502,20 +654,24 @@ impl WorldRenderer {
             spec: gpu.texture_index(spec),
             mode: u32::from(denoised && debug == 0),
             light: 0,
-            pad: [0; 3],
+            plain: pt_plain(),
+            pad: [0; 2],
         };
         let origins = page;
         self.bind_run(list, cs, page, origins);
         list.bind(pt_bind::OUT, out);
         list.bind(pt_bind::CACHE, cache);
+        list.bind(pt_bind::LIGHTS, lights);
         list.push_constants(&args);
         list.push(Cmd::Dispatch { x: size.0.div_ceil(8), y: size.1.div_ceil(8), z: 1 });
+        crate::diag::probe(list, "pt_trace");
         list.push(Cmd::Barrier);
         // The cache takes in what the paths left in it (read by the next frame's).
         self.bind_run(list, resolve, page, origins);
         list.bind(pt_bind::CACHE, cache);
         list.push_constants(&args);
         list.push(Cmd::Dispatch { x: PT_CACHE / 64, y: 1, z: 1 });
+        crate::diag::probe(list, "pt_cache");
         list.push(Cmd::Barrier);
         let none = [0.0; 4];
         list.push(Cmd::PassExtras([Some((specular, Some(none))), None, None]));
@@ -525,6 +681,7 @@ impl WorldRenderer {
         list.push_constants(&args);
         list.draw(3, 1);
         list.push(Cmd::EndPass);
+        crate::diag::probe(list, "pt_composite");
     }
 
     /// The image a denoiser writes its denoised light into (diffuse x albedo + specular x
@@ -565,7 +722,8 @@ impl WorldRenderer {
             spec: 0,
             mode: 1,
             light: gpu.texture_index(light),
-            pad: [0; 3],
+            plain: pt_plain(),
+            pad: [0; 2],
         };
         list.push(Cmd::BeginPass { color: Some((target, None)), depth: None, motion: None });
         self.bind_run(list, finish, page, page);
@@ -642,7 +800,83 @@ impl WorldRenderer {
         list.push(Cmd::EndPass);
     }
 
+    /// The opaque depth prepass, before the world's pass (`prepass_now`, decided by this frame's
+    /// `draw`): the opaque and cutout cubes' depth alone into `depth` (cleared here), so the world's
+    /// pass shades each of their pixels once (`equal_pipe`). With traced shadows every fragment
+    /// shaded and then hidden cost its rays (11-25: the 3060's world pass). The same draws as the
+    /// world's (`gb_draws`, the CPU's runs before `translucent`); the fading and distant ones are
+    /// left to the world's pass. Returns whether it ran (the world's pass then keeps this depth).
+    pub fn depth_prepass(&self, list: &mut CommandList, depth: TextureId) -> bool {
+        let (Some(p), true, Some((_, obuf, ibuf, ..))) = (self.pre_pipes, self.prepass_now, self.buffers) else {
+            return false;
+        };
+        list.push(Cmd::BeginPass { color: None, depth: Some((depth, Some(0.0))), motion: None });
+        let pipe = |kind: u8, layer: u8| p[kind as usize * 2 + layer as usize];
+        if let Some(o) = self.table.out.as_ref() {
+            let (draws, origins, slot) = (o.draws, o.origins, self.gb_draws_slot);
+            for &(kind, layer, page, id, base, n) in &self.gb_draws {
+                if kind >= 2 {
+                    continue;
+                }
+                let buf = if kind == 1 { self.quads.pages[page as usize].0 } else { self.faces.pages[page as usize].0 };
+                self.bind_run(list, pipe(kind, layer), buf, origins);
+                list.push(Cmd::DrawIndexedIndirectCount {
+                    buffer: draws,
+                    offset: base as u64 * 20,
+                    count_buffer: self.table.buckets[slot].0,
+                    count_offset: id as u64 * 8,
+                    max: n,
+                });
+            }
+        }
+        for &(kind, layer, page, start, count) in &self.runs[..self.translucent.min(self.runs.len())] {
+            if layer >= 2 || kind >= 2 {
+                continue;
+            }
+            let buf = if kind == 1 { self.quads.pages[page as usize].0 } else { self.faces.pages[page as usize].0 };
+            self.bind_run(list, pipe(kind, layer), buf, obuf);
+            list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count });
+        }
+        list.push(Cmd::EndPass);
+        true
+    }
+
     /// Frames the ray-traced scene has been kept (`Scene::rt.y`, for noise that moves every frame).
+    /// The path tracer's light table, made again when the cubes' lights changed (at most every
+    /// `LIGHTS_EVERY` frames), its buffer grown as needed.
+    fn pt_lights_buffer(&mut self, gpu: &mut dyn Backend, frame: u64) -> BufferId {
+        let stale = self
+            .pt_lights
+            .as_ref()
+            .is_none_or(|l| self.lights_dirty && frame >= l.made + LIGHTS_EVERY);
+        if stale {
+            let words = if self.body_lights.is_empty() {
+                light_words(&self.cube_lights)
+            } else {
+                let mut all = self.cube_lights.clone();
+                for (&c, l) in &self.body_lights {
+                    all.entry(c).or_default().extend_from_slice(l);
+                }
+                light_words(&all)
+            };
+            let n = words.len() as u64;
+            log::debug!("path traced lights: {} cubes with lights, {} listed, frame {frame}", self.cube_lights.len(), words[1]);
+            if self.pt_lights.as_ref().is_none_or(|l| l.words < n) {
+                if let Some(l) = self.pt_lights.take() {
+                    l.destroy(gpu);
+                }
+                let cap = n.next_power_of_two();
+                self.pt_lights =
+                    Some(RtLights { buffer: gpu.create_buffer(cap * 4, usage::STORAGE, "path traced lights"), words: cap, made: 0 });
+            }
+            let l = self.pt_lights.as_mut().unwrap();
+            gpu.write_buffer(l.buffer, 0, bytemuck::cast_slice(&words));
+            l.made = frame;
+            self.lights_dirty = false;
+        }
+        self.pt_lights.as_ref().unwrap().buffer
+    }
+
     pub fn rt_frame_no(&self) -> u64 {
         self.rt.as_ref().map_or(0, |r| r.frame_no)
     }
@@ -652,6 +886,12 @@ impl WorldRenderer {
     /// isn't drawn.
     pub fn rt_traced(&self) -> bool {
         self.rt_compiled && self.rt.is_some() && self.rt_modes.0
+    }
+
+    /// Whether the path tracer can run (`path_trace`): the traced scene, its pipelines and the
+    /// G-buffer's. The world's shader then leaves the rays it would redo to it (`Scene::rt.x` 2).
+    pub fn pt_ready(&self) -> bool {
+        self.rt_traced() && self.pt_pipes.is_some() && self.gb_pipes.is_some()
     }
 
     /// Whether the world's shader traces its reflections this frame (`Scene::rt.w`).

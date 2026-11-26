@@ -21,8 +21,11 @@ const TABLE_REACH: i32 = 5;
 /// Recipes on a page of the book: 5 columns of 4.
 const COLS: usize = 5;
 const PER_PAGE: usize = 20;
-/// The tabs a row holds.
-const TABS_PER_ROW: usize = 3;
+/// The tabs a row holds, how wide each is and the gap between them, GUI pixels: two across the
+/// recipe grid (`COLS` slots of 18), Russian's longest (Инструменты) fitting.
+const TABS_PER_ROW: usize = 2;
+const TAB_GAP: f32 = 2.0;
+const TAB_W: f32 = (COLS as f32 * 18.0 - TAB_GAP) / 2.0;
 /// The most one Craft makes ("all").
 const MAX_BATCH: u32 = 64;
 
@@ -411,7 +414,7 @@ fn chest_totals(w: &World, player: u64, station: Station) -> Vec<(u32, u32)> {
 /// Makes `r` up to `count` times at `station` from the player's bag (and the chests by the
 /// table), giving each result to the bag or dropping it at the player's feet.
 fn craft(w: &World, player: u64, station: Station, r: &RecipeView, count: u32) -> u32 {
-    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) {
+    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) || crate::ruins::recipe_locked(w, player, r) {
         return 0;
     }
     let Some(src) = sources(w, player, station) else { return 0 };
@@ -501,7 +504,7 @@ fn timed(r: &RecipeView) -> Option<f32> {
 /// `count` of `r` asked for at `station`: added to the player's line (one more of the same recipe
 /// joins it; another replaces it), the first made in `secs`.
 fn queue(w: &World, player: u64, station: Station, r: &RecipeView, count: u32, secs: f32) {
-    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) {
+    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) || crate::ruins::recipe_locked(w, player, r) {
         return;
     }
     let each = (secs * vitals::TICKS as f32).round().max(1.0) as u64;
@@ -646,7 +649,12 @@ pub fn book(ui: &mut Ui, station: Station) {
         // A knapped head from memory waits for one made by hand (`first.rs`).
         .filter(|r| creative || !crate::first::locked(r, &touched))
         .filter_map(|r| {
-            let n = if table_only(station, &r) { 0 } else { times(&r, &have, MAX_BATCH) };
+            // A blueprint not yet read: shown, never makeable (`ruins.rs`).
+            let blueprint = r
+                .outputs()
+                .first()
+                .is_some_and(|(o, _)| crate::ruins::craft_locked_here(&ui.view(), o.item).is_some());
+            let n = if table_only(station, &r) || blueprint { 0 } else { times(&r, &have, MAX_BATCH) };
             if creative || n > 0 || crate::discovery::starter(&r) {
                 return Some((r, n, None));
             }
@@ -709,8 +717,10 @@ pub fn book(ui: &mut Ui, station: Station) {
     let pages = list.len().div_ceil(PER_PAGE).max(1);
     let page = page.min(pages - 1);
 
-    ui.panel("panel", S::column().pad(7.0).gap(3.0), |ui| {
-        ui.text_styled(S::column().class("title"), "crafting.book.title", &[]);
+    // The windows' margin and a 4 gap (`UI Style Guide.md`, "Spacing"); the heading at 2x, as
+    // every window's, with room at its right for the corner icons (`panel.gui` `corner`).
+    ui.panel("panel", S::column().pad(crate::window::WINDOW_PAD).gap(4.0), |ui| {
+        ui.text_styled(S::column().class("title").no_wrap().scale(2.0), "crafting.book.title", &[]);
         // The picked recipe's name, at the top (Ronald's first-day test: the book was icons only).
         if let Some((out, _)) = picked
             .and_then(recipe_of)
@@ -727,8 +737,10 @@ pub fn book(ui: &mut Ui, station: Station) {
             .enumerate()
             .filter(|(_, t)| station != Station::Hands || *t != PARTS_TAB)
             .collect();
+        // In even columns, each chip as wide as its column: rows of three were crammed and
+        // ragged (Planner 11-24).
         for chunk in tabs.chunks(TABS_PER_ROW) {
-            ui.row(S::row().gap(1.0), |ui| {
+            ui.row(S::row().gap(TAB_GAP), |ui| {
                 for &(i, t) in chunk {
                     // The book's own short names (the creative tabs' were too long for it in Russian:
                     // "Инструменты и приспособления", Playtest B10).
@@ -741,7 +753,8 @@ pub fn book(ui: &mut Ui, station: Station) {
                     ui.button(
                         &key,
                         S::default()
-                            .h(12.0)
+                            .w(TAB_W)
+                            .h(13.0)
                             .pad(2.0)
                             .class("category")
                             .selected(i == tab),
@@ -785,7 +798,9 @@ pub fn book(ui: &mut Ui, station: Station) {
                         let lack = first_missing(r, &have);
                         let s = S::default().size(18.0, 18.0).class(class);
                         let name = name_of(out.item);
-                        let s = if *n > 0 {
+                        let s = if let Some(b) = crate::ruins::craft_locked_here(&ui.view(), out.item) {
+                            s.tooltip_args("crafting.book.blueprint", &[Arg::Name(&name), Arg::Name(&crate::ruins::name_of(b))])
+                        } else if *n > 0 {
                             s.tooltip_args("crafting.book.can", &[Arg::Name(&name)])
                         } else if table_only(station, r) {
                             s.tooltip_args("crafting.book.needs_table_tip", &[Arg::Name(&name)])
@@ -823,15 +838,22 @@ pub fn book(ui: &mut Ui, station: Station) {
         });
         if pages > 1 {
             ui.row(S::row().gap(4.0), |ui| {
-                ui.button("crafting.book.prev", S::default().h(12.0).pad(2.0).disabled(page == 0), move |c| {
+                ui.button("crafting.book.prev", S::default().h(12.0).pad_xy(5.0, 2.0).disabled(page == 0), move |c| {
                     edit(|b| b.page = page.saturating_sub(1));
                     c.client().rebuild_screen();
                 });
                 ui.text_args("crafting.book.page", &[Arg::Int(page as i64 + 1), Arg::Int(pages as i64)]);
-                ui.button("crafting.book.next", S::default().h(12.0).pad(2.0).disabled(page + 1 >= pages), move |c| {
-                    edit(|b| b.page = page + 1);
-                    c.client().rebuild_screen();
-                });
+                ui.button(
+                    "crafting.book.next",
+                    S::default()
+                        .h(12.0)
+                        .pad_xy(5.0, 2.0)
+                        .disabled(page + 1 >= pages),
+                    move |c| {
+                        edit(|b| b.page = page + 1);
+                        c.client().rebuild_screen();
+                    },
+                );
             });
         }
         if let Some(r) = picked.and_then(recipe_of) {
@@ -909,7 +931,7 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &RecipeView, have: &[(u32, u3
     }
     ui.row(S::row().gap(2.0), |ui| {
         for (key, n) in [("crafting.book.craft_one", 1), ("crafting.book.craft_five", 5)] {
-            ui.button(key, S::default().h(14.0).pad(3.0).disabled(can < n), move |c| {
+            ui.button(key, S::default().h(16.0).pad(3.0).disabled(can < n), move |c| {
                 c.client()
                     .send(&CRAFT, &[index as u64, n as u64, station as u64]);
             });
@@ -917,7 +939,7 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &RecipeView, have: &[(u32, u3
         // Max makes one of what doesn't stack (a tool, a drill): Max on the hand drill ate four
         // sticks for two drills (the world playtester, round 13). Craft 5 still makes more.
         let all = if weft_sdk::max_stack(out.item) <= 1 { can.min(1) } else { can };
-        ui.button_args("crafting.book.craft_all", &[Arg::Int(all as i64)], S::default().h(14.0).pad(3.0).disabled(all == 0), move |c| {
+        ui.button_args("crafting.book.craft_all", &[Arg::Int(all as i64)], S::default().h(16.0).pad(3.0).disabled(all == 0), move |c| {
             c.client()
                 .send(&CRAFT, &[index as u64, all as u64, station as u64]);
         });

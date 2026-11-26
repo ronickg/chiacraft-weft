@@ -121,6 +121,104 @@ pub fn weapon(kind: &str, level: f32) -> Option<(f32, f32)> {
     Some((dps / s.speed, s.speed))
 }
 
+// ------------------------------------------------------------------ bows and arrows
+
+/// A plain arrow's item level: flint-tipped, the Stone Age's reference. An arrow's head sets its
+/// level (an arrowhead part's material will, when arrows are built from parts); the bow is its
+/// times, as a blade's grade is: its stave's spring, its grade and its gems (`crafting::combine`).
+pub const ARROW_LEVEL: f32 = REFERENCE_DEPTH;
+
+/// What an arrow's head can be, in order (an arrow keeps its place here plus one; 0 is a plain
+/// flint one): every material that makes an arrow's head (`crafting`'s working materials;
+/// progression's ranged check holds them equal). Its item level is its material's.
+pub const ARROWHEADS: &[&str] = &[
+    "flint",
+    "chert",
+    "obsidian",
+    "tektite",
+    "bone",
+    "antler",
+    "copper",
+    "bronze",
+    "meteoric_iron",
+    "wrought_iron",
+    "steel",
+    "star_steel",
+    "diamond",
+];
+
+/// An arrowhead's place in `ARROWHEADS`.
+pub fn arrowhead_of(material: &str) -> Option<u32> {
+    ARROWHEADS
+        .iter()
+        .position(|m| *m == material)
+        .map(|i| i as u32)
+}
+
+/// The item level of an arrow headed with `ARROWHEADS[head]`: its material's (a plain one
+/// `ARROW_LEVEL`).
+pub fn arrow_level(head: u32) -> f32 {
+    ARROWHEADS
+        .get(head as usize)
+        .and_then(|m| material(m))
+        .map_or(ARROW_LEVEL, |m| m.level())
+}
+
+/// A drawn bow's power after `secs` held, 0 to 1 (vanilla's draw: full at one second, under 0.1
+/// it doesn't shoot). An arrow flies at its power times full speed and hits by its speed.
+pub fn draw_power(secs: f32) -> f32 {
+    ((secs * secs + secs * 2.0) / 3.0).min(1.0)
+}
+
+/// Seconds to a full draw: one shot a second, the bow's speed in `SPREADS`.
+pub const FULL_DRAW_SECS: f32 = 1.0;
+
+/// An arrow's hit at full draw: the bow's spread at the arrow's item level, times the bow's own
+/// times (1 for a Sound yew or Osage bow). Less drawn, it hits by its speed (`draw_power`); in the
+/// head, twice (a bow's critical hit, kept from vanilla).
+pub fn arrow_hit(arrow_level: f32, bow_times: f32) -> f32 {
+    weapon("bow", arrow_level).map_or(0.0, |(hit, _)| hit) * bow_times
+}
+
+// ------------------------------------------------------------------ saddles
+
+/// A plain saddle's item level: leather, the Stone Age's reference.
+pub const SADDLE_PLAIN_LEVEL: f32 = REFERENCE_DEPTH;
+
+/// What a saddle may be fitted with, plain first (Planner 11-23, option A: its fittings set its
+/// level, as a tool's working part does). A fitted saddle carries its fitting's index
+/// (`base_api::SADDLE_FIT`); a saddle item per age (option B) would carry its own the same way.
+/// Each is a crafting material with a fitting's role (checked); gold is too soft to hold a rider.
+pub const SADDLE_FITTINGS: &[&str] = &["leather", "copper", "bronze", "meteoric_iron", "wrought_iron", "steel", "star_steel"];
+
+/// The fitting at `fit`'s index.
+pub fn saddle_fitting(fit: u32) -> Option<&'static str> {
+    SADDLE_FITTINGS.get(fit as usize).copied()
+}
+
+/// The index of `material` as a saddle's fitting.
+pub fn saddle_fit_of(material: &str) -> Option<u32> {
+    SADDLE_FITTINGS
+        .iter()
+        .position(|m| *m == material)
+        .map(|i| i as u32)
+}
+
+/// A saddle's item level: its fitting's, never under a plain one's.
+pub fn saddle_level(fit: u32) -> f32 {
+    saddle_fitting(fit)
+        .and_then(material)
+        .map_or(SADDLE_PLAIN_LEVEL, |m| m.level().max(SADDLE_PLAIN_LEVEL))
+}
+
+/// What a saddle at `saddle_level` does for a tame fighting at area level `own` (`notes/PROGRESSION.md`:
+/// "a higher-age saddle ... raises the tame, capped like player gear"): its health, hit and armour
+/// times the curve from its level to the saddle's, never below 1. The over-tier cap then reads
+/// the higher of the two, as a player's gear (`animals_core::danger::tame`).
+pub fn saddle_lift(saddle_level: f32, own: f32) -> f32 {
+    (g(saddle_level) / g(own)).max(1.0)
+}
+
 /// A weapon or tool of `kind` made of `material`.
 pub fn weapon_of(kind: &str, of: &str) -> Option<(f32, f32)> {
     weapon(kind, material(of)?.level())
@@ -140,6 +238,15 @@ pub const MINE_POWER: f32 = 0.75;
 /// steel 320 obsidian, diamond's 300; diamond itself 400, above steel).
 pub const REF_HARVEST: f32 = 100.0;
 pub const HARVEST_PER_LEVEL: f32 = 10.0;
+
+/// What breaking iron ore takes: a pickaxe of this harvest or better, bronze's (`harvest` at
+/// bronze's level: copper's 170 doesn't, meteoric iron's 230 does). Ronald, 11-23 ("A: bronze
+/// pickaxe"): with a stone pickaxe iron skipped the Bronze Age (`progression`'s materials gate).
+/// Base's iron ores are `mined_by` it.
+pub const IRON_ORE_HARVEST: u32 = 210;
+
+/// The material whose pickaxe first breaks iron ore (`IRON_ORE_HARVEST` is its harvest).
+pub const IRON_ORE_PICK: &str = "bronze";
 
 /// Uses of a Sound working part at item level `level`.
 pub fn tool_uses(level: f32) -> f32 {
@@ -193,7 +300,8 @@ mod tests {
             .fold((0.0, 0.0), |t, x| (t.0 + x.0, t.1 + x.1));
         assert!((a - Player::of(Age::Iron).armour()).abs() < 1e-3);
         assert!((REF_HEALTH + v - Player::of(Age::Iron).health()).abs() < 1e-3);
-        assert!(((REF_HEALTH + v) - 65.5).abs() < 0.5, "{}", REF_HEALTH + v);
+        // 20 × 1.6^2.5: the sheet's Iron Age reference health, 65.
+        assert!(((REF_HEALTH + v) - 64.76).abs() < 0.05, "{}", REF_HEALTH + v);
     }
 
     #[test]
@@ -214,6 +322,9 @@ mod tests {
         assert!(harvest(material("steel").unwrap().level()) >= 300);
         assert!(harvest(material("diamond").unwrap().level()) > harvest(material("steel").unwrap().level()));
         assert!(harvest(material("bone").unwrap().level()) < 100 && harvest(material("oak").unwrap().level()) < 100);
+        // Iron ore takes bronze's pickaxe, not copper's.
+        assert_eq!(harvest(material(IRON_ORE_PICK).unwrap().level()), IRON_ORE_HARVEST);
+        assert!(harvest(material("copper").unwrap().level()) < IRON_ORE_HARVEST);
         assert!((tool_uses(flint) - 75.0).abs() < 2.0 && (mining_speed(flint) - 3.0).abs() < 0.05);
         assert!(tool_uses(35.0) > tool_uses(25.0) && mining_speed(35.0) > mining_speed(25.0));
     }

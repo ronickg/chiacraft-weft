@@ -99,7 +99,12 @@ pub async fn displayed_stacks(t: T) -> R {
     }
     let shown = t.c().displayed(carrier, DisplaySource::Shown);
     t.check(shown.len() == 2 && shown[0].is_empty() && shown[1] == reference, "shown slots preserve order and empties");
-    t.check_eq(t.c().displayed(carrier, DisplaySource::Equipment).len(), 4, "equipment slot count");
+    // Every equipment slot the game has (Weft's four; chiacraft's clothing adds its own).
+    t.check_eq(
+        t.c().displayed(carrier, DisplaySource::Equipment).len(),
+        t.c().displayed(player, DisplaySource::Equipment).len(),
+        "equipment slot count",
+    );
     t.frames(5).await?;
     let calls = look_calls(&t, "initial").await?;
     t.op(&format!("display_data {carrier} 0 0 10 42")).await?;

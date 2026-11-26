@@ -452,6 +452,10 @@ fn init(r: &mut Registry) {
         .on_use(base_api::components::eat)
         .set(&FOOD_HEAL, 2.0)
         .tab(&BASE_TOOLS);
+    // And on the base game's own food, eaten through the vitals (testkit `food`): the apple eats
+    // through Weft's hunger, which base's stomach replaces, so it is never eaten there.
+    r.edit(Item::generated("base:cooked_beef".into()))
+        .set(&FOOD_HEAL, 2.0);
     // The hottest, driest part of Mars.
     r.biome(&SCORCHED)
         .temperature(0.4..)

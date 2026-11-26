@@ -29,8 +29,11 @@ pub fn markdown() -> String {
     weapons(&mut w);
     tames(&mut w);
     bosses(&mut w);
+    loot_table(&mut w, &g);
     web_prices(&mut w);
-    keys(&mut w);
+    keys(&mut w, &g);
+    age_gates(&mut w, &g);
+    knowledge(&mut w);
     tags(&mut w, &g);
     materials(&mut w);
     w
@@ -257,6 +260,15 @@ fn weapons(w: &mut String) {
             .fold((0.0, 0.0), |t, x| (t.0 + x.0, t.1 + x.1));
         let _ = writeln!(w, " {a:.0} / {:.0} |", combat::REF_HEALTH + v);
     }
+    let _ = writeln!(
+        w,
+        "\nBows and arrows (`vitals::gear::arrow_hit`): an arrow's head sets its item level (a plain one is flint-tipped, level {:.0}); the bow is its times (its stave's spring, grade and gems; a Sound yew bow ×1). A full draw takes {} s and hits by its speed: less drawn, less; in the head ×2. Its level counts against a big creature at most the size's cap over it, as a blade's.\n\n| age | arrow level | hit at full draw |\n|---|---|---|",
+        vitals::gear::ARROW_LEVEL,
+        vitals::gear::FULL_DRAW_SECS
+    );
+    for age in AGES {
+        let _ = writeln!(w, "| {} | {:.0} | {:.1} |", age.name(), age.reference(), vitals::gear::arrow_hit(age.reference(), 1.0));
+    }
     w.push('\n');
 }
 
@@ -295,8 +307,13 @@ fn tames(w: &mut String) {
 }
 
 fn bosses(w: &mut String) {
-    use animals_core::bosses::{BOSSES, SIZE};
-    w.push_str("## Biome bosses\n\nEach boss is a titan at its form's age (`animals_core::bosses`): its numbers from the curve like any creature's, a fight of 2-5 minutes for a same-age player, the cap and the floor against over-tier gear. Seconds to kill and its hits to down the player (grade 4), by the player's age. Forms with no offering are data for later ages.\n\n| boss | form | offering | level | health | armour | hit | Stone | Bronze | Iron | Steam | Stars |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+    use animals_core::bosses::{BOSSES, PLAYER_BLOW, SIZE};
+    let _ = write!(
+        w,
+        "## Biome bosses\n\nEach boss is a titan at its form's age (`animals_core::bosses`): its numbers from the curve like any creature's, a fight of 2-5 minutes for a same-age player, the cap and the floor against over-tier gear. Seconds to kill and its hits to down the player (grade 4), by the player's age. Forms with no offering are data for later ages. One blow takes at most {:.0} % of a player's max health before the player's armour (`PLAYER_BLOW`), so a player at full health lives through any one; the hits column is the curve's, before that cap.\n\n",
+        PLAYER_BLOW * 100.0
+    );
+    w.push_str("| boss | form | offering | level | health | armour | hit | Stone | Bronze | Iron | Steam | Stars |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n");
     for b in &BOSSES {
         for f in b.forms {
             let st = b.stats(f);
@@ -366,7 +383,67 @@ fn web_prices(w: &mut String) {
     );
 }
 
-fn keys(w: &mut String) {
+fn age_gates(w: &mut String, g: &graph::Solved) {
+    w.push_str("## The materials gate\n\nAn age's key needs the age before's tools or stations (`graph::age_gates`): each material past the Stone Age has something of the age before on its cheapest way, or the age could be skipped. Known skips wait on a decision and don't fail the check.\n\n| material | age | through the age before | otherwise up to | skips |\n|---|---|---|---|---|\n");
+    for x in graph::gates(g) {
+        let skips = match (&x.through, x.known) {
+            (Some(_), _) => "-".to_string(),
+            (None, Some(root)) => format!("known, by {root}"),
+            (None, None) => "**yes**".to_string(),
+        };
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {} | {skips} |",
+            x.id,
+            AGES[x.tier as usize].name(),
+            x.through.as_deref().unwrap_or("-"),
+            x.top
+                .map_or("-".to_string(), |t| AGES[t as usize].name().to_string()),
+        );
+    }
+    w.push_str("\nKnown skips:\n\n");
+    if graph::KNOWN_SKIPS.is_empty() {
+        w.push_str("- none (iron, the first, takes a bronze pickaxe since 11-23)\n");
+    }
+    for (root, why) in graph::KNOWN_SKIPS {
+        let _ = writeln!(w, "- {root}: {why}");
+    }
+    w.push('\n');
+}
+
+fn knowledge(w: &mut String) {
+    use vitals::ruins as r;
+    let _ = write!(
+        w,
+        "## The knowledge gate\n\nAn age's key needs its age's blueprint, found in its age's ruins on the ley lines (`vitals::ruins`, `graph::knowledge`): a pedestal gives each player one, and until it is read the grid, the book and the furnace refuse what it teaches. One Stone ring always stands within {:.0} blocks of the world's spawn.\n\n| blueprint | age | ruin | its grid (blocks), chance | ward (harvest) | teaches | finding (EM) |\n|---|---|---|---|---|---|---|\n",
+        r::SPAWN_REACH
+    );
+    for b in r::BLUEPRINTS {
+        let Some(k) = r::kind_of_age(b.age) else { continue };
+        let teaches: Vec<String> = b
+            .crafts
+            .iter()
+            .map(|c| format!("crafting {c}"))
+            .chain(b.smelts.iter().map(|s| format!("smelting {s}")))
+            .collect();
+        let ward = if k.ward == 0 { "open".to_string() } else { k.ward.to_string() };
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} ({} deep) | {}, {:.0} % | {ward} | {} | {} |",
+            b.item(),
+            AGES[b.age as usize].name(),
+            k.id,
+            k.depth,
+            k.cell,
+            k.chance * 100.0,
+            teaches.join(", "),
+            k.find_em
+        );
+    }
+    w.push('\n');
+}
+
+fn keys(w: &mut String, g: &graph::Solved) {
     w.push_str("## Age keys by path\n\nMoving to the next age takes a key, one thing from each gate (materials and tools, a biome boss, knowledge, infrastructure), by a route for each path. What exists so far:\n\n| age | tech | magic | beasts | not built yet |\n|---|---|---|---|---|\n");
     for a in AGES {
         let routes = graph::routes(a);
@@ -387,6 +464,38 @@ fn keys(w: &mut String) {
             cell(curve::Path::Tech),
             cell(curve::Path::Magic),
             cell(curve::Path::Beasts)
+        );
+    }
+    let _ = writeln!(
+        w,
+        "\nWhat each route costs from scratch (`graph::route_cost`): its items at their cheapest, plus every tool and station on the way once. Path parity: a route at most ×{:.2} its age's cheapest. Own: without what every route of the age takes (its boss part), what tells the paths apart.\n\n| age | path | EM | × cheapest | own EM | tools and stations |\n|---|---|---|---|---|---|",
+        1.0 + curve::PARITY
+    );
+    for (a, p, em, over) in graph::parity(g) {
+        let items = graph::routes(a)
+            .into_iter()
+            .find(|(q, _)| *q == p)
+            .and_then(|(_, r)| r)
+            .unwrap_or(&[]);
+        let kept = graph::route_cost(g, items).1;
+        let shared: Vec<&str> = items
+            .iter()
+            .copied()
+            .filter(|i| {
+                graph::routes(a)
+                    .iter()
+                    .all(|(_, r)| r.is_some_and(|r| r.contains(i)))
+            })
+            .collect();
+        let shared_em: f32 = shared.iter().filter_map(|i| g.cost_of(i)).sum();
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {over:.2} | {} | {} |",
+            a.name(),
+            p.name(),
+            em_text(em),
+            em_text(em - shared_em),
+            kept.iter().map(|k| short(k)).collect::<Vec<_>>().join(", ")
         );
     }
     w.push('\n');
@@ -450,8 +559,71 @@ fn tags(w: &mut String, g: &graph::Solved) {
     }
 }
 
+fn loot_table(w: &mut String, g: &graph::Solved) {
+    let _ = writeln!(
+        w,
+        "## Loot per hour\n\nEvery kill priced in effort minutes (`crate::loot`, `vitals::loot`): its drops at their cheapest cost in the graph, against its time, which is finding one ({} min for a common animal, longer as its spawn chance is smaller, shared by a pack that comes at you together; {} min for a mob at night), the fight at its home age (grade 4), {} min to take what it leaves and {} min to work each hide or fur (scraping, tanning, drying: `vitals::loot::PELT_MINUTES`, added to their price). A fair rate is about 1 EM a minute, within ±{:.0} % (up to +{:.0} % more for what fights back). Wild ones at level 0; a big one's breaks counted. Drops that kills give are priced from their cheapest kill (Planner 11-23, option A: its minutes shared among its drops by their old hand prices, `vitals::loot::KILL_DROPS`), so that kill pays 1 and the rest less: \"poor\" is only a poor way to spend time, \"over\" fails the check.\n\n| kill | age | role | find (min) | kills | fight (s) | drops | loot (EM) | minutes | EM a minute | band |\n|---|---|---|---|---|---|---|---|---|---|---|",
+        vitals::loot::COMMON_FIND_MINUTES,
+        vitals::loot::NIGHT_FIND_MINUTES,
+        vitals::loot::HANDLING_MINUTES,
+        vitals::loot::PELT_MINUTES,
+        vitals::loot::BAND * 100.0,
+        vitals::loot::RISK_PREMIUM * 100.0
+    );
+    let mut kills = crate::loot::kills();
+    kills.sort_by(|a, b| b.rate(g).total_cmp(&a.rate(g)));
+    for k in &kills {
+        let drops: Vec<String> = k
+            .drops
+            .iter()
+            .map(|(id, n)| format!("{n:.1} {}", short(id)))
+            .collect();
+        let (lo, hi) = vitals::loot::band(k.fights_back());
+        let r = k.rate(g);
+        let mark = if k.drops.is_empty() {
+            "no loot"
+        } else if (lo..=hi).contains(&r) {
+            "ok"
+        } else if r < lo {
+            "poor"
+        } else {
+            "over"
+        };
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {:.1} | {:.1} | {:.1} | {} | {} | {:.1} | {:.2} | {mark} |",
+            k.who,
+            k.age.name(),
+            k.role.name(),
+            k.find,
+            k.kills,
+            k.fight_secs,
+            if drops.is_empty() { "-".to_string() } else { drops.join(", ") },
+            em(k.value(g)),
+            k.minutes(),
+            r
+        );
+    }
+    w.push_str("\nWhat kills drop, priced from their cheapest kill; the weight is the old hand price (option B, to come back to):\n\n| drop | weight (old EM) | EM now | cheapest from |\n|---|---|---|---|\n");
+    for &(id, weight) in vitals::loot::KILL_DROPS {
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {} |",
+            short(id),
+            em(weight),
+            g.cost_of(id).map_or("-".to_string(), em),
+            crate::loot::cheapest(id).unwrap_or_else(|| "-".to_string())
+        );
+    }
+    w.push('\n');
+}
+
 fn short(id: &str) -> &str {
     id.strip_prefix("base:").unwrap_or(id)
+}
+
+fn em_text(c: f32) -> String {
+    em(c)
 }
 
 fn em(c: f32) -> String {

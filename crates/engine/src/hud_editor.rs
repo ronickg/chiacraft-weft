@@ -315,9 +315,10 @@ fn split_control(ui: &mut Ui, cx: &BuildCx, width: f32, key: &str, on: bool, scr
                 let t = ui.text(cx.t(key, &[]), "button");
                 ui.nodes[t].style = Style::default().at_from([0.5, 0.5], -(LED + GAP) * 0.5, 0.0, [0.5, 0.5]);
                 ui.text_mut(t).unwrap().wrap = false;
+                // The settings cog at one of its pixels a UI pixel (16 pixels: 8 GUI), whole pixels.
                 if let Some(texture) = cx.look.texture("menu_settings", "") {
                     let style = Style::default()
-                        .size(9.0, 9.0)
+                        .size(8.0, 8.0)
                         .at_from([1.0, 0.5], -LED * 0.5, 0.0, [0.5, 0.5]);
                     ui.add(Kind::Image { texture, color: 0xFFFFFFFF }, style);
                 }
@@ -355,12 +356,16 @@ impl Screen for DebugOptions {
                     .h(0.0)
                     .grow()
                     .min_h(60.0)
-                    .scroll(),
+                    .scroll()
+                    .snap_rows(true),
                 |ui| {
                     let row = |ui: &mut Ui, id: String, name: Vec<crate::ui::text::Span>| {
                         let state = lines.get(&id).copied().unwrap_or_default();
                         ui.container(Style::row().gap(6.0).self_align(crate::ui::Align::Stretch), |ui| {
                             let n = ui.text(name, "default");
+                            // 2x like the button beside it (style 1).
+                            crate::screens::field_label(ui, cx, n);
+                            ui.nodes[n].style.w = crate::ui::Len::Px(0.0);
                             ui.nodes[n].style.grow = 1.0;
                             let shown = id.clone();
                             let b = button(ui, cx, state.key(), &[], 90.0, move |c| {
@@ -377,6 +382,9 @@ impl Screen for DebugOptions {
                         ui.add(Kind::Container { class: None }, Style::default().h(3.0));
                         ui.container(Style::row().gap(6.0).self_align(crate::ui::Align::Stretch), |ui| {
                             let n = ui.text(cx.t(title, &[]), "default");
+                            // 2x like the button beside it (style 1).
+                            crate::screens::field_label(ui, cx, n);
+                            ui.nodes[n].style.w = crate::ui::Len::Px(0.0);
                             ui.nodes[n].style.grow = 1.0;
                             let b = button(ui, cx, key, &[], 90.0, move |c| {
                                 let groups = crate::settings::debug_groups();

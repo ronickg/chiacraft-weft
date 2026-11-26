@@ -120,21 +120,10 @@ impl Server {
     /// operator; on a world hosted from a game, its player): never refused, never on probation.
     pub(super) fn trusted(&self, pi: usize, key: &str) -> bool {
         let p = &self.players[pi];
-        // The player on the machine that runs the world, when the world has no certificate to
-        // say who its owner is. (Not by connection order alone: once the owner's own
-        // connection is gone, a guest's may come first.)
-        if pi == 0 && !self.cfg.dedicated && self.cfg.identity.is_none() {
+        if self.is_world_owner(pi) {
             return true;
         }
         if p.joined && self.permission_of(pi) >= abi::permission::MODERATOR {
-            return true;
-        }
-        let owner = self
-            .cfg
-            .identity
-            .as_ref()
-            .and_then(|i| i.cert.owner.split_once(':').map(|(id, _)| id.to_string()));
-        if owner.is_some() && owner == p.account {
             return true;
         }
         self.storage.as_ref().is_some_and(|s| {
@@ -144,6 +133,21 @@ impl Server {
                 .iter()
                 .any(|o| o.0 == key && o.1 >= abi::permission::MODERATOR)
         })
+    }
+
+    /// The world's owner: the player on the machine that runs the world, when the world has no
+    /// certificate to say who its owner is (not by connection order alone: once the owner's own
+    /// connection is gone, a guest's may come first), else the account its certificate names.
+    pub(crate) fn is_world_owner(&self, pi: usize) -> bool {
+        if pi == 0 && !self.cfg.dedicated && self.cfg.identity.is_none() {
+            return true;
+        }
+        let owner = self
+            .cfg
+            .identity
+            .as_ref()
+            .and_then(|i| i.cert.owner.split_once(':').map(|(id, _)| id.to_string()));
+        owner.is_some() && owner == self.players[pi].account
     }
 
     /// The probation player `pi` is on now, if any.
@@ -519,7 +523,10 @@ fn ban_for(s: &mut Server, x: &Ctx, until: Option<u64>) -> Vec<Msg> {
     log::info!("{by} banned {name}{}", until.map_or(String::new(), |u| format!(" until {u}")));
     s.send_banned_away(x.c);
     match until {
-        Some(u) => say("banned_for_done", vec![text(&name), Arg::Int(u.saturating_sub(crate::saves::now_secs()).div_ceil(3600) as i64)]),
+        Some(u) => {
+            let (minutes, n) = adm::time_left(u.saturating_sub(crate::saves::now_secs()));
+            say(&adm::left_key("banned_for_done", minutes), vec![text(&name), Arg::Int(n)])
+        }
         None => say("banned_done", vec![text(&name)]),
     }
 }
