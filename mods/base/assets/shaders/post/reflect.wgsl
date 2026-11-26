@@ -252,6 +252,11 @@ fn reflect_result(p: PostPixel) -> vec4<f32> {
 }
 
 fn apply(p: PostPixel) -> vec4<f32> {
+    // None of the pack's look path traced plain (`scene.rt.x` 3, `core:pt_plain`): the picture as
+    // the engine draws it with no pack.
+    if scene.rt.x > 2.5 {
+        return p.color;
+    }
     let r = reflect_result(p);
     return vec4(p.color.rgb * (1.0 - r.a) + r.rgb, p.color.a);
 }

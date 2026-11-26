@@ -153,8 +153,11 @@ pub fn init(r: &mut Registry) {
                 eaters.extend(on_it);
             }
             let kg = animals_core::needs::share(prey, eaters.len());
+            let mut ate = 0.0;
             for &e in &eaters {
                 let (Some(a), Some(own)) = (w.component(e, &ANIMAL), mass(&w, e)) else { continue };
+                // A full meal is the most it eats of its share (`needs::fills`).
+                ate += kg.min(own * animals_core::needs::MEAL);
                 let max = a.stat(species::FOOD);
                 let meal = (max * animals_core::needs::fills(own, kg)).round().max(1.0) as u16;
                 animal::feed(&w, e, meal);
@@ -167,6 +170,8 @@ pub fn init(r: &mut Registry) {
                 );
                 w.component_mut(e, &HUNT).map(|h| *h = [0; 4]);
             }
+            // What they ate is gone off the body (`carcass`): a pack's meal opens it, or leaves bones.
+            crate::carcass::taken(&w, d.entity, d.pos, ate);
         }
     });
 }

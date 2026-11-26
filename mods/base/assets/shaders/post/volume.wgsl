@@ -4,6 +4,11 @@
 // cost) and drawn here from it, upsampled by depth so beams don't bleed over silhouettes. Without
 // the half-size image (an engine without `post_low`), marched here per pixel as before.
 fn apply(p: PostPixel) -> vec4<f32> {
+    // None of the pack's look path traced plain (`scene.rt.x` 3, `core:pt_plain`): the picture as
+    // the engine draws it with no pack.
+    if scene.rt.x > 2.5 {
+        return p.color;
+    }
     var glow: vec3<f32>;
     // Off under the one fog (its march is this light, `post_low`'s gate): skip the filter too.
     if scene.frame.x > 0.5 && scene.options[18][0] > 0.5 {

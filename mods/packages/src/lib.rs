@@ -177,6 +177,9 @@ fn block(r: &mut Registry, id: &str, d: &BlockDef, code: Option<&std::sync::Arc<
     if let Some(l) = d.light {
         b = b.light(l);
     }
+    if let Some([r, g, bl]) = d.light_color {
+        b = b.light_rgb(r, g, bl);
+    }
     if let Some(s) = &d.sound {
         b = b.sound_group(&sound_group(s));
     }

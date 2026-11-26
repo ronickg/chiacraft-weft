@@ -514,7 +514,8 @@ fn fs_cloud_trace(in: CloudOut) -> @location(0) vec4<f32> {
     }
     let h = hash(u32(in.clip.x) * 1973u + u32(in.clip.y) * 9277u);
     let dither = fract(unit(h) + f32(n) * 0.618034);
-    if !open_sky() || in_liquid() {
+    // (Path traced plain, `scene.rt.x` 3: `fs_clouds` draws the engine's clouds, so none to march.)
+    if !open_sky() || in_liquid() || scene.rt.x > 2.5 {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
     // Where the land is lit from the physical sky, Bliss's three layers (`bc_clouds`), to the world's
@@ -627,6 +628,16 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     NIGHT_SKY_SHARE = SKY_ROD_SHARE;
     let s = sky[in.index];
     let dir = normalize(mat(sky[0]) * in.at);
+    // Path traced plain (`scene.rt.x` 3, `core:pt_plain`): the engine's own clouds (its
+    // `fs_clouds`), the flat layer vanilla draws, so the traced land stands under vanilla's sky.
+    if scene.rt.x > 2.5 {
+        let hit = trace_cloud(s, dir, scene.environment.z, scene);
+        if hit.color.a <= 0.0 {
+            discard;
+        }
+        let clip = scene.view_proj * vec4(dir * max(hit.distance, 0.001), 1.0);
+        return CloudPixel(vec4(hit.color.rgb * hit.color.a, hit.color.a), clamp(clip.z / clip.w, 0.0, 1.0));
+    }
     if scene.soft_clouds.x > 0.5 {
         return soft_pixel(in, s, dir);
     }
@@ -1247,6 +1258,62 @@ fn moon_body(s: Sky, local: vec3<f32>) -> vec4<f32> {
     return vec4(shine * mix(1.0, 0.32, day), a);
 }
 
+// ---- plain (`scene.rt.x` 3: path traced with `core:pt_plain`) ----
+//
+// The engine's own sky (its `sky.wgsl`'s `fs`, `gradient` and `glow`), with none of the pack's: no
+// atmosphere, haze, grade or round sun. With the pack's sky round a plain traced land the frame came
+// out greyer and darker than raster without the pack, and the compare against vanilla measured the
+// sky's look along with the tracing.
+
+// Vanilla's sky disc fading into the fog toward the horizon, mixed in sRGB as the engine mixes it.
+fn plain_gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
+    if s.extra.x > 0.5 {
+        return vec4(scene.fog_color.rgb, 1.0);
+    }
+    if dir.y <= 0.0 {
+        let dark = s.uv.x * smoothstep(0.0, 0.08, -dir.y);
+        return vec4(scene.fog_color.rgb * (1.0 - dark) * s.color.a, s.color.a);
+    }
+    let g = clamp(0.0625 / dir.y, 0.0, 1.0);
+    let srgb = mix(pow(s.color.rgb, vec3(1.0 / 2.2)), pow(scene.fog_color.rgb, vec3(1.0 / 2.2)), g);
+    return vec4(pow(srgb, vec3(2.2)) * s.color.a, s.color.a);
+}
+
+// Every sky entry but the liquid overlay (which `fs` draws the same either way) as the engine draws
+// it: the mist (`environment.w`) over all of it, the bodies and stars by their own shaders.
+fn plain_sky(in: VOut, s: Sky, dir: vec3<f32>) -> vec4<f32> {
+    let mist = scene.environment.w;
+    if s.ids.y == SKY_GRADIENT {
+        let c = plain_gradient(dir, s);
+        return vec4(mix(c.rgb, scene.fog_color.rgb * c.a, mist), c.a);
+    }
+    if s.ids.y == SKY_GLOW {
+        // Vanilla's sunset fan whole: the pack's `glow` keeps a quarter of it and grades it.
+        let toward = dot(dir, s.axes[0].xyz);
+        if toward <= 0.0 {
+            return vec4(0.0);
+        }
+        let x = dot(dir, s.axes[2].xyz) / toward / 1.2;
+        let y = dir.y / toward / max(0.4 * s.color.a, 0.001);
+        let a = s.color.a * max(0.0, 1.0 - sqrt(x * x + y * y)) * (1.0 - mist);
+        return vec4(s.color.rgb * a, a);
+    }
+    let local = dir * mat(s);
+    var uv = in.uv;
+    var albedo = vec4(1.0);
+    if s.ids.y == SKY_DOME {
+        uv = dome_uv(local, s);
+        if s.ids.x != 0xffffffffu {
+            albedo = textureSampleLevel(textures[s.ids.x], linear_clamp, uv, 0.0);
+        }
+    } else if s.ids.x != 0xffffffffu {
+        albedo = textureSampleLevel(textures[s.ids.x], nearest_clamp, uv, 0.0);
+    }
+    let c = sky_shade(s.ids.z, SkyPixel(dir, local, uv, albedo, vec4(s.color.rgb, 1.0), scene.params.z, scene.params.w));
+    let a = c.a * s.color.a * (1.0 - mist);
+    return vec4(c.rgb * a, select(a, 0.0, s.ids.w != 0u));
+}
+
 @fragment
 fn fs(in: VOut) -> @location(0) vec4<f32> {
     NIGHT_SKY_SHARE = SKY_ROD_SHARE;
@@ -1266,6 +1333,9 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         dir = mat(sky[0]) * in.at;
     }
     dir = normalize(dir);
+    if scene.rt.x > 2.5 {
+        return plain_sky(in, s, dir);
+    }
     if s.ids.y == SKY_GRADIENT {
         return gradient(dir, s);
     }

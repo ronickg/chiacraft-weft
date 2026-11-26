@@ -94,7 +94,9 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // `finish_picture` in look.wgsl): the surfaces left it in linear light. Checked on each
         // entry, as merged (`pad`) the last effect is not the first entry, which alone was read
         // before, so a merged pass never finished the picture.
-        if pass_.spare == 1u && scene.frame.x > 0.5 {
+        // (Not path traced plain, `scene.rt.x` 3: the world and the sky left the picture finished as
+        // the engine's own shaders do, so it goes to the screen as it is, as with no pack.)
+        if pass_.spare == 1u && scene.frame.x > 0.5 && scene.rt.x < 2.5 {
             color = vec4(finish_picture(hdr_light(color.rgb + sharpen_delta(first.scene, in.uv), in.uv, pass_)), 1.0);
             color = vec4(output_dither(color.rgb, in.clip.xy), 1.0);
             // Debug view 10: the clouds' shadow map itself (r through, as grey) on the screen's left
@@ -173,7 +175,8 @@ fn fs_pre_taa(in: VOut) -> @location(0) vec4<f32> {
     let pass_ = passes[in.pass_index];
     let px = vec2<i32>(in.clip.xy);
     let color = textureLoad(textures[pass_.scene], px, 0);
-    if scene.frame.x < 0.5 || in_liquid() || !open_sky() {
+    // (None path traced plain, `scene.rt.x` 3: the engine's frame has no mist banks.)
+    if scene.frame.x < 0.5 || in_liquid() || !open_sky() || scene.rt.x > 2.5 {
         return color;
     }
     // Debug views 7, 11 and 12 without the fog (11: is a deck under it; 12: the clouds' layers).

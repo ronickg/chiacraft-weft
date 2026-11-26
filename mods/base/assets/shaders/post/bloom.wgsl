@@ -4,6 +4,11 @@
 // and filtered up here; without the half-size image, gathered here as before. It also darkens the
 // corners a little (a vignette).
 fn apply(p: PostPixel) -> vec4<f32> {
+    // None of the pack's look path traced plain (`scene.rt.x` 3, `core:pt_plain`): the picture as
+    // the engine draws it with no pack.
+    if scene.rt.x > 2.5 {
+        return p.color;
+    }
     var glow: vec3<f32>;
     // The HDR world's bloom pyramid glows in the last pass (`scene.frame.y`, chiacraft's pack):
     // here only the vignette then.
