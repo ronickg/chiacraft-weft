@@ -161,7 +161,8 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   smells spots 24 blocks off, walks to the nearest and on along the trail spot by spot in the order they fell, to prey it takes or to a carcass
   (`hunt.rs`, before kill sites). Check: cov_blood (`/animalprof gash`, `/animalprof blood`).
 - Pickup shown (11-26, branch claude/animals-pickup): what a skinning takes off is tossed from the body toward the
-  skinner (`animals_core::carcass::OFF_SPEED`, `OFF_UP`), fanned apart, and picked up `OFF_PICKUP_TICKS` (1.25 s)
+  skinner (`animals_core::carcass::off_speed`, `OFF_UP`: landing at their feet, in the engine's 1.5-block pickup reach;
+  pt_rain_5's venison, dropped at the body with the engine's random toss, lay out of reach), fanned apart, and picked up `OFF_PICKUP_TICKS` (1.25 s)
   later, so it is seen to come off and land. cov_carcass_skin shots 8b_off, 8c_off.
 - Laid clear of walls (11-26, pt_rain_4: a deer that died against a stone wall lay half in it, out of the knife's
   reach): `animals_core::carcass::clear_spot` moves a carcass to the nearest spot its lying box is clear of solid

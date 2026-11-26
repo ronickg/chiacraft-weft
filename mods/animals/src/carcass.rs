@@ -674,9 +674,9 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
         let d = (dx * dx + dz * dz).sqrt().max(0.1);
         let spread = (n_off as f64 - 1.0) * 0.6;
         let v = [
-            ((dx / d) * core::OFF_SPEED as f64 - dz / d * spread) as f32,
+            ((dx / d) * core::off_speed(d) - dz / d * spread) as f32,
             core::OFF_UP,
-            ((dz / d) * core::OFF_SPEED as f64 + dx / d * spread) as f32,
+            ((dz / d) * core::off_speed(d) + dx / d * spread) as f32,
         ];
         n_off += 1;
         w.spawn_with(

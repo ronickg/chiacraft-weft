@@ -369,11 +369,22 @@ pub enum Kill {
     Ruined,
 }
 
-/// What a skinning takes off is tossed from the body toward the skinner at this speed (blocks a second) and this much
-/// up, and can be picked up this many ticks later: it is seen to come off and land before it is taken.
-pub const OFF_SPEED: f32 = 2.2;
+/// What a skinning takes off is tossed from the body toward the skinner, `OFF_UP` blocks a second up and fast enough
+/// sideways (`off_speed`) to land `OFF_SHORT` in front of their feet, and can be picked up `OFF_PICKUP_TICKS` later: it
+/// is seen to come off and land before it is taken. The engine picks an item up only within 1.5 blocks of a player
+/// (`server::dim`), and a skinner stands up to `SKIN_REACH` off: pt_rain_5's venison, dropped at the body with the
+/// engine's random toss, lay out of reach and was never taken.
 pub const OFF_UP: f32 = 4.0;
+/// Seconds from the toss to where it rests: its arc from half a block up (about 0.55 s at 4 blocks a second up) and the
+/// short slide after.
+pub const OFF_FLIGHT_SECS: f64 = 0.6;
+pub const OFF_SHORT: f64 = 0.3;
 pub const OFF_PICKUP_TICKS: u32 = 25;
+
+/// Sideways speed (blocks a second) that tosses a skin's take `dist` blocks to land by the skinner.
+pub fn off_speed(dist: f64) -> f64 {
+    (dist - OFF_SHORT).max(0.0) / OFF_FLIGHT_SECS
+}
 
 /// How a death with `hits` and the engine's damage `cause` (`abi::damage_cause`) leaves the hide.
 pub fn kill(hits: u32, cause: u32) -> Kill {
@@ -543,5 +554,15 @@ mod tests {
         // The floor under it is no wall.
         let floor = |p: [i32; 3]| p[1] < 73;
         assert_eq!(clear_spot([0.5, 73.0, 0.5], 0.7, 0.36, floor), [0.5, 73.0, 0.5]);
+    }
+
+    #[test]
+    fn skins_take_lands_in_reach() {
+        // Anywhere a skinner can stand, the take lands within the engine's 1.5 blocks of them (a margin for the arc).
+        for d in [0.5, 1.0, 2.0, SKIN_REACH] {
+            let lands = off_speed(d) * OFF_FLIGHT_SECS;
+            assert!((d - lands).abs() < 1.0, "{d}: {lands}");
+        }
+        assert_eq!(off_speed(0.1), 0.0);
     }
 }
