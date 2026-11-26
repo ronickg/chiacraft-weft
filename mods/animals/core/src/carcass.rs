@@ -174,6 +174,13 @@ pub const MEAT_ROT_RGB: [f32; 3] = [92.0, 54.0, 40.0];
 pub const MEAT_ROT_TINT: f32 = 0.85;
 pub const MEAT_DRY_RGB: [f32; 3] = [62.0, 44.0, 36.0];
 pub const MEAT_DRY_TINT: f32 = 0.85;
+/// The blood pool under an opened body (`carcass_gore`) goes the meat's way, all of it: toward `MEAT_ROT_RGB` by this
+/// much at the last bloated step (less before), and at remains to a dry dark stain, `MEAT_DRY_RGB` by
+/// `GORE_DRY_TINT` and then this much darker (Planner 11-26: "darker red-brown through the bloat, a dry dark stain at
+/// remains, gone with the pile").
+pub const GORE_TINT: f32 = 0.85;
+pub const GORE_DRY_TINT: f32 = 0.9;
+pub const GORE_DRY_DARKEN: f32 = 0.75;
 /// Flies over a deer-sized body at once while it bloats (as many again per body as big by area), and the share left at
 /// remains.
 pub const FLIES: f32 = 10.0;
@@ -227,6 +234,40 @@ pub fn rot_tint(rgba: &mut [u8], step: u8) {
             px[i] = (v * dark).round().clamp(0.0, 255.0) as u8;
         }
     }
+}
+
+/// Turns the blood pool's texture (`rgba`, every opaque texel) to rot `step`'s colour at its own brightness: toward
+/// `MEAT_ROT_RGB` through the bloat, a dark dry `MEAT_DRY_RGB` stain at remains.
+pub fn gore_tint(rgba: &mut [u8], step: u8) {
+    if step == 0 {
+        return;
+    }
+    let dry = step >= ROT_STEPS;
+    let (to, k, dark) = if dry {
+        (MEAT_DRY_RGB, GORE_DRY_TINT, GORE_DRY_DARKEN)
+    } else {
+        (MEAT_ROT_RGB, GORE_TINT * step as f32 / (ROT_STEPS - 1) as f32, 1.0)
+    };
+    let lum = |c: [f32; 3]| 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+    let lt = lum(to);
+    for px in rgba.as_chunks_mut::<4>().0 {
+        if px[3] == 0 {
+            continue;
+        }
+        let c = [px[0] as f32, px[1] as f32, px[2] as f32];
+        let l = lum(c);
+        for i in 0..3 {
+            px[i] = ((c[i] * (1.0 - k) + l * to[i] / lt * k) * dark)
+                .round()
+                .clamp(0.0, 255.0) as u8;
+        }
+    }
+}
+
+/// Whether a body drawn as `look` at rot `step` has its blood pool under it: opened, and still as a dry stain under
+/// the bones it rotted to (remains), but not under bones eaten clean while fresh, nor the pile.
+pub fn has_gore(look: Look, step: u8) -> bool {
+    look == Look::Opened || (look == Look::Bones && step >= ROT_STEPS)
 }
 
 /// Flies over a body at rot `step`, drawn as `look`, at `scale` of its plan's reference animal.
@@ -370,6 +411,14 @@ mod tests {
         assert_eq!(flies(3, Look::Bones, 1.0), 0);
         assert!(flies(ROT_STEPS, Look::Opened, 1.0) < flies(3, Look::Opened, 1.0));
         assert!(flies(3, Look::Whole, 0.3) >= 1 && flies(3, Look::Whole, 5.0) <= FLIES_MAX);
+        // The pool: browner and darker as it rots, a dark stain at remains; under remains' bones, not the pile.
+        let fresh = [150u8, 24, 22, 255];
+        let (mut mid, mut dry) = (fresh, fresh);
+        gore_tint(&mut mid, 3);
+        gore_tint(&mut dry, ROT_STEPS);
+        assert!(mid[0] < fresh[0] && mid[1] > fresh[1] && dry[0] < mid[0]);
+        assert!(has_gore(Look::Opened, 0) && has_gore(Look::Bones, ROT_STEPS));
+        assert!(!has_gore(Look::Bones, 2) && !has_gore(Look::Pile, ROT_STEPS) && !has_gore(Look::Whole, 3));
     }
 
     #[test]

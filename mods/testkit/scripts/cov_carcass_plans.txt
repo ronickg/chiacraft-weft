@@ -4,7 +4,8 @@
 # Report whether each lies on its side (the caiman on its belly), rests on the ground, and is its own animal's shape.
 # Rot: whole fresh in its own coat; opened (3 days, bloating) duller and greener; bones and pile (remains) a dry
 # grey-brown. 13_flies_wolf: small dark flies darting over the opened wolf (ticks running). Report each carcass's
-# "rot step" and "flies" from the /animalprof carcass lines.
+# "rot step" and "flies" from the /animalprof carcass lines. The blood pool: under the opened bodies a darker
+# red-brown than r4's bright red, under the bones (remains) a dry dark brown-black stain, none under the pile.
 loaded
 idle
 chat /tk mode creative

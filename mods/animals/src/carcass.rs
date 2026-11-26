@@ -61,6 +61,8 @@ static PILE: [EntityKind; 5] = [
 /// The blood and guts under an opened body: a second entity at its place (the animal's own model can't be painted per
 /// carcass), so "opened" reads apart from "whole" until the art slice draws the opened body itself.
 static GORE: EntityKind = EntityKind::named("carcass_gore");
+/// The blood pool's rot step (`animals_core::carcass::gore_tint`), its watchers repainting it when it changes.
+static GORE_ROT: Component<u32> = Component::named("carcass_gore_rot");
 
 value! {
     #[derive(Default)]
@@ -160,6 +162,8 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&SKIN, [0u64; 4], 0);
     // Its coat painted over whichever body plan it is drawn as (they share the texture), keeping the light painted in.
     r.entity_skin(&CARCASS, &GENES, paint_dead);
+    // The pool under an opened body rots with it: browner, then a dry dark stain (`core::gore_tint`).
+    r.entity_component(&GORE_ROT, 0u32, component_flags::SAVE | component_flags::SYNC_WATCHERS);
     r.particle(&FLY)
         .textures(&["carcass_fly"])
         .life(FLY_LIFE * 0.7, FLY_LIFE * 1.3)
@@ -238,12 +242,14 @@ pub fn init(r: &mut Registry) {
         .unpushable()
         .model_file("carcass_gore")
         .texture("carcass/bones")
+        .attach(&GORE_ROT)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
             let Some(at) = w.entity(id).map(|g| g.pos) else { return false };
             let near = w.entities_near(at, 1.0, Some(&CARCASS));
             near.first().is_some_and(|&c| start_skinning(&w, c, player))
         });
+    r.entity_skin(&GORE, &GORE_ROT, |step, skin| core::gore_tint(skin.rgba, *step as u8));
     for (i, plan) in core::Plan::ALL.into_iter().enumerate() {
         let looks = [(&WHOLE[i], ""), (&OPENED[i], "_open"), (&BONES[i], "_bones"), (&PILE[i], "_pile")];
         for (kind, model) in looks.map(|(k, s)| (k, format!("carcass_{}{s}", plan.name()))) {
@@ -403,7 +409,7 @@ fn show(w: &World, id: u64) {
     let Some(b) = w.component(id, &BODY) else { return };
     let Some(l) = look(&b) else {
         weft_sdk::info!("carcass {id} gone ({:.1} of {:.1} kg eaten, {:.1} days aged)", b.eaten, b.mass * core::EDIBLE, b.aged);
-        gore(w, id, &b, false);
+        gore(w, id, &b, false, 0);
         w.despawn(id);
         return;
     };
@@ -414,6 +420,7 @@ fn show(w: &World, id: u64) {
         .map_or(1.0, |s| core::body_scale(b.mass, core::plan_of(s.model)));
     let step = core::rot_step(core::keeps(), b.aged);
     let n_flies = core::flies(step, l, plan_scale);
+    let stepped = w.component(id, &GENES).is_some_and(|g| g.rot != step);
     if w.component(id, &GENES)
         .is_some_and(|g| (g.rot, g.flies) != (step, n_flies))
         && let Some(g) = w.component_mut(id, &GENES)
@@ -422,6 +429,9 @@ fn show(w: &World, id: u64) {
     }
     let n = l as u32 + 1;
     if w.component(id, &SHOWN) == Some(n) {
+        if stepped {
+            gore(w, id, &b, core::has_gore(l, step), step);
+        }
         return;
     }
     let Some(s) = (b.species as usize)
@@ -443,7 +453,7 @@ fn show(w: &World, id: u64) {
     w.set_appearance(id, Some(name_of(abi::entry_kind::ENTITY, kind.id())));
     w.set_scale(id, core::body_scale(b.mass, plan));
     w.action_stop(id);
-    gore(w, id, &b, l == Look::Opened);
+    gore(w, id, &b, core::has_gore(l, step), step);
     if let Some(v) = w.component_mut(id, &SHOWN) {
         *v = n;
     }
@@ -461,8 +471,9 @@ fn show(w: &World, id: u64) {
     }
 }
 
-/// Lays the blood and guts under carcass `id` (`on`), at its size, or takes them up; one at most.
-fn gore(w: &World, id: u64, b: &Body, on: bool) {
+/// Lays the blood and guts under carcass `id` (`on`), at its size and rot `step` (`GORE_ROT`), or takes them up; one at
+/// most.
+fn gore(w: &World, id: u64, b: &Body, on: bool, step: u8) {
     let Some(e) = w.entity(id) else { return };
     let near = w.entities_near(e.pos, 0.5, Some(&GORE));
     if !on {
@@ -489,6 +500,11 @@ fn gore(w: &World, id: u64, b: &Body, on: bool) {
         .and_then(|i| SPECIES.get(i))
         .map_or(core::Plan::Quadruped, |s| core::plan_of(s.model));
     w.set_scale(g, core::body_scale(b.mass, plan) * plan.pool());
+    if w.component(g, &GORE_ROT) != Some(step as u32)
+        && let Some(r) = w.component_mut(g, &GORE_ROT)
+    {
+        *r = step as u32;
+    }
 }
 
 /// A goal: it ages as its raw meat would at its spot's air (`vitals::rot::rate`), and looks again; a skinning goes on.

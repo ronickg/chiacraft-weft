@@ -512,7 +512,8 @@ s = head("carcass_plans", [
     "Report whether each lies on its side (the caiman on its belly), rests on the ground, and is its own animal's shape.",
     "Rot: whole fresh in its own coat; opened (3 days, bloating) duller and greener; bones and pile (remains) a dry",
     "grey-brown. 13_flies_wolf: small dark flies darting over the opened wolf (ticks running). Report each carcass's",
-    "\"rot step\" and \"flies\" from the /animalprof carcass lines.",
+    "\"rot step\" and \"flies\" from the /animalprof carcass lines. The blood pool: under the opened bodies a darker",
+    "red-brown than r4's bright red, under the bones (remains) a dry dark brown-black stain, none under the pile.",
 ]) + plans_part(1000, "cov_carcass_plans")
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") and "tooltip" not in l else [l])]
 write("carcass_plans", s)
