@@ -443,7 +443,10 @@ fn check(p: &Package, errors: &mut Vec<String>) {
         if b.def.light_color.is_some_and(|c| c.iter().any(|&l| l > 15)) {
             errors.push(format!("{at}: light_color's channels go from 0 to 15"));
         }
-        if b.def.light_strength.is_some_and(|l| !(0.25..=3.75).contains(&l)) {
+        if b.def
+            .light_strength
+            .is_some_and(|l| !(0.25..=3.75).contains(&l))
+        {
             errors.push(format!("{at}: light_strength goes from 0.25 to 3.75"));
         }
         if b.def.light.is_some() && b.def.light_color.is_some() {

@@ -1044,13 +1044,7 @@ const PARTS: [Row; 27] = [
         shown: off_on,
     },
     // The lamps' draws reused (ReSTIR): less noise with many lamps for the same rays.
-    Row {
-        key: "pt_restir",
-        values: &[0.0, 1.0],
-        get: || PT_RESTIR.get() as u8 as f64,
-        set: |v| PT_RESTIR.set(v > 0.0),
-        shown: off_on,
-    },
+    Row { key: "pt_restir", values: &[0.0, 1.0], get: || PT_RESTIR.get() as u8 as f64, set: |v| PT_RESTIR.set(v > 0.0), shown: off_on },
 ];
 
 /// A part only a GPU that traces rays shows (traced shadows, reflections, the path tracer's denoiser).
