@@ -239,6 +239,11 @@ const CARRION_INSECTS: f32 = 0.1;
 
 /// Grams of the dropped item `id` that `s` eats: food of its diet (spoiled food as carrion).
 fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32> {
+    // A carcass (`carcass.rs`): carrion to a scavenger, meat to a hunter, a bite at a time while any is left.
+    if let Some(left) = crate::carcass::left(w, id) {
+        let c = if s.scavenges() { vitals::food::Category::Carrion } else { vitals::food::Category::Meat };
+        return (left > 0.0 && s.eats(c)).then(|| left.min(animals_core::carcass::BITE_KG) * 1000.0);
+    }
     let stack = w.dropped_item(id)?;
     let name = name_of(abi::entry_kind::ITEM, stack.item);
     let food = vitals::food::FOODS.iter().find(|f| f.name == name);
@@ -285,6 +290,20 @@ fn reach(at: [f64; 3], pos: [f64; 3]) -> bool {
 /// It eats one of the dropped item `item` (`grams` each): as much of its food as the item's
 /// weight is of a meal of its mass (`needs::fills`).
 fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
+    if crate::carcass::left(w, item).is_some() {
+        let own = crate::hunt::mass(w, id).unwrap_or_else(|| a.species().map_or(1.0, |s| s.bio.mass));
+        let got = crate::carcass::take(w, item, grams / 1000.0);
+        let max = a.stat(species::FOOD);
+        let points = (max * animals_core::needs::fills(own, got))
+            .round()
+            .max(1.0) as u16;
+        animal::feed(w, id, points);
+        weft_sdk::info!(
+            "animal {id} eats {got:.2} kg off carcass {item}: food {} of {max:.0}",
+            a.food.saturating_add(points).min(max as u16)
+        );
+        return;
+    }
     let Some(mut stack) = w.dropped_item(item) else { return };
     let own = crate::hunt::mass(w, id).unwrap_or_else(|| a.species().map_or(1.0, |s| s.bio.mass));
     let max = a.stat(species::FOOD);

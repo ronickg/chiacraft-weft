@@ -34,6 +34,7 @@ mod breath;
 mod breeding;
 mod caiman;
 mod capybara;
+mod carcass;
 mod cat;
 mod choose;
 mod citipati;
@@ -174,6 +175,7 @@ fn init(r: &mut Registry) {
     forage::init(r);
     drink::init(r);
     stuck::init(r);
+    carcass::init(r);
     hunt::init(r);
     anim::init(r);
     senses::init(r);

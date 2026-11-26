@@ -10,6 +10,7 @@ pub mod balance;
 pub mod biology;
 pub mod bodies;
 pub mod bosses;
+pub mod carcass;
 pub mod coats;
 pub mod danger;
 pub mod eggs;

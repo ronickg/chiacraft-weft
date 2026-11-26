@@ -346,3 +346,43 @@ s += ["chat /tk mode spectator"] + pad(x) + spawns(x, [("chihuahua", 1, 2, 0), (
 s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.3"]
 s += watch(x, 8) + shot(x, "cov_dogs_2_untamed")
 write("dogs", s)
+
+# 9. Carcasses (notes/crew/plans/carcass-and-skinning.md, slice 1): a body lies where an animal died, and steps down
+# whole, opened, bones, a pile, gone, as it is eaten and as it rots.
+def carcass_rows(n, every=10):
+    out = []
+    for _ in range(n):
+        out += ["chat /animalprof carcass", f"wait {every}"]
+    return out
+
+
+s = head("carcass", [
+    "Carcasses, slice 1. Part 1: three hungry grey wolves and two fed white-tailed deer: the kill leaves a carcass",
+    "(\"carcass N of white_tailed_deer\") that the pack's meal opens or takes to bones (\"carcass N of ... now Opened/Bones\").",
+    "Part 2: a red deer killed by the player (a skinned carcass, drawn as the deer lying dead) and two hungry turkey",
+    "vultures: \"smells carrion\", \"animal N eats 0.50 kg off carcass M\", its look stepping down. Part 3: a red deer killed",
+    "by the player, then aged by `/animalprof carcass <days>`: 3 days (opened), 5 (bones), 9 (a pile), 13 (gone).",
+    "Report per part: the carcass lines (laid, looks, gone), the eats lines, the `/animalprof carcass` rows (look, kg",
+    "eaten, days aged), and the shots: is the dead animal lying on the ground at its place, the ribcage and the bone pile",
+    "sized to the animal; anything floating, sunk, flickering or drawn wrong.",
+])
+x = 0
+s += pad(x) + spawns(x, [("grey_wolf", 3, 8, -10), ("white_tailed_deer", 2, -6, 6)])
+s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.3"]
+s += watch(x, 6) + carcass_rows(4) + shot(x, "cov_carcass_1_wolves", z_back=18, pitch=-40)
+x = 200
+s += pad(x) + spawns(x, [("red_deer", 1, 0, 0)])
+s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+4}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2"]
+s += ["chat /animalprof carcass"] + shot(x, "cov_carcass_2_killed", z_back=6, pitch=-35)
+s += spawns(x, [("turkey_vulture", 2, 10, -12)]) + ["chat /animalprof food 0.2"]
+s += ["chat /tk mode spectator", f"chat /tp {x} 90 {Z+20}", "wait 1"] + carcass_rows(10)
+s += shot(x, "cov_carcass_3_vultures", z_back=8, pitch=-35)
+x = 400
+s += pad(x) + spawns(x, [("red_deer", 1, 0, 0)])
+s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+4}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
+      "chat /tk mode spectator"]
+for n, days in enumerate([3, 2, 4]):
+    s += [f"chat /tp {x} 75 {Z+6}", f"chat /animalprof carcass {days}", "wait 2", "chat /animalprof carcass"]
+    s += shot(x, f"cov_carcass_{4+n}_aged", z_back=6, pitch=-35)
+s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 4", "wait 2", "chat /animalprof carcass"]
+write("carcass", s)
