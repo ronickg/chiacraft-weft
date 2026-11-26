@@ -135,6 +135,13 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
                 // Swatches 6-8 as Bliss's capture 3 (11-26): our own units, raw: the land's sun
                 // (`land_sun`, Bliss's lightSourceColor texel), the clouds' sky light (texel 5, its
                 // skyGroundCol), the land's shade fill (texel 4, its averageSkyCol_Clouds), from x 476.
+                // Swatch 9 (11-26), at x 680: the map clouds' sky light alone (texel 9), as swatch 3 (Bliss's capture 4).
+                if q.y >= 270.0 && q.y < 334.0 && q.x >= 680.0 && q.x < 744.0 {
+                    let t = textures[u32(scene.frame_look.x) - 1u];
+                    let v = textureLoad(t, vec2(9, 0), 0).rgb;
+                    let e = clamp((log2(max(v, vec3(1e-12))) + 24.0) / 28.0, vec3(0.0), vec3(1.0));
+                    color = vec4(select(pow((e + 0.055) / 1.055, vec3(2.4)), e / 12.92, e <= vec3(0.04045)), 1.0);
+                }
                 if q.y >= 270.0 && q.y < 334.0 && q.x >= 476.0 && q.x < 680.0 && (q.x - 476.0) % 68.0 < 64.0 {
                     let t = textures[u32(scene.frame_look.x) - 1u];
                     let k = i32((q.x - 476.0) / 68.0);

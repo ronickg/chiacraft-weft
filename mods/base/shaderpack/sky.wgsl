@@ -1640,7 +1640,9 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
         // cloudy average, 6 the clouds' light alone and 7 the fog's alone, in Bliss's raw units (x 12.3,
         // as `land_ambient` takes the mean); 8 the clouds' and the fog's mean transmittance and, where
         // Bliss has its atmosphereAlpha, our mean cloud shadow on the fog's steps.
-        case 6u, 7u, 8u: {
+        // 9 (11-26): the clouds' light with no sun, their sky light alone (Bliss's capture 4 has the same:
+        // the sun's share is 6 less this).
+        case 6u, 7u, 8u, 9u: {
             if from_sky && look_debug() == 13u {
                 let moon = normalize(scene.moon.xyz);
                 let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
@@ -1659,7 +1661,8 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                 for (var i = 0; i < 9; i++) {
                     if i == ATM_MEAN_SKIP { continue; }
                     let dir = atm_mean_dir(i, sun);
-                    let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k) * (2.0 / 1.875), bc_ground_sky(sun, moon, sky_k, mean));
+                    let cl_sun = select(land_sun(sun, moon_k) * (2.0 / 1.875), vec3(0.0), u32(in.clip.x) == 9u);
+                    let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), cl_sun, bc_ground_sky(sun, moon, sky_k, mean));
                     let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k) * (2.0 / 1.875), bc_ground_sky(sun, moon, sky_k, mean), land_ambient(mean), 1.0, false);
                     var sh = 0.0;
                     for (var k = 0; k < 4; k++) {
@@ -1670,7 +1673,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     alphas += vec3(cl.a, fog.a, sh) / 9.0;
                 }
                 let x = u32(in.clip.x);
-                return vec4(select(select(alphas, fog_rgb * 12.3, x == 7u), cl_rgb * 12.3, x == 6u), 1.0);
+                return vec4(select(select(alphas, fog_rgb * 12.3, x == 7u), cl_rgb * 12.3, x == 6u || x == 9u), 1.0);
             }
             return vec4(0.0);
         }
