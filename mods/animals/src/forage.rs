@@ -138,7 +138,10 @@ pub fn food_now(w: &World, s: &animals_core::species::Species, pos: [i32; 3]) ->
 }
 
 /// `food_now`'s usuals worked out today: (biome, species, day) and the usual.
-static USUAL: std::sync::Mutex<Vec<((u32, usize, u64), Option<f32>)>> = std::sync::Mutex::new(Vec::new());
+static USUAL: std::sync::Mutex<Vec<Usual>> = std::sync::Mutex::new(Vec::new());
+
+/// (biome, species, day) and its usual.
+type Usual = ((u32, usize, u64), Option<f32>);
 
 /// How much of its food the place at `pos` grows now, 0 to 1 (`vitals::forage::lushness`); 1 for
 /// one that doesn't forage.
