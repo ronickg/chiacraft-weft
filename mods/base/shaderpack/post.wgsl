@@ -109,8 +109,8 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
                 }
             }
             // Debug view 13: the sky's two averages as Bliss's debug capture reads its own (bliss_tex4,
-            // 11-25), in its units (ours / 0.122): left the clear one (frame look texel 5, its
-            // averageSkyCol / 30), right the cloudy one the land is lit by (texel 4, its
+            // 11-25), in its units (ours / 0.122): left the clouds' and fog's sky light (frame look texel 5,
+            // its skyGroundCol / 30, the sky straight down; / 0.122 is not its unit any more), right the cloudy one the land is lit by (texel 4, its
             // averageSkyCol_Clouds / 30 after its normalize), each 64 px square at 270 px down,
             // coded (log2(v) + 24) / 28 per channel through the screen's sRGB.
             if look_debug() == 13u && scene.frame_look.x > 0.5 {

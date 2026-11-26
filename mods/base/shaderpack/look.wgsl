@@ -2057,9 +2057,18 @@ fn bc_clouds(dir: vec3<f32>, far_in: f32, dither: vec2<f32>, sun: vec3<f32>, sky
     }
     return vec4(color, l0.a * l1.a * l2.a);
 }
-// The clear sky's average light for the clouds (Bliss's averageSkyCol / 30, `fs_frame_look`'s texel 5).
-fn bc_sky_light(mean: vec3<f32>) -> vec3<f32> {
-    return max(mean * 12.3, vec3(0.5, 0.75, 1.0) * 0.0005) * 0.122;
+// The sky light Bliss gives its clouds and fog, on the screen and in its sky-with-clouds map: the sky
+// straight down, skyGroundCol / 30 (deferred.fsh's skyFromTex(0, -1, 0), stored at texel (1,37), which
+// composite2 reads under the name averageSkyCol; method only). Below the horizon its march keeps only
+// the light scattered more than once (SKY_GROUND's exp(-100 (5 y - 0.1)^2) cuts the sun's and moon's),
+// lit by the average, darkened at night (0.3), turned toward the average in rain like any look. In
+// ours that is the down look itself (its stored x 100 / 30 / 41 = ours x 12.3 x 100 / 1230 = x 1).
+// Ours took the clear average x 1.5 by the name (cdb0903d): about 6x the sky light at night (Bliss's
+// down 0.23 of its average, capture 2), and the noon clouds lit 9x too bright, dawn's flat and grey.
+fn bc_ground_sky(sun: vec3<f32>, moon: vec3<f32>, moon_k: f32, mean: vec3<f32>) -> vec3<f32> {
+    let down = vec3(0.0, -1.0, 0.0);
+    let a = atm_march(down, sun, moon, moon_k, atm_background(mean), 4, 2);
+    return atm_rain(a.light, down, a.through, mean);
 }
 fn bc_sky_read() -> vec3<f32> {
     if scene.frame_look.x > 0.5 {
