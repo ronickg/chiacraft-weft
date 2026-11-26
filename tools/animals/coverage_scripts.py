@@ -440,4 +440,6 @@ s += ["chat /tick freeze"]
 for kind, dx in [("wolf", -8), ("eagle", -4), ("raptor", 0), ("caiman", 4), ("pacu", 8)]:
     s += [f"chat /tp {x+dx+2} 68.9 {Z+8.5}", "look 39 -8", "wait 2", f"shot cov_carcass_13_low_{kind}.png"]
 s += ["chat /tick unfreeze", "wait 1"]
+# Every shot without the HUD (Planner on r7: the chat log covered half of each frame): F1 off, shoot, F1 on.
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass", s)

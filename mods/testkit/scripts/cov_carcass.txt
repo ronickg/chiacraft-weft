@@ -85,7 +85,10 @@ chat /tick freeze
 chat /tp 0 82 562
 look 0 -40
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_1_wolves.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tp 200 90 544
@@ -113,14 +116,20 @@ chat /tick freeze
 chat /tp 203 72 554
 look 37 -22
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_2_killed.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tick freeze
 chat /tp 203 68.9 553
 look 45 -5
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_2_low.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tk spawn animals:turkey_vulture 210 70 532
@@ -154,7 +163,10 @@ chat /tick freeze
 chat /tp 200 82 552
 look 0 -35
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_3_vultures.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tp 400 90 544
@@ -186,14 +198,20 @@ chat /tick freeze
 chat /tp 403 72 554
 look 37 -22
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_4_aged.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tick freeze
 chat /tp 403 68.9 553
 look 45 -5
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_4_low.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tp 400 75 550
@@ -204,14 +222,20 @@ chat /tick freeze
 chat /tp 403 72 554
 look 37 -22
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_5_aged.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tick freeze
 chat /tp 403 68.9 553
 look 45 -5
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_5_low.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tp 400 75 550
@@ -222,14 +246,20 @@ chat /tick freeze
 chat /tp 403 72 554
 look 37 -22
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_6_aged.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tick freeze
 chat /tp 403 68.9 553
 look 45 -5
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_6_low.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tp 400 75 550
@@ -267,21 +297,30 @@ aim 6
 wait 1
 press core:use
 wait 4
+press core:hide_hud
+wait 0.5
 shot cov_carcass_8_skinning.png
+press core:hide_hud
 wait 9
 chat /animalprof carcass
 chat /tick freeze
 chat /tp 603 72 554
 look 37 -22
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_9_skinned.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tick freeze
 chat /tp 603 68.9 553
 look 45 -5
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_9_low.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tp 1000 90 544
@@ -334,11 +373,17 @@ chat /tick freeze
 chat /tp 1000 76 560
 look 0 -30
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_10_plans_whole.png
+press core:hide_hud
 chat /tp 994 71.5 552.5
 look 38 -40
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_11_wolf_close.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tp 1000 75 550
@@ -349,30 +394,48 @@ chat /tick freeze
 chat /tp 1000 76 560
 look 0 -30
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_12_plans_opened.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 chat /tick freeze
 chat /tp 994 68.9 552.5
 look 39 -8
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_13_low_wolf.png
+press core:hide_hud
 chat /tp 998 68.9 552.5
 look 39 -8
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_13_low_eagle.png
+press core:hide_hud
 chat /tp 1002 68.9 552.5
 look 39 -8
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_13_low_raptor.png
+press core:hide_hud
 chat /tp 1006 68.9 552.5
 look 39 -8
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_13_low_caiman.png
+press core:hide_hud
 chat /tp 1010 68.9 552.5
 look 39 -8
 wait 2
+press core:hide_hud
+wait 0.5
 shot cov_carcass_13_low_pacu.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
 quit
