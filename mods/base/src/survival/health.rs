@@ -14,6 +14,15 @@ use weft_sdk::*;
 /// The engine's max health a player has before food (the base game's 20).
 const ENGINE_HEALTH: f32 = 20.0;
 
+/// The `base:fed` modifier base last set on a player's max health, engine points (not saved: 0 till
+/// it is set this session; till then nothing counts over base's own max).
+static FED_SET: Component<f32> = Component::named("base:fed_set");
+
+pub fn register(r: &mut Registry) {
+    r.entity_component(&FED_SET, 0.0f32, 0);
+    r.edit(&PLAYER).attach(&FED_SET);
+}
+
 /// A tick's health: the max, healing and losses (`pulse`: once a second).
 #[allow(clippy::too_many_arguments)]
 pub fn tick(
@@ -27,10 +36,21 @@ pub fn tick(
     d: &Difficulty,
     pulse: bool,
 ) {
-    let engine_max = max_health / HEALTH_SCALE;
-    if (v.max_health - max_health).abs() > 0.01 {
+    // What other modifiers add to the engine's max over base's own (the health boost effect's +4, a
+    // test's): the engine's max less what base set last. Clamped to base's alone, a boosted player's
+    // health was cut back at every change of the fed max, and `/tk heal` filled it past the HUD's max
+    // ("1585 / 90", cov_bosses' Drenkaun shot).
+    let fed_set = w.component(id, &FED_SET).unwrap_or(0.0);
+    let others = if fed_set != 0.0 { (st.max_health - ENGINE_HEALTH - fed_set).max(0.0) } else { 0.0 };
+    let engine_max = max_health / HEALTH_SCALE + others;
+    if (v.max_health - max_health).abs() > 0.01 || fed_set == 0.0 {
         v.max_health = max_health;
-        w.attribute_add_modifier(id, "base:fed", &Modifier::add(&attribute::MAX_HEALTH, (engine_max - ENGINE_HEALTH) as f64), 0);
+        let fed = max_health / HEALTH_SCALE - ENGINE_HEALTH;
+        w.attribute_add_modifier(id, "base:fed", &Modifier::add(&attribute::MAX_HEALTH, fed as f64), 0);
+        // Never 0, so that it reads as set (a fed max of exactly the engine's 20).
+        if let Some(f) = w.component_mut(id, &FED_SET) {
+            *f = if fed == 0.0 { f32::MIN_POSITIVE } else { fed };
+        }
         if st.health > engine_max {
             st.health = engine_max;
             w.entity_modify(id).health(st.health);

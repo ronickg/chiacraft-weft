@@ -207,7 +207,9 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             }
             if k.angry > 0 {
                 set(w, id, |k| k.angry = k.angry.saturating_sub(e as _));
-                let alive = w.entity(k.angry_at).is_some_and(|e| e.health > 0.0);
+                // A spectator is out of reach: anger at one ends (cov_bosses: a hit wyvern followed the
+                // spectating player off its pad, out of the shot).
+                let alive = w.entity(k.angry_at).is_some_and(|e| e.health > 0.0) && w.game_mode(k.angry_at) != abi::game_mode::SPECTATOR;
                 if alive {
                     crate::wake(w, id, index);
                     crate::commands::fight(w, id, st, k.angry_at);

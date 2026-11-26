@@ -27,7 +27,6 @@ run per group is the last table in its section.
   - `HURT_AT` never attached (healing ran through fights; the hurt-cause log never ran).
 - **Not tested:**
   - a player's own right click, blows and bites (the scripts use commands);
-  - hawk and snowy owl strikes;
   - small land animals fleeing a walk-in;
   - wolves mating;
   - Borkon's leash;
@@ -244,9 +243,15 @@ atmosphere shader, and missing idle clips.
 | Species | kill feeds the prey's own mass | shot |
 |---|---|---|
 | utahraptor | pass (24.558 kg, three shares; another packmate killing: not tested) | r7 5 |
-| all other land hunters | pass | r7 1-7 |
+| jaguar, coyote, foxes, raptor, crocodyliform, yacare_caiman | pass | r7 1-7 |
+| osmolskae, spectacled_caiman | not tested in r7 (no kill; run 6: pass) | r7 4, 7 |
 
 Grid r7: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r14_hunters_m-202849/r14_hunters_grid.jpg`.
+
+Run 8 (09494f1f, `r15_hunters_m`, 651 s, script pass). Fifteen eats lines, every one at the prey's own mass. The
+utahraptor pack hunted at 26.0 kg and ate 25.951 in three shares. The jaguar, the crocodyliform and the yacare
+killed. The spectacled caiman made no kill. Five hurt lines, all `core:attack`. Grid r8:
+`~/Coding/chiacraft-archive/images/tester/2026-11-25/r15_hunters_m-205818/r15_hunters_grid.jpg`.
 
 ## Birds and fliers (cov_birds.txt)
 
@@ -312,6 +317,27 @@ the whole run, none on a flying look (run 2: 8): the fix holds.
 | songbirds (4 kinds) | pass (bolt from the walk-in, fly) | n/a |
 
 Grid r3: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r7_birds_m-175912/r7_birds_grid.jpg`.
+
+Run 4 (09494f1f, `r15_birds_m`, 346 s, script pass). Every bird of prey now strikes from the air and eats its kill
+at the prey's own mass. The savanna hawk took a wood mouse. The golden eagle struck a hare three times and killed
+it. The great horned owl took a mouse at night. The snowy owl struck a vole twice and killed it. Scavengers:
+the vultures smelled the deer from 18-19 blocks, glided in and ate venison; a gull ate too, and a raven and a
+gull went to the kill site. Songbirds bolted from the player with their alarm. Flocking can't be told from the
+rows. Shots: the owls' night pad is lit, but the birds were out of frame (the snowy owl behind the camera, the
+rodents off-axis); the raptors' pad was in rain with the birds off frame.
+
+| Species | strikes from the air / scavenges | shot |
+|---|---|---|
+| golden_eagle | pass (hare, 3 strikes, 3.8 kg) | r4 2 (out of frame) |
+| savanna_hawk | pass (mouse) | r4 2 (out of frame) |
+| great_horned_owl | pass (mouse, at night) | r4 3 (out of frame) |
+| snowy_owl | pass (vole, 2 strikes) | r4 3 (out of frame) |
+| turkey_vulture | pass (smells, lands, eats venison) | r4 4 |
+| herring_gull | pass (one ate venison) | r4 4 |
+| raven | goes to the kill site; eating not seen | r4 4 |
+| songbirds | flee the player (alarm); flocking not tested | r4 1 |
+
+Grid r4: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r15_birds_m-210707/r15_birds_grid.jpg`.
 
 ## Small animals and fish (cov_small.txt)
 
@@ -459,6 +485,12 @@ breathed lightning twice (its genes pick the breath). Drenkaun and Borkon took d
 went back to their places. The HUD in Drenkaun's shot reads "1505 / 90": that is the script's +300 testkit
 health over base's fed max, not a game bug. Grid r6:
 `~/Coding/chiacraft-archive/images/tester/2026-11-25/r13_bosses_m-200242/r13_bosses_grid.jpg`.
+
+Run 7 (09494f1f, `r15_bosses_m`, 434 s, script pass). Borkon's toss: "hits 1 for 14.3 (health 3.1/17.9
+after)", no death. The three plant eaters turned on the player, charged 7-10 times and let go. The wyvern
+stayed on its pad and is in the shot. Drenkaun and Borkon took damage, died, dropped loot and went back to their
+places. HUD: "1585 / 1590" for Drenkaun's +300 player, "84 / 89" for Borkon's. Grid r7:
+`~/Coding/chiacraft-archive/images/tester/2026-11-25/r15_bosses_m-204422/r15_bosses_grid.jpg`.
 
 | What | before | now | checked |
 |---|---|---|---|
@@ -639,19 +671,46 @@ their own. Since facb1a89f (working since ffdb839c1, which attaches `HURT_AT`) e
 `core:attack`; no fall, hunger or cold. The sound runs' cases are still unnamed: the next sound run with
 `--log mod:animals=debug` will show them.
 
+## Follow-ups from the grids (Planner, 11-25 evening)
+
+| What | cause | fix | checked |
+|---|---|---|---|
+| HUD health over max in Drenkaun's shot ("1585 / 90") | base clamped health to its own fed max and the HUD divided by it, but anything else on the engine's max (the script's +300, the game's health boost +4) was outside both | base counts the rest of the engine's max (`base:fed_set`), and the HUD and the levels screen show the engine's whole max (7d0700f1b) | pass (r15_bosses, 09494f1f): shot 5 "1585 / 1590", shot 6 "84 / 89" |
+| wyvern pad empty in the shot | the hit wyvern stayed angry at the player after they turned spectator and followed them to the watch spot at z 574, out of frame | anger at a spectator ends (`knockout::behave`, 598c06be7) | pass (r15_bosses): the wyvern stays at its pad's centre and is in shot 4 |
+| night caiman shot black | no light at 01:37 | glowstone round the night pads after the watching, before the shot (hunters' caimans, birds' owls; 75668b544) | hunters r15: the pad is lit and readable, but no caiman in frame. The spectacled caiman rested under water in the pond (y 68), the yacare had wandered behind the camera (z 573) and the hares were 22 blocks off: placement, not drawing. Owls (birds r15): the pad is lit, the birds out of frame |
+
 ## Sounds
 
-Every species' calls come from a shared voice family (`animals_core::voices`, files in
-`mods/animals/assets/sounds/voice/<family>/`), pitched for the species: none has calls of its own.
+Updated 11-25 from dev, after the AI voice sets, the act sounds and the bosses' voices merged. The full
+list, sources and listening pages are in `notes/crew/plans/ai-sound.md`. Each species plays a family in
+`animals_core::voices` (files in `mods/animals/assets/sounds/voice/<family>/`), pitched for its size.
 
-- **Silent:** the fish (brown_trout, pacu, lungfish, lycoptera), by design. **Drenkaun and Borkon**
-  have no voice at all (no hurt, death or call; only their stone sound group).
-- **Borrowed:** borkon_kid and drenkaun_calf use the reindeer's voice (`voices.rs`).
-- **Shared families, no own sounds:** canine (dog, grey_wolf, coyote), fox (both), cat, big_cat
-  (jaguar), deer (white-tailed, red, reindeer), rodent (capybara, wood_mouse, field_vole,
-  kryptobaatar), hare (both; hurt and death only), songbird (sparrow, bunting, confuciusornis,
-  gobipteryx), hawk (golden_eagle, savanna_hawk), owl (both), gull, corvid (raven), hiss
-  (turkey_vulture, both caimans, priscagama), bellow (crocodyliform, psittacosaurus,
-  protoceratops, gastonia, pinacosaurus, iguanodont, cedarosaurus), small_dino (raptor,
-  osmolskae, utahraptor, citipati), dragon (wyvern). The most stretched: the Cretaceous's plant
-  eaters all on one bellow (a 25 kg Psittacosaurus to a 10 t sauropod), the vulture on a hiss.
+- **Own families now, made by AI (Stable Audio 3 Small SFX; licence rows in `SOURCES.md`):**
+  - borkon_kid (goat_kid) and drenkaun_calf (calf): no longer the reindeer's voice
+  - Drenkaun and Borkon: ambient, hurt, death, plus summon, attack and stunned from `boss.rs`
+  - the six plant-eating dinosaurs (horned_dino)
+  - raptor, osmolskae, utahraptor, citipati (raptor)
+  - capybara, reindeer, jaguar, golden eagle, snowy owl, snow bunting
+  - the hares' rabbit screams
+- **Acts:** an `alarm` as an animal bolts (from `anim::play` with the alarm clip), an `attack` with each bite or
+  pounce, and eating (`animal::feed`: graze, meat or peck by diet). Steps: plant eaters from 80 kg and
+  anything from 250 kg step `heavy`, from 1 t `huge`.
+- **Still shared, CC0 recordings:**
+  - canine: dog, grey_wolf, coyote
+  - fox: both
+  - cat
+  - deer: white-tailed, red
+  - rodent: wood_mouse, field_vole, kryptobaatar
+  - songbird: sparrow, confuciusornis, gobipteryx
+  - hawk: savanna_hawk
+  - owl: great horned
+  - gull
+  - corvid: raven
+  - hiss: turkey_vulture, both caimans, priscagama
+  - bellow: crocodyliform
+  - dragon: wyvern
+- **Silent by design:** the fish (brown_trout, pacu, lungfish, lycoptera); their splash is ambient.
+- **Not checked in the coverage runs:**
+  - whether each act sound plays at the right moment;
+  - the bosses' young have no species, so nothing plays their alarm.
+- **Hurt sounds with no logged cause** (the section above): every hurt now logs its cause.
