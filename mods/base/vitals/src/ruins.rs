@@ -230,10 +230,18 @@ fn raw_near(seed: u64, k: usize, x: i32, z: i32, r: i32) -> Vec<Ruin> {
     out
 }
 
-/// Whether `ruin` stands: no deeper kind's ruin, no waystone and not the spawn's ruin (`first`)
-/// within `APART` of it.
+/// Whether `ruin` stands: no deeper kind's ruin, no waystone, not the spawn's ruin (`first`) and
+/// no ruin of its own kind from a lower cell (`(j, i)` order) within `APART` of it. (Two cells can
+/// pull theirs onto one line, both held `APART` from its end: seed 2 had two 4 blocks apart.)
 fn stands(seed: u64, ruin: &Ruin, first: Option<Ruin>) -> bool {
     let reach = APART as i32 + 1;
+    let lower = |c: (i32, i32)| (c.1, c.0) < (ruin.cell.1, ruin.cell.0);
+    let kin = raw_near(seed, ruin.kind, ruin.x, ruin.z, reach)
+        .iter()
+        .any(|o| o.cell != ruin.cell && lower(o.cell) && o.dist(ruin.x as f64, ruin.z as f64) < APART);
+    if kin {
+        return false;
+    }
     let deeper = (ruin.kind + 1..KINDS.len()).any(|k| {
         raw_near(seed, k, ruin.x, ruin.z, reach)
             .iter()
