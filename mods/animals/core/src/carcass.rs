@@ -139,6 +139,74 @@ pub fn body_scale(mass: f32, plan: Plan) -> f32 {
 pub const COAT_RGB: [f32; 3] = [124.0, 80.0, 50.0];
 pub const UNDER_RGB: [f32; 3] = [212.0, 194.0, 166.0];
 
+// ---------------------------------------------------------------- rot drawn
+//
+// A body shows its rot (the stages are `vitals::rot::carcass_stage`'s): fresh, it is the animal's coat; bloating, the
+// skin and fur go a dull green-black (the marbling of decay) step by step; gone to remains, a dried grey-brown hide.
+// Blow flies hover over it while it bloats and rots (they come within minutes of a death and are thickest at bloat and
+// active decay; few stay at dry remains, none at bones).
+
+/// Steps the rot is drawn in (each a repaint of the coat): 0 fresh, 1.. through the bloat, `ROT_STEPS` at remains.
+pub const ROT_STEPS: u8 = 6;
+/// The colour a bloating body turns toward and how far at its last step (0..1), and a dry one's.
+pub const BLOAT_RGB: [f32; 3] = [66.0, 78.0, 46.0];
+pub const BLOAT_TINT: f32 = 0.45;
+pub const DRY_RGB: [f32; 3] = [118.0, 104.0, 84.0];
+pub const DRY_TINT: f32 = 0.55;
+/// How much darker it is at the full tint (wet, then dark dried skin), a white texel's (a dark one's less: a white belly
+/// goes a dirty grey-green, not mint).
+pub const ROT_DARKEN: f32 = 0.42;
+/// Flies over a deer-sized body at once while it bloats (as many again per body as big by area), and the share left at
+/// remains.
+pub const FLIES: f32 = 10.0;
+pub const FLIES_MAX: u8 = 24;
+pub const DRY_FLIES: f32 = 0.3;
+
+/// The rot step drawn at `larder_days` of age for meat keeping `keeps` (`keeps()`).
+pub fn rot_step(keeps: (f32, f32), larder_days: f32) -> u8 {
+    let t = (larder_days - keeps.0) / keeps.1.max(1e-3);
+    if t <= 0.0 {
+        0
+    } else if t >= 1.0 {
+        ROT_STEPS
+    } else {
+        1 + (t * (ROT_STEPS - 1) as f32) as u8
+    }
+}
+
+/// Turns a painted body (`rgba`, every opaque texel: coat, meat and bones alike) to rot `step`'s colour, keeping each
+/// texel's brightness.
+pub fn rot_tint(rgba: &mut [u8], step: u8) {
+    if step == 0 {
+        return;
+    }
+    let (to, k) = if step >= ROT_STEPS { (DRY_RGB, DRY_TINT) } else { (BLOAT_RGB, BLOAT_TINT * step as f32 / (ROT_STEPS - 1) as f32) };
+    let lum = |c: [f32; 3]| 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+    let full = k / BLOAT_TINT.max(DRY_TINT);
+    let lt = lum(to);
+    for px in rgba.as_chunks_mut::<4>().0 {
+        if px[3] == 0 {
+            continue;
+        }
+        let l = lum([px[0] as f32, px[1] as f32, px[2] as f32]);
+        let dark = 1.0 - ROT_DARKEN * full * (0.35 + 0.65 * l / 255.0);
+        for c in 0..3 {
+            let v = px[c] as f32 * (1.0 - k) + l * to[c] / lt * k;
+            px[c] = (v * dark).round().clamp(0.0, 255.0) as u8;
+        }
+    }
+}
+
+/// Flies over a body at rot `step`, drawn as `look`, at `scale` of its plan's reference animal.
+pub fn flies(step: u8, look: Look, scale: f32) -> u8 {
+    let n = match (step, look) {
+        (0, _) | (_, Look::Bones | Look::Pile) => return 0,
+        (s, _) if s >= ROT_STEPS => FLIES * DRY_FLIES,
+        _ => FLIES,
+    };
+    (n * scale * scale).round().clamp(1.0, FLIES_MAX as f32) as u8
+}
+
 // ---------------------------------------------------------------- skinning (slice 2)
 //
 // Ronald (11-25): "skinning only": an animal that leaves a carcass drops no hide or meat when it dies; a player kneels
@@ -233,6 +301,31 @@ pub fn meat_count(lo: u32, hi: u32, eaten: f32, mass: f32, rot: vitals::rot::Car
 mod tests {
     use super::*;
     use vitals::rot::Carcass;
+
+    #[test]
+    fn rot_steps_and_flies() {
+        let k = keeps();
+        assert_eq!(rot_step(k, 0.0), 0);
+        assert_eq!(rot_step(k, k.0 + k.1 * 0.01), 1);
+        assert_eq!(rot_step(k, k.0 + k.1 * 0.99), ROT_STEPS - 1);
+        assert_eq!(rot_step(k, k.0 + k.1), ROT_STEPS);
+        let mut last = 0;
+        for i in 0..100 {
+            let s = rot_step(k, i as f32 * 0.1);
+            assert!(s >= last);
+            last = s;
+        }
+        // The tint darkens and pulls toward green while bloating; nothing while fresh, transparent untouched.
+        let mut px = [200, 150, 100, 255, 9, 9, 9, 0];
+        rot_tint(&mut px, 0);
+        assert_eq!(px, [200, 150, 100, 255, 9, 9, 9, 0]);
+        rot_tint(&mut px, ROT_STEPS - 1);
+        assert!(px[0] < 200 && px[1] < 150 && px[4..] == [9, 9, 9, 0]);
+        assert_eq!(flies(0, Look::Whole, 1.0), 0);
+        assert_eq!(flies(3, Look::Bones, 1.0), 0);
+        assert!(flies(ROT_STEPS, Look::Opened, 1.0) < flies(3, Look::Opened, 1.0));
+        assert!(flies(3, Look::Whole, 0.3) >= 1 && flies(3, Look::Whole, 5.0) <= FLIES_MAX);
+    }
 
     #[test]
     fn eaten_steps_it_down() {

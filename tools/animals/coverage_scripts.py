@@ -454,6 +454,9 @@ def plans_part(x, p="cov_carcass"):
         for name, _, dx in PLANS:
             out += [f"chat /tp {x+dx+1.6} 68.9 {Z+7.8}", "look 39 -9", "wait 2", f"shot {p}_{n}_low_{stage}_{name}.png"]
         out += ["chat /tick unfreeze", "wait 1"]
+        if stage == "opened":
+            # Its flies (client particles, drawn with ticks running): the wolf at 3 days bloats, rot step 3.
+            out += [f"chat /tp {x-8+1.2} 68.9 {Z+7.2}", "look 39 -12", "wait 3", f"shot {p}_{n+1}_flies_wolf.png"]
     return out
 
 
@@ -477,6 +480,9 @@ s = head("carcass_plans", [
     "row, then aged: whole, opened (3 days), bones (5), pile (9). Per stage: the row (_plans_), the wolf from straight",
     "above (_wolf_above_: legs out sideways flat on the ground, not under it), and each body close and low (_low_).",
     "Report whether each lies on its side (the caiman on its belly), rests on the ground, and is its own animal's shape.",
+    "Rot: whole fresh in its own coat; opened (3 days, bloating) duller and greener; bones and pile (remains) a dry",
+    "grey-brown. 13_flies_wolf: small dark flies darting over the opened wolf (ticks running). Report each carcass's",
+    "\"rot step\" and \"flies\" from the /animalprof carcass lines.",
 ]) + plans_part(1000, "cov_carcass_plans")
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass_plans", s)

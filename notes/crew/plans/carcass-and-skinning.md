@@ -131,6 +131,14 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   feet and blazes land where they grow, its underside share, white and points zones), keeping the shared texture's
   painted light by its brightness. Offline: `cargo run -p animals_core --bin carcass_coats` then `sheet.py --coats`
   (jaguar rosettes, tabby and white cats, striped raptors, archived).
+- Rot drawn (Planner 11-26, "rot tint and flies" first of the four): the body's coat is repainted at each rot step
+  (`animals_core::carcass::rot_step`: 0 fresh, 1-5 through the bloat, 6 at remains), turning toward a dull green-black
+  as it bloats and a dry grey-brown at remains, bright texels darkening most (`rot_tint`, `BLOAT_RGB`, `DRY_RGB`,
+  `ROT_DARKEN`); blow flies dart over it while it bloats (`FLIES` over a deer-sized body, as many again per body as big
+  by area, `DRY_FLIES` of them at remains, none at bones), drawn on each client as short-lived particles
+  (`carcass_fly`). The step and the flies ride in the synced `Dead` (`carcass_genome`) with the genes, so a step
+  repaints the coat. `/animalprof carcass` lists both. Offline: `sheet.py --rot`. The golden eagle's coat now has its
+  coverts' paler mottling (living and dead: a plain brown read flat).
 - Left for later: vultures
   fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.

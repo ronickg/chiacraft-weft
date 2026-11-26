@@ -66,7 +66,42 @@ def coats():
     print(os.path.join(OUT, "sheet_coats.png"))
 
 
+def rot():
+    """`--rot`: each species' first coat fresh and at rot steps 2, 5 (late bloat) and 6 (remains: `carcass_coats`'s
+    `_rot<k>`), the last two opened. Writes out/sheet_rot.png."""
+    d = os.path.join(OUT, "coats")
+    cell = 240
+    rows = []
+    for sp, plan in PLAN_OF.items():
+        row = []
+        for label, f, opened in [("fresh", f"{sp}_0.png", False), ("rot 2", f"{sp}_0_rot2.png", False),
+                                 ("rot 5", f"{sp}_0_rot5.png", False), ("rot 5 opened", f"{sp}_0_rot5.png", True),
+                                 ("remains (6) opened", f"{sp}_0_rot6.png", True)]:
+            path = os.path.join(d, f)
+            if not os.path.exists(path):
+                continue
+            tex = np.array(Image.open(path).convert("RGBA"))
+            spec = json.load(open(os.path.join(OUT, f"carcass_{plan}{'_open' if opened else ''}.spec.json")))
+            img = Image.fromarray(render(spec, tex, yaw=150 if opened else 35, pitch=-42 if opened else -30,
+                                         ppu=PPU[plan]))
+            img.thumbnail((cell, cell))
+            row.append((f"{sp} {label}", img))
+        if row:
+            rows.append(row)
+    sheet = Image.new("RGBA", (cell * 5, len(rows) * (cell + 20)), (120, 132, 110, 255))
+    dr = ImageDraw.Draw(sheet)
+    for r, row in enumerate(rows):
+        for c, (label, img) in enumerate(row):
+            x0, y0 = c * cell, r * (cell + 20)
+            sheet.alpha_composite(img, (x0 + (cell - img.width) // 2, y0 + 18 + (cell - img.height) // 2))
+            dr.text((x0 + 4, y0 + 2), label, fill=(255, 255, 255, 255))
+    sheet.save(os.path.join(OUT, "sheet_rot.png"))
+    print(os.path.join(OUT, "sheet_rot.png"))
+
+
 def main():
+    if "--rot" in sys.argv:
+        return rot()
     if "--coats" in sys.argv:
         return coats()
     tex = np.array(Image.open(os.path.join(OUT, "body.png")).convert("RGBA"))

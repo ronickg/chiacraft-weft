@@ -1,9 +1,10 @@
 //! Paints the dead bodies' texture in sample coats, for `mods/animals/source/carcass/sheet.py --coats`:
 //! `cargo run -p animals_core --bin carcass_coats -- <body.png> <out dir> [species ...]` writes
 //! `<out>/<species>_<n>.png` (four wild individuals each, their genes drawn from the species' wild pool) through
-//! `coats::paint_dead`, as the game paints a carcass.
+//! `coats::paint_dead`, as the game paints a carcass; the first also at rot steps (`<species>_0_rot<k>.png`, `rot_tint`),
+//! for `sheet.py --rot`.
 
-use animals_core::carcass::{COAT_RGB, UNDER_RGB, body_scale, plan_of};
+use animals_core::carcass::{COAT_RGB, ROT_STEPS, UNDER_RGB, body_scale, plan_of, rot_tint};
 use animals_core::coats::{paint_dead, sample, wild_pool};
 use animals_core::species::SPECIES;
 
@@ -46,15 +47,25 @@ fn main() {
             let Some(g) = sample(i, n % 2 == 0, &pool, &mut rng) else { continue };
             let mut rgba = tex.clone();
             paint_dead(&g, &mut rgba, w, h, scale, COAT_RGB, UNDER_RGB);
-            let path = format!("{out}/{name}_{n}.png");
-            let f = std::io::BufWriter::new(std::fs::File::create(&path).expect("out"));
-            let mut e = png::Encoder::new(f, w as u32, h as u32);
-            e.set_color(png::ColorType::Rgba);
-            e.set_depth(png::BitDepth::Eight);
-            e.write_header()
-                .and_then(|mut wr| wr.write_image_data(&rgba))
-                .expect("write");
-            println!("{path}");
+            write(&format!("{out}/{name}_{n}.png"), &rgba, w, h);
+            if n == 0 {
+                for k in [2, ROT_STEPS - 1, ROT_STEPS] {
+                    let mut r = rgba.clone();
+                    rot_tint(&mut r, k);
+                    write(&format!("{out}/{name}_0_rot{k}.png"), &r, w, h);
+                }
+            }
         }
     }
+}
+
+fn write(path: &str, rgba: &[u8], w: usize, h: usize) {
+    let f = std::io::BufWriter::new(std::fs::File::create(path).expect("out"));
+    let mut e = png::Encoder::new(f, w as u32, h as u32);
+    e.set_color(png::ColorType::Rgba);
+    e.set_depth(png::BitDepth::Eight);
+    e.write_header()
+        .and_then(|mut wr| wr.write_image_data(rgba))
+        .expect("write");
+    println!("{path}");
 }

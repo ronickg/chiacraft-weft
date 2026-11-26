@@ -479,6 +479,13 @@ shot cov_carcass_12_low_opened_pacu.png
 press core:hide_hud
 chat /tick unfreeze
 wait 1
+chat /tp 993.2 68.9 551.2
+look 39 -12
+wait 3
+press core:hide_hud
+wait 0.5
+shot cov_carcass_13_flies_wolf.png
+press core:hide_hud
 chat /tp 1000 75 550
 chat /animalprof carcass 2
 wait 2

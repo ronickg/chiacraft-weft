@@ -2,6 +2,9 @@
 # row, then aged: whole, opened (3 days), bones (5), pile (9). Per stage: the row (_plans_), the wolf from straight
 # above (_wolf_above_: legs out sideways flat on the ground, not under it), and each body close and low (_low_).
 # Report whether each lies on its side (the caiman on its belly), rests on the ground, and is its own animal's shape.
+# Rot: whole fresh in its own coat; opened (3 days, bloating) duller and greener; bones and pile (remains) a dry
+# grey-brown. 13_flies_wolf: small dark flies darting over the opened wolf (ticks running). Report each carcass's
+# "rot step" and "flies" from the /animalprof carcass lines.
 loaded
 idle
 chat /tk mode creative
@@ -168,6 +171,13 @@ shot cov_carcass_plans_12_low_opened_pacu.png
 press core:hide_hud
 chat /tick unfreeze
 wait 1
+chat /tp 993.2 68.9 551.2
+look 39 -12
+wait 3
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_13_flies_wolf.png
+press core:hide_hud
 chat /tp 1000 75 550
 chat /animalprof carcass 2
 wait 2
