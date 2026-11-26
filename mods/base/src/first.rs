@@ -35,6 +35,10 @@ pub static BONE_SPLINTER: Item = Item::named("bone_splinter");
 /// in the furnace as raw copper is.
 pub static LOOSE_COPPER: Block = Block::named("loose_copper");
 pub static NATIVE_COPPER: Item = Item::named("native_copper");
+/// A shed antler on the ground in the deer lands (`vitals::first::ANTLER_LANDS`), picked up as
+/// `ANTLER`: the antler material, and in the bag a pressure flaker (`knapping::knapped_head`).
+pub static SHED_ANTLER: Block = Block::named("shed_antler");
+pub static ANTLER: Item = Item::named("antler");
 
 static LEAVES: Tag = Tag::named("leaves");
 /// Edges that cut fibre plants (a flake; a knife later).
@@ -83,6 +87,22 @@ pub fn register(r: &mut Registry) {
         "native_copper",
         &[([4.0, 0.0, 5.0], [11.0, 2.5, 11.0]), ([10.0, 0.0, 7.0], [13.0, 1.5, 10.0]), ([5.0, 0.0, 3.0], [8.0, 1.5, 5.0])],
     );
+    // A shed antler: a curved beam and two tines (its tile is a recoloured bone's until Art
+    // paints one).
+    loose(
+        r,
+        &SHED_ANTLER,
+        &[],
+        "stone",
+        "shed_antler",
+        &[
+            ([2.0, 0.0, 7.0], [13.0, 2.0, 9.0]),
+            ([11.0, 0.0, 4.0], [13.0, 3.0, 7.0]),
+            ([6.0, 0.0, 3.0], [8.0, 3.0, 7.0]),
+            ([1.0, 0.0, 9.0], [3.0, 2.5, 11.0]),
+        ],
+    );
+    r.loot(&SHED_ANTLER).pool(Pool::new().item("antler"));
     r.loot(&LOOSE_COPPER)
         .pool(Pool::new().item("native_copper"));
     r.loot(&LOOSE_BONE).pool(Pool::new().item("bone"));
@@ -122,6 +142,7 @@ pub fn register(r: &mut Registry) {
         .tag("raw_ores/copper")
         .on_use(strike)
         .tab(&crate::tabs::INGREDIENTS);
+    r.item(&ANTLER).tag("antler").tab(&crate::tabs::INGREDIENTS);
     r.item(&BONE_SPLINTER)
         .tag("cutters")
         .handheld()
@@ -413,5 +434,6 @@ pub fn ground_block(g: Ground) -> u32 {
         Ground::Branch => FALLEN_BRANCH.id(),
         Ground::Bone => LOOSE_BONE.id(),
         Ground::Copper => LOOSE_COPPER.id(),
+        Ground::Antler => SHED_ANTLER.id(),
     }
 }

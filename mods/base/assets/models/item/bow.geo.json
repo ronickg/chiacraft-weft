@@ -9,6 +9,14 @@
    },
    "bones": [
     {
+     "name": "bow",
+     "pivot": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
      "name": "grip",
      "pivot": [
       0,
@@ -90,7 +98,8 @@
         }
        }
       }
-     ]
+     ],
+     "parent": "bow"
     },
     {
      "name": "upperLimb",
@@ -396,7 +405,8 @@
         }
        }
       }
-     ]
+     ],
+     "parent": "bow"
     },
     {
      "name": "lowerLimb",
@@ -702,7 +712,8 @@
         }
        }
       }
-     ]
+     ],
+     "parent": "bow"
     },
     {
      "name": "stringTop",
@@ -1104,7 +1115,8 @@
         }
        }
       }
-     ]
+     ],
+     "parent": "bow"
     }
    ]
   }

@@ -566,3 +566,23 @@ mod healing {
         assert!(RAID_SHARE < 0.5, "a herd should thin a field, not clear it");
     }
 }
+
+#[cfg(test)]
+mod antlers {
+    use crate::species::SPECIES;
+
+    /// Shed antlers lie where deer live (`vitals::first::ANTLER_LANDS`): every antler land is a
+    /// habitat of a deer that grows them, so a find never lies where no buck walks.
+    #[test]
+    fn antler_lands_are_the_deers() {
+        let deer = ["white_tailed_deer", "red_deer", "reindeer"];
+        for land in vitals::first::ANTLER_LANDS {
+            let homes: Vec<&str> = SPECIES
+                .iter()
+                .filter(|s| deer.contains(&s.name) && s.habitats.iter().any(|&(b, w)| b == land && w > 0.0))
+                .map(|s| s.name)
+                .collect();
+            assert!(!homes.is_empty(), "{land}: antlers but no deer");
+        }
+    }
+}

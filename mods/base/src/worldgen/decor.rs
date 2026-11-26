@@ -100,7 +100,7 @@ pub(super) fn decorate(g: &mut Gen) {
             // The loose things lie on open soil, sand and gravel, thicker on steep ground and gravel
             // and round the spawn; fallen branches under the crowns; old bones instead of rocks
             // and flint in the bone lands, the frozen north among them; native copper in the copper
-            // lands (`vitals::first`).
+            // lands, shed antlers in the deer lands (`vitals::first`).
             let bony = ground_u < vitals::first::MOST && vitals::first::BONE_LANDS.contains(&name_of(abi::entry_kind::BIOME, b));
             if ground_u < vitals::first::MOST
                 && (bony || !FROZEN.on_biome(b))
@@ -109,7 +109,9 @@ pub(super) fn decorate(g: &mut Gen) {
                 let stony = fall >= 2 || GRAVEL.is(below);
                 let from_spawn = (((wx - spawn[0]) as f32).powi(2) + ((wz - spawn[2]) as f32).powi(2)).sqrt();
                 let coppery = COPPER_LANDS.iter().any(|t| t.on_biome(b));
-                if let Some(thing) = vitals::first::ground_at(ground_u, stony, under_crown(g, x, y, z), bony, coppery, from_spawn) {
+                let antlered = vitals::first::ANTLER_LANDS.contains(&name_of(abi::entry_kind::BIOME, b));
+                if let Some(thing) = vitals::first::ground_at(ground_u, stony, under_crown(g, x, y, z), bony, coppery, antlered, from_spawn)
+                {
                     if y >= 1 && fall >= 3 && PLANT_SOIL.on_block(below) {
                         g.set(x, y - 1, z, GRAVEL.id());
                     }
