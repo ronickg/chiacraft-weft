@@ -1,0 +1,44 @@
+# A carried pelt on the player (mods/animals/src/pelt_look.rs, source/pelt_carried): seed 1, a fresh world.
+# The player in third person from behind and in front: with nothing (pl_none_back, pl_none_front), then with
+# a hide in the inventory (pl_hide_back, pl_hide_front: a tan skin folded over the left shoulder, down the
+# outside of the left arm, a flap on the chest with a foreleg, a longer one down the back with two hind legs),
+# then with a fur as well (pl_fur_back, pl_fur_front: the fur wins: a brown roll across the back with two
+# straps round it, a strap from the left shoulder to the right hip; the hide gone), then walking with the fur
+# (pl_fur_walk: nothing pokes through the arms). Read: the shots, run.log for "no model" or texture errors.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /time set 6000
+chat /tk mode survival
+until mode survival within 10
+look 0 0
+wait 1
+press core:perspective
+wait 1
+shot pl_none_back.png
+press core:perspective
+wait 1
+shot pl_none_front.png
+chat /tk give base:hide 1
+wait 2
+shot pl_hide_front.png
+# core:perspective goes first person, behind, in front, first person again.
+press core:perspective
+press core:perspective
+wait 1
+shot pl_hide_back.png
+chat /tk give base:fur 1
+wait 2
+shot pl_fur_back.png
+press core:perspective
+wait 1
+shot pl_fur_front.png
+press core:perspective
+press core:perspective
+wait 1
+hold core:forward 1.5 nowait
+wait 0.7
+shot pl_fur_walk.png
+wait 1
+quit
