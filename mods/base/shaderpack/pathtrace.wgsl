@@ -355,15 +355,76 @@ fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: ve
     if own {
         return vec2(1.0, 1.0);
     }
-    let to = chosen - world;
+    var to = chosen - world;
+    // A light behind the face lights it only round a corner, as the lightmap spreads it: hidden.
+    // But one in the layer of the surface's own block (a fire in a hole in the floor, a lamp set in
+    // a wall) shines out of its open face over the surface, as the lightmap spreads it from there:
+    // its point is brought out to just over the face. Drawn inside its block, every point lay under
+    // the floor's plane, and the floor round the nave's fire pits kept a tenth of its light (w76).
+    let behind = -dot(to, ng);
+    if behind >= 0.0 {
+        if behind > 1.0 {
+            return vec2(0.0, 1.0);
+        }
+        to += ng * (behind + 0.05);
+    }
     let dist = length(to);
     let dir = to / max(dist, 1e-4);
-    // A light behind the face lights it only round a corner, as the lightmap spreads it: hidden.
-    if dot(dir, ng) <= 0.0 {
-        return vec2(0.0, 1.0);
-    }
     let hit = rt_hit(rel + lift, dir, max(dist - 0.9, 0.0), 0.0);
     return vec2(select(1.0, 0.0, hit.hit && !hit.clear), 1.0);
+}
+
+// ---- plain (`core:pt_plain`): vanilla's math, and only what tracing adds to it ----
+//
+// The world's pass without a pack (the engine's `world.wgsl`): the texel times its tint, its face's
+// shade and the lightmap's curve, multiplied in sRGB values as vanilla does; no grade, no haze, no
+// specular. Tracing adds two things: the sky level the lightmap's flood fill guesses becomes the
+// sky's share the surface sees (a ray that gets out counts whole, one that meets a surface counts
+// that surface's own sky light, so a wall over open ground stays as vanilla's and a cave's goes
+// dark by its shape), and the sun's shadow (a face the traced sun misses loses `PT_PLAIN_SUN` of
+// the daylight). The block light is shadowed as in the look's path. For Ronald's stage-1 compare
+// (ours plain against vanilla): PT that differs from vanilla only where tracing does.
+const PT_PLAIN_SUN: f32 = 0.3;
+
+fn pt_srgb_encode(l: vec3<f32>) -> vec3<f32> {
+    let c = max(l, vec3(0.0));
+    return select(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, c * 12.92, c <= vec3(0.0031308));
+}
+
+fn pt_srgb_decode(s: vec3<f32>) -> vec3<f32> {
+    let c = max(s, vec3(0.0));
+    return select(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, c <= vec3(0.04045));
+}
+
+// Vanilla's lightmap (`common.wgsl`) at `light` (sky, then the block light's channels, 0..1).
+fn pt_lightmap(light: vec4<f32>) -> vec3<f32> {
+    return lightmap(light, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
+}
+
+// The plain pixel at `at` (see above): `h` the surface met, `n` its normal, `ng` its face's, `sun`
+// the traced sun on it (0..1, 0 facing away), `albedo` the G-buffer's (linear, tinted).
+fn pt_plain(at: u32, px: vec2<f32>, h: RtHit, ng: vec3<f32>, lift: vec3<f32>, sun: f32, albedo: vec3<f32>) {
+    // The sky's share: one cosine ray a frame about the face (the denoisers average them).
+    let b = rt_hit(h.rel + lift, pt_cosine(ng, pt_noise(px)), 96.0, 2.0);
+    let access = select(1.0, clamp(b.light.x, 0.0, 1.0), b.hit);
+    let blk = h.light.yzw;
+    let none = pt_lightmap(vec4(0.0));
+    var light = mix(pt_lightmap(vec4(0.0, blk)), pt_lightmap(vec4(1.0, blk)), access);
+    // The sun's shadow on the daylight the surface sees.
+    let day = max(pt_lightmap(vec4(1.0, 0.0, 0.0, 0.0)) - none, vec3(0.0));
+    light -= day * access * PT_PLAIN_SUN * clamp(light_strength(), 0.0, 1.0) * (1.0 - clamp(sun, 0.0, 1.0));
+    // The block light, as much of it as reaches the surface.
+    let block = max(pt_lightmap(vec4(0.0, blk)) - none, vec3(0.0));
+    if max(block.r, max(block.g, block.b)) > 1e-4 {
+        let vis = pt_block_visibility(h.world, h.rel, ng, lift, px).x;
+        light -= block * ((1.0 - vis) * PT_BLOCK_SHADOW);
+    }
+    light = clamp(light, vec3(0.0), vec3(1.0)) * normal_shade(ng);
+    let surface = pt_srgb_decode(pt_srgb_encode(albedo) * light);
+    // The light alone for the denoisers (the surface over its albedo), no specular, no air.
+    pt_out[at] = vec4(surface / max(albedo, vec3(1e-4)), select(PT_SKY_T, max(b.t, 1e-3), b.hit));
+    pt_out[at + 1u] = vec4(0.0);
+    pt_out[at + 2u] = vec4(select(surface, vec3(0.0), pt.mode == 1u), 1.0);
 }
 
 @compute @workgroup_size(8, 8)
@@ -475,6 +536,10 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         // and players are not in the traced scene) and the clouds'. Without them a rainy day's
         // ground stayed sunlit where the world's lay under its clouds (w33).
         sun *= models_shadow(h.rel, n) * cloud_shadow(h.rel);
+    }
+    if pt.plain != 0u {
+        pt_plain(at, px, h, ng, lift, sun, albedo);
+        return;
     }
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
     // lightmap gives it (already lowered under cover) and as the open sky would give it.
@@ -711,5 +776,8 @@ fn fs_pt_finish(in: PtOut) -> @location(0) vec4<f32> {
     // The pixel's sky share as `cs_trace` found it: left at 1, the whole denoised light went
     // the night's blue, a fire's with it.
     NIGHT_SKY_SHARE = clamp((kind.a - 1.0) * 4.0, 0.0, 1.0);
+    if pt.plain != 0u {
+        return vec4(kind.rgb + light, 0.0);
+    }
     return vec4(display(kind.rgb + light), 0.0);
 }
