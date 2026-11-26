@@ -748,8 +748,10 @@ s = head("crops", [
     "plants a day, `needs::RAID_SHARE`), none at z 532..536; each eaten plant set back to a seedling (1_fields: gaps of",
     "young crop in the open fields, the walled and lit ones whole). Part 2 (x 200, summer):",
     "a pond with lily pads on it and reeds along its south side, 2 capybaras hungry on its north side: \"eats",
-    "base:lily_pad\" first (they stay: no block changes). Part 1's \"crop at ...: block light L\" lines: L 8 or more",
-    "in the torch field, \"left\"; the `/tk light` replies there 8 or more. Shots 1_fields, 2_pond.",
+    "base:lily_pad\" first (they stay: no block changes). Part 1's \"crop at ...: block light L, guard G\" lines: in the",
+    "torch field G is Some([..]) (a torch) and every one \"left\". The `/tk light` replies (plant cells, then the air above",
+    "them, then a cell beside a torch): raw packed light, sky in the low byte, block light in the three above it. Shots",
+    "1_fields, 2_pond.",
 ])
 s += pad(0) + [
     f"chat /tk fill 4 69 {Z-2} 8 69 {Z+2} base:farmland", f"chat /tk fill 4 70 {Z-2} 8 70 {Z+2} base:wheat[age=7]",
@@ -765,6 +767,7 @@ s += pad(0) + [
     "chat /time set 18000", "wait 1",
     # The torch field's light where its plants stand (`needs::RAID_LIGHT` 8): r1's deer ate 5 of them.
     f"chat /tk light -4 70 {Z-11}", f"chat /tk light -5 70 {Z-9}", f"chat /tk light -8 70 {Z-12}", f"chat /tk light 6 70 {Z+1}",
+    f"chat /tk light -4 71 {Z-11}", f"chat /tk light -5 71 {Z-9}", f"chat /tk light -3 71 {Z-13}", f"chat /tk light -2 70 {Z-13}",
     f"chat /tk spawn animals:white_tailed_deer 6 70 {Z+5}", f"chat /tk spawn animals:white_tailed_deer 7 70 {Z+5}",
     f"chat /tk spawn animals:white_tailed_deer 0 70 {Z-10}", f"chat /tk spawn animals:white_tailed_deer 1 70 {Z-10}",
     f"chat /tk spawn animals:hare -6 70 {Z+5}", f"chat /tk spawn animals:hare -5 70 {Z+5}",

@@ -52,7 +52,7 @@ pub const ROOM_FLOOR: f32 = 0.25;
 
 /// Crops (`vitals::forage::crop`, part 3): a wild animal finds a ripe crop worth raiding only on some days, a share
 /// `RAID_SHARE` of a field's plants a game day (each plant's own roll for the day), so a herd thins a field rather than
-/// clearing it at once; and never one in block light of `RAID_LIGHT` or more (a torch within about 6 blocks: lit ground
+/// clearing it at once; and never one in block light of `RAID_LIGHT` or more or within `GUARD_REACH` of a crop guard (lit ground
 /// is people's ground). A fence keeps them out as any wall does (they can't path through it, and `CROP_REACH` is too
 /// short to eat over it). Game numbers, not
 /// measured ones: farming has to stay winnable.
@@ -61,10 +61,17 @@ pub const RAID_LIGHT: u32 = 8;
 /// How close a raider must stand to a crop to eat it, blocks from its middle (other food: 2): a wall a block thick round
 /// a field keeps its edge plants out of reach (cov_crops r1: a deer ate the corner plant over a 2-high wall at 2).
 pub const CROP_REACH: f32 = 1.5;
+/// How far a crop guard (a block in the `crop_guards` tag: a torch, a campfire, glowstone, a lantern scarecrow) keeps
+/// raiders off, blocks each way: a torch at each corner of a 7 by 7 field, or one in the middle of a 9 by 9, guards it
+/// all. A torch's own light falls under `RAID_LIGHT` 7 blocks out along the ground, so this is the nearer of the two.
+/// The guard is looked for by block, not read from the light (cov_crops r2: the server's light at the plants read 0
+/// beside torches).
+pub const GUARD_REACH: i32 = 4;
 
 /// Whether a wild animal goes for a ripe crop in block light `light` whose roll for the day is `roll` (0 to 1).
-pub fn raids(light: u32, roll: f32) -> bool {
-    light < RAID_LIGHT && roll < RAID_SHARE
+/// `guarded`: a crop guard within `GUARD_REACH`.
+pub fn raids(light: u32, guarded: bool, roll: f32) -> bool {
+    !guarded && light < RAID_LIGHT && roll < RAID_SHARE
 }
 
 /// A plant eater's room, `crowd` in a usual season, where its food grew `now` against the season's `usual`
@@ -560,9 +567,11 @@ mod healing {
 
     #[test]
     fn torchlight_keeps_raiders_off_the_crops() {
-        assert!(raids(0, 0.0), "a dark field is raided on its day");
-        assert!(!raids(RAID_LIGHT, 0.0), "a field lit by a torch is left alone");
-        assert!(!raids(0, RAID_SHARE), "only RAID_SHARE of a field's plants a day");
+        assert!(raids(0, false, 0.0), "a dark field is raided on its day");
+        assert!(!raids(RAID_LIGHT, false, 0.0), "a field lit by a torch is left alone");
+        assert!(!raids(0, true, 0.0), "a guard near the field keeps raiders off, whatever the light reads");
+        assert!(!raids(0, false, RAID_SHARE), "only RAID_SHARE of a field's plants a day");
+        assert!(GUARD_REACH >= 3, "corner torches of a 7 by 7 field guard its middle");
         assert!(RAID_SHARE < 0.5, "a herd should thin a field, not clear it");
     }
 }

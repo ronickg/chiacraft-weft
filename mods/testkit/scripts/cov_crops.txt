@@ -6,8 +6,10 @@
 # plants a day, `needs::RAID_SHARE`), none at z 532..536; each eaten plant set back to a seedling (1_fields: gaps of
 # young crop in the open fields, the walled and lit ones whole). Part 2 (x 200, summer):
 # a pond with lily pads on it and reeds along its south side, 2 capybaras hungry on its north side: "eats
-# base:lily_pad" first (they stay: no block changes). Part 1's "crop at ...: block light L" lines: L 8 or more
-# in the torch field, "left"; the `/tk light` replies there 8 or more. Shots 1_fields, 2_pond.
+# base:lily_pad" first (they stay: no block changes). Part 1's "crop at ...: block light L, guard G" lines: in the
+# torch field G is Some([..]) (a torch) and every one "left". The `/tk light` replies (plant cells, then the air above
+# them, then a cell beside a torch): raw packed light, sky in the low byte, block light in the three above it. Shots
+# 1_fields, 2_pond.
 loaded
 idle
 chat /tk mode creative
@@ -55,6 +57,10 @@ chat /tk light -4 70 533
 chat /tk light -5 70 535
 chat /tk light -8 70 532
 chat /tk light 6 70 545
+chat /tk light -4 71 533
+chat /tk light -5 71 535
+chat /tk light -3 71 531
+chat /tk light -2 70 531
 chat /tk spawn animals:white_tailed_deer 6 70 549
 chat /tk spawn animals:white_tailed_deer 7 70 549
 chat /tk spawn animals:white_tailed_deer 0 70 534

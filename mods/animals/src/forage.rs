@@ -42,6 +42,9 @@ static DUNG: Item = Item::named("base:dung");
 static DUNG_PAT: Block = Block::named("base:dung_pat");
 static TALL_GRASS: Block = Block::named("base:tall_grass");
 static PLANT_SOIL: Tag = Tag::named("plant_soil");
+/// What keeps raiders off a field (`needs::GUARD_REACH`): light where people are. Another mod adds its own (a
+/// scarecrow) with `r.tag("crop_guards", ...)`.
+static CROP_GUARDS: Tag = Tag::named("crop_guards");
 
 /// Blocks it looks round, and up and down.
 const LOOK: i32 = 8;
@@ -59,6 +62,7 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&FORAGE, [0.0; 4], 0);
     r.entity_component(&ITEM, 0u64, 0);
     r.entity_component(&PATCH, [0i32; 4], 0);
+    r.tag("crop_guards", &["base:torch", "base:campfire", "base:glowstone"]);
     for s in &SPECIES {
         r.edit(s.kind).attach(&FORAGE);
         r.edit(s.kind).attach(&ITEM);
@@ -268,17 +272,51 @@ fn nearest(w: &World, s: &Species, center: [i32; 3], r: i32, p: [i32; 3], ground
     best.or(ground).map(|(at, _)| at)
 }
 
-/// Whether a wild animal goes for the ripe crop at `at` today (`needs::raids`: its day's roll, and no torch near).
+/// Whether a wild animal goes for the ripe crop at `at` today (`needs::raids`: its day's roll, no guard near, not lit).
+/// Worked out once a plant every 30 seconds: a herd looks at the same field many times a second.
 fn raids(w: &World, at: [i32; 3]) -> bool {
-    // The brighter of the crop's own cell and the air above it: a plant's cell may hold less light than the air round
-    // it (cov_crops r1: deer ate 5 plants of a torch-lit field).
+    thread_local! {
+        static SEEN: std::cell::RefCell<(u64, std::collections::HashMap<[i32; 3], bool>)> = Default::default();
+    }
+    let now = w.day_time() / 600;
+    if let Some(yes) = SEEN.with_borrow(|(t, m)| if *t == now { m.get(&at).copied() } else { None }) {
+        return yes;
+    }
+    // The brighter of the crop's own cell and the air above it; and a guard block looked for, as the light at the
+    // plants read 0 beside torches (cov_crops r2).
     let light = w
         .block_light(at)
         .max(w.block_light([at[0], at[1] + 1, at[2]]));
+    let guard = guarded(w, at);
     let roll = raid_roll(w, at);
-    let yes = animals_core::needs::raids(light, roll);
-    weft_sdk::debug!("crop at {at:?}: block light {light}, roll {roll:.2}: {}", if yes { "raided" } else { "left" });
+    let yes = animals_core::needs::raids(light, guard.is_some(), roll);
+    weft_sdk::debug!("crop at {at:?}: block light {light}, guard {guard:?}, roll {roll:.2}: {}", if yes { "raided" } else { "left" });
+    SEEN.with_borrow_mut(|(t, m)| {
+        if *t != now || m.len() > 4096 {
+            m.clear();
+            *t = now;
+        }
+        m.insert(at, yes);
+    });
     yes
+}
+
+/// The nearest crop guard (`CROP_GUARDS`) within `needs::GUARD_REACH` of `at`, if any.
+fn guarded(w: &World, at: [i32; 3]) -> Option<[i32; 3]> {
+    let r = animals_core::needs::GUARD_REACH;
+    let mut best: Option<([i32; 3], i32)> = None;
+    for dy in -2..=2 {
+        for dz in -r..=r {
+            for dx in -r..=r {
+                let p = [at[0] + dx, at[1] + dy, at[2] + dz];
+                let d = dx.abs().max(dz.abs()) * 4 + dy.abs();
+                if best.is_none_or(|(_, b)| d < b) && CROP_GUARDS.on_block(w.block(p)) {
+                    best = Some((p, d));
+                }
+            }
+        }
+    }
+    best.map(|(p, _)| p)
 }
 
 /// Whether block state `state` is a crop where a player sowed it (`vitals::forage::PLANTED`).
