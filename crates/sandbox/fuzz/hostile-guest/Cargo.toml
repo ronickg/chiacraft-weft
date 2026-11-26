@@ -1,0 +1,18 @@
+[package]
+# The `hostile` fuzz target's mod: built for wasm32-unknown-unknown by fuzz_targets/hostile.rs.
+name = "sandbox_hostile_guest"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+chiacraft-mod-sdk = { path = "../../../mod-sdk" }
+
+[workspace]
+
+[profile.release]
+opt-level = "s"

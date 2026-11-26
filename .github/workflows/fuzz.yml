@@ -1,0 +1,60 @@
+# Fuzzes what takes data and code from strangers, five minutes a target, every week: data
+# packages (crates/packages/fuzz: the manifest, the signature, the definitions) and sandboxed mods
+# (crates/sandbox/fuzz: the component, its storage). A crash leaves its input as the
+# `fuzz-<target>` artifact; replay it with `cargo +nightly fuzz run <target> <file>` in that
+# crate.
+name: Fuzz
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+  # And when what it fuzzes changes.
+  pull_request:
+    paths: ["crates/packages/**", "crates/sandbox/**", ".github/workflows/fuzz.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { crate: packages, target: manifest }
+          - { crate: packages, target: signature }
+          - { crate: packages, target: defs }
+          - { crate: sandbox, target: component }
+          - { crate: sandbox, target: storage }
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: crates/${{ matrix.crate }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/${{ matrix.crate }}/fuzz
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+
+      # From a real component, which random bytes would take long to find.
+      - name: Seed corpus
+        if: matrix.target == 'component'
+        run: mkdir -p fuzz/corpus/component && cp ../../examples/packages/clans/code/server.wasm fuzz/corpus/component/
+
+      # The prebuilt cargo-fuzz is a musl binary and would build for musl, where the sanitizer
+      # cannot run.
+      - name: Fuzz ${{ matrix.target }}
+        run: cargo fuzz run --target x86_64-unknown-linux-gnu ${{ matrix.target }} -- -max_total_time=300
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: crates/${{ matrix.crate }}/fuzz/artifacts

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a raw steak: a glossy red cut of meat with a cream fat edge and marbling, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.577,
+   "outline": 0.82,
+   "red_line": 0.0,
+   "fill": 0.45,
+   "passed": true
+  }
+ ]
+}

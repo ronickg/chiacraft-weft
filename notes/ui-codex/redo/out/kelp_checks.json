@@ -1,0 +1,26 @@
+{
+ "kind": "item",
+ "what": "a strand of kelp: a wavy olive-green seaweed ribbon with small air bladders, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.526,
+   "outline": 0.97,
+   "red_line": 0.0,
+   "fill": 0.19,
+   "passed": false
+  },
+  {
+   "grid": 0.595,
+   "outline": 0.77,
+   "red_line": 0.0,
+   "fill": 0.19,
+   "passed": true
+  }
+ ]
+}

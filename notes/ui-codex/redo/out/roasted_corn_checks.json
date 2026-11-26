@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a roasted ear of maize: golden kernels with dark brown char spots, husk leaves peeled back, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.567,
+   "outline": 0.63,
+   "red_line": 0.02,
+   "fill": 0.42,
+   "passed": true
+  }
+ ]
+}

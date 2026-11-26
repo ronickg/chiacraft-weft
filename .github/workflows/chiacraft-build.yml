@@ -80,7 +80,9 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.build) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    # The dist profile builds several times slower than release (thin LTO, one codegen unit):
+    # the first Windows run took 41 minutes with release.
+    timeout-minutes: 300
     defaults:
       run:
         shell: bash
@@ -109,7 +111,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: release-${{ matrix.platform }}
+          key: dist-${{ matrix.platform }}
           cache-on-failure: true
 
       - name: System libraries (Linux)
@@ -131,9 +133,18 @@ jobs:
           echo "MOLTENVK_DYLIB=$RUNNER_TEMP/MoltenVK/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib" >> "$GITHUB_ENV"
           echo "MOLTENVK_LICENSE=$RUNNER_TEMP/MoltenVK/LICENSE" >> "$GITHUB_ENV"
 
-      # The workspace's default members: the game (crates/app) and every mod in mods/.
+      # The workspace's default members: the game (crates/app) and every mod in mods/, with the
+      # `dist` profile (Cargo.toml: release plus thin LTO and one codegen unit; far tiles 17 %
+      # faster on the PC), into target/dist.
+      # Players' copies carry no debug info. The profile inherits release's line tables (for the
+      # crew's backtraces), and on Linux they stay inside the libraries: 129 MB of the first
+      # Linux artifact against 43 (Windows, in .pdb files) and 48 (macOS, left in the object
+      # files). `debuginfo` keeps the symbol names, so a backtrace still names functions.
       - name: Build
-        run: cargo build --release
+        env:
+          CARGO_PROFILE_DIST_DEBUG: "0"
+          CARGO_PROFILE_DIST_STRIP: debuginfo
+        run: cargo build --profile dist
 
       - name: Package
         id: package

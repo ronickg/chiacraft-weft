@@ -16,6 +16,8 @@ pub enum BufferKind {
     Uniform,
     StorageRead,
     StorageWrite,
+    /// A top-level acceleration structure (`var x: acceleration_structure`), [`crate::Cmd::BindAccel`].
+    Accel,
 }
 
 #[derive(Debug)]
@@ -30,7 +32,23 @@ impl std::fmt::Display for ShaderError {
 impl Shader {
     /// `name` only shows up in error messages.
     pub fn from_wgsl(name: &str, source: &str) -> Result<Shader, ShaderError> {
-        let full = format!("{}\n{}", crate::PRELUDE, source);
+        // `enable` directives must come before any declaration, the prelude's included: a shader's
+        // own (`enable wgpu_ray_query;`) goes up front, its line left blank so lines still count.
+        let mut enables = String::new();
+        let source: String = source
+            .lines()
+            .map(|l| {
+                if l.trim_start().starts_with("enable ") && l.trim_end().ends_with(';') {
+                    enables.push_str(l.trim());
+                    enables.push(' ');
+                    ""
+                } else {
+                    l
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let full = format!("{enables}{}\n{}", crate::PRELUDE, source);
         let prelude_lines = crate::PRELUDE.lines().count() + 1;
         let module = naga::front::wgsl::parse_str(&full).map_err(|e| {
             let msg = e.emit_to_string(&full);
@@ -46,6 +64,11 @@ impl Shader {
             match var.space {
                 naga::AddressSpace::Immediate => {
                     push_constant_size = module.types[var.ty].inner.size(module.to_ctx());
+                }
+                naga::AddressSpace::Handle if matches!(module.types[var.ty].inner, naga::TypeInner::AccelerationStructure { .. }) => {
+                    if let Some(b) = var.binding.as_ref().filter(|b| b.group == 1) {
+                        buffers.push((b.binding, BufferKind::Accel));
+                    }
                 }
                 naga::AddressSpace::Uniform | naga::AddressSpace::Storage { .. } => {
                     let Some(b) = &var.binding else { continue };

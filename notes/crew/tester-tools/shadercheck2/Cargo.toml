@@ -1,0 +1,14 @@
+[package]
+name = "shadercheck2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+weft_engine = { path = "../../../../crates/engine" }
+weft_render = { path = "../../../../crates/render" }
+naga = { version = "30", features = ["spv-out"] }
+# SPIRV-Cross, as MoltenVK runs it: the game's Mac path is naga -> SPIR-V -> SPIRV-Cross -> Metal.
+spirv-cross2 = { version = "0.7", default-features = false, features = ["msl"] }
+
+# Its own workspace, so the game's workspace doesn't build it.
+[workspace]

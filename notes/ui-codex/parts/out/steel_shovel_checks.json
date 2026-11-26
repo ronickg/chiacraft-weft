@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a steel shovel: a rounded spade blade made of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.584,
+   "outline": 0.57,
+   "red_line": 0.1,
+   "fill": 0.26,
+   "passed": true
+  }
+ ]
+}

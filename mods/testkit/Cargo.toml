@@ -10,8 +10,9 @@ crate-type = ["cdylib"]
 [dependencies]
 weft_sdk.workspace = true
 base_api.workspace = true
+vitals.workspace = true
 png.workspace = true
 
-# Development tool: left out of `weft --dist`.
+# Development tool: left out of `weft dist`.
 [package.metadata.weft]
 dist = false

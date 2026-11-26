@@ -1,0 +1,34 @@
+# Day routines (reports/Creature AI.md; the crew's step 8): each species is about in its hours
+# (Species::active). Red deer and hares are about at dawn and dusk (twilight). Flat pad by a pond,
+# creative, still, mobs off; 12 red deer and 8 hares 6-18 blocks off, their water at 60%.
+# Read the ANIMAL_SENSES lines at noon and at dusk: "about" (their activity: about 0.35 at noon,
+# 1 at dusk) and "doing" (more rest at noon; at dusk they go to drink at 60% water, which at noon
+# they leave until 50%), and the census line (resting / drinking).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /air 0 0 0
+chat /tk fill ~-30 ~-1 ~-30 ~30 ~-1 ~30 base:grass
+chat /tk fill ~-30 ~ ~-30 ~30 ~3 ~30 core:air
+chat /tk fill ~-3 ~-1 ~-14 ~3 ~-1 ~-10 base:water
+wait 2
+chat /tk time 6000
+chat /tk ring animals:red_deer 12 6 18
+chat /tk ring animals:hare 8 6 14
+wait 3
+chat /animalprof water 0.6
+wait 40
+chat /animalprof senses
+look 0 -20
+wait 1
+shot routine_noon.png
+wait 1
+chat /tk time 12000
+chat /animalprof water 0.6
+wait 40
+chat /animalprof senses
+look 0 -20
+wait 1
+shot routine_dusk.png
+quit

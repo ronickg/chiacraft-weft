@@ -22,6 +22,8 @@ pub struct FileBox {
     pub uv: [[f32; 4]; 6],
     pub turn: [u8; 6],
     pub tilt: weft_abi::BoxTilt,
+    /// `shade: false`: no shading by side.
+    pub flat: bool,
 }
 
 impl FileBox {
@@ -34,12 +36,10 @@ impl FileBox {
             max: self.max.map(|v| v / 16.0),
             textures: std::array::from_fn(|i| texture(&self.textures[i], i)),
             uv: self.uv,
+            flat: self.flat,
         }
     }
 }
-
-/// A face the element leaves out.
-pub const NO_FACE: f32 = -2.0;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FileModel {
@@ -49,23 +49,59 @@ pub struct FileModel {
     pub cube: Option<[String; 6]>,
     /// `item/generated` or `item/handheld`: a flat item showing `layer0`.
     pub sprite: Option<String>,
+    /// Where it goes in the hand, if the model or a parent says.
+    pub display: Option<Display>,
 }
 
-/// Faces in the engine's order and their names in the files.
-const FACES: [&str; 6] = ["west", "east", "down", "up", "north", "south"];
+/// An item model's place in the hand, as Blockbench's Display tab writes it: degrees, pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Display {
+    pub rotation: [f32; 3],
+    pub translation: [f32; 3],
+    pub scale: [f32; 3],
+}
+
+fn read_display(root: &Value) -> Option<Display> {
+    let d = root.get("display")?.get("thirdperson_righthand")?;
+    let three = |key: &str, default: f32| -> [f32; 3] {
+        d.get(key)
+            .and_then(|v| v.as_array())
+            .map_or([default; 3], |a| {
+                std::array::from_fn(|i| {
+                    a.get(i)
+                        .and_then(|v| v.as_f64())
+                        .map_or(default, |v| v as f32)
+                })
+            })
+    };
+    Some(Display { rotation: three("rotation", 0.0), translation: three("translation", 0.0), scale: three("scale", 1.0) })
+}
+
+use weft_abi::FACE_NAMES as FACES;
 
 /// Reads the model `name` (`ns:block/lamp`) through `read` (file text by asset name), following
 /// parents. Errors name the file.
 pub fn load(name: &str, read: &dyn Fn(&str) -> Option<String>) -> Result<Option<FileModel>, String> {
+    load_with(name, read, &[])
+}
+
+/// `load` with `textures` (a `#name` and the texture there) over whatever the files say: one
+/// model for many blocks, each with its own pictures.
+pub fn load_with(name: &str, read: &dyn Fn(&str) -> Option<String>, own: &[(String, String)]) -> Result<Option<FileModel>, String> {
     let Some(src) = read(name) else { return Ok(None) };
-    let mut textures: FxHashMap<String, String> = FxHashMap::default();
+    let mut textures: FxHashMap<String, String> = own
+        .iter()
+        .map(|(k, v)| (k.trim_start_matches('#').to_string(), v.clone()))
+        .collect();
     let mut elements: Option<Vec<Value>> = None;
     let mut builtin: Option<String> = None;
+    let mut display = None;
     let (mut src, mut current) = (src, name.to_string());
     // Child first: its textures win, its elements replace the parent's.
     for _ in 0..16 {
         let root: Value = serde_json::from_str(&src).map_err(|e| format!("model {current}: {e}"))?;
         let ns = current.split_once(':').map_or("", |x| x.0).to_string();
+        display = display.or_else(|| read_display(&root));
         for (k, v) in root
             .get("textures")
             .and_then(Value::as_object)
@@ -111,7 +147,7 @@ pub fn load(name: &str, read: &dyn Fn(&str) -> Option<String>) -> Result<Option<
         }
         String::new()
     };
-    let mut out = FileModel::default();
+    let mut out = FileModel { display, ..FileModel::default() };
     if let Some(list) = elements {
         for (i, e) in list.iter().enumerate() {
             let v3 = |k: &str| -> Result<[f32; 3], String> {
@@ -127,9 +163,10 @@ pub fn load(name: &str, read: &dyn Fn(&str) -> Option<String>) -> Result<Option<
                 min: std::array::from_fn(|j| from[j].min(to[j])),
                 max: std::array::from_fn(|j| from[j].max(to[j])),
                 textures: Default::default(),
-                uv: [[NO_FACE, 0.0, 0.0, 0.0]; 6],
+                uv: [weft_abi::UV_NO_FACE; 6],
                 turn: [0; 6],
                 tilt: tilt(e),
+                flat: e.get("shade").and_then(Value::as_bool) == Some(false),
             };
             let faces = e.get("faces").and_then(Value::as_object);
             for (d, face) in FACES.iter().enumerate() {
@@ -144,7 +181,7 @@ pub fn load(name: &str, read: &dyn Fn(&str) -> Option<String>) -> Result<Option<
                     .filter(|a| a.len() == 4)
                 {
                     Some(a) => std::array::from_fn(|j| a[j].as_f64().unwrap_or(0.0) as f32),
-                    None => [-1.0; 4],
+                    None => weft_abi::UV_FROM_BOX,
                 };
                 // Files turn a picture clockwise, `ModelBox::turn` goes the other way round.
                 let quarters = f
@@ -218,7 +255,7 @@ mod tests {
         assert_eq!((b.turn[3], b.turn[4]), (3, 0));
         assert_eq!((b.tilt.origin, b.tilt.axis, b.tilt.degrees), ([8.0, 0.0, 8.0], [0.0, 1.0, 0.0], 22.5));
         assert_eq!((b.textures[4].as_str(), b.uv[4][0]), ("m:block/lamp_side", -1.0));
-        assert_eq!((b.textures[5].as_str(), b.uv[0][0]), ("", NO_FACE));
+        assert_eq!((b.textures[5].as_str(), b.uv[0]), ("", weft_abi::UV_NO_FACE));
         let log = load("m:block/log", &read).unwrap().unwrap();
         assert_eq!(log.cube.unwrap()[3], "m:block/log_top");
         assert_eq!(

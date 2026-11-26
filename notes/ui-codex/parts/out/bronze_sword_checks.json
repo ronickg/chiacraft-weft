@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a bronze sword: a straight cast warm orange-brown bronze blade with a soft golden sheen and a near-white edge highlight, a gold cross-guard, a grip wrapped in red-brown leather, a round gold pommel, lying diagonally, handle at the bottom left, point at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.599,
+   "outline": 0.64,
+   "red_line": 0.02,
+   "fill": 0.18,
+   "passed": true
+  }
+ ]
+}

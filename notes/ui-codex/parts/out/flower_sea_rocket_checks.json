@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "sea rocket: a low sprawling fleshy plant with lobed succulent leaves and small clusters of pale lilac four-petalled flowers, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.496,
+   "outline": 0.9,
+   "red_line": 0.0,
+   "fill": 0.16,
+   "passed": false
+  },
+  {
+   "grid": 0.221,
+   "outline": 0.95,
+   "red_line": 0.0,
+   "fill": 0.17,
+   "passed": false
+  },
+  {
+   "grid": 0.213,
+   "outline": 0.76,
+   "red_line": 0.0,
+   "fill": 0.18,
+   "passed": true
+  }
+ ]
+}

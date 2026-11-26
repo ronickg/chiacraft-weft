@@ -15,22 +15,40 @@ use super::codec;
 use super::{ClientConn, Conn, ServerConn, ToClient, ToServer};
 use crate::settings::Settings;
 
-const ALPN: &[u8] = b"weft/1";
+/// Joining a world (public for load-test clients, `crates/bots`).
+pub const ALPN: &[u8] = b"weft/1";
 /// A world's status, for lists of worlds (chiacraft): answered without joining.
 const STATUS_ALPN: &[u8] = b"chiacraft/status/1";
 /// Link requests and answers between owners' account endpoints (chiacraft, `links`).
 const LINKS_ALPN: &[u8] = b"chiacraft/links/1";
 /// A player's worlds, for their friends, and where their worlds moved, for anyone (`friends`).
 const WORLDS_ALPN: &[u8] = b"chiacraft/worlds/1";
+/// Ban lists a world holds, its own and the ones it follows, for anyone (`admission`).
+const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// 3: `Join` carries the account's vouching (chiacraft). 4: the hello offers the world's data
 /// packages, which the joining game downloads and loads before it is let in (chiacraft). 5: the
-/// hello may carry a travel ticket from a linked world's portal (chiacraft, `travel`).
-const PROTOCOL: u32 = 5;
-const MAX_FRAME: usize = 64 << 20;
+/// hello may carry a travel ticket from a linked world's portal (chiacraft, `travel`). 6: an offer
+/// says whether the package carries sandboxed code (chiacraft, phase 6). 7: a world refuses with a
+/// reason in the player's language (`ToClient::Refused`), and its status says what its admission
+/// rules ask (chiacraft, `admission`). 8: an offer says which mod API its code needs instead of
+/// only whether it has code (empty: no code; chiacraft, phase 6). 9: worlds send players their
+/// signed achievements (`ToClient::Achievement`; chiacraft, phase 4). 10: a world asks a joining
+/// game for an achievement its rules need (`AskAchievement`, `Proofs`; chiacraft, phase 4). 11: a
+/// world sends its issuer's revocation list (`ToClient::Revocations`; chiacraft, phase 4). 12: a
+/// time-of-day rate per dimension (`ToClient::Time`). 13: a moving structure leans
+/// (`ToClient::BodyLean`; chiacraft, falling trees). 14: Weft's 26.11.2 messages merged in (structs
+/// for positions, weather by id, cell parts, riding, camera modes; chiacraft's upstream sync).
+/// 25: Weft's protocol 24 merged in at the 11-22 sync (its clock, weather field, sites, skins,
+/// bodies; peers must agree on deterministic terrain and weather as well as the wire format),
+/// with ours on top (`ToClient::Clock`'s day rate, `ShapeField::scale`).
+pub const PROTOCOL: u32 = 25;
+pub const MAX_FRAME: usize = 64 << 20;
 
-/// A data package the host's world plays with: id, version, hash (hex), size in bytes, and its
-/// signature envelope (empty if unsigned).
-pub type Offer = (String, String, String, u64, String);
+/// A data package the host's world plays with: id, version, hash (hex), size in bytes, its
+/// signature envelope (empty if unsigned), and the mod API its sandboxed code
+/// (`code/server.wasm`, `code/client.wasm`) needs, as `1.1` (empty: no code). The joining game refuses an API it
+/// doesn't run before downloading, and checks there is code exactly when the manifest says so.
+pub type Offer = (String, String, String, u64, String, String);
 
 /// Requests on the extra streams a joining game opens to download packages.
 const GET_MANIFEST: u8 = 0;
@@ -40,8 +58,8 @@ const MAX_MANIFEST: u64 = 1 << 20;
 /// Limits on joining (chiacraft): the hello and the ready are small; a player has this long to
 /// download the world's packages and load them; the host serves this many players' downloads at
 /// once, this many requests of each at once.
-const MAX_HELLO: usize = 2 << 10;
-const MAX_OFFER: usize = 1 << 20;
+pub const MAX_HELLO: usize = 2 << 10;
+pub const MAX_OFFER: usize = 1 << 20;
 const CONFIGURE_TIME: Duration = Duration::from_secs(15 * 60);
 const MAX_CONFIGURING: usize = 8;
 const PEER_STREAMS: usize = 4;
@@ -163,9 +181,8 @@ fn mod_list() -> String {
         .join(", ")
 }
 
-fn relay_mode(settings: &Settings) -> RelayMode {
-    let custom: Vec<RelayUrl> = settings
-        .relays()
+fn relay_mode() -> RelayMode {
+    let custom: Vec<RelayUrl> = crate::settings::relays()
         .iter()
         .filter_map(|r| r.parse().ok())
         .collect();
@@ -185,7 +202,13 @@ enum Who {
 /// neither is needed alone; a hosted world publishes to both (its relay only, never its IPs).
 async fn endpoint(settings: &Settings, who: Who) -> Result<Endpoint, String> {
     use iroh_mainline_address_lookup::DhtAddressLookup;
-    let b = Endpoint::builder(presets::N0).relay_mode(relay_mode(settings));
+    let mut b = Endpoint::builder(presets::N0).relay_mode(relay_mode());
+    // The relay-only test (`core:net_relay_only`): no IP transport at all, so nothing goes direct
+    // and nothing direct is published; every path is the relay.
+    if crate::settings::net_relay_only() {
+        log::info!("net: relay only (core:net_relay_only): no direct paths");
+        b = b.clear_ip_transports();
+    }
     let b = match who {
         Who::Player => b
             .secret_key(identity(&settings.run_dir)?)
@@ -193,7 +216,7 @@ async fn endpoint(settings: &Settings, who: Who) -> Result<Endpoint, String> {
             .address_lookup(DhtAddressLookup::builder()),
         Who::World(key) => b
             .secret_key(*key)
-            .alpns(vec![ALPN.to_vec(), STATUS_ALPN.to_vec()])
+            .alpns(vec![ALPN.to_vec(), STATUS_ALPN.to_vec(), BANS_ALPN.to_vec()])
             .address_lookup(DhtAddressLookup::builder()),
         Who::Anonymous => b.secret_key(throwaway_key()),
     };
@@ -215,7 +238,7 @@ fn throwaway_key() -> iroh::SecretKey {
     iroh::SecretKey::from_bytes(&bytes)
 }
 
-async fn write_frame(send: &mut iroh::endpoint::SendStream, data: &[u8]) -> Result<(), String> {
+pub async fn write_frame(send: &mut iroh::endpoint::SendStream, data: &[u8]) -> Result<(), String> {
     let packed = if data.len() > 256 { lz4_flex::compress_prepend_size(data) } else { data.to_vec() };
     let flag = (data.len() > 256) as u32;
     let header = (packed.len() as u32) << 1 | flag;
@@ -231,7 +254,7 @@ async fn read_frame(recv: &mut iroh::endpoint::RecvStream) -> Result<Vec<u8>, St
 
 /// A frame of at most `max` bytes, unpacked: the size a packed frame claims is checked before
 /// anything is allocated for it (chiacraft: a few bytes could otherwise claim gigabytes).
-async fn read_frame_max(recv: &mut iroh::endpoint::RecvStream, max: usize) -> Result<Vec<u8>, String> {
+pub async fn read_frame_max(recv: &mut iroh::endpoint::RecvStream, max: usize) -> Result<Vec<u8>, String> {
     let mut h = [0u8; 4];
     recv.read_exact(&mut h).await.map_err(|e| e.to_string())?;
     let header = u32::from_le_bytes(h);
@@ -336,6 +359,29 @@ pub fn warmed(key: &str) -> Option<Status> {
         .get(key)
         .filter(|(_, t)| t.elapsed().as_secs() < 60)
         .map(|(s, _)| s.clone())
+}
+
+/// Asks the DID sponsor `sponsor` (its endpoint id) through the player's own endpoint: `request`
+/// as given, or its status when `None`. Blocks (call it from a thread of its own): the answer's
+/// status and body, or why nobody answered.
+pub fn ask_sponsor(
+    settings: &Settings,
+    sponsor: &str,
+    request: Option<&chiacraft_wallet::sponsor::Request>,
+) -> Result<(u16, String), String> {
+    let id: EndpointId = sponsor
+        .trim()
+        .parse()
+        .map_err(|_| format!("'{sponsor}' isn't a sponsor's address"))?;
+    let settings = settings.clone();
+    let request = request.cloned();
+    runtime().block_on(async move {
+        let ep = account(&settings).await?;
+        match &request {
+            Some(r) => chiacraft_sponsor::client::ask(&ep, id, r).await,
+            None => chiacraft_sponsor::client::status(&ep, id).await,
+        }
+    })
 }
 
 /// Opens the player's endpoint in the background: link requests can reach this game from now on.
@@ -496,6 +542,8 @@ pub static HOSTING: Mutex<Option<Hosting>> = Mutex::new(None);
 
 /// The hosting endpoint (chiacraft), closed when hosting stops.
 static HOST_ENDPOINT: Mutex<Option<Endpoint>> = Mutex::new(None);
+/// The settings the hosted world was opened with (its relays), for fetching its ban lists.
+static HOST_SETTINGS: Mutex<Option<Settings>> = Mutex::new(None);
 
 /// Starts accepting players for the running server. The ticket appears in `HOSTING` once the
 /// endpoint is online.
@@ -510,6 +558,8 @@ pub struct HostWorld {
     /// The owner's account endpoint (their inbox for link requests) and their identity's vouching
     /// for it; empty without an account.
     pub inbox: (String, String),
+    /// The world's folder: its admission rules (summed up in the status) and ban lists (served).
+    pub dir: Option<std::path::PathBuf>,
 }
 
 /// Starts hosting under the world's own key: its address appears in `HOSTING` once the endpoint
@@ -520,6 +570,7 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
         return;
     }
     *HOSTING.lock() = Some(Hosting { ticket: None, error: None });
+    *HOST_SETTINGS.lock() = Some(settings.clone());
     let settings = settings.clone();
     runtime().spawn(async move {
         let key = hw.identity.key();
@@ -547,6 +598,20 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
             h.ticket = Some(t);
         }
         let hw = std::sync::Arc::new(hw);
+        // The ban lists it follows: now, then daily while it is open; a list not fetched yet
+        // (its world offline, or not published yet) is asked for again every minute.
+        if let Some(dir) = hw.dir.clone() {
+            tokio::spawn(async move {
+                while HOSTING.lock().is_some() {
+                    fetch_lists(&dir).await;
+                    let d = dir.clone();
+                    let missing = tokio::task::spawn_blocking(move || crate::admission::lists_missing(&d))
+                        .await
+                        .unwrap_or(false);
+                    tokio::time::sleep(Duration::from_secs(if missing { 60 } else { 24 * 3600 })).await;
+                }
+            });
+        }
         while let Some(incoming) = ep.accept().await {
             let (connect, hw, key) = (connect.clone(), hw.clone(), key.clone());
             tokio::spawn(async move {
@@ -556,8 +621,13 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
                 };
                 if conn.alpn() == STATUS_ALPN {
                     serve_status(conn, world, &hw).await;
-                } else if let Err(e) = accept(conn, connect, world, &key).await {
-                    log::warn!("incoming player: {e}");
+                } else if conn.alpn() == BANS_ALPN {
+                    serve_bans(conn, hw.dir.clone()).await;
+                } else {
+                    watch_path(conn.clone(), "player in");
+                    if let Err(e) = accept(conn, connect, world, &key, hw.dir.clone()).await {
+                        log::warn!("incoming player: {e}");
+                    }
                 }
             });
         }
@@ -578,6 +648,12 @@ pub struct Status {
     pub package_bytes: u64,
     /// The owner's account endpoint, where link requests go: only if the owner vouches for it.
     pub inbox: String,
+    /// What its admission rules ask, as lang keys with a number (`admission::summary`); empty:
+    /// open to all, or a world from before protocol 6.
+    pub admission: Vec<(String, i64)>,
+    /// Its DID and the owner's DID it names (launcher ids, hex), as the world says: a visitor
+    /// checks both ways on chain (`world_did::check`).
+    pub did: Option<(String, String)>,
 }
 
 async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::content::Content, hw: &HostWorld) {
@@ -588,8 +664,23 @@ async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::c
         (PROTOCOL, hw.name.clone(), hw.identity.cert.text(), players, packages.len() as u32, packages.iter().map(|p| p.3).sum::<u64>()),
         hw.inbox.clone(),
     );
+    let admission = hw
+        .dir
+        .as_deref()
+        .map(|d| crate::admission::summary(&crate::admission::load_rules(d)))
+        .unwrap_or_default();
+    // Its DID and the owner's it names (phase 4), when it has one.
+    let did = hw
+        .dir
+        .as_deref()
+        .and_then(crate::chiacraft::worlds::world_did::load)
+        .map(|d| (d.launcher, d.owner))
+        .unwrap_or_default();
     let mut w = codec::W::default();
     codec::Wire::put(&answer, &mut w);
+    // After the rest, so a game from before protocol 6 still reads the start.
+    codec::Wire::put(&admission, &mut w);
+    codec::Wire::put(&did, &mut w);
     if write_frame(&mut send, &w.0).await.is_ok() {
         let _ = send.finish();
         // Wait for the asker to read it and close.
@@ -615,9 +706,17 @@ async fn status_on(ep: &Endpoint, addr: EndpointAddr, wait: Duration) -> Result<
         write_frame(&mut send, &[]).await?;
         let frame = read_frame_max(&mut recv, 8 << 10).await?;
         conn.close(0u32.into(), b"thanks");
+        let mut r = codec::R(&frame);
         let ((protocol, name, cert, players, packages, package_bytes), (inbox, vouch)) =
-            <((u32, String, String, u32, u32, u64), (String, String)) as codec::Wire>::get(&mut codec::R(&frame))
+            <((u32, String, String, u32, u32, u64), (String, String)) as codec::Wire>::get(&mut r)
                 .ok_or("a status this game can't read")?;
+        let mut admission = <Vec<(String, i64)> as codec::Wire>::get(&mut r).unwrap_or_default();
+        // Only keys this game knows, so a world can't make a list say anything.
+        admission.retain(|(k, _)| k.starts_with("admission.summary."));
+        admission.truncate(8);
+        let (did, owner_did) = <(String, String) as codec::Wire>::get(&mut r).unwrap_or_default();
+        let hex64 = |s: &str| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit());
+        let did = (hex64(&did) && hex64(&owner_did)).then_some((did, owner_did));
         // The certificate must be for the key that answered, and the inbox the owner's.
         let owner = crate::world_address::WorldCert::parse(&cert)
             .ok()
@@ -638,6 +737,8 @@ async fn status_on(ep: &Endpoint, addr: EndpointAddr, wait: Duration) -> Result<
             packages,
             package_bytes,
             inbox,
+            admission,
+            did,
         })
     })
     .await
@@ -662,6 +763,116 @@ pub fn ping(address: &str, settings: &Settings) -> crossbeam_channel::Receiver<R
     rx
 }
 
+/// Answers `chiacraft/bans/1`: the asker names a maintainer (identity hex), the world answers
+/// with the copy of their ban list it holds, or nothing. Lists are signed, so it serves any.
+async fn serve_bans(conn: iroh::endpoint::Connection, dir: Option<std::path::PathBuf>) {
+    let Ok(Ok((mut send, mut recv))) = tokio::time::timeout(Duration::from_secs(5), conn.accept_bi()).await else { return };
+    let Ok(Ok(asked)) = tokio::time::timeout(Duration::from_secs(5), read_frame_max(&mut recv, 256)).await else { return };
+    let maintainer = String::from_utf8_lossy(&asked).into_owned();
+    let list = match dir {
+        Some(d) => tokio::task::spawn_blocking(move || crate::admission::held_list(&d, &maintainer))
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_default(),
+        None => Vec::new(),
+    };
+    if write_frame(&mut send, &list).await.is_ok() {
+        let _ = send.finish();
+        let _ = tokio::time::timeout(Duration::from_secs(5), conn.closed()).await;
+    }
+}
+
+/// Asks the world at `address` for `maintainer`'s ban list.
+async fn ask_list(ep: &Endpoint, address: &str, maintainer: &str) -> Result<crate::admission::BanList, String> {
+    let addr = parse_ticket(address)?;
+    tokio::time::timeout(Duration::from_secs(15), async {
+        let conn = ep
+            .connect(addr, BANS_ALPN)
+            .await
+            .map_err(|e| e.to_string())?;
+        let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+        write_frame(&mut send, maintainer.as_bytes()).await?;
+        let frame = read_frame_max(&mut recv, crate::admission::MAX_LIST_BYTES).await?;
+        conn.close(0u32.into(), b"thanks");
+        if frame.is_empty() {
+            return Err("it holds no such list".to_string());
+        }
+        let list = crate::admission::BanList::parse(&frame)?;
+        if list.maintainer != maintainer {
+            return Err("it sent someone else's list".into());
+        }
+        Ok(list)
+    })
+    .await
+    .unwrap_or_else(|_| Err("no answer".into()))
+}
+
+/// Fetches the ban lists the world in `dir` follows from where each is served, keeping each
+/// newer version that its maintainer signed.
+async fn fetch_lists(dir: &std::path::Path) {
+    let rules = crate::admission::load_rules(dir);
+    if rules.lists.is_empty() {
+        return;
+    }
+    let Some(settings) = HOST_SETTINGS.lock().clone() else { return };
+    let Ok(ep) = endpoint(&settings, Who::Anonymous).await else { return };
+    for f in rules.lists.iter().take(crate::admission::MAX_LISTS) {
+        for from in f.from.iter().take(4) {
+            let Some(key) = crate::admission::world_key(from) else { continue };
+            // Whose list: the one named, else the owner of that world, as its certificate says.
+            let maintainer = if f.maintainer.is_empty() {
+                let Ok(addr) = parse_ticket(from) else { continue };
+                match status_on(&ep, addr, Duration::from_secs(10)).await {
+                    Ok(st) if !st.owner.is_empty() => {
+                        let (d, k, o) = (dir.to_path_buf(), key.clone(), st.owner.clone());
+                        if let Ok(Err(e)) = tokio::task::spawn_blocking(move || crate::admission::set_owner(&d, &k, &o)).await {
+                            log::warn!("{e}");
+                        }
+                        st.owner
+                    }
+                    Ok(_) => {
+                        log::info!(
+                            "ban list from {}: that world's certificate doesn't check out",
+                            key.chars().take(12).collect::<String>()
+                        );
+                        continue;
+                    }
+                    Err(e) => {
+                        log::info!("ban list from {}: {e}", key.chars().take(12).collect::<String>());
+                        continue;
+                    }
+                }
+            } else {
+                f.maintainer.clone()
+            };
+            match ask_list(&ep, from, &maintainer).await {
+                Ok(list) => {
+                    let (d, name, seq) = (dir.to_path_buf(), list.name.clone(), list.seq);
+                    match tokio::task::spawn_blocking(move || crate::admission::store_list(&d, &list)).await {
+                        Ok(Ok(true)) => log::info!("ban list '{name}' version {seq} fetched"),
+                        Ok(Ok(false)) => log::info!("ban list '{name}' is up to date (version {seq})"),
+                        Ok(Err(e)) => log::warn!("ban list '{name}': {e}"),
+                        Err(_) => {}
+                    }
+                    break;
+                }
+                Err(e) => log::info!(
+                    "ban list of {} from {}: {e}",
+                    maintainer.chars().take(12).collect::<String>(),
+                    key.chars().take(12).collect::<String>()
+                ),
+            }
+        }
+    }
+    ep.close().await;
+}
+
+/// [`fetch_lists`] in the background.
+pub fn fetch_ban_lists(dir: std::path::PathBuf) {
+    runtime().spawn(async move { fetch_lists(&dir).await });
+}
+
 pub fn stop_hosting() {
     *HOSTING.lock() = None;
     // Closing it ends its accept loop.
@@ -675,9 +886,21 @@ async fn accept(
     connect: crossbeam_channel::Sender<ServerConn>,
     world: &'static crate::content::Content,
     me: &str,
+    dir: Option<std::path::PathBuf>,
 ) -> Result<(), String> {
     use crate::content::with;
     let peer = conn.remote_id();
+    // Banned (chiacraft, `admission`): turned away at the door, before anything is served.
+    let banned = match dir {
+        Some(d) => {
+            let key = peer.to_string();
+            tokio::task::spawn_blocking(move || crate::admission::at_the_door(&d, &key))
+                .await
+                .ok()
+                .flatten()
+        }
+        None => None,
+    };
     let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi())
         .await
         .map_err(|_| "no hello")?
@@ -698,7 +921,10 @@ async fn accept(
     let offers = with(world, crate::modloader::current_packages);
     // Joins still configuring hold a place until this goes out of scope.
     let place = Configuring::take();
-    let refusal = if place.is_none() {
+    let refusal = if let Some(why) = &banned {
+        log::info!("{peer} is not let in at the door: {}", why.key);
+        crate::admission::refusal_text(why)
+    } else if place.is_none() {
         "the world is busy with other players joining; try again in a minute".to_string()
     } else if proto != PROTOCOL {
         format!("protocol mismatch: server {PROTOCOL}, client {proto}")
@@ -964,7 +1190,7 @@ async fn download(
         return Err(format!("the world wants {} packages, {} MiB: more than this game downloads", missing.len(), total >> 20));
     }
     let mut done = 0u64;
-    for (id, _, hex, size, sig) in missing {
+    for (id, _, hex, size, sig, code) in missing {
         let h = Hash::from_hex(hex).ok_or_else(|| format!("package {id}: a bad hash"))?;
         if *size > MAX_TOTAL_BYTES {
             return Err(format!("package {id} is too big ({size} bytes)"));
@@ -977,6 +1203,15 @@ async fn download(
             FileManifest::parse(std::str::from_utf8(&text).map_err(|e| e.to_string())?).map_err(|e| format!("package {id}: {e}"))?;
         if &manifest.id != id || manifest.files.iter().map(|f| f.size).sum::<u64>() != *size {
             return Err(format!("package {id}: the manifest doesn't match what the host offered"));
+        }
+        // The player was asked knowing whether it carries code: a host that hid it is refused.
+        if manifest
+            .files
+            .iter()
+            .any(|f| chiacraft_packages::identity::is_code(&f.path))
+            != !code.is_empty()
+        {
+            return Err(format!("package {id}: the host didn't say truly whether it carries code"));
         }
         for f in &manifest.files {
             if !store.has_blob(&f.hash) {
@@ -1028,6 +1263,67 @@ async fn pump_out<T: Send + crate::net::Message + 'static>(
     }
 }
 
+/// Logs which way a connection to another game goes (Ronald, 11-04: do joins really go over the
+/// network?), when it opens and whenever that changes, until it closes: `net: path to <id> relay`,
+/// `direct` or `mixed` (both open), and the kind of address in use (loopback, LAN, VPN, public, or
+/// the relay). `what`: a join, a portal arrival, or a player coming in (the host's side).
+fn watch_path(conn: iroh::endpoint::Connection, what: &'static str) {
+    runtime().spawn(async move {
+        let id = conn.remote_id().to_string();
+        let id = &id[..id.len().min(8)];
+        let mut last = String::new();
+        while conn.close_reason().is_none() {
+            let line = path_line(&conn);
+            if line != last {
+                log::info!("net: path to {id} {line} ({what})");
+                last = line;
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    });
+}
+
+/// `relay`, `direct` or `mixed`, and the address the connection sends on now with its kind.
+fn path_line(conn: &iroh::endpoint::Connection) -> String {
+    let (mut ip, mut relay, mut used) = (false, false, None);
+    for p in conn.paths().iter() {
+        ip |= p.is_ip();
+        relay |= p.is_relay();
+        if p.is_selected() {
+            used = Some(p.remote_addr().clone());
+        }
+    }
+    let way = match (ip, relay) {
+        (true, true) => "mixed",
+        (true, false) => "direct",
+        (false, true) => "relay",
+        (false, false) => "none",
+    };
+    match used {
+        Some(TransportAddr::Ip(a)) => format!("{way} {} {a}", ip_kind(a.ip())),
+        Some(TransportAddr::Relay(url)) => format!("{way} relay {url}"),
+        Some(other) => format!("{way} {other:?}"),
+        None => format!("{way} (no path in use yet)"),
+    }
+}
+
+/// Where an address is: this machine, the local network, a VPN or carrier NAT range (Tailscale's
+/// 100.64/10), or the internet.
+fn ip_kind(ip: std::net::IpAddr) -> &'static str {
+    use std::net::IpAddr;
+    match ip {
+        IpAddr::V4(v) if v.is_loopback() => "loopback",
+        IpAddr::V4(v) if v.is_private() || v.is_link_local() => "LAN",
+        IpAddr::V4(v) if v.octets()[0] == 100 && (64..128).contains(&v.octets()[1]) => "VPN",
+        IpAddr::V6(v) if v.is_loopback() => "loopback",
+        IpAddr::V6(v) if (v.segments()[0] & 0xfe00) == 0xfc00 || (v.segments()[0] & 0xffc0) == 0xfe80 => "LAN",
+        IpAddr::V6(v) if v.to_ipv4_mapped().is_some() => v
+            .to_ipv4_mapped()
+            .map_or("public", |v4| ip_kind(IpAddr::V4(v4))),
+        _ => "public",
+    }
+}
+
 /// Connects to `addr`: every address at once first; if the handshake does not finish soon, again
 /// from a new endpoint through the relay alone. With several network adapters (VPNs, virtual
 /// switches) the host may take the handshake's first packet from an address its answers never
@@ -1071,7 +1367,7 @@ fn check_offers(offers: &[Offer]) -> Result<(), String> {
     if offers.len() > MAX_OFFERS {
         return Err(format!("the world plays with {} packages: more than this game takes", offers.len()));
     }
-    for (id, version, hash, _, sig) in offers {
+    for (id, version, hash, _, sig, api) in offers {
         let fine = (1..=64).contains(&id.len())
             && id
                 .chars()
@@ -1084,6 +1380,15 @@ fn check_offers(offers: &[Offer]) -> Result<(), String> {
             && sig.len() <= 4096;
         if !fine {
             return Err("the host offered a package this game can't read".into());
+        }
+        // Code built for an API this game doesn't run would only fail once it loads.
+        match chiacraft_packages::code::parse(api) {
+            None => return Err("the host offered a package this game can't read".into()),
+            Some(Some(v)) if !chiacraft_packages::code::runs(v) => {
+                let (a, b) = chiacraft_packages::code::API;
+                return Err(format!("package {id} runs code for mod API {api}; this game runs {a}.{b}: a newer game can join"));
+            }
+            _ => {}
         }
     }
     Ok(())
@@ -1103,6 +1408,7 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
     runtime().spawn(async move {
         let result = async {
             let conn = connect(&settings, addr).await?;
+            watch_path(conn.clone(), if travel.is_empty() { "join" } else { "portal arrival" });
             let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
             let mut hello = codec::W::default();
             codec::Wire::put(&(PROTOCOL, native_hash(), travel.clone()), &mut hello);
@@ -1176,6 +1482,21 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
 
 #[cfg(test)]
 mod tests {
+
+    /// Which kind of network a joined game's address is on (`net: path to`).
+    #[test]
+    fn address_kinds() {
+        let kind = |a: &str| super::ip_kind(a.parse().unwrap());
+        assert_eq!(kind("127.0.0.1"), "loopback");
+        assert_eq!(kind("::1"), "loopback");
+        assert_eq!(kind("192.168.1.13"), "LAN");
+        assert_eq!(kind("10.0.0.5"), "LAN");
+        assert_eq!(kind("fe80::1"), "LAN");
+        assert_eq!(kind("100.127.39.114"), "VPN");
+        assert_eq!(kind("::ffff:192.168.1.13"), "LAN");
+        assert_eq!(kind("5.223.65.62"), "public");
+        assert_eq!(kind("2a01:4ff:f0:b1b3::1"), "public");
+    }
     /// The identity is the account's network key: made on the first call, the same afterwards.
     #[test]
     fn identity_is_the_accounts_network_key() {

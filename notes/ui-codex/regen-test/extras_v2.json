@@ -1,0 +1,38 @@
+[
+ {
+  "kind": "item",
+  "name": "n2_diamond",
+  "ref": "05,15",
+  "what": "a diamond gem: faceted diamond (#48aeba base, #468594/#3a5a62 teal shadow, #c6f9fb to white facet tips, #3a8490/#26555b teal outline), one white plus-shaped sparkle; centred, about 22 x 22 px"
+ },
+ {
+  "kind": "item",
+  "name": "n2_iron_ingot",
+  "ref": "04,15",
+  "what": "an iron ingot: warm silver bar (#c9c3be base, #8e8884 shadow, #5a5553 deepest, near-white #ece6e2 top bevel, #6a6461/#48423f outline), seen slightly from above; centred, about 24 x 16 px"
+ },
+ {
+  "kind": "item",
+  "name": "n2_coal",
+  "ref": "04,15",
+  "what": "a lump of coal: deep black-brown (#2a2420 base, #1a1512 shadow) with bright blue-grey glints (#8a95a0) on its facets, #4a403a outline; centred, about 22 x 20 px"
+ },
+ {
+  "kind": "item",
+  "name": "n2_wheat_seeds",
+  "ref": "22",
+  "what": "wheat seeds: a few plump golden-tan grains (#d9b45a base, #a5813a shadow, #f2dc96 highlight, #6b5224 outline), each with a light top-left; centred, about 20 x 18 px"
+ },
+ {
+  "kind": "block",
+  "name": "b2_grass_top",
+  "type": "grass block",
+  "what": "a grass block top: seamless leafy grass tufts filling the whole tile, drawn in light greyscale for biome tinting"
+ },
+ {
+  "kind": "block",
+  "name": "b2_grass_side",
+  "type": "grass block",
+  "what": "a grass block side: brown dirt clods (#3a2926 to #94724b) with a green grass fringe (#5e9a2c, #395123 shadow) hanging 4-8 px down from the top edge with irregular tips"
+ }
+]

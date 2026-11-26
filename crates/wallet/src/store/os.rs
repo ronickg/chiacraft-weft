@@ -7,7 +7,7 @@
 //! - Elsewhere: no keystore; [`OsStore::put`] fails and the caller falls back to the file store.
 //!
 //! Checks never reach this module: a game home given by `HORIZON_HOME` uses the file store unless
-//! `HORIZON_WALLET_STORE=os` says otherwise (`crate::accounts::StoreChoice`).
+//! `CHIACRAFT_WALLET_STORE=os` says otherwise (`crate::accounts::StoreChoice`).
 use super::{SecretStore, StoreKind};
 use crate::{Error, Result, secret::Secret};
 

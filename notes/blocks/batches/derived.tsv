@@ -1,0 +1,13 @@
+# Made in code by derive.py, not generated: install with blocks.py install batches/derived.tsv.
+d_0	base	farmland_worn_1|cube|derived	farmland_worn_2|cube|derived	farmland_worn_3|cube|derived	glass_red|cutout|derived
+d_1	base	glass_green|cutout|derived	glass_blue|cutout|derived	water_still|cutout|derived	lava_still|cutout|derived
+d_2	base	anchor|cutout|derived	anchor_on|cutout|derived	button|cutout|derived	comparator|cutout|derived
+d_3	base	comparator_on|cutout|derived	repeater|cutout|derived	repeater_on|cutout|derived	dispenser_front_vertical|cutout|derived
+d_4	base	observer_back_on|cutout|derived	piston_inner|cutout|derived	floater_back|cutout|derived	floater_front|cutout|derived
+d_5	base	floater_side|cutout|derived	floater_side_going|cutout|derived	floater_side_stuck|cutout|derived	lever|cutout|derived
+d_6	base	torch|cutout|derived	redstone_torch|cutout|derived	redstone_torch_off|cutout|derived	bed_foot_east|cutout|derived
+d_7	base	bed_foot_south|cutout|derived	bed_foot_west|cutout|derived	bed_head_east|cutout|derived	bed_head_north|cutout|derived
+d_8	base	bed_head_west|cutout|derived	bed_top_foot|cutout|derived	bed_top_foot_90|cutout|derived	bed_top_foot_180|cutout|derived
+d_9	base	bed_top_foot_270|cutout|derived	bed_top_head_0|cutout|derived	bed_top_head_90|cutout|derived	bed_top_head_180|cutout|derived
+d_10	base	bed_top_head_270|cutout|derived	redstone_dust_dot|cutout|derived	redstone_dust_line|cutout|derived
+d_gateway	animals	gateway|cutout|derived

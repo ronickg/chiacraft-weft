@@ -1,0 +1,96 @@
+# Creature-crowd bench (reports/Creature AI.md, part 3, step 0). Seed 1, spectator, standing still,
+# mobs off. A thousand animals resting (54-70 blocks out, past core:entity_activation_distance 48),
+# then 100, 250, 500 and 1000 active ones within 6-40 blocks, a 20 s bench at each; then the same
+# 1000 hungry and thirsty (foraging, drinking, hunting). Read per bench: the BENCH line's
+# 'server avg/max', 'mods per tick: animals' and 'entities N', and the ANIMAL_GOALS line after it
+# (the animals mod's per-goal timer, `/animalprof`). Mix: deer, reindeer, hares, mice, foxes,
+# wolves, ravens. Run as a bench (alone): t2q.py bench <id> <TREE> <this> --limit 420 -- --seed 1
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /tk mode spectator
+chat /tk time 6000
+wait 8
+chat /animalprof count
+chat /animalprof on
+bench 20 empty
+chat /animalprof dump
+# The resting thousand.
+chat /tk ring animals:red_deer 200 54 70
+chat /tk ring animals:reindeer 150 54 70
+chat /tk ring animals:hare 200 54 70
+chat /tk ring animals:wood_mouse 100 54 70
+chat /tk ring animals:red_fox 100 54 70
+chat /tk ring animals:grey_wolf 100 54 70
+chat /tk ring animals:raven 100 54 70
+chat /tk ring animals:white_tailed_deer 50 54 70
+wait 15
+chat /animalprof count
+chat /animalprof on
+bench 20 rest1000
+chat /animalprof dump
+# Active: 100.
+chat /tk ring animals:red_deer 20 6 40
+chat /tk ring animals:reindeer 15 6 40
+chat /tk ring animals:hare 20 6 40
+chat /tk ring animals:wood_mouse 10 6 40
+chat /tk ring animals:red_fox 10 6 40
+chat /tk ring animals:grey_wolf 10 6 40
+chat /tk ring animals:raven 10 6 40
+chat /tk ring animals:white_tailed_deer 5 6 40
+wait 15
+chat /animalprof count
+chat /animalprof on
+bench 20 active100
+chat /animalprof dump
+# Active: 250.
+chat /tk ring animals:red_deer 31 6 40
+chat /tk ring animals:reindeer 22 6 40
+chat /tk ring animals:hare 30 6 40
+chat /tk ring animals:wood_mouse 15 6 40
+chat /tk ring animals:red_fox 15 6 40
+chat /tk ring animals:grey_wolf 15 6 40
+chat /tk ring animals:raven 15 6 40
+chat /tk ring animals:white_tailed_deer 7 6 40
+wait 15
+chat /animalprof count
+chat /animalprof on
+bench 20 active250
+chat /animalprof dump
+# Active: 500.
+chat /tk ring animals:red_deer 51 6 40
+chat /tk ring animals:reindeer 37 6 40
+chat /tk ring animals:hare 50 6 40
+chat /tk ring animals:wood_mouse 25 6 40
+chat /tk ring animals:red_fox 25 6 40
+chat /tk ring animals:grey_wolf 25 6 40
+chat /tk ring animals:raven 25 6 40
+chat /tk ring animals:white_tailed_deer 12 6 40
+wait 15
+chat /animalprof count
+chat /animalprof on
+bench 20 active500
+chat /animalprof dump
+# Active: 1000.
+chat /tk ring animals:red_deer 100 6 40
+chat /tk ring animals:reindeer 75 6 40
+chat /tk ring animals:hare 100 6 40
+chat /tk ring animals:wood_mouse 50 6 40
+chat /tk ring animals:red_fox 50 6 40
+chat /tk ring animals:grey_wolf 50 6 40
+chat /tk ring animals:raven 50 6 40
+chat /tk ring animals:white_tailed_deer 25 6 40
+wait 15
+chat /animalprof count
+chat /animalprof on
+bench 20 active1000
+chat /animalprof dump
+# The same thousand hungry and thirsty.
+chat /animalprof starve
+wait 5
+chat /animalprof on
+bench 20 hungry1000
+chat /animalprof dump
+chat /animalprof count
+quit

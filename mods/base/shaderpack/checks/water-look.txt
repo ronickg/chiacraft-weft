@@ -1,0 +1,85 @@
+loaded
+idle
+chat /tk mode creative
+chat /weather clear
+chat /air 0 2 90 mist
+chat /gamemode spectator
+# The lake (the same views as water.txt): from above, then just over the water.
+chat /tp 30000 90 30000
+wait 8
+chat /tk fill ~-2 ~-1 ~-2 ~2 ~-1 ~2 stone
+chat /gamemode creative
+wait 1
+chat /time set 6000
+look 30 -12
+wait 4
+shot 01_lake_noon.png
+chat /time set 11300
+look 60 -8
+wait 3
+shot 02_lake_golden.png
+look 120 -8
+wait 2
+shot 03_lake_golden_side.png
+chat /gamemode spectator
+chat /tp 30000 66 30000
+wait 3
+chat /tk fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 stone
+chat /gamemode creative
+chat /time set 6000
+look 30 -3
+wait 3
+shot 04_low_noon.png
+chat /time set 11300
+look 60 -2
+wait 3
+shot 05_low_golden.png
+# A pool in the open sky: a stone box (sand on top) whose floor steps from 1 to 6 blocks deep along x, sand all
+# round for the shore. From the shallow end's beach, both ways along x (the sun goes along x).
+chat /gamemode spectator
+chat /tp 30098 108 30106
+wait 6
+chat /tk fill 30096 98 30097 30120 104 30114 stone
+chat /tk fill 30096 105 30097 30120 105 30114 sand
+chat /tk fill 30100 105 30100 30102 105 30111 water
+chat /tk fill 30103 104 30100 30105 105 30111 water
+chat /tk fill 30106 103 30100 30108 105 30111 water
+chat /tk fill 30109 102 30100 30111 105 30111 water
+chat /tk fill 30112 101 30100 30114 105 30111 water
+chat /tk fill 30115 100 30100 30117 105 30111 water
+chat /tp 30098 106 30106
+chat /gamemode creative
+wait 3
+chat /time set 6000
+look 90 -22
+wait 3
+shot 10_pool_noon_90.png
+look 270 -22
+wait 2
+shot 11_pool_noon_270.png
+look 90 -60
+wait 2
+shot 12_pool_noon_down_90.png
+look 270 -60
+wait 2
+shot 14_pool_noon_down_270.png
+look 270 -8
+wait 2
+shot 13_pool_noon_low_270.png
+chat /time set 11300
+look 90 -22
+wait 3
+shot 15_pool_golden_90.png
+look 270 -22
+wait 2
+shot 16_pool_golden_270.png
+look 90 -60
+wait 2
+shot 17_pool_golden_down_90.png
+look 270 -60
+wait 2
+shot 19_pool_golden_down_270.png
+look 270 -8
+wait 2
+shot 18_pool_golden_low_270.png
+quit

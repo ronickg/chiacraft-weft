@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a light undyed beige linen with a coarse weave shirt, front view, sleeves out a little, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.509,
+   "outline": 0.75,
+   "red_line": 0.0,
+   "fill": 0.45,
+   "passed": true
+  }
+ ]
+}

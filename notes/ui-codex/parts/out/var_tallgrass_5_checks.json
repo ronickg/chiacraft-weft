@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "two small low tufts side by side, 6-10 px tall, standing on the bottom edge; in the same style, colours and blade width as the attached tall grass from my game; centred, see-through around it",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.503,
+   "outline": 1.01,
+   "red_line": 0.0,
+   "fill": 0.07,
+   "passed": false
+  },
+  {
+   "grid": 0.369,
+   "outline": 1.01,
+   "red_line": 0.0,
+   "fill": 0.07,
+   "passed": false
+  },
+  {
+   "grid": 0.233,
+   "outline": 1.02,
+   "red_line": 0.0,
+   "fill": 0.06,
+   "passed": false
+  }
+ ]
+}

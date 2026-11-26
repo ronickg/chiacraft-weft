@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a steel axe: a broad wedge-shaped head of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle. The handle runs along the canvas diagonal from the bottom-left corner to the top-right; the axe head sits at the handle's top end and follows that diagonal: its cutting edge is a straight or gently curved line running perpendicular to the handle, from the upper left down to the lower right (along the canvas's other diagonal), never a vertical edge and never parallel to the canvas sides. Filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.612,
+   "outline": 0.79,
+   "red_line": 0.04,
+   "fill": 0.21,
+   "passed": true
+  }
+ ]
+}

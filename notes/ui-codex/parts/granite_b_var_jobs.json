@@ -1,0 +1,26 @@
+[
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "name": "var_granite_b_1",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/rock_granite_b_px.png",
+  "what": "warm-grey speckled granite slabs. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same SIZE of rounded slabs and flecks, the same crevice darkness, light and contrast; only the arrangement of the slabs differs, so this tile and the original side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "name": "var_granite_b_2",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/rock_granite_b_px.png",
+  "what": "warm-grey speckled granite slabs. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same SIZE of rounded slabs and flecks, the same crevice darkness, light and contrast; only the arrangement of the slabs differs, so this tile and the original side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "name": "var_granite_b_3",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/rock_granite_b_px.png",
+  "what": "warm-grey speckled granite slabs. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same SIZE of rounded slabs and flecks, the same crevice darkness, light and contrast; only the arrangement of the slabs differs, so this tile and the original side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ }
+]

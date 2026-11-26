@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a raw pacu: a deep-bodied round Amazon fish lying diagonally, silver-grey with an orange-red chest and belly",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.556,
+   "outline": 0.61,
+   "red_line": 0.0,
+   "fill": 0.42,
+   "passed": true
+  }
+ ]
+}

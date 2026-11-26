@@ -1,0 +1,58 @@
+[
+ {
+  "kind": "item",
+  "name": "hoeL_wood",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/hoeL_iron_1.png",
+  "diagonal": true,
+  "what": "a wood hoe: the blade of carved warm orange-brown wood with clear grain, crude and chunky, a plain wooden handle, the head lashed on with tan cord. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge"
+ },
+ {
+  "kind": "item",
+  "name": "hoeL_stone",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/hoeL_iron_1.png",
+  "diagonal": true,
+  "what": "a stone hoe: the blade of chunky chipped warm grey-tan stone with rough bumpy edges, no shine, a plain wooden handle, the head lashed on with tan cord. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge"
+ },
+ {
+  "kind": "item",
+  "name": "hoeL_flint",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/hoeL_iron_1.png",
+  "diagonal": true,
+  "what": "a flint hoe: the blade of crude knapped grey-brown flint with chipped faceted edges, a plain wooden handle, the head lashed on with tan sinew cord. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge"
+ },
+ {
+  "kind": "item",
+  "name": "hoeL_copper",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/hoeL_iron_1.png",
+  "diagonal": true,
+  "what": "a copper hoe: the blade of cast bright orange copper with a peach highlight, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge"
+ },
+ {
+  "kind": "item",
+  "name": "hoeL_bronze",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/hoeL_iron_1.png",
+  "diagonal": true,
+  "what": "a bronze hoe: the blade of cast warm orange-brown bronze with a golden sheen and a near-white edge highlight, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge"
+ },
+ {
+  "kind": "item",
+  "name": "hoeL_steel",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/hoeL_iron_1.png",
+  "diagonal": true,
+  "what": "a steel hoe: the blade of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge"
+ },
+ {
+  "kind": "item",
+  "name": "hoeL_gold",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/hoeL_iron_1.png",
+  "diagonal": true,
+  "what": "a gold hoe: the blade of shiny lemon-gold with orange-brown shadows and small white glints, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge"
+ },
+ {
+  "kind": "item",
+  "name": "hoeL_diamond",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/hoeL_iron_1.png",
+  "diagonal": true,
+  "what": "a diamond hoe: the blade of faceted cyan diamond with teal shadows and white facet tips, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge"
+ }
+]

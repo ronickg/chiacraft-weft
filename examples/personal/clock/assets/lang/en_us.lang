@@ -1,0 +1,3 @@
+clock.time = {0}:{1}
+clock.hidden = The clock is hidden (Personal Key 1 shows it).
+clock.shown = The clock shows.

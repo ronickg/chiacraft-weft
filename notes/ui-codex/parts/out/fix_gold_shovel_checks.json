@@ -1,0 +1,28 @@
+{
+ "kind": "item",
+ "what": "a gold shovel: a rounded, slightly pointed spade blade of shiny lemon-gold with orange-brown shadows and small white glints at the handle's top end, the blade lying along the same diagonal as the handle and its rounded tip pointing to the top-right, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.281,
+   "outline": 0.52,
+   "red_line": 0.01,
+   "fill": 0.2,
+   "vertical": 1,
+   "passed": false
+  },
+  {
+   "grid": 0.344,
+   "outline": 0.44,
+   "red_line": 0.08,
+   "fill": 0.17,
+   "vertical": 0,
+   "passed": true
+  }
+ ]
+}

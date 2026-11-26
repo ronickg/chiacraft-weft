@@ -1,0 +1,197 @@
+// chiacraft's mobs and players: the engine's model shader, lit and graded like the world.
+// Entity models: boxes and free-form triangles of every kind in two static tables; each entity
+// layer (skin or something worn) is one instance pointing at its bone matrices, posed on the CPU
+// (hierarchy, keyframes, vanilla's limb swing) and uploaded per frame.
+
+struct VOut {
+    @builtin(position) clip: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+    @location(1) color: vec3<f32>,
+    @location(2) @interpolate(flat) tex: u32,
+    @location(3) dist: f32,
+    @location(4) @interpolate(flat) shader: u32,
+    @location(5) @interpolate(flat) glow: u32,
+    @location(6) rel: vec3<f32>,
+    // 1 where the world lights it (not in a preview on a screen).
+    @location(7) @interpolate(flat) graded: u32,
+    // Sky light where it stands (0..1): fog gathers only out under the sky.
+    @location(8) @interpolate(flat) sky: f32,
+    // Its entity effect (`shaders/entity_effect/<name>.wgsl`, 0 none) and how strong (Weft 26.11.2:
+    // a hurt flash, a glow, ... are effects now).
+    @location(9) @interpolate(flat) effect: u32,
+    @location(10) @interpolate(flat) strength: f32,
+    // Temporal anti-aliasing: how far this vertex moved on the screen since last frame
+    // (`screen_motion`), z 1: its own (`motion_texel`).
+    @location(11) motion: vec3<f32>,
+}
+
+// A layer draws the parts of its roles, and the bones it names (Weft 26.11.2).
+fn drawn(inst: Instance, role: u32, bone: u32) -> bool {
+    return ((inst.roles >> role) & 1u) != 0u || (bone < 32u && ((inst.bone_mask >> bone) & 1u) != 0u);
+}
+
+var<private> NORMAL: array<vec3<f32>, 6> = array<vec3<f32>, 6>(
+    vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, -1.0), vec3(0.0, 0.0, 1.0),
+);
+
+// A direction turned by a bone (its rows without the move).
+fn turn(bone: u32, d: vec3<f32>) -> vec3<f32> {
+    let b = bones[bone];
+    return normalize(vec3(dot(b.rows[0].xyz, d), dot(b.rows[1].xyz, d), dot(b.rows[2].xyz, d)) + vec3(0.0, 1e-6, 0.0));
+}
+
+fn place(bone: u32, p: vec3<f32>) -> vec3<f32> {
+    let b = bones[bone];
+    let q = vec4(p, 1.0);
+    return vec3(dot(b.rows[0], q), dot(b.rows[1], q), dot(b.rows[2], q));
+}
+
+// Where `place` put it last frame, in this frame's camera-relative positions (`prev_bones`).
+fn place_prev(bone: u32, p: vec3<f32>) -> vec3<f32> {
+    let b = prev_bones[bone];
+    let q = vec4(p, 1.0);
+    return vec3(dot(b.rows[0], q), dot(b.rows[1], q), dot(b.rows[2], q));
+}
+
+// The models' color and motion (`motion_texel`).
+struct ModelOut {
+    @location(0) color: vec4<f32>,
+    @location(1) motion: vec4<f32>,
+}
+
+fn vertex(vi: u32, ii: u32) -> VOut {
+    let inst = instances[ii];
+    var out: VOut;
+    var world: vec3<f32>;
+    // Where it was last frame, for the motion image.
+    var was = vec3(0.0);
+    var shade: f32;
+    var normal = vec3(0.0, 1.0, 0.0);
+    let boxes = inst.cuboid_count * 36u;
+    if vi < boxes {
+        let cub = cuboids[inst.cuboids + vi / 36u];
+        if !drawn(inst, cub.role, cub.bone) {
+            out.clip = vec4(0.0, 0.0, 0.0, 1.0);
+            return out;
+        }
+        let face = (vi % 36u) / 6u;
+        let c = TRI[vi % 6u];
+        let grow = cub.inflate + inst.inflate;
+        let local = cub.origin - vec3(grow) + CORNERS[face * 4u + c] * (cub.size + vec3(2.0 * grow));
+        world = place(inst.bones + cub.bone, local);
+        if scene.taa.z > 0.5 && scene.taa_frame.y > 0.5 {
+            was = place_prev(inst.bones + cub.bone, local);
+        }
+        // Constant indices: SPIRV-Cross cannot copy a runtime-indexed array out of a storage buffer to Metal.
+        var r: vec4<f32>;
+        switch face {
+            case 0u: { r = cub.faces[0]; }
+            case 1u: { r = cub.faces[1]; }
+            case 2u: { r = cub.faces[2]; }
+            case 3u: { r = cub.faces[3]; }
+            case 4u: { r = cub.faces[4]; }
+            default: { r = cub.faces[5]; }
+        }
+        out.uv = (r.xy + UVS[c] * r.zw) / inst.tex_size;
+        shade = SHADE[face];
+        normal = turn(inst.bones + cub.bone, NORMAL[face]);
+    } else {
+        let k = vi - boxes;
+        let v = corners[inst.vertices + k];
+        if !drawn(inst, v.role, v.bone) {
+            out.clip = vec4(0.0, 0.0, 0.0, 1.0);
+            return out;
+        }
+        world = place(inst.bones + v.bone, v.pos);
+        if scene.taa.z > 0.5 && scene.taa_frame.y > 0.5 {
+            was = place_prev(inst.bones + v.bone, v.pos);
+        }
+        out.uv = v.uv / inst.tex_size;
+        // Face shading from the triangle's normal, like the world's free-form quads.
+        let t = inst.vertices + k - k % 3u;
+        let a = place(inst.bones + corners[t].bone, corners[t].pos);
+        let b = place(inst.bones + corners[t + 1u].bone, corners[t + 1u].pos);
+        let c2 = place(inst.bones + corners[t + 2u].bone, corners[t + 2u].pos);
+        let n = normalize(cross(b - a, c2 - a) + vec3(0.0, 1e-6, 0.0));
+        shade = n.x * n.x * 0.6 + n.z * n.z * 0.8 + n.y * n.y * select(0.5, 1.0, n.y > 0.0);
+        normal = n;
+    }
+    out.clip = scene.view_proj * vec4(world, 1.0);
+    if scene.taa.z > 0.5 && scene.taa_frame.y > 0.5 {
+        out.motion = vec3(screen_motion(out.clip, scene.taa_prev * vec4(was, 1.0), scene.taa.xy), 1.0);
+    }
+    out.dist = length(world);
+    out.rel = world;
+    out.tex = inst.tex;
+    var lit = vec3(1.0);
+    if inst.light != 0xffffffffu {
+        lit = lightmap(unpack_light(inst.light), scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
+    }
+    out.graded = select(0u, 1u, inst.light != 0xffffffffu);
+    out.sky = select(1.0, unpack_light(inst.light).x, inst.light != 0xffffffffu);
+    if inst.light != 0xffffffffu {
+        // The pack's light; no traced shadow here, the sky light stands in for it.
+        let l = unpack_light(inst.light);
+        let shadow = sun_on_body(world, normal, l.x);
+        out.color = pow(inst.color, vec3(2.2)) * light_on(normal, l, shadow, 1.0, world, world);
+    } else {
+        out.color = pow(inst.color * lit * shade, vec3(2.2));
+    }
+    out.shader = inst.shader;
+    out.glow = inst.glow;
+    out.effect = inst.effect;
+    out.strength = inst.strength;
+    return out;
+}
+
+@vertex
+fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
+    return vertex(vi, ii);
+}
+
+// The first person's arms (Weft 26.11.2's own hand): depth squeezed into the near half (reverse Z),
+// in front of the world but sorted within themselves.
+@vertex
+fn vs_hand(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
+    var out = vertex(vi, ii);
+    out.clip.z = (0.5 + 0.5 * out.clip.z / out.clip.w) * out.clip.w;
+    // It moves with the camera: it stays on the screen.
+    out.motion = vec3(0.0, 0.0, 1.0);
+    return out;
+}
+
+@fragment
+fn fs(in: VOut) -> ModelOut {
+    let albedo = textureSample(textures[in.tex], nearest_clamp, in.uv);
+    var light = in.color;
+    if in.glow != 0xffffffffu {
+        let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
+        light = max(light, vec3(pow(e, 2.2)));
+    }
+    let p = EntityPixel(in.uv, albedo, light, scene.params.w);
+    var c = entity_effect(in.effect, p, entity_shade(in.shader, p), in.strength);
+    if c.a < 0.5 {
+        discard;
+    }
+    // On a blood moon the monsters' eyes burn red: their glow masks' green channel (Art's
+    // `entity/<skin>_e.png`, red 0 so no glow on other nights), brighter in totality; deep red,
+    // which stays red through the night's curve (brighter, it clipped to orange).
+    if in.glow != 0xffffffffu && blood_moon() > 0.0 {
+        let g = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).g * blood_moon();
+        c = vec4(mix(c.rgb, vec3(1.15, 0.03, 0.01), g), c.a);
+    }
+    if in.graded != 0u {
+        return ModelOut(vec4(display(haze_lit(c.rgb, in.rel, in.sky)), SOLID_ALPHA), motion_texel(in.motion, in.clip.z));
+    }
+    let f = fog_amount(in.dist, scene.params.x, scene.params.y);
+    return ModelOut(vec4(mix(c.rgb, scene.fog_color.rgb, f), 1.0), motion_texel(in.motion, in.clip.z));
+}
+
+// The sun's shadow map (`sun_shadows`): only depth, without the model's see-through texels, so
+// mobs and the player's own body cast their shade, wings and whiskers as they are drawn.
+@fragment
+fn fs_shadow(in: VOut) {
+    if textureSampleLevel(textures[in.tex], nearest_clamp, in.uv, 0.0).a < 0.5 {
+        discard;
+    }
+}

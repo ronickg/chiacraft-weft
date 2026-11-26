@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "alpenrose: a small evergreen shrub with glossy dark leaves, rusty underneath, and clusters of deep pink trumpet flowers on top, 16-20 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.356,
+   "outline": 0.93,
+   "red_line": 0.04,
+   "fill": 0.29,
+   "passed": false
+  },
+  {
+   "grid": 0.467,
+   "outline": 0.99,
+   "red_line": 0.02,
+   "fill": 0.28,
+   "passed": false
+  },
+  {
+   "grid": 0.275,
+   "outline": 0.94,
+   "red_line": 0.04,
+   "fill": 0.24,
+   "passed": false
+  }
+ ]
+}

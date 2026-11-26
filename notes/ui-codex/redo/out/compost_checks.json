@@ -1,0 +1,26 @@
+{
+ "kind": "item",
+ "what": "a heap of compost: dark crumbly brown soil with bits of green leaf and straw, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.554,
+   "outline": 0.85,
+   "red_line": 0.46,
+   "fill": 0.4,
+   "passed": false
+  },
+  {
+   "grid": 0.565,
+   "outline": 0.81,
+   "red_line": 0.32,
+   "fill": 0.43,
+   "passed": true
+  }
+ ]
+}

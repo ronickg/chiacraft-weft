@@ -1,0 +1,26 @@
+{
+ "kind": "block",
+ "what": "globeflower: two or three stems with deeply lobed leaves, each topped by a round closed globe of glossy lemon-yellow petals, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.493,
+   "outline": 0.93,
+   "red_line": 0.0,
+   "fill": 0.17,
+   "passed": false
+  },
+  {
+   "grid": 0.455,
+   "outline": 0.79,
+   "red_line": 0.0,
+   "fill": 0.17,
+   "passed": true
+  }
+ ]
+}

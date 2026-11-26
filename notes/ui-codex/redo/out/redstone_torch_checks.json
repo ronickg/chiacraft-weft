@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a redstone torch, upright and centred: a short wooden handle with a small iron collar, a glowing round red crystal tip with a bright pink highlight",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.505,
+   "outline": 0.53,
+   "red_line": 0.09,
+   "fill": 0.22,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,6 @@
+# An example package with a sandboxed server half: code/server.wasm, built from examples/wasm/clans.
+format = "1.0"
+id = "clans"
+version = "0.1.0"
+name = "Clans"
+description = "Found a clan, invite players, see who is in it: the animals mod's tribes as a sandboxed mod."

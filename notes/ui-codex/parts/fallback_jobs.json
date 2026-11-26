@@ -1,0 +1,122 @@
+[
+ {
+  "kind": "item",
+  "name": "fb_part_felling_axe_head",
+  "what": "a felling axe head without its handle: a heavy broad wedge of bright warm-silver iron with a near-white bevel and a soft warm-grey outline, the blade flaring to a wide curved cutting edge, a flat poll on the other side and the empty eye hole for the handle between them, seen from the side, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_bearded_axe_head",
+  "what": "a bearded axe head without its handle: a narrow neck of bright warm-silver iron with a near-white bevel and a soft warm-grey outline whose blade drops into a long hooked beard, the empty eye hole for the handle at the back, seen from the side, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_pick_head",
+  "what": "a pickaxe head without its handle: a double crescent of bright warm-silver iron with a near-white bevel and a soft warm-grey outline curving down to two points, the empty eye hole in the middle, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_shovel_blade",
+  "what": "a shovel blade without its handle: a rounded, slightly pointed spade of bright warm-silver iron with a near-white bevel and a soft warm-grey outline with a short socket at its top for the handle, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_hoe_blade",
+  "what": "a hoe blade without its handle: a flat blade of bright warm-silver iron with a near-white bevel and a soft warm-grey outline turned down at a right angle from a short neck with an eye hole, an L shape, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_knife_blade",
+  "what": "a knife blade without its handle: a short single-edged blade of bright warm-silver iron with a near-white bevel and a soft warm-grey outline with a tang at its base, lying diagonally, point at the top right, centred with 3-5 px of padding, on its own",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_leaf_point",
+  "what": "a spearhead: a leaf-shaped point of bright warm-silver iron with a near-white bevel and a soft warm-grey outline with a hollow socket at its base, lying diagonally, point at the top right, centred with 3-5 px of padding, on its own",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_barbed_point",
+  "what": "a barbed spearhead: a narrow point of bright warm-silver iron with a near-white bevel and a soft warm-grey outline with two back-swept barbs and a hollow socket at its base, lying diagonally, point at the top right, centred with 3-5 px of padding, on its own",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_straight_blade",
+  "what": "a sword blade without its hilt: a straight double-edged blade of bright warm-silver iron with a near-white bevel and a soft warm-grey outline with a central fuller and a tang at its base, lying diagonally, point at the top right, centred with 3-5 px of padding, on its own",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_long_blade",
+  "what": "a long sword blade without its hilt: a long straight double-edged blade of bright warm-silver iron with a near-white bevel and a soft warm-grey outline, longer and narrower, with a tang, lying diagonally from corner to corner, centred with 3-5 px of padding, on its own",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_short_blade",
+  "what": "a short sword blade without its hilt: a short wide double-edged blade of bright warm-silver iron with a near-white bevel and a soft warm-grey outline with a tang, lying diagonally, point at the top right, centred with 3-5 px of padding, on its own",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_haft",
+  "what": "a wooden tool haft: a straight warm brown oak handle with clear grain, slightly thicker at one end, lying diagonally, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_long_haft",
+  "what": "a long wooden haft: a long straight warm brown oak pole with clear grain, lying diagonally from corner to corner, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_grip",
+  "what": "a sword grip: a short wooden core wrapped in red-brown leather with gold cross-bands, lying diagonally, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_shaft",
+  "what": "a spear shaft: a long thin straight ash-wood shaft, pale tan with fine grain, lying diagonally from corner to corner, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_lashing",
+  "what": "a coil of lashing: tan sinew cord wound into a small loose bundle with a loose end, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_bar_guard",
+  "what": "a sword cross-guard: a straight bar of gold with rounded ends and a slot in the middle for the blade, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_round_pommel",
+  "what": "a round sword pommel: a gold ball with a soft highlight and a small hole for the tang, centred with 3-5 px of padding, on its own",
+  "diagonal": false
+ },
+ {
+  "kind": "item",
+  "name": "fb_knife",
+  "what": "a knife: a short single-edged blade of bright warm-silver iron with a near-white bevel and a soft warm-grey outline on a wooden handle wrapped in red-brown leather with a small gold guard, lying diagonally, handle at the bottom left, tip at the top right, filling about two thirds of the canvas",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fb_spear",
+  "what": "a spear: a leaf-shaped spearhead of bright warm-silver iron with a near-white bevel and a soft warm-grey outline on a long thin ash-wood shaft with a leather grip in the middle, lying diagonally, handle at the bottom left, tip at the top right, corner to corner",
+  "diagonal": true
+ }
+]

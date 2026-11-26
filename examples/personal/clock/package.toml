@@ -1,0 +1,9 @@
+# An example personal mod: a client half only, the player's own. Put this folder into
+# <run dir>/personal/clock/ ; it runs in worlds whose owner allows personal mods
+# (the world rule Personal Mods, `/rule personal_mods 1`). code/client.wasm is built from
+# examples/wasm/clock.
+format = "1.0"
+id = "clock"
+version = "0.1.0"
+name = "Clock"
+description = "The time of day in the top left; Personal Key 1 hides it."

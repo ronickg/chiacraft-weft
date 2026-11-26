@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "acuri palm nuts: two oval hard brown nuts with fibrous husk remains and a pointed tip, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.558,
+   "outline": 0.85,
+   "red_line": 0.07,
+   "fill": 0.35,
+   "passed": true
+  }
+ ]
+}

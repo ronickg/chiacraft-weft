@@ -1,0 +1,57 @@
+[package]
+name = "chiacraft-sponsor"
+version = "0.1.0"
+edition.workspace = true
+license = "MIT"
+rust-version.workspace = true
+publish = false
+description = "chiacraft's DID sponsor: launches DIDs to new players' addresses, paid by the sponsor's own wallet, with a daily budget; served over iroh (and the client the game asks it with)"
+
+[dependencies]
+# The client (always built, light): the request the identity key signs and the answer's reading
+# are the wallet's `sponsor` module (no `chain`); iroh carries them.
+chiacraft-wallet = { path = "../wallet" }
+iroh.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
+# The service (feature `service`): keys, coin selection, the eve-DID spend and the chain reader
+# (the wallet's `chain`), its config file, its log.
+serde = { version = "1", features = ["derive"], optional = true }
+toml = { version = "1", optional = true }
+log = { workspace = true, optional = true }
+sha2 = { version = "0.10", optional = true }
+
+[features]
+default = []
+# The sponsor itself and its binary. The game needs only the client and never builds this.
+service = ["chiacraft-wallet/chain", "dep:serde", "dep:toml", "dep:log", "dep:sha2", "tokio/signal"]
+
+[[bin]]
+name = "chiacraft-sponsor"
+path = "src/main.rs"
+required-features = ["service"]
+
+[[test]]
+name = "sponsor_sim"
+required-features = ["service"]
+
+[[test]]
+name = "world_sim"
+required-features = ["service"]
+
+[[test]]
+name = "mainnet_sim"
+required-features = ["service"]
+
+[[test]]
+name = "no_secret_leaks"
+required-features = ["service"]
+
+[dev-dependencies]
+# chia-sdk-test's peer simulator: the tests' chain (never a real network).
+chiacraft-wallet = { path = "../wallet", features = ["sim"] }
+# Spending a sponsored DID as its owner, and failing to as the sponsor.
+chia-sdk-driver = "0.37.1"
+chia-sdk-types = "0.37.1"
+chia-protocol = "0.52.1"
+chia-puzzle-types = "0.52.1"

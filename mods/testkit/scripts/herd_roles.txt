@@ -1,0 +1,44 @@
+# Herds and packs with roles (reports/Creature AI.md; the crew's step 6). Flat pad, creative, still
+# air, mobs off. Read:
+# 1. ANIMAL_SENSES after 12 s: six red deer in a herd 20 blocks north show their kin, and one of
+#    them is the herd's " sentinel" (it stands with its head up, turning to look round).
+# 2. A starving pack of three grey wolves 20 blocks beyond the herd: the first deer to notice
+#    "calls the alarm: N of its kind near run too", and the herd runs together.
+# 3. A lone grey wolf 7 blocks from a lone red deer (160 kg, past roles::STANDS_KG): the deer
+#    "stands its ground against ... (a lone hunter)" and "charges" if it comes close.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /tk time 6000
+chat /air 0 0 0
+chat /tk fill ~-40 ~-1 ~-50 ~40 ~-1 ~40 base:grass
+chat /tk fill ~-40 ~ ~-50 ~40 ~3 ~40 core:air
+wait 2
+chat /tk spawn animals:red_deer ~0 ~ ~-20
+chat /tk spawn animals:red_deer ~2 ~ ~-21
+chat /tk spawn animals:red_deer ~-2 ~ ~-19
+chat /tk spawn animals:red_deer ~1 ~ ~-23
+chat /tk spawn animals:red_deer ~-1 ~ ~-17
+chat /tk spawn animals:red_deer ~3 ~ ~-18
+wait 12
+chat /animalprof senses
+look 0 -10
+wait 1
+shot herd_watch.png
+wait 1
+chat /tk spawn animals:red_deer ~-30 ~ ~25
+chat /tk spawn animals:grey_wolf ~-30 ~ ~32
+chat /tk spawn animals:grey_wolf ~0 ~ ~-42
+chat /tk spawn animals:grey_wolf ~2 ~ ~-43
+chat /tk spawn animals:grey_wolf ~-2 ~ ~-41
+wait 1
+chat /animalprof starve
+wait 15
+look 0 -10
+wait 1
+shot herd_run.png
+wait 1
+chat /animalprof senses
+wait 10
+quit

@@ -1,0 +1,115 @@
+[
+ {
+  "kind": "model_block",
+  "name": "chest",
+  "type": "chest",
+  "size": "32x32",
+  "what": "only the closed front face of a wooden chest, filling the canvas: dark walnut planks in a riveted grey-green iron frame with corner brackets, the lid (the top third) and the base meeting at a seam, a small iron lock plate centred on the seam",
+  "tile": true
+ },
+ {
+  "kind": "model_block",
+  "name": "sign",
+  "type": "sign",
+  "size": "32x32",
+  "what": "a standing wooden sign: a pale parchment board with a 2-px warm wooden frame and a plain centre for text, on a short wooden post down to the bottom edge"
+ },
+ {
+  "kind": "model_block",
+  "name": "bell",
+  "type": "bell",
+  "size": "32x32",
+  "what": "a gold bell with a strong vertical highlight down the centre and a darker rim, hanging from a short dark wooden beam across the top"
+ },
+ {
+  "kind": "monster",
+  "name": "zombie",
+  "type": "undead",
+  "size": "32x48",
+  "what": "a zombie, side view facing right: sickly green-grey skin, a torn brown leather jerkin and ragged grey trousers, dark sunken eye sockets with tiny glowing green eyes, arms held forward, shambling"
+ },
+ {
+  "kind": "monster",
+  "name": "spider",
+  "type": "creature",
+  "size": "48x32",
+  "what": "a big cave spider, side view facing right: a dark brown-black body (never pure black, the darkest shade of its own brown) with fine bristles, four visible legs a side bent at the knee, a cluster of small glowing red eyes"
+ },
+ {
+  "kind": "monster",
+  "name": "adventurer",
+  "type": "villager or trader",
+  "size": "32x48",
+  "what": "the player, an adventurer, side view facing right: a warm green tunic with a leather belt and pouch, brown trousers and boots, a short travelling cape, a pickaxe in hand, warm skin, an expressive face"
+ },
+ {
+  "kind": "ui",
+  "name": "button",
+  "type": "button set",
+  "size": "48x32",
+  "what": "an orange main button with the text OK, its four states in a 2 x 2 grid (normal top left, hover top right, pressed bottom left, disabled bottom right), each button 22 x 14 pixels with magenta between them"
+ },
+ {
+  "kind": "ui",
+  "name": "cold_tile",
+  "type": "status-effect tile",
+  "size": "32x32",
+  "what": "a 24 x 24 square status tile centred on the canvas: a bronze frame, a dark centre holding one bright pale-blue snowflake, for the cold debuff"
+ },
+ {
+  "kind": "ui",
+  "name": "heart",
+  "type": "hud icon",
+  "size": "16x16",
+  "what": "a 16 x 16 HUD heart icon, full state only, one clear heart shape in red with a darker red edge and a single pink highlight pixel at the upper left"
+ },
+ {
+  "kind": "ui",
+  "name": "health_bar",
+  "type": "bar",
+  "size": "48x32",
+  "what": "a health bar 44 px wide shown three times stacked with magenta between them (full, half and nearly empty): dark track, 1-px bronze rim, red fill with a lighter top line"
+ },
+ {
+  "kind": "effect",
+  "name": "smoke",
+  "type": "particle animation",
+  "size": "48x32",
+  "what": "six frames of a grey smoke puff, each 16 x 16, in a 3 x 2 grid read left to right then top to bottom, shrinking from a big soft puff in frame 1 to a single dot in frame 6, drawn in light greys only so the game can tint it"
+ },
+ {
+  "kind": "effect",
+  "name": "flame",
+  "type": "particle",
+  "size": "16x16",
+  "what": "a single flame particle, 16 x 16, one bold teardrop flame with a near-white yellow core, an orange middle and a dark orange rim"
+ },
+ {
+  "kind": "effect",
+  "name": "speed_icon",
+  "type": "status effect icon",
+  "size": "16x16",
+  "what": "a status effect icon for speed: a small winged leather boot, light blue wing, in the item style with a soft outline in its own darker colors, readable on a dark tile"
+ },
+ {
+  "kind": "sky",
+  "name": "sun",
+  "type": "sun",
+  "size": "64x64",
+  "what": "a 32-px pixel sun disc centred on the 64 x 64 canvas: a near-white core, a yellow-orange middle, and a ring of short blocky orange rays around it (the glow drawn as stepped pixel bands, no smooth gradient)"
+ },
+ {
+  "kind": "sky",
+  "name": "moon",
+  "type": "moon phases",
+  "size": "64x64",
+  "what": "four moon phases in a 2 x 2 grid, each 32 x 32 with the disc 24 px across: full (top left), waning gibbous (top right), third quarter (bottom left), waning crescent (bottom right); a pale blue-white disc with soft grey craters, the same disc and position in every phase, the shadow side near-black navy"
+ },
+ {
+  "kind": "sky",
+  "name": "clouds",
+  "type": "clouds",
+  "size": "64x64",
+  "what": "a cloud layer seen from below for a blocky world: three or four big flat blocky cloud shapes made of square steps, white tops with a light grey underside, no outline, magenta gaps between them"
+ }
+]

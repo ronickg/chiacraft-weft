@@ -1,0 +1,34 @@
+[
+ {
+  "kind": "block",
+  "type": "log side / log top",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "name": "log_sequoia_top_2",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/log_oak_top.png",
+  "what": "the cut end of a giant sequoia log, laid out like the attached log top: CLEARLY VISIBLE concentric growth rings, drawn as many thin DARK lines (#6a2c18), each one 1 px wide with 1-2 px of lighter wood between them, forming nested rounded squares round the centre, at least 8 rings; the wood between the rings warm red-brown (#a85434 to #d8925e), the centre a darker red-brown pith; a 3 px band of thick fibrous dark red-brown bark (#5e2a18) round all four edges. Every cell filled, no border, light from the top left, flat face-on view of one block face."
+ },
+ {
+  "kind": "block",
+  "type": "log side / log top",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "name": "var_log_sequoia_1",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/log_sequoia_px.png",
+  "what": "giant sequoia bark. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same width of fibrous ridges and the same deep vertical furrows, the same light and contrast; only where the furrows and ridges fall differs, so this tile and the original side by side don't look like a repeat. Tileable top to bottom and left to right, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "log side / log top",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "name": "var_log_sequoia_2",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/log_sequoia_px.png",
+  "what": "giant sequoia bark. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same width of fibrous ridges and the same deep vertical furrows, the same light and contrast; only where the furrows and ridges fall differs, so this tile and the original side by side don't look like a repeat. Tileable top to bottom and left to right, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "log side / log top",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "name": "var_log_sequoia_3",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/log_sequoia_px.png",
+  "what": "giant sequoia bark. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same width of fibrous ridges and the same deep vertical furrows, the same light and contrast; only where the furrows and ridges fall differs, so this tile and the original side by side don't look like a repeat. Tileable top to bottom and left to right, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ }
+]

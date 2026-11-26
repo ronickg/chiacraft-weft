@@ -1,0 +1,19 @@
+{
+ "kind": "ui",
+ "what": "a 16 x 16 HUD heart icon, full state only, one clear heart shape in red with a darker red edge and a single pink highlight pixel at the upper left",
+ "size": [
+  16,
+  16
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.54,
+   "outline": 0.58,
+   "red_line": 0.0,
+   "fill": 0.53,
+   "passed": true
+  }
+ ]
+}

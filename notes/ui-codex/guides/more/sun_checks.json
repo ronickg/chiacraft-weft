@@ -1,0 +1,19 @@
+{
+ "kind": "sky",
+ "what": "a 32-px pixel sun disc centred on the 64 x 64 canvas: a near-white core, a yellow-orange middle, and a ring of short blocky orange rays around it (the glow drawn as stepped pixel bands, no smooth gradient)",
+ "size": [
+  64,
+  64
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.18,
+   "outline": 0.93,
+   "red_line": 0.0,
+   "fill": 0.34,
+   "passed": true
+  }
+ ]
+}

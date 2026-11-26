@@ -1,0 +1,50 @@
+[
+ {
+  "kind": "item",
+  "name": "crowberries",
+  "what": "a small cluster of six glossy jet-black crowberries, each round berry big enough to see on its own with a blue-grey bloom and a white glint, on a sprig of short needle-like green leaves, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "beans",
+  "what": "a handful of five dry kidney beans, clearly bean-shaped and glossy: speckled cream-and-pink-brown ones and two plain dark red ones, each with a small pale eye, a soft shadow under them, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "barley",
+  "what": "a bundle of ripe barley lying diagonally: three full golden ears with long dark-tipped bristly awns, tied with a cord, strong contrast between the golden grains and their darker outline",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "rye",
+  "what": "a bundle of ripe rye lying diagonally: three long slender grey-gold ears with fine bristly awns, tied with a cord, the grains clearly drawn with a light top and a darker outline, never washed out",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "melon_seeds",
+  "what": "a few big flat oval melon seeds, glossy dark brown with a paler rim and a white glint, five seeds spread a little apart on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "diamond_hoe",
+  "what": "a diamond hoe: a long plain leather-wrapped handle; across its top end one flat faceted cyan diamond, shaped like the stone one, blade shaped like a garden hoe, about 10 px wide and 4-5 px tall, flat and plain, set at a right angle to the handle so the blade points down-left; the blade clearly bigger than the handle is thick, but no block-shaped hammer head, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ }
+]

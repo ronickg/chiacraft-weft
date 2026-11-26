@@ -1,0 +1,144 @@
+# Server tick profile, busy world (11-04, lag hunt): 120 animals of 12 species in a ring 12-40
+# blocks around the player, and a 17x17 wheat field. Run with `--seed 1 --log net=debug` on a
+# fresh world while the CPU sampler records the REC windows (tools/profile/README.md): standing
+# still 30 s (animals' AI, vitals, growth, sends) and walking 30 s (plus terrain loading).
+loaded
+idle
+chat /tk mode creative
+chat /tk time 6000
+chat /weather clear
+# Wheat on farmland, east of the player.
+chat /tk fill ~4 ~-1 ~-20 ~20 ~-1 ~-4 base:farmland
+chat /tk fill ~4 ~ ~-20 ~20 ~2 ~-4 core:air
+chat /tk fill ~4 ~ ~-20 ~20 ~ ~-4 base:wheat
+chat /tk spawn animals:red_deer ~14 ~2 ~0
+chat /tk spawn animals:white_tailed_deer ~-11 ~2 ~10
+chat /tk spawn animals:hare ~1 ~2 ~-16
+chat /tk spawn animals:red_fox ~10 ~2 ~13
+chat /tk spawn animals:grey_wolf ~-17 ~2 ~-3
+chat /tk spawn animals:capybara ~15 ~2 ~-10
+chat /tk spawn animals:wood_mouse ~-5 ~2 ~18
+chat /tk spawn animals:reindeer ~-9 ~2 ~-17
+chat /tk spawn animals:cat ~18 ~2 ~7
+chat /tk spawn animals:jaguar ~-18 ~2 ~8
+chat /tk spawn animals:raptor ~9 ~2 ~-18
+chat /tk spawn animals:psittacosaurus ~6 ~2 ~20
+chat /tk spawn animals:red_deer ~-18 ~2 ~-11
+chat /tk spawn animals:white_tailed_deer ~21 ~2 ~-5
+chat /tk spawn animals:hare ~-12 ~2 ~18
+chat /tk spawn animals:red_fox ~-3 ~2 ~-22
+chat /tk spawn animals:grey_wolf ~17 ~2 ~14
+chat /tk spawn animals:capybara ~-23 ~2 ~1
+chat /tk spawn animals:wood_mouse ~16 ~2 ~-16
+chat /tk spawn animals:reindeer ~-1 ~2 ~23
+chat /tk spawn animals:cat ~-15 ~2 ~-18
+chat /tk spawn animals:jaguar ~24 ~2 ~3
+chat /tk spawn animals:raptor ~-20 ~2 ~14
+chat /tk spawn animals:psittacosaurus ~5 ~2 ~-24
+chat /tk spawn animals:red_deer ~12 ~2 ~21
+chat /tk spawn animals:white_tailed_deer ~-24 ~2 ~-8
+chat /tk spawn animals:hare ~23 ~2 ~-11
+chat /tk spawn animals:red_fox ~-10 ~2 ~23
+chat /tk spawn animals:grey_wolf ~-9 ~2 ~-24
+chat /tk spawn animals:capybara ~23 ~2 ~12
+chat /tk spawn animals:wood_mouse ~-25 ~2 ~7
+chat /tk spawn animals:reindeer ~14 ~2 ~-22
+chat /tk spawn animals:cat ~5 ~2 ~26
+chat /tk spawn animals:jaguar ~-21 ~2 ~-16
+chat /tk spawn animals:raptor ~27 ~2 ~-2
+chat /tk spawn animals:psittacosaurus ~-18 ~2 ~20
+chat /tk spawn animals:red_deer ~0 ~2 ~-27
+chat /tk spawn animals:white_tailed_deer ~19 ~2 ~20
+chat /tk spawn animals:hare ~-28 ~2 ~-3
+chat /tk spawn animals:red_fox ~22 ~2 ~-17
+chat /tk spawn animals:grey_wolf ~-5 ~2 ~28
+chat /tk spawn animals:capybara ~-15 ~2 ~-24
+chat /tk spawn animals:wood_mouse ~28 ~2 ~8
+chat /tk spawn animals:reindeer ~-26 ~2 ~13
+chat /tk spawn animals:cat ~10 ~2 ~-27
+chat /tk spawn animals:jaguar ~11 ~2 ~27
+chat /tk spawn animals:raptor ~-27 ~2 ~-13
+chat /tk spawn animals:psittacosaurus ~28 ~2 ~-9
+chat /tk spawn animals:red_deer ~-15 ~2 ~26
+chat /tk spawn animals:white_tailed_deer ~-6 ~2 ~-29
+chat /tk spawn animals:hare ~25 ~2 ~17
+chat /tk spawn animals:red_fox ~-30 ~2 ~4
+chat /tk spawn animals:grey_wolf ~20 ~2 ~-23
+chat /tk spawn animals:capybara ~1 ~2 ~31
+chat /tk spawn animals:wood_mouse ~-22 ~2 ~-22
+chat /tk spawn animals:reindeer ~31 ~2 ~2
+chat /tk spawn animals:cat ~-24 ~2 ~20
+chat /tk spawn animals:jaguar ~4 ~2 ~-31
+chat /tk spawn animals:raptor ~18 ~2 ~26
+chat /tk spawn animals:psittacosaurus ~-31 ~2 ~-7
+chat /tk spawn animals:red_deer ~28 ~2 ~-16
+chat /tk spawn animals:white_tailed_deer ~-10 ~2 ~30
+chat /tk spawn animals:hare ~-13 ~2 ~-29
+chat /tk spawn animals:red_fox ~30 ~2 ~13
+chat /tk spawn animals:grey_wolf ~-31 ~2 ~11
+chat /tk spawn animals:capybara ~15 ~2 ~-29
+chat /tk spawn animals:wood_mouse ~8 ~2 ~32
+chat /tk spawn animals:reindeer ~-28 ~2 ~-18
+chat /tk spawn animals:cat ~33 ~2 ~-5
+chat /tk spawn animals:jaguar ~-21 ~2 ~26
+chat /tk spawn animals:raptor ~-3 ~2 ~-33
+chat /tk spawn animals:psittacosaurus ~25 ~2 ~23
+chat /tk spawn animals:red_deer ~-34 ~2 ~0
+chat /tk spawn animals:white_tailed_deer ~25 ~2 ~-23
+chat /tk spawn animals:hare ~-3 ~2 ~34
+chat /tk spawn animals:red_fox ~-21 ~2 ~-27
+chat /tk spawn animals:grey_wolf ~34 ~2 ~6
+chat /tk spawn animals:capybara ~-29 ~2 ~18
+chat /tk spawn animals:wood_mouse ~9 ~2 ~-33
+chat /tk spawn animals:reindeer ~16 ~2 ~31
+chat /tk spawn animals:cat ~-33 ~2 ~-12
+chat /tk spawn animals:jaguar ~33 ~2 ~-13
+chat /tk spawn animals:raptor ~-15 ~2 ~32
+chat /tk spawn animals:psittacosaurus ~-10 ~2 ~-34
+chat /tk spawn animals:red_deer ~31 ~2 ~18
+chat /tk spawn animals:white_tailed_deer ~-35 ~2 ~7
+chat /tk spawn animals:hare ~21 ~2 ~-29
+chat /tk spawn animals:red_fox ~4 ~2 ~36
+chat /tk spawn animals:grey_wolf ~-27 ~2 ~-23
+chat /tk spawn animals:capybara ~36 ~2 ~-1
+chat /tk spawn animals:wood_mouse ~-26 ~2 ~25
+chat /tk spawn animals:reindeer ~2 ~2 ~-36
+chat /tk spawn animals:cat ~23 ~2 ~28
+chat /tk spawn animals:jaguar ~-36 ~2 ~-5
+chat /tk spawn animals:raptor ~30 ~2 ~-21
+chat /tk spawn animals:psittacosaurus ~-8 ~2 ~36
+chat /tk spawn animals:red_deer ~-18 ~2 ~-32
+chat /tk spawn animals:white_tailed_deer ~35 ~2 ~12
+chat /tk spawn animals:hare ~-34 ~2 ~15
+chat /tk spawn animals:red_fox ~15 ~2 ~-34
+chat /tk spawn animals:grey_wolf ~12 ~2 ~36
+chat /tk spawn animals:capybara ~-33 ~2 ~-18
+chat /tk spawn animals:wood_mouse ~37 ~2 ~-9
+chat /tk spawn animals:reindeer ~-21 ~2 ~32
+chat /tk spawn animals:cat ~-6 ~2 ~-38
+chat /tk spawn animals:jaguar ~30 ~2 ~24
+chat /tk spawn animals:raptor ~-38 ~2 ~3
+chat /tk spawn animals:psittacosaurus ~26 ~2 ~-28
+chat /tk spawn animals:red_deer ~-1 ~2 ~39
+chat /tk spawn animals:white_tailed_deer ~-26 ~2 ~-29
+chat /tk spawn animals:hare ~39 ~2 ~4
+chat /tk spawn animals:red_fox ~-31 ~2 ~23
+chat /tk spawn animals:grey_wolf ~7 ~2 ~-38
+chat /tk spawn animals:capybara ~21 ~2 ~33
+chat /tk spawn animals:wood_mouse ~-38 ~2 ~-11
+chat /tk spawn animals:reindeer ~35 ~2 ~-18
+chat /tk spawn animals:cat ~-14 ~2 ~37
+chat /tk spawn animals:jaguar ~-15 ~2 ~-37
+chat /tk spawn animals:raptor ~36 ~2 ~17
+chat /tk spawn animals:psittacosaurus ~-38 ~2 ~11
+wait 20
+chat /tk near ~ ~ ~ 48
+rec stand start
+bench 30 stand
+rec stand end
+rec walk start
+hold core:forward 30
+bench 30 walk
+rec walk end
+chat /tk near ~ ~ ~ 48
+quit

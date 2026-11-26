@@ -1,0 +1,20 @@
+# Phase 4, slices 4-7 on testnet11: the visitor's side. Starts with alice.txt, any time after.
+await_file did-mark-ready 1500
+join did-ticket.txt      # refused: the world asks for a DID and bob has none
+wait 10
+shot did-bob-1-refused.png
+screen core:account
+tap_once core:account id:get_did
+wait 240
+shot did-bob-2-account.png
+join did-ticket.txt      # his DID is checked on chain at the join: he gets in
+loaded
+chat /tk mode creative
+wait 5
+shot did-bob-3-in.png
+leave
+screen core:multiplayer  # alice's world in the saved list: its DID, confirmed by her DID
+wait 60
+shot did-bob-4-saved.png
+mark did-mark-bob-done
+quit

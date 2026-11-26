@@ -9,12 +9,14 @@ use crate::app::{Ctx, Request};
 use crate::client::modui;
 use crate::content::content;
 use crate::input::Key;
-use crate::screens::{BuildCx, Screen, button, label};
+use crate::screens::{BuildCx, Screen, back_button, button, label};
 use crate::ui::text::{self, Span};
 use crate::ui::{Kind, Style, Ui};
 
 pub struct MenuScreen {
     pub kind: u32,
+    /// The status effects (effect, level) its list was built with.
+    effects: Vec<(u32, u32)>,
     /// Creative inventory filter and open tab.
     search: Rc<RefCell<String>>,
     tab: Rc<std::cell::Cell<usize>>,
@@ -22,7 +24,7 @@ pub struct MenuScreen {
 
 impl MenuScreen {
     pub fn new(kind: u32) -> MenuScreen {
-        MenuScreen { kind, search: Default::default(), tab: Default::default() }
+        MenuScreen { kind, effects: Vec::new(), search: Default::default(), tab: Default::default() }
     }
 }
 
@@ -53,25 +55,33 @@ fn creative_panel(ui: &mut Ui, cx: &BuildCx, search: &Rc<RefCell<String>>, tab: 
             })
             .collect()
     };
+    let grid_w = 9.0 * 18.0 + crate::ui::Scrollbar::ROOM;
+    let tabs_per_row = ((grid_w + 1.0) / 21.0) as usize;
     ui.panel("panel", Style::default().pad(7.0).gap(4.0), |ui| {
-        ui.container(Style::row().gap(1.0), |ui| {
-            for (i, t) in c.creative_tabs.iter().enumerate() {
-                let tab = tab.clone();
-                let b = ui.button(
-                    "button",
-                    Style::default().size(20.0, 20.0),
-                    Rc::new(move |ctx: &mut Ctx| {
-                        tab.set(i);
-                        ctx.requests.push(Request::Rebuild);
-                    }),
-                    |ui| {
-                        ui.add(Kind::Custom { tag: modui::TAG_ICON, data: t.icon as u64 }, Style::default().size(16.0, 16.0));
-                    },
-                );
-                if let Kind::Button { selected, .. } = &mut ui.nodes[b].kind {
-                    *selected = i == open && filter.is_empty();
-                }
-                ui.nodes[b].tooltip = Some(tab_title(cx, &t.name));
+        ui.container(Style::default().w(grid_w).gap(1.0), |ui| {
+            for (row_index, row) in c.creative_tabs.chunks(tabs_per_row).enumerate() {
+                ui.container(Style::row().gap(1.0), |ui| {
+                    for (column, t) in row.iter().enumerate() {
+                        let i = row_index * tabs_per_row + column;
+                        let tab = tab.clone();
+                        let b = ui.button(
+                            "button",
+                            Style::default().size(20.0, 20.0).center(),
+                            Rc::new(move |ctx: &mut Ctx| {
+                                tab.set(i);
+                                ctx.requests.push(Request::Rebuild);
+                            }),
+                            |ui| {
+                                ui.add(Kind::Custom { tag: modui::TAG_ICON, data: t.icon as u64 }, Style::default().size(16.0, 16.0));
+                            },
+                        );
+                        if let Kind::Button { selected, .. } = &mut ui.nodes[b].kind {
+                            *selected = i == open && filter.is_empty();
+                        }
+                        ui.nodes[b].tooltip = Some(tab_title(cx, &t.name));
+                        ui.set_id(b, &format!("creative_tab:{}", t.name));
+                    }
+                });
             }
         });
         if let Some(t) = c.creative_tabs.get(open).filter(|_| filter.is_empty()) {
@@ -83,6 +93,7 @@ fn creative_panel(ui: &mut Ui, cx: &BuildCx, search: &Rc<RefCell<String>>, tab: 
                 value: search.borrow().clone(),
                 caret: search.borrow().chars().count(),
                 max: 32,
+                area: None,
                 on_change: Some(Rc::new(move |ctx: &mut Ctx, v: &str| {
                     *s.borrow_mut() = v.to_string();
                     ctx.requests.push(Request::Rebuild);
@@ -91,7 +102,7 @@ fn creative_panel(ui: &mut Ui, cx: &BuildCx, search: &Rc<RefCell<String>>, tab: 
             Style::default().h(14.0).w(162.0),
         );
         ui.set_id(input, "creative_search");
-        let grid = ui.container(Style::default().w(162.0).h(18.0 * 8.0).scroll(), |ui| {
+        let grid = ui.container(Style::default().h(18.0 * 8.0).scroll(), |ui| {
             for row in items.chunks(9) {
                 ui.container(Style::row(), |ui| {
                     for &i in row {
@@ -104,9 +115,104 @@ fn creative_panel(ui: &mut Ui, cx: &BuildCx, search: &Rc<RefCell<String>>, tab: 
     });
 }
 
+/// The place name shared by every menu screen.
+pub const MENUS: &str = "core:menus";
+
+const RECIPES: &str = "core:recipes";
+
+/// Whether mods add anything to these places (screen, area).
+fn has_parts(places: &[(&str, &str)]) -> bool {
+    let c = content();
+    places.iter().any(|(s, a)| {
+        c.game
+            .screen_parts
+            .iter()
+            .any(|p| p.screen == *s && p.area == *a)
+    })
+}
+
+fn side_parts(ui: &mut Ui, cx: &BuildCx, places: &[(&str, &str)]) {
+    if has_parts(places) {
+        ui.container(Style::default().gap(4.0), |ui| {
+            for &(screen, area) in places {
+                crate::screens::parts(ui, cx, screen, area);
+            }
+        });
+    }
+}
+
+/// The status effects shown and their levels.
+fn effects_now(client: &crate::client::Client) -> Vec<(u32, u32)> {
+    crate::hud::shown_effects(client)
+        .iter()
+        .map(|f| (f.0, f.1))
+        .collect()
+}
+
+/// The player's status effects beside its inventory: icons with the time left under them, four
+/// a column, the name and level in a tooltip.
+fn effects_panel(ui: &mut Ui, cx: &BuildCx) {
+    let Some(client) = cx.client else { return };
+    let all = crate::hud::shown_effects(client);
+    if all.is_empty() {
+        return;
+    }
+    ui.panel(
+        "panel",
+        Style::row()
+            .pad(4.0)
+            .gap(3.0)
+            .align(crate::ui::Align::Start),
+        |ui| {
+            for column in all.chunks(4) {
+                ui.container(Style::default().gap(3.0), |ui| {
+                    for &(effect, level, _) in column {
+                        let name = crate::hud::effect_name(cx.lang, effect, level);
+                        let cell = ui.container(Style::default().gap(1.0).align(crate::ui::Align::Center), |ui| {
+                            let icon = crate::hud::effect_icon(ui, effect);
+                            ui.nodes[icon].tooltip = Some(name.clone());
+                            // Counted down as it shows, without building the screen again.
+                            ui.text_bound(
+                                "label",
+                                Box::new(move |c: &Ctx| {
+                                    let left = c
+                                        .client
+                                        .as_deref()
+                                        .and_then(|cl| {
+                                            crate::hud::shown_effects(cl)
+                                                .into_iter()
+                                                .find(|f| f.0 == effect)
+                                        })
+                                        .map_or(0, |f| f.2);
+                                    ("effect.time".into(), vec![crate::hud::effect_time(left)])
+                                }),
+                            );
+                        });
+                        ui.nodes[cell].tooltip = Some(name);
+                    }
+                });
+            }
+        },
+    );
+}
+
 impl Screen for MenuScreen {
     fn name(&self) -> &str {
         "core:menu"
+    }
+
+    /// Built again when an effect comes, goes or changes level while it is open.
+    fn pointer(&mut self, _cursor: glam::Vec2, _ui: &mut Ui, ctx: &mut Ctx, _hud: &mut crate::hud::Hud) -> bool {
+        let c = content();
+        let shows = c.game.player_menu == Some(self.kind)
+            && !ctx
+                .client
+                .as_deref()
+                .is_some_and(|cl| cl.mode.has(crate::tag_bits::game_mode::CREATIVE_INVENTORY));
+        if shows && ctx.client.as_deref().map_or(Vec::new(), effects_now) != self.effects {
+            ctx.requests.push(Request::Rebuild);
+        }
+        false
     }
 
     fn shows_menu(&self) -> bool {
@@ -118,17 +224,46 @@ impl Screen for MenuScreen {
         ui.root_style(Style::default().stretch());
         let creative = cx
             .client
-            .is_some_and(|cl| cl.mode == crate::world::GameMode::Creative)
+            .is_some_and(|cl| cl.mode.has(crate::tag_bits::game_mode::CREATIVE_INVENTORY))
             && c.game.player_menu == Some(self.kind);
         ui.panel("overlay", Style::default().grow().center(), |ui| {
             ui.container(Style::row().gap(4.0).align(crate::ui::Align::Start), |ui| {
                 if creative {
                     creative_panel(ui, cx, &self.search, &self.tab);
+                } else if c.game.player_menu == Some(self.kind) {
+                    self.effects = cx.client.map_or(Vec::new(), effects_now);
+                    effects_panel(ui, cx);
                 }
                 if let Some(def) = c.game.menus.get(self.kind as usize) {
-                    if let Some(cb) = def.screen {
+                    side_parts(ui, cx, &[(def.name.as_str(), "left"), (MENUS, "left")]);
+                    if let Some((by, cb)) = def.screen {
                         let first = ui.nodes.len();
-                        modui::build(ui, cx.lang, Some(cx.input), def.owner, cb, cx.client);
+                        modui::build(ui, cx.lang, Some(cx.input), by, cb, cx.client);
+                        // What mods add in the top right corner inside the menu's panel: this
+                        // menu's place, then every menu's, then the X closing it.
+                        let corner = [(def.name.as_str(), "corner"), (MENUS, "corner")];
+                        if first < ui.nodes.len() {
+                            ui.open_existing(first);
+                            // In from the corner by the look's `corner` (`panel.gui`, GUI pixels):
+                            // style 1's icons sat on the frame's corner plate (Planner 11-24).
+                            let inset = cx
+                                .look
+                                .sidecar("panel", "corner")
+                                .and_then(|v| v.trim().parse::<f32>().ok())
+                                .unwrap_or(0.0);
+                            ui.container(
+                                Style::row()
+                                    .gap(1.0)
+                                    .at_from([1.0, 0.0], -inset, inset, [1.0, 0.0]),
+                                |ui| {
+                                    for (screen, area) in corner {
+                                        crate::client::modui::parts(ui, cx.lang, Some(cx.input), cx.client, screen, area);
+                                    }
+                                    crate::screens::close_button(ui, 8.0);
+                                },
+                            );
+                            ui.close();
+                        }
                         // The arrows of a menu that makes recipes open them.
                         if !def.recipes.is_empty() {
                             let tip = cx.t("recipes.show", &[]);
@@ -139,6 +274,7 @@ impl Screen for MenuScreen {
                             }
                         }
                     }
+                    side_parts(ui, cx, &[(def.name.as_str(), "side"), (MENUS, "side")]);
                 }
             });
         });
@@ -160,40 +296,37 @@ impl Screen for Death {
         true
     }
 
-    /// Built from node descriptors like a mod's screen, so a replacement can match it.
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
-        use crate::ui::desc;
-        use weft_abi as abi;
-        desc::build(ui, cx, |d| {
-            let panel = abi::UiNode {
-                class: abi::Str::new("death"),
-                grow: 1.0,
-                align: abi::ui_align::CENTER,
-                justify: abi::ui_justify::CENTER,
-                gap: 12.0,
-                ..desc::node(abi::ui_kind::PANEL)
-            };
-            d.open(&panel, |d| {
-                d.title("death.title");
-                d.button("death.respawn", &[], 200.0, false, |r| r.handle(vec![Request::Respawn]));
-                d.button("menu.save_quit", &[], 200.0, false, |r| r.handle(vec![Request::LeaveWorld]));
-            });
+        use crate::screens::{button, title};
+        ui.root_style(Style::default().stretch());
+        ui.panel("death", Style::default().grow().center().gap(12.0), |ui| {
+            title(ui, cx, "death.title");
+            button(ui, cx, "death.respawn", &[], 200.0, |c| c.requests.push(Request::Respawn));
+            button(ui, cx, "menu.save_quit", &[], 200.0, |c| c.requests.push(Request::LeaveWorld));
         });
     }
 }
 
 /// The chat's messages: the last 20 in the open chat, otherwise the last 10 of those under ten
 /// seconds old (the HUD).
-pub fn chat_lines(ui: &mut Ui, client: &crate::client::Client, lang: &crate::ui::lang::Lang, input: &crate::input::Input, open: bool) {
+/// `room`: the height free for it over the game (`Hud::chat_room`), which its lines keep to.
+pub fn chat_lines(
+    ui: &mut Ui,
+    client: &crate::client::Client,
+    lang: &crate::ui::lang::Lang,
+    input: &crate::input::Input,
+    open: bool,
+    room: Option<f32>,
+) {
     let now = std::time::Instant::now();
     let look = crate::settings::chat_look();
     let said: Vec<_> = client
         .chat
         .iter()
-        .filter(|(_, at)| open || now.duration_since(*at).as_secs() < 10)
+        .filter(|(s, at)| open || s.alpha(now.duration_since(*at).as_secs_f32()) > 0.0)
         .collect();
     // Over the game, only what fits; a line is about this tall.
-    let room = if open { usize::MAX } else { (look.closed_height / 11.0).max(1.0) as usize };
+    let room = if open { usize::MAX } else { (look.closed_height.min(room.unwrap_or(f32::MAX)) / 11.0).max(1.0) as usize };
     let fill = (look.dim > 0 && !said.is_empty()).then_some(look.dim as u32);
     let shown = Style {
         fill,
@@ -220,8 +353,10 @@ pub fn chat_lines(ui: &mut Ui, client: &crate::client::Client, lang: &crate::ui:
         shown.self_align(crate::ui::Align::Start)
     };
     let lines = ui.container(style, |ui| {
-        for (line, _) in said.iter().rev().take(room).rev() {
-            ui.text(line.spans(lang, Some(input)), "chat");
+        for (line, at) in said.iter().rev().take(room).rev() {
+            // Open it is the history, what is over included.
+            let alpha = if open { 1.0 } else { line.alpha(now.duration_since(*at).as_secs_f32()) };
+            crate::hud::shown_text(ui, line, alpha, lang, Some(input));
         }
     });
     ui.set_id(lines, "chat_lines");
@@ -249,18 +384,18 @@ impl Chat {
     /// Opened with `/` the command list shows at once.
     pub fn new(text: &str) -> Chat {
         let mut st = ChatState::default();
-        st.update(text, &[], weft_abi::permission::OWNER);
+        st.update(text, &[], weft_abi::permission::OWNER, true);
         Chat { state: Rc::new(RefCell::new(st)) }
     }
 }
 
 impl ChatState {
-    fn update(&mut self, text: &str, players: &[String], permission: u32) {
+    fn update(&mut self, text: &str, players: &[String], permission: u32, owner: bool) {
         self.text = text.to_string();
         self.selected = 0;
         self.stem = None;
         self.completion = text.strip_prefix('/').map(|line| {
-            let mut comp = crate::commands::complete(content(), line, players, permission);
+            let mut comp = crate::commands::complete(content(), line, players, permission, owner);
             comp.from += 1;
             comp
         });
@@ -292,7 +427,7 @@ impl Screen for Chat {
                 .stretch(),
             |ui| {
                 if let Some(client) = cx.client {
-                    chat_lines(ui, client, cx.lang, cx.input, true);
+                    chat_lines(ui, client, cx.lang, cx.input, true, None);
                 }
                 if let Some(comp) = &st.completion {
                     if !comp.suggestions.is_empty() {
@@ -330,15 +465,19 @@ impl Screen for Chat {
                         value: st.text.clone(),
                         caret: st.text.chars().count(),
                         max: 256,
+                        area: None,
                         on_change: Some(Rc::new(move |ctx: &mut Ctx, v: &str| {
                             let players = ctx
                                 .client
                                 .as_ref()
                                 .map(|c| c.players.clone())
                                 .unwrap_or_default();
-                            let permission = ctx.client.as_ref().map_or(0, |c| c.permission);
+                            let (permission, owner) = ctx
+                                .client
+                                .as_ref()
+                                .map_or((0, false), |c| (c.permission, c.local_host));
                             let mut s = state.borrow_mut();
-                            s.update(v, &players, permission);
+                            s.update(v, &players, permission, owner);
                             s.history = None;
                             ctx.requests.push(Request::Rebuild);
                         })),
@@ -357,7 +496,10 @@ impl Screen for Chat {
             .as_ref()
             .map(|c| c.players.clone())
             .unwrap_or_default();
-        let permission = ctx.client.as_ref().map_or(0, |c| c.permission);
+        let (permission, owner) = ctx
+            .client
+            .as_ref()
+            .map_or((0, false), |c| (c.permission, c.local_host));
         let sent = ctx
             .client
             .as_ref()
@@ -366,7 +508,7 @@ impl Screen for Chat {
         let mut st = self.state.borrow_mut();
         let n = st.completion.as_ref().map_or(0, |c| c.suggestions.len());
         let set = |st: &mut ChatState, text: String, ctx: &mut Ctx| {
-            st.update(&text, &players, permission);
+            st.update(&text, &players, permission, owner);
             ctx.set_input("chat", text);
             ctx.requests.push(Request::Rebuild);
         };
@@ -375,14 +517,22 @@ impl Screen for Chat {
             let stem = st.stem.get_or_insert_with(|| st.text.clone()).clone();
             let comp = st.completion.as_ref().unwrap();
             let text = format!("{}{}", &stem[..comp.from.min(stem.len())], comp.suggestions[st.selected.min(n - 1)]);
+            if n == 1 && text != stem {
+                set(st, text, ctx);
+                return;
+            }
             st.text = text.clone();
             ctx.set_input("chat", text);
             ctx.requests.push(Request::Rebuild);
         };
         match key {
+            // Shift+Tab goes back through the list.
             Key::Code(KeyCode::Tab) if n > 0 => {
+                let back = ctx.input.mods() & crate::input::SHIFT != 0;
                 if st.stem.is_some() {
-                    st.selected = (st.selected + 1) % n;
+                    st.selected = if back { (st.selected + n - 1) % n } else { (st.selected + 1) % n };
+                } else if back {
+                    st.selected = n - 1;
                 }
                 take(&mut st, ctx);
                 true
@@ -434,15 +584,22 @@ pub struct RecipeView {
     pub query: RecipeQuery,
     /// (tab, page), kept while the screen rebuilds.
     state: Rc<std::cell::Cell<(usize, usize)>>,
+    pages: usize,
 }
 
 impl RecipeView {
     pub fn new(query: RecipeQuery) -> RecipeView {
-        RecipeView { query, state: Rc::new(std::cell::Cell::new((0, 0))) }
+        RecipeView { query, state: Rc::new(std::cell::Cell::new((0, 0))), pages: 1 }
     }
 
     pub fn item(item: u32, uses: bool) -> RecipeView {
         RecipeView::new(if uses { RecipeQuery::UsedIn(item) } else { RecipeQuery::MadeBy(item) })
+    }
+
+    fn turn(state: &std::cell::Cell<(usize, usize)>, pages: usize, by: isize, ctx: &mut Ctx) {
+        let (tab, page) = state.get();
+        state.set((tab, (page as isize + by).rem_euclid(pages as isize) as usize));
+        ctx.requests.push(Request::Rebuild);
     }
 }
 
@@ -474,11 +631,17 @@ fn found_recipes(q: &RecipeQuery) -> Vec<(&'static str, Vec<usize>)> {
     let mut kinds: Vec<&String> = c.game.recipes.keys().collect();
     kinds.sort();
     let mut out = Vec::new();
+    let hidden = c.components.id(weft_abi::comp::recipe::HIDDEN);
     for kind in kinds {
         let list: Vec<usize> = c.game.recipes[kind]
             .iter()
             .enumerate()
-            .filter(|(_, r)| !r.hidden)
+            .filter(|(_, r)| {
+                hidden.is_none_or(|h| {
+                    !c.components
+                        .has(weft_abi::entry_kind::RECIPE as usize, r.entry, h)
+                })
+            })
             .filter(|(_, r)| match q {
                 RecipeQuery::MadeBy(item) => r.outputs.iter().any(|o| o.what == Ingredient::Item(*item)),
                 RecipeQuery::UsedIn(item) => r
@@ -519,7 +682,20 @@ fn kind_icon(kind: &str) -> u32 {
 
 impl Screen for RecipeView {
     fn name(&self) -> &str {
-        "core:recipes"
+        RECIPES
+    }
+
+    fn pointer(&mut self, cursor: glam::Vec2, ui: &mut Ui, ctx: &mut Ctx, _hud: &mut crate::hud::Hud) -> bool {
+        let scroll = ctx.input.scroll();
+        if scroll == 0.0 {
+            return false;
+        }
+        if ui.scroll_at(cursor, scroll) {
+            return true;
+        }
+        let steps = scroll.abs().round().max(1.0) as isize;
+        Self::turn(&self.state, self.pages, -scroll.signum() as isize * steps, ctx);
+        true
     }
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
@@ -540,9 +716,10 @@ impl Screen for RecipeView {
             .map_or(1, |(_, l)| l.len().div_ceil(per_page))
             .max(1);
         page = page.min(pages - 1);
+        self.pages = pages;
         self.state.set((tab, page));
         ui.root_style(Style::default().stretch());
-        ui.panel("overlay", Style::default().grow().center().pad(10.0).gap(6.0), |ui| {
+        let body = |ui: &mut Ui| {
             label(ui, cx, title, &args, "title");
             if found.is_empty() {
                 label(ui, cx, "recipes.none", &[], "dim");
@@ -569,7 +746,11 @@ impl Screen for RecipeView {
                 }
             });
             if let Some((kind, list)) = found.get(tab) {
-                let p = ui.panel("panel", Style::default().pad(7.0).gap(10.0).min_w(220.0), |ui| {
+                let mut style = Style::default().pad(7.0).gap(10.0).min_w(220.0);
+                if has_parts(&[(RECIPES, "entry")]) {
+                    style = Style { max_h: room, ..style.scroll() };
+                }
+                let p = ui.panel("panel", style, |ui| {
                     ui.container(Style::row().gap(4.0), |ui| {
                         for &station in content()
                             .game
@@ -591,9 +772,7 @@ impl Screen for RecipeView {
                 let turn = |d: isize| {
                     let state = self.state.clone();
                     Rc::new(move |c: &mut Ctx| {
-                        let (t, p) = state.get();
-                        state.set((t, (p as isize + d).rem_euclid(pages as isize) as usize));
-                        c.requests.push(Request::Rebuild);
+                        Self::turn(&state, pages, d, c);
                     }) as crate::ui::Action
                 };
                 let prev = ui.button("button", Style::default().size(20.0, 20.0).center(), turn(-1), |ui| {
@@ -607,8 +786,20 @@ impl Screen for RecipeView {
                 ui.set_id(next, "page_next");
                 ui.add(Kind::Container { class: None }, Style::default().w(12.0));
                 button(ui, cx, "recipes.tags", &[], 70.0, |c| c.requests.push(Request::Open(Box::new(TagList::default()))));
-                button(ui, cx, "menu.back", &[], 70.0, |c| c.requests.push(Request::Close));
+                modui::parts(ui, cx.lang, Some(cx.input), cx.client, RECIPES, "buttons");
+                back_button(ui, cx, "menu.back", &[], 70.0, |c| c.requests.push(Request::Close));
             });
+        };
+        ui.panel("overlay", Style::default().grow().center().pad(10.0).gap(6.0), |ui| {
+            if has_parts(&[(RECIPES, "left"), (RECIPES, "side")]) {
+                ui.container(Style::row().gap(4.0).align(crate::ui::Align::Start), |ui| {
+                    side_parts(ui, cx, &[(RECIPES, "left")]);
+                    ui.container(Style::default().center().gap(6.0), body);
+                    side_parts(ui, cx, &[(RECIPES, "side")]);
+                });
+            } else {
+                body(ui);
+            }
         });
     }
 }
@@ -655,6 +846,7 @@ fn recipe_entry(ui: &mut Ui, cx: &BuildCx, kind: &str, index: usize) {
     if let Some((owner, cb)) = def.and_then(|d| d.display.map(|cb| (d.owner, cb))) {
         ui.container(Style::default().gap(2.0), |ui| {
             modui::build_recipe(ui, cx.lang, Some(cx.input), owner, cb, cx.client, kind, index as u32);
+            recipe_parts(ui, cx, kind, index);
         });
         return;
     }
@@ -667,9 +859,24 @@ fn recipe_entry(ui: &mut Ui, cx: &BuildCx, kind: &str, index: usize) {
                     Kind::Progress { class: "arrow".into(), bind: Box::new(|_: &Ctx| 0.0), value: 0.0, dir: weft_abi::ui_dir::RIGHT },
                     Style::default().size(w, h),
                 );
-                if r.time > 0 && def.is_none_or(|d| d.info.is_none()) {
-                    label(ui, cx, "recipes.time", &[text::Arg::Float(r.time as f64 / crate::world::TPS as f64, 1)], "dim");
-                }
+                ui.container(
+                    Style::default()
+                        .gap(1.0)
+                        .center()
+                        .at_from([0.5, 1.0], 0.0, 1.0, [0.5, 0.0]),
+                    |ui| {
+                        if r.shaped.is_none() && grid_size(kind, r, false).0 * grid_size(kind, r, false).1 > 1 {
+                            let marker = ui.add(
+                                Kind::Image { texture: "core:gui/icon_shapeless".into(), color: 0x808080FF },
+                                Style::default().size(9.0, 9.0),
+                            );
+                            ui.nodes[marker].tooltip = Some(cx.t("recipes.shapeless", &[]));
+                        }
+                        if r.time > 0 && def.is_none_or(|d| d.info.is_none()) {
+                            label(ui, cx, "recipes.time", &[text::Arg::Float(r.time as f64 / crate::world::TPS as f64, 1)], "dim");
+                        }
+                    },
+                );
             });
             recipe_grid(ui, cx.lang, cx.input, kind, r, true);
         });
@@ -677,7 +884,12 @@ fn recipe_entry(ui: &mut Ui, cx: &BuildCx, kind: &str, index: usize) {
             let args = info_args(d, r);
             label(ui, cx, d.info.as_deref().unwrap_or(""), &args, "dim");
         }
+        recipe_parts(ui, cx, kind, index);
     });
+}
+
+fn recipe_parts(ui: &mut Ui, cx: &BuildCx, kind: &str, index: usize) {
+    modui::parts_with_recipe(ui, cx.lang, Some(cx.input), cx.client, RECIPES, "entry", Some((kind, index as u32)));
 }
 
 /// The values a kind's info line asks for, from one recipe.
@@ -695,7 +907,10 @@ fn info_args(def: &crate::registry::RecipeKindDef, r: &crate::registry::Recipe) 
                 .schemas
                 .get(id as usize)
                 .map_or("", String::as_str);
-            let b = r.value(id).unwrap_or(&[]);
+            let b = c
+                .components
+                .bytes(weft_abi::entry_kind::RECIPE as usize, r.entry, id)
+                .unwrap_or(&[]);
             let num = |n: usize| b.get(..n).map(|s| s.to_vec());
             match schema {
                 "u32" => num(4).map_or(text::Arg::Int(0), |v| text::Arg::Int(u32::from_le_bytes(v.try_into().unwrap()) as i64)),
@@ -773,27 +988,6 @@ pub fn recipe_slot(
             ui.add(Kind::Container { class: Some("recipe_slot".into()) }, size);
             return;
         }
-        Ingredient::Fluid(name) => {
-            // The liquid's own top texture, tinted like its item would be (water is gray).
-            let state = c
-                .liquids
-                .iter()
-                .find(|l| &l.name == name)
-                .and_then(|l| c.states.get(l.first_state as usize));
-            let texture = state
-                .and_then(|s| c.textures.get(s.textures[2] as usize))
-                .cloned()
-                .unwrap_or_default();
-            let color =
-                state.map_or(0xFFFFFFFF, |s| if s.tint != 0 { (crate::content::item_tint(s.tint) << 8) | 0xFF } else { 0xFFFFFFFF });
-            let b = ui.button("recipe_slot", size, Rc::new(|_: &mut Ctx| {}), |ui| {
-                ui.add(Kind::Image { texture, color }, Style::default().size(16.0, 16.0));
-            });
-            tip = text::Name::Liquid(name.clone()).spans(lang, None);
-            tip.push(text::Span::text("\n", None));
-            tip.extend(fmt("recipes.fluid_amount", &[text::Arg::Int(count as i64)]));
-            b
-        }
         Ingredient::Item(_) | Ingredient::Tag(_) | Ingredient::Any(_) => {
             let items: Vec<u32> = match ing {
                 Ingredient::Item(i) => vec![*i],
@@ -808,7 +1002,8 @@ pub fn recipe_slot(
                 return;
             }
             let shown = items.clone();
-            let tag = if let Ingredient::Tag(t) = ing { Some(*t) } else { None };
+            // A tag only one item has goes straight to that item.
+            let tag = if let Ingredient::Tag(t) = ing { Some(*t).filter(|_| items.len() > 1) } else { None };
             let b = ui.button(
                 "recipe_slot",
                 size,
@@ -890,6 +1085,7 @@ impl Screen for TagList {
                     value: self.filter.borrow().clone(),
                     caret: self.filter.borrow().chars().count(),
                     max: 48,
+                    area: None,
                     on_change: Some(Rc::new(move |ctx: &mut Ctx, v: &str| {
                         *f.borrow_mut() = v.to_string();
                         ctx.requests.push(Request::Rebuild);
@@ -926,7 +1122,7 @@ impl Screen for TagList {
                 },
             );
             ui.set_id(list, "tags");
-            button(ui, cx, "menu.back", &[], 160.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.back", &[], 160.0, |c| c.requests.push(Request::Close));
         });
     }
 }
@@ -965,7 +1161,7 @@ impl Screen for TagView {
                     });
                 }
             });
-            button(ui, cx, "menu.back", &[], 160.0, |c| c.requests.push(Request::Close));
+            back_button(ui, cx, "menu.back", &[], 160.0, |c| c.requests.push(Request::Close));
         });
     }
 }

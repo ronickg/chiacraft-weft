@@ -1,0 +1,5 @@
+# The second player for entity_ranges_host.txt: joins, stays at spawn, leaves after the host.
+join run/entity_ranges_ticket.txt
+loaded
+wait 150
+quit

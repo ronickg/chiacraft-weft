@@ -9,3 +9,4 @@ description = "The player's account in the game: opens it at start (made quietly
 [dependencies]
 chiacraft-wallet = { path = "../wallet" }
 log.workspace = true
+parking_lot.workspace = true

@@ -1,0 +1,476 @@
+//! The crowd bench's per-goal timer (`reports/Creature AI.md`, part 3, step 0): after
+//! `/animalprof on` (which also starts the rows over), every goal wrapped by `Timed::timed` adds
+//! the nanoseconds it took, how often it ran and how often it took the turn to its name's row;
+//! `/animalprof dump` logs the rows since as one `ANIMAL_GOALS` line (µs per tick and per call)
+//! and starts them over. Off, a goal costs one atomic load more. `/animalprof starve` sets every wild animal within 96 blocks hungry and thirsty, so
+//! the bench's second pass runs foraging, drinking and hunting.
+
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+use std::time::Instant;
+
+use weft_sdk::ai::{Goal, Goals};
+use weft_sdk::*;
+
+/// Whether the timer runs (`/animalprof on|off`).
+static ON: AtomicBool = AtomicBool::new(false);
+/// The goal names, in the order first seen, and their sums: nanoseconds, runs, and runs that
+/// took the turn.
+const ROWS: usize = 32;
+static NAMES: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::new());
+static NANOS: [AtomicU64; ROWS] = [const { AtomicU64::new(0) }; ROWS];
+static CALLS: [AtomicU64; ROWS] = [const { AtomicU64::new(0) }; ROWS];
+static TOOK: [AtomicU64; ROWS] = [const { AtomicU64::new(0) }; ROWS];
+/// The longest single run, nanoseconds (a spike: one search, one burst).
+static MAX: [AtomicU64; ROWS] = [const { AtomicU64::new(0) }; ROWS];
+/// The tick the rows started at.
+static SINCE: AtomicU64 = AtomicU64::new(0);
+
+fn row(name: &'static str) -> usize {
+    let mut names = NAMES.lock().unwrap();
+    names.iter().position(|&n| n == name).unwrap_or_else(|| {
+        names.push(name);
+        (names.len() - 1).min(ROWS - 1)
+    })
+}
+
+/// While the timer is on: a stamp for `slow`.
+pub fn stamp() -> Option<Instant> {
+    ON.load(Relaxed).then(Instant::now)
+}
+
+/// While the timer is on, logs `what` if it took more than 20 ms since `t` (`stamp`): where a spike
+/// in a goal comes from.
+pub fn slow(t: Option<Instant>, what: impl FnOnce() -> String) {
+    if let Some(t) = t
+        && t.elapsed().as_millis() >= 20
+    {
+        weft_sdk::warn!("ANIMAL_SLOW {} ms: {}", t.elapsed().as_millis(), what());
+    }
+}
+
+/// A goal, timed under `name` while the timer is on.
+pub struct Time<G> {
+    row: usize,
+    goal: G,
+}
+
+impl<G: Goal> Goal for Time<G> {
+    fn run(&self, w: &World, id: u64, st: &EntityState) -> bool {
+        if !ON.load(Relaxed) {
+            return self.goal.run(w, id, st);
+        }
+        let t = Instant::now();
+        let took = self.goal.run(w, id, st);
+        let ns = t.elapsed().as_nanos() as u64;
+        NANOS[self.row].fetch_add(ns, Relaxed);
+        MAX[self.row].fetch_max(ns, Relaxed);
+        CALLS[self.row].fetch_add(1, Relaxed);
+        TOOK[self.row].fetch_add(took as u64, Relaxed);
+        took
+    }
+    fn passed_over(&self, w: &World, id: u64) {
+        self.goal.passed_over(w, id)
+    }
+}
+
+/// `Goals::then`, timed.
+pub trait Timed {
+    fn timed(self, name: &'static str, g: impl Goal) -> Self;
+}
+
+impl Timed for Goals {
+    fn timed(self, name: &'static str, g: impl Goal) -> Goals {
+        self.then(Time { row: row(name), goal: g })
+    }
+}
+
+/// The rows since they last started over, as one line, and a fresh start.
+fn report(w: &World) -> String {
+    let now = w.game_time();
+    let ticks = now.saturating_sub(SINCE.swap(now, Relaxed)).max(1) as f64;
+    let names = NAMES.lock().unwrap().clone();
+    let mut total = 0.0;
+    let mut rows = Vec::new();
+    for (i, name) in names.iter().enumerate().take(ROWS) {
+        let (ns, calls, took, max) =
+            (NANOS[i].swap(0, Relaxed), CALLS[i].swap(0, Relaxed), TOOK[i].swap(0, Relaxed), MAX[i].swap(0, Relaxed));
+        if calls == 0 {
+            continue;
+        }
+        let us = ns as f64 / 1000.0;
+        total += us;
+        rows.push(format!(
+            "{name} {:.1}us/t {:.2}us/call {}/{} max {:.0}us",
+            us / ticks,
+            us / calls as f64,
+            took,
+            calls,
+            max as f64 / 1000.0
+        ));
+    }
+    format!("ANIMAL_GOALS {:.0} ticks | total {:.1} us/tick | {}", ticks, total / ticks, rows.join(" | "))
+}
+
+pub fn init(r: &mut Registry) {
+    // The rows in the same order every run.
+    row("upkeep");
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,wound,lead,recall,wetter,where,cave)> [value:float]", |cmd| {
+        let w = cmd.world();
+        let text = match cmd.text("what").unwrap_or("") {
+            "on" => {
+                ON.store(true, Relaxed);
+                report(&w);
+                "animal goal timer on".to_string()
+            }
+            "dump" => report(&w),
+            "water" => {
+                // Every wild animal within 96 blocks has this share of its water.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(0.5) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if let Some(a) = w.component_mut(id, &crate::animal::ANIMAL)
+                        && a.species != 0
+                    {
+                        a.thirst = (1.0 - v).clamp(0.0, 1.0);
+                        n += 1;
+                    }
+                }
+                format!("{n} animals at {:.0}% water", v * 100.0)
+            }
+            "hunters" => {
+                // Every wild hunter within 96 blocks has this share of its food (its prey left as
+                // they are), for runs that watch a hunt.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(0.3).clamp(0.0, 1.0) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if let Some(a) = w.component_mut(id, &crate::animal::ANIMAL)
+                        && a.species().is_some_and(|s| s.hunts())
+                    {
+                        a.food = (a.stat(crate::species::FOOD) * v) as u16;
+                        n += 1;
+                    }
+                }
+                format!("{n} hunters at {:.0}% food", v * 100.0)
+            }
+            "wound" => {
+                // Every wild animal within 96 blocks down to this share of its health (a blow with
+                // no one behind it), for runs that watch it heal (`animal::heal`).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(0.5) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if w.component(id, &crate::animal::ANIMAL).is_some_and(|a| a.species != 0)
+                        && let Some(e) = w.entity(id)
+                        && e.health > e.max_health * v
+                    {
+                        w.damage(id, Damage::new(e.health - e.max_health * v, damage_cause::GENERIC));
+                        n += 1;
+                    }
+                }
+                format!("{n} animals at {:.0}% health", v * 100.0)
+            }
+            "food" => {
+                // Every wild animal within 96 blocks has this share of its food.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(1.0).clamp(0.0, 1.0) as f32;
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if let Some(a) = w.component_mut(id, &crate::animal::ANIMAL)
+                        && a.species != 0
+                    {
+                        a.food = (a.stat(crate::species::FOOD) * v) as u16;
+                        n += 1;
+                    }
+                }
+                format!("{n} animals at {:.0}% food", v * 100.0)
+            }
+            "lead" => {
+                // Every wild group leader within 96 blocks (lowest id of its kind near, with kin)
+                // has this share of its water (`group.rs`: its herd drinks with it).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(0.3).clamp(0.0, 1.0) as f32;
+                let mut led = Vec::new();
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    let leads = w
+                        .component(id, &crate::senses::SENSES)
+                        .is_some_and(|s| s.kin >= animals_core::groups::GROUP && s.leader == id);
+                    if leads && let Some(a) = w.component_mut(id, &crate::animal::ANIMAL) {
+                        a.thirst = (1.0 - v).clamp(0.0, 1.0);
+                        led.push(id.to_string());
+                    }
+                }
+                format!("leaders {} at {:.0}% water", led.join(" "), v * 100.0)
+            }
+            "recall" => {
+                // Every wild member within 96 blocks that isn't its group's leader remembers water
+                // `value` blocks north of the player (-z), on his level less one: the leaders know
+                // it only from their herd (`drink::trek`).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(50.0);
+                let p = [me.pos.x.floor() + 0.5, me.pos.y.floor() - 1.0, me.pos.z.floor() + 0.5 - v];
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    let member = w
+                        .component(id, &crate::senses::SENSES)
+                        .is_some_and(|s| s.kin >= animals_core::groups::GROUP && s.leader != 0 && s.leader != id);
+                    if member {
+                        crate::drink::remember(&w, id, p);
+                        n += 1;
+                    }
+                }
+                format!("{n} members remember water at {:.1} {:.0} {:.1}", p[0], p[1], p[2])
+            }
+            "wetter" => {
+                // Testing the dry season's migration (`migrate`): everywhere is in its dry season
+                // but ground `value` blocks north of the player (-z), wet within 16 blocks of it;
+                // 0: the real climate again. Leaders near look round at their next wander.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let v = cmd.float("value").unwrap_or(80.0);
+                let at = (v > 0.0).then_some([me.pos.x, me.pos.z - v, 16.0]);
+                crate::migrate::set_wetter(at);
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    crate::migrate::look_now(&w, id);
+                }
+                match at {
+                    Some([x, z, _]) => format!("dry everywhere but round {x:.0} {z:.0}"),
+                    None => "the real climate".to_string(),
+                }
+            }
+            "kill" => {
+                // The player kills the wild animal nearest him (a hunter's kill: fear there, and
+                // its kind's reputation of him falls).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let near = w
+                    .entities_near(me.pos, 48.0, None)
+                    .into_iter()
+                    .filter(|&id| {
+                        w.component(id, &crate::animal::ANIMAL)
+                            .is_some_and(|a| a.species != 0)
+                            && !crate::animal::tamed(&w, id)
+                    })
+                    .filter_map(|id| Some((crate::dist2(w.entity(id)?.pos, me.pos), id)))
+                    .min_by(|a, b| a.0.total_cmp(&b.0));
+                let Some((_, id)) = near else { return };
+                w.damage(id, Damage::new(1e6, damage_cause::ATTACK).by(cmd.player()));
+                format!("KILL {id}")
+            }
+            "fear" => {
+                // The fear of the ground where the player stands, and red deer's (and hares')
+                // reputation of him there.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let p = me.pos.to_array();
+                let rep = |name: &str| {
+                    crate::species::SPECIES
+                        .iter()
+                        .position(|s| s.name == name)
+                        .map_or(0.0, |i| crate::memory::reputation(&w, i, p, cmd.player()))
+                };
+                format!(
+                    "ANIMAL_FEAR here {:.2}, red_deer reputation {:.2}, hare {:.2}",
+                    crate::memory::fear_at(&w, p),
+                    rep("red_deer"),
+                    rep("hare")
+                )
+            }
+            "wind" => {
+                // The wind's way the animals smell by (degrees clockwise from north; none: the
+                // weather's own), for a test.
+                let v = cmd.float("value").map_or(f32::NAN, |v| v as f32);
+                crate::senses::WIND_TEST.store(v.to_bits(), Relaxed);
+                format!("animals' wind toward {v}")
+            }
+            "where" => {
+                // Every wild animal within `value` blocks (256 by default): where it is, what it is
+                // doing, its food, water and health, for runs that follow a herd's wanderings.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let r = cmd.float("value").unwrap_or(256.0);
+                let rows: Vec<String> = w
+                    .entities_near(me.pos, r, None)
+                    .into_iter()
+                    .filter_map(|id| {
+                        let a = w.component(id, &crate::animal::ANIMAL).filter(|a| a.species != 0)?;
+                        let e = w.entity(id)?;
+                        Some(format!(
+                            "{id} {} at {:.0} {:.0} {:.0} doing {} food {:.0}% water {:.0}% health {:.0}/{:.0}",
+                            a.species()?.name,
+                            e.pos.x,
+                            e.pos.y,
+                            e.pos.z,
+                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
+                                .get(crate::choose::doing(&w, id) as usize)
+                                .unwrap_or(&"?"),
+                            a.food as f32 / a.stat(crate::species::FOOD).max(1.0) * 100.0,
+                            (1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0,
+                            e.health,
+                            e.max_health
+                        ))
+                    })
+                    .collect();
+                format!("ANIMAL_WHERE {}", rows.join(" | "))
+            }
+            "cave" => {
+                // Every wild animal within `value` blocks (32 by default): the blocks round it,
+                // 17 x 17 a layer from 3 under its feet to 14 over ('#' solid, '~' water, '.' open;
+                // rows north to south, x west to east, its own column 'A'), and what its way-up
+                // search finds (`stuck::way_out`), for a cave or a pit a script can't see into.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let r = cmd.float("value").unwrap_or(32.0);
+                let mut n = 0;
+                for id in w.entities_near(me.pos, r, None) {
+                    if w.component(id, &crate::animal::ANIMAL).is_none_or(|a| a.species == 0) {
+                        continue;
+                    }
+                    let Some(e) = w.entity(id) else { continue };
+                    n += 1;
+                    let (fx, fy, fz) = (e.pos.x.floor() as i32, (e.pos.y + 0.05).floor() as i32, e.pos.z.floor() as i32);
+                    weft_sdk::info!("ANIMAL_CAVE {id} at {fx} {fy} {fz}: {}", crate::stuck::way_out_report(&w, id, &e));
+                    for y in fy - 3..=fy + 14 {
+                        let rows: Vec<String> = (fz - 8..=fz + 8)
+                            .map(|z| {
+                                (fx - 8..=fx + 8)
+                                    .map(|x| {
+                                        if x == fx && z == fz && y == fy {
+                                            'A'
+                                        } else if w.block_flags([x, y, z]) & abi::block_flags::SOLID != 0 {
+                                            '#'
+                                        } else if w.in_liquid([x as f64 + 0.5, y as f64 + 0.5, z as f64 + 0.5]) {
+                                            '~'
+                                        } else {
+                                            '.'
+                                        }
+                                    })
+                                    .collect()
+                            })
+                            .collect();
+                        weft_sdk::info!("ANIMAL_CAVE {id} y {y}: {}", rows.join("/"));
+                    }
+                }
+                format!("ANIMAL_CAVE {n} animals")
+            }
+            "senses" => {
+                // What the animals nearest the player have noticed: awareness of hunters and of
+                // players, by whom.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let mut near: Vec<(f64, u64)> = w
+                    .entities_near(me.pos, 48.0, None)
+                    .into_iter()
+                    .filter_map(|id| Some((crate::dist2(w.entity(id)?.pos, me.pos), id)))
+                    .filter(|&(_, id)| w.component(id, &crate::senses::SENSES).is_some())
+                    .collect();
+                near.sort_by(|a, b| a.0.total_cmp(&b.0));
+                let rows: Vec<String> = near
+                    .iter()
+                    .take(8)
+                    .filter_map(|&(d2, id)| {
+                        let s = w.component(id, &crate::senses::SENSES)?;
+                        let e = w.entity(id)?;
+                        let kind = name_of(abi::entry_kind::ENTITY, e.kind);
+                        Some(format!(
+                            "{id} {kind} at {:.1}: player {} fright {:.2}, hunter {} aware {:.2}, kin {} lead {}{}, wind {:.0} {:.1} m/s, persona {}, about {:.2} doing {}, nav {} moved {:.3} ground {} pose {} using {}, food {} water {} health {:.0}",
+                            d2.sqrt(),
+                            s.player,
+                            s.fright,
+                            s.threat,
+                            s.aware,
+                            s.kin,
+                            s.leader,
+                            if s.sentinel != 0 { " sentinel" } else { "" },
+                            s.heading,
+                            s.wind,
+                            w.component(id, &crate::senses::FACTS)
+                                .map(|f| f.persona().map(|v| format!("{v:.2}")).join("/"))
+                                .unwrap_or_default(),
+                            crate::routines::activity_of(&w, id),
+                            ["-", "love", "rest", "hold", "comfort", "drink", "eat", "wander", "watch", "investigate", "migrate"]
+                                .get(crate::choose::doing(&w, id) as usize)
+                                .unwrap_or(&"?"),
+                            // Its walk, for a check that wandering moves it.
+                            w.navigating(id) as u8,
+                            e.moved,
+                            e.on_ground,
+                            e.pose,
+                            e.using,
+                            // Its stomach and water, for the self-feeding checks.
+                            w.component(id, &crate::animal::ANIMAL)
+                                .map_or("-".into(), |a| format!("{:.0}%", a.food as f32 / a.stat(crate::species::FOOD).max(1.0) * 100.0)),
+                            w.component(id, &crate::animal::ANIMAL)
+                                .map_or("-".into(), |a| format!("{:.0}%", (1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0)),
+                            e.health
+                        ))
+                    })
+                    .collect();
+                format!("ANIMAL_SENSES {}", rows.join(" | "))
+            }
+            "bite" => {
+                // The hunter nearest the player bites the animal nearest it (`taming::hurt` with
+                // the hunter as the source: the bitten one runs from it).
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let near = w.entities_near(me.pos, 48.0, None);
+                let species = |id: u64| {
+                    w.component(id, &crate::animal::ANIMAL)
+                        .and_then(|a| a.species())
+                };
+                let by_distance = |from: Vec3| {
+                    let mut v: Vec<(u64, f64)> = near
+                        .iter()
+                        .filter_map(|&id| Some((id, crate::dist2(w.entity(id)?.pos, from))))
+                        .collect();
+                    v.sort_by(|a, b| a.1.total_cmp(&b.1));
+                    v
+                };
+                let Some((hunter, _)) = by_distance(me.pos)
+                    .into_iter()
+                    .find(|&(id, _)| species(id).is_some_and(|s| s.hunts()))
+                else {
+                    return;
+                };
+                let Some(at) = w.entity(hunter).map(|e| e.pos) else { return };
+                let Some((prey, _)) = by_distance(at)
+                    .into_iter()
+                    .find(|&(id, _)| id != hunter && species(id).is_some_and(|s| !s.hunts()))
+                else {
+                    return;
+                };
+                w.damage(prey, Damage::new(1.0, damage_cause::ATTACK).by(hunter));
+                format!("BITE {hunter} bites {prey}")
+            }
+            "off" => {
+                ON.store(false, Relaxed);
+                "animal goal timer off".to_string()
+            }
+            "starve" => {
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let mut n = 0;
+                for id in w.entities_near(me.pos, 96.0, None) {
+                    if crate::animal::tamed(&w, id) {
+                        continue;
+                    }
+                    if let Some(a) = w.component_mut(id, &crate::animal::ANIMAL)
+                        && a.species != 0
+                    {
+                        a.food = (a.stat(crate::species::FOOD) * 0.15) as u16;
+                        a.thirst = 0.75;
+                        n += 1;
+                    }
+                }
+                format!("{n} animals hungry and thirsty")
+            }
+            _ => {
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let n = w
+                    .entities_near(me.pos, 256.0, None)
+                    .into_iter()
+                    .filter(|&id| {
+                        w.component(id, &crate::animal::ANIMAL)
+                            .is_some_and(|a| a.species != 0)
+                    })
+                    .count();
+                format!("ANIMAL_COUNT {n}")
+            }
+        };
+        weft_sdk::info!("{text}");
+        cmd.reply("command.animals.line", &[Arg::Text(&text)]);
+    });
+}

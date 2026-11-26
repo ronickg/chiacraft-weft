@@ -1,0 +1,18 @@
+{
+ "kind": "block",
+ "what": "a cooking pot seen from straight above: a thick round dark-iron rim, and inside it a thick orange-brown stew with chunks of meat, carrot and greens and a soft glint. (The game shows only part of this texture on its box: only the middle 24 x 24 px (columns 4 to 28, rows 4 to 28), so the rim's outer edge touches that square's edges and the stew fills its middle. Draw the whole 32 x 32 so that part reads right; what lies outside it is the same material, unimportant.)",
+ "size": [
+  32,
+  32
+ ],
+ "full": true,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.576,
+   "empty": 0,
+   "seam": 0.0,
+   "passed": true
+  }
+ ]
+}

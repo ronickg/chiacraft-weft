@@ -1,0 +1,9 @@
+LOD views, Tester 2 on the Linux PC, 2026-11-04 ~06:40.
+Build: dev 6955aacb (git archive), release, pack chiacraft. GPU: NVIDIA RTX 5090 (driver 615.78.08, Vulkan), KDE kwin --virtual 1280x720, game 1280x720.
+World seed 1, fresh world per run (lod_a, lod_b, lod_c), creative, clear.
+A: core:lod_distance 256 (default), --view 12   -> a_*.png
+B: core:lod_distance 0 (LOD off), --view 12      -> b_*.png
+C: core:lod_distance 256, --view 24              -> c_*.png  (looks and draws IDENTICAL to A: --view 24 did not take effect in a scripted run; testkit pins view distance 12)
+--no-vsync was passed but frames stayed vsync-capped at 60 fps under the virtual compositor; compare the "gpu ms" figures instead.
+BENCH lines: bench_lines.txt. F3 not read (testkit has no F3 readout in shots).
+Caveat: the "high" views landed on the ground (creative falls after /tp; the script needs /fly or spectator), so lod_high_noon/sunset are a dirt wall, lod_coast is in a valley. Only lod_after_flight (from the air, via travel) shows the LOD horizon.

@@ -6,9 +6,9 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Instant;
 
 use glam::{DVec3, IVec3};
-use weft_abi::{self as abi, Callback, Host, ItemStack, ModId, Str};
+use weft_abi::{self as abi, Callback, Host, ItemStack, ModId, Str, entry_kind as ek};
 
-use crate::content::{self, RawRegistrar, content, try_content};
+use crate::content::{RawRegistrar, content, try_content};
 use crate::registry;
 use crate::server::Dim;
 use crate::server::menu::MenuCall;
@@ -17,67 +17,72 @@ pub static HOST: Host = Host {
     log: host_log,
     log_at,
     log_enabled,
-    reg_block,
-    reg_item,
-    reg_biome,
-    reg_dimension,
-    reg_entity,
-    reg_entity_model,
-    reg_component,
     reg_world_tick,
-    entity_after,
-    reg_recipe,
-    reg_menu,
-    set_player_menu,
-    set_block_entity,
-    reg_hud_element,
+    timer,
     reg_command,
-    reg_ore,
-    reg_scatter,
-    reg_decoration,
-    reg_creative_tab,
-    reg_set,
     find,
     block_of,
     state_prop,
     state_with,
+    state_cycle,
+    state_turned,
     state_flags,
     find_component,
-    components,
+    matcher_has,
+    component_table,
     stack_get,
     stack_with,
-    get_block,
-    get_block_loaded,
+    storage_slots,
+    component_info,
+    block_info,
+    item_info,
+    block_get,
     world_dimension,
-    set_block,
-    schedule_tick,
-    world_time,
+    block_set,
+    part_list,
+    part_add,
+    part_replace,
+    game_time,
     random,
     light,
     daylight,
+    world_session,
     entity_spawn,
-    entity_remove,
+    entity_despawn,
+    entity_mount,
+    entity_dismount,
+    entity_vehicle,
+    entity_riders,
     entity_get,
+    player_info,
     entity_push,
     entity_set,
     entity_walk,
     entity_damage,
     entity_attack,
-    entity_look_at,
-    entities_near,
-    entities_near_bodies,
+    entity_in_reach,
+    raycast,
+    entities_in,
+    entity_item,
+    entity_set_item,
     in_liquid,
     entity_swing_strength,
+    entity_use_item,
+    entity_key,
+    entity_release_use,
+    entity_mine,
     component,
     player_count,
     player_at,
-    is_creative,
-    inv_size,
-    inv_get,
-    inv_set,
-    inv_insert,
+    game_mode,
+    inventory_len,
+    inventory_get,
+    inventory_set,
+    inventory_insert,
+    inventory_move,
+    inventory_move_into,
     selected_slot,
-    spawn_item,
+
     block_entity,
     open_menu,
     menu_group,
@@ -89,222 +94,303 @@ pub static HOST: Host = Host {
     recipe_find,
     recipe_info,
     recipe_output,
-    recipe_value,
+    recipe_roll,
     recipe_consume,
+    recipe_input,
+    recipe_accepts,
     item_block,
     ui_open: crate::client::modui::ui_open,
+    ui_recipe: crate::client::modui::ui_recipe,
     ui_close: crate::client::modui::ui_close,
     ui_text: crate::client::modui::ui_text,
     client_player: crate::client::modui::client_player,
     client_attribute: crate::client::modui::client_attribute,
+    client_effect_level: crate::client::modui::client_effect_level,
     client_swing_strength: crate::client::modui::client_swing_strength,
-    client_using: crate::client::modui::client_using,
+    client_use_ticks_left: crate::client::modui::client_using,
     client_day_time: crate::client::modui::client_day_time,
-    client_raining: crate::client::modui::client_raining,
-    client_permission: crate::client::modui::client_permission,
+    client_weather: crate::client::modui::client_weather,
     client_component: crate::client::modui::client_component,
     client_entity: crate::client::modui::client_entity,
-    client_creative: crate::client::modui::client_creative,
-    energy_insert,
-    energy_extract,
+    client_target: crate::client::modui::client_target,
+    energy_move,
+    component_get,
+    component_set,
     command_reply,
-    gizmo_on,
+    show,
+    client_show: crate::app::api::client_show,
+    reg_chat_format,
+    chat_format_set,
+    gizmo_shown,
     gizmo,
-    reg_client_hook,
-    reg_client_entity_tick,
-    client_entity_defaults: crate::app::api::client_entity_defaults,
+    gizmo_text,
+    reg_client_frame,
+    reg_camera_frame,
+    client_pose_bone: crate::app::api::client_pose_bone,
+    client_bone_position: crate::app::api::client_bone_position,
+    client_action_current: crate::app::api::client_entity_action,
+    client_clip_length: crate::app::api::client_clip_length,
+    client_image_set: crate::app::api::client_image_set,
+    environment_set,
+    client_environment_set: crate::app::api::client_environment_set,
+    client_environment_values: crate::app::api::client_environment_values,
+    client_displayed: crate::app::api::client_displayed,
     reg_packet,
-    reg_key,
-    reg_error,
+    reg_mistake,
     launch_option: crate::app::api::launch_option,
     send_packet,
-    open_menu_at,
-    inventory_create,
     entity_teleport,
-    set_time,
+    set_day_time,
     day_time,
     skip_ticks,
-    area_fill,
+    fill,
+    shape_contains,
+    shape_bounds,
     set_game_mode,
     client_state: crate::app::api::client_state,
     client_input: crate::app::api::client_input,
-    client_pressed: crate::app::api::client_pressed,
-    client_set_player: crate::app::api::client_set_player,
-    client_command: crate::app::api::client_command,
+    client_key_state: crate::app::api::client_pressed,
+    keys_state: crate::input::keys_state,
+    client_control: crate::app::api::client_set_player,
+    client_op: crate::app::api::client_command,
     client_text: crate::app::api::client_text,
+    client_music: crate::app::api::client_music,
+    client_music_status: crate::app::api::client_music_status,
+    client_music_track: crate::app::api::client_music_track,
     client_command_reply: crate::app::api::client_command_reply,
-    client_block: crate::app::api::client_block,
-    client_structure_block: crate::app::api::client_structure_block,
+    client_block_in: crate::app::api::client_block_in,
     client_cube_shown: crate::app::api::client_cube_shown,
     client_light: crate::app::api::client_light,
     client_slot: crate::app::api::client_slot,
     client_menu: crate::app::api::client_menu,
+    client_menu_group: crate::app::api::client_menu_group,
+    client_menu_move: crate::app::api::client_menu_move,
     client_entities: crate::app::api::client_entities,
     client_ui_rect: crate::app::api::client_ui_rect,
     client_draw: crate::app::api::client_draw,
+    client_draw_text: crate::app::api::client_draw_text,
+    client_screen_text: crate::app::api::client_screen_text,
+    client_screen_text_wrapped: crate::app::api::client_screen_text_wrapped,
     client_send_packet: crate::app::api::client_send_packet,
-    image_get: crate::app::api::image_get,
+    image_pixels: crate::app::api::image_get,
     image_load: crate::app::api::image_load,
     image_save: crate::app::api::image_save,
-    image_free: crate::app::api::image_free,
+    image_unload: crate::app::api::image_free,
     name_of,
-    reg_liquid,
-    reg_liquid_change,
-    reg_liquid_reaction,
     liquid_of,
     use_container,
     reg_event_handler,
     find_event,
     emit,
-    reg_interceptor,
     ask,
-    reg_modifier,
-    compute,
+    chain_compute,
     explanation,
-    reg_attribute,
     attribute,
-    attribute_modifier,
-    attribute_remove,
-    attribute_explain,
-    reg_loot,
-    reg_loot_modifier,
+    attribute_add_modifier,
+    attribute_remove_modifier,
+    reg_entry,
+    mod_loaded,
     roll_loot,
+    holds,
     break_block,
-    reg_stack_component,
     client_menu_owner: crate::client::modui::client_menu_owner,
     reg_system,
-    reg_client_command,
     set_weather,
-    raining,
-    thundering,
-    entity_flash,
+    weather_now,
+    set_rain,
+    raining_at,
+    set_air,
+    air_at,
+    set_sky_event,
+    sky_landing,
+    set_biome_tints,
+    content_tint,
+    weather_at,
+    entity_effect,
+    entity_effects,
+    entity_set_pose,
     reg_command_permission,
     player_permission,
     set_player_permission,
     reg_command_branch,
-    reg_text_condition,
-    reg_particle,
-    reg_sky,
-    particles,
+    particle_burst,
     signal_at,
-    client_particles: crate::app::api::client_particles,
-    reg_config,
+    client_particle_burst: crate::app::api::client_particle_burst,
     config_value,
     config_set,
     config_text,
     config_set_text,
-    reg_sound,
-    reg_music,
-    play_animation,
+    action_play,
+    action_override,
     play_sound,
     client_play_sound: crate::app::api::client_play_sound,
-    reg_spawn,
+    client_sound_start: crate::app::api::client_sound_start,
+    client_sound_set: crate::app::api::client_sound_set,
+    client_sound_stop: crate::app::api::client_sound_stop,
+    client_sound_playing: crate::app::api::client_sound_playing,
+    set_day_rate,
     biome_at,
     navigate,
     navigating,
-    reg_structure,
-    reg_template,
-    ref_list,
-    world_place,
+    block_list,
+    place,
+    unplace,
+    plan_op,
+    generation_read,
+    template_size,
+    template_joints,
     world_seed,
     structure_near,
     fall_block,
-    reg_attach_value,
-    reg_recipe_kind,
-    reg_entity_category,
-    reg_sound_category,
-    reg_tint_kind,
-    reg_biome_tint,
-    reg_player_inventory,
-    reg_equipment_slot,
-    player_group,
-    reg_screen,
-    reg_words,
+    player_inventory_group,
     set_entity_size,
-    set_entity_look,
+    set_entity_appearance,
+    reg_entity_skin,
     entity_kind_size,
-    structure_block,
-    set_structure_block,
-    lift_blocks,
-    put_down_body,
-    body_go,
+    set_entity_scale,
+    entity_fly,
+    entity_ignite,
+    body_from_blocks,
+    assembly_select,
+    controller_bindings,
+    rotor_program,
+    assembly_bounds,
+    ship_controls,
+    ship_flooded_cells,
+    body_to_blocks,
+    body_fall,
+    push_blocks,
+    world_has_space,
+    world_transform,
+    body_move_to,
+    body_turn,
+    body_dynamics,
+    body_force,
     signal_read_changed,
-    reg_terrain,
-    reg_screen_part,
     dim_column,
-    dim_carved,
-    dim_surface,
+    entity_tick_elapsed,
+    ease,
+    force_load,
+    asset_exists,
+    player_camera,
 };
 
-unsafe extern "C" fn fall_block(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u64 {
-    unsafe { dim(w).fall_block(content(), ip(pos)) }
+unsafe extern "C" fn fall_block(w: *mut abi::WorldCtx, pos: *const abi::BlockPos) -> u64 {
+    unsafe { dim(w).fall_block(space_id(w), content(), ip(pos)) }
 }
 
-unsafe extern "C" fn reg_template(r: *mut abi::Registrar, d: *const abi::TemplateDesc) {
-    unsafe {
-        let d = &*d;
-        reg(r).game.templates.push(registry::RawTemplate {
-            name: d.name.as_str().to_string(),
-            blocks: d
-                .blocks
-                .as_slice()
-                .iter()
-                .map(|b| (b.pos, b.block.as_str().to_string()))
-                .collect(),
-        });
-    }
-}
-
-unsafe extern "C" fn ref_list(index: u32) -> abi::Slice<[u32; 2]> {
+unsafe extern "C" fn block_list(index: u32) -> abi::Slice<[u32; 2]> {
     try_content()
         .and_then(|c| c.ref_lists.get(index as usize))
         .map_or(abi::Slice::EMPTY, |l| abi::Slice::new(l))
 }
 
-unsafe extern "C" fn world_place(w: *mut abi::WorldCtx, name: Str, pos: *const [i32; 3]) -> u32 {
+unsafe extern "C" fn place(w: *mut abi::WorldCtx, name: Str, pos: *const abi::BlockPos, transform: u32, palette: Str) -> u64 {
     unsafe {
         let c = content();
-        let Some(&t) = c.template_names.get(name.as_str()) else {
-            misuse("place", || format!("no template {}", name.as_str()));
-            return 0;
-        };
+        let (name, palette) = (name.as_str(), palette.as_str());
         let d = dim(w);
         let at = ip(pos);
-        let blocks = &c.templates[t as usize].blocks;
-        if blocks.iter().any(|(p, _)| d.get(at + *p).is_none()) {
+        let pal = match palette {
+            "" => None,
+            p => match c.game.catalog.ids(ek::PALETTE).get(p) {
+                Some(&p) => Some(p),
+                None => {
+                    misuse("place", || format!("no palette {p}"));
+                    return 0;
+                }
+            },
+        };
+        let placed = if let Some(t) = c.game.catalog.find(ek::TEMPLATE, name) {
+            d.place_template(space_id(w), c, &c.templates[t as usize], at, crate::template::Transform::new(transform), pal)
+        } else if let Some(fi) = c.dims[d.id as usize]
+            .features
+            .iter()
+            .position(|f| f.name == name)
+        {
+            d.place_feature(space_id(w), c, fi, at)
+        } else {
+            misuse("place", || format!("no template or feature {name} (here)"));
             return 0;
-        }
-        for &(p, state) in blocks {
-            d.set(c, at + p, state);
-        }
-        1
+        };
+        placed.unwrap_or(0)
     }
 }
 
-unsafe extern "C" fn reg_structure(r: *mut abi::Registrar, d: *const abi::StructureDesc) {
-    unsafe {
-        let d = *d;
-        reg(r).game.structures.push(registry::RawStructure {
-            template: d.template.as_str().to_string(),
-            dimension: d.dimension.as_str().to_string(),
-            spacing: d.spacing,
-            chance: d.chance,
-            biome: d.biome.as_str().to_string(),
-            sink: d.sink,
-        });
+unsafe extern "C" fn unplace(w: *mut abi::WorldCtx, placing: u64) -> u32 {
+    unsafe { dim(w).unplace(space_id(w), content(), placing) as u32 }
+}
+
+unsafe extern "C" fn generation_read(source: *const abi::GenSource, pos: abi::BlockPos) -> u32 {
+    let Some(source) = (unsafe { source.as_ref() }) else { return 0 };
+    let c = content();
+    if source.dim as usize >= c.dims.len() {
+        return 0;
     }
+    let pos = crate::world::ivec(pos);
+    if source.ctx.is_null() {
+        if !crate::generation::can_read(source) {
+            misuse("generation_read", || {
+                "a generation callback cannot read its own or a later stage's output; use its borrowed view".into()
+            });
+            return 0;
+        }
+        crate::generation::Snapshot::new(c, source.dim, source.seed, source.before).read(pos)
+    } else {
+        unsafe { (&*source.ctx.cast::<crate::generation::ReadCtx>()).read(pos) }
+    }
+}
+
+unsafe extern "C" fn plan_op(ctx: *mut abi::PlanCtx, op: *const abi::PlanOp) -> u32 {
+    if ctx.is_null() || op.is_null() {
+        return 0;
+    }
+    unsafe { (*(ctx as *mut crate::features::PlanCtx)).op(&*op) as u32 }
+}
+
+unsafe extern "C" fn template_size(name: Str, transform: u32, out: *mut abi::BlockPos) -> u32 {
+    let Some(c) = try_content() else { return 0 };
+    let Some(t) = c.game.catalog.find(ek::TEMPLATE, unsafe { name.as_str() }) else { return 0 };
+    let size = crate::template::Transform::new(transform).size(c.templates[t as usize].size);
+    unsafe { *out = size.to_array().into() };
+    1
+}
+
+unsafe extern "C" fn template_joints(name: Str, transform: u32, out: *mut abi::Joint, cap: u32) -> u32 {
+    let Some(c) = try_content() else { return 0 };
+    let Some(t) = c.game.catalog.find(ek::TEMPLATE, unsafe { name.as_str() }) else { return 0 };
+    let def = &c.templates[t as usize];
+    let tr = crate::template::Transform::new(transform);
+    for (i, j) in def.joints.iter().enumerate().take(cap as usize) {
+        let pos = tr.cell(def.size, IVec3::from_array(j.pos));
+        let joint = abi::Joint {
+            pos: pos.to_array().into(),
+            face: tr.face(j.face as usize) as u32,
+            name: Str::new(&j.name),
+            target: Str::new(&j.target),
+            pool: Str::new(&j.pool),
+        };
+        unsafe { *out.add(i) = joint };
+    }
+    def.joints.len() as u32
 }
 
 unsafe extern "C" fn world_seed(w: *mut abi::WorldCtx) -> u64 {
     unsafe { dim(w).seed }
 }
 
-unsafe extern "C" fn structure_near(w: *mut abi::WorldCtx, name: Str, pos: *const [i32; 3], radius: i32, out: *mut [i32; 3]) -> u32 {
+unsafe extern "C" fn structure_near(
+    w: *mut abi::WorldCtx,
+    name: Str,
+    pos: *const abi::BlockPos,
+    radius: i32,
+    out: *mut abi::BlockPos,
+) -> u32 {
     unsafe {
         let d = dim(w);
-        match crate::server::structure_near(content(), d.id, d.seed, name.as_str(), ip(pos), radius) {
+        match crate::features::nearest(content(), d.id, d.seed, name.as_str(), ip(pos), radius) {
             Some(p) => {
-                *out = p.to_array();
+                *out = p.to_array().into();
                 1
             }
             None => 0,
@@ -312,13 +398,15 @@ unsafe extern "C" fn structure_near(w: *mut abi::WorldCtx, name: Str, pos: *cons
     }
 }
 
-unsafe extern "C" fn navigate(w: *mut abi::WorldCtx, id: u64, target: *const [f64; 3], speed: f32) -> u32 {
+unsafe extern "C" fn navigate(w: *mut abi::WorldCtx, id: u64, target: *const abi::Vec3, speed: f32) -> u32 {
     unsafe {
         let c = content();
         let d = dim(w);
-        let target = d.place.to_world(DVec3::from_array(*target));
-        let mul = d.attribute(c, id, crate::server::MOVEMENT_SPEED, false) as f32;
-        let jump_mul = d.attribute(c, id, crate::server::JUMP_STRENGTH, false) as f32;
+        let target = d
+            .space_pose(space_id(w))
+            .to_world(crate::world::dvec(*target));
+        let mul = d.attribute(space_id(w), c, id, crate::registry::attr::MOVEMENT_SPEED, false) as f32;
+        let jump_mul = d.attribute(space_id(w), c, id, crate::registry::attr::JUMP_STRENGTH, false) as f32;
         if let Some(e) = d.entities.get_mut(id) {
             e.jump_mul = jump_mul;
         }
@@ -330,7 +418,17 @@ unsafe extern "C" fn navigating(w: *mut abi::WorldCtx, id: u64) -> u32 {
     unsafe { dim(w).entities.get(id).is_some_and(|e| e.nav.is_some()) as u32 }
 }
 
-unsafe extern "C" fn biome_at(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u32 {
+unsafe extern "C" fn entity_tick_elapsed(w: *mut abi::WorldCtx, id: u64) -> u32 {
+    unsafe {
+        let d = dim(w);
+        d.entities
+            .get(id)
+            .filter(|e| e.ticked_at > 0)
+            .map_or(1, |e| d.time.saturating_sub(e.ticked_at).clamp(1, u32::MAX as u64) as u32)
+    }
+}
+
+unsafe extern "C" fn biome_at(w: *mut abi::WorldCtx, pos: *const abi::BlockPos) -> u32 {
     unsafe {
         let p = ip(pos);
         dim(w)
@@ -341,78 +439,73 @@ unsafe extern "C" fn biome_at(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u3
     }
 }
 
-unsafe extern "C" fn reg_spawn(r: *mut abi::Registrar, d: *const abi::SpawnDesc) {
-    unsafe {
-        let d = *d;
-        let tag = |s: Str| s.as_str().to_string();
-        reg(r).game.spawns.push(registry::RawSpawn {
-            entity: d.entity.as_str().to_string(),
-            biome: tag(d.biome),
-            ground: tag(d.ground),
-            dimension: d.dimension.as_str().to_string(),
-            light: d.light,
-            y: d.y,
-            group: [d.group[0].max(1), d.group[1].max(d.group[0]).max(1)],
-            weight: d.weight,
-            chance: d.chance,
-        });
-    }
-}
-
-unsafe extern "C" fn reg_sound(r: *mut abi::Registrar, d: *const abi::SoundDesc) {
-    unsafe {
-        let d = *d;
-        let def = registry::SoundDef {
-            name: d.name.as_str().to_string(),
-            files: d
-                .files
-                .as_slice()
-                .iter()
-                .map(|s| s.as_str().to_string())
-                .collect(),
-            category: 0,
-            category_name: d.category_name.as_str().to_string(),
-            volume: d.volume,
-            pitch: [d.pitch[0].min(d.pitch[1]).max(0.01), d.pitch[0].max(d.pitch[1]).max(0.01)],
-            range: d.range.max(1.0),
-        };
-        reg(r).game.sounds.push((d.cell as usize, def));
-    }
-}
-
-unsafe extern "C" fn reg_music(r: *mut abi::Registrar, d: *const abi::MusicDesc) {
-    unsafe {
-        let d = *d;
-        let m = registry::MusicDef {
-            name: d.name.as_str().to_string(),
-            tracks: d
-                .tracks
-                .as_slice()
-                .iter()
-                .map(|s| s.as_str().to_string())
-                .collect(),
-            dimension: None,
-            when: d.when,
-        };
-        reg(r)
-            .game
-            .music
-            .push((d.dimension.as_str().to_string(), m));
-    }
-}
-
-unsafe extern "C" fn play_animation(w: *mut abi::WorldCtx, id: u64, name: Str, looping: u32) {
+unsafe extern "C" fn action_override(w: *mut abi::WorldCtx, id: u64, from: Str, to: Str) {
     unsafe {
         let d = dim(w);
-        d.events
-            .push(crate::server::DimEvent::Animation { id, name: name.as_str().to_string(), looping: looping != 0 });
+        if d.entities.get(id).is_none() {
+            return;
+        }
+        let comp = content().game.fields.swaps;
+        let (from, to) = (from.as_str(), to.as_str());
+        let now = d
+            .entities
+            .comps
+            .get(&(id, comp))
+            .map_or(&[][..], |b| &b[..]);
+        let text = String::from_utf8_lossy(now);
+        let mut pairs = text.lines().filter_map(|l| l.split_once('='));
+        // A goal says it every tick: the same as before costs one look.
+        if pairs.clone().any(|p| p == (from, to)) || (to.is_empty() && !pairs.any(|p| p.0 == from)) {
+            return;
+        }
+        let mut next = String::new();
+        for (a, b) in text
+            .lines()
+            .filter_map(|l| l.split_once('='))
+            .filter(|p| p.0 != from)
+        {
+            next.push_str(&format!("{a}={b}\n"));
+        }
+        if !to.is_empty() {
+            next.push_str(&format!("{from}={to}\n"));
+        }
+        d.entities
+            .comps
+            .insert((id, comp), next.into_bytes().into_boxed_slice());
     }
 }
 
-unsafe extern "C" fn play_sound(w: *mut abi::WorldCtx, sound: u32, pos: *const [f64; 3], volume: f32, pitch: f32) {
+unsafe extern "C" fn action_play(w: *mut abi::WorldCtx, id: u64, name: Str, looping: u32) {
+    unsafe {
+        let d = dim(w);
+        // What loops goes on for whoever comes along later too, as anything else they should see.
+        let comp = content().game.fields.looping;
+        let now = if looping != 0 { name.as_str().as_bytes() } else { &[] };
+        if d.entities.get(id).is_some()
+            && d.entities
+                .comps
+                .get(&(id, comp))
+                .map_or(&[][..], |b| &b[..])
+                != now
+        {
+            d.entities
+                .comps
+                .insert((id, comp), now.to_vec().into_boxed_slice());
+        }
+        d.events
+            .push(crate::server::DimEvent::PlayAction { id, name: name.as_str().to_string(), looping: looping != 0 });
+    }
+}
+
+unsafe extern "C" fn play_sound(w: *mut abi::WorldCtx, who: abi::Who, sound: u32, pos: *const abi::Vec3, volume: f32, pitch: f32) {
     unsafe {
         if (sound as usize) < content().game.sounds.len() {
-            dim(w).sound(sound, DVec3::from_array(*pos), volume, pitch);
+            let d = dim(w);
+            let pos = pos
+                .as_ref()
+                .map(|p| d.space_pose(space_id(w)).to_world(crate::world::dvec(*p)));
+            d.events
+                .push(crate::server::DimEvent::Sound { dim: d.id, who, sound, pos, volume, pitch });
         } else {
             misuse("play_sound", || format!("no sound {sound}"));
         }
@@ -436,24 +529,48 @@ pub fn stats(m: ModId) -> &'static ModStats {
     &STATS[(m.0 as usize).min(MAX_MODS - 1)]
 }
 
-/// Callback nanoseconds and calls of a mod since start; readers diff two looks.
+/// Server-side callback nanoseconds (its own, not counting the mod calls inside) and calls of a
+/// mod since start; readers diff two looks.
 pub fn mod_totals(m: ModId) -> (u64, u64) {
     let s = stats(m);
     (s.nanos.load(Ordering::Relaxed), s.calls.load(Ordering::Relaxed))
 }
+
+/// A server mod call taking this long of its own (50 ms, a whole tick) is logged.
+const SLOW_CALL_NS: u64 = 50_000_000;
 
 /// Calls a mod callback. Time is charged to `owner`; a failing callback is logged with the mod's
 /// name and the engine carries on.
 pub fn invoke<A>(owner: ModId, cb: Callback, args: &mut A) -> bool {
     let Some(f) = cb.func else { return true };
     let start = Instant::now();
+    let saved = crate::diag::inner_start();
     let prev = crate::diag::enter_mod(owner);
     let r = unsafe { f(cb.data, args as *mut A as *mut c_void) };
     crate::diag::leave_mod(prev);
+    // Its own time: less what other calls it made took (they are charged to their own mods).
+    let own = crate::diag::inner_end(saved, start.elapsed().as_nanos() as u64);
     let s = stats(owner);
-    s.nanos
-        .fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
-    s.calls.fetch_add(1, Ordering::Relaxed);
+    // Only the server's calls count toward a mod's time per tick (`mod_totals`): the client's
+    // (drawing an animal's look every frame) ran at the frame rate and were counted as if each
+    // were a server tick's.
+    if crate::diag::on_server() {
+        s.nanos.fetch_add(own, Ordering::Relaxed);
+        s.calls.fetch_add(1, Ordering::Relaxed);
+        // A hitch players feel: say whose, and what kind of call (its own time, without the
+        // calls it made).
+        if own >= SLOW_CALL_NS {
+            let name = try_content().map_or("?".to_string(), |c| c.mod_name(owner).to_string());
+            log::warn!(
+                "slow mod call: {name} took {:.0} ms of its own in a {} call",
+                own as f64 / 1e6,
+                std::any::type_name::<A>()
+                    .rsplit("::")
+                    .next()
+                    .unwrap_or("?")
+            );
+        }
+    }
     if r != 0 {
         let n = s.faults.fetch_add(1, Ordering::Relaxed);
         if n < 10 {
@@ -468,34 +585,61 @@ pub fn invoke<A>(owner: ModId, cb: Callback, args: &mut A) -> bool {
 // ---------------------------------------------------------------- world access from callbacks
 
 /// `WorldCtx` pointers handed to mods point at one of these. Only valid during the callback.
-pub struct CallCtx {
-    pub dim: *mut Dim,
+unsafe fn dim<'a>(w: *mut abi::WorldCtx) -> &'a mut Dim {
+    unsafe { &mut *(*w).region.cast() }
 }
 
-impl CallCtx {
-    pub fn raw(&mut self) -> *mut abi::WorldCtx {
-        self as *mut CallCtx as *mut abi::WorldCtx
+unsafe fn space_id(w: *mut abi::WorldCtx) -> u64 {
+    unsafe { (*w).frame }
+}
+
+fn ip(p: *const abi::BlockPos) -> IVec3 {
+    crate::world::ivec(unsafe { *p })
+}
+
+unsafe extern "C" fn block_get(w: *mut abi::WorldCtx, pos: *const abi::BlockPos) -> u32 {
+    unsafe { dim(w).seen(space_id(w), ip(pos)).unwrap_or(u32::MAX) }
+}
+
+unsafe extern "C" fn part_list(w: *mut abi::WorldCtx, pos: *const abi::BlockPos, out: *mut u32, cap: u32) -> u32 {
+    unsafe {
+        let space = dim(w).space(space_id(w));
+        let at = ip(pos);
+        let parts: Vec<_> = space
+            .layout(at)
+            .parts(space.get(at).unwrap_or(0))
+            .map(|v| v.state)
+            .collect();
+        std::ptr::copy_nonoverlapping(parts.as_ptr(), out, parts.len().min(cap as usize));
+        parts.len() as u32
     }
 }
 
-unsafe fn dim<'a>(w: *mut abi::WorldCtx) -> &'a mut Dim {
-    unsafe { &mut *(*(w as *mut CallCtx)).dim }
+unsafe extern "C" fn part_add(w: *mut abi::WorldCtx, pos: *const abi::BlockPos, state: u32) -> u32 {
+    if !known_state("part_add", state) {
+        return 0;
+    }
+    unsafe { dim(w).add_part(space_id(w), content(), ip(pos), state) as u32 }
 }
 
-fn ip(p: *const [i32; 3]) -> IVec3 {
-    IVec3::from_array(unsafe { *p })
-}
-
-unsafe extern "C" fn get_block(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u32 {
-    unsafe { dim(w).get(ip(pos)).unwrap_or(content::AIR) }
-}
-
-unsafe extern "C" fn get_block_loaded(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u32 {
-    unsafe { dim(w).get(ip(pos)).unwrap_or(u32::MAX) }
+unsafe extern "C" fn part_replace(w: *mut abi::WorldCtx, pos: *const abi::BlockPos, old: u32, new: u32) -> u32 {
+    if !known_state("part_replace", new) {
+        return 0;
+    }
+    unsafe { dim(w).replace_part(space_id(w), content(), ip(pos), old, new) as u32 }
 }
 
 unsafe extern "C" fn world_dimension(w: *mut abi::WorldCtx) -> u32 {
     unsafe { dim(w).id }
+}
+
+/// Whether block state `state` exists, a `misuse` of `func` if not.
+fn known_state(func: &'static str, state: u32) -> bool {
+    let known = (state as usize) < content().states.len();
+    if !known {
+        misuse(func, || format!("no block state {state}"));
+    }
+    known
 }
 
 /// A mod called a host function with something that does not exist: logged, the first 20 times
@@ -518,54 +662,114 @@ pub(crate) fn misuse(func: &'static str, detail: impl FnOnce() -> String) {
     }
 }
 
-unsafe extern "C" fn set_block(w: *mut abi::WorldCtx, pos: *const [i32; 3], state: u32) -> u32 {
-    if state as usize >= content().states.len() {
-        log::error!("mod tried to set invalid state {state}");
-        return 0;
-    }
-    unsafe { dim(w).set(content(), ip(pos), state).is_some() as u32 }
-}
-
-unsafe extern "C" fn structure_block(w: *mut abi::WorldCtx, entity: u64, pos: *const [i32; 3]) -> u32 {
-    unsafe {
-        let d = dim(w);
-        match d.bodies.get(&entity) {
-            Some(s) if entity != 0 => s.get(ip(pos)).unwrap_or(crate::content::AIR),
-            _ if entity != 0 && entity == d.frame => d.get(ip(pos)).unwrap_or(crate::content::AIR),
-            _ => u32::MAX,
-        }
-    }
-}
-
-unsafe extern "C" fn set_structure_block(w: *mut abi::WorldCtx, entity: u64, pos: *const [i32; 3], state: u32) -> u32 {
-    if state as usize >= content().states.len() || entity == 0 {
+unsafe extern "C" fn block_set(w: *mut abi::WorldCtx, pos: *const abi::BlockPos, state: u32) -> u32 {
+    if !known_state("block_set", state) {
         return 0;
     }
     unsafe {
         dim(w)
-            .with_space(content(), entity, |d, _| d.set(content(), ip(pos), state).is_some())
-            .unwrap_or(false) as u32
+            .set_seen(space_id(w), content(), ip(pos), state)
+            .is_some() as u32
     }
 }
 
-unsafe extern "C" fn lift_blocks(w: *mut abi::WorldCtx, center: *const [i32; 3], cells: *const [i32; 3], count: usize) -> u64 {
+unsafe extern "C" fn body_from_blocks(
+    w: *mut abi::WorldCtx,
+    center: *const abi::BlockPos,
+    cells: *const abi::BlockPos,
+    count: usize,
+) -> u64 {
     unsafe {
         let cells: Vec<IVec3> = std::slice::from_raw_parts(cells, count)
             .iter()
-            .map(|p| IVec3::from_array(*p))
+            .map(|p| crate::world::ivec(*p))
             .collect();
-        dim(w).lift_for_mod(content(), ip(center), &cells)
+        dim(w).lift_for_mod(space_id(w), content(), ip(center), &cells)
     }
 }
 
-unsafe extern "C" fn put_down_body(w: *mut abi::WorldCtx, entity: u64) {
+unsafe extern "C" fn assembly_select(w: *mut abi::WorldCtx, player: u64, cell: *const abi::BlockPos, flags: u8) -> u32 {
+    unsafe { dim(w).assembly_select(space_id(w), content(), player, cell.as_ref().map(|p| IVec3::from_array(p.to_array())), flags) }
+}
+
+unsafe extern "C" fn controller_bindings(
+    w: *mut abi::WorldCtx,
+    at: *const abi::BlockPos,
+    bindings: abi::Slice<abi::ControllerBinding>,
+) -> u8 {
+    unsafe { dim(w).set_controller_bindings(space_id(w), content(), ip(at), bindings.as_slice()) as u8 }
+}
+
+unsafe extern "C" fn rotor_program(w: *mut abi::WorldCtx, at: *const abi::BlockPos, rules: abi::Slice<abi::RotorRule>, hold: u8) -> u8 {
+    unsafe { dim(w).set_rotor_program(space_id(w), content(), ip(at), rules.as_slice(), hold != 0) as u8 }
+}
+
+unsafe extern "C" fn assembly_bounds(
+    w: *mut abi::WorldCtx,
+    at: *const abi::BlockPos,
+    min: *const abi::BlockPos,
+    max: *const abi::BlockPos,
+) -> u8 {
+    unsafe { dim(w).set_assembly_bounds(space_id(w), content(), ip(at), ip(min), ip(max)) as u8 }
+}
+
+unsafe extern "C" fn ship_controls(w: *mut abi::WorldCtx, ship: u64, input: *const abi::ShipControls) -> u32 {
+    unsafe { dim(w).set_ship_controls(ship, input.as_ref().copied()) as u32 }
+}
+
+unsafe extern "C" fn ship_flooded_cells(w: *mut abi::WorldCtx, ship: u64, out: *mut abi::BlockPos, cap: usize) -> usize {
+    let Some(cells) = (unsafe { dim(w) }).ship_flooded_cells(ship) else { return usize::MAX };
+    if out.is_null() || cap == 0 {
+        return cells.count();
+    }
+    let mut count = 0;
+    for cell in cells {
+        if count < cap {
+            unsafe { out.add(count).write(cell.to_array().into()) };
+        }
+        count += 1;
+    }
+    count
+}
+
+unsafe extern "C" fn body_to_blocks(w: *mut abi::WorldCtx, entity: u64) {
     unsafe { dim(w).ask_put_down(entity) }
 }
 
-unsafe extern "C" fn body_go(w: *mut abi::WorldCtx, entity: u64, pos: *const [f64; 3], ticks: u32) {
+unsafe extern "C" fn world_has_space(w: *mut abi::WorldCtx, frame: u64) -> u32 {
+    unsafe { dim(w).active_space(frame) as u32 }
+}
+
+unsafe extern "C" fn world_transform(w: *mut abi::WorldCtx, frame: u64, value: abi::Vec3, vector: u32, out: *mut abi::Vec3) -> u32 {
+    let d = unsafe { dim(w) };
+    let from = unsafe { space_id(w) };
+    if !d.active_space(from) || !d.active_space(frame) {
+        return 0;
+    }
+    let result = if from == frame {
+        value
+    } else {
+        let transform = d.space_pose(from).relative_to(d.space_pose(frame));
+        let v = crate::world::dvec(value);
+        let v = if vector != 0 { transform.vector_to_world(v) } else { transform.to_world(v) };
+        v.to_array().into()
+    };
+    unsafe { *out = result };
+    1
+}
+
+unsafe extern "C" fn push_blocks(w: *mut abi::WorldCtx, pos: *const abi::BlockPos, dir: u32) -> u32 {
+    unsafe { dim(w).push_blocks(space_id(w), content(), ip(pos), dir.min(6) as u8) as u32 }
+}
+
+unsafe extern "C" fn body_fall(w: *mut abi::WorldCtx, entity: u64) {
+    unsafe { dim(w).body_fall(entity) }
+}
+
+unsafe extern "C" fn body_move_to(w: *mut abi::WorldCtx, entity: u64, pos: *const abi::Vec3, ticks: u32) {
     unsafe {
         let d = dim(w);
-        let to = d.place.to_world(DVec3::from_array(*pos));
+        let to = d.space_pose(space_id(w)).to_world(crate::world::dvec(*pos));
         if let Some(e) = d
             .entities
             .get_mut(entity)
@@ -576,15 +780,41 @@ unsafe extern "C" fn body_go(w: *mut abi::WorldCtx, entity: u64, pos: *const [f6
     }
 }
 
-unsafe extern "C" fn signal_read_changed(w: *mut abi::WorldCtx, pos: *const [i32; 3]) {
-    unsafe { dim(w).space.signals.read_changed(content(), ip(pos)) }
+/// chiacraft: a moving body leans about `pivot` (world) by `rot`, reached in `ticks`.
+unsafe extern "C" fn body_turn(w: *mut abi::WorldCtx, entity: u64, pivot: *const abi::Vec3, rot: *const [f32; 4], ticks: u32) {
+    unsafe {
+        let d = dim(w);
+        let pivot = d
+            .space_pose(space_id(w))
+            .to_world(crate::world::dvec(*pivot));
+        let Some(e) = d.entities.get(entity) else { return };
+        let local = crate::physics::Transform::of(e.pos).to_local(pivot);
+        let rot = *rot;
+        let Some(st) = d.bodies.get_mut(&entity) else { return };
+        let upright = rot[0] == 0.0 && rot[1] == 0.0 && rot[2] == 0.0;
+        st.lean = (!upright).then_some((local.as_vec3().to_array(), rot));
+        st.lean_moved = Some(ticks);
+    }
 }
 
-unsafe extern "C" fn schedule_tick(w: *mut abi::WorldCtx, pos: *const [i32; 3], delay: u32) {
-    unsafe { dim(w).schedule(ip(pos), delay) }
+unsafe extern "C" fn body_dynamics(w: *mut abi::WorldCtx, body: u64) -> u32 {
+    unsafe { dim(w).enable_dynamics(body, None) as u32 }
 }
 
-unsafe extern "C" fn world_time(w: *mut abi::WorldCtx) -> u64 {
+unsafe extern "C" fn body_force(w: *mut abi::WorldCtx, body: u64, at: *const abi::Vec3, force: *const abi::Vec3) -> u32 {
+    unsafe { dim(w).body_force(body, crate::world::dvec(*at), crate::world::dvec(*force)) as u32 }
+}
+
+unsafe extern "C" fn signal_read_changed(w: *mut abi::WorldCtx, pos: *const abi::BlockPos) {
+    unsafe {
+        dim(w)
+            .space_mut(space_id(w))
+            .signals
+            .read_changed(content(), ip(pos))
+    }
+}
+
+unsafe extern "C" fn game_time(w: *mut abi::WorldCtx) -> u64 {
     unsafe { dim(w).time }
 }
 
@@ -592,34 +822,106 @@ unsafe extern "C" fn random(w: *mut abi::WorldCtx) -> u64 {
     unsafe { dim(w).random() }
 }
 
-unsafe extern "C" fn light(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u32 {
-    unsafe { dim(w).light(ip(pos)) }
+unsafe extern "C" fn light(w: *mut abi::WorldCtx, pos: *const abi::BlockPos) -> u32 {
+    unsafe { dim(w).light(space_id(w), ip(pos)) }
+}
+
+extern "C" fn world_session(_: *mut abi::WorldCtx) -> u64 {
+    crate::server::SESSION.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 unsafe extern "C" fn daylight(w: *mut abi::WorldCtx) -> f32 {
     unsafe { dim(w).daylight(content()) }
 }
 
-unsafe extern "C" fn entity_spawn(w: *mut abi::WorldCtx, kind: u32, pos: *const [f64; 3]) -> u64 {
-    if kind as usize >= content().game.entities.len() {
+unsafe extern "C" fn entity_spawn(w: *mut abi::WorldCtx, desc: *const abi::SpawnEntityDesc) -> u64 {
+    let c = content();
+    let d = unsafe { &*desc };
+    let kind = d.kind;
+    if kind as usize >= c.game.entities.len() {
         misuse("entity_spawn", || format!("no entity kind {kind}"));
         return 0;
     }
-    if content().game.is_block_entity(kind) {
-        misuse("entity_spawn", || format!("{} belongs to a block, set the block instead", content().game.entities[kind as usize].name));
+    if c.game.is_block_entity(kind) {
+        misuse("entity_spawn", || format!("{} belongs to a block, set the block instead", c.game.entities[kind as usize].name));
         return 0;
     }
-    unsafe { dim(w).spawn(content(), kind, DVec3::from_array(*pos)) }
+    let is_item = kind == c.game.item_kind;
+    if !is_item && !d.stack.is_empty() {
+        misuse("entity_spawn", || format!("{} carries no stack", c.game.entities[kind as usize].name));
+    }
+    if is_item && !known_item("entity_spawn", &d.stack) {
+        return 0;
+    }
+    let (dim, space_id) = unsafe { (dim(w), space_id(w)) };
+    let pos = crate::world::dvec(d.pos);
+    let inherited = if d.set & abi::spawn_set::INHERIT_VELOCITY != 0 { dim.world_velocity(d.owner) } else { DVec3::ZERO };
+    // Items are their stack: nothing to spawn for an empty one.
+    // How it starts, set before anyone is asked about it.
+    let init = |e: &mut crate::server::entity::Entity| {
+        use abi::spawn_set as s;
+        if d.set & s::VELOCITY != 0 && crate::world::dvec(d.velocity).is_finite() {
+            e.vel = crate::world::dvec(d.velocity);
+        }
+        e.vel += inherited;
+        if d.set & s::YAW != 0 && d.yaw.is_finite() {
+            e.yaw = d.yaw;
+        }
+        if d.set & s::PICKUP_DELAY != 0 {
+            e.pickup_delay = d.pickup_delay;
+        }
+        e.owner = d.owner;
+    };
+    if is_item {
+        let id = dim.spawn_item(space_id, c, pos, d.stack);
+        if let Some(e) = dim.entities.get_mut(id) {
+            init(e);
+        }
+        return id;
+    }
+    dim.spawn_by(space_id, c, kind, pos, d.cause, init)
 }
 
-unsafe extern "C" fn entity_remove(w: *mut abi::WorldCtx, id: u64) {
+unsafe extern "C" fn entity_despawn(w: *mut abi::WorldCtx, id: u64) {
     unsafe {
         let d = dim(w);
         if d.entities.get(id).is_some_and(|e| e.player) {
             misuse("entity_remove", || "a player can't be removed; kill it or teleport it".to_string());
             return;
         }
-        d.entities.remove(id)
+        d.entities.remove(id, abi::removal::MOD)
+    }
+}
+
+unsafe extern "C" fn entity_mount(w: *mut abi::WorldCtx, rider: u64, mount: u64, seat: u32) -> u32 {
+    unsafe { dim(w).mount(content(), rider, mount, (seat != u32::MAX).then_some(seat.min(255) as u8)) as u32 }
+}
+
+unsafe extern "C" fn entity_dismount(w: *mut abi::WorldCtx, rider: u64) {
+    unsafe {
+        dim(w).dismount(space_id(w), content(), rider);
+    }
+}
+
+unsafe extern "C" fn entity_vehicle(w: *mut abi::WorldCtx, rider: u64, seat: *mut u32) -> u64 {
+    unsafe {
+        let Some((mount, s)) = dim(w).entities.get(rider).and_then(|e| e.vehicle) else { return 0 };
+        if !seat.is_null() {
+            *seat = s as u32;
+        }
+        mount
+    }
+}
+
+unsafe extern "C" fn entity_riders(w: *mut abi::WorldCtx, mount: u64, out: *mut u64, cap: u32) -> u32 {
+    unsafe {
+        let d = dim(w);
+        let Some(m) = d.entities.get(mount) else { return 0 };
+        let seats = content().game.entities[m.kind as usize].seats.len() as u32;
+        for s in 0..seats.min(cap) {
+            *out.add(s as usize) = d.rider_in(mount, s as u8).unwrap_or(0);
+        }
+        seats
     }
 }
 
@@ -627,10 +929,15 @@ unsafe extern "C" fn entity_get(w: *mut abi::WorldCtx, id: u64, out: *mut abi::E
     unsafe {
         let d = dim(w);
         let c = content();
+        let max = d.max_health(space_id(w), c, id);
+        let kept = d.entities.comps.contains_key(&(id, c.game.persistent_comp));
         match d.entities.get(id) {
             Some(e) => {
-                *out = e.state(c, d.max_health(c, id));
-                (*out).pos = d.place.to_local(e.pos).to_array();
+                *out = e.state(c, max);
+                if kept {
+                    (*out).flags |= abi::entity_state::PERSISTENT;
+                }
+                (*out).pos = (d.space_pose(space_id(w)).to_local(e.pos).to_array()).into();
                 1
             }
             None => 0,
@@ -638,38 +945,90 @@ unsafe extern "C" fn entity_get(w: *mut abi::WorldCtx, id: u64, out: *mut abi::E
     }
 }
 
-unsafe extern "C" fn entity_set(w: *mut abi::WorldCtx, id: u64, s: *const abi::EntityState) {
+unsafe extern "C" fn entity_set(w: *mut abi::WorldCtx, id: u64, set: u32, s: *const abi::EntityState) {
+    use crate::server::entity::Told;
+    use abi::entity_set as es;
     unsafe {
         let s = &*s;
-        let place = dim(w).place;
-        if let Some(e) = dim(w).entities.get_mut(id) {
-            let pos = DVec3::from_array(s.pos);
-            if pos.is_finite() {
-                e.pos = place.to_world(pos);
-            }
-            let vel = DVec3::from_array(s.vel);
-            if vel.is_finite() {
-                e.vel = vel;
-            }
+        let d = dim(w);
+        let c = content();
+        let max_health = d.max_health(space_id(w), c, id);
+        let place = d.space_pose(space_id(w));
+        let Some(e) = d.entities.get_mut(id) else { return };
+        let player = e.player;
+        let mut told = Vec::new();
+        let pos = crate::world::dvec(s.pos);
+        let teleport = set & es::POS != 0 && pos.is_finite();
+        if teleport && !player {
+            e.pos = place.to_world(pos);
+        }
+        let vel = crate::world::dvec(s.vel);
+        if set & es::VELOCITY != 0 && vel.is_finite() {
+            e.vel = vel;
+            told.push(Told::Velocity((vel / crate::world::TPS as f64).as_vec3().to_array()));
+        }
+        if set & es::YAW != 0 && s.yaw.is_finite() {
             e.yaw = s.yaw;
+        }
+        if set & es::PITCH != 0 && s.pitch.is_finite() {
             e.pitch = s.pitch;
-            // Only a respawn brings back the dead, and only damage kills: everything that follows
-            // a death goes one way.
-            if e.alive() {
-                let health = s.health.min(s.max_health.max(e.health));
-                if health > 0.0 {
-                    e.health = health;
-                } else {
-                    dim(w).damage(content(), id, f32::MAX, 0, weft_abi::damage::VOID);
-                }
+        }
+        if set & (es::YAW | es::PITCH) != 0 {
+            told.push(Told::Look([e.yaw, e.pitch]));
+        }
+        if set & es::FALL_DISTANCE != 0 && s.fall_distance.is_finite() {
+            e.fall = s.fall_distance.max(0.0);
+        }
+        if set & es::FLYING != 0 {
+            e.flying = s.flying != 0;
+            told.push(Told::Flying(e.flying));
+        }
+        if set & es::FIRE != 0 {
+            e.fire = s.fire;
+        }
+        let hands = c.game.entities[e.kind as usize].hand_slots;
+        if set & es::SELECTED != 0 && hands > 0 {
+            e.selected = s.selected.min(hands - 1);
+            if player {
+                told.push(Told::Selected(e.selected));
             }
+        }
+        // Only a respawn brings back the dead, and only damage kills: everything that follows
+        // a death goes one way.
+        let dies = set & es::HEALTH != 0 && e.alive() && {
+            let health = s.health.min(max_health);
+            if health > 0.0 {
+                e.health = health;
+            }
+            !(health > 0.0)
+        };
+        if player {
+            d.entities.told.extend(told.into_iter().map(|t| (id, t)));
+        }
+        if teleport && !player {
+            d.entities.moved_to(c, id);
+        }
+        if teleport && player {
+            d.events
+                .push(crate::server::DimEvent::Teleport { from: d.id, id, dim: d.id, pos: d.space_pose(space_id(w)).to_world(pos) });
+        }
+        if set & es::PERSISTENT != 0 {
+            let key = (id, c.game.persistent_comp);
+            if s.flags & abi::entity_state::PERSISTENT != 0 {
+                d.entities.comps.insert(key, Box::new([]));
+            } else {
+                d.entities.comps.remove(&key);
+            }
+        }
+        if dies {
+            d.damage(space_id(w), c, id, &abi::Damage::new(f32::MAX, weft_abi::damage_cause::VOID));
         }
     }
 }
 
-unsafe extern "C" fn entity_push(w: *mut abi::WorldCtx, id: u64, v: *const [f64; 3]) {
+unsafe extern "C" fn entity_push(w: *mut abi::WorldCtx, id: u64, v: *const abi::Vec3) {
     unsafe {
-        let v = DVec3::from_array(*v);
+        let v = crate::world::dvec(*v);
         if !v.is_finite() {
             return;
         }
@@ -677,82 +1036,191 @@ unsafe extern "C" fn entity_push(w: *mut abi::WorldCtx, id: u64, v: *const [f64;
     }
 }
 
-unsafe extern "C" fn entity_walk(w: *mut abi::WorldCtx, id: u64, dir: *const [f32; 2], speed: f32, jump: u32) {
+unsafe extern "C" fn entity_walk(w: *mut abi::WorldCtx, id: u64, dir: *const [f32; 2], speed: f32, keys: u32) {
     unsafe {
-        let d = dim(w);
-        let mul = d.attribute(content(), id, crate::server::MOVEMENT_SPEED, false) as f32;
-        let jump_mul = d.attribute(content(), id, crate::server::JUMP_STRENGTH, false) as f32;
-        if let Some(e) = d.entities.get_mut(id) {
-            e.walk = Some((*dir, speed * mul, jump != 0));
+        let (d, c) = (dim(w), content());
+        let mut attr = |a| d.attribute(space_id(w), c, id, a, false) as f32;
+        use crate::registry::attr as a;
+        let (mul, jump_mul, can_fly, can_sprint) = (attr(a::MOVEMENT_SPEED), attr(a::JUMP_STRENGTH), attr(a::CAN_FLY), attr(a::CAN_SPRINT));
+        if let Some(e) = d.entities.get_mut(id).filter(|e| !e.player) {
+            // What it may not do, its keys don't do: as a hungry player's sprint key.
+            let keys = if can_sprint < 1.0 { keys & !abi::walk::SPRINT } else { keys };
+            e.walk = Some(crate::server::entity::Walk { dir: *dir, speed: speed * mul, keys });
             e.jump_mul = jump_mul;
+            // It takes off with the key, and comes down when it may fly no more or lands.
+            if keys & abi::walk::FLY != 0 || can_fly < 1.0 {
+                e.flying = keys & abi::walk::FLY != 0 && can_fly >= 1.0;
+            }
         }
     }
 }
 
-unsafe extern "C" fn entity_look_at(
-    w: *mut abi::WorldCtx,
-    id: u64,
-    max: f64,
-    liquids: u32,
-    pos: *mut [i32; 3],
-    face: *mut u32,
-    frame: *mut u64,
-) -> u32 {
+unsafe extern "C" fn entity_fly(w: *mut abi::WorldCtx, id: u64, dir: *const [f32; 3], speed: f32) {
     unsafe {
-        let Some(hit) = dim(w).look_ray(content(), id, max, liquids != 0) else { return 0 };
-        *pos = hit.block.to_array();
-        *face = hit.face as u32;
-        *frame = hit.frame;
-        hit.state + 1
+        let d = dim(w);
+        let mul = d.attribute(space_id(w), content(), id, crate::registry::attr::MOVEMENT_SPEED, false) as f32;
+        if let Some(e) = d.entities.get_mut(id) {
+            e.fly = Some((*dir, speed * mul));
+        }
     }
 }
 
-unsafe extern "C" fn entity_damage(w: *mut abi::WorldCtx, id: u64, amount: f32, source: u64, cause: u32) -> u32 {
-    unsafe { dim(w).damage(content(), id, amount, source, cause) as u32 }
+unsafe extern "C" fn entity_ignite(w: *mut abi::WorldCtx, id: u64, ticks: u32) {
+    unsafe {
+        if let Some(e) = dim(w).entities.get_mut(id) {
+            e.fire = e.fire.max(ticks);
+        }
+    }
+}
+
+unsafe extern "C" fn raycast(
+    w: *mut abi::WorldCtx,
+    from: *const abi::Vec3,
+    dir: *const abi::Vec3,
+    max: f64,
+    flags: u32,
+    skip: u64,
+    out: *mut abi::RayHit,
+) -> u32 {
+    unsafe {
+        let hit =
+            dim(w).raycast(space_id(w), content(), crate::world::dvec(*from), crate::world::dvec(*dir), max.min(1024.0), flags, &[skip]);
+        if let Some(h) = hit {
+            *out = h;
+        }
+        hit.is_some() as u32
+    }
+}
+
+unsafe extern "C" fn entity_damage(w: *mut abi::WorldCtx, id: u64, damage: *const abi::Damage) -> u32 {
+    unsafe { dim(w).damage(space_id(w), content(), id, &*damage) as u32 }
+}
+
+unsafe extern "C" fn entity_in_reach(w: *mut abi::WorldCtx, id: u64, target: u64) -> u32 {
+    unsafe { crate::server::actions::in_reach(content(), dim(w), id, target) as u32 }
+}
+
+unsafe extern "C" fn entity_item(w: *mut abi::WorldCtx, id: u64) -> ItemStack {
+    unsafe {
+        dim(w)
+            .entities
+            .get(id)
+            .filter(|e| !e.removed)
+            .map_or(ItemStack::EMPTY, |e| e.item)
+    }
+}
+
+unsafe extern "C" fn entity_set_item(w: *mut abi::WorldCtx, id: u64, stack: ItemStack) {
+    unsafe {
+        // Only a dropped item (one that carries a stack) changes; an empty one is gone, as when
+        // it's picked up.
+        if let Some(e) = dim(w)
+            .entities
+            .get_mut(id)
+            .filter(|e| !e.removed && !e.item.is_empty())
+        {
+            if stack.is_empty() {
+                e.removed = true;
+            } else {
+                e.item = stack;
+            }
+        }
+    }
 }
 
 unsafe extern "C" fn entity_attack(w: *mut abi::WorldCtx, attacker: u64, target: u64) -> u32 {
-    unsafe { dim(w).melee(content(), attacker, target) as u32 }
+    unsafe { dim(w).melee(space_id(w), content(), attacker, target) as u32 }
 }
 
-unsafe extern "C" fn entities_near_bodies(w: *mut abi::WorldCtx, pos: *const [f64; 3], radius: f64, out: *mut u64, max: usize) -> usize {
+unsafe extern "C" fn in_liquid(w: *mut abi::WorldCtx, pos: *const abi::Vec3) -> u32 {
     unsafe {
-        let ids = dim(w)
-            .entities
-            .near_bodies(content(), dim(w).place.to_world(DVec3::from_array(*pos)), radius);
-        for (i, id) in ids.iter().take(max).enumerate() {
-            *out.add(i) = *id;
-        }
-        ids.len()
+        dim(w)
+            .observed_liquid_at(space_id(w), content(), crate::world::dvec(*pos))
+            .is_some() as u32
     }
 }
 
-unsafe extern "C" fn in_liquid(w: *mut abi::WorldCtx, pos: *const [f64; 3]) -> u32 {
+unsafe extern "C" fn entity_use_item(w: *mut abi::WorldCtx, id: u64, off: u32, target: *const abi::BlockPos, face: u32) -> u32 {
+    unsafe {
+        let (d, c) = (dim(w), content());
+        let Some(e) = d.entities.get(id) else { return 0 };
+        let inv = d.entities.inventories.get(&id).map_or(&[][..], |i| &i[..]);
+        // The main hand as `content::in_main_hand` has it: none while both are needed.
+        let main = !crate::content::in_main_hand(c, e.kind, inv, e.selected).is_empty();
+        let slot = if off != 0 { c.game.entities[e.kind as usize].off } else { main.then_some(e.selected) };
+        let target = (!target.is_null()).then(|| (ip(target), face.min(5) as u8));
+        slot.is_some_and(|slot| d.use_in_hand(space_id(w), c, id, slot, target, false)) as u32
+    }
+}
+
+unsafe extern "C" fn entity_release_use(w: *mut abi::WorldCtx, id: u64) {
+    unsafe { dim(w).release_use(space_id(w), content(), id) }
+}
+
+unsafe extern "C" fn player_info(w: *mut abi::WorldCtx, id: u64, out: *mut abi::PlayerInfo) -> u32 {
+    let identities = (unsafe { dim(w) }).player_identities.read();
+    let Some(identity) = identities.get(&id) else { return 0 };
+    unsafe { *out = abi::PlayerInfo { name: Str::new(&identity.name), key: Str::new(&identity.key) } };
+    1
+}
+
+unsafe extern "C" fn entity_key(w: *mut abi::WorldCtx, player: u64, key: Str, out: *mut abi::KeyState) {
+    unsafe {
+        let (d, c) = (dim(w), content());
+        let id = c.game.keys.iter().position(|k| k.name == key.as_str());
+        let since = id.and_then(|id| {
+            d.entities
+                .get(player)?
+                .keys
+                .iter()
+                .find(|k| k.0 == id as u32)
+                .map(|k| k.1)
+        });
+        *out = abi::KeyState {
+            held: since.is_some() as u32,
+            held_ticks: since.map_or(0, |s| d.time.saturating_sub(s) as u32),
+            ..Default::default()
+        };
+    }
+}
+
+unsafe extern "C" fn entity_mine(w: *mut abi::WorldCtx, id: u64, pos: *const abi::BlockPos) -> u32 {
     unsafe {
         let d = dim(w);
-        crate::physics::liquid_at(content(), &|p| d.get(p), DVec3::from_array(*pos)).is_some() as u32
+        if pos.is_null() {
+            d.stop_mining(id);
+            return 1;
+        }
+        d.block_at(0, content(), ip(pos))
+            .and_then(|(p, state)| d.resident(0, p, state).map(|part| (p, part)))
+            .is_some_and(|(p, part)| d.start_mining(content(), id, 0, p, part)) as u32
     }
 }
 
 unsafe extern "C" fn entity_swing_strength(w: *mut abi::WorldCtx, id: u64) -> f32 {
     unsafe {
         let d = dim(w);
-        d.swing_strength(content(), id, d.entities.held(id))
+        d.swing_strength(space_id(w), content(), id, d.entities.held(id))
     }
 }
 
-unsafe extern "C" fn entities_near(
+unsafe extern "C" fn entities_in(
     w: *mut abi::WorldCtx,
-    pos: *const [f64; 3],
-    radius: f64,
+    shape: abi::Slice<abi::ShapeStep>,
     kind: u32,
+    flags: u32,
     out: *mut u64,
     max: usize,
 ) -> usize {
     unsafe {
-        let ids = dim(w)
+        let Some(shape) = crate::shape::Shape::from_abi(shape.as_slice()) else {
+            misuse("entities_in", || "the shape's steps don't make one shape".to_string());
+            return 0;
+        };
+        let d = dim(w);
+        let ids = d
             .entities
-            .near(dim(w).place.to_world(DVec3::from_array(*pos)), radius, kind);
+            .within(content(), &d.space_pose(space_id(w)), &shape, kind, flags);
         for (i, id) in ids.iter().take(max).enumerate() {
             *out.add(i) = *id;
         }
@@ -785,31 +1253,27 @@ unsafe extern "C" fn player_at(w: *mut abi::WorldCtx, index: u32) -> u64 {
     }
 }
 
-unsafe extern "C" fn inv_size(w: *mut abi::WorldCtx, owner: u64) -> u32 {
-    unsafe {
-        dim(w)
-            .entities
-            .inventories
-            .get(&owner)
-            .map_or(0, |i| i.len() as u32)
-    }
+/// What `holder` points at here, `None` (and nothing done) when it isn't.
+unsafe fn held(w: *mut abi::WorldCtx, h: *const abi::Holder) -> Option<crate::server::holder::At> {
+    unsafe { crate::server::holder::resolve(dim(w), space_id(w), &*h) }
 }
 
-unsafe extern "C" fn inv_get(w: *mut abi::WorldCtx, owner: u64, slot: u32) -> ItemStack {
-    unsafe {
-        dim(w)
-            .entities
-            .inventories
-            .get(&owner)
-            .and_then(|i| i.get(slot as usize))
-            .copied()
-            .unwrap_or_default()
-    }
+/// The inventory `holder` points at here, `None` (and nothing done) when there is none.
+unsafe fn inventory(w: *mut abi::WorldCtx, h: *const abi::Holder) -> Option<crate::server::holder::Inv> {
+    unsafe { crate::server::holder::inventory(dim(w), space_id(w), content(), &*h) }
+}
+
+unsafe extern "C" fn inventory_len(w: *mut abi::WorldCtx, h: *const abi::Holder) -> u32 {
+    unsafe { inventory(w, h).map_or(0, |inv| crate::server::holder::len(dim(w), content(), inv)) }
+}
+
+unsafe extern "C" fn inventory_get(w: *mut abi::WorldCtx, h: *const abi::Holder, slot: u32) -> ItemStack {
+    unsafe { inventory(w, h).map_or(ItemStack::EMPTY, |inv| crate::server::holder::get(dim(w), content(), inv, slot)) }
 }
 
 /// A stack from a mod: anything it says goes into saves and on screen, where a wrong id would
 /// bring down the game instead of naming the mod.
-fn known_item(what: &'static str, stack: &ItemStack) -> bool {
+pub(crate) fn known_item(what: &'static str, stack: &ItemStack) -> bool {
     let known = stack.is_empty() || (stack.item as usize) < content().items.len();
     if !known {
         misuse(what, || format!("no item with id {}", stack.item));
@@ -817,89 +1281,88 @@ fn known_item(what: &'static str, stack: &ItemStack) -> bool {
     known
 }
 
-unsafe extern "C" fn inv_set(w: *mut abi::WorldCtx, owner: u64, slot: u32, stack: ItemStack) {
-    if known_item("inv_set", &stack) {
-        unsafe { dim(w).entities.set_slot(owner, slot, stack) }
+unsafe extern "C" fn inventory_set(w: *mut abi::WorldCtx, h: *const abi::Holder, slot: u32, stack: ItemStack) {
+    if known_item("inventory_set", &stack) {
+        unsafe {
+            if let Some(inv) = inventory(w, h) {
+                crate::server::holder::set(dim(w), content(), inv, slot, stack)
+            }
+        }
     }
 }
 
-unsafe extern "C" fn inv_insert(w: *mut abi::WorldCtx, owner: u64, stack: ItemStack) -> ItemStack {
-    if !known_item("inv_insert", &stack) {
+unsafe extern "C" fn inventory_insert(w: *mut abi::WorldCtx, h: *const abi::Holder, stack: ItemStack) -> ItemStack {
+    if !known_item("inventory_insert", &stack) {
         return ItemStack::EMPTY;
     }
-    unsafe { dim(w).entities.insert_item(content(), owner, stack) }
+    unsafe {
+        match inventory(w, h) {
+            Some(inv) => crate::server::holder::insert(dim(w), content(), inv, stack),
+            None => stack,
+        }
+    }
+}
+
+unsafe extern "C" fn inventory_move(w: *mut abi::WorldCtx, moves: abi::Slice<abi::ItemMove<abi::InventorySlot>>) -> u32 {
+    if moves.len > abi::MAX_ITEM_MOVES {
+        return 0;
+    }
+    unsafe { crate::server::holder::move_items(dim(w), content(), moves.as_slice()) as u32 }
+}
+
+unsafe extern "C" fn inventory_move_into(w: *mut abi::WorldCtx, from: abi::InventorySlot, to: *const abi::Holder) -> u32 {
+    unsafe { crate::server::holder::move_into(dim(w), content(), from, *to, space_id(w)) }
 }
 
 unsafe extern "C" fn selected_slot(w: *mut abi::WorldCtx, player: u64) -> u32 {
     unsafe { dim(w).entities.get(player).map_or(0, |e| e.selected) }
 }
 
-unsafe extern "C" fn spawn_item(w: *mut abi::WorldCtx, pos: *const [f64; 3], stack: ItemStack) {
-    unsafe {
-        dim(w).spawn_item(content(), DVec3::from_array(*pos), stack);
-    }
+unsafe extern "C" fn block_entity(w: *mut abi::WorldCtx, pos: *const abi::BlockPos) -> u64 {
+    unsafe { dim(w).anchored(space_id(w), ip(pos)).unwrap_or(0) }
 }
 
-unsafe extern "C" fn block_entity(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u64 {
-    unsafe { dim(w).anchored(ip(pos)).unwrap_or(0) }
-}
-
-unsafe extern "C" fn open_menu(w: *mut abi::WorldCtx, player: u64, menu: u32, owner: u64) {
+unsafe extern "C" fn open_menu(w: *mut abi::WorldCtx, player: u64, menu: u32, h: *const abi::Holder) -> u32 {
+    use crate::server::holder::{self, At};
     unsafe {
         let d = dim(w);
         let c = content();
         let Some(def) = c.game.menus.get(menu as usize) else {
             log::error!("open_menu: there is no menu {menu}");
-            return;
+            return 0;
         };
-        if owner != 0 && d.entities.get(owner).is_none_or(|e| e.removed) {
-            log::error!("open_menu {}: entity {owner} is not here (removed, or in another region)", def.name);
-            return;
-        }
+        let h = &*h;
+        let on = match holder::inventory(d, space_id(w), c, h) {
+            _ if h.kind == abi::holder::NONE => None,
+            Some(inv) if matches!(inv.at, At::Entity(_)) || holder::len(d, c, inv) > 0 => Some(inv),
+            found => {
+                let what = match h.kind {
+                    _ if h.storage != 0 && holder::resolve(d, space_id(w), h).is_some() => {
+                        let name = c
+                            .game
+                            .components
+                            .get(h.storage as usize)
+                            .map_or("?", |d| d.name.as_str());
+                        format!("storage {name}, which isn't one or isn't carried there")
+                    }
+                    abi::holder::BLOCK => {
+                        let p = crate::world::ivec(h.pos);
+                        d.get(space_id(w), p)
+                            .map_or("an unloaded block".to_string(), |s| format!("{} at {p}, which has no block entity", c.state_name(s)))
+                    }
+                    abi::holder::HELD if found.is_some() => {
+                        format!("the stack in slot {} of entity {}, which holds no items", h.slot, h.entity)
+                    }
+                    abi::holder::HELD => format!("slot {} of entity {}, which isn't here", h.slot, h.entity),
+                    _ => format!("entity {} (removed, or in another region)", h.entity),
+                };
+                log::error!("cannot open menu {} on {what}", def.name);
+                return 0;
+            }
+        };
         d.events
-            .push(crate::server::DimEvent::OpenMenu { player, menu, owner, block: 0 })
-    }
-}
-
-unsafe extern "C" fn open_menu_at(w: *mut abi::WorldCtx, player: u64, menu: u32, pos: *const [i32; 3]) -> u32 {
-    unsafe {
-        let d = dim(w);
-        let p = ip(pos);
-        let c = content();
-        let name = c
-            .game
-            .menus
-            .get(menu as usize)
-            .map_or("?", |m| m.name.as_str());
-        match d.anchored(p) {
-            Some(owner) => {
-                open_menu(w, player, menu, owner);
-                1
-            }
-            None => {
-                let what = d
-                    .get(p)
-                    .map_or("an unloaded block".to_string(), |s| c.state_name(s));
-                log::error!("cannot open menu {name} at {p}: {what} has no block entity");
-                0
-            }
-        }
-    }
-}
-
-unsafe extern "C" fn inventory_create(w: *mut abi::WorldCtx, slots: u32, pos: *const [f64; 3]) -> u64 {
-    unsafe {
-        let d = dim(w);
-        let c = content();
-        let id = d.new_id();
-        let p = DVec3::from_array(*pos);
-        let e =
-            crate::server::entity::Entity::new(id, c.game.virtual_kind, if p.is_finite() { d.place.to_world(p) } else { DVec3::ZERO }, 1.0);
-        d.entities.insert(c, e);
-        d.entities
-            .inventories
-            .insert(id, vec![ItemStack::EMPTY; slots.min(1 << 16) as usize]);
-        id
+            .push(crate::server::DimEvent::OpenMenu { player, menu, on, block: 0 });
+        1
     }
 }
 
@@ -918,15 +1381,19 @@ unsafe extern "C" fn skip_ticks(w: *mut abi::WorldCtx, ticks: u64) {
     }
 }
 
-unsafe extern "C" fn entity_teleport(w: *mut abi::WorldCtx, id: u64, to: u32, pos: *const [f64; 3]) {
+unsafe extern "C" fn entity_teleport(w: *mut abi::WorldCtx, id: u64, to: u32, pos: *const abi::Vec3) {
     unsafe {
         let d = dim(w);
-        d.events
-            .push(crate::server::DimEvent::Teleport { from: d.id, id, dim: to, pos: d.place.to_world(DVec3::from_array(*pos)) })
+        d.events.push(crate::server::DimEvent::Teleport {
+            from: d.id,
+            id,
+            dim: to,
+            pos: d.space_pose(space_id(w)).to_world(crate::world::dvec(*pos)),
+        })
     }
 }
 
-unsafe extern "C" fn set_time(w: *mut abi::WorldCtx, time: u64) {
+unsafe extern "C" fn set_day_time(w: *mut abi::WorldCtx, time: u64) {
     unsafe {
         let d = dim(w);
         d.events
@@ -934,28 +1401,112 @@ unsafe extern "C" fn set_time(w: *mut abi::WorldCtx, time: u64) {
     }
 }
 
-unsafe extern "C" fn area_fill(w: *mut abi::WorldCtx, desc: *const abi::AreaFillDesc) {
+unsafe extern "C" fn set_day_rate(w: *mut abi::WorldCtx, rate: f32) {
+    unsafe {
+        let d = dim(w);
+        d.events
+            .push(crate::server::DimEvent::SetDayRate { dim: d.id, rate })
+    }
+}
+
+unsafe extern "C" fn fill(w: *mut abi::WorldCtx, desc: *const abi::FillDesc) {
     unsafe {
         let d = dim(w);
         let a = &*desc;
-        if d.frame != 0 || !a.radius.is_finite() || a.radius <= 0.0 || a.state as usize >= crate::content::content().states.len() {
+        let c = content();
+        if space_id(w) != 0 {
+            misuse("fill", || "fills are for the world, not a body's blocks".to_string());
             return;
         }
-        let fill = crate::server::area::AreaFill {
-            id: 0,
-            center: DVec3::from_array(a.center),
-            radius: a.radius,
-            state: a.state,
-            keep_unbreakable: a.flags & abi::area_flags::KEEP_UNBREAKABLE != 0,
-            keep_liquids: a.flags & abi::area_flags::KEEP_LIQUIDS != 0,
+        let Some(shape) = crate::shape::Shape::from_abi(a.shape.as_slice()) else {
+            misuse("fill", || "the shape's steps don't make one shape".to_string());
+            return;
+        };
+        if !known_state("fill", a.state) {
+            return;
+        }
+        let fill = match crate::server::area::AreaFill::new(c, shape, a.state, a.keep.as_str(), a.only.as_str()) {
+            Ok(f) => f,
+            Err(e) => {
+                misuse("fill", || e);
+                return;
+            }
         };
         d.events
             .push(crate::server::DimEvent::AreaFill { dim: d.id, fill });
     }
 }
 
+unsafe extern "C" fn shape_contains(shape: abi::Slice<abi::ShapeStep>, p: *const abi::Vec3) -> u32 {
+    unsafe { crate::shape::Shape::from_abi(shape.as_slice()).is_some_and(|s| s.contains(crate::world::dvec(*p))) as u32 }
+}
+
+unsafe extern "C" fn shape_bounds(shape: abi::Slice<abi::ShapeStep>, min: *mut abi::Vec3, max: *mut abi::Vec3) -> u32 {
+    unsafe {
+        let Some(s) = crate::shape::Shape::from_abi(shape.as_slice()) else { return 0 };
+        let (lo, hi) = s.bounds();
+        (*min, *max) = (lo.to_array().into(), hi.to_array().into());
+        1
+    }
+}
+
+unsafe extern "C" fn force_load(
+    w: *mut abi::WorldCtx,
+    key: u64,
+    from: *const abi::BlockPos,
+    to: *const abi::BlockPos,
+    mode: u32,
+    ticks: u32,
+) -> u32 {
+    unsafe {
+        let d = dim(w);
+        let (a, b) = (crate::world::ivec(*from), crate::world::ivec(*to));
+        if mode != abi::force_load::OFF {
+            let mut q = abi::Query { other: key, pos: *from, amount: mode as f64, ..abi::Query::DEFAULT };
+            if !d.ask(space_id(w), content(), abi::action::FORCE_LOAD, &mut q) {
+                return 0;
+            }
+        }
+        let (a, b) = (
+            d.space_pose(space_id(w))
+                .to_world(a.as_dvec3())
+                .floor()
+                .as_ivec3(),
+            d.space_pose(space_id(w))
+                .to_world(b.as_dvec3())
+                .floor()
+                .as_ivec3(),
+        );
+        d.events.push(crate::server::DimEvent::ForceLoad {
+            dim: d.id,
+            key,
+            min: crate::world::cube_of(a.min(b)),
+            max: crate::world::cube_of(a.max(b)),
+            mode,
+            ticks,
+        });
+        1
+    }
+}
+
+unsafe extern "C" fn asset_exists(name: Str, kind: Str, ext: Str) -> u32 {
+    unsafe { crate::modloader::asset_exists(name.as_str(), kind.as_str(), ext.as_str()) as u32 }
+}
+
+unsafe extern "C" fn ease(kind: u32, t: f32) -> f32 {
+    crate::client::camera::ease(kind, t)
+}
+
+unsafe extern "C" fn player_camera(w: *mut abi::WorldCtx, player: u64, mode: u32, locked: u32, transition: f32, easing: u32) {
+    unsafe {
+        dim(w)
+            .events
+            .push(crate::server::DimEvent::Camera { player, mode, locked: locked != 0, transition, easing })
+    }
+}
+
 unsafe extern "C" fn set_game_mode(w: *mut abi::WorldCtx, player: u64, mode: u32) {
-    let mode = crate::world::GameMode::from_u8(mode.min(255) as u8);
+    let mode = crate::world::GameMode::from_id(mode);
     unsafe {
         dim(w)
             .events
@@ -963,12 +1514,12 @@ unsafe extern "C" fn set_game_mode(w: *mut abi::WorldCtx, player: u64, mode: u32
     }
 }
 
-unsafe extern "C" fn send_packet(w: *mut abi::WorldCtx, player: u64, name: Str, schema: Str, data: abi::Slice<u8>) {
+unsafe extern "C" fn send_packet(w: *mut abi::WorldCtx, who: abi::Who, name: Str, schema: Str, data: abi::Slice<u8>) {
     unsafe {
         if let Some(channel) = channel_for(name.as_str(), schema.as_str()) {
-            dim(w)
-                .events
-                .push(crate::server::DimEvent::Packet { player, channel, data: data.as_slice().to_vec() });
+            let d = dim(w);
+            d.events
+                .push(crate::server::DimEvent::Packet { dim: d.id, who, channel, data: data.as_slice().to_vec() });
         }
     }
 }
@@ -1000,7 +1551,11 @@ unsafe extern "C" fn find_component(name: Str, schema: Str) -> u32 {
     id
 }
 
-unsafe extern "C" fn components() -> *const abi::ComponentTable {
+extern "C" fn matcher_has(matcher: u32, state: u32) -> u32 {
+    try_content().is_some_and(|c| c.matchers.has(matcher, state)) as u32
+}
+
+unsafe extern "C" fn component_table() -> *const abi::ComponentTable {
     try_content().map_or(std::ptr::null(), |c| c.components.table())
 }
 
@@ -1018,30 +1573,188 @@ unsafe extern "C" fn stack_get(data: u32, comp: u32, len: *mut usize) -> *const 
 
 unsafe extern "C" fn stack_with(data: u32, comp: u32, value: abi::Slice<u8>, remove: u32) -> u32 {
     if try_content().is_none_or(|c| comp >= c.components.count()) {
+        misuse("stack_with", || "a component nobody declared: r.stack_component(&COMP, 0) makes it one".to_string());
         return data;
     }
     let bytes = unsafe { value.as_slice() };
     crate::stack::with(data, comp, (remove == 0).then_some(bytes))
 }
 
-unsafe extern "C" fn energy_insert(w: *mut abi::WorldCtx, id: u64, amount: i64, simulate: u32) -> i64 {
-    unsafe { crate::server::energy::insert(&mut dim(w).entities, content(), id, amount, simulate != 0) }
+unsafe extern "C" fn storage_slots(comp: u32) -> u32 {
+    try_content()
+        .and_then(|c| crate::server::holder::storage_slots(c, comp))
+        .unwrap_or(0)
 }
 
-unsafe extern "C" fn energy_extract(w: *mut abi::WorldCtx, id: u64, amount: i64, simulate: u32) -> i64 {
-    unsafe { crate::server::energy::extract(&mut dim(w).entities, content(), id, amount, simulate != 0) }
+unsafe extern "C" fn component_info(comp: u32, name: *mut Str, schema: *mut Str) -> u32 {
+    let Some(c) = try_content() else { return 0 };
+    let Some(n) = c.components.names.get(comp as usize) else { return 0 };
+    let s = c
+        .components
+        .schemas
+        .get(comp as usize)
+        .map_or("", String::as_str);
+    unsafe {
+        *name = Str::new(n);
+        *schema = Str::new(s);
+    }
+    1
 }
 
-unsafe extern "C" fn gizmo_on(w: *mut abi::WorldCtx, group: Str) -> u32 {
+unsafe extern "C" fn block_info(state: u32, out: *mut abi::BlockInfo) -> u32 {
+    let Some(c) = try_content() else { return 0 };
+    let Some(s) = c.states.get(state as usize) else { return 0 };
+    let b = &c.blocks[s.block as usize];
+    let tex = |i: u32| {
+        c.textures
+            .get(i as usize)
+            .map_or(Str::EMPTY, |t| Str::new(t))
+    };
+    let item = c
+        .items
+        .iter()
+        .position(|i| i.block == Some(b.first_state))
+        .map_or(u32::MAX, |i| i as u32);
+    unsafe {
+        *out = abi::BlockInfo {
+            block: s.block,
+            first_state: b.first_state,
+            states: b.states,
+            name: Str::new(&b.name),
+            owner: Str::new(c.mod_name(b.owner)),
+            flags: s.flags,
+            opacity: s.opacity as u32,
+            light: s.light,
+            absorb: s.absorb,
+            layer: s.layer,
+            model: s.model,
+            hardness: s.hardness,
+            friction: s.friction,
+            drag: s.drag,
+            textures: s.textures.map(tex),
+            liquid: s.liquid.map_or(u32::MAX, |l| l as u32),
+            item,
+        };
+    }
+    1
+}
+
+unsafe extern "C" fn item_info(item: u32, out: *mut abi::ItemInfo) -> u32 {
+    let Some(c) = try_content() else { return 0 };
+    let Some(d) = c.items.get(item as usize) else { return 0 };
+    let worn = d
+        .equip
+        .and_then(|e| c.game.player_layout.equipment.get(e as usize))
+        .map_or(Str::EMPTY, |e| Str::new(&e.group.name));
+    unsafe {
+        *out = abi::ItemInfo {
+            name: Str::new(&d.name),
+            owner: Str::new(c.mod_name(d.owner)),
+            max_stack: c.max_stack(&abi::ItemStack::new(item, 1)),
+            durability: c.item_value(item, c.ids.durability).unwrap_or(0),
+            attack: c.item_value(item, c.ids.attack_damage).unwrap_or(1.0),
+            block: d.block.unwrap_or(u32::MAX),
+            worn,
+            handheld: c.item_has(item, c.ids.handheld) as u32,
+        };
+    }
+    1
+}
+
+unsafe extern "C" fn energy_move(w: *mut abi::WorldCtx, h: *const abi::Holder, amount: i64, simulate: u32) -> i64 {
+    unsafe { held(w, h).map_or(0, |at| crate::server::holder::move_energy(dim(w), content(), at, amount, simulate != 0)) }
+}
+
+unsafe extern "C" fn component_get(w: *mut abi::WorldCtx, h: *const abi::Holder, comp: u32, out: *mut u8, cap: u32) -> u32 {
+    unsafe {
+        let copy = |v: &[u8]| {
+            std::ptr::copy_nonoverlapping(v.as_ptr(), out, v.len().min(cap as usize));
+            v.len() as u32
+        };
+        match held(w, h) {
+            // An entity's straight from where it lives: mob AI reads several a mob a tick.
+            Some(crate::server::holder::At::Entity(id)) => dim(w)
+                .entities
+                .comps
+                .get(&(id, comp))
+                .map_or(0, |v| copy(v)),
+            Some(at) => crate::server::holder::component(dim(w), at, comp).map_or(0, |v| copy(&v)),
+            None => 0,
+        }
+    }
+}
+
+unsafe extern "C" fn environment_set(w: *mut abi::WorldCtx, entity: u64, name: abi::Str, data: abi::Slice<u8>) -> u32 {
+    unsafe {
+        let d = dim(w);
+        if d.entities.get(entity).is_none_or(|e| e.removed) {
+            return 0;
+        }
+        let c = content();
+        let id = c.components.id(abi::environment::COMPONENT).unwrap();
+        let old = d
+            .entities
+            .comps
+            .get(&(entity, id))
+            .map_or(&[][..], |b| b.as_ref());
+        let mut layers: Vec<abi::environment::EnvironmentLayer> = abi::data::from_bytes(old).unwrap_or_default();
+        let key = name.as_str();
+        if !data.as_slice().is_empty() {
+            let Some(mut layer) = abi::data::from_bytes::<abi::environment::EnvironmentLayer>(data.as_slice()) else { return 0 };
+            layer.name = key.to_string();
+            layers.retain(|l| l.name != key);
+            layers.push(layer);
+        } else {
+            layers.retain(|l| l.name != key);
+        }
+        d.entities
+            .comps
+            .insert((entity, id), abi::data::bytes_of(&layers).into_boxed_slice());
+        1
+    }
+}
+
+unsafe extern "C" fn component_set(w: *mut abi::WorldCtx, h: *const abi::Holder, comp: u32, value: abi::Slice<u8>) -> u32 {
+    unsafe {
+        let v = value.as_slice();
+        held(w, h).is_some_and(|at| crate::server::holder::set_component(dim(w), content(), at, comp, (!v.is_empty()).then_some(v))) as u32
+    }
+}
+
+unsafe extern "C" fn gizmo_shown(w: *mut abi::WorldCtx, group: Str) -> u32 {
     unsafe { dim(w).gizmo_groups.iter().any(|g| g == group.as_str()) as u32 }
 }
 
 unsafe extern "C" fn gizmo(
     w: *mut abi::WorldCtx,
+    who: abi::Who,
     group: Str,
     kind: u32,
-    a: *const [f64; 3],
-    b: *const [f64; 3],
+    a: *const abi::Vec3,
+    b: *const abi::Vec3,
+    color: u32,
+    ticks: u32,
+) {
+    unsafe {
+        let d = dim(w);
+        let group = group.as_str();
+        if kind > abi::gizmo_kind::FILL || !d.gizmo_seen(group) {
+            return;
+        }
+        let (a, b) =
+            (d.space_pose(space_id(w)).to_world(crate::world::dvec(*a)), d.space_pose(space_id(w)).to_world(crate::world::dvec(*b)));
+        d.gizmos
+            .push((who, crate::net::GizmoShape::shape(group, kind as u8, a, b, color, ticks.max(1))));
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+unsafe extern "C" fn gizmo_text(
+    w: *mut abi::WorldCtx,
+    who: abi::Who,
+    group: Str,
+    pos: *const abi::Vec3,
+    size: f32,
     color: u32,
     ticks: u32,
     key: Str,
@@ -1050,19 +1763,13 @@ unsafe extern "C" fn gizmo(
     unsafe {
         let d = dim(w);
         let group = group.as_str();
-        if kind > abi::gizmo_kind::FILL || !d.gizmo_groups.iter().any(|g| g == group) {
+        if !d.gizmo_seen(group) {
             return;
         }
-        let place = d.place;
-        d.gizmos.push(crate::net::GizmoShape {
-            group: group.to_string(),
-            kind: kind as u8,
-            a: place.to_world(DVec3::from_array(*a)),
-            b: place.to_world(DVec3::from_array(*b)),
-            color,
-            ticks: ticks.max(1),
-            text: crate::ui::text::Msg::new(key.as_str(), crate::client::modui::args(args)),
-        });
+        let at = d.space_pose(space_id(w)).to_world(crate::world::dvec(*pos));
+        let text = crate::ui::text::Msg::new(key.as_str(), crate::client::modui::args(args));
+        d.gizmos
+            .push((who, crate::net::GizmoShape::text(group, at, size, color, ticks.max(1), text)));
     }
 }
 
@@ -1072,48 +1779,66 @@ unsafe fn menu<'a>(m: *mut abi::MenuCtx) -> &'a mut MenuCall {
     unsafe { &mut *(m as *mut MenuCall) }
 }
 
-unsafe extern "C" fn menu_group(m: *mut abi::MenuCtx, name: Str, out: *mut [u32; 3]) -> u32 {
+unsafe extern "C" fn menu_group(m: *mut abi::MenuCtx, name: Str, out: *mut abi::SlotGroup) -> u32 {
     unsafe {
         match menu(m).group(content(), name.as_str()) {
-            Some((start, count, cols)) => {
-                *out = [start, count, cols];
+            Some((start, len, cols)) => {
+                *out = abi::SlotGroup { start, len, cols };
                 1
             }
-            None => {
-                misuse("menu group", || format!("the menu has no group {}", name.as_str()));
-                0
-            }
+            None => 0,
         }
     }
 }
 
 /// A machine's group in its entity's inventory: the menu built for its kind says where.
-unsafe extern "C" fn inventory_group(w: *mut abi::WorldCtx, entity: u64, name: Str, out: *mut [u32; 2]) -> u32 {
+unsafe extern "C" fn inventory_group(w: *mut abi::WorldCtx, h: *const abi::Holder, name: Str, out: *mut abi::SlotGroup) -> u32 {
     unsafe {
         let c = content();
+        let entity = match held(w, h) {
+            Some(crate::server::holder::At::Entity(id)) if (*h).storage == 0 => id,
+            _ => return 0,
+        };
         let Some(e) = dim(w).entities.get(entity) else { return 0 };
         let layout = &c.game.player_layout;
         // A player's groups are the player inventory's.
         if e.player {
             return match layout.group(name.as_str()) {
                 Some(g) => {
-                    *out = [g.start, g.count];
+                    *out = g;
                     1
                 }
                 None => 0,
             };
         }
-        let kind_name = &c.game.entities[e.kind as usize].name;
+        // A wearing kind's equipment, each slot named like it.
+        let worn = &c.game.entities[e.kind as usize].worn;
+        let slot = layout
+            .equipment
+            .iter()
+            .position(|q| q.group.name == name.as_str())
+            .map(|i| i as u32);
+        let (start, len) = match slot {
+            _ if name.as_str() == registry::EQUIPMENT_GROUP => (worn.start, worn.len() as u32),
+            Some(i) if i < worn.len() as u32 => (worn.start + i, 1),
+            _ => (0, 0),
+        };
+        if len > 0 {
+            *out = abi::SlotGroup { start, len, cols: 1 };
+            return 1;
+        }
+        // A block entity's are those of the menu its block opens.
         let found = c
             .game
-            .menus
+            .block_entities
             .iter()
-            .filter(|d| &d.entity == kind_name)
-            .find_map(|d| d.group(layout, name.as_str()))
-            .filter(|g| g.0.owner == abi::slot_owner::BLOCK);
+            .find(|&(_, &k)| k == e.kind)
+            .and_then(|(&b, _)| c.blocks[b as usize].opens)
+            .and_then(|m| c.game.menus[m as usize].group(layout, name.as_str()))
+            .filter(|g| g.0.owner == abi::slot_owner::HOLDER);
         match found {
             Some((g, _, n)) => {
-                *out = [g.start, n];
+                *out = abi::SlotGroup { start: g.start, len: n, cols: g.cols };
                 1
             }
             None => 0,
@@ -1121,51 +1846,15 @@ unsafe extern "C" fn inventory_group(w: *mut abi::WorldCtx, entity: u64, name: S
     }
 }
 
-unsafe extern "C" fn reg_player_inventory(r: *mut abi::Registrar, groups: abi::Slice<abi::SlotGroupDesc>) {
-    unsafe {
-        let r = reg(r);
-        let groups = groups
-            .as_slice()
-            .iter()
-            .map(|g| (g.name.as_str().to_string(), g.cols.max(1), g.rows.max(1), g.flags))
-            .collect();
-        r.game.player_inventory = Some((r.owner, groups));
-    }
-}
-
-unsafe extern "C" fn player_group(name: Str, out: *mut [u32; 2]) -> u32 {
+unsafe extern "C" fn player_inventory_group(name: Str, out: *mut abi::SlotGroup) -> u32 {
     unsafe {
         match content().game.player_layout.group(name.as_str()) {
             Some(g) => {
-                *out = [g.start, g.count];
+                *out = g;
                 1
             }
             None => 0,
         }
-    }
-}
-
-unsafe extern "C" fn reg_equipment_slot(r: *mut abi::Registrar, name: Str, parts: u32, background: Str) {
-    unsafe {
-        let r = reg(r);
-        r.game.equipment.push(registry::EquipmentSlot {
-            name: name.as_str().to_string(),
-            parts,
-            background: background.as_str().to_string(),
-        });
-    }
-}
-
-unsafe extern "C" fn reg_screen(r: *mut abi::Registrar, d: *const abi::ScreenDesc) {
-    unsafe {
-        let (r, d) = (reg(r), &*d);
-        r.game.screens.push(registry::ScreenDef {
-            name: d.name.as_str().to_string(),
-            owner: r.owner,
-            cb: d.build,
-            flags: d.flags,
-            on_key: d.on_key,
-        });
     }
 }
 
@@ -1174,7 +1863,9 @@ unsafe extern "C" fn menu_get(m: *mut abi::MenuCtx, slot: u32) -> ItemStack {
 }
 
 unsafe extern "C" fn menu_set(m: *mut abi::MenuCtx, slot: u32, stack: ItemStack) {
-    unsafe { menu(m).set(slot, stack) }
+    if known_item("menu_set", &stack) {
+        unsafe { menu(m).set(slot, stack) }
+    }
 }
 
 // ---------------------------------------------------------------- lookups
@@ -1186,7 +1877,7 @@ unsafe extern "C" fn recipe_match(kind: Str, grid: *const ItemStack, width: u32,
         .collect();
     content()
         .game
-        .match_grid(kind, &cells, width, height, &content().components)
+        .match_grid(kind, &cells, width, height, &content().components, None)
         .map_or(ItemStack::EMPTY, |r| r.result())
 }
 
@@ -1198,20 +1889,65 @@ fn recipe_at(kind: Str, recipe: u32) -> Option<&'static registry::Recipe> {
         .get(recipe as usize)
 }
 
-unsafe extern "C" fn recipe_find(kind: Str, stacks: *const ItemStack, count: u32) -> u32 {
+unsafe extern "C" fn recipe_find(kind: Str, stacks: *const ItemStack, count: u32, from: u32) -> u32 {
     let c = content();
     let stacks = unsafe { std::slice::from_raw_parts(stacks, count as usize) };
     let Some(list) = c.game.recipes.get(unsafe { kind.as_str() }) else { return 0 };
-    list.iter()
-        .position(|r| c.game.find_inputs(r, stacks, &c.components).is_some())
+    (from as usize..list.len())
+        .find(|&i| {
+            c.game
+                .find_inputs(&list[i], stacks, &c.components)
+                .is_some()
+        })
         .map_or(0, |i| i as u32 + 1)
 }
 
 unsafe extern "C" fn recipe_info(kind: Str, recipe: u32, out: *mut abi::RecipeInfo) -> u32 {
     let Some(r) = recipe_at(kind, recipe) else { return 0 };
-    let flags = if r.hidden { abi::recipe_flags::HIDDEN } else { 0 };
-    unsafe { *out = abi::RecipeInfo { time: r.time, inputs: r.inputs.len() as u32, outputs: r.outputs.len() as u32, flags } };
+    let (width, height) = r.shaped.as_ref().map_or((0, 0), |s| (s.0, s.1));
+    unsafe {
+        *out =
+            abi::RecipeInfo { time: r.time, inputs: r.inputs.len() as u32, outputs: r.outputs.len() as u32, entry: r.entry, width, height }
+    };
     1
+}
+
+/// Input `index` of a recipe and how many: a shaped one's cells (all of them), else its inputs.
+fn recipe_cell(r: &registry::Recipe, index: u32) -> Option<(&registry::Ingredient, u32)> {
+    match &r.shaped {
+        Some((_, _, cells)) => cells.get(index as usize).map(|c| (c, 1)),
+        None => r
+            .inputs
+            .get(index as usize)
+            .map(|i| (i, r.input_counts.get(index as usize).copied().unwrap_or(1))),
+    }
+}
+
+unsafe extern "C" fn recipe_input(kind: Str, recipe: u32, index: u32, out: *mut abi::RecipeInput) -> u32 {
+    use abi::recipe_input_kind as k;
+    use registry::Ingredient;
+    let c = content();
+    let Some((ing, count)) = recipe_at(kind, recipe).and_then(|r| recipe_cell(r, index)) else { return 0 };
+    let first_tagged = |t: u32| {
+        (1..c.items.len() as u32)
+            .find(|&i| c.components.has(crate::components::ITEM, i, t))
+            .unwrap_or(0)
+    };
+    let (what, shown) = match ing {
+        Ingredient::Empty => (k::EMPTY, 0),
+        Ingredient::Item(i) => (k::ITEM, *i),
+        Ingredient::Tag(t) => (k::TAG, first_tagged(*t)),
+        Ingredient::Any(list) => (k::ANY, list.first().copied().unwrap_or(0)),
+    };
+    unsafe { *out = abi::RecipeInput { kind: what, count, shown } };
+    1
+}
+
+unsafe extern "C" fn recipe_accepts(kind: Str, recipe: u32, index: u32, item: u32) -> u32 {
+    let c = content();
+    recipe_at(kind, recipe)
+        .and_then(|r| recipe_cell(r, index))
+        .is_some_and(|(ing, _)| !matches!(ing, registry::Ingredient::Empty) && ing.matches(item, &c.components)) as u32
 }
 
 unsafe extern "C" fn recipe_output(kind: Str, recipe: u32, index: u32, stack: *mut ItemStack, chance: *mut f32) -> u32 {
@@ -1226,13 +1962,15 @@ unsafe extern "C" fn recipe_output(kind: Str, recipe: u32, index: u32, stack: *m
     1
 }
 
-unsafe extern "C" fn recipe_value(kind: Str, recipe: u32, component: Str, out: *mut u8, cap: u32) -> u32 {
-    let c = content();
-    let Some(id) = c.components.id(unsafe { component.as_str() }) else { return 0 };
-    let Some(v) = recipe_at(kind, recipe).and_then(|r| r.value(id)) else { return 0 };
-    let n = v.len().min(cap as usize);
-    unsafe { std::ptr::copy_nonoverlapping(v.as_ptr(), out, n) };
-    v.len() as u32
+unsafe extern "C" fn recipe_roll(w: *mut abi::WorldCtx, kind: Str, recipe: u32, out: *mut ItemStack, max: usize) -> usize {
+    let Some(r) = recipe_at(kind, recipe) else { return 0 };
+    unsafe {
+        let stacks = dim(w).roll_table(content(), &r.extras, &Default::default(), DVec3::ZERO, 0);
+        for (i, s) in stacks.iter().take(max).enumerate() {
+            *out.add(i) = *s;
+        }
+        stacks.len()
+    }
 }
 
 unsafe extern "C" fn recipe_consume(kind: Str, recipe: u32, stacks: *mut ItemStack, count: u32) -> u32 {
@@ -1240,17 +1978,11 @@ unsafe extern "C" fn recipe_consume(kind: Str, recipe: u32, stacks: *mut ItemSta
     let Some(r) = recipe_at(kind, recipe) else { return 0 };
     let stacks = unsafe { std::slice::from_raw_parts_mut(stacks, count as usize) };
     let Some(found) = c.game.find_inputs(r, stacks, &c.components) else { return 0 };
-    let counts = r
-        .inputs
-        .iter()
-        .zip(&r.input_counts)
-        .filter(|(i, _)| !matches!(i, registry::Ingredient::Empty))
-        .map(|(_, &n)| n);
-    for (i, n) in found.into_iter().zip(counts) {
-        stacks[i].count -= n;
-        if stacks[i].count == 0 {
-            stacks[i] = ItemStack::EMPTY;
-        }
+    let used = (0..r.inputs.len()).filter(|&k| !matches!(r.inputs[k], registry::Ingredient::Empty));
+    for (i, k) in found.into_iter().zip(used) {
+        let (s, n) = (stacks[i], r.input_counts[k]);
+        let (after, back) = registry::use_ingredient(c, s, r.uses.get(k).copied().unwrap_or(registry::Use::Consume), n, 1);
+        stacks[i] = if after.is_empty() { back } else { after };
     }
     1
 }
@@ -1280,29 +2012,13 @@ unsafe extern "C" fn find(kind: u32, name: Str, count: *mut u32) -> u32 {
     let Some(c) = try_content() else { return u32::MAX };
     let mut n = 1;
     let id = match kind {
-        // `#tag`: the first block carrying it, in mod load order (biome surfaces by tag).
-        // `#tag`: its preferred block (mod load order) or item.
-        abi::entry_kind::BLOCK if name.starts_with('#') => crate::refs::Ref::parse(name)
-            .ok()
-            .and_then(|r| crate::refs::state(&r, &c.block_names, &c.blocks, &c.components).ok())
-            .inspect(|&s| n = c.block_of(s).states),
-        abi::entry_kind::ITEM if name.starts_with('#') => crate::refs::Ref::parse(name)
-            .ok()
-            .and_then(|r| crate::refs::item(&r, &c.item_names, &c.components, &c.tag_items).ok()),
         abi::entry_kind::BLOCK if name.contains('[') => c.state_by_name(name),
-        abi::entry_kind::BLOCK => c.block_names.get(name).map(|&b| {
+        abi::entry_kind::BLOCK => c.game.catalog.find(ek::BLOCK, name).map(|b| {
             n = c.blocks[b as usize].states;
             c.blocks[b as usize].first_state
         }),
-        abi::entry_kind::ITEM => c.item_names.get(name).copied(),
-        abi::entry_kind::ENTITY => c.game.entity_names.get(name).copied(),
-        abi::entry_kind::BIOME => c.biome_names.get(name).copied(),
-        abi::entry_kind::DIMENSION => c.dim_names.get(name).copied(),
-        abi::entry_kind::MENU => c.game.menu_names.get(name).copied(),
-        abi::entry_kind::PARTICLE => c.game.particle_names.get(name).copied(),
-        abi::entry_kind::CONFIG => c.game.config_names.get(name).copied(),
-        abi::entry_kind::SOUND => c.game.sound_names.get(name).copied(),
-        _ => None,
+        ek::COMPONENT => c.components.id(name),
+        _ => c.game.catalog.find(kind, name),
     };
     if !count.is_null() {
         unsafe { *count = if id.is_some() { n } else { 0 } }
@@ -1321,15 +2037,8 @@ unsafe extern "C" fn name_of(kind: u32, id: u32) -> Str {
             });
             names.get(id as usize).map(|s| s.as_str())
         }
-        abi::entry_kind::ITEM => c.items.get(id as usize).map(|i| i.name.as_str()),
-        abi::entry_kind::ENTITY => c.game.entities.get(id as usize).map(|e| e.name.as_str()),
-        abi::entry_kind::BIOME => c.biomes.get(id as usize).map(|b| b.name.as_str()),
-        abi::entry_kind::DIMENSION => c.dims.get(id as usize).map(|d| d.name.as_str()),
-        abi::entry_kind::MENU => c.game.menus.get(id as usize).map(|m| m.name.as_str()),
-        abi::entry_kind::PARTICLE => c.game.particles.get(id as usize).map(|p| p.name.as_str()),
-        abi::entry_kind::CONFIG => c.game.configs.get(id as usize).map(|d| d.name.as_str()),
-        abi::entry_kind::SOUND => c.game.sounds.get(id as usize).map(|d| d.name.as_str()),
-        _ => None,
+        ek::COMPONENT => c.components.names.get(id as usize).map(String::as_str),
+        _ => c.game.catalog.name(kind, id),
     };
     name.map_or(Str::EMPTY, Str::new)
 }
@@ -1351,6 +2060,31 @@ unsafe extern "C" fn state_with(state: u32, name: Str, value: Str) -> u32 {
     unsafe { c.state_with(state, name.as_str(), value.as_str()) }.unwrap_or(u32::MAX)
 }
 
+extern "C" fn state_turned(state: u32, turn: u8) -> u32 {
+    let c = content();
+    match weft_abi::Turn::from_index(turn) {
+        Some(t) if (state as usize) < c.states.len() => c.turned_state(state, t),
+        _ => u32::MAX,
+    }
+}
+
+unsafe extern "C" fn state_cycle(state: u32, name: Str) -> u32 {
+    let c = content();
+    let Some(s) = c.states.get(state as usize) else { return u32::MAX };
+    let name = unsafe { name.as_str() };
+    let Some(prop) = c.blocks[s.block as usize]
+        .props
+        .iter()
+        .find(|p| p.name == name)
+    else {
+        return u32::MAX;
+    };
+    let at = (state - c.blocks[s.block as usize].first_state) / prop.stride.max(1);
+    let next = (at as usize % prop.values.len().max(1) + 1) % prop.values.len().max(1);
+    c.state_with(state, name, &prop.values[next])
+        .unwrap_or(u32::MAX)
+}
+
 unsafe extern "C" fn block_of(state: u32) -> u32 {
     let c = content();
     c.states
@@ -1366,10 +2100,10 @@ unsafe extern "C" fn state_flags(state: u32) -> u32 {
 
 fn level(level: u32) -> log::Level {
     match level {
-        abi::level::ERROR => log::Level::Error,
-        abi::level::WARN => log::Level::Warn,
-        abi::level::DEBUG => log::Level::Debug,
-        abi::level::TRACE => log::Level::Trace,
+        abi::log_level::ERROR => log::Level::Error,
+        abi::log_level::WARN => log::Level::Warn,
+        abi::log_level::DEBUG => log::Level::Debug,
+        abi::log_level::TRACE => log::Level::Trace,
         _ => log::Level::Info,
     }
 }
@@ -1400,79 +2134,6 @@ unsafe fn reg<'a>(r: *mut abi::Registrar) -> &'a mut RawRegistrar {
     unsafe { &mut *(r as *mut RawRegistrar) }
 }
 
-unsafe extern "C" fn reg_block(r: *mut abi::Registrar, d: *const abi::BlockDesc) {
-    unsafe {
-        let b = content::copy_block(&*d);
-        let r = reg(r);
-        if b.states.is_empty() {
-            r.errors.push(format!("block {} has no states", b.name));
-            return;
-        }
-        r.blocks.push(b);
-    }
-}
-
-unsafe extern "C" fn reg_item(r: *mut abi::Registrar, d: *const abi::ItemDesc) {
-    unsafe {
-        let r = reg(r);
-        let mut item = content::copy_item(&*d);
-        item.seq = r.items.len() as u32;
-        r.items.push(item);
-    }
-}
-
-unsafe extern "C" fn reg_biome(r: *mut abi::Registrar, d: *const abi::BiomeDesc) {
-    unsafe {
-        let d = &*d;
-        reg(r).biomes.push((
-            content::BiomeDef { name: d.name.as_str().to_string(), tints: Vec::new() },
-            d.cell as usize,
-            crate::components::RawValue::list(d.components),
-            crate::server::terrain::copy_rule(&d.rule),
-        ));
-    }
-}
-
-unsafe extern "C" fn reg_dimension(r: *mut abi::Registrar, d: *const abi::DimensionDesc) {
-    unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.dims.push(content::copy_dimension(owner, &*d));
-    }
-}
-
-unsafe extern "C" fn reg_entity(r: *mut abi::Registrar, d: *const abi::EntityDesc) {
-    unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.game.entities.push(registry::copy_entity(owner, &*d));
-    }
-}
-
-unsafe extern "C" fn reg_entity_model(r: *mut abi::Registrar, kind: Str, parts: abi::Slice<abi::ModelPart>, uv_width: u32, uv_height: u32) {
-    unsafe {
-        let parts = registry::copy_parts(parts);
-        reg(r)
-            .game
-            .entity_models
-            .push((kind.as_str().to_string(), parts, [uv_width, uv_height]));
-    }
-}
-
-unsafe extern "C" fn reg_component(r: *mut abi::Registrar, d: *const abi::ComponentDesc) {
-    unsafe {
-        let d = &*d;
-        let mut default = d.default.as_slice().to_vec();
-        default.resize(d.value_size as usize, 0);
-        let r = reg(r);
-        r.game.components.push(registry::RawComponent {
-            owner: r.owner,
-            def: registry::ComponentDef { name: d.name.as_str().to_string(), size: d.value_size, flags: d.flags, default, runtime: true },
-            schema: d.schema.as_str().to_string(),
-        });
-    }
-}
-
 unsafe extern "C" fn reg_world_tick(r: *mut abi::Registrar, cb: Callback) {
     unsafe {
         let r = reg(r);
@@ -1481,140 +2142,33 @@ unsafe extern "C" fn reg_world_tick(r: *mut abi::Registrar, cb: Callback) {
     }
 }
 
-unsafe extern "C" fn entity_after(w: *mut abi::WorldCtx, entity: u64, ticks: u32, event: u32, data: abi::Slice<u8>) {
+unsafe extern "C" fn timer(w: *mut abi::WorldCtx, h: *const abi::Holder, ticks: u32, event: u32, data: abi::Slice<u8>) {
     unsafe {
         let c = content();
-        let Some(def) = c.game.events.get(event as usize) else {
-            misuse("after", || format!("no event {event}"));
-            return;
-        };
-        let d = dim(w);
-        if d.entities.get(entity).is_none() {
+        if c.game.events.get(event as usize).is_none() {
+            misuse("timer", || format!("no event {event}"));
             return;
         }
+        let (d, h, data) = (dim(w), &*h, data.as_slice());
         let until = d.time + ticks.max(1) as u64;
-        let list = d
-            .entities
-            .comps
-            .entry((entity, c.game.timers_comp))
-            .or_insert_with(|| Box::new([]));
-        // One timer per entity and event: setting it again moves it.
-        let mut v = Vec::new();
-        for (t, name, value) in crate::server::dim::read_timers(list) {
-            if name != def.name {
-                crate::server::dim::push_timer(&mut v, t, &name, &value);
+        match h.kind {
+            abi::holder::ENTITY if d.entities.get(h.entity).is_some() => {
+                let list = d
+                    .entities
+                    .comps
+                    .entry((h.entity, c.game.timers_comp))
+                    .or_insert_with(|| Box::new([]));
+                let mut v = list.to_vec();
+                crate::server::dim::push_timer(&mut v, until, &c.game.events[event as usize].name, data);
+                *list = v.into_boxed_slice();
             }
+            abi::holder::ENTITY => {}
+            // A block's own tick is the same whoever set it.
+            abi::holder::BLOCK if event == c.game.block_tick => d.schedule(space_id(w), ip(&h.pos), ticks),
+            abi::holder::BLOCK => d.timer_at(space_id(w), ip(&h.pos), ticks, event, data),
+            abi::holder::NONE => d.dim_timers.push((until, event, data.into())),
+            _ => misuse("timer", || "a stack doesn't tick, so it can't hold a timer".into()),
         }
-        crate::server::dim::push_timer(&mut v, until, &def.name, data.as_slice());
-        *list = v.into_boxed_slice();
-    }
-}
-
-unsafe extern "C" fn reg_recipe(r: *mut abi::Registrar, d: *const abi::RecipeDesc) {
-    unsafe { reg(r).game.recipes.push(registry::copy_recipe(&*d)) }
-}
-
-unsafe extern "C" fn reg_menu(r: *mut abi::Registrar, d: *const abi::MenuDesc) {
-    unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.game.menus.push(registry::copy_menu(owner, &*d));
-    }
-}
-
-unsafe extern "C" fn reg_set(r: *mut abi::Registrar, d: *const abi::SetDesc) {
-    use crate::components::Target;
-    unsafe {
-        let d = *d;
-        let r = reg(r);
-        let name = d.target.as_str().to_string();
-        let target = match d.target_kind {
-            // A reference: `#pattern` for everything tagged, else a name.
-            abi::set_target::NAME if name.starts_with('#') => Target::Tagged(name[1..].to_string()),
-            abi::set_target::NAME => Target::Name(name),
-            abi::set_target::TAGGED => Target::Tagged(name),
-            abi::set_target::ENTITY => Target::Entity(name),
-            abi::set_target::BIOME => Target::Biome(name),
-            abi::set_target::DIMENSION => Target::Dimension(name),
-            k => {
-                r.errors
-                    .push(format!("set {}: unknown target kind {k}", d.value.name.as_str()));
-                return;
-            }
-        };
-        let value = crate::components::RawValue::copy(&d.value);
-        r.game
-            .sets
-            .push(crate::components::RawSet { owner: r.owner, target, value, remove: d.remove != 0 });
-    }
-}
-
-unsafe extern "C" fn reg_creative_tab(r: *mut abi::Registrar, name: Str, icon: Str) {
-    unsafe {
-        let r = reg(r);
-        r.game
-            .creative_tabs
-            .push((name.as_str().to_string(), icon.as_str().to_string()));
-    }
-}
-
-unsafe extern "C" fn reg_screen_part(r: *mut abi::Registrar, screen: Str, area: Str, order: i32, cb: Callback) {
-    unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.game.screen_parts.push(registry::ScreenPart {
-            screen: screen.as_str().to_string(),
-            area: area.as_str().to_string(),
-            order,
-            owner,
-            cb,
-        });
-    }
-}
-
-unsafe extern "C" fn reg_scatter(r: *mut abi::Registrar, d: *const abi::ScatterDesc) {
-    unsafe {
-        let r = reg(r);
-        let d = &*d;
-        r.game.scatters.push(registry::RawScatter {
-            owner: r.owner,
-            name: d.name.as_str().to_string(),
-            dimensions: d
-                .dimensions
-                .as_str()
-                .split_whitespace()
-                .map(str::to_string)
-                .collect(),
-            cell: d.cell,
-            reach: d.reach,
-            density: d.density.as_str().to_string(),
-            shape: d.shape,
-        });
-    }
-}
-
-unsafe extern "C" fn reg_decoration(r: *mut abi::Registrar, dimensions: Str, cb: Callback) {
-    unsafe {
-        let r = reg(r);
-        r.game.decorations.push((
-            r.owner,
-            dimensions
-                .as_str()
-                .split_whitespace()
-                .map(str::to_string)
-                .collect(),
-            cb,
-        ));
-    }
-}
-
-unsafe extern "C" fn reg_terrain(r: *mut abi::Registrar, d: *const abi::TerrainDesc) {
-    unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.game
-            .terrain
-            .push(crate::server::terrain::copy(owner, &*d));
     }
 }
 
@@ -1630,54 +2184,12 @@ unsafe extern "C" fn dim_column(dim: u32, seed: u64, x: i32, z: i32, out: *mut a
     1
 }
 
-unsafe extern "C" fn dim_carved(dim: u32, seed: u64, x: i32, z: i32) -> u32 {
-    content()
-        .dims
-        .get(dim as usize)
-        .is_some_and(|d| d.carved(seed, x, z)) as u32
-}
-
-unsafe extern "C" fn dim_surface(dim: u32, seed: u64, x: i32, z: i32) -> u32 {
-    content()
-        .dims
-        .get(dim as usize)
-        .map_or(0, |d| d.surface_block(seed, x, z))
-}
-
-unsafe extern "C" fn reg_ore(r: *mut abi::Registrar, d: *const abi::OreDesc) {
-    unsafe {
-        let r = reg(r);
-        let d = &*d;
-        r.game.ores.push(registry::RawOre {
-            dimensions: d
-                .dimensions
-                .as_str()
-                .split_whitespace()
-                .map(str::to_string)
-                .collect(),
-            block: d.block.as_str().to_string(),
-            replace: d
-                .replace
-                .as_str()
-                .split_whitespace()
-                .map(str::to_string)
-                .collect(),
-            min_y: d.min_y,
-            max_y: d.max_y,
-            veins: d.veins,
-            size: d.blocks,
-            biome: d.biome.as_str().to_string(),
-        });
-    }
-}
-
-unsafe extern "C" fn reg_command(r: *mut abi::Registrar, name: Str, usage: Str, cb: Callback) {
+unsafe extern "C" fn reg_command(r: *mut abi::Registrar, name: Str, usage: Str, client: u32, cb: Callback) {
     unsafe {
         let r = reg(r);
         let owner = r.owner;
-        r.game
-            .commands
-            .push((owner, name.as_str().to_string(), usage.as_str().to_string(), cb));
+        let list = if client != 0 { &mut r.game.client_commands } else { &mut r.game.commands };
+        list.push((owner, name.as_str().to_string(), usage.as_str().to_string(), cb));
     }
 }
 
@@ -1688,130 +2200,44 @@ unsafe extern "C" fn command_reply(args: *mut abi::CommandArgs, key: Str, list: 
     }
 }
 
-unsafe extern "C" fn is_creative(w: *mut abi::WorldCtx, entity: u64) -> u32 {
+/// The text of a `ShowDesc`, to whoever it goes.
+pub(crate) unsafe fn shown(d: &abi::ShowDesc) -> crate::net::Shown {
     unsafe {
-        dim(w)
-            .entities
-            .get(entity)
-            .is_some_and(|e| e.mode.invulnerable()) as u32
+        crate::net::Shown {
+            id: d.id.as_str().to_string(),
+            times: d.times,
+            scale: d.scale,
+            at: (d.at[0] >= 0.0 && d.at[1] >= 0.0).then_some(d.at),
+            color: (d.color >= 0).then_some(d.color as u32),
+            ..crate::net::Shown::new(d.place, crate::ui::text::Msg::new(d.key.as_str(), crate::client::modui::args(d.args)))
+        }
     }
 }
 
-unsafe extern "C" fn reg_hud_element(r: *mut abi::Registrar, name: Str, anchor: Str, order: i32, cb: Callback) {
+unsafe extern "C" fn show(w: *mut abi::WorldCtx, who: abi::Who, d: *const abi::ShowDesc) {
     unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.game.huds.push(registry::HudElement {
-            name: name.as_str().to_string(),
-            title: crate::ui::text::dotted(name.as_str()),
-            anchor: anchor.as_str().to_string(),
-            order,
-            owner,
-            cb,
-        });
+        let r = dim(w);
+        r.events
+            .push(crate::server::DimEvent::Show { dim: r.id, who, shown: shown(&*d) })
     }
 }
 
-unsafe extern "C" fn set_player_menu(r: *mut abi::Registrar, menu: Str) {
+unsafe extern "C" fn reg_chat_format(r: *mut abi::Registrar, cb: Callback) {
     unsafe {
         let r = reg(r);
-        r.game.player_menu = Some((r.owner, menu.as_str().to_string()));
+        r.game.chat_format = Some((r.owner, cb));
     }
 }
 
-unsafe extern "C" fn reg_tint_kind(r: *mut abi::Registrar, name: Str, default: u32) {
-    unsafe { reg(r).tint_kinds.push((name.as_str().to_string(), default)) }
-}
-
-unsafe extern "C" fn reg_biome_tint(r: *mut abi::Registrar, biome: Str, kind: Str, color: u32) {
+unsafe extern "C" fn chat_format_set(args: *mut abi::ChatFormatArgs, key: Str, list: abi::Slice<abi::UiArg>) {
     unsafe {
-        reg(r)
-            .biome_tints
-            .push((biome.as_str().to_string(), kind.as_str().to_string(), color))
+        let out = &mut *((*args).out as *mut Option<crate::ui::text::Msg>);
+        *out = Some(crate::ui::text::Msg::new(key.as_str(), crate::client::modui::args(list)));
     }
 }
 
-unsafe extern "C" fn reg_sound_category(r: *mut abi::Registrar, name: Str, world: u32) {
-    unsafe {
-        reg(r)
-            .game
-            .sound_categories
-            .push(registry::SoundCategory::new(name.as_str(), world != 0))
-    }
-}
-
-unsafe extern "C" fn reg_entity_category(r: *mut abi::Registrar, name: Str, cap: u32, despawn: f32) {
-    unsafe {
-        reg(r)
-            .game
-            .categories
-            .push(crate::registry::CategoryDef { name: name.as_str().to_string(), cap, despawn: despawn as f64 })
-    }
-}
-
-unsafe extern "C" fn reg_recipe_kind(r: *mut abi::Registrar, d: *const abi::RecipeKindDesc) {
-    unsafe {
-        let d = &*d;
-        let r = reg(r);
-        let def = registry::RecipeKindDef {
-            owner: r.owner,
-            input_grid: d.input_grid,
-            output_grid: d.output_grid,
-            info: (d.info.len > 0).then(|| d.info.as_str().to_string()),
-            info_values: d
-                .info_values
-                .as_slice()
-                .iter()
-                .map(|s| s.as_str().to_string())
-                .collect(),
-            display: d.display.is_some().then_some(d.display),
-        };
-        r.game
-            .recipe_kinds
-            .push(registry::RawRecipeKind { name: d.name.as_str().to_string(), def });
-    }
-}
-
-unsafe extern "C" fn reg_attach_value(r: *mut abi::Registrar, kind: Str, component: Str, value: abi::Slice<u8>) {
-    let value = unsafe { value.as_slice() };
-    unsafe {
-        reg(r)
-            .game
-            .attach
-            .push((kind.as_str().to_string(), component.as_str().to_string(), (!value.is_empty()).then(|| value.to_vec())))
-    }
-}
-
-unsafe extern "C" fn reg_liquid(r: *mut abi::Registrar, d: *const abi::LiquidDesc) {
-    unsafe {
-        let d = *d;
-        reg(r).game.liquids.push((
-            d.name.as_str().to_string(),
-            d.overlay.as_str().to_string(),
-            abi::LiquidDesc { overlay: Str::EMPTY, ..d },
-        ));
-    }
-}
-
-unsafe extern "C" fn reg_liquid_change(r: *mut abi::Registrar, d: *const abi::LiquidChange) {
-    unsafe {
-        let d = *d;
-        reg(r).game.liquid_changes.push((
-            d.name.as_str().to_string(),
-            d.overlay.as_str().to_string(),
-            abi::LiquidChange { name: Str::EMPTY, overlay: Str::EMPTY, ..d },
-        ));
-    }
-}
-
-unsafe extern "C" fn reg_liquid_reaction(r: *mut abi::Registrar, d: *const abi::ReactionDesc) {
-    unsafe {
-        let d = *d;
-        reg(r)
-            .game
-            .reactions
-            .push([d.liquid, d.touching, d.source, d.flowing, d.falls_into].map(|s| s.as_str().to_string()));
-    }
+unsafe extern "C" fn game_mode(w: *mut abi::WorldCtx, entity: u64) -> u32 {
+    unsafe { dim(w).entities.get(entity).map_or(0, |e| e.mode.0 as u32) }
 }
 
 unsafe extern "C" fn liquid_of(state: u32) -> u32 {
@@ -1823,7 +2249,7 @@ unsafe extern "C" fn liquid_of(state: u32) -> u32 {
 
 unsafe extern "C" fn use_container(w: *mut abi::WorldCtx, player: u64, stack: ItemStack, handled: *mut u32) -> ItemStack {
     unsafe {
-        let r = dim(w).use_container(content(), player, stack);
+        let r = dim(w).use_container(space_id(w), content(), player, stack);
         if !handled.is_null() {
             *handled = r.is_some() as u32;
         }
@@ -1850,46 +2276,21 @@ unsafe extern "C" fn find_event(name: Str, schema: Str) -> u32 {
         log::error!("event {name} is '{}' but a mod emits '{schema}'", def.schema);
         return u32::MAX;
     }
-    if def.handlers.is_empty() { u32::MAX } else { id }
+    id
 }
 
 unsafe extern "C" fn emit(w: *mut abi::WorldCtx, event: u32, value: abi::Slice<u8>) {
-    unsafe { dim(w).emit(content(), event, value.as_slice()) }
+    unsafe { dim(w).emit(space_id(w), content(), event, value.as_slice()) }
 }
 
-unsafe extern "C" fn reg_interceptor(r: *mut abi::Registrar, name: Str, cb: Callback) {
-    unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.game
-            .interceptors
-            .push((owner, name.as_str().to_string(), cb));
-    }
+unsafe extern "C" fn ask(w: *mut abi::WorldCtx, name: Str, query: *const abi::Query) -> u32 {
+    unsafe { dim(w).ask(space_id(w), content(), name.as_str(), &*query) as u32 }
 }
 
-unsafe extern "C" fn ask(w: *mut abi::WorldCtx, name: Str, query: *mut abi::Query) -> u32 {
-    unsafe {
-        let mut q = *query;
-        let ok = dim(w).ask(content(), name.as_str(), &mut q);
-        *query = q;
-        ok as u32
-    }
-}
-
-unsafe extern "C" fn reg_modifier(r: *mut abi::Registrar, name: Str, stage: u32, cb: Callback) {
-    unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.game
-            .modifiers
-            .push((owner, name.as_str().to_string(), stage, cb));
-    }
-}
-
-unsafe extern "C" fn compute(w: *mut abi::WorldCtx, name: Str, base: f64, ctx: *const abi::Query, explain: u32) -> f64 {
+unsafe extern "C" fn chain_compute(w: *mut abi::WorldCtx, name: Str, base: f64, ctx: *const abi::Query, explain: u32) -> f64 {
     unsafe {
         let q = if ctx.is_null() { abi::Query::DEFAULT } else { *ctx };
-        dim(w).compute(content(), name.as_str(), base, &q, explain != 0)
+        dim(w).compute(space_id(w), content(), name.as_str(), base, &q, explain != 0)
     }
 }
 
@@ -1904,72 +2305,66 @@ unsafe extern "C" fn explanation() -> Str {
     })
 }
 
-unsafe extern "C" fn reg_attribute(r: *mut abi::Registrar, name: Str, default: f64, min: f64, max: f64) {
-    unsafe {
-        reg(r)
-            .game
-            .attributes
-            .push((name.as_str().to_string(), default, min, max))
-    }
+unsafe extern "C" fn attribute(w: *mut abi::WorldCtx, entity: u64, name: Str, explain: u32) -> f64 {
+    unsafe { dim(w).attribute_named(space_id(w), content(), entity, name.as_str(), explain != 0) }
 }
 
-unsafe extern "C" fn attribute(w: *mut abi::WorldCtx, entity: u64, name: Str) -> f64 {
-    unsafe { dim(w).attribute_named(content(), entity, name.as_str(), false) }
-}
-
-unsafe extern "C" fn attribute_explain(w: *mut abi::WorldCtx, entity: u64, name: Str) -> f64 {
-    unsafe { dim(w).attribute_named(content(), entity, name.as_str(), true) }
-}
-
-unsafe extern "C" fn attribute_modifier(w: *mut abi::WorldCtx, entity: u64, name: Str, id: Str, op: u32, amount: f64, ticks: u64) {
+#[allow(clippy::too_many_arguments)]
+unsafe extern "C" fn attribute_add_modifier(
+    w: *mut abi::WorldCtx,
+    entity: u64,
+    name: Str,
+    id: Str,
+    step: Str,
+    phase: Str,
+    amount: f64,
+    ticks: u64,
+) {
     unsafe {
         let c = content();
-        match c.game.attr_names.get(name.as_str()) {
-            Some(&a) => dim(w).set_attr_modifier(c, entity, a, id.as_str(), op, amount, ticks),
-            None => log::error!("no attribute {}", name.as_str()),
+        let (name, step, phase) = (name.as_str(), step.as_str(), phase.as_str());
+        let Some(a) = c.game.catalog.find(ek::ATTRIBUTE, name) else {
+            return misuse("attribute_add_modifier", || format!("no attribute {name}"));
+        };
+        if !c.game.catalog.ids(ek::STEP).contains_key(step) {
+            return misuse("attribute_add_modifier", || format!("no step {step}"));
         }
+        if !phase.is_empty() && !c.game.catalog.ids(ek::PHASE).contains_key(phase) {
+            return misuse("attribute_add_modifier", || format!("no phase {phase}"));
+        }
+        let phase = if phase.is_empty() { 0 } else { crate::registry::name_hash(phase) };
+        dim(w).set_attr_modifier(c, entity, a, id.as_str(), crate::registry::name_hash(step), phase, amount, ticks);
     }
 }
 
-unsafe extern "C" fn attribute_remove(w: *mut abi::WorldCtx, entity: u64, name: Str, id: Str) {
+unsafe extern "C" fn attribute_remove_modifier(w: *mut abi::WorldCtx, entity: u64, name: Str, id: Str) {
     unsafe {
         let c = content();
-        match c.game.attr_names.get(name.as_str()) {
+        match c.game.catalog.ids(ek::ATTRIBUTE).get(name.as_str()) {
             Some(&a) => dim(w).remove_attr_modifier(c, entity, a, id.as_str()),
             None => misuse("attribute_remove", || format!("no attribute {}", name.as_str())),
         }
     }
 }
 
-unsafe extern "C" fn reg_loot(r: *mut abi::Registrar, d: *const abi::LootDesc) {
+unsafe extern "C" fn reg_entry(r: *mut abi::Registrar, d: *const abi::EntryDesc) {
     unsafe {
-        let d = *d;
         let r = reg(r);
-        let mut pools = Vec::new();
-        d.pools
-            .as_slice()
-            .iter()
-            .copied()
-            .for_each(|p| pools.push(crate::loot::copy_pool(&p)));
-        r.game
-            .loot
-            .push(crate::loot::RawLoot { owner: r.owner, name: d.name.as_str().to_string(), pools });
+        let e = crate::entries::RawEntry::copy(r.owner, &*d);
+        r.game.entries.push(e);
     }
 }
 
-unsafe extern "C" fn reg_loot_modifier(r: *mut abi::Registrar, d: *const abi::LootModDesc) {
+unsafe extern "C" fn mod_loaded(id: Str) -> u32 {
+    unsafe { crate::modloader::mod_loaded(id.as_str()) as u32 }
+}
+
+unsafe extern "C" fn holds(w: *mut abi::WorldCtx, text: Str, pos: abi::Vec3, entity: u64) -> u32 {
     unsafe {
-        let d = *d;
-        let r = reg(r);
-        let pool = crate::loot::copy_pool(&d.pool);
-        r.game.loot_mods.push(crate::loot::RawLootMod {
-            owner: r.owner,
-            table: d.table.as_str().to_string(),
-            op: d.op,
-            pool,
-            from: d.from.as_str().to_string(),
-            to: d.to.as_str().to_string(),
-        });
+        let c = content();
+        let ask = crate::conditions::Ask { pos: crate::world::dvec(pos), entity, ..Default::default() };
+        c.condition(text.as_str())
+            .is_some_and(|e| crate::conditions::holds_server(dim(w), space_id(w), c, &e, &ask)) as u32
     }
 }
 
@@ -1977,7 +2372,7 @@ unsafe extern "C" fn roll_loot(w: *mut abi::WorldCtx, name: Str, ctx: *const abi
     unsafe {
         let x = if ctx.is_null() { abi::LootCtx::DEFAULT } else { *ctx };
         let ctx = crate::loot::Ctx { tool: x.tool, by_player: x.by_player != 0, on_fire: x.on_fire != 0, mined: x.mined, state: x.mined };
-        let stacks = dim(w).roll_loot(content(), name.as_str(), &ctx);
+        let stacks = dim(w).roll_loot(content(), name.as_str(), &ctx, DVec3::ZERO, 0);
         for (i, s) in stacks.iter().take(max).enumerate() {
             *out.add(i) = *s;
         }
@@ -1985,25 +2380,35 @@ unsafe extern "C" fn roll_loot(w: *mut abi::WorldCtx, name: Str, ctx: *const abi
     }
 }
 
-unsafe extern "C" fn break_block(w: *mut abi::WorldCtx, pos: *const [i32; 3], tool: ItemStack, player: u64, drops: u32) -> u32 {
-    unsafe { dim(w).break_block(content(), ip(pos), tool, player, drops != 0) as u32 }
+unsafe extern "C" fn break_block(w: *mut abi::WorldCtx, pos: *const abi::BlockPos, tool: ItemStack, player: u64, drops: u32) -> u32 {
+    unsafe { dim(w).break_block(space_id(w), content(), ip(pos), tool, player, drops != 0) as u32 }
 }
 
-unsafe extern "C" fn set_entity_size(w: *mut abi::WorldCtx, id: u64, width: f32, height: f32, eye: f32) {
+unsafe extern "C" fn set_entity_size(w: *mut abi::WorldCtx, id: u64, size: abi::EntitySize) {
     unsafe {
         let d = dim(w);
         if let Some(e) = d.entities.get_mut(id) {
-            e.size = (width > 0.0).then_some([width, height.max(0.0), eye.clamp(0.0, height.max(0.0))]);
+            let height = size.height.max(0.0);
+            e.size = (size.width > 0.0).then_some(abi::EntitySize { width: size.width, height, eye: size.eye.clamp(0.0, height) });
         }
     }
 }
 
-unsafe extern "C" fn set_entity_look(w: *mut abi::WorldCtx, id: u64, kind: Str) {
+unsafe extern "C" fn set_entity_scale(w: *mut abi::WorldCtx, id: u64, scale: f32) {
+    unsafe {
+        let d = dim(w);
+        if let Some(e) = d.entities.get_mut(id) {
+            e.scale = if scale.is_finite() { scale.clamp(0.05, 20.0) } else { 1.0 };
+        }
+    }
+}
+
+unsafe extern "C" fn set_entity_appearance(w: *mut abi::WorldCtx, id: u64, kind: Str) {
     unsafe {
         let name = kind.as_str();
         let look = match name {
             "" => None,
-            n => match content().game.entity_names.get(n) {
+            n => match content().game.catalog.ids(ek::ENTITY).get(n) {
                 Some(&k) => Some(k),
                 None => return misuse("set_entity_look", || format!("no entity kind {n}")),
             },
@@ -2015,55 +2420,240 @@ unsafe extern "C" fn set_entity_look(w: *mut abi::WorldCtx, id: u64, kind: Str) 
     }
 }
 
-unsafe extern "C" fn entity_kind_size(kind: Str, out: *mut [f32; 3]) -> u32 {
+unsafe extern "C" fn entity_kind_size(kind: Str, out: *mut abi::EntitySize) -> u32 {
     unsafe {
         let g = &content().game;
-        let Some(&k) = g.entity_names.get(kind.as_str()) else { return 0 };
+        let Some(k) = g.catalog.find(ek::ENTITY, kind.as_str()) else { return 0 };
         let e = &g.entities[k as usize];
-        *out = [e.width, e.height, e.eye];
+        *out = e.size();
         1
     }
 }
 
-unsafe extern "C" fn reg_words(r: *mut abi::Registrar, set: Str, words: Str) {
+unsafe extern "C" fn set_weather(w: *mut abi::WorldCtx, weather: u32, ticks: u32) {
     unsafe {
-        let words = words
-            .as_str()
-            .split(',')
-            .map(str::trim)
-            .filter(|w| !w.is_empty())
-            .map(String::from)
-            .collect();
-        reg(r).game.words.push((set.as_str().to_string(), words));
+        let d = dim(w);
+        if weather as usize >= content().game.weathers.len() {
+            misuse("set_weather", || format!("no weather {weather}"));
+            return;
+        }
+        d.events
+            .push(crate::server::DimEvent::SetWeather { dim: d.id, weather: weather as u16, ticks });
     }
 }
 
-unsafe extern "C" fn set_weather(w: *mut abi::WorldCtx, raining: u32, thunder: u32, ticks: u32) {
+unsafe extern "C" fn weather_now(w: *mut abi::WorldCtx) -> u32 {
+    unsafe { dim(w).weather.at_pos(DVec3::ZERO) as u32 }
+}
+
+unsafe extern "C" fn weather_at(w: *mut abi::WorldCtx, pos: abi::BlockPos) -> u32 {
+    let d = unsafe { dim(w) };
+    let at = unsafe { d.space_pose(space_id(w)) }.to_world(IVec3::from_array(pos.to_array()).as_dvec3() + DVec3::splat(0.5));
+    d.weather.at_pos(at) as u32
+}
+
+unsafe extern "C" fn entity_effect(w: *mut abi::WorldCtx, id: u64, effect: u32, level: u32, ticks: u32) {
+    let c = content();
+    if effect as usize >= c.game.entity_effects.len() {
+        misuse("entity_effect", || format!("no entity effect {effect}"));
+        return;
+    }
+    unsafe { dim(w).give_effect(space_id(w), c, id, effect, level, ticks) }
+}
+
+unsafe extern "C" fn set_rain(w: *mut abi::WorldCtx, biomes: *const u32, len: u32, weather: u32) {
+    unsafe {
+        let d = dim(w);
+        let biomes = if len == 0 { Vec::new() } else { std::slice::from_raw_parts(biomes, len as usize).to_vec() };
+        d.events
+            .push(crate::server::DimEvent::SetRain { dim: d.id, biomes, weather: weather as u16 });
+    }
+}
+
+unsafe extern "C" fn set_sky_event(w: *mut abi::WorldCtx, kind: u32, strength: f32) {
     unsafe {
         let d = dim(w);
         d.events
-            .push(crate::server::DimEvent::SetWeather { dim: d.id, raining: raining != 0, thunder: thunder != 0, ticks });
+            .push(crate::server::DimEvent::SetSkyEvent { dim: d.id, kind, strength: strength.clamp(0.0, 1.0) });
     }
 }
 
-unsafe extern "C" fn thundering(w: *mut abi::WorldCtx) -> u32 {
-    unsafe { dim(w).thunder as u32 }
+unsafe extern "C" fn sky_landing(w: *mut abi::WorldCtx, pos: *const [f64; 3], seconds: f32) {
+    unsafe {
+        let d = dim(w);
+        let pos = glam::DVec3::from_array(*pos);
+        d.events
+            .push(crate::server::DimEvent::SkyLanding { dim: d.id, pos, seconds: seconds.max(0.0) });
+    }
 }
 
-unsafe extern "C" fn raining(w: *mut abi::WorldCtx) -> u32 {
-    unsafe { dim(w).raining as u32 }
+unsafe extern "C" fn set_air(
+    w: *mut abi::WorldCtx,
+    biomes: *const u32,
+    fog: *const f32,
+    wind: *const f32,
+    snow: *const f32,
+    flags: *const u32,
+    len: u32,
+    heading: f32,
+) {
+    unsafe {
+        let d = dim(w);
+        let n = len as usize;
+        let air = if n == 0 {
+            Vec::new()
+        } else {
+            let (b, f, s, sn, fl) = (
+                std::slice::from_raw_parts(biomes, n),
+                std::slice::from_raw_parts(fog, n),
+                std::slice::from_raw_parts(wind, n),
+                std::slice::from_raw_parts(snow, n),
+                std::slice::from_raw_parts(flags, n),
+            );
+            (0..n)
+                .map(|i| (b[i], f[i].clamp(0.0, 1.0), s[i].max(0.0), sn[i].clamp(0.0, 1.0), fl[i]))
+                .collect()
+        };
+        d.events
+            .push(crate::server::DimEvent::SetAir { dim: d.id, air, heading });
+    }
 }
 
-unsafe extern "C" fn entity_flash(w: *mut abi::WorldCtx, id: u64) {
-    unsafe { dim(w).events.push(crate::server::DimEvent::Flash { id }) }
+unsafe extern "C" fn content_tint(biome: u32, kind: Str) -> u32 {
+    let c = content();
+    let kn = unsafe { kind.as_str() };
+    let Some(ki) = c.tint_kinds.iter().position(|x| x.0 == kn) else { return 0 };
+    c.biomes
+        .get(biome as usize)
+        .and_then(|b| b.tints.get(ki).copied())
+        .unwrap_or(c.tint_kinds[ki].1)
+}
+
+unsafe extern "C" fn set_biome_tints(w: *mut abi::WorldCtx, biomes: *const u32, kinds: *const Str, colors: *const u32, len: u32) {
+    unsafe {
+        let d = dim(w);
+        let c = content();
+        let k = c.tint_kinds.len();
+        // The whole table, biome by biome (the content's colors where not named): small, and the
+        // client blends from it as it does from the content's.
+        let tints = if len == 0 || c.biomes.is_empty() {
+            Vec::new()
+        } else {
+            let mut table: Vec<u32> = c
+                .biomes
+                .iter()
+                .flat_map(|b| b.tints.iter().copied())
+                .collect();
+            let n = len as usize;
+            let (b, kd, col) =
+                (std::slice::from_raw_parts(biomes, n), std::slice::from_raw_parts(kinds, n), std::slice::from_raw_parts(colors, n));
+            for i in 0..n {
+                let (bi, kn) = (b[i] as usize, kd[i].as_str());
+                match (bi < c.biomes.len(), c.tint_kinds.iter().position(|x| x.0 == kn)) {
+                    (true, Some(ki)) => table[bi * k + ki] = col[i] & 0xff_ffff,
+                    _ => misuse("set_biome_tints", || format!("no biome {bi} or tint kind {kn}")),
+                }
+            }
+            table
+        };
+        d.events
+            .push(crate::server::DimEvent::SetTints { dim: d.id, tints });
+    }
+}
+
+unsafe extern "C" fn air_at(w: *mut abi::WorldCtx, pos: *const abi::BlockPos, out: *mut [f32; 4]) -> u32 {
+    unsafe {
+        let d = dim(w);
+        let biome = biome_at(w, pos);
+        let found = d
+            .air
+            .0
+            .binary_search_by_key(&biome, |a| a.0)
+            .ok()
+            .map(|i| d.air.0[i]);
+        *out = found.map_or([0.0; 4], |a| [a.1, a.2, a.3, a.4 as f32]);
+        (!d.air.0.is_empty()) as u32
+    }
+}
+
+unsafe extern "C" fn raining_at(w: *mut abi::WorldCtx, pos: *const abi::BlockPos) -> u32 {
+    unsafe {
+        let biome = biome_at(w, pos);
+        let d = dim(w);
+        let p = &*pos;
+        let weather = d.weather_in(biome, glam::DVec3::new(p.x as f64 + 0.5, p.y as f64 + 0.5, p.z as f64 + 0.5));
+        (content()
+            .game
+            .weathers
+            .get(weather as usize)
+            .is_some_and(|w| w.falls())) as u32
+    }
+}
+
+unsafe extern "C" fn entity_effects(w: *mut abi::WorldCtx, id: u64, out: *mut abi::EffectOn, cap: u32) -> u32 {
+    unsafe {
+        let d = dim(w);
+        let comp = content().game.fields.effect;
+        let list: Vec<abi::EffectOn> = crate::world::effects_on(d.entities.comps.get(&(id, comp)).map(|b| &b[..]), d.time)
+            .map(|f| abi::EffectOn {
+                effect: f.id,
+                level: f.level,
+                ticks_left: if f.until == crate::world::FOREVER {
+                    abi::INFINITE_TICKS
+                } else {
+                    f.until
+                        .saturating_sub(d.time)
+                        .min(abi::INFINITE_TICKS as u64 - 1) as u32
+                },
+            })
+            .collect();
+        for (i, e) in list.iter().take(cap as usize).enumerate() {
+            *out.add(i) = *e;
+        }
+        list.len() as u32
+    }
+}
+
+unsafe extern "C" fn entity_set_pose(w: *mut abi::WorldCtx, id: u64, pose: u32, yaw: f32) {
+    unsafe {
+        let d = dim(w);
+        let c = content();
+        let comp = c.game.fields.forced;
+        let Some(e) = d.entities.get_mut(id) else { return };
+        let held = (pose as usize) < c.game.poses.len();
+        e.facing = (held && !yaw.is_nan()).then_some(yaw);
+        let bytes: Vec<u8> = if held {
+            e.pose = crate::world::Pose(pose as u16);
+            if let Some(y) = e.facing {
+                e.yaw = y;
+            }
+            <crate::net::ForcedPoseField as crate::net::codec::Wire>::to_bytes(&crate::net::ForcedPoseField { pose, yaw })
+        } else {
+            Vec::new()
+        };
+        d.entities
+            .comps
+            .insert((id, comp), bytes.into_boxed_slice());
+    }
 }
 
 unsafe extern "C" fn reg_command_permission(r: *mut abi::Registrar, command: Str, level: u32) {
     unsafe {
-        reg(r)
-            .game
+        let r = reg(r);
+        let owner = r.owner;
+        r.game
             .command_permissions
-            .push((command.as_str().to_string(), level));
+            .push((owner, command.as_str().to_string(), level));
+    }
+}
+
+unsafe extern "C" fn reg_entity_skin(r: *mut abi::Registrar, kind: Str, comp: Str, cb: Callback) {
+    unsafe {
+        let r = reg(r);
+        let owner = r.owner;
+        r.game
+            .skin_painters
+            .push(registry::SkinPainter { kind: kind.as_str().to_string(), comp: comp.as_str().to_string(), owner, cb });
     }
 }
 
@@ -2093,16 +2683,6 @@ unsafe extern "C" fn reg_command_branch(r: *mut abi::Registrar, command: Str, us
     }
 }
 
-unsafe extern "C" fn reg_client_command(r: *mut abi::Registrar, name: Str, usage: Str, cb: Callback) {
-    unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.game
-            .client_commands
-            .push((owner, name.as_str().to_string(), usage.as_str().to_string(), cb));
-    }
-}
-
 unsafe extern "C" fn reg_system(r: *mut abi::Registrar, name: Str, schema: Str, cb: Callback) {
     unsafe {
         let r = reg(r);
@@ -2113,34 +2693,17 @@ unsafe extern "C" fn reg_system(r: *mut abi::Registrar, name: Str, schema: Str, 
     }
 }
 
-unsafe extern "C" fn reg_stack_component(r: *mut abi::Registrar, name: Str, schema: Str, flags: u32) {
+unsafe extern "C" fn reg_client_frame(r: *mut abi::Registrar, cb: Callback) {
     unsafe {
-        reg(r)
-            .game
-            .stack_components
-            .push((name.as_str().to_string(), schema.as_str().to_string(), flags))
+        let r = reg(r);
+        r.game.client_frames.push((r.owner, cb));
     }
 }
 
-unsafe extern "C" fn reg_client_hook(r: *mut abi::Registrar, hook: u32, cb: Callback) {
+unsafe extern "C" fn reg_camera_frame(r: *mut abi::Registrar, cb: Callback) {
     unsafe {
         let r = reg(r);
-        if hook > abi::client_hook::SCREEN {
-            r.errors.push(format!("client hook {hook} does not exist"));
-            return;
-        }
-        let owner = r.owner;
-        r.game.client_hooks.push((owner, hook, cb));
-    }
-}
-
-unsafe extern "C" fn reg_client_entity_tick(r: *mut abi::Registrar, kind: Str, cb: Callback) {
-    unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.game
-            .client_entity_ticks
-            .push((owner, kind.as_str().to_string(), cb));
+        r.game.camera_frames.push((r.owner, cb));
     }
 }
 
@@ -2154,127 +2717,34 @@ unsafe extern "C" fn reg_packet(r: *mut abi::Registrar, name: Str, schema: Str, 
     }
 }
 
-unsafe extern "C" fn reg_error(r: *mut abi::Registrar, message: Str) {
+unsafe extern "C" fn reg_mistake(r: *mut abi::Registrar, message: Str) {
     unsafe { reg(r).errors.push(message.as_str().to_string()) }
 }
 
-unsafe extern "C" fn reg_key(r: *mut abi::Registrar, name: Str, key: Str) {
-    unsafe {
-        let r = reg(r);
-        if crate::settings::parse_chord(key.as_str()).is_none() {
-            r.errors
-                .push(format!("key {}: unknown key name {:?}", name.as_str(), key.as_str()));
-        }
-        r.game
-            .keys
-            .push((name.as_str().to_string(), key.as_str().to_string()))
-    }
-}
-
-unsafe extern "C" fn set_block_entity(r: *mut abi::Registrar, block: Str, entity: Str, slots: u32) {
-    unsafe {
-        reg(r)
-            .game
-            .block_entities
-            .push((block.as_str().to_string(), entity.as_str().to_string(), slots))
-    }
-}
-
-unsafe extern "C" fn reg_text_condition(r: *mut abi::Registrar, name: Str, cb: Callback) {
-    unsafe {
-        let r = reg(r);
-        let owner = r.owner;
-        r.game
-            .text_conditions
-            .push((owner, name.as_str().to_string(), cb));
-    }
-}
-
-unsafe extern "C" fn reg_particle(r: *mut abi::Registrar, d: *const abi::ParticleDesc) {
-    unsafe {
-        let d = *d;
-        let textures = d
-            .textures
-            .as_slice()
-            .iter()
-            .map(|t| t.as_str().to_string())
-            .collect();
-        let p = registry::RawParticle {
-            name: d.name.as_str().to_string(),
-            cell: d.cell as usize,
-            textures,
-            shader: d.shader.as_str().to_string(),
-            desc: abi::ParticleDesc { name: Str::EMPTY, cell: std::ptr::null(), textures: abi::Slice::EMPTY, shader: Str::EMPTY, ..d },
-        };
-        reg(r).game.particles.push(p);
-    }
-}
-
-unsafe extern "C" fn reg_sky(r: *mut abi::Registrar, d: *const abi::SkyDesc) {
-    unsafe {
-        let d = *d;
-        let s = registry::RawSky {
-            dimension: d.dimension.as_str().to_string(),
-            name: d.name.as_str().to_string(),
-            texture: d.texture.as_str().to_string(),
-            shader: d.shader.as_str().to_string(),
-            desc: abi::SkyDesc { dimension: Str::EMPTY, name: Str::EMPTY, texture: Str::EMPTY, shader: Str::EMPTY, ..d },
-        };
-        reg(r).game.sky.push(s);
-    }
-}
-
-unsafe extern "C" fn particles(w: *mut abi::WorldCtx, b: *const abi::ParticleBurst) {
+unsafe extern "C" fn particle_burst(w: *mut abi::WorldCtx, who: abi::Who, b: *const abi::ParticleBurst) {
     unsafe {
         let mut b = *b;
         if (b.kind as usize) < content().game.particles.len() {
             let d = dim(w);
-            b.pos = d.place.to_world(DVec3::from_array(b.pos)).to_array();
+            b.pos = d
+                .space_pose(space_id(w))
+                .to_world(crate::world::dvec(b.pos))
+                .to_array()
+                .into();
             d.events
-                .push(crate::server::DimEvent::Particles { dim: d.id, burst: b });
+                .push(crate::server::DimEvent::Particles { dim: d.id, who, burst: b });
         } else {
             misuse("particles", || format!("no particle {}", b.kind));
         }
     }
 }
 
-unsafe extern "C" fn signal_at(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u32 {
+unsafe extern "C" fn signal_at(w: *mut abi::WorldCtx, pos: *const abi::BlockPos) -> u32 {
     unsafe {
         let d = dim(w);
-        d.space
-            .signals
-            .power_at(content(), d.signal_view(), IVec3::from_array(*pos)) as u32
-    }
-}
-
-unsafe extern "C" fn reg_config(r: *mut abi::Registrar, d: *const abi::ConfigDesc) {
-    unsafe {
-        let d = *d;
-        let def = crate::config::ConfigDef {
-            name: d.name.as_str().to_string(),
-            kind: d.kind,
-            default: d.default,
-            min: d.min,
-            max: d.max,
-            step: d.step,
-            choices: d
-                .choices
-                .as_slice()
-                .iter()
-                .map(|s| s.as_str().to_string())
-                .collect(),
-            flags: d.flags,
-            scope: d.scope,
-            text: d.text.as_str().to_string(),
-        };
-        if def.kind == abi::config_kind::TEXT && def.scope != abi::config_scope::CLIENT {
-            reg(r)
-                .errors
-                .push(format!("setting {}: text settings are the client's own", def.name));
-            return;
-        }
-        let def = crate::config::ConfigDef { default: def.fit(d.default), ..def };
-        reg(r).game.configs.push((d.cell as usize, def));
+        let id = space_id(w);
+        let at = crate::world::ivec(*pos);
+        d.power_at(content(), id, at) as u32
     }
 }
 

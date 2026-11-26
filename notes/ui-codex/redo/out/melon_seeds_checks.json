@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a few big flat oval melon seeds, glossy dark brown with a paler rim and a white glint, five seeds spread a little apart on a tiny patch of dark soil, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.339,
+   "outline": 0.83,
+   "red_line": 0.19,
+   "fill": 0.4,
+   "passed": true
+  }
+ ]
+}

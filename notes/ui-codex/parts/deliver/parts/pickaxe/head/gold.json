@@ -1,0 +1,15 @@
+{
+ "kind": "base:pickaxe",
+ "layer": "head",
+ "material": "gold",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 14,
+ "anchor": [
+  13.9,
+  17.2
+ ]
+}

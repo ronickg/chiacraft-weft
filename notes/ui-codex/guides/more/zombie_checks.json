@@ -1,0 +1,19 @@
+{
+ "kind": "monster",
+ "what": "a zombie, side view facing right: sickly green-grey skin, a torn brown leather jerkin and ragged grey trousers, dark sunken eye sockets with tiny glowing green eyes, arms held forward, shambling",
+ "size": [
+  32,
+  48
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.455,
+   "outline": 0.53,
+   "red_line": 0.16,
+   "fill": 0.41,
+   "passed": true
+  }
+ ]
+}

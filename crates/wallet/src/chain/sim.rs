@@ -198,6 +198,22 @@ impl Sim {
         }
     }
 
+    /// What the DID sponsor does for world DIDs (plan phase 4, slice 7): launch DIDs with
+    /// [`super::sponsor::build_eve_dids_with`] (world metadata, gifts of mojos to the owners),
+    /// paid by a throwaway sponsor key funded on the spot, and push them in a block. The bundle.
+    pub fn sponsor_dids(&self, asks: &[super::EveAsk], fee: u64) -> Result<super::SponsorBundle> {
+        let sponsor = WalletKeys::from_mnemonic(&crate::Mnemonic::generate()?, super::ChainNetwork::Testnet11, 1);
+        let gifts: u64 = asks.iter().map(|a| a.gift).sum();
+        self.fund(sponsor.primary(), asks.len() as u64 + gifts + fee + 1_000);
+        let built = super::sponsor::build_eve_dids_with(&sponsor, &self.unspent(sponsor.primary()), asks, fee)?;
+        self.rt
+            .block_on(async { self.sim.lock().await.create_block() });
+        match self.push(built.bundle.clone())? {
+            PushOutcome::Rejected { error, .. } => Err(Error::new(error)),
+            _ => Ok(built),
+        }
+    }
+
     /// An NFT (no royalty, no DID) held by `keys`' primary address.
     pub fn mint_nft(&self, keys: &WalletKeys) -> Result<Bytes32> {
         let out = self.spend(keys, &[Action::mint_nft(HashedPtr::NIL, Bytes32::default(), keys.primary(), 0, 1)])?;

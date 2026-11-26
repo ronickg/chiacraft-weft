@@ -1,0 +1,28 @@
+loaded
+chat /dim base:flatlands
+wait 6
+loaded
+idle
+chat /tk mode creative
+chat /tk spawn animals:cat ~0 ~ ~2
+wait 0.5
+look 180 -50
+chat /animal tame
+chat /tk spawn animals:cat ~-6 ~ ~10
+chat /tk spawn animals:cat ~-3 ~ ~10
+chat /tk spawn animals:cat ~0 ~ ~10
+chat /tk spawn animals:cat ~3 ~ ~10
+chat /tk spawn animals:cat ~6 ~ ~10
+chat /tk spawn animals:cat ~9 ~ ~10
+wait 2
+chat /animal reset
+chat /animal census 64
+chat /animal away 80
+wait 2
+chat /animal census 64
+chat /tp ~4000 ~ ~0
+wait 6
+chat /tp ~-4000 ~ ~0
+wait 4
+chat /animal census 64
+quit

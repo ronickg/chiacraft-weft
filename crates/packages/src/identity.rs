@@ -39,6 +39,18 @@ const ALLOWED: &[(&str, &[&str], u64)] = &[
     ("assets/sounds/", &["ogg", "wav"], MAX_FILE_BYTES),
 ];
 
+/// The sandboxed server half (`docs/sandboxed-mods.md`): one WebAssembly component, at exactly
+/// this path, run only inside the game's sandbox.
+pub const SERVER_CODE: &str = "code/server.wasm";
+/// The sandboxed client half, run in each player's own game.
+pub const CLIENT_CODE: &str = "code/client.wasm";
+
+/// Whether `path` is one of a package's sandboxed halves.
+pub fn is_code(path: &str) -> bool {
+    path == SERVER_CODE || path == CLIENT_CODE
+}
+pub const MAX_CODE_BYTES: u64 = 16 << 20;
+
 /// Whether a package may hold a file at `path` of `size` bytes; why not if it may not.
 pub fn check_file(path: &str, size: u64) -> Result<(), String> {
     if !valid_file_path(path) {
@@ -46,6 +58,8 @@ pub fn check_file(path: &str, size: u64) -> Result<(), String> {
     }
     let max = if path == "package.toml" {
         64 << 10
+    } else if path == SERVER_CODE || path == CLIENT_CODE {
+        MAX_CODE_BYTES
     } else {
         let ext = path.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
         let kind = ALLOWED
@@ -309,6 +323,13 @@ mod tests {
         assert!(check_file("README.md", 10).is_err());
         assert!(check_file("assets/textures/block/ruby.png", 17 << 20).is_err());
         assert!(check_file("defs/items/ruby.toml", 300 << 10).is_err());
+        // Sandboxed code: one component at one path, nothing else in `code/`.
+        assert!(check_file("code/server.wasm", 1 << 20).is_ok());
+        assert!(check_file("code/server.wasm", 17 << 20).is_err());
+        assert!(check_file("code/client.wasm", 10).is_ok());
+        assert!(check_file("code/other.wasm", 10).is_err());
+        assert!(check_file("code/server.so", 10).is_err());
+        assert!(check_file("assets/server.wasm", 10).is_err());
         let a = package("allow");
         std::fs::write(a.join("notes.txt"), "hi").unwrap();
         assert!(FileManifest::of_dir(&a).unwrap_err().contains("notes.txt"));

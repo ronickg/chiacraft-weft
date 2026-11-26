@@ -1,0 +1,15 @@
+{
+ "kind": "base:hoe",
+ "layer": "head",
+ "material": "oak",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 13,
+ "anchor": [
+  14.9,
+  18.1
+ ]
+}

@@ -1,0 +1,10 @@
+[
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "rock_weathered_limestone_side",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/mods/base/assets/textures/block/limestone_side.png",
+  "what": "the side of weathered limestone on a tall karst tower in warm wet country: the SAME pale limestone as the attached limestone side (its colours, grain and level lines), now streaked by rain: thin vertical darker streaks 1-2 px wide running down from the top edge (#9a9a88 #8a8e7c), a few with a faint grey-green tinge of algae (#8a9878 #7e8e70), small pits, the level lines softened. Overall still pale (no darker than #a8a490 on average). Seamless on all four edges, every cell filled, no border; streaks continue across the top and bottom edges so a tall wall reads as one face."
+ }
+]

@@ -1,0 +1,15 @@
+{
+ "kind": "base:axe",
+ "layer": "head",
+ "material": "gold",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 12,
+ "anchor": [
+  11.4,
+  22.6
+ ]
+}

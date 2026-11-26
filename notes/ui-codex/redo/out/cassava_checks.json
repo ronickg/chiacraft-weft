@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a cassava root: a long tapering tuber with rough dark brown bark-like skin, one cut end showing white flesh, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.322,
+   "outline": 0.79,
+   "red_line": 0.33,
+   "fill": 0.34,
+   "passed": true
+  }
+ ]
+}

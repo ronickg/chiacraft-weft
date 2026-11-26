@@ -1,0 +1,15 @@
+{
+ "kind": "base:axe",
+ "layer": "head",
+ "material": "flint",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 15,
+ "anchor": [
+  11.7,
+  21.8
+ ]
+}

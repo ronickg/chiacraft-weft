@@ -1,0 +1,306 @@
+[
+ {
+  "kind": "item",
+  "name": "berries",
+  "what": "a small cluster of round glossy red berries, two or three green leaves, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "blackberries",
+  "what": "a small cluster of glossy black-purple bramble berries made of tiny round drupelets, two or three green leaves, centred with 3-5 px of padding",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "raspberries",
+  "what": "a small cluster of bright pink-red raspberries made of tiny round drupelets, two or three green leaves, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cloudberries",
+  "what": "a small cluster of amber-orange cloudberries made of large soft drupelets, two or three green leaves, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "crowberries",
+  "what": "a small cluster of tiny shiny black crowberries on a sprig with needle-like leaves, two or three green leaves, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "lingonberries",
+  "what": "a small cluster of small glossy bright red lingonberries on a sprig with small oval dark-green leaves, two or three green leaves, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "rose_hip",
+  "what": "rose hips: two glossy orange-red oval hips with dark sepals at the tip on a short green stem, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "acorn",
+  "what": "an acorn: a smooth tan-brown nut in a scaly cup cap with a short stem, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "hazelnut",
+  "what": "two hazelnuts: round glossy brown nuts with pale bases, one with a leafy green husk, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "pine_nut",
+  "what": "a few pine nuts: small ivory teardrop-shaped kernels beside one dark brown shell, centred with 3-5 px of padding",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "acuri_nut",
+  "what": "acuri palm nuts: two oval hard brown nuts with fibrous husk remains and a pointed tip, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "moriche_fruit",
+  "what": "a moriche palm fruit: an egg-shaped fruit covered in glossy red-brown scales like a pine cone, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "prickly_pear_fruit",
+  "what": "a prickly pear fruit: an oval magenta-red cactus fruit with tiny tufts of spines, centred with 3-5 px of padding",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "mesquite_pod",
+  "what": "mesquite pods: two long flat curved pale tan pods with bumps along the beans inside, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "araucaria_cone",
+  "what": "an araucaria cone: a large round green-brown cone covered in pointed overlapping scales, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "cycad_seed",
+  "what": "a cycad seed: a large oval glossy orange-red seed, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "ginkgo_seed",
+  "what": "ginkgo seeds: two round wrinkled pale yellow-orange fleshy seeds, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "mushroom_brown",
+  "what": "a brown mushroom: a flat broad tan-brown cap on a short pale stem, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "mushroom_red",
+  "what": "a red mushroom: a round red cap with cream spots on a short pale stem, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "kelp",
+  "what": "a strand of kelp: a wavy olive-green seaweed ribbon with small air bladders, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "wheat",
+  "what": "a bundle of ripe wheat: golden stalks with plump bearded ears, tied, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "barley",
+  "what": "a bundle of ripe barley: pale gold stalks with long-bearded nodding ears, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "rye",
+  "what": "a bundle of ripe rye: grey-gold stalks with long slender bearded ears, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "rice",
+  "what": "a bundle of ripe rice: golden drooping panicles of grain on thin stalks, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "millet",
+  "what": "a bundle of ripe millet: bushy round golden-tan seed heads on stalks, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "sorghum",
+  "what": "a head of sorghum: a dense cluster of round red-brown grains on a stalk, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "beans",
+  "what": "a handful of dry beans: speckled pink-brown and cream kidney beans, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "sunflower_seeds",
+  "what": "a few sunflower seeds: teardrop seeds striped black and grey-white, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "wheat_seeds",
+  "what": "a small heap of seeds: small oval pale tan wheat grains on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "barley_seeds",
+  "what": "a small heap of seeds: plump pale gold barley grains with tiny husk points on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "rye_seeds",
+  "what": "a small heap of seeds: slender grey-green rye grains on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "rice_seeds",
+  "what": "a small heap of seeds: golden-husked rice grains on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "millet_seeds",
+  "what": "a small heap of seeds: tiny round cream-yellow millet grains on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "sorghum_seeds",
+  "what": "a small heap of seeds: round red-brown sorghum grains on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "maize_seeds",
+  "what": "a small heap of seeds: flat golden-yellow maize kernels on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "bean_seeds",
+  "what": "a small heap of seeds: speckled pink-brown bean seeds on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "melon_seeds",
+  "what": "a small heap of seeds: flat oval dark brown melon seeds on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "pumpkin_seeds",
+  "what": "a small heap of seeds: flat oval cream pumpkin seeds on a tiny patch of dark soil, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ }
+]

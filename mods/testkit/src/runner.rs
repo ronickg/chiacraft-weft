@@ -13,6 +13,15 @@ use std::time::{Duration, Instant};
 use weft_sdk::client::{self, ClientState, client_flags as cf};
 use weft_sdk::*;
 
+/// The key of an action tests and scripts name as text, one handle per name.
+fn key_named(action: &str) -> &'static Key {
+    static KEYS: std::sync::Mutex<Option<HashMap<String, &'static Key>>> = std::sync::Mutex::new(None);
+    let mut keys = KEYS.lock().unwrap();
+    keys.get_or_insert_with(HashMap::new)
+        .entry(action.to_string())
+        .or_insert_with(|| Key::generated(action.to_string()))
+}
+
 pub type R = Result<(), String>;
 pub type BoxTest = Pin<Box<dyn Future<Output = R>>>;
 
@@ -29,6 +38,32 @@ macro_rules! tests {
 }
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+
+thread_local! {
+    /// The script clock (`script_clock`): game time as the test sees it, advanced once a frame.
+    static SCRIPT_TIME: std::cell::Cell<Duration> = const { std::cell::Cell::new(Duration::ZERO) };
+    static LAST_FRAME: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) };
+}
+
+/// The longest step one frame adds to the script clock. A game stopped for a while (the PC runner
+/// freezes looks with SIGSTOP while a bench runs) or a hitch of seconds adds this much, no more.
+const MAX_FRAME_STEP: Duration = Duration::from_secs(1);
+
+/// The script clock: every `wait`, `until ... within` and reply timeout of a test or script counts
+/// this, not the wall clock, so a game that was stopped (SIGSTOP) and continued finds its waits
+/// where it left them. It advances by the real time since the last frame, capped at `MAX_FRAME_STEP`.
+pub(crate) fn script_clock() -> Duration {
+    SCRIPT_TIME.with(|t| t.get())
+}
+
+/// Advances the script clock; called once at the start of every frame.
+fn tick_script_clock() {
+    let now = Instant::now();
+    if let Some(last) = LAST_FRAME.with(|l| l.replace(Some(now))) {
+        let step = now.saturating_duration_since(last).min(MAX_FRAME_STEP);
+        SCRIPT_TIME.with(|t| t.set(t.get() + step));
+    }
+}
 
 pub struct Inner {
     client: Option<Client>,
@@ -120,6 +155,20 @@ impl T {
         ok
     }
 
+    /// Whether CI leaves this check out (`ci-skip.txt`, as `test/check` or `test/scenario/check`);
+    /// says so in the report.
+    pub fn ci_skips(&self, check: &str) -> bool {
+        let name = match &self.1 {
+            Some(l) => format!("{}/{l}/{check}", self.name()),
+            None => format!("{}/{check}", self.name()),
+        };
+        let why = crate::ci_skip(&name);
+        if let Some(why) = why {
+            skip(&name, why);
+        }
+        why.is_some()
+    }
+
     pub fn check_eq<V: PartialEq + std::fmt::Debug>(&self, got: V, want: V, what: &str) -> bool {
         self.check(got == want, format!("{what}: got {got:?}, want {want:?}"))
     }
@@ -136,16 +185,15 @@ impl T {
     /// of the local player in first person; `None` behind the camera.
     pub fn on_screen(&self, p: [f64; 3]) -> Option<(f32, f32)> {
         let s = self.state();
-        let eye_y = self.c().entity(0).map_or(1.62, |e| e.size[2] as f64);
-        let eye = [s.shown[0], s.shown[1] + eye_y, s.shown[2]];
+        let eye_y = self.c().entity(0).map_or(1.62, |e| e.size.eye as f64);
+        let eye = [s.shown.x, s.shown.y + eye_y, s.shown.z];
+        let fwd = look_dir(s.yaw, s.pitch);
         let (sy, cy) = (s.yaw as f64).sin_cos();
-        let (sp, cp) = (s.pitch as f64).sin_cos();
-        let fwd = [-sy * cp, sp, -cy * cp];
         let right = [cy, 0.0, -sy];
-        let up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
+        let up = [right[1] * fwd.z - right[2] * fwd.y, right[2] * fwd.x - right[0] * fwd.z, right[0] * fwd.y - right[1] * fwd.x];
         let d = [p[0] - eye[0], p[1] - eye[1], p[2] - eye[2]];
         let dot = |a: [f64; 3]| a[0] * d[0] + a[1] * d[1] + a[2] * d[2];
-        let z = dot(fwd);
+        let z = dot(fwd.to_array());
         if z <= 0.05 {
             return None;
         }
@@ -164,7 +212,7 @@ impl T {
 
     /// Waits until `f` holds, failing after `timeout`.
     pub fn until<F: FnMut(&T) -> bool + Unpin>(&self, what: &str, timeout: Duration, f: F) -> Wait<F> {
-        Wait { t: self.clone(), f, deadline: Instant::now() + timeout, what: what.to_string() }
+        Wait { t: self.clone(), f, deadline: script_clock() + timeout, what: what.to_string(), shot: None }
     }
 
     pub fn frames(&self, n: u64) -> Wait<impl FnMut(&T) -> bool + Unpin> {
@@ -174,8 +222,8 @@ impl T {
 
     /// A plain delay, for things that take game time (smelting, falling).
     pub fn secs(&self, s: f32) -> Wait<impl FnMut(&T) -> bool + Unpin> {
-        let end = Instant::now() + Duration::from_secs_f32(s);
-        self.until("time", Duration::from_secs_f32(s + 600.0), move |_| Instant::now() >= end)
+        let end = script_clock() + Duration::from_secs_f32(s);
+        self.until("time", Duration::from_secs_f32(s + 600.0), move |_| script_clock() >= end)
     }
 
     /// The world around the player is loaded and meshed.
@@ -185,15 +233,36 @@ impl T {
 
     /// Nothing left to generate, send or mesh.
     pub fn idle(&self) -> Wait<impl FnMut(&T) -> bool + Unpin> {
-        let mut since: Option<Instant> = None;
+        let mut since: Option<Duration> = None;
         self.until("idle", Duration::from_secs(120), move |t| {
             // Cubes sent may still be in flight when the server reports idle.
             if !t.flag(cf::IDLE) {
                 since = None;
                 return false;
             }
-            since.get_or_insert_with(Instant::now).elapsed() >= Duration::from_millis(300)
+            script_clock() - *since.get_or_insert_with(script_clock) >= Duration::from_millis(300)
         })
+    }
+
+    /// Does `open` (a key press, `menu_open`) until screen `name` shows, again every 3 seconds
+    /// up to four times: on CI (software Vulkan) a single one right after joining or placing a
+    /// block was lost, and the test waited 30 s for a screen nothing had opened.
+    pub async fn open_screen(&self, name: &str, open: impl Fn(&T)) -> R {
+        let shown = |t: &T| t.0.borrow().screen == name && t.flag(cf::SCREEN_READY);
+        for _ in 0..4 {
+            // Not again once it is up: a retry presses a toggle, and closed it.
+            if self.0.borrow().screen != name {
+                open(self);
+            }
+            let end = script_clock() + Duration::from_secs(3);
+            while script_clock() < end {
+                self.frames(1).await?;
+                if shown(self) {
+                    return Ok(());
+                }
+            }
+        }
+        self.screen(name).await
     }
 
     /// `name` is the top screen and it is laid out and drawn.
@@ -208,8 +277,8 @@ impl T {
         let mut last = [f64::NAN; 3];
         self.until("standing still", DEFAULT_TIMEOUT, move |t| {
             let s = t.state();
-            let moved = (0..3).any(|i| (s.pos[i] - last[i]).abs() > 1e-6 || s.pos[i].is_nan());
-            last = s.pos;
+            let moved = (s.pos - last.into()).length_squared() > 1e-12 || s.pos.to_array().iter().any(|v| v.is_nan());
+            last = s.pos.to_array();
             still = if moved || !t.flag(cf::ON_GROUND) { 0 } else { still + 1 };
             still >= 20
         })
@@ -225,7 +294,7 @@ impl T {
     /// A fresh world `test-<name>` with `seed`, waiting until it is loaded.
     pub async fn world(&self, seed: u64) -> R {
         let name = format!("test-{}", self.name());
-        self.c().new_world(&name, seed);
+        self.c().world_create(&name, seed);
         self.until("joined", Duration::from_secs(60), |t| t.flag(cf::JOINED))
             .await?;
         // Mobs only where a test puts them, so pictures repeat.
@@ -237,11 +306,15 @@ impl T {
     pub async fn cmd(&self, line: &str) -> Result<String, String> {
         let before = self.c().chat_line(0);
         let marker = self.0.borrow().state.frame;
-        self.c().chat(line);
+        let sent = script_clock();
+        self.c().say(line);
         let mut seen = String::new();
+        // A reply the same as the line before (time frozen) or none at all (`/rename`) shows as no
+        // change: then 600 frames or 5 s, whichever first, count as answered. Frames alone never
+        // came in time on a software renderer (a few frames a second).
         self.until(&format!("reply to {line}"), Duration::from_secs(10), |t| {
             let now = t.c().chat_line(0);
-            if now != before || t.state().frame > marker + 600 {
+            if now != before || t.state().frame > marker + 600 || script_clock() - sent > Duration::from_secs(5) {
                 seen = now;
                 true
             } else {
@@ -299,10 +372,10 @@ impl T {
 
     /// Polls a slot until something is in it (machines), giving what was there at the end.
     pub async fn wait_slot(&self, owner: &str, slot: u32, secs: f32) -> Result<(String, u32, u32), String> {
-        let deadline = Instant::now() + Duration::from_secs_f32(secs);
+        let deadline = script_clock() + Duration::from_secs_f32(secs);
         loop {
             let s = self.slot(owner, slot).await?;
-            if s.1 > 0 || Instant::now() > deadline {
+            if s.1 > 0 || script_clock() > deadline {
                 return Ok(s);
             }
             self.secs(0.25).await?;
@@ -311,14 +384,13 @@ impl T {
 
     /// Player's block position as the client has it.
     pub fn feet(&self) -> [i32; 3] {
-        let p = self.state().pos;
-        [p[0].floor() as i32, p[1].floor() as i32, p[2].floor() as i32]
+        block_pos_of(self.state().pos).to_array()
     }
 
     // ------------------------------------------------ input
 
     pub fn press(&self, action: &str) {
-        if !self.c().press(action, 0.0) {
+        if !self.c().input_action(key_named(action), 0.0) {
             self.fail(format!("no action {action}"));
         }
     }
@@ -333,7 +405,7 @@ impl T {
     }
 
     pub fn hold(&self, action: &str, secs: f32) {
-        if !self.c().press(action, secs) {
+        if !self.c().input_action(key_named(action), secs) {
             self.fail(format!("no action {action}"));
         }
     }
@@ -343,7 +415,7 @@ impl T {
         for q in queries {
             match self.c().ui_rect(q) {
                 None => self.fail(format!("no UI element {q} on {}", self.0.borrow().screen)),
-                Some([x, y, w, h]) => {
+                Some(Rect { x, y, w, h }) => {
                     self.check(
                         x >= 0.0 && y >= 0.0 && x + w <= 1.001 && y + h <= 1.001,
                         format!("{q} sticks out of the window ({x:.3} {y:.3} {w:.3} {h:.3})"),
@@ -369,8 +441,43 @@ impl T {
         Err(format!("clicking {query} never opened {screen}"))
     }
 
+    /// The UI query of hotbar slot `i` in the open menu: the bottom row of slots, left to right
+    /// (the player's inventory comes last in every menu). Found by place, not number: slots
+    /// numbered after the hotbar (the other hand's, base's trash) moved it before.
+    pub fn hotbar(&self, i: u32) -> String {
+        let slots: Vec<(u32, Rect)> = (0..512u32)
+            .filter_map(|n| self.c().ui_rect(&format!("slot:{n}")).map(|r| (n, r)))
+            .collect();
+        let Some(bottom) = slots.iter().map(|(_, r)| r.y).reduce(f32::max) else {
+            return format!("slot:{}", 36 + i);
+        };
+        let mut row: Vec<&(u32, Rect)> = slots
+            .iter()
+            .filter(|(_, r)| (r.y - bottom).abs() < 0.001)
+            .collect();
+        row.sort_by(|a, b| a.1.x.total_cmp(&b.1.x));
+        format!("slot:{}", row.get(i as usize).map_or(36 + i, |(n, _)| *n))
+    }
+
+    /// Clicks a UI element after the cursor has rested on it for two frames. `click_ui` moves the
+    /// cursor and presses in one frame, which may land on what the cursor was over before: with a
+    /// stack held, a right click meant for a grid cell then goes back onto the slot it was taken from.
+    pub async fn click_settled(&self, query: &str, button: u32) -> R {
+        // A scripted click holds its button at least 0.05 s: one still down from the last click
+        // (a stack just picked up) sweeps the cells the cursor moves over, and the first right
+        // click into a grid went back to where the stack came from.
+        self.secs(0.08).await?;
+        let Some(Rect { x, y, w, h }) = self.c().ui_rect(query) else {
+            return Err(format!("no UI element {query} on {}", self.0.borrow().screen));
+        };
+        self.c().input_cursor(x + w / 2.0, y + h / 2.0);
+        self.frames(2).await?;
+        self.c().input_click(button, 0.0);
+        Ok(())
+    }
+
     pub fn click_ui(&self, query: &str, button: u32) -> bool {
-        let ok = self.c().click_ui(query, button);
+        let ok = self.c().ui_click(query, button);
         if !ok {
             self.fail(format!("no UI element {query} on {}", self.0.borrow().screen));
         }
@@ -390,11 +497,11 @@ impl T {
         let id = self.c().screenshot(&path);
         let mut shot = None;
         self.until(&format!("screenshot {name}"), Duration::from_secs(10), |_| {
-            shot = client::image(id).map(|(w, h, p)| Shot { w, h, px: p.to_vec() });
+            shot = client::image_pixels(id).map(|(w, h, p)| Shot { w, h, px: p.to_vec() });
             shot.is_some()
         })
         .await?;
-        client::image_free(id);
+        client::image_unload(id);
         Ok(shot.unwrap())
     }
 
@@ -579,6 +686,9 @@ impl Future for All {
 
 /// One scenario of a scene: labeled failures, its error reported as a failure, its time noted.
 pub fn scenario<F: Future<Output = R> + 'static>(t: &T, name: &str, f: impl FnOnce(T) -> F) -> BoxTest {
+    if t.ci_skips(name) {
+        return Box::pin(async { Ok(()) });
+    }
     let t = t.scoped(name);
     let fut = f(t.clone());
     Box::pin(async move {
@@ -594,18 +704,38 @@ pub fn scenario<F: Future<Output = R> + 'static>(t: &T, name: &str, f: impl FnOn
 pub struct Wait<F> {
     t: T,
     f: F,
-    deadline: Instant,
+    deadline: Duration,
     what: String,
+    /// The timeout's screenshot and when to stop waiting for it.
+    shot: Option<(u64, Duration)>,
 }
 
 impl<F: FnMut(&T) -> bool + Unpin> Future for Wait<F> {
     type Output = R;
     fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<R> {
         let me = &mut *self;
+        if let Some((id, until)) = me.shot {
+            // Fail only once the shot is taken: the test leaves its world right after, and a
+            // shot taken then showed the title screen.
+            if client::image_pixels(id).is_none() && script_clock() < until {
+                return Poll::Pending;
+            }
+            client::image_unload(id);
+            return Poll::Ready(Err(format!("timed out waiting for {}", me.what)));
+        }
         if (me.f)(&me.t) {
             Poll::Ready(Ok(()))
-        } else if Instant::now() > me.deadline {
-            Poll::Ready(Err(format!("timed out waiting for {}", me.what)))
+        } else if script_clock() > me.deadline {
+            // What the screen showed when it gave up (`timeout_<what>.png`): a wait that times
+            // out usually has no shot of its own, and the run is on another machine.
+            let file: String = me
+                .what
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                .collect();
+            let path = format!("{}/test-shots/{}/timeout_{file}.png", me.t.c().run_dir(), me.t.name());
+            me.shot = Some((me.t.c().screenshot(&path), script_clock() + Duration::from_secs(5)));
+            Poll::Pending
         } else {
             Poll::Pending
         }
@@ -640,6 +770,16 @@ thread_local! {
     static ACTIVE: RefCell<Option<T>> = const { RefCell::new(None) };
 }
 
+thread_local! {
+    static SKIPPED: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Left out on CI (`crate::ci_skip`): in the log now and in the report, never silently.
+pub fn skip(name: &str, why: &str) {
+    weft_sdk::info!("testkit: SKIP {name} on CI: {why}");
+    SKIPPED.with(|s| s.borrow_mut().push(format!("SKIP {name} on CI: {why}")));
+}
+
 pub fn start(queue: Vec<TestDef>) {
     weft_sdk::info!(
         "testkit: running {} test(s): {}",
@@ -656,6 +796,7 @@ pub fn start(queue: Vec<TestDef>) {
 }
 
 pub fn frame(c: &Client) {
+    tick_script_clock();
     RUNNER.with(|r| {
         let mut guard = r.borrow_mut();
         let Some(run) = guard.as_mut() else { return };
@@ -663,9 +804,18 @@ pub fn frame(c: &Client) {
             return;
         }
         if run.warmup > 0 {
-            // Each run's screenshots only.
+            // Each run's screenshots only in test-shots; the last run's move to
+            // test-shots-old/<time> (never deleted: Ronald looks back at them).
             if run.warmup == 3 {
-                let _ = std::fs::remove_dir_all(format!("{}/test-shots", c.run_dir()));
+                let dir = format!("{}/test-shots", c.run_dir());
+                if std::path::Path::new(&dir).exists() {
+                    let stamp = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_or(0, |d| d.as_secs());
+                    let old = format!("{}/test-shots-old", c.run_dir());
+                    let _ = std::fs::create_dir_all(&old);
+                    let _ = std::fs::rename(&dir, format!("{old}/{stamp}"));
+                }
             }
             run.warmup -= 1;
             return;
@@ -678,6 +828,9 @@ pub fn frame(c: &Client) {
             }
             let def = run.queue.remove(0);
             weft_sdk::info!("testkit: --- {} ---", def.name);
+            if let Ok(mut s) = crate::script::STEP.lock() {
+                *s = format!("test {}", def.name);
+            }
             crate::same_conditions(c);
             let t = T::new(&def.name);
             ACTIVE.with(|a| *a.borrow_mut() = Some(t.clone()));
@@ -686,7 +839,7 @@ pub fn frame(c: &Client) {
         }
         let (t, fut, began) = run.current.as_mut().unwrap();
         // Held, not pressed: a key the test taps itself is pressed only within its own frame.
-        if c.held(&PROBE) {
+        if c.key_held(&PROBE) {
             PROBES.with(|p| p.set(p.get() + 1));
         }
         {
@@ -706,6 +859,8 @@ pub fn frame(c: &Client) {
             lines.extend(i.failures.iter().map(|f| format!("FAIL {f}")));
             if let Err(e) = res {
                 ok = false;
+                // In the log too: CI keeps the log, not always the report.
+                weft_sdk::warn!("[{}] ERROR {e}", i.name);
                 lines.push(format!("ERROR {e}"));
             }
             let out = Outcome { name: i.name.clone(), ok, secs: began.elapsed().as_secs_f32(), lines };
@@ -713,12 +868,12 @@ pub fn frame(c: &Client) {
             drop(i);
             run.done.push(out);
             run.current = None;
-            c.release_all();
+            c.input_release_all();
             if c.state().flags & cf::DEBUG != 0 {
-                c.key("F3", 0.0);
+                c.input_key("F3", 0.0);
             }
             if c.state().flags & cf::IN_WORLD != 0 {
-                c.leave_world();
+                c.world_leave();
             }
         }
     });
@@ -729,6 +884,11 @@ fn finish(c: &Client, run: &mut Runner) {
     let failed = run.done.iter().filter(|o| !o.ok).count();
     let mut report =
         format!("testkit report: {} passed, {failed} failed, {:.1} s\n", run.done.len() - failed, run.started.elapsed().as_secs_f32());
+    SKIPPED.with(|s| {
+        for l in s.borrow().iter() {
+            report.push_str(&format!("\n{l}\n"));
+        }
+    });
     for o in &run.done {
         report.push_str(&format!("\n{} {} ({:.1} s)\n", if o.ok { "PASS" } else { "FAIL" }, o.name, o.secs));
         for l in &o.lines {

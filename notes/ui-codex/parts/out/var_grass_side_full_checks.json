@@ -1,0 +1,24 @@
+{
+ "kind": "block",
+ "what": "the side of a grass block, like the attached one but with a much fuller grass fringe: muted green grass hanging 8-12 px down from the top edge in long irregular tufts that cover most of the upper half, with only the lower part showing the brown dirt clods; seamless left to right, every cell filled",
+ "size": [
+  32,
+  32
+ ],
+ "full": true,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.59,
+   "empty": 0,
+   "seam": 2.38,
+   "passed": false
+  },
+  {
+   "grid": 0.579,
+   "empty": 0,
+   "seam": 2.19,
+   "passed": true
+  }
+ ]
+}

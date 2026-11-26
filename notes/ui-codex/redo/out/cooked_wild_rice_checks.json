@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a wooden bowl of cooked wild rice seen from the front and slightly above: long slender dark brown-black grains, some split open showing pale insides, a soft shine, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.216,
+   "outline": 0.88,
+   "red_line": 0.14,
+   "fill": 0.68,
+   "passed": true
+  }
+ ]
+}

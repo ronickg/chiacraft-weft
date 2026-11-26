@@ -1,0 +1,133 @@
+[
+ {
+  "kind": "block",
+  "name": "var_grass_top_1",
+  "type": "grass block",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/grass_top.png",
+  "what": "muted natural green grass tufts. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_grass_top_2",
+  "type": "grass block",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/grass_top.png",
+  "what": "muted natural green grass tufts. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_grass_top_3",
+  "type": "grass block",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/grass_top.png",
+  "what": "muted natural green grass tufts. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_dirt_1",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/dirt.png",
+  "what": "rounded brown dirt clods with dark gaps. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_dirt_2",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/dirt.png",
+  "what": "rounded brown dirt clods with dark gaps. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_dirt_3",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/dirt.png",
+  "what": "rounded brown dirt clods with dark gaps. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_stone_1",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/stone.png",
+  "what": "large sage-grey stone slabs with deep crevices. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_stone_2",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/stone.png",
+  "what": "large sage-grey stone slabs with deep crevices. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_stone_3",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/stone.png",
+  "what": "large sage-grey stone slabs with deep crevices. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_sand_1",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/sand.png",
+  "what": "light sand with soft wind ripples and a few pale grains. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_sand_2",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/sand.png",
+  "what": "light sand with soft wind ripples and a few pale grains. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_sand_3",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/sand.png",
+  "what": "light sand with soft wind ripples and a few pale grains. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "name": "var_grass_side_full",
+  "type": "grass block",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/grass_side.png",
+  "what": "the side of a grass block, like the attached one but with a much fuller grass fringe: muted green grass hanging 8-12 px down from the top edge in long irregular tufts that cover most of the upper half, with only the lower part showing the brown dirt clods; seamless left to right, every cell filled"
+ },
+ {
+  "kind": "block",
+  "name": "var_tallgrass_1",
+  "type": "short grass",
+  "cutout": true,
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/tallgrass.png",
+  "what": "a full clump of long thin grass blades, most of them leaning a little to the right, rising 22-26 px from the bottom edge; in the same style, colours and blade width as the attached tall grass from my game; centred, see-through around it"
+ },
+ {
+  "kind": "block",
+  "name": "var_tallgrass_2",
+  "type": "short grass",
+  "cutout": true,
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/tallgrass.png",
+  "what": "a sparser clump of fewer, longer blades fanning out, two of them bending over at the tip, rising 24-28 px; in the same style, colours and blade width as the attached tall grass from my game; centred, see-through around it"
+ },
+ {
+  "kind": "block",
+  "name": "var_tallgrass_3",
+  "type": "short grass",
+  "cutout": true,
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/tallgrass.png",
+  "what": "a clump with a few seed heads on thin stems among the blades, rising 20-26 px; in the same style, colours and blade width as the attached tall grass from my game; centred, see-through around it"
+ },
+ {
+  "kind": "block",
+  "name": "var_tallgrass_4",
+  "type": "short grass",
+  "cutout": true,
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/tallgrass.png",
+  "what": "a short low tuft of grass, 8-12 px tall, standing on the bottom edge; in the same style, colours and blade width as the attached tall grass from my game; centred, see-through around it"
+ },
+ {
+  "kind": "block",
+  "name": "var_tallgrass_5",
+  "type": "short grass",
+  "cutout": true,
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/tallgrass.png",
+  "what": "two small low tufts side by side, 6-10 px tall, standing on the bottom edge; in the same style, colours and blade width as the attached tall grass from my game; centred, see-through around it"
+ }
+]

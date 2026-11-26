@@ -1,0 +1,15 @@
+{
+ "kind": "base:shovel",
+ "layer": "head",
+ "material": "oak",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 14,
+ "anchor": [
+  17.0,
+  14.3
+ ]
+}

@@ -1,0 +1,28 @@
+# The world playtester's forest (seed 42, x -88 z 456, ground about 103), where trunks, leaves and
+# mossy cobble in the canopy's shade came out blue: noon and afternoon, two ways. Seed 42,
+# --view 12, 1280x720, --shader-pack chiacraft, a fresh world. Spectator, mobs off.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /time set 6000
+chat /tp -88 105 456
+loaded
+idle
+wait 10
+look 0 -5
+wait 2
+shot forest_1_noon_n.png
+look 90 -5
+wait 2
+shot forest_1_noon_w.png
+chat /time set 9500
+wait 3
+look 0 -5
+wait 2
+shot forest_2_afternoon_n.png
+look 90 -5
+wait 2
+shot forest_2_afternoon_w.png
+quit

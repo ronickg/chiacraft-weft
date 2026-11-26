@@ -1,0 +1,53 @@
+{
+ "species": "confuciusornis",
+ "about": "Confuciusornis sanctus: mottled grey-black and brown, the wings spotted pale (Li et al. 2018, from its color cells), pale below.",
+ "loci": [
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "greyer to browner"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  },
+  {
+   "id": "Cu",
+   "name": "Curiosity",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "h": 0.35,
+   "about": "aloof to curious: whether it comes to look at a player standing still nearby instead of keeping away"
+  },
+  {
+   "id": "Fi",
+   "name": "Fierceness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "h": 0.35,
+   "about": "timid to fierce: a hunter's eagerness to hunt and to keep at a chase, a plant eater's readiness to stand its ground"
+  }
+ ],
+ "eyes": [
+  [
+   90,
+   62,
+   40
+  ],
+  [
+   70,
+   48,
+   32
+  ]
+ ],
+ "build": {}
+}

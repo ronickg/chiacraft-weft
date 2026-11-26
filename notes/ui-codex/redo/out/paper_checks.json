@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a slightly crumpled square sheet of parchment lying at an angle, soft cream with gentle fold shading and a warm brown edge",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.472,
+   "outline": 0.82,
+   "red_line": 0.0,
+   "fill": 0.51,
+   "passed": true
+  }
+ ]
+}

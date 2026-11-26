@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "an egg: an upright oval, slightly narrower at the top, warm cream shell with a soft highlight on the upper left, an outline no darker than mid brown, drawn small: its longest side only about 18 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.477,
+   "outline": 0.65,
+   "red_line": 0.0,
+   "fill": 0.14,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,105 @@
+[
+ {
+  "kind": "item",
+  "name": "fix_wood_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_pickaxe.png",
+  "what": "a wood pickaxe in the same shape as the attached iron pickaxe: a curved crescent head of carved warm orange-brown wood with clear grain, crude and chunky crosswise at the handle's top, both points curving down, a plain wooden handle, the head lashed on with tan cord, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_flint_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_pickaxe.png",
+  "what": "a flint pickaxe in the same shape as the attached iron pickaxe: a curved crescent head of crude knapped grey-brown flint with chipped faceted edges and lighter flake scars crosswise at the handle's top, both points curving down, a plain wooden handle, the head lashed on with tan sinew cord, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_copper_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_pickaxe.png",
+  "what": "a copper pickaxe in the same shape as the attached iron pickaxe: a curved crescent head of cast bright orange copper with a peach highlight crosswise at the handle's top, both points curving down, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_bronze_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_pickaxe.png",
+  "what": "a bronze pickaxe in the same shape as the attached iron pickaxe: a curved crescent head of cast warm orange-brown bronze with a golden sheen and a near-white edge highlight crosswise at the handle's top, both points curving down, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_steel_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_pickaxe.png",
+  "what": "a steel pickaxe in the same shape as the attached iron pickaxe: a curved crescent head of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight crosswise at the handle's top, both points curving down, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_diamond_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_pickaxe.png",
+  "what": "a diamond pickaxe in the same shape as the attached iron pickaxe: a curved crescent head of faceted cyan diamond with teal shadows, white facet tips and one small sparkle crosswise at the handle's top, both points curving down, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_wood_shovel",
+  "what": "a wood shovel: a rounded, slightly pointed spade blade of carved warm orange-brown wood with clear grain, crude and chunky at the handle's top end, the blade lying along the same diagonal as the handle and its rounded tip pointing to the top-right, a plain wooden handle, the head lashed on with tan cord, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_stone_shovel",
+  "what": "a stone shovel: a rounded, slightly pointed spade blade of chunky chipped warm grey-tan stone with rough bumpy edges, no shine at the handle's top end, the blade lying along the same diagonal as the handle and its rounded tip pointing to the top-right, a plain wooden handle, the head lashed on with tan cord, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_flint_shovel",
+  "what": "a flint shovel: a rounded, slightly pointed spade blade of crude knapped grey-brown flint with chipped faceted edges and lighter flake scars at the handle's top end, the blade lying along the same diagonal as the handle and its rounded tip pointing to the top-right, a plain wooden handle, the head lashed on with tan sinew cord, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_copper_shovel",
+  "what": "a copper shovel: a rounded, slightly pointed spade blade of cast bright orange copper with a peach highlight at the handle's top end, the blade lying along the same diagonal as the handle and its rounded tip pointing to the top-right, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_bronze_shovel",
+  "what": "a bronze shovel: a rounded, slightly pointed spade blade of cast warm orange-brown bronze with a golden sheen and a near-white edge highlight at the handle's top end, the blade lying along the same diagonal as the handle and its rounded tip pointing to the top-right, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_iron_shovel",
+  "what": "an iron shovel: a rounded, slightly pointed spade blade of bright warm-silver iron with a near-white bevel and a soft warm-grey outline at the handle's top end, the blade lying along the same diagonal as the handle and its rounded tip pointing to the top-right, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_steel_shovel",
+  "what": "a steel shovel: a rounded, slightly pointed spade blade of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight at the handle's top end, the blade lying along the same diagonal as the handle and its rounded tip pointing to the top-right, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_gold_shovel",
+  "what": "a gold shovel: a rounded, slightly pointed spade blade of shiny lemon-gold with orange-brown shadows and small white glints at the handle's top end, the blade lying along the same diagonal as the handle and its rounded tip pointing to the top-right, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_diamond_shovel",
+  "what": "a diamond shovel: a rounded, slightly pointed spade blade of faceted cyan diamond with teal shadows, white facet tips and one small sparkle at the handle's top end, the blade lying along the same diagonal as the handle and its rounded tip pointing to the top-right, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ },
+ {
+  "kind": "item",
+  "name": "fix_copper_hoe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_hoe.png",
+  "what": "a copper hoe in the same shape as the attached iron hoe: one flat blade about 10 px wide and 4-5 px tall of cast bright orange copper with a peach highlight, set at a right angle across the handle's top and pointing down-left, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+  "diagonal": true
+ }
+]

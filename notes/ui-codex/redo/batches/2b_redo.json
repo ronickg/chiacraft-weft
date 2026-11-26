@@ -1,0 +1,82 @@
+[
+ {
+  "kind": "item",
+  "name": "wood_hoe",
+  "what": "a wooden hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of warm orange-brown wood with clear grain, crudely carved, lashed with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "stone_hoe",
+  "what": "a stone hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of chunky chipped warm grey-tan stone with rough bumpy edges, no shine, bound with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "iron_hoe",
+  "what": "an iron hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, on a handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "gold_hoe",
+  "what": "a gold hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of shiny lemon-gold with orange-brown shadows and small white glints, a gold collar with its own brown-gold outline, on a handle wrapped in red-brown leather with gold bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "diamond_hoe",
+  "what": "a diamond hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of faceted cyan diamond with teal shadows, white facet tips and one small sparkle, a gold collar, on a handle wrapped in red-brown leather with gold bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "leather_helmet",
+  "what": "a soft leather cap, front view: a rounded brown leather cap with stitched panels, a short brim and ear flaps, open face (no visor, no eye slit), centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "leather_boots",
+  "what": "a pair of soft warm-brown leather with stitching boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "iron_boots",
+  "what": "a pair of warm-silver plate with a near-white highlight, gold trim boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "gold_boots",
+  "what": "a pair of ornate lemon-gold plate with orange-brown shadows and red cloth boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "diamond_boots",
+  "what": "a pair of cyan diamond plates with white facet tips over dark leather boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ }
+]

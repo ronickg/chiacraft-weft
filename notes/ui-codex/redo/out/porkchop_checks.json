@@ -1,0 +1,26 @@
+{
+ "kind": "item",
+ "what": "a raw pork chop: pale pink meat with a cream fat rim and a small bone, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": true,
+ "tries": [
+  {
+   "grid": 0.562,
+   "outline": 0.93,
+   "red_line": 0.0,
+   "fill": 0.41,
+   "passed": false
+  },
+  {
+   "grid": 0.565,
+   "outline": 0.65,
+   "red_line": 0.0,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,26 @@
+{
+ "kind": "block",
+ "what": "a short low tuft of grass, 8-12 px tall, standing on the bottom edge; in the same style, colours and blade width as the attached tall grass from my game; centred, see-through around it",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.525,
+   "outline": 0.9,
+   "red_line": 0.0,
+   "fill": 0.14,
+   "passed": false
+  },
+  {
+   "grid": 0.53,
+   "outline": 0.87,
+   "red_line": 0.0,
+   "fill": 0.15,
+   "passed": true
+  }
+ ]
+}

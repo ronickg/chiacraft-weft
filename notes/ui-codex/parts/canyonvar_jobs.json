@@ -1,0 +1,98 @@
+[
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_cream_sandstone_side_1",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_cream_sandstone_side_px.png",
+  "what": "the side of a pale cream sandstone. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. One even band colour, no darker bands through the middle, the same slightly darker line along the bottom edge; the left and right edges meet so the band runs unbroken along a wall. Seamless on all four edges, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_cream_sandstone_side_2",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_cream_sandstone_side_px.png",
+  "what": "the side of a pale cream sandstone. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. One even band colour, no darker bands through the middle, the same slightly darker line along the bottom edge; the left and right edges meet so the band runs unbroken along a wall. Seamless on all four edges, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_cream_sandstone_side_3",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_cream_sandstone_side_px.png",
+  "what": "the side of a pale cream sandstone. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. One even band colour, no darker bands through the middle, the same slightly darker line along the bottom edge; the left and right edges meet so the band runs unbroken along a wall. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_cream_sandstone_top_1",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_cream_sandstone_top_px.png",
+  "what": "the top of a pale cream sandstone. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_cream_sandstone_top_2",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_cream_sandstone_top_px.png",
+  "what": "the top of a pale cream sandstone. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_cream_sandstone_top_3",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_cream_sandstone_top_px.png",
+  "what": "the top of a pale cream sandstone. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_banded_clay_side_1",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_banded_clay_side_px.png",
+  "what": "the side of a banded clay rock, its thin horizontal stripes running straight across. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. The same thin stripes at the same heights (rows) as the attached texture, so they join with it side by side; only small grains and flecks differ; the same slightly darker line along the bottom edge. Seamless on all four edges, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_banded_clay_side_2",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_banded_clay_side_px.png",
+  "what": "the side of a banded clay rock, its thin horizontal stripes running straight across. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. The same thin stripes at the same heights (rows) as the attached texture, so they join with it side by side; only small grains and flecks differ; the same slightly darker line along the bottom edge. Seamless on all four edges, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_banded_clay_side_3",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_banded_clay_side_px.png",
+  "what": "the side of a banded clay rock, its thin horizontal stripes running straight across. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. The same thin stripes at the same heights (rows) as the attached texture, so they join with it side by side; only small grains and flecks differ; the same slightly darker line along the bottom edge. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_banded_clay_top_1",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_banded_clay_top_px.png",
+  "what": "the top of a banded clay rock. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_banded_clay_top_2",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_banded_clay_top_px.png",
+  "what": "the top of a banded clay rock. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_banded_clay_top_3",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_banded_clay_top_px.png",
+  "what": "the top of a banded clay rock. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same size of grains, flecks and shapes, the same light and contrast; only their arrangement differs, so this tile and the original side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ }
+]

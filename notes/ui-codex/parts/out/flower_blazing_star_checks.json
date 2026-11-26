@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "dotted blazing star: three or four stiff upright spikes densely covered in fluffy magenta-purple flowers, grass-like leaves at the base, 22-26 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.549,
+   "outline": 1.08,
+   "red_line": 0.0,
+   "fill": 0.26,
+   "passed": false
+  },
+  {
+   "grid": 0.27,
+   "outline": 1.21,
+   "red_line": 0.0,
+   "fill": 0.23,
+   "passed": false
+  },
+  {
+   "grid": 0.469,
+   "outline": 0.71,
+   "red_line": 0.0,
+   "fill": 0.23,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+# Block light by day (First hours' Starheart lantern washed the stone about it pale and glassy at
+# noon): torches and a campfire among stone on a stone floor high in the open (x 40 y 200), at noon
+# (they should hardly show) and at midnight (they should light the way as before).
+# Seed 1, --view 12, 1280x720, --shader-pack chiacraft, a fresh world, mobs off.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /tk mode creative
+chat /time set 6000
+chat /tp 40 205 52
+loaded
+idle
+wait 6
+chat /tk fill 30 199 36 50 199 60 stone
+chat /tk fill 36 200 44 44 200 44 stone
+chat /tk fill 38 200 44 38 200 44 torch
+chat /tk fill 40 200 44 40 200 44 campfire
+chat /tk fill 42 200 44 42 200 44 torch
+chat /tp 40 201.5 49
+look 0 -20
+wait 4
+shot bl_1_noon.png
+chat /time set 18000
+wait 4
+shot bl_2_night.png
+quit

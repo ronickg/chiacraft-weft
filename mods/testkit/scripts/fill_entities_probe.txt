@@ -1,0 +1,41 @@
+# Logs each entity as the server and the client have it ("entities:" lines: position, block
+# under, light, or MISSING when the client doesn't know it), with shots looking down at them.
+# Written for "animals spawned after a big /tk fill aren't drawn" (11-04), which turned out to be
+# wild animals running from the player: within 2 s they were 10-20 blocks off, at the cleared
+# ground's edge or out of view. The world is frozen right after they spawn so they stay put.
+# Positive pitch looks up: these look down.
+loaded
+wait 3
+chat /tk mode creative
+chat /tk time 6000
+chat /weather clear
+where start
+# 1. The fill, then five animals 5-11 blocks to +z (yaw 180 faces +z).
+chat /tk fill ~-10 ~-1 ~-2 ~10 ~-1 ~16 base:grass
+chat /tk fill ~-10 ~ ~-2 ~10 ~8 ~16 air
+wait 1
+chat /tk spawn animals:cat ~-4 ~ ~5
+chat /tk spawn animals:grey_wolf ~0 ~ ~6
+chat /tk spawn animals:jaguar ~4 ~ ~6
+chat /tk spawn animals:raptor ~-4 ~ ~10
+chat /tk spawn animals:capybara ~4 ~ ~11
+chat /tick freeze
+wait 2
+entities 20
+look 180 -25
+wait 1
+shot fill_a_down.png
+# Unfrozen for 10 s: where they run.
+chat /tick unfreeze
+wait 10
+entities 20
+look 180 -25
+wait 1
+shot fill_b_down.png
+# 2. From 12 blocks up, looking down at the pen.
+chat /tp ~ ~12 ~
+look 180 -60
+wait 2
+entities 32
+shot fill_c_above.png
+quit

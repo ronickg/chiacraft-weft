@@ -1,0 +1,33 @@
+{
+ "kind": "item",
+ "what": "a bundle of ripe rice: golden drooping panicles of grain on thin stalks, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.287,
+   "outline": 1.01,
+   "red_line": 0.01,
+   "fill": 0.33,
+   "passed": false
+  },
+  {
+   "grid": 0.479,
+   "outline": 1.03,
+   "red_line": 0.0,
+   "fill": 0.31,
+   "passed": false
+  },
+  {
+   "grid": 0.538,
+   "outline": 0.84,
+   "red_line": 0.0,
+   "fill": 0.3,
+   "passed": true
+  }
+ ]
+}

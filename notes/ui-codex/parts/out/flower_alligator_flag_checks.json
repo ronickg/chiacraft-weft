@@ -1,0 +1,26 @@
+{
+ "kind": "block",
+ "what": "alligator flag: a tall clump of big paddle-shaped blue-green leaves on long stalks and a zigzag stem with small violet flowers at the top, 26-30 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.505,
+   "outline": 0.95,
+   "red_line": 0.0,
+   "fill": 0.26,
+   "passed": false
+  },
+  {
+   "grid": 0.349,
+   "outline": 0.64,
+   "red_line": 0.0,
+   "fill": 0.22,
+   "passed": true
+  }
+ ]
+}

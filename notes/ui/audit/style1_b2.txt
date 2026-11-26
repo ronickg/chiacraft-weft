@@ -1,0 +1,74 @@
+# Style 1, batch 2 (UI redo, 11-24): the menus still on Weft's frame. Sound, Controls and Language
+# from a world (the dimmed overlay), then from the title: Sound, Language, Controls (top and end),
+# Mod Settings, Profile (top and end), Resource Packs, Shader Packs.
+# Run once on dev (before) and once on the branch (after); contact sheets pair them by file name.
+loaded
+idle
+wait 2
+cursor 0.02 0.02
+screen core:sound
+wait 1.5
+shot b2_01_sound_world.png
+key Escape
+wait 1
+screen core:controls
+wait 1.5
+shot b2_02_controls_world.png
+key Escape
+wait 1
+screen core:language
+wait 1.5
+shot b2_03_language_world.png
+key Escape
+wait 1
+leave
+wait 2
+cursor 0.02 0.02
+screen core:sound
+wait 1.5
+shot b2_10_sound.png
+key Escape
+wait 1
+screen core:language
+wait 1.5
+shot b2_11_language.png
+key Escape
+wait 1
+screen core:controls
+wait 1.5
+shot b2_12_controls.png
+cursor 0.5 0.5
+scroll -60
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot b2_13_controls_end.png
+key Escape
+wait 1
+screen core:mod_settings
+wait 1.5
+shot b2_14_mod_settings.png
+key Escape
+wait 1
+screen core:profile
+wait 1.5
+shot b2_15_profile.png
+cursor 0.5 0.5
+scroll -40
+wait 1
+cursor 0.02 0.02
+wait 0.5
+shot b2_16_profile_end.png
+key Escape
+wait 1
+screen core:resource_packs
+wait 1.5
+shot b2_17_resource_packs.png
+key Escape
+wait 1
+screen core:shader_packs
+wait 1.5
+shot b2_18_shader_packs.png
+key Escape
+wait 1
+quit

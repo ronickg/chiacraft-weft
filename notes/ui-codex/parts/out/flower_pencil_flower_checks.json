@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "pencil flower: a low wiry clump with small three-part leaves and a few tiny bright yellow pea flowers, 8-12 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.352,
+   "outline": 1.0,
+   "red_line": 0.0,
+   "fill": 0.04,
+   "passed": false
+  },
+  {
+   "grid": 0.385,
+   "outline": 0.88,
+   "red_line": 0.0,
+   "fill": 0.04,
+   "passed": false
+  },
+  {
+   "grid": 0.297,
+   "outline": 1.11,
+   "red_line": 0.0,
+   "fill": 0.05,
+   "passed": false
+  }
+ ]
+}

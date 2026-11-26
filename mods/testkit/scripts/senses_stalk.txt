@@ -1,0 +1,42 @@
+# Senses (reports/Creature AI.md, part 3, step 4). On a flat pad, creative, mobs off, a steady
+# wind toward the north (-z) at 6 m/s (/air 0 6 0, and /animalprof wind 0 for the animals' nose).
+# 1. Scent: a red deer 14 blocks north (downwind of the player, it smells him) and one 14 south
+#    (upwind: nothing). The player stands still. Read ANIMAL_SENSES: the north one's fright near
+#    0.8 (alert, staring, never bolting on scent alone), the south one's 0.
+# 2. Walking up: a red deer 16 blocks east; the player walks at it. Read the "bolts from player
+#    ... blocks off" line: it notices him well before he is close (red deer shy 20).
+# 3. Sneaking up: a red deer 16 blocks west of where he stands then; he sneaks at it. Before, a
+#    sneaking player was never noticed; now it notices him later and closer ("bolts ... blocks
+#    off" nearer than in 2, or ANIMAL_SENSES with its fright still building).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /tk time 6000
+chat /air 0 6 0
+chat /animalprof wind 0
+chat /tk fill ~-30 ~-1 ~-30 ~30 ~-1 ~30 base:grass
+chat /tk fill ~-30 ~ ~-30 ~30 ~3 ~30 core:air
+wait 2
+chat /tk spawn animals:red_deer ~0 ~ ~-14
+chat /tk spawn animals:red_deer ~0 ~ ~14
+wait 8
+chat /animalprof senses
+look 0 -10
+wait 1
+shot senses_scent.png
+wait 1
+chat /tk spawn animals:red_deer ~16 ~ ~0
+wait 3
+look 270 0
+hold core:forward 3
+chat /animalprof senses
+wait 2
+chat /tk spawn animals:red_deer ~-16 ~ ~0
+wait 3
+look 90 0
+hold core:sneak 7 nowait
+hold core:forward 6
+chat /animalprof senses
+wait 1
+quit

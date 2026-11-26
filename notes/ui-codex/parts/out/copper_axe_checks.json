@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a copper axe: a broad wedge-shaped blade made of cast bright orange copper with a peach highlight and a soft sheen, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.364,
+   "outline": 0.56,
+   "red_line": 0.1,
+   "fill": 0.28,
+   "passed": true
+  }
+ ]
+}

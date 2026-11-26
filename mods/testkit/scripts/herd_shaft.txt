@@ -1,0 +1,91 @@
+# Deer near a shaft and a stepped ravine don't end up shut in them. Paths go down as far as an
+# animal falls unharmed (3, `core:safe_fall`) but up only one (or a leap of 2 when shut in:
+# `stuck.rs`), so ground a few drops of 3 below is a trap it walks into for food and can't leave
+# (graze10 and savanna15e: deer at the foot of a shaft under seed 1's savanna pond, dead of thirst).
+# Seed 1's savanna as `herd_pit.txt`: flat grass, the pond 10 blocks north. Between the deer and
+# the pond a shaft 2 x 2, 9 deep; east of them a ravine stepped down in two drops of 3 (a ledge at
+# feet 67, a floor at feet 64), tall grass on its floor. Water and food at 15 %, so both drive them.
+# Report: each deer's y in the `/animalprof where` rows, and any deer that ends below y 70 (in the
+# shaft, on the ledge or on the ravine's floor) and how it got there (its last lines before), and
+# whether it got out. A deer on the floor at y 64 at the end, or in the shaft, is shut in.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+# The pond, 10 blocks north, its rim clear.
+chat /tk fill -4 70 528 4 70 536 core:air
+chat /tk fill -2 68 530 2 68 534 base:dirt
+chat /tk fill -2 69 530 2 69 534 base:water
+# The shaft: 2 x 2 at x -1..0, z 539..540, open from 69 down to 61, its floor dirt at 60.
+chat /tk fill -1 70 539 0 70 540 core:air
+chat /tk fill -1 61 539 0 69 540 core:air
+chat /tk fill -1 60 539 0 60 540 base:dirt
+# The ravine east: x 5..10, z 536..546, open from 64 up; a ledge (floor 66, feet 67) along its
+# west side x 5..6, its floor (63, feet 64) x 7..10 with tall grass on it.
+chat /tk fill 5 64 536 10 70 546 core:air
+chat /tk fill 5 64 536 6 66 546 base:dirt
+chat /tk fill 7 63 536 10 63 546 base:grass
+chat /tk fill 7 64 536 10 64 546 base:tall_grass
+wait 2
+chat /tk count -1 61 539 0 69 540 core:air
+chat /tk count 7 64 536 10 64 546 base:tall_grass
+chat /tk spawn animals:white_tailed_deer 0 70 548
+chat /tk spawn animals:white_tailed_deer 1 70 549
+chat /tk spawn animals:white_tailed_deer -1 70 549
+chat /tk spawn animals:white_tailed_deer 2 70 548
+wait 2
+chat /anim log
+chat /animalprof water 0.15
+chat /animalprof food 0.15
+chat /tp 0 90 572
+wait 3
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+chat /animalprof senses
+chat /tp 6 80 552
+wait 2
+look 0 -40
+wait 1
+shot herd_shaft_1.png
+quit

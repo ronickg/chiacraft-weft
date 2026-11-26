@@ -14,8 +14,10 @@ use super::{
     did::{self, DidRecord},
     failed, hex32,
     offer::{self, MadeOffer, MakeOffer, OfferGive, OfferSummary},
+    sponsor::EveAsk,
     sync::CoinRecord,
     wallet::WalletKeys,
+    world::DidMetadata,
 };
 use crate::{
     Error, Result,
@@ -222,6 +224,19 @@ pub enum OfferState {
 #[derive(Clone, Debug)]
 pub struct TakeOutcome {
     pub summary: OfferSummary,
+    pub push: PushOutcome,
+}
+
+/// A DID whose metadata the wallet set ([`ChainReader::set_did_metadata`]), pushed.
+#[derive(Clone, Debug)]
+pub struct UpdatedDid {
+    pub launcher_id: Bytes32,
+    /// The DID's coin the update spends.
+    pub spent: Bytes32,
+    /// The DID's coin after the update.
+    pub coin_id: Bytes32,
+    /// The owner's p2 puzzle hash (one of the wallet's addresses; unchanged).
+    pub owner: Bytes32,
     pub push: PushOutcome,
 }
 
@@ -664,9 +679,25 @@ impl ChainReader {
         fee: u64,
         timeout: Duration,
     ) -> Result<(super::sponsor::SponsorBundle, PushOutcome)> {
-        let n = u64::try_from(owners.len().max(1)).unwrap_or(u64::MAX);
-        self.caps()
-            .check("max-did-fee", "the fee per DID", fee.div_ceil(n))?;
+        let asks: Vec<EveAsk> = owners.iter().copied().map(EveAsk::plain).collect();
+        self.launch_dids_with(keys, &asks, fee, timeout)
+    }
+
+    /// [`Self::launch_dids`] for asks that may carry a world's metadata and a gift of mojos to
+    /// the owner ([`super::sponsor::build_eve_dids_with`]). Each gift is held to `max-send`.
+    pub fn launch_dids_with(
+        &self,
+        keys: &WalletKeys,
+        asks: &[EveAsk],
+        fee: u64,
+        timeout: Duration,
+    ) -> Result<(super::sponsor::SponsorBundle, PushOutcome)> {
+        let n = u64::try_from(asks.len().max(1)).unwrap_or(u64::MAX);
+        let caps = self.caps();
+        caps.check("max-did-fee", "the fee per DID", fee.div_ceil(n))?;
+        for ask in asks {
+            caps.check("max-send", "a gift with a DID", ask.gift)?;
+        }
         self.check_keys(keys)?;
         let (source, coins) = {
             let s = self.state();
@@ -676,7 +707,7 @@ impl ChainReader {
                 s.cache.spendable(),
             )
         };
-        let built = super::sponsor::build_eve_dids(keys, &coins, owners, fee)?;
+        let built = super::sponsor::build_eve_dids_with(keys, &coins, asks, fee)?;
         let bundle = built.bundle.clone();
         let push = self.run(timeout, async { source.push(bundle).await })?;
         if !matches!(push, PushOutcome::Rejected { .. }) {
@@ -751,6 +782,95 @@ impl ChainReader {
         Ok(CreatedDid { push, ..created })
     }
 
+    /// Set the metadata of a DID the wallet holds (plan phase 4, slice 7: an owner DID listing
+    /// its worlds, [`super::world`]): one spend of the DID by its owner's key, back to the same
+    /// address with `metadata` (revealed in its memos, so a resolve reads it), `fee` paid from
+    /// the wallet's spendable coins (refused when they can't pay it). Held to `max-fee` and
+    /// `max-did-fee`. Pushed; the DID's coin and the fee's coins are kept out of other spends
+    /// until settled.
+    ///
+    /// The DID is resolved live first and must be held at one of `keys`' addresses. An eve DID
+    /// (a sponsored one never spent) is taken to have nil metadata, as a plain sponsored DID
+    /// has; use [`Self::set_did_metadata_from`] for an eve world DID.
+    pub fn set_did_metadata(
+        &self,
+        keys: &WalletKeys,
+        launcher_id: Bytes32,
+        metadata: &DidMetadata,
+        fee: u64,
+        timeout: Duration,
+    ) -> Result<UpdatedDid> {
+        self.set_did_metadata_from(keys, launcher_id, &DidMetadata::Empty, metadata, fee, timeout)
+    }
+
+    /// [`Self::set_did_metadata`] for a DID that may be eve with metadata `eve_metadata` (a
+    /// sponsored world DID: the metadata it was launched with, which the chain doesn't show and
+    /// its eve puzzle hash commits to). A DID already spent ignores `eve_metadata`: its metadata
+    /// is read from the chain.
+    pub fn set_did_metadata_from(
+        &self,
+        keys: &WalletKeys,
+        launcher_id: Bytes32,
+        eve_metadata: &DidMetadata,
+        metadata: &DidMetadata,
+        fee: u64,
+        timeout: Duration,
+    ) -> Result<UpdatedDid> {
+        use chia_sdk_driver::SpendContext;
+        let caps = self.caps();
+        caps.check_fee(fee)?;
+        caps.check("max-did-fee", "the DID update's fee", fee)?;
+        self.check_keys(keys)?;
+        let lookup = self.resolve_did(launcher_id, timeout)?;
+        if !lookup.live {
+            return Err(Error::new("no chain peer reachable"));
+        }
+        let record = lookup.record;
+        let current = record
+            .current()
+            .filter(|c| c.spent.is_none() && !record.melted)
+            .ok_or_else(|| Error::new("the DID has no unspent coin"))?
+            .coin_id;
+        let owners = keys.puzzle_hashes();
+        if !owners.iter().any(|ph| record.owned_by(*ph)) && !record.is_eve() {
+            return Err(Error::new("the DID isn't held at one of this wallet's addresses"));
+        }
+        let (source, coins) = {
+            let s = self.state();
+            if s.cache.pending.contains_key(&hex32(current)) {
+                return Err(Error::new("a spend of this DID is already pending"));
+            }
+            (
+                s.active_source()
+                    .ok_or_else(|| Error::new("no chain peer reachable"))?,
+                s.cache.spendable(),
+            )
+        };
+        let chosen = if fee > 0 {
+            offer::select(&coins, fee).map_err(|_| Error::new(format!("the wallet needs at least {fee} mojos for the DID update's fee")))?
+        } else {
+            Vec::new()
+        };
+        let (bundle, child) = self.run(timeout, async {
+            let mut ctx = SpendContext::new();
+            // Nil (a plain sponsored DID) first, then the eve metadata the caller knows.
+            let candidates = [chia_sdk_driver::HashedPtr::NIL, eve_metadata.alloc(&mut ctx)?];
+            let did = did::current_did(&source, &mut ctx, &record, &owners, &candidates).await?;
+            super::world::build_metadata_update(&mut ctx, keys, did, metadata, &chosen, fee)
+        })?;
+        let push = self.run(timeout, async { source.push(bundle).await })?;
+        if !matches!(push, PushOutcome::Rejected { .. }) {
+            let now = offer::now_seconds();
+            let mut s = self.state();
+            s.cache.pending.insert(hex32(current), now);
+            for c in &chosen {
+                s.cache.pending.insert(hex32(c.coin_id()), now);
+            }
+            s.save();
+        }
+        Ok(UpdatedDid { launcher_id, spent: current, coin_id: child.coin.coin_id(), owner: child.info.p2_puzzle_hash, push })
+    }
+
     /// Wait until a DID launched by `launcher_id` is on chain (its launcher spent, its singleton
     /// made), asking every `every` up to `timeout`: its record, read live. A sponsored DID is
     /// watched this way too (the sponsor answers with its launcher id before it confirms).
@@ -806,6 +926,102 @@ impl ChainReader {
     /// The root an anchor coin carries on chain (none while it isn't there).
     pub fn anchor_root(&self, coin_id: Bytes32, timeout: Duration) -> Result<Option<[u8; 32]>> {
         self.read(timeout, move |source| async move { super::anchor::anchor_root(&source, coin_id).await })
+    }
+
+    /// List a world (phase 5, [`super::listing`]): a coin of `deposit` mojos at `owner` (one of
+    /// `keys`' addresses: the one holding the world DID) hinted with the listing tag, naming
+    /// `world_did`, made from the smallest spendable coin that covers it and `fee`. Pushed; the
+    /// listing coin is reserved (no coin selection spends it) until [`Self::delist_world`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_world(
+        &self,
+        keys: &WalletKeys,
+        owner: Bytes32,
+        world: &super::WorldMeta,
+        world_did: Bytes32,
+        deposit: u64,
+        fee: u64,
+        timeout: Duration,
+    ) -> Result<(PushOutcome, chia_protocol::Coin)> {
+        let caps = self.caps();
+        caps.check_fee(fee)?;
+        caps.check("max-send", "the listing's deposit", deposit)?;
+        self.check_keys(keys)?;
+        if !keys.puzzle_hashes().contains(&owner) {
+            return Err(Error::new("the listing's address isn't one of this wallet's"));
+        }
+        let need = deposit
+            .checked_add(fee)
+            .ok_or_else(|| Error::new("the amounts overflow"))?;
+        let (source, coins) = {
+            let s = self.state();
+            (
+                s.active_source()
+                    .ok_or_else(|| Error::new("no chain peer reachable"))?,
+                s.cache.spendable(),
+            )
+        };
+        let coin = coins
+            .iter()
+            .filter(|c| c.amount >= need)
+            .min_by_key(|c| c.amount)
+            .copied()
+            .ok_or_else(|| Error::new(format!("no coin of at least {need} mojos to list the world with")))?;
+        let (coin_spends, signature, listing) = super::listing::build(keys, coin, owner, world, world_did, deposit, fee)?;
+        let push = self.run(timeout, async { source.push(SpendBundle::new(coin_spends, signature)).await })?;
+        if !matches!(push, PushOutcome::Rejected { .. }) {
+            let mut s = self.state();
+            s.cache
+                .pending
+                .insert(hex32(coin.coin_id()), offer::now_seconds());
+            s.cache.reserved.insert(hex32(listing.coin_id()));
+            s.save();
+        }
+        Ok((push, listing))
+    }
+
+    /// Delist: spend the listing coin back to the primary address, less `fee`. Pushed.
+    pub fn delist_world(&self, keys: &WalletKeys, listing: chia_protocol::Coin, fee: u64, timeout: Duration) -> Result<PushOutcome> {
+        self.caps().check_fee(fee)?;
+        self.check_keys(keys)?;
+        let source = self
+            .state()
+            .active_source()
+            .ok_or_else(|| Error::new("no chain peer reachable"))?;
+        let (coin_spends, signature) = super::listing::build_delist(keys, listing, fee)?;
+        let push = self.run(timeout, async { source.push(SpendBundle::new(coin_spends, signature)).await })?;
+        if !matches!(push, PushOutcome::Rejected { .. }) {
+            let mut s = self.state();
+            let id = hex32(listing.coin_id());
+            s.cache.reserved.remove(&id);
+            s.cache.pending.insert(id, offer::now_seconds());
+            s.save();
+        }
+        Ok(push)
+    }
+
+    /// Keep coin `coin_id` out of coin selection (a listing made before this cache).
+    pub fn reserve(&self, coin_id: Bytes32) {
+        let mut s = self.state();
+        if s.cache.reserved.insert(hex32(coin_id)) {
+            s.save();
+        }
+    }
+
+    /// Whether a listing is what it says (phase 5): its world DID was launched with the world it
+    /// names to the listing's own address (or its revealed metadata names it), the owner DID it
+    /// names lists that world DID, and that owner DID is held by the listing's address too. Two
+    /// DID reads, live where a peer answers.
+    pub fn check_listing(&self, l: &super::listing::Listing, timeout: Duration) -> Result<bool> {
+        let world = self.resolve_did(l.world_did, timeout)?.record;
+        let owner = self.resolve_did(l.world.owner, timeout)?.record;
+        let link = super::world::world_link_expecting(&world, &owner, &l.world, l.coin.puzzle_hash);
+        Ok(link.holds() && link.world == Some(l.world) && owner.owned_by(l.coin.puzzle_hash))
+    }
+
+    /// The listings on chain holding at least `min_amount`, the newest `max` (phase 5).
+    pub fn listings(&self, min_amount: u64, max: usize, timeout: Duration) -> Result<Vec<super::listing::Listing>> {
+        self.read(timeout, move |source| async move { super::listing::listings(&source, min_amount, max).await })
     }
 
     /// Spendable XCH of the wallet, in mojos (unspent coins no offer or pending spend holds).

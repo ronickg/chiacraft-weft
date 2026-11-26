@@ -1,0 +1,15 @@
+{
+ "kind": "base:hoe",
+ "layer": "head",
+ "material": "bronze",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 15,
+ "anchor": [
+  15.2,
+  19.3
+ ]
+}

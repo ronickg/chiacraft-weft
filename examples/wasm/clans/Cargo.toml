@@ -1,0 +1,24 @@
+[package]
+# A sandboxed mod: the server half of the `clans` package (examples/packages/clans). Build it with
+# `./build.sh`, which writes the package's code/server.wasm.
+name = "clans"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# The sandboxed SDK under the name of Weft's: the code ported from the animals mod keeps its
+# `use weft_sdk::*;`.
+weft_sdk = { package = "chiacraft-mod-sdk", path = "../../../crates/mod-sdk" }
+
+# Its own cargo root, outside the game's build (it is built for wasm32-unknown-unknown).
+[workspace]
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+codegen-units = 1

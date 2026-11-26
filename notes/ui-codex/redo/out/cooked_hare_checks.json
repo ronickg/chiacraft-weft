@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a roast hare: a golden-brown roasted game carcass with long hind legs, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.387,
+   "outline": 0.59,
+   "red_line": 0.1,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "cyan diamond plates with white facet tips over dark leather leggings, front view: a brown leather belt with a small buckle, two plated legs with knee plates, a dark gap between the legs, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.446,
+   "outline": 0.52,
+   "red_line": 0.23,
+   "fill": 0.41,
+   "passed": true
+  }
+ ]
+}

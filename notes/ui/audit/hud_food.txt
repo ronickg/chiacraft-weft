@@ -1,0 +1,20 @@
+# The HUD's food tiles (UI redo, 11-04): a full stomach (/feed cycles apple, bread, steak: three
+# foods, several portions each), a small one, an empty one; and the old two foods of the test.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 2
+look 0 5
+wait 1
+shot hf_01_start.png
+chat /feed
+wait 2
+shot hf_02_full.png
+chat /feed 30
+wait 2
+shot hf_03_small.png
+chat /feed 0
+wait 2
+shot hf_04_empty.png
+quit

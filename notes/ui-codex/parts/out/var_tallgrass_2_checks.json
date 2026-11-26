@@ -1,0 +1,26 @@
+{
+ "kind": "block",
+ "what": "a sparser clump of fewer, longer blades fanning out, two of them bending over at the tip, rising 24-28 px; in the same style, colours and blade width as the attached tall grass from my game; centred, see-through around it",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.565,
+   "outline": 0.98,
+   "red_line": 0.0,
+   "fill": 0.3,
+   "passed": false
+  },
+  {
+   "grid": 0.53,
+   "outline": 0.74,
+   "red_line": 0.0,
+   "fill": 0.29,
+   "passed": true
+  }
+ ]
+}

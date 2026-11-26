@@ -1,0 +1,48 @@
+# The rain's and the storm's sky beside Bliss (Ronald: "Still looks so much worse the bliss why ?",
+# then "Soft clouds first", 11-05): big forms, dark masses sweeping to a brighter side toward the
+# sun, light breaking through the gaps there, beams in the rain under them. From the clouds check's
+# hill (149.5 75 -166.5, on the ground) in the afternoon (9500) and evening (11000), toward the sun
+# (yaw 90), away (yaw 270) and up. Seed 1, --view 12, 1280x720, --shader-pack chiacraft, a fresh
+# world, spectator, mobs off.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /tp 149.5 75 -166.5
+loaded
+idle
+wait 8
+chat /time set 9500
+chat /weather rain 99999
+wait 12
+look 90 12
+wait 2
+shot sl_1_rain_tosun.png
+look 270 12
+wait 2
+shot sl_2_rain_away.png
+look 90 55
+wait 2
+shot sl_3_rain_up.png
+chat /weather thunder 99999
+wait 12
+look 90 12
+wait 2
+shot sl_4_storm_tosun.png
+look 270 12
+wait 2
+shot sl_5_storm_away.png
+look 90 55
+wait 2
+shot sl_6_storm_up.png
+look 90 12
+wait 1
+bench 4 storm_light
+chat /time set 11000
+wait 3
+shot sl_7_storm_evening_tosun.png
+look 0 15
+wait 2
+shot sl_8_storm_evening_side.png
+chat /weather clear 99999
+quit

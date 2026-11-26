@@ -1,0 +1,15 @@
+# Server tick profile in a COPY of Ronald's world (dev/run/saves/New_World; never the original):
+# his settings, his time and weather. Run with `--world New_World --log net=debug` in a run dir
+# holding the copy, while the CPU sampler records the REC windows (tools/profile/README.md).
+loaded
+idle
+wait 20
+chat /tk near ~ ~ ~ 64
+rec stand start
+bench 30 stand
+rec stand end
+rec walk start
+hold core:forward 30
+bench 30 walk
+rec walk end
+quit

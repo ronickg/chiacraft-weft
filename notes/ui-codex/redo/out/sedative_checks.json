@@ -1,0 +1,33 @@
+{
+ "kind": "item",
+ "what": "a round glass potion flask, front view, white glass outline with a pale inner edge, transparent glass with one curved white highlight on the upper left, small tan cork, a white cloth tied round the neck with thin red cords, filled two-thirds with a sleepy lavender-purple liquid",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": true,
+ "tries": [
+  {
+   "grid": 0.39,
+   "outline": 1.37,
+   "red_line": 0.0,
+   "fill": 0.37,
+   "passed": false
+  },
+  {
+   "grid": 0.233,
+   "outline": 1.4,
+   "red_line": 0.0,
+   "fill": 0.35,
+   "passed": false
+  },
+  {
+   "grid": 0.442,
+   "outline": 1.26,
+   "red_line": 0.0,
+   "fill": 0.37,
+   "passed": false
+  }
+ ]
+}

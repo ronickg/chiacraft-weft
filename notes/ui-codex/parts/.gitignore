@@ -1,0 +1,4 @@
+out/*
+!out/*_px.png
+!out/*_checks.json
+__pycache__/

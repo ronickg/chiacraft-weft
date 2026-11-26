@@ -1,0 +1,14 @@
+Use your image generation tool to make ONE image, then save it as a PNG file named NAME.png in the current folder. Do not write any code or edit any other files.
+
+Style: Hand-painted pixel-art block texture for a block-building game, 32x32, no anti-aliasing, top-left light. Earthy medieval-fantasy look, made of readable clumps rather than noise: rounded stone slabs, dirt clods, pebbles, leaf shapes, bevelled bricks, iron-banded wood. Soft painted grain with 1-2 shade variation, no checkerboard dithering, 20-60 shades per texture. Light and airy: shadows are mid-dark, crevices and mortar lines are a deep shade of the block's own colour (never black, brightness at least 20%), and highlights are restrained so walls don't look noisy. Stone is sage-grey, wood is warm walnut-to-honey, and grass and leaves are muted natural greens. Ores and flowers are the only bright saturated accents. Full-cube textures must tile seamlessly on all four edges. Plants and other cutouts sit on a flat solid #FF00FF magenta background with hard edges, each pixel fully opaque or fully magenta, and a soft 1-px edge slightly darker than the inside.
+
+The attached images are my game's colour palette and a sheet of its own approved block textures in this style. Match their pixel size, shading and colour.
+
+The image is square, 1024 x 1024, divided into four equal squares (2 x 2), each 512 x 512, each holding one 32 x 32 texture enlarged with hard square pixels of one even size (16 x 16 screen pixels per texture pixel). No gap, border or line between the squares, nothing crossing from one square into another.
+
+Top left: TL
+Top right: TR
+Bottom left: BL
+Bottom right: BR
+
+When done, reply with the file name you saved.

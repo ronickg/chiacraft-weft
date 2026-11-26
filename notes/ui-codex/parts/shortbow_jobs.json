@@ -1,0 +1,9 @@
+[
+ {
+  "kind": "item",
+  "name": "bow_short_stave_2",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/bow_self_stave_px.png",
+  "what": "a short bow WITHOUT any string: its stave starts and ends at exactly the same two corner tips as the attached bow (bottom-left corner and top-right corner) but is thicker (3-4 px) and bends much more deeply toward the upper left, with tips that flick back outward (a recurve); warm orange-brown oak wood with clear grain and a dark warm outline, a red-brown leather grip wrapped round the middle of the stave, small horn-coloured tips. No string, nothing drawn between the tips"
+ }
+]

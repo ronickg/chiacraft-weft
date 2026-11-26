@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a bundle of ripe millet: bushy round golden-tan seed heads on stalks, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.602,
+   "outline": 0.89,
+   "red_line": 0.0,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

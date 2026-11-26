@@ -1,0 +1,38 @@
+[
+ {
+  "kind": "item",
+  "name": "campfire",
+  "mod": "base",
+  "green": false,
+  "pale": false,
+  "what": "a campfire seen from the front and slightly above: three or four short split logs crossed in a ring on a few grey stones, a bright teardrop flame rising from the middle (yellow-white core, orange body, dark orange edge), a little grey ash, centred with 3-5 px of padding"
+ },
+ {
+  "kind": "block",
+  "name": "campfire_top",
+  "mod": "base",
+  "type": "workstation face",
+  "what": "the top face of a low campfire block seen from straight above: a ring of grey stones round the edge, crossed split oak logs inside, glowing orange embers and a bright yellow-white fire core in the middle, grey ash between the logs; filling the whole face"
+ },
+ {
+  "kind": "block",
+  "name": "campfire_side",
+  "mod": "base",
+  "type": "workstation face",
+  "what": "the side face of a low campfire block: a row of grey stones along the bottom, two crossed split oak log ends above them with bark and pale cut rings, small orange flames licking up between them at the top edge; filling the whole face"
+ },
+ {
+  "kind": "block",
+  "name": "cooking_pot_side",
+  "mod": "base",
+  "type": "workstation face",
+  "what": "the side face of a cooking pot block: a round-bellied dark black-iron pot (the darkest shade of its own grey, never pure black) with a bright rim along the top, a small iron handle ring on each side, rivets, soft highlight on the upper left, on a few grey hearth stones along the bottom; filling the whole face"
+ },
+ {
+  "kind": "block",
+  "name": "cooking_pot_top",
+  "mod": "base",
+  "type": "workstation face",
+  "what": "the top face of a cooking pot block seen from straight above: a thick round dark-iron rim filling most of the face, a thick orange-brown stew with chunks of meat and vegetables inside, a soft glint, the dark corners outside the rim; filling the whole face"
+ }
+]

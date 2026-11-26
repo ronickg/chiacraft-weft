@@ -1,0 +1,10 @@
+# The empty-name join (2026-11-04): a guest switching to a world whose data package registers
+# a key (the bell's client half) must keep its name. Alice hosts with the example packages.
+loaded
+chat /tk mode creative
+host name-ticket.txt
+await_file name-mark-bob-in 300
+wait 3
+shot name-alice.png      # chat: "bob joined the game"
+mark name-mark-done
+quit

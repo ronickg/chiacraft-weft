@@ -1,0 +1,90 @@
+[
+ {
+  "kind": "item",
+  "name": "coal",
+  "what": "a lump of coal: a chunky faceted lump of deep glossy black-brown (the darkest shade of its own brown, never pure black) with bright blue-grey glints along its upper-left facet edges, strong contrast, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "gunpowder",
+  "what": "a small heap of gunpowder: a soft cone of near-black charcoal-grey grains with clearly lighter grey and a few sulphur-yellow specks, a light top-left side and a dark lower-right side, strong contrast, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "stick",
+  "what": "a wooden stick: a slightly crooked warm-brown twig a full 3 px thick from end to end, with grain, a small knot and a lighter top edge, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "wood_hoe",
+  "what": "a wooden hoe: a long plain wooden handle and, across its top end, one thin flat blade like a garden hoe, about a third of the canvas wide and only 3 px thick, set at a right angle to the handle and bent downward, made of warm orange-brown carved wood; not a hammer, no block-shaped head, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "stone_hoe",
+  "what": "a stone hoe: a long plain wooden handle and, across its top end, one thin flat blade like a garden hoe, about a third of the canvas wide and only 3 px thick, set at a right angle to the handle and bent downward, made of chipped warm grey-tan stone bound with cream cord; not a hammer, no block-shaped head, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "diamond_hoe",
+  "what": "a diamond hoe: a long plain leather-wrapped handle and, across its top end, one thin flat blade like a garden hoe, about a third of the canvas wide and only 3 px thick, set at a right angle to the handle and bent downward, made of faceted cyan diamond with white facet tips; not a hammer, no block-shaped head, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "venison",
+  "what": "raw venison: a lean deep dark-red steak with a clear darker red-brown outline, a thin cream fat edge and soft marbling, glossy highlight on the upper left, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "spider_eye",
+  "what": "a spider eye: a glossy dark red eyeball seen from the front, a big black slit pupil in an amber iris, a white glint on the upper left and a few thin dark red veins, clearly an eye, centred with 3-5 px of padding",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "kibble",
+  "what": "a small sack of kibble: a tied cream-tan burlap sack, open at the top showing round brown pet-food pellets, a few pellets spilled in front, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "hare",
+  "what": "a raw hare: a whole skinned hare carcass lying diagonally, head at the top right with long ears laid back, long hind legs at the bottom left, dark red meat with a clear outline, reading as a hare",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_beef",
+  "what": "a cooked steak: a warm rich brown seared steak with darker brown grill stripes, a crisp golden fat edge and a glossy highlight, never grey, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ }
+]

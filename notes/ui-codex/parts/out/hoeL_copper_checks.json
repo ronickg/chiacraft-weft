@@ -1,0 +1,20 @@
+{
+ "kind": "item",
+ "what": "a copper hoe: the blade of cast bright orange copper with a peach highlight, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.243,
+   "outline": 0.49,
+   "red_line": 0.03,
+   "fill": 0.2,
+   "vertical": 0,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "kind": "base:axe",
+ "layer": "head",
+ "material": "stone",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 8,
+ "anchor": [
+  11.9,
+  22.6
+ ]
+}

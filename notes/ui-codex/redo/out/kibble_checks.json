@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a small sack of kibble: a tied cream-tan burlap sack, open at the top showing round brown pet-food pellets, a few pellets spilled in front, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.551,
+   "outline": 0.64,
+   "red_line": 0.0,
+   "fill": 0.47,
+   "passed": true
+  }
+ ]
+}

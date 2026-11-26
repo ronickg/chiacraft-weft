@@ -1,0 +1,36 @@
+# The same in Russian (--config core:language=ru_ru).
+# Render scale and shadow detail changed mid-game (Planner, 11-05: render scale 1.0 to 0.5 in a
+# world lost the PC's GPU): the Low preset from the pause menu's Video screen, in a world. The
+# rows say "Applies after a restart" and the world goes on at its scale for 15 s (no device lost,
+# no "world drawn at" line); back at the title they take effect ("video: render scale 0.5 from
+# the last game"). Run with --config "core:render_scale=1.0".
+loaded
+idle
+chat /tk mode creative
+chat /tk time 6000
+wait 2
+shot ru_vm_01_before.png
+key Escape
+wait 1
+tap core:pause text:Настройки
+wait 1
+# At the bottom of the settings: scrolled to.
+cursor 0.5 0.5
+scroll -40
+wait 1
+tap_once core:settings text:Графика и качество
+wait 1.5
+tap_once base:video text:Низкое
+wait 1
+shot ru_vm_02_low_waiting.png
+key Escape
+wait 0.5
+key Escape
+wait 0.5
+key Escape
+wait 15
+shot ru_vm_03_after_15s.png
+leave
+wait 4
+shot ru_vm_04_title.png
+quit

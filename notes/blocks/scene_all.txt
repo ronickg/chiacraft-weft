@@ -1,0 +1,84 @@
+loaded
+chat /time set noon
+chat /weather clear
+chat /gamemode creative
+wait 2
+loaded
+chat /tk fill 4 97 -4 28 99 16 base:dirt
+chat /tk fill 4 99 -4 28 99 16 base:grass
+chat /tk fill 4 100 -4 28 112 16 air
+chat /tk set 11 103 10 base:stone
+chat /tk set 12 103 10 base:cobblestone
+chat /tk set 13 103 10 base:mossy_cobblestone
+chat /tk set 14 103 10 base:stone_bricks
+chat /tk set 15 103 10 base:bricks
+chat /tk set 16 103 10 base:sandstone
+chat /tk set 17 103 10 base:gravel
+chat /tk set 18 103 10 base:sand
+chat /tk set 19 103 10 base:clay
+chat /tk set 20 103 10 base:podzol
+chat /tk set 21 103 10 base:snowy_grass
+chat /tk set 11 102 10 base:oak_planks
+chat /tk set 12 102 10 base:birch_planks
+chat /tk set 13 102 10 base:spruce_planks
+chat /tk set 14 102 10 base:acacia_planks
+chat /tk set 15 102 10 base:oak_log
+chat /tk set 16 102 10 base:birch_log
+chat /tk set 17 102 10 base:spruce_log
+chat /tk set 18 102 10 base:acacia_log
+chat /tk set 19 102 10 base:bookshelf
+chat /tk set 20 102 10 base:hay_bale
+chat /tk set 21 102 10 base:crafting_table
+chat /tk set 11 101 10 base:coal_ore
+chat /tk set 12 101 10 base:iron_ore
+chat /tk set 13 101 10 base:gold_ore
+chat /tk set 14 101 10 base:diamond_ore
+chat /tk set 15 101 10 base:redstone_ore
+chat /tk set 16 101 10 base:coal_block
+chat /tk set 17 101 10 base:iron_block
+chat /tk set 18 101 10 base:gold_block
+chat /tk set 19 101 10 base:diamond_block
+chat /tk set 20 101 10 base:redstone_block
+chat /tk set 21 101 10 base:glowstone
+chat /tk set 11 100 10 base:furnace
+chat /tk set 12 100 10 base:chest
+chat /tk set 13 100 10 base:copper_lamp
+chat /tk set 14 100 10 base:redstone_lamp
+chat /tk set 15 100 10 base:piston
+chat /tk set 16 100 10 base:observer
+chat /tk set 17 100 10 base:dispenser
+chat /tk set 18 100 10 base:glass
+chat /tk set 19 100 10 base:ice
+chat /tk set 20 100 10 base:obsidian
+chat /tk set 21 100 10 base:slime_block
+chat /tk fill 10 99 4 14 99 7 base:farmland
+chat /tk fill 10 100 4 11 100 7 base:wheat[age=7]
+chat /tk fill 12 100 4 12 100 7 base:wheat[age=3]
+chat /tk fill 13 100 4 14 100 7 base:wheat[age=5]
+chat /tk set 16 100 5 base:tall_grass
+chat /tk set 17 100 5 base:dandelion
+chat /tk set 18 100 5 base:rose
+chat /tk set 19 100 5 base:sapling
+chat /tk set 20 100 5 base:dead_bush
+chat /tk set 21 100 5 base:berry_bush[age=3]
+chat /tk set 22 100 5 base:berry_bush[age=1]
+chat /tk set 23 100 5 base:grazed_grass
+chat /tk fill 25 100 3 25 103 3 base:oak_log
+chat /tk fill 23 104 1 27 105 5 base:oak_leaves
+chat /tk fill 25 100 6 25 103 6 base:birch_log
+chat /tk fill 24 104 6 26 105 8 base:birch_leaves
+chat /tk fill 5 99 0 8 99 3 base:water
+chat /tk set 7 100 8 base:torch
+chat /tp 16.5 101 -3.5
+wait 2
+look 180 -12
+wait 3
+idle
+wait 6
+shot all_1.png
+chat /tp 14.5 101 1.5
+wait 2
+look 160 -30
+wait 3
+shot all_2.png
+quit

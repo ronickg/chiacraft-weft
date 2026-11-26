@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a pair of soft tan buckskin leather with fringed seams moccasins side by side, front view, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.286,
+   "outline": 0.73,
+   "red_line": 0.0,
+   "fill": 0.53,
+   "passed": true
+  }
+ ]
+}

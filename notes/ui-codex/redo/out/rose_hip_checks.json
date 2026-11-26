@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "rose hips: two glossy orange-red oval hips with dark sepals at the tip on a short green stem, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.299,
+   "outline": 0.52,
+   "red_line": 0.01,
+   "fill": 0.34,
+   "passed": true
+  }
+ ]
+}

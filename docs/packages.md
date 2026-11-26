@@ -1,6 +1,7 @@
 # Data packages
 
-A data package adds blocks, items, recipes and tags with files only: no code, nothing to compile.
+A data package adds blocks, items, recipes and tags with files only: nothing to compile. It may
+also carry a sandboxed server half, `code/server.wasm` (see `docs/sandboxed-mods.md`).
 Worlds will name the packages they need, and players who join download them (chiacraft plan,
 phase 2). `examples/packages/gems` is a complete example; start the game with
 `--packages examples/packages` to try it.
@@ -115,6 +116,7 @@ the log; a joining game refuses such a package before downloading any of it.
 | `assets/textures/` | `.anim`, `.ctm`, `.gui` | 64 KiB |
 | `assets/models/` | `.json` | 1 MiB |
 | `assets/sounds/` | `.ogg`, `.wav` | 64 MiB |
+| `code/server.wasm` (exactly) | a WebAssembly component, run sandboxed (`docs/sandboxed-mods.md`) | 16 MiB |
 
 A package has at most 4096 files and 256 MiB in all, and at most 4096 definitions. A texture
 larger than 4096 pixels on a side shows as the missing texture. `package.sig` (see below) and hidden

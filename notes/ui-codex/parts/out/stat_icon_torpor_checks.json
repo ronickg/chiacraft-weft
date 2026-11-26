@@ -1,0 +1,19 @@
+{
+ "kind": "ui",
+ "what": "a 16 x 16 stat icon of a crescent moon with a small zzz, its main colour #9b4fe0 with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel",
+ "size": [
+  16,
+  16
+ ],
+ "full": false,
+ "green": true,
+ "tries": [
+  {
+   "grid": 0.409,
+   "outline": 0.5,
+   "red_line": 0.0,
+   "fill": 0.44,
+   "passed": true
+  }
+ ]
+}

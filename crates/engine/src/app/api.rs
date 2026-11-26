@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicI32, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
-use glam::{DVec3, IVec3, Vec2};
+use glam::{DVec3, Vec2};
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 use weft_abi::{self as abi, ItemStack, Slice, Str, client_flags as cf};
@@ -16,7 +16,6 @@ use crate::client::Client;
 use crate::client::modui::ClientView;
 use crate::input::Key;
 use crate::ui::Kind;
-use winit::keyboard::KeyCode;
 
 static LAUNCH: OnceLock<FxHashMap<String, String>> = OnceLock::new();
 static EXIT_CODE: AtomicI32 = AtomicI32::new(0);
@@ -28,6 +27,36 @@ pub fn set_launch_options(o: Vec<(String, String)>) {
 
 pub fn launch_options() -> &'static FxHashMap<String, String> {
     LAUNCH.get_or_init(FxHashMap::default)
+}
+
+/// chiacraft, test only: `--mc-days`, Minecraft's sun for like-for-like shots: no day swing over
+/// the year (`DimensionDef::daylight_clock`) and no leaned path (`client::sky::frame_of`), so an
+/// hour's sun stands where Minecraft's does (ours was at the horizon at 05:00 on spring 8 where
+/// Minecraft's is 3.5 degrees under; Shader, 11-06).
+pub fn mc_days() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| launch_options().contains_key("mc-days"))
+}
+
+/// chiacraft, test only: `--bliss-sun`, Bliss's sun for like-for-like shots against it: Minecraft's
+/// clock (no day swing, as `mc_days`) but the path still leaned, as Bliss leans it
+/// (`sunPathRotation`, 35 degrees by default; base's sun leans 35 too). With `--sun-tilt <degrees>`
+/// the lean is set outright (`sun_tilt`), to try the sign against Bliss's shadows (Trees, 11-06).
+pub fn bliss_sun() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| launch_options().contains_key("bliss-sun"))
+}
+
+/// chiacraft, test only: `--sun-tilt <degrees>`, every sky body's path leaned by that instead of
+/// its own (radians here).
+pub fn sun_tilt() -> Option<f32> {
+    static ON: OnceLock<Option<f32>> = OnceLock::new();
+    *ON.get_or_init(|| {
+        launch_options()
+            .get("sun-tilt")
+            .and_then(|v| v.parse::<f32>().ok())
+            .map(f32::to_radians)
+    })
 }
 
 /// Exit code a mod asked for with `client_op::QUIT`.
@@ -115,6 +144,14 @@ pub(crate) unsafe fn run<'a>(c: *mut abi::ClientCtx) -> Option<&'a mut Running> 
     unsafe { view(c).and_then(|v| (v.run as *mut Running).as_mut()) }
 }
 
+pub unsafe extern "C" fn client_show(c: *mut abi::ClientCtx, d: *const abi::ShowDesc) {
+    unsafe {
+        if let Some(g) = run(c).and_then(|r| r.game.as_mut()) {
+            g.client.show(crate::host::shown(&*d));
+        }
+    }
+}
+
 /// The answer to a command run with `client_op::RUN_COMMAND`, once it came: its lines in the
 /// client's language, one per line.
 pub unsafe extern "C" fn client_command_reply(c: *mut abi::ClientCtx, id: u32, out: *mut Str) -> u32 {
@@ -165,16 +202,20 @@ impl Running {
         self.input.key_up(k);
         self.input.key_down(k);
         let until = Instant::now() + Duration::from_secs_f32(secs.max(0.05));
-        self.mod_held.retain(|(h, _)| *h != k);
-        self.mod_held.push((k, until));
+        self.mod_held.retain(|(h, _, _)| *h != k);
+        // Down through the next frame's start at least: a mod whose frame hook runs before the
+        // one that pressed it (base's `on_client` keys, by the edge of held) sees it then. Let go
+        // by time alone, a frame longer than the hold (CI, software Vulkan) never showed it them.
+        self.mod_held.push((k, until, self.frame_no + 1));
     }
 
     /// Releases keys mods held down once their time is up.
     pub(super) fn release_mod_keys(&mut self) {
         let now = Instant::now();
+        let frame = self.frame_no;
         let input = &mut self.input;
-        self.mod_held.retain(|(k, at)| {
-            if now >= *at {
+        self.mod_held.retain(|(k, at, through)| {
+            if now >= *at && frame > *through {
                 input.key_up(*k);
                 false
             } else {
@@ -219,6 +260,7 @@ pub unsafe extern "C" fn client_state(c: *mut abi::ClientCtx, out: *mut abi::Cli
                 flags |= cf::PAUSED;
             }
             s.sounds = r.audio.as_ref().map_or(0, |a| a.played);
+            (s.voices, s.handles) = r.audio.as_ref().map_or((0, 0), |a| a.counts());
             s.flags = flags;
             s.frame = r.frame_no;
             s.dt = r.frame_dt;
@@ -233,6 +275,11 @@ pub unsafe extern "C" fn client_state(c: *mut abi::ClientCtx, out: *mut abi::Cli
                 .map_or(Str::EMPTY, |(sc, _)| Str::new(sc.name()));
             s.screen_frames = r.screen_frames;
             s.bob = r.game.as_ref().map_or(0.0, |g| g.client.bob());
+            if let Some(g) = &r.game {
+                s.camera = g.client.cameras.mode;
+                s.lod_columns = g.client.lod_columns() as u32;
+                s.camera_pos = g.client.cameras.shown.pos.to_array().into();
+            }
             (s.benches, [s.bench_fps, s.bench_avg_ms, s.bench_p99_ms, s.bench_gpu_ms, s.bench_server_ms]) = (r.benches, r.bench_last);
             if let Some(srv) = r.game.as_ref().and_then(|g| g.server.as_ref()) {
                 s.server_ms = srv.tick_ms();
@@ -251,17 +298,17 @@ pub unsafe extern "C" fn client_state(c: *mut abi::ClientCtx, out: *mut abi::Cli
                 | bit(cl.menu.is_some(), cf::MENU_OPEN);
             s.dim = cl.world.dim;
             s.player = cl.player_id;
-            s.pos = p.pos.to_array();
-            s.shown = cl.smooth_pos().to_array();
+            s.pos = p.pos.to_array().into();
+            s.shown = cl.smooth_pos().to_array().into();
             if let Some(h) = cl.target {
-                (s.target, s.target_frame) = (h.block.to_array(), h.frame);
+                (s.target, s.target_body) = (h.block.to_array().into(), h.frame);
             }
-            s.vel = p.vel.to_array();
+            s.vel = p.vel.to_array().into();
             s.yaw = p.yaw;
             s.pitch = p.pitch;
             s.selected = cl.selected as u32;
-            s.mode = cl.mode as u32;
-            s.health = cl.health;
+            s.mode = cl.mode.0 as u32;
+            s.health = cl.health();
             s.cubes = cl.world.len() as u32;
             s.pending_meshes = cl.pending_meshes() as u32;
             s.gpu_cubes = crate::client::terrain_gpu::GPU_CUBES.load(std::sync::atomic::Ordering::Relaxed);
@@ -270,6 +317,7 @@ pub unsafe extern "C" fn client_state(c: *mut abi::ClientCtx, out: *mut abi::Cli
             (s.lod_tiles, s.lod_pending) = (shown as u32, pending as u32);
             s.entities = cl.entities.len() as u32;
             s.particles = cl.particles.len() as u32;
+            (s.rain, s.thunder, s.wind, s.snowing, s.lightnings) = cl.weather_now();
         }
         *out = s;
     }
@@ -281,22 +329,16 @@ pub unsafe extern "C" fn client_input(c: *mut abi::ClientCtx, op: u32, text: Str
         let Some(r) = run(c) else { return 0 };
         let text = text.as_str();
         match op {
-            ci::ACTION => match r.input.key_of(text) {
-                Some(c) => {
-                    for (bit, k) in [
-                        (crate::input::CTRL, KeyCode::ControlLeft),
-                        (crate::input::SHIFT, KeyCode::ShiftLeft),
-                        (crate::input::ALT, KeyCode::AltLeft),
-                    ] {
-                        if c.mods & bit != 0 {
-                            r.hold(Key::Code(k), x);
-                        }
-                    }
-                    r.hold(c.key, x)
+            ci::ACTION => {
+                let keys = r.input.keys_of(text, true);
+                if keys.is_empty() {
+                    return 0;
                 }
-                None => return 0,
-            },
-            ci::KEY => match crate::settings::parse_key(text) {
+                for k in keys {
+                    r.hold(k, x);
+                }
+            }
+            ci::KEY => match crate::input::Key::parse(text) {
                 Some(k) => r.hold(k, x),
                 None => return 0,
             },
@@ -305,7 +347,7 @@ pub unsafe extern "C" fn client_input(c: *mut abi::ClientCtx, op: u32, text: Str
                 let (w, h) = r.gpu.surface_size();
                 r.input.cursor = Vec2::new(x * w as f32, y * h as f32);
             }
-            ci::SCROLL => r.input.scroll += x,
+            ci::SCROLL => r.input.wheel(x),
             ci::TYPE => r.input.typed.push_str(text),
             ci::RELEASE_ALL => {
                 r.input.release_all();
@@ -317,15 +359,16 @@ pub unsafe extern "C" fn client_input(c: *mut abi::ClientCtx, op: u32, text: Str
     }
 }
 
-pub unsafe extern "C" fn client_pressed(c: *mut abi::ClientCtx, action: Str) -> u32 {
+pub unsafe extern "C" fn client_pressed(c: *mut abi::ClientCtx, action: Str, out: *mut abi::KeyState) {
     unsafe {
-        let Some(r) = run(c) else { return 0 };
+        let Some(r) = run(c) else { return };
         // Mod keys belong to the world: while a screen (chat, inventory) has the input they stay up.
-        if !r.input.captured || !r.screens.is_empty() {
-            return 0;
-        }
-        let a = action.as_str();
-        r.input.pressed(a) as u32 | (r.input.held(a) as u32) << 1
+        *out = match &r.game {
+            Some(g) if r.screens.is_empty() => {
+                crate::input::Keys { input: &r.input, ticks: &g.client.key_ticks, raw: false }.state(action.as_str())
+            }
+            _ => abi::KeyState::default(),
+        };
     }
 }
 
@@ -336,12 +379,12 @@ pub unsafe extern "C" fn client_set_player(c: *mut abi::ClientCtx, control: *con
         let Some(g) = r.game.as_mut() else { return };
         let ctl = *control;
         let p = &mut g.client.player;
-        if ctl.mask & m::POS != 0 && DVec3::from_array(ctl.pos).is_finite() {
-            p.pos = DVec3::from_array(ctl.pos);
+        if ctl.mask & m::POS != 0 && crate::world::dvec(ctl.pos).is_finite() {
+            p.pos = crate::world::dvec(ctl.pos);
             p.prev = p.pos;
         }
-        if ctl.mask & m::VEL != 0 && DVec3::from_array(ctl.vel).is_finite() {
-            p.vel = DVec3::from_array(ctl.vel);
+        if ctl.mask & m::VEL != 0 && crate::world::dvec(ctl.vel).is_finite() {
+            p.vel = crate::world::dvec(ctl.vel);
         }
         if ctl.mask & m::LOOK != 0 {
             p.yaw = ctl.yaw;
@@ -351,12 +394,6 @@ pub unsafe extern "C" fn client_set_player(c: *mut abi::ClientCtx, control: *con
         }
         if ctl.mask & m::FLYING != 0 {
             p.flying = ctl.flying != 0;
-        }
-        if ctl.mask & m::LYING != 0 {
-            p.lying = (!ctl.lying.is_nan()).then_some(ctl.lying);
-            if p.lying.is_none() {
-                p.pose = crate::world::Pose::Stand;
-            }
         }
         if ctl.mask & m::FLY_SPEED != 0 {
             p.fly_speed = ctl.fly_speed.max(0.0);
@@ -431,20 +468,21 @@ pub unsafe extern "C" fn client_command(c: *mut abi::ClientCtx, op: u32, text: S
                 r.open(s);
             }
             op_::CLOSE_SCREEN => {
-                if r.screens.last().is_some_and(|(s, _)| s.shows_menu()) {
-                    if let Some(g) = r.game.as_mut() {
-                        g.client.close_menu();
-                    }
-                }
                 if !r.screens.is_empty() {
                     r.handle(vec![Request::Close]);
                 }
             }
             op_::RELOAD_ASSETS => r.reload_requested = true,
-            op_::POST_EFFECT => return r.post.set(&text, num as f32) as u64,
+            op_::REBUILD_SCREEN => r.handle(vec![Request::Rebuild]),
             op_::BENCH => r.bench = Some(crate::bench::Bench::new(&text, num.max(0.1) as f32)),
             op_::RESPAWN => r.handle(vec![Request::Respawn]),
             op_::RUN_COMMAND => return r.run_command(&text) as u64,
+            op_::MENU_SORT => {
+                let Some(g) = r.game.as_mut().filter(|g| g.client.menu.is_some()) else { return 0 };
+                let slot = if num < 0.0 { u32::MAX } else { num as u32 };
+                g.client
+                    .send(crate::net::ToServer::Click { slot, button: crate::server::menu::SORT, shift: false });
+            }
             _ => return 0,
         }
         1
@@ -467,7 +505,7 @@ pub unsafe extern "C" fn client_text(c: *mut abi::ClientCtx, which: u32, index: 
                     .iter()
                     .rev()
                     .nth(index as usize)
-                    .map_or(Str::EMPTY, |(m, _)| text_out(&m.text(&r.lang))),
+                    .map_or(Str::EMPTY, |(m, _)| text_out(&m.msg.text(&r.lang))),
                 _ => Str::EMPTY,
             },
             ct::BENCH => match run(c) {
@@ -493,31 +531,95 @@ pub unsafe extern "C" fn client_text(c: *mut abi::ClientCtx, which: u32, index: 
     }
 }
 
-pub unsafe extern "C" fn client_block(c: *mut abi::ClientCtx, pos: *const [i32; 3]) -> u32 {
-    unsafe { client(c).map_or(u32::MAX, |cl| cl.world.block(IVec3::from_array(*pos))) }
+pub unsafe extern "C" fn client_music(c: *mut abi::ClientCtx, source: abi::MusicSource, op: u32, track: Str, value: f64) -> u32 {
+    use abi::local_music as music;
+    let Some(r) = (unsafe { run(c) }) else { return 0 };
+    let Some(game) = r.game.as_mut() else { return 0 };
+    let cl = &mut game.client;
+    let folder = crate::audio::music_folder(&r.settings.run_dir);
+    let (ok, rebuild) = match op {
+        music::REFRESH => match cl.local_music.refresh(&folder) {
+            Ok(changed) => (true, changed),
+            Err(err) => {
+                log::warn!("music directory: {err}");
+                (false, false)
+            }
+        },
+        music::OPEN_FOLDER => {
+            if let Err(err) = std::fs::create_dir_all(&folder) {
+                log::warn!("music directory: {err}");
+                return 0;
+            }
+            crate::packs::open_path(&folder);
+            (true, false)
+        }
+        music::PLAY => {
+            let ok = if let (Some(pos), Some(audio)) = (cl.music_source_position(source), r.audio.as_mut()) {
+                let listener = cl.render_camera().pos;
+                let filter = cl.source_filter(pos, listener);
+                audio.start_local(&mut cl.local_music, &folder, source, pos, listener, filter, unsafe { track.as_str() })
+            } else {
+                cl.local_music.fail(source);
+                false
+            };
+            (ok, true)
+        }
+        _ => {
+            let ok = cl.local_music.control(source, op, value);
+            (ok, ok && matches!(op, music::TOGGLE_PAUSE | music::STOP))
+        }
+    };
+    if rebuild {
+        r.rebuild_music_screens();
+    }
+    ok as u32
 }
 
-pub unsafe extern "C" fn client_structure_block(c: *mut abi::ClientCtx, entity: u64, pos: *const [i32; 3]) -> u32 {
+pub unsafe extern "C" fn client_music_track(c: *mut abi::ClientCtx, index: u32, out: *mut abi::MusicTrack) {
+    let track = unsafe { music_client(c) }.map_or(abi::MusicTrack { file: Str::EMPTY, duration: 0.0 }, |cl| cl.local_music.track(index));
+    unsafe { out.write(track) };
+}
+
+pub unsafe extern "C" fn client_music_status(c: *mut abi::ClientCtx, source: abi::MusicSource, out: *mut abi::MusicStatus) {
+    let status = unsafe { music_client(c) }.map_or(
+        abi::MusicStatus { track: Str::EMPTY, position: 0.0, duration: 0.0, volume: 1.0, state: abi::local_music::STOPPED },
+        |cl| cl.local_music.status(source),
+    );
+    unsafe { out.write(status) };
+}
+
+unsafe fn music_client<'a>(c: *mut abi::ClientCtx) -> Option<&'a Client> {
+    let view = unsafe { view(c)? };
+    view.read_music.set(true);
+    unsafe { view.client.as_ref() }
+}
+
+pub unsafe extern "C" fn client_block_in(c: *mut abi::ClientCtx, frame: u64, pos: *const abi::BlockPos) -> u32 {
     unsafe {
-        client(c)
-            .and_then(|cl| cl.entities.get(&entity))
+        let Some(cl) = client(c) else { return u32::MAX };
+        let p = crate::world::ivec(*pos);
+        if frame == 0 {
+            return cl.world.seen(p);
+        }
+        cl.entities
+            .get(&frame)
             .and_then(|e| e.structure.as_ref())
-            .map_or(u32::MAX, |s| s.block(IVec3::from_array(*pos)))
+            .map_or(u32::MAX, |s| s.seen(p))
     }
 }
 
-pub unsafe extern "C" fn client_cube_shown(c: *mut abi::ClientCtx, pos: *const [i32; 3]) -> u32 {
+pub unsafe extern "C" fn client_cube_shown(c: *mut abi::ClientCtx, pos: *const abi::BlockPos) -> u32 {
     unsafe {
         client(c).is_some_and(|cl| {
             cl.world
-                .cube_shown(crate::world::cube_of(IVec3::from_array(*pos)))
+                .cube_shown(crate::world::cube_of(crate::world::ivec(*pos)))
         }) as u32
     }
 }
 
-pub unsafe extern "C" fn client_light(c: *mut abi::ClientCtx, pos: *const [i32; 3]) -> u32 {
+pub unsafe extern "C" fn client_light(c: *mut abi::ClientCtx, pos: *const abi::BlockPos) -> u32 {
     unsafe {
-        let p = IVec3::from_array(*pos);
+        let p = crate::world::ivec(*pos);
         client(c).map_or(u32::MAX, |cl| if cl.world.block(p) == u32::MAX { u32::MAX } else { cl.world.light(p) })
     }
 }
@@ -525,29 +627,55 @@ pub unsafe extern "C" fn client_light(c: *mut abi::ClientCtx, pos: *const [i32; 
 pub unsafe extern "C" fn client_slot(c: *mut abi::ClientCtx, container: u32, slot: u32) -> ItemStack {
     unsafe {
         let Some(cl) = client(c) else { return ItemStack::EMPTY };
+        use abi::slot_container as sc;
         let s = match container {
-            0 => cl.inventory.get(slot as usize).copied(),
-            1 => cl
+            sc::INVENTORY => cl.inventory.get(slot as usize).copied(),
+            sc::MENU => cl
                 .menu
                 .as_ref()
                 .and_then(|m| m.slots.get(slot as usize))
                 .copied(),
-            2 => cl.menu.as_ref().map(|m| m.cursor),
+            sc::CURSOR => cl.menu.as_ref().map(|m| m.cursor),
             _ => None,
         };
         s.unwrap_or_default()
     }
 }
 
-pub unsafe extern "C" fn client_menu(c: *mut abi::ClientCtx, out: *mut [u32; 3]) -> u32 {
+pub unsafe extern "C" fn client_menu(c: *mut abi::ClientCtx, out: *mut abi::OpenMenu) -> u32 {
     unsafe {
         match client(c).and_then(|cl| cl.menu.as_ref()) {
             Some(m) => {
-                *out = [m.kind, m.window, m.slots.len() as u32];
+                *out = abi::OpenMenu { kind: m.kind, window: m.window, slots: m.slots.len() as u32 };
                 1
             }
             None => 0,
         }
+    }
+}
+
+pub unsafe extern "C" fn client_menu_group(c: *mut abi::ClientCtx, name: Str, out: *mut abi::SlotGroup) -> u32 {
+    unsafe {
+        let Some(m) = client(c).and_then(|cl| cl.menu.as_ref()) else { return 0 };
+        let game = &crate::content::content().game;
+        let Some((group, start, len)) = game.menus[m.kind as usize].group(&game.player_layout, name.as_str()) else { return 0 };
+        *out = abi::SlotGroup { start, len, cols: group.span(&game.player_layout).2 };
+        1
+    }
+}
+
+pub unsafe extern "C" fn client_menu_move(c: *mut abi::ClientCtx, window: u32, moves: abi::Slice<abi::ItemMove<u32>>) -> u32 {
+    if moves.len == 0 || moves.len > abi::MAX_ITEM_MOVES {
+        return 0;
+    }
+    unsafe {
+        let Some(g) = run(c).and_then(|r| r.game.as_mut()) else { return 0 };
+        if !g.client.menu.as_ref().is_some_and(|m| m.window == window) {
+            return 0;
+        }
+        g.client
+            .send(crate::net::ToServer::MenuMove { window, moves: moves.as_slice().to_vec() });
+        1
     }
 }
 
@@ -563,7 +691,7 @@ pub unsafe extern "C" fn client_entities(c: *mut abi::ClientCtx, out: *mut u64, 
     }
 }
 
-pub unsafe extern "C" fn client_ui_rect(c: *mut abi::ClientCtx, query: Str, out: *mut [f32; 4]) -> u32 {
+pub unsafe extern "C" fn client_ui_rect(c: *mut abi::ClientCtx, query: Str, out: *mut abi::Rect) -> u32 {
     unsafe {
         let Some(r) = run(c) else { return 0 };
         let q = query.as_str();
@@ -577,7 +705,17 @@ pub unsafe extern "C" fn client_ui_rect(c: *mut abi::ClientCtx, query: Str, out:
             ui.nodes
                 .iter()
                 .position(|node| matches!(node.kind, Kind::Custom { tag: crate::client::modui::TAG_CREATIVE, data } if data == n))
-        } else if let Some(n) = q.strip_prefix("icon:").and_then(|n| n.parse::<u64>().ok()) {
+        } else if let Some(n) = q.strip_prefix("icon:").and_then(|n| {
+            // A number, or an item's name (`icon:base:part_haft`): scripts can't know numbers.
+            n.parse::<u64>().ok().or_else(|| {
+                crate::content::content()
+                    .game
+                    .catalog
+                    .ids(weft_abi::entry_kind::ITEM)
+                    .get(n)
+                    .map(|&i| i as u64)
+            })
+        }) {
             ui.nodes.iter().position(|node| match node.kind {
                 Kind::Custom { tag: crate::client::modui::TAG_ICON, data } => data == n,
                 Kind::Item { last, .. } => last.0 as u64 == n,
@@ -586,7 +724,7 @@ pub unsafe extern "C" fn client_ui_rect(c: *mut abi::ClientCtx, query: Str, out:
         } else if q == "slider" {
             ui.nodes
                 .iter()
-                .position(|node| matches!(node.kind, Kind::Slider { .. }))
+                .position(|node| matches!(node.kind, Kind::Slider(_)))
         } else if q == "entity" {
             ui.nodes
                 .iter()
@@ -624,17 +762,35 @@ pub unsafe extern "C" fn client_ui_rect(c: *mut abi::ClientCtx, query: Str, out:
         let Some(rect) = bar.or_else(|| found.map(|i| ui.nodes[i].rect)) else { return 0 };
         let scale = r.gui_scale();
         let (w, h) = r.gpu.surface_size();
-        *out = [rect.x * scale / w as f32, rect.y * scale / h as f32, rect.w * scale / w as f32, rect.h * scale / h as f32];
+        let (w, h) = (w as f32 / scale, h as f32 / scale);
+        *out = abi::Rect { x: rect.x / w, y: rect.y / h, w: rect.w / w, h: rect.h / h };
         1
     }
 }
 
-pub unsafe extern "C" fn client_draw(
+/// Whether a mod's drawing this frame shows: no group, or one the player shows.
+fn drawn(r: &Running, group: &str) -> bool {
+    group.is_empty() || r.game.as_ref().is_some_and(|g| g.client.gizmos.on(group))
+}
+
+pub unsafe extern "C" fn client_draw(c: *mut abi::ClientCtx, group: Str, kind: u32, a: *const abi::Vec3, b: *const abi::Vec3, color: u32) {
+    unsafe {
+        let Some(r) = run(c) else { return };
+        let group = group.as_str();
+        if kind > abi::gizmo_kind::FILL || !drawn(r, group) {
+            return;
+        }
+        let (a, b) = (crate::world::dvec(*a), crate::world::dvec(*b));
+        r.mod_gizmos
+            .push(crate::net::GizmoShape::shape(group, kind as u8, a, b, color, 0));
+    }
+}
+
+pub unsafe extern "C" fn client_draw_text(
     c: *mut abi::ClientCtx,
     group: Str,
-    kind: u32,
-    a: *const [f64; 3],
-    b: *const [f64; 3],
+    pos: *const abi::Vec3,
+    size: f32,
     color: u32,
     key: Str,
     args: Slice<abi::UiArg>,
@@ -642,31 +798,51 @@ pub unsafe extern "C" fn client_draw(
     unsafe {
         let Some(r) = run(c) else { return };
         let group = group.as_str();
-        if !group.is_empty() && !r.game.as_ref().is_some_and(|g| g.client.gizmos.on(group)) {
+        if !drawn(r, group) {
             return;
         }
-        let (a, b, text) =
-            (DVec3::from_array(*a), DVec3::from_array(*b), crate::ui::text::Msg::new(key.as_str(), crate::client::modui::args(args)));
-        match kind {
-            abi::gizmo_kind::SCREEN_LABEL => {
-                r.mod_screen_text
-                    .push((a.x as f32, a.y as f32, text, color, if b.x > 0.0 { b.x as f32 } else { 1.0 }))
-            }
-            k if k <= abi::gizmo_kind::FILL => {
-                r.mod_gizmos
-                    .push(crate::net::GizmoShape { group: group.to_string(), kind: k as u8, a, b, color, ticks: 0, text })
-            }
-            _ => {}
-        }
+        let text = crate::ui::text::Msg::new(key.as_str(), crate::client::modui::args(args));
+        r.mod_gizmos
+            .push(crate::net::GizmoShape::text(group, crate::world::dvec(*pos), size, color, 0, text));
     }
 }
 
-pub unsafe extern "C" fn client_entity_defaults(a: *mut abi::ClientEntityArgs) {
+pub unsafe extern "C" fn client_screen_text(
+    c: *mut abi::ClientCtx,
+    x: f32,
+    y: f32,
+    size: f32,
+    color: u32,
+    key: Str,
+    args: Slice<abi::UiArg>,
+) {
     unsafe {
-        let Some(a) = a.as_ref() else { return };
-        if let Some(g) = run(a.client).and_then(|r| r.game.as_mut()) {
-            g.client.entity_effects(a);
-        }
+        let Some(r) = run(c) else { return };
+        let text = crate::ui::text::Msg::new(key.as_str(), crate::client::modui::args(args));
+        r.mod_screen_text
+            .push((x, y, text, color, if size > 0.0 { size } else { 1.0 }, 0.0));
+    }
+}
+
+/// chiacraft: `client_screen_text` wrapped to `width` GUI pixels, its lines centered; a negative
+/// `width` draws it on the HUD's plate (`hud_plate`), wrapped to its size (a hint: the playtest's
+/// "thin small line mid-screen").
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn client_screen_text_wrapped(
+    c: *mut abi::ClientCtx,
+    x: f32,
+    y: f32,
+    size: f32,
+    color: u32,
+    key: Str,
+    args: Slice<abi::UiArg>,
+    width: f32,
+) {
+    unsafe {
+        let Some(r) = run(c) else { return };
+        let text = crate::ui::text::Msg::new(key.as_str(), crate::client::modui::args(args));
+        r.mod_screen_text
+            .push((x, y, text, color, if size > 0.0 { size } else { 1.0 }, width));
     }
 }
 
@@ -681,7 +857,7 @@ pub unsafe extern "C" fn client_send_packet(c: *mut abi::ClientCtx, name: Str, s
     }
 }
 
-pub unsafe extern "C" fn client_particles(c: *mut abi::ClientCtx, burst: *const abi::ParticleBurst) {
+pub unsafe extern "C" fn client_particle_burst(c: *mut abi::ClientCtx, burst: *const abi::ParticleBurst) {
     unsafe {
         let Some(r) = run(c) else { return };
         if let Some(g) = r.game.as_mut() {
@@ -690,11 +866,199 @@ pub unsafe extern "C" fn client_particles(c: *mut abi::ClientCtx, burst: *const 
     }
 }
 
-pub unsafe extern "C" fn client_play_sound(c: *mut abi::ClientCtx, sound: u32, pos: *const [f64; 3], volume: f32, pitch: f32) {
+/// `Host::client_image_set`: a mod's picture for the GUI (`ui::render::set_dynamic`).
+pub unsafe extern "C" fn client_image_set(_c: *mut abi::ClientCtx, name: Str, w: u32, h: u32, rgba: *const u8, len: usize) -> u32 {
+    unsafe {
+        let name = name.as_str();
+        let need = w as usize * h as usize * 4;
+        if rgba.is_null() || len < need {
+            return 0;
+        }
+        crate::ui::render::set_dynamic(name, w, h, std::slice::from_raw_parts(rgba, need)) as u32
+    }
+}
+
+pub unsafe extern "C" fn client_pose_bone(
+    c: *mut abi::ClientCtx,
+    entity: u64,
+    bone: Str,
+    turn: *const [f32; 3],
+    by: *const [f32; 3],
+    scale: *const [f32; 3],
+) {
+    unsafe {
+        let Some(g) = run(c).and_then(|r| r.game.as_mut()) else { return };
+        let pose = crate::client::models::BonePose {
+            turn: glam::Vec3::from_array(*turn),
+            by: glam::Vec3::from_array(*by),
+            scale: glam::Vec3::from_array(*scale),
+        };
+        g.client
+            .entity_render
+            .models
+            .turned
+            .entry(entity)
+            .or_default()
+            .push((bone.as_str().to_string(), pose));
+    }
+}
+
+/// Runs `f` on an entity as the renderer sees it, the local player too.
+unsafe fn with_entity<T>(
+    c: *mut abi::ClientCtx,
+    entity: u64,
+    f: impl FnOnce(&crate::client::Client, &crate::client::ClientEntity) -> T,
+) -> Option<T> {
+    unsafe {
+        let g = run(c)?.game.as_ref()?;
+        if entity == g.client.player_id {
+            return Some(f(&g.client, &g.client.me));
+        }
+        g.client
+            .entities
+            .get(&entity)
+            .or_else(|| g.client.showing_blocks.get(&entity))
+            .map(|e| f(&g.client, e))
+    }
+}
+
+pub unsafe extern "C" fn client_entity_action(c: *mut abi::ClientCtx, entity: u64, out: *mut Str) -> u32 {
+    unsafe {
+        let name = with_entity(c, entity, |g, e| g.entity_render.action_of(entity, e).map(str::to_string));
+        match name.flatten() {
+            Some(n) => {
+                *out = text_out(&n);
+                1
+            }
+            None => 0,
+        }
+    }
+}
+
+pub unsafe extern "C" fn client_clip_length(c: *mut abi::ClientCtx, entity: u64, name: Str) -> f32 {
+    unsafe {
+        with_entity(c, entity, |g, e| g.entity_render.clip_length(entity, e, name.as_str()))
+            .flatten()
+            .unwrap_or(-1.0)
+    }
+}
+
+pub unsafe extern "C" fn client_environment_set(c: *mut abi::ClientCtx, name: Str, data: Slice<u8>) -> u32 {
+    unsafe {
+        let Some(r) = run(c) else { return 0 };
+        let name = name.as_str();
+        if data.len == 0 {
+            if let Some(g) = r.game.as_mut() {
+                g.client.environment.local.remove(name);
+                return 1;
+            }
+            return 0;
+        }
+        let Some(mut layer) = abi::data::from_bytes::<abi::environment::EnvironmentLayer>(data.as_slice()) else { return 0 };
+        if layer.post.iter().any(|effect| !r.post.has(&effect.name)) {
+            return 0;
+        }
+        let Some(g) = r.game.as_mut() else { return 0 };
+        layer.name = name.to_string();
+        g.client.environment.local.insert(name.to_string(), layer);
+        1
+    }
+}
+
+pub unsafe extern "C" fn client_environment_values(c: *mut abi::ClientCtx, out: *mut abi::environment::EnvironmentValues) {
+    unsafe {
+        if let Some(client) = client(c) {
+            *out = client.environment.values;
+        }
+    }
+}
+
+pub unsafe extern "C" fn client_displayed(c: *mut abi::ClientCtx, entity: u64, source: u32, out: *mut ItemStack, max: usize) -> usize {
+    unsafe {
+        with_entity(c, entity, |_, e| {
+            let hands = [e.held, e.off_held];
+            let stacks = match source {
+                abi::display_source::HANDS => &hands[..],
+                abi::display_source::EQUIPMENT => &e.worn,
+                abi::display_source::SHOWN => &e.shown,
+                abi::display_source::GROUND => std::slice::from_ref(&e.item),
+                _ => &[],
+            };
+            for (i, stack) in stacks.iter().take(max).enumerate() {
+                *out.add(i) = *stack;
+            }
+            stacks.len()
+        })
+        .unwrap_or(0)
+    }
+}
+
+pub unsafe extern "C" fn client_bone_position(c: *mut abi::ClientCtx, entity: u64, bone: Str, out: *mut abi::Vec3) -> u32 {
+    unsafe {
+        let Some(g) = run(c).and_then(|r| r.game.as_ref()) else { return 0 };
+        match g
+            .client
+            .entity_render
+            .models
+            .bone_position(entity, bone.as_str())
+        {
+            Some(p) => {
+                *out = p.to_array().into();
+                1
+            }
+            None => 0,
+        }
+    }
+}
+
+pub unsafe extern "C" fn client_play_sound(c: *mut abi::ClientCtx, sound: u32, pos: *const abi::Vec3, volume: f32, pitch: f32) {
     unsafe {
         let Some(r) = run(c) else { return };
-        let pos = (!pos.is_null()).then(|| DVec3::from_array(*pos));
+        let pos = (!pos.is_null()).then(|| crate::world::dvec(*pos));
         r.ui_sounds
             .push(crate::audio::Play { sound, pos, volume, pitch });
+    }
+}
+
+pub unsafe extern "C" fn client_sound_start(c: *mut abi::ClientCtx, start: *const abi::SoundStart) -> u64 {
+    unsafe {
+        let Some(r) = run(c) else { return 0 };
+        let (Some(a), Some(s)) = (r.audio.as_mut(), start.as_ref()) else { return 0 };
+        if crate::content::content()
+            .game
+            .sounds
+            .get(s.sound as usize)
+            .is_none()
+        {
+            return 0;
+        }
+        let pos = (s.flags & abi::sound_start::POSITIONED != 0).then(|| DVec3::from_array(s.pos));
+        let play = crate::audio::Play { sound: s.sound, pos, volume: s.volume, pitch: s.pitch };
+        a.start(play, s.flags & abi::sound_start::LOOP != 0, s.fade)
+    }
+}
+
+pub unsafe extern "C" fn client_sound_set(c: *mut abi::ClientCtx, handle: u64, change: *const abi::SoundChange) {
+    unsafe {
+        let Some(r) = run(c) else { return };
+        if let (Some(a), Some(ch)) = (r.audio.as_mut(), change.as_ref()) {
+            a.change(handle, ch);
+        }
+    }
+}
+
+pub unsafe extern "C" fn client_sound_stop(c: *mut abi::ClientCtx, handle: u64, fade: f32) {
+    unsafe {
+        if let Some(a) = run(c).and_then(|r| r.audio.as_mut()) {
+            a.stop(handle, fade);
+        }
+    }
+}
+
+pub unsafe extern "C" fn client_sound_playing(c: *mut abi::ClientCtx, handle: u64) -> u32 {
+    unsafe {
+        run(c)
+            .and_then(|r| r.audio.as_ref())
+            .is_some_and(|a| a.playing(handle)) as u32
     }
 }

@@ -28,6 +28,7 @@ pub const CHANNELS: &[(&str, &str)] = &[
     ("frame", "frame, GPU pass and server phase times every second"),
     ("summary", "tick time, world size, memory and costliest mods every 10 seconds"),
     ("modifiers", "how value chains computed damage and other numbers"),
+    ("bones", "trace: simulated bone pivots and tips every frame"),
 ];
 
 #[derive(Clone, Copy)]
@@ -41,9 +42,10 @@ pub enum Channel {
     Frame,
     Summary,
     Modifiers,
+    Bones,
 }
 
-static CHANNEL_LEVEL: [AtomicU8; 9] = [const { AtomicU8::new(0) }; 9];
+static CHANNEL_LEVEL: [AtomicU8; 10] = [const { AtomicU8::new(0) }; 10];
 
 /// Hot paths ask this instead of the logger: one atomic load.
 #[inline]
@@ -115,6 +117,11 @@ impl Filter {
 
 struct Logger {
     start: Instant,
+    /// Where lines go to be written (`writer`): the terminal and the file are written off the
+    /// thread that logs, so a slow disk or a slow reader of the terminal never holds up a tick
+    /// (a busy disk made the server's mod calls wait 0.1-0.4 s on their log lines). `None`
+    /// before the writer runs: written at once.
+    send: Mutex<Option<std::sync::mpsc::Sender<Write_>>>,
     file: Mutex<Option<std::fs::File>>,
     filter: RwLock<Filter>,
     initial: Filter,
@@ -122,6 +129,44 @@ struct Logger {
 }
 
 static LOGGER: OnceLock<Logger> = OnceLock::new();
+
+/// What the writer thread is handed: a line for the terminal and the file, or a flush to answer.
+enum Write_ {
+    Line { colored: String, plain: String },
+    Flush(std::sync::mpsc::Sender<()>),
+}
+
+/// Starts the writer thread with `file`; lines logged from now on go through it.
+fn start_writer(l: &Logger, file: Option<std::fs::File>) {
+    let (tx, rx) = std::sync::mpsc::channel::<Write_>();
+    let spawned = std::thread::Builder::new()
+        .name("log".into())
+        .spawn(move || {
+            let mut file = file;
+            for w in rx {
+                match w {
+                    Write_::Line { colored, plain } => {
+                        let _ = writeln!(std::io::stderr().lock(), "{colored}");
+                        if let Some(f) = file.as_mut() {
+                            let _ = f.write_all(plain.as_bytes());
+                            let _ = f.write_all(b"\n");
+                        }
+                    }
+                    Write_::Flush(done) => {
+                        if let Some(f) = file.as_mut() {
+                            let _ = f.flush();
+                        }
+                        let _ = done.send(());
+                    }
+                }
+            }
+        });
+    match spawned {
+        Ok(_) => *l.send.lock() = Some(tx),
+        // No thread: lines are written where they are logged, as before.
+        Err(_) => *l.file.lock() = None,
+    }
+}
 
 /// Short target shown in brackets and matched by filters: `weft_engine::server::dim` becomes
 /// `server::dim`, `weft_vulkan` becomes `vulkan`.
@@ -151,14 +196,17 @@ pub fn init(file: Option<&Path>, verbose: bool, spec: &str) {
     });
     let mut filter = Filter { default: if verbose { LevelFilter::Debug } else { LevelFilter::Info }, rules: Vec::new() };
     let bad = filter.apply(spec).err();
+    let mut file = file;
     let logger = LOGGER.get_or_init(|| Logger {
         start: Instant::now(),
-        file: Mutex::new(file),
+        send: Mutex::new(None),
+        file: Mutex::new(None),
         initial: filter.clone(),
         filter: RwLock::new(filter),
         recent: Mutex::new(VecDeque::with_capacity(RECENT)),
     });
     if log::set_logger(logger).is_ok() {
+        start_writer(logger, file.take());
         refresh(logger);
     }
     enable_ansi();
@@ -229,10 +277,17 @@ impl log::Log for Logger {
     }
 
     fn log(&self, record: &Record) {
+        // winit 0.30 tells nobody when Android destroys the activity, only its log; and Android's
+        // main thread then waits until the game ends (an "isn't responding" otherwise).
+        #[cfg(target_os = "android")]
+        if record.target().starts_with("winit::platform_impl::android") && record.args().to_string().contains("onDestroy") {
+            crate::app::ANDROID_DESTROYED.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
         if !self.enabled(record.metadata()) {
             return;
         }
         let t = self.start.elapsed().as_secs_f32();
+        #[cfg_attr(target_os = "android", allow(unused_variables))]
         let (color, name) = match record.level() {
             Level::Error => ("\x1b[1;31m", "ERROR"),
             Level::Warn => ("\x1b[33m", "WARN "),
@@ -242,11 +297,21 @@ impl log::Log for Logger {
         };
         let short = short(record.target());
         let line = format!("{t:9.3} {name} [{short}] {}", record.args());
-        let mut out = std::io::stderr().lock();
-        let _ = writeln!(out, "\x1b[90m{t:9.3}\x1b[0m {color}{name}\x1b[0m \x1b[90m[{short}]\x1b[0m {}", record.args());
-        if let Some(f) = self.file.lock().as_mut() {
-            let _ = f.write_all(line.as_bytes());
-            let _ = f.write_all(b"\n");
+        #[cfg(target_os = "android")]
+        logcat(record.level(), &line);
+        // The terminal and the file through the writer thread (chiacraft, `Write_`), else here.
+        let colored = format!("\x1b[90m{t:9.3}\x1b[0m {color}{name}\x1b[0m \x1b[90m[{short}]\x1b[0m {}", record.args());
+        let sent = self.send.lock().as_ref().is_some_and(|tx| {
+            tx.send(Write_::Line { colored: colored.clone(), plain: line.clone() })
+                .is_ok()
+        });
+        if !sent {
+            #[cfg(not(target_os = "android"))]
+            let _ = writeln!(std::io::stderr().lock(), "{colored}");
+            if let Some(f) = self.file.lock().as_mut() {
+                let _ = f.write_all(line.as_bytes());
+                let _ = f.write_all(b"\n");
+            }
         }
         let mut recent = self.recent.lock();
         if recent.len() == RECENT {
@@ -255,7 +320,15 @@ impl log::Log for Logger {
         recent.push_back(line);
     }
 
+    /// Waits (a second at most) until every line logged so far is written.
     fn flush(&self) {
+        let tx = self.send.lock().clone();
+        if let Some(tx) = tx {
+            let (done, wait) = std::sync::mpsc::channel();
+            if tx.send(Write_::Flush(done)).is_ok() {
+                let _ = wait.recv_timeout(std::time::Duration::from_secs(1));
+            }
+        }
         if let Some(f) = self.file.lock().as_mut() {
             let _ = f.flush();
         }
@@ -404,4 +477,23 @@ mod tests {
         let b = stamp(1_700_000_061);
         assert!(a < b && a.len() == 19);
     }
+}
+
+/// Android has no terminal: its own log takes the lines (`adb logcat -s weft`).
+#[cfg(target_os = "android")]
+fn logcat(level: Level, line: &str) {
+    #[link(name = "log")]
+    unsafe extern "C" {
+        fn __android_log_write(prio: i32, tag: *const std::ffi::c_char, text: *const std::ffi::c_char) -> i32;
+    }
+    // android/log.h's priorities.
+    let prio = match level {
+        Level::Error => 6,
+        Level::Warn => 5,
+        Level::Info => 4,
+        Level::Debug => 3,
+        Level::Trace => 2,
+    };
+    let text = std::ffi::CString::new(line.replace('\0', "")).unwrap_or_default();
+    unsafe { __android_log_write(prio, c"weft".as_ptr(), text.as_ptr()) };
 }

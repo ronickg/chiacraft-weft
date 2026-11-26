@@ -1,15 +1,16 @@
+use crate::world::placement::CellLayout;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
-use glam::{IVec2, IVec3};
+use glam::{DVec3, IVec2, IVec3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::mesher::{self, Mesh, Neighborhood, PAD_VOLUME, pidx};
 use crate::content::{AIR, content};
 use crate::world::cube::{ALL_AROUND, around_mask};
-use crate::world::light::{CubeMap, Lighter};
+use crate::world::light::CubeMap;
 use crate::world::{Cube, cube_of, local_index};
 
 pub struct MeshResult {
@@ -55,7 +56,20 @@ struct Slot {
 pub struct ClientWorld {
     pub dim: u32,
     cubes: FxHashMap<IVec3, Slot>,
+    exhaust: FxHashMap<IVec3, Vec<IVec3>>,
     pub time: u64,
+    /// The biomes it rains in when a mod says where (`ToClient::Weather`); `None`: everywhere.
+    pub rain_in: Option<Vec<u32>>,
+    /// The air a mod says its biomes have (`ToClient::Air`): (biome, fog 0..1, wind m/s, snow
+    /// lying 0..1, `air_flags`) sorted by biome, and where the wind blows to, degrees clockwise
+    /// from north.
+    pub air: (Vec<(u32, f32, f32, f32, u32)>, f32),
+    /// Every biome's tint colors as a mod set them (`ToClient::Tints`), biome by biome, one per
+    /// tint kind; none: the content's. `tints_changed` until the renderer took them.
+    pub tints: Option<Vec<u32>>,
+    pub tints_changed: bool,
+    /// Ticks the dimension ran, what entity effects end by (`net::ToClient::Clock`).
+    pub ticks: u64,
     /// Dirty cubes whose six neighbors are all known: meshable now. Kept up to date as cubes
     /// come and go, so a frame never walks every dirty cube (tens of thousands while loading).
     ready: FxHashSet<IVec3>,
@@ -71,6 +85,8 @@ pub struct ClientWorld {
     pub removed: Vec<IVec3>,
     /// Cubes to look at again for redstone wire (`wires.rs`).
     wire_dirty: rustc_hash::FxHashSet<IVec3>,
+    /// Some cube has had wire: only then its neighbors have anything to ask about.
+    wire_seen: bool,
     /// What left the world this batch, to be freed off the main thread.
     unloaded: Vec<Slot>,
     next_version: u32,
@@ -83,6 +99,10 @@ pub struct ClientWorld {
     /// A moving structure's blocks: cubes that are not there are air (the server sends all of
     /// them), and the block bounds (inclusive), for collisions.
     pub bounded: bool,
+    /// What moving bodies' lights give cells of the world, for working out light as the server does.
+    body_glow: FxHashMap<IVec3, [u8; 3]>,
+    /// Light that moves with entities, the client's own (`glow`).
+    pub(super) glow: super::glow::Glow,
     pub bounds: Option<(IVec3, IVec3)>,
     /// Updates that came together, shown together once all their cubes are meshed: new meshes
     /// next to old ones open holes for a few frames otherwise (a crater showing the caves
@@ -118,11 +138,19 @@ struct Batch {
 }
 
 /// A batch waits no longer than this for its slowest cube.
-const HOLD_MAX: Duration = Duration::from_secs(5);
+pub(super) const HOLD_MAX: Duration = Duration::from_secs(5);
 
 /// Ready cubes this close to the player (in cubes) are meshed first and past the limit on jobs:
 /// what the player just placed or broke shows the next frame, whatever else waits.
 const URGENT: i32 = 2;
+
+fn emits_exhaust(c: &crate::content::Content, state: u32) -> bool {
+    let s = c.states[state as usize].signal;
+    s.kind == weft_abi::signal_kind::SINK
+        && s.level != 0
+        && c.block_value::<f32>(state, Some(c.game.thrust_comp))
+            .is_some_and(|force| force.is_finite() && force > 0.0)
+}
 
 impl crate::physics::Blocks for ClientWorld {
     fn block(&self, p: IVec3) -> u32 {
@@ -130,6 +158,78 @@ impl crate::physics::Blocks for ClientWorld {
             u32::MAX => AIR,
             s => s,
         }
+    }
+    fn bounds(&self) -> Option<(IVec3, IVec3)> {
+        self.bounds
+    }
+    fn layout(&self, p: IVec3) -> &CellLayout {
+        ClientWorld::layout(self, p)
+    }
+}
+
+/// The world as physics reads it on this side: a cube not here yet counts as solid, or as air
+/// for what flies.
+#[derive(Clone, Copy)]
+pub struct SeenCells<'a> {
+    pub world: &'a ClientWorld,
+    pub air_if_missing: bool,
+}
+
+impl crate::physics::Cells for SeenCells<'_> {
+    fn main(&self, p: IVec3) -> Option<u32> {
+        self.world
+            .block_or_air(p)
+            .or(self.air_if_missing.then_some(AIR))
+    }
+    fn layout(&self, p: IVec3) -> &CellLayout {
+        self.world.layout(p)
+    }
+}
+
+pub(super) struct LiquidSampler<'a> {
+    pub world: &'a ClientWorld,
+    pub entities: &'a FxHashMap<u64, super::ClientEntity>,
+    pub tick: f64,
+}
+
+impl LiquidSampler<'_> {
+    pub fn observation(&self, point: DVec3) -> Option<(u16, bool)> {
+        let cells = SeenCells { world: self.world, air_if_missing: false };
+        let liquid = crate::physics::liquid_at(content(), &cells, point)?;
+        let dry = self
+            .entities
+            .values()
+            .filter(|e| !e.dry_boxes.is_empty())
+            .any(|e| crate::physics::inside_dry_volume((e.place_at(self.tick), &e.dry_boxes), point));
+        Some((liquid, dry))
+    }
+
+    pub fn at(&self, point: DVec3) -> Option<u16> {
+        let (liquid, dry) = self.observation(point)?;
+        (!dry).then_some(liquid)
+    }
+
+    pub fn at_source(&self, point: DVec3, listener: DVec3) -> Option<u16> {
+        if let Some((liquid, dry)) = self.observation(point) {
+            return (!dry).then_some(liquid);
+        }
+        let cell = point.floor();
+        let state = self.world.block_or_air(cell.as_ivec3())?;
+        let local = point - cell;
+        if !content().states[state as usize]
+            .collision
+            .iter()
+            .any(|bounds| (0..3).all(|axis| (f64::from(bounds[axis])..f64::from(bounds[axis + 3])).contains(&local[axis])))
+        {
+            return None;
+        }
+        // A solid emitter radiates into the medium outside its cell toward the listener.
+        let dir = (listener - point).normalize_or_zero();
+        let exit = (0..3)
+            .filter(|&axis| dir[axis].abs() > 1e-8)
+            .map(|axis| ((if dir[axis] > 0.0 { 1.0 } else { 0.0 }) - local[axis]) / dir[axis])
+            .reduce(f64::min)?;
+        self.at(point + dir * (exit + 0.001))
     }
 }
 
@@ -145,6 +245,11 @@ const BLEND: i32 = 4;
 /// About 9 us each, blended on every core; while loading, columns get redone as neighbors
 /// arrive.
 const TINTS_PER_FRAME: usize = 256;
+/// Fewer than twice this many items, the frame thread does a parallel step itself: each item
+/// costs about a microsecond, while handing them to the pool means waiting for a worker to wake
+/// and get a core (milliseconds on a busy Mac). `start_jobs` runs three times a frame, mostly
+/// with a handful of cubes.
+const PAR_MIN: usize = 128;
 
 /// Grass, foliage and water colors of one block column, 0xFFRRGGBB.
 /// Blended colors of a column: per block (z, x), one per tint kind.
@@ -156,7 +261,14 @@ impl ClientWorld {
         ClientWorld {
             dim,
             cubes: FxHashMap::default(),
+            exhaust: FxHashMap::default(),
             time: 0,
+            rain_in: None,
+            air: (Vec::new(), 0.0),
+            tints: None,
+            // A new world (another dimension) starts from the content's colors.
+            tints_changed: true,
+            ticks: 0,
             ready: FxHashSet::default(),
             order: Vec::new(),
             order_center: IVec3::ZERO,
@@ -169,6 +281,7 @@ impl ClientWorld {
             next_version: 0,
             next_rev: 0,
             wire_dirty: Default::default(),
+            wire_seen: false,
             filler: content()
                 .states
                 .iter()
@@ -177,6 +290,8 @@ impl ClientWorld {
             columns: FxHashMap::default(),
             tints_dirty: FxHashSet::default(),
             bounded: false,
+            body_glow: FxHashMap::default(),
+            glow: Default::default(),
             bounds: None,
             batches: Vec::new(),
             open: None,
@@ -191,8 +306,27 @@ impl ClientWorld {
         ClientWorld { bounded: true, ..ClientWorld::new(dim) }
     }
 
-    /// Recomputes `bounds` from the blocks (structures, after their cubes changed).
-    pub fn scan_bounds(&mut self) {
+    pub(super) fn apply_update(&mut self, update: super::terrain::Out) {
+        use super::terrain::Out;
+        match update {
+            Out::Cube { pos, cube, around } => self.insert(pos, cube, around),
+            Out::Blocks(changes, extras) => {
+                for (pos, state) in changes {
+                    self.set_block(pos, state);
+                }
+                for (pos, parts) in extras {
+                    self.set_layout(pos, parts);
+                }
+            }
+            Out::Unload(pos) => self.remove(pos),
+            Out::Range { lo, hi } => self.set_range(lo, hi),
+        }
+        if self.bounded {
+            self.scan_bounds();
+        }
+    }
+
+    pub(super) fn scan_bounds(&mut self) {
         self.bounds = crate::world::block_bounds(self.cubes.iter().map(|(p, s)| (p, &*s.cube)));
     }
 
@@ -224,18 +358,42 @@ impl ClientWorld {
     /// Above the camera a cube not here yet is taken for air: those are the new top of the view
     /// while rising, nearly always sky. Nothing but air all the way down means the same, unless
     /// the land lies under what the view reaches, seen from high up: that is left to distant terrain.
-    pub fn column_shown(&self, col: IVec2, seed: u64) -> bool {
+    /// `ground` (chiacraft, test only): the column's height in an imported world, which our
+    /// generator's (`DimensionDef::column`) knows nothing of.
+    /// (Weft takes a `through: bool` here, translucent blocks counted as air when asked; ours keeps
+    /// the imported ground and counts liquid as air always, as our far terrain asks.)
+    pub fn column_shown(&self, col: IVec2, seed: u64, ground: Option<i32>) -> bool {
         let lo = self.range.0;
         let def = &crate::content::content().dims[self.dim as usize];
-        let land_below = || {
-            def.column(seed, col.x * 16 + 8, col.y * 16 + 8)
-                .is_some_and(|c| c.height >> 4 < lo)
+        let land_below = || match ground {
+            Some(h) => h >> 4 < lo,
+            None => def
+                .column(seed, col.x * 16 + 8, col.y * 16 + 8)
+                .is_some_and(|c| c.height >> 4 < lo),
+        };
+        // chiacraft: a cube of nothing but liquid and air is seen through, as air is: its ground is
+        // further down. Taken for ground, a lake's column handed distant terrain over while the cube
+        // with its bed hadn't come, and through the near water the fog showed, a pale band across the
+        // bay where near water met far (stage 1, vanilla + DH, 11-06).
+        let c = crate::content::content();
+        let see_through = |cube: &crate::world::Cube| {
+            cube.uniform_state() == Some(AIR)
+                || cube.palette().iter().all(|&st| {
+                    st == AIR
+                        || c.states
+                            .get(st as usize)
+                            .is_some_and(|i| i.liquid.is_some())
+                })
         };
         shows_ground(self.range, self.eye, land_below, |y| {
             self.cubes
                 .get(&IVec3::new(col.x, y, col.y))
-                .map(|s| (s.shown, s.cube.uniform_state() == Some(AIR), s.sky & ABOVE != 0))
+                .map(|s| (s.shown, see_through(&s.cube), s.sky & ABOVE != 0))
         })
+    }
+
+    pub(super) fn lod_range(&self) -> (i32, i32) {
+        self.range
     }
 
     /// Columns whose `column_shown` may have changed since the last call.
@@ -247,11 +405,47 @@ impl ClientWorld {
         self.cubes.len()
     }
 
+    /// Whether rain, when it rains, falls in the column at `p`: in its biome, if a mod says where.
+    pub fn rains_at(&self, p: IVec3) -> bool {
+        let Some(only) = &self.rain_in else { return true };
+        let biome = self
+            .cube(p >> 4i32)
+            .map_or(0, |c| c.biome((p.x & 15) as usize, (p.z & 15) as usize));
+        only.contains(&(biome as u32))
+    }
+
+    /// What a mod says the air in the biome at `p` is (`ToClient::Air`): fog 0..1, wind m/s, snow
+    /// lying 0..1 and `air_flags`; clear, still and bare if it says nothing.
+    pub fn air_at(&self, p: IVec3) -> (f32, f32, f32, u32) {
+        let biome = self
+            .cube(p >> 4i32)
+            .map_or(0, |c| c.biome((p.x & 15) as usize, (p.z & 15) as usize)) as u32;
+        self.air
+            .0
+            .binary_search_by_key(&biome, |a| a.0)
+            .map_or((0.0, 0.0, 0.0, 0), |i| {
+                let a = self.air.0[i];
+                (a.1, a.2, a.3, a.4)
+            })
+    }
+
     pub fn cube(&self, p: IVec3) -> Option<&Arc<Cube>> {
         self.cubes.get(&p).map(|s| &s.cube)
     }
 
+    /// The biome of the column a block is in, if its cube is here.
+    pub fn biome_at(&self, p: IVec3) -> Option<u16> {
+        self.cube(p >> 4i32)
+            .map(|cube| cube.biome((p.x & 15) as usize, (p.z & 15) as usize))
+    }
+
     /// With a number that changes whenever its blocks do (`Slot::rev`).
+    /// Changes whenever any cube comes, goes or changes (light too): nothing to look at again
+    /// while it stays the same.
+    pub fn revision(&self) -> u32 {
+        self.next_rev
+    }
+
     pub fn cube_rev(&self, p: IVec3) -> Option<(&Arc<Cube>, u32)> {
         self.cubes.get(&p).map(|s| (&s.cube, s.rev))
     }
@@ -313,11 +507,14 @@ impl ClientWorld {
     pub fn clear(&mut self) {
         self.removed.extend(self.cubes.keys().copied());
         self.cubes.clear();
+        self.exhaust.clear();
         self.ready.clear();
         self.changed_columns.clear();
         self.columns.clear();
         self.tints_dirty.clear();
         self.batches.clear();
+        self.body_glow.clear();
+        self.glow = Default::default();
     }
 
     /// Starts collecting what arrives into one batch; `whole`: shown once all of it is meshed
@@ -348,6 +545,7 @@ impl ClientWorld {
         let cubes = &self.cubes;
         let masks: Vec<(IVec3, u32)> = resent
             .par_iter()
+            .with_min_len(PAR_MIN)
             .filter_map(|(p, old)| {
                 cubes
                     .get(p)
@@ -358,6 +556,7 @@ impl ClientWorld {
         b.touched.extend(masks);
         let mut members: Vec<IVec3> = std::mem::take(&mut b.touched)
             .into_par_iter()
+            .with_min_len(PAR_MIN)
             .flat_map_iter(|(p, mask)| around(p, mask))
             .filter(|p| self.cubes.contains_key(p))
             .collect();
@@ -371,6 +570,7 @@ impl ClientWorld {
         let cubes = &self.cubes;
         let todo: Vec<(IVec3, Option<bool>)> = members
             .par_iter()
+            .with_min_len(PAR_MIN)
             .map(|&p| {
                 let new_air = cubes[&p].cube.uniform_state() == Some(AIR)
                     && fresh
@@ -422,7 +622,11 @@ impl ClientWorld {
 
     /// `around`: the cubes around it not to wait for.
     pub fn insert(&mut self, pos: IVec3, cube: Arc<Cube>, around: super::terrain::Around) {
-        if self.has_wire(&cube) || self.cubes.get(&pos).is_some_and(|s| self.has_wire(&s.cube)) || self.wire_around(pos) {
+        self.glow.changed(pos);
+        self.index_exhaust(pos, &cube);
+        let wired = self.has_wire(&cube);
+        self.wire_seen |= wired;
+        if wired || self.wire_around(pos) {
             self.wire_dirty.insert(pos);
         }
         let (hidden, sky) = (around.hidden, around.sky);
@@ -432,8 +636,11 @@ impl ClientWorld {
             fresh = true;
             Column { biomes: None, cubes: 0 }
         });
-        if fresh || column.biomes.is_none() && cube.biomes.is_some() {
-            column.biomes = column.biomes.take().or_else(|| cube.biomes.clone());
+        // A cube the server sent sets the column's biomes over one this client made (in an
+        // imported world they differ: chiacraft::mc_import; elsewhere both are the generator's).
+        let theirs = around.from_server && cube.biomes.is_some() && column.biomes != cube.biomes;
+        if fresh || theirs || column.biomes.is_none() && cube.biomes.is_some() {
+            column.biomes = if theirs { cube.biomes.clone() } else { column.biomes.take().or_else(|| cube.biomes.clone()) };
             for dz in -1..=1 {
                 for dx in -1..=1 {
                     self.tints_dirty.insert(col + IVec2::new(dx, dz));
@@ -474,14 +681,44 @@ impl ClientWorld {
     }
 
     fn has_wire(&self, cube: &Cube) -> bool {
-        let c = crate::content::content();
-        cube.palette()
-            .iter()
-            .any(|&s| c.states[s as usize].signal.kind == weft_abi::signal_kind::WIRE)
+        crate::wire::has_wire(crate::content::content(), cube)
     }
 
-    /// Whether this cube or one next to it has wire.
+    fn index_exhaust(&mut self, cube_pos: IVec3, cube: &Cube) {
+        let c = content();
+        if !cube.palette().iter().any(|&state| emits_exhaust(c, state)) {
+            self.exhaust.remove(&cube_pos);
+            return;
+        }
+        let cells = self.exhaust.entry(cube_pos).or_default();
+        cells.clear();
+        for i in 0..crate::world::cube::VOLUME {
+            if emits_exhaust(c, cube.get(i)) {
+                let p = crate::world::cube::offset(i);
+                cells.push((cube_pos << 4) + p);
+            }
+        }
+    }
+
+    pub(super) fn exhausts(&self, eye: glam::DVec3, range: f64) -> impl Iterator<Item = (IVec3, crate::content::Signal)> + '_ {
+        let c = content();
+        self.exhaust
+            .iter()
+            .filter(move |(at, _)| {
+                let min = (**at << 4i32).as_dvec3();
+                let nearest = eye.clamp(min, min + glam::DVec3::splat(16.0));
+                eye.distance_squared(nearest) < range * range
+            })
+            .flat_map(|(_, cells)| cells)
+            .map(|&p| (p, c.states[self.block(p) as usize].signal))
+    }
+
+    /// Whether this cube or one next to it has wire. Most worlds have none, and asking for all the
+    /// neighbors of each cube coming and going was a tenth of a frame while flying.
     fn wire_around(&self, pos: IVec3) -> bool {
+        if !self.wire_seen {
+            return false;
+        }
         std::iter::once(IVec3::ZERO)
             .chain(crate::world::DIRS)
             .any(|d| {
@@ -492,10 +729,12 @@ impl ClientWorld {
     }
 
     pub fn remove(&mut self, pos: IVec3) {
+        self.exhaust.remove(&pos);
         if self.wire_around(pos) {
             self.wire_dirty.insert(pos);
         }
         if let Some(slot) = self.cubes.remove(&pos) {
+            self.next_rev += 1;
             self.unloaded.push(slot);
             let col = IVec2::new(pos.x, pos.z);
             if let Some(c) = self.columns.get_mut(&col) {
@@ -525,16 +764,27 @@ impl ClientWorld {
 
     pub fn set_block(&mut self, p: IVec3, state: u32) {
         let cp = cube_of(p);
+        self.glow.changed(cp);
         let Some(slot) = self.cubes.get_mut(&cp) else { return };
         // The shape of wire near it may depend on it, if it is more than a gate going on or off.
         let c = crate::content::content();
-        let (old, new) = (&c.states[slot.cube.get(local_index(p)) as usize], &c.states[state as usize]);
-        let same_shape = old.block == new.block
-            && old.signal.kind != weft_abi::signal_kind::WIRE
-            && old.signal.front == new.signal.front
-            && old.signal.attach == new.signal.attach;
+        let previous = slot.cube.get(local_index(p));
+        let (old, new) = (&c.states[previous as usize], &c.states[state as usize]);
+        match (emits_exhaust(c, previous), emits_exhaust(c, state)) {
+            (false, true) => self.exhaust.entry(cp).or_default().push(p),
+            (true, false) => {
+                if let std::collections::hash_map::Entry::Occupied(mut entry) = self.exhaust.entry(cp) {
+                    entry.get_mut().retain(|&cell| cell != p);
+                    if entry.get().is_empty() {
+                        entry.remove();
+                    }
+                }
+            }
+            _ => {}
+        }
         let wire = weft_abi::signal_kind::WIRE;
-        if !same_shape && (old.signal.kind == wire || new.signal.kind == wire || self.wire_around(cp)) {
+        self.wire_seen |= new.signal.kind == wire;
+        if !crate::wire::same_shape(old, new) && (old.signal.kind == wire || new.signal.kind == wire || self.wire_around(cp)) {
             self.wire_dirty.insert(cp);
         }
         let Some(slot) = self.cubes.get_mut(&cp) else { return };
@@ -546,23 +796,86 @@ impl ClientWorld {
         }
         let l = p & 15;
         self.touch(cp, around_mask(l.x, l.y, l.z));
-        // Its light with it, not when the server's word on that comes: a block broken doesn't
-        // leave a dark hole for a moment. What the server says after is the same. A moving
-        // structure's light is its own.
-        if !self.bounded {
-            let sky = c.dims[self.dim as usize].sky_light;
-            let mut map = LitCubes(&mut self.cubes);
-            let mut lighter = Lighter::new(&mut map, c, sky);
-            lighter.block_changed(p, was);
-            let changed = std::mem::take(&mut lighter.changed);
-            for n in changed {
-                self.next_rev += 1;
-                if let Some(slot) = self.cubes.get_mut(&n) {
-                    (slot.rev, slot.stamp) = (self.next_rev, self.next_rev);
-                }
-                self.touch(n, ALL_AROUND);
+        self.relight_at(p, Some(was));
+    }
+
+    /// Cubes whose light the client changed, to draw again.
+    pub(super) fn relit(&mut self, changed: Vec<IVec3>) {
+        for n in changed {
+            self.next_rev += 1;
+            if let Some(slot) = self.cubes.get_mut(&n) {
+                (slot.rev, slot.stamp) = (self.next_rev, self.next_rev);
             }
+            self.touch(n, ALL_AROUND);
         }
+    }
+
+    /// What else is in the cell at `p`.
+    pub fn extras(&self, p: IVec3) -> &[u32] {
+        &self.layout(p).extras
+    }
+
+    pub fn layout(&self, p: IVec3) -> &CellLayout {
+        self.cubes
+            .get(&cube_of(p))
+            .map_or(&crate::world::placement::EMPTY_LAYOUT, |slot| slot.cube.layout(local_index(p)))
+    }
+
+    /// What else is in the cell at `p` is now `extras`.
+    pub fn set_layout(&mut self, p: IVec3, layout: CellLayout) {
+        let cp = cube_of(p);
+        self.glow.changed(cp);
+        let Some(slot) = self.cubes.get_mut(&cp) else { return };
+        if slot.cube.layout(local_index(p)) == &layout {
+            return;
+        }
+        let c = content();
+        let i = local_index(p);
+        let relight = !slot
+            .cube
+            .light_material(c, i)
+            .same_light(&layout.light(c, slot.cube.get(i)));
+        let wire = |s: u32| c.states[s as usize].signal.kind == weft_abi::signal_kind::WIRE;
+        let main = slot.cube.get(local_index(p));
+        let wires = slot
+            .cube
+            .layout(local_index(p))
+            .residents(main)
+            .chain(layout.residents(main))
+            .any(|v| wire(v.state));
+        self.wire_seen |= wires;
+        if self.wire_seen {
+            self.wire_dirty.insert(cp);
+        }
+        Arc::make_mut(&mut slot.cube).set_layout(local_index(p), layout);
+        self.next_rev += 1;
+        (slot.rev, slot.stamp) = (self.next_rev, self.next_rev);
+        let l = p & 15;
+        self.touch(cp, around_mask(l.x, l.y, l.z));
+        if relight {
+            self.relight_at(p, None);
+        }
+    }
+
+    fn relight_at(&mut self, pos: IVec3, old: Option<u32>) {
+        use crate::world::light::{self, Sky};
+        let c = content();
+        let sky = Sky::local(self.bounded, c.dims[self.dim as usize].sky_light);
+        let changed = light::relight(&mut LitCubes(&mut self.cubes), c, sky, &self.body_glow, pos, old);
+        self.relit(changed);
+    }
+
+    /// One block of the cell at `p` becomes another state, as the server does it (`Dim::replace_part`):
+    /// what the client shows of breaking it, not waiting to hear.
+    pub fn replace_part(&mut self, p: IVec3, old: u32, new: u32) {
+        let c = content();
+        let is_liquid = |s: u32| c.states[s as usize].liquid.is_some();
+        let was = self.block(p);
+        let Some((main, extras)) = crate::world::cube::cell_after(was, self.extras(p), old, new, is_liquid) else { return };
+        if main != was {
+            self.set_block(p, main);
+        }
+        self.set_layout(p, CellLayout { extras, ..CellLayout::EMPTY });
     }
 
     /// Remeshes every cube, e.g. after textures were reloaded.
@@ -570,6 +883,47 @@ impl ClientWorld {
         let all: Vec<IVec3> = self.cubes.keys().copied().collect();
         for p in all {
             self.touch(p, 1 << 13);
+        }
+    }
+
+    /// Every biome's tint colors from now on (`tints`, empty or of the wrong length: the
+    /// content's); every column is blended again.
+    pub fn set_tints(&mut self, tints: Vec<u32>) {
+        let c = content();
+        let ok = !c.biomes.is_empty() && tints.len() == c.biomes.len() * c.tint_kinds.len();
+        let tints = ok.then_some(tints);
+        if tints != self.tints {
+            self.tints = tints;
+            self.tints_changed = true;
+            self.retint_all();
+        }
+    }
+
+    /// Every biome's tint colors, biome by biome: the mod's or the content's.
+    pub fn biome_tints(&self) -> Vec<u32> {
+        let c = content();
+        match &self.tints {
+            Some(t) => t.clone(),
+            None if c.biomes.is_empty() => c.tint_kinds.iter().map(|k| k.1).collect(),
+            None => c
+                .biomes
+                .iter()
+                .flat_map(|b| b.tints.iter().copied())
+                .collect(),
+        }
+    }
+
+    /// Biome `biome`'s color of tint kind `kind` now: the mod's (`set_tints`) or the content's.
+    pub fn biome_tint(&self, biome: u32, kind: u32) -> Option<u32> {
+        let c = content();
+        let kinds = c.tint_kinds.len();
+        match &self.tints {
+            Some(t) => t.get(biome as usize * kinds + kind as usize).copied(),
+            None => c
+                .biomes
+                .get(biome as usize)
+                .and_then(|b| b.tints.get(kind as usize))
+                .copied(),
         }
     }
 
@@ -621,11 +975,11 @@ impl ClientWorld {
         for gz in 0..W {
             for gx in 0..W {
                 let id = biome_at(gx as i32 - BLEND, gz as i32 - BLEND) as usize;
-                let tints = c
-                    .biomes
-                    .get(id)
-                    .or(c.biomes.first())
-                    .map_or(&defaults[..], |b| &b.tints[..]);
+                let id = if id < c.biomes.len() { id } else { 0 };
+                let tints = match &self.tints {
+                    Some(t) => &t[id * k..(id + 1) * k],
+                    None => c.biomes.get(id).map_or(&defaults[..], |b| &b.tints[..]),
+                };
                 for (t, rgb) in tints.iter().enumerate() {
                     line[gx * k + t] = [rgb >> 16 & 255, rgb >> 8 & 255, rgb & 255];
                 }
@@ -670,6 +1024,11 @@ impl ClientWorld {
 
     /// The block, `None` while its cube has not arrived; outside the dimension's height there are
     /// no cubes, only air.
+    pub fn seen(&self, p: IVec3) -> u32 {
+        let main = self.block(p);
+        if main == AIR { self.layout(p).covers.first().map_or(AIR, |v| v.state) } else { main }
+    }
+
     pub fn block_or_air(&self, p: IVec3) -> Option<u32> {
         let s = self.block(p);
         if s != u32::MAX {
@@ -681,9 +1040,24 @@ impl ClientWorld {
     }
 
     pub fn light(&self, p: IVec3) -> u32 {
+        self.light_loaded(p).unwrap_or(15)
+    }
+
+    /// `light` for what asks whether there is anything there at all.
+    pub fn light_loaded(&self, p: IVec3) -> Option<u32> {
         self.cubes
             .get(&cube_of(p))
-            .map_or(15, |s| s.cube.light(local_index(p)))
+            .map(|s| s.cube.light(local_index(p)))
+    }
+
+    pub fn body_glow_changed(&mut self, cells: Vec<(IVec3, [u8; 3])>) {
+        for (p, v) in cells {
+            if v == [0; 3] {
+                self.body_glow.remove(&p);
+            } else {
+                self.body_glow.insert(p, v);
+            }
+        }
     }
 
     /// Starts meshing jobs for dirty cubes nearest to `center` first.
@@ -752,20 +1126,21 @@ impl ClientWorld {
         }
         // What each job takes from the world, gathered on every core: thousands start a frame
         // while loading.
-        let cubes = &self.cubes;
-        let jobs: Vec<(IVec3, [Option<Arc<Cube>>; 27], u32, u32)> = start
+        let (cubes, glow) = (&self.cubes, &self.glow);
+        let jobs: Vec<(IVec3, [Option<Arc<Cube>>; 27], u32, u32, Vec<(usize, [u8; 3])>)> = start
             .par_iter()
+            .with_min_len(PAR_MIN)
             .map(|&pos| {
                 let around = std::array::from_fn(|i| {
                     cubes
-                        .get(&(pos + IVec3::new(i as i32 % 3 - 1, i as i32 / 9 - 1, i as i32 / 3 % 3 - 1)))
+                        .get(&(pos + crate::world::cube::around(i as i32)))
                         .map(|s| s.cube.clone())
                 });
                 let s = &cubes[&pos];
-                (pos, around, s.version, s.hidden)
+                (pos, around, s.version, s.hidden, glow_around(glow, pos))
             })
             .collect();
-        for (pos, around, version, hidden) in jobs {
+        for (pos, around, version, hidden, glow) in jobs {
             let tx = self.tx.clone();
             let filler = self.filler;
             let ctm = super::ctm::current();
@@ -779,7 +1154,7 @@ impl ClientWorld {
                 let mesh = if empty {
                     mesher::Mesh::default()
                 } else {
-                    mesher::build(content(), &neighborhood(&around, hidden, filler, pos), &ctm)
+                    mesher::build(content(), &neighborhood(&around, hidden, filler, pos, &glow), &ctm)
                 };
                 crate::diag::MESHED.add(1);
                 crate::diag::MESH_NS.add(t.elapsed().as_nanos() as u64);
@@ -840,6 +1215,17 @@ impl ClientWorld {
             .is_some_and(|s| s.version == r.version)
     }
 
+    pub(super) fn mesh_pending(&self, pos: IVec3) -> bool {
+        self.cubes.get(&pos).is_some_and(|slot| slot.dirty)
+            || self.in_flight.contains(&pos)
+            || self.batches.iter().any(|batch| {
+                batch
+                    .results
+                    .iter()
+                    .any(|mesh| mesh.pos == pos && self.current(mesh))
+            })
+    }
+
     /// Jobs running plus dirty cubes that could be meshed now (edge cubes wait for neighbors
     /// that may never come and are not counted).
     pub fn pending_meshes(&self) -> usize {
@@ -856,7 +1242,27 @@ fn around(pos: IVec3, mask: u32) -> impl Iterator<Item = IVec3> {
 
 const BORDER_ROW: [i32; 18] = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
-fn neighborhood(around: &[Option<Arc<Cube>>; 27], hidden: u32, filler: u32, pos: IVec3) -> Neighborhood {
+/// The entities' light (`glow`) in a cube and the blocks around it, by padded index.
+fn glow_around(glow: &super::glow::Glow, pos: IVec3) -> Vec<(usize, [u8; 3])> {
+    if !(0..27).any(|i| glow.cubes.contains(&(pos + crate::world::cube::around(i)))) {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for y in -1..17 {
+        for z in -1..17 {
+            for x in -1..17 {
+                if let Some(l) = glow.cells.get(&(pos * 16 + IVec3::new(x, y, z))) {
+                    out.push((pidx(x, y, z), *l));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// What meshing reads around a cube: its blocks and the border's, their light with the
+/// entities' (`glow`) taken where it is brighter.
+fn neighborhood(around: &[Option<Arc<Cube>>; 27], hidden: u32, filler: u32, pos: IVec3, glow: &[(usize, [u8; 3])]) -> Neighborhood {
     let mut states = Box::new([AIR; PAD_VOLUME]);
     let mut light = Box::new([15u32; PAD_VOLUME]);
     let mut biomes = [0u16; 256];
@@ -866,6 +1272,13 @@ fn neighborhood(around: &[Option<Arc<Cube>>; 27], hidden: u32, filler: u32, pos:
             biomes[z * 16 + x] = center.biome(x, z);
         }
     }
+    let mut extras: FxHashMap<usize, CellLayout> = center
+        .layouts()
+        .map(|(i, parts)| {
+            let at = crate::world::cube::offset(i);
+            (pidx(at.x, at.y, at.z), parts.clone())
+        })
+        .collect();
     // The cube itself whole, a row at a time; the border from its neighbors block by block.
     let mut own = [0u32; crate::world::cube::VOLUME];
     center.decode(&mut own);
@@ -910,7 +1323,7 @@ fn neighborhood(around: &[Option<Arc<Cube>>; 27], hidden: u32, filler: u32, pos:
                     if face && hidden & (1 << (cy * 9 + cz * 3 + cx)) != 0 {
                         let pi = pidx(x, y, z);
                         states[pi] = filler;
-                        light[pi] = 0;
+                        light[pi] = super::mesher::ABSENT;
                     }
                     continue;
                 };
@@ -918,10 +1331,18 @@ fn neighborhood(around: &[Option<Arc<Cube>>; 27], hidden: u32, filler: u32, pos:
                 let pi = pidx(x, y, z);
                 states[pi] = cube.get(li);
                 light[pi] = cube.light(li);
+                if cube.layout(li) != &crate::world::placement::EMPTY_LAYOUT {
+                    extras.insert(pi, cube.layout(li).clone());
+                }
             }
         }
     }
-    Neighborhood { states, light, biomes, origin: (pos * 16).to_array() }
+    for &(i, g) in glow {
+        if light[i] != mesher::ABSENT {
+            light[i] = super::glow::with_glow(light[i], g);
+        }
+    }
+    Neighborhood { states, extras, light, biomes, origin: (pos * 16).to_array() }
 }
 
 /// A cube's bit for the cube above it, in `cube::around_mask` order.
@@ -1010,7 +1431,7 @@ mod tests {
             *slot = Some(Arc::new(cube));
         }
         let hidden = 1 << 4 | 1 << 22;
-        let n = neighborhood(&around, hidden, 9, IVec3::ZERO);
+        let n = neighborhood(&around, hidden, 9, IVec3::ZERO, &[]);
         for y in -1..17i32 {
             for z in -1..17i32 {
                 for x in -1..17i32 {
@@ -1029,7 +1450,9 @@ mod tests {
                             let i = crate::world::cube::index((x & 15) as usize, (y & 15) as usize, (z & 15) as usize);
                             (cube.get(i), cube.light(i))
                         }
-                        None if [c(x), c(y), c(z)].iter().filter(|&&v| v != 1).count() == 1 && hidden & (1 << k) != 0 => (9, 0),
+                        None if [c(x), c(y), c(z)].iter().filter(|&&v| v != 1).count() == 1 && hidden & (1 << k) != 0 => {
+                            (9, crate::client::mesher::ABSENT)
+                        }
                         None => (AIR, 15),
                     };
                     assert_eq!((n.states[pidx(x, y, z)], n.light[pidx(x, y, z)]), (s, l), "at {x} {y} {z}");

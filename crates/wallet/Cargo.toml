@@ -70,7 +70,9 @@ chain = [
 ]
 # `chain::sim` and the `chain-sim` example: the simulator for horizon-client's admission tests and
 # the checks (never a real network).
-sim = ["chain", "dep:chia-sdk-test"]
+sim = ["chain", "tool", "dep:chia-sdk-test"]
+# The live test tool (`chain::tool`, ~800 lines) and its binary: not in the game.
+tool = ["chain"]
 
 [[example]]
 name = "chain-sim"
@@ -80,7 +82,7 @@ required-features = ["sim"]
 [[bin]]
 name = "chiacraft-wallet-test"
 path = "src/bin/chiacraft-wallet-test.rs"
-required-features = ["chain"]
+required-features = ["tool"]
 
 [dev-dependencies]
 chia-sdk-test = { version = "0.37.1", features = ["peer-simulator"] }

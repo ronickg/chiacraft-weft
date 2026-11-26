@@ -1,0 +1,19 @@
+{
+ "kind": "sky",
+ "what": "four moon phases in a 2 x 2 grid, each 32 x 32 with the disc 24 px across: full (top left), waning gibbous (top right), third quarter (bottom left), waning crescent (bottom right); a pale blue-white disc with soft grey craters, the same disc and position in every phase, the shadow side near-black navy",
+ "size": [
+  64,
+  64
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.476,
+   "outline": 1.27,
+   "red_line": 0.0,
+   "fill": 0.43,
+   "passed": true
+  }
+ ]
+}

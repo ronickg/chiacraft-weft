@@ -1,0 +1,11 @@
+{
+ "kind": "base:pickaxe",
+ "layer": "haft",
+ "style": "plain",
+ "override": true,
+ "socket": [
+  13.3,
+  16.6
+ ],
+ "note": "moved so this socket meets the head's anchor"
+}

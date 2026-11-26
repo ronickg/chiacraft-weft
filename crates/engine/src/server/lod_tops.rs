@@ -1,0 +1,726 @@
+//! What distant terrain needs of the cubes that are saved: the rest generates the same again, so
+//! the client's tiles take it from the terrain formula, and only columns whose saved cubes make
+//! them differ from it (a town, a crater, a tower) are kept here and sent. Per saved cube, the
+//! runs of each column's blocks with the block light by them; a column's ground then comes from
+//! those and the formula for the cubes of it that aren't saved, and what stands above the ground
+//! is sent as spans.
+
+use std::collections::BTreeMap;
+use std::path::Path;
+use std::sync::Arc;
+
+use crossbeam_channel::Receiver;
+use glam::{IVec2, IVec3};
+use rustc_hash::{FxHashMap, FxHashSet};
+
+use weft_abi::BlockModel;
+use weft_abi::block_flags as bf;
+
+use crate::content::Content;
+use crate::features::Start;
+use crate::generation::Snapshot;
+use crate::world::Cube;
+use crate::world::cube::index;
+
+/// One block's vertical run, inclusive, and the block light by it (`abi::light` without the sky,
+/// a byte a channel).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Span {
+    pub bottom: i32,
+    pub top: i32,
+    pub block: u32,
+    pub light: u32,
+}
+
+/// A column that differs from the terrain: its ground's height, top block, the one under it and
+/// the light on it, and what stands above the ground. `top` `u32::MAX`: as the terrain says
+/// again; 0: the terrain's ground, only spans or light of its own.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct LodColumn {
+    pub x: i32,
+    pub z: i32,
+    pub y: i32,
+    pub top: u32,
+    pub under: u32,
+    pub light: u32,
+    pub spans: Vec<Span>,
+    /// Grid features edited in the saved cubes, keyed by the feature's grid origin.
+    pub removed_scatter: Vec<u32>,
+}
+
+/// The cubes beside one, -x, +x, -z, +z, as far as they are loaded: the light at its sides.
+pub type Around = [Option<Arc<Cube>>; 4];
+
+/// A saved cube's columns: the runs that make each, low to high, local to the cube (0..15).
+#[derive(Clone, PartialEq, Eq)]
+struct CubeTops {
+    /// `at[i]..at[i + 1]` of `runs` is column `i`.
+    at: Box<[u16; 257]>,
+    runs: Vec<Span>,
+    /// chiacraft: a bit per column whose drawn blocks aren't as generation made them (`check`).
+    /// Only those are sent: a cube is saved for an animal in it or a timer too, and our
+    /// decorations change the ground the formula gives (leaf litter, gravel, ponds), so its
+    /// untouched columns differ from the formula without anyone having built there.
+    differs: [u64; 4],
+    /// `differs` is worked out for these runs (else it is the last cube's, and a check is due).
+    checked: bool,
+}
+
+impl CubeTops {
+    fn column(&self, i: usize) -> &[Span] {
+        &self.runs[self.at[i] as usize..self.at[i + 1] as usize]
+    }
+
+    fn differs(&self, i: usize) -> bool {
+        self.differs[i / 64] >> (i % 64) & 1 != 0
+    }
+
+    fn same_runs(&self, other: &CubeTops) -> bool {
+        self.at == other.at && self.runs == other.runs
+    }
+
+    /// Which columns aren't as in `generated` (light aside).
+    fn differs_from(&self, generated: &CubeTops) -> [u64; 4] {
+        let mut m = [0u64; 4];
+        for i in 0..256 {
+            let (a, b) = (self.column(i), generated.column(i));
+            if a.len() != b.len()
+                || a.iter()
+                    .zip(b)
+                    .any(|(a, b)| (a.bottom, a.top, a.block) != (b.bottom, b.top, b.block))
+            {
+                m[i / 64] |= 1 << (i % 64);
+            }
+        }
+        m
+    }
+}
+
+/// chiacraft: the cube at `pos` as generation makes it, its runs.
+fn generated_tops(c: &Content, dim: u32, seed: u64, pos: IVec3) -> CubeTops {
+    tops_of(c, &super::dim::generate(c, dim, seed, pos), &[None, None, None, None])
+}
+
+/// chiacraft: where saved cubes are generated again for `DimTops::check`: one thread at low
+/// priority, so a teleport's hundreds of unloaded cubes don't hold up loading the new place on
+/// `background` (the far columns can wait).
+fn checking() -> &'static rayon::ThreadPool {
+    static POOL: crate::Pool = crate::Pool::new();
+    crate::pool(&POOL, "lod checks", 1, true)
+}
+
+/// chiacraft: a saved cube's runs checked against generation in the background (`DimTops::check`).
+struct Checked {
+    pos: IVec3,
+    tops: Arc<CubeTops>,
+    differs: [u64; 4],
+}
+
+struct Checks {
+    tx: crossbeam_channel::Sender<Checked>,
+    rx: Receiver<Checked>,
+}
+
+impl Default for Checks {
+    fn default() -> Self {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        Checks { tx, rx }
+    }
+}
+
+/// Runs kept per column of one cube, the highest. A wall is one run; the rest is trim and a roof.
+const MAX_RUNS: usize = 6;
+/// Spans sent for one column, the highest of them.
+const MAX_SPANS: usize = 8;
+const MAGIC: &[u8] = b"LOD5";
+
+/// A dimension's saved cubes' runs, by cube column then cube height.
+#[derive(Default)]
+pub struct DimTops {
+    cubes: Arc<FxHashMap<IVec2, BTreeMap<i32, Arc<CubeTops>>>>,
+    /// Columns that differ from the terrain, as last worked out.
+    pub columns: FxHashMap<IVec2, LodColumn>,
+    /// Columns that changed since `take_changed`.
+    changed: Vec<IVec2>,
+    edited_scatter: FxHashMap<IVec2, Vec<u32>>,
+    rebuild: Rebuild,
+    dirty: bool,
+    checks: Checks,
+}
+
+#[derive(Default)]
+enum Rebuild {
+    #[default]
+    Ready,
+    Deferred,
+    Running {
+        done: Receiver<Rebuilt>,
+        /// Cubes saved since the worker took its snapshot.
+        saved: FxHashSet<IVec3>,
+        _keep_running: Arc<()>,
+    },
+}
+
+struct Rebuilt {
+    columns: FxHashMap<IVec2, LodColumn>,
+    edited_scatter: FxHashMap<IVec2, Vec<u32>>,
+}
+
+/// Solid and opaque, or a liquid: the ground from afar. A window or a stair is not.
+pub fn shows(c: &Content, s: u32) -> bool {
+    let Some(st) = c.states.get(s as usize) else { return false };
+    s != 0 && (st.liquid.is_some() || (st.solid() && st.flags & bf::OPAQUE != 0))
+}
+
+/// Solid-volume geometry that distant terrain can represent as a column.
+fn drawn(c: &Content, s: u32) -> bool {
+    let Some(st) = c.states.get(s as usize) else { return false };
+    st.liquid.is_some()
+        || (s != 0
+            && st.flags & bf::REPLACEABLE == 0
+            && st.model == BlockModel::Boxes
+            && st.boxes.iter().any(|b| (0..3).all(|i| b.max[i] > b.min[i])))
+}
+
+pub(crate) fn impostor_block(c: &Content, s: u32) -> bool {
+    drawn(c, s) && c.states[s as usize].liquid.is_none() && c.states[s as usize].sides == 0
+}
+
+/// Each channel the brighter of the two.
+fn brighter(a: u32, b: u32) -> u32 {
+    (0..24)
+        .step_by(8)
+        .fold(0, |l, s| l | ((a >> s) & 0xFF).max((b >> s) & 0xFF) << s)
+}
+
+/// The block light by the run from `lo` to `hi` of column (`x`, `z`): of its cells and the ones
+/// beside them, in the cubes around too.
+fn light_by(cube: &Cube, around: &Around, x: usize, z: usize, lo: usize, hi: usize) -> u32 {
+    let at = |x: i32, y: usize, z: i32| {
+        let (cube, x, z) = match (x, z) {
+            (-1, _) => (around[0].as_deref(), 15, z),
+            (16, _) => (around[1].as_deref(), 0, z),
+            (_, -1) => (around[2].as_deref(), x, 15),
+            (_, 16) => (around[3].as_deref(), x, 0),
+            _ => (Some(cube), x, z),
+        };
+        cube.map_or(0, |c| c.light(index(x as usize, y, z as usize)) >> 8)
+    };
+    let mut l = 0;
+    for y in lo.saturating_sub(1)..=(hi + 1).min(15) {
+        for (dx, dz) in [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)] {
+            l = brighter(l, at(x as i32 + dx, y, z as i32 + dz));
+        }
+    }
+    l
+}
+
+fn tops_of(c: &Content, cube: &Cube, around: &Around) -> CubeTops {
+    let mut at = Box::new([0u16; 257]);
+    let mut runs = Vec::new();
+    for z in 0..16 {
+        for x in 0..16 {
+            at[z * 16 + x] = runs.len() as u16;
+            let mut column: Vec<Span> = Vec::new();
+            let mut y = 0;
+            while y < 16 {
+                let s = cube.get(index(x, y, z));
+                if !drawn(c, s) {
+                    y += 1;
+                    continue;
+                }
+                let lo = y;
+                while y < 16 && cube.get(index(x, y, z)) == s {
+                    y += 1;
+                }
+                column.push(Span { bottom: lo as i32, top: y as i32 - 1, block: s, light: light_by(cube, around, x, z, lo, y - 1) });
+            }
+            runs.extend_from_slice(&column[column.len().saturating_sub(MAX_RUNS)..]);
+        }
+    }
+    at[256] = runs.len() as u16;
+    CubeTops { at, runs, differs: [0; 4], checked: false }
+}
+
+impl DimTops {
+    /// A cube was saved as `cube`. Its columns are sent once `check` has found which of them
+    /// aren't as generated (`finish_checks`).
+    pub fn saved(&mut self, c: &Content, dim: u32, seed: u64, pos: IVec3, cube: &Cube, around: &Around) {
+        let mut tops = tops_of(c, cube, around);
+        let col = IVec2::new(pos.x, pos.z);
+        let old = self.cubes.get(&col).and_then(|list| list.get(&pos.y));
+        if old.is_some_and(|t| t.same_runs(&tops)) {
+            return;
+        }
+        // Until the check says otherwise, the columns that differed before.
+        tops.differs = old.map_or([0; 4], |t| t.differs);
+        let tops = Arc::new(tops);
+        Arc::make_mut(&mut self.cubes)
+            .entry(col)
+            .or_default()
+            .insert(pos.y, tops.clone());
+        self.dirty = true;
+        self.check(dim, seed, pos, tops);
+    }
+
+    /// chiacraft: generates the cube at `pos` again in the background, to find which columns of
+    /// `tops` aren't as generated.
+    fn check(&self, dim: u32, seed: u64, pos: IVec3, tops: Arc<CubeTops>) {
+        let tx = self.checks.tx.clone();
+        let scope = super::Scope::current().unwrap_or_else(super::Scope::now);
+        checking().spawn(move || {
+            scope.with(|| {
+                let differs = tops.differs_from(&generated_tops(scope.content, dim, seed, pos));
+                let _ = tx.send(Checked { pos, tops, differs });
+            })
+        });
+    }
+
+    /// chiacraft: takes in the finished checks and works out their cubes' columns again where
+    /// any differ.
+    pub fn finish_checks(&mut self, c: &Content, dim: u32, seed: u64) {
+        let mut done = Vec::new();
+        for Checked { pos, tops, differs } in self.checks.rx.try_iter() {
+            let col = IVec2::new(pos.x, pos.z);
+            // Saved again since: that save's own check follows.
+            if !self
+                .cubes
+                .get(&col)
+                .and_then(|list| list.get(&pos.y))
+                .is_some_and(|now| Arc::ptr_eq(now, &tops))
+            {
+                continue;
+            }
+            let before = tops.differs;
+            let mut now = (*tops).clone();
+            (now.differs, now.checked) = (differs, true);
+            let cubes = Arc::make_mut(&mut self.cubes);
+            let list = cubes.get_mut(&col).expect("checked above");
+            list.insert(pos.y, Arc::new(now));
+            self.dirty = true;
+            // An untouched cube under no touched column changes nothing sent.
+            if before != [0; 4] || list.values().any(|t| t.differs != [0; 4]) {
+                done.push(pos);
+            }
+        }
+        if done.is_empty() {
+            return;
+        }
+        match &mut self.rebuild {
+            Rebuild::Deferred => {}
+            Rebuild::Running { saved, .. } => saved.extend(done),
+            Rebuild::Ready => self.refresh_saved(c, dim, seed, done),
+        }
+    }
+
+    fn refresh_saved(&mut self, c: &Content, dim: u32, seed: u64, positions: impl IntoIterator<Item = IVec3>) {
+        let snap = Snapshot::new(c, dim, seed, u32::MAX);
+        let mut refresh = FxHashSet::default();
+        let mut checked = FxHashSet::default();
+        for pos in positions {
+            let col = IVec2::new(pos.x, pos.z);
+            refresh.insert(col);
+            for start in Self::scatter(snap, col) {
+                if (start.lo.y.div_euclid(16)..=start.hi.y.div_euclid(16)).contains(&pos.y) && checked.insert((start.feature, start.pos)) {
+                    self.update_scatter(snap, &start, &mut refresh);
+                }
+            }
+        }
+        for col in refresh {
+            self.refresh(c, dim, seed, col);
+        }
+    }
+
+    /// Build saved terrain only when someone enters this dimension.
+    pub fn request(&mut self, c: &'static Content, dim: u32, seed: u64) -> bool {
+        match self.rebuild {
+            Rebuild::Ready => return true,
+            Rebuild::Running { .. } => return false,
+            Rebuild::Deferred => {}
+        }
+        let (done_tx, done) = crossbeam_channel::bounded(1);
+        let keep_running = Arc::new(());
+        let alive = Arc::downgrade(&keep_running);
+        let mut snapshot = DimTops { cubes: self.cubes.clone(), ..DimTops::default() };
+        // chiacraft: cubes saved while their check ran (the game closed) are checked again; till
+        // then they count as they did before.
+        for (col, list) in self.cubes.iter() {
+            for (&y, tops) in list.iter().filter(|(_, t)| !t.checked) {
+                self.check(dim, seed, IVec3::new(col.x, y, col.y), tops.clone());
+            }
+        }
+        crate::background().spawn(move || {
+            let snap = Snapshot::new(c, dim, seed, u32::MAX);
+            let cols: Vec<_> = snapshot.cubes.keys().copied().collect();
+            let mut refresh = FxHashSet::from_iter(cols.iter().copied());
+            let mut checked = FxHashSet::default();
+            for col in cols {
+                if alive.strong_count() == 0 {
+                    return;
+                }
+                for start in Self::scatter(snap, col) {
+                    if checked.insert((start.feature, start.pos)) {
+                        snapshot.update_scatter(snap, &start, &mut refresh);
+                    }
+                }
+            }
+            for col in refresh {
+                if alive.strong_count() == 0 {
+                    return;
+                }
+                snapshot.refresh(c, dim, seed, col);
+            }
+            let _ = done_tx.send(Rebuilt { columns: snapshot.columns, edited_scatter: snapshot.edited_scatter });
+        });
+        self.rebuild = Rebuild::Running { done, saved: FxHashSet::default(), _keep_running: keep_running };
+        false
+    }
+
+    /// Publish the rebuilt index and bring it up to date with saves made during the rebuild.
+    pub fn finish_rebuild(&mut self, c: &Content, dim: u32, seed: u64) -> bool {
+        let Rebuild::Running { done, saved, .. } = &mut self.rebuild else { return false };
+        let Ok(snapshot) = done.try_recv() else { return false };
+        let saved = std::mem::take(saved);
+        self.rebuild = Rebuild::Ready;
+        self.columns = snapshot.columns;
+        self.edited_scatter = snapshot.edited_scatter;
+        self.refresh_saved(c, dim, seed, saved);
+        self.changed.clear();
+        log::debug!("rebuilt saved LOD for dimension {dim}: {} columns", self.columns.len());
+        true
+    }
+
+    fn scatter(snap: Snapshot<'_>, col: IVec2) -> impl Iterator<Item = Arc<Start>> {
+        let def = snap.def();
+        let starts = if def.features.iter().any(|f| f.impostor_grid().is_some()) {
+            crate::features::column_starts(snap.c, def, snap.dim, snap.seed, col.x, col.y)
+        } else {
+            Arc::default()
+        };
+        (0..starts.len()).filter_map(move |i| {
+            let start = &starts[i];
+            def.features[start.feature]
+                .impostor_grid()
+                .map(|_| start.clone())
+        })
+    }
+
+    fn saved_runs(&self, p: IVec3) -> Option<&[Span]> {
+        Some(
+            self.cubes
+                .get(&IVec2::new(p.x.div_euclid(16), p.z.div_euclid(16)))?
+                .get(&p.y.div_euclid(16))?
+                .column(((p.z & 15) * 16 + (p.x & 15)) as usize),
+        )
+    }
+
+    fn update_scatter(&mut self, snap: Snapshot<'_>, start: &Start, refresh: &mut FxHashSet<IVec2>) {
+        let f = &snap.def().features[start.feature];
+        let preview = Snapshot { before: f.stage, ..snap };
+        let origin = IVec2::new(start.pos.x, start.pos.z);
+        let edited = start.lod_blocks(preview).iter().any(|&(p, state)| {
+            let Some(runs) = self.saved_runs(p) else { return false };
+            let y = p.y.rem_euclid(16);
+            if runs.len() == MAX_RUNS && y < runs[0].bottom {
+                return false;
+            }
+            impostor_block(snap.c, state)
+                && !runs
+                    .iter()
+                    .any(|span| span.bottom <= y && y <= span.top && span.block == state)
+                && snap.read(p) == state
+        });
+        let was_edited = self
+            .edited_scatter
+            .get(&origin)
+            .is_some_and(|marks| marks.contains(&f.id));
+        if edited == was_edited {
+            return;
+        }
+        if edited {
+            let marks = self.edited_scatter.entry(origin).or_default();
+            marks.push(f.id);
+            marks.sort_unstable();
+        } else if let Some(marks) = self.edited_scatter.get_mut(&origin) {
+            marks.retain(|&id| id != f.id);
+            if marks.is_empty() {
+                self.edited_scatter.remove(&origin);
+            }
+        }
+        refresh.insert(origin.div_euclid(IVec2::splat(16)));
+        for &(p, state) in start.lod_blocks(preview) {
+            if drawn(snap.c, state) {
+                refresh.insert(IVec2::new(p.x.div_euclid(16), p.z.div_euclid(16)));
+            }
+        }
+    }
+
+    /// Works out the 256 columns of cube column `col` again.
+    fn refresh(&mut self, c: &Content, dim: u32, seed: u64, col: IVec2) {
+        let def = &c.dims[dim as usize];
+        let empty = BTreeMap::new();
+        let list = self.cubes.get(&col).unwrap_or(&empty);
+        let sea = def.sea_level();
+        let snap = Snapshot::new(c, dim, seed, u32::MAX);
+        let mut natural: [_; 256] = std::array::from_fn(|_| Vec::new());
+        let mut remaining: [_; 256] = std::array::from_fn(|_| Vec::new());
+        for start in Self::scatter(snap, col) {
+            let f = &def.features[start.feature];
+            let origin = IVec2::new(start.pos.x, start.pos.z);
+            let edited = self
+                .edited_scatter
+                .get(&origin)
+                .is_some_and(|ids| ids.contains(&f.id));
+            let blocks = start.lod_blocks(Snapshot { before: f.stage, ..snap });
+            if !blocks.iter().any(|&(_, state)| impostor_block(c, state)) {
+                continue;
+            }
+            for &(p, state) in blocks {
+                if IVec2::new(p.x.div_euclid(16), p.z.div_euclid(16)) != col
+                    || !drawn(c, state)
+                    || c.states[state as usize].liquid.is_some()
+                {
+                    continue;
+                }
+                let index = ((p.z & 15) * 16 + (p.x & 15)) as usize;
+                if !edited {
+                    natural[index].push((p.y, state));
+                } else if !list.contains_key(&p.y.div_euclid(16)) && snap.read(p) == state {
+                    remaining[index].push(Span { bottom: p.y, top: p.y, block: state, light: 0 });
+                }
+            }
+        }
+        for blocks in &mut natural {
+            blocks.sort_unstable();
+        }
+        for i in 0..256 {
+            let (x, z) = (col.x * 16 + (i % 16) as i32, col.y * 16 + (i / 16) as i32);
+            let p = IVec2::new(x, z);
+            // chiacraft: a column no saved cube changed from how it was generated is the terrain's.
+            if !list.values().any(|t| t.differs(i)) && remaining[i].is_empty() && !self.edited_scatter.contains_key(&p) {
+                if self.columns.remove(&p).is_some() {
+                    self.changed.push(p);
+                }
+                continue;
+            }
+            let Some(t) = def.column(seed, x, z) else { continue };
+            // As distant terrain shows it untouched: the ground, or the sea over it.
+            let (fy, ftop) = match sea {
+                Some(s) if t.height < s => (s, u32::MAX),
+                _ => (t.height, def.surface_block(seed, x, z)),
+            };
+            let ground = t.height.div_euclid(16);
+            let lowest = list.keys().next().copied().unwrap_or(ground);
+            let highest = list
+                .keys()
+                .next_back()
+                .copied()
+                .unwrap_or(ground)
+                .max(ground);
+            // What rises above the ground, from the ground up; the rest stays the ground.
+            let mut spans: Vec<Span> = Vec::new();
+            for (&cy, tops) in list.range(lowest..=highest) {
+                for r in tops.column(i) {
+                    let top = cy * 16 + r.top;
+                    let mut bottom = (cy * 16 + r.bottom).max(fy + 1);
+                    let mut push = |bottom, top| {
+                        if bottom > top {
+                            return;
+                        }
+                        match spans.last_mut() {
+                            Some(prev) if prev.top + 1 == bottom && prev.block == r.block => {
+                                (prev.top, prev.light) = (top, brighter(prev.light, r.light));
+                            }
+                            _ => spans.push(Span { bottom, top, ..*r }),
+                        }
+                    };
+                    for &(y, block) in &natural[i] {
+                        if block == r.block && y >= bottom && y <= top {
+                            push(bottom, y - 1);
+                            bottom = y + 1;
+                        }
+                    }
+                    push(bottom, top);
+                }
+            }
+            if !remaining[i].is_empty() {
+                spans.extend(remaining[i].iter().copied().filter(|span| span.bottom > fy));
+                spans.sort_unstable_by_key(|span| (span.bottom, span.block));
+                spans.dedup();
+                spans.dedup_by(|next, prev| {
+                    if next.bottom == prev.top + 1 && next.block == prev.block {
+                        prev.top = next.top;
+                        prev.light = brighter(prev.light, next.light);
+                        true
+                    } else {
+                        false
+                    }
+                });
+            }
+            spans.drain(..spans.len().saturating_sub(MAX_SPANS));
+            // The ground under them: from the highest saved cube down, what shows in it; where
+            // one isn't saved above the terrain's ground, air; at or under it, the terrain.
+            let limit = fy;
+            let mut here = None;
+            for cy in (lowest.min(ground) - 1..=highest).rev() {
+                match list.get(&cy) {
+                    Some(tops) => {
+                        let runs = tops.column(i);
+                        let found = (0..runs.len())
+                            .rev()
+                            .find(|&k| shows(c, runs[k].block) && cy * 16 + runs[k].bottom <= limit);
+                        if let Some(k) = found {
+                            let r = runs[k];
+                            let y = (cy * 16 + r.top).min(limit);
+                            let below = k
+                                .checked_sub(1)
+                                .map(|b| runs[b])
+                                .filter(|b| b.top + 1 == r.bottom);
+                            let under = if y > cy * 16 + r.bottom { r.block } else { below.map_or(r.block, |b| b.block) };
+                            here = Some((y, r.block, under, r.light));
+                            break;
+                        }
+                    }
+                    None if cy == ground => break,
+                    None if cy < ground => {
+                        let stone = def.terrain.as_ref().map_or(0, |t| t.stone);
+                        here = Some((cy * 16 + 15, stone, stone, 0));
+                        break;
+                    }
+                    None => {}
+                }
+            }
+            let terrain = |&(y, top, _, _): &(i32, u32, u32, u32)| {
+                y == fy && (top == ftop || ftop == u32::MAX && c.states[top as usize].liquid.is_some())
+            };
+            let light = here.map_or(0, |h| h.3);
+            let removed_scatter = self.edited_scatter.get(&p).cloned().unwrap_or_default();
+            let now = match here.filter(|h| !terrain(h)) {
+                Some((y, top, under, light)) => Some(LodColumn { x, z, y, top, under, light, spans, removed_scatter }),
+                None if !spans.is_empty() || light != 0 || !removed_scatter.is_empty() => {
+                    Some(LodColumn { x, z, y: fy, top: 0, under: 0, light, spans, removed_scatter })
+                }
+                None => None,
+            };
+            match now {
+                Some(now) if self.columns.get(&p) != Some(&now) => {
+                    self.columns.insert(p, now);
+                    self.changed.push(p);
+                }
+                Some(_) => {}
+                None => {
+                    if self.columns.remove(&p).is_some() {
+                        self.changed.push(p);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Columns changed since the last call, as they are now (`top` `u32::MAX` for gone).
+    pub fn take_changed(&mut self) -> Vec<LodColumn> {
+        let mut ps = std::mem::take(&mut self.changed);
+        ps.sort_unstable_by_key(|p| (p.x, p.y));
+        ps.dedup();
+        ps.into_iter()
+            .map(|p| {
+                self.columns.get(&p).cloned().unwrap_or(LodColumn {
+                    x: p.x,
+                    z: p.y,
+                    y: 0,
+                    top: u32::MAX,
+                    under: 0,
+                    light: 0,
+                    spans: Vec::new(),
+                    removed_scatter: Vec::new(),
+                })
+            })
+            .collect()
+    }
+
+    /// Written by world ids, lz4 packed.
+    pub fn write(&mut self, path: &Path, world_id: &mut impl FnMut(u32) -> u32) {
+        if !self.dirty {
+            return;
+        }
+        self.dirty = false;
+        let mut b: Vec<u8> = MAGIC.to_vec();
+        for (col, list) in self.cubes.iter() {
+            for (y, tops) in list {
+                for v in [col.x, *y, col.y] {
+                    b.extend_from_slice(&v.to_le_bytes());
+                }
+                b.push(tops.checked as u8);
+                for m in tops.differs {
+                    b.extend_from_slice(&m.to_le_bytes());
+                }
+                for i in 0..256 {
+                    let rs = tops.column(i);
+                    b.push(rs.len() as u8);
+                    for r in rs {
+                        b.extend_from_slice(&[r.bottom as u8, r.top as u8]);
+                        b.extend_from_slice(&world_id(r.block).to_le_bytes());
+                        b.extend_from_slice(&r.light.to_le_bytes());
+                    }
+                }
+            }
+        }
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if let Err(e) = std::fs::write(path, lz4_flex::compress_prepend_size(&b)) {
+            log::error!("saving {}: {e}", path.display());
+        }
+    }
+
+    /// Read the saved runs. A file of another layout is left out: its
+    /// columns come back as their cubes are saved again.
+    pub fn read(path: &Path, runtime_id: &mut impl FnMut(u32) -> u32) -> DimTops {
+        let Some(b) = std::fs::read(path)
+            .ok()
+            .and_then(|raw| lz4_flex::decompress_size_prepended(&raw).ok())
+        else {
+            return DimTops::default();
+        };
+        let Some(mut r) = b.strip_prefix(MAGIC) else { return DimTops::default() };
+        let mut cubes = FxHashMap::<_, BTreeMap<_, _>>::default();
+        let u32_ = |r: &mut &[u8]| -> Option<u32> {
+            let (v, rest) = r.split_first_chunk::<4>()?;
+            *r = rest;
+            Some(u32::from_le_bytes(*v))
+        };
+        let u8_ = |r: &mut &[u8]| -> Option<u8> {
+            let (v, rest) = r.split_first()?;
+            *r = rest;
+            Some(*v)
+        };
+        'cubes: while !r.is_empty() {
+            let (Some(x), Some(y), Some(z)) = (u32_(&mut r), u32_(&mut r), u32_(&mut r)) else { break };
+            let Some(checked) = u8_(&mut r) else { break };
+            let mut differs = [0u64; 4];
+            for m in &mut differs {
+                let Some((v, rest)) = r.split_first_chunk::<8>() else { break 'cubes };
+                (*m, r) = (u64::from_le_bytes(*v), rest);
+            }
+            let mut at = Box::new([0u16; 257]);
+            let mut runs = Vec::new();
+            for i in 0..256 {
+                at[i] = runs.len() as u16;
+                let Some(n) = u8_(&mut r) else { break 'cubes };
+                for _ in 0..n {
+                    let (Some(lo), Some(hi), Some(block), Some(light)) = (u8_(&mut r), u8_(&mut r), u32_(&mut r), u32_(&mut r)) else {
+                        break 'cubes;
+                    };
+                    runs.push(Span { bottom: lo as i32, top: hi as i32, block: runtime_id(block), light });
+                }
+            }
+            at[256] = runs.len() as u16;
+            cubes
+                .entry(IVec2::new(x as i32, z as i32))
+                .or_default()
+                .insert(y as i32, Arc::new(CubeTops { at, runs, differs, checked: checked != 0 }));
+        }
+        let rebuild = if cubes.is_empty() { Rebuild::Ready } else { Rebuild::Deferred };
+        DimTops { cubes: Arc::new(cubes), rebuild, ..DimTops::default() }
+    }
+}

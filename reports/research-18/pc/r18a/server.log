@@ -1,0 +1,1123 @@
+[90m    0.000[0m [32mINFO [0m [90m[weft][0m game folder /home/ronaldg/bots/r18a/server-run, cache /home/ronaldg/bots/r18a/server-run/cache
+[90m    0.295[0m [32mINFO [0m [90m[weft][0m packed /home/ronaldg/bots/r18a/server-run/mods/animals.zip
+[90m    0.819[0m [32mINFO [0m [90m[weft][0m packed /home/ronaldg/bots/r18a/server-run/mods/base.zip
+[90m    1.598[0m [32mINFO [0m [90m[weft][0m packed /home/ronaldg/bots/r18a/server-run/mods/packages.zip
+[90m    1.668[0m [32mINFO [0m [90m[weft][0m packed /home/ronaldg/bots/r18a/server-run/mods/portals.zip
+[90m    1.910[0m [32mINFO [0m [90m[weft][0m packed /home/ronaldg/bots/r18a/server-run/mods/testkit.zip
+[90m    1.993[0m [32mINFO [0m [90m[weft][0m packed /home/ronaldg/bots/r18a/server-run/test-mods/testmod.zip
+[90m    2.047[0m [32mINFO [0m [90m[modloader][0m unpacked mod animals
+[90m    2.146[0m [32mINFO [0m [90m[modloader][0m unpacked mod base
+[90m    2.295[0m [32mINFO [0m [90m[modloader][0m unpacked mod packages
+[90m    2.308[0m [32mINFO [0m [90m[modloader][0m unpacked mod portals
+[90m    2.348[0m [32mINFO [0m [90m[modloader][0m unpacked mod testkit
+[90m    2.401[0m [32mINFO [0m [90m[modloader][0m 5 mods registered in 407.4 ms
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dirt (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dirt (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:clay (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:clay (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:farmland (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:farmland (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:farmland (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:farmland (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:farmland (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:podzol (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:podzol (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:charcoal_clamp (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:charcoal_clamp (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:snow (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:snow (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:snowy_grass (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:snowy_grass (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ice (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ice (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:iron_block (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:iron_block (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:gold_block (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:gold_block (was set by its registration)
+[90m    2.410[0m [32mINFO [0m [90m[components][0m base overrides sound on base:copper_lamp (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:copper_lamp (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:copper_lamp (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:copper_lamp (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:copper_lamp (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:araucaria_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:ginkgo_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:scale_conifer_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:swamp_cypress_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:tempskya_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acacia_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acacia_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acacia_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acacia_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acuri_palm_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acuri_palm_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:andiroba_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:andiroba_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:birch_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:birch_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:brazil_nut_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:brazil_nut_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:cacao_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:cacao_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:creosote_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:creosote_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dogwood_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dogwood_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dogwood_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dogwood_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ipe_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ipe_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ipe_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ipe_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:juniper_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:matamata_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:matamata_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:mesquite_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:mesquite_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:mesquite_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:mesquite_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:moriche_palm_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:moriche_palm_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:oak_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:oak_leaves (was set by its registration)
+[90m    2.411[0m [32mINFO [0m [90m[components][0m base overrides sound on base:sequoia_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:sequoia_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:spruce_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:spruce_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:willow_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:willow_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:araucaria_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:ginkgo_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:scale_conifer_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:swamp_cypress_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on animals:tempskya_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acacia_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:acuri_palm_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:andiroba_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:birch_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:brazil_nut_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:cacao_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:creosote_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:dogwood_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:ipe_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:juniper_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:matamata_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:mesquite_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:moriche_palm_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:oak_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:sequoia_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:spruce_leaves (was set by its registration)
+[90m    2.412[0m [32mINFO [0m [90m[components][0m base overrides sound on base:willow_leaves (was set by its registration)
+[90m    2.413[0m [32mINFO [0m [90m[content][0m testkit replaces the engine's command /regions
+[90m    2.417[0m [32mINFO [0m [90m[content][0m block sounds: 7 blocks have none: packages:unknown, testkit:and_gate, testkit:blue_wire, testkit:drill, testkit:varied_box, testkit:varied_cube, testkit:varied_plant
+[90m    2.417[0m [32mINFO [0m [90m[modloader][0m content: 5 mods and packages, 323 blocks (3285 states), 603 items, 5 dimensions in 15.9 ms
+[90m    2.417[0m [32mINFO [0m [90m[modloader][0m loaded mod base 26.10.4 (load position 0)
+[90m    2.417[0m [32mINFO [0m [90m[modloader][0m loaded mod animals 0.1.0 (load position 1)
+[90m    2.417[0m [32mINFO [0m [90m[modloader][0m loaded mod packages 0.1.0 (load position 2)
+[90m    2.417[0m [32mINFO [0m [90m[modloader][0m loaded mod portals 0.1.0 (load position 3)
+[90m    2.417[0m [32mINFO [0m [90m[modloader][0m loaded mod testkit 26.10.4 (load position 4)
+[90m    2.438[0m [32mINFO [0m [90m[chiacraft_account][0m made a new account (3033896488), kept in the file store
+[90m    2.462[0m [32mINFO [0m [90m[chiacraft_account][0m account 3033896488 open, identity 870f75bf76e174029d7404fd0a8c23f99d1464cf6f07c371ab5958bb370d6357ca67462bd313990236d06e704d5b632f
+[90m    2.463[0m [32mINFO [0m [90m[dedicated][0m server running world 'botworld'; type stop to save and leave, anything else for help
+[90m    7.463[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 101 ticks (20.2/s), tick avg 0.03 p50 0.03 p99 0.08 max 0.41 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.01, regions 0.01, request 0.01, sync 0.00, rest 0.00 | players 0, cubes 0, entities 0 | to clients 0 msgs/s 0.0 KB/s () | to server 0 msgs/s 0.0 KB/s () | cpu 0.02 cores (net 0.02) | rss 133 MB, 49 threads
+[90m    9.985[0m [32mINFO [0m [90m[net::p2p][0m hosting 'botworld' at chiacraft://w/3227ea1afab61aeb6fc9836bdb3edcd640c9ca815d8a49963d7722bf863f0395?n=botworld&r=https://use1-1.relay.n0.iroh.link./&a=172.17.0.1:60399,172.18.0.1:60399,191.177.192.179:5408,192.168.1.13:60399
+[90m   10.332[0m [32mINFO [0m [90m[net::p2p][0m net: path to f1e8e9f1 direct loopback 127.0.0.1:57184 (player in)
+[90m   10.333[0m [32mINFO [0m [90m[net::p2p][0m player f1e8e9f1d8713c7774ac3bfd61ed7cc329e588da1205923738028b6e7fca2f3c connected
+[90m   10.434[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3dc823b1 direct loopback 127.0.0.1:42701 (player in)
+[90m   10.435[0m [32mINFO [0m [90m[net::p2p][0m player 3dc823b183d81f0023bb873bcc663544573ad09dd45548f763d457146d2fd435 connected
+[90m   10.451[0m [32mINFO [0m [90m[server::player_file][0m bot0 joined
+[90m   10.451[0m [32mINFO [0m [90m[server::player_file][0m bot1 joined
+[90m   10.536[0m [32mINFO [0m [90m[net::p2p][0m net: path to 64b3a0aa direct loopback 127.0.0.1:38748 (player in)
+[90m   10.537[0m [32mINFO [0m [90m[net::p2p][0m player 64b3a0aa47cc2d573cdb9386b4262f3c0f3d95953864b53cb3f04193125eb384 connected
+[90m   10.563[0m [32mINFO [0m [90m[server::player_file][0m bot2 joined
+[90m   10.640[0m [32mINFO [0m [90m[net::p2p][0m net: path to 76ee8481 direct loopback 127.0.0.1:33399 (player in)
+[90m   10.641[0m [32mINFO [0m [90m[net::p2p][0m player 76ee8481ac13d44f7e7ca791605eb46940cf26e5b32a0560cb66135a06b7761f connected
+[90m   10.664[0m [32mINFO [0m [90m[server::player_file][0m bot3 joined
+[90m   10.740[0m [32mINFO [0m [90m[net::p2p][0m net: path to 15352bae direct loopback 127.0.0.1:49732 (player in)
+[90m   10.740[0m [32mINFO [0m [90m[net::p2p][0m player 15352bae334ad5880870581b0faa69e611523e2799100d62321d65fbafd8f8c5 connected
+[90m   10.763[0m [32mINFO [0m [90m[server::player_file][0m bot4 joined
+[90m   10.841[0m [32mINFO [0m [90m[net::p2p][0m net: path to 37f15998 direct loopback 127.0.0.1:41921 (player in)
+[90m   10.841[0m [32mINFO [0m [90m[net::p2p][0m player 37f15998e0c48759edfc3dbccb0082eeb1126c0b90480d9dc99332e0d5372cc6 connected
+[90m   10.863[0m [32mINFO [0m [90m[server::player_file][0m bot5 joined
+[90m   10.942[0m [32mINFO [0m [90m[net::p2p][0m net: path to 59f8527c direct loopback 127.0.0.1:55417 (player in)
+[90m   10.943[0m [32mINFO [0m [90m[net::p2p][0m player 59f8527ce6e356eb0ed6aa2e7f70ea9e2dfce363f54549960ec9b62c15cb2cff connected
+[90m   10.964[0m [32mINFO [0m [90m[server::player_file][0m bot6 joined
+[90m   11.044[0m [32mINFO [0m [90m[net::p2p][0m net: path to f61c37f4 direct loopback 127.0.0.1:34412 (player in)
+[90m   11.045[0m [32mINFO [0m [90m[net::p2p][0m player f61c37f432ef47329aeadbce72f4974b194eb9b237d2539a929946940da6b732 connected
+[90m   11.063[0m [32mINFO [0m [90m[server::player_file][0m bot7 joined
+[90m   11.142[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3ecb86dc direct loopback 127.0.0.1:35474 (player in)
+[90m   11.143[0m [32mINFO [0m [90m[net::p2p][0m player 3ecb86dc59acc39b2c5142e73c044686a3f09c6c0f9983e2b41175b64d2949aa connected
+[90m   11.163[0m [32mINFO [0m [90m[server::player_file][0m bot8 joined
+[90m   11.243[0m [32mINFO [0m [90m[net::p2p][0m net: path to 73e46a73 direct loopback 127.0.0.1:56199 (player in)
+[90m   11.244[0m [32mINFO [0m [90m[net::p2p][0m player 73e46a7398689017e7dc344b9597b7cadd692bb8aafe86e158de672423915ba6 connected
+[90m   11.263[0m [32mINFO [0m [90m[server::player_file][0m bot9 joined
+[90m   12.464[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 1.44 p50 0.02 p99 7.03 max 88.62 ms, 1 over 50 ms | phases avg insert 0.09, messages 0.90, regions 0.13, request 0.14, sync 0.18, rest 0.00 | players 10, cubes 3702, entities 10 | to clients 6605 msgs/s 23673.7 KB/s (Cube 6344/s 23608.1 KB/s, Components 68/s 30.1 KB/s, Moves 66/s 26.1 KB/s, EntityComponents 55/s 3.2 KB/s, Inventory 2/s 1.4 KB/s, Spawn 11/s 1.0 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 1.49 cores (background 1.42, server 0.04, net 0.03) | rss 256 MB, 59 threads
+[90m   16.438[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3dc823b1 direct LAN 192.168.1.13:42701 (player in)
+[90m   17.464[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 78 ticks (15.6/s), tick avg 0.29 p50 0.23 p99 0.89 max 1.18 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.00, regions 0.19, request 0.04, sync 0.05, rest 0.00 | players 10, cubes 4215, entities 10 | to clients 1121 msgs/s 2973.5 KB/s (Cube 639/s 2845.5 KB/s, Moves 156/s 63.9 KB/s, Components 156/s 58.3 KB/s, EntityComponents 128/s 4.3 KB/s, Air 2/s 0.8 KB/s, Attributes 17/s 0.2 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.17 cores (background 0.15, net 0.01, server 0.01) | rss 260 MB, 59 threads
+[90m   18.005[0m [32mINFO [0m [90m[net::p2p][0m net: path to 73e46a73 direct LAN 192.168.1.13:56199 (player in)
+[90m   18.966[0m [32mINFO [0m [90m[net::p2p][0m net: path to 15352bae direct LAN 192.168.1.13:49732 (player in)
+[90m   18.966[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3ecb86dc direct LAN 192.168.1.13:35474 (player in)
+[90m   18.966[0m [32mINFO [0m [90m[net::p2p][0m net: path to 64b3a0aa direct LAN 192.168.1.13:38748 (player in)
+[90m   19.005[0m [32mINFO [0m [90m[server::actions][0m <bot7> bot7 says hello
+[90m   23.966[0m [32mINFO [0m [90m[dedicated][0m server stats per 6.5 s: 84 ticks (12.9/s), tick avg 41.66 p50 0.47 p99 1592.48 max 1864.27 ms, 2 over 50 ms | phases avg insert 0.01, messages 22.18, regions 19.31, request 0.06, sync 0.10, rest 0.00 | players 10, cubes 5422, entities 12 | to clients 962 msgs/s 2549.1 KB/s (Cube 572/s 2468.8 KB/s, Components 129/s 48.3 KB/s, Moves 107/s 25.5 KB/s, EntityComponents 107/s 4.2 KB/s, Air 3/s 1.3 KB/s, Spawn 2/s 0.2 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.34 cores (background 0.32, server 0.01, net 0.01) | rss 266 MB, 57 threads
+[90m   28.967[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 0.52 p50 0.44 p99 1.34 max 1.49 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 0.37, request 0.05, sync 0.08, rest 0.00 | players 10, cubes 5422, entities 14 | to clients 686 msgs/s 385.7 KB/s (Cube 55/s 238.3 KB/s, Components 200/s 74.8 KB/s, Moves 197/s 64.0 KB/s, EntityComponents 167/s 5.7 KB/s, Air 4/s 1.7 KB/s, Blocks 9/s 0.4 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.02 cores (server 0.01, net 0.01) | rss 266 MB, 57 threads
+[90m   33.620[0m [32mINFO [0m [90m[server::actions][0m <bot4> bot4 says hello
+[90m   33.870[0m [32mINFO [0m [90m[server::actions][0m <bot6> bot6 says hello
+[90m   33.967[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 0.55 p50 0.43 p99 1.34 max 5.09 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 0.39, request 0.05, sync 0.09, rest 0.00 | players 10, cubes 5422, entities 15 | to clients 922 msgs/s 1135.2 KB/s (Cube 279/s 966.4 KB/s, Moves 200/s 85.4 KB/s, Components 200/s 74.8 KB/s, EntityComponents 167/s 5.6 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.3 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.03 cores (net 0.01, server 0.01, net-out 0.01) | rss 266 MB, 57 threads
+[90m   35.772[0m [32mINFO [0m [90m[server][0m saved 11 cubes in 1.2 ms
+[90m   38.968[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 0.49 p50 0.41 p99 1.31 max 2.38 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.01, regions 0.34, request 0.04, sync 0.08, rest 0.02 | players 10, cubes 5480, entities 15 | to clients 1112 msgs/s 2129.4 KB/s (Cube 488/s 1972.1 KB/s, Components 200/s 74.8 KB/s, Moves 198/s 74.0 KB/s, EntityComponents 167/s 5.8 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.3 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.04 cores (server 0.01, background 0.01, net 0.01, net-out 0.01) | rss 265 MB, 57 threads
+[90m   43.968[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 0.47 p50 0.40 p99 1.43 max 1.44 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.01, regions 0.34, request 0.04, sync 0.08, rest 0.00 | players 10, cubes 5552, entities 15 | to clients 887 msgs/s 1347.2 KB/s (Cube 283/s 1197.6 KB/s, Components 200/s 74.8 KB/s, Moves 190/s 66.7 KB/s, EntityComponents 165/s 5.5 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.3 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.04 cores (background 0.02, server 0.01, net 0.01) | rss 264 MB, 58 threads
+[90m   45.520[0m [32mINFO [0m [90m[server::actions][0m <bot5> bot5 says hello
+[90m   48.968[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 0.50 p50 0.43 p99 1.36 max 1.38 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.01, regions 0.35, request 0.05, sync 0.08, rest 0.00 | players 10, cubes 5696, entities 15 | to clients 760 msgs/s 673.4 KB/s (Cube 110/s 521.5 KB/s, Components 200/s 74.8 KB/s, Moves 190/s 68.1 KB/s, EntityComponents 163/s 5.7 KB/s, Air 4/s 1.7 KB/s, Blocks 12/s 0.4 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.06 cores (background 0.04, server 0.01, net 0.01) | rss 271 MB, 58 threads
+[90m   53.969[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 0.49 p50 0.42 p99 1.38 max 1.51 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.01, regions 0.35, request 0.04, sync 0.08, rest 0.00 | players 10, cubes 5712, entities 15 | to clients 820 msgs/s 886.4 KB/s (Cube 187/s 726.9 KB/s, Moves 200/s 76.1 KB/s, Components 200/s 74.8 KB/s, EntityComponents 167/s 5.8 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.3 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.02 cores (net 0.01, server 0.01) | rss 265 MB, 58 threads
+[90m   58.969[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 0.50 p50 0.43 p99 1.19 max 1.23 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.01, regions 0.36, request 0.04, sync 0.08, rest 0.00 | players 10, cubes 5757, entities 15 | to clients 841 msgs/s 1114.8 KB/s (Cube 225/s 969.2 KB/s, Components 200/s 74.8 KB/s, Moves 197/s 62.8 KB/s, EntityComponents 165/s 5.5 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.3 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.05 cores (background 0.03, server 0.01, net 0.01) | rss 266 MB, 58 threads
+[90m   63.970[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 0.49 p50 0.44 p99 1.18 max 1.40 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.01, regions 0.35, request 0.04, sync 0.08, rest 0.00 | players 10, cubes 5821, entities 15 | to clients 759 msgs/s 701.8 KB/s (Cube 117/s 559.2 KB/s, Components 200/s 74.8 KB/s, Moves 200/s 59.5 KB/s, EntityComponents 165/s 5.5 KB/s, Air 4/s 1.7 KB/s, Attributes 22/s 0.3 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.03 cores (net 0.01, server 0.01, background 0.01) | rss 270 MB, 58 threads
+[90m   65.772[0m [32mINFO [0m [90m[server][0m saved 19 cubes in 1.5 ms
+[90m   68.970[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 0.54 p50 0.44 p99 1.95 max 2.82 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.01, regions 0.36, request 0.05, sync 0.10, rest 0.02 | players 10, cubes 5833, entities 16 | to clients 723 msgs/s 498.8 KB/s (Cube 82/s 352.0 KB/s, Components 200/s 74.8 KB/s, Moves 197/s 63.3 KB/s, EntityComponents 165/s 5.5 KB/s, Air 4/s 1.7 KB/s, Blocks 9/s 0.5 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.02 cores (server 0.01, net 0.01) | rss 270 MB, 58 threads
+[90m   71.346[0m [32mINFO [0m [90m[net::p2p][0m net: path to 5119faac direct loopback 127.0.0.1:50982 (player in)
+[90m   71.346[0m [32mINFO [0m [90m[net::p2p][0m player 5119faace9672032f0899ee6d18d0f8762a4f73df693e77fa84358c8bad594ab connected
+[90m   71.371[0m [32mINFO [0m [90m[server::player_file][0m bot10 joined
+[90m   71.447[0m [32mINFO [0m [90m[net::p2p][0m net: path to 1fe29d27 direct loopback 127.0.0.1:51985 (player in)
+[90m   71.447[0m [32mINFO [0m [90m[net::p2p][0m player 1fe29d277e4492b1c3e86a31c89d2cd48236ab5d2a86dd5b7b1e2df48413bf1a connected
+[90m   71.470[0m [32mINFO [0m [90m[server::player_file][0m bot11 joined
+[90m   71.548[0m [32mINFO [0m [90m[net::p2p][0m net: path to 8584057e direct loopback 127.0.0.1:53718 (player in)
+[90m   71.548[0m [32mINFO [0m [90m[net::p2p][0m player 8584057edea3a198449b82650fed7083b56855a8a62e87f3be1070c21d1c6115 connected
+[90m   71.570[0m [32mINFO [0m [90m[server::player_file][0m bot12 joined
+[90m   71.649[0m [32mINFO [0m [90m[net::p2p][0m net: path to c045b6d8 direct loopback 127.0.0.1:40588 (player in)
+[90m   71.649[0m [32mINFO [0m [90m[net::p2p][0m player c045b6d856e9080afb5f4af4fd0dd03adea79c61e800599ed29eba539e66cba3 connected
+[90m   71.670[0m [32mINFO [0m [90m[server::player_file][0m bot13 joined
+[90m   71.749[0m [32mINFO [0m [90m[net::p2p][0m net: path to 20a0b194 direct loopback 127.0.0.1:48707 (player in)
+[90m   71.750[0m [32mINFO [0m [90m[net::p2p][0m player 20a0b194a7f94b606fb0920c547d95bb0916926910f0a1b06295a2ffb93aa36b connected
+[90m   71.770[0m [32mINFO [0m [90m[server::player_file][0m bot14 joined
+[90m   71.850[0m [32mINFO [0m [90m[net::p2p][0m net: path to a1c8e1fe direct loopback 127.0.0.1:44783 (player in)
+[90m   71.850[0m [32mINFO [0m [90m[net::p2p][0m player a1c8e1fecedc9d7f6c898c79fe185787a7f180098f48bf6558345e15eee516f3 connected
+[90m   71.870[0m [32mINFO [0m [90m[server::player_file][0m bot15 joined
+[90m   71.952[0m [32mINFO [0m [90m[net::p2p][0m net: path to efd8e597 direct loopback 127.0.0.1:46330 (player in)
+[90m   71.952[0m [32mINFO [0m [90m[net::p2p][0m player efd8e5972252e43c93dce84e79efa43382eaf56d4ebb37c416771f8e6a0737c8 connected
+[90m   71.970[0m [32mINFO [0m [90m[server::player_file][0m bot16 joined
+[90m   72.054[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6c95f6c9 direct loopback 127.0.0.1:53302 (player in)
+[90m   72.054[0m [32mINFO [0m [90m[net::p2p][0m player 6c95f6c9bbfe8574dc77e996ccec1c8cd9964c912e7da62f3bc3c4cb52f8c102 connected
+[90m   72.070[0m [32mINFO [0m [90m[server::player_file][0m bot17 joined
+[90m   72.164[0m [32mINFO [0m [90m[net::p2p][0m net: path to 559a7933 direct loopback 127.0.0.1:33966 (player in)
+[90m   72.164[0m [32mINFO [0m [90m[net::p2p][0m player 559a793329a3fc1c9e39ff53bca8d7b841bfe408d36a574ee7c73a0e71482331 connected
+[90m   72.170[0m [32mINFO [0m [90m[server::player_file][0m bot18 joined
+[90m   72.257[0m [32mINFO [0m [90m[net::p2p][0m net: path to 65d0c227 direct loopback 127.0.0.1:60803 (player in)
+[90m   72.257[0m [32mINFO [0m [90m[net::p2p][0m player 65d0c2272893c4f3f0659b4f29d85ba1ea2dfa9272cc760fb21ee3e98100d53d connected
+[90m   72.270[0m [32mINFO [0m [90m[server::player_file][0m bot19 joined
+[90m   72.358[0m [32mINFO [0m [90m[net::p2p][0m net: path to 38cbce61 direct loopback 127.0.0.1:36706 (player in)
+[90m   72.358[0m [32mINFO [0m [90m[net::p2p][0m player 38cbce617efeac017626545b78bd7b7f79ba14db9bc6deac4b4b24007d4143a5 connected
+[90m   72.370[0m [32mINFO [0m [90m[server::player_file][0m bot20 joined
+[90m   72.458[0m [32mINFO [0m [90m[net::p2p][0m net: path to 630c0169 direct loopback 127.0.0.1:58227 (player in)
+[90m   72.458[0m [32mINFO [0m [90m[net::p2p][0m player 630c0169de85b868f0fbb04fdf7468adc978ed189c17126de1f986307a2db3d0 connected
+[90m   72.470[0m [32mINFO [0m [90m[server::player_file][0m bot21 joined
+[90m   72.560[0m [32mINFO [0m [90m[net::p2p][0m net: path to 82dd3122 direct loopback 127.0.0.1:47456 (player in)
+[90m   72.560[0m [32mINFO [0m [90m[net::p2p][0m player 82dd3122947d12c683a67fe1dd2cbeb7b8259022247346960b3c98144aee3b9b connected
+[90m   72.570[0m [32mINFO [0m [90m[server::player_file][0m bot22 joined
+[90m   72.660[0m [32mINFO [0m [90m[net::p2p][0m net: path to 57ed4b36 direct loopback 127.0.0.1:60673 (player in)
+[90m   72.660[0m [32mINFO [0m [90m[net::p2p][0m player 57ed4b368f711374289a9ceb150234091c33fdc0fb3cd406a195dd7c0da2805a connected
+[90m   72.670[0m [32mINFO [0m [90m[server::player_file][0m bot23 joined
+[90m   72.762[0m [32mINFO [0m [90m[net::p2p][0m net: path to 793a58b1 direct loopback 127.0.0.1:58121 (player in)
+[90m   72.762[0m [32mINFO [0m [90m[net::p2p][0m player 793a58b1cbbff25306c58b07ce147812d761cffa780d5c9f877a38bffa241b5f connected
+[90m   72.770[0m [32mINFO [0m [90m[server::player_file][0m bot24 joined
+[90m   72.863[0m [32mINFO [0m [90m[net::p2p][0m net: path to 610c7452 direct loopback 127.0.0.1:44923 (player in)
+[90m   72.863[0m [32mINFO [0m [90m[net::p2p][0m player 610c745237baad512c282b6e4e9bc306403a847dd385275aaf741ec31b77f8a0 connected
+[90m   72.870[0m [32mINFO [0m [90m[server::player_file][0m bot25 joined
+[90m   72.964[0m [32mINFO [0m [90m[net::p2p][0m net: path to c0151695 direct loopback 127.0.0.1:42021 (player in)
+[90m   72.964[0m [32mINFO [0m [90m[net::p2p][0m player c0151695339667821f1725974619cfa6f6b86c176d09dd89c48e0c49aebe471b connected
+[90m   72.970[0m [32mINFO [0m [90m[server::player_file][0m bot26 joined
+[90m   73.064[0m [32mINFO [0m [90m[net::p2p][0m net: path to 4ed33e26 direct loopback 127.0.0.1:52737 (player in)
+[90m   73.065[0m [32mINFO [0m [90m[net::p2p][0m player 4ed33e26b5e781119c818f0695ed341f0b744d2507502494a5e93ae783ae74c0 connected
+[90m   73.070[0m [32mINFO [0m [90m[server::player_file][0m bot27 joined
+[90m   73.165[0m [32mINFO [0m [90m[net::p2p][0m net: path to dcd12b43 direct loopback 127.0.0.1:39818 (player in)
+[90m   73.166[0m [32mINFO [0m [90m[net::p2p][0m player dcd12b4375a5fd0b8f9fd444261124db95a06950606c9b3a85a8bfb693aec831 connected
+[90m   73.170[0m [32mINFO [0m [90m[server::player_file][0m bot28 joined
+[90m   73.266[0m [32mINFO [0m [90m[net::p2p][0m net: path to 276233f6 direct loopback 127.0.0.1:58715 (player in)
+[90m   73.267[0m [32mINFO [0m [90m[net::p2p][0m player 276233f623adc5d6bde1068bed2005389f1282e60b5842f60ad729e678face99 connected
+[90m   73.270[0m [32mINFO [0m [90m[server::player_file][0m bot29 joined
+[90m   73.367[0m [32mINFO [0m [90m[net::p2p][0m net: path to ab43251c direct loopback 127.0.0.1:47805 (player in)
+[90m   73.367[0m [32mINFO [0m [90m[net::p2p][0m player ab43251cf388db51c55f9bb82670567027c3dfd780cae9df93a09c60c2f58c08 connected
+[90m   73.370[0m [32mINFO [0m [90m[server::player_file][0m bot30 joined
+[90m   73.468[0m [32mINFO [0m [90m[net::p2p][0m net: path to 2dbb8d29 direct loopback 127.0.0.1:45904 (player in)
+[90m   73.469[0m [32mINFO [0m [90m[net::p2p][0m player 2dbb8d29999d5eac015effe81e66125d83f0155e4be50149be66e07f17cf29f0 connected
+[90m   73.470[0m [32mINFO [0m [90m[server::player_file][0m bot31 joined
+[90m   73.570[0m [32mINFO [0m [90m[net::p2p][0m net: path to 263ac494 direct loopback 127.0.0.1:49497 (player in)
+[90m   73.570[0m [32mINFO [0m [90m[net::p2p][0m player 263ac49488bc611b3fd39b69e51cd849d1b885fb6de492a1642879c89ed86f84 connected
+[90m   73.620[0m [32mINFO [0m [90m[server::player_file][0m bot32 joined
+[90m   73.670[0m [32mINFO [0m [90m[net::p2p][0m net: path to bc51ac57 direct loopback 127.0.0.1:41909 (player in)
+[90m   73.670[0m [32mINFO [0m [90m[net::p2p][0m player bc51ac57fa0c768f59de88b68f776959cc8e74a12b027da35361e81fe1f827cb connected
+[90m   73.720[0m [32mINFO [0m [90m[server::player_file][0m bot33 joined
+[90m   73.771[0m [32mINFO [0m [90m[net::p2p][0m net: path to 001ef5c6 direct loopback 127.0.0.1:36400 (player in)
+[90m   73.771[0m [32mINFO [0m [90m[net::p2p][0m player 001ef5c68124285f8f1bbc147bb01608f293b4a4af21798177229437a2e080e2 connected
+[90m   73.820[0m [32mINFO [0m [90m[server::player_file][0m bot34 joined
+[90m   73.873[0m [32mINFO [0m [90m[net::p2p][0m net: path to e1d7de14 direct loopback 127.0.0.1:44153 (player in)
+[90m   73.873[0m [32mINFO [0m [90m[net::p2p][0m player e1d7de14c14782ba2a626798a04672ecbd48f6eaf3122e4cd2c7b0fcb2c3f07b connected
+[90m   73.920[0m [32mINFO [0m [90m[server::player_file][0m bot35 joined
+[90m   73.971[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 1.20 p50 0.97 p99 3.67 max 3.84 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.04, regions 0.48, request 0.30, sync 0.36, rest 0.01 | players 36, cubes 5833, entities 41 | to clients 19018 msgs/s 69622.7 KB/s (Cube 17422/s 69096.9 KB/s, Moves 329/s 282.5 KB/s, Components 340/s 137.6 KB/s, EntityComponents 320/s 41.5 KB/s, Players 122/s 27.2 KB/s, Spawn 122/s 14.5 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.09 cores (net 0.06, server 0.02, net-out 0.01) | rss 384 MB, 85 threads
+[90m   73.973[0m [32mINFO [0m [90m[net::p2p][0m net: path to c2214c8d direct loopback 127.0.0.1:40089 (player in)
+[90m   73.973[0m [32mINFO [0m [90m[net::p2p][0m player c2214c8d72b178a0baf45fec30c71ce450b030a853cb9c8c242effd87142752e connected
+[90m   74.020[0m [32mINFO [0m [90m[server::player_file][0m bot36 joined
+[90m   74.074[0m [32mINFO [0m [90m[net::p2p][0m net: path to 8c40fb69 direct loopback 127.0.0.1:48818 (player in)
+[90m   74.074[0m [32mINFO [0m [90m[net::p2p][0m player 8c40fb690f3acabedc81a3465009ed0991175ccca547871ec96771d74fedc171 connected
+[90m   74.120[0m [32mINFO [0m [90m[server::player_file][0m bot37 joined
+[90m   74.165[0m [32mINFO [0m [90m[net::p2p][0m net: path to 559a7933 direct LAN 192.168.1.13:33966 (player in)
+[90m   74.175[0m [32mINFO [0m [90m[net::p2p][0m net: path to 92b6db28 direct loopback 127.0.0.1:35898 (player in)
+[90m   74.175[0m [32mINFO [0m [90m[net::p2p][0m player 92b6db28593bcfbb45c293f32fcfea740adb594e3885ba59e544a8696f84a5dc connected
+[90m   74.220[0m [32mINFO [0m [90m[server::player_file][0m bot38 joined
+[90m   74.276[0m [32mINFO [0m [90m[net::p2p][0m net: path to 724d6735 direct loopback 127.0.0.1:53864 (player in)
+[90m   74.277[0m [32mINFO [0m [90m[net::p2p][0m player 724d6735f27e7c88c7b7785aa0eb8cb2e2397ce84f4169dd85c91a9bd6c40e54 connected
+[90m   74.320[0m [32mINFO [0m [90m[server::player_file][0m bot39 joined
+[90m   74.385[0m [32mINFO [0m [90m[net::p2p][0m net: path to 271850db direct loopback 127.0.0.1:45172 (player in)
+[90m   74.386[0m [32mINFO [0m [90m[net::p2p][0m player 271850db8886c2071502446fdfa11114be6244f017a9627418ce4d5ec9fa6cd8 connected
+[90m   74.420[0m [32mINFO [0m [90m[server::player_file][0m bot40 joined
+[90m   74.479[0m [32mINFO [0m [90m[net::p2p][0m net: path to bb764a74 direct loopback 127.0.0.1:43518 (player in)
+[90m   74.479[0m [32mINFO [0m [90m[net::p2p][0m player bb764a747cac279daea67e90fd824e333ffd133d3b091d876f9ec3400965b0fa connected
+[90m   74.520[0m [32mINFO [0m [90m[server::player_file][0m bot41 joined
+[90m   74.580[0m [32mINFO [0m [90m[net::p2p][0m net: path to 21843b7b direct loopback 127.0.0.1:35921 (player in)
+[90m   74.580[0m [32mINFO [0m [90m[net::p2p][0m player 21843b7b76ecdf76f7a7d8f2190b9615a566e774ac0f61414b2b9530cde0c926 connected
+[90m   74.620[0m [32mINFO [0m [90m[server::player_file][0m bot42 joined
+[90m   74.680[0m [32mINFO [0m [90m[net::p2p][0m net: path to 47d6f5ef direct loopback 127.0.0.1:47061 (player in)
+[90m   74.680[0m [32mINFO [0m [90m[net::p2p][0m player 47d6f5efc385fc61f5e0bd195bbceb1c99a3dac6f6fd1d610121976f51b3a48a connected
+[90m   74.720[0m [32mINFO [0m [90m[server::player_file][0m bot43 joined
+[90m   74.782[0m [32mINFO [0m [90m[net::p2p][0m net: path to c61bc727 direct loopback 127.0.0.1:36182 (player in)
+[90m   74.782[0m [32mINFO [0m [90m[net::p2p][0m player c61bc7271022452b6ce576f9726f9a4664661a2958a5ed4c157ce50dcb750edc connected
+[90m   74.820[0m [32mINFO [0m [90m[server::player_file][0m bot44 joined
+[90m   74.883[0m [32mINFO [0m [90m[net::p2p][0m net: path to eac15501 direct loopback 127.0.0.1:46011 (player in)
+[90m   74.883[0m [32mINFO [0m [90m[net::p2p][0m player eac15501286ec31ae37c8e5440ac96fc5c928891c39abccf4e59cd54fd339b55 connected
+[90m   74.920[0m [32mINFO [0m [90m[server::player_file][0m bot45 joined
+[90m   74.965[0m [32mINFO [0m [90m[net::p2p][0m net: path to c0151695 direct LAN 192.168.1.13:42021 (player in)
+[90m   74.985[0m [32mINFO [0m [90m[net::p2p][0m net: path to 058cdeb7 direct loopback 127.0.0.1:51831 (player in)
+[90m   74.985[0m [32mINFO [0m [90m[net::p2p][0m player 058cdeb7d596a8b90a32396f24860aedf3a97b1062546ddad9addd0fe6e5eefa connected
+[90m   75.020[0m [32mINFO [0m [90m[server::player_file][0m bot46 joined
+[90m   75.085[0m [32mINFO [0m [90m[net::p2p][0m net: path to 2385da0b direct loopback 127.0.0.1:48831 (player in)
+[90m   75.085[0m [32mINFO [0m [90m[net::p2p][0m player 2385da0bb170c6695596986eaba2b92e9a1af57d98d05e55369af0e91935ee5c connected
+[90m   75.120[0m [32mINFO [0m [90m[server::player_file][0m bot47 joined
+[90m   75.186[0m [32mINFO [0m [90m[net::p2p][0m net: path to 540a167a direct loopback 127.0.0.1:42310 (player in)
+[90m   75.186[0m [32mINFO [0m [90m[net::p2p][0m player 540a167a8fb3cdf12cef73212c169492a63593827e6b1dce36a6574102d12156 connected
+[90m   75.220[0m [32mINFO [0m [90m[server::player_file][0m bot48 joined
+[90m   75.287[0m [32mINFO [0m [90m[net::p2p][0m net: path to fa2ec6ac direct loopback 127.0.0.1:38522 (player in)
+[90m   75.287[0m [32mINFO [0m [90m[net::p2p][0m player fa2ec6ac73c47b0892425ba5cff9b2b4998719c148bec2955604e3e11ad87b4d connected
+[90m   75.320[0m [32mINFO [0m [90m[server::player_file][0m bot49 joined
+[90m   77.450[0m [32mINFO [0m [90m[net::p2p][0m net: path to 1fe29d27 direct LAN 192.168.1.13:51985 (player in)
+[90m   77.652[0m [32mINFO [0m [90m[net::p2p][0m net: path to c045b6d8 direct LAN 192.168.1.13:40588 (player in)
+[90m   77.752[0m [32mINFO [0m [90m[net::p2p][0m net: path to 20a0b194 direct LAN 192.168.1.13:48707 (player in)
+[90m   77.854[0m [32mINFO [0m [90m[net::p2p][0m net: path to a1c8e1fe direct LAN 192.168.1.13:44783 (player in)
+[90m   78.056[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6c95f6c9 direct LAN 192.168.1.13:53302 (player in)
+[90m   78.320[0m [32mINFO [0m [90m[server::actions][0m <bot9> bot9 says hello
+[90m   78.663[0m [32mINFO [0m [90m[net::p2p][0m net: path to 57ed4b36 direct LAN 192.168.1.13:60673 (player in)
+[90m   78.765[0m [32mINFO [0m [90m[net::p2p][0m net: path to 793a58b1 direct LAN 192.168.1.13:58121 (player in)
+[90m   78.870[0m [32mINFO [0m [90m[server::actions][0m <bot20> bot20 says hello
+[90m   78.970[0m [32mINFO [0m [90m[server::actions][0m <bot17> bot17 says hello
+[90m   78.971[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 101 ticks (20.2/s), tick avg 1.96 p50 1.70 p99 4.65 max 5.77 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.04, regions 0.98, request 0.31, sync 0.61, rest 0.01 | players 50, cubes 5833, entities 58 | to clients 16195 msgs/s 50066.9 KB/s (Cube 12350/s 47566.0 KB/s, Moves 966/s 1893.0 KB/s, Components 971/s 369.3 KB/s, EntityComponents 971/s 146.5 KB/s, Players 122/s 46.4 KB/s, Spawn 132/s 15.4 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.11 cores (net 0.07, server 0.04) | rss 448 MB, 99 threads
+[90m   79.068[0m [32mINFO [0m [90m[net::p2p][0m net: path to 4ed33e26 direct LAN 192.168.1.13:52737 (player in)
+[90m   79.169[0m [32mINFO [0m [90m[net::p2p][0m net: path to dcd12b43 direct LAN 192.168.1.13:39818 (player in)
+[90m   79.270[0m [32mINFO [0m [90m[net::p2p][0m net: path to 276233f6 direct LAN 192.168.1.13:58715 (player in)
+[90m   79.370[0m [32mINFO [0m [90m[net::p2p][0m net: path to ab43251c direct LAN 192.168.1.13:47805 (player in)
+[90m   79.774[0m [32mINFO [0m [90m[net::p2p][0m net: path to 001ef5c6 direct LAN 192.168.1.13:36400 (player in)
+[90m   79.977[0m [32mINFO [0m [90m[net::p2p][0m net: path to c2214c8d direct LAN 192.168.1.13:40089 (player in)
+[90m   80.178[0m [32mINFO [0m [90m[net::p2p][0m net: path to 92b6db28 direct LAN 192.168.1.13:35898 (player in)
+[90m   80.388[0m [32mINFO [0m [90m[net::p2p][0m net: path to 271850db direct LAN 192.168.1.13:45172 (player in)
+[90m   80.585[0m [32mINFO [0m [90m[net::p2p][0m net: path to 21843b7b direct LAN 192.168.1.13:35921 (player in)
+[90m   80.683[0m [32mINFO [0m [90m[net::p2p][0m net: path to 47d6f5ef direct LAN 192.168.1.13:47061 (player in)
+[90m   80.870[0m [32mINFO [0m [90m[server::actions][0m <bot43> bot43 says hello
+[90m   80.886[0m [32mINFO [0m [90m[net::p2p][0m net: path to eac15501 direct LAN 192.168.1.13:46011 (player in)
+[90m   80.988[0m [32mINFO [0m [90m[net::p2p][0m net: path to 058cdeb7 direct LAN 192.168.1.13:51831 (player in)
+[90m   81.088[0m [32mINFO [0m [90m[net::p2p][0m net: path to 2385da0b direct LAN 192.168.1.13:48831 (player in)
+[90m   81.189[0m [32mINFO [0m [90m[net::p2p][0m net: path to 540a167a direct LAN 192.168.1.13:42310 (player in)
+[90m   81.290[0m [32mINFO [0m [90m[net::p2p][0m net: path to fa2ec6ac direct LAN 192.168.1.13:38522 (player in)
+[90m   81.670[0m [32mINFO [0m [90m[server::actions][0m <bot47> bot47 says hello
+[90m   83.972[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 1.73 p50 1.47 p99 5.99 max 6.75 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.01, regions 1.12, request 0.16, sync 0.43, rest 0.00 | players 50, cubes 6048, entities 65 | to clients 6232 msgs/s 10217.0 KB/s (Cube 2184/s 8129.7 KB/s, Moves 1000/s 1517.8 KB/s, Components 1000/s 373.8 KB/s, EntityComponents 1000/s 156.5 KB/s, Cracks 187/s 14.7 KB/s, Air 20/s 8.4 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.11 cores (background 0.04, net 0.04, server 0.03) | rss 455 MB, 99 threads
+[90m   88.973[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 1.80 p50 1.54 p99 6.00 max 6.47 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.01, regions 1.18, request 0.16, sync 0.45, rest 0.00 | players 50, cubes 6274, entities 67 | to clients 4330 msgs/s 4608.5 KB/s (Cube 642/s 2532.0 KB/s, Moves 1000/s 1512.2 KB/s, Components 1000/s 373.8 KB/s, EntityComponents 1000/s 167.0 KB/s, Air 20/s 8.4 KB/s, Cracks 137/s 6.3 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.13 cores (background 0.05, server 0.04, net 0.03) | rss 448 MB, 98 threads
+[90m   93.973[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 1.88 p50 1.61 p99 5.98 max 6.27 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.26, request 0.16, sync 0.45, rest 0.00 | players 50, cubes 6274, entities 69 | to clients 4423 msgs/s 5296.6 KB/s (Cube 756/s 2841.1 KB/s, Moves 998/s 1891.3 KB/s, Components 1000/s 373.8 KB/s, EntityComponents 1000/s 168.5 KB/s, Air 20/s 8.4 KB/s, Cracks 108/s 3.7 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.08 cores (server 0.04, net 0.03) | rss 447 MB, 98 threads
+[90m   95.780[0m [32mINFO [0m [90m[server][0m saved 25 cubes in 4.7 ms
+[90m   98.970[0m [32mINFO [0m [90m[server::actions][0m <bot44> bot44 says hello
+[90m   98.974[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 1.94 p50 1.67 p99 7.00 max 10.46 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.24, request 0.17, sync 0.46, rest 0.05 | players 50, cubes 6413, entities 70 | to clients 5719 msgs/s 9207.0 KB/s (Cube 1879/s 6736.3 KB/s, Moves 993/s 1903.9 KB/s, Components 1000/s 373.8 KB/s, EntityComponents 1000/s 166.2 KB/s, Air 20/s 8.4 KB/s, Cracks 157/s 8.0 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.14 cores (server 0.04, net-out 0.04, net 0.03, background 0.03) | rss 442 MB, 98 threads
+[90m  103.974[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 1.85 p50 1.63 p99 5.92 max 5.96 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.21, request 0.15, sync 0.47, rest 0.00 | players 50, cubes 6447, entities 71 | to clients 5520 msgs/s 8495.1 KB/s (Cube 1667/s 6309.8 KB/s, Moves 1000/s 1616.8 KB/s, Components 1000/s 373.8 KB/s, EntityComponents 1000/s 167.1 KB/s, Cracks 157/s 9.4 KB/s, Air 20/s 8.4 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.11 cores (server 0.04, net 0.03, net-out 0.02, background 0.02) | rss 448 MB, 98 threads
+[90m  108.870[0m [32mINFO [0m [90m[server::actions][0m <bot3> bot3 says hello
+[90m  108.975[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 2.06 p50 1.87 p99 6.29 max 6.77 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.44, request 0.14, sync 0.44, rest 0.00 | players 50, cubes 6447, entities 71 | to clients 4553 msgs/s 5139.0 KB/s (Cube 794/s 2943.7 KB/s, Moves 1000/s 1628.5 KB/s, Components 1000/s 373.8 KB/s, EntityComponents 1000/s 167.1 KB/s, Cracks 147/s 8.4 KB/s, Air 20/s 8.4 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.08 cores (server 0.04, net 0.03, net-out 0.01) | rss 439 MB, 98 threads
+[90m  112.170[0m [32mINFO [0m [90m[server::actions][0m <bot49> bot49 says hello
+[90m  113.720[0m [32mINFO [0m [90m[server::actions][0m <bot27> bot27 says hello
+[90m  113.976[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 2.15 p50 2.04 p99 6.47 max 6.50 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.49, request 0.16, sync 0.46, rest 0.00 | players 50, cubes 6447, entities 71 | to clients 4713 msgs/s 4770.1 KB/s (Cube 638/s 2365.0 KB/s, Moves 1000/s 1830.3 KB/s, Components 1000/s 373.7 KB/s, EntityComponents 1000/s 168.0 KB/s, Cracks 196/s 11.1 KB/s, Air 20/s 8.4 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.08 cores (server 0.04, net 0.03, net-out 0.01) | rss 425 MB, 98 threads
+[90m  118.520[0m [32mINFO [0m [90m[server::actions][0m <bot28> bot28 says hello
+[90m  118.977[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 2.01 p50 1.81 p99 6.31 max 6.53 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.37, request 0.16, sync 0.45, rest 0.00 | players 50, cubes 6447, entities 71 | to clients 4517 msgs/s 4945.6 KB/s (Cube 742/s 2654.6 KB/s, Moves 1000/s 1727.3 KB/s, Components 1000/s 373.8 KB/s, EntityComponents 1000/s 166.4 KB/s, Air 20/s 8.4 KB/s, Cracks 137/s 4.5 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.08 cores (server 0.04, net 0.03, net-out 0.01) | rss 411 MB, 99 threads
+[90m  121.120[0m [32mINFO [0m [90m[server::actions][0m <bot45> bot45 says hello
+[90m  121.720[0m [32mINFO [0m [90m[server::actions][0m <bot43> bot43 says hello
+[90m  123.978[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 1.89 p50 1.69 p99 6.18 max 6.30 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.27, request 0.15, sync 0.44, rest 0.00 | players 50, cubes 6447, entities 71 | to clients 4264 msgs/s 4146.8 KB/s (Cube 544/s 1960.3 KB/s, Moves 1000/s 1622.6 KB/s, Components 1000/s 373.7 KB/s, EntityComponents 1000/s 166.5 KB/s, Air 20/s 8.4 KB/s, Cracks 128/s 6.1 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.07 cores (server 0.04, net 0.03) | rss 397 MB, 99 threads
+[90m  125.781[0m [32mINFO [0m [90m[server][0m saved 24 cubes in 5.3 ms
+[90m  128.978[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 1.89 p50 1.58 p99 6.49 max 11.06 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.20, request 0.17, sync 0.45, rest 0.06 | players 50, cubes 6447, entities 71 | to clients 4113 msgs/s 3581.7 KB/s (Moves 1000/s 1703.6 KB/s, Cube 342/s 1311.2 KB/s, Components 1000/s 373.8 KB/s, EntityComponents 1000/s 167.8 KB/s, Air 20/s 8.4 KB/s, Cracks 138/s 7.3 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.07 cores (server 0.04, net 0.03) | rss 383 MB, 98 threads
+[90m  133.979[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 1.95 p50 1.74 p99 6.00 max 6.14 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.29, request 0.17, sync 0.46, rest 0.00 | players 50, cubes 6447, entities 71 | to clients 4209 msgs/s 4213.8 KB/s (Cube 497/s 1872.3 KB/s, Moves 1000/s 1778.7 KB/s, Components 1000/s 373.8 KB/s, EntityComponents 1000/s 166.9 KB/s, Air 20/s 8.4 KB/s, Cracks 138/s 5.7 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.06 cores (server 0.04, net 0.03) | rss 381 MB, 98 threads
+[90m  135.390[0m [32mINFO [0m [90m[net::p2p][0m net: path to 1b94a5bf direct loopback 127.0.0.1:44567 (player in)
+[90m  135.390[0m [32mINFO [0m [90m[net::p2p][0m player 1b94a5bf606461c82dc041ad177e936f88a6a42a454f6b728db442e1b5625262 connected
+[90m  135.420[0m [32mINFO [0m [90m[server::player_file][0m bot50 joined
+[90m  135.490[0m [32mINFO [0m [90m[net::p2p][0m net: path to 99fdad61 direct loopback 127.0.0.1:40818 (player in)
+[90m  135.491[0m [32mINFO [0m [90m[net::p2p][0m player 99fdad6167ee5885e9dda4b6592c02874bb57a08ad1e4a9a5bf0473a018289b9 connected
+[90m  135.520[0m [32mINFO [0m [90m[server::player_file][0m bot51 joined
+[90m  135.591[0m [32mINFO [0m [90m[net::p2p][0m net: path to dc232056 direct loopback 127.0.0.1:53086 (player in)
+[90m  135.591[0m [32mINFO [0m [90m[net::p2p][0m player dc232056372f314dc2cf86fadd40b6b2c61a19644cf93987b67615c7866b9eb3 connected
+[90m  135.620[0m [32mINFO [0m [90m[server::player_file][0m bot52 joined
+[90m  135.693[0m [32mINFO [0m [90m[net::p2p][0m net: path to a95aa134 direct loopback 127.0.0.1:46842 (player in)
+[90m  135.693[0m [32mINFO [0m [90m[net::p2p][0m player a95aa134bc22f86e0f16128404dacb7084d804b9b6a7f4c618af3a365e7e5461 connected
+[90m  135.720[0m [32mINFO [0m [90m[server::player_file][0m bot53 joined
+[90m  135.794[0m [32mINFO [0m [90m[net::p2p][0m net: path to ac0aedc0 direct loopback 127.0.0.1:33409 (player in)
+[90m  135.794[0m [32mINFO [0m [90m[net::p2p][0m player ac0aedc06de3df093a3e857029d9f3fdda3c54f4b9e52ff17342c78579cc63ae connected
+[90m  135.820[0m [32mINFO [0m [90m[server::player_file][0m bot54 joined
+[90m  135.895[0m [32mINFO [0m [90m[net::p2p][0m net: path to a93e7203 direct loopback 127.0.0.1:43328 (player in)
+[90m  135.895[0m [32mINFO [0m [90m[net::p2p][0m player a93e72030008d83f8e0cdbd3688addcafed18fcd28d262813d82e6852d27db72 connected
+[90m  135.920[0m [32mINFO [0m [90m[server::player_file][0m bot55 joined
+[90m  135.996[0m [32mINFO [0m [90m[net::p2p][0m net: path to 093f12bc direct loopback 127.0.0.1:55908 (player in)
+[90m  135.996[0m [32mINFO [0m [90m[net::p2p][0m player 093f12bccbb7ca2edf909539ce97e5ab0c620213d1aa419b94c40423110d481a connected
+[90m  136.020[0m [32mINFO [0m [90m[server::player_file][0m bot56 joined
+[90m  136.096[0m [32mINFO [0m [90m[net::p2p][0m net: path to fac394c9 direct loopback 127.0.0.1:56740 (player in)
+[90m  136.096[0m [32mINFO [0m [90m[net::p2p][0m player fac394c9e18e39a11e12f8bdc21e1a9651b0dba698a84e6ec6a32e02ad70398e connected
+[90m  136.120[0m [32mINFO [0m [90m[server::player_file][0m bot57 joined
+[90m  136.197[0m [32mINFO [0m [90m[net::p2p][0m net: path to b1399c3b direct loopback 127.0.0.1:49831 (player in)
+[90m  136.197[0m [32mINFO [0m [90m[net::p2p][0m player b1399c3bcbd2ba43c31755cfc65b1e314dbe73e8885ad561551824ae31e97439 connected
+[90m  136.220[0m [32mINFO [0m [90m[server::player_file][0m bot58 joined
+[90m  136.299[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3ca5f3b8 direct loopback 127.0.0.1:39166 (player in)
+[90m  136.299[0m [32mINFO [0m [90m[net::p2p][0m player 3ca5f3b8fb498a4c33818072039b2ae4d3c5241555a0c8816600572ca715cae1 connected
+[90m  136.320[0m [32mINFO [0m [90m[server::player_file][0m bot59 joined
+[90m  136.399[0m [32mINFO [0m [90m[net::p2p][0m net: path to 77bcfcc1 direct loopback 127.0.0.1:47024 (player in)
+[90m  136.400[0m [32mINFO [0m [90m[net::p2p][0m player 77bcfcc1380c1ef703fda2d1d29209421b893e316de0fe6c561120733936e5fc connected
+[90m  136.420[0m [32mINFO [0m [90m[server::player_file][0m bot60 joined
+[90m  136.470[0m [32mINFO [0m [90m[server::actions][0m <bot28> bot28 says hello
+[90m  136.501[0m [32mINFO [0m [90m[net::p2p][0m net: path to 235e1ee6 direct loopback 127.0.0.1:53240 (player in)
+[90m  136.501[0m [32mINFO [0m [90m[net::p2p][0m player 235e1ee673fe6c31c698174054f2d9e5e13f1cf3c4d14252aa6e7c4ad62d12e4 connected
+[90m  136.520[0m [32mINFO [0m [90m[server::player_file][0m bot61 joined
+[90m  136.602[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3061e127 direct loopback 127.0.0.1:33490 (player in)
+[90m  136.602[0m [32mINFO [0m [90m[net::p2p][0m player 3061e127eff894986357fa55e7fa6b721bf5c3b77e856dccb9bf2ff50b978e11 connected
+[90m  136.620[0m [32mINFO [0m [90m[server::player_file][0m bot62 joined
+[90m  136.702[0m [32mINFO [0m [90m[net::p2p][0m net: path to 986e389a direct loopback 127.0.0.1:56009 (player in)
+[90m  136.702[0m [32mINFO [0m [90m[net::p2p][0m player 986e389a74eb2239c7c1d962695c07556c67565fd11e8e965cb1caa8be7c34fa connected
+[90m  136.720[0m [32mINFO [0m [90m[server::player_file][0m bot63 joined
+[90m  136.803[0m [32mINFO [0m [90m[net::p2p][0m net: path to 00147716 direct loopback 127.0.0.1:41181 (player in)
+[90m  136.803[0m [32mINFO [0m [90m[net::p2p][0m player 00147716ba6140dde35ff8af8059ce3547c700a658d98f3cde4d45f7db74ae4b connected
+[90m  136.820[0m [32mINFO [0m [90m[server::player_file][0m bot64 joined
+[90m  136.904[0m [32mINFO [0m [90m[net::p2p][0m net: path to 721dc688 direct loopback 127.0.0.1:39654 (player in)
+[90m  136.904[0m [32mINFO [0m [90m[net::p2p][0m player 721dc68839127942f900dcfa1b33bbfa4d9b170c4c93f0cc11cfab79ec641ec5 connected
+[90m  136.920[0m [32mINFO [0m [90m[server::player_file][0m bot65 joined
+[90m  137.006[0m [32mINFO [0m [90m[net::p2p][0m net: path to ef8f69a3 direct loopback 127.0.0.1:40367 (player in)
+[90m  137.006[0m [32mINFO [0m [90m[net::p2p][0m player ef8f69a3ebfc1f94de9a8dd30c0c768e05aa529ee38f9a0b6a4ff7174c09ff2d connected
+[90m  137.020[0m [32mINFO [0m [90m[server::player_file][0m bot66 joined
+[90m  137.107[0m [32mINFO [0m [90m[net::p2p][0m net: path to ee484fe9 direct loopback 127.0.0.1:38176 (player in)
+[90m  137.107[0m [32mINFO [0m [90m[net::p2p][0m player ee484fe97244638882d11b05a8c81be94a558d96f5c7e630f74ce145b817328b connected
+[90m  137.120[0m [32mINFO [0m [90m[server::player_file][0m bot67 joined
+[90m  137.208[0m [32mINFO [0m [90m[net::p2p][0m net: path to 177c7c7b direct loopback 127.0.0.1:54187 (player in)
+[90m  137.209[0m [32mINFO [0m [90m[net::p2p][0m player 177c7c7b386449472c9c097eaa94039b45b88a12dd63743e7a495af2fe8fe028 connected
+[90m  137.220[0m [32mINFO [0m [90m[server::player_file][0m bot68 joined
+[90m  137.309[0m [32mINFO [0m [90m[net::p2p][0m net: path to 9bf29e95 direct loopback 127.0.0.1:44112 (player in)
+[90m  137.309[0m [32mINFO [0m [90m[net::p2p][0m player 9bf29e95cbacac88397350464991f3e01a6f4343e2e7fd34dc9ea2fd88b172f2 connected
+[90m  137.320[0m [32mINFO [0m [90m[server::player_file][0m bot69 joined
+[90m  137.411[0m [32mINFO [0m [90m[net::p2p][0m net: path to d3773e37 direct loopback 127.0.0.1:60772 (player in)
+[90m  137.411[0m [32mINFO [0m [90m[net::p2p][0m player d3773e37dc09397c8864ce7f385808be73d1b4a519e92e6b998d825debb2f7ae connected
+[90m  137.420[0m [32mINFO [0m [90m[server::player_file][0m bot70 joined
+[90m  137.511[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3a4fb0bd direct loopback 127.0.0.1:48297 (player in)
+[90m  137.511[0m [32mINFO [0m [90m[net::p2p][0m player 3a4fb0bdd9707a080ec206008df97be1d554a851d973b7beb865c75c2de79885 connected
+[90m  137.520[0m [32mINFO [0m [90m[server::player_file][0m bot71 joined
+[90m  137.612[0m [32mINFO [0m [90m[net::p2p][0m net: path to fb2f5bf9 direct loopback 127.0.0.1:40410 (player in)
+[90m  137.613[0m [32mINFO [0m [90m[net::p2p][0m player fb2f5bf94abe430c49985c9a184b8d6b6265e57289e6518be089c4061afa017c connected
+[90m  137.620[0m [32mINFO [0m [90m[server::player_file][0m bot72 joined
+[90m  137.713[0m [32mINFO [0m [90m[net::p2p][0m net: path to c00f5779 direct loopback 127.0.0.1:33373 (player in)
+[90m  137.713[0m [32mINFO [0m [90m[net::p2p][0m player c00f5779c858edfcfc02b0fb5fd09bb1e38d9ba7a0beca504257cc9c27552d0f connected
+[90m  137.720[0m [32mINFO [0m [90m[server::player_file][0m bot73 joined
+[90m  137.815[0m [32mINFO [0m [90m[net::p2p][0m net: path to 81829399 direct loopback 127.0.0.1:55360 (player in)
+[90m  137.815[0m [32mINFO [0m [90m[net::p2p][0m player 818293993043a7107f77910719026f98e1ad22a1b924dfa97706eef25a8aeabc connected
+[90m  137.820[0m [32mINFO [0m [90m[server::player_file][0m bot74 joined
+[90m  137.915[0m [32mINFO [0m [90m[net::p2p][0m net: path to 93552df0 direct loopback 127.0.0.1:40646 (player in)
+[90m  137.915[0m [32mINFO [0m [90m[net::p2p][0m player 93552df01aca9ae0e0f670f567d70277604ce7f8dbb6bd732e3014b97be1da23 connected
+[90m  137.920[0m [32mINFO [0m [90m[server::player_file][0m bot75 joined
+[90m  138.017[0m [32mINFO [0m [90m[net::p2p][0m net: path to fdad021a direct loopback 127.0.0.1:39974 (player in)
+[90m  138.017[0m [32mINFO [0m [90m[net::p2p][0m player fdad021a49ab36da892360ae39299cacd471fed753342033962c5c799b7866a2 connected
+[90m  138.020[0m [32mINFO [0m [90m[server::player_file][0m bot76 joined
+[90m  138.117[0m [32mINFO [0m [90m[net::p2p][0m net: path to 8b352147 direct loopback 127.0.0.1:59513 (player in)
+[90m  138.117[0m [32mINFO [0m [90m[net::p2p][0m player 8b3521476c909eaa9864c978eef2c40ebd828c5bc03947303b034b5012aeb72a connected
+[90m  138.120[0m [32mINFO [0m [90m[server::player_file][0m bot77 joined
+[90m  138.218[0m [32mINFO [0m [90m[net::p2p][0m net: path to 4ec5608e direct loopback 127.0.0.1:59821 (player in)
+[90m  138.218[0m [32mINFO [0m [90m[net::p2p][0m player 4ec5608e59c0c81cc1419e39a3fd49a0a2ae417fbb1dd620cc568b36ab6226b8 connected
+[90m  138.220[0m [32mINFO [0m [90m[server::player_file][0m bot78 joined
+[90m  138.320[0m [32mINFO [0m [90m[net::p2p][0m net: path to 911fd05f direct loopback 127.0.0.1:55351 (player in)
+[90m  138.320[0m [32mINFO [0m [90m[net::p2p][0m player 911fd05f97c165de13cc386ad948f4c4a9c7b02d1c530f764d33b0fcf59fdd9b connected
+[90m  138.370[0m [32mINFO [0m [90m[server::player_file][0m bot79 joined
+[90m  138.420[0m [32mINFO [0m [90m[net::p2p][0m net: path to 4c8827cf direct loopback 127.0.0.1:56975 (player in)
+[90m  138.420[0m [32mINFO [0m [90m[net::p2p][0m player 4c8827cf58dea4e0838ebbae6d54556e81906a9a13f68daedea6bf653979f04d connected
+[90m  138.470[0m [32mINFO [0m [90m[server::player_file][0m bot80 joined
+[90m  138.521[0m [32mINFO [0m [90m[net::p2p][0m net: path to f8c96fab direct loopback 127.0.0.1:46136 (player in)
+[90m  138.522[0m [32mINFO [0m [90m[net::p2p][0m player f8c96fabf8a5691f86a4a53df9f9235d8a26e16e93440dc608f5f2e6b756e005 connected
+[90m  138.570[0m [32mINFO [0m [90m[server::player_file][0m bot81 joined
+[90m  138.627[0m [32mINFO [0m [90m[net::p2p][0m net: path to a81e8416 direct loopback 127.0.0.1:42005 (player in)
+[90m  138.627[0m [32mINFO [0m [90m[net::p2p][0m player a81e84169462292836e20916b47dab36f75b332356fcf60338f438204f9708d5 connected
+[90m  138.670[0m [32mINFO [0m [90m[server::player_file][0m bot82 joined
+[90m  138.724[0m [32mINFO [0m [90m[net::p2p][0m net: path to e7aadb13 direct loopback 127.0.0.1:46574 (player in)
+[90m  138.724[0m [32mINFO [0m [90m[net::p2p][0m player e7aadb13dc9b21aa729041dcf8937f04919e08861d9fd9afd7d7720e77df60a5 connected
+[90m  138.770[0m [32mINFO [0m [90m[server::player_file][0m bot83 joined
+[90m  138.825[0m [32mINFO [0m [90m[net::p2p][0m net: path to 9dc2f5d0 direct loopback 127.0.0.1:41629 (player in)
+[90m  138.825[0m [32mINFO [0m [90m[net::p2p][0m player 9dc2f5d08cdd54a1972fd15ca89338f3059116600a998fb141ca80cdd0848078 connected
+[90m  138.870[0m [32mINFO [0m [90m[server::player_file][0m bot84 joined
+[90m  138.925[0m [32mINFO [0m [90m[net::p2p][0m net: path to f1fb5b4a direct loopback 127.0.0.1:52184 (player in)
+[90m  138.925[0m [32mINFO [0m [90m[net::p2p][0m player f1fb5b4a18de69045e53f6d2e53fe672d82f89c1ef7a1144dc28b7f880d28703 connected
+[90m  138.970[0m [32mINFO [0m [90m[server::player_file][0m bot85 joined
+[90m  138.980[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 3.16 p50 2.78 p99 9.14 max 11.86 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.07, regions 1.59, request 0.50, sync 0.92, rest 0.08 | players 86, cubes 6447, entities 105 | to clients 31305 msgs/s 105113.2 KB/s (Cube 25015/s 100854.4 KB/s, Moves 1257/s 2989.5 KB/s, Components 1265/s 486.0 KB/s, EntityComponents 1265/s 354.3 KB/s, Players 493/s 301.3 KB/s, Spawn 495/s 61.4 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.20 cores (net 0.12, server 0.06, net-out 0.01) | rss 584 MB, 135 threads
+[90m  139.027[0m [32mINFO [0m [90m[net::p2p][0m net: path to 16abde74 direct loopback 127.0.0.1:45823 (player in)
+[90m  139.027[0m [32mINFO [0m [90m[net::p2p][0m player 16abde74ee7872344882f2c3a2a5cbc376d250590daab64bc5332716fcf697b9 connected
+[90m  139.070[0m [32mINFO [0m [90m[server::player_file][0m bot86 joined
+[90m  139.128[0m [32mINFO [0m [90m[net::p2p][0m net: path to 593e0c0a direct loopback 127.0.0.1:40506 (player in)
+[90m  139.128[0m [32mINFO [0m [90m[net::p2p][0m player 593e0c0a992c6ba0dad9672466cb97a1dcd43bd92a833c00b47578e45e6c09d5 connected
+[90m  139.170[0m [32mINFO [0m [90m[server::player_file][0m bot87 joined
+[90m  139.228[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3e3cc99f direct loopback 127.0.0.1:40207 (player in)
+[90m  139.229[0m [32mINFO [0m [90m[net::p2p][0m player 3e3cc99f4181dc21d26b61c880f340547adc7e08dc89d1e1610089064ccb6cf6 connected
+[90m  139.270[0m [32mINFO [0m [90m[server::player_file][0m bot88 joined
+[90m  139.330[0m [32mINFO [0m [90m[net::p2p][0m net: path to e2471127 direct loopback 127.0.0.1:58766 (player in)
+[90m  139.330[0m [32mINFO [0m [90m[net::p2p][0m player e24711279843f7bac076f5c68e5fb089195aad404ebd90b2943b6795143d6eb7 connected
+[90m  139.370[0m [32mINFO [0m [90m[server::player_file][0m bot89 joined
+[90m  139.430[0m [32mINFO [0m [90m[net::p2p][0m net: path to c16291e9 direct loopback 127.0.0.1:53770 (player in)
+[90m  139.430[0m [32mINFO [0m [90m[net::p2p][0m player c16291e988e33ba88987223cd9961f6c89c309fad0f32a5adb3f87c141b4010c connected
+[90m  139.470[0m [32mINFO [0m [90m[server::player_file][0m bot90 joined
+[90m  139.531[0m [32mINFO [0m [90m[net::p2p][0m net: path to ff47ee62 direct loopback 127.0.0.1:43866 (player in)
+[90m  139.531[0m [32mINFO [0m [90m[net::p2p][0m player ff47ee62468bd22ba94b1b16e3febcbdf76cbc43a76c216aa863a0b0bc757742 connected
+[90m  139.570[0m [32mINFO [0m [90m[server::player_file][0m bot91 joined
+[90m  139.632[0m [32mINFO [0m [90m[net::p2p][0m net: path to a539eaac direct loopback 127.0.0.1:52618 (player in)
+[90m  139.632[0m [32mINFO [0m [90m[net::p2p][0m player a539eaac17f93548005170880e39a5380245c2e19b9ae36e01a37fd576175789 connected
+[90m  139.670[0m [32mINFO [0m [90m[server::player_file][0m bot92 joined
+[90m  139.733[0m [32mINFO [0m [90m[net::p2p][0m net: path to d602c8ce direct loopback 127.0.0.1:54934 (player in)
+[90m  139.733[0m [32mINFO [0m [90m[net::p2p][0m player d602c8ce424acb9379556db00517c3bb01b0e5e9f00f498bac472408fcac101b connected
+[90m  139.770[0m [32mINFO [0m [90m[server::player_file][0m bot93 joined
+[90m  139.834[0m [32mINFO [0m [90m[net::p2p][0m net: path to d1004004 direct loopback 127.0.0.1:54179 (player in)
+[90m  139.834[0m [32mINFO [0m [90m[net::p2p][0m player d10040040d3883f1624126910602701420c4ad26cd45a8aed6bc9a7eb63759ce connected
+[90m  139.870[0m [32mINFO [0m [90m[server::player_file][0m bot94 joined
+[90m  139.935[0m [32mINFO [0m [90m[net::p2p][0m net: path to c29fc7c2 direct loopback 127.0.0.1:35167 (player in)
+[90m  139.935[0m [32mINFO [0m [90m[net::p2p][0m player c29fc7c2f16993287ee37dd7caf6acda514c72f68eae44f95f54f4738f7a2285 connected
+[90m  139.970[0m [32mINFO [0m [90m[server::player_file][0m bot95 joined
+[90m  140.036[0m [32mINFO [0m [90m[net::p2p][0m net: path to 17d94ded direct loopback 127.0.0.1:32909 (player in)
+[90m  140.037[0m [32mINFO [0m [90m[net::p2p][0m player 17d94ded029e7b94249cd5489c59b2eff2e32407da29eda4cd9acc90e7e183ea connected
+[90m  140.070[0m [32mINFO [0m [90m[server::player_file][0m bot96 joined
+[90m  140.137[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6d8729f5 direct loopback 127.0.0.1:48820 (player in)
+[90m  140.137[0m [32mINFO [0m [90m[net::p2p][0m player 6d8729f533c4dc3e86ec161b9f316c213e5e5853ff064648a226009a33292c5c connected
+[90m  140.170[0m [32mINFO [0m [90m[server::player_file][0m bot97 joined
+[90m  140.239[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3d72d63a direct loopback 127.0.0.1:42740 (player in)
+[90m  140.239[0m [32mINFO [0m [90m[net::p2p][0m player 3d72d63ac2e0269167f6ce7ff6f2b18bcc35b6d59799a46a0690d5fd853b1daf connected
+[90m  140.270[0m [32mINFO [0m [90m[server::player_file][0m bot98 joined
+[90m  140.339[0m [32mINFO [0m [90m[net::p2p][0m net: path to 49e757a5 direct loopback 127.0.0.1:57522 (player in)
+[90m  140.340[0m [32mINFO [0m [90m[net::p2p][0m player 49e757a54085641ce5423e1ae4f50f47f544cd63702a2a56abd97f677b76b3a9 connected
+[90m  140.370[0m [32mINFO [0m [90m[server::player_file][0m bot99 joined
+[90m  141.120[0m [32mINFO [0m [90m[server::actions][0m <bot44> bot44 says hello
+[90m  141.392[0m [32mINFO [0m [90m[net::p2p][0m net: path to 1b94a5bf direct LAN 192.168.1.13:44567 (player in)
+[90m  141.493[0m [32mINFO [0m [90m[net::p2p][0m net: path to 99fdad61 direct LAN 192.168.1.13:40818 (player in)
+[90m  141.594[0m [32mINFO [0m [90m[net::p2p][0m net: path to dc232056 direct LAN 192.168.1.13:53086 (player in)
+[90m  141.797[0m [32mINFO [0m [90m[net::p2p][0m net: path to ac0aedc0 direct LAN 192.168.1.13:33409 (player in)
+[90m  143.515[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3a4fb0bd direct LAN 192.168.1.13:48297 (player in)
+[90m  143.616[0m [32mINFO [0m [90m[net::p2p][0m net: path to fb2f5bf9 direct LAN 192.168.1.13:40410 (player in)
+[90m  143.716[0m [32mINFO [0m [90m[net::p2p][0m net: path to c00f5779 direct LAN 192.168.1.13:33373 (player in)
+[90m  143.918[0m [32mINFO [0m [90m[net::p2p][0m net: path to 93552df0 direct LAN 192.168.1.13:40646 (player in)
+[90m  143.980[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 4.15 p50 3.68 p99 12.27 max 13.57 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.05, regions 2.19, request 0.43, sync 1.43, rest 0.05 | players 100, cubes 6447, entities 123 | to clients 21716 msgs/s 60167.0 KB/s (Cube 13273/s 51171.7 KB/s, Moves 1958/s 7249.2 KB/s, Components 1960/s 741.2 KB/s, EntityComponents 1960/s 685.3 KB/s, Players 262/s 214.2 KB/s, Spawn 266/s 34.2 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.21 cores (net 0.11, server 0.09, net-out 0.01) | rss 641 MB, 149 threads
+[90m  144.020[0m [32mINFO [0m [90m[net::p2p][0m net: path to fdad021a direct LAN 192.168.1.13:39974 (player in)
+[90m  144.221[0m [32mINFO [0m [90m[net::p2p][0m net: path to 4ec5608e direct LAN 192.168.1.13:59821 (player in)
+[90m  144.423[0m [32mINFO [0m [90m[net::p2p][0m net: path to 4c8827cf direct LAN 192.168.1.13:56975 (player in)
+[90m  144.524[0m [32mINFO [0m [90m[net::p2p][0m net: path to f8c96fab direct LAN 192.168.1.13:46136 (player in)
+[90m  144.630[0m [32mINFO [0m [90m[net::p2p][0m net: path to a81e8416 direct LAN 192.168.1.13:42005 (player in)
+[90m  144.828[0m [32mINFO [0m [90m[net::p2p][0m net: path to 9dc2f5d0 direct LAN 192.168.1.13:41629 (player in)
+[90m  145.232[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3e3cc99f direct LAN 192.168.1.13:40207 (player in)
+[90m  145.433[0m [32mINFO [0m [90m[net::p2p][0m net: path to c16291e9 direct LAN 192.168.1.13:53770 (player in)
+[90m  145.534[0m [32mINFO [0m [90m[net::p2p][0m net: path to ff47ee62 direct LAN 172.18.0.1:43866 (player in)
+[90m  145.636[0m [32mINFO [0m [90m[net::p2p][0m net: path to a539eaac direct LAN 192.168.1.13:52618 (player in)
+[90m  145.736[0m [32mINFO [0m [90m[net::p2p][0m net: path to d602c8ce direct LAN 192.168.1.13:54934 (player in)
+[90m  145.938[0m [32mINFO [0m [90m[net::p2p][0m net: path to c29fc7c2 direct LAN 192.168.1.13:35167 (player in)
+[90m  146.040[0m [32mINFO [0m [90m[net::p2p][0m net: path to 17d94ded direct LAN 192.168.1.13:32909 (player in)
+[90m  146.140[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6d8729f5 direct LAN 192.168.1.13:48820 (player in)
+[90m  146.242[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3d72d63a direct LAN 192.168.1.13:42740 (player in)
+[90m  146.343[0m [32mINFO [0m [90m[net::p2p][0m net: path to 49e757a5 direct LAN 192.168.1.13:57522 (player in)
+[90m  148.981[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 3.87 p50 3.38 p99 12.29 max 12.54 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 2.18, request 0.30, sync 1.36, rest 0.00 | players 100, cubes 6447, entities 123 | to clients 11886 msgs/s 17557.4 KB/s (Cube 2667/s 9639.7 KB/s, Moves 2000/s 6373.0 KB/s, Components 2000/s 747.5 KB/s, EntityComponents 2000/s 663.6 KB/s, Cracks 693/s 81.0 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.16 cores (server 0.08, net 0.07, net-out 0.01) | rss 643 MB, 149 threads
+[90m  153.982[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 3.90 p50 3.48 p99 12.28 max 12.89 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 2.19, request 0.32, sync 1.36, rest 0.00 | players 100, cubes 6537, entities 123 | to clients 10239 msgs/s 13353.5 KB/s (Moves 2000/s 6276.1 KB/s, Cube 1399/s 5568.6 KB/s, Components 2000/s 747.5 KB/s, EntityComponents 2000/s 661.0 KB/s, Cracks 573/s 47.0 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.19 cores (server 0.08, net 0.07, background 0.02, net-out 0.02) | rss 641 MB, 148 threads
+[90m  154.170[0m [32mINFO [0m [90m[server::actions][0m <bot23> bot23 says hello
+[90m  155.791[0m [32mINFO [0m [90m[server][0m saved 34 cubes in 8.8 ms
+[90m  158.983[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 4.03 p50 3.51 p99 12.84 max 21.07 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.03, regions 2.25, request 0.31, sync 1.35, rest 0.09 | players 100, cubes 6537, entities 124 | to clients 9974 msgs/s 13875.4 KB/s (Moves 2000/s 7102.0 KB/s, Cube 1452/s 5277.6 KB/s, Components 2000/s 747.5 KB/s, EntityComponents 2000/s 664.1 KB/s, Cracks 514/s 35.1 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.20 cores (server 0.08, net 0.07, net-out 0.05) | rss 641 MB, 148 threads
+[90m  163.984[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 3.92 p50 3.47 p99 12.52 max 12.75 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.03, regions 2.22, request 0.31, sync 1.36, rest 0.00 | players 100, cubes 6584, entities 124 | to clients 10799 msgs/s 16123.4 KB/s (Moves 2000/s 7353.0 KB/s, Cube 2104/s 7261.9 KB/s, Components 2000/s 747.5 KB/s, EntityComponents 2000/s 664.0 KB/s, Cracks 575/s 49.8 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.20 cores (server 0.08, net 0.07, net-out 0.04, background 0.01) | rss 638 MB, 148 threads
+[90m  165.120[0m [32mINFO [0m [90m[server::actions][0m <bot77> bot77 says hello
+[90m  167.420[0m [32mINFO [0m [90m[server::actions][0m <bot29> bot29 says hello
+[90m  168.985[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 4.00 p50 3.60 p99 11.98 max 12.24 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.03, regions 2.29, request 0.31, sync 1.36, rest 0.00 | players 100, cubes 6584, entities 125 | to clients 10862 msgs/s 16524.1 KB/s (Cube 2403/s 8004.7 KB/s, Moves 2000/s 7019.8 KB/s, Components 2000/s 747.5 KB/s, EntityComponents 2000/s 664.8 KB/s, Cracks 476/s 37.8 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.18 cores (server 0.08, net 0.07, net-out 0.03) | rss 624 MB, 148 threads
+[90m  173.985[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 4.08 p50 3.67 p99 12.60 max 12.93 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.03, regions 2.36, request 0.31, sync 1.37, rest 0.00 | players 100, cubes 6584, entities 125 | to clients 10288 msgs/s 13291.0 KB/s (Moves 2000/s 6678.0 KB/s, Cube 1410/s 5100.0 KB/s, Components 2000/s 747.5 KB/s, EntityComponents 2000/s 663.7 KB/s, Cracks 595/s 51.2 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.18 cores (server 0.09, net 0.07, net-out 0.02) | rss 582 MB, 148 threads
+[90m  176.520[0m [32mINFO [0m [90m[server::actions][0m <bot75> bot75 says hello
+[90m  178.986[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 4.05 p50 3.67 p99 12.26 max 12.94 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.03, regions 2.36, request 0.29, sync 1.36, rest 0.00 | players 100, cubes 6636, entities 125 | to clients 9362 msgs/s 12384.6 KB/s (Moves 2000/s 6952.4 KB/s, Cube 908/s 3936.7 KB/s, Components 2000/s 747.5 KB/s, EntityComponents 2000/s 663.0 KB/s, Cracks 516/s 39.8 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.17 cores (server 0.08, net 0.06, background 0.02, net-out 0.01) | rss 548 MB, 148 threads
+[90m  183.987[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 3.94 p50 3.47 p99 12.52 max 12.79 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 2.24, request 0.33, sync 1.35, rest 0.00 | players 100, cubes 6636, entities 125 | to clients 8722 msgs/s 11643.2 KB/s (Moves 2000/s 7324.2 KB/s, Cube 742/s 2843.6 KB/s, Components 2000/s 747.5 KB/s, EntityComponents 2000/s 664.9 KB/s, Cracks 376/s 22.5 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.15 cores (server 0.08, net 0.06, net-out 0.01) | rss 545 MB, 148 threads
+[90m  185.791[0m [32mINFO [0m [90m[server][0m saved 31 cubes in 9.4 ms
+[90m  186.720[0m [32mINFO [0m [90m[server::actions][0m <bot8> bot8 says hello
+[90m  188.988[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 3.85 p50 3.21 p99 18.11 max 21.62 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.99, request 0.31, sync 1.43, rest 0.10 | players 100, cubes 6636, entities 125 | to clients 9331 msgs/s 12258.2 KB/s (Moves 2000/s 6844.9 KB/s, Cube 977/s 3924.1 KB/s, Components 2000/s 747.5 KB/s, EntityComponents 2000/s 664.1 KB/s, Cracks 495/s 33.2 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.15 cores (server 0.07, net 0.06, net-out 0.01) | rss 547 MB, 148 threads
+[90m  193.989[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 4.39 p50 3.30 p99 15.53 max 17.05 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.03, regions 2.06, request 0.36, sync 1.93, rest 0.00 | players 100, cubes 6636, entities 125 | to clients 8558 msgs/s 10224.0 KB/s (Moves 2000/s 6635.2 KB/s, Cube 526/s 2111.0 KB/s, Components 2000/s 747.5 KB/s, EntityComponents 2000/s 663.8 KB/s, Cracks 416/s 26.4 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.15 cores (server 0.07, net 0.07, net-out 0.01) | rss 550 MB, 148 threads
+[90m  198.990[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 3.39 p50 3.01 p99 10.26 max 10.26 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.02, regions 1.81, request 0.29, sync 1.27, rest 0.00 | players 100, cubes 6636, entities 125 | to clients 8495 msgs/s 10423.1 KB/s (Moves 1999/s 7162.4 KB/s, Cube 476/s 1783.7 KB/s, Components 1999/s 747.4 KB/s, EntityComponents 1999/s 664.6 KB/s, Cracks 396/s 25.0 KB/s, Air 40/s 16.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.15 cores (server 0.07, net 0.07, net-out 0.01) | rss 542 MB, 148 threads
+[90m  200.450[0m [32mINFO [0m [90m[net::p2p][0m net: path to 093d26c2 direct loopback 127.0.0.1:57964 (player in)
+[90m  200.450[0m [32mINFO [0m [90m[net::p2p][0m player 093d26c2dff169967331c1af31ec32a631755f5eb1fb3e4b13aeedb34dfdc430 connected
+[90m  200.470[0m [32mINFO [0m [90m[server::player_file][0m bot100 joined
+[90m  200.544[0m [32mINFO [0m [90m[net::p2p][0m net: path to 7ac7699a direct loopback 127.0.0.1:52145 (player in)
+[90m  200.544[0m [32mINFO [0m [90m[net::p2p][0m player 7ac7699ac040a63783e9cb89e17550c8f598044a42996155fd211000a30acb68 connected
+[90m  200.570[0m [32mINFO [0m [90m[server::player_file][0m bot101 joined
+[90m  200.645[0m [32mINFO [0m [90m[net::p2p][0m net: path to 937312b0 direct loopback 127.0.0.1:48420 (player in)
+[90m  200.645[0m [32mINFO [0m [90m[net::p2p][0m player 937312b0745b9dc54aca02108e9b89937a7e0ebcc1e4bccb4ede2af9a1162506 connected
+[90m  200.670[0m [32mINFO [0m [90m[server::player_file][0m bot102 joined
+[90m  200.746[0m [32mINFO [0m [90m[net::p2p][0m net: path to 18fcd46b direct loopback 127.0.0.1:45192 (player in)
+[90m  200.746[0m [32mINFO [0m [90m[net::p2p][0m player 18fcd46b65125f77a5f3c71fcb1da96e9ad3c71f7d573fc76223d9842ae6e850 connected
+[90m  200.770[0m [32mINFO [0m [90m[server::player_file][0m bot103 joined
+[90m  200.847[0m [32mINFO [0m [90m[net::p2p][0m net: path to 08bf1aee direct loopback 127.0.0.1:35497 (player in)
+[90m  200.847[0m [32mINFO [0m [90m[net::p2p][0m player 08bf1aee2338b6393ac2c64d9d454b1452a30c59630a9e539e59b8b3a262685d connected
+[90m  200.870[0m [32mINFO [0m [90m[server::player_file][0m bot104 joined
+[90m  200.947[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3d091f5f direct loopback 127.0.0.1:35456 (player in)
+[90m  200.947[0m [32mINFO [0m [90m[net::p2p][0m player 3d091f5fdce4ef0b05840f6c8f7d281ee782d9074b1b59b48da636c3d775f473 connected
+[90m  200.970[0m [32mINFO [0m [90m[server::player_file][0m bot105 joined
+[90m  201.048[0m [32mINFO [0m [90m[net::p2p][0m net: path to a5daadcd direct loopback 127.0.0.1:60833 (player in)
+[90m  201.048[0m [32mINFO [0m [90m[net::p2p][0m player a5daadcda133c2548d6fc584e8a6cb3e26c120c5013f4e3add80f442fde552cf connected
+[90m  201.070[0m [32mINFO [0m [90m[server::player_file][0m bot106 joined
+[90m  201.149[0m [32mINFO [0m [90m[net::p2p][0m net: path to a253c86a direct loopback 127.0.0.1:51691 (player in)
+[90m  201.149[0m [32mINFO [0m [90m[net::p2p][0m player a253c86a8cb40fc22343e128e450d8f78938858ae418dfdb02ed1f5973bafff0 connected
+[90m  201.170[0m [32mINFO [0m [90m[server::player_file][0m bot107 joined
+[90m  201.250[0m [32mINFO [0m [90m[net::p2p][0m net: path to cf0e94a4 direct loopback 127.0.0.1:44382 (player in)
+[90m  201.250[0m [32mINFO [0m [90m[net::p2p][0m player cf0e94a417a22622f2bf98fb71345d9e843d040cce868f03f591d7b1c4b4346c connected
+[90m  201.270[0m [32mINFO [0m [90m[server::player_file][0m bot108 joined
+[90m  201.352[0m [32mINFO [0m [90m[net::p2p][0m net: path to a0a0e936 direct loopback 127.0.0.1:52400 (player in)
+[90m  201.352[0m [32mINFO [0m [90m[net::p2p][0m player a0a0e936e017ba6882c5ebfe547269a6d3bf54cf6649b99c865251f141117956 connected
+[90m  201.370[0m [32mINFO [0m [90m[server::player_file][0m bot109 joined
+[90m  201.453[0m [32mINFO [0m [90m[net::p2p][0m net: path to 79bcd84b direct loopback 127.0.0.1:41135 (player in)
+[90m  201.454[0m [32mINFO [0m [90m[net::p2p][0m player 79bcd84ba6e0139c6098ec764896f71dc0310b24c82a5ae659cab3f3f9691bc0 connected
+[90m  201.470[0m [32mINFO [0m [90m[server::player_file][0m bot110 joined
+[90m  201.554[0m [32mINFO [0m [90m[net::p2p][0m net: path to b2f702aa direct loopback 127.0.0.1:36634 (player in)
+[90m  201.554[0m [32mINFO [0m [90m[net::p2p][0m player b2f702aad034071831e8707860c0a66d0e51de69b02f6f431464b9bc20ba2a7a connected
+[90m  201.570[0m [32mINFO [0m [90m[server::player_file][0m bot111 joined
+[90m  201.654[0m [32mINFO [0m [90m[net::p2p][0m net: path to cc0bfd4b direct loopback 127.0.0.1:33444 (player in)
+[90m  201.654[0m [32mINFO [0m [90m[net::p2p][0m player cc0bfd4b3eb72783a376422c3bbc65821c65caecff36e45603430294640e9a88 connected
+[90m  201.670[0m [32mINFO [0m [90m[server::player_file][0m bot112 joined
+[90m  201.756[0m [32mINFO [0m [90m[net::p2p][0m net: path to cb59af76 direct loopback 127.0.0.1:57092 (player in)
+[90m  201.756[0m [32mINFO [0m [90m[net::p2p][0m player cb59af766b42c57c25e1b9e6c1d17f0b0ed94a4e60c0c0f26a81613054069f92 connected
+[90m  201.770[0m [32mINFO [0m [90m[server::player_file][0m bot113 joined
+[90m  201.857[0m [32mINFO [0m [90m[net::p2p][0m net: path to b73cd0f3 direct loopback 127.0.0.1:44732 (player in)
+[90m  201.857[0m [32mINFO [0m [90m[net::p2p][0m player b73cd0f343705cca42b97df7010583dfbdbe277185946962a7a403d337abfa6a connected
+[90m  201.870[0m [32mINFO [0m [90m[server::player_file][0m bot114 joined
+[90m  201.958[0m [32mINFO [0m [90m[net::p2p][0m net: path to ce54e1ea direct loopback 127.0.0.1:43843 (player in)
+[90m  201.958[0m [32mINFO [0m [90m[net::p2p][0m player ce54e1ea0faa97d7c6b3ad46a2a4a38d27f0cc4e1024b4d23253fb918cd10951 connected
+[90m  201.970[0m [32mINFO [0m [90m[server::player_file][0m bot115 joined
+[90m  202.059[0m [32mINFO [0m [90m[net::p2p][0m net: path to e36d6284 direct loopback 127.0.0.1:39277 (player in)
+[90m  202.059[0m [32mINFO [0m [90m[net::p2p][0m player e36d62840547252dc76863d9c65c691bc2587ead21d47a8f3f34b0e06ef4ea00 connected
+[90m  202.070[0m [32mINFO [0m [90m[server::player_file][0m bot116 joined
+[90m  202.161[0m [32mINFO [0m [90m[net::p2p][0m net: path to f3371914 direct loopback 127.0.0.1:57794 (player in)
+[90m  202.161[0m [32mINFO [0m [90m[net::p2p][0m player f3371914ecbb59a9b35c8c57b8b9777c4e99217abe3b62a5197d00c87d67bb04 connected
+[90m  202.170[0m [32mINFO [0m [90m[server::player_file][0m bot117 joined
+[90m  202.263[0m [32mINFO [0m [90m[net::p2p][0m net: path to f665ced4 direct loopback 127.0.0.1:43391 (player in)
+[90m  202.263[0m [32mINFO [0m [90m[net::p2p][0m player f665ced46f838491e16d00bad0a4d7430916718e7ed1b8753988c0d09192cf85 connected
+[90m  202.270[0m [32mINFO [0m [90m[server::player_file][0m bot118 joined
+[90m  202.364[0m [32mINFO [0m [90m[net::p2p][0m net: path to 188da71e direct loopback 127.0.0.1:58063 (player in)
+[90m  202.364[0m [32mINFO [0m [90m[net::p2p][0m player 188da71ea21dfdf7cee6b7dca075f97681cf430ab889a230a6603e9e25578706 connected
+[90m  202.370[0m [32mINFO [0m [90m[server::player_file][0m bot119 joined
+[90m  202.466[0m [32mINFO [0m [90m[net::p2p][0m net: path to 1df6e796 direct loopback 127.0.0.1:41771 (player in)
+[90m  202.466[0m [32mINFO [0m [90m[net::p2p][0m player 1df6e7961577454413dc88ef634b8ccd4f1ce525946eff42808434f3113c887e connected
+[90m  202.470[0m [32mINFO [0m [90m[server::player_file][0m bot120 joined
+[90m  202.567[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3e47b875 direct loopback 127.0.0.1:38707 (player in)
+[90m  202.567[0m [32mINFO [0m [90m[net::p2p][0m player 3e47b875a2d572a665d429cf0254520f3a23354ded6217b18c1b2c6f59110282 connected
+[90m  202.570[0m [32mINFO [0m [90m[server::player_file][0m bot121 joined
+[90m  202.668[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3aa761cf direct loopback 127.0.0.1:41421 (player in)
+[90m  202.668[0m [32mINFO [0m [90m[net::p2p][0m player 3aa761cf28f596ad7b0d6f23ceb716df645d97adb14af28d11c3454235fe86fc connected
+[90m  202.670[0m [32mINFO [0m [90m[server::player_file][0m bot122 joined
+[90m  202.769[0m [32mINFO [0m [90m[net::p2p][0m net: path to 22d43072 direct loopback 127.0.0.1:33270 (player in)
+[90m  202.770[0m [32mINFO [0m [90m[net::p2p][0m player 22d430723685ebead78f97b6e061a5473902ace77a52fd8c30881c9dc66799ef connected
+[90m  202.820[0m [32mINFO [0m [90m[server::player_file][0m bot123 joined
+[90m  202.871[0m [32mINFO [0m [90m[net::p2p][0m net: path to 7a073ed4 direct loopback 127.0.0.1:57407 (player in)
+[90m  202.871[0m [32mINFO [0m [90m[net::p2p][0m player 7a073ed4c848de5bc9c80ae22d2d58b7d0e168537b052cc201e22a8b6b1616e1 connected
+[90m  202.920[0m [32mINFO [0m [90m[server::player_file][0m bot124 joined
+[90m  202.972[0m [32mINFO [0m [90m[net::p2p][0m net: path to 9aeeb004 direct loopback 127.0.0.1:44698 (player in)
+[90m  202.972[0m [32mINFO [0m [90m[net::p2p][0m player 9aeeb0041780dcb844b315a6340b48d822d66cb11a07d89fc83b66ffb584304c connected
+[90m  203.020[0m [32mINFO [0m [90m[server::player_file][0m bot125 joined
+[90m  203.073[0m [32mINFO [0m [90m[net::p2p][0m net: path to 43d26996 direct loopback 127.0.0.1:57387 (player in)
+[90m  203.073[0m [32mINFO [0m [90m[net::p2p][0m player 43d269965013ff961339d784d598debeca807bcd8eaebeff32215a32609f2abf connected
+[90m  203.120[0m [32mINFO [0m [90m[server::player_file][0m bot126 joined
+[90m  203.174[0m [32mINFO [0m [90m[net::p2p][0m net: path to 81f051e9 direct loopback 127.0.0.1:52820 (player in)
+[90m  203.174[0m [32mINFO [0m [90m[net::p2p][0m player 81f051e9df7cf26446b743f5908b03e03b7516656054d5f58d8c63f38501a235 connected
+[90m  203.220[0m [32mINFO [0m [90m[server::player_file][0m bot127 joined
+[90m  203.275[0m [32mINFO [0m [90m[net::p2p][0m net: path to ae9b9b36 direct loopback 127.0.0.1:45620 (player in)
+[90m  203.275[0m [32mINFO [0m [90m[net::p2p][0m player ae9b9b368735e2abe69446bbcccea51daca65087173388a17014074b4e54a045 connected
+[90m  203.320[0m [32mINFO [0m [90m[server::player_file][0m bot128 joined
+[90m  203.376[0m [32mINFO [0m [90m[net::p2p][0m net: path to 07e97fef direct loopback 127.0.0.1:53015 (player in)
+[90m  203.377[0m [32mINFO [0m [90m[net::p2p][0m player 07e97fef005a9f18664de8e56a009a8f34f895092b9e764e23f4bb8b36077a60 connected
+[90m  203.420[0m [32mINFO [0m [90m[server::player_file][0m bot129 joined
+[90m  203.477[0m [32mINFO [0m [90m[net::p2p][0m net: path to 1d7d6294 direct loopback 127.0.0.1:37466 (player in)
+[90m  203.477[0m [32mINFO [0m [90m[net::p2p][0m player 1d7d62944ea5a3908d0a03c3ad10c1a0f320c11e73432b136d8dc43711e2f4da connected
+[90m  203.520[0m [32mINFO [0m [90m[server::player_file][0m bot130 joined
+[90m  203.578[0m [32mINFO [0m [90m[net::p2p][0m net: path to c4e327cb direct loopback 127.0.0.1:49173 (player in)
+[90m  203.578[0m [32mINFO [0m [90m[net::p2p][0m player c4e327cb0bbea4330e2487e8991f9d5b5fd43746d13c5b414eee23b671b7d366 connected
+[90m  203.620[0m [32mINFO [0m [90m[server::player_file][0m bot131 joined
+[90m  203.679[0m [32mINFO [0m [90m[net::p2p][0m net: path to 48591067 direct loopback 127.0.0.1:57054 (player in)
+[90m  203.679[0m [32mINFO [0m [90m[net::p2p][0m player 485910679458d601bc7ca446adbe07c5576f7c120d3bedf0ab9fa5ecfc27b7ef connected
+[90m  203.720[0m [32mINFO [0m [90m[server::player_file][0m bot132 joined
+[90m  203.780[0m [32mINFO [0m [90m[net::p2p][0m net: path to 116ef33b direct loopback 127.0.0.1:43196 (player in)
+[90m  203.780[0m [32mINFO [0m [90m[net::p2p][0m player 116ef33b48e5c128750035c63ed79ad7225fe63458deff030cbb32067fe3f630 connected
+[90m  203.820[0m [32mINFO [0m [90m[server::player_file][0m bot133 joined
+[90m  203.881[0m [32mINFO [0m [90m[net::p2p][0m net: path to 520a263a direct loopback 127.0.0.1:52804 (player in)
+[90m  203.881[0m [32mINFO [0m [90m[net::p2p][0m player 520a263a2f6457d19df49aa48ad9df6a64a97a60f135f0fa4590063e24834853 connected
+[90m  203.920[0m [32mINFO [0m [90m[server::player_file][0m bot134 joined
+[90m  203.981[0m [32mINFO [0m [90m[net::p2p][0m net: path to 53eb3da4 direct loopback 127.0.0.1:56220 (player in)
+[90m  203.982[0m [32mINFO [0m [90m[net::p2p][0m player 53eb3da4c048b0a588443f51b338cfed0e5cc8c9dd9168b08b707de6c653099d connected
+[90m  203.991[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 5.99 p50 5.23 p99 17.70 max 17.80 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.10, regions 2.46, request 0.78, sync 2.48, rest 0.17 | players 135, cubes 6636, entities 159 | to clients 37344 msgs/s 113770.4 KB/s (Cube 24861/s 101210.6 KB/s, Moves 2249/s 9569.1 KB/s, EntityComponents 2256/s 980.6 KB/s, Players 826/s 873.9 KB/s, Components 2256/s 858.0 KB/s, Spawn 830/s 100.6 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.33 cores (net 0.17, server 0.11, net-out 0.05) | rss 680 MB, 185 threads
+[90m  204.020[0m [32mINFO [0m [90m[server::player_file][0m bot135 joined
+[90m  204.082[0m [32mINFO [0m [90m[net::p2p][0m net: path to d73c0165 direct loopback 127.0.0.1:45005 (player in)
+[90m  204.083[0m [32mINFO [0m [90m[net::p2p][0m player d73c0165c15d1eb2f0af98e610895ee18a44c80f1896e87723772334a2012e8e connected
+[90m  204.120[0m [32mINFO [0m [90m[server::player_file][0m bot136 joined
+[90m  204.184[0m [32mINFO [0m [90m[net::p2p][0m net: path to 68b70cdf direct loopback 127.0.0.1:36411 (player in)
+[90m  204.184[0m [32mINFO [0m [90m[net::p2p][0m player 68b70cdf4ec6a18bddab734c175a51647b691297c1026a7806b807c959e94e59 connected
+[90m  204.220[0m [32mINFO [0m [90m[server::player_file][0m bot137 joined
+[90m  204.285[0m [32mINFO [0m [90m[net::p2p][0m net: path to 354d2a23 direct loopback 127.0.0.1:49733 (player in)
+[90m  204.285[0m [32mINFO [0m [90m[net::p2p][0m player 354d2a238ff94f01fa369d38d09d15fa5246149b52c307ec19cd7638cedc085e connected
+[90m  204.320[0m [32mINFO [0m [90m[server::player_file][0m bot138 joined
+[90m  204.386[0m [32mINFO [0m [90m[net::p2p][0m net: path to ae0e945a direct loopback 127.0.0.1:49571 (player in)
+[90m  204.386[0m [32mINFO [0m [90m[net::p2p][0m player ae0e945a4a2113c6347b81db57f524a68d2b75669eea2184fd7a9768ea0b6d10 connected
+[90m  204.420[0m [32mINFO [0m [90m[server::player_file][0m bot139 joined
+[90m  204.487[0m [32mINFO [0m [90m[net::p2p][0m net: path to f13205ab direct loopback 127.0.0.1:53262 (player in)
+[90m  204.487[0m [32mINFO [0m [90m[net::p2p][0m player f13205abdd17897bda97eaa14d142929b7ab31f40423e3b4eb8e132a943d5429 connected
+[90m  204.520[0m [32mINFO [0m [90m[server::player_file][0m bot140 joined
+[90m  204.588[0m [32mINFO [0m [90m[net::p2p][0m net: path to 0711ed08 direct loopback 127.0.0.1:60376 (player in)
+[90m  204.588[0m [32mINFO [0m [90m[net::p2p][0m player 0711ed08827a606568016dde0c35b0ecd910f096e099e12c0aa9fb50eb4f0462 connected
+[90m  204.620[0m [32mINFO [0m [90m[server::player_file][0m bot141 joined
+[90m  204.689[0m [32mINFO [0m [90m[net::p2p][0m net: path to 0923b63f direct loopback 127.0.0.1:59528 (player in)
+[90m  204.690[0m [32mINFO [0m [90m[net::p2p][0m player 0923b63f0b31849ea2f49baa6e3ada907e8524b823cc346a5bd7e06ff048f612 connected
+[90m  204.720[0m [32mINFO [0m [90m[server::player_file][0m bot142 joined
+[90m  204.790[0m [32mINFO [0m [90m[net::p2p][0m net: path to f08fe9dc direct loopback 127.0.0.1:41223 (player in)
+[90m  204.790[0m [32mINFO [0m [90m[net::p2p][0m player f08fe9dc521a41ff943d26a7b4523d822cd454b3065f9bf95387c9dfa3bf0da8 connected
+[90m  204.820[0m [32mINFO [0m [90m[server::player_file][0m bot143 joined
+[90m  204.891[0m [32mINFO [0m [90m[net::p2p][0m net: path to f9bc0714 direct loopback 127.0.0.1:49045 (player in)
+[90m  204.891[0m [32mINFO [0m [90m[net::p2p][0m player f9bc0714e2e140da62cebc260cca2440da1d1acd496021dd0352f0952a0b9977 connected
+[90m  204.920[0m [32mINFO [0m [90m[server::player_file][0m bot144 joined
+[90m  204.992[0m [32mINFO [0m [90m[net::p2p][0m net: path to 637ce9bf direct loopback 127.0.0.1:53604 (player in)
+[90m  204.992[0m [32mINFO [0m [90m[net::p2p][0m player 637ce9bfb58ff1e15365314059071d9543a13fcf020f57421802cad5a32d50a9 connected
+[90m  205.020[0m [32mINFO [0m [90m[server::player_file][0m bot145 joined
+[90m  205.093[0m [32mINFO [0m [90m[net::p2p][0m net: path to 81d8b67d direct loopback 127.0.0.1:34074 (player in)
+[90m  205.094[0m [32mINFO [0m [90m[net::p2p][0m player 81d8b67d346da3d001abedb7d6c89f78ff2be9137945c0056ec9188b05fd47fc connected
+[90m  205.120[0m [32mINFO [0m [90m[server::player_file][0m bot146 joined
+[90m  205.170[0m [32mINFO [0m [90m[server::actions][0m <bot60> bot60 says hello
+[90m  205.194[0m [32mINFO [0m [90m[net::p2p][0m net: path to baa8da80 direct loopback 127.0.0.1:57063 (player in)
+[90m  205.194[0m [32mINFO [0m [90m[net::p2p][0m player baa8da809ccb69bf084e1d915ebe25ce48f40491a772cb21693446330fd3e575 connected
+[90m  205.220[0m [32mINFO [0m [90m[server::player_file][0m bot147 joined
+[90m  205.295[0m [32mINFO [0m [90m[net::p2p][0m net: path to 37db7304 direct loopback 127.0.0.1:57222 (player in)
+[90m  205.295[0m [32mINFO [0m [90m[net::p2p][0m player 37db73048c58baac64ee159441c8371d347f1732712af5f6e070ed6c4f4cb5ba connected
+[90m  205.320[0m [32mINFO [0m [90m[server::player_file][0m bot148 joined
+[90m  205.396[0m [32mINFO [0m [90m[net::p2p][0m net: path to c5f0171c direct loopback 127.0.0.1:58791 (player in)
+[90m  205.396[0m [32mINFO [0m [90m[net::p2p][0m player c5f0171ccdde304cce97ff9ced5222d9211c185fecd97fd4e65cb5d01035bac2 connected
+[90m  205.420[0m [32mINFO [0m [90m[server::player_file][0m bot149 joined
+[90m  205.497[0m [32mINFO [0m [90m[net::p2p][0m net: path to 5a985f75 direct loopback 127.0.0.1:38670 (player in)
+[90m  205.497[0m [32mINFO [0m [90m[net::p2p][0m player 5a985f753d5902c3594dbde4e92a2c7029f2012a228a8b85a6e3b7518ea8c4f0 connected
+[90m  205.520[0m [32mINFO [0m [90m[server::player_file][0m bot150 joined
+[90m  205.598[0m [32mINFO [0m [90m[net::p2p][0m net: path to 52656e9c direct loopback 127.0.0.1:55307 (player in)
+[90m  205.598[0m [32mINFO [0m [90m[net::p2p][0m player 52656e9c4a259db474b3eea8f108b1591900715cf7cab04647ee30269b2d3319 connected
+[90m  205.620[0m [32mINFO [0m [90m[server::player_file][0m bot151 joined
+[90m  205.699[0m [32mINFO [0m [90m[net::p2p][0m net: path to b4546021 direct loopback 127.0.0.1:53279 (player in)
+[90m  205.700[0m [32mINFO [0m [90m[net::p2p][0m player b45460214fd8229852b8281b927d45840f665c8cfb54dab295d5dc345f21a6dc connected
+[90m  205.720[0m [32mINFO [0m [90m[server::player_file][0m bot152 joined
+[90m  205.800[0m [32mINFO [0m [90m[net::p2p][0m net: path to 8ec44763 direct loopback 127.0.0.1:39297 (player in)
+[90m  205.800[0m [32mINFO [0m [90m[net::p2p][0m player 8ec44763c34d7d5915c9b13fc2ad7f4ab70669467e9e92b37d962c221668a244 connected
+[90m  205.820[0m [32mINFO [0m [90m[server::player_file][0m bot153 joined
+[90m  205.901[0m [32mINFO [0m [90m[net::p2p][0m net: path to b42dbc53 direct loopback 127.0.0.1:34902 (player in)
+[90m  205.901[0m [32mINFO [0m [90m[net::p2p][0m player b42dbc5350dece24211f43afe7210d8e8d00dc3fe394d540cfa3c16a456a5c1a connected
+[90m  205.920[0m [32mINFO [0m [90m[server::player_file][0m bot154 joined
+[90m  206.002[0m [32mINFO [0m [90m[net::p2p][0m net: path to 77303f82 direct loopback 127.0.0.1:43704 (player in)
+[90m  206.002[0m [32mINFO [0m [90m[net::p2p][0m player 77303f82c36ea5ebb34179d0f3648362e3026c4402c62a20a50d5a6cac99bcb4 connected
+[90m  206.020[0m [32mINFO [0m [90m[server::player_file][0m bot155 joined
+[90m  206.103[0m [32mINFO [0m [90m[net::p2p][0m net: path to 14277935 direct loopback 127.0.0.1:48317 (player in)
+[90m  206.103[0m [32mINFO [0m [90m[net::p2p][0m player 142779353f77b9c5e1881ca65785748e7db9aca7e5050933adb3c80d9fc8476e connected
+[90m  206.120[0m [32mINFO [0m [90m[server::player_file][0m bot156 joined
+[90m  206.204[0m [32mINFO [0m [90m[net::p2p][0m net: path to b7301e00 direct loopback 127.0.0.1:41912 (player in)
+[90m  206.204[0m [32mINFO [0m [90m[net::p2p][0m player b7301e0071091ecae4548a252160b5f6e63e655248ea4fe04e4f893c1f17347d connected
+[90m  206.220[0m [32mINFO [0m [90m[server::player_file][0m bot157 joined
+[90m  206.304[0m [32mINFO [0m [90m[net::p2p][0m net: path to 18d5db86 direct loopback 127.0.0.1:54103 (player in)
+[90m  206.305[0m [32mINFO [0m [90m[net::p2p][0m player 18d5db8696d1ac606eabff7e5506319efe8cfee08f2e21123acd432c32e201ab connected
+[90m  206.320[0m [32mINFO [0m [90m[server::player_file][0m bot158 joined
+[90m  206.406[0m [32mINFO [0m [90m[net::p2p][0m net: path to 366d18c8 direct loopback 127.0.0.1:59992 (player in)
+[90m  206.406[0m [32mINFO [0m [90m[net::p2p][0m player 366d18c85057d8e8fdcb0f4615b827974336c6ff8321861b41bb06fbbd46ad8b connected
+[90m  206.420[0m [32mINFO [0m [90m[server::player_file][0m bot159 joined
+[90m  206.507[0m [32mINFO [0m [90m[net::p2p][0m net: path to cff07939 direct loopback 127.0.0.1:40408 (player in)
+[90m  206.507[0m [32mINFO [0m [90m[net::p2p][0m player cff07939c200151bc1ff90d3569f7df305c522d6c4fe32dd2b69508fada0114a connected
+[90m  206.520[0m [32mINFO [0m [90m[server::player_file][0m bot160 joined
+[90m  206.608[0m [32mINFO [0m [90m[net::p2p][0m net: path to 12b304a9 direct loopback 127.0.0.1:52920 (player in)
+[90m  206.608[0m [32mINFO [0m [90m[net::p2p][0m player 12b304a9a33219f3cfc94a20f8316cee1ff561cff92699695d7b78d33252357f connected
+[90m  206.620[0m [32mINFO [0m [90m[server::player_file][0m bot161 joined
+[90m  206.648[0m [32mINFO [0m [90m[net::p2p][0m net: path to 937312b0 direct LAN 192.168.1.13:48420 (player in)
+[90m  206.709[0m [32mINFO [0m [90m[net::p2p][0m net: path to 5cb30120 direct loopback 127.0.0.1:35635 (player in)
+[90m  206.709[0m [32mINFO [0m [90m[net::p2p][0m player 5cb30120fcce76b0e4d06b113c976a66174f55fa98380ad839de331935e1596b connected
+[90m  206.720[0m [32mINFO [0m [90m[server::player_file][0m bot162 joined
+[90m  206.750[0m [32mINFO [0m [90m[net::p2p][0m net: path to 18fcd46b direct LAN 192.168.1.13:45192 (player in)
+[90m  206.770[0m [32mINFO [0m [90m[server::actions][0m <bot45> bot45 says hello
+[90m  206.810[0m [32mINFO [0m [90m[net::p2p][0m net: path to fa1e31cf direct loopback 127.0.0.1:38383 (player in)
+[90m  206.810[0m [32mINFO [0m [90m[net::p2p][0m player fa1e31cf110d20787d6eaffd399cdb77c1c683b5153abb3284ef0812086763e6 connected
+[90m  206.820[0m [32mINFO [0m [90m[server::player_file][0m bot163 joined
+[90m  206.911[0m [32mINFO [0m [90m[net::p2p][0m net: path to d0041c6f direct loopback 127.0.0.1:33351 (player in)
+[90m  206.911[0m [32mINFO [0m [90m[net::p2p][0m player d0041c6f367d09e64aa47c6ffa89abfa8ddb6047a84666821f17e06025eaf758 connected
+[90m  206.920[0m [32mINFO [0m [90m[server::player_file][0m bot164 joined
+[90m  206.950[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3d091f5f direct LAN 192.168.1.13:35456 (player in)
+[90m  207.012[0m [32mINFO [0m [90m[net::p2p][0m net: path to 1e48a232 direct loopback 127.0.0.1:44165 (player in)
+[90m  207.013[0m [32mINFO [0m [90m[net::p2p][0m player 1e48a23261c23b909fa2d4b04363474149d75c2c73e882b44c6b296e94cd920c connected
+[90m  207.020[0m [32mINFO [0m [90m[server::player_file][0m bot165 joined
+[90m  207.112[0m [32mINFO [0m [90m[net::p2p][0m net: path to 9894205f direct loopback 127.0.0.1:39034 (player in)
+[90m  207.113[0m [32mINFO [0m [90m[net::p2p][0m player 9894205f83e755108951a2e0d70a42e914984dc6245facf133213538a8c36b8c connected
+[90m  207.120[0m [32mINFO [0m [90m[server::player_file][0m bot166 joined
+[90m  207.152[0m [32mINFO [0m [90m[net::p2p][0m net: path to a253c86a direct LAN 192.168.1.13:51691 (player in)
+[90m  207.213[0m [32mINFO [0m [90m[net::p2p][0m net: path to a3c0f42a direct loopback 127.0.0.1:53587 (player in)
+[90m  207.214[0m [32mINFO [0m [90m[net::p2p][0m player a3c0f42abb30d361be25fb3d23b5afe3eeffc58815e5b7e89b1fb0c9bf22362a connected
+[90m  207.220[0m [32mINFO [0m [90m[server::player_file][0m bot167 joined
+[90m  207.255[0m [32mINFO [0m [90m[net::p2p][0m net: path to cf0e94a4 direct LAN 192.168.1.13:44382 (player in)
+[90m  207.323[0m [32mINFO [0m [90m[net::p2p][0m net: path to e3b78c56 direct loopback 127.0.0.1:35922 (player in)
+[90m  207.323[0m [32mINFO [0m [90m[net::p2p][0m player e3b78c562c518700a130ff7bbc672bf9543b5cf8fe229afff751afa5e6f42002 connected
+[90m  207.370[0m [32mINFO [0m [90m[server::player_file][0m bot168 joined
+[90m  207.416[0m [32mINFO [0m [90m[net::p2p][0m net: path to a782f1c2 direct loopback 127.0.0.1:34601 (player in)
+[90m  207.416[0m [32mINFO [0m [90m[net::p2p][0m player a782f1c25fb084a9ed9388014064d6c93c28c308017f3a1f066db2a1df907cbc connected
+[90m  207.420[0m [32mINFO [0m [90m[server::player_file][0m bot169 joined
+[90m  207.517[0m [32mINFO [0m [90m[net::p2p][0m net: path to 9f8462f8 direct loopback 127.0.0.1:41925 (player in)
+[90m  207.517[0m [32mINFO [0m [90m[net::p2p][0m player 9f8462f87fcf76012c5cc124597f2093eb8bd7eeaaf31b9f09808796b0f6cbf5 connected
+[90m  207.520[0m [32mINFO [0m [90m[server::player_file][0m bot170 joined
+[90m  207.619[0m [32mINFO [0m [90m[net::p2p][0m net: path to bed38a79 direct loopback 127.0.0.1:58753 (player in)
+[90m  207.619[0m [32mINFO [0m [90m[net::p2p][0m player bed38a797f03dec045bd4e3be9903738777de5b97e2fe7d69200f4b2ffdb8f6f connected
+[90m  207.620[0m [32mINFO [0m [90m[server::player_file][0m bot171 joined
+[90m  207.670[0m [32mINFO [0m [90m[server::actions][0m <bot155> bot155 says hello
+[90m  207.700[0m [32mINFO [0m [90m[net::p2p][0m net: path to b4546021 direct LAN 192.168.1.13:53279 (player in)
+[90m  207.720[0m [32mINFO [0m [90m[server::actions][0m <bot130> bot130 says hello
+[90m  207.720[0m [32mINFO [0m [90m[net::p2p][0m net: path to f6d1ddc0 direct loopback 127.0.0.1:57409 (player in)
+[90m  207.721[0m [32mINFO [0m [90m[net::p2p][0m player f6d1ddc0b6f92f219298e8e49e7dd7270f4f5ee4dccedfc369e21bd5bf0caf83 connected
+[90m  207.759[0m [32mINFO [0m [90m[net::p2p][0m net: path to cb59af76 direct LAN 192.168.1.13:57092 (player in)
+[90m  207.770[0m [32mINFO [0m [90m[server::player_file][0m bot172 joined
+[90m  207.822[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3a3a1570 direct loopback 127.0.0.1:54162 (player in)
+[90m  207.822[0m [32mINFO [0m [90m[net::p2p][0m player 3a3a15704a48eb161c31be12ba12d3f84f35dc04d9bc5f2cde425b7e3b3aa563 connected
+[90m  207.870[0m [32mINFO [0m [90m[server::player_file][0m bot173 joined
+[90m  207.923[0m [32mINFO [0m [90m[net::p2p][0m net: path to 28d09091 direct loopback 127.0.0.1:55043 (player in)
+[90m  207.923[0m [32mINFO [0m [90m[net::p2p][0m player 28d090913d26100a0a9638cc992afd589c2eab74f94c5be9500a0279841344dd connected
+[90m  207.970[0m [32mINFO [0m [90m[server::player_file][0m bot174 joined
+[90m  208.024[0m [32mINFO [0m [90m[net::p2p][0m net: path to 5d2d2210 direct loopback 127.0.0.1:33539 (player in)
+[90m  208.024[0m [32mINFO [0m [90m[net::p2p][0m player 5d2d22104a2695c93380c39b363abad2f576139fb8aee729be548d51fbd76e07 connected
+[90m  208.070[0m [32mINFO [0m [90m[server::player_file][0m bot175 joined
+[90m  208.125[0m [32mINFO [0m [90m[net::p2p][0m net: path to 631500bd direct loopback 127.0.0.1:51369 (player in)
+[90m  208.126[0m [32mINFO [0m [90m[net::p2p][0m player 631500bd2064d6492ddc9ac68b619565a46dac251df8ed8de5cc99042f8c3498 connected
+[90m  208.170[0m [32mINFO [0m [90m[server::player_file][0m bot176 joined
+[90m  208.226[0m [32mINFO [0m [90m[net::p2p][0m net: path to 997775a6 direct loopback 127.0.0.1:46887 (player in)
+[90m  208.226[0m [32mINFO [0m [90m[net::p2p][0m player 997775a621651e9434115a5e33448faa26261324a4c8d524dadf502de3880351 connected
+[90m  208.270[0m [32mINFO [0m [90m[server::player_file][0m bot177 joined
+[90m  208.328[0m [32mINFO [0m [90m[net::p2p][0m net: path to 279e44a1 direct loopback 127.0.0.1:55059 (player in)
+[90m  208.329[0m [32mINFO [0m [90m[net::p2p][0m player 279e44a1ffdb090a50004de70cd84666e6a01b64ceb9ea8f4f7301f3dd3ea65b connected
+[90m  208.367[0m [32mINFO [0m [90m[net::p2p][0m net: path to 188da71e direct LAN 192.168.1.13:58063 (player in)
+[90m  208.370[0m [32mINFO [0m [90m[server::player_file][0m bot178 joined
+[90m  208.428[0m [32mINFO [0m [90m[net::p2p][0m net: path to 746d3abb direct loopback 127.0.0.1:48771 (player in)
+[90m  208.428[0m [32mINFO [0m [90m[net::p2p][0m player 746d3abbf1f8b1c0f29820f854afb4d2683df2a1cb8fbce14648d765d3740dc0 connected
+[90m  208.470[0m [32mINFO [0m [90m[server::player_file][0m bot179 joined
+[90m  208.529[0m [32mINFO [0m [90m[net::p2p][0m net: path to 7eb81bae direct loopback 127.0.0.1:45427 (player in)
+[90m  208.529[0m [32mINFO [0m [90m[net::p2p][0m player 7eb81bae607d088d6f4ef3cd8dce8a923b7bb9531ad0381bfd2cbbd3cb7bd67e connected
+[90m  208.570[0m [32mINFO [0m [90m[server::player_file][0m bot180 joined
+[90m  208.570[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3e47b875 direct LAN 172.18.0.1:38707 (player in)
+[90m  208.630[0m [32mINFO [0m [90m[net::p2p][0m net: path to 0565cd34 direct loopback 127.0.0.1:58593 (player in)
+[90m  208.630[0m [32mINFO [0m [90m[net::p2p][0m player 0565cd345f495335bb5b3d31111a978cdb814866fccab995bcc3583c0644722d connected
+[90m  208.670[0m [32mINFO [0m [90m[server::player_file][0m bot181 joined
+[90m  208.731[0m [32mINFO [0m [90m[net::p2p][0m net: path to 4d0b5e8f direct loopback 127.0.0.1:46928 (player in)
+[90m  208.731[0m [32mINFO [0m [90m[net::p2p][0m player 4d0b5e8fc14fbdb3d9a7e6bf054b0708ca908a442885e4acc814a3f9041ef259 connected
+[90m  208.770[0m [32mINFO [0m [90m[server::player_file][0m bot182 joined
+[90m  208.772[0m [32mINFO [0m [90m[net::p2p][0m net: path to 22d43072 direct LAN 192.168.1.13:33270 (player in)
+[90m  208.831[0m [32mINFO [0m [90m[net::p2p][0m net: path to 14f2cc0e direct loopback 127.0.0.1:41510 (player in)
+[90m  208.832[0m [32mINFO [0m [90m[net::p2p][0m player 14f2cc0e0c5c801bb0de2196a229d18df8b5a5888900d6e597feb74d5ccfd0c8 connected
+[90m  208.870[0m [32mINFO [0m [90m[server::player_file][0m bot183 joined
+[90m  208.874[0m [32mINFO [0m [90m[net::p2p][0m net: path to 7a073ed4 direct LAN 172.18.0.1:57407 (player in)
+[90m  208.932[0m [32mINFO [0m [90m[net::p2p][0m net: path to b4006d99 direct loopback 127.0.0.1:52522 (player in)
+[90m  208.933[0m [32mINFO [0m [90m[net::p2p][0m player b4006d99277d63875f0b1b6cbd149547fc7cb3e396f2330a3d6ff006632cec7d connected
+[90m  208.970[0m [32mINFO [0m [90m[server::player_file][0m bot184 joined
+[90m  208.993[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 9.46 p50 8.50 p99 25.81 max 27.21 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.17, regions 3.48, request 1.15, sync 4.26, rest 0.40 | players 185, cubes 6636, entities 209 | to clients 58242 msgs/s 178459.2 KB/s (Cube 37916/s 153398.1 KB/s, Moves 3196/s 19087.0 KB/s, Players 1605/s 2370.9 KB/s, EntityComponents 3206/s 1863.1 KB/s, Components 3206/s 1218.1 KB/s, Spawn 1637/s 194.4 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.53 cores (net 0.28, server 0.18, net-out 0.07) | rss 893 MB, 234 threads
+[90m  209.034[0m [32mINFO [0m [90m[net::p2p][0m net: path to 5e767459 direct loopback 127.0.0.1:41120 (player in)
+[90m  209.034[0m [32mINFO [0m [90m[net::p2p][0m player 5e767459981cd305b958178dafe0349be9bf95970d575c2105017a121faa14ac connected
+[90m  209.070[0m [32mINFO [0m [90m[server::player_file][0m bot185 joined
+[90m  209.135[0m [32mINFO [0m [90m[net::p2p][0m net: path to ce59c3c8 direct loopback 127.0.0.1:57565 (player in)
+[90m  209.136[0m [32mINFO [0m [90m[net::p2p][0m player ce59c3c830e802421320f6a037e92ab68cb41391c59f4b63b65b72d5e2ef7fab connected
+[90m  209.170[0m [32mINFO [0m [90m[server::player_file][0m bot186 joined
+[90m  209.177[0m [32mINFO [0m [90m[net::p2p][0m net: path to 81f051e9 direct LAN 192.168.1.13:52820 (player in)
+[90m  209.236[0m [32mINFO [0m [90m[net::p2p][0m net: path to 515e8aac direct loopback 127.0.0.1:41730 (player in)
+[90m  209.236[0m [32mINFO [0m [90m[net::p2p][0m player 515e8aac8c8929bbc47445c57767be6b3534bc347628c4d3221130d8b87fbe9d connected
+[90m  209.270[0m [32mINFO [0m [90m[server::player_file][0m bot187 joined
+[90m  209.337[0m [32mINFO [0m [90m[net::p2p][0m net: path to e22edd71 direct loopback 127.0.0.1:58412 (player in)
+[90m  209.337[0m [32mINFO [0m [90m[net::p2p][0m player e22edd71353e1b6667eb47cde676925ae98bb1a4a41fa074c8e6fadcf6983556 connected
+[90m  209.370[0m [32mINFO [0m [90m[server::player_file][0m bot188 joined
+[90m  209.438[0m [32mINFO [0m [90m[net::p2p][0m net: path to e32eb40c direct loopback 127.0.0.1:39336 (player in)
+[90m  209.438[0m [32mINFO [0m [90m[net::p2p][0m player e32eb40c2182b9033735389a0d69e613f4ccc68b5d85c467be36c50f00ea9716 connected
+[90m  209.470[0m [32mINFO [0m [90m[server::player_file][0m bot189 joined
+[90m  209.518[0m [32mINFO [0m [90m[net::p2p][0m net: path to 9f8462f8 direct LAN 192.168.1.13:41925 (player in)
+[90m  209.539[0m [32mINFO [0m [90m[net::p2p][0m net: path to 0798d8cc direct loopback 127.0.0.1:59736 (player in)
+[90m  209.539[0m [32mINFO [0m [90m[net::p2p][0m player 0798d8cc8257d82fdce04f5ab571e9b818bb51aee8d2b05a0bea362a9a967ced connected
+[90m  209.570[0m [32mINFO [0m [90m[server::player_file][0m bot190 joined
+[90m  209.619[0m [32mINFO [0m [90m[net::p2p][0m net: path to bed38a79 direct LAN 172.18.0.1:58753 (player in)
+[90m  209.640[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3e664aab direct loopback 127.0.0.1:40826 (player in)
+[90m  209.641[0m [32mINFO [0m [90m[net::p2p][0m player 3e664aab5c3e77ffa8da5fe4def77fb906f81b4672eeaededaca39dcc0978a70 connected
+[90m  209.670[0m [32mINFO [0m [90m[server::player_file][0m bot191 joined
+[90m  209.741[0m [32mINFO [0m [90m[net::p2p][0m net: path to 2cc368f1 direct loopback 127.0.0.1:43990 (player in)
+[90m  209.741[0m [32mINFO [0m [90m[net::p2p][0m player 2cc368f1eb502843622c7c255042c70449758b8e92e2830ca01d83f776174c32 connected
+[90m  209.770[0m [32mINFO [0m [90m[server::player_file][0m bot192 joined
+[90m  209.784[0m [32mINFO [0m [90m[net::p2p][0m net: path to 116ef33b direct LAN 192.168.1.13:43196 (player in)
+[90m  209.842[0m [32mINFO [0m [90m[net::p2p][0m net: path to 76f92ad8 direct loopback 127.0.0.1:36960 (player in)
+[90m  209.842[0m [32mINFO [0m [90m[net::p2p][0m player 76f92ad81e67c737a91300252715eca9f0aef9f06448b2edd996b369e7bfba42 connected
+[90m  209.870[0m [32mINFO [0m [90m[server::player_file][0m bot193 joined
+[90m  209.884[0m [32mINFO [0m [90m[net::p2p][0m net: path to 520a263a direct LAN 192.168.1.13:52804 (player in)
+[90m  209.943[0m [32mINFO [0m [90m[net::p2p][0m net: path to e04b4ced direct loopback 127.0.0.1:50933 (player in)
+[90m  209.943[0m [32mINFO [0m [90m[net::p2p][0m player e04b4cedd54b705d42fb695855765db191ea78191a61febd55430113f1863c9b connected
+[90m  209.970[0m [32mINFO [0m [90m[server::player_file][0m bot194 joined
+[90m  210.044[0m [32mINFO [0m [90m[net::p2p][0m net: path to 3cd8bcbc direct loopback 127.0.0.1:41173 (player in)
+[90m  210.044[0m [32mINFO [0m [90m[net::p2p][0m player 3cd8bcbceff07297a13ef497271e734daf3419a81aa8d061b964e5ce2a420be5 connected
+[90m  210.070[0m [32mINFO [0m [90m[server::player_file][0m bot195 joined
+[90m  210.145[0m [32mINFO [0m [90m[net::p2p][0m net: path to 8f08b011 direct loopback 127.0.0.1:40208 (player in)
+[90m  210.146[0m [32mINFO [0m [90m[net::p2p][0m player 8f08b011955bde19e6b8111296a401a1233afb39e4ae4beafdc5b55b36a2e235 connected
+[90m  210.170[0m [32mINFO [0m [90m[server::player_file][0m bot196 joined
+[90m  210.246[0m [32mINFO [0m [90m[net::p2p][0m net: path to 1c637366 direct loopback 127.0.0.1:55467 (player in)
+[90m  210.246[0m [32mINFO [0m [90m[net::p2p][0m player 1c637366c9c44817732c17fee5812fac11a15937648f290c22407e4d1a4b0366 connected
+[90m  210.270[0m [32mINFO [0m [90m[server::player_file][0m bot197 joined
+[90m  210.347[0m [32mINFO [0m [90m[net::p2p][0m net: path to 7da1e609 direct loopback 127.0.0.1:39929 (player in)
+[90m  210.347[0m [32mINFO [0m [90m[net::p2p][0m player 7da1e6091f79f0a1db837710a35fe8ae6f7fa847a3d001669bced2b09e1580b1 connected
+[90m  210.370[0m [32mINFO [0m [90m[server::player_file][0m bot198 joined
+[90m  210.448[0m [32mINFO [0m [90m[net::p2p][0m net: path to d1942de5 direct loopback 127.0.0.1:56003 (player in)
+[90m  210.448[0m [32mINFO [0m [90m[net::p2p][0m player d1942de5b34aff185b5bb8d1ffdf8b7b8a2810c6beee455720ababea20ea61a7 connected
+[90m  210.470[0m [32mINFO [0m [90m[server::player_file][0m bot199 joined
+[90m  210.549[0m [32mINFO [0m [90m[net::p2p][0m net: path to 8489101b direct loopback 127.0.0.1:44950 (player in)
+[90m  210.549[0m [32mINFO [0m [90m[net::p2p][0m player 8489101b6644a745311abea275bc5186507a91437aff7da106c5a0cadc5fac46 connected
+[90m  210.570[0m [32mINFO [0m [90m[server::player_file][0m bot200 joined
+[90m  210.650[0m [32mINFO [0m [90m[net::p2p][0m net: path to 925cabc0 direct loopback 127.0.0.1:35388 (player in)
+[90m  210.650[0m [32mINFO [0m [90m[net::p2p][0m player 925cabc0e24c2e6cb94b5d7646990c36897aad29f0bf617c183b51a417308ca4 connected
+[90m  210.670[0m [32mINFO [0m [90m[server::player_file][0m bot201 joined
+[90m  210.751[0m [32mINFO [0m [90m[net::p2p][0m net: path to abf1d491 direct loopback 127.0.0.1:45964 (player in)
+[90m  210.751[0m [32mINFO [0m [90m[net::p2p][0m player abf1d49115f1980b5ed6c2e56f90eee756f2543d7716d59ad1b794ebfdd908be connected
+[90m  210.770[0m [32mINFO [0m [90m[server::player_file][0m bot202 joined
+[90m  210.852[0m [32mINFO [0m [90m[net::p2p][0m net: path to e7e0accf direct loopback 127.0.0.1:54908 (player in)
+[90m  210.852[0m [32mINFO [0m [90m[net::p2p][0m player e7e0accf7d4bb081030d42cfaf47120aed390de147b406745d0e5a103751ac59 connected
+[90m  210.870[0m [32mINFO [0m [90m[server::player_file][0m bot203 joined
+[90m  210.953[0m [32mINFO [0m [90m[net::p2p][0m net: path to df91c2e6 direct loopback 127.0.0.1:42396 (player in)
+[90m  210.953[0m [32mINFO [0m [90m[net::p2p][0m player df91c2e6dff9e990189ada2e7c7a82bf92f5d1359c1d6c9a5f42a0b58718b1f2 connected
+[90m  210.970[0m [32mINFO [0m [90m[server::player_file][0m bot204 joined
+[90m  211.020[0m [32mINFO [0m [90m[server::actions][0m <bot169> bot169 says hello
+[90m  211.054[0m [32mINFO [0m [90m[net::p2p][0m net: path to b9f99f45 direct loopback 127.0.0.1:58391 (player in)
+[90m  211.054[0m [32mINFO [0m [90m[net::p2p][0m player b9f99f4580f606a4554ad925767ff2b6cb875797b4479cce83e5e4f436882d0e connected
+[90m  211.070[0m [32mINFO [0m [90m[server::player_file][0m bot205 joined
+[90m  211.096[0m [32mINFO [0m [90m[net::p2p][0m net: path to 81d8b67d direct LAN 172.18.0.1:34074 (player in)
+[90m  211.155[0m [32mINFO [0m [90m[net::p2p][0m net: path to 90bc0789 direct loopback 127.0.0.1:55493 (player in)
+[90m  211.155[0m [32mINFO [0m [90m[net::p2p][0m player 90bc0789a91351576378dced3c5b04eae39331fbfce905b4a3fd2c5a2adce28f connected
+[90m  211.170[0m [32mINFO [0m [90m[server::player_file][0m bot206 joined
+[90m  211.256[0m [32mINFO [0m [90m[net::p2p][0m net: path to ba04b63f direct loopback 127.0.0.1:59490 (player in)
+[90m  211.256[0m [32mINFO [0m [90m[net::p2p][0m player ba04b63fe25c54c72470afce081e96e5e9b4445fc4600fd5c6619c7af29b98ff connected
+[90m  211.270[0m [32mINFO [0m [90m[server::player_file][0m bot207 joined
+[90m  211.300[0m [32mINFO [0m [90m[net::p2p][0m net: path to 37db7304 direct LAN 192.168.1.13:57222 (player in)
+[90m  211.357[0m [32mINFO [0m [90m[net::p2p][0m net: path to 02b9f081 direct loopback 127.0.0.1:33189 (player in)
+[90m  211.357[0m [32mINFO [0m [90m[net::p2p][0m player 02b9f0816fd8fcc5a87c8950fe6aad4a76bcabc80840efd0b4e9a724b36f62b0 connected
+[90m  211.370[0m [32mINFO [0m [90m[server::player_file][0m bot208 joined
+[90m  211.399[0m [32mINFO [0m [90m[net::p2p][0m net: path to c5f0171c direct LAN 192.168.1.13:58791 (player in)
+[90m  211.458[0m [32mINFO [0m [90m[net::p2p][0m net: path to d896f01d direct loopback 127.0.0.1:56226 (player in)
+[90m  211.459[0m [32mINFO [0m [90m[net::p2p][0m player d896f01daa002ff3df769452c4d3565aea9d726ada85f4fc7192af5e346ef119 connected
+[90m  211.470[0m [32mINFO [0m [90m[server::player_file][0m bot209 joined
+[90m  211.502[0m [32mINFO [0m [90m[net::p2p][0m net: path to 5a985f75 direct LAN 192.168.1.13:38670 (player in)
+[90m  211.559[0m [32mINFO [0m [90m[net::p2p][0m net: path to 2a25db49 direct loopback 127.0.0.1:47484 (player in)
+[90m  211.559[0m [32mINFO [0m [90m[net::p2p][0m player 2a25db498e1469c52adc8ce9444a71d50cc00594f75cd517a7cb75c450bb1025 connected
+[90m  211.570[0m [32mINFO [0m [90m[server::player_file][0m bot210 joined
+[90m  211.660[0m [32mINFO [0m [90m[net::p2p][0m net: path to 0cd592a3 direct loopback 127.0.0.1:57792 (player in)
+[90m  211.660[0m [32mINFO [0m [90m[net::p2p][0m player 0cd592a3489e093245d862cff72e14705462515324425134269a41a1fc604d03 connected
+[90m  211.670[0m [32mINFO [0m [90m[server::player_file][0m bot211 joined
+[90m  211.761[0m [32mINFO [0m [90m[net::p2p][0m net: path to 93d9e509 direct loopback 127.0.0.1:45925 (player in)
+[90m  211.761[0m [32mINFO [0m [90m[net::p2p][0m player 93d9e509d5983ad0b1047cb1dc933e548b134ca9187cc79bc168aebb0a348637 connected
+[90m  211.770[0m [32mINFO [0m [90m[server::player_file][0m bot212 joined
+[90m  211.862[0m [32mINFO [0m [90m[net::p2p][0m net: path to ea54cfe9 direct loopback 127.0.0.1:53807 (player in)
+[90m  211.862[0m [32mINFO [0m [90m[net::p2p][0m player ea54cfe952472b44bdad3047954a87532a12fee4f7e8fa57d57416dba11c5494 connected
+[90m  211.870[0m [32mINFO [0m [90m[server::player_file][0m bot213 joined
+[90m  211.905[0m [32mINFO [0m [90m[net::p2p][0m net: path to b42dbc53 direct LAN 192.168.1.13:34902 (player in)
+[90m  211.963[0m [32mINFO [0m [90m[net::p2p][0m net: path to bd0408fd direct loopback 127.0.0.1:50119 (player in)
+[90m  211.964[0m [32mINFO [0m [90m[net::p2p][0m player bd0408fd3a269fad9eb3a6b35995a2d12654657666436d4576d5453a075b1985 connected
+[90m  211.970[0m [32mINFO [0m [90m[server::player_file][0m bot214 joined
+[90m  212.064[0m [32mINFO [0m [90m[net::p2p][0m net: path to 7ad74584 direct loopback 127.0.0.1:39940 (player in)
+[90m  212.064[0m [32mINFO [0m [90m[net::p2p][0m player 7ad745842668d908d77b5cf4964c14f123932b10c40f9f5a7f83d378c377c985 connected
+[90m  212.070[0m [32mINFO [0m [90m[server::player_file][0m bot215 joined
+[90m  212.165[0m [32mINFO [0m [90m[net::p2p][0m net: path to 67fd4143 direct loopback 127.0.0.1:50903 (player in)
+[90m  212.165[0m [32mINFO [0m [90m[net::p2p][0m player 67fd4143091728d2792a22ab62079e462158603f3d5b5231a882a59c5bd68dbe connected
+[90m  212.170[0m [32mINFO [0m [90m[server::player_file][0m bot216 joined
+[90m  212.265[0m [32mINFO [0m [90m[net::p2p][0m net: path to 18b13d42 direct loopback 127.0.0.1:57677 (player in)
+[90m  212.266[0m [32mINFO [0m [90m[net::p2p][0m player 18b13d42589859424b608170a22ae0e33605af6224fa8cfe508a0fa289f0b474 connected
+[90m  212.270[0m [32mINFO [0m [90m[server::player_file][0m bot217 joined
+[90m  212.367[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6d6c192e direct loopback 127.0.0.1:39384 (player in)
+[90m  212.367[0m [32mINFO [0m [90m[net::p2p][0m player 6d6c192ea1a0a07fcb301d17bff0a089aedad36d462ae4ba145f7b78c64da32d connected
+[90m  212.370[0m [32mINFO [0m [90m[server::player_file][0m bot218 joined
+[90m  212.468[0m [32mINFO [0m [90m[net::p2p][0m net: path to b26cbbf1 direct loopback 127.0.0.1:53557 (player in)
+[90m  212.468[0m [32mINFO [0m [90m[net::p2p][0m player b26cbbf109de1d2c1baf3341dbc4aed1103216aea75ed781e3fdfa52adfe6ae6 connected
+[90m  212.470[0m [32mINFO [0m [90m[server::player_file][0m bot219 joined
+[90m  212.569[0m [32mINFO [0m [90m[net::p2p][0m net: path to 7acca29a direct loopback 127.0.0.1:55230 (player in)
+[90m  212.569[0m [32mINFO [0m [90m[net::p2p][0m player 7acca29a3b729fc1a5af4153dedf107fe159ef5f0095b1ec56a989a7844b810b connected
+[90m  212.570[0m [32mINFO [0m [90m[server::player_file][0m bot220 joined
+[90m  212.670[0m [32mINFO [0m [90m[net::p2p][0m net: path to dc2ae31e direct loopback 127.0.0.1:45613 (player in)
+[90m  212.670[0m [32mINFO [0m [90m[net::p2p][0m player dc2ae31e640437816db88aa8ae3b7a8185a54a1e372c197768438f428db47ced connected
+[90m  212.720[0m [32mINFO [0m [90m[server::player_file][0m bot221 joined
+[90m  212.770[0m [32mINFO [0m [90m[server::actions][0m <bot48> bot48 says hello
+[90m  212.771[0m [32mINFO [0m [90m[net::p2p][0m net: path to 117655dc direct loopback 127.0.0.1:50081 (player in)
+[90m  212.771[0m [32mINFO [0m [90m[net::p2p][0m player 117655dc864e791f8b6c61b0543fc970cf4285432fb82f8d12527df17adb5c41 connected
+[90m  212.820[0m [32mINFO [0m [90m[server::player_file][0m bot222 joined
+[90m  212.872[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6fc0c6bd direct loopback 127.0.0.1:54415 (player in)
+[90m  212.872[0m [32mINFO [0m [90m[net::p2p][0m player 6fc0c6bded31b9bae4ed0638c28e3e957a9f3b1ef8767c0666df9af352d575b0 connected
+[90m  212.920[0m [32mINFO [0m [90m[server::player_file][0m bot223 joined
+[90m  212.972[0m [32mINFO [0m [90m[net::p2p][0m net: path to 0a5b741e direct loopback 127.0.0.1:60860 (player in)
+[90m  212.973[0m [32mINFO [0m [90m[net::p2p][0m player 0a5b741eb85cd27c64dfb46c878a79efd2381688e7c482756075b354b1e2df7e connected
+[90m  213.020[0m [32mINFO [0m [90m[server::player_file][0m bot224 joined
+[90m  213.075[0m [32mINFO [0m [90m[net::p2p][0m net: path to 9d5f83e6 direct loopback 127.0.0.1:58091 (player in)
+[90m  213.076[0m [32mINFO [0m [90m[net::p2p][0m player 9d5f83e697e84ca9e3af229b07698d27c4665120a696d64842e30a82072cf3b7 connected
+[90m  213.120[0m [32mINFO [0m [90m[server::player_file][0m bot225 joined
+[90m  213.175[0m [32mINFO [0m [90m[net::p2p][0m net: path to f22ce20d direct loopback 127.0.0.1:34800 (player in)
+[90m  213.176[0m [32mINFO [0m [90m[net::p2p][0m player f22ce20dbca35cd69834920c0a4a0907881bd54140951e6fde91c1809510260e connected
+[90m  213.217[0m [32mINFO [0m [90m[net::p2p][0m net: path to a3c0f42a direct LAN 192.168.1.13:53587 (player in)
+[90m  213.220[0m [32mINFO [0m [90m[server::player_file][0m bot226 joined
+[90m  213.270[0m [32mINFO [0m [90m[server::actions][0m <bot163> bot163 says hello
+[90m  213.276[0m [32mINFO [0m [90m[net::p2p][0m net: path to 180c4a3a direct loopback 127.0.0.1:33445 (player in)
+[90m  213.276[0m [32mINFO [0m [90m[net::p2p][0m player 180c4a3ab6356a0f7321d76241a49088b4df002d1fff155c80b655f1be1fe204 connected
+[90m  213.320[0m [32mINFO [0m [90m[server::player_file][0m bot227 joined
+[90m  213.377[0m [32mINFO [0m [90m[net::p2p][0m net: path to 953beb6a direct loopback 127.0.0.1:58309 (player in)
+[90m  213.378[0m [32mINFO [0m [90m[net::p2p][0m player 953beb6adb558becd71b265b3b69470a609fc9aa73fbd91608f3abe5c3674cd8 connected
+[90m  213.420[0m [32mINFO [0m [90m[net::p2p][0m net: path to a782f1c2 direct LAN 172.18.0.1:34601 (player in)
+[90m  213.420[0m [32mINFO [0m [90m[server::player_file][0m bot228 joined
+[90m  213.479[0m [32mINFO [0m [90m[net::p2p][0m net: path to 410d0736 direct loopback 127.0.0.1:59488 (player in)
+[90m  213.479[0m [32mINFO [0m [90m[net::p2p][0m player 410d07360c7eba509827535b094e9177da0c8e6343bf6012590276734e22ca76 connected
+[90m  213.520[0m [32mINFO [0m [90m[server::player_file][0m bot229 joined
+[90m  213.580[0m [32mINFO [0m [90m[net::p2p][0m net: path to 020d4a2b direct loopback 127.0.0.1:52863 (player in)
+[90m  213.580[0m [32mINFO [0m [90m[net::p2p][0m player 020d4a2b6d9984bc6958384892a878757a1d19625063d228729e9a9a04925660 connected
+[90m  213.620[0m [32mINFO [0m [90m[server::player_file][0m bot230 joined
+[90m  213.681[0m [32mINFO [0m [90m[net::p2p][0m net: path to db03f61d direct loopback 127.0.0.1:46385 (player in)
+[90m  213.681[0m [32mINFO [0m [90m[net::p2p][0m player db03f61dc7b2b06c52a984bcbee66b6cf8a203710143648b97ea1001a01bf174 connected
+[90m  213.720[0m [32mINFO [0m [90m[server::player_file][0m bot231 joined
+[90m  213.782[0m [32mINFO [0m [90m[net::p2p][0m net: path to 60dc9b53 direct loopback 127.0.0.1:55646 (player in)
+[90m  213.782[0m [32mINFO [0m [90m[net::p2p][0m player 60dc9b53dcc4fb89df6655532001253abbbec4f069cd25c8fb37632341b37fee connected
+[90m  213.820[0m [32mINFO [0m [90m[server::player_file][0m bot232 joined
+[90m  213.883[0m [32mINFO [0m [90m[net::p2p][0m net: path to dfe5ec4f direct loopback 127.0.0.1:47954 (player in)
+[90m  213.883[0m [32mINFO [0m [90m[net::p2p][0m player dfe5ec4f3520d6328d58073a536ce3f75fe78afcb66d757df6147bcfaadd6bfc connected
+[90m  213.920[0m [32mINFO [0m [90m[server::player_file][0m bot233 joined
+[90m  213.983[0m [32mINFO [0m [90m[net::p2p][0m net: path to a5398d7f direct loopback 127.0.0.1:48489 (player in)
+[90m  213.984[0m [32mINFO [0m [90m[net::p2p][0m player a5398d7f9be946f65d8b393024d2a07be29c6150b61d25b2a753893c587a2c7a connected
+[90m  213.994[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 12.85 p50 11.84 p99 33.07 max 33.69 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.20, regions 4.59, request 1.36, sync 6.03, rest 0.67 | players 234, cubes 6661, entities 259 | to clients 66848 msgs/s 199159.3 KB/s (Cube 39925/s 159324.5 KB/s, Moves 4186/s 30521.2 KB/s, Players 2058/s 4027.7 KB/s, EntityComponents 4196/s 2959.1 KB/s, Components 4196/s 1591.5 KB/s, Spawn 2068/s 245.1 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.74 cores (net 0.35, server 0.25, net-out 0.12, background 0.01) | rss 1160 MB, 284 threads
+[90m  214.020[0m [32mINFO [0m [90m[server::player_file][0m bot234 joined
+[90m  214.027[0m [32mINFO [0m [90m[net::p2p][0m net: path to 5d2d2210 direct LAN 192.168.1.13:33539 (player in)
+[90m  214.085[0m [32mINFO [0m [90m[net::p2p][0m net: path to 201cf670 direct loopback 127.0.0.1:47846 (player in)
+[90m  214.085[0m [32mINFO [0m [90m[net::p2p][0m player 201cf670be844c57496421e0e86383aa0ac5d6791fb32547a356036a61f9ef16 connected
+[90m  214.120[0m [32mINFO [0m [90m[server::player_file][0m bot235 joined
+[90m  214.128[0m [32mINFO [0m [90m[net::p2p][0m net: path to 631500bd direct LAN 192.168.1.13:51369 (player in)
+[90m  214.185[0m [32mINFO [0m [90m[net::p2p][0m net: path to b9836d87 direct loopback 127.0.0.1:59352 (player in)
+[90m  214.186[0m [32mINFO [0m [90m[net::p2p][0m player b9836d87f4dcf6bf1d33a01c7ba89ee9afdc9983dc72ddd5fbed4acdfe9d03a2 connected
+[90m  214.220[0m [32mINFO [0m [90m[server::player_file][0m bot236 joined
+[90m  214.228[0m [32mINFO [0m [90m[net::p2p][0m net: path to 997775a6 direct LAN 192.168.1.13:46887 (player in)
+[90m  214.286[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6d6d44ea direct loopback 127.0.0.1:36151 (player in)
+[90m  214.286[0m [32mINFO [0m [90m[net::p2p][0m player 6d6d44ead9d4ee6844d05a7b70112373131242555f0ea0f36c26363458ead7c6 connected
+[90m  214.320[0m [32mINFO [0m [90m[server::player_file][0m bot237 joined
+[90m  214.370[0m [32mINFO [0m [90m[server::actions][0m <bot70> bot70 says hello
+[90m  214.387[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6a0b54ae direct loopback 127.0.0.1:52999 (player in)
+[90m  214.387[0m [32mINFO [0m [90m[net::p2p][0m player 6a0b54ae8c3bd0a44a2e8181f5d92245d27d1849f57eb8c17841b3c4c6b22dda connected
+[90m  214.420[0m [32mINFO [0m [90m[server::player_file][0m bot238 joined
+[90m  214.488[0m [32mINFO [0m [90m[net::p2p][0m net: path to e43a3675 direct loopback 127.0.0.1:60653 (player in)
+[90m  214.489[0m [32mINFO [0m [90m[net::p2p][0m player e43a3675a0845e4594579f9f62eb9cc3bc34d1cb3073731497753f88e2c9346c connected
+[90m  214.520[0m [32mINFO [0m [90m[server::player_file][0m bot239 joined
+[90m  214.589[0m [32mINFO [0m [90m[net::p2p][0m net: path to edac4450 direct loopback 127.0.0.1:47926 (player in)
+[90m  214.589[0m [32mINFO [0m [90m[net::p2p][0m player edac4450da8fe3ca1d610f7a6324a9826dc791fa4a89d5c2a76414831b53642c connected
+[90m  214.620[0m [32mINFO [0m [90m[server::player_file][0m bot240 joined
+[90m  214.691[0m [32mINFO [0m [90m[net::p2p][0m net: path to 637296b8 direct loopback 127.0.0.1:33734 (player in)
+[90m  214.691[0m [32mINFO [0m [90m[net::p2p][0m player 637296b86fe2a661f2834d43ed3f6a1fddf39af3bb4906e042fe1fa79c4f03de connected
+[90m  214.720[0m [32mINFO [0m [90m[server::player_file][0m bot241 joined
+[90m  214.793[0m [32mINFO [0m [90m[net::p2p][0m net: path to b9be18b1 direct loopback 127.0.0.1:52433 (player in)
+[90m  214.793[0m [32mINFO [0m [90m[net::p2p][0m player b9be18b1eaa94bee62cbf9fdb3d496710810816436777e0380674a9834084026 connected
+[90m  214.820[0m [32mINFO [0m [90m[server::player_file][0m bot242 joined
+[90m  214.894[0m [32mINFO [0m [90m[net::p2p][0m net: path to e384b970 direct loopback 127.0.0.1:44800 (player in)
+[90m  214.894[0m [32mINFO [0m [90m[net::p2p][0m player e384b970d5354e2887e713ad53be158b35412644fa2e607f07f4f913e75dee5c connected
+[90m  214.920[0m [32mINFO [0m [90m[server::player_file][0m bot243 joined
+[90m  214.995[0m [32mINFO [0m [90m[net::p2p][0m net: path to f11e6167 direct loopback 127.0.0.1:45132 (player in)
+[90m  214.995[0m [32mINFO [0m [90m[net::p2p][0m player f11e61672e9c676f3a4238558254e9af508c361a842df0865c845c4318153072 connected
+[90m  215.020[0m [32mINFO [0m [90m[server::player_file][0m bot244 joined
+[90m  215.037[0m [32mINFO [0m [90m[net::p2p][0m net: path to 5e767459 direct LAN 192.168.1.13:41120 (player in)
+[90m  215.095[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6ae3049e direct loopback 127.0.0.1:38891 (player in)
+[90m  215.095[0m [32mINFO [0m [90m[net::p2p][0m player 6ae3049ef7440cac4e6e8ab63d9ff21999aa171247d8fd6323455d6a8fa72010 connected
+[90m  215.120[0m [32mINFO [0m [90m[server::player_file][0m bot245 joined
+[90m  215.138[0m [32mINFO [0m [90m[net::p2p][0m net: path to ce59c3c8 direct LAN 192.168.1.13:57565 (player in)
+[90m  215.196[0m [32mINFO [0m [90m[net::p2p][0m net: path to 75af0ae8 direct loopback 127.0.0.1:45417 (player in)
+[90m  215.196[0m [32mINFO [0m [90m[net::p2p][0m player 75af0ae8838d4abf7183fa7dce6c046b55c2f758d19838a92b796b7e12bb4d07 connected
+[90m  215.220[0m [32mINFO [0m [90m[server::player_file][0m bot246 joined
+[90m  215.297[0m [32mINFO [0m [90m[net::p2p][0m net: path to 314c7e0b direct loopback 127.0.0.1:60993 (player in)
+[90m  215.297[0m [32mINFO [0m [90m[net::p2p][0m player 314c7e0b60344f61daecd14101879addbb4e086ceb092cdd77718bcb83d8ee37 connected
+[90m  215.320[0m [32mINFO [0m [90m[server::player_file][0m bot247 joined
+[90m  215.399[0m [32mINFO [0m [90m[net::p2p][0m net: path to 9ee65cca direct loopback 127.0.0.1:33811 (player in)
+[90m  215.399[0m [32mINFO [0m [90m[net::p2p][0m player 9ee65cca1f37c3f44deba7e0a7415b73bdb60e34e1a64d3d50d7b283c2251cd1 connected
+[90m  215.420[0m [32mINFO [0m [90m[server::player_file][0m bot248 joined
+[90m  215.499[0m [32mINFO [0m [90m[net::p2p][0m net: path to f2b5bd05 direct loopback 127.0.0.1:41015 (player in)
+[90m  215.499[0m [32mINFO [0m [90m[net::p2p][0m player f2b5bd05692ac60103a1b1921f6c713288623456f59b60860d0815ff85e4b217 connected
+[90m  215.520[0m [32mINFO [0m [90m[server::player_file][0m bot249 joined
+[90m  215.744[0m [32mINFO [0m [90m[net::p2p][0m net: path to 2cc368f1 direct LAN 192.168.1.13:43990 (player in)
+[90m  215.815[0m [32mINFO [0m [90m[server][0m saved 29 cubes in 17.2 ms
+[90m  215.845[0m [32mINFO [0m [90m[net::p2p][0m net: path to 76f92ad8 direct LAN 192.168.1.13:36960 (player in)
+[90m  216.148[0m [32mINFO [0m [90m[net::p2p][0m net: path to 8f08b011 direct LAN 192.168.1.13:40208 (player in)
+[90m  216.451[0m [32mINFO [0m [90m[net::p2p][0m net: path to d1942de5 direct LAN 172.18.0.1:56003 (player in)
+[90m  217.270[0m [32mINFO [0m [90m[server::actions][0m <bot245> bot245 says hello
+[90m  217.520[0m [32mINFO [0m [90m[server::actions][0m <bot190> bot190 says hello
+[90m  217.966[0m [32mINFO [0m [90m[net::p2p][0m net: path to bd0408fd direct LAN 192.168.1.13:50119 (player in)
+[90m  218.020[0m [32mINFO [0m [90m[server::actions][0m <bot20> bot20 says hello
+[90m  218.167[0m [32mINFO [0m [90m[net::p2p][0m net: path to 67fd4143 direct LAN 192.168.1.13:50903 (player in)
+[90m  218.471[0m [32mINFO [0m [90m[net::p2p][0m net: path to b26cbbf1 direct LAN 192.168.1.13:53557 (player in)
+[90m  218.774[0m [32mINFO [0m [90m[net::p2p][0m net: path to 117655dc direct LAN 192.168.1.13:50081 (player in)
+[90m  218.875[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6fc0c6bd direct LAN 192.168.1.13:54415 (player in)
+[90m  218.975[0m [32mINFO [0m [90m[net::p2p][0m net: path to 0a5b741e direct LAN 192.168.1.13:60860 (player in)
+[90m  218.995[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 11.76 p50 10.32 p99 29.46 max 45.12 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.12, regions 4.40, request 0.82, sync 5.96, rest 0.47 | players 250, cubes 6661, entities 276 | to clients 47818 msgs/s 117858.9 KB/s (Cube 17839/s 68859.9 KB/s, Moves 4947/s 40911.3 KB/s, EntityComponents 4950/s 3676.8 KB/s, Components 4950/s 1857.8 KB/s, Players 776/s 1758.2 KB/s, Cracks 2574/s 471.5 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.63 cores (net 0.28, server 0.24, net-out 0.11) | rss 1279 MB, 299 threads
+[90m  219.170[0m [32mINFO [0m [90m[server::actions][0m <bot98> bot98 says hello
+[90m  219.178[0m [32mINFO [0m [90m[net::p2p][0m net: path to f22ce20d direct LAN 192.168.1.13:34800 (player in)
+[90m  219.220[0m [32mINFO [0m [90m[server::actions][0m <bot104> bot104 says hello
+[90m  219.320[0m [32mINFO [0m [90m[server::actions][0m <bot71> bot71 says hello
+[90m  219.420[0m [32mINFO [0m [90m[server::actions][0m <bot218> bot218 says hello
+[90m  219.583[0m [32mINFO [0m [90m[net::p2p][0m net: path to 020d4a2b direct LAN 192.168.1.13:52863 (player in)
+[90m  219.683[0m [32mINFO [0m [90m[net::p2p][0m net: path to db03f61d direct LAN 192.168.1.13:46385 (player in)
+[90m  219.785[0m [32mINFO [0m [90m[net::p2p][0m net: path to 60dc9b53 direct LAN 192.168.1.13:55646 (player in)
+[90m  219.887[0m [32mINFO [0m [90m[net::p2p][0m net: path to dfe5ec4f direct LAN 192.168.1.13:47954 (player in)
+[90m  219.986[0m [32mINFO [0m [90m[net::p2p][0m net: path to a5398d7f direct LAN 192.168.1.13:48489 (player in)
+[90m  220.289[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6d6d44ea direct LAN 192.168.1.13:36151 (player in)
+[90m  220.390[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6a0b54ae direct LAN 192.168.1.13:52999 (player in)
+[90m  220.492[0m [32mINFO [0m [90m[net::p2p][0m net: path to e43a3675 direct LAN 192.168.1.13:60653 (player in)
+[90m  220.520[0m [32mINFO [0m [90m[server::actions][0m <bot81> bot81 says hello
+[90m  220.592[0m [32mINFO [0m [90m[net::p2p][0m net: path to edac4450 direct LAN 192.168.1.13:47926 (player in)
+[90m  220.620[0m [32mINFO [0m [90m[server::actions][0m <bot185> bot185 says hello
+[90m  221.098[0m [32mINFO [0m [90m[net::p2p][0m net: path to 6ae3049e direct LAN 192.168.1.13:38891 (player in)
+[90m  221.300[0m [32mINFO [0m [90m[net::p2p][0m net: path to 314c7e0b direct LAN 192.168.1.13:60993 (player in)
+[90m  221.403[0m [32mINFO [0m [90m[net::p2p][0m net: path to 9ee65cca direct LAN 192.168.1.13:33811 (player in)
+[90m  221.502[0m [32mINFO [0m [90m[net::p2p][0m net: path to f2b5bd05 direct LAN 172.18.0.1:41015 (player in)
+[90m  221.970[0m [32mINFO [0m [90m[server::actions][0m <bot14> bot14 says hello
+[90m  222.170[0m [32mINFO [0m [90m[server::actions][0m <bot140> bot140 says hello
+[90m  222.520[0m [32mINFO [0m [90m[server::actions][0m <bot60> bot60 says hello
+[90m  223.520[0m [32mINFO [0m [90m[server::actions][0m <bot0> bot0 says hello
+[90m  223.997[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 10.60 p50 9.71 p99 27.80 max 28.17 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.08, regions 4.37, request 0.68, sync 5.46, rest 0.01 | players 250, cubes 6824, entities 277 | to clients 32333 msgs/s 64088.2 KB/s (Moves 4999/s 41575.5 KB/s, Cube 4456/s 16404.5 KB/s, EntityComponents 4999/s 3614.7 KB/s, Components 4999/s 1868.6 KB/s, Cracks 2343/s 405.3 KB/s, Blocks 1599/s 62.5 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.52 cores (server 0.21, net 0.21, net-out 0.07, background 0.03) | rss 1299 MB, 299 threads
+[90m  227.520[0m [32mINFO [0m [90m[server::actions][0m <bot202> bot202 says hello
+[90m  227.820[0m [32mINFO [0m [90m[server::actions][0m <bot87> bot87 says hello
+[90m  228.020[0m [32mINFO [0m [90m[server::actions][0m <bot182> bot182 says hello
+[90m  228.270[0m [32mINFO [0m [90m[server::actions][0m <bot199> bot199 says hello
+[90m  228.998[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 11.12 p50 10.08 p99 28.07 max 32.12 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.07, regions 4.70, request 0.69, sync 5.65, rest 0.01 | players 250, cubes 6900, entities 280 | to clients 31469 msgs/s 68819.4 KB/s (Moves 4999/s 43570.7 KB/s, Cube 4706/s 19173.6 KB/s, EntityComponents 4999/s 3639.6 KB/s, Components 4999/s 1868.6 KB/s, Cracks 2244/s 376.4 KB/s, EntitySwing 6569/s 57.7 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.53 cores (server 0.22, net 0.21, net-out 0.08, background 0.01) | rss 1310 MB, 298 threads
+[90m  230.070[0m [32mINFO [0m [90m[server::actions][0m <bot64> bot64 says hello
+[90m  230.920[0m [32mINFO [0m [90m[server::actions][0m <bot55> bot55 says hello
+[90m  233.920[0m [32mINFO [0m [90m[server::actions][0m <bot19> bot19 says hello
+[90m  233.999[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 12.74 p50 11.62 p99 33.88 max 34.52 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.07, regions 5.42, request 0.80, sync 6.45, rest 0.01 | players 250, cubes 6900, entities 281 | to clients 34934 msgs/s 72110.8 KB/s (Moves 4999/s 44869.1 KB/s, Cube 5814/s 20978.9 KB/s, EntityComponents 4999/s 3621.0 KB/s, Components 4999/s 1868.6 KB/s, Cracks 2888/s 563.2 KB/s, EntitySwing 8055/s 70.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.56 cores (server 0.26, net 0.23, net-out 0.07) | rss 1229 MB, 298 threads
+[90m  234.720[0m [32mINFO [0m [90m[server::actions][0m <bot125> bot125 says hello
+[90m  236.820[0m [32mINFO [0m [90m[server::actions][0m <bot28> bot28 says hello
+[90m  239.001[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 12.92 p50 11.82 p99 33.74 max 34.35 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.07, regions 5.48, request 0.74, sync 6.62, rest 0.01 | players 250, cubes 6900, entities 281 | to clients 36709 msgs/s 67242.1 KB/s (Moves 4999/s 42677.3 KB/s, Cube 5243/s 18137.5 KB/s, EntityComponents 4999/s 3609.7 KB/s, Components 4999/s 1868.5 KB/s, Cracks 2993/s 718.8 KB/s, EntitySwing 10100/s 88.8 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.56 cores (server 0.26, net 0.24, net-out 0.06) | rss 1118 MB, 298 threads
+[90m  240.420[0m [32mINFO [0m [90m[server::actions][0m <bot75> bot75 says hello
+[90m  244.002[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 12.59 p50 11.64 p99 33.88 max 34.28 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.06, regions 5.34, request 0.79, sync 6.39, rest 0.01 | players 250, cubes 6900, entities 281 | to clients 35323 msgs/s 63438.9 KB/s (Moves 4999/s 41910.2 KB/s, Cube 4395/s 15074.5 KB/s, EntityComponents 4999/s 3613.6 KB/s, Components 4999/s 1868.5 KB/s, Cracks 3089/s 751.1 KB/s, EntitySwing 9592/s 84.3 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.58 cores (server 0.26, net 0.23, net-out 0.10) | rss 1009 MB, 298 threads
+[90m  244.370[0m [32mINFO [0m [90m[server::actions][0m <bot226> bot226 says hello
+[90m  245.825[0m [32mINFO [0m [90m[server][0m saved 40 cubes in 21.4 ms
+[90m  245.920[0m [32mINFO [0m [90m[server::actions][0m <bot235> bot235 says hello
+[90m  246.270[0m [32mINFO [0m [90m[server::actions][0m <bot5> bot5 says hello
+[90m  247.470[0m [32mINFO [0m [90m[server::actions][0m <bot5> bot5 says hello
+[90m  247.920[0m [32mINFO [0m [90m[server::actions][0m <bot11> bot11 says hello
+[90m  248.020[0m [32mINFO [0m [90m[server::actions][0m <bot110> bot110 says hello
+[90m  248.870[0m [32mINFO [0m [90m[server::actions][0m <bot58> bot58 says hello
+[90m  249.003[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 12.65 p50 11.64 p99 33.35 max 55.35 ms, 1 over 50 ms | phases avg insert 0.00, messages 0.08, regions 5.27, request 0.76, sync 6.31, rest 0.22 | players 250, cubes 6900, entities 283 | to clients 33624 msgs/s 60135.0 KB/s (Moves 4999/s 43287.2 KB/s, Cube 2961/s 10473.5 KB/s, EntityComponents 4999/s 3622.2 KB/s, Components 4999/s 1868.5 KB/s, Cracks 2893/s 642.2 KB/s, EntitySwing 8950/s 78.7 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.57 cores (server 0.27, net 0.22, net-out 0.08) | rss 1005 MB, 298 threads
+[90m  249.620[0m [32mINFO [0m [90m[server::actions][0m <bot7> bot7 says hello
+[90m  251.070[0m [32mINFO [0m [90m[server::actions][0m <bot187> bot187 says hello
+[90m  252.270[0m [32mINFO [0m [90m[server::actions][0m <bot64> bot64 says hello
+[90m  253.120[0m [32mINFO [0m [90m[server::actions][0m <bot16> bot16 says hello
+[90m  254.005[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 12.35 p50 11.43 p99 33.02 max 34.65 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.07, regions 5.27, request 0.78, sync 6.22, rest 0.01 | players 250, cubes 6900, entities 283 | to clients 29474 msgs/s 60759.9 KB/s (Moves 4999/s 45437.0 KB/s, Cube 2414/s 9241.2 KB/s, EntityComponents 4999/s 3616.0 KB/s, Components 4999/s 1868.6 KB/s, Cracks 2393/s 416.7 KB/s, EntitySwing 6868/s 60.4 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.55 cores (server 0.25, net 0.21, net-out 0.09) | rss 1014 MB, 298 threads
+[90m  254.170[0m [32mINFO [0m [90m[server::actions][0m <bot42> bot42 says hello
+[90m  254.170[0m [32mINFO [0m [90m[server::actions][0m <bot241> bot241 says hello
+[90m  254.370[0m [32mINFO [0m [90m[server::actions][0m <bot42> bot42 says hello
+[90m  258.420[0m [32mINFO [0m [90m[server::actions][0m <bot165> bot165 says hello
+[90m  258.520[0m [32mINFO [0m [90m[server::actions][0m <bot149> bot149 says hello
+[90m  259.006[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 12.55 p50 11.67 p99 32.55 max 33.21 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.07, regions 5.33, request 0.75, sync 6.38, rest 0.01 | players 250, cubes 6900, entities 283 | to clients 32926 msgs/s 59789.4 KB/s (Moves 4999/s 43808.9 KB/s, Cube 2550/s 9616.2 KB/s, EntityComponents 4999/s 3615.8 KB/s, Components 4999/s 1868.5 KB/s, Cracks 2942/s 655.7 KB/s, EntitySwing 9158/s 80.5 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.56 cores (server 0.25, net 0.22, net-out 0.09) | rss 1027 MB, 298 threads
+[90m  259.170[0m [32mINFO [0m [90m[server::actions][0m <bot141> bot141 says hello
+[90m  259.270[0m [32mINFO [0m [90m[server::actions][0m <bot96> bot96 says hello
+[90m  263.870[0m [32mINFO [0m [90m[server::actions][0m <bot125> bot125 says hello
+[90m  263.970[0m [32mINFO [0m [90m[server::actions][0m <bot19> bot19 says hello
+[90m  264.007[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 11.81 p50 10.99 p99 33.33 max 33.89 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.07, regions 5.07, request 0.75, sync 5.91, rest 0.01 | players 250, cubes 6900, entities 283 | to clients 29268 msgs/s 56343.8 KB/s (Moves 4999/s 42189.8 KB/s, Cube 2179/s 8081.5 KB/s, EntityComponents 4999/s 3612.5 KB/s, Components 4999/s 1868.6 KB/s, Cracks 2444/s 406.2 KB/s, EntitySwing 6814/s 59.9 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.52 cores (server 0.24, net 0.20, net-out 0.07) | rss 1023 MB, 298 threads
+[90m  264.520[0m [32mINFO [0m [90m[server::actions][0m <bot143> bot143 says hello
+[90m  264.670[0m [32mINFO [0m [90m[server::actions][0m <bot85> bot85 says hello
+[90m  268.770[0m [32mINFO [0m [90m[server::actions][0m <bot217> bot217 says hello
+[90m  269.009[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 12.76 p50 11.65 p99 33.57 max 34.26 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.07, regions 5.45, request 0.73, sync 6.50, rest 0.01 | players 250, cubes 6900, entities 283 | to clients 30774 msgs/s 56251.4 KB/s (Moves 4999/s 42809.6 KB/s, Cube 1826/s 7202.2 KB/s, EntityComponents 4999/s 3612.1 KB/s, Components 4999/s 1868.5 KB/s, Cracks 2890/s 558.2 KB/s, EntitySwing 7910/s 69.5 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.56 cores (server 0.26, net 0.23, net-out 0.07) | rss 1014 MB, 298 threads
+[90m  269.920[0m [32mINFO [0m [90m[server::actions][0m <bot93> bot93 says hello
+[90m  270.520[0m [32mINFO [0m [90m[server::actions][0m <bot57> bot57 says hello
+[90m  270.520[0m [32mINFO [0m [90m[server::actions][0m <bot219> bot219 says hello
+[90m  272.020[0m [32mINFO [0m [90m[server::actions][0m <bot116> bot116 says hello
+[90m  273.420[0m [32mINFO [0m [90m[server::actions][0m <bot165> bot165 says hello
+[90m  274.010[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 12.79 p50 11.66 p99 33.54 max 33.66 ms, 0 over 50 ms | phases avg insert 0.00, messages 0.07, regions 5.46, request 0.79, sync 6.44, rest 0.01 | players 250, cubes 6900, entities 283 | to clients 30728 msgs/s 57456.1 KB/s (Moves 4999/s 45006.5 KB/s, Cube 1402/s 6169.7 KB/s, EntityComponents 4999/s 3616.2 KB/s, Components 4999/s 1868.5 KB/s, Cracks 2988/s 577.9 KB/s, Blocks 2069/s 71.3 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.58 cores (server 0.26, net 0.22, net-out 0.09) | rss 989 MB, 298 threads
+[90m  275.320[0m [32mINFO [0m [90m[server::actions][0m <bot149> bot149 says hello
+[90m  275.823[0m [32mINFO [0m [90m[server][0m saved 37 cubes in 20.2 ms
+[90m  279.012[0m [32mINFO [0m [90m[dedicated][0m server stats per 5.0 s: 100 ticks (20.0/s), tick avg 11.50 p50 9.98 p99 31.36 max 53.00 ms, 1 over 50 ms | phases avg insert 0.00, messages 0.03, regions 5.38, request 0.28, sync 5.60, rest 0.21 | players 250, cubes 6900, entities 283 | to clients 22664 msgs/s 23379.6 KB/s (Moves 1691/s 14922.2 KB/s, EntityComponents 4999/s 3618.0 KB/s, Cube 654/s 2629.0 KB/s, Components 4999/s 1868.5 KB/s, Cracks 897/s 190.6 KB/s, EntitySwing 7617/s 66.9 KB/s) | to server 0 msgs/s 0.0 KB/s () | cpu 0.42 cores (server 0.24, net 0.13, net-out 0.05) | rss 1007 MB, 298 threads

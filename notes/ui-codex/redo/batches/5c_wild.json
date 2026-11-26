@@ -1,0 +1,18 @@
+[
+ {
+  "kind": "item",
+  "name": "cattail_root",
+  "what": "a cattail root: a pale cream-tan starchy rhizome lying diagonally, segmented with faint rings, a few thin brown root hairs, one cut end showing white starchy flesh",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_wild_rice",
+  "what": "a wooden bowl of cooked wild rice seen from the front and slightly above: long slender dark brown-black grains, some split open showing pale insides, a soft shine, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ }
+]

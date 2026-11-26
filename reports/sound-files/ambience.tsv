@@ -1,0 +1,27 @@
+# Ambience beds, calls and liquid loops (mods/base/src/ambience.rs). python3 sfx.py ambience.tsv mods/base/assets/sounds
+ambient/dawn1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/856634_Noisyjones_henllys_woods_22_06_2026_dawn_chorus.mp3	loop:24	30	-24
+ambient/night1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/522299_Defelozedd94_crickets_at_night_raw_sound.mp3	loop:80	30	-26
+ambient/dry1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/156414_felix.blume_wind_blowing_into_some_cactus_spine_on_the_top_o.mp3	loop:67	30	-26
+ambient/swamp1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/633817_DBlover_frogs_and_geese_in_a_swamp.mp3	loop:110	30	-24
+ambient/surf1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/155641_felix.blume_ocean_waves_crushing_on_the_chilean_shore.mp3	loop:33	24	-22
+ambient/water_flow1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/231536_VKProduktion_creek_06_loop.mp3	loop:2	20	-22
+ambient/water_still1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/614299_TheFlyFishingFilmmaker_gentle_waves_on_a_lake.mp3	loop:116	20	-26
+ambient/lava1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/474851_Fission9_lava_loop_3.mp3	loop:13	20	-24
+ambient/call/lava_pop1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/145036_ATG142_lava.mp3	hit:0	1.2	-4
+ambient/call/lava_pop2.ogg	~/Coding/chiacraft-archive/references/sound/freesound/145036_ATG142_lava.mp3	hit:1	1.2	-4
+ambient/call/drip1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/234554_Electroviolence_dripping_water.mp3	hit:0	1.0	-6
+ambient/call/drip2.ogg	~/Coding/chiacraft-archive/references/sound/freesound/234554_Electroviolence_dripping_water.mp3	hit:1	1.0	-6
+ambient/call/drip3.ogg	~/Coding/chiacraft-archive/references/sound/freesound/234554_Electroviolence_dripping_water.mp3	hit:2	1.0	-6
+ambient/call/raven1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/723570_SoundsLikeYukon_solitary_raven_cawing.mp3	hit:0	1.6	-3
+ambient/call/raven2.ogg	~/Coding/chiacraft-archive/references/sound/freesound/723570_SoundsLikeYukon_solitary_raven_cawing.mp3	hit:1	1.6	-3
+ambient/call/owl1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/871240_SyntaxSeed_owl_4.mp3	copy	4	-3
+ambient/call/gull1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/263786_steaq_seagull_single_call.mp3	copy	2	-3
+ambient/call/frog1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/527846_D.jones_frog_croaks.mp3	hit:0	1.2	-4
+ambient/call/frog2.ogg	~/Coding/chiacraft-archive/references/sound/freesound/527846_D.jones_frog_croaks.mp3	hit:1	1.2	-4
+ambient/call/frog3.ogg	~/Coding/chiacraft-archive/references/sound/freesound/397028_ceelum_croaking.mp3	hit:0	1.2	-4
+ambient/call/bird1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/730301_HECKFRICKER_quiet_forest_single_bird.mp3	hit:0	2.5	-4
+ambient/call/bird2.ogg	~/Coding/chiacraft-archive/references/sound/freesound/730301_HECKFRICKER_quiet_forest_single_bird.mp3	hit:1	2.5	-4
+ambient/birds1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/788118_RealSquink_forest_day_bird_chirps_insects.mp3	loop:73	30	-26
+ambient/call/owl2.ogg	~/Coding/chiacraft-archive/references/sound/freesound/465697_Breviceps_owl_hoot.mp3	copy	4	-3
+ambient/call/bird3.ogg	~/Coding/chiacraft-archive/references/sound/freesound/346853_Kinoton_single_blackbird_at_dawn.mp3	hit:0	2.5	-4
+ambient/call/bird4.ogg	~/Coding/chiacraft-archive/references/sound/freesound/671058_Andrew.soundscape_robin_song.mp3	hit:0	2.5	-4

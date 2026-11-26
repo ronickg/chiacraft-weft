@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a flint shovel: a rounded spade blade made of crude knapped grey-brown flint with chipped faceted edges and a few lighter flake scars, lashed with tan sinew cord to a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.424,
+   "outline": 0.68,
+   "red_line": 0.07,
+   "fill": 0.21,
+   "passed": true
+  }
+ ]
+}

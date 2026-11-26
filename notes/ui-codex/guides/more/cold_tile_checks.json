@@ -1,0 +1,19 @@
+{
+ "kind": "ui",
+ "what": "a 24 x 24 square status tile centred on the canvas: a bronze frame, a dark centre holding one bright pale-blue snowflake, for the cold debuff",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.356,
+   "outline": 3.76,
+   "red_line": 0.0,
+   "fill": 0.61,
+   "passed": true
+  }
+ ]
+}

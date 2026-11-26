@@ -1,0 +1,14 @@
+{
+ "kind": "base:sword",
+ "layer": "blade",
+ "material": "stone",
+ "override": true,
+ "regions": [
+  "blade",
+  "guard"
+ ],
+ "socket": [
+  8.1,
+  23.4
+ ]
+}

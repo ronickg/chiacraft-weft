@@ -1,0 +1,18 @@
+{
+ "kind": "block",
+ "what": "muted natural green grass tufts. A new variant of the attached texture (the last image before the grid, from my game): the same colours, the same size of clumps and shapes, the same light and style, but a different arrangement of them, so this tile and the original placed side by side don't look like a repeat. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants.",
+ "size": [
+  32,
+  32
+ ],
+ "full": true,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.543,
+   "empty": 0,
+   "seam": 0.99,
+   "passed": true
+  }
+ ]
+}

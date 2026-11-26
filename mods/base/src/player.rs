@@ -1,93 +1,106 @@
-//! Survival rules on top of the engine's player: hunger, regeneration, drowning, armor, eating,
-//! the HUD and the inventory screen with its 2x2 crafting grid.
+//! The player's armor, its HUD points and the inventory screen with its 2x2 crafting grid; eating,
+//! stamina, health and breath are the vitals' (`survival/`).
 
 use weft_sdk::*;
 
-use crate::items::{ARMOR, FOOD};
+use crate::items::ARMOR;
 
-pub use base_api::{FEET, HEAD, HUNGER, Hunger, LEGS};
+pub use base_api::slots::{self, EQUIPMENT};
 
-/// Every 4 seconds a player with a full belly heals and a starving one hurts, like vanilla's.
-const PULSE_TICKS: u32 = 80;
-pub static INVENTORY: Menu = Menu::named("inventory");
-pub static CRAFTING: Menu = Menu::named("crafting_table");
-static HUD_HEALTH: HudElement = HudElement::named("health");
+pub use base_api::menus::{CRAFTING, INVENTORY};
 static HUD_ARMOR: HudElement = HudElement::named("armor");
-static HUD_FOOD: HudElement = HudElement::named("food");
 static HUD_AIR: HudElement = HudElement::named("air");
 static HUD_ATTACK: HudElement = HudElement::named("attack_indicator");
-static WATER_LIKE: Tag = Tag::named("water");
 
-const MAX_AIR: f32 = 300.0;
-
-/// Head to feet.
-pub const EQUIPMENT: [&EquipmentSlot; 4] = [&HEAD, &base_api::CHEST, &LEGS, &FEET];
-
-/// Armor points and toughness of what `entity` wears.
-fn armor_of(w: &World, entity: u64) -> (u32, f32) {
-    let Some(worn) = w.inventory(entity).find_group(EQUIPMENT_GROUP) else { return (0, 0.0) };
-    (0..worn.len())
-        .filter_map(|i| ARMOR.on_item(worn.get(i).item))
-        .fold((0, 0.0), |t, a| (t.0 + a.points, t.1 + a.toughness))
+/// Armor and the health it adds (engine points) of what `entity` wears, from the curve by each
+/// piece's shell and slot (`vitals::gear::armour`), carried by each piece built from parts
+/// (`parts::ARMOUR_OF`). A worn-out piece stops nothing.
+pub fn armor_of(w: &World, entity: u64) -> (f32, f32) {
+    armor_against(w, entity, 0)
 }
 
+/// `armor_of` against `foe` (0: none): each piece's armour counts as much as the foe lets gear of
+/// its item level count (`base_api::chains::GEAR_COUNTS`: a big creature caps over-tier armour as
+/// it caps over-tier weapons). Health from armour is never capped: it's the player's, not the hit's.
+pub fn armor_against(w: &World, entity: u64, foe: u64) -> (f32, f32) {
+    let Some(worn) = w.inventory(entity).find_group(EQUIPMENT_GROUP) else { return (0.0, 0.0) };
+    (0..worn.len())
+        .filter_map(|i| {
+            let s = worn.get(i);
+            ARMOR.on_item(s.item)?;
+            if crate::parts::broken(&s) {
+                return None;
+            }
+            let a = crate::parts::ARMOUR_OF.on_stack_own(&s)?;
+            let counts = match (foe, base_api::ITEM_LEVEL.on_stack(&s)) {
+                (0, _) | (_, None) => 1.0,
+                (_, Some(level)) => {
+                    let q = abi::Query { entity, other: foe, amount: level as f64, ..abi::Query::DEFAULT };
+                    w.chain_compute(&base_api::chains::GEAR_COUNTS, 1.0, &q)
+                        .clamp(0.0, 1.0) as f32
+                }
+            };
+            Some((a.armour * counts, a.health))
+        })
+        .fold((0.0, 0.0), |t, a| (t.0 + a.0, t.1 + a.1))
+}
+
+/// How much bigger held items are in the player's own first-person hand than Weft draws them
+/// (`comp::FIRST_PERSON_HELD_SCALE`).
+const FIRST_PERSON_ITEMS: f32 = 1.8;
+
 pub fn register(r: &mut Registry) {
-    r.player_inventory()
+    // Third person sways and jolts as first person does (chiacraft's feel; Weft's own behind and
+    // front cameras are still).
+    drop(
+        r.edit(&cameras::BEHIND)
+            .tag(weft_sdk::abi::comp::camera::EFFECTS),
+    );
+    drop(
+        r.edit(&cameras::FRONT)
+            .tag(weft_sdk::abi::comp::camera::EFFECTS),
+    );
+    // Held items about as big in the view as they were before the Weft sync (Ronald: "our items
+    // a bit bigger"): Weft holds them in the posed hand, smaller than our old corner.
+    r.edit(&PLAYER)
+        .set(&FIRST_PERSON_HELD_SCALE, FIRST_PERSON_ITEMS);
+    r.player_slots()
         .group("hotbar", Slots::row(9).hotbar())
         .group("main", Slots::grid(9, 3));
+    for (slot, covers, piece) in [
+        (&slots::HEAD, worn::HEAD, "helmet"),
+        (&slots::CHEST, worn::CHEST, "chestplate"),
+        (&slots::LEGS, worn::LEGS, "leggings"),
+        (&slots::FEET, worn::FEET, "boots"),
+    ] {
+        r.equipment_slot(slot, covers, &format!("slot_{piece}"));
+    }
+    // Clothes under the armor (`vitals::clothing`): warmth, no protection.
     for (slot, parts, piece) in [
-        (&HEAD, worn_parts::HEAD, "helmet"),
-        (&base_api::CHEST, worn_parts::BODY | worn_parts::ARMS, "chestplate"),
-        (&LEGS, worn_parts::BODY | worn_parts::LEGS, "leggings"),
-        (&FEET, worn_parts::LEGS, "boots"),
+        (&base_api::HAT, worn::HEAD, "hat"),
+        (&base_api::COAT, worn::CHEST, "coat"),
+        (&base_api::TROUSERS, worn::LEGS, "trousers"),
+        (&base_api::SHOES, worn::FEET, "shoes"),
+        // And a cloak over everything (CONTENT decision 3: nine slots).
+        (&base_api::CLOAK, worn::CHEST, "cloak"),
     ] {
         r.equipment_slot(slot, parts, &format!("slot_{piece}"));
     }
-    r.entity_component(
-        &HUNGER,
-        Hunger { food: 20.0, saturation: 5.0, exhaustion: 0.0, air: MAX_AIR, food_timer: 0 },
-        component_flags::SAVE | component_flags::SYNC_OWNER,
-    );
-    r.attach(&PLAYER, &HUNGER);
-    r.world_tick(tick_players);
-    // Not hungry, it doesn't start eating; the other way round it would only find out at the end.
-    r.intercept(&question::USE_ITEM, |q| {
-        let full = FOOD.on_item(q.item()).is_some()
-            && q.world()
-                .component(q.entity(), &HUNGER)
-                .is_some_and(|h| h.food >= 20.0);
-        if full { Verdict::Deny } else { Verdict::Abstain }
-    });
-    // Modern's exhaustion, by what the player does.
-    r.on(&BLOCK_BROKEN, |b| {
-        let w = b.world();
-        for e in b.iter() {
-            tire(&w, e.player, 0.005);
-        }
-    });
-    r.on(&ENTITY_HURT, |b| {
-        let w = b.world();
-        for e in b.iter() {
-            tire(&w, e.source, 0.1);
-            if armor_applies(e.cause) {
-                tire(&w, e.entity, 0.1);
-            }
-        }
-    });
-    // Armor is a step of the damage chain (modern's CombatRules: big hits go through more of it,
-    // unless it is tough), and wears when the hit actually lands, a quarter of the damage per
-    // piece (at least 1) like vanilla.
-    r.modify(&chain::DAMAGE, stage::MULTIPLY, |m| {
+    // Upstream's off-hand: a second item to hold (a shield, a torch).
+    r.equipment_slot(&OFF_HAND, &[], "slot_offhand")
+        .priority(1, "#offhand_preferred");
+    // Armor is a step of the damage chain (`vitals::combat`: armour / (armour + 5 × hit), at most
+    // 80 %: big hits go through more of it), and wears when the hit actually lands, a quarter of
+    // the damage per piece (at least 1) like vanilla.
+    r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
         let q = *m.query();
         if !armor_applies(q.cause) {
             return;
         }
-        let (points, toughness) = armor_of(&m.world(), q.entity);
-        let points = points as f64;
-        let through = m.value / (2.0 + toughness as f64 / 4.0);
-        m.value *= 1.0 - (points - through).clamp(points * 0.2, 20.0) / 25.0;
+        let (armour, _) = armor_against(&m.world(), q.entity, q.other);
+        m.value *= 1.0 - vitals::combat::armour_cut(armour, m.value as f32) as f64;
     });
-    r.on(&ENTITY_HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter().filter(|h| armor_applies(h.cause)) {
             let Some(worn) = w.inventory(h.entity).find_group(EQUIPMENT_GROUP) else { continue };
@@ -95,9 +108,7 @@ pub fn register(r: &mut Registry) {
             for slot in 0..worn.len() {
                 let s = worn.get(slot);
                 if ARMOR.on_item(s.item).is_some() {
-                    let durability = DURABILITY.on_item(s.item).unwrap_or(0);
-                    let damage = s.damage() + wear;
-                    worn.set(slot, if durability > 0 && damage >= durability { ItemStack::EMPTY } else { s.with_damage(damage) });
+                    worn.set(slot, s.add_wear(wear));
                 }
             }
         }
@@ -110,40 +121,34 @@ pub fn register(r: &mut Registry) {
         let slot = w.selected_slot(cmd.player());
         let s = hotbar.get(slot);
         if !s.is_empty() {
-            hotbar.set(slot, with_name(s, cmd.text("name")));
+            hotbar.set(slot, stack_with_name(s, cmd.text("name")));
         }
     })
     .permission(permission::EVERYONE);
-    r.command("feed", "[food:int]", |cmd| {
-        let food = cmd.int("food").unwrap_or(20).clamp(0, 20) as f32;
-        if let Some(h) = cmd.world().component_mut(cmd.player(), &HUNGER) {
-            h.food = food;
-            h.saturation = h.saturation.min(food);
-        }
-        cmd.reply("command.base.feed", &[Arg::Int(food as i64)]);
-    });
-
-    // Survival bars; a negative value hides them (creative).
-    r.hud_element(&HUD_HEALTH, hud_anchor::HOTBAR_LEFT, 0, |ui| {
-        ui.icons_shaking("heart", 10, |c| if c.creative() { -1.0 } else { c.me().map_or(20.0, |s| s.health.ceil()) })
-    });
-    r.hud_element(&HUD_ARMOR, hud_anchor::HOTBAR_LEFT, 1, |ui| {
+    // Armor and breath in the top left, under the vitals' bars (`hud.rs`); a negative value hides
+    // them (creative).
+    r.hud_element(&HUD_ARMOR, hud_anchor::TOP_LEFT, 6, |ui| {
         ui.icons("armor", 10, |c| {
-            // From what the client knows of its own inventory, like the server's damage chain.
+            // From what the client knows of its own inventory, like the server's damage chain: a
+            // built piece's own points (`parts::ARMOUR_PER_POINT`).
             let points: u32 = c
                 .inventory_group(EQUIPMENT_GROUP)
                 .iter()
-                .filter_map(|s| ARMOR.on_item(s.item))
+                .filter_map(|s| ARMOR.on_stack(s))
                 .map(|a| a.points)
                 .sum();
-            if points > 0 && !c.creative() { points as f32 } else { -1.0 }
-        })
+            if points > 0 && !c.outside_survival() { points as f32 } else { -1.0 }
+        });
     });
-    r.hud_element(&HUD_FOOD, hud_anchor::HOTBAR_RIGHT, 0, |ui| {
-        ui.icons_rtl("food", 10, |c| if c.creative() { -1.0 } else { c.component(&HUNGER).map_or(20.0, |h| h.food.ceil()) })
-    });
-    r.hud_element(&HUD_AIR, hud_anchor::HOTBAR_RIGHT, 1, |ui| {
-        ui.icons_rtl("air", 10, |c| if c.creative() { -1.0 } else { c.component(&HUNGER).map_or(-1.0, |h| air_bubbles(h.air)) })
+    r.hud_element(&HUD_AIR, hud_anchor::TOP_LEFT, 7, |ui| {
+        ui.icons("air", 10, |c| {
+            if c.outside_survival() {
+                -1.0
+            } else {
+                c.component(&base_api::VITALS)
+                    .map_or(-1.0, |v| air_bubbles(v.air))
+            }
+        });
     });
 
     // While a swing charges.
@@ -155,177 +160,198 @@ pub fn register(r: &mut Registry) {
     });
 
     // The equipment slots take what is worn there and show its silhouette while empty.
+    // SYNC: upstream's engine crafting (`Slots::crafting()`: the engine fills the result and uses
+    // the grid up, shift-click crafts all) is off on our grids: ours makes the result itself
+    // (`craft_result`: stale food, `first.rs`'s lashed axe, parts) and uses it up with XP, skills
+    // and advancements (`consume_grid`). Move those onto the engine's crafting to get its
+    // shift-click.
     r.menu(&INVENTORY)
         .group("grid", Slots::grid(2, 2))
         .group("result", Slots::single().output().large())
         .equipment()
         .player_inventory()
+        // Last, so the slots before keep their numbers.
+        .group(
+            "trash",
+            Slots::single()
+                .trash()
+                .background("slot_trash")
+                .tooltip("storage.base.trash"),
+        )
         .recipes(&crate::recipes::CRAFTING)
         .on_change(craft_result)
         .on_take(consume_grid)
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(5.0), |ui| {
-                ui.row(S::row().gap(1.0), |ui| {
-                    ui.equipment();
-                    ui.player_model(51.0, 72.0);
-                    ui.spacer();
-                    ui.column(S::col().gap(2.0), |ui| {
-                        ui.title();
-                        ui.row(S::row().gap(4.0), |ui| {
-                            ui.group("grid");
-                            ui.recipe_arrow();
-                            ui.group("result");
+            let tabs: [crate::window::Tab; 2] = [
+                ("window.base.tab.stats", |c| {
+                    c.client().menu_open(&crate::levels::SCREEN);
+                }),
+                ("window.base.tab.advancements", |c| {
+                    c.client().menu_open(&crate::advancements::SCREEN);
+                }),
+            ];
+            // The recipe book beside it, hand recipes only (`book.rs`).
+            ui.row(S::row().gap(4.0), |ui| {
+                crate::window::family_window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(5.0), None, &tabs, |ui| {
+                    ui.row(S::row().gap(1.0), |ui| {
+                        // Armor, and the clothes worn under it beside, the cloak under them.
+                        ui.column(S::column(), |ui| {
+                            for slot in EQUIPMENT.iter() {
+                                ui.group(slot.name());
+                            }
+                        });
+                        ui.column(S::column(), |ui| {
+                            for slot in base_api::CLOTHES.iter() {
+                                ui.group(slot.name());
+                            }
+                            ui.group(base_api::CLOAK.name());
+                        });
+                        ui.player_model(51.0, 72.0);
+                        ui.spacer();
+                        ui.column(S::column().gap(2.0).stretch(), |ui| {
+                            // A heading at 2x, as every window's (`UI Style Guide.md`, type scale).
+                            ui.text_styled(S::default().no_wrap().scale(2.0), "window.base.crafting", &[]);
+                            ui.row(S::row().gap(4.0), |ui| {
+                                ui.group("grid");
+                                ui.recipe_arrow();
+                                ui.group("result");
+                            });
+                            // Upstream's off-hand slot, under the grid.
+                            ui.spacer();
+                            ui.group(OFF_HAND.name());
+                            ui.group("trash");
                         });
                     });
+                    ui.player_inventory(false);
                 });
-                ui.player_inventory(false);
+                // Not in creative: its item picker takes the left side and has every item, and the
+                // picker, the inventory and the book side by side were wider than a 1280 x 720
+                // screen at GUI scale 2 (both ends cut off, the label check, 11-04).
+                if !ui.view().creative() {
+                    crate::book::book(ui, crate::book::Station::Hands);
+                }
             });
         });
 
     r.menu(&CRAFTING)
         .group("grid", Slots::grid(3, 3))
         .group("result", Slots::single().output().large())
+        // Items built from parts (`parts.rs`): four slots in a row, each showing while empty what
+        // usually goes there (a head, a haft, a fitting; they take parts in any order), and the
+        // slot that takes a tool apart.
+        .group(
+            crate::parts::ASSEMBLY[0],
+            Slots::single()
+                .background("slot_part_head")
+                .tooltip("crafting.parts.slot.head"),
+        )
+        .group(
+            crate::parts::ASSEMBLY[1],
+            Slots::single()
+                .background("slot_part_haft")
+                .tooltip("crafting.parts.slot.haft"),
+        )
+        .group(
+            crate::parts::ASSEMBLY[2],
+            Slots::single()
+                .background("slot_part_fitting")
+                .tooltip("crafting.parts.slot.fitting"),
+        )
+        .group(crate::parts::ASSEMBLY[3], Slots::single().tooltip("crafting.parts.slot.more"))
+        .group("assembled", Slots::single().output())
+        .group(
+            "apart",
+            Slots::single()
+                .background("slot_part_tool")
+                .tooltip("crafting.parts.slot.apart"),
+        )
         .player_inventory()
         .recipes(&crate::recipes::CRAFTING)
-        .on_change(craft_result)
-        .on_take(consume_grid)
+        .on_change(|m| {
+            craft_result(m);
+            crate::parts::on_change(m);
+        })
+        .on_take(|m| {
+            if !crate::parts::on_take(m) {
+                consume_grid(m);
+            }
+        })
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0).stretch(), |ui| {
-                ui.title();
-                ui.row(S::row().gap(8.0), |ui| {
-                    ui.spacer();
-                    ui.group("grid");
-                    ui.recipe_arrow();
-                    ui.group("result");
-                    ui.spacer();
-                });
-                ui.player_inventory(true);
+            // The recipe book beside it: every recipe, from the bag and the chests near the table.
+            ui.row(S::row().gap(4.0), |ui| {
+                crate::window::window(
+                    ui,
+                    S::column()
+                        .pad(crate::window::WINDOW_PAD)
+                        .gap(4.0)
+                        .stretch(),
+                    &[],
+                    |ui| {
+                        ui.row(S::row().gap(8.0), |ui| {
+                            ui.spacer();
+                            ui.group("grid");
+                            ui.recipe_arrow();
+                            ui.group("result");
+                            ui.spacer();
+                        });
+                        crate::parts::ui(ui);
+                        ui.player_inventory(true);
+                    },
+                );
+                crate::book::book(ui, crate::book::Station::Table);
             });
         });
     r.player_menu(&INVENTORY);
 }
 
-fn armor_applies(cause: u32) -> bool {
-    cause & damage::BYPASSES_ARMOR == 0
+pub fn armor_applies(cause: u32) -> bool {
+    !comps::damage_cause::BYPASSES_ARMOR.on_id(cause)
 }
 
 /// The `result` slot shows what the `grid` makes.
 fn craft_result(m: &MenuCtx) {
     let grid = m.group("grid");
     let cells: Vec<ItemStack> = (0..grid.len()).map(|i| grid.get(i)).collect();
-    m.group("result")
-        .set(0, recipe_match(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows()));
+    let made = recipe_grid_output(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
+    // Food made of food is as far along as its stalest part, and nothing comes of spoiled food.
+    let made = crate::survival::crafted(&cells, made, m.world().day_time());
+    // An axe lashed by hand takes its parts from the grid (`first.rs`).
+    let made = crate::first::finish(&m.world(), m.player(), &cells, made, None);
+    // Nothing a blueprint not yet read teaches (`ruins.rs`).
+    let made =
+        if !made.is_empty() && crate::ruins::craft_locked(&m.world(), m.player(), made.item).is_some() { ItemStack::EMPTY } else { made };
+    m.group("result").set(0, made);
 }
 
-/// Takes one of each ingredient; the last of a stack leaves its `remainder` (a bucket).
+/// Takes one of each ingredient; the last of a stack leaves its `remainder` (a bucket). Crafting
+/// gives XP by how many things went into it.
 fn consume_grid(m: &MenuCtx) {
+    // Only for the grid's own result.
+    if m.group("result").index_of(m.slot()).is_none() {
+        return;
+    }
     let grid = m.group("grid");
+    let cells: Vec<ItemStack> = (0..grid.len()).map(|i| grid.get(i)).collect();
+    let made = recipe_grid_output(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
+    if !made.is_empty() {
+        crate::advancements::crafted(&m.world(), m.player(), made.item);
+    }
+    let mut used = 0;
     for i in 0..grid.len() {
         let s = grid.get(i);
         if !s.is_empty() {
-            grid.set(i, use_one(s));
+            grid.set(i, consume_one(s));
+            used += 1;
         }
     }
-}
-
-fn tire(w: &World, player: u64, amount: f32) {
-    if let Some(h) = w
-        .component_mut(player, &HUNGER)
-        .filter(|_| !w.creative(player))
-    {
-        h.exhaustion += amount;
-    }
-}
-
-/// Modern's FoodData: full and saturated heals fast and burns the saturation, 18 and up heals
-/// slowly, empty starves.
-fn heal_or_starve(w: &World, id: u64, st: &mut EntityState) {
-    let Some(h) = w.component_mut(id, &HUNGER) else { return };
-    let hurt = st.health < st.max_health;
-    let every = if h.food >= 20.0 && h.saturation > 0.0 && hurt {
-        10
-    } else if (h.food >= 18.0 && hurt) || h.food <= 0.0 {
-        PULSE_TICKS
-    } else {
-        h.food_timer = 0;
-        return;
-    };
-    h.food_timer += 1;
-    if h.food_timer < every {
-        return;
-    }
-    h.food_timer = 0;
-    if h.food <= 0.0 {
-        if st.health > 1.0 {
-            w.damage(id, 1.0, 0, damage::STARVE);
-        }
-    } else {
-        let spent = if every == 10 { h.saturation.min(6.0) } else { 6.0 };
-        h.exhaustion += spent;
-        st.health = (st.health + spent / 6.0).min(st.max_health);
-        w.set_entity(id, st);
-    }
+    base_api::give_xp(&m.world(), m.player(), vitals::levels::xp::craft(used));
+    crate::skills::made(&m.world(), m.player(), &made, used);
 }
 
 /// What the air bar shows: whole bubbles like vanilla's, hidden with a full breath.
 fn air_bubbles(air: f32) -> f32 {
+    use crate::survival::MAX_AIR;
     if air < MAX_AIR { (air.max(0.0) / MAX_AIR * 10.0).ceil() * 2.0 } else { -1.0 }
-}
-
-fn tick_players(w: &World) {
-    for id in w.players() {
-        let Some(mut st) = w.entity(id) else { continue };
-        if w.creative(id) {
-            // Nothing takes the breath here, and what was used comes back.
-            if w.component(id, &HUNGER).is_some_and(|h| h.air < MAX_AIR) {
-                if let Some(h) = w.component_mut(id, &HUNGER) {
-                    h.air = (h.air + 4.0).min(MAX_AIR);
-                }
-            }
-            continue;
-        }
-        heal_or_starve(w, id, &mut st);
-        // Jumping tires by a landing's worth of pulling yourself up.
-        if st.jumped != 0 {
-            tire(w, id, if st.sprinting != 0 { 0.2 } else { 0.05 });
-        }
-        // Too hungry to sprint: modern's 3 drumsticks.
-        let hungry = w.component(id, &HUNGER).is_some_and(|h| h.food <= 6.0);
-        if hungry {
-            w.add_modifier(id, &attribute::CAN_SPRINT, "base:too_hungry", attr_op::ADD, -1.0, 20);
-        }
-        let Some(h) = w.component_mut(id, &HUNGER) else { continue };
-        // Modern's: 0.1 a block sprinting, 0.01 swimming, 0 walking; jumps are counted from `Move`.
-        h.exhaustion += st.moved
-            * if st.sprinting != 0 {
-                0.1
-            } else if st.in_liquid != 0 {
-                0.01
-            } else {
-                0.0
-            };
-        if h.exhaustion > 4.0 {
-            h.exhaustion -= 4.0;
-            if h.saturation > 0.0 {
-                h.saturation = (h.saturation - 1.0).max(0.0);
-            } else {
-                h.food = (h.food - 1.0).max(0.0);
-            }
-        }
-        let eye = [st.pos[0].floor() as i32, (st.pos[1] + st.size[2] as f64).floor() as i32, st.pos[2].floor() as i32];
-        // Only water takes the breath, whatever else burns or drags.
-        let underwater = WATER_LIKE.on_block(w.get(eye)) && w.in_liquid([st.pos[0], st.pos[1] + st.size[2] as f64, st.pos[2]]);
-        let Some(h) = w.component_mut(id, &HUNGER) else { continue };
-        if underwater {
-            h.air -= 1.0;
-            if h.air <= -20.0 {
-                h.air = 0.0;
-                w.damage(id, 2.0, 0, damage::DROWN);
-            }
-        } else if h.air < MAX_AIR {
-            h.air = (h.air + 4.0).min(MAX_AIR);
-        }
-    }
 }
 
 #[cfg(test)]
@@ -334,7 +360,7 @@ mod tests {
 
     #[test]
     fn air_shows_whole_bubbles() {
-        assert_eq!(air_bubbles(MAX_AIR), -1.0, "hidden with a full breath");
+        assert_eq!(air_bubbles(crate::survival::MAX_AIR), -1.0, "hidden with a full breath");
         assert_eq!(air_bubbles(299.0), 20.0);
         assert_eq!(air_bubbles(270.0), 18.0);
         assert_eq!(air_bubbles(1.0), 2.0);

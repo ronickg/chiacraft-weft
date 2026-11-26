@@ -25,7 +25,8 @@ They work in any translation, not only in tooltips:
 | `{icons:base:food_full value.hunger/2}` | a row of a picture, as many as the number says, see [icons and meters](#icons-and-meters) |
 | `{value}`, `{value.hunger}`, `{value/200}`, `{value:food.hunger}` | a number from the item the text is about, see [lines by tag](#lines-by-tag) |
 | `{align:center}text{/align}` | lays out the lines inside centered (`left`, `right`); a picture alone on such a line is a centered picture |
-| `{key:core:sneak}` | the key the player has bound to that action |
+| `{key:core:sneak}` | the key the player has bound to that action, in brackets (`[Shift]`) |
+| `{keyname:core:sneak}` | the same key without brackets, for a label beside a picture |
 | `{lang:some.key}` | inserts another translation, so a shared phrase is written once |
 | `{name:item:base:coal}` | the display name of something, colors and all: `item:`, `block:`, `liquid:`, `tab:`, `mod:`, `recipe:`, `config:`, `key:`. Without a translation it shows the raw name. From code it's `Arg::Name("item:base:coal")` |
 | `{on_key:core:sneak}text{/on_key}` | shown only while the key is held; `!` in front inverts it; raw keys work too, but it's recommended to not use them |
@@ -56,10 +57,10 @@ fn effect(g: Glyph) -> Glyph {
 
 ### Conditions
 `{if:name}` shows text while a condition holds.\
-The engine's are `creative`, `survival`, `spectator`, `debug` and `dev`. Your own are registered in the mod
-and read the client, so they see the local player only:
+The engine's are every game mode by its name (`creative`, `survival`, `spectator`), `day`, `night`, `underground`, `surface`, `light(..7)`, `debug` and `dev`, and they go together with `&`, `|` and `!`: `{if:night & surface}`. Your own are registered in the mod, and in text they are asked on the client, so they see the local player only:
 ```rust
-r.text_condition("charged", |v| v.player_component(&CHARGE).is_some_and(|c| *c > 0));
+static CHARGED: Condition = Condition::named("charged");
+r.condition(&CHARGED, |c| c.client().is_some_and(|v| v.component(&CHARGE).is_some_and(|c| c > 0)));
 ```
 then `{if:mymod:charged}Charged!{/if}` in any translation.
 
@@ -78,7 +79,7 @@ What the part of a picture looks like is up to the files next to it:
 - **`<picture>_<frame>`:** when a number is over 1 they are frames of one turn, the share picks the nearest. `clock_0.png` to `clock_23.png` is a clock: 0.5 is `clock_12`.
 - **`<stem>_half`** is vanilla's name for the half of `<stem>_full`, so `food_full` and `food_half` work as they are.
 
-The same goes for the HUD's bars (`ui.icons`, `ui.icons_rtl`, `ui.icons_dir(class, count, ui_dir::UP, ..)`) and for the fill of a progress bar. They have a direction of their own instead of a mirrored picture.
+The same goes for the HUD's bars (`ui.icons(..)`, with `.from_right()` or `.dir(abi::ui_dir::UP)`) and for the fill of a progress bar. They have a direction of their own instead of a mirrored picture.
 
 ## Item tooltips
 Hovering an item or block shows its name, and `<name key>.tooltip` under it if the language has one.\
@@ -107,6 +108,12 @@ block.base.furnace.tooltip = Smelts ores and cooks food.
     {on_key:!core:sneak}{lang:tooltip.more}{/on_key}{on_key:core:sneak}Burns {item:base:coal} coal, {item:base:oak_planks} planks or other {#ffe070}fuel{/} in the bottom slot.{/on_key}
 ```
 
+## Attribute modifiers
+What an item gives worn or in hand (`Modifier::add(&ARMOR, 3.0).worn()`) gets a line by itself, `tooltip.modifier.worn` or `tooltip.modifier` with the amount and the attribute's name, `attribute.<name>`:
+```
+attribute.base.armor = Armor
+```
+
 ## Lines by tag
 A line for every item with a tag or component, in one place, is `tagged.<name>`. It goes under the item's own tooltip, and a new item gets it just by having the tag:
 ```
@@ -127,8 +134,8 @@ Another mod adds its line to the same tag without replacing it, as with tooltips
 - **Settings:** `config.<mod>.<key>.tooltip` is shown over the setting's row in Mod Settings. Settings that the
   server overrides or that need a restart get a note added by the engine.
 - **Creative tabs:** show their name from `tab.<mod>.<name>`, or the mod's display name when there is no key.
-- **Your own screens:** any part with a style takes one, `S::col().tooltip("examplemod.hint")`.
-- **Slots:** a slot group's `tooltip(key)` shows over its empty slots ([machines guide](machines.md#creating-a-machine)).
+- **Your own screens:** any part with a style takes one, `S::column().tooltip("examplemod.hint")`.
+- **Slots:** a slot group's `tooltip(key)` shows over its empty slots ([block entities guide](block_entities.md#creating-one)).
 
 ## Adding from outside
 Translations are one shared table: every `lang/<code>.lang` of every mod and pack is read into it, so the

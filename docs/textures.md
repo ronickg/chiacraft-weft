@@ -12,7 +12,7 @@ Examples to copy from are in `mods/base/assets/textures/block/`:\
 `water_still.anim`,`furnace_front_lit_e.png`, `grass_side_overlay.png`.
 
 ## Quick links
-[animation](#animation) | [emission](#emission) | [overlays](#overlays) | [debugging](#debugging)
+[animation](#animation) | [emission](#emission) | [materials](#materials) | [overlays](#overlays) | [debugging](#debugging)
 
 ## Animation
 A texture is animated when its picture is a vertical strip of square frames: a 16x16 texture with
@@ -73,16 +73,42 @@ uses alpha channel, `0` - `254` is glow strength, `255` means no emission at all
 If both files exist, `_e` overrides `_s`.\
 Glow works for blocks and for entity skins (`_e` next to the skin png).
 
+## Materials
+How shiny, metallic and bumpy a block's texels are (chiacraft), in LabPBR 1.3's two maps, so packs' maps work as
+they are. Both sit beside the texture, the same size or any square size (scaled to the texture's), the same number
+of frames, and are read as linear values (not sRGB):
+
+### `<texture>_s.png`
+- red: smoothness, 0 rough to 255 a mirror (roughness = (1 - red/255)²)
+- green: 0-229 the reflectance looking straight at it, /255 (stone and glass about 10, so 4%); 230-237 a metal
+  (iron, gold, aluminium, chrome, copper, lead, platinum, silver); 255 a metal of the texture's own colour
+- blue: 0-64 porosity (how much rain darkens it), 65-255 subsurface light
+- alpha: emission, as above (255 none)
+
+### `<texture>_n.png`
+- red, green: the normal's x and y (DirectX's y: 0 up the picture, 255 down; 128 128 is flat)
+- blue: ambient occlusion (255 none)
+- alpha: height (255 the surface)
+
+A texture with either map has both (the missing one is neutral: rough, 4%, flat). Shaders read them through
+`mat_at` (see the [shaders guide](shaders.md)); the engine's own shaders don't, so they change the look only with a
+shader pack that uses them (chiacraft's does: highlights, the sky and the screen mirrored on smooth blocks).
+
 ## Overlays
-If `<texture>.png` has a `<texture>_overlay.png` next to it, the overlay is drawn over the face
-and takes the block's tint instead of the face itself.\
-There is exactly one overlay per texture and it is always tinted, (there are no `_overlay1` or conditions).\
-That's how grass sides are done: the dirt side stays brown, the grass fringe gets the biome's color.\
+A block's face is layers, pictures one over the other, set in code:
+`.sides("dirt").layer("grass_side_overlay").tint_kind(&tints::GRASS)`.\
+That's how grass sides are done: the dirt stays brown, the grass fringe gets the biome's color.\
+Each layer is drawn by itself over the one under it, with its own animation, `.ctm` and tint.\
+A fixed tint (`.tint(0x303038)`) makes a tinted copy of the picture when the game loads, every
+frame and connected tile too, so one picture is many blocks. A pack changes them by replacing
+the pictures, like any other.\
 Different looks for different block states (a lit furnace) are different textures, not overlays.
 
-The overlay has no `_e` of its own, the glow of a face comes from the base texture's `_e`.
+Each layer's `_e` glows where that layer shows.
 
 ## Debugging
 A broken picture never stops the game: a texture that is missing or has a wrong size shows the missing
 texture pattern, and the log says which file caused it.\
 `F3+T` reloads the textures, so a `.anim` or an `_e` file can be changed while the game is running.
+
+`BlockModel::Cube` and `Cross` are registration presets expanded into model boxes when content is loaded. All block geometry uses the same box renderer; a single full cube with standard UVs uses packed faces automatically. `block.item_sprite(Dir::West)` selects a face as a flat item icon independently of the model. The `comps::block::ITEM_FACE` value 255 draws the model instead.

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a lever: a small grey cobblestone base plate in three-quarter top view with a wooden handle sticking up and tilted to the right, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.335,
+   "outline": 0.55,
+   "red_line": 0.14,
+   "fill": 0.3,
+   "passed": true
+  }
+ ]
+}

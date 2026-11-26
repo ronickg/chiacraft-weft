@@ -2,32 +2,126 @@
 //! engine knows about stone, water or zombies.
 
 mod advancements;
+mod ambience;
+mod assembly;
 mod beds;
+mod block_entities;
 mod blocks;
+mod book;
+mod camera;
+mod climbing;
+mod clothing;
+mod commands;
+mod cooking;
+mod crafts;
+mod crops;
+mod death;
+mod developer;
+mod discovery;
+mod dlss;
+mod doors;
+mod effects;
+mod events;
+mod fall;
+mod farming;
+mod felled;
+mod felling;
+mod firebed;
+mod fireflies;
+mod first;
+mod gems;
+mod glider;
+mod grapple;
+mod growth;
+mod hints;
+mod hud;
+mod impact;
 mod items;
-mod machines;
+mod knapping;
+mod land;
+mod leaf_decay;
+mod levels;
+mod ley;
+mod look;
+mod map;
+mod metals;
+mod meteors;
 mod mobs;
+mod music_player;
+mod parts;
+mod plants3d;
+mod plants3d_files;
 mod player;
 mod recipes;
 mod redstone;
+mod ruins;
+mod seasons;
+mod shaderpack;
+mod showcase;
+mod skills;
+mod snow;
 mod sounds;
+mod stars;
+mod storage;
+mod survival;
+mod target_info;
+mod vehicles;
+mod video;
+mod video_costs;
+mod waterholes;
+mod waystones;
+mod weather;
+mod weather_sound;
+mod web;
+mod wild;
+mod wind_life;
+mod wind_life_colours;
+mod window;
+mod woodcutter;
 mod worldgen;
 
 use weft_sdk::*;
 
-pub use base_api::{CLOUDS, FLATLANDS, MOON, OVERWORLD, STARS, SUN, tabs};
+pub use base_api::{dimensions::*, sky_objects::*, tabs};
+// Ours: the Minecraft forest test world.
+pub use base_api::MC_FOREST;
 
 declare_mod!(deps: [], init: init);
 
+// ------------------------------------------------------------------ the engine's bridge
+
+type Query = unsafe extern "C" fn(query: weft_sdk::abi::Str, arg: weft_sdk::abi::Str) -> weft_sdk::abi::Str;
+static BRIDGE: std::sync::OnceLock<Query> = std::sync::OnceLock::new();
+
+/// The engine hands the mod its bridge when the mod loads (chiacraft): what Weft's interface
+/// doesn't carry, such as asking the world to sign an achievement.
+///
+/// # Safety
+/// `q` must be the engine's `bridge::query`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn chiacraft_bridge(q: Query) {
+    let _ = BRIDGE.set(q);
+}
+
+/// Asks the engine's bridge `q` with `arg` (empty without a bridge: plain Weft).
+pub(crate) fn bridge(q: &str, arg: &str) -> String {
+    use weft_sdk::abi::Str;
+    BRIDGE
+        .get()
+        .map(|f| unsafe { f(Str::new(q), Str::new(arg)).as_str().to_string() })
+        .unwrap_or_default()
+}
+
 fn init(r: &mut Registry) {
+    base_api::components::editor_methods(r);
     // Vanilla's creative tabs; blocks and items join them with `.tab(..)`.
     for (tab, icon) in [
         (&tabs::BUILDING, &Item::named("bricks")),
         (&tabs::COLORED, &Item::named("red_stained_glass")),
         (&tabs::NATURAL, &Item::named("grass")),
         (&tabs::FUNCTIONAL, &Item::named("crafting_table")),
-        (&tabs::TOOLS, &Item::named("iron_pickaxe")),
-        (&tabs::COMBAT, &Item::named("iron_sword")),
+        (&tabs::TOOLS, &Item::named("pickaxe")),
+        (&tabs::COMBAT, &Item::named("sword")),
         (&tabs::FOOD, &Item::named("apple")),
         (&tabs::INGREDIENTS, &items::IRON_INGOT),
         (&tabs::REDSTONE, &Item::named("redstone")),
@@ -35,45 +129,154 @@ fn init(r: &mut Registry) {
         r.creative_tab(tab, icon);
     }
     blocks::register(r);
+    commands::register(r);
+    wild::register(r);
+    crops::register(r);
     items::register(r);
     player::register(r);
-    machines::register(r);
+    survival::register(r);
+    climbing::register(r);
+    glider::register(r);
+    grapple::register(r);
+    levels::register(r);
+    skills::register(r);
+    web::register(r);
+    clothing::register(r);
+    cooking::register(r);
+    crafts::register(r);
+    // Upstream's camera modes (Weft sync 11-22).
+    camera::register(r);
+    block_entities::register(r);
     recipes::register(r);
+    showcase::register(r);
+    book::register(r);
+    discovery::register(r);
+    metals::register(r);
+    parts::register(r);
+    gems::register(r);
+    first::register(r);
+    knapping::register(r);
+    firebed::register(r);
+    events::register(r);
+    meteors::register(r);
+    stars::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);
+    weather::register(r);
+    snow::register(r);
+    waterholes::register(r);
+    weather_sound::register(r);
+    ambience::register(r);
+    seasons::register(r);
+    growth::register(r);
+    farming::register(r);
+    fireflies::register(r);
+    wind_life::register(r);
+    ley::register(r);
+    waystones::register(r);
+    ruins::register(r);
+    map::register(r);
+    felling::register(r);
+    fall::register(r);
+    leaf_decay::register(r);
     advancements::register(r);
+    hints::register(r);
+    death::register(r);
     beds::register(r);
+    hud::register(r);
+    impact::register(r);
     redstone::register(r);
+    look::register(r);
+    shaderpack::register(r);
+    plants3d::register(r);
+    shaderpack::register_for_scripts(r);
+    shaderpack::register_shafts(r);
+    video::register(r);
+    video_costs::register(r, video::measured_rows);
+    dlss::register(r);
+    // Upstream's new content (Weft sync 11-22), each in its own file: doors, potion effects,
+    // ships (assembly, vehicles), the music player, the woodcutter, storage sorting, the target
+    // info panel. Cutting one is deleting its file, its `mod` line and its line here.
+    doors::register(r);
+    effects::register(r);
+    assembly::register(r);
+    vehicles::register(r);
+    music_player::register(r);
+    woodcutter::register(r);
+    storage::register(r);
+    target_info::register(r);
     // Its terrain is described in `worldgen`.
+    // A year of four 14-day seasons (notes/SURVIVAL.md): sixteen hours of daylight at midsummer,
+    // eight at midwinter.
     r.dimension(&OVERWORLD)
         .player_spawn()
+        // A fair first place: level plains, temperate, by water and woods (`base_api::land::spawn`).
+        .spawn_point(|seed| fair_spawn(seed).into())
         .sky_above(16)
         .day_length(24000)
-        .weather();
+        .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)
+        .set(&base_api::SEASONS, base_api::calendars::FOUR)
+        .weathers(&[&weathers::RAIN, &weathers::THUNDER]);
+    // The Minecraft forest test world (`base_api::land::MC_MIX`): the overworld's land, sky, days
+    // and seasons, so a shot there at an hour and a day matches the overworld's.
+    r.dimension(&MC_FOREST)
+        .spawn_point(|seed| fair_spawn(seed).into())
+        .sky_above(16)
+        .day_length(24000)
+        .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)
+        .set(&base_api::SEASONS, base_api::calendars::FOUR)
+        .weathers(&[&weathers::RAIN, &weathers::THUNDER]);
     // Second dimension on purpose: nothing in the engine may assume there is only one world.
     r.dimension(&FLATLANDS)
         .generator(worldgen::flat)
         .bare()
-        .spawn(|_| [0, 3, 0])
-        .height(-2, 8)
+        .spawn_point(|_| [0, 3, 0].into())
+        .height_cubes(-2, 8)
         .sky_above(1)
         .fixed_time(6000)
         .gravity(20.0)
-        .sky(0xb0c8ff, 0xe0e8ff);
-    for dim in [&OVERWORLD, &FLATLANDS] {
+        .sky_color(0xb0c8ff, 0xe0e8ff);
+    for dim in [&OVERWORLD, &MC_FOREST, &FLATLANDS] {
         r.sky_stars(dim, &STARS).count(1500);
         r.sky_clouds(dim, &CLOUDS).texture("clouds");
         r.sky_body(dim, &SUN)
             .texture("sun")
-            .additive()
+            .blend_add()
             .size(33.0)
-            .glow(0xFFE633);
+            .glow(0xFFE633)
+            // Its path leaned 35° to the south (Bliss's and Complementary's sun paths lean about
+            // 40°): noon stands 55° up, so shadows stay long all day and slopes and walls keep a
+            // lit and a shaded side (Ronald, 11-04: "it all seems so flat"). The engine's sun
+            // light and shadows follow this body.
+            .tilt(35.0);
+        // The moon on the same leaned path, lagging the day as the real one does: a turn every 8/7
+        // of a day, so it rises later each night and goes round the sky once against the sun in
+        // the eight days of its phases (one picture a day). Full (day 0) it is opposite the sun and
+        // up all night; at a half moon half the night; new (day 4) it is up with the sun and the
+        // night has none. The night's light and shadows come from it (Ronald, 11-04: a full moon
+        // lights the night, no moon is dark).
         r.sky_body(dim, &MOON)
             .texture("moon_phases")
-            .additive()
+            .blend_add()
             .frames(4, 2)
             .size(23.0)
-            .phase(0.5);
+            .orbit(vitals::calendar::DAY_TICKS as f32 * 8.0 / 7.0)
+            .phase(0.5)
+            .tilt(35.0);
     }
+}
+
+/// The overworld's first place for `seed` (`base_api::land::spawn_where`), out of the caves' mouths
+/// (none in the three by three columns round it); worked out once per seed, as the engine asks on
+/// every join.
+pub(crate) fn fair_spawn(seed: u64) -> [i32; 3] {
+    static KNOWN: std::sync::Mutex<Vec<(u64, [i32; 3])>> = std::sync::Mutex::new(Vec::new());
+    if let Some(&(_, p)) = KNOWN.lock().unwrap().iter().find(|(s, _)| *s == seed) {
+        return p;
+    }
+    let open = |x: i32, z: i32| (-1..=1).all(|dz| (-1..=1).all(|dx| !OVERWORLD.surface_carved(seed, x + dx, z + dz)));
+    let p = base_api::land::spawn_where(seed, &open);
+    KNOWN.lock().unwrap().push((seed, p));
+    p
 }

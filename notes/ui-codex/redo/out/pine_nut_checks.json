@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a few pine nuts: small ivory teardrop-shaped kernels beside one dark brown shell, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.537,
+   "outline": 0.64,
+   "red_line": 0.14,
+   "fill": 0.23,
+   "passed": true
+  }
+ ]
+}

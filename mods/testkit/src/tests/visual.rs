@@ -8,6 +8,10 @@ use weft_sdk::*;
 use super::{add, probe};
 use crate::runner::{R, Shot, T};
 
+fn item(name: &str) -> u32 {
+    Item::lookup(name).unwrap_or(u32::MAX)
+}
+
 /// Share of the box around where `p` is drawn (half size `r`) for which `f` holds.
 fn around(t: &T, shot: &Shot, p: [f64; 3], r: f32, f: impl FnMut([u8; 3]) -> bool) -> f32 {
     let Some((x, y)) = t.on_screen(p) else { return 0.0 };
@@ -35,14 +39,10 @@ fn changed(a: &[u8], b: &[u8], w: u32, h: u32, x0: f32, y0: f32, x1: f32, y1: f3
     n / all.max(1.0)
 }
 
-fn item(name: &str) -> u32 {
-    Item::lookup(name).unwrap_or(u32::MAX)
-}
-
 /// F1 takes the hotbar, crosshair, hand and block outline off the picture, and F1 brings them back.
 pub async fn hide_hud(t: T) -> R {
     t.flat().await?;
-    t.c().look(0.0, -40.0);
+    t.c().set_look(0.0, -40.0);
     t.secs(0.6).await?;
     let shown = t.shot("shown").await?;
     t.press("core:hide_hud");
@@ -68,33 +68,38 @@ pub async fn held_items(t: T) -> R {
     static HANDHELD: Tag = Tag::named("handheld");
     let handheld = |name: &str| Item::lookup(name).is_some_and(|i| HANDHELD.on_item(i));
     t.check(
-        handheld("base:diamond_sword") && handheld("base:wood_pickaxe") && handheld("base:stick") && handheld("testmod:steel_pickaxe"),
+        handheld("base:sword") && handheld("base:pickaxe") && handheld("base:stick") && handheld("testmod:steel_pickaxe"),
         "tools and the stick are held like tools",
     );
     t.check(!handheld("base:apple") && !handheld("base:stone"), "the rest are not");
     t.flat().await?;
-    for (i, name) in ["wood_pickaxe", "diamond_sword", "glass", "rose", "torch"]
-        .iter()
-        .enumerate()
-    {
-        t.op(&format!("put me {i} {name} 1")).await?;
+    // (wool: the 32 px glass is mostly see-through in a brown frame, too little of it light)
+    // A flint pickaxe on an oak haft and a diamond-bladed sword, built from parts (their looks
+    // drawn from the parts' layers), then three plain items.
+    t.cmd("/gear pickaxe flint slot=0").await?;
+    t.cmd("/gear sword diamond slot=1").await?;
+    for (i, name) in ["wool", "rose", "torch"].iter().enumerate() {
+        t.op(&format!("put me {} {name} 1", i + 2)).await?;
     }
-    t.c().look(0.0, -10.0);
+    t.c().set_look(0.0, -10.0);
     let looks: [(&str, fn([u8; 3]) -> bool, f32); 5] = [
         ("pickaxe", probe::brown, 0.03),
         ("sword", probe::cyan, 0.03),
         ("block", probe::light, 0.03),
         ("flower", probe::red, 0.02),
-        ("torch", probe::dark, 0.03),
+        // our torch is its flame (dark was the old stick): fire orange
+        ("torch", probe::orange, 0.03),
     ];
     for (i, (name, color, min)) in looks.into_iter().enumerate() {
-        t.c().select(i as u32);
+        t.c().select_slot(i as u32);
         t.until("selected", Duration::from_secs(5), |t| t.state().selected == i as u32)
             .await?;
         // The hand lowers and comes back up on a switch.
         t.secs(0.6).await?;
         let shot = t.shot(name).await?;
-        let v = shot.share(0.78, 0.55, 1.0, 0.95, color);
+        // Where Weft's posed hand holds it, our items drawn bigger there
+        // (`comp::FIRST_PERSON_HELD_SCALE` on the player, base's `player.rs`).
+        let v = shot.share(0.58, 0.45, 0.90, 1.0, color);
         t.probe(&format!("{name} colors in the hand"), v, v > min);
     }
     Ok(())
@@ -105,22 +110,22 @@ pub async fn tooltips(t: T) -> R {
     t.flat().await?;
     t.op("put me 0 furnace 1").await?;
     t.op("put me 1 coal 5").await?;
-    t.op("put me 2 diamond_sword 1").await?;
+    t.cmd("/gear sword diamond slot=2").await?;
     t.op("put me 3 bread 1").await?;
-    t.op("put me 4 diamond_chestplate 1").await?;
+    t.cmd("/gear chestplate diamond slot=4").await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    t.c().cursor(0.02, 0.02);
+    t.c().input_cursor(0.02, 0.02);
     t.frames(4).await?;
     let plain = t.grab().await?;
     let (w, h) = (t.state().window[0], t.state().window[1]);
-    for (slot, name) in [(36, "furnace"), (37, "coal"), (38, "sword"), (39, "bread"), (40, "chestplate")] {
-        let Some([x, y, sw, sh]) = t.c().ui_rect(&format!("slot:{slot}")) else {
+    for (slot, name) in [(0, "furnace"), (1, "coal"), (2, "sword"), (3, "bread"), (4, "chestplate")] {
+        let Some(Rect { x, y, w: sw, h: sh }) = t.c().ui_rect(&t.hotbar(slot)) else {
             t.fail(format!("no slot {slot}"));
             continue;
         };
         let (cx, cy) = (x + sw / 2.0, y + sh / 2.0);
-        t.c().cursor(cx, cy);
+        t.c().input_cursor(cx, cy);
         t.frames(4).await?;
         t.shot(name).await?;
         let now = t.grab().await?;
@@ -156,7 +161,15 @@ pub async fn tooltips(t: T) -> R {
             t.probe("diamond block icon in the tooltip", block, block > 0.0008);
         }
     }
-    t.c().close_screen();
+    settings::ADVANCED_TOOLTIPS.set(true);
+    t.frames(4).await?;
+    if let Some(Rect { x, y, w, h }) = t.c().ui_rect("slot:36") {
+        t.c().input_cursor(x + w / 2.0, y + h / 2.0);
+        t.frames(4).await?;
+        t.shot("advanced").await?;
+    }
+    settings::ADVANCED_TOOLTIPS.set(false);
+    t.c().menu_close();
     t.no_screen().await
 }
 
@@ -171,7 +184,7 @@ pub async fn night_light(t: T) -> R {
         .await?;
     t.fill(add(f, [-4, -1, -8]), add(f, [4, -1, 1]), "birch_planks")
         .await?;
-    t.c().look(0.0, -35.0);
+    t.c().set_look(0.0, -35.0);
     t.secs(0.5).await?;
     let dark = t.shot("dark").await?;
     let v = dark.share(0.1, 0.3, 0.9, 0.8, probe::dark);
@@ -187,91 +200,73 @@ pub async fn night_light(t: T) -> R {
     t.probe("floor by the glowstone is lit", crate::runner::lum(by_glow), crate::runner::lum(by_glow) > 50.0);
     let red = by_lamp[0] - by_lamp[1];
     t.probe("floor by the red lamp is reddish (red minus green)", red, red > 15.0);
-    Ok(())
-}
-
-/// Third person shows the player's model from behind and from the front.
-pub async fn third_person(t: T) -> R {
-    t.flat().await?;
-    t.op("put me 0 iron_sword 1").await?;
-    t.c().select(0);
-    t.press("core:perspective");
-    t.c().look(30.0, -15.0);
+    t.set(glow, "air").await?;
+    t.set(lamp, "lava").await?;
     t.secs(0.5).await?;
-    for name in ["behind", "front"] {
-        let shot = t.shot(name).await?;
-        let (shirt, skin) = (shot.share(0.42, 0.35, 0.58, 0.8, probe::cyan), shot.share(0.42, 0.35, 0.58, 0.8, probe::skin));
-        t.probe(&format!("{name}: shirt"), shirt, shirt > 0.05);
-        t.probe(&format!("{name}: skin"), skin, skin > 0.05);
-        t.press("core:perspective");
-        t.secs(0.3).await?;
-    }
+    let lava = t.shot("lava").await?;
+    let warm = avg_around(&t, &lava, floor(add(lamp, [1, 0, 1])), 0.02);
+    t.note(format!("floor by lava: {warm:?}"));
+    t.check(warm[0] > warm[1] + 15.0 && warm[1] > warm[2] + 5.0, "lava lights the floor orange");
     Ok(())
 }
 
-/// A skin of the player's own (`skins/skin.png`) goes to the server with the join and the model
-/// wears it: an all red one turns the figure red instead of its shirt and skin.
-pub async fn player_skin(t: T) -> R {
-    let path = format!("{}/skins/skin.png", t.c().run_dir());
-    std::fs::create_dir_all(format!("{}/skins", t.c().run_dir())).map_err(|e| e.to_string())?;
-    let file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
-    let mut enc = png::Encoder::new(std::io::BufWriter::new(file), 64, 64);
-    enc.set_color(png::ColorType::Rgba);
-    let px: Vec<u8> = (0..64 * 64).flat_map(|_| [220u8, 30, 30, 255]).collect();
-    enc.write_header()
-        .and_then(|mut w| w.write_image_data(&px))
-        .map_err(|e| e.to_string())?;
-    let result = async {
-        t.flat().await?;
-        t.press("core:perspective");
-        t.c().look(30.0, -15.0);
-        t.secs(0.8).await?;
-        let shot = t.shot("red").await?;
-        let (red, shirt) = (shot.share(0.42, 0.35, 0.58, 0.8, probe::red), shot.share(0.42, 0.35, 0.58, 0.8, probe::cyan));
-        t.probe("the model in the player's red skin", red, red > 0.05);
-        t.probe("and not in the default shirt", shirt, shirt < 0.01);
-        t.press("core:perspective");
-        t.press("core:perspective");
-        Ok::<(), String>(())
-    }
-    .await;
-    drop(std::fs::remove_file(&path));
-    result
-}
-
-/// Crouching shows in third person: the model is lower (vanilla's pose).
-pub async fn crouch_pose(t: T) -> R {
+/// Light that moves with entities, which clients draw alone, in a closed dark room: the player's
+/// own (`LIGHT` set while it lives), an effect's until it ends (by ticks, which `/time set`
+/// doesn't move), and the item a block entity shows.
+pub async fn moving_light(t: T) -> R {
     t.flat().await?;
-    t.press("core:perspective");
-    t.c().look(30.0, -15.0);
-    t.secs(0.3).await?;
-    t.press("core:perspective");
-    t.secs(0.3).await?;
-    let standing = t.shot("standing").await?;
-    t.hold("core:sneak", 2.0);
-    t.secs(1.0).await?;
-    let crouching = t.shot("crouching").await?;
-    // The camera goes down with the eyes, so the model is not lower on the picture but shorter:
-    // from the top of its hair (below the sky) to the bottom of its trousers in the middle column.
-    let height = |s: &Shot| {
-        let rows: Vec<f32> = (0..s.h).map(|y| y as f32 / s.h as f32).collect();
-        let top = rows
-            .iter()
-            .copied()
-            .find(|&y| !probe::light(s.at(0.5, y)))
-            .unwrap_or(1.0);
-        let bottom = rows
-            .iter()
-            .copied()
-            .filter(|&y| probe::blue(s.at(0.5, y)))
-            .last()
-            .unwrap_or(top);
-        bottom - top
+    let f = t.feet();
+    t.fill(add(f, [-5, -1, -9]), add(f, [5, 4, 2]), "stone")
+        .await?;
+    t.fill(add(f, [-4, 0, -8]), add(f, [4, 3, 1]), "air")
+        .await?;
+    t.fill(add(f, [-4, -1, -8]), add(f, [4, -1, 1]), "birch_planks")
+        .await?;
+    t.cmd("/time set 18000").await?;
+    t.c().set_look(0.0, -35.0);
+    let floor = [f[0] as f64 + 0.5, f[1] as f64, f[2] as f64 - 2.5];
+    let color = |what: &'static str| {
+        let t = &t;
+        async move { Ok::<_, String>(avg_around(t, &t.shot(what).await?, floor, 0.03)) }
     };
-    let ratio = height(&crouching) / height(&standing).max(1e-3);
-    t.probe("crouching model height / standing", ratio, ratio < 0.92 && ratio > 0.6);
-    t.secs(1.2).await?;
-    t.press("core:perspective");
+    t.op("glow me 0 0 15").await?;
+    t.secs(0.5).await?;
+    let c = color("own light").await?;
+    t.probe("the floor in the player's own blue light (blue minus red)", c[2] - c[0], c[2] - c[0] > 15.0);
+    t.op("glow me 0 0 0").await?;
+    t.op("lit me 400").await?;
+    t.secs(0.5).await?;
+    let c = color("effect light").await?;
+    t.probe("the floor in the green light of an effect (green minus red)", c[1] - c[0], c[1] - c[0] > 15.0);
+    t.op("lit me 1").await?;
+    t.secs(1.5).await?;
+    let c = color("effect over").await?;
+    t.probe("dark again once the effect is over", crate::runner::lum(c), crate::runner::lum(c) < 20.0);
+    let p = add(f, [0, 0, -4]);
+    t.set(p, "testkit:pedestal").await?;
+    t.op(&format!("insert {} {} {} base:red_lamp", p[0], p[1], p[2]))
+        .await?;
+    t.secs(0.5).await?;
+    let c = color("shown item").await?;
+    t.probe("the floor by a pedestal showing a red lamp is reddish", c[0] - c[1], c[0] - c[1] > 15.0);
+    t.op(&format!("stack_light {} {} {} 0 0 0 15", p[0], p[1], p[2]))
+        .await?;
+    t.secs(0.5).await?;
+    let c = color("shown stack light").await?;
+    t.probe("shown stack data overrides the item's red light", c[2] - c[0], c[2] - c[0] > 15.0);
+    t.set(p, "air").await?;
+    let carrier = t
+        .op(&format!("spawn testmod:display_carrier {} {} {}", p[0], p[1], p[2]))
+        .await?;
+    for (slot, label) in [(0, "main stack light"), (6, "off stack light"), (2, "equipment stack light")] {
+        t.op(&format!("put {carrier} {slot} stick 1")).await?;
+        t.op(&format!("stack_light {carrier} {slot} 0 0 15"))
+            .await?;
+        t.secs(0.5).await?;
+        let c = color(label).await?;
+        t.probe(label, c[2] - c[0], c[2] - c[0] > 15.0);
+        t.op(&format!("put {carrier} {slot} stick 0")).await?;
+    }
     Ok(())
 }
 
@@ -290,15 +285,23 @@ pub async fn liquid_layers(t: T) -> R {
         .await?;
     t.op(&format!("spawn pig {} {} {}", f[0], f[1] - 3, f[2] - 5))
         .await?;
-    t.c().look(0.0, -40.0);
+    // Time stands still from here: the pig swims about, and on CI the shot over the pool came 15 s
+    // after the spawn with the pig at the window's lower edge, out of the box (violet 0.0029).
+    t.cmd("/tick freeze").await?;
+    t.c().set_look(0.0, -40.0);
     t.frames(30).await?;
     let pool = t.shot("pool").await?;
     let water = around(&t, &pool, [f[0] as f64, f[1] as f64 - 0.1, f[2] as f64 - 4.5], 0.03, probe::blue);
     t.probe("the pool is drawn blue", water, water > 0.5);
-    let lava = around(&t, &pool, [f[0] as f64 + 4.0, f[1] as f64 - 0.1, f[2] as f64 - 5.0], 0.02, probe::orange);
-    t.probe("the lava pit is drawn orange", lava, lava > 0.5);
-    // Over the pool, looking down at the pig under the water.
-    t.c().look(0.0, -70.0);
+    // Our lava is red, orange and yellow with deep red troughs, not one orange: any warm color.
+    let warm = |c: probe::C| c[0] > 100 && c[0] as i32 > c[1] as i32 + 30 && c[2] < 110;
+    let lava = around(&t, &pool, [f[0] as f64 + 4.0, f[1] as f64 - 0.1, f[2] as f64 - 5.0], 0.02, warm);
+    t.probe("the lava pit is drawn lava-colored", lava, lava > 0.5);
+    // Over the pool, looking down at the pig under the water. Hanging there: in survival the
+    // player drops into the pool within the 20 frames on CI (software Vulkan, slow frames) and
+    // the shot is from inside the water.
+    t.op("mode spectator").await?;
+    t.c().set_look(0.0, -70.0);
     t.cmd(&format!("/tp {} {} {}", f[0] as f64 - 0.5, f[1], f[2] as f64 - 4.0))
         .await?;
     t.frames(20).await?;
@@ -309,11 +312,13 @@ pub async fn liquid_layers(t: T) -> R {
     t.probe("and not drawn pink", pink, pink < 0.002);
     t.cmd(&format!("/tp {} {} {}", f[0] as f64 + 2.5, f[1], f[2] as f64 - 4.5))
         .await?;
-    t.c().look(270.0, -55.0);
+    t.c().set_look(270.0, -55.0);
     t.frames(20).await?;
     let pit = t.shot("outline_lava").await?;
-    let v = pit.share(0.3, 0.3, 0.7, 0.7, probe::orange);
+    let v = pit.share(0.3, 0.3, 0.7, 0.7, warm);
     t.probe("looking into the lava pit", v, v > 0.6);
+    t.cmd("/tick unfreeze").await?;
+    t.op("mode survival").await?;
     Ok(())
 }
 
@@ -325,13 +330,14 @@ pub async fn break_overlay(t: T) -> R {
     let wall = add(f, [0, 0, -2]);
     t.fill(wall, add(wall, [0, 1, 0]), "cobblestone").await?;
     let ladder = add(wall, [0, 0, 1]);
-    t.set(ladder, "ladder[facing=south]").await?;
+    t.set(ladder, "ladder[west=false,north=true]").await?;
     t.look_at(ladder);
     t.frames(3).await?;
     let (w, h) = (t.state().window[0], t.state().window[1]);
     let before = t.grab().await?;
     // Mining slowly, so a late picture still finds the button down and the block there.
-    t.op("attr_mod me core:mining_speed slow 0 -0.75 0").await?;
+    t.op("attr_mod me core:mining_speed slow core:add -0.75 0")
+        .await?;
     t.secs(0.2).await?;
     t.hold("core:attack", 2.0);
     t.secs(1.0).await?;
@@ -376,132 +382,10 @@ pub async fn break_overlay(t: T) -> R {
     Ok(())
 }
 
-/// The player figure in the inventory stays while mobs are drawn in the world behind it (both
-/// once shared the model buffers of a frame).
-pub async fn inventory_figure(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    for dz in -2..=2 {
-        t.op(&format!("spawn testmod:idol {} {} {}", f[0] + 4, f[1], f[2] + dz))
-            .await?;
-    }
-    t.look_at(add(f, [4, 1, 0]));
-    t.secs(0.5).await?;
-    t.press("core:inventory");
-    t.screen("core:menu").await?;
-    t.frames(4).await?;
-    let Some([x, y, w, h]) = t.c().ui_rect("entity") else { return Err("no player figure in the inventory".into()) };
-    let shot = t.shot("figure").await?;
-    let v = shot.share(x, y, x + w, y + h, probe::skin);
-    t.probe("skin in the figure's box", v, v > 0.03);
-    t.press("core:inventory");
-    Ok(())
-}
-
-/// Right click swings the arm only when it did something: on grass with an empty hand the
-/// picture stays as it was, placing a block swings.
-pub async fn use_swing(t: T) -> R {
-    t.flat().await?;
-    t.c().look(0.0, -45.0);
-    // The hand eases after the camera.
-    t.secs(1.0).await?;
-    let still = t.grab().await?;
-    t.press("core:use");
-    t.frames(4).await?;
-    let after = t.grab().await?;
-    t.check(T::differ(&still, &after) < 0.001, format!("the arm moved on a use that did nothing ({:.4})", T::differ(&still, &after)));
-    t.op("put me 0 dirt 4").await?;
-    t.c().select(0);
-    // Past the use cooldown of the first click.
-    t.secs(0.3).await?;
-    t.press("core:use");
-    t.until("placed", Duration::from_secs(3), |t| t.c().inventory_slot(0).count == 3)
-        .await?;
-    t.frames(2).await?;
-    t.shot("placed").await?;
-    Ok(())
-}
-
-/// A ladder takes the facing of the wall it was put on.
-pub async fn ladder_placement(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    let wall = add(f, [0, 0, -2]);
-    t.fill(wall, add(wall, [0, 1, 0]), "cobblestone").await?;
-    t.op("put me 0 ladder 8").await?;
-    t.c().select(0);
-    t.look_at(wall);
-    t.frames(3).await?;
-    t.press("core:use");
-    let at = add(wall, [0, 0, 1]);
-    t.until("ladder placed", Duration::from_secs(5), |t| t.c().inventory_slot(0).count == 7)
-        .await?;
-    // States face away from the wall, in face order (west, east, north, south): on a wall to
-    // its north it faces south.
-    t.check_eq(t.block(at).await?, "base:ladder[facing=south]".into(), "ladder on the north wall");
-    Ok(())
-}
-
-/// A torch put against a wall hangs on it, and drops when the wall goes.
-pub async fn wall_torch(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    let wall = add(f, [0, 0, -2]);
-    t.fill(wall, add(wall, [0, 1, 0]), "cobblestone").await?;
-    t.op("put me 0 torch 8").await?;
-    t.c().select(0);
-    t.look_at(wall);
-    t.frames(3).await?;
-    t.press("core:use");
-    let at = add(wall, [0, 0, 1]);
-    t.until("torch placed", Duration::from_secs(5), |t| t.c().inventory_slot(0).count == 7)
-        .await?;
-    // West, east, up (the floor), north, south: on a wall to its north it faces south.
-    t.check_eq(t.block(at).await?, "base:torch[facing=south]".into(), "torch on the north wall");
-    t.frames(5).await?;
-    t.shot("wall_torch").await?;
-    t.set(wall, "air").await?;
-    t.secs(0.3).await?;
-    t.check_eq(t.block(at).await?, "core:air".into(), "the torch fell with its wall");
-    Ok(())
-}
-
-pub async fn pick_block(t: T) -> R {
-    t.flat().await?;
-    t.op("mode creative").await?;
-    t.until("creative", Duration::from_secs(5), |t| t.state().mode == 1)
-        .await?;
-    let f = t.feet();
-    let b = add(f, [0, -1, -1]);
-    t.set(b, "bricks").await?;
-    t.look_at(b);
-    t.frames(3).await?;
-    t.c().click(2, 0.0);
-    t.until("bricks picked", Duration::from_secs(5), |t| t.c().inventory_slot(t.state().selected).item == item("base:bricks"))
-        .await
-}
-
-/// The cube and light gizmos draw their lines and numbers.
-pub async fn gizmos(t: T) -> R {
-    t.flat().await?;
-    t.c().look(30.0, -30.0);
-    t.secs(0.5).await?;
-    let off = t.shot("off").await?;
-    t.cmd("/gizmo cubes").await?;
-    t.cmd("/gizmo light").await?;
-    t.secs(0.5).await?;
-    let on = t.shot("cubes_light").await?;
-    let v = on.share(0.0, 0.0, 1.0, 0.9, probe::yellow) - off.share(0.0, 0.0, 1.0, 0.9, probe::yellow);
-    t.probe("yellow gizmo pixels added", v, v > 0.002);
-    t.cmd("/gizmo cubes").await?;
-    t.cmd("/gizmo light").await?;
-    Ok(())
-}
-
 /// Hosts the test world and lets a second game process join it over the network transport.
 pub async fn multiplayer(t: T) -> R {
     t.world(13).await?;
-    t.c().host_world();
+    t.c().world_host();
     t.until("hosting", Duration::from_secs(60), |t| t.flag(client::client_flags::HOSTING))
         .await?;
     let run = t.c().run_dir();
@@ -520,6 +404,10 @@ pub async fn multiplayer(t: T) -> R {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut child = std::process::Command::new(exe)
         .args(["--run-dir", &dir, "--script", &script, "--size", "640x360"])
+        .args(crate::package_args())
+        // The host runs the test-only mods (testmod), which a `--script` game leaves out: the
+        // joining game needs the same code mods.
+        .args(["--mods", &format!("{dir}/test-mods")])
         .spawn()
         .map_err(|e| format!("cannot start the second client: {e}"))?;
     let heard = t
@@ -534,7 +422,6 @@ pub async fn multiplayer(t: T) -> R {
         .filter_map(|&id| t.c().entity(id))
         .any(|e| name_of(abi::entry_kind::ENTITY, e.kind) == "core:player");
     // What they hold reaches the others, to draw it in their hand.
-    static HELD: weft_sdk::Component<u32> = weft_sdk::Component::named("core:held");
     if let Some(other) = t.c().entities().iter().copied().find(|&id| {
         t.c()
             .entity(id)
@@ -542,7 +429,7 @@ pub async fn multiplayer(t: T) -> R {
     }) {
         t.op(&format!("put {other} 0 stone 1")).await?;
         let stone = Item::lookup("base:stone").unwrap_or(u32::MAX);
-        t.until("what the other player holds", Duration::from_secs(5), |t| t.c().view().component_of(other, &HELD) == Some(stone))
+        t.until("what the other player holds", Duration::from_secs(5), |t| t.c().held(other, weft_sdk::Hand::Main).item == stone)
             .await?;
     }
     // A synced setting the host changes while the other player is in reaches them.
@@ -582,25 +469,25 @@ pub async fn multiplayer(t: T) -> R {
 pub async fn client_hooks(t: T) -> R {
     t.flat().await?;
     let before = crate::runner::PROBES.with(|p| p.get());
-    t.c().key("F9", 0.0);
+    t.c().input_key("F9", 0.0);
     t.until("probe key seen", Duration::from_secs(3), |_| crate::runner::PROBES.with(|p| p.get()) > before)
         .await?;
-    t.c().open_screen(&screens::CONTROLS);
+    t.c().menu_open(&screens::CONTROLS);
     t.screen("core:controls").await?;
     for _ in 0..40 {
         if t.c().ui_rect("text:test probe").is_some() {
             break;
         }
-        t.c().cursor(0.5, 0.5);
-        t.c().scroll(-3.0);
+        t.c().input_cursor(0.5, 0.5);
+        t.c().input_scroll(-3.0);
         t.frames(2).await?;
     }
     t.check(t.c().ui_rect("text:test probe").is_some(), "Controls does not list the mod's key");
-    t.c().close_screen();
+    t.c().menu_close();
     t.no_screen().await?;
     let f = t.feet();
     let b = [f[0] as f64 + 2.0, f[1] as f64, f[2] as f64 - 4.0];
-    t.c().look(0.0, -10.0);
+    t.c().set_look(0.0, -10.0);
     static DRAWN: weft_sdk::GizmoGroup = weft_sdk::GizmoGroup::named("drawn");
     let green = |shot: &crate::runner::Shot| shot.share(0.0, 0.0, 1.0, 0.9, |c| c[1] > 200 && c[0] < 80 && c[2] < 80);
     for _ in 0..3 {
@@ -611,7 +498,7 @@ pub async fn client_hooks(t: T) -> R {
         t.c()
             .draw_text(None, [b[0] + 0.5, b[1] + 2.5, b[2] + 0.5], "testkit.drawn", &[], 0xFFFF80FF, 2.0);
         t.c()
-            .screen_text(0.5, 0.3, "testkit.screen_text", &[], 0x80FFFFFF, 1.0);
+            .draw_screen_text(0.5, 0.3, "testkit.screen_text", &[], 0x80FFFFFF, 1.0);
         t.frames(1).await?;
     }
     t.c()
@@ -621,7 +508,7 @@ pub async fn client_hooks(t: T) -> R {
     t.c()
         .draw_text(None, [b[0] + 0.5, b[1] + 2.5, b[2] + 0.5], "testkit.drawn", &[], 0xFFFF80FF, 2.0);
     t.c()
-        .screen_text(0.5, 0.3, "testkit.screen_text", &[], 0x80FFFFFF, 1.0);
+        .draw_screen_text(0.5, 0.3, "testkit.screen_text", &[], 0x80FFFFFF, 1.0);
     let shot = t.shot("drawn").await?;
     let hidden = green(&shot);
     t.probe("a shape of a group that is off is not drawn", hidden, hidden < 0.0005);
@@ -646,13 +533,181 @@ pub async fn client_hooks(t: T) -> R {
     // Screen text is text like any other: icons of blocks and items show in it.
     for _ in 0..3 {
         t.c()
-            .screen_text(0.5, 0.7, "testkit.rich_label", &[], 0xFFFFFFFF, 2.0);
+            .draw_screen_text(0.5, 0.7, "testkit.rich_label", &[], 0xFFFFFFFF, 2.0);
         t.frames(1).await?;
     }
     t.c()
-        .screen_text(0.5, 0.7, "testkit.rich_label", &[], 0xFFFFFFFF, 2.0);
+        .draw_screen_text(0.5, 0.7, "testkit.rich_label", &[], 0xFFFFFFFF, 2.0);
     let rich = t.shot("rich_label").await?;
     let diamond = rich.share(0.35, 0.65, 0.65, 0.8, probe::cyan);
     t.probe("a block icon in screen text", diamond, diamond > 0.002);
     Ok(())
+}
+
+// Restored from dev b5815f09 (Weft v26.11.2 removed them): see notes/crew/upstream/lost-tests.md
+
+pub async fn pick_block(t: T) -> R {
+    t.flat().await?;
+    t.op("mode creative").await?;
+    t.until("creative", Duration::from_secs(5), |t| t.state().mode == 1)
+        .await?;
+    let f = t.feet();
+    let b = add(f, [0, -1, -1]);
+    t.set(b, "bricks").await?;
+    t.look_at(b);
+    t.frames(3).await?;
+    t.c().input_click(2, 0.0);
+    t.until("bricks picked", Duration::from_secs(5), |t| t.c().inventory_slot(t.state().selected).item == item("base:bricks"))
+        .await
+}
+
+/// A torch put against a wall hangs on it, and drops when the wall goes.
+pub async fn wall_torch(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let wall = add(f, [0, 0, -2]);
+    t.fill(wall, add(wall, [0, 1, 0]), "cobblestone").await?;
+    t.op("put me 0 torch 8").await?;
+    t.c().select_slot(0);
+    t.look_at(wall);
+    t.frames(3).await?;
+    t.press("core:use");
+    let at = add(wall, [0, 0, 1]);
+    t.until("torch placed", Duration::from_secs(5), |t| t.c().inventory_slot(0).count == 7)
+        .await?;
+    // West, east, up (the floor), north, south: on a wall to its north it faces south.
+    t.check_eq(t.block(at).await?, "base:torch[facing=south]".into(), "torch on the north wall");
+    t.frames(5).await?;
+    t.shot("wall_torch").await?;
+    t.set(wall, "air").await?;
+    t.secs(0.3).await?;
+    t.check_eq(t.block(at).await?, "core:air".into(), "the torch fell with its wall");
+    Ok(())
+}
+
+/// A ladder takes the facing of the wall it was put on.
+pub async fn ladder_placement(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let wall = add(f, [0, 0, -2]);
+    t.fill(wall, add(wall, [0, 1, 0]), "cobblestone").await?;
+    t.op("put me 0 ladder 8").await?;
+    t.c().select_slot(0);
+    t.look_at(wall);
+    t.frames(3).await?;
+    t.press("core:use");
+    let at = add(wall, [0, 0, 1]);
+    t.until("ladder placed", Duration::from_secs(5), |t| t.c().inventory_slot(0).count == 7)
+        .await?;
+    // States face away from the wall, in face order (west, east, north, south): on a wall to
+    // its north it faces south.
+    t.check_eq(t.block(at).await?, "base:ladder[facing=south]".into(), "ladder on the north wall");
+    Ok(())
+}
+
+/// Third person shows the player's model from behind and from the front.
+pub async fn third_person(t: T) -> R {
+    t.flat().await?;
+    t.cmd("/gear sword wrought_iron slot=0").await?;
+    t.c().select_slot(0);
+    t.press("core:perspective");
+    t.c().set_look(30.0, -15.0);
+    t.secs(0.5).await?;
+    for name in ["behind", "front"] {
+        let shot = t.shot(name).await?;
+        let (shirt, skin) = (shot.share(0.42, 0.35, 0.58, 0.8, probe::cyan), shot.share(0.42, 0.35, 0.58, 0.8, probe::skin));
+        t.probe(&format!("{name}: shirt"), shirt, shirt > 0.05);
+        t.probe(&format!("{name}: skin"), skin, skin > 0.05);
+        t.press("core:perspective");
+        t.secs(0.3).await?;
+    }
+    Ok(())
+}
+
+/// Crouching shows in third person: the model is lower (vanilla's pose).
+pub async fn crouch_pose(t: T) -> R {
+    t.flat().await?;
+    t.press("core:perspective");
+    t.c().set_look(30.0, -15.0);
+    t.secs(0.3).await?;
+    t.press("core:perspective");
+    t.secs(0.3).await?;
+    let standing = t.shot("standing").await?;
+    t.hold("core:sneak", 2.0);
+    t.secs(1.0).await?;
+    let crouching = t.shot("crouching").await?;
+    // The camera goes down with the eyes, so the model is not lower on the picture but shorter:
+    // from the top of its hair (below the sky) to the bottom of its trousers in the middle column.
+    let height = |s: &Shot| {
+        let rows: Vec<f32> = (0..s.h).map(|y| y as f32 / s.h as f32).collect();
+        let top = rows
+            .iter()
+            .copied()
+            .find(|&y| !probe::light(s.at(0.5, y)))
+            .unwrap_or(1.0);
+        let bottom = rows
+            .iter()
+            .copied()
+            .filter(|&y| probe::blue(s.at(0.5, y)))
+            .last()
+            .unwrap_or(top);
+        bottom - top
+    };
+    let ratio = height(&crouching) / height(&standing).max(1e-3);
+    t.probe("crouching model height / standing", ratio, ratio < 0.92 && ratio > 0.6);
+    t.secs(1.2).await?;
+    t.press("core:perspective");
+    Ok(())
+}
+
+/// The player figure in the inventory stays while mobs are drawn in the world behind it (both
+/// once shared the model buffers of a frame).
+pub async fn inventory_figure(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    for dz in -2..=2 {
+        t.op(&format!("spawn testmod:idol {} {} {}", f[0] + 4, f[1], f[2] + dz))
+            .await?;
+    }
+    t.look_at(add(f, [4, 1, 0]));
+    t.secs(0.5).await?;
+    t.press("core:inventory");
+    t.screen("core:menu").await?;
+    t.frames(4).await?;
+    let Some(Rect { x, y, w, h }) = t.c().ui_rect("entity") else { return Err("no player figure in the inventory".into()) };
+    let shot = t.shot("figure").await?;
+    let v = shot.share(x, y, x + w, y + h, probe::skin);
+    t.probe("skin in the figure's box", v, v > 0.03);
+    t.press("core:inventory");
+    Ok(())
+}
+
+/// A skin of the player's own (`skins/skin.png`) goes to the server with the join and the model
+/// wears it: an all red one turns the figure red instead of its shirt and skin.
+pub async fn player_skin(t: T) -> R {
+    let path = format!("{}/skins/skin.png", t.c().run_dir());
+    std::fs::create_dir_all(format!("{}/skins", t.c().run_dir())).map_err(|e| e.to_string())?;
+    let file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
+    let mut enc = png::Encoder::new(std::io::BufWriter::new(file), 64, 64);
+    enc.set_color(png::ColorType::Rgba);
+    let px: Vec<u8> = (0..64 * 64).flat_map(|_| [220u8, 30, 30, 255]).collect();
+    enc.write_header()
+        .and_then(|mut w| w.write_image_data(&px))
+        .map_err(|e| e.to_string())?;
+    let result = async {
+        t.flat().await?;
+        t.press("core:perspective");
+        t.c().set_look(30.0, -15.0);
+        t.secs(0.8).await?;
+        let shot = t.shot("red").await?;
+        let (red, shirt) = (shot.share(0.42, 0.35, 0.58, 0.8, probe::red), shot.share(0.42, 0.35, 0.58, 0.8, probe::cyan));
+        t.probe("the model in the player's red skin", red, red > 0.05);
+        t.probe("and not in the default shirt", shirt, shirt < 0.01);
+        t.press("core:perspective");
+        t.press("core:perspective");
+        Ok::<(), String>(())
+    }
+    .await;
+    drop(std::fs::remove_file(&path));
+    result
 }

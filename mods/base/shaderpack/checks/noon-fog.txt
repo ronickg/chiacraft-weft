@@ -1,0 +1,32 @@
+# Noon fog by water and on snow (the world playtester: a milky white-out at noon by the river of
+# seed 1, x 272 z -208, frame luma 0.76, saturation 0.06; milder at a lake). Seed 1, --view 12,
+# 1280x720, --shader-pack chiacraft, a fresh world. Spectator, mobs off.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /tp 272 76 -208
+loaded
+idle
+wait 10
+chat /tk time 6000
+wait 3
+look 180 -10
+wait 2
+shot fog_1_river_noon.png
+look 180 35
+wait 2
+shot fog_1b_river_noon_sky.png
+chat /tk time 1500
+wait 3
+look 180 -10
+wait 2
+shot fog_2_river_morning.png
+chat /tp -368 80 352
+wait 8
+chat /tk time 6000
+wait 3
+look 180 -10
+wait 2
+shot fog_3_lake_noon.png
+quit

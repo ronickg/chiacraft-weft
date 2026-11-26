@@ -1,0 +1,11 @@
+{
+ "kind": "base:hoe",
+ "layer": "haft",
+ "style": "wrapped",
+ "override": true,
+ "socket": [
+  15.2,
+  17.2
+ ],
+ "note": "moved so this socket meets the head's anchor"
+}

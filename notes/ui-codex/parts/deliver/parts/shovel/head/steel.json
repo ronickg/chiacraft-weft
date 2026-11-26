@@ -1,0 +1,15 @@
+{
+ "kind": "base:shovel",
+ "layer": "head",
+ "material": "steel",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 12,
+ "anchor": [
+  18.9,
+  13.2
+ ]
+}

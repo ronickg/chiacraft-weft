@@ -1,0 +1,19 @@
+{
+ "kind": "ui",
+ "what": "a health bar 44 px wide shown three times stacked with magenta between them (full, half and nearly empty): dark track, 1-px bronze rim, red fill with a lighter top line",
+ "size": [
+  48,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.344,
+   "outline": 1.0,
+   "red_line": 0.0,
+   "fill": 0.6,
+   "passed": true
+  }
+ ]
+}

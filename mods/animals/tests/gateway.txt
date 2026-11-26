@@ -1,0 +1,31 @@
+loaded
+idle
+chat /tk mode survival
+wait 4
+where
+chat /tk fill ~-1 ~ ~3 ~2 ~4 ~3 animals:amber_block
+chat /tk fill ~0 ~1 ~3 ~1 ~3 ~3 core:air
+chat /tk give base:torch 1
+wait 0.5
+look 180 -24
+click 1
+wait 0.5
+chat /tk get ~0 ~1 ~3
+wait 1
+chat /tp ~ ~1 ~3
+wait 4
+where
+wait 6
+loaded
+wait 2
+where
+chat /tp ~ ~ ~2
+wait 4
+where
+wait 6
+loaded
+wait 2
+where
+look 180 -10
+shot gateway_back.png
+quit

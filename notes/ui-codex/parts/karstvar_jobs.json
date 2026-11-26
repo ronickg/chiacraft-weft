@@ -1,0 +1,26 @@
+[
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_weathered_limestone_side_1",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_weathered_limestone_side_px.png",
+  "what": "the side of weathered limestone. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same width and darkness of the vertical rain streaks, the same grey-green tinge, grain and light; only their arrangement differs, so this tile and the original side by side don't look like a repeat. Streaks continue across the top and bottom edges. Seamless on all four edges, every cell filled. Variant 1 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_weathered_limestone_side_2",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_weathered_limestone_side_px.png",
+  "what": "the side of weathered limestone. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same width and darkness of the vertical rain streaks, the same grey-green tinge, grain and light; only their arrangement differs, so this tile and the original side by side don't look like a repeat. Streaks continue across the top and bottom edges. Seamless on all four edges, every cell filled. Variant 2 of 3: a clearly different layout from the other variants."
+ },
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out",
+  "name": "var_weathered_limestone_side_3",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out/rock_weathered_limestone_side_px.png",
+  "what": "the side of weathered limestone. A new variant of the attached texture (the last image before the grid, from my game): exactly the same colours, the same width and darkness of the vertical rain streaks, the same grey-green tinge, grain and light; only their arrangement differs, so this tile and the original side by side don't look like a repeat. Streaks continue across the top and bottom edges. Seamless on all four edges, every cell filled. Variant 3 of 3: a clearly different layout from the other variants."
+ }
+]

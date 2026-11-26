@@ -1,0 +1,245 @@
+[
+ {
+  "id": "wood_pickaxe",
+  "kind": "item",
+  "group": "Tools",
+  "w": 32,
+  "h": 32,
+  "grid": 0.156,
+  "colors": 174
+ },
+ {
+  "id": "iron_axe",
+  "kind": "item",
+  "group": "Tools",
+  "w": 32,
+  "h": 32,
+  "grid": 0.228,
+  "colors": 131
+ },
+ {
+  "id": "diamond_shovel",
+  "kind": "item",
+  "group": "Tools",
+  "w": 32,
+  "h": 32,
+  "grid": 0.221,
+  "colors": 124
+ },
+ {
+  "id": "stone_sword",
+  "kind": "item",
+  "group": "Weapons",
+  "w": 32,
+  "h": 32,
+  "grid": 0.049,
+  "colors": 90
+ },
+ {
+  "id": "gold_sword",
+  "kind": "item",
+  "group": "Weapons",
+  "w": 32,
+  "h": 32,
+  "grid": 0.129,
+  "colors": 106
+ },
+ {
+  "id": "club",
+  "kind": "item",
+  "group": "Weapons",
+  "w": 32,
+  "h": 32,
+  "grid": 0.093,
+  "colors": 129
+ },
+ {
+  "id": "iron_chestplate",
+  "kind": "item",
+  "group": "Armour",
+  "w": 32,
+  "h": 32,
+  "grid": 0.057,
+  "colors": 188
+ },
+ {
+  "id": "diamond_helmet",
+  "kind": "item",
+  "group": "Armour",
+  "w": 32,
+  "h": 32,
+  "grid": 0.059,
+  "colors": 170
+ },
+ {
+  "id": "leather_boots",
+  "kind": "item",
+  "group": "Armour",
+  "w": 32,
+  "h": 32,
+  "grid": 0.339,
+  "colors": 84
+ },
+ {
+  "id": "iron_ingot",
+  "kind": "item",
+  "group": "Ingots",
+  "w": 32,
+  "h": 32,
+  "grid": 0.049,
+  "colors": 89
+ },
+ {
+  "id": "raw_gold",
+  "kind": "item",
+  "group": "Ingots",
+  "w": 32,
+  "h": 32,
+  "grid": 0.051,
+  "colors": 180
+ },
+ {
+  "id": "diamond",
+  "kind": "item",
+  "group": "Gems",
+  "w": 32,
+  "h": 32,
+  "grid": 0.045,
+  "colors": 158
+ },
+ {
+  "id": "amber",
+  "kind": "item",
+  "group": "Gems",
+  "w": 32,
+  "h": 32,
+  "grid": 0.049,
+  "colors": 142
+ },
+ {
+  "id": "coal",
+  "kind": "item",
+  "group": "Gems",
+  "w": 32,
+  "h": 32,
+  "grid": 0.054,
+  "colors": 100
+ },
+ {
+  "id": "redstone",
+  "kind": "item",
+  "group": "Gems",
+  "w": 32,
+  "h": 32,
+  "grid": 0.208,
+  "colors": 101
+ },
+ {
+  "id": "stick",
+  "kind": "item",
+  "group": "Crafting materials",
+  "w": 32,
+  "h": 32,
+  "grid": 0.149,
+  "colors": 54
+ },
+ {
+  "id": "feather",
+  "kind": "item",
+  "group": "Crafting materials",
+  "w": 32,
+  "h": 32,
+  "grid": 0.048,
+  "colors": 94
+ },
+ {
+  "id": "leather",
+  "kind": "item",
+  "group": "Crafting materials",
+  "w": 32,
+  "h": 32,
+  "grid": 0.149,
+  "colors": 69
+ },
+ {
+  "id": "string",
+  "kind": "item",
+  "group": "Crafting materials",
+  "w": 32,
+  "h": 32,
+  "grid": 0.047,
+  "colors": 85
+ },
+ {
+  "id": "bone",
+  "kind": "item",
+  "group": "Crafting materials",
+  "w": 32,
+  "h": 32,
+  "grid": 0.05,
+  "colors": 39
+ },
+ {
+  "id": "apple",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.053,
+  "colors": 195
+ },
+ {
+  "id": "bread",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.098,
+  "colors": 158
+ },
+ {
+  "id": "cooked_trout",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.048,
+  "colors": 182
+ },
+ {
+  "id": "melon_slice",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.053,
+  "colors": 126
+ },
+ {
+  "id": "apple_pie",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.183,
+  "colors": 218
+ },
+ {
+  "id": "beef",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.077,
+  "colors": 119
+ },
+ {
+  "id": "water_bucket",
+  "kind": "item",
+  "group": "Containers",
+  "w": 32,
+  "h": 32,
+  "grid": 0.061,
+  "colors": 169
+ }
+]

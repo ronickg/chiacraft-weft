@@ -1,0 +1,40 @@
+# The world playtester's sinkhole (11-04): seed 1, spring day 1, clear, 14:01, spectator at
+# x -337 y 120 z -802 looking straight down went a milky white-out under the afternoon's fog,
+# while from 40 blocks north at pitch -30 the view was clear. The fog lay 5 blocks under the eye,
+# wherever the eye was. Now it lies on the ground at the end of each look, and the sun burns the
+# banks to a third by day. Also the morning (07:30), when the banks should stay. Seed 1, --view 12,
+# 1280x720, --shader-pack chiacraft, a fresh world. Yaw 0 faces -z; a negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /tk time 8000
+chat /tp -337 120 -802
+loaded
+idle
+wait 10
+look 0 -85
+wait 3
+shot sink_1_down_1400.png
+chat /tp -337 120 -762
+wait 4
+look 0 -30
+wait 3
+shot sink_2_north_1400.png
+chat /tp -337 80 -762
+wait 4
+look 0 -10
+wait 3
+shot sink_3_low_1400.png
+chat /tk time 1500
+wait 4
+shot sink_4_low_0730.png
+chat /tp -337 120 -802
+wait 4
+look 0 -85
+wait 3
+shot sink_5_down_0730.png
+wait 1
+bench 4 sink_down_morning
+quit

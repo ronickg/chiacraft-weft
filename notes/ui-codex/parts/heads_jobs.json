@@ -1,0 +1,27 @@
+[
+ {
+  "kind": "item",
+  "name": "flint_axe",
+  "what": "a crude flint axe: a chunky knapped grey-brown flint head with chipped faceted edges and a few lighter flake scars, lashed to a plain wooden handle with tan sinew cord wound many times, lying diagonally, handle at the bottom left, head at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "bronze_axe",
+  "what": "a bronze axe: a cast warm orange-brown bronze head with a soft golden sheen and a near-white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar band where head meets handle, lying diagonally, handle at the bottom left, head at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "bearded_gold_axe",
+  "what": "a bearded golden axe: a narrow-necked lemon-gold head with orange-brown shadows whose lower edge drops into a long hooked beard, small white glints, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar band where head meets handle, lying diagonally, handle at the bottom left, head at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "bearded_diamond_axe",
+  "what": "a bearded diamond axe: a narrow-necked head of faceted cyan diamond with teal shadows and white facet tips, its lower edge dropping into a long hooked beard, one small sparkle, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar band where head meets handle, lying diagonally, handle at the bottom left, head at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "bearded_bronze_axe",
+  "what": "a bearded bronze axe: a narrow-necked cast warm orange-brown bronze head with a golden sheen whose lower edge drops into a long hooked beard, a near-white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar band where head meets handle, lying diagonally, handle at the bottom left, head at the top right, filling the canvas corner to corner"
+ }
+]

@@ -4,15 +4,12 @@
 struct WirePush {
     origin: vec4<i32>,
     frac: vec4<f32>,
+    rotation: vec4<f32>,
 }
 var<immediate> push: WirePush;
 
 var<private> CORNER: array<vec2<f32>, 6> = array<vec2<f32>, 6>(
     vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0),
-);
-
-var<private> DIRS: array<vec3<f32>, 6> = array<vec3<f32>, 6>(
-    vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, -1.0), vec3(0.0, 0.0, 1.0),
 );
 
 // Off the block it lies on, not to fight with it.
@@ -53,7 +50,8 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
         default: {}
     }
     let cell = vec3<f32>(q.pos.xyz - push.origin.xyz) - push.frac.xyz;
-    let world = cell + vec3(0.5) + DIRS[face] * (0.5 - LIFT) + u * (c.x - 0.5) + v * (c.y - 0.5);
+    let local = cell + q.offset.xyz + vec3(0.5) + FACE_DIRS[face] * (0.5 - LIFT) + u * (c.x - 0.5) + v * (c.y - 0.5);
+    let world = quat_vector(push.rotation, local);
     var out: VOut;
     out.clip = scene.view_proj * vec4(world, 1.0);
     out.uv = uv;
@@ -79,7 +77,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         let w = unpack_light(in.around);
         own = vec4(min(own.x, w.x), max(own.yzw, w.yzw));
     }
-    let light = pow(lightmap(own, scene.params.z, scene.light.x, scene.light.y), vec3(2.2));
+    let light = pow(lightmap(own, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x), vec3(2.2));
     // Power shows in the dark as well.
     let shown = color.rgb * red * max(light, vec3(p * 0.7));
     let fog = fog_amount(in.dist, scene.params.x, scene.params.y);

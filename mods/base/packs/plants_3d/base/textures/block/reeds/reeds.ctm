@@ -1,0 +1,4 @@
+# 3D plants pack (mods/base/source/plants3d/build.py): bottom, middle, top and alone, each a model
+method = vertical
+connect = block
+tiles = base:block/p3d/reeds_0 base:block/p3d/reeds_1 base:block/p3d/reeds_2 base:block/p3d/reeds_3

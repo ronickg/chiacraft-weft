@@ -1,0 +1,19 @@
+{
+ "kind": "effect",
+ "what": "six frames of a grey smoke puff, each 16 x 16, in a 3 x 2 grid read left to right then top to bottom, shrinking from a big soft puff in frame 1 to a single dot in frame 6, drawn in light greys only so the game can tint it",
+ "size": [
+  48,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.248,
+   "outline": 0.99,
+   "red_line": 0.0,
+   "fill": 0.16,
+   "passed": true
+  }
+ ]
+}

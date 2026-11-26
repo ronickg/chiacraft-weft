@@ -1,0 +1,11 @@
+{
+ "kind": "base:sword",
+ "layer": "hilt",
+ "style": "plain",
+ "override": true,
+ "socket": [
+  7.6,
+  23.8
+ ],
+ "note": "moved so this socket meets the head's anchor"
+}

@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "lily of the valley: two broad upright green leaves and an arching stem hung with a row of small white bell flowers, 14-18 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.375,
+   "outline": 1.15,
+   "red_line": 0.0,
+   "fill": 0.16,
+   "passed": false
+  },
+  {
+   "grid": 0.237,
+   "outline": 0.9,
+   "red_line": 0.0,
+   "fill": 0.15,
+   "passed": false
+  },
+  {
+   "grid": 0.311,
+   "outline": 1.15,
+   "red_line": 0.0,
+   "fill": 0.16,
+   "passed": false
+  }
+ ]
+}

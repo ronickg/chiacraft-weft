@@ -1,0 +1,68 @@
+//! Survival rules that need no game world, the same for players and animals
+//! (`notes/SURVIVAL.md`): the nine stats and what points make of them, levels and XP, the stomach
+//! and the nutrients of every food (from real nutrition facts), freshness, meals and preserving, body temperature and clothing, the
+//! effects and what they change, stamina's costs, and the difficulty presets. The base mod wires
+//! them to the player, the animals mod to its animals; both read the same numbers here.
+//!
+//! The rule that ties it together: **a stat sets the ceiling, food sets how much of it is
+//! reached.** Well fed, max health and stamina are the stats' values; on an empty stomach they
+//! fall to a floor, never to death.
+
+pub mod air;
+pub mod ambience;
+pub mod balance;
+pub mod calendar;
+pub mod canopy;
+pub mod climate;
+pub mod climb;
+pub mod clothing;
+pub mod combat;
+pub mod crafts;
+pub mod crops;
+pub mod curve;
+pub mod difficulty;
+pub mod effects;
+pub mod events;
+pub mod felling;
+pub mod fireflies;
+pub mod first;
+pub mod foliage;
+pub mod food;
+pub mod forage;
+pub mod gear;
+pub mod glide;
+pub mod grapple;
+pub mod impact;
+pub mod layers;
+pub mod levels;
+pub mod ley;
+pub mod loot;
+pub mod meals;
+pub mod mobs;
+pub mod perks;
+pub mod plants;
+pub mod preserve;
+pub mod rot;
+pub mod ruins;
+pub mod sheet;
+pub mod shelter;
+pub mod skills;
+pub mod sockets;
+pub mod soil;
+pub mod stamina;
+pub mod stats;
+pub mod stomach;
+pub mod temperature;
+pub mod waystones;
+pub mod weather_sound;
+pub mod weathering;
+pub mod web;
+pub mod web_layout;
+pub mod web_sheet;
+pub mod wild;
+pub mod wind_life;
+
+/// Ticks a second, as the game's.
+pub const TICKS: u32 = 20;
+/// A game day in seconds (20 minutes, as the game's).
+pub const DAY_SECS: f32 = 1200.0;

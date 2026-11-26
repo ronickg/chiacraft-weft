@@ -1,0 +1,19 @@
+{
+ "kind": "block",
+ "what": "yellow horned poppy: a clump of crinkled silvery blue-grey leaves with two bright yellow four-petalled poppies and one long curved seed horn, 16-20 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.288,
+   "outline": 0.6,
+   "red_line": 0.0,
+   "fill": 0.24,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+texture = "base:gold_block"
+hardness = 1.0
+sound = "stone"
+mineable = "pickaxe"
+tab = "base:building"

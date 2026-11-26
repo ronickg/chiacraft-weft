@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a cooked trout: a whole fish lying diagonally, head at the bottom left, golden-brown roasted skin with darker char marks, a fin on top",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.616,
+   "outline": 0.63,
+   "red_line": 0.0,
+   "fill": 0.33,
+   "passed": true
+  }
+ ]
+}

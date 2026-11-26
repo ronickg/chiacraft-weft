@@ -1,0 +1,57 @@
+# Clouds lit as volumes, still blocky (Research round 15, rec. 2; Ronald: "both, a setting"): at
+# noon looking up and across, toward a low sun (the silver lining and backlit glow) and away from
+# it, at sunset, and a thunderstorm's deck with its towers and darker bellies; plus a bench at noon.
+# Seed 1, --view 12, 1280x720, --shader-pack chiacraft, a fresh world. Spectator at y 120 over the
+# spawn. Yaw 0 faces -z, 90 -x (west), 270 +x (east).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /time set 6000
+chat /air 0 0
+chat /tp 149.5 120 -166.5
+loaded
+wait 20
+look 0 25
+wait 3
+shot clouds_1_noon_n.png
+look 180 10
+wait 2
+shot clouds_1b_noon_s.png
+wait 1
+bench 4 clouds_noon
+chat /time set 11300
+wait 4
+look 90 8
+wait 3
+shot clouds_2_evening_tosun.png
+look 270 8
+wait 2
+shot clouds_2b_evening_away.png
+chat /time set 12100
+wait 4
+look 90 6
+wait 3
+shot clouds_3_sunset.png
+chat /time set 6000
+chat /weather thunder 99999
+wait 15
+look 0 15
+wait 3
+shot clouds_4_storm_n.png
+look 0 40
+wait 2
+shot clouds_4b_storm_up.png
+look 0 15
+wait 1
+bench 4 clouds_storm
+chat /tp 149.5 75 -166.5
+wait 6
+look 0 5
+wait 3
+shot clouds_5_storm_ground.png
+look 180 20
+wait 2
+shot clouds_5b_storm_ground_s.png
+quit

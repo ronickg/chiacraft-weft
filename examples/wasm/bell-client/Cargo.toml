@@ -1,0 +1,30 @@
+[package]
+# A sandboxed mod: the client half of the `bell` package (examples/packages/bell). Build it with
+# `./build.sh`, which writes the package's code/client.wasm.
+name = "bell_client"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# The sandboxed client SDK (API 1.2) under the name of Weft's, so the code reads like a Weft mod's
+# (`use weft_sdk::*;`).
+weft_sdk = { package = "chiacraft-mod-sdk-client", path = "../../../crates/mod-sdk-client" }
+
+# Its own cargo root, outside the game's build (it is built for wasm32-unknown-unknown).
+[workspace]
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+codegen-units = 1
+
+# Small without a release build (the Mac builds no release now): what goes into the package.
+[profile.dev]
+opt-level = "s"
+debug = false
+strip = true

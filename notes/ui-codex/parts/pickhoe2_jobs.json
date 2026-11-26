@@ -1,0 +1,93 @@
+[
+ {
+  "kind": "item",
+  "name": "pick2_wood_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/gold_pickaxe.png",
+  "diagonal": true,
+  "what": "a wood pickaxe in the same shape as the attached golden pickaxe: a double crescent head of carved warm orange-brown wood with clear grain, crude and chunky set crosswise at the handle's top, both points curving down and out evenly, a plain wooden handle, the head lashed on with tan cord, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "pick2_stone_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/gold_pickaxe.png",
+  "diagonal": true,
+  "what": "a stone pickaxe in the same shape as the attached golden pickaxe: a double crescent head of chunky chipped warm grey-tan stone with rough bumpy edges, no shine set crosswise at the handle's top, both points curving down and out evenly, a plain wooden handle, the head lashed on with tan cord, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "pick2_flint_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/gold_pickaxe.png",
+  "diagonal": true,
+  "what": "a flint pickaxe in the same shape as the attached golden pickaxe: a double crescent head of crude knapped grey-brown flint with chipped faceted edges and lighter flake scars set crosswise at the handle's top, both points curving down and out evenly, a plain wooden handle, the head lashed on with tan sinew cord, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "pick2_copper_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/gold_pickaxe.png",
+  "diagonal": true,
+  "what": "a copper pickaxe in the same shape as the attached golden pickaxe: a double crescent head of cast bright orange copper with a peach highlight set crosswise at the handle's top, both points curving down and out evenly, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "pick2_bronze_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/gold_pickaxe.png",
+  "diagonal": true,
+  "what": "a bronze pickaxe in the same shape as the attached golden pickaxe: a double crescent head of cast warm orange-brown bronze with a golden sheen and a near-white edge highlight set crosswise at the handle's top, both points curving down and out evenly, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "pick2_iron_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/gold_pickaxe.png",
+  "diagonal": true,
+  "what": "an iron pickaxe in the same shape as the attached golden pickaxe: a double crescent head of bright warm-silver iron with a near-white bevel and a soft warm-grey outline set crosswise at the handle's top, both points curving down and out evenly, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "pick2_steel_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/gold_pickaxe.png",
+  "diagonal": true,
+  "what": "a steel pickaxe in the same shape as the attached golden pickaxe: a double crescent head of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight set crosswise at the handle's top, both points curving down and out evenly, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "pick2_gold_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/gold_pickaxe.png",
+  "diagonal": true,
+  "what": "a gold pickaxe in the same shape as the attached golden pickaxe: a double crescent head of shiny lemon-gold with orange-brown shadows and small white glints set crosswise at the handle's top, both points curving down and out evenly, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "pick2_diamond_pickaxe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/gold_pickaxe.png",
+  "diagonal": true,
+  "what": "a diamond pickaxe in the same shape as the attached golden pickaxe: a double crescent head of faceted cyan diamond with teal shadows, white facet tips and one small sparkle set crosswise at the handle's top, both points curving down and out evenly, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "hoe2_flint_hoe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_hoe.png",
+  "diagonal": true,
+  "what": "a flint hoe in the same shape as the attached iron hoe: one flat blade of crude knapped grey-brown flint with chipped faceted edges and lighter flake scars about 10 px wide and 4-5 px tall, set at a right angle across the handle's top and pointing down-left; not a hammer head, not an axe, not a thin hook; a plain wooden handle, the head lashed on with tan sinew cord, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "hoe2_copper_hoe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_hoe.png",
+  "diagonal": true,
+  "what": "a copper hoe in the same shape as the attached iron hoe: one flat blade of cast bright orange copper with a peach highlight about 10 px wide and 4-5 px tall, set at a right angle across the handle's top and pointing down-left; not a hammer head, not an axe, not a thin hook; a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "hoe2_bronze_hoe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_hoe.png",
+  "diagonal": true,
+  "what": "a bronze hoe in the same shape as the attached iron hoe: one flat blade of cast warm orange-brown bronze with a golden sheen and a near-white edge highlight about 10 px wide and 4-5 px tall, set at a right angle across the handle's top and pointing down-left; not a hammer head, not an axe, not a thin hook; a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ },
+ {
+  "kind": "item",
+  "name": "hoe2_steel_hoe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/redo/out/iron_hoe.png",
+  "diagonal": true,
+  "what": "a steel hoe in the same shape as the attached iron hoe: one flat blade of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight about 10 px wide and 4-5 px tall, set at a right angle across the handle's top and pointing down-left; not a hammer head, not an axe, not a thin hook; a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line"
+ }
+]

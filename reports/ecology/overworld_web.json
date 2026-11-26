@@ -1,0 +1,4242 @@
+{
+ "about": "Overworld food webs for chiacraft: species by tier, a web per biome, and ecological rules of thumb. See 'Overworld food webs.md'. 'est.' marks this report's own estimates; 'ref.' standard natural history not checked this session.",
+ "categories": [
+  "grass",
+  "leaves",
+  "fruit",
+  "seeds",
+  "roots",
+  "insects",
+  "meat",
+  "fish",
+  "carrion",
+  "water",
+  "water_plants (proposed)",
+  "lichen (proposed)",
+  "fungi (proposed)"
+ ],
+ "species": [
+  {
+   "name": "chihuahua",
+   "binomial": "Canis familiaris",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 2.5,
+   "diet": {
+    "meat": 0.4,
+    "carrion": 0.2,
+    "insects": 0.15,
+    "fruit": 0.15,
+    "seeds": 0.1
+   },
+   "foods": [
+    "mice, voles, kangaroo rats",
+    "young rabbits",
+    "eggs and nestlings",
+    "grasshoppers, beetles",
+    "carcasses and scraps",
+    "berries, cactus fruit",
+    "grain"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 6.5,
+    "note": "est.: ~260 kcal/day (NRC ~130 kcal x kg^0.75) as ~165 g wet prey"
+   },
+   "water_l_day": {
+    "value": 0.23,
+    "note": "est. (USEPA equation); mostly from food on a prey diet"
+   },
+   "home_range_km2": {
+    "value": 3.2,
+    "range": [
+     2.4,
+     11.6
+    ],
+    "note": "kit fox of the same size; a feral dog pack ranges far wider"
+   },
+   "active": "crepuscular and nocturnal; rests at midday in hot biomes",
+   "social": "pairs or small packs (2-6)",
+   "predators": [
+    "coyote",
+    "eagle",
+    "owl",
+    "wolf",
+    "jaguar",
+    "lynx"
+   ],
+   "prey_mass_ratio": {
+    "min": 0.01,
+    "max": 0.8,
+    "usual_max": 0.2
+   },
+   "biomes": {
+    "base:plains": 1.0,
+    "base:savanna": 0.6,
+    "base:desert": 0.4,
+    "base:forest": 0.3,
+    "base:birch_forest": 0.3
+   },
+   "sources": [
+    "https://wicri-demo.istex.fr/Wicri/Bois/explor/RenardV1/Site/fr/Main/Exploration/bibRecord.php?hk=000601",
+    "https://bioone.org/journals/journal-of-mammalogy/volume-90/issue-5/09-MAMM-A-107.1/Dietary-Niche-Separation-Between-Sympatric-Free-Ranging-Domestic-Dogs-and/10.1644/09-MAMM-A-107.1.full",
+    "https://cambridge.org/core/journals/animal-conservation-forum/article/diet-of-freeranging-domestic-dogs-canis-familiaris-in-rural-zimbabwe-implications-for-wild-scavengers-on-the-periphery-of-wildlife-reserves/7523A6957C93E6365D03DB46EBC773F0",
+    "https://digitalcommons.usu.edu/wild_facpub/2046",
+    "https://animaldiversity.org/accounts/Vulpes_macrotis/",
+    "https://animaldiversity.org/accounts/Vulpes_velox/",
+    "https://wildlife-damage-management.extension.org/?p=754",
+    "https://www.nature.com/articles/46266",
+    "https://www.epa.gov/node/97121"
+   ],
+   "estimates": [
+    "diet shares",
+    "intake",
+    "water"
+   ],
+   "season": {
+    "summer": "insects, young animals",
+    "autumn": "fruit",
+    "winter": "rodents, carrion"
+   }
+  },
+  {
+   "name": "cat",
+   "binomial": "Felis catus (Felis lybica)",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 4.5,
+   "diet": {
+    "meat": 0.8,
+    "insects": 0.1,
+    "carrion": 0.05,
+    "fish": 0.05
+   },
+   "foods": [
+    "mice and voles (~55%)",
+    "small birds (~15%)",
+    "lizards and frogs (~10%)",
+    "young rabbits",
+    "insects",
+    "fish by water"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 4.5,
+    "note": "est.: 1.5-2x the captive 153 kJ/kg/day; 7-10 mice; Australian feral cats kill ~740 vertebrates/yr"
+   },
+   "water_l_day": {
+    "value": 0.38,
+    "note": "est. (USEPA); mostly from prey"
+   },
+   "home_range_km2": {
+    "value": 6.0,
+    "range": [
+     0.004,
+     32
+    ],
+    "note": "Kalahari wildcats 6.1 (F) and 9.8 (M); feral cats 0.1-32"
+   },
+   "active": "nocturnal and crepuscular (peaks ~21:00 and ~05:00)",
+   "social": "alone",
+   "predators": [
+    "coyote",
+    "owl",
+    "eagle",
+    "wolf",
+    "lynx",
+    "fox (kittens)",
+    "jaguar"
+   ],
+   "prey_mass_ratio": {
+    "min": 0.005,
+    "max": 0.4,
+    "usual_max": 0.05
+   },
+   "biomes": {
+    "base:plains": 1.0,
+    "base:forest": 0.6,
+    "base:birch_forest": 0.6,
+    "base:savanna": 0.5,
+    "base:desert": 0.4,
+    "base:taiga": 0.2
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Southern_African_wildcat",
+    "https://www.nature.com/articles/s41467-023-42766-6.pdf",
+    "https://figshare.utas.edu.au/articles/journal_contribution/A_continental-scale_analysis_of_feral_cat_diet_in_Australia/22952837",
+    "https://www.cdu.edu.au/news/news-archive/cute-killers-cats-kill-more-15-billion-australian-native-animals-year",
+    "https://newzealandecology.org/nzje/3476",
+    "https://news.mongabay.com/2025/05/tabbys-likely-ancestor-earths-most-widespread-wildcat-is-an-enigma/",
+    "https://en.wikivet.net/Timing_of_Feline_Activity",
+    "https://onlinelibrary-wiley-com-443.webvpn.zafu.edu.cn/doi/10.1046/j.1439-0396.2003.00431.x",
+    "https://phys.org/news/2020-03-urban-coyotes-lots-catsand-human.html",
+    "https://wildlife-damage-management.extension.org/?p=754",
+    "https://www.epa.gov/node/97121"
+   ],
+   "estimates": [
+    "diet shares",
+    "intake",
+    "water"
+   ],
+   "by_habitat": {
+    "base:desert": "reptiles and insects up to a third",
+    "base:savanna": "reptiles and insects up to a third",
+    "base:forest": "more birds in spring and summer"
+   }
+  },
+  {
+   "name": "capybara",
+   "binomial": "Hydrochoerus hydrochaeris",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 50.0,
+   "diet": {
+    "grass": 0.75,
+    "water_plants": 0.2,
+    "fruit": 0.05
+   },
+   "foods": [
+    "Hymenachne amplexicaulis, Leersia hexandra, Panicum laxum (rains)",
+    "Reimarochloa, Paratheria, Sporobolus indicus, Axonopus (dry season)",
+    "reeds and sedges (Eleocharis, Cyperaceae)",
+    "water hyacinth",
+    "crops: maize, melon, squash, manioc"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 6.0,
+    "dry": 2.6,
+    "note": "~3 kg fresh/day; FAO 70 g DM per kg^0.75 = ~1.3 kg DM"
+   },
+   "water_l_day": {
+    "value": 3.35,
+    "note": "est. (USEPA); no measured value found"
+   },
+   "home_range_km2": {
+    "value": 0.8,
+    "range": [
+     0.05,
+     2.0
+    ],
+    "note": "group range; territory ~0.09 km2"
+   },
+   "active": "crepuscular: grazes late afternoon, evening and at night; rests in water through the heat; nocturnal when hunted",
+   "social": "groups of ~10 adults (3-30); up to 100 at dry-season water",
+   "predators": [
+    "jaguar",
+    "puma",
+    "caiman",
+    "anaconda",
+    "eagle (young)",
+    "fox (young)",
+    "vulture (newborns)",
+    "dogs"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:swamp": 1.0,
+    "base:savanna": 0.8,
+    "base:forest": 0.2
+   },
+   "sources": [
+    "https://animaldiversity.org/accounts/Hydrochoerus_hydrochaeris/",
+    "https://www.fao.org/4/t0750e/t0750e0o.htm",
+    "https://ielc.libguides.com/sdzg/factsheets/capybaras/diet",
+    "https://ielc.libguides.com/sdzg/factsheets/capybaras/behavior",
+    "https://acnpsearch.tweb-dev.unibo.it/singlejournalindex/52391845",
+    "https://tropicalstudies.org/rbt/attachments/volumes/vol51-2/29-Forero-Dieta.pdf",
+    "https://news.mongabay.com/2021/12/meet-the-fishing-jaguars-that-have-made-this-patch-of-the-pantanal-their-own/",
+    "https://www.epa.gov/node/97121"
+   ],
+   "density_km2": {
+    "llanos_guarico": 10,
+    "llanos_apure_peak": [
+     200,
+     350
+    ],
+    "pantanal": [
+     3.2,
+     14.8
+    ]
+   },
+   "season": {
+    "wet": "Hymenachne, selective; reeds ignored",
+    "dry": "reeds and short grasses, longer and less selective"
+   },
+   "escape": "into the nearest water (stays under up to 5 min); alarm barks; huddle with young inside"
+  },
+  {
+   "name": "wolf",
+   "binomial": "Canis lupus",
+   "tier": 1,
+   "in_game": false,
+   "mass_kg": 42.0,
+   "diet": {
+    "meat": 0.85,
+    "carrion": 0.15
+   },
+   "foods": [
+    "red deer, roe deer",
+    "wild boar",
+    "moose and caribou",
+    "bison calves",
+    "hares, beavers"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 7.7,
+    "note": "NPS: ~3.25 kg/wolf/day"
+   },
+   "water_l_day": {
+    "value": 2.86,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 200,
+    "range": [
+     100,
+     1000
+    ],
+    "note": "Abruzzo pack 197 km2; est. range"
+   },
+   "active": "crepuscular and nocturnal (ref.)",
+   "social": "pack of 4-8 (ref.)",
+   "predators": [],
+   "prey_mass_ratio": {
+    "min": 0.05,
+    "max": 10,
+    "usual_max": 4,
+    "note": "packs take moose and elk"
+   },
+   "biomes": {
+    "base:forest": 0.6,
+    "base:birch_forest": 0.6,
+    "base:taiga": 1.0,
+    "base:snowy_plains": 0.4,
+    "base:mountains": 0.5,
+    "base:plains": 0.1
+   },
+   "sources": [
+    "https://www.nps.gov/articles/yellowstone-wolf-facts.htm",
+    "https://digitalcommons.mtu.edu/michigantech-p/13805",
+    "https://bvbvf1.bib-bvb.de/vufind/PrimoRecord/cdi_proquest_miscellaneous_18403333",
+    "https://acnpsearch.tweb-dev.unibo.it/singlejournalindex/50959025",
+    "https://www.nature.com/articles/46266"
+   ],
+   "why": "top hunter of five cold and temperate biomes; the dog's wild ancestor, a natural tame"
+  },
+  {
+   "name": "jaguar",
+   "binomial": "Panthera onca",
+   "tier": 1,
+   "in_game": false,
+   "mass_kg": 80.0,
+   "diet": {
+    "meat": 0.85,
+    "fish": 0.15
+   },
+   "foods": [
+    "caiman",
+    "capybara",
+    "peccaries",
+    "deer",
+    "cattle calves",
+    "fish"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 3.5,
+    "note": "est.: one kill every 4.3 days"
+   },
+   "water_l_day": {
+    "value": 5.11,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 50,
+    "range": [
+     25,
+     150
+    ],
+    "note": "est.; ~12 per 100 km2 at Taiama"
+   },
+   "active": "nocturnal and crepuscular (ref.)",
+   "social": "alone",
+   "predators": [],
+   "prey_mass_ratio": {
+    "min": 0.05,
+    "max": 3.0,
+    "usual_max": 1.0
+   },
+   "biomes": {
+    "base:swamp": 1.0,
+    "base:savanna": 0.6,
+    "base:desert": 0.05
+   },
+   "sources": [
+    "https://www.academia.edu/3122316",
+    "https://news.mongabay.com/2021/12/meet-the-fishing-jaguars-that-have-made-this-patch-of-the-pantanal-their-own/",
+    "https://www.fao.org/4/t0750e/t0750e0o.htm"
+   ],
+   "why": "the capybara's and the caiman's predator; top of both tropical webs"
+  },
+  {
+   "name": "cow",
+   "binomial": "Bos taurus",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 600.0,
+   "diet": {
+    "grass": 0.9,
+    "leaves": 0.1
+   },
+   "foods": [
+    "grass",
+    "forbs"
+   ],
+   "intake_pct_mass_day": {
+    "dry": 2.5,
+    "note": "ref."
+   },
+   "water_l_day": {
+    "value": 31.33,
+    "note": "est. (USEPA); cattle drink more"
+   },
+   "home_range_km2": null,
+   "active": "diurnal",
+   "social": "herd",
+   "predators": [
+    "wolf (calves)",
+    "jaguar (calves)"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:plains": 1.0,
+    "base:forest": 0.1,
+    "base:taiga": 0.05
+   },
+   "sources": [
+    "https://lter.konza.ksu.edu/outreach/BisonFact17.pdf",
+    "https://www.academia.edu/3122316"
+   ],
+   "wild_role": "bison (plains, Kansas), European bison (forest, Bialowieza), wood bison (taiga); the aurochs, the cow's own ancestor, lived in European forests and plains until 1627"
+  },
+  {
+   "name": "pig",
+   "binomial": "Sus scrofa domesticus",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 80.0,
+   "diet": {
+    "roots": 0.35,
+    "seeds": 0.25,
+    "fruit": 0.15,
+    "insects": 0.1,
+    "leaves": 0.1,
+    "carrion": 0.05
+   },
+   "foods": [
+    "acorns and beechmast",
+    "roots",
+    "grubs and worms",
+    "fruit",
+    "carrion"
+   ],
+   "intake_pct_mass_day": {
+    "dry": 2.5,
+    "note": "est."
+   },
+   "water_l_day": {
+    "value": 5.11,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 10,
+    "range": [
+     2,
+     40
+    ],
+    "note": "est. for wild boar"
+   },
+   "active": "crepuscular and nocturnal (wild boar, ref.)",
+   "social": "sounders of sows and young",
+   "predators": [
+    "wolf",
+    "jaguar",
+    "puma",
+    "coyote (young)"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:forest": 1.0,
+    "base:birch_forest": 0.6,
+    "base:taiga": 0.3,
+    "base:desert": 0.5,
+    "base:savanna": 0.4,
+    "base:swamp": 0.6
+   },
+   "sources": [
+    "https://rcin.org.pl//Content/12705/PDF/BI002_26987_Cz-40-2_Acta-T42-nr36-398-451_o.pdf",
+    "https://bvbvf1.bib-bvb.de/vufind/PrimoRecord/cdi_proquest_miscellaneous_18403333",
+    "https://www.desertmuseum.org/kids/oz/long-fact-sheets/index.php?print=y"
+   ],
+   "wild_role": "wild boar (forests), collared peccary or javelina (desert, llanos), white-lipped peccary and feral pigs (Pantanal)"
+  },
+  {
+   "name": "sheep",
+   "binomial": "Ovis aries",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 70.0,
+   "diet": {
+    "grass": 0.8,
+    "leaves": 0.15,
+    "lichen": 0.05
+   },
+   "foods": [
+    "alpine grass",
+    "herbs",
+    "browse",
+    "lichen in winter"
+   ],
+   "intake_pct_mass_day": {
+    "dry": 2.5,
+    "note": "ref."
+   },
+   "water_l_day": {
+    "value": 4.53,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 10,
+    "range": [
+     2,
+     30
+    ],
+    "note": "est."
+   },
+   "active": "diurnal",
+   "social": "herds; rams in bachelor groups",
+   "predators": [
+    "wolf",
+    "lynx",
+    "puma",
+    "eagle (young)"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:mountains": 1.0,
+    "base:desert": 0.1
+   },
+   "sources": [
+    "ref.: standard natural history, not checked this session"
+   ],
+   "wild_role": "mouflon, Alpine ibex and chamois (Alps); bighorn and desert bighorn (Rockies, Sonora)"
+  },
+  {
+   "name": "chicken",
+   "binomial": "Gallus gallus domesticus",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 1.0,
+   "diet": {
+    "seeds": 0.5,
+    "leaves": 0.2,
+    "insects": 0.2,
+    "fruit": 0.1
+   },
+   "foods": [
+    "seeds",
+    "buds",
+    "berries",
+    "insects"
+   ],
+   "intake_pct_mass_day": {
+    "dry": 5.0,
+    "note": "ref."
+   },
+   "water_l_day": {
+    "value": 0.1,
+    "note": "est. (mammal equation, rough for birds)"
+   },
+   "home_range_km2": {
+    "value": 0.5,
+    "range": [
+     0.05,
+     2
+    ],
+    "note": "est."
+   },
+   "active": "diurnal",
+   "social": "flocks; leks in spring for grouse",
+   "predators": [
+    "fox",
+    "coyote",
+    "eagle",
+    "owl",
+    "cat",
+    "lynx"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:plains": 0.6,
+    "base:forest": 0.5,
+    "base:birch_forest": 1.0,
+    "base:taiga": 0.8,
+    "base:snowy_plains": 0.6,
+    "base:mountains": 0.6,
+    "base:desert": 0.6,
+    "base:savanna": 0.5
+   },
+   "sources": [
+    "ref.: standard natural history, not checked this session"
+   ],
+   "wild_role": "red junglefowl, its ancestor, lives in none of our places; the local grouse or quail takes its role: prairie-chicken, wild turkey, hazel grouse, black grouse, capercaillie, ptarmigan, Gambel's quail, crested bobwhite"
+  },
+  {
+   "name": "hare",
+   "binomial": "Lepus / Sylvilagus spp.",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 2.5,
+   "diet": {
+    "grass": 0.6,
+    "leaves": 0.3,
+    "roots": 0.1
+   },
+   "foods": [
+    "grass",
+    "forbs",
+    "twigs and bark in winter"
+   ],
+   "intake_pct_mass_day": {
+    "dry": 4.0,
+    "note": "est."
+   },
+   "water_l_day": {
+    "value": 0.23,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 0.1,
+    "range": [
+     0.02,
+     0.5
+    ],
+    "note": "est."
+   },
+   "active": "crepuscular and nocturnal",
+   "social": "alone",
+   "predators": [
+    "coyote",
+    "fox",
+    "wolf",
+    "eagle",
+    "owl",
+    "lynx",
+    "jaguar",
+    "cat (young)",
+    "chihuahua (young)"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:plains": 1.0,
+    "base:forest": 0.6,
+    "base:birch_forest": 0.8,
+    "base:taiga": 0.8,
+    "base:snowy_plains": 0.6,
+    "base:mountains": 0.6,
+    "base:desert": 1.0,
+    "base:savanna": 0.4,
+    "base:beach": 0.4
+   },
+   "sources": [
+    "https://bdu.siu.edu.ar/bdu/Record/todo:paper_00129658_v79_n4_p1193_ODonoghue",
+    "https://era.library.ualberta.ca/files/8910jv725",
+    "https://www.desertmuseum.org/kids/oz/long-fact-sheets/index.php?print=y",
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "mid-sized prey everywhere; main food of the coyote, fox, eagle and lynx",
+   "variants": {
+    "base:plains": "eastern cottontail, black-tailed jackrabbit",
+    "base:forest": "brown hare",
+    "base:birch_forest": "mountain hare",
+    "base:taiga": "snowshoe or mountain hare (white in winter)",
+    "base:snowy_plains": "Arctic hare (white)",
+    "base:mountains": "mountain hare",
+    "base:desert": "black-tailed jackrabbit, desert cottontail",
+    "base:savanna": "Florida cottontail",
+    "base:beach": "rabbit"
+   },
+   "set": "core"
+  },
+  {
+   "name": "rodent",
+   "binomial": "Muridae, Cricetidae, Heteromyidae, Sciuridae",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 0.04,
+   "diet": {
+    "seeds": 0.5,
+    "grass": 0.3,
+    "insects": 0.15,
+    "fruit": 0.05
+   },
+   "foods": [
+    "seeds",
+    "grass",
+    "insects",
+    "fungi",
+    "spruce cones (squirrel)"
+   ],
+   "intake_pct_mass_day": {
+    "dry": 10.0,
+    "note": "est. (small mammals eat much more per kg)"
+   },
+   "water_l_day": {
+    "value": 0.01,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 0.001,
+    "range": [
+     0.0002,
+     0.01
+    ],
+    "note": "est."
+   },
+   "active": "nocturnal (voles: day and night)",
+   "social": "alone or family; lemmings and voles cycle",
+   "predators": [
+    "cat",
+    "chihuahua",
+    "fox",
+    "owl",
+    "eagle",
+    "coyote",
+    "raven",
+    "snake"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:plains": 1.0,
+    "base:forest": 1.0,
+    "base:birch_forest": 1.0,
+    "base:taiga": 1.0,
+    "base:snowy_plains": 1.0,
+    "base:desert": 1.0,
+    "base:savanna": 1.0,
+    "base:swamp": 1.0,
+    "base:mountains": 1.0,
+    "base:beach": 1.0
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/Southern_African_wildcat",
+    "https://www.nationalgeographic.com/animals/birds/facts/snowy-owl",
+    "https://openpolar.no/Record/ftbioone:10.1093%2Fjmammal%2Fgyab115",
+    "https://www.desertmuseum.org/kids/oz/long-fact-sheets/index.php?print=y",
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "our two hunters' main food; lemmings drive the tundra's fox and owl",
+   "variants": {
+    "base:plains": "prairie vole, deer mouse, 13-lined ground squirrel",
+    "base:forest": "bank vole, wood mouse, red squirrel",
+    "base:birch_forest": "bank vole, red squirrel",
+    "base:taiga": "red-backed vole, red squirrel",
+    "base:snowy_plains": "lemming",
+    "base:desert": "Merriam's kangaroo rat (never drinks), ground squirrels",
+    "base:savanna": "cane mice, cotton rats",
+    "base:swamp": "marsh rats",
+    "base:mountains": "snow vole (marmot later)",
+    "base:beach": "dune mice"
+   },
+   "set": "core"
+  },
+  {
+   "name": "small_bird",
+   "binomial": "Passeriformes",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 0.03,
+   "diet": {
+    "seeds": 0.45,
+    "insects": 0.4,
+    "fruit": 0.15
+   },
+   "foods": [
+    "seeds",
+    "insects",
+    "berries"
+   ],
+   "intake_pct_mass_day": {
+    "dry": 20.0,
+    "note": "est."
+   },
+   "water_l_day": {
+    "value": 0.0,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 0.01,
+    "range": [
+     0.001,
+     0.1
+    ],
+    "note": "est."
+   },
+   "active": "diurnal",
+   "social": "pairs in spring, flocks in winter",
+   "predators": [
+    "cat",
+    "eagle",
+    "owl",
+    "fox",
+    "snake"
+   ],
+   "prey_mass_ratio": {
+    "min": 0.0001,
+    "max": 0.1,
+    "note": "insects"
+   },
+   "biomes": {
+    "base:plains": 1.0,
+    "base:forest": 1.0,
+    "base:birch_forest": 1.0,
+    "base:taiga": 1.0,
+    "base:snowy_plains": 1.0,
+    "base:desert": 1.0,
+    "base:savanna": 1.0,
+    "base:swamp": 1.0,
+    "base:mountains": 1.0,
+    "base:beach": 1.0
+   },
+   "sources": [
+    "https://www.nature.com/articles/s41467-023-42766-6.pdf",
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the cat's bird prey; a seed and insect eater in every biome",
+   "variants": {
+    "base:plains": "dickcissel, meadowlark",
+    "base:forest": "jay, great tit, thrushes",
+    "base:snowy_plains": "snow bunting",
+    "base:desert": "cactus wren, doves",
+    "base:savanna": "seedeaters",
+    "base:mountains": "alpine chough, snowfinch",
+    "base:beach": "oystercatcher, terns"
+   },
+   "set": "core"
+  },
+  {
+   "name": "deer",
+   "binomial": "Cervidae (Odocoileus, Capreolus, Cervus, Blastocerus)",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 60.0,
+   "diet": {
+    "leaves": 0.5,
+    "grass": 0.3,
+    "fruit": 0.15,
+    "water_plants": 0.05
+   },
+   "foods": [
+    "browse",
+    "forbs",
+    "acorns",
+    "cactus fruit (desert)",
+    "water plants (marsh deer)"
+   ],
+   "intake_pct_mass_day": {
+    "dry": 2.5,
+    "note": "ref."
+   },
+   "water_l_day": {
+    "value": 3.94,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 2.0,
+    "range": [
+     0.5,
+     10
+    ],
+    "note": "est."
+   },
+   "active": "crepuscular",
+   "social": "small groups; red deer in herds",
+   "predators": [
+    "wolf",
+    "jaguar",
+    "puma",
+    "lynx (roe)",
+    "coyote (fawns)",
+    "fox (fawns)"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:plains": 0.4,
+    "base:forest": 1.0,
+    "base:birch_forest": 0.8,
+    "base:savanna": 0.5,
+    "base:swamp": 0.3,
+    "base:mountains": 0.6,
+    "base:desert": 0.3
+   },
+   "sources": [
+    "https://rcin.org.pl//Content/12705/PDF/BI002_26987_Cz-40-2_Acta-T42-nr36-398-451_o.pdf",
+    "https://bvbvf1.bib-bvb.de/vufind/PrimoRecord/cdi_proquest_miscellaneous_18403333",
+    "https://rcin.org.pl/dlibra/publication/28582/edition/12686/content",
+    "https://www.nps.gov/parkhistory/online_books/natural/4a/nh4ah1.htm",
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the big grazer and browser of seven biomes; the wolf's and jaguar's prey",
+   "variants": {
+    "base:plains": "white-tailed deer",
+    "base:forest": "red deer, roe deer (25 kg)",
+    "base:birch_forest": "roe deer",
+    "base:savanna": "llanos white-tailed deer (35-45 kg)",
+    "base:swamp": "marsh deer (100 kg)",
+    "base:mountains": "red deer (elk in the Rockies)",
+    "base:desert": "desert mule deer"
+   },
+   "set": "core"
+  },
+  {
+   "name": "reindeer",
+   "binomial": "Rangifer tarandus",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 110.0,
+   "diet": {
+    "lichen": 0.4,
+    "grass": 0.35,
+    "leaves": 0.2,
+    "fungi": 0.05
+   },
+   "foods": [
+    "reindeer lichen (winter)",
+    "sedges, cottongrass",
+    "willow and birch leaves",
+    "mushrooms"
+   ],
+   "intake_pct_mass_day": {
+    "dry": 2.5,
+    "note": "ref."
+   },
+   "water_l_day": {
+    "value": 6.81,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 500,
+    "range": [
+     100,
+     5000
+    ],
+    "note": "est.; tundra herds migrate"
+   },
+   "active": "day and night (no fixed rhythm in polar summer)",
+   "social": "herds, thousands on migration",
+   "predators": [
+    "wolf",
+    "bear (calves)",
+    "eagle (calves)",
+    "wolverine"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:snowy_plains": 1.0,
+    "base:taiga": 0.6
+   },
+   "sources": [
+    "https://en.wikipedia.org/wiki/St._Matthew_Island",
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the only big grazer of the tundra, and the taiga's; it makes lichen a food",
+   "variants": {
+    "base:snowy_plains": "barren-ground caribou, tundra reindeer",
+    "base:taiga": "woodland caribou, forest reindeer"
+   },
+   "set": "core"
+  },
+  {
+   "name": "fish",
+   "binomial": "Teleostei",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 1.0,
+   "diet": {
+    "insects": 0.4,
+    "fish": 0.3,
+    "water_plants": 0.2,
+    "fruit": 0.1
+   },
+   "foods": [
+    "insects",
+    "plankton",
+    "small fish",
+    "fallen fruit (pacu)",
+    "detritus"
+   ],
+   "intake_pct_mass_day": {
+    "dry": 2.0,
+    "note": "est."
+   },
+   "water_l_day": {
+    "value": 0.1,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": null,
+   "active": "day and night",
+   "social": "schools",
+   "predators": [
+    "caiman",
+    "jaguar",
+    "gull",
+    "cat",
+    "eagle",
+    "heron",
+    "seal",
+    "fox"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:ocean": 1.0,
+    "base:swamp": 1.0,
+    "base:beach": 0.6,
+    "rivers and lakes": 0.5
+   },
+   "sources": [
+    "https://news.mongabay.com/2021/12/meet-the-fishing-jaguars-that-have-made-this-patch-of-the-pantanal-their-own/",
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the middle of both water webs; the caiman's and the gull's food",
+   "variants": {
+    "base:ocean": "herring, sand eel, cod, flatfish",
+    "base:swamp": "piranha, pacu, catfish"
+   },
+   "set": "core"
+  },
+  {
+   "name": "caiman",
+   "binomial": "Caiman crocodilus / C. yacare",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 35.0,
+   "diet": {
+    "fish": 0.6,
+    "meat": 0.3,
+    "insects": 0.1
+   },
+   "foods": [
+    "fish",
+    "snails and crabs",
+    "water birds",
+    "young capybaras",
+    "rodents"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 1.0,
+    "note": "est.; ectotherm, eats little"
+   },
+   "water_l_day": {
+    "value": 2.43,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 1.0,
+    "range": [
+     0.1,
+     5
+    ],
+    "note": "est."
+   },
+   "active": "nocturnal hunter; basks by day",
+   "social": "alone; many together at dry-season pools",
+   "predators": [
+    "jaguar",
+    "anaconda (young)"
+   ],
+   "prey_mass_ratio": {
+    "min": 0.01,
+    "max": 1.0
+   },
+   "biomes": {
+    "base:swamp": 1.0,
+    "base:savanna": 0.6
+   },
+   "sources": [
+    "https://www.fao.org/4/t0750e/t0750e0o.htm",
+    "https://ielc.libguides.com/sdzg/factsheets/capybaras/behavior",
+    "https://news.mongabay.com/2021/12/meet-the-fishing-jaguars-that-have-made-this-patch-of-the-pantanal-their-own/",
+    "https://www.academia.edu/3122316"
+   ],
+   "why": "the water's ambush hunter; makes the capybara's flight into water a real choice",
+   "variants": {
+    "base:savanna": "spectacled caiman",
+    "base:swamp": "yacare caiman"
+   },
+   "set": "core"
+  },
+  {
+   "name": "fox",
+   "binomial": "Vulpes / Cerdocyon spp.",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 5.0,
+   "diet": {
+    "meat": 0.5,
+    "insects": 0.15,
+    "fruit": 0.2,
+    "carrion": 0.15
+   },
+   "foods": [
+    "voles and mice",
+    "hares and rabbits",
+    "eggs",
+    "insects",
+    "berries",
+    "carrion",
+    "crabs (crab-eating fox)"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 6.0,
+    "note": "est."
+   },
+   "water_l_day": {
+    "value": 0.42,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 3.0,
+    "range": [
+     0.5,
+     12
+    ],
+    "note": "kit fox 2.4-11.6"
+   },
+   "active": "nocturnal and crepuscular",
+   "social": "pairs; family groups",
+   "predators": [
+    "coyote",
+    "wolf",
+    "eagle",
+    "jaguar",
+    "lynx",
+    "owl (eagle-owl)"
+   ],
+   "prey_mass_ratio": {
+    "min": 0.005,
+    "max": 0.8,
+    "usual_max": 0.2
+   },
+   "biomes": {
+    "base:plains": 0.6,
+    "base:forest": 1.0,
+    "base:birch_forest": 1.0,
+    "base:taiga": 0.8,
+    "base:snowy_plains": 1.0,
+    "base:mountains": 0.8,
+    "base:desert": 0.6,
+    "base:savanna": 0.8,
+    "base:swamp": 0.6,
+    "base:beach": 0.4
+   },
+   "sources": [
+    "https://animaldiversity.org/accounts/Vulpes_macrotis/",
+    "https://animaldiversity.org/accounts/Vulpes_velox/",
+    "https://openpolar.no/Record/ftbioone:10.1093%2Fjmammal%2Fgyab115",
+    "https://www.nature.com/articles/46266"
+   ],
+   "why": "small hunter of ten biomes and the chihuahua's and cat's rival; the tundra's main hunter",
+   "variants": {
+    "base:plains": "red fox, swift fox",
+    "base:forest": "red fox",
+    "base:snowy_plains": "Arctic fox (white)",
+    "base:desert": "kit fox, gray fox",
+    "base:savanna": "crab-eating fox",
+    "base:swamp": "crab-eating fox"
+   },
+   "set": "core"
+  },
+  {
+   "name": "coyote",
+   "binomial": "Canis latrans",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 13.0,
+   "diet": {
+    "meat": 0.6,
+    "fruit": 0.15,
+    "carrion": 0.15,
+    "insects": 0.1
+   },
+   "foods": [
+    "rabbits and hares",
+    "rodents",
+    "deer fawns",
+    "cats and small dogs",
+    "fruit",
+    "carrion"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 6.0,
+    "note": "est."
+   },
+   "water_l_day": {
+    "value": 1.0,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 15,
+    "range": [
+     5,
+     40
+    ],
+    "note": "est."
+   },
+   "active": "crepuscular and nocturnal",
+   "social": "pairs and family packs; hunts alone or together",
+   "predators": [
+    "wolf",
+    "jaguar (rare)",
+    "puma"
+   ],
+   "prey_mass_ratio": {
+    "min": 0.002,
+    "max": 0.3,
+    "pack_max": 5.0
+   },
+   "biomes": {
+    "base:plains": 1.0,
+    "base:desert": 1.0,
+    "base:forest": 0.4,
+    "base:mountains": 0.4
+   },
+   "sources": [
+    "https://phys.org/news/2020-03-urban-coyotes-lots-catsand-human.html",
+    "https://animaldiversity.org/accounts/Vulpes_macrotis/",
+    "https://bdu.siu.edu.ar/bdu/Record/todo:paper_00129658_v79_n4_p1193_ODonoghue"
+   ],
+   "why": "the main predator of small dogs and cats in their commonest biomes",
+   "variants": {},
+   "set": "core"
+  },
+  {
+   "name": "eagle",
+   "binomial": "Accipitridae (Aquila, Buteo, Parabuteo, Accipiter, Caracara...)",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 3.0,
+   "diet": {
+    "meat": 0.85,
+    "carrion": 0.1,
+    "fish": 0.05
+   },
+   "foods": [
+    "rodents",
+    "hares",
+    "grouse",
+    "young deer and sheep",
+    "small dogs and kittens (golden eagle)",
+    "fish (sea eagle)"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 8.0,
+    "note": "est."
+   },
+   "water_l_day": {
+    "value": 0.27,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 20,
+    "range": [
+     1,
+     150
+    ],
+    "note": "est."
+   },
+   "active": "diurnal",
+   "social": "pairs; Harris's hawks hunt in groups",
+   "predators": [],
+   "prey_mass_ratio": {
+    "min": 0.01,
+    "max": 1.5,
+    "usual_max": 0.5
+   },
+   "biomes": {
+    "base:plains": 1.0,
+    "base:forest": 1.0,
+    "base:birch_forest": 1.0,
+    "base:taiga": 1.0,
+    "base:snowy_plains": 1.0,
+    "base:desert": 1.0,
+    "base:savanna": 1.0,
+    "base:swamp": 1.0,
+    "base:mountains": 1.0,
+    "base:beach": 1.0
+   },
+   "sources": [
+    "https://wildlife-damage-management.extension.org/?p=754",
+    "https://www.desertmuseum.org/center/edu/docs/3-4_Hunters_predators.pdf",
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the daytime raptor; makes open ground dangerous for small animals",
+   "variants": {
+    "base:plains": "red-tailed hawk, golden eagle (winter)",
+    "base:forest": "goshawk, buzzard",
+    "base:birch_forest": "goshawk",
+    "base:taiga": "goshawk, golden eagle",
+    "base:snowy_plains": "gyrfalcon, golden eagle",
+    "base:mountains": "golden eagle",
+    "base:desert": "Harris's hawk, red-tailed hawk",
+    "base:savanna": "savanna hawk, crested caracara",
+    "base:swamp": "great black hawk, snail kite",
+    "base:beach": "white-tailed eagle"
+   },
+   "set": "core"
+  },
+  {
+   "name": "owl",
+   "binomial": "Strigidae, Tytonidae",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 1.5,
+   "diet": {
+    "meat": 1.0
+   },
+   "foods": [
+    "mice, voles, lemmings",
+    "hares",
+    "small birds",
+    "cats and small dogs rarely"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 8.0,
+    "note": "snowy owl 3-5 lemmings/day"
+   },
+   "water_l_day": {
+    "value": 0.14,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 5,
+    "range": [
+     0.5,
+     30
+    ],
+    "note": "est."
+   },
+   "active": "nocturnal (snowy owl: also by day)",
+   "social": "pairs",
+   "predators": [],
+   "prey_mass_ratio": {
+    "min": 0.01,
+    "max": 1.5,
+    "usual_max": 0.2
+   },
+   "biomes": {
+    "base:plains": 1.0,
+    "base:forest": 1.0,
+    "base:birch_forest": 1.0,
+    "base:taiga": 1.0,
+    "base:snowy_plains": 1.0,
+    "base:desert": 1.0,
+    "base:savanna": 1.0,
+    "base:swamp": 1.0,
+    "base:mountains": 1.0,
+    "base:beach": 1.0
+   },
+   "sources": [
+    "https://www.nationalgeographic.com/animals/birds/facts/snowy-owl",
+    "https://wildlife-damage-management.extension.org/?p=754",
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the night raptor; our nocturnal hunters meet it",
+   "variants": {
+    "base:plains": "great horned owl",
+    "base:forest": "tawny owl, eagle-owl",
+    "base:birch_forest": "Ural owl, eagle-owl",
+    "base:taiga": "great grey owl",
+    "base:snowy_plains": "snowy owl",
+    "base:savanna": "barn owl",
+    "base:mountains": "eagle-owl"
+   },
+   "set": "core"
+  },
+  {
+   "name": "vulture",
+   "binomial": "Cathartidae, Gypaetus",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 2.0,
+   "diet": {
+    "carrion": 0.95,
+    "meat": 0.05
+   },
+   "foods": [
+    "carcasses",
+    "newborn animals (black vulture)",
+    "bones (bearded vulture)"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 8.0,
+    "note": "est."
+   },
+   "water_l_day": {
+    "value": 0.18,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 100,
+    "range": [
+     10,
+     1000
+    ],
+    "note": "est.; soars far"
+   },
+   "active": "diurnal",
+   "social": "roosting groups",
+   "predators": [],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:savanna": 1.0,
+    "base:swamp": 1.0,
+    "base:desert": 0.8,
+    "base:plains": 0.6,
+    "base:forest": 0.3,
+    "base:mountains": 0.3
+   },
+   "sources": [
+    "https://www.fao.org/4/t0750e/t0750e0o.htm",
+    "https://www.desertmuseum.org/kids/oz/long-fact-sheets/index.php?print=y",
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "something for the dead in the warm biomes",
+   "variants": {
+    "base:savanna": "black and turkey vultures",
+    "base:swamp": "black vulture",
+    "base:desert": "turkey vulture",
+    "base:mountains": "bearded vulture"
+   },
+   "set": "core"
+  },
+  {
+   "name": "raven",
+   "binomial": "Corvus spp.",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 1.2,
+   "diet": {
+    "carrion": 0.5,
+    "meat": 0.2,
+    "insects": 0.15,
+    "fruit": 0.15
+   },
+   "foods": [
+    "carcasses (follows wolves)",
+    "eggs",
+    "small rodents",
+    "insects",
+    "berries"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 10.0,
+    "note": "est."
+   },
+   "water_l_day": {
+    "value": 0.12,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 20,
+    "range": [
+     2,
+     100
+    ],
+    "note": "est."
+   },
+   "active": "diurnal",
+   "social": "pairs; winter roosts",
+   "predators": [
+    "owl (eagle-owl)",
+    "eagle (goshawk)"
+   ],
+   "prey_mass_ratio": {
+    "min": 0.01,
+    "max": 0.1
+   },
+   "biomes": {
+    "base:forest": 0.6,
+    "base:birch_forest": 1.0,
+    "base:taiga": 1.0,
+    "base:snowy_plains": 0.6,
+    "base:mountains": 1.0,
+    "base:desert": 0.6,
+    "base:plains": 0.3,
+    "base:beach": 0.6
+   },
+   "sources": [
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "something for the dead in the cold biomes, where there are no vultures",
+   "variants": {
+    "base:birch_forest": "raven, hooded crow",
+    "base:beach": "raven, crows"
+   },
+   "set": "core"
+  },
+  {
+   "name": "gull",
+   "binomial": "Larus argentatus",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 1.0,
+   "diet": {
+    "fish": 0.5,
+    "carrion": 0.25,
+    "meat": 0.1,
+    "insects": 0.15
+   },
+   "foods": [
+    "fish",
+    "mussels and crabs",
+    "strandline carrion",
+    "eggs",
+    "scraps"
+   ],
+   "intake_pct_mass_day": {
+    "wet": 15.0,
+    "note": "est."
+   },
+   "water_l_day": {
+    "value": 0.1,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": {
+    "value": 20,
+    "range": [
+     5,
+     100
+    ],
+    "note": "est."
+   },
+   "active": "diurnal",
+   "social": "colonies",
+   "predators": [
+    "fox (eggs)"
+   ],
+   "prey_mass_ratio": {
+    "min": 0.005,
+    "max": 0.3
+   },
+   "biomes": {
+    "base:beach": 1.0,
+    "base:ocean": 1.0
+   },
+   "sources": [
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the coast's hunter and its carrion eater",
+   "variants": {},
+   "set": "core"
+  },
+  {
+   "name": "lynx",
+   "binomial": "Lynx lynx / L. canadensis / L. rufus",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 18.0,
+   "diet": {
+    "meat": 1.0
+   },
+   "foods": [],
+   "intake_pct_mass_day": null,
+   "water_l_day": {
+    "value": 1.33,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": null,
+   "active": null,
+   "social": null,
+   "predators": [
+    "wolf",
+    "puma"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:forest": 0.3,
+    "base:birch_forest": 0.5,
+    "base:taiga": 0.6,
+    "base:mountains": 0.3,
+    "base:plains": 0.2,
+    "base:desert": 0.3
+   },
+   "sources": [
+    "https://rcin.org.pl/dlibra/publication/28582/edition/12686/content",
+    "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4373782/",
+    "https://bdu.siu.edu.ar/bdu/Record/todo:paper_00129658_v79_n4_p1193_ODonoghue"
+   ],
+   "why": "hare and roe specialist; took 21-36% of spring roe deer in Bialowieza",
+   "set": "later"
+  },
+  {
+   "name": "puma",
+   "binomial": "Puma concolor",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 55.0,
+   "diet": {
+    "meat": 1.0
+   },
+   "foods": [],
+   "intake_pct_mass_day": null,
+   "water_l_day": {
+    "value": 3.65,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": null,
+   "active": null,
+   "social": null,
+   "predators": [],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:desert": 0.3,
+    "base:mountains": 0.3,
+    "base:savanna": 0.3,
+    "base:swamp": 0.2
+   },
+   "sources": [
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the desert's and the Rockies' top hunter",
+   "set": "later"
+  },
+  {
+   "name": "bear",
+   "binomial": "Ursus arctos",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 250.0,
+   "diet": {
+    "fruit": 0.35,
+    "roots": 0.15,
+    "leaves": 0.15,
+    "fish": 0.1,
+    "meat": 0.15,
+    "carrion": 0.1
+   },
+   "foods": [],
+   "intake_pct_mass_day": null,
+   "water_l_day": {
+    "value": 14.25,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": null,
+   "active": null,
+   "social": null,
+   "predators": [],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:taiga": 0.8,
+    "base:birch_forest": 0.3,
+    "base:mountains": 0.4,
+    "base:forest": 0.2
+   },
+   "sources": [
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "big omnivore and scavenger of wolf kills",
+   "set": "later"
+  },
+  {
+   "name": "moose",
+   "binomial": "Alces alces",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 450.0,
+   "diet": {
+    "leaves": 0.8,
+    "water_plants": 0.2
+   },
+   "foods": [],
+   "intake_pct_mass_day": null,
+   "water_l_day": {
+    "value": 24.18,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": null,
+   "active": null,
+   "social": null,
+   "predators": [
+    "wolf",
+    "bear (calves)"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:taiga": 1.0,
+    "base:birch_forest": 1.0
+   },
+   "sources": [
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the boreal forest's big browser",
+   "set": "later"
+  },
+  {
+   "name": "frog",
+   "binomial": "Anura",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 0.05,
+   "diet": {
+    "insects": 1.0
+   },
+   "foods": [],
+   "intake_pct_mass_day": null,
+   "water_l_day": {
+    "value": 0.01,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": null,
+   "active": null,
+   "social": null,
+   "predators": [
+    "caiman",
+    "heron",
+    "fox",
+    "cat",
+    "snake"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:swamp": 1.0,
+    "base:forest": 0.5,
+    "base:birch_forest": 0.5,
+    "base:plains": 0.3,
+    "base:savanna": 0.5
+   },
+   "sources": [
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "insect eater of wet ground",
+   "set": "later"
+  },
+  {
+   "name": "lizard",
+   "binomial": "Squamata (lizards)",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 0.05,
+   "diet": {
+    "insects": 1.0
+   },
+   "foods": [],
+   "intake_pct_mass_day": null,
+   "water_l_day": {
+    "value": 0.01,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": null,
+   "active": null,
+   "social": null,
+   "predators": [
+    "cat",
+    "fox",
+    "eagle",
+    "snake"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:desert": 1.0,
+    "base:savanna": 0.6
+   },
+   "sources": [
+    "https://figshare.utas.edu.au/articles/journal_contribution/A_continental-scale_analysis_of_feral_cat_diet_in_Australia/22952837",
+    "https://en.wikipedia.org/wiki/Southern_African_wildcat"
+   ],
+   "why": "the desert cat's reptile prey",
+   "set": "later"
+  },
+  {
+   "name": "snake",
+   "binomial": "Crotalus atrox / Eunectes murinus",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 2.0,
+   "diet": {
+    "meat": 1.0
+   },
+   "foods": [],
+   "intake_pct_mass_day": null,
+   "water_l_day": {
+    "value": 0.18,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": null,
+   "active": null,
+   "social": null,
+   "predators": [
+    "eagle",
+    "jaguar",
+    "coyote"
+   ],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:desert": 0.6,
+    "base:plains": 0.3,
+    "base:swamp": 0.6,
+    "base:savanna": 0.4
+   },
+   "sources": [
+    "https://ielc.libguides.com/sdzg/factsheets/capybaras/behavior",
+    "https://www.desertmuseum.org/center/edu/docs/3-4_Hunters_predators.pdf"
+   ],
+   "why": "rodent hunter; the anaconda is the capybara's third predator",
+   "set": "later"
+  },
+  {
+   "name": "heron",
+   "binomial": "Ardeidae, Jabiru mycteria",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 3.0,
+   "diet": {
+    "fish": 0.8,
+    "meat": 0.2
+   },
+   "foods": [],
+   "intake_pct_mass_day": null,
+   "water_l_day": {
+    "value": 0.27,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": null,
+   "active": null,
+   "social": null,
+   "predators": [],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:swamp": 1.0,
+    "base:savanna": 0.6,
+    "base:beach": 0.3
+   },
+   "sources": [
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the swamp's fish eater on land",
+   "set": "later"
+  },
+  {
+   "name": "seal",
+   "binomial": "Phoca vitulina",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 100.0,
+   "diet": {
+    "fish": 1.0
+   },
+   "foods": [],
+   "intake_pct_mass_day": null,
+   "water_l_day": {
+    "value": 6.25,
+    "note": "est. (USEPA)"
+   },
+   "home_range_km2": null,
+   "active": null,
+   "social": null,
+   "predators": [],
+   "prey_mass_ratio": null,
+   "biomes": {
+    "base:ocean": 1.0,
+    "base:beach": 0.5
+   },
+   "sources": [
+    "ref.: standard natural history, not checked this session"
+   ],
+   "why": "the coast's top hunter",
+   "set": "later"
+  },
+  {
+   "name": "insects",
+   "tier": 3,
+   "in_game": false,
+   "biomes": {
+    "base:plains": 1.0,
+    "base:forest": 0.6,
+    "base:birch_forest": 0.6,
+    "base:taiga": 0.5,
+    "base:snowy_plains": 0.5,
+    "base:desert": 0.8,
+    "base:savanna": 1.0,
+    "base:swamp": 0.8,
+    "base:mountains": 0.4,
+    "base:beach": 0.5
+   },
+   "found_in": "tall grass, sand, termite mounds; most in summer and the rains",
+   "eaten_by": [
+    "chihuahua",
+    "cat",
+    "fox",
+    "small_bird",
+    "rodent",
+    "frog",
+    "lizard"
+   ],
+   "category": "insects"
+  },
+  {
+   "name": "grubs",
+   "tier": 3,
+   "in_game": false,
+   "biomes": {
+    "base:forest": 1.0,
+    "base:birch_forest": 1.0,
+    "base:taiga": 0.8
+   },
+   "found_in": "rotten logs and stumps; a winter food",
+   "eaten_by": [
+    "pig",
+    "fox",
+    "small_bird",
+    "bear",
+    "chihuahua"
+   ],
+   "category": "insects"
+  },
+  {
+   "name": "worms",
+   "tier": 3,
+   "in_game": false,
+   "biomes": {
+    "base:plains": 0.6,
+    "base:forest": 1.0,
+    "base:birch_forest": 0.8,
+    "base:swamp": 1.0
+   },
+   "found_in": "wet soil, after rain (follows soil water)",
+   "eaten_by": [
+    "pig",
+    "fox",
+    "small_bird",
+    "chihuahua"
+   ],
+   "category": "insects"
+  },
+  {
+   "name": "shellfish",
+   "tier": 3,
+   "in_game": false,
+   "biomes": {
+    "base:beach": 1.0,
+    "base:ocean": 0.6,
+    "base:swamp": 0.4
+   },
+   "found_in": "mussels, crabs, cockles; snails and crabs in the swamp",
+   "eaten_by": [
+    "gull",
+    "fox",
+    "raven",
+    "caiman"
+   ],
+   "category": "fish"
+  },
+  {
+   "name": "eggs",
+   "tier": 3,
+   "in_game": false,
+   "biomes": {
+    "base:plains": 1.0,
+    "base:forest": 1.0,
+    "base:birch_forest": 1.0,
+    "base:taiga": 1.0,
+    "base:snowy_plains": 1.0,
+    "base:desert": 1.0,
+    "base:savanna": 1.0,
+    "base:swamp": 1.0,
+    "base:mountains": 1.0,
+    "base:beach": 1.0
+   },
+   "found_in": "nests of grouse, small birds, gulls and caimans; in spring",
+   "eaten_by": [
+    "fox",
+    "raven",
+    "chihuahua",
+    "coyote",
+    "gull"
+   ],
+   "category": "meat"
+  },
+  {
+   "name": "fish_catch",
+   "tier": 3,
+   "in_game": false,
+   "biomes": {
+    "any water": 1.0
+   },
+   "found_in": "fallback where no fish creatures are loaded",
+   "eaten_by": [
+    "cat",
+    "jaguar",
+    "fox",
+    "eagle"
+   ],
+   "category": "fish"
+  }
+ ],
+ "webs": [
+  {
+   "biome": "base:plains",
+   "place": "Kansas tallgrass prairie (Konza Prairie, Flint Hills)",
+   "plants": {
+    "grass": [
+     "big bluestem",
+     "Indiangrass",
+     "switchgrass",
+     "little bluestem"
+    ],
+    "leaves": [
+     "forbs: coneflowers, sunflowers, leadplant"
+    ],
+    "fruit": [
+     "wild plum",
+     "sumac"
+    ],
+    "seeds": [
+     "grass and sunflower seed"
+    ],
+    "trees": [
+     "gallery oak and hackberry along streams"
+    ]
+   },
+   "eats": [
+    [
+     "cow",
+     "grass"
+    ],
+    [
+     "cow",
+     "leaves"
+    ],
+    [
+     "deer",
+     "leaves"
+    ],
+    [
+     "deer",
+     "grass"
+    ],
+    [
+     "deer",
+     "fruit"
+    ],
+    [
+     "hare",
+     "grass"
+    ],
+    [
+     "hare",
+     "leaves"
+    ],
+    [
+     "rodent",
+     "seeds"
+    ],
+    [
+     "rodent",
+     "grass"
+    ],
+    [
+     "rodent",
+     "insects"
+    ],
+    [
+     "chicken",
+     "seeds"
+    ],
+    [
+     "chicken",
+     "leaves"
+    ],
+    [
+     "chicken",
+     "insects"
+    ],
+    [
+     "small_bird",
+     "seeds"
+    ],
+    [
+     "small_bird",
+     "insects"
+    ],
+    [
+     "insects",
+     "grass"
+    ],
+    [
+     "chihuahua",
+     "rodent"
+    ],
+    [
+     "chihuahua",
+     "hare"
+    ],
+    [
+     "chihuahua",
+     "eggs"
+    ],
+    [
+     "chihuahua",
+     "insects"
+    ],
+    [
+     "chihuahua",
+     "fruit"
+    ],
+    [
+     "chihuahua",
+     "seeds"
+    ],
+    [
+     "chihuahua",
+     "carrion"
+    ],
+    [
+     "cat",
+     "rodent"
+    ],
+    [
+     "cat",
+     "small_bird"
+    ],
+    [
+     "cat",
+     "insects"
+    ],
+    [
+     "fox",
+     "rodent"
+    ],
+    [
+     "fox",
+     "hare"
+    ],
+    [
+     "fox",
+     "small_bird"
+    ],
+    [
+     "fox",
+     "eggs"
+    ],
+    [
+     "fox",
+     "insects"
+    ],
+    [
+     "fox",
+     "fruit"
+    ],
+    [
+     "fox",
+     "carrion"
+    ],
+    [
+     "fox",
+     "chicken"
+    ],
+    [
+     "coyote",
+     "hare"
+    ],
+    [
+     "coyote",
+     "rodent"
+    ],
+    [
+     "coyote",
+     "deer"
+    ],
+    [
+     "coyote",
+     "cat"
+    ],
+    [
+     "coyote",
+     "chihuahua"
+    ],
+    [
+     "coyote",
+     "fox"
+    ],
+    [
+     "coyote",
+     "fruit"
+    ],
+    [
+     "coyote",
+     "carrion"
+    ],
+    [
+     "coyote",
+     "chicken"
+    ],
+    [
+     "eagle",
+     "rodent"
+    ],
+    [
+     "eagle",
+     "hare"
+    ],
+    [
+     "eagle",
+     "chicken"
+    ],
+    [
+     "eagle",
+     "chihuahua"
+    ],
+    [
+     "eagle",
+     "cat"
+    ],
+    [
+     "owl",
+     "rodent"
+    ],
+    [
+     "owl",
+     "hare"
+    ],
+    [
+     "owl",
+     "small_bird"
+    ],
+    [
+     "owl",
+     "cat"
+    ],
+    [
+     "owl",
+     "chihuahua"
+    ],
+    [
+     "wolf",
+     "cow"
+    ],
+    [
+     "wolf",
+     "deer"
+    ],
+    [
+     "vulture",
+     "carrion"
+    ],
+    [
+     "raven",
+     "carrion"
+    ],
+    [
+     "raven",
+     "eggs"
+    ]
+   ],
+   "notes": "Konza stocks bison at 1 animal unit per 4.7 ha to remove 25% of growth; wolves gone from Kansas by ~1900, keep rare; dung beetles and rot are the decomposers."
+  },
+  {
+   "biome": "base:forest",
+   "place": "Temperate deciduous forest (Bialowieza, Poland; eastern US variant)",
+   "plants": {
+    "leaves": [
+     "oak",
+     "hornbeam",
+     "lime",
+     "maple",
+     "ash",
+     "hazel",
+     "bramble"
+    ],
+    "seeds": [
+     "acorns",
+     "beechmast",
+     "hazelnuts"
+    ],
+    "fruit": [
+     "raspberry",
+     "wild apple"
+    ],
+    "fungi": [
+     "leaf-litter and dead-wood fungi"
+    ]
+   },
+   "eats": [
+    [
+     "deer",
+     "leaves"
+    ],
+    [
+     "deer",
+     "grass"
+    ],
+    [
+     "deer",
+     "fruit"
+    ],
+    [
+     "deer",
+     "seeds"
+    ],
+    [
+     "pig",
+     "roots"
+    ],
+    [
+     "pig",
+     "seeds"
+    ],
+    [
+     "pig",
+     "grubs"
+    ],
+    [
+     "pig",
+     "worms"
+    ],
+    [
+     "pig",
+     "fruit"
+    ],
+    [
+     "pig",
+     "carrion"
+    ],
+    [
+     "cow",
+     "grass"
+    ],
+    [
+     "cow",
+     "leaves"
+    ],
+    [
+     "hare",
+     "grass"
+    ],
+    [
+     "hare",
+     "leaves"
+    ],
+    [
+     "rodent",
+     "seeds"
+    ],
+    [
+     "rodent",
+     "fungi"
+    ],
+    [
+     "rodent",
+     "insects"
+    ],
+    [
+     "small_bird",
+     "seeds"
+    ],
+    [
+     "small_bird",
+     "insects"
+    ],
+    [
+     "small_bird",
+     "fruit"
+    ],
+    [
+     "chicken",
+     "seeds"
+    ],
+    [
+     "chicken",
+     "leaves"
+    ],
+    [
+     "chicken",
+     "fruit"
+    ],
+    [
+     "capybara",
+     "grass"
+    ],
+    [
+     "capybara",
+     "water_plants"
+    ],
+    [
+     "chihuahua",
+     "rodent"
+    ],
+    [
+     "chihuahua",
+     "eggs"
+    ],
+    [
+     "chihuahua",
+     "insects"
+    ],
+    [
+     "chihuahua",
+     "fruit"
+    ],
+    [
+     "chihuahua",
+     "carrion"
+    ],
+    [
+     "chihuahua",
+     "grubs"
+    ],
+    [
+     "chihuahua",
+     "worms"
+    ],
+    [
+     "cat",
+     "rodent"
+    ],
+    [
+     "cat",
+     "small_bird"
+    ],
+    [
+     "cat",
+     "insects"
+    ],
+    [
+     "fox",
+     "rodent"
+    ],
+    [
+     "fox",
+     "hare"
+    ],
+    [
+     "fox",
+     "small_bird"
+    ],
+    [
+     "fox",
+     "eggs"
+    ],
+    [
+     "fox",
+     "insects"
+    ],
+    [
+     "fox",
+     "fruit"
+    ],
+    [
+     "fox",
+     "carrion"
+    ],
+    [
+     "coyote",
+     "hare"
+    ],
+    [
+     "coyote",
+     "rodent"
+    ],
+    [
+     "coyote",
+     "deer"
+    ],
+    [
+     "coyote",
+     "cat"
+    ],
+    [
+     "coyote",
+     "chihuahua"
+    ],
+    [
+     "coyote",
+     "fruit"
+    ],
+    [
+     "wolf",
+     "deer"
+    ],
+    [
+     "wolf",
+     "pig"
+    ],
+    [
+     "wolf",
+     "hare"
+    ],
+    [
+     "wolf",
+     "cow"
+    ],
+    [
+     "wolf",
+     "capybara"
+    ],
+    [
+     "wolf",
+     "fox"
+    ],
+    [
+     "wolf",
+     "coyote"
+    ],
+    [
+     "eagle",
+     "rodent"
+    ],
+    [
+     "eagle",
+     "small_bird"
+    ],
+    [
+     "eagle",
+     "hare"
+    ],
+    [
+     "eagle",
+     "chicken"
+    ],
+    [
+     "eagle",
+     "chihuahua"
+    ],
+    [
+     "owl",
+     "rodent"
+    ],
+    [
+     "owl",
+     "small_bird"
+    ],
+    [
+     "owl",
+     "fox"
+    ],
+    [
+     "owl",
+     "cat"
+    ],
+    [
+     "owl",
+     "chihuahua"
+    ],
+    [
+     "owl",
+     "raven"
+    ],
+    [
+     "raven",
+     "carrion"
+    ],
+    [
+     "raven",
+     "eggs"
+    ],
+    [
+     "vulture",
+     "carrion"
+    ]
+   ],
+   "notes": "The capybara's forest habitat (gallery forest) has no jaguar in this web; the wolf stands in. Wolves killed 72 red deer, 31 boar and 16 roe /100 km2/yr at 2.3 wolves/100 km2, limiting but not regulating deer. Ungulates 65-1,180 kg/km2. US variant: white-tailed deer, wild turkey, coyote, black bear, turkey vulture."
+  },
+  {
+   "biome": "base:birch_forest",
+   "place": "Hemiboreal birch forest (southern Finland, Moscow region)",
+   "plants": {
+    "leaves": [
+     "birch",
+     "aspen",
+     "willow",
+     "rowan"
+    ],
+    "fruit": [
+     "bilberry",
+     "lingonberry",
+     "raspberry"
+    ],
+    "seeds": [
+     "spruce and pine seed"
+    ],
+    "grass": [
+     "clearings"
+    ]
+   },
+   "eats": [
+    [
+     "deer",
+     "leaves"
+    ],
+    [
+     "deer",
+     "grass"
+    ],
+    [
+     "pig",
+     "roots"
+    ],
+    [
+     "pig",
+     "seeds"
+    ],
+    [
+     "pig",
+     "grubs"
+    ],
+    [
+     "pig",
+     "worms"
+    ],
+    [
+     "hare",
+     "grass"
+    ],
+    [
+     "hare",
+     "leaves"
+    ],
+    [
+     "rodent",
+     "seeds"
+    ],
+    [
+     "rodent",
+     "fungi"
+    ],
+    [
+     "rodent",
+     "fruit"
+    ],
+    [
+     "chicken",
+     "leaves"
+    ],
+    [
+     "chicken",
+     "fruit"
+    ],
+    [
+     "small_bird",
+     "insects"
+    ],
+    [
+     "small_bird",
+     "fruit"
+    ],
+    [
+     "chihuahua",
+     "rodent"
+    ],
+    [
+     "chihuahua",
+     "eggs"
+    ],
+    [
+     "chihuahua",
+     "insects"
+    ],
+    [
+     "chihuahua",
+     "fruit"
+    ],
+    [
+     "chihuahua",
+     "carrion"
+    ],
+    [
+     "cat",
+     "rodent"
+    ],
+    [
+     "cat",
+     "small_bird"
+    ],
+    [
+     "cat",
+     "insects"
+    ],
+    [
+     "fox",
+     "rodent"
+    ],
+    [
+     "fox",
+     "hare"
+    ],
+    [
+     "fox",
+     "small_bird"
+    ],
+    [
+     "fox",
+     "chicken"
+    ],
+    [
+     "fox",
+     "eggs"
+    ],
+    [
+     "fox",
+     "fruit"
+    ],
+    [
+     "fox",
+     "carrion"
+    ],
+    [
+     "wolf",
+     "deer"
+    ],
+    [
+     "wolf",
+     "pig"
+    ],
+    [
+     "wolf",
+     "hare"
+    ],
+    [
+     "wolf",
+     "fox"
+    ],
+    [
+     "eagle",
+     "chicken"
+    ],
+    [
+     "eagle",
+     "rodent"
+    ],
+    [
+     "eagle",
+     "hare"
+    ],
+    [
+     "eagle",
+     "small_bird"
+    ],
+    [
+     "eagle",
+     "chihuahua"
+    ],
+    [
+     "owl",
+     "rodent"
+    ],
+    [
+     "owl",
+     "hare"
+    ],
+    [
+     "owl",
+     "small_bird"
+    ],
+    [
+     "owl",
+     "fox"
+    ],
+    [
+     "owl",
+     "cat"
+    ],
+    [
+     "owl",
+     "chihuahua"
+    ],
+    [
+     "raven",
+     "carrion"
+    ],
+    [
+     "raven",
+     "eggs"
+    ]
+   ],
+   "notes": "The moose is the big browser here (later); until then deer and boar carry the role. Raccoon dogs share the fox's niche."
+  },
+  {
+   "biome": "base:taiga",
+   "place": "Boreal forest (central Siberia, Canadian boreal)",
+   "plants": {
+    "leaves": [
+     "willow",
+     "alder",
+     "birch"
+    ],
+    "lichen": [
+     "reindeer lichen"
+    ],
+    "fruit": [
+     "bilberry",
+     "cloudberry",
+     "crowberry"
+    ],
+    "seeds": [
+     "spruce, larch, pine cone seed"
+    ]
+   },
+   "eats": [
+    [
+     "reindeer",
+     "lichen"
+    ],
+    [
+     "reindeer",
+     "grass"
+    ],
+    [
+     "reindeer",
+     "leaves"
+    ],
+    [
+     "reindeer",
+     "fungi"
+    ],
+    [
+     "cow",
+     "grass"
+    ],
+    [
+     "pig",
+     "roots"
+    ],
+    [
+     "pig",
+     "seeds"
+    ],
+    [
+     "pig",
+     "grubs"
+    ],
+    [
+     "hare",
+     "leaves"
+    ],
+    [
+     "hare",
+     "grass"
+    ],
+    [
+     "rodent",
+     "seeds"
+    ],
+    [
+     "rodent",
+     "fruit"
+    ],
+    [
+     "rodent",
+     "fungi"
+    ],
+    [
+     "chicken",
+     "leaves"
+    ],
+    [
+     "chicken",
+     "fruit"
+    ],
+    [
+     "small_bird",
+     "seeds"
+    ],
+    [
+     "small_bird",
+     "insects"
+    ],
+    [
+     "cat",
+     "rodent"
+    ],
+    [
+     "cat",
+     "small_bird"
+    ],
+    [
+     "fox",
+     "rodent"
+    ],
+    [
+     "fox",
+     "hare"
+    ],
+    [
+     "fox",
+     "chicken"
+    ],
+    [
+     "fox",
+     "eggs"
+    ],
+    [
+     "fox",
+     "fruit"
+    ],
+    [
+     "wolf",
+     "reindeer"
+    ],
+    [
+     "wolf",
+     "cow"
+    ],
+    [
+     "wolf",
+     "pig"
+    ],
+    [
+     "wolf",
+     "hare"
+    ],
+    [
+     "wolf",
+     "fox"
+    ],
+    [
+     "eagle",
+     "chicken"
+    ],
+    [
+     "eagle",
+     "hare"
+    ],
+    [
+     "eagle",
+     "rodent"
+    ],
+    [
+     "eagle",
+     "fox"
+    ],
+    [
+     "owl",
+     "rodent"
+    ],
+    [
+     "owl",
+     "hare"
+    ],
+    [
+     "owl",
+     "cat"
+    ],
+    [
+     "raven",
+     "carrion"
+    ],
+    [
+     "raven",
+     "eggs"
+    ]
+   ],
+   "notes": "Hares cycle (~10 yr): 14.7 to 0.2 per ha in one Kluane decline; lynx kill 0.3-1.2 hares/day. Wood bison is the cow's role in Canada. Moose, lynx, bear, beaver later."
+  },
+  {
+   "biome": "base:snowy_plains",
+   "place": "Arctic tundra",
+   "plants": {
+    "grass": [
+     "sedges",
+     "cottongrass"
+    ],
+    "leaves": [
+     "dwarf willow",
+     "dwarf birch"
+    ],
+    "lichen": [
+     "lichens",
+     "mosses"
+    ],
+    "fruit": [
+     "cloudberry",
+     "crowberry"
+    ]
+   },
+   "eats": [
+    [
+     "reindeer",
+     "lichen"
+    ],
+    [
+     "reindeer",
+     "grass"
+    ],
+    [
+     "reindeer",
+     "leaves"
+    ],
+    [
+     "hare",
+     "leaves"
+    ],
+    [
+     "hare",
+     "grass"
+    ],
+    [
+     "rodent",
+     "grass"
+    ],
+    [
+     "chicken",
+     "leaves"
+    ],
+    [
+     "chicken",
+     "fruit"
+    ],
+    [
+     "small_bird",
+     "seeds"
+    ],
+    [
+     "small_bird",
+     "insects"
+    ],
+    [
+     "fox",
+     "rodent"
+    ],
+    [
+     "fox",
+     "eggs"
+    ],
+    [
+     "fox",
+     "small_bird"
+    ],
+    [
+     "fox",
+     "chicken"
+    ],
+    [
+     "fox",
+     "carrion"
+    ],
+    [
+     "owl",
+     "rodent"
+    ],
+    [
+     "owl",
+     "hare"
+    ],
+    [
+     "eagle",
+     "chicken"
+    ],
+    [
+     "eagle",
+     "hare"
+    ],
+    [
+     "eagle",
+     "fox"
+    ],
+    [
+     "wolf",
+     "reindeer"
+    ],
+    [
+     "wolf",
+     "hare"
+    ],
+    [
+     "wolf",
+     "fox"
+    ],
+    [
+     "raven",
+     "carrion"
+    ],
+    [
+     "raven",
+     "eggs"
+    ]
+   ],
+   "notes": "Lemmings cycle every 3-5 years and drive Arctic fox breeding; a snowy owl eats ~1,600 a year. A High Arctic web is mostly top-down. Neither chihuahua nor cat lives here."
+  },
+  {
+   "biome": "base:desert",
+   "place": "Sonoran Desert (Arizona, Sonora)",
+   "plants": {
+    "fruit": [
+     "saguaro",
+     "prickly pear",
+     "cholla"
+    ],
+    "seeds": [
+     "mesquite pods",
+     "annual grass seed"
+    ],
+    "leaves": [
+     "creosote",
+     "bursage",
+     "palo verde",
+     "annual wildflowers"
+    ],
+    "grass": [
+     "annual grasses after rain"
+    ]
+   },
+   "eats": [
+    [
+     "deer",
+     "leaves"
+    ],
+    [
+     "deer",
+     "fruit"
+    ],
+    [
+     "pig",
+     "fruit"
+    ],
+    [
+     "pig",
+     "roots"
+    ],
+    [
+     "pig",
+     "seeds"
+    ],
+    [
+     "sheep",
+     "grass"
+    ],
+    [
+     "sheep",
+     "leaves"
+    ],
+    [
+     "hare",
+     "grass"
+    ],
+    [
+     "hare",
+     "leaves"
+    ],
+    [
+     "hare",
+     "fruit"
+    ],
+    [
+     "rodent",
+     "seeds"
+    ],
+    [
+     "chicken",
+     "seeds"
+    ],
+    [
+     "chicken",
+     "leaves"
+    ],
+    [
+     "small_bird",
+     "insects"
+    ],
+    [
+     "small_bird",
+     "seeds"
+    ],
+    [
+     "small_bird",
+     "fruit"
+    ],
+    [
+     "insects",
+     "seeds"
+    ],
+    [
+     "chihuahua",
+     "rodent"
+    ],
+    [
+     "chihuahua",
+     "insects"
+    ],
+    [
+     "chihuahua",
+     "fruit"
+    ],
+    [
+     "chihuahua",
+     "eggs"
+    ],
+    [
+     "chihuahua",
+     "carrion"
+    ],
+    [
+     "cat",
+     "rodent"
+    ],
+    [
+     "cat",
+     "small_bird"
+    ],
+    [
+     "cat",
+     "insects"
+    ],
+    [
+     "fox",
+     "rodent"
+    ],
+    [
+     "fox",
+     "hare"
+    ],
+    [
+     "fox",
+     "insects"
+    ],
+    [
+     "fox",
+     "fruit"
+    ],
+    [
+     "coyote",
+     "hare"
+    ],
+    [
+     "coyote",
+     "rodent"
+    ],
+    [
+     "coyote",
+     "fox"
+    ],
+    [
+     "coyote",
+     "cat"
+    ],
+    [
+     "coyote",
+     "chihuahua"
+    ],
+    [
+     "coyote",
+     "deer"
+    ],
+    [
+     "coyote",
+     "pig"
+    ],
+    [
+     "coyote",
+     "fruit"
+    ],
+    [
+     "coyote",
+     "carrion"
+    ],
+    [
+     "coyote",
+     "chicken"
+    ],
+    [
+     "jaguar",
+     "deer"
+    ],
+    [
+     "jaguar",
+     "pig"
+    ],
+    [
+     "jaguar",
+     "sheep"
+    ],
+    [
+     "eagle",
+     "hare"
+    ],
+    [
+     "eagle",
+     "rodent"
+    ],
+    [
+     "eagle",
+     "chicken"
+    ],
+    [
+     "eagle",
+     "small_bird"
+    ],
+    [
+     "eagle",
+     "sheep"
+    ],
+    [
+     "eagle",
+     "chihuahua"
+    ],
+    [
+     "eagle",
+     "cat"
+    ],
+    [
+     "owl",
+     "rodent"
+    ],
+    [
+     "owl",
+     "hare"
+    ],
+    [
+     "vulture",
+     "carrion"
+    ],
+    [
+     "raven",
+     "carrion"
+    ],
+    [
+     "raven",
+     "eggs"
+    ]
+   ],
+   "notes": "Two growing seasons (winter rains, July-Sept monsoon). Kangaroo rats never drink; kit foxes and wildcats barely do: water should be optional for desert species. Coyotes cause over 75% of kit fox predation."
+  },
+  {
+   "biome": "base:savanna",
+   "place": "Venezuelan llanos",
+   "plants": {
+    "grass": [
+     "Trachypogon",
+     "Paspalum",
+     "Axonopus",
+     "Hymenachne and Leersia in the flooded lows"
+    ],
+    "water_plants": [
+     "water hyacinth",
+     "sedges"
+    ],
+    "fruit": [
+     "moriche and llanera palms",
+     "gallery forest"
+    ]
+   },
+   "eats": [
+    [
+     "capybara",
+     "grass"
+    ],
+    [
+     "capybara",
+     "water_plants"
+    ],
+    [
+     "capybara",
+     "fruit"
+    ],
+    [
+     "deer",
+     "leaves"
+    ],
+    [
+     "deer",
+     "fruit"
+    ],
+    [
+     "deer",
+     "grass"
+    ],
+    [
+     "pig",
+     "roots"
+    ],
+    [
+     "pig",
+     "fruit"
+    ],
+    [
+     "pig",
+     "seeds"
+    ],
+    [
+     "hare",
+     "grass"
+    ],
+    [
+     "rodent",
+     "seeds"
+    ],
+    [
+     "rodent",
+     "grass"
+    ],
+    [
+     "rodent",
+     "insects"
+    ],
+    [
+     "chicken",
+     "seeds"
+    ],
+    [
+     "chicken",
+     "insects"
+    ],
+    [
+     "small_bird",
+     "seeds"
+    ],
+    [
+     "small_bird",
+     "insects"
+    ],
+    [
+     "insects",
+     "grass"
+    ],
+    [
+     "fish",
+     "insects"
+    ],
+    [
+     "fish",
+     "water_plants"
+    ],
+    [
+     "chihuahua",
+     "rodent"
+    ],
+    [
+     "chihuahua",
+     "insects"
+    ],
+    [
+     "chihuahua",
+     "fruit"
+    ],
+    [
+     "chihuahua",
+     "eggs"
+    ],
+    [
+     "chihuahua",
+     "carrion"
+    ],
+    [
+     "cat",
+     "rodent"
+    ],
+    [
+     "cat",
+     "small_bird"
+    ],
+    [
+     "cat",
+     "insects"
+    ],
+    [
+     "fox",
+     "rodent"
+    ],
+    [
+     "fox",
+     "hare"
+    ],
+    [
+     "fox",
+     "chicken"
+    ],
+    [
+     "fox",
+     "small_bird"
+    ],
+    [
+     "fox",
+     "insects"
+    ],
+    [
+     "fox",
+     "fruit"
+    ],
+    [
+     "fox",
+     "carrion"
+    ],
+    [
+     "fox",
+     "eggs"
+    ],
+    [
+     "caiman",
+     "fish"
+    ],
+    [
+     "caiman",
+     "capybara"
+    ],
+    [
+     "caiman",
+     "small_bird"
+    ],
+    [
+     "caiman",
+     "rodent"
+    ],
+    [
+     "jaguar",
+     "capybara"
+    ],
+    [
+     "jaguar",
+     "deer"
+    ],
+    [
+     "jaguar",
+     "pig"
+    ],
+    [
+     "jaguar",
+     "caiman"
+    ],
+    [
+     "jaguar",
+     "fox"
+    ],
+    [
+     "jaguar",
+     "cat"
+    ],
+    [
+     "jaguar",
+     "chihuahua"
+    ],
+    [
+     "eagle",
+     "rodent"
+    ],
+    [
+     "eagle",
+     "hare"
+    ],
+    [
+     "eagle",
+     "chicken"
+    ],
+    [
+     "eagle",
+     "small_bird"
+    ],
+    [
+     "eagle",
+     "carrion"
+    ],
+    [
+     "eagle",
+     "capybara"
+    ],
+    [
+     "eagle",
+     "chihuahua"
+    ],
+    [
+     "eagle",
+     "cat"
+    ],
+    [
+     "owl",
+     "rodent"
+    ],
+    [
+     "owl",
+     "hare"
+    ],
+    [
+     "owl",
+     "cat"
+    ],
+    [
+     "vulture",
+     "carrion"
+    ],
+    [
+     "vulture",
+     "capybara"
+    ]
+   ],
+   "notes": "Wet May-Oct, dry Nov-Apr. Capybaras 10/km2 (Guarico) to 200-350/km2 peaks (Apure); dry season packs capybaras, caimans and waders at shrinking pools. Caracara and vultures take newborn capybaras; the harpy eagle is not a llanos bird."
+  },
+  {
+   "biome": "base:swamp",
+   "place": "Pantanal (Brazil)",
+   "plants": {
+    "water_plants": [
+     "water hyacinth",
+     "Salvinia",
+     "water lilies"
+    ],
+    "grass": [
+     "floodplain grasses",
+     "sedges"
+    ],
+    "fruit": [
+     "acuri and caranda palms",
+     "gallery forest"
+    ]
+   },
+   "eats": [
+    [
+     "capybara",
+     "grass"
+    ],
+    [
+     "capybara",
+     "water_plants"
+    ],
+    [
+     "deer",
+     "water_plants"
+    ],
+    [
+     "deer",
+     "grass"
+    ],
+    [
+     "pig",
+     "fruit"
+    ],
+    [
+     "pig",
+     "roots"
+    ],
+    [
+     "rodent",
+     "seeds"
+    ],
+    [
+     "rodent",
+     "grass"
+    ],
+    [
+     "fish",
+     "insects"
+    ],
+    [
+     "fish",
+     "fruit"
+    ],
+    [
+     "fish",
+     "fish"
+    ],
+    [
+     "fish",
+     "water_plants"
+    ],
+    [
+     "small_bird",
+     "insects"
+    ],
+    [
+     "small_bird",
+     "seeds"
+    ],
+    [
+     "caiman",
+     "fish"
+    ],
+    [
+     "caiman",
+     "shellfish"
+    ],
+    [
+     "caiman",
+     "small_bird"
+    ],
+    [
+     "caiman",
+     "capybara"
+    ],
+    [
+     "caiman",
+     "rodent"
+    ],
+    [
+     "jaguar",
+     "caiman"
+    ],
+    [
+     "jaguar",
+     "fish"
+    ],
+    [
+     "jaguar",
+     "capybara"
+    ],
+    [
+     "jaguar",
+     "pig"
+    ],
+    [
+     "jaguar",
+     "deer"
+    ],
+    [
+     "jaguar",
+     "fox"
+    ],
+    [
+     "fox",
+     "shellfish"
+    ],
+    [
+     "fox",
+     "rodent"
+    ],
+    [
+     "fox",
+     "fruit"
+    ],
+    [
+     "fox",
+     "carrion"
+    ],
+    [
+     "eagle",
+     "fish"
+    ],
+    [
+     "eagle",
+     "rodent"
+    ],
+    [
+     "eagle",
+     "shellfish"
+    ],
+    [
+     "owl",
+     "rodent"
+    ],
+    [
+     "vulture",
+     "carrion"
+    ],
+    [
+     "vulture",
+     "fish"
+    ]
+   ],
+   "notes": "Floods Dec-May. Ranch cattle (31.7% of jaguar kills in the southern Pantanal) are the player's cows here, not wild prey. Taiama jaguars: caiman in 55% of scats, fish 46%, mammals 11%; 12.4 jaguars per 100 km2. Rising water spreads caimans and raises jaguar kills of them. Capybaras 3.2-14.8/km2."
+  },
+  {
+   "biome": "base:mountains",
+   "place": "The Alps (Rockies variant)",
+   "plants": {
+    "grass": [
+     "alpine grasses",
+     "sedges",
+     "herbs"
+    ],
+    "leaves": [
+     "alpenrose",
+     "dwarf shrubs"
+    ],
+    "fruit": [
+     "bilberry"
+    ],
+    "lichen": [
+     "rock lichen"
+    ]
+   },
+   "eats": [
+    [
+     "sheep",
+     "grass"
+    ],
+    [
+     "sheep",
+     "leaves"
+    ],
+    [
+     "sheep",
+     "lichen"
+    ],
+    [
+     "deer",
+     "grass"
+    ],
+    [
+     "deer",
+     "leaves"
+    ],
+    [
+     "rodent",
+     "grass"
+    ],
+    [
+     "rodent",
+     "seeds"
+    ],
+    [
+     "hare",
+     "grass"
+    ],
+    [
+     "hare",
+     "leaves"
+    ],
+    [
+     "chicken",
+     "leaves"
+    ],
+    [
+     "chicken",
+     "fruit"
+    ],
+    [
+     "small_bird",
+     "insects"
+    ],
+    [
+     "small_bird",
+     "fruit"
+    ],
+    [
+     "wolf",
+     "sheep"
+    ],
+    [
+     "wolf",
+     "deer"
+    ],
+    [
+     "wolf",
+     "fox"
+    ],
+    [
+     "wolf",
+     "coyote"
+    ],
+    [
+     "fox",
+     "rodent"
+    ],
+    [
+     "fox",
+     "carrion"
+    ],
+    [
+     "fox",
+     "hare"
+    ],
+    [
+     "fox",
+     "chicken"
+    ],
+    [
+     "coyote",
+     "rodent"
+    ],
+    [
+     "coyote",
+     "hare"
+    ],
+    [
+     "coyote",
+     "sheep"
+    ],
+    [
+     "eagle",
+     "rodent"
+    ],
+    [
+     "eagle",
+     "hare"
+    ],
+    [
+     "eagle",
+     "sheep"
+    ],
+    [
+     "eagle",
+     "chicken"
+    ],
+    [
+     "eagle",
+     "fox"
+    ],
+    [
+     "owl",
+     "rodent"
+    ],
+    [
+     "owl",
+     "hare"
+    ],
+    [
+     "owl",
+     "small_bird"
+    ],
+    [
+     "vulture",
+     "carrion"
+    ],
+    [
+     "raven",
+     "carrion"
+    ]
+   ],
+   "notes": "Alpine marmot (golden eagle's main prey) as a rodent until it exists. Rockies: elk, bighorn, mountain goat, pika, puma, wolverine, grizzly."
+  },
+  {
+   "biome": "base:ocean",
+   "place": "Temperate coast, open water (North Sea / North Atlantic)",
+   "plants": {
+    "water_plants": [
+     "phytoplankton",
+     "kelp",
+     "eelgrass"
+    ]
+   },
+   "eats": [
+    [
+     "shellfish",
+     "water_plants"
+    ],
+    [
+     "fish",
+     "water_plants"
+    ],
+    [
+     "fish",
+     "shellfish"
+    ],
+    [
+     "fish",
+     "fish"
+    ],
+    [
+     "gull",
+     "fish"
+    ],
+    [
+     "gull",
+     "shellfish"
+    ],
+    [
+     "gull",
+     "carrion"
+    ],
+    [
+     "seal",
+     "fish"
+    ]
+   ],
+   "notes": "Phytoplankton does most of the production. Aquatic herbivores eat ~51% of primary production, three times land herbivores."
+  },
+  {
+   "biome": "base:beach",
+   "place": "Temperate coast, shore and dunes",
+   "plants": {
+    "water_plants": [
+     "wrack and kelp on the strandline"
+    ],
+    "grass": [
+     "marram",
+     "lyme grass"
+    ],
+    "leaves": [
+     "sea beet",
+     "sea kale"
+    ]
+   },
+   "eats": [
+    [
+     "shellfish",
+     "water_plants"
+    ],
+    [
+     "shellfish",
+     "carrion"
+    ],
+    [
+     "insects",
+     "water_plants"
+    ],
+    [
+     "insects",
+     "carrion"
+    ],
+    [
+     "hare",
+     "grass"
+    ],
+    [
+     "rodent",
+     "grass"
+    ],
+    [
+     "rodent",
+     "seeds"
+    ],
+    [
+     "small_bird",
+     "shellfish"
+    ],
+    [
+     "small_bird",
+     "insects"
+    ],
+    [
+     "fish",
+     "shellfish"
+    ],
+    [
+     "gull",
+     "fish"
+    ],
+    [
+     "gull",
+     "shellfish"
+    ],
+    [
+     "gull",
+     "carrion"
+    ],
+    [
+     "gull",
+     "eggs"
+    ],
+    [
+     "fox",
+     "hare"
+    ],
+    [
+     "fox",
+     "rodent"
+    ],
+    [
+     "fox",
+     "eggs"
+    ],
+    [
+     "fox",
+     "carrion"
+    ],
+    [
+     "fox",
+     "shellfish"
+    ],
+    [
+     "eagle",
+     "fish"
+    ],
+    [
+     "eagle",
+     "small_bird"
+    ],
+    [
+     "eagle",
+     "carrion"
+    ],
+    [
+     "raven",
+     "carrion"
+    ],
+    [
+     "raven",
+     "shellfish"
+    ]
+   ],
+   "notes": "The tide line is the beach's carrion: gulls, crabs, ravens and foxes clean it."
+  }
+ ],
+ "rules": {
+  "predator_prey_biomass": {
+   "value": 0.009,
+   "text": "10,000 kg of prey supports ~90 kg of a given carnivore species (~111 kg prey per kg carnivore), whatever its size; carnivore number per prey biomass scales as 1/mass",
+   "source": "Carbone & Gittleman 2002, Science",
+   "url": "https://innovations-report.com/life-sciences/report-8728"
+  },
+  "prey_size_switch": {
+   "value_kg": 21.5,
+   "text": "carnivores under 21.5 kg take mostly prey under half their mass (incl. invertebrates); larger ones take prey near their own mass; invertebrate intake rates are ~1/10 of vertebrate feeders'",
+   "source": "Carbone et al. 1999, Nature",
+   "url": "https://www.nature.com/articles/46266"
+  },
+  "small_hunter_max_prey": {
+   "value": 0.5,
+   "text": "largest usual prey of a small hunter as a share of its mass",
+   "source": "Carbone et al. 1999"
+  },
+  "pack_max_prey": {
+   "value": 3.0,
+   "text": "design value from ECOLOGY.md; real wolf packs take 4-10x one wolf's mass (ref.)"
+  },
+  "trophic_transfer": {
+   "value": 0.1,
+   "range": [
+    0.02,
+    0.25
+   ],
+   "text": "~10% of energy passes up a level (Lindeman 1942; his data 0.1-37.5%); marine 2-24%, mean ~10%",
+   "source": "Lindeman 1942; Pauly & Christensen 1995",
+   "url": [
+    "https://en.wikipedia.org/wiki/Ecological_efficiency",
+    "https://fishbase.se/Ecopath/ecopathm.htm"
+   ]
+  },
+  "herbivory_share_of_growth": {
+   "terrestrial_median": 0.18,
+   "aquatic_mean": 0.51,
+   "managed_konza": 0.25,
+   "text": "share of yearly plant production eaten by herbivores",
+   "source": "Cyr & Pace 1993; Konza bison fact sheet",
+   "url": [
+    "https://www.nature.com/articles/361148a0.pdf",
+    "https://lter.konza.ksu.edu/outreach/BisonFact17.pdf"
+   ]
+  },
+  "livestock_vs_wild_biomass": {
+   "value": 10,
+   "text": "livestock reach ~10x wild herbivore biomass for the same productivity; herbivore biomass, consumption and production all rise with primary production",
+   "source": "Oesterheld, Sala & McNaughton 1992",
+   "url": "https://link.springer.com/article/10.1038/356234a0"
+  },
+  "herbivore_biomass_rain": {
+   "text": "large herbivore biomass rises with rainfall in African reserves",
+   "source": "Coe, Cumming & Phillipson 1976",
+   "url": "https://link.springer.com/article/10.1007/BF00317566"
+  },
+  "grazer_dm_intake_pct": {
+   "value": [
+    2.0,
+    3.0
+   ],
+   "capybara": 2.6,
+   "source": "FAO (70 g DM per kg^0.75)",
+   "url": "https://www.fao.org/4/t0750e/t0750e0o.htm"
+  },
+  "small_carnivore_wet_intake_pct": {
+   "value": [
+    4.0,
+    7.0
+   ],
+   "estimate": true
+  },
+  "wolf_intake_kg_day": {
+   "value": 3.25,
+   "source": "NPS Yellowstone",
+   "url": "https://www.nps.gov/articles/yellowstone-wolf-facts.htm"
+  },
+  "water_l_day": {
+   "formula": "0.099 * mass_kg^0.90",
+   "text": "mammal drinking water; carnivores and desert animals get much of it from food",
+   "source": "USEPA Wildlife Exposure Factors Handbook",
+   "url": "https://www.epa.gov/node/97121"
+  },
+  "carrying_by_biome": {
+   "base:plains": {
+    "text": "managed bison 1 AU per 4.7 ha removing 25% of growth (~100 kg/ha); wild est. 10-30 kg/ha",
+    "url": "https://lter.konza.ksu.edu/outreach/BisonFact17.pdf"
+   },
+   "base:savanna": {
+    "text": "capybara 10/km2 (Guarico) to 200-350/km2 peaks (Apure); flood meadow optimum 1.6-3/ha",
+    "url": "https://www.fao.org/4/t0750e/t0750e0o.htm"
+   },
+   "base:swamp": {
+    "text": "capybara 3.2-14.8/km2",
+    "url": "https://www.fao.org/4/t0750e/t0750e0o.htm"
+   },
+   "base:forest": {
+    "text": "ungulates 2-14.4/km2, 65-1,180 kg/km2 (1798-1993)",
+    "url": "https://rcin.org.pl//Content/12705/PDF/BI002_26987_Cz-40-2_Acta-T42-nr36-398-451_o.pdf"
+   },
+   "base:birch_forest": {
+    "text": "est. 3-10 kg/ha (moose, roe, hares)",
+    "estimate": true
+   },
+   "base:taiga": {
+    "text": "hares 0.2-15/ha through the cycle; moose and caribou est. 0.1-2/km2",
+    "url": "https://era.library.ualberta.ca/files/8910jv725"
+   },
+   "base:snowy_plains": {
+    "text": "est. caribou 0.1-1/km2 year-averaged, herds of thousands on migration; lemmings 1-100+/ha in cycle",
+    "estimate": true
+   },
+   "base:desert": {
+    "text": "est. 1-5 kg/ha; mule deer 0.5-2/km2; kangaroo rats 5-50/ha",
+    "estimate": true
+   },
+   "base:mountains": {
+    "text": "est. chamois and ibex 2-10/km2 on summer pastures",
+    "estimate": true
+   }
+  },
+  "kill_rates": {
+   "wolf_yellowstone": {
+    "value": "1.9 elk per wolf per month in winter (1.6 early, 2.2 late)",
+    "url": "https://digitalcommons.mtu.edu/michigantech-p/13805"
+   },
+   "wolf_bialowieza": {
+    "value": "72 red deer, 31 boar, 16 roe /100 km2/yr at 2.3 wolves/100 km2 (~50 ungulates/wolf/yr, est.)",
+    "url": "https://bvbvf1.bib-bvb.de/vufind/PrimoRecord/cdi_proquest_miscellaneous_18403333"
+   },
+   "lynx_bialowieza": {
+    "value": "110-169 roe /100 km2/yr at 2.4-3.2 lynx (~1 roe per 7 days, est.); 21-36% of spring roe",
+    "url": "https://rcin.org.pl/dlibra/publication/28582/edition/12686/content"
+   },
+   "lynx_scandinavia": {
+    "value": "2.7-6.2 roe per 30 days",
+    "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4373782/"
+   },
+   "canada_lynx": {
+    "value": "0.3-1.2 hares per day",
+    "url": "https://bdu.siu.edu.ar/bdu/Record/todo:paper_00129658_v79_n4_p1193_ODonoghue"
+   },
+   "jaguar_pantanal": {
+    "value": "one kill per 4.3 days (SD 4.4)",
+    "url": "https://www.academia.edu/3122316"
+   },
+   "feral_cat_australia": {
+    "value": "~740 vertebrates per cat per year (~2/day)",
+    "url": "https://www.cdu.edu.au/news/news-archive/cute-killers-cats-kill-more-15-billion-australian-native-animals-year"
+   },
+   "snowy_owl": {
+    "value": "3-5 lemmings/day, ~1,600/yr",
+    "url": "https://www.nationalgeographic.com/animals/birds/facts/snowy-owl"
+   }
+  },
+  "predation_share_of_prey_per_year": {
+   "value": [
+    0.1,
+    0.36
+   ],
+   "text": "one predator's yearly take of a prey population",
+   "source": "Okarma et al. 1997; Jedrzejewski et al. 2002"
+  },
+  "without_predators": {
+   "lago_guri": {
+    "value": "rodents, howlers, iguanas, leaf-cutter ants 10-100x mainland density on predator-free islands; saplings severely reduced",
+    "url": "https://library.wcs.org/en-us/doi/ctl/view/mid/33065/pubid/PUB11398.aspx"
+   },
+   "st_matthew": {
+    "value": "29 reindeer (1944) to ~6,000 (1963) to 42 (1966); lichen 1 cm vs 8-12 cm",
+    "url": "https://en.wikipedia.org/wiki/St._Matthew_Island"
+   },
+   "bialowieza": {
+    "value": "wolves limited but did not regulate deer; predation was inversely density dependent",
+    "url": "https://bvbvf1.bib-bvb.de/vufind/PrimoRecord/cdi_proquest_miscellaneous_18403333"
+   }
+  },
+  "checks_for_the_game": {
+   "grazers_at_capacity_eat_max_share_of_growth": 0.25,
+   "hunters_at_capacity_share_of_prey_biomass": 0.01,
+   "predator_take_below_prey_births": true,
+   "overshoot_model": "reduced regrowth then starvation, not unlimited growth",
+   "estimate": true
+  }
+ }
+}

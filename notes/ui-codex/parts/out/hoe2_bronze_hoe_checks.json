@@ -1,0 +1,20 @@
+{
+ "kind": "item",
+ "what": "a bronze hoe in the same shape as the attached iron hoe: one flat blade of cast warm orange-brown bronze with a golden sheen and a near-white edge highlight about 10 px wide and 4-5 px tall, set at a right angle across the handle's top and pointing down-left; not a hammer head, not an axe, not a thin hook; a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.452,
+   "outline": 0.6,
+   "red_line": 0.08,
+   "fill": 0.18,
+   "vertical": 0,
+   "passed": true
+  }
+ ]
+}

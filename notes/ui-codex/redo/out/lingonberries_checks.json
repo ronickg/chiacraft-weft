@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a small cluster of small glossy bright red lingonberries on a sprig with small oval dark-green leaves, two or three green leaves, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.392,
+   "outline": 0.69,
+   "red_line": 0.01,
+   "fill": 0.26,
+   "passed": true
+  }
+ ]
+}

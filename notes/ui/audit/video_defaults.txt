@@ -1,0 +1,22 @@
+# The Video screen's new defaults (Ronald, 11-05: contact shadows "Off by default", light shafts
+# "Default to Low"): fresh settings, then the High and Ultra presets (contact shadows on at Ultra
+# only, shafts low below it).
+loaded
+idle
+leave
+wait 2
+tap core:title text:Settings
+wait 1.5
+cursor 0.5 0.5
+scroll -40
+wait 1
+tap_once core:settings text:Video and Quality
+wait 1.5
+shot vd_01_defaults.png
+tap_once base:video text:High
+wait 1
+shot vd_02_high.png
+tap_once base:video text:Ultra
+wait 1
+shot vd_03_ultra.png
+quit

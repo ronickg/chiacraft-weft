@@ -8,9 +8,9 @@ use std::time::Instant;
 
 use weft_sdk::*;
 
-use crate::items::ARMOR;
+use crate::items::*;
 
-pub use base_api::{ADVANCEMENTS, Advancements};
+pub use base_api::components::{ADVANCEMENTS, Advancements};
 
 /// What a player has to do, by what things are rather than which they are: a mod's mob tagged
 /// `hostile` or food tagged `cooked_meat` counts without anything here knowing of it.
@@ -29,6 +29,14 @@ enum Rule {
     Below(i32),
     /// Standing on the ground this high up.
     Above(i32),
+    /// Takes a crafted thing with this tag from a crafting grid.
+    Craft(&'static Tag),
+    /// Has this effect on (`vitals::effects`).
+    Effect(vitals::effects::Effect),
+    /// Eats food still hot from the fire.
+    EatHot,
+    /// A milestone another mod marked (`base_api::milestone`).
+    Milestone(u32),
 }
 
 struct Advancement {
@@ -41,7 +49,7 @@ struct Advancement {
 }
 
 /// `advancements.base.group.<name>` in the lang files.
-const GROUPS: [&str; 4] = ["start", "progress", "food_and_combat", "exploration"];
+const GROUPS: [&str; 5] = ["start", "progress", "food_and_combat", "exploration", "surviving"];
 
 static LOGS: Tag = Tag::named("logs");
 static CRAFTING_TABLES: Tag = Tag::named("crafting_tables");
@@ -58,21 +66,27 @@ static LIVESTOCK: Tag = Tag::named("livestock");
 static COOKED_MEAT: Tag = Tag::named("cooked_meat");
 static HOSTILE: Tag = Tag::named("hostile");
 static LAVA_BUCKETS: Tag = Tag::named("buckets/lava");
+static CAMPFIRES: Tag = Tag::named("campfires");
+static STRING: Tag = Tag::named("string");
+static CLOTHES: Tag = Tag::named("clothes");
+static STEWS: Tag = Tag::named("stew");
+static PRESERVED: Tag = Tag::named("preserved");
+static METEORIC_IRON: Tag = Tag::named("meteoric_iron");
 
 /// In the order they usually come. The index is the bit in `Advancements::done`, so new ones go
 /// at the end (at most 64).
-static ALL: [Advancement; 19] = [
+static ALL: [Advancement; 31] = [
     Advancement { id: "timber", icon: Item::named("oak_log"), group: 0, rule: Rule::Break(&LOGS) },
     Advancement { id: "workbench", icon: Item::named("crafting_table"), group: 0, rule: Rule::Have(&CRAFTING_TABLES) },
-    Advancement { id: "first_pickaxe", icon: Item::named("wood_pickaxe"), group: 0, rule: Rule::Have(&PICKAXES) },
+    Advancement { id: "first_pickaxe", icon: Item::named("pickaxe"), group: 0, rule: Rule::Have(&PICKAXES) },
     Advancement { id: "stone_age", icon: Item::named("cobblestone"), group: 0, rule: Rule::Have(&COBBLESTONE) },
-    Advancement { id: "armed", icon: Item::named("stone_sword"), group: 0, rule: Rule::Have(&SWORDS) },
+    Advancement { id: "armed", icon: Item::named("sword"), group: 0, rule: Rule::Have(&SWORDS) },
     Advancement { id: "furnace", icon: Item::named("furnace"), group: 0, rule: Rule::Have(&FURNACES) },
     Advancement { id: "light", icon: Item::named("torch"), group: 0, rule: Rule::Place(&TORCHES) },
     Advancement { id: "iron", icon: Item::named("iron_ingot"), group: 1, rule: Rule::Have(&IRON) },
     Advancement { id: "gold", icon: Item::named("gold_ingot"), group: 1, rule: Rule::Have(&GOLD) },
-    Advancement { id: "suit_up", icon: Item::named("iron_chestplate"), group: 1, rule: Rule::Wear(1) },
-    Advancement { id: "full_armor", icon: Item::named("diamond_chestplate"), group: 1, rule: Rule::Wear(4) },
+    Advancement { id: "suit_up", icon: Item::named("chestplate_mail"), group: 1, rule: Rule::Wear(1) },
+    Advancement { id: "full_armor", icon: Item::named("chestplate_gem"), group: 1, rule: Rule::Wear(4) },
     Advancement { id: "diamonds", icon: Item::named("diamond"), group: 1, rule: Rule::Have(&DIAMONDS) },
     Advancement { id: "baker", icon: Item::named("bread"), group: 2, rule: Rule::Have(&BREAD) },
     Advancement { id: "hunter", icon: Item::named("porkchop"), group: 2, rule: Rule::Kill(&LIVESTOCK) },
@@ -81,19 +95,37 @@ static ALL: [Advancement; 19] = [
     Advancement { id: "hot_stuff", icon: Item::named("lava_bucket"), group: 1, rule: Rule::Have(&LAVA_BUCKETS) },
     Advancement { id: "deep", icon: Item::named("diamond_ore"), group: 3, rule: Rule::Below(0) },
     Advancement { id: "summit", icon: Item::named("snow"), group: 3, rule: Rule::Above(180) },
+    // Surviving (Research round 4, H2): through the first night and into the loop.
+    Advancement { id: "hearth", icon: Item::named("campfire"), group: 4, rule: Rule::Place(&CAMPFIRES) },
+    Advancement { id: "spun", icon: Item::named("string"), group: 4, rule: Rule::Have(&STRING) },
+    Advancement { id: "tailor", icon: Item::named("hide_coat"), group: 4, rule: Rule::Craft(&CLOTHES) },
+    Advancement { id: "rested", icon: Item::named("bed"), group: 4, rule: Rule::Effect(vitals::effects::Effect::Rested) },
+    Advancement { id: "hot_meal", icon: Item::named("cooked_porkchop"), group: 4, rule: Rule::EatHot },
+    Advancement { id: "stew", icon: Item::named("stew"), group: 4, rule: Rule::Have(&STEWS) },
+    Advancement { id: "preserved", icon: Item::named("dried_meat"), group: 4, rule: Rule::Have(&PRESERVED) },
+    Advancement { id: "tame", icon: Item::named("bone"), group: 4, rule: Rule::Milestone(base_api::milestones::TAME) },
+    // A blood moon seen through without dying (sky events, `events.rs`).
+    Advancement { id: "red_night", icon: Item::named("campfire"), group: 4, rule: Rule::Milestone(base_api::milestones::RED_NIGHT) },
+    // A fallen star's iron in hand (sky events, `meteors.rs`).
+    Advancement { id: "starfall", icon: Item::named("meteoric_iron"), group: 3, rule: Rule::Have(&METEORIC_IRON) },
+    // Out under the sky on a shower's peak and an aurora storm (sky events, `events.rs`).
+    Advancement { id: "wish_upon", icon: Item::named("meteorite"), group: 3, rule: Rule::Milestone(base_api::milestones::WISH_UPON) },
+    Advancement { id: "sky_on_fire", icon: Item::named("snow"), group: 3, rule: Rule::Milestone(base_api::milestones::SKY_ON_FIRE) },
 ];
 
 /// Server to the player who made it: the index into `ALL`.
 static MADE: Channel<u32> = Channel::named("advancement_made");
 static CHIME: Sound = Sound::named("ui.advancement");
-static SCREEN: Screen = Screen::named("advancements");
+pub use base_api::menus::ADVANCEMENTS as SCREEN;
 static OPEN: Key = Key::named("advancements");
 
 const TOAST_SECS: f32 = 5.0;
 const SLIDE_SECS: f32 = 0.35;
-/// The toast's box (`gui/advancement_toast.png`) in GUI pixels, and its gap to the window's edge.
+/// The toast's box (`gui/advancement_toast.png`) in GUI pixels, and its gap to the window's right edge.
 const TOAST_W: f32 = 160.0;
 const TOAST_MARGIN: f32 = 4.0;
+/// Its top, under the clock and position in the top right (`hud.rs`).
+const TOAST_TOP: f32 = 40.0;
 /// Top of the icon in the box, centered in its slot (y 7 to 27).
 const ICON_Y: f32 = 9.0;
 
@@ -102,36 +134,41 @@ pub fn register(r: &mut Registry) {
     r.entity_component(
         &ADVANCEMENTS,
         Advancements { done: 0 },
-        component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP,
+        component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
-    r.attach(&PLAYER, &ADVANCEMENTS);
+    r.edit(&PLAYER).attach(&ADVANCEMENTS);
     r.sound(&CHIME)
         .files(&["random/advancement"])
         .category(&sound_categories::UI);
 
     r.world_tick(check_players);
-    r.on(&BLOCK_BROKEN, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
             grant_where(&w, c.player, |rule| matches!(rule, Rule::Break(t) if t.on_block(c.state)));
         }
     });
-    r.on(&BLOCK_PLACED, |b| {
+    r.on_event(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
-            grant_where(&w, c.player, |rule| matches!(rule, Rule::Place(t) if t.on_block(c.state)));
+            placed(&w, c.player, c.state);
         }
     });
-    r.on(&ENTITY_DIED, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
-            grant_where(&w, d.killer, |rule| matches!(rule, Rule::Kill(t) if t.on_entity(d.kind)));
+            grant_where(&w, d.source, |rule| matches!(rule, Rule::Kill(t) if t.on_entity(d.kind)));
         }
     });
-    r.on(&ITEM_USED, |b| {
+    r.on_event(&actions::USE_ITEM, |b| {
         let w = b.world();
         for u in b.iter() {
-            grant_where(&w, u.player, |rule| matches!(rule, Rule::Eat(t) if t.on_item(u.stack.item)));
+            let hot = base_api::food_age(&u.stack, w.day_time()).1;
+            grant_where(&w, u.entity, |rule| match rule {
+                Rule::Eat(t) => t.on_item(u.stack.item),
+                Rule::EatHot => hot,
+                _ => false,
+            });
         }
     });
 
@@ -154,11 +191,11 @@ pub fn register(r: &mut Registry) {
 fn check_players(w: &World) {
     for id in w.players() {
         let Some(st) = w.entity(id) else { continue };
-        if st.age % 20 != 0 || w.creative(id) {
+        if st.age % 20 != 0 || w.outside_survival(id) {
             continue;
         }
         let inv = w.inventory(id);
-        let items: Vec<u32> = (0..inv.size())
+        let items: Vec<u32> = (0..inv.len())
             .map(|i| inv.get(i))
             .filter(|s| !s.is_empty())
             .map(|s| s.item)
@@ -168,8 +205,12 @@ fn check_players(w: &World) {
                 .filter(|&i| ARMOR.on_item(g.get(i).item).is_some())
                 .count() as u32
         });
-        let y = st.pos[1];
+        let y = st.pos.y;
+        let effects = w.component(id, &base_api::VITALS).map_or(0, |v| v.effects);
+        let milestones = w.component(id, &base_api::MILESTONES).unwrap_or(0);
         grant_where(w, id, |rule| match *rule {
+            Rule::Effect(e) => effects & (1 << e.index()) != 0,
+            Rule::Milestone(m) => milestones & m != 0,
             Rule::Have(tag) => items.iter().any(|&i| tag.on_item(i)),
             Rule::Wear(n) => worn >= n,
             Rule::Below(min) => y < min as f64,
@@ -179,10 +220,15 @@ fn check_players(w: &World) {
     }
 }
 
+/// A player took `item` from a crafting grid (`player.rs`).
+pub fn crafted(w: &World, player: u64, item: u32) {
+    grant_where(w, player, |rule| matches!(rule, Rule::Craft(t) if t.on_item(item)));
+}
+
 /// Grants every advancement whose rule `met` says so to `player`, if it is a player in survival
 /// that doesn't have it yet, and tells their client.
 fn grant_where(w: &World, player: u64, met: impl Fn(&Rule) -> bool) {
-    if player == 0 || w.creative(player) {
+    if player == 0 || w.outside_survival(player) {
         return;
     }
     let Some(a) = w.component_mut(player, &ADVANCEMENTS) else { return };
@@ -191,6 +237,14 @@ fn grant_where(w: &World, player: u64, met: impl Fn(&Rule) -> bool) {
         if a.done & bit == 0 && met(&adv.rule) {
             a.done |= bit;
             w.send(player, &MADE, &(i as u32));
+            // chiacraft: the world signs it for the player, a credential that outlives the world.
+            let arg = format!(
+                "{player}\tbase:{id}\tadvancement.base.{id}\tadvancement.base.{id}.desc\t{icon}",
+                id = adv.id,
+                icon = adv.icon.name()
+            );
+            crate::bridge("achievement", &arg);
+            base_api::give_xp(w, player, vitals::levels::xp::ADVANCEMENT);
         }
     }
 }
@@ -212,6 +266,13 @@ fn client(r: &mut Registry) {
             toasts.pop_front();
             return;
         };
+        // Never over a window, as the level up's banner (Tester's scale 6 run: "A Friend" covered
+        // the animal screen's top right and its close button, opened as the animal was tamed): it
+        // waits while a screen is open, and starts over, chime and all, once it closes.
+        if !c.screen().is_empty() {
+            *shown = None;
+            return;
+        }
         let start = *shown.get_or_insert_with(|| {
             c.play_sound(&CHIME, None, 1.0);
             Instant::now()
@@ -232,7 +293,7 @@ fn client(r: &mut Registry) {
         let (gw, gh) = (st.window[0] as f32 / scale, st.window[1] as f32 / scale);
         let left = gw - (TOAST_W + TOAST_MARGIN) * ease;
         let text = |x: f32, y: f32, key: &str, args: &[Arg], color: u32, size: f32| {
-            c.screen_text((left + x) / gw, (TOAST_MARGIN + y) / gh, key, args, color, size)
+            c.draw_screen_text((left + x) / gw, (TOAST_TOP + y) / gh, key, args, color, size)
         };
         text(TOAST_W / 2.0, 0.0, "advancements.base.toast_box", &[], 0xffffffff, 1.0);
         // An icon in text is as tall as a line: twice the size fills the slot.
@@ -245,56 +306,69 @@ fn client(r: &mut Registry) {
 
     // Every group a chain of tiles, gold framed once made, with the details in their tooltips.
     // Built when the screen opens, from what the player has made by then.
-    r.screen(&SCREEN, |ui| {
-        let done = ui.client().component(&ADVANCEMENTS).map_or(0, |a| a.done);
-        ui.panel("panel", S::col().pad(8.0).gap(6.0), |ui| {
-            ui.row(S::row().gap(8.0), |ui| {
-                ui.text_styled(S::col().class("title").scale(1.5).no_wrap(), "advancements.base.title", &[]);
-                ui.spacer();
-                ui.text_bind_styled(S::col().class("dim").no_wrap(), |v, out| {
-                    let done = v
-                        .component(&ADVANCEMENTS)
-                        .map_or(0, |a| a.done.count_ones());
-                    out.set("advancements.base.progress", &[Arg::Int(done as i64), Arg::Int(ALL.len() as i64)]);
-                });
-            });
-            ui.panel("well", S::col().pad(6.0).gap(6.0), |ui| {
-                for (g, group) in GROUPS.iter().enumerate() {
-                    ui.row(S::row(), |ui| {
-                        ui.text_styled(S::col().w(90.0).no_wrap(), &format!("advancements.base.group.{group}"), &[]);
-                        for (n, (i, adv)) in ALL
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, a)| a.group == g)
-                            .enumerate()
-                        {
-                            let made = done & (1 << i) != 0;
-                            if n > 0 {
-                                ui.image(if made { "base:gui/advancement_line_done" } else { "base:gui/advancement_line" }, 6.0, 2.0);
-                            }
-                            let (title, desc) = (format!("advancement.base.{}", adv.id), format!("advancement.base.{}.desc", adv.id));
-                            let status = if made { "advancements.base.done" } else { "advancements.base.locked" };
-                            let tile = S::row()
-                                .size(26.0, 26.0)
-                                .center()
-                                .tooltip_args("advancements.base.tip", &[Arg::Key(&title), Arg::Key(&desc), Arg::Key(status)]);
-                            ui.panel(if made { "advancement_tile_done" } else { "advancement_tile" }, tile, |ui| {
-                                ui.item(adv.icon.id(), 1, S::default());
-                            });
-                        }
+    r.menu(&SCREEN).screen(|ui| {
+        let done = ui.view().component(&ADVANCEMENTS).map_or(0, |a| a.done);
+        let tabs: [crate::window::Tab; 1] = [("window.base.tab.stats", |c| {
+            c.client().menu_open(&crate::levels::SCREEN);
+        })];
+        crate::window::family_window(
+            ui,
+            S::column().pad(crate::window::WINDOW_PAD).gap(6.0),
+            Some("advancements.base.title"),
+            &tabs,
+            |ui| {
+                ui.row(S::row().gap(8.0), |ui| {
+                    ui.spacer();
+                    ui.text_bind_styled(S::column().class("dim").no_wrap(), |v, out| {
+                        let done = v
+                            .component(&ADVANCEMENTS)
+                            .map_or(0, |a| a.done.count_ones());
+                        out.set("advancements.base.progress", &[Arg::Int(done as i64), Arg::Int(ALL.len() as i64)]);
                     });
-                }
-            });
-        });
+                });
+                ui.panel("well", S::column().pad(6.0).gap(6.0), |ui| {
+                    for (g, group) in GROUPS.iter().enumerate() {
+                        ui.row(S::row(), |ui| {
+                            ui.text_styled(S::column().w(90.0).no_wrap(), &format!("advancements.base.group.{group}"), &[]);
+                            for (n, (i, adv)) in ALL
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, a)| a.group == g)
+                                .enumerate()
+                            {
+                                let made = done & (1 << i) != 0;
+                                if n > 0 {
+                                    ui.image(if made { "base:gui/advancement_line_done" } else { "base:gui/advancement_line" }, 6.0, 2.0);
+                                }
+                                let (title, desc) = (format!("advancement.base.{}", adv.id), format!("advancement.base.{}.desc", adv.id));
+                                let status = if made { "advancements.base.done" } else { "advancements.base.locked" };
+                                let tile = S::row()
+                                    .size(26.0, 26.0)
+                                    .center()
+                                    .tooltip_args("advancements.base.tip", &[Arg::Key(&title), Arg::Key(&desc), Arg::Key(status)]);
+                                ui.panel(if made { "advancement_tile_done" } else { "advancement_tile" }, tile, |ui| {
+                                    ui.item(adv.icon.id(), 1, S::default());
+                                });
+                            }
+                        });
+                    }
+                });
+            },
+        );
     });
-    r.key(&OPEN, "L").on_press(|c| {
-        c.open_screen(&SCREEN);
+    r.key(&OPEN, "L").on_client(|c| {
+        c.menu_open(&SCREEN);
     });
     // The pause menu stretches its mods' parts across the screen; sized and centered like its own
     // buttons (200 wide) instead.
     r.screen_part(&screens::PAUSE, "buttons", 0, |ui| {
-        ui.button("advancements.base.button", S::col().min_w(200.0).self_align(abi::ui_align::CENTER), |c| {
-            c.client().open_screen(&SCREEN);
+        ui.button("advancements.base.button", S::column().min_w(200.0).self_align(abi::ui_align::CENTER), |c| {
+            c.client().menu_open(&SCREEN);
         });
     });
+}
+
+/// `player` made a block be `state` where it stands (placed, or a fire lit by a drill: `firebed.rs`).
+pub fn placed(w: &World, player: u64, state: u32) {
+    grant_where(w, player, |rule| matches!(rule, Rule::Place(t) if t.on_block(state)));
 }

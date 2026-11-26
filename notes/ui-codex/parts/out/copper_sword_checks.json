@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a copper sword: a straight blade made of cast bright orange copper with a peach highlight and a soft sheen, a cross-guard, on a short grip wrapped in red-brown leather with a gold cross-guard and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.44,
+   "outline": 0.52,
+   "red_line": 0.05,
+   "fill": 0.23,
+   "passed": true
+  }
+ ]
+}

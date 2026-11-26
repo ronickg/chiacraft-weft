@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a ornate lemon-gold plate with orange-brown shadows and red cloth chestplate, front view: a breastplate with rounded shoulder plates, a collar at the neck, a brown leather belt at the waist, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.485,
+   "outline": 0.6,
+   "red_line": 0.04,
+   "fill": 0.61,
+   "passed": true
+  }
+ ]
+}

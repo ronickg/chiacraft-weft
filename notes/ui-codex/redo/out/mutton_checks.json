@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "raw mutton: a red-pink leg cut with cream fat and a short bone end, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.524,
+   "outline": 0.8,
+   "red_line": 0.0,
+   "fill": 0.35,
+   "passed": true
+  }
+ ]
+}

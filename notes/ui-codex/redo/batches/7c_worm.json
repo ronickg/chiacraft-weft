@@ -1,0 +1,10 @@
+[
+ {
+  "kind": "item",
+  "name": "earthworm",
+  "what": "an earthworm: a pink-brown segmented worm curled in an S shape, faint ring segments and a slightly paler band, plump enough to read at 1x, drawn small: its longest side only about 20 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": true,
+  "pale": true,
+  "mod": "base"
+ }
+]

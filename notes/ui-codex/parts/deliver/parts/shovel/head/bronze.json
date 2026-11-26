@@ -1,0 +1,15 @@
+{
+ "kind": "base:shovel",
+ "layer": "head",
+ "material": "bronze",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 11,
+ "anchor": [
+  17.7,
+  14.0
+ ]
+}

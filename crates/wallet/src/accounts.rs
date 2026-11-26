@@ -102,12 +102,13 @@ pub struct StoreChoice {
     pub file_dir: PathBuf,
 }
 impl StoreChoice {
-    /// For a home folder: `HORIZON_WALLET_STORE` (`os`, `file`, `memory`) when set; else the OS
+    /// For a home folder: `CHIACRAFT_WALLET_STORE` (`os`, `file`, `memory`; Horizon's
+    /// `HORIZON_WALLET_STORE` is read too) when set; else the OS
     /// keystore for the platform's default home, and the file store for a home that was given
     /// explicitly (`home_given`: checks run in `mktemp -d` homes and must never reach the real
     /// keystore).
     pub fn for_home(home: &Path, service: &str, home_given: bool) -> Self {
-        let env = std::env::var("HORIZON_WALLET_STORE")
+        let env = env_var("CHIACRAFT_WALLET_STORE", "HORIZON_WALLET_STORE")
             .ok()
             .and_then(|s| StoreKind::parse(s.trim()));
         Self {
@@ -146,9 +147,15 @@ impl SecretStore for MemoryHandle {
     }
 }
 
-/// The passphrase checks give a file store (`HORIZON_WALLET_PASSPHRASE`), else none.
+/// An environment variable by its chiacraft name, else by Horizon's (read for old setups).
+fn env_var(name: &str, old: &str) -> std::result::Result<String, std::env::VarError> {
+    std::env::var(name).or_else(|_| std::env::var(old))
+}
+
+/// The passphrase checks give a file store (`CHIACRAFT_WALLET_PASSPHRASE`, or Horizon's
+/// `HORIZON_WALLET_PASSPHRASE`), else none.
 pub fn env_passphrase() -> Passphrase {
-    Secret::new(std::env::var("HORIZON_WALLET_PASSPHRASE").unwrap_or_default())
+    Secret::new(env_var("CHIACRAFT_WALLET_PASSPHRASE", "HORIZON_WALLET_PASSPHRASE").unwrap_or_default())
 }
 
 /// An unlocked account: its facts and its identity signer, and the linked DID's owner signer.

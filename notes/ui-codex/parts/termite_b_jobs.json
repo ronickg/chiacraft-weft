@@ -1,0 +1,23 @@
+[
+ {
+  "name": "termite_cathedral_b_side",
+  "what": "the side of a cathedral termite mound, like the tall fluted spires of northern Australia: NOT wood and NOT bark: hard dried MUD, its surface clearly granular, made of tiny rounded soil pellets 1-2 px with speckles of pale sand, ochre-brown (#94683e to #c8985e) with darker earthy hollows (#5a3a22); shaped into 3 or 4 uneven vertical buttresses of DIFFERENT widths (3-9 px) that bulge, lean slightly and merge into each other, with irregular deep crevices between them, and a few small dark vent holes; tileable top to bottom too. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "termite_cathedral_b_cap",
+  "what": "the side of the upper block of a cathedral termite mound: NOT wood and NOT bark: hard dried MUD, its surface clearly granular, made of tiny rounded soil pellets 1-2 px with speckles of pale sand, ochre-brown (#94683e to #c8985e) with darker earthy hollows (#5a3a22); its bottom edge continues the lower block's uneven buttresses seamlessly, and toward the top the buttresses narrow and converge into knobbly rounded pinnacles of mud, with sky-facing knobs along the top edge (still a full opaque face). Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "termite_cathedral_b_top",
+  "what": "the top of a cathedral termite mound seen from above: NOT wood and NOT bark: hard dried MUD, its surface clearly granular, made of tiny rounded soil pellets 1-2 px with speckles of pale sand, ochre-brown (#94683e to #c8985e) with darker earthy hollows (#5a3a22); a cluster of round knobbly pinnacle tops (rounded lumps 5-10 px, lighter where the sun hits) with dark crevices between them and one small dark vent hole; seamless on all four edges. Seamless left to right, every cell filled, no border, light from the top left, flat face-on view of one block face.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
+ }
+]

@@ -1,0 +1,26 @@
+# The same in Russian (--config core:language=ru_ru).
+# Eating refused (Tester, 11-04: after two beefs an apple and bread wouldn't eat on a 4 s hold, and
+# nothing said why): a full stomach, an apple held to the mouth, the line under the crosshair. Then
+# an empty one, where it eats and nothing is said.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+chat /tk fill ~-3 ~-1 ~-3 ~3 ~-1 ~3 base:stone
+wait 2
+look 0 5
+chat /tk put me 0 base:apple 4
+chat /feed
+wait 1
+hold core:use 2
+wait 0.6
+shot ru_er_01_full.png
+wait 1.6
+shot ru_er_02_still_full.png
+wait 2.5
+chat /feed 0
+wait 1
+hold core:use 3
+wait 3.2
+shot ru_er_03_ate.png
+quit

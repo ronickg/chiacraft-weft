@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a lump of raw iron ore: a rough chunky rock of warm grey stone with tan-copper iron nuggets showing on it, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.578,
+   "outline": 0.61,
+   "red_line": 0.18,
+   "fill": 0.41,
+   "passed": true
+  }
+ ]
+}

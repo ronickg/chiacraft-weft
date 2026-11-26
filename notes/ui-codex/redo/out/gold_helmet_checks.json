@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a ornate lemon-gold plate with orange-brown shadows and red cloth helmet, front view: a rounded dome narrowing to the chin, a horizontal eye slit, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.303,
+   "outline": 0.55,
+   "red_line": 0.0,
+   "fill": 0.44,
+   "passed": true
+  }
+ ]
+}

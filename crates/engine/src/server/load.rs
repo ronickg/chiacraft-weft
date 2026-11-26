@@ -2,6 +2,12 @@
 
 use super::*;
 
+fn restore_cave_biomes(c: &Content, dim: u32, seed: u64, pos: IVec3, cube: &mut Cube) {
+    if let (Some(terrain), Some(biomes)) = (&c.dims[dim as usize].terrain, &mut cube.biomes) {
+        terrain.backfill_cave_biomes(seed, pos, biomes);
+    }
+}
+
 impl Server {
     /// Inserts generated cubes and keeps the workers fed until `deadline`, between ticks.
     pub(super) fn load_until(&mut self, deadline: Instant) {
@@ -143,7 +149,7 @@ impl Server {
         *self.shared.views.write() = self
             .players
             .iter()
-            .filter(|p| p.joined)
+            .filter(|p| p.streams_world())
             .map(|p| (p.dim, self.view(p)))
             .collect();
         let mut wanted: Vec<(i32, u32, IVec3)> = Vec::new();
@@ -151,7 +157,7 @@ impl Server {
         let edited: Vec<Vec<IVec3>> = self.dims.iter_mut().map(|d| d.take_edited()).collect();
         for pi in 0..self.players.len() {
             let p = &self.players[pi];
-            if !p.joined {
+            if !p.streams_world() {
                 continue;
             }
             let view = self.view(p);
@@ -225,6 +231,16 @@ impl Server {
             }
             self.players[pi].gen_done = missing.is_empty().then_some(key);
         }
+        // What tickets keep, after what players see.
+        for d in 0..self.dims.len() as u32 {
+            let dim = &self.dims[d as usize];
+            for pos in self.forced_missing(d, |p| dim.has(p)) {
+                if !dim.generating.contains(&pos) && !queued.contains(&(d, pos)) {
+                    wanted.push((i32::MAX, d, pos));
+                    self.wanted.insert((d, pos));
+                }
+            }
+        }
         if wanted.is_empty() {
             return;
         }
@@ -250,14 +266,23 @@ impl Server {
                 let wanted = shared.views.read().iter().any(|&(d, v)| {
                     let v = v.grown(2);
                     d == dim && v.column(pos) && pos.y >= v.center.y - v.down
-                });
+                }) || shared
+                    .forced
+                    .read()
+                    .iter()
+                    .any(|&(d, lo, hi)| d == dim && pos.cmpge(lo).all() && pos.cmple(hi).all());
                 if !wanted {
                     let _ = tx.send(Generated { dim, pos, cube: None, entities: Vec::new(), conn: 0 });
                     return;
                 }
                 let t = Instant::now();
                 let loaded = storage.and_then(|s| s.lock().load(dim, pos));
-                let (mut cube, entities) = loaded.unwrap_or_else(|| (dim::generate(content(), dim, seed, pos), Vec::new()));
+                let (mut cube, entities) = loaded
+                    .map(|(mut cube, entities)| {
+                        restore_cave_biomes(content(), dim, seed, pos, &mut cube);
+                        (cube, entities)
+                    })
+                    .unwrap_or_else(|| (dim::generate(content(), dim, seed, pos), Vec::new()));
                 dim::prepare(content(), dim, &edits, pos, &mut cube);
                 let conn = dim::see_through(content(), &cube);
                 shared
@@ -274,40 +299,58 @@ impl Server {
         if self.tick % 10 != 0 {
             return;
         }
+        self.expire_forced();
         for di in 0..self.dims.len() {
             let def = &c.dims[di];
             let views: Vec<(View, i32, i32)> = self
                 .players
                 .iter()
-                .filter(|p| p.joined && p.dim as usize == di)
+                .filter(|p| p.streams_world() && p.dim as usize == di)
                 .map(|p| {
                     let view = self.view(p);
                     let (lo, hi) = view.loaded_y(def);
                     (view.grown(3), lo - 3, hi + 3)
                 })
                 .collect();
+            let near = |pos: IVec3| {
+                views
+                    .iter()
+                    .any(|&(v, lo, hi)| v.column(pos) && pos.y >= lo && pos.y <= hi)
+            };
+            let idle = self.idle_cubes(di as u32, near);
+            let tickets: Vec<super::forced::Ticket> = self.forced[di].values().copied().collect();
             let storage = self.storage.clone();
             let d = &mut self.dims[di];
+            for r in &mut d.regions {
+                r.idle = idle.clone();
+            }
             let before: usize = d.regions.iter().map(|r| r.space.cubes.len()).sum();
             for r in &mut d.regions {
                 let removed = r.retain_cubes(c, |pos| {
                     views
                         .iter()
                         .any(|&(v, lo, hi)| v.column(pos) && pos.y >= lo && pos.y <= hi)
+                        || tickets.iter().any(|t| t.contains(pos))
                 });
-                for (pos, cube, inside) in removed {
+                let around: Vec<_> = removed
+                    .iter()
+                    .map(|x| r.around(x.0, |p| removed.iter().find(|o| o.0 == p).map(|o| o.1.clone())))
+                    .collect();
+                for ((pos, cube, inside), around) in removed.into_iter().zip(around) {
+                    let inside = r.entities.structure_tree(&inside);
                     if let Some(s) = &storage {
                         // Written in the background; loads queue behind it there.
-                        let (s, mut bytes, dim) = (s.clone(), serialize(c, r, &inside), r.id);
-                        persist::append_ticks(&mut bytes, &r.ticks_in(pos));
+                        let (s, mut bytes, dim) = (s.clone(), super::serialize_tree(c, r, &inside), r.id);
+                        persist::append_timers(&mut bytes, c, &r.take_timers(pos));
                         let scope = Scope::current().unwrap_or_else(Scope::now);
-                        crate::background().spawn(move || scope.with(|| s.lock().save(c, dim, pos, &cube, &bytes)));
+                        crate::background().spawn(move || scope.with(|| s.lock().save(c, dim, pos, &cube, &around, &bytes)));
                     }
                     for id in inside {
-                        r.entities.remove(id);
+                        r.entities.remove(id, weft_abi::removal::UNLOADED);
+                        r.bodies.remove(&id);
                     }
                 }
-                r.entities.compact();
+                r.compact(0, c);
             }
             d.dirty |= d.regions.iter().map(|r| r.space.cubes.len()).sum::<usize>() != before;
         }
@@ -321,31 +364,26 @@ impl Server {
         let views: Vec<View> = self
             .players
             .iter()
-            .filter(|p| p.joined && p.dim == dim)
+            .filter(|p| p.streams_world() && p.dim == dim)
             .map(|p| self.view(p))
             .collect();
         let def = &c.dims[dim as usize];
         let in_view = |cp: IVec3| views.iter().any(|v| v.contains_in(def, cp));
-        // Unbreakable blocks or liquids it keeps may be anywhere in terrain: such cubes are generated.
-        let keeps = fill.keep_liquids
-            || fill.keep_unbreakable
-                && c.states
-                    .iter()
-                    .any(|s| s.hardness < 0.0 && s.liquid.is_none());
+        // Blocks it keeps may be anywhere in terrain: such cubes are generated.
+        let keeps = fill.keeps_any();
         let d = &self.dims[dim as usize];
-        let reach = (fill.radius / 16.0).ceil() as i32 + 2;
-        let mid = (fill.center / 16.0).floor().as_ivec3();
+        let (lo, hi) = fill.shape.bounds();
+        let (lo, hi) = (((lo - 17.0) / 16.0).floor().as_ivec3(), ((hi + 17.0) / 16.0).floor().as_ivec3());
         let (mut whole, mut load) = (Vec::new(), Vec::new());
-        for z in -reach..=reach {
-            for y in -reach..=reach {
-                for x in -reach..=reach {
-                    let cp = mid + IVec3::new(x, y, z);
+        for z in lo.z..=hi.z {
+            for y in lo.y..=hi.y {
+                for x in lo.x..=hi.x {
+                    let cp = IVec3::new(x, y, z);
                     // The cubes it changes and the ones next to them.
-                    let (near, far) = fill.reach(cp);
-                    if near > (fill.radius + 17.0).powi(2) || d.has(cp) || !in_view(cp) {
+                    if !fill.near(cp, 17.0) || d.has(cp) || !in_view(cp) {
                         continue;
                     }
-                    if far <= fill.radius * fill.radius && !keeps {
+                    if fill.covers(cp) && !keeps {
                         whole.push(cp);
                     } else {
                         load.push(cp);
@@ -358,7 +396,12 @@ impl Server {
             .par_iter()
             .map(|&pos| {
                 let loaded = storage.as_ref().and_then(|s| s.lock().load(dim, pos));
-                let (mut cube, entities) = loaded.unwrap_or_else(|| (dim::generate(c, dim, seed, pos), Vec::new()));
+                let (mut cube, entities) = loaded
+                    .map(|(mut cube, entities)| {
+                        restore_cave_biomes(c, dim, seed, pos, &mut cube);
+                        (cube, entities)
+                    })
+                    .unwrap_or_else(|| (dim::generate(c, dim, seed, pos), Vec::new()));
                 dim::prepare(c, dim, edits, pos, &mut cube);
                 let conn = dim::see_through(c, &cube);
                 (pos, cube, entities, conn)
@@ -369,16 +412,21 @@ impl Server {
         for (pos, cube, entities, conn) in made {
             self.dims[dim as usize].insert(c, pos, cube, &entities, conn, true);
         }
+        let size = hi - lo + 1;
         log::info!(
-            "area fill r {:.0}: loaded {loaded} cubes it opens up, made {} it fills whole, {:.0} ms",
-            fill.radius,
+            "area fill of {} cubes across: loaded {loaded} cubes it opens up, made {} it fills whole, {:.0} ms",
+            size.max_element(),
             whole.len(),
             start.elapsed().as_secs_f64() * 1000.0
         );
         self.dims[dim as usize].area_fill(c, fill, &whole);
         if let Some(e) = self.dims[dim as usize].edits.last() {
             let spec = e.spec(c);
-            for p in self.players.iter_mut().filter(|p| p.joined && p.dim == dim) {
+            for p in self
+                .players
+                .iter_mut()
+                .filter(|p| p.streams_world() && p.dim == dim)
+            {
                 p.conn
                     .send(ToClient::Edits { dim, specs: vec![spec.clone()], all: false });
             }
@@ -437,13 +485,12 @@ pub(super) fn send_far(
             None => {
                 n += 1;
                 let Some((mut cube, _)) = storage.and_then(|s| s.lock().load(p.dim, pos)) else { continue };
-                dim.catch_up_edits(c, pos, &mut cube);
+                restore_cave_biomes(c, p.dim, dim.seed(), pos, &mut cube);
+                dim.catch_up_edits(pos, &mut cube);
                 Arc::new(cube)
             }
         };
-        p.conn
-            .send(ToClient::Cube { dim: p.dim, frame: 0, pos, cube, edit: false });
-        p.send_levels(dim, pos);
+        p.send_terrain_cube(dim, pos, cube);
         p.sent.insert(pos);
     }
 }

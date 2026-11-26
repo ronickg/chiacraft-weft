@@ -1,0 +1,6 @@
+# The generated originals and run logs stay local; the cut parts are in mods/base/source/ui/kit.
+*.log
+last*.txt
+sheet_*.png
+background.png
+logo.png

@@ -1,0 +1,8 @@
+{
+ "kind": "base:sword",
+ "layer": "hilt",
+ "regions": [
+  "hilt"
+ ],
+ "steps": 8
+}

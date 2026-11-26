@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "tufted saxifrage: a tight cushion of small green leaf rosettes with several short stems carrying small white five-petalled flowers, 8-12 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.259,
+   "outline": 0.97,
+   "red_line": 0.0,
+   "fill": 0.1,
+   "passed": false
+  },
+  {
+   "grid": 0.39,
+   "outline": 0.95,
+   "red_line": 0.0,
+   "fill": 0.11,
+   "passed": false
+  },
+  {
+   "grid": 0.224,
+   "outline": 1.23,
+   "red_line": 0.0,
+   "fill": 0.12,
+   "passed": false
+  }
+ ]
+}

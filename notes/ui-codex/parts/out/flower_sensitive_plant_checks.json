@@ -1,0 +1,19 @@
+{
+ "kind": "block",
+ "what": "sensitive plant: a low sprawling plant with fern-like pairs of tiny leaflets and three or four round fluffy pink puffball flowers, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game. The background everywhere around the plant must be solid flat #00FFFF cyan, filling the whole image, never black or dark",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.474,
+   "outline": 0.9,
+   "red_line": 0.0,
+   "fill": 0.14,
+   "passed": true
+  }
+ ]
+}

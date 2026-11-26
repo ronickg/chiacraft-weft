@@ -1,0 +1,33 @@
+{
+ "kind": "item",
+ "what": "a beetle seen from above: a shiny dark green-bronze shell with a highlight, six thin legs and short antennae, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.288,
+   "outline": 0.98,
+   "red_line": 0.06,
+   "fill": 0.31,
+   "passed": false
+  },
+  {
+   "grid": 0.26,
+   "outline": 0.94,
+   "red_line": 0.06,
+   "fill": 0.38,
+   "passed": false
+  },
+  {
+   "grid": 0.232,
+   "outline": 1.07,
+   "red_line": 0.05,
+   "fill": 0.32,
+   "passed": false
+  }
+ ]
+}

@@ -1,0 +1,82 @@
+[
+ {
+  "kind": "item",
+  "name": "flint_pickaxe",
+  "what": "a flint pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of crude knapped grey-brown flint with chipped faceted edges and a few lighter flake scars, lashed with tan sinew cord to a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "copper_pickaxe",
+  "what": "a copper pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of cast bright orange copper with a peach highlight and a soft sheen, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "bronze_pickaxe",
+  "what": "a bronze pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of cast warm orange-brown bronze with a soft golden sheen and a near-white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "steel_pickaxe",
+  "what": "a steel pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "flint_shovel",
+  "what": "a flint shovel: a rounded spade blade made of crude knapped grey-brown flint with chipped faceted edges and a few lighter flake scars, lashed with tan sinew cord to a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "copper_shovel",
+  "what": "a copper shovel: a rounded spade blade made of cast bright orange copper with a peach highlight and a soft sheen, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "bronze_shovel",
+  "what": "a bronze shovel: a rounded spade blade made of cast warm orange-brown bronze with a soft golden sheen and a near-white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "steel_shovel",
+  "what": "a steel shovel: a rounded spade blade made of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "flint_hoe",
+  "what": "a flint hoe: one flat blade like a garden hoe, about 10 px wide and 4-5 px tall, set at a right angle across the top of the handle and pointing down-left, made of crude knapped grey-brown flint with chipped faceted edges and a few lighter flake scars, lashed with tan sinew cord to a plain wooden handle; never a hammer head nor a thin hook, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "copper_hoe",
+  "what": "a copper hoe: one flat blade like a garden hoe, about 10 px wide and 4-5 px tall, set at a right angle across the top of the handle and pointing down-left, made of cast bright orange copper with a peach highlight and a soft sheen, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle; never a hammer head nor a thin hook, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "bronze_hoe",
+  "what": "a bronze hoe: one flat blade like a garden hoe, about 10 px wide and 4-5 px tall, set at a right angle across the top of the handle and pointing down-left, made of cast warm orange-brown bronze with a soft golden sheen and a near-white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle; never a hammer head nor a thin hook, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "steel_hoe",
+  "what": "a steel hoe: one flat blade like a garden hoe, about 10 px wide and 4-5 px tall, set at a right angle across the top of the handle and pointing down-left, made of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle; never a hammer head nor a thin hook, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "copper_axe",
+  "what": "a copper axe: a broad wedge-shaped blade made of cast bright orange copper with a peach highlight and a soft sheen, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "steel_axe",
+  "what": "a steel axe: a broad wedge-shaped blade made of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "copper_sword",
+  "what": "a copper sword: a straight blade made of cast bright orange copper with a peach highlight and a soft sheen, a cross-guard, on a short grip wrapped in red-brown leather with a gold cross-guard and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ },
+ {
+  "kind": "item",
+  "name": "steel_sword",
+  "what": "a steel sword: a straight blade made of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight, a cross-guard, on a short grip wrapped in red-brown leather with a gold cross-guard and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner"
+ }
+]

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a head of sorghum: a dense cluster of round red-brown grains on a stalk, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.319,
+   "outline": 0.87,
+   "red_line": 0.0,
+   "fill": 0.3,
+   "passed": true
+  }
+ ]
+}

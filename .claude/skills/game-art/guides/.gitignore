@@ -1,0 +1,12 @@
+# Reference sheets cut from another texture pack (Dokucraft Light and the like): attached after our
+# own key since Ronald's guides 2 (11-05), with "Make it yours", but never committed. art.py reads
+# the archived set (~/Coding/chiacraft-archive/references/style-guides/) when a checkout lacks them.
+1 Items/Item Prompt References/
+2 Blocks/Block Prompt References/
+3 Model Blocks/Model Block Prompt References/
+4 Animals/Animal Prompt References/
+5 Monsters and Characters/Monster Prompt References/
+7 Effects/Effect Prompt References/
+8 Sky/Sky Prompt References/
+# the pack's own UI pieces (Ronald's UI sheets beside it are his and are committed)
+6 UI/UI Prompt References/01 Reference UI pieces.png

@@ -9,6 +9,7 @@ use glam::{DVec3, IVec3};
 use rustc_hash::FxHashMap;
 
 use crate::content::Content;
+use crate::physics::{self, Aabb, Dims};
 
 /// Where an entity is walking to.
 pub struct Nav {
@@ -46,35 +47,79 @@ thread_local! {
     /// The search's map and queue, kept between searches (thousands of mobs walk about).
     static SCRATCH: std::cell::RefCell<Scratch> = std::cell::RefCell::new((FxHashMap::default(), BinaryHeap::new()));
 }
-const MAX_DROP: i32 = 3;
 
-/// Cells a body `height` blocks tall can stand in, from the feet cell `from` towards `to`: the
-/// whole way, or as far as it gets (the reachable cell closest to the target) when `to` is out
-/// of reach or more than `MAX_NODES` cells away.
-pub fn find(c: &Content, block: &impl Fn(IVec3) -> Option<u32>, from: IVec3, to: IVec3, height: i32) -> Vec<IVec3> {
-    // Judged by the collision boxes walking bumps into, like the step itself.
-    let top = |s: u32| crate::physics::collision_top(c, s);
-    let open = |p: IVec3| {
-        block(p).is_some_and(|s| {
-            let st = &c.states[s as usize];
-            top(s).is_none()
-                && st
-                    .liquid
-                    .is_none_or(|l| c.liquids[l as usize].temperature < crate::server::liquid::BURNING)
-        })
-    };
-    let room = |p: IVec3| (0..height).all(|k| open(p + IVec3::Y * k));
+// Center even-sized footprints between cells so they fit even-width passages.
+/// The tallest floor stood on inside its own cell (`find`): under a half slab, whose top a body
+/// stands on from the cell above.
+const THIN: f64 = 7.0 / 16.0;
+
+fn offset(dims: Dims) -> DVec3 {
+    let half = (dims.half_width * 2.0).ceil() * 0.5;
+    DVec3::new(half, 0.0, half)
+}
+
+/// Positions a body can stand in, from `from` towards `to`: the whole way, or as far as
+/// it gets when the target is out of reach or more than `MAX_NODES` nodes away.
+/// `drop`: the most blocks it goes down at once (what it falls without harm).
+pub fn find(c: &Content, block: &impl physics::Cells, from: DVec3, to: DVec3, dims: Dims, drop: i32) -> Vec<IVec3> {
+    let offset = offset(dims);
+    let cell = |p: DVec3| (p - offset + DVec3::new(0.5, 0.0, 0.5)).floor().as_ivec3();
+    let target = to;
+    let (from, to) = (cell(from), cell(to));
+    let area = |p: IVec3| Aabb::around(p.as_dvec3() + offset, dims.half_width, dims.height);
     let burns = |s: u32| {
         c.states[s as usize]
             .liquid
-            .is_some_and(|l| c.liquids[l as usize].temperature >= 1000)
+            .is_some_and(|l| c.liquids[l as usize].burns())
+    };
+    // A floor thinner than `THIN` in the cell itself (a carpet, snow layers, a dried mud crust)
+    // is stood on in that cell: its room is looked for above it, and it is the cell's ground.
+    // Without it a cell over one had neither room (the floor in it) nor ground (the floor too far
+    // under the cell above), so mobs could not walk on snow or a dried pond's bed at all.
+    let thin = |area: Aabb| physics::collides(c, block, area) && !physics::collides(c, block, area.shifted(DVec3::Y * THIN));
+    let room = |p: IVec3| {
+        let area = area(p);
+        if physics::collides(c, block, area) && physics::collides(c, block, area.shifted(DVec3::Y * THIN)) {
+            return false;
+        }
+        let lo = area.min.floor().as_ivec3();
+        let hi = area.max.ceil().as_ivec3() - IVec3::ONE;
+        for y in lo.y..=hi.y {
+            for z in lo.z..=hi.z {
+                for x in lo.x..=hi.x {
+                    let p = IVec3::new(x, y, z);
+                    if block.main(p).is_none_or(burns) || block.layout(p).extras.iter().any(|&s| burns(s)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
     };
     let ground = |p: IVec3| {
-        block(p - IVec3::Y).is_some_and(|s| !burns(s) && (c.states[s as usize].liquid.is_some() || top(s).is_some_and(|t| t >= 0.5)))
+        let area = area(p);
+        let lo = area.min.floor().as_ivec3();
+        let hi = area.max.ceil().as_ivec3() - IVec3::ONE;
+        let floor = Aabb { min: area.min - DVec3::Y * 0.50001, max: DVec3::new(area.max.x, area.min.y, area.max.z) };
+        let mut supported = physics::collides(c, block, floor) || thin(area);
+        for z in lo.z..=hi.z {
+            for x in lo.x..=hi.x {
+                let below = IVec3::new(x, p.y - 1, z);
+                if let Some(main) = block.main(below) {
+                    for part in block.layout(below).parts(main) {
+                        if burns(part.state) {
+                            return false;
+                        }
+                        supported |= c.states[part.state as usize].liquid.is_some();
+                    }
+                }
+            }
+        }
+        supported
     };
     let standable = |p: IVec3| room(p) && ground(p);
-    let wet = |p: IVec3| block(p).is_some_and(|s| c.states[s as usize].liquid.is_some());
-    let h = |p: IVec3| (p - to).as_vec3().length();
+    let wet = |p: IVec3| block.liquid(c, p).is_some();
+    let h = |p: IVec3| (p.as_dvec3() + offset - target).length() as f32;
 
     let (mut came, mut queue) = SCRATCH.with_borrow_mut(std::mem::take);
     came.clear();
@@ -90,7 +135,7 @@ pub fn find(c: &Content, block: &impl Fn(IVec3) -> Option<u32>, from: IVec3, to:
         if d < best.0 {
             best = (d, p);
         }
-        if p == to || (d < 1.5 && (p.y - to.y).abs() <= 1) {
+        if p == to || (d < 1.0 && (p.y - to.y).abs() <= 1) {
             best = (0.0, p);
             break;
         }
@@ -112,14 +157,14 @@ pub fn find(c: &Content, block: &impl Fn(IVec3) -> Option<u32>, from: IVec3, to:
             } else if !room(q) {
                 // A step up: jump, with room above the head first.
                 let up = q + IVec3::Y;
-                if standable(up) && open(p + IVec3::Y * height) {
+                if standable(up) && room(p + IVec3::Y) {
                     next = Some((up, base + 1.0));
                 }
             } else {
                 // Open but nothing to stand on: drop down to the first ground.
-                for k in 1..=MAX_DROP {
+                for k in 1..=drop {
                     let down = q - IVec3::Y * k;
-                    if !open(down) {
+                    if !room(down) {
                         break;
                     }
                     if ground(down) {
@@ -146,14 +191,86 @@ pub fn find(c: &Content, block: &impl Fn(IVec3) -> Option<u32>, from: IVec3, to:
     }
     path.reverse();
     SCRATCH.with_borrow_mut(|s| *s = (came, queue));
-    path
+    // String-pulled: a cell a later one on the same level is seen straight from is left out, so
+    // the walk goes straight across open ground instead of zigzagging along the diagonals from
+    // cell centre to cell centre. A straight leg keeps the path's rules: every cell its body
+    // crosses is one it stands in, dry if the cells it skips are.
+    // Each cell looked up once per path: the legs tried from one cell overlap, and a leg samples
+    // a cell several times (crowd bench: string-pulling without it cost 4-7 % server time).
+    let seen = std::cell::RefCell::new(FxHashMap::<IVec3, bool>::default());
+    let open = |q: IVec3| {
+        *seen
+            .borrow_mut()
+            .entry(q)
+            .or_insert_with(|| standable(q) && !wet(q))
+    };
+    let clear = |a: IVec3, b: IVec3| {
+        let y = a.y;
+        let (a, b) = (a.as_dvec3() + offset, b.as_dvec3() + offset);
+        let along = (b - a).with_y(0.0);
+        let len = along.length();
+        let side = DVec3::new(-along.z, 0.0, along.x) / len.max(1e-9) * (dims.half_width - 0.05).max(0.0);
+        let steps = (len * 3.0).ceil() as i32;
+        (0..=steps).all(|k| {
+            let at = a + along * (k as f64 / steps.max(1) as f64);
+            [at - side, at, at + side].into_iter().all(|q| {
+                let q = cell(q);
+                q.y == y && open(q)
+            })
+        })
+    };
+    smooth(path, clear)
+}
+
+/// Cells of `path` left out where `clear` says the walk from the last kept cell to a later one
+/// on its level goes straight (`find`): at most `SMOOTH_AHEAD` cells ahead, the jumps and drops
+/// kept.
+fn smooth(path: Vec<IVec3>, clear: impl Fn(IVec3, IVec3) -> bool) -> Vec<IVec3> {
+    if path.len() < 3 {
+        return path;
+    }
+    let mut out = vec![path[0]];
+    let mut i = 0;
+    while i + 1 < path.len() {
+        let mut j = i + 1;
+        for k in i + 2..path.len().min(i + 1 + SMOOTH_AHEAD) {
+            if path[i + 1..=k].iter().any(|c| c.y != path[i].y) || !clear(path[i], path[k]) {
+                break;
+            }
+            j = k;
+        }
+        out.push(path[j]);
+        i = j;
+    }
+    out
+}
+
+/// The most cells a string-pulled leg skips (`smooth`): far enough to straighten a walk, near
+/// enough that each check is a few cells.
+const SMOOTH_AHEAD: usize = 8;
+
+#[cfg(test)]
+mod smoothing {
+    use super::*;
+
+    /// On open ground a zigzag of diagonals and straights becomes one straight leg; a step up
+    /// stays where it is.
+    #[test]
+    fn straightens_open_ground_and_keeps_steps() {
+        let p = |x, y, z| IVec3::new(x, y, z);
+        let path = vec![p(0, 0, 0), p(1, 0, 1), p(2, 0, 1), p(3, 0, 2), p(4, 0, 2), p(5, 1, 3), p(6, 1, 3)];
+        let out = smooth(path, |_, _| true);
+        assert_eq!(out, vec![p(0, 0, 0), p(4, 0, 2), p(5, 1, 3), p(6, 1, 3)]);
+        let walled = smooth(vec![p(0, 0, 0), p(1, 0, 0), p(2, 0, 0)], |_, _| false);
+        assert_eq!(walled.len(), 3);
+    }
 }
 
 /// Steering for this tick: walk direction, jump, and whether the target is reached.
-pub fn steer(nav: &mut Nav, pos: DVec3, blocked: bool) -> Option<([f32; 2], bool)> {
+pub fn steer(nav: &mut Nav, pos: DVec3, dims: Dims, blocked: bool) -> Option<([f32; 2], bool)> {
     let feet = pos.floor().as_ivec3();
     while let Some(&w) = nav.path.get(nav.next) {
-        let center = w.as_dvec3() + DVec3::new(0.5, 0.0, 0.5);
+        let center = w.as_dvec3() + offset(dims);
         let flat = (center - pos).with_y(0.0);
         if flat.length() < 0.35 && (w.y - feet.y).abs() <= 1 {
             nav.next += 1;

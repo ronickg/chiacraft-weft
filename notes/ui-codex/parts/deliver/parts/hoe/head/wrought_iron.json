@@ -1,0 +1,15 @@
+{
+ "kind": "base:hoe",
+ "layer": "head",
+ "material": "wrought_iron",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 14,
+ "anchor": [
+  15.2,
+  17.2
+ ]
+}

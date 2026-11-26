@@ -1,0 +1,11 @@
+{
+ "kind": "base:shovel",
+ "layer": "haft",
+ "style": "plain",
+ "override": true,
+ "socket": [
+  17.0,
+  14.3
+ ],
+ "note": "moved so this socket meets the head's anchor"
+}

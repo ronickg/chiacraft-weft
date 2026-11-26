@@ -1,0 +1,266 @@
+<title>Chiacraft Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<style>
+/* Layout: the game's own panel look, a board of pieces (cards) each listing its parts by status. */
+:root {
+  --bg: #f4ecdd;
+  --panel: #fffaf0;
+  --well: #efe3cd;
+  --line: #d9c4a2;
+  --fg: #2a1f17;
+  --dim: #6f5a45;
+  --copper: #a3561c;
+  --amber: #9a6400;
+  --built: #3f7f2a;
+  --partial: #a46a00;
+  --missing: #b5472e;
+  --later: #8a7b6a;
+  --display: "Pixelify Sans", "Courier New", monospace;
+  --body: "Alegreya Sans", "Gill Sans", "Trebuchet MS", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17120e; --panel: #241c16; --well: #1d1712; --line: #4a3a2c; --fg: #f5e4bc; --dim: #b9a68a;
+    --copper: #d98d4a; --amber: #ffbe45; --built: #8fd16a; --partial: #ffbe45; --missing: #e8907a; --later: #9a8b7a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17120e; --panel: #241c16; --well: #1d1712; --line: #4a3a2c; --fg: #f5e4bc; --dim: #b9a68a;
+  --copper: #d98d4a; --amber: #ffbe45; --built: #8fd16a; --partial: #ffbe45; --missing: #e8907a; --later: #9a8b7a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 3rem); color: var(--copper); letter-spacing: 0.02em; }
+h2 { font-size: 1.35rem; color: var(--copper); }
+h3 { font-size: 1.15rem; }
+p { margin: 0; }
+.lead { max-width: 68ch; color: var(--fg); }
+.dim { color: var(--dim); }
+header { display: grid; gap: 14px; }
+.sum { display: grid; gap: 10px; }
+.bar { display: flex; height: 14px; border: 2px solid var(--line); background: var(--well); }
+.bar span { display: block; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.95rem; }
+.legend b { font-variant-numeric: tabular-nums; }
+.mark { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; flex: none; }
+.mark.built { color: var(--built); background: var(--built); }
+.mark.partial { color: var(--partial); background: linear-gradient(90deg, var(--partial) 50%, transparent 50%); }
+.mark.missing { color: var(--missing); }
+.mark.later { color: var(--later); border-style: dotted; }
+.fill-built { background: var(--built); } .fill-partial { background: var(--partial); }
+.fill-missing { background: var(--missing); } .fill-later { background: var(--later); }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.filters button {
+  font: 600 0.95rem var(--body); color: var(--fg); background: var(--panel); border: 2px solid var(--line);
+  padding: 6px 12px; cursor: pointer;
+}
+.filters button[aria-pressed="true"] { border-color: var(--copper); color: var(--copper); }
+.filters button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.core { display: grid; gap: 10px; }
+.core ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.core li { background: var(--panel); border: 2px solid var(--line); border-left: 6px solid var(--copper); padding: 10px 12px; min-width: 0; }
+.core li .piece { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); }
+.core li .name { font-weight: 700; display: flex; gap: 8px; align-items: center; }
+.core li p { font-size: 0.92rem; color: var(--dim); margin-top: 2px; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; align-items: start; }
+.card { background: var(--panel); border: 2px solid var(--line); display: grid; min-width: 0; }
+.card > header { padding: 14px 16px 10px; gap: 8px; border-bottom: 2px solid var(--line); }
+.card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.card .count { font: 500 0.95rem var(--display); color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.card .what { font-size: 0.95rem; color: var(--dim); }
+.card .bar { height: 10px; }
+.parts { list-style: none; margin: 0; padding: 8px 16px; display: grid; }
+.parts li { display: grid; grid-template-columns: 12px 1fr; gap: 4px 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+.parts li:last-child { border-bottom: 0; }
+.parts .mark { margin-top: 6px; }
+.parts .pname { font-weight: 500; }
+.parts .tag { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--copper); border: 1px solid var(--copper); padding: 0 5px; margin-left: 6px; vertical-align: 2px; }
+.parts .note { grid-column: 2; font-size: 0.9rem; color: var(--dim); }
+.parts .where { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.parts .where code { font-family: var(--mono); font-size: 0.74rem; color: var(--copper); overflow-wrap: anywhere; }
+.files { padding: 10px 16px 14px; background: var(--well); border-top: 2px solid var(--line); display: grid; gap: 4px; font-size: 0.8rem; }
+.files div { display: flex; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
+.files b { font: 500 0.8rem var(--display); color: var(--dim); min-width: 3.5em; }
+.files code { font-family: var(--mono); font-size: 0.78rem; overflow-wrap: anywhere; }
+.links { display: grid; gap: 12px; }
+.diagram { background: var(--panel); border: 2px solid var(--line); padding: 16px; overflow-x: auto; }
+.diagram pre { margin: 0; }
+body.todo .parts li.built { display: none; }
+body.todo .card.done { display: none; }
+body.corefilter .parts li:not(.is-core) { display: none; }
+body.corefilter .card:not(.has-core) { display: none; }
+@media (prefers-reduced-motion: no-preference) { .filters button { transition: border-color 0.15s, color 0.15s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Chiacraft Map</h1>
+    <p class="lead" id="goal"></p>
+    <div class="sum">
+      <div class="bar" id="total-bar" role="img"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="filters" role="group" aria-label="Show">
+      <button id="show-all" aria-pressed="true">Everything</button>
+      <button id="show-todo" aria-pressed="false">Still to build</button>
+      <button id="show-core" aria-pressed="false">Core next</button>
+    </div>
+  </header>
+
+  <section class="core">
+    <h2>Core next</h2>
+    <p class="dim">Missing pieces the rest leans on.</p>
+    <ul id="core"></ul>
+  </section>
+
+  <section class="links">
+    <h2>The pieces</h2>
+    <div class="board" id="board"></div>
+  </section>
+
+  <section class="links">
+    <h2>How the gameplay connects</h2>
+    <p class="dim">What reads what, in survival and the animals. The full table and the "change this, check that" list are in notes/SYSTEMS.md.</p>
+    <div class="diagram"><pre class="mermaid">
+flowchart LR
+  climate["Climates"] --> air["The air"]
+  calendar["Calendar and seasons"] --> air
+  fires["Fires, roofs, water"] --> air
+  air --> player["Player's body"]
+  air --> animal["Animal's body"]
+  air --> eggs["Eggs"]
+  food["Food table"] --> stomach["Stomach"]
+  items["Food items"] --> stomach
+  stomach --> player
+  stats["Nine stats"] --> player
+  stats --> animal
+  species["Species facts"] --> animal
+  species --> breeding["Breeding"]
+  calendar --> breeding
+  breeding --> eggs
+  effects["Effects"] --> player
+  effects --> animal
+  difficulty["Difficulty"] --> player
+  difficulty --> animal
+  player --> hud["HUD and stats screen"]
+  levels["Levels and XP"] --> hud
+  animal --> xp["XP from animals"] --> levels
+    </pre></div>
+  </section>
+
+  <section class="links">
+    <h2>The living world loop</h2>
+    <p class="dim">The loop designed in notes/ECOLOGY.md, with its numbers from real places. Every box is in the game now, in part: the loop is closed. What each part still lacks is on its card above.</p>
+    <div class="diagram"><pre class="mermaid">
+flowchart LR
+  research["Real places, plants, animals"] -.-> seasons
+  seasons["Seasons: heat"] --> rain["Rain by season"]
+  rain --> soil["Soil water"]
+  soil --> plants["Plants grow"]
+  plants --> grazers["Grazers eat"]
+  grazers --> hunters["Hunters eat"]
+  grazers --> death["Death, dung, rot"]
+  hunters --> death
+  death --> fertile["Fertile soil"]
+  fertile --> plants
+  plants --> player["Player: crops, meals"]
+  grazers --> player2["Player: meat, fur, tames"]
+  classDef missing stroke-dasharray: 5 4
+    </pre></div>
+  </section>
+
+  <p class="dim">Written from notes/overview/pieces.json by notes/overview/build.py.</p>
+</div>
+
+<script>
+const DATA = /*PIECES*/null;
+const ORDER = ["built", "partial", "missing", "later"];
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const mark = s => { const m = el("span", "mark " + s); m.title = DATA.statuses[s]; m.setAttribute("aria-label", DATA.statuses[s]); return m; };
+const count = parts => Object.fromEntries(ORDER.map(s => [s, parts.filter(p => p.status === s).length]));
+function bar(node, c, total) {
+  node.replaceChildren(...ORDER.filter(s => c[s]).map(s => { const b = el("span", "fill-" + s); b.style.width = (c[s] / total * 100) + "%"; return b; }));
+  node.setAttribute("aria-label", ORDER.map(s => `${c[s]} ${DATA.statuses[s].toLowerCase()}`).join(", "));
+}
+function files(label, list) {
+  const row = el("div"); row.append(el("b", null, label));
+  list.forEach(f => row.append(el("code", null, f)));
+  return row;
+}
+function render() {
+  document.getElementById("goal").textContent = DATA.goal;
+  const every = DATA.pieces.flatMap(p => p.parts);
+  const c = count(every);
+  bar(document.getElementById("total-bar"), c, every.length);
+  document.getElementById("legend").replaceChildren(...ORDER.map(s => {
+    const item = el("span"); item.style.display = "inline-flex"; item.style.alignItems = "center"; item.style.gap = "6px";
+    item.append(mark(s), el("span", null, DATA.statuses[s] + " "), el("b", null, String(c[s])));
+    return item;
+  }));
+  const core = document.getElementById("core");
+  DATA.pieces.forEach(piece => piece.parts.filter(p => p.core && p.status !== "built").forEach(p => {
+    const li = el("li");
+    const name = el("div", "name"); name.append(mark(p.status), el("span", null, p.name));
+    li.append(el("div", "piece", piece.name), name);
+    if (p.note) li.append(el("p", null, p.note));
+    core.append(li);
+  }));
+  const board = document.getElementById("board");
+  DATA.pieces.forEach(piece => {
+    const pc = count(piece.parts);
+    const card = el("article", "card");
+    card.id = piece.id;
+    if (pc.built === piece.parts.length) card.classList.add("done");
+    if (piece.parts.some(p => p.core && p.status !== "built")) card.classList.add("has-core");
+    const head = el("header");
+    const top = el("div", "top");
+    top.append(el("h3", null, piece.name), el("span", "count", `${pc.built}/${piece.parts.length} built`));
+    const b = el("div", "bar"); bar(b, pc, piece.parts.length);
+    head.append(top, b, el("p", "what", piece.what));
+    const ul = el("ul", "parts");
+    piece.parts.forEach(p => {
+      const li = el("li", p.status);
+      if (p.core && p.status !== "built") li.classList.add("is-core");
+      const name = el("div", "pname", p.name);
+      if (p.core && p.status !== "built") name.append(el("span", "tag", "core"));
+      li.append(mark(p.status), name);
+      const note = [p.note, p.docs && p.docs.length ? "Docs: " + p.docs.join(", ") : ""].filter(Boolean).join(" ");
+      if (note) li.append(el("div", "note", note));
+      if (p.code && p.code.length) {
+        const where = el("div", "where");
+        p.code.forEach(c => where.append(el("code", null, c.split("/").slice(-2).join("/"))));
+        where.title = p.code.join("\n");
+        li.append(where);
+      }
+      ul.append(li);
+    });
+    const f = el("div", "files");
+    f.append(files("Code", piece.code), files("Docs", piece.docs));
+    card.append(head, ul, f);
+    board.append(card);
+  });
+}
+function filter(mode) {
+  document.body.classList.toggle("todo", mode === "todo");
+  document.body.classList.toggle("corefilter", mode === "core");
+  [["show-all", "all"], ["show-todo", "todo"], ["show-core", "core"]].forEach(([id, m]) =>
+    document.getElementById(id).setAttribute("aria-pressed", String(m === mode)));
+  try { localStorage.setItem("map-filter", mode); } catch (e) {}
+}
+render();
+document.getElementById("show-all").addEventListener("click", () => filter("all"));
+document.getElementById("show-todo").addEventListener("click", () => filter("todo"));
+document.getElementById("show-core").addEventListener("click", () => filter("core"));
+try { const m = localStorage.getItem("map-filter"); if (m) filter(m); } catch (e) {}
+</script>

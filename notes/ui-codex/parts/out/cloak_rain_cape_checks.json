@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "an oilskin rain cape reaching to the waist: waxy ochre-yellow oilskin (#987838 to #b89858) with darker seams and a soft waxy sheen highlight, a short collar tied at the neck, no hood, seen from the front, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.581,
+   "outline": 0.7,
+   "red_line": 0.0,
+   "fill": 0.48,
+   "passed": true
+  }
+ ]
+}

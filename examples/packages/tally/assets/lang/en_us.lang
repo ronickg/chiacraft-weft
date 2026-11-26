@@ -1,0 +1,4 @@
+command.tally.count = You have broken {0} blocks.
+command.tally.pillar = A pillar of {0} glass blocks.
+command.tally.no_glass = This world has no base:glass.
+tally.tenth = {0} blocks broken!

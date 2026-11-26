@@ -1,0 +1,50 @@
+[
+ {
+  "kind": "item",
+  "name": "felling_wood_axe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/axe_C_felling_1.png",
+  "what": "a wood felling axe: a heavy broad head of carved warm orange-brown wood with clear grain, crude and chunky, a plain wooden handle, the head lashed on with tan cord. Same layout as the attached felling axe: the handle runs from the bottom-left corner up to near the top-right; the head sits crosswise at its top; the blade sticks out to the UPPER LEFT, flaring strongly to a wide, gently curved cutting edge PARALLEL to the handle; a solid flat poll sticks out to the lower right. Never a vertical edge. 1-2 px margin from the canvas sides"
+ },
+ {
+  "kind": "item",
+  "name": "felling_stone_axe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/axe_C_felling_1.png",
+  "what": "a stone felling axe: a heavy broad head of chunky chipped warm grey-tan stone with rough bumpy edges, no shine, a plain wooden handle, the head lashed on with tan cord. Same layout as the attached felling axe: the handle runs from the bottom-left corner up to near the top-right; the head sits crosswise at its top; the blade sticks out to the UPPER LEFT, flaring strongly to a wide, gently curved cutting edge PARALLEL to the handle; a solid flat poll sticks out to the lower right. Never a vertical edge. 1-2 px margin from the canvas sides"
+ },
+ {
+  "kind": "item",
+  "name": "felling_flint_axe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/axe_C_felling_1.png",
+  "what": "a flint felling axe: a heavy broad head of crude knapped grey-brown flint with chipped faceted edges and lighter flake scars, a plain wooden handle, the head lashed on with tan sinew cord. Same layout as the attached felling axe: the handle runs from the bottom-left corner up to near the top-right; the head sits crosswise at its top; the blade sticks out to the UPPER LEFT, flaring strongly to a wide, gently curved cutting edge PARALLEL to the handle; a solid flat poll sticks out to the lower right. Never a vertical edge. 1-2 px margin from the canvas sides"
+ },
+ {
+  "kind": "item",
+  "name": "felling_copper_axe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/axe_C_felling_1.png",
+  "what": "a copper felling axe: a heavy broad head of cast bright orange copper with a peach highlight along the edge, a gold collar where head meets handle, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same layout as the attached felling axe: the handle runs from the bottom-left corner up to near the top-right; the head sits crosswise at its top; the blade sticks out to the UPPER LEFT, flaring strongly to a wide, gently curved cutting edge PARALLEL to the handle; a solid flat poll sticks out to the lower right. Never a vertical edge. 1-2 px margin from the canvas sides"
+ },
+ {
+  "kind": "item",
+  "name": "felling_bronze_axe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/axe_C_felling_1.png",
+  "what": "a bronze felling axe: a heavy broad head of cast warm orange-brown bronze with a golden sheen and a near-white edge highlight, a gold collar where head meets handle, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same layout as the attached felling axe: the handle runs from the bottom-left corner up to near the top-right; the head sits crosswise at its top; the blade sticks out to the UPPER LEFT, flaring strongly to a wide, gently curved cutting edge PARALLEL to the handle; a solid flat poll sticks out to the lower right. Never a vertical edge. 1-2 px margin from the canvas sides"
+ },
+ {
+  "kind": "item",
+  "name": "felling_steel_axe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/axe_C_felling_1.png",
+  "what": "a steel felling axe: a heavy broad head of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight, a gold collar where head meets handle, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same layout as the attached felling axe: the handle runs from the bottom-left corner up to near the top-right; the head sits crosswise at its top; the blade sticks out to the UPPER LEFT, flaring strongly to a wide, gently curved cutting edge PARALLEL to the handle; a solid flat poll sticks out to the lower right. Never a vertical edge. 1-2 px margin from the canvas sides"
+ },
+ {
+  "kind": "item",
+  "name": "felling_gold_axe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/axe_C_felling_1.png",
+  "what": "a gold felling axe: a heavy broad head of shiny lemon-gold with orange-brown shadows and small white glints along the edge, a gold collar where head meets handle, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same layout as the attached felling axe: the handle runs from the bottom-left corner up to near the top-right; the head sits crosswise at its top; the blade sticks out to the UPPER LEFT, flaring strongly to a wide, gently curved cutting edge PARALLEL to the handle; a solid flat poll sticks out to the lower right. Never a vertical edge. 1-2 px margin from the canvas sides"
+ },
+ {
+  "kind": "item",
+  "name": "felling_diamond_axe",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/axe_C_felling_1.png",
+  "what": "a diamond felling axe: a heavy broad head of faceted cyan diamond with teal shadows, white facet tips along the edge and one small sparkle, a gold collar where head meets handle, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same layout as the attached felling axe: the handle runs from the bottom-left corner up to near the top-right; the head sits crosswise at its top; the blade sticks out to the UPPER LEFT, flaring strongly to a wide, gently curved cutting edge PARALLEL to the handle; a solid flat poll sticks out to the lower right. Never a vertical edge. 1-2 px margin from the canvas sides"
+ }
+]

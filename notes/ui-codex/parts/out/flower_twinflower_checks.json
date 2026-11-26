@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "twinflower: a low mat of small round evergreen leaves with thin upright stalks, each forked into a pair of tiny nodding pale pink bells, 8-12 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.365,
+   "outline": 1.42,
+   "red_line": 0.0,
+   "fill": 0.04,
+   "passed": false
+  },
+  {
+   "grid": 0.202,
+   "outline": 1.03,
+   "red_line": 0.0,
+   "fill": 0.12,
+   "passed": false
+  },
+  {
+   "grid": 0.339,
+   "outline": 1.31,
+   "red_line": 0.0,
+   "fill": 0.1,
+   "passed": false
+  }
+ ]
+}

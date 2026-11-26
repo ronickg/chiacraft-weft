@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a warm-silver plate with a near-white highlight, gold trim chestplate, front view: a breastplate with rounded shoulder plates, a collar at the neck, a brown leather belt at the waist, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.309,
+   "outline": 0.56,
+   "red_line": 0.09,
+   "fill": 0.57,
+   "passed": true
+  }
+ ]
+}

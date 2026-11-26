@@ -10,3 +10,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 weft_sdk.workspace = true
+# What our own mods may ask the engine beyond Weft's mod interface.
+chiacraft-bridge = { path = "../../crates/bridge" }

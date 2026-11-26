@@ -1,0 +1,14 @@
+# The HUD clock follows /season in every mode (spectators weren't refreshed): it should read
+# "Winter 8", then "Summer 3".
+loaded
+idle
+chat /tk mode spectator
+wait 2
+chat /season winter 8
+wait 3
+shot clock_spectator_winter.png
+chat /tk mode creative
+chat /season summer 3
+wait 3
+shot clock_creative_summer.png
+quit

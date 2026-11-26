@@ -1,0 +1,19 @@
+{
+ "kind": "block",
+ "what": "black-eyed Susan: two or three golden-yellow daisy heads with dark brown-black domed centres on hairy green stems, narrow leaves, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.243,
+   "outline": 0.74,
+   "red_line": 0.06,
+   "fill": 0.16,
+   "passed": true
+  }
+ ]
+}

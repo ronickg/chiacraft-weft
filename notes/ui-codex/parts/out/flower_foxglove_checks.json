@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "foxglove: one tall spire hung on one side with many purple-pink tubular bells, speckled inside, broad soft green leaves at the base, 26-30 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.277,
+   "outline": 0.95,
+   "red_line": 0.0,
+   "fill": 0.16,
+   "passed": false
+  },
+  {
+   "grid": 0.133,
+   "outline": 1.0,
+   "red_line": 0.0,
+   "fill": 1.0,
+   "passed": false
+  },
+  {
+   "grid": 0.375,
+   "outline": 0.84,
+   "red_line": 0.0,
+   "fill": 0.19,
+   "passed": true
+  }
+ ]
+}

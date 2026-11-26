@@ -1,0 +1,15 @@
+{
+ "kind": "base:shovel",
+ "layer": "head",
+ "material": "gold",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 16,
+ "anchor": [
+  19.1,
+  12.4
+ ]
+}

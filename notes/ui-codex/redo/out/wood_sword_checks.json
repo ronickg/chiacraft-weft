@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a wooden sword: a straight blade made of warm orange-brown wood with clear grain, crudely carved, lashed with cream cord, a cross-guard, on a short plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.615,
+   "outline": 0.55,
+   "red_line": 0.0,
+   "fill": 0.31,
+   "passed": true
+  }
+ ]
+}

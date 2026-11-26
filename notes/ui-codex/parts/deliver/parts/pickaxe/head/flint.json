@@ -1,0 +1,15 @@
+{
+ "kind": "base:pickaxe",
+ "layer": "head",
+ "material": "flint",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 12,
+ "anchor": [
+  12.7,
+  17.2
+ ]
+}

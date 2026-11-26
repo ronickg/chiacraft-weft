@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a cooking pot: a round black-iron cauldron pot seen from the front and slightly above, a thick rim, two small handles, a wisp of steam, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.368,
+   "outline": 0.76,
+   "red_line": 0.0,
+   "fill": 0.44,
+   "passed": true
+  }
+ ]
+}

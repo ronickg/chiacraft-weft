@@ -1,0 +1,51 @@
+# The fog from high up, and a lagoon from high up (the world playtester's round 10, 11-04): from
+# y 250 over snow in thick fog a pale flat disc floated in the middle distance (the fog walked only
+# 220 blocks along each view), and a lagoon's shallows showed in squares with a straight edge (the
+# water's depth from the blocks, known only round the camera). Also the sinkhole's look down from
+# y 120 (sinkhole-fog.txt), so the fog near the ground stays as it was. Seed 1, --view 12,
+# 1280x720, --shader-pack chiacraft, a fresh world. Spectator, absolute /tp, mobs off.
+# Yaw 0 faces -z (north), 180 +z (south); a negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /time set 7700
+chat /tp 149.5 130 -166.5
+loaded
+wait 10
+chat /air 0.8 0 0 snow
+wait 30
+chat /tp 149.5 250 -166.5
+wait 12
+look 180 -25
+wait 3
+shot far_1_snow250_s.png
+look 0 -25
+wait 2
+shot far_1b_snow250_n.png
+chat /tp 149.5 150 -166.5
+wait 8
+look 180 -25
+wait 3
+shot far_2_snow150_s.png
+chat /air 0 0
+wait 12
+chat /tp -400 150 -330
+wait 15
+look 180 -30
+wait 3
+shot far_3_islands_s.png
+look 270 -30
+wait 2
+shot far_3b_islands_e.png
+look 0 -30
+wait 2
+shot far_3c_islands_n.png
+chat /time set 8000
+chat /tp -337 120 -802
+wait 15
+look 0 -85
+wait 3
+shot far_4_sinkhole_down.png
+quit

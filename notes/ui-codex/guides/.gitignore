@@ -1,0 +1,8 @@
+# raw generations (1024-1536 px each, tens of MB) and the built page: remade by gt.py / art.py / build.py
+out/
+out2/
+more/*.png
+!more/*_px.png
+more/*.txt
+more/*.log
+index.html

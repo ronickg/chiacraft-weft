@@ -1,0 +1,75 @@
+# Deer in a pit two blocks deep get out (`mods/animals/src/stuck.rs`, `animals_core::needs`,
+# "stuck, and the way out"). Paths step up one block, so every walk to food or water from the pit
+# ends where it began; before the way out each such walk gave up and handed the turn to a rest, and
+# a deer in a pit or a cave lay down and got up on one block till it died (ai1124_graze9: 2 game
+# days in a pit 2 blocks deep, starved; graze10: in the cave under seed 1's savanna pond, 10
+# blocks down, died of thirst). Now walks that end short twice where they began send it on legs
+# out along its own level, and a pit those can't leave, a leap onto the rim (`needs::leap`). Water and
+# food start at 15 %, past `memory::DRIVEN`, so the need drives it on (at 30 % they lay down: pit3).
+# Seed 1's savanna as `herd_savanna_winter.txt`: flat grass with tall grass, a 5 x 5 pond 10
+# blocks north, and the pit 3 x 3, its floor bare dirt 2 blocks under the grass (no food in it).
+# PASS: both deer are out of the pit (y 70 in the `/animalprof where` rows, not 68) within the
+# 120 s, and drink ("anim: <id> holds drink" for each, water up from 15 %); the log has "is stuck
+# at ... looks for a way out" and "leaps out" lines for them. Report how long each took (the
+# first row it is at y 70) and any deer still at y 68 at the end.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill ~-20 ~ ~-30 ~20 ~ ~10 base:tall_grass
+# The pond, 10 blocks north of the pit, its rim clear.
+chat /tk fill -4 70 528 4 70 536 core:air
+chat /tk fill -2 68 530 2 68 534 base:dirt
+chat /tk fill -2 69 530 2 69 534 base:water
+# The pit: 3 x 3, its floor dirt at 67 (feet at 68), its sides grass at 68-69, nothing growing in it.
+chat /tk fill -2 70 543 2 70 547 core:air
+chat /tk fill -1 67 544 1 67 546 base:dirt
+chat /tk fill -1 68 544 1 69 546 core:air
+wait 2
+chat /tk spawn animals:white_tailed_deer 0 68 545
+chat /tk spawn animals:white_tailed_deer 1 68 544
+wait 2
+chat /anim log
+chat /animalprof water 0.15
+chat /animalprof food 0.15
+chat /tp 0 90 572
+wait 3
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+chat /animalprof senses
+chat /tp 0 74 552
+wait 2
+look 0 -30
+wait 1
+shot herd_pit_1.png
+quit

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a pair of light undyed beige linen with a coarse weave trousers, front view, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.545,
+   "outline": 0.63,
+   "red_line": 0.0,
+   "fill": 0.51,
+   "passed": true
+  }
+ ]
+}

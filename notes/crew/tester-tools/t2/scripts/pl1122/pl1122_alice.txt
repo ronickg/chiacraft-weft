@@ -1,0 +1,32 @@
+# pl1122 two-player join, host side (Tester 2, 11-22). Run beside pl1122_bob.txt; marks pl1122-mark-* in the tree dir (the runner clears them).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /time set 6000
+chat /weather clear 99999
+chat /tk fill ~-9 ~-1 ~-9 ~9 ~-1 ~9 base:stone
+chat /tk fill ~-9 ~0 ~-9 ~9 ~3 ~9 base:stone
+chat /tk fill ~-8 ~0 ~-8 ~8 ~3 ~8 core:air
+wait 2
+host pl1122-ticket.txt
+wait 2
+shot pl1122_a01_hosting.png
+await_file pl1122-mark-bob-in 300
+wait 3
+shot pl1122_a02_bob_joined.png
+chat hello bob, welcome
+chat /tk set ~3 ~0 ~2 base:chest
+chat /tk put ~3 ~0 ~2 0 base:bread 12
+mark pl1122-mark-chest
+await_file pl1122-mark-bob-chat 300
+shot pl1122_a03_chat_both.png
+await_file pl1122-mark-bob-left 300
+wait 2
+shot pl1122_a04_bob_left.png
+await_file pl1122-mark-bob-back 300
+wait 3
+shot pl1122_a05_bob_back.png
+chat bye
+wait 3
+quit

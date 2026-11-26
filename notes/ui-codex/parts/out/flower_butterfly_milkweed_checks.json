@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "butterfly milkweed: a bushy clump topped by flat clusters of bright orange star-shaped flowers, narrow green leaves, 16-20 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.41,
+   "outline": 0.91,
+   "red_line": 0.0,
+   "fill": 0.22,
+   "passed": false
+  },
+  {
+   "grid": 0.366,
+   "outline": 0.97,
+   "red_line": 0.0,
+   "fill": 0.21,
+   "passed": false
+  },
+  {
+   "grid": 0.549,
+   "outline": 1.16,
+   "red_line": 0.0,
+   "fill": 0.17,
+   "passed": false
+  }
+ ]
+}

@@ -1,0 +1,6 @@
+tree=C_e9dadf18 spread=0 steps=10,50,100,250 hold=60 rate=10 threads=4 limit=1220s fd=65535 start=22:32:16 load=9.80 17.69 19.26
+server up after 11s pid 2261675
+bots pid 2262003
+server real pid 2261677, bots real pid 2262005
+bots ended 22:36:51 rc=0
+done 22:36:56

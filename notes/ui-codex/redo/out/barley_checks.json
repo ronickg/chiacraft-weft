@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a bundle of ripe barley lying diagonally: three full golden ears with long dark-tipped bristly awns, tied with a cord, strong contrast between the golden grains and their darker outline",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.265,
+   "outline": 0.58,
+   "red_line": 0.04,
+   "fill": 0.36,
+   "passed": true
+  }
+ ]
+}

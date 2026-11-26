@@ -1,0 +1,5 @@
+One sheet of HUD parts in four rows, landscape 1536 x 1024, copied from the attached HUD mockup. Draw them all at one scale: one game pixel is 5 image pixels. Rows top to bottom, parts left to right, evenly spaced, plenty of magenta between them:
+Row 1: a player portrait frame, 28 x 28 (a square copper frame with cut corners, empty dark inside, like the mockup's top-left portrait); a round minimap frame, 48 x 48 (a thick copper ring with an empty magenta middle and a small "N" plate on top, like the mockup's minimap); a small player arrow for the map, 7 x 9 (ivory, pointing up, dark outline).
+Row 2: a compass strip, 96 x 10 (a dark plate with copper ends and small tick marks, no letters), and a small amber triangle marker for its middle, 5 x 4.
+Row 3: a quest tracker panel, 72 x 40 (dark translucent-looking brown panel with a thin copper frame, empty), and a quest badge, 10 x 12 (an amber-gold shield shape with a dark "!" exclamation mark).
+Row 4: four keyboard key caps for interaction prompts, 11 x 11 each, empty (a light ivory key with a darker bottom edge, no letter): normal, pressed (shifted down, darker), wide key 22 x 11, and a mouse icon 9 x 12 (ivory).

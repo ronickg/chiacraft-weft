@@ -1,0 +1,20 @@
+{
+ "kind": "item",
+ "what": "a flint hoe in the same shape as the attached iron hoe: one flat blade of crude knapped grey-brown flint with chipped faceted edges and lighter flake scars about 10 px wide and 4-5 px tall, set at a right angle across the handle's top and pointing down-left; not a hammer head, not an axe, not a thin hook; a plain wooden handle, the head lashed on with tan sinew cord, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.3,
+   "outline": 0.62,
+   "red_line": 0.0,
+   "fill": 0.19,
+   "vertical": 0,
+   "passed": true
+  }
+ ]
+}

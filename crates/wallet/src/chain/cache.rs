@@ -55,6 +55,10 @@ pub struct ChainCache {
     /// Coins of ours a pushed spend is spending (hex → unix seconds when pushed), kept out of
     /// coin selection until the chain shows them spent or a while passes.
     pub pending: BTreeMap<String, u64>,
+    /// Coins of ours never spent by coin selection (hex): a world's listing, whose deposit stays
+    /// locked until the owner delists it (phase 5).
+    #[serde(default)]
+    pub reserved: std::collections::BTreeSet<String>,
     /// Peers that answered lately (`host:port`), tried first next time.
     pub peers: Vec<String>,
 }
@@ -70,6 +74,7 @@ impl ChainCache {
             watched: BTreeMap::new(),
             offers: Vec::new(),
             pending: BTreeMap::new(),
+            reserved: Default::default(),
             peers: Vec::new(),
         }
     }
@@ -115,6 +120,7 @@ impl ChainCache {
             .iter()
             .flat_map(|o| o.offered_coins.iter())
             .chain(self.pending.keys())
+            .chain(self.reserved.iter())
             .filter_map(|h| super::parse_hex32(h).ok())
             .collect()
     }

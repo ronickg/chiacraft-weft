@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a spider eye: a glossy dark red eyeball seen from the front, a big black slit pupil in an amber iris, a white glint on the upper left and a few thin dark red veins, clearly an eye, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": true,
+ "tries": [
+  {
+   "grid": 0.273,
+   "outline": 0.67,
+   "red_line": 0.0,
+   "fill": 0.54,
+   "passed": true
+  }
+ ]
+}

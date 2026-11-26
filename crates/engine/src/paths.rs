@@ -74,7 +74,73 @@ fn per_user(os: &str, env: &dyn Fn(&str) -> Option<PathBuf>) -> Option<Dirs> {
     }
 }
 
+static SHIPPED: OnceLock<PathBuf> = OnceLock::new();
+
+/// Where a shipped game keeps its own files (`assets/core`): next to the executable, or on Android
+/// where the package's were unpacked (`set_shipped`).
+pub fn shipped() -> Option<PathBuf> {
+    SHIPPED.get().cloned().or_else(|| {
+        std::env::current_exe()
+            .ok()?
+            .parent()
+            .map(Path::to_path_buf)
+    })
+}
+
+/// Once, at start, where an Android package's files were unpacked.
+pub fn set_shipped(dir: PathBuf) {
+    let _ = SHIPPED.set(dir);
+}
+
+/// Where the engine's own code is, which a shipped game's mod libraries sit beside: the
+/// executable's folder, or on Android the package's native libraries, the only place a library
+/// may load from there.
+pub fn libraries() -> Option<PathBuf> {
+    #[cfg(target_os = "android")]
+    {
+        let mut info: libc::Dl_info = unsafe { std::mem::zeroed() };
+        if unsafe { libc::dladdr(libraries as *const libc::c_void, &mut info) } == 0 || info.dli_fname.is_null() {
+            return None;
+        }
+        let path = unsafe { std::ffi::CStr::from_ptr(info.dli_fname) };
+        Path::new(&*path.to_string_lossy())
+            .parent()
+            .map(Path::to_path_buf)
+    }
+    #[cfg(not(target_os = "android"))]
+    std::env::current_exe()
+        .ok()?
+        .parent()
+        .map(Path::to_path_buf)
+}
+
 static CONFIG: OnceLock<PathBuf> = OnceLock::new();
+static ENGINE_ASSETS: OnceLock<PathBuf> = OnceLock::new();
+
+/// Once, at start, where the engine's own assets are when they aren't beside the executable
+/// (Android: unpacked from the APK into the app's storage; the executable is the system's).
+pub fn set_engine_assets(dir: PathBuf) {
+    let _ = ENGINE_ASSETS.set(dir);
+}
+
+static LIBRARIES: OnceLock<PathBuf> = OnceLock::new();
+
+/// Once, at start, where mods' libraries are when not in their folders or zips and the
+/// executable's folder isn't the game's (Android: the APK's native libraries, one set per CPU,
+/// so the mods' zips carry only their assets).
+pub fn set_library_dir(dir: PathBuf) {
+    let _ = LIBRARIES.set(dir);
+}
+
+/// What `set_library_dir` was given.
+pub fn library_dir() -> Option<&'static Path> {
+    LIBRARIES.get().map(PathBuf::as_path)
+}
+
+/// What `set_engine_assets` was given.
+pub fn engine_assets() -> Option<&'static Path> {
+    ENGINE_ASSETS.get().map(PathBuf::as_path)
+}
 
 /// Once, at start, with what `config` should answer.
 pub fn set_config(dir: PathBuf) {

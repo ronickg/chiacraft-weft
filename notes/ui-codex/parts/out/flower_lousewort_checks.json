@@ -1,0 +1,26 @@
+{
+ "kind": "block",
+ "what": "woolly lousewort: one or two short stout spikes wrapped in white woolly hair with pink-purple hooded flowers, fern-like leaves at the base, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.361,
+   "outline": 0.94,
+   "red_line": 0.0,
+   "fill": 0.13,
+   "passed": false
+  },
+  {
+   "grid": 0.314,
+   "outline": 0.75,
+   "red_line": 0.0,
+   "fill": 0.08,
+   "passed": true
+  }
+ ]
+}

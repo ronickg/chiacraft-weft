@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a pile of glowing red powder: a lumpy pile of saturated red nuggets with pink highlights, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.554,
+   "outline": 0.76,
+   "red_line": 0.0,
+   "fill": 0.24,
+   "passed": true
+  }
+ ]
+}

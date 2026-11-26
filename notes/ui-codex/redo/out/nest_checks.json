@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a bird nest: a round bowl of woven twigs and dry grass seen from the front and slightly above, empty inside, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.535,
+   "outline": 0.83,
+   "red_line": 0.01,
+   "fill": 0.6,
+   "passed": true
+  }
+ ]
+}

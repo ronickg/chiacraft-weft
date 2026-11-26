@@ -1,0 +1,10 @@
+[package]
+name = "chiacraft-bridge"
+version.workspace = true
+edition.workspace = true
+license = "MIT"
+rust-version.workspace = true
+description = "A chiacraft mod's side of the engine's bridge (crates/engine/src/chiacraft/bridge.rs): what our own mods may ask beyond Weft's mod interface"
+
+[dependencies]
+weft_abi.workspace = true

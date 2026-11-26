@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a gold ingot: a lemon-gold bar in three-quarter top view, tilted along the diagonal rising to the top right, a bright lit top face, an orange-brown side face 2 px thick along the bottom right, a faint embossed rune, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.584,
+   "outline": 0.44,
+   "red_line": 0.0,
+   "fill": 0.36,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,26 @@
+{
+ "kind": "block",
+ "what": "narrow-leaf purple coneflower: two or three stems with daisy heads of drooping pink-purple petals round a raised dark orange-brown cone, narrow leaves low down, 20-24 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.533,
+   "outline": 0.96,
+   "red_line": 0.02,
+   "fill": 0.22,
+   "passed": false
+  },
+  {
+   "grid": 0.542,
+   "outline": 0.85,
+   "red_line": 0.01,
+   "fill": 0.19,
+   "passed": true
+  }
+ ]
+}

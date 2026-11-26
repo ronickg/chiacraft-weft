@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a raw hare: a whole skinned hare carcass lying diagonally, head at the top right with long ears laid back, long hind legs at the bottom left, dark red meat with a clear outline, reading as a hare",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.414,
+   "outline": 0.67,
+   "red_line": 0.0,
+   "fill": 0.32,
+   "passed": true
+  }
+ ]
+}

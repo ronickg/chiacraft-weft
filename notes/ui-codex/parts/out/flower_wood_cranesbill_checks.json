@@ -1,0 +1,19 @@
+{
+ "kind": "block",
+ "what": "wood cranesbill: a leafy clump of deeply lobed green leaves with five or six open violet five-petalled flowers with pale centres, 16-20 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.396,
+   "outline": 0.81,
+   "red_line": 0.0,
+   "fill": 0.28,
+   "passed": true
+  }
+ ]
+}

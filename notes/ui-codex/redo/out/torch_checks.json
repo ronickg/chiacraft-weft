@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a torch, upright and centred: a short wooden handle 3-4 px wide with a small iron collar, a teardrop flame on top, dark orange at its edge, orange in the body and yellow-white in the core",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.359,
+   "outline": 0.48,
+   "red_line": 0.0,
+   "fill": 0.17,
+   "passed": true
+  }
+ ]
+}

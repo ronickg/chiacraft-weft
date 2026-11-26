@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "an iron ingot: a warm-silver bar in three-quarter top view, tilted along the diagonal rising to the top right, a near-white lit top face, a darker side face 2 px thick along the bottom right, a faint embossed rune, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.516,
+   "outline": 0.53,
+   "red_line": 0.0,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

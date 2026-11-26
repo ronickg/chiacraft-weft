@@ -1,0 +1,48 @@
+# Herds trek to water they remember (creature AI step 9, migration's first step, `drink::trek`):
+# one that finds no water within 16 blocks goes to the nearest its herd remembers, up to
+# `groups::WATER_TREK` (96) blocks off, and its herd goes with it. A herd of red deer on a dry pad,
+# a small pond 50 blocks north (-z, out of their 16-block look). `/animalprof recall 50` makes only
+# the members (not the leaders) remember that pond; then the leaders go thirsty (`lead 0.05`), so a
+# leader can only find the pond from what its herd remembers.
+# PASS: "animal <leader> treks to water its herd remembers ... (remembered by <other id>)" lines,
+# then "red_deer <leader> drinks" and members' "drinks" lines; herd_trek_2.png (looking north from
+# above the pad's far edge) shows deer at the pond. FAIL: no trek lines, or leaders that trek alone
+# (members staying on the pad in herd_trek_2.png).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /air 0 0 0
+chat /tk fill ~-20 ~-1 ~-60 ~20 ~-1 ~20 base:grass
+chat /tk fill ~-20 ~ ~-60 ~20 ~4 ~20 core:air
+chat /tk fill ~-1 ~-1 ~-51 ~1 ~-1 ~-49 base:water
+wait 2
+chat /tk time 6000
+chat /tk mode spectator
+chat /tk ring animals:red_deer 6 5 10
+wait 4
+chat /anim log
+chat /animalprof food 1.0
+chat /animalprof water 0.8
+chat /animalprof senses
+wait 2
+chat /animalprof recall 50
+wait 1
+chat /animalprof lead 0.05
+wait 10
+chat /animalprof senses
+look 0 -15
+wait 1
+shot herd_trek_1.png
+wait 20
+chat /animalprof food 1.0
+chat /animalprof senses
+look 0 -15
+wait 1
+shot herd_trek_2.png
+wait 20
+chat /animalprof senses
+look 0 -15
+wait 1
+shot herd_trek_3.png
+quit

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a closed leather book lying at an angle, deep red cover with a darker border, a cream page block 4 px thick showing on the lower-left edge, dark brown spine, small metal corner caps",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.431,
+   "outline": 0.64,
+   "red_line": 0.22,
+   "fill": 0.47,
+   "passed": true
+  }
+ ]
+}

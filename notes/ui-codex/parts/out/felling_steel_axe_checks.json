@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a steel felling axe: a heavy broad head of cool blue-grey forged steel, darker and cooler than iron, with a bright white edge highlight, a gold collar where head meets handle, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Same layout as the attached felling axe: the handle runs from the bottom-left corner up to near the top-right; the head sits crosswise at its top; the blade sticks out to the UPPER LEFT, flaring strongly to a wide, gently curved cutting edge PARALLEL to the handle; a solid flat poll sticks out to the lower right. Never a vertical edge. 1-2 px margin from the canvas sides",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.306,
+   "outline": 0.53,
+   "red_line": 0.01,
+   "fill": 0.23,
+   "passed": true
+  }
+ ]
+}

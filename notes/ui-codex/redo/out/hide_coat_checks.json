@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a soft tan buckskin leather with fringed seams shirt, front view, sleeves out a little, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.272,
+   "outline": 0.74,
+   "red_line": 0.0,
+   "fill": 0.55,
+   "passed": true
+  }
+ ]
+}

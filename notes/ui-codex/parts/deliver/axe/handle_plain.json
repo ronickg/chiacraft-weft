@@ -1,0 +1,9 @@
+{
+ "kind": "base:axe",
+ "layer": "haft",
+ "override": true,
+ "regions": [
+  "haft"
+ ],
+ "steps": 8
+}

@@ -1,0 +1,32 @@
+# The Field Journal (Ronald, 11-05): in survival with nothing met every animal is "???"; after
+# /journal all every page is full, the grey wolf's open; then from the inventory's tab.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 2
+press animals:journal
+wait 1.5
+shot jn_01_nothing_met.png
+key Escape
+wait 1
+chat /journal all
+wait 1
+press animals:journal
+wait 1.5
+shot jn_02_first_page.png
+tap_once animals:journal text:Grey Wolf
+wait 2
+shot jn_03_grey_wolf.png
+cursor 0.38 0.40
+wait 1
+shot jn_04_wolf_turned.png
+key Escape
+wait 1
+press core:inventory
+wait 1.5
+shot jn_05_inventory_tab.png
+tap core:menu text:Field Journal
+wait 1.5
+shot jn_06_from_the_tab.png
+quit

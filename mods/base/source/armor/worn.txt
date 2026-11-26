@@ -1,0 +1,77 @@
+# The armour worn on the player (mods/base/source/armor/build.py) at 32 texels a block: each set
+# from behind and the front (third person), and one set over the clothes. Shots: run/screenshots/armour_*.png.
+loaded
+chat /dim base:flatlands
+wait 6
+loaded
+idle
+chat /tk time 6000
+chat /tk mode creative
+look 0 5
+wait 1
+# iron
+chat /gear helmet wrought_iron slot=36
+chat /gear chestplate wrought_iron slot=37
+chat /gear leggings wrought_iron slot=38
+chat /gear boots wrought_iron slot=39
+wait 1
+press core:perspective
+wait 1
+shot armour_iron_back.png
+press core:perspective
+wait 1
+shot armour_iron_front.png
+press core:perspective
+wait 0.5
+# gold
+chat /gear helmet bronze gold slot=36
+chat /gear chestplate bronze gold slot=37
+chat /gear leggings bronze gold slot=38
+chat /gear boots bronze gold slot=39
+wait 1
+press core:perspective
+wait 1
+shot armour_gold_back.png
+press core:perspective
+wait 1
+shot armour_gold_front.png
+press core:perspective
+wait 0.5
+# diamond
+chat /gear helmet diamond slot=36
+chat /gear chestplate diamond slot=37
+chat /gear leggings diamond slot=38
+chat /gear boots diamond slot=39
+wait 1
+press core:perspective
+wait 1
+shot armour_diamond_back.png
+press core:perspective
+wait 1
+shot armour_diamond_front.png
+press core:perspective
+wait 0.5
+# leather
+chat /gear helmet leather slot=36
+chat /gear chestplate leather slot=37
+chat /gear leggings leather slot=38
+chat /gear boots leather slot=39
+wait 1
+press core:perspective
+wait 1
+shot armour_leather_back.png
+press core:perspective
+wait 1
+shot armour_leather_front.png
+press core:perspective
+wait 0.5
+# first person and the inventory figure, in leather
+look 0 -20
+wait 1
+shot armour_hand.png
+press core:inventory
+wait 1
+shot armour_inventory.png
+key escape
+wait 0.5
+quit

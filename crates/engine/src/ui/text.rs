@@ -26,6 +26,7 @@
 use super::font::Font;
 use super::lang::Lang;
 use crate::input::{Input, key_name};
+use weft_abi::entry_kind as ek;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Arg {
@@ -49,9 +50,17 @@ pub struct Msg {
     pub args: Vec<Arg>,
 }
 
+/// What a key starts with to be its own template: no translation to look for and warn about.
+const TEMPLATE: char = '\u{1}';
+
 impl Msg {
     pub fn new(key: &str, args: Vec<Arg>) -> Msg {
         Msg { key: key.to_string(), args }
+    }
+
+    /// `template` as it is, not a translation, formatting and all.
+    pub fn template(template: &str) -> Msg {
+        Msg { key: format!("{TEMPLATE}{template}"), args: Vec::new() }
     }
 
     pub fn spans(&self, lang: &Lang, input: Option<&Input>) -> Vec<Span> {
@@ -412,7 +421,7 @@ fn push_icons(spec: &str, cx: &Ctx, out: &mut Vec<Span>, st: &State) {
             _ => {}
         }
     }
-    let Some((w, h)) = size.or_else(|| texture_size(&name).map(|(w, h)| (w as f32, h as f32))) else { return };
+    let Some((w, h)) = size.or_else(|| crate::assets::texture_size(&name).map(|(w, h)| (w as f32, h as f32))) else { return };
     // At most a line's worth, whatever a value says.
     let whole = (n.floor() as u32).min(64);
     let mut pictures: Vec<(String, [f32; 4])> = (0..whole)
@@ -434,12 +443,23 @@ pub fn format(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>) {
 }
 
 /// A translation `key` with `args`; an empty key shows its one argument as it is (ready text
-/// from code, like a ticket or a profile line).
+/// from code, like a ticket or a profile line), and nothing without one (a mod's bound text that
+/// set nothing this frame: it showed "{0}", Playtest B2).
 pub fn message(key: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>) {
+    if key.is_empty() && args.is_empty() {
+        return;
+    }
+    format(template_of(key, cx), args, cx, out);
+}
+
+/// What a message's key stands for: its translation, the template it carries, or its one argument.
+fn template_of<'a>(key: &'a str, cx: &Ctx<'a>) -> &'a str {
     if key.is_empty() {
-        format("{0}", args, cx, out);
+        "{0}"
+    } else if let Some(template) = key.strip_prefix(TEMPLATE) {
+        template
     } else {
-        format(cx.lang.get(key), args, cx, out);
+        cx.lang.get(key)
     }
 }
 
@@ -484,10 +504,6 @@ fn gui_texture(name: &str) -> String {
         return String::new();
     }
     format!("{ns}:gui/{path}")
-}
-
-fn texture_size(name: &str) -> Option<(u32, u32)> {
-    crate::assets::texture_size(name)
 }
 
 fn push_text(out: &mut Vec<Span>, s: &str, st: &State) {
@@ -547,16 +563,22 @@ fn format_depth(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>, st:
                 .or(st.color);
         } else if tag == "/" {
             st.color = base;
-        } else if let Some(action) = tag.strip_prefix("key:") {
+        } else if let Some((action, bare)) = tag
+            .strip_prefix("key:")
+            .map(|a| (a, false))
+            .or_else(|| tag.strip_prefix("keyname:").map(|a| (a, true)))
+        {
+            // `key:` in brackets for sentences ("press [E]"), `keyname:` bare beside a picture.
             let name = cx
                 .input
-                .and_then(|i| i.key_of(action))
-                .map(|k| display_chord(cx.lang, k))
+                .and_then(|i| i.binding_of(action))
+                .map(|b| display_binding(cx.lang, b))
                 .unwrap_or_else(|| "?".into());
             let color = st
                 .color
                 .or_else(|| cx.lang.color("color.key").map(|c| c >> 8));
-            out.push(st.span(Piece::Text(format!("[{name}]")), color));
+            let text = if bare { name } else { format!("[{name}]") };
+            out.push(st.span(Piece::Text(text), color));
         } else if let Some(item) = tag.strip_prefix("item:") {
             if let Some(id) = crate::content::try_content().and_then(|c| c.item_by_ref(item)) {
                 out.push(st.span(Piece::Icon(id), None));
@@ -579,7 +601,7 @@ fn format_depth(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>, st:
                 .next()
                 .and_then(|s| s.split_once('x'))
                 .and_then(|(w, h)| Some((w.parse::<f32>().ok()?, h.parse::<f32>().ok()?)));
-            if let Some((w, h)) = size.or_else(|| texture_size(name).map(|(w, h)| (w as f32, h as f32))) {
+            if let Some((w, h)) = size.or_else(|| crate::assets::texture_size(name).map(|(w, h)| (w as f32, h as f32))) {
                 out.push(st.span(Piece::Image(image_id(name), w * FONT_PER_GUI, h * FONT_PER_GUI, [0.0, 0.0, 1.0, 1.0]), None));
             }
         } else if let Some(spec) = tag.strip_prefix("icons:") {
@@ -641,7 +663,7 @@ fn format_depth(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>, st:
                 Some(Arg::Name(n)) => push_name(n, cx, out, st, depth),
                 Some(Arg::Msg(m)) if depth < 4 => {
                     let color = st.color;
-                    format_depth(cx.lang.get(&m.key), &m.args, cx, out, st, color, depth + 1);
+                    format_depth(template_of(&m.key, cx), &m.args, cx, out, st, color, depth + 1);
                     st.color = color;
                 }
                 Some(Arg::Key(k)) if depth < 4 => {
@@ -681,8 +703,34 @@ fn push_name(n: &Name, cx: &Ctx, out: &mut Vec<Span>, st: &mut State, depth: u32
             format_depth(cx.lang.get("item.spawn_egg"), &args, cx, out, st, color, depth + 1);
             st.color = color;
         }
+        // So is a stair nobody named after what it is made of.
+        None if depth < 4 && shape_of(n).is_some() => {
+            let color = st.color;
+            let (source, key) = shape_of(n).unwrap_or_default();
+            format_depth(cx.lang.get(&key), &[Arg::Name(Name::Block(source))], cx, out, st, color, depth + 1);
+            st.color = color;
+        }
         _ => push_text(out, &n.keys().1, st),
     }
+}
+
+/// What a block made of another is made of (its first state), and the lang key for that.
+fn shape_of(n: &Name) -> Option<(u32, String)> {
+    let c = crate::content::try_content()?;
+    let name = match n {
+        Name::Item(i) => &c.items.get(*i as usize)?.name,
+        Name::Block(s) => &c.block_of(*c.states.get(*s as usize).map(|_| s)?).name,
+        _ => return None,
+    };
+    let (source, key) = c.shapes.get(name)?;
+    Some((
+        c.game
+            .catalog
+            .ids(ek::BLOCK)
+            .get(source)
+            .map(|&b| c.blocks[b as usize].first_state)?,
+        key.clone(),
+    ))
 }
 
 /// Re-evaluates conditional spans; `test` answers a condition without its `!`. True if anything
@@ -782,7 +830,7 @@ pub fn layout_with(spans: &[Span], font: &Font, max_width: Option<f32>, line_hei
                         last_break = None;
                         continue;
                     }
-                    let adv = font.glyph(ch).advance as f32;
+                    let adv = font.glyph(ch).advance;
                     if x + adv > limit && x > 0.0 {
                         if ch == ' ' {
                             // Wrapping right at a space: the space just disappears.
@@ -863,6 +911,33 @@ pub fn layout_with(spans: &[Span], font: &Font, max_width: Option<f32>, line_hei
             }
         }
     }
+    // One line of glyphs: its box is its ink, without the first glyph's lead-in or the last
+    // one's spacing after it, so a label centred in a button or tab is centred by its letters.
+    if lines.is_empty() && max_width.is_none() {
+        let glyph = |it: &Placed| match *it {
+            Placed::Glyph { x, ch, .. } if ch != ' ' => Some((x, font.glyph(ch))),
+            _ => None,
+        };
+        // A line may start with an inline image (an icon before a button's word): then there is
+        // no glyph lead-in to take off, but the last glyph's spacing after it still goes, or the
+        // label sat a pixel off centre (the label check, 11-04).
+        let starts_with_image = matches!(out.items.first(), Some(Placed::Image { .. }));
+        let lead = match out.items.first().and_then(glyph) {
+            Some((_, g0)) => Some(g0.bearing.max(0.0)),
+            None if starts_with_image => Some(0.0),
+            None => None,
+        };
+        let last = out.items.last().and_then(glyph);
+        if let (Some(lead), Some((lx, gl))) = (lead, last) {
+            let end = lx + gl.bearing + gl.width;
+            if lead > 0.0 || end < x {
+                for it in &mut out.items {
+                    *it.pos().0 -= lead;
+                }
+                x = (end - lead).max(0.0);
+            }
+        }
+    }
     lines.push((line_start, x, line_align));
     max_x = max_x.max(x);
     out.width = max_x;
@@ -891,13 +966,26 @@ pub fn layout_with(spans: &[Span], font: &Font, max_width: Option<f32>, line_hei
 
 /// A key's name for players: translated (`keyname.ShiftLeft`) when the language has it.
 /// `Ctrl+T`: the modifiers (`keyname.ctrl` ..., either side's key), then the key.
+/// What a player reads for a binding: its keys, `*2` after a double tap's (`W*2`).
+pub fn display_binding(lang: &Lang, b: crate::input::Binding) -> String {
+    let chord = display_chord(lang, b.chord);
+    match b.trigger {
+        crate::input::Trigger::Double => format!("{chord}*2"),
+        _ => chord,
+    }
+}
+
 pub fn display_chord(lang: &Lang, c: crate::input::Chord) -> String {
     let mut out = String::new();
-    for (bit, name) in [(crate::input::CTRL, "keyname.ctrl"), (crate::input::SHIFT, "keyname.shift"), (crate::input::ALT, "keyname.alt")] {
+    for (bit, name, ..) in crate::input::MODIFIERS {
         if c.mods & bit != 0 {
-            out += lang.get(name);
+            out += lang.get(&format!("keyname.{name}"));
             out.push('+');
         }
+    }
+    if let Some(w) = c.with {
+        out += &display_key(lang, w);
+        out.push('+');
     }
     out + &display_key(lang, c.key)
 }
@@ -910,6 +998,29 @@ pub fn display_key(lang: &Lang, k: crate::input::Key) -> String {
 
 pub fn plain(s: &str) -> Vec<Span> {
     vec![Span::text(s, None)]
+}
+
+/// The spans holding chars `from..to` of their text, cut where a span crosses either end.
+pub fn slice(spans: &[Span], from: usize, to: usize) -> Vec<Span> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    for s in spans {
+        match &s.piece {
+            Piece::Text(t) => {
+                let n = t.chars().count();
+                let (a, b) = (from.max(at), to.min(at + n));
+                if a < b {
+                    let mut part = s.clone();
+                    part.piece = Piece::Text(t.chars().skip(a - at).take(b - a).collect());
+                    out.push(part);
+                }
+                at += n;
+            }
+            _ if (from..to).contains(&at) => out.push(s.clone()),
+            _ => {}
+        }
+    }
+    out
 }
 
 /// The text of spans, without icons or formatting.
@@ -957,7 +1068,7 @@ mod tests {
         assert_eq!(spans.iter().map(text).collect::<Vec<_>>(), ["a", "b", "c", "d", "e"]);
         assert_eq!((spans[2].when.len(), spans[3].fx, spans[4].fx), (2, fx_id("core:wave"), 0));
         // Sneak held, not creative: only the unconditional parts and the effect remain.
-        let font = Font::parse_hex(include_str!("../../assets/fonts/unifont.hex"));
+        let font = Font::new(include_str!("../../assets/fonts/unifont.hex"), None);
         assert!(refresh(&mut spans, &|t| matches!(t, Test::Keys(_))));
         let shown: String = layout(&spans, &font, None)
             .items
@@ -983,7 +1094,7 @@ ab",
             &cx,
             &mut spans,
         );
-        let font = Font::parse_hex(include_str!("../../assets/fonts/unifont.hex"));
+        let font = Font::new(include_str!("../../assets/fonts/unifont.hex"), None);
         let l = layout(&spans, &font, Some(100.0));
         let (ix, iw, ih) = l
             .items
@@ -1007,7 +1118,7 @@ ab",
 
     #[test]
     fn wrapping_never_loses_or_panics() {
-        let font = Font::parse_hex(include_str!("../../assets/fonts/unifont.hex"));
+        let font = Font::new(include_str!("../../assets/fonts/unifont.hex"), None);
         let text = "Cubes: 5583 loaded, 0 meshing, 725 draws  double  spaces and a_very_long_word_without_breaks";
         let inked = text.chars().filter(|c| *c != ' ').count();
         for width in [0.0, 8.0, 13.0, 40.0, 100.0, 1000.0] {

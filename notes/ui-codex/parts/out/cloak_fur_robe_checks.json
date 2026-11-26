@@ -1,0 +1,26 @@
+{
+ "kind": "item",
+ "what": "a heavy fur robe closed down the front: thick brown fur (#683828 to #886848) with a shaggy texture, a deep cream fur collar and cream cuffs at the sleeve ends, seen from the front, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.236,
+   "outline": 0.92,
+   "red_line": 0.13,
+   "fill": 0.46,
+   "passed": false
+  },
+  {
+   "grid": 0.358,
+   "outline": 0.88,
+   "red_line": 0.01,
+   "fill": 0.48,
+   "passed": true
+  }
+ ]
+}

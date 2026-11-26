@@ -1,3 +1,6 @@
 target/
 /run*
 /.idea
+
+# crew details for one Mac
+.claude/crew-local.md

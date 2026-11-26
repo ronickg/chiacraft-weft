@@ -1,0 +1,41 @@
+# Rain and thunderstorm mist (Ronald, 11-05: "when raining shouldn't it be more misty??"): the same hill at seed 1's spawn, dry, rain, thunderstorm; and the storm from y 150.
+# a low hill and from y 150 at seed 1's spawn, four ways, at noon and at 17:00, clear weather, no
+# fog (/air 0 0). Then a rainy noon and a misty dawn (/air 0.6 0) from the hill, so the fog still
+# shows when it should. Seed 1, --view 12, 1280x720, --shader-pack chiacraft, a fresh world.
+# Spectator, absolute /tp, plain waits. Yaw 0 faces -z (north).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /time set 6000
+chat /tp 149.5 95 -166.5
+loaded
+wait 25
+chat /air 0 0
+wait 10
+look 0 -4
+wait 3
+shot rain_0_dry_n.png
+chat /weather rain 99999
+wait 15
+look 0 -4
+wait 3
+shot rain_1_rain_n.png
+look 180 -4
+wait 2
+shot rain_1b_rain_s.png
+chat /weather thunder 99999
+wait 15
+look 0 -4
+wait 3
+shot rain_2_storm_n.png
+look 180 -4
+wait 2
+shot rain_2b_storm_s.png
+chat /tp 149.5 150 -166.5
+wait 8
+look 0 -10
+wait 3
+shot rain_3_storm_high_n.png
+quit

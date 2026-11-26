@@ -1,0 +1,19 @@
+{
+ "kind": "effect",
+ "what": "a status effect icon for speed: a small winged leather boot, light blue wing, in the item style with a soft outline in its own darker colors, readable on a dark tile",
+ "size": [
+  16,
+  16
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.512,
+   "outline": 0.46,
+   "red_line": 0.38,
+   "fill": 0.25,
+   "passed": true
+  }
+ ]
+}

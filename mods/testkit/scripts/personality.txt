@@ -1,0 +1,30 @@
+# Personality from genes (reports/Creature AI.md; the crew's step 7). Each animal's temperament,
+# curiosity and fierceness come from its genes (coats::personality: Tp, Cu, Fi). Flat pad,
+# creative, still air, mobs off; the player stands still among 16 red deer and 8 hares 6-18
+# blocks off. Read:
+# - ANIMAL_SENSES: each one's "persona T/C/F" (they differ, around 0.5);
+# - "comes to look at player ... (curiosity 0.6x)": the curious, calm ones walk up and stand
+#   looking at him while the others keep their distance;
+# - the shots: before (scattered) and after 40 s (some near him).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /tk time 6000
+chat /air 0 0 0
+chat /tk fill ~-30 ~-1 ~-30 ~30 ~-1 ~30 base:grass
+chat /tk fill ~-30 ~ ~-30 ~30 ~3 ~30 core:air
+wait 2
+chat /tk ring animals:red_deer 16 8 18
+chat /tk ring animals:hare 8 6 14
+wait 5
+chat /animalprof senses
+look 0 -15
+wait 1
+shot persona_before.png
+wait 40
+look 0 -15
+wait 1
+shot persona_after.png
+chat /animalprof senses
+quit

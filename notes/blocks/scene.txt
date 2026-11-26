@@ -1,0 +1,35 @@
+loaded
+chat /time set noon
+chat /weather clear
+chat /gamemode creative
+wait 2
+loaded
+chat /tk fill 6 97 -4 26 99 14 base:dirt
+chat /tk fill 6 99 -4 26 99 14 base:grass
+chat /tk fill 6 100 -4 26 112 14 air
+chat /tk fill 10 100 8 11 101 9 base:stone
+chat /tk fill 12 100 8 13 101 9 base:cobblestone
+chat /tk fill 14 100 8 15 101 9 base:mossy_cobblestone
+chat /tk fill 16 100 8 17 101 9 base:dirt
+chat /tk fill 18 100 8 19 101 9 base:sand
+chat /tk fill 20 100 8 21 101 9 base:gravel
+chat /tk fill 10 100 5 10 102 5 base:oak_log
+chat /tk fill 12 100 5 12 102 5 base:spruce_log
+chat /tk fill 14 100 5 14 102 5 base:birch_log
+chat /tk fill 19 103 3 23 105 7 base:oak_leaves
+chat /tk fill 20 106 4 22 106 6 base:oak_leaves
+chat /tk fill 21 100 5 21 105 5 base:oak_log
+chat /tk fill 15 100 1 16 100 2 base:cobblestone
+chat /tp 16.5 100 -2.5
+wait 2
+look 180 -14
+wait 3
+idle
+wait 5
+shot blocks_1.png
+chat /tp 24.5 102 -1.5
+wait 2
+look 150 -18
+wait 3
+shot blocks_2.png
+quit
