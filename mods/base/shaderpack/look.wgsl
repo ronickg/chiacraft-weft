@@ -2009,9 +2009,10 @@ fn screen_ao(rel: vec3<f32>, n: vec3<f32>) -> f32 {
     let reach = z * z * share * 10.0 / mix(4.0, 50.0, clamp(z * z - 0.1, 0.0, 1.0));
     // Bliss denoises its SSAO before the ^6 its lighting takes; ours has only TAA, whose clamp left
     // a fine hatch of the noise (lksp_ssao1): two of its rings, the second turned half a turn, and
-    // the turn stepped by the golden ratio each frame (as `shadow_pcss`).
-    let ign = fract(52.9829189 * fract(dot(floor(centre), vec2(0.06711056, 0.00583715))));
-    let turn = fract(ign + 0.7548777 * fract(scene.frame.w * 0.618034));
+    // the noise's pattern itself moved across the screen each frame (Jimenez's temporal IGN): only
+    // stepping every pixel's turn by the same amount, what TAA's few frames left over still had
+    // the pattern's weave (lksp_ssao4).
+    let turn = fract(52.9829189 * fract(dot(floor(centre) + 5.588238 * scene.frame.w, vec2(0.06711056, 0.00583715))));
     let facing = normalize(n);
     var closed = 0.0;
     var count = 0.0;

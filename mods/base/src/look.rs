@@ -191,11 +191,13 @@ pub static LOOK_PCSS: Config<f32> = Config::named("look_pcss");
 /// Bliss's screen-space contact shadows toward the sun (SCREENSPACE_CONTACT_SHADOWS, 1 as made):
 /// 16 steps of 3 pixels across last frame's solid world toward the light, the darker of it and the
 /// map's, also past the map and on the far land; 0 the map alone (feature audit item 6, 11-26).
+/// With temporal anti-aliasing on only (as SSAO).
 pub static LOOK_CONTACT_SUN: Config<f32> = Config::named("look_contact_sun");
 /// Bliss's SSAO (indirect_effect 1, 1 as made): 7 taps round each point over last frame's solid
 /// world cap the sky's facing light and shade all but the sun by the darker of the corner shading
 /// and SSAO^6, in place of the post passes' contact and far shade; 0 those passes as before
-/// (feature audit item 6, 11-26). On the land lit from the sky only.
+/// (feature audit item 6, 11-26). On the land lit from the sky only, and with temporal
+/// anti-aliasing on (it reads last frame's depth through last frame's camera, which only TAA keeps).
 pub static LOOK_SSAO: Config<f32> = Config::named("look_ssao");
 /// The engine's map of the ground's height (`client::ground_map`), which the banks lie on: on with
 /// them (`register`'s frame hook keeps it so, however the banks were set).
