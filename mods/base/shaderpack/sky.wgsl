@@ -1485,14 +1485,28 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     // cloudy average, here this frame's clear one: this pass may not read its own
                     // target): in rain its deep, sunlit fog is what turns the cloudy average, and so
                     // the land's light, warm grey (Bliss's rain ground INDIRECT, 1 : 0.73 : 0.39).
-                    var cloudy = vec3(0.0);
+                    // The fog's air is lit by the cloudy average itself, x 5 (deferred.fsh's
+                    // GetVolumetricFog(..., averageSkyCol_Clouds * 5): last frame's, so over frames it
+                    // settles where the two agree; `land_ambient` is that x 5 in ours). Settled here in
+                    // four rounds from the clear average, the clouds marched once. Lit by the clear
+                    // one alone, a rain's map stayed a dark blue-grey where Bliss's settles warm
+                    // (lkmxE2d: the sun's share 0.016 under the deck, the map's air all the light).
+                    var cl: array<vec4<f32>, 9>;
                     for (var i = 0; i < 9; i++) {
-                        let dir = atm_mean_dir(i, sun);
-                        let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), bc_sky_light(clear / 9.0));
-                        let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k), bc_sky_light(clear / 9.0), land_ambient(clear / 9.0), 1.0, false);
-                        cloudy += (wet[i] * cl.a + cl.rgb) * fog.a + fog.rgb;
+                        cl[i] = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), bc_sky_light(clear / 9.0));
                     }
-                    return vec4(land_ambient(cloudy / 9.0), 1.0);
+                    var amb = land_ambient(clear / 9.0);
+                    var cloudy = vec3(0.0);
+                    for (var k = 0; k < 4; k++) {
+                        cloudy = vec3(0.0);
+                        for (var i = 0; i < 9; i++) {
+                            let dir = atm_mean_dir(i, sun);
+                            let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k), bc_sky_light(clear / 9.0), amb, 1.0, false);
+                            cloudy += (wet[i] * cl[i].a + cl[i].rgb) * fog.a + fog.rgb;
+                        }
+                        amb = land_ambient(cloudy / 9.0);
+                    }
+                    return vec4(amb, 1.0);
                 }
                 return vec4(land_ambient(clear / 9.0), 1.0);
             }
