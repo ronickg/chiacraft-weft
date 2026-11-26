@@ -97,6 +97,29 @@ pub fn init(r: &mut Registry) {
         })
         .goals(Goals::new().then(rot));
     r.entity_component(&SKIN, [0u64; 4], 0);
+    // A knife used at the ground beside a carcass skins it too (a body lying flat is easy to aim past: r3's use hit
+    // the grass by it). The nearest carcass within `SKIN_REACH` of the block aimed at, or of the player.
+    r.before_event(&actions::USE_ITEM, |q| {
+        let (w, player) = (q.world(), q.entity());
+        if player == 0 || !matches!(item_name(q.item()), "base:knife" | "base:sharp_flake") {
+            return Verdict::Abstain;
+        }
+        let Some(me) = w.entity(player) else { return Verdict::Abstain };
+        let p = q.pos();
+        let at = if q.state() != 0 { Vec3 { x: p.x as f64 + 0.5, y: p.y as f64 + 1.0, z: p.z as f64 + 0.5 } } else { me.pos };
+        let near = w
+            .entities_near(at, core::SKIN_REACH, Some(&CARCASS))
+            .into_iter()
+            .filter(|&c| crate::dist2(w.entity(c).map_or(at, |e| e.pos), me.pos) <= core::SKIN_REACH * core::SKIN_REACH)
+            .min_by(|&a, &b| {
+                let d = |c: u64| crate::dist2(w.entity(c).map_or(at, |e| e.pos), at);
+                d(a).total_cmp(&d(b))
+            });
+        match near {
+            Some(c) if start_skinning(&w, c, player) => Verdict::Deny,
+            _ => Verdict::Abstain,
+        }
+    });
     r.stack_component(&PELT_QUALITY, 0);
     r.entity_component(&HITS, 0u32, 0);
     for s in &SPECIES {

@@ -371,8 +371,9 @@ s = head("carcass", [
 ])
 x = 0
 s += pad(x) + spawns(x, [("grey_wolf", 3, 8, -10), ("white_tailed_deer", 2, -6, 6)])
-s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.3"]
-s += watch(x, 6) + carcass_rows(4) + shot(x, "cov_carcass_1_wolves", z_back=18, pitch=-40)
+# Hungrier than the hunters runs (r3's wolves rested 100 s at 30 %, and the part ended before their kill).
+s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.15"]
+s += watch(x, 12) + carcass_rows(4) + shot(x, "cov_carcass_1_wolves", z_back=18, pitch=-40)
 x = 200
 s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 0)])
 s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+4}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2"]
@@ -389,11 +390,12 @@ for n, days in enumerate([3, 2, 4]):
     s += shot(x, f"cov_carcass_{4+n}_aged", z_back=6, pitch=-35)
 s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 4", "wait 2", "chat /animalprof carcass"]
 x = 600
-s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 0)])
-s += ["chat /tk mode creative", f"chat /tp {x} 70 {Z+3}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
+# On the grass south of the pond (r3's deer died in the pond's pit, below the knife's aim).
+s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
+s += ["chat /tk mode creative", f"chat /tp {x} 70 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
       "chat /animalprof carcass", "chat /tk put me 0 base:knife 1", "key 1", "wait 1",
-      # Standing 3 blocks south of it, looking down at it (a positive pitch looks up).
-      f"chat /tp {x} 70 {Z+2.5}", "look 0 -32", "wait 1", "press core:use", "wait 4",
+      # Standing 2 blocks south of it, looking down at it (a positive pitch looks up).
+      f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "press core:use", "wait 4",
       "shot cov_carcass_8_skinning.png", "wait 9", "chat /animalprof carcass"]
-s += shot(x, "cov_carcass_9_skinned", z_back=5, pitch=-40)
+s += shot(x, "cov_carcass_9_skinned", z_back=11, pitch=-40)
 write("carcass", s)
