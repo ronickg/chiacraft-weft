@@ -1884,7 +1884,7 @@ fn bc_alto(w: vec3<f32>) -> f32 {
     return shape * shape;
 }
 // The land's sun through them at camera-relative `rel` (GetCloudShadow): each layer's density where
-// the light crosses a plane in it, summed, 2^(-100 s^2): cores black, soft over s 0.05-0.2.
+// the light crosses a plane in it, summed, exp(-100 s^2) as its (2^ before: a third too light).
 fn bc_shadow(rel: vec3<f32>) -> f32 {
     let l = light_dir();
     let w = rel + vec3(scene.eye.x, scene.eye.y, scene.eye.z);
@@ -1893,7 +1893,7 @@ fn bc_shadow(rel: vec3<f32>) -> f32 {
     s += bc_cumulus(1u, w + along * max(BC_L1 + 50.0 - w.y, 0.0), 0u) * bc_density(1u);
     s += bc_alto(w + along * max(BC_ALTO - w.y, 0.0)) * 0.1 * (1.0 - abs(l.y));
     s = clamp(s, 0.0, 1.0);
-    return exp2(s * s * -100.0);
+    return exp(s * s * -100.0);
 }
 // Its phase (phaseg).
 fn bc_phase(x: f32, g: f32) -> f32 {
