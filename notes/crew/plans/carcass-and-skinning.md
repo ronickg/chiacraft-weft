@@ -153,5 +153,18 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   (`clothing.rs` `crafted`, the crafting grid and the book: a garment as good as its worst hide, an unknown one as
   good); fur and leather clothes and cloaks warm by `vitals::clothing::HIDE_WARMTH` (poor 0.85, good 1, perfect
   1.15) in `survival/temperature.rs`. The tooltip (`tagged.base.hide_quality`, en and ru) gives stars and the warmth.
-- Left for later: species without stagger-break rows drop nothing on a break; the hide and meat go to the
-  inventory with no pickup shown.
+- Blood trails (11-26, branch claude/animals-blood, "hunters following blood"): a blow struck by something of a fifth
+  of its max health or more opens a wound on a wild animal (as a player's), bleeding 30 s at a fifth and longer for
+  heavier, 120 s at most, 0.4 % of max health a second (`animals_core::blood`): one hit for 62.5 % or more bleeds out
+  and leaves its carcass where it fell. Bleeding as it goes it drops a spot of blood (`blood_spot`, a flat splash drawn 1.8 times its 0.4-block model, `SPOT_SCALE`) every
+  3 blocks along its way (`SPOT_GAP`, at most 2 a second), shrinking as it dries over 5 minutes, then gone. A hungry hunter with no prey in sight
+  smells spots 24 blocks off, walks to the nearest and on along the trail spot by spot in the order they fell, to prey it takes or to a carcass
+  (`hunt.rs`, before kill sites). Check: cov_blood (`/animalprof gash`, `/animalprof blood`).
+- Pickup shown (11-26, branch claude/animals-pickup): what a skinning takes off is tossed from the body toward the
+  skinner (`animals_core::carcass::off_speed`, `OFF_UP`: landing at their feet, in the engine's 1.5-block pickup reach;
+  pt_rain_5's venison, dropped at the body with the engine's random toss, lay out of reach), fanned apart, and picked up `OFF_PICKUP_TICKS` (1.25 s)
+  later, so it is seen to come off and land. cov_carcass_skin shots 8b_off, 8c_off.
+- Laid clear of walls (11-26, pt_rain_4: a deer that died against a stone wall lay half in it, out of the knife's
+  reach): `animals_core::carcass::clear_spot` moves a carcass to the nearest spot its lying box is clear of solid
+  blocks, up to `CLEAR_REACH` (1.5 blocks, or half its width), toward the side the animal stood. cov_carcass_wall.
+- Left for later: species without stagger-break rows drop nothing on a break.

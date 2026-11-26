@@ -114,7 +114,7 @@ fn report(w: &World) -> String {
 pub fn init(r: &mut Registry) {
     // The rows in the same order every run.
     row("upkeep");
-    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave,hit,carcass)> [value:float]", |cmd| {
+    r.command("animalprof", "<what:word(on,off,dump,starve,count,bite,wind,senses,kill,fear,water,food,hunters,hunter,chill,ko,wound,lead,recall,wetter,where,cave,hit,carcass,blood,gash)> [value:float]", |cmd| {
         let w = cmd.world();
         let text = match cmd.text("what").unwrap_or("") {
             "on" => {
@@ -373,6 +373,31 @@ pub fn init(r: &mut Registry) {
                 // Every carcass within 64 blocks: its look, kg eaten of what can be, days aged (`value` days more first).
                 let Some(me) = w.entity(cmd.player()) else { return };
                 crate::carcass::report(&w, me.pos, cmd.float("value").unwrap_or(0.0) as f32)
+            }
+            "gash" => {
+                // The player strikes the wild animal nearest him (within 48 blocks) for `value` (0.5 by default) of its
+                // max health: a wound that bleeds (`blood.rs`), for the blood trail checks.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                let near = w
+                    .entities_near(me.pos, 48.0, None)
+                    .into_iter()
+                    .filter(|&id| {
+                        w.component(id, &crate::animal::ANIMAL)
+                            .is_some_and(|a| a.species != 0)
+                            && !crate::animal::tamed(&w, id)
+                    })
+                    .filter_map(|id| Some((crate::dist2(w.entity(id)?.pos, me.pos), id)))
+                    .min_by(|a, b| a.0.total_cmp(&b.0));
+                let Some((_, id)) = near else { return };
+                let Some(e) = w.entity(id) else { return };
+                let dmg = e.max_health * cmd.float("value").unwrap_or(0.5) as f32;
+                w.damage(id, Damage::new(dmg, damage_cause::ATTACK).by(cmd.player()));
+                format!("GASH {id} for {dmg:.1} of {:.1}", e.max_health)
+            }
+            "blood" => {
+                // Every bleeding animal within 64 blocks (seconds left, health) and the spots of blood.
+                let Some(me) = w.entity(cmd.player()) else { return };
+                crate::blood::report(&w, me.pos)
             }
             "where" => {
                 // Every wild animal within `value` blocks (256 by default): where it is, what it is

@@ -130,7 +130,9 @@ fn fs(in: VOut) -> WeatherOut {
     let light = light_weather(unpack_light(in.data.y), in.rel);
     // Drops a pale grey-blue, flakes white; fading out right by the eye.
     let tint = select(vec3(0.78, 0.84, 0.92), vec3(1.0, 1.0, 1.04), snow);
-    let near = smoothstep(select(1.5, 1.0, snow), select(6.0, 3.0, snow), length(in.rel));
+    // Flakes from 3 blocks out, full by 8: nearer, each a soft disc a tenth of the screen wide, and over
+    // the land below a snowy deck they read as dirt on the lens (wx_band2 y300, Planner 11-26).
+    let near = smoothstep(select(1.5, 3.0, snow), select(6.0, 8.0, snow), length(in.rel));
     // (Rain at 0.6 drew bright white lines over a storm's dark deck.)
     var strength = select(0.42, 0.95, snow);
     if land_from_sky() {

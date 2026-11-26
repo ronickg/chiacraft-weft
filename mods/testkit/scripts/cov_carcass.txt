@@ -314,7 +314,23 @@ press core:hide_hud
 wait 0.5
 shot cov_carcass_8_skinning.png
 press core:hide_hud
-wait 9
+wait 3.4
+look 0 -50
+wait 0.5
+chat /tick freeze
+press core:hide_hud
+wait 0.5
+shot cov_carcass_8b_off.png
+press core:hide_hud
+chat /tick unfreeze
+wait 0.4
+chat /tick freeze
+press core:hide_hud
+wait 0.5
+shot cov_carcass_8c_off.png
+press core:hide_hud
+chat /tick unfreeze
+wait 4
 chat /animalprof carcass
 chat /tick freeze
 chat /tp 603 72 554
@@ -336,6 +352,7 @@ shot cov_carcass_9_low.png
 press core:hide_hud
 chat /tick unfreeze
 wait 1
+chat /tk inv me
 press core:inventory
 wait 1
 cursor 0.547 0.710

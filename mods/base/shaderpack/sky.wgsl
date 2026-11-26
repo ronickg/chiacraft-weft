@@ -1533,14 +1533,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
             if from_sky {
                 let moon = normalize(scene.moon.xyz);
                 let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
-                var sum = vec3(0.0);
-                for (var i = 0; i < 9; i++) {
-                    if i == ATM_MEAN_SKIP { continue; }
-                    let dir = atm_mean_dir(i, sun);
-                    let a = atm_march(dir, sun, moon, sky_k, ATM_FLOOR, 4, 2);
-                    sum += a.light;
-                }
-                var mean = sum / 9.0;
+                var mean = atm_mean(sun, moon, sky_k);
                 // In rain the average Bliss settles on (`atm_rain_mean`).
                 if rain_amount() > 0.0 {
                     mean = atm_rain_mean(sun, moon, sky_k);
@@ -1620,12 +1613,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
             if from_sky {
                 let moon = normalize(scene.moon.xyz);
                 let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
-                var sum = vec3(0.0);
-                for (var i = 0; i < 9; i++) {
-                    if i == ATM_MEAN_SKIP { continue; }
-                    sum += atm_march(atm_mean_dir(i, sun), sun, moon, sky_k, ATM_FLOOR, 4, 2).light;
-                }
-                let mean = sum / 9.0;
+                let mean = atm_mean(sun, moon, sky_k);
                 var clear = vec3(0.0);
                 for (var i = 0; i < 9; i++) {
                     if i == ATM_MEAN_SKIP { continue; }
