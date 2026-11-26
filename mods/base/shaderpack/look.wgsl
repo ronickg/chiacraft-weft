@@ -2098,6 +2098,22 @@ fn bc_alto_layer(start: vec3<f32>, dir: vec3<f32>, mult: f32, dither: f32, sky: 
     let kept = exp(-mult * mu_e);
     return vec4(max(lit - lit * kept, vec3(0.0)), kept);
 }
+// A layer's step and its extinction per step (`mult`) for the look `d` (`renderClouds`' dV_view,
+// its planet curve in y). From outside the slab Bliss's: the slab crossed in `steps`, its extinction
+// by its fixed 90 / |y| / steps. From inside, ours (Bliss's camera never sits in its clouds): the way
+// out of the slab (or `far`) in `steps`, the extinction by the step's own length at the same 90 / 100
+// of it. Bliss's 100 / |y| steps from inside put a near-level look's samples 600+ blocks apart, and
+// the low layer ended at a hard curve of one height across the sky (wx_snow y300, lksd_mrgw).
+fn bc_inside_step(d: vec3<f32>, cam_y: f32, lo: f32, steps: i32, far: f32, outside: vec3<f32>, mult: f32) -> vec4<f32> {
+    let hi = lo + BC_WIDTH;
+    if cam_y <= lo || cam_y >= hi {
+        return vec4(outside, mult);
+    }
+    let out_y = select(cam_y - lo, hi - cam_y, d.y > 0.0) / max(abs(d.y), 1e-6);
+    let len = min(out_y, far / max(length(d), 1e-6));
+    let step = d * (len / f32(steps));
+    return vec4(step, length(step) * 0.9);
+}
 // All three along the unit look `dir` up to `far` blocks (renderClouds): `dither` x for the light
 // taps, y for the starts; `sun` the light reaching them (the land's: Bliss's light / 80), `sky` the
 // clear sky's average (its / 30). rgb their light, a what shows through.
@@ -2110,6 +2126,12 @@ fn bc_clouds(dir: vec3<f32>, far_in: f32, dither: vec2<f32>, sun: vec3<f32>, sky
     // The planet's curve: a level look still meets the low layer, some kilometres off.
     var d = dir;
     d.y += 0.025 * above_low;
+    // From inside a cumulus slab a level look still runs through it (`bc_inside_step`): kept just off
+    // level, where clear sky drew a line across the deck.
+    let in_slab = (cam_y > BC_L0 && cam_y < BC_L0 + BC_WIDTH) || (cam_y > BC_L1 && cam_y < BC_L1 + BC_WIDTH);
+    if in_slab && abs(d.y) < 1e-4 {
+        d.y = select(-1e-4, 1e-4, d.y >= 0.0);
+    }
     if abs(d.y) < 1e-4 || steps < 1 {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
@@ -2135,9 +2157,11 @@ fn bc_clouds(dir: vec3<f32>, far_in: f32, dither: vec2<f32>, sun: vec3<f32>, sky
     let below1 = cam_y < BC_L1;
     let below2 = cam_y < BC_ALTO;
     let step0 = d * (BC_WIDTH / abs(d.y) / f32(steps));
-    let l0 = bc_layer(0u, bc_start(step0, cam_y, dither.y, BC_L0, BC_L0 + BC_WIDTH), step0, mult, steps, dither.x, sky, sun1, sun_multi, distant, far, false);
+    let in0 = bc_inside_step(d, cam_y, BC_L0, steps, far, step0, mult);
+    let in1 = bc_inside_step(d, cam_y, BC_L1, steps, far, step0, mult);
+    let l0 = bc_layer(0u, bc_start(in0.xyz, cam_y, dither.y, BC_L0, BC_L0 + BC_WIDTH), in0.xyz, in0.w, steps, dither.x, sky, sun1, sun_multi, distant, far, false);
     let hidden1 = l0.a < 1e-5 && below1;
-    var l1 = bc_layer(1u, bc_start(step0, cam_y, dither.y, BC_L1, BC_L1 + BC_WIDTH), step0, mult, steps, dither.x, sky, sun1, sun_multi, distant, far, hidden1 || bc_density(1u) <= 0.0);
+    var l1 = bc_layer(1u, bc_start(in1.xyz, cam_y, dither.y, BC_L1, BC_L1 + BC_WIDTH), in1.xyz, in1.w, steps, dither.x, sky, sun1, sun_multi, distant, far, hidden1 || bc_density(1u) <= 0.0);
     let hidden2 = (l1.a < 1e-5 || hidden1) && below1;
     let l2 = bc_alto_layer(bc_start(alto_step, cam_y, dither.y, BC_ALTO, BC_ALTO), d, mult_alto, dither.x, sky, sun1 * (1.0 + r * 3.0), sun_multi * (1.0 + r * 3.0), distant, far, hidden2);
     // The order by where the camera is: below the low layer front to back, above it back to front;
