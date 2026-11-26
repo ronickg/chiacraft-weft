@@ -918,7 +918,15 @@ fn aim_block(t: &T, d: [f32; 3], h: f32, eye_height: f32) {
     let v = at - eye;
     let yaw = (-v.x).atan2(-v.z).to_degrees();
     let pitch = v.y.atan2((v.x * v.x + v.z * v.z).sqrt()).to_degrees();
-    weft_sdk::info!("script: aim_block at {:.2} {:.2} {:.2} from {:.2} {:.2} {:.2}: yaw {yaw:.1} pitch {pitch:.1}", at.x, at.y, at.z, eye.x, eye.y, eye.z);
+    weft_sdk::info!(
+        "script: aim_block at {:.2} {:.2} {:.2} from {:.2} {:.2} {:.2}: yaw {yaw:.1} pitch {pitch:.1}",
+        at.x,
+        at.y,
+        at.z,
+        eye.x,
+        eye.y,
+        eye.z
+    );
     t.c().set_look(yaw as f32, pitch as f32);
 }
 

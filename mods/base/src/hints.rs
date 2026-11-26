@@ -16,8 +16,23 @@ use weft_sdk::*;
 
 /// The hints, by their bit in `SEEN`: `hint.base.<name>` in the lang files.
 const HINTS: [&str; 17] = [
-    "logs", "table", "night", "cold", "freezing", "wet", "empty", "raw_meat", "grave", "hot", "rest", "knap", "flake", "lash", "tree",
-    "tree_far", "knap_bone",
+    "logs",
+    "table",
+    "night",
+    "cold",
+    "freezing",
+    "wet",
+    "empty",
+    "raw_meat",
+    "grave",
+    "hot",
+    "rest",
+    "knap",
+    "flake",
+    "lash",
+    "tree",
+    "tree_far",
+    "knap_bone",
 ];
 const LOGS: u32 = 0;
 const TABLE: u32 = 1;
