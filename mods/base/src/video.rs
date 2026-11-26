@@ -133,6 +133,13 @@ static RT_REFLECTIONS: Config<bool> = Config::named("core:rt_reflections");
 static PT_DENOISER: Config<i32> = Config::named("core:pt_denoiser");
 /// Path-traced lighting (the sun, the sky, a bounce and the lamps traced: the pack's pathtrace.wgsl).
 static PATH_TRACED: Config<bool> = Config::named("core:path_traced");
+/// The path tracer's lamps: their own light, falling off with distance, at this strength
+/// (`core:pt_emissive`; 0 the lightmap's block light, shadowed). Stage 2 of the Remix match.
+static PT_EMISSIVE: Config<f32> = Config::named("core:pt_emissive");
+/// The lamps light the bounce's surface too (`core:pt_bounce_lights`, stage 2 step 2).
+static PT_BOUNCE_LIGHTS: Config<bool> = Config::named("core:pt_bounce_lights");
+/// The lamps' draws reused over frames and neighbours (`core:pt_restir`, stage 2 step 3).
+static PT_RESTIR: Config<bool> = Config::named("core:pt_restir");
 /// The newer quality settings, parts of the features' rows or rows of their own on the Developer
 /// screen (`PARTS`): the HDR world and temporal anti-aliasing (read at start), the mist as a
 /// volume, the soft clouds' shadow, the bloom's levels, the far shadow map's reach, the screen
@@ -593,6 +600,11 @@ fn apply(p: usize) {
     // Path-traced lighting only at Ultra, and there only on an RTX card, with Ray Reconstruction
     // (`ultra_extras`): our own denoiser alone was too slow and too noisy for a default.
     PATH_TRACED.set(p == ULTRA && rtx());
+    // The traced lamps' own light at its strength in every preset (Max and Ultra included: it
+    // shows only under path tracing).
+    PT_EMISSIVE.set(1.0);
+    PT_BOUNCE_LIGHTS.set(true);
+    PT_RESTIR.set(true);
     if p == ULTRA {
         crate::dlss::AUTO.set(false);
         ultra_extras();
@@ -877,7 +889,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 /// Players see the features' rows instead (Ronald, 11-24: the tuning "is more for developer
 /// things"). Traced shadows, reflections and the path tracer's denoiser only where the GPU traces
 /// rays (`traced`).
-const PARTS: [Row; 24] = [
+const PARTS: [Row; 27] = [
     Row {
         key: "shadows",
         values: &[0.0, 1.0, 2.0],
@@ -1013,6 +1025,31 @@ const PARTS: [Row; 24] = [
         get: || PT_DENOISER.get() as f64,
         set: |v| PT_DENOISER.set(v as i32),
         shown: |v| word(if v > 0.0 { "pt_denoiser_svgf" } else { "pt_denoiser_raw" }),
+    },
+    // The lamps' own light under path tracing (stage 2 of the Remix match), by strength; off the
+    // lightmap's block light, shadowed.
+    Row {
+        key: "pt_emissive",
+        values: &[0.0, 1.0, 2.0, 4.0],
+        get: || PT_EMISSIVE.get() as f64,
+        set: |v| PT_EMISSIVE.set(v as f32),
+        shown: |v| if v > 0.0 { number(v) } else { word("off") },
+    },
+    // The lamps' light off the walls (one more shadow ray a pixel).
+    Row {
+        key: "pt_bounce_lights",
+        values: &[0.0, 1.0],
+        get: || PT_BOUNCE_LIGHTS.get() as u8 as f64,
+        set: |v| PT_BOUNCE_LIGHTS.set(v > 0.0),
+        shown: off_on,
+    },
+    // The lamps' draws reused (ReSTIR): less noise with many lamps for the same rays.
+    Row {
+        key: "pt_restir",
+        values: &[0.0, 1.0],
+        get: || PT_RESTIR.get() as u8 as f64,
+        set: |v| PT_RESTIR.set(v > 0.0),
+        shown: off_on,
     },
 ];
 
@@ -1150,6 +1187,9 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
             ];
             if GPU_RAY_QUERY.get() {
                 keys.push(("pt_denoiser", 1.0));
+                keys.push(("pt_emissive", 0.6));
+                keys.push(("pt_bounce_lights", 0.6));
+                keys.push(("pt_restir", 0.6));
             }
             pick(&PARTS, &keys)
         }

@@ -135,6 +135,9 @@ pub struct BlockDef {
     pub light: Option<u8>,
     /// Coloured light, each channel 0 to 15 (`[15, 9, 4]` a fire's orange), in place of `light`.
     pub light_color: Option<[u8; 3]>,
+    /// How strongly path tracing's traced light shines from it, 1 a torch's (0.25 to 3.75; default
+    /// by kind: fire 2.5, lava 2, glowstone 1.5, the rest 1).
+    pub light_strength: Option<f32>,
     /// Step, dig and place sounds: a sound group such as `stone`, `wood`, `grass`, `glass`.
     pub sound: Option<String>,
     /// The tool class that mines it fast (`pickaxe`, `axe`, `shovel`).
@@ -439,6 +442,9 @@ fn check(p: &Package, errors: &mut Vec<String>) {
         }
         if b.def.light_color.is_some_and(|c| c.iter().any(|&l| l > 15)) {
             errors.push(format!("{at}: light_color's channels go from 0 to 15"));
+        }
+        if b.def.light_strength.is_some_and(|l| !(0.25..=3.75).contains(&l)) {
+            errors.push(format!("{at}: light_strength goes from 0.25 to 3.75"));
         }
         if b.def.light.is_some() && b.def.light_color.is_some() {
             errors.push(format!("{at}: `light` and `light_color` both set; use one"));

@@ -509,6 +509,9 @@ pub struct WorldRenderer {
     /// The radiance cache (`pathtrace.wgsl`'s `pt_cache`, `gpu_layout::PT_CACHE` cells), made zeroed
     /// with the first traced frame.
     pt_cache: Option<BufferId>,
+    /// chiacraft: the lamps' reservoirs (ReSTIR, `core:pt_restir`), 16 bytes a pixel, two that
+    /// take turns (this frame's written, last frame's read), made zeroed; and the pixels they hold.
+    pt_res: Option<([BufferId; 2], u32)>,
     /// Each meshed world cube's light-giving blocks (`Mesh::lights`), kept whether or not anything
     /// traces, and whether they changed since the GPU's table (`rt::RtLights`) was made.
     cube_lights: FxHashMap<IVec3, Vec<u32>>,
@@ -730,6 +733,7 @@ impl WorldRenderer {
             pt_pipes: if rt_compiled { rt::pt_pipelines(gpu, assets) } else { None },
             pt_out: Vec::new(),
             pt_cache: None,
+            pt_res: None,
             cube_lights: FxHashMap::default(),
             body_lights: FxHashMap::default(),
             body_epoch: u64::MAX,
@@ -1519,6 +1523,9 @@ impl WorldRenderer {
         if let Some(b) = self.pt_cache.take() {
             gpu.destroy_buffer(b);
         }
+        if let Some((r, _)) = self.pt_res.take() {
+            r.into_iter().for_each(|b| gpu.destroy_buffer(b));
+        }
         if let Some(l) = self.pt_lights.take() {
             l.destroy(gpu);
         }
@@ -1787,14 +1794,16 @@ impl WorldRenderer {
         self.body_lights.clear();
         for (&p, &[r, g, b]) in cells {
             let l = p & 15;
-            // Bit 24: a small light (a torch's flame, a light in hand), not a whole glowing block.
+            // Bit 24: a small light (a torch's flame, a light in hand), not a whole glowing block;
+            // strength 1 (4 quarters, `Mesh::lights`).
             let w = l.x as u32
                 | (l.y as u32) << 4
                 | (l.z as u32) << 8
                 | u32::from(r.min(15)) << 12
                 | u32::from(g.min(15)) << 16
                 | u32::from(b.min(15)) << 20
-                | 1 << 24;
+                | 1 << 24
+                | 4 << 25;
             self.body_lights.entry(p >> 4).or_default().push(w);
         }
         self.lights_dirty = true;

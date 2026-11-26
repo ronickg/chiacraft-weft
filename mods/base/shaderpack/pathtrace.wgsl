@@ -374,6 +374,404 @@ fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: ve
     return vec2(select(1.0, 0.0, hit.hit && !hit.clear), 1.0);
 }
 
+// ---- the lamps' own light (stage 2 of the Remix match, `core:pt_emissive` above 0) ----
+//
+// In place of the lightmap's block light (its level falling a step a block, then shadowed), the
+// light from the lamp itself: I colour cos / (d^2 + r^2), I the light's level times its strength
+// (`light_strength`: a torch 1, fire 2.5, lava 2, glowstone 1.5) times `core:pt_emissive`, r its
+// size (a flame's small, a glowing block's half a block). Calibrated so that `PT_NEE_AT` blocks off
+// (fewer for a dim light) a light of strength 1 gives what the lightmap gives there (the look's own
+// curve and colour: `light_on` of the light's level less that), and from there it falls off as light
+// does, nearer up to `PT_NEE_HOT` times that. (Matched 1 block off, a torch lit a pool a block or
+// two wide and the room went dark past it, s2b cave_torch.) The candidates are drawn as
+// above (8, then one in proportion to its estimate here: resampled importance sampling, so a near
+// fire beats a far torch) and one shadow ray goes to it. Where no light of the cube's list reaches,
+// the lightmap's block light stays (lights past the lists, the far land).
+
+// The light's size squared (blocks): a glowing block's, a flame's.
+const PT_NEE_R2_BLOCK: f32 = 0.25;
+const PT_NEE_R2_FLAME: f32 = 0.04;
+// Where the lamps' light matches the lightmap's (blocks off the light), and how much brighter it
+// may get nearer.
+const PT_NEE_AT: f32 = 5.0;
+const PT_NEE_HOT: f32 = 3.0;
+// The most the lamps' light gives a surface, its brightest channel, its hue kept (the world's light
+// units: 1 a full lightmap). Past it the display's curve took red to 1 and green after it, and the
+// fire's orange went yellow-white on the pillar and wall (s2c fire18000).
+const PT_NEE_MAX: f32 = 1.5;
+// How far the normal map may change the lamps' light (a share either way): the cosine is the face's,
+// times 1 plus the map's difference to it, within this. (Its cosine itself, even 0.3 of its tilt,
+// mottled a wall the fire's light grazed: s2a and s2b fire18000.)
+const PT_NEE_DETAIL: f32 = 0.2;
+
+// The falloff at `d2` (squared distance) from a light of size `r2` whose match lies `at` blocks off.
+fn pt_nee_falloff(d2: f32, r2: f32, at: f32) -> f32 {
+    return min((at * at + r2) / (d2 + r2), PT_NEE_HOT);
+}
+
+// How much of a light of level `e` reaches a surface `to` off its middle: (1 - x^2)^2 by x, the
+// surface's straight distance from the block over `e`, one smooth window over the whole reach to 0
+// at `e` blocks (0.79 at the 5-block match of a level-15 light). Round, as a real light's: by the
+// lightmap's axis-wise distance its reach was a diamond that the inverse square ended in hard
+// diagonal lines (s2q to s2u lava_glow); whole out to the match and windowed only past it, the
+// plateau met the inverse square in a hard rim round each glowstone (s2v). The lists hold every
+// light within `e` blocks of a cube the same way (`rt.rs` `light_words`).
+fn pt_nee_fade(e: f32, to: vec3<f32>) -> f32 {
+    let x = min(length(max(abs(to) - 0.5, vec3(0.0))) / max(e, 1.0), 1.0);
+    let w = 1.0 - x * x;
+    return w * w;
+}
+
+// How far above the lightmap's own block light at a surface a field of lamps' light may sum (a
+// lamp with two or more glowing neighbours, bit 31 of its listed word: a lava pit, a glowstone
+// wall). Each lamp is matched to the lightmap as if alone, and the lightmap takes the strongest
+// light where tracing adds them up: a 10 x 7 lava pit lit the floor round it white, a third over
+// the room's lightmap (s2o lava_glow); at twice, the floor round it still bleached pale in the
+// tone curve, its edge the lightmap's diamond steps (s2q). A lamp alone keeps its own light
+// (capped for all, it took a third of the alcove fire's off its pillar and wall, s2p fire18000).
+// Shadows still take the light down freely. The cap scales the field's share of the draws
+// (`pt_block_direct`), not the light of a field lamp once drawn: capped only when a field lamp
+// was drawn, a lone lamp drawn among them carried the whole field's weight uncapped, a spike
+// about 70 times its own light, and the ceiling glowstone's reach over the lava pit's floor
+// averaged pale with a hard edge (s2q to s2t lava_glow).
+const PT_NEE_SUM: f32 = 1.0;
+// How far above the lightmap's own block light at a surface the lamps' light may come, all of
+// them, a lone lamp's included (its hue kept): within 1.5 absolute, a glowstone's near field still
+// blew out in white ellipses on the wall and floor beside it (s2v lava_glow), and one reservoir's
+// draw a red blob on the nave's floor (s2v nave12800, ReSTIR on). Shadows still take it down freely.
+const PT_NEE_NEAR: f32 = 1.25;
+
+// `c` within `k` times the luminance of `block`, its hue kept.
+fn pt_nee_near_cap(c: vec3<f32>, block: vec3<f32>, k: f32) -> vec3<f32> {
+    let w = vec3(0.2126, 0.7152, 0.0722);
+    return c * min(1.0, k * dot(block, w) / max(dot(c, w), 1e-6));
+}
+
+// A lamp's colour where it matches the lightmap (`at_d` blocks off), in the world's light (the
+// look's curve and tint): its hue as the lightmap has it a block off, its brightness as there
+// (matched off the colour itself, a fire's green and blue run out first).
+fn pt_nee_one_off(l: u32, world: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let level = vec3(f32((l >> 18u) & 15u), f32((l >> 22u) & 15u), f32((l >> 26u) & 15u));
+    let at_d = clamp(max(level.r, max(level.g, level.b)) - 1.0, 1.0, PT_NEE_AT);
+    let up = vec3(0.0, 1.0, 0.0);
+    let dark = light_on(up, vec4(0.0), 0.0, 1.0, world, rel);
+    let near = max(light_on(up, vec4(0.0, max(level - 1.0, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - dark, vec3(0.0));
+    let far = max(light_on(up, vec4(0.0, max(level - at_d, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - dark, vec3(0.0));
+    return near * (dot(far, vec3(0.2126, 0.7152, 0.0722)) / max(dot(near, vec3(0.2126, 0.7152, 0.0722)), 1e-4));
+}
+
+// The lamps' light within `PT_NEE_MAX`, its hue kept.
+fn pt_nee_cap(c: vec3<f32>) -> vec3<f32> {
+    return c * min(1.0, PT_NEE_MAX / max(max(c.r, max(c.g, c.b)), 1e-4));
+}
+
+// The cosine for the lamps' light: the face's own, with the normal map's detail within
+// `PT_NEE_DETAIL`.
+fn pt_nee_cos(n: vec3<f32>, ng: vec3<f32>, dir: vec3<f32>) -> f32 {
+    let c = dot(ng, dir);
+    return max(c, 0.0) * clamp(1.0 + dot(n, dir) - c, 1.0 - PT_NEE_DETAIL, 1.0 + PT_NEE_DETAIL);
+}
+
+// A lamp as drawn: its block, its word in the lists (levels, the flame bit) and its strength.
+struct PtLamp {
+    lp: vec3<i32>,
+    word: u32,
+    strength: f32,
+}
+
+// What a lamp is likely to give a surface at `world` (normals `n`, `ng`): the draws' weight, as the
+// light itself (`pt_block_direct`) without its colour or its shadow; 0 none.
+fn pt_nee_target(world: vec3<f32>, n: vec3<f32>, ng: vec3<f32>, lamp: PtLamp) -> f32 {
+    let l = lamp.word;
+    let e = f32(max((l >> 18u) & 15u, max((l >> 22u) & 15u, (l >> 26u) & 15u)));
+    let small = ((l >> 30u) & 1u) == 1u;
+    let fade = pt_nee_fade(e, vec3<f32>(lamp.lp) + 0.5 - world);
+    if fade <= 0.0 {
+        return 0.0;
+    }
+    if all(lamp.lp == vec3<i32>(floor(world - ng * 0.5))) {
+        // The surface is the light's own block.
+        return lamp.strength * e / 15.0 * PT_NEE_HOT * fade;
+    }
+    var to = vec3<f32>(lamp.lp) + select(vec3(0.5), vec3(0.5, 0.6, 0.5), small) - world;
+    let behind = -dot(to, ng);
+    if behind > 1.0 {
+        return 0.0;
+    }
+    if behind >= 0.0 {
+        to += ng * (behind + 0.05);
+    }
+    let d2 = dot(to, to);
+    let r2 = select(PT_NEE_R2_BLOCK, PT_NEE_R2_FLAME, small);
+    let cs = pt_nee_cos(n, ng, to * inverseSqrt(max(d2, 1e-6)));
+    if cs <= 0.0 {
+        return 0.0;
+    }
+    return lamp.strength * e / 15.0 * cs * pt_nee_falloff(d2, r2, clamp(e - 1.0, 1.0, PT_NEE_AT)) * fade;
+}
+
+// ---- the lamps' draws reused (ReSTIR, `core:pt_restir`: `PtArgs::flags` bit 1) ----
+//
+// Each pixel keeps the lamp it drew and that draw's weight (a reservoir, 16 bytes: the lamp's block
+// from the surface's and its word, its strength and how many draws it stands for, its weight, and
+// which block face it was for). Before its shadow ray it merges last frame's at its own pixel and
+// at two near ones, each kept only for the same face (its own) or a face of the same way within 2
+// blocks (a neighbour's), weighed again for this surface: many more lamps tried for the same one
+// ray, so less noise where several light a room. (Biased as the cheap ReSTIR is: no visibility in
+// the weights; the denoiser keeps the rest smooth.)
+
+// How many draws a reservoir may stand for (about 8 frames of fresh draws).
+const PT_RES_CAP: f32 = 64.0;
+// How far off the near pixels a reservoir reuses lie (pixels, each way).
+const PT_RES_NEAR: f32 = 6.0;
+// The draws the pixel's reservoir stood for this frame (debug view 20).
+var<private> PT_RES_M: f32 = 0.0;
+// Debug view 21: for the pixel's first fresh draw, which of `pt_nee_target`'s tests pass (red in
+// reach, green not behind the face, blue facing it).
+var<private> PT_NEE_DBG: vec3<f32> = vec3(0.0);
+
+fn pt_nee_tests(world: vec3<f32>, n: vec3<f32>, ng: vec3<f32>, lamp: PtLamp) -> vec3<f32> {
+    let l = lamp.word;
+    let e = f32(max((l >> 18u) & 15u, max((l >> 22u) & 15u, (l >> 26u) & 15u)));
+    let small = ((l >> 30u) & 1u) == 1u;
+    let fade = pt_nee_fade(e, vec3<f32>(lamp.lp) + 0.5 - world);
+    var to = vec3<f32>(lamp.lp) + select(vec3(0.5), vec3(0.5, 0.6, 0.5), small) - world;
+    let behind = -dot(to, ng);
+    if behind >= 0.0 {
+        to += ng * (behind + 0.05);
+    }
+    let cs = pt_nee_cos(n, ng, normalize(to));
+    return vec3(select(0.0, 1.0, fade > 0.0), select(0.0, 1.0, behind <= 1.0), select(0.0, 1.0, cs > 0.0));
+}
+
+// The face a reservoir is for: its block's low 9 bits an axis, the face's way (1-6).
+fn pt_res_check(cell: vec3<i32>, ng: vec3<f32>) -> u32 {
+    let a = abs(ng);
+    var face = select(1u, 2u, ng.x > 0.0);
+    if a.y > a.x && a.y >= a.z {
+        face = select(3u, 4u, ng.y > 0.0);
+    } else if a.z > a.x && a.z > a.y {
+        face = select(5u, 6u, ng.z > 0.0);
+    }
+    let c = vec3<u32>(cell) & vec3(511u);
+    return c.x | (c.y << 9u) | (c.z << 18u) | (face << 27u);
+}
+
+// A reservoir's block less this one's (each axis wrapped in 9 bits).
+fn pt_res_diff(theirs: u32, mine: u32) -> vec3<i32> {
+    let d = (vec3<i32>(vec3(theirs, theirs >> 9u, theirs >> 18u) & vec3(511u)) - vec3<i32>(vec3(mine, mine >> 9u, mine >> 18u) & vec3(511u)) + 256) & vec3(511);
+    return d - 256;
+}
+
+// The lamps' light at a surface at `world` (`rel` camera relative), its shading normal `n` and
+// face's `ng`: rgb in the world's light units, a as `pt_block_visibility`'s y (1 lamps in the
+// list, drawn or none lighting this face; 0 no list for the cube, -2 no lights at all). `at`: the pixel whose reservoir
+// it keeps and reuses (`0xffffffff` none: the bounce's surface), `pix` that pixel; `most` the
+// luminance a field of lamps' light may sum to there (`PT_NEE_SUM`).
+fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>, lift: vec3<f32>, px: vec2<f32>, at: u32, pix: vec2<i32>, most: f32) -> vec4<f32> {
+    let reuse = at != 0xffffffffu && (pt.flags & 2u) != 0u;
+    PT_RES_M = 0.0;
+    if pt_lights[1] == 0u {
+        return vec4(0.0, 0.0, 0.0, -2.0);
+    }
+    let cell = vec3<i32>(floor(world + ng * 0.5));
+    let cube = cell >> vec3(4u);
+    let base = 2u + pt_lights[0] * 4u;
+    let strengths = base + pt_lights[1];
+    let r = pt_light_find(cube);
+    let total = r.y;
+    // A draw kept for the lamps alone and one for a field's, each among its own by weight: the
+    // field's share is scaled to its cap below, before one of the two is taken.
+    var y = PtLamp(vec3(0), 0u, 0.0);
+    var y_p = 0.0;
+    var w_sum = 0.0;
+    var yf = PtLamp(vec3(0), 0u, 0.0);
+    var yf_p = 0.0;
+    var w_field = 0.0;
+    var m = 0.0;
+    // Fresh draws among the cube's list, each as likely.
+    if total > 0u {
+        for (var k = 0u; k < PT_LIGHT_CANDIDATES; k++) {
+            let t = min(u32(pt_rand(px, 16u + k * 2u).x * f32(total)), total - 1u);
+            let l = pt_lights[base + r.x + t];
+            let lamp = PtLamp(vec3<i32>(i32(l & 63u), i32((l >> 6u) & 63u), i32((l >> 12u) & 63u)) - 16 + cube * 16, l, f32(pt_lights[strengths + r.x + t]) * 0.25);
+            m += 1.0;
+            if k == 0u && pt.debug == 21u {
+                PT_NEE_DBG = pt_nee_tests(world, n, ng, lamp) * select(1.0, 0.5, lamp.strength <= 0.0);
+            }
+            let p = pt_nee_target(world, n, ng, lamp);
+            if p <= 0.0 {
+                continue;
+            }
+            // Its weight over the chance of drawing it (1 in `total`).
+            let w = p * f32(total);
+            if (lamp.word >> 31u) == 1u {
+                w_field += w;
+                if pt_rand(px, 17u + k * 2u).x * w_field < w {
+                    yf = lamp;
+                    yf_p = p;
+                }
+            } else {
+                w_sum += w;
+                if pt_rand(px, 17u + k * 2u).x * w_sum < w {
+                    y = lamp;
+                    y_p = p;
+                }
+            }
+        }
+    }
+    // Last frame's at this pixel and two near ones.
+    let check = pt_res_check(cell, ng);
+    // Each reused reservoir's draws and block (for the count below).
+    var res_m = array<f32, 3>(0.0, 0.0, 0.0);
+    var res_dc = array<vec3<i32>, 3>(vec3(0), vec3(0), vec3(0));
+    if reuse {
+        for (var j = 0u; j < 3u; j++) {
+            var q = pix;
+            if j > 0u {
+                let o = (pt_rand(px, 60u + j).xy * 2.0 - 1.0) * PT_RES_NEAR;
+                q = clamp(pix + vec2<i32>(round(o)), vec2(0), vec2<i32>(pt.size) - 1);
+            }
+            let v = pt_res_prev[u32(q.y) * pt.size.x + u32(q.x)];
+            if v.w == 0u || (v.w >> 27u) != (check >> 27u) {
+                continue;
+            }
+            let dc = pt_res_diff(v.w, check);
+            if (j == 0u && any(dc != vec3(0))) || any(abs(dc) > vec3(2)) {
+                continue;
+            }
+            let lamp = PtLamp(cell + dc + vec3<i32>(i32(v.x & 63u), i32((v.x >> 6u) & 63u), i32((v.x >> 12u) & 63u)) - 32, v.x, f32(v.y & 15u) * 0.25);
+            let mq = min(f32(v.y >> 4u), PT_RES_CAP);
+            res_m[j] = mq;
+            res_dc[j] = dc;
+            let p = pt_nee_target(world, n, ng, lamp);
+            let w = p * bitcast<f32>(v.z) * mq;
+            if w <= 0.0 {
+                continue;
+            }
+            if (lamp.word >> 31u) == 1u {
+                w_field += w;
+                if pt_rand(px, 70u + j).x * w_field < w {
+                    yf = lamp;
+                    yf_p = p;
+                }
+            } else {
+                w_sum += w;
+                if pt_rand(px, 70u + j).x * w_sum < w {
+                    y = lamp;
+                    y_p = p;
+                }
+            }
+        }
+    }
+    // The field's share at most `most`: its weights stand for its summed light over the draws
+    // (a lamp's light is its weight times its colour at the match per level), counted over every
+    // draw seen (the count below is at most that, so the share is if anything kept a little lower).
+    if w_field > 0.0 {
+        let seen = m + res_m[0] + res_m[1] + res_m[2];
+        let e = f32(max((yf.word >> 18u) & 15u, max((yf.word >> 22u) & 15u, (yf.word >> 26u) & 15u)));
+        let per = dot(pt_nee_one_off(yf.word, world, rel), vec3(0.2126, 0.7152, 0.0722)) * 15.0 / max(e, 1.0) * pt.emissive;
+        let s = min(1.0, most / max(w_field / seen * per, 1e-6));
+        w_field *= s;
+        if pt_rand(px, 75u).x * (w_sum + w_field) < w_field {
+            y = yf;
+            y_p = yf_p;
+        }
+        w_sum += w_field;
+    }
+    if y_p <= 0.0 {
+        PT_RES_M = m;
+        // Lamps in the list but none lighting this face (all behind it or out of reach): none of
+        // their light, not the lightmap's. The lightmap's floods round a wall, so falling back to
+        // it lit a wall's near face from a torch behind it (s2l wall); it stays only where the
+        // cube has no list (`0`).
+        return vec4(0.0, 0.0, 0.0, select(1.0, 0.0, total == 0u));
+    }
+    // The draws the chosen lamp stands for: this pixel's fresh ones, and each reused reservoir's
+    // only where that lamp could light the reservoir's own surface (its block, this face). Counting
+    // every reservoir's draws darkened the fires' light by 5-20 % (s2h, s2j nave12800 and
+    // fire18000): a near surface that can't see the chosen lamp (it lies behind it) could never
+    // have drawn it.
+    for (var j = 0u; j < 3u; j++) {
+        if res_m[j] > 0.0 && (all(res_dc[j] == vec3(0)) || pt_nee_target(world + vec3<f32>(res_dc[j]), n, ng, y) > 0.0) {
+            m += res_m[j];
+        }
+    }
+    PT_RES_M = m;
+    // (RIS: what was chosen, over its estimate, times the draws' mean weight.)
+    let ris = w_sum / (m * y_p);
+    let l = y.word;
+    let lp = y.lp;
+    if reuse {
+        let o = lp - cell + 32;
+        if all(o >= vec3(0)) && all(o < vec3(64)) {
+            let word = u32(o.x) | (u32(o.y) << 6u) | (u32(o.z) << 12u) | (l & 0xFFFC0000u);
+            let q = u32(round(y.strength * 4.0)) & 15u;
+            pt_res[at] = vec4(word, q | (u32(min(m, PT_RES_CAP)) << 4u), bitcast<u32>(ris), check);
+        }
+    }
+    let small = ((l >> 30u) & 1u) == 1u;
+    let fade = pt_nee_fade(f32(max((l >> 18u) & 15u, max((l >> 22u) & 15u, (l >> 26u) & 15u))), vec3<f32>(lp) + 0.5 - world);
+    let chosen_s = y.strength * fade;
+    // Its colour where it matches the lightmap, facing it.
+    let level = vec3(f32((l >> 18u) & 15u), f32((l >> 22u) & 15u), f32((l >> 26u) & 15u));
+    let at_d = clamp(max(level.r, max(level.g, level.b)) - 1.0, 1.0, PT_NEE_AT);
+    let one_off = pt_nee_one_off(l, world, rel);
+    if all(lp == vec3<i32>(floor(world - ng * 0.5))) {
+        return vec4(pt_nee_cap(one_off * chosen_s * PT_NEE_HOT * ris * pt.emissive), 1.0);
+    }
+    // A point on the light, a new one each frame (as `pt_block_visibility`), and one shadow ray.
+    let jit = vec3(pt_rand(px, 40u).xy, pt_rand(px, 48u).x) * 2.0 - 1.0;
+    var to = vec3<f32>(lp) + vec3(0.5, 0.6, 0.5) + jit * PT_FLAME - world;
+    var short = 0.9;
+    // How far the light is for its falloff: from the block's middle, as `pt_nee_target` and the
+    // 5-block match measure it (only which point the ray aims at moves to a face).
+    var mid = to;
+    if !small {
+        // A glowing block shines from its faces: one of the three facing this surface, drawn by
+        // how much of it faces it (so on average the whole block's light), a point on it, and
+        // the ray stopping at it. A face buried in the floor or ceiling then shades as it should
+        // and an open one lights even at a grazing look; aimed at a point inside the block, the
+        // ray's last stretch ran through the floor or ceiling beside lava in a pit or glowstone
+        // in a ceiling, which took the pit's light and cut hard wedges into the walls (s2i
+        // lava_glow).
+        let c = vec3<f32>(lp) + 0.5 - world;
+        mid = c;
+        let mb = -dot(c, ng);
+        if mb >= 0.0 {
+            mid += ng * (mb + 0.05);
+        }
+        let a = abs(c);
+        let u = pt_rand(px, 56u).x * (a.x + a.y + a.z);
+        var axis = vec3(0.0, 0.0, 1.0);
+        if u < a.x {
+            axis = vec3(1.0, 0.0, 0.0);
+        } else if u < a.x + a.y {
+            axis = vec3(0.0, 1.0, 0.0);
+        }
+        to = c - axis * sign(c) * 0.5 + (vec3(1.0) - axis) * jit * 0.48;
+        short = 0.03;
+    }
+    let behind = -dot(to, ng);
+    if behind >= 0.0 {
+        to += ng * (behind + 0.05);
+    }
+    let d2 = dot(to, to);
+    let dist = sqrt(d2);
+    let dir = to / max(dist, 1e-4);
+    let cs = pt_nee_cos(n, ng, dir);
+    if cs <= 0.0 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let hit = rt_hit(rel + lift, dir, max(dist - short, 0.0), 0.0);
+    if hit.hit && !hit.clear {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let r2 = select(PT_NEE_R2_BLOCK, PT_NEE_R2_FLAME, small);
+    let f = one_off * chosen_s * cs * pt_nee_falloff(select(d2, dot(mid, mid), !small), r2, at_d);
+    return vec4(pt_nee_cap(f * ris * pt.emissive), 1.0);
+}
+
 // ---- plain (`core:pt_plain`): vanilla's math, and only what tracing adds to it ----
 //
 // The world's pass without a pack (the engine's `world.wgsl`): the texel times its tint, its face's
@@ -448,6 +846,8 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     let at = (id.y * pt.size.x + id.x) * 3u;
+    // No lamp kept here unless the lamps' light below keeps one (`pt_block_direct`).
+    pt_res[id.y * pt.size.x + id.x] = vec4(0u);
     pt_out[at] = vec4(0.0);
     pt_out[at + 1u] = vec4(0.0);
     pt_out[at + 2u] = vec4(0.0);
@@ -585,6 +985,18 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     var diffuse_t = PT_SKY_T;
     if b.hit {
         bounce = pt_lit(b, l, pt_noise(px + vec2(3.0, 11.0)));
+        // Stage 2 step 2 (`core:pt_bounce_lights`, flags bit 0): the surface met is lit by the
+        // lamps as the pixel is (`pt_block_direct`: its own shadow ray), in place of its lightmap's
+        // block light; a lamp's own block met gives its glow. The wall a fire lights lights the floor.
+        if pt.emissive > 0.0 && (pt.flags & 1u) != 0u {
+            let b_block = max(light_on(b.n, vec4(0.0, b.light.yzw), 0.0, 1.0, b.world, b.rel) - light_on(b.n, vec4(0.0), 0.0, 1.0, b.world, b.rel), vec3(0.0));
+            if max(b_block.r, max(b_block.g, b_block.b)) > 1e-4 {
+                let e = pt_block_direct(b.world, b.rel, b.n, b.n, b.n * 0.02, px + vec2(37.0, 53.0), 0xffffffffu, vec2(0), PT_NEE_SUM * dot(b_block, vec3(0.2126, 0.7152, 0.0722)));
+                if e.a > 0.5 {
+                    bounce += pt_albedo(b) * (pt_nee_near_cap(e.rgb, b_block, PT_NEE_NEAR) - b_block);
+                }
+            }
+        }
         // Above 0 on every traced pixel: the denoisers read diffuse's a > 0 as "traced".
         diffuse_t = max(b.t, 1e-3);
     }
@@ -603,9 +1015,22 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // lightmap's block light keeps its colour and reach; the held light is not a block's.
     let block = max(light_on(n, h.light, 0.0, 1.0, h.world, h.rel) - light_on(n, vec4(h.light.x, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel), vec3(0.0));
     var block_vis = vec2(1.0, 0.0);
+    var direct = vec3(0.0);
     if max(block.r, max(block.g, block.b)) > 1e-4 {
-        block_vis = pt_block_visibility(h.world, h.rel, ng, lift, px);
-        diffuse -= block * ((1.0 - block_vis.x) * PT_BLOCK_SHADOW);
+        if pt.emissive > 0.0 {
+            // The lamps' own light in place of the lightmap's, where a light of the list reaches.
+            let e = pt_block_direct(h.world, h.rel, n, ng, lift, px, id.y * pt.size.x + id.x, vec2<i32>(id.xy), PT_NEE_SUM * dot(block, vec3(0.2126, 0.7152, 0.0722)));
+            block_vis = vec2(select(0.0, 1.0, max(e.r, max(e.g, e.b)) > 0.0), e.a);
+            if e.a > 0.5 {
+                direct = pt_nee_near_cap(e.rgb, block, PT_NEE_NEAR);
+                diffuse += direct - block;
+            } else {
+                direct = block;
+            }
+        } else {
+            block_vis = pt_block_visibility(h.world, h.rel, ng, lift, px);
+            diffuse -= block * ((1.0 - block_vis.x) * PT_BLOCK_SHADOW);
+        }
     }
     // Into the cache: the indirect light found here (one pixel in four a frame).
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
@@ -690,6 +1115,12 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 6u: { out = albedo * pt_cached(h.world, ng, dist, pt_noise(px + vec2(3.0, 11.0))).rgb; }
             // 14: the lightmap's block light at the surface (as light, without the texture).
             case 14u: { out = block; }
+            // 19: the lamps' light as traced (`core:pt_emissive`; the lightmap's where none reaches).
+            case 19u: { out = direct; }
+            // 20: the draws the lamps' reservoir stood for (ReSTIR): black 0, white `PT_RES_CAP`.
+            case 20u: { out = vec3(PT_RES_M / PT_RES_CAP); }
+            // 21: the first fresh draw's tests (`PT_NEE_DBG`; half bright when its strength is 0).
+            case 21u: { out = PT_NEE_DBG; }
             // 15: the traced block lights: green seen, red hidden; no light drawn: blue no list for
             // the cube, cyan none in reach, magenta no lights at all; black no block light.
             case 15u: {

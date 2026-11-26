@@ -1636,6 +1636,9 @@ pub mod comp {
     pub const KEEP_BROKEN: &str = "keep_broken";
     /// The block drops its loot only to a fitting tool of at least this level (0 = any tier).
     pub const HARVEST_LEVEL: &str = "harvest_level";
+    /// chiacraft: on a block that gives light, how strongly the path tracer's traced light shines from
+    /// it (`f32`, 1 a torch's; default by kind: fire 2.5, lava 2, glowstone 1.5, the rest 1).
+    pub const LIGHT_STRENGTH: &str = "light_strength";
     /// Items: right click tries the hand whose item has the higher one first (default 0).
     pub const USE_PRIORITY: &str = "use_priority";
     /// Items, a tag: needs both hands.
