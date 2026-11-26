@@ -54,6 +54,9 @@ until chat base:sharp_flake within 5
 # 3. The axe head on the knapping screen: sneaking, the rock on a fresh nodule.
 chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
 chat /tk set ~ ~ ~-1 base:loose_flint
+# Three flakes use a nodule up (FLAKES_PER_STONE), and a strike on the bare ground after puts the
+# rock down: a rock back in the bag.
+chat /tk give base:rock
 chat /tk hand me base:rock
 wait 0.5
 hold core:sneak 2 nowait
@@ -293,6 +296,12 @@ until screen core:menu within 10
 wait 1
 tap_once core:menu icon:base:string
 tap_once core:menu text:craft 5
+wait 1
+key Escape
+until screen none within 10
+# The book sorts what can be made when it opens: reopened, the axe (string now in the bag) is on its first page.
+press core:inventory
+until screen core:menu within 10
 wait 1
 tap_once core:menu icon:base:axe
 wait 1
