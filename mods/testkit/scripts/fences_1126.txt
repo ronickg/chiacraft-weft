@@ -4,7 +4,7 @@
 #   A (west, centre ~-8 ~ ~-10) walled with fences, B (east, centre ~8 ~ ~-10) with a cobblestone
 #   wall one block high (a control: a deer steps over one block). After 90 s (ticks running, the
 #   player a spectator high above so nothing is scared), /tk near counts what is still inside
-#   each pen (radius 3) and round it (radius 12). Expect A: all 4 inside; B: fewer inside (they
+#   each pen (radius 4: a deer in a corner sits ~4.1 from the centre; Animals, 11-26) and round it (radius 12). Expect A: all 4 inside; B: fewer inside (they
 #   step out). The shot fp_pens shows the fences joined into a ring (rails between posts, no
 #   gaps) and the deer.
 # Part 3 (11-26 later): fences of other woods join each other and the oak: a line south from pen
@@ -52,8 +52,8 @@ chat /tk spawn animals:white_tailed_deer ~9 ~ ~-11
 chat /tk spawn animals:white_tailed_deer ~7 ~ ~-9
 chat /tk spawn animals:white_tailed_deer ~9 ~ ~-9
 wait 1
-chat /tk near ~-8 ~ ~-10 3
-chat /tk near ~8 ~ ~-10 3
+chat /tk near ~-8 ~ ~-10 4
+chat /tk near ~8 ~ ~-10 4
 # Up out of the way, a spectator: nothing scares them.
 chat /tk mode spectator
 chat /tp ~ ~30 ~6
@@ -63,9 +63,9 @@ shot fp_pens.png
 wait 88
 chat /tp ~ ~-30 ~-6
 wait 1
-chat /tk near ~-8 ~ ~-10 3
+chat /tk near ~-8 ~ ~-10 4
 chat /tk near ~-8 ~ ~-10 12
-chat /tk near ~8 ~ ~-10 3
+chat /tk near ~8 ~ ~-10 4
 chat /tk near ~8 ~ ~-10 12
 # Part 2: the gate in pen A's south side, used for real.
 # The gate is placed by the player's hand (a set gate takes the first facing, west, across the
