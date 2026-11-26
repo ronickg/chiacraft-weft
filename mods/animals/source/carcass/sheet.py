@@ -34,9 +34,10 @@ def main():
     names = ["quadruped", "bird", "biped", "reptile", "fish"]
     cell = 300
     rows = []
+    which = ("_bones", "_pile") if "--bones" in sys.argv else ("", "_open")
     for n in names:
         row = []
-        for suffix in ("", "_open"):
+        for suffix in which:
             spec = json.load(open(os.path.join(OUT, f"carcass_{n}{suffix}.spec.json")))
             for yaw, pitch in ((35, -30), (150, -42)):
                 ppu = {"quadruped": 2.2, "bird": 5.5, "biped": 2.2, "reptile": 2.2, "fish": 7}[n]
@@ -44,7 +45,7 @@ def main():
                 img.thumbnail((cell, cell))
                 row.append((f"{n}{suffix} {yaw}/{pitch}", img))
         rows.append(row)
-    spec = json.load(open(os.path.join(OUT, "carcass_quadruped_open.spec.json")))
+    spec = json.load(open(os.path.join(OUT, f"carcass_quadruped{which[0] if which[0] else '_open'}.spec.json")))
     row = []
     for label, coat, under in (("grey wolf coat", (118, 112, 104), (206, 200, 190)),
                                ("capybara coat", (140, 96, 60), (156, 112, 76)),
@@ -54,7 +55,8 @@ def main():
         img.thumbnail((cell, cell))
         row.append((label, img))
     rows.append(row)
-    befores = [Image.open(p).convert("RGBA") for p in sys.argv[sys.argv.index("--before") + 1:]] if "--before" in sys.argv else []
+    befores = [Image.open(p).convert("RGBA") for p in sys.argv[sys.argv.index("--before") + 1:] if not p.startswith("--")] \
+        if "--before" in sys.argv else []
     top = 0
     for im in befores:
         im.thumbnail((cell * 2, cell))
@@ -66,14 +68,15 @@ def main():
         sheet.paste(im, (x, 20))
         x += im.width + 10
     if befores:
-        d.text((4, 4), "before (r6 in the game): the living model rolled onto its side", fill=(255, 255, 255, 255))
+        d.text((4, 4), "before (in the game)", fill=(255, 255, 255, 255))
     for r, row in enumerate(rows):
         for c, (label, img) in enumerate(row):
             x0, y0 = c * cell, top + r * (cell + 20)
             sheet.alpha_composite(img, (x0 + (cell - img.width) // 2, y0 + 18 + (cell - img.height) // 2))
             d.text((x0 + 4, y0 + 2), label, fill=(255, 255, 255, 255))
-    sheet.save(os.path.join(OUT, "sheet.png"))
-    print(os.path.join(OUT, "sheet.png"))
+    name = "sheet_bones.png" if "--bones" in sys.argv else "sheet.png"
+    sheet.save(os.path.join(OUT, name))
+    print(os.path.join(OUT, name))
 
 
 if __name__ == "__main__":

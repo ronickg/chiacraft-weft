@@ -117,6 +117,13 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   1 hide at quality 1 from a level-33 deer, 4 venison; the venison taken counts as eaten, so it steps to Bones); the
   kneel view shows the deer on its side, belly and legs toward the skinner, on its pool; the five plans' opened bodies
   rest on the ground.
-- Left for later: white spotting and patterns on dead coats (only the base and underside colours carry over); the dead body shows the base coat, not its own; vultures
+- Planner on r9: the kneel fell apart (Weft's humanoid has no parent bones and its body hangs from the neck: r9's
+  10 degree torso and 38 degree head tipped apart over flat legs). Refitted by `mods/base/source/player/skin_pose.py`:
+  torso, head and arms turned 30 degrees about the hips with position keys holding each joint, knees down behind,
+  hands at the body. Slice 3, second part: bones and pile per body plan (`body.py`: a ribcage on its side, skull,
+  legs' long bones with their hooves or claws, a little meat, a scrap of the animal's own hide or feathers that the
+  coat painter turns to its colour; the pile a skull, a few long bones and the hide), replacing slice 1's one
+  placeholder pair. cov_carcass shots 14 (bones) and 15 (pile) of each plan's row.
+- Left for later: white spotting and patterns on dead coats (next) (only the base and underside colours carry over); the dead body shows the base coat, not its own; vultures
   fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.
