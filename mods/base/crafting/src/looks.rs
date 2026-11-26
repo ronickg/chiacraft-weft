@@ -262,6 +262,13 @@ pub fn ramp(material: &str) -> String {
     format!("base:ramps/{material}")
 }
 
+/// The skin of Weft's 3D bow (`models/item/bow.geo.json`) painted with a bow's stave, grip and
+/// string materials: its shade map (`textures/parts/bow/skin.png`, made from Weft's skin by
+/// `source/items/bow_skin_map.py`) with their ramps, for the stack's model as `<file>|<skin>`.
+pub fn bow_skin(stave: &str, grip: &str, string: &str) -> String {
+    format!("base:parts/bow/skin@{},{},{}", ramp(stave), ramp(grip), ramp(string))
+}
+
 /// Where gems sit on each kind's 32 px icon, the centre of its first, second and third socket
 /// (measured on the iron heads, the hilt's guard and pommel, and the armour shells' icons).
 pub const GEM_SPOTS: &[(&str, [[i32; 2]; 3])] = &[
@@ -544,6 +551,24 @@ mod tests {
             for layer in arrow_look(m).split(';') {
                 let f = file(layer);
                 assert!(std::path::Path::new(&f).exists(), "{m}: no {f}");
+            }
+        }
+    }
+
+    #[test]
+    fn every_bow_skin_has_its_map_and_ramps() {
+        // Weft's 3D bow painted per stack: the shade map and a ramp for each material that can be a
+        // stave, a grip or a string (a missing ramp leaves that region unpainted).
+        let tex = concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/textures/");
+        let file = |name: &str| format!("{tex}{}.png", name.trim_start_matches("base:"));
+        let (map, ramps) = bow_skin("yew", "leather", "sinew").split_once('@').map(|(m, r)| (m.to_string(), r.to_string())).unwrap();
+        assert!(std::path::Path::new(&file(&map)).exists(), "no {map}");
+        assert_eq!(ramps.split(',').count(), 3);
+        let bow = crate::kinds::KINDS.iter().find(|k| k.id == "bow").unwrap();
+        for slot in bow.slots {
+            for m in crate::materials::MATERIALS.iter().filter(|m| crate::materials::fits(m, "bow", slot.name, slot.role)) {
+                let f = file(&ramp(m.id));
+                assert!(std::path::Path::new(&f).exists(), "a bow's {} of {}: no {f}", slot.name, m.id);
             }
         }
     }

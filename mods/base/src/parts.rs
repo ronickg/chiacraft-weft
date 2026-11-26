@@ -478,6 +478,11 @@ fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats, gems: &[
         (true, true) => look,
     };
     let stack = with_look(stack, (!look.is_empty()).then_some(look.as_str()));
+    // A bow is drawn by Weft's 3D model (its draw bends it): that skin, in its parts' colours.
+    let stack = match bow_model(kind.id, &plain) {
+        Some(model) => stack.with(&weft_sdk::MODEL, Text::from(model)),
+        None => stack,
+    };
     let worn = (used * uses as f32) as u32;
     if worn > 0 { stack.with(&DAMAGE, worn) } else { stack }
 }
@@ -627,6 +632,19 @@ pub fn look_text(kind: &str, parts: &[Part]) -> String {
         })
         .collect::<Vec<_>>()
         .join(";")
+}
+
+/// A bow's model, Weft's 3D one skinned in its stave's, grip's and string's materials
+/// (`crafting::looks::bow_skin`); `None` for other kinds or a bow missing a part.
+fn bow_model(kind: &str, parts: &[Part]) -> Option<String> {
+    if kind != "bow" {
+        return None;
+    }
+    let material = |slot: &str| parts.iter().find(|p| p.slot == slot).map(|p| p.material);
+    Some(format!(
+        "base:item/bow|{}",
+        crafting::looks::bow_skin(material("stave")?, material("grip")?, material("string")?)
+    ))
 }
 
 /// What the assembly slots make, for the output slot (empty when nothing).

@@ -1219,12 +1219,15 @@ impl Models {
     }
 
     /// `name`'s model from its file, read once: `models/<name>.geo.json`, its clips, what its bones
-    /// do. An item adds the clips it brings along.
+    /// do. An item adds the clips it brings along. `<file>|<skin>` (a stack's `abi::comp::MODEL`)
+    /// skins that file's model with `skin` instead of `textures/<file>.png`: a texture, or a look
+    /// text composed as a worn look is (`stack::is_look`), so one model shows what a stack is made of.
     pub fn load_file(&mut self, assets: &Assets, name: &str, item: Option<u32>) -> Option<u32> {
         let key = self.file_key(name, item).into_owned();
         if let Some(&k) = self.files.get(&key) {
             return k;
         }
+        let (name, skin) = name.split_once('|').unwrap_or((name, name));
         let geo = read(assets, name, "models", "geo.json").and_then(|src| {
             model::load_geo(&src)
                 .map_err(|e| log::error!("model {name}: {e}"))
@@ -1237,8 +1240,8 @@ impl Models {
             let k = push_kind(&mut self.kinds, &mut self.tables, g.parts, g.texture, (&own, &[], &[]), None);
             let m = &mut self.kinds[k as usize];
             m.live = live_bones(name, &m.parts, &motions_of(assets, name));
-            m.skin = Some(name.to_string());
-            self.new_skins.push(name.to_string());
+            m.skin = Some(skin.to_string());
+            self.new_skins.push(skin.to_string());
             self.stale = true;
             k
         });

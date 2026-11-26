@@ -1,9 +1,12 @@
 # The held bow (11-26, Tester's pt_rain_3: /gear bow yew drew as a solid dark-red box right of the
 # crosshair, and slot 1 showed no icon). Weft's 3D bow (models/item/bow.geo.json) is skinned with
 # textures/item/bow.png; the 11-22 sync had kept our 32 px flat icon there, so the model sampled
-# the wrong texture. The skin is Weft's again. Expect: the bow in the hand in first person (a
-# brown wooden bow with a string, not a box), its icon in hotbar slot 1, the draw bending it with
-# an arrow nocked (bh_draw), and in third person the bow in the player's hand.
+# the wrong texture. The skin is Weft's again, and each bow's skin is painted from its parts
+# (engine `<file>|<skin>` model, `parts::bow_model`): the yew bow (leather grip, sinew string)
+# reddish brown, the osage one (rawhide, plant cordage) golden. Expect: the bow in the hand in
+# first person (a wooden bow with a string, not a box), its icon in hotbar slot 1, the draw
+# bending it with an arrow nocked (bh_draw), in third person the bow in the player's hand, and in
+# bh_osage the second bow golden with its own icon in slot 3. Read the /gear replies too.
 # Read the shots and run.log for "no model" or texture errors. A fresh world name each run.
 loaded
 idle
@@ -36,5 +39,9 @@ chat /gear knife flint slot=1
 key 2
 wait 1
 shot bh_knife.png
+chat /gear bow osage_orange rawhide plant_cordage slot=2
+key 3
+wait 1
+shot bh_osage.png
 expect alive
 quit
