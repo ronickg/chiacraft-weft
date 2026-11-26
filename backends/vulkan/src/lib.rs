@@ -133,10 +133,16 @@ pub struct VulkanBackend {
     /// Compiled pipelines, kept in `cache_file` between runs; `cache_dirty` once one was added.
     pipeline_cache: vk::PipelineCache,
     cache_file: Option<std::path::PathBuf>,
+    /// The cache started from nothing: its size is written as `clean_size` with each save.
+    cache_fresh: bool,
     cache_dirty: bool,
     /// `precompile`'s threads, how many are still at it, and whether one finished since the
     /// cache was last written.
     compile_threads: Vec<std::thread::JoinHandle<()>>,
+    /// `warm_pipelines_behind`'s batches, merged into the kept cache by `warming` once done.
+    warm_behind: Vec<std::thread::JoinHandle<WarmDone>>,
+    /// Set on drop: the batches start no further pipeline.
+    warm_stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
     compiling: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     compiled: std::sync::Arc<std::sync::atomic::AtomicBool>,
     allocator: ManuallyDrop<Allocator>,
@@ -629,10 +635,24 @@ impl VulkanBackend {
             let draw_count_fn = draw_count.then(|| khr::draw_indirect_count::Device::new(&instance, &device));
             // The driver checks the data is its own and starts empty otherwise.
             let cache_file = desc.cache.map(|d| d.join("vulkan_pipelines.bin"));
-            let cached = cache_file
+            let mut cached = cache_file
                 .as_ref()
                 .and_then(|f| std::fs::read(f).ok())
                 .unwrap_or_default();
+            // The driver's data only grows: every pipeline ever compiled stays, each shader edit
+            // and setting adding a set (the 3060 laptop's reached 545 MB, a Mac's 172 MB hung in
+            // vkCreatePipelineCache). Past `CACHE_GROWTH` times what a start from nothing kept
+            // (`clean_size`), or with no such size known, it starts from nothing again.
+            let clean = cache_file.as_ref().and_then(|f| clean_size(f));
+            if !cached.is_empty() && clean.is_none_or(|c| cached.len() as u64 > CACHE_GROWTH * c.max(1 << 20)) {
+                log::info!(
+                    "pipeline cache {} MB (from nothing: {}), started again",
+                    cached.len() >> 20,
+                    clean.map_or("unknown".into(), |c| format!("{} MB", c >> 20))
+                );
+                cached = Vec::new();
+            }
+            let cache_fresh = cached.is_empty();
             let pipeline_cache = device
                 .create_pipeline_cache(&vk::PipelineCacheCreateInfo::default().initial_data(&cached), None)
                 .or_else(|_| device.create_pipeline_cache(&Default::default(), None))
@@ -798,8 +818,11 @@ impl VulkanBackend {
                 passes: HashMap::new(),
                 pipeline_cache,
                 cache_file,
+                cache_fresh,
                 cache_dirty: false,
                 compile_threads: Vec::new(),
+                warm_behind: Vec::new(),
+                warm_stop: Default::default(),
                 compiling: Default::default(),
                 compiled: Default::default(),
                 allocator: ManuallyDrop::new(allocator),
@@ -1155,7 +1178,11 @@ impl VulkanBackend {
             .parent()
             .map_or(Ok(()), std::fs::create_dir_all)
             .and_then(|_| std::fs::write(&part, &data))
-            .and_then(|_| std::fs::rename(&part, file));
+            .and_then(|_| std::fs::rename(&part, file))
+            .and_then(|_| match self.cache_fresh {
+                true => std::fs::write(file.with_extension("clean"), data.len().to_string()),
+                false => Ok(()),
+            });
         if let Err(e) = written {
             log::warn!("{}: {e}", file.display());
         }
@@ -1969,6 +1996,72 @@ impl VulkanBackend {
 
     /// What a graphics pipeline needs from the backend (SPIR-V, layout, render pass), made here so
     /// that `build_pipeline` can run on any thread.
+    /// `descs` made ready for `warm_batch`; one that fails is left out (it compiles when made).
+    fn prepare_warm(&mut self, descs: &[PipelineDesc]) -> Vec<PreparedPipeline> {
+        descs
+            .iter()
+            .filter_map(|d| {
+                self.prepare_pipeline(d, &[])
+                    .map_err(|e| log::warn!("warming {}: {}", d.label, e.0))
+                    .ok()
+            })
+            .collect()
+    }
+
+    /// After `warm_batch`: its caches merged into the kept one, what it took logged, its parts
+    /// destroyed.
+    fn finish_warm(&mut self, done: WarmDone) {
+        let WarmDone { own, mut took, prepared, threads, started } = done;
+        if !own.is_empty() {
+            if let Err(e) = unsafe { self.device.merge_pipeline_caches(self.pipeline_cache, &own) } {
+                log::warn!("merging the warmed pipelines: {e:?}");
+            }
+            for c in &own {
+                unsafe { self.device.destroy_pipeline_cache(*c, None) };
+            }
+        }
+        if !prepared.is_empty() {
+            self.cache_dirty = true;
+            took.sort_by(|a, b| b.0.total_cmp(&a.0));
+            let name = |i: usize| {
+                let p = &prepared[i];
+                format!("{}/{}", p.vs_name.to_string_lossy(), p.fs.map_or("-".into(), |_| p.fs_name.to_string_lossy()))
+            };
+            let slowest: Vec<String> = took
+                .iter()
+                .take(5)
+                .map(|&(t, i)| format!("{} {t:.1} s", name(i)))
+                .collect();
+            log::info!(
+                "warmed {} pipelines in {:.1} s on {} threads ({:.1} s of compiling; slowest {})",
+                prepared.len(),
+                started.elapsed().as_secs_f32(),
+                threads,
+                took.iter().map(|t| t.0).sum::<f32>(),
+                slowest.join(", ")
+            );
+            // Every pipeline over a second, in the order asked (for finding what a driver is slow
+            // to compile).
+            let mut all: Vec<_> = took.iter().filter(|t| t.0 >= 1.0).collect();
+            all.sort_by_key(|t| t.1);
+            let all: Vec<String> = all
+                .iter()
+                .map(|&&(t, i)| format!("#{i} {} {t:.1}", name(i)))
+                .collect();
+            if !all.is_empty() {
+                log::info!("warmed pipelines over 1 s: {}", all.join(", "));
+            }
+        }
+        for p in prepared {
+            unsafe {
+                p.destroy_modules(&self.device);
+                self.device.destroy_pipeline_layout(p.layout, None);
+                self.device
+                    .destroy_descriptor_set_layout(p.set_layout, None);
+            }
+        }
+    }
+
     fn prepare_pipeline(&mut self, desc: &PipelineDesc, extra: &[Format]) -> Result<PreparedPipeline, Error> {
         let vs = self.spirv(desc.shader, naga::ShaderStage::Vertex, desc.vertex)?;
         let fs = match desc.fragment {
@@ -2158,6 +2251,81 @@ impl PreparedPipeline {
             }
         }
     }
+}
+
+/// How many times the size it had from nothing the pipeline cache may grow before a start begins
+/// it again.
+const CACHE_GROWTH: u64 = 3;
+
+/// The pipeline cache's size when it was last written by a start that began it from nothing
+/// (`vulkan_pipelines.clean` beside `file`).
+fn clean_size(file: &std::path::Path) -> Option<u64> {
+    std::fs::read_to_string(file.with_extension("clean"))
+        .ok()?
+        .trim()
+        .parse()
+        .ok()
+}
+
+/// A batch `warm_batch` compiled: the caches it compiled into (to merge into the kept one),
+/// each pipeline's seconds by its place in `prepared`, and `prepared` (destroyed by
+/// `VulkanBackend::finish_warm`).
+struct WarmDone {
+    own: Vec<vk::PipelineCache>,
+    took: Vec<(f32, usize)>,
+    prepared: Vec<PreparedPipeline>,
+    threads: usize,
+    started: std::time::Instant,
+}
+
+fn warm_threads(n: usize) -> usize {
+    std::thread::available_parallelism()
+        .map_or(4, |n| n.get())
+        .clamp(1, 16)
+        .min(n.max(1))
+}
+
+/// Compiles `prepared` on `threads` threads, each into a pipeline cache of its own, keeping no
+/// pipeline: what stays is the driver's compiled code in those caches. MoltenVK holds a pipeline
+/// cache's lock while it compiles into it, so threads sharing one compiled one at a time (the
+/// Mac: 63 s to 44 s only). Without caches of their own the threads share `shared` (none when
+/// null).
+fn warm_batch(
+    device: &ash::Device,
+    shared: vk::PipelineCache,
+    prepared: Vec<PreparedPipeline>,
+    threads: usize,
+    started: std::time::Instant,
+    stop: Option<&std::sync::atomic::AtomicBool>,
+) -> WarmDone {
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let took = std::sync::Mutex::new(Vec::new());
+    let own: Vec<vk::PipelineCache> = (0..threads.min(prepared.len()))
+        .filter_map(|_| unsafe { device.create_pipeline_cache(&Default::default(), None) }.ok())
+        .collect();
+    let caches = if own.is_empty() && !prepared.is_empty() { vec![shared] } else { own.clone() };
+    std::thread::scope(|scope| {
+        for &cache in &caches {
+            let (next, took, prepared) = (&next, &took, &prepared);
+            scope.spawn(move || {
+                loop {
+                    if stop.is_some_and(|s| s.load(std::sync::atomic::Ordering::Relaxed)) {
+                        break;
+                    }
+                    let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some(p) = prepared.get(i) else { break };
+                    let one = std::time::Instant::now();
+                    let built = unsafe { build_pipeline(device, cache, p) };
+                    took.lock().unwrap().push((one.elapsed().as_secs_f32(), i));
+                    match built {
+                        Ok(raw) => unsafe { device.destroy_pipeline(raw, None) },
+                        Err(e) => log::warn!("warming a pipeline: {e:?}"),
+                    }
+                }
+            });
+        }
+    });
+    WarmDone { own, took: took.into_inner().unwrap(), prepared, threads: caches.len(), started }
 }
 
 /// `vkCreateGraphicsPipelines` for `p`: where the driver compiles (MoltenVK: SPIRV-Cross to MSL,
@@ -2464,98 +2632,42 @@ impl Backend for VulkanBackend {
 
     fn warm_pipelines(&mut self, descs: &[PipelineDesc]) {
         let started = std::time::Instant::now();
-        let prepared: Vec<PreparedPipeline> = descs
-            .iter()
-            .filter_map(|d| {
-                self.prepare_pipeline(d, &[])
-                    .map_err(|e| log::warn!("warming {}: {}", d.label, e.0))
-                    .ok()
-            })
-            .collect();
-        let threads = std::thread::available_parallelism()
-            .map_or(4, |n| n.get())
-            .clamp(1, 16);
-        let next = std::sync::atomic::AtomicUsize::new(0);
-        let took = std::sync::Mutex::new(Vec::new());
-        let device = &self.device;
-        // A cache per thread, merged into the kept one after: MoltenVK holds a pipeline cache's
-        // lock while it compiles into it, so threads sharing one compiled one at a time (the Mac:
-        // 63 s to 44 s only).
-        let own: Vec<vk::PipelineCache> = (0..threads.min(prepared.len()))
-            .filter_map(|_| unsafe { device.create_pipeline_cache(&Default::default(), None) }.ok())
-            .collect();
-        // Without caches of their own, the threads share the kept one.
-        let caches = if own.is_empty() && !prepared.is_empty() { vec![self.pipeline_cache] } else { own.clone() };
-        std::thread::scope(|scope| {
-            for &cache in &caches {
-                let (next, took, prepared) = (&next, &took, &prepared);
-                scope.spawn(move || {
-                    loop {
-                        let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        let Some(p) = prepared.get(i) else { break };
-                        // The pipeline goes: what stays is the driver's compiled code in the cache.
-                        let one = std::time::Instant::now();
-                        let built = unsafe { build_pipeline(device, cache, p) };
-                        took.lock().unwrap().push((one.elapsed().as_secs_f32(), i));
-                        match built {
-                            Ok(raw) => unsafe { device.destroy_pipeline(raw, None) },
-                            Err(e) => log::warn!("warming a pipeline: {e:?}"),
-                        }
-                    }
-                });
-            }
-        });
-        if !own.is_empty() {
-            if let Err(e) = unsafe { device.merge_pipeline_caches(self.pipeline_cache, &own) } {
-                log::warn!("merging the warmed pipelines: {e:?}");
-            }
-            for c in &own {
-                unsafe { device.destroy_pipeline_cache(*c, None) };
+        let prepared = self.prepare_warm(descs);
+        let threads = warm_threads(prepared.len());
+        let done = warm_batch(&self.device, self.pipeline_cache, prepared, threads, started, None);
+        self.finish_warm(done);
+    }
+
+    fn warm_pipelines_behind(&mut self, descs: &[PipelineDesc]) {
+        let started = std::time::Instant::now();
+        let prepared = self.prepare_warm(descs);
+        if prepared.is_empty() {
+            return;
+        }
+        // Half the threads: the frame and the chunk meshers keep going meanwhile.
+        let threads = warm_threads(prepared.len()).div_ceil(2);
+        let (device, stop) = (self.device.clone(), self.warm_stop.clone());
+        // Never the kept cache: the threads have caches of their own (else they share none, and
+        // a pipeline made meanwhile compiles alone as before), merged into it by `warming`.
+        self.warm_behind
+            .push(std::thread::spawn(move || warm_batch(&device, vk::PipelineCache::null(), prepared, threads, started, Some(&stop))));
+    }
+
+    fn warming(&mut self) -> bool {
+        let mut i = 0;
+        while i < self.warm_behind.len() {
+            // Merged only with no `precompile` thread in the kept cache: its merge is not
+            // internally synchronized.
+            if self.warm_behind[i].is_finished() && !self.compiling() {
+                let t = self.warm_behind.swap_remove(i);
+                if let Ok(done) = t.join() {
+                    self.finish_warm(done);
+                }
+            } else {
+                i += 1;
             }
         }
-        if !descs.is_empty() {
-            self.cache_dirty = true;
-            let mut took = took.into_inner().unwrap();
-            took.sort_by(|a, b| b.0.total_cmp(&a.0));
-            let slowest: Vec<String> = took
-                .iter()
-                .take(5)
-                .map(|&(t, i)| {
-                    let p = &prepared[i];
-                    format!("{}/{} {t:.1} s", p.vs_name.to_string_lossy(), p.fs.map_or("-".into(), |_| p.fs_name.to_string_lossy()))
-                })
-                .collect();
-            log::info!(
-                "warmed {} pipelines in {:.1} s on {} threads ({:.1} s of compiling; slowest {})",
-                descs.len(),
-                started.elapsed().as_secs_f32(),
-                caches.len(),
-                took.iter().map(|t| t.0).sum::<f32>(),
-                slowest.join(", ")
-            );
-            // Every pipeline over a second, in the order asked (for finding what a driver is slow
-            // to compile: the world's plain set first, then its calm sets).
-            let mut all: Vec<_> = took.iter().filter(|t| t.0 >= 1.0).collect();
-            all.sort_by_key(|t| t.1);
-            let all: Vec<String> = all
-                .iter()
-                .map(|&&(t, i)| {
-                    let p = &prepared[i];
-                    format!("#{i} {}/{} {t:.1}", p.vs_name.to_string_lossy(), p.fs.map_or("-".into(), |_| p.fs_name.to_string_lossy()))
-                })
-                .collect();
-            if !all.is_empty() {
-                log::info!("warmed pipelines over 1 s: {}", all.join(", "));
-            }
-        }
-        for p in prepared {
-            unsafe {
-                p.destroy_modules(&self.device);
-                self.device.destroy_pipeline_layout(p.layout, None);
-                self.device
-                    .destroy_descriptor_set_layout(p.set_layout, None);
-            }
-        }
+        !self.warm_behind.is_empty()
     }
 
     fn precompile(&mut self, desc: &ComputeDesc) {
@@ -3162,6 +3274,15 @@ impl Drop for VulkanBackend {
     fn drop(&mut self) {
         for t in self.compile_threads.drain(..) {
             let _ = t.join();
+        }
+        // A batch still warming finishes the pipelines it is at and starts none more; what it
+        // compiled is kept for the next start.
+        self.warm_stop
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        for t in std::mem::take(&mut self.warm_behind) {
+            if let Ok(done) = t.join() {
+                self.finish_warm(done);
+            }
         }
         unsafe {
             self.device.device_wait_idle().ok();

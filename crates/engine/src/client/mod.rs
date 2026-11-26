@@ -4340,6 +4340,7 @@ impl Client {
             && (scene.params[0] - 0.6 * scene.params[1]).abs() <= 0.5;
         // And dry (`gpu_layout::DRY_OFF`): no rain, the ground dry, no puddles, no snow lying here.
         let dry = scene.fog_color[3] <= 0.0 && scene.canopy[1] <= 0.0 && scene.canopy[2] <= 0.0 && scene.ground[0] <= 0.0;
+        self.render.finish_calm(gpu);
         self.render.set_calm(if calm { 1 + dry as u8 } else { 0 });
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(

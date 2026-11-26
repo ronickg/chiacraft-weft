@@ -419,6 +419,9 @@ pub struct WorldRenderer {
     /// place here holds the plain ones meanwhile.
     calm_sets: [Option<ColorPipes>; 2],
     calm_level: u8,
+    /// The calm shaders whose pipelines are compiling behind (`warm_calm`), and since when.
+    calm_pending: [Option<Shader>; 2],
+    calm_since: std::time::Instant,
     /// How far from the camera (blocks, across) the cubes end while distant terrain is shown; 0:
     /// no fade. Cubes past it aren't drawn.
     pub lod_fade: u32,
@@ -616,7 +619,7 @@ impl WorldRenderer {
             .map_err(|e| e.0)
             .and_then(|(s, slots)| {
                 calm = Self::calm_shaders(assets);
-                Self::warm(gpu, &s, &calm);
+                Self::warm(gpu, &[&s], Some(&s), false);
                 Ok((Self::pipelines(gpu, &s)?, s, slots))
             });
         let made = match made {
@@ -666,7 +669,7 @@ impl WorldRenderer {
         let shadow_globals = (0..frames)
             .map(|_| gpu.create_buffer(size_of::<Globals>() as u64, usage::STORAGE | usage::HOST, "shadow globals"))
             .collect();
-        Ok(WorldRenderer {
+        let mut renderer = WorldRenderer {
             shadow_pipes,
             lod_shadow_pipe,
             terrain_epoch: 0,
@@ -750,13 +753,19 @@ impl WorldRenderer {
             rt_reload: false,
             ground_compiled,
             calm_sets: {
-                let sets = [Self::calm_pipes(gpu, calm[0].as_ref()), Self::calm_pipes(gpu, calm[1].as_ref())];
                 log::info!("world shader ready in {:.1} s", started.elapsed().as_secs_f32());
-                sets
+                [None, None]
             },
+            calm_pending: [None, None],
+            calm_since: std::time::Instant::now(),
             calm_level: 0,
             lod_drawn: 0,
-        })
+        };
+        // The calm sets only speed a calm scene up (the plain ones draw it the same meanwhile):
+        // compiled behind, the world opens without them (the 3060 laptop: 34 of the 56
+        // pipelines, about 58% of a cold compile).
+        renderer.warm_calm(gpu, calm);
+        Ok(renderer)
     }
 
     /// The colour pipelines from the world shader with `CALM` true (`packs::compose_calm`), when
@@ -792,7 +801,10 @@ impl WorldRenderer {
     /// before they are made one by one from the warm cache. A shader pack's on Metal (MoltenVK):
     /// 40 s and more one at a time, the first time its source is seen. Only a speed-up: a pipeline
     /// left out here, or made differently, is compiled when it is made, as before.
-    fn warm(gpu: &mut dyn Backend, shader: &Shader, calm: &[Option<Shader>; 2]) {
+    /// `sets`: the shaders whose colour pipelines to compile; `shadows`: the one whose shadow and
+    /// depth-only pipelines to compile too. `behind`: on other threads, `finish_calm` taking them
+    /// once done (`Backend::warm_pipelines_behind`).
+    fn warm(gpu: &mut dyn Backend, sets: &[&Shader], shadows: Option<&Shader>, behind: bool) {
         let depth_write = Some(DepthState { write: true, compare: Compare::GreaterEqual });
         let depth_read = Some(DepthState { write: crate::packs::translucent_depth(), compare: Compare::GreaterEqual });
         let layer_depth = Some(DepthState { write: false, compare: Compare::GreaterEqual });
@@ -810,7 +822,7 @@ impl WorldRenderer {
             motion: color && crate::post::motion(),
         };
         let mut descs = Vec::new();
-        for s in std::iter::once(shader).chain(calm.iter().flatten()) {
+        for &s in sets {
             let layers = if s.module.entry_points.iter().any(|e| e.name == "fs_layers") { "fs_layers" } else { "fs_translucent" };
             for vs in ["vs_face", "vs_quad"] {
                 descs.push(desc(s, vs, Some("fs_opaque"), true, depth_write, Blend::None, true));
@@ -836,7 +848,9 @@ impl WorldRenderer {
             }
         }
         // Shadows and depth-only passes come from the plain shader alone.
-        if crate::packs::sun_shadows() {
+        if let Some(shader) = shadows
+            && crate::packs::sun_shadows()
+        {
             for vs in ["vs_face", "vs_quad"] {
                 descs.push(desc(shader, vs, None, false, depth_write, Blend::None, false));
                 descs.push(desc(shader, vs, Some("fs_shadow"), false, depth_write, Blend::None, false));
@@ -845,7 +859,38 @@ impl WorldRenderer {
                 descs.push(desc(shader, "vs_lod", Some("fs_lod_shadow"), false, depth_write, Blend::None, false));
             }
         }
-        gpu.warm_pipelines(&descs);
+        if behind {
+            gpu.warm_pipelines_behind(&descs);
+        } else {
+            gpu.warm_pipelines(&descs);
+        }
+    }
+
+    /// The calm shaders' pipelines warmed behind (`calm_pending`, `warm`) made into their sets
+    /// once the backend is done; until then the plain ones serve every calm level (`set_calm`).
+    /// Call each frame, before `set_calm`.
+    pub fn finish_calm(&mut self, gpu: &mut dyn Backend) {
+        if self.calm_pending.iter().all(Option::is_none) || gpu.warming() {
+            return;
+        }
+        let calm = std::mem::take(&mut self.calm_pending);
+        let started = std::time::Instant::now();
+        self.calm_sets = [Self::calm_pipes(gpu, calm[0].as_ref()), Self::calm_pipes(gpu, calm[1].as_ref())];
+        log::info!(
+            "calm world pipelines ready, {:.1} s after the world shader ({:.1} s to make)",
+            self.calm_since.elapsed().as_secs_f32(),
+            started.elapsed().as_secs_f32()
+        );
+    }
+
+    /// The calm shaders' pipelines compiled behind (`warm`), for `finish_calm`.
+    fn warm_calm(&mut self, gpu: &mut dyn Backend, calm: [Option<Shader>; 2]) {
+        let sets: Vec<&Shader> = calm.iter().flatten().collect();
+        if !sets.is_empty() {
+            Self::warm(gpu, &sets, None, true);
+        }
+        self.calm_pending = calm;
+        self.calm_since = std::time::Instant::now();
     }
 
     /// Trades the colour pipelines in use with `set`'s.
@@ -1376,7 +1421,7 @@ impl WorldRenderer {
             .map_err(|e| e.0)
             .and_then(|(s, slots)| {
                 calm = Self::calm_shaders(assets);
-                Self::warm(gpu, &s, &calm);
+                Self::warm(gpu, &[&s], Some(&s), false);
                 Ok((Self::pipelines(gpu, &s)?, slots))
             }) {
             Ok(((f, q, l), slots)) => {
@@ -1435,7 +1480,7 @@ impl WorldRenderer {
                 self.tex_shader = shader_table(gpu, crate::content::content(), textures, &slots);
                 self.solid
                     .set_on(gpu, crate::packs::pack_uses("world.wgsl", "solid_at"));
-                self.calm_sets = [Self::calm_pipes(gpu, calm[0].as_ref()), Self::calm_pipes(gpu, calm[1].as_ref())];
+                self.warm_calm(gpu, std::mem::take(&mut calm));
                 log::info!("world shader reloaded in {:.1} s", started.elapsed().as_secs_f32());
             }
             Err(e) => log::error!("world shader: {e}"),
