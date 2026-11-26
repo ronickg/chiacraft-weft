@@ -374,7 +374,8 @@ s = head("carcass", [
     "Carcasses (slices 1 and 2). Part 1: three hungry grey wolves and two fed white-tailed deer: the kill leaves a carcass",
     "(\"carcass N of white_tailed_deer\") that the pack's meal opens or takes to bones (\"carcass N of ... now Opened/Bones\").",
     "Part 2: a white-tailed deer killed by the player (no drops now: \"skinning only\"; drawn as the deer lying dead) and two hungry",
-    "turkey vultures: \"smells carrion\", \"animal N eats 0.50 kg off carcass M\", its look stepping down. Part 3: a white-tailed",
+    "turkey vultures: \"smells carrion\", \"animal N eats 0.04 kg off carcass M\" a few times each (a mouthful its size, one a",
+    "chew) until full, the body still whole (two 140 g meals off a 40 kg deer). Part 3: a white-tailed",
     "deer (not a red deer: a Large animal's blow cap kept r1's alive) killed by the player, then aged by `/animalprof carcass <days>`: 3 days (opened), 5 (bones), 9 (a pile), 13 (gone).",
     "Part 4: skinning: a white-tailed deer killed with one blow, the player with a (flint) knife uses its carcass: kneels, the camera",
     "comes in beside them (shot 8 is taken mid-skin from the player's own camera), and after about 8 s \"skinned carcass N",
@@ -396,13 +397,22 @@ s += spawns(x, [("grey_wolf", 3, 8, -10)])
 # Hungrier than the hunters runs (r3's wolves rested 100 s at 30 %, and the part ended before their kill).
 s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.15"]
 s += watch(x, 12) + carcass_rows(4) + shot(x, "cov_carcass_1_wolves", z_back=18, pitch=-40)
+
+
+def vultures_part(x, p="cov_carcass", rows=10):
+    """Part 2: a white-tailed deer killed by the player, then two hungry turkey vultures at its carcass, each eating
+    mouthfuls of its own size (`animals_core::carcass::bite_kg`: about 40 g, one a chew) until full."""
+    out = pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
+    out += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2"]
+    out += ["chat /animalprof carcass"] + side_shot(x, f"{p}_2_killed") + low_shot(x, f"{p}_2_low")
+    out += spawns(x, [("turkey_vulture", 2, 10, -12)]) + ["chat /animalprof food 0.2"]
+    out += ["chat /tk mode spectator", f"chat /tp {x} 90 {Z+20}", "wait 1"] + carcass_rows(rows)
+    out += shot(x, f"{p}_3_vultures", z_back=8, pitch=-35) + side_shot(x, f"{p}_3_vultures_low")
+    return out
+
+
 x = 200
-s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
-s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2"]
-s += ["chat /animalprof carcass"] + side_shot(x, "cov_carcass_2_killed") + low_shot(x, "cov_carcass_2_low")
-s += spawns(x, [("turkey_vulture", 2, 10, -12)]) + ["chat /animalprof food 0.2"]
-s += ["chat /tk mode spectator", f"chat /tp {x} 90 {Z+20}", "wait 1"] + carcass_rows(10)
-s += shot(x, "cov_carcass_3_vultures", z_back=8, pitch=-35)
+s += vultures_part(x)
 x = 400
 s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
 s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
@@ -473,6 +483,16 @@ s = head("carcass_skin", [
 ]) + skin_part(600, "cov_carcass_skin")
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass_skin", s)
+
+# Part 2 alone, longer, for the scavengers' mouthfuls (Planner 11-26: vultures filled after one 0.5 kg bite).
+s = head("carcass_vultures", [
+    "Vultures alone (cov_carcass part 2, watched 4 minutes): a white-tailed deer killed by the player, two hungry turkey",
+    "vultures (food 0.2) come to it. Report each \"animal N eats K kg off carcass M: food F of MAX\" line: K about 0.04,",
+    "a few per vulture 30 s apart, F rising to full, then it leaves; the carcass rows' kg eaten (about 0.3 at most), the",
+    "body still whole; and the shots (3_vultures, 3_vultures_low): the vultures at or near the body.",
+]) + vultures_part(200, "cov_carcass_vultures", rows=24)
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("carcass_vultures", s)
 
 # Part 5 alone, for the body plans' looks (Planner on r10: the wolf read as standing; the bones and piles specks).
 s = head("carcass_plans", [

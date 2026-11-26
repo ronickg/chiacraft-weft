@@ -14,8 +14,18 @@ pub const FROM_KG: f32 = crate::meat::CARCASS_FROM_KG;
 pub const OPENED: f32 = 0.25;
 pub const BONES: f32 = 0.65;
 pub const PILE: f32 = 0.95;
-/// What a scavenger bites off at a time, kg (a vulture swallows a few hundred grams a mouthful).
-pub const BITE_KG: f32 = 0.5;
+/// A mouthful an eater tears off a carcass, a share of its own mass (a wolf's a kilo, a turkey vulture's 40 g), one a
+/// chew (`forage.rs`), and no more than it still needs, so it feeds a few mouthfuls and leaves the rest (a fixed 0.5 kg
+/// bite filled a 1.4 kg vulture, whose meal is 140 g, at once and took the rest off the body for nothing).
+pub const MOUTHFUL: f32 = 0.03;
+/// The least it takes in a mouthful, kg.
+pub const MOUTHFUL_MIN_KG: f32 = 0.02;
+
+/// The kg an eater of `own` kg, `full` of its food stat (0..1), takes off a carcass in a mouthful.
+pub fn bite_kg(own: f32, full: f32) -> f32 {
+    let need = own * crate::needs::MEAL * (1.0 - full).clamp(0.0, 1.0);
+    (own * MOUTHFUL).min(need).max(MOUTHFUL_MIN_KG)
+}
 /// The raw meat a carcass rots as (`vitals::food::FOODS`): venison.
 pub const ROTS_AS: &str = "animals:venison";
 
@@ -301,6 +311,19 @@ pub fn meat_count(lo: u32, hi: u32, eaten: f32, mass: f32, rot: vitals::rot::Car
 mod tests {
     use super::*;
     use vitals::rot::Carcass;
+
+    #[test]
+    fn mouthfuls_by_the_eater() {
+        // A turkey vulture (1.4 kg) takes 40 g a mouthful and is full after a few, its 140 g meal; never more than it
+        // needs; a wolf about a kilo.
+        let v = bite_kg(1.4, 0.0);
+        assert!((0.03..0.06).contains(&v), "{v}");
+        let mouthfuls = (1.4 * crate::needs::MEAL / v).ceil();
+        assert!((3.0..=5.0).contains(&mouthfuls), "{mouthfuls}");
+        assert!(bite_kg(1.4, 0.9) <= 1.4 * crate::needs::MEAL * 0.1 + MOUTHFUL_MIN_KG);
+        assert!((0.9..1.5).contains(&bite_kg(40.0, 0.0)));
+        assert_eq!(bite_kg(40.0, 1.0), MOUTHFUL_MIN_KG);
+    }
 
     #[test]
     fn rot_steps_and_flies() {

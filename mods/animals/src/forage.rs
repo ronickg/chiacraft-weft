@@ -242,7 +242,8 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
     // A carcass (`carcass.rs`): carrion to a scavenger, meat to a hunter, a bite at a time while any is left.
     if let Some(left) = crate::carcass::left(w, id) {
         let c = if s.scavenges() { vitals::food::Category::Carrion } else { vitals::food::Category::Meat };
-        return (left > 0.0 && s.eats(c)).then(|| left.min(animals_core::carcass::BITE_KG) * 1000.0);
+        // What's left on it; each mouthful its eater's own (`eat_item`, `animals_core::carcass::bite_kg`).
+        return (left > 0.0 && s.eats(c)).then_some(left * 1000.0);
     }
     let stack = w.dropped_item(id)?;
     let name = name_of(abi::entry_kind::ITEM, stack.item);
@@ -292,8 +293,9 @@ fn reach(at: [f64; 3], pos: [f64; 3]) -> bool {
 fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
     if crate::carcass::left(w, item).is_some() {
         let own = crate::hunt::mass(w, id).unwrap_or_else(|| a.species().map_or(1.0, |s| s.bio.mass));
-        let got = crate::carcass::take(w, item, grams / 1000.0);
         let max = a.stat(species::FOOD);
+        let full = a.food as f32 / max.max(1.0);
+        let got = crate::carcass::take(w, item, animals_core::carcass::bite_kg(own, full).min(grams / 1000.0));
         let points = (max * animals_core::needs::fills(own, got))
             .round()
             .max(1.0) as u16;

@@ -139,6 +139,10 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   (`carcass_fly`). The step and the flies ride in the synced `Dead` (`carcass_genome`) with the genes, so a step
   repaints the coat. `/animalprof carcass` lists both. Offline: `sheet.py --rot`. The golden eagle's coat now has its
   coverts' paler mottling (living and dead: a plain brown read flat).
-- Left for later: vultures
-  fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
+- Vultures (Planner 11-26, second of the four): a carcass is eaten a mouthful at a time, each the eater's own
+  (`animals_core::carcass::bite_kg`: `MOUTHFUL` 3 % of its mass, no more than it still needs, at least
+  `MOUTHFUL_MIN_KG`; a turkey vulture 40 g, a wolf a kilo), one a chew, so a 1.4 kg vulture feeds four mouthfuls to
+  its 140 g meal; the fixed 0.5 kg bite filled it at once and took the rest off the body for nothing. Check:
+  cov_carcass_vultures (part 2 alone, watched 4 minutes).
+- Left for later: species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.
