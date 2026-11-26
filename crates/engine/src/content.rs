@@ -914,10 +914,14 @@ impl DimensionDef {
     /// Fraction of full daylight (0..1) at world time `time`: the dimension's curve, or
     /// vanilla's.
     pub fn daylight(&self, time: u64) -> f32 {
+        self.daylight_at(time as f64)
+    }
+
+    pub fn daylight_at(&self, time: f64) -> f32 {
         if !self.sky_light {
             return 0.0;
         }
-        let turn = self.day_turn(time as f64);
+        let turn = self.day_turn(time);
         let pts = &self.daylight;
         if pts.is_empty() {
             return ((turn * std::f64::consts::TAU).sin() * 2.0 + 0.5).clamp(0.0, 1.0) as f32;
@@ -2257,8 +2261,16 @@ pub fn freeze(
             errors.push(format!("{}: {pattern} matches no tag or component", mod_name(m)));
         }
     }
-    let crate::blocks::Blocks { mut states, mut block_defs, opens_names, block_names, rules: raw_rules, hazards: raw_hazards, .. } =
-        block_tables;
+    let crate::blocks::Blocks {
+        mut states,
+        mut block_defs,
+        opens_names,
+        block_names,
+        instance_data,
+        rules: raw_rules,
+        hazards: raw_hazards,
+        ..
+    } = block_tables;
     let ItemTables { mut item_defs, item_names, .. } = item_tables;
     let BiomeTables { biome_defs, biome_rules, biome_names, .. } = biome_tables;
     let DimTables { mut dim_defs, dim_names, spawn_dim, void_dim, .. } = dim_tables;
@@ -2317,7 +2329,6 @@ pub fn freeze(
     let mut game = crate::registry::freeze(
         games,
         entities,
-        &block_names,
         &item_names,
         &item_defs,
         &dim_names,
@@ -2331,6 +2342,7 @@ pub fn freeze(
         step_order,
         &mut errors,
     );
+    crate::registry::freeze_block_data(&mut game, &components, &block_defs, instance_data, &mut errors);
     // The kinds frozen with the game (poses, entity effects ...) get their tables before what
     // reads them.
     for (kind, entries) in &mut tables.0 {

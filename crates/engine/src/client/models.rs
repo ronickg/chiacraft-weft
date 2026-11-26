@@ -1651,12 +1651,35 @@ impl Models {
         clips: &[PlayClip],
         layers: impl IntoIterator<Item = Instance>,
     ) -> u32 {
+        self.add_clips_in(kind, root, look, clips, layers, false)
+    }
+
+    pub(super) fn add_clips_in(
+        &mut self,
+        kind: u32,
+        root: Mat4,
+        look: (f32, f32),
+        clips: &[PlayClip],
+        layers: impl IntoIterator<Item = Instance>,
+        sun_only: bool,
+    ) -> u32 {
         let first = self.rows.len() as u32;
         if self.pose_scratch(kind, root, look, clips) {
             self.rows.extend(self.scratch.iter().map(|b| rows(*b)));
         }
-        self.queue(kind, first, layers);
+        // No built-in sun pass here (our pack draws the shadows): sun-only layers go nowhere.
+        if !sun_only {
+            self.queue(kind, first, layers);
+        }
         first
+    }
+
+    pub(super) fn add_pose(&mut self, kind: u32, root: Mat4, pose: &[Mat4], layer: Instance, sun_only: bool) {
+        let first = self.rows.len() as u32;
+        self.rows.extend(pose.iter().map(|&bone| rows(root * bone)));
+        if !sun_only {
+            self.queue(kind, first, [layer]);
+        }
     }
 
     /// How many bones are posed so far: where what comes next starts in `bone`.

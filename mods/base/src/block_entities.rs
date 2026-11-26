@@ -1,4 +1,4 @@
-//! Furnace and chest: blocks with an entity holding their inventory and state.
+//! Furnace and chest: blocks with their own inventories and state.
 
 use weft_sdk::*;
 
@@ -13,7 +13,7 @@ pub use base_api::{
 };
 
 pub fn register(r: &mut Registry) {
-    r.entity_component(
+    r.instance_component(
         &SMELTING,
         Smelting { burn: 0, burn_max: 0, cook: 0, cook_max: 0, cooking_item: 0 },
         component_flags::SAVE | component_flags::SYNC_MENU,
@@ -36,7 +36,8 @@ pub fn register(r: &mut Registry) {
         .hardness(3.5)
         .mined_by("pickaxe", 0)
         .tab(&crate::tabs::FUNCTIONAL)
-        .entity(|e| e.attach(&SMELTING).inventory(3))
+        .attach(&SMELTING)
+        .inventory(3)
         .opens(&FURNACE_MENU);
     r.menu(&FURNACE_MENU)
         .group("input", Slots::single().holder())
@@ -97,7 +98,8 @@ pub fn register(r: &mut Registry) {
         .mined_by("axe", tool_tier::HAND)
         .tab(&crate::tabs::FUNCTIONAL)
         // Its food rots by its place (`survival/rot.rs`).
-        .entity(|e| e.attach(&crate::survival::LARDER).inventory(27))
+        .attach(&crate::survival::LARDER)
+        .inventory(27)
         .opens(&CHEST_MENU);
     r.menu(&CHEST_MENU)
         .group("chest", Slots::chest(3).holder())
@@ -150,8 +152,8 @@ fn needs_heat(item: u32) -> bool {
 /// `ticks` of one furnace at once (its area was unloaded, the time jumped): it smelts while
 /// input, room and fuel last, lighting fuel as it goes, then the fire burns down and the
 /// progress cools, as tick by tick.
-fn catch_up(w: &World, id: u64, pos: BlockPos, s: &mut Smelting, ticks: u32) {
-    let inv = w.inventory(id);
+fn catch_up(w: &World, owner: Holder, pos: BlockPos, s: &mut Smelting, ticks: u32) {
+    let inv = w.inventory(owner);
     let (input_slot, fuel_slot, output_slot) = (inv.group("input"), inv.group("fuel"), inv.group("output"));
     let (input, fuel, output) = (input_slot.get(0), fuel_slot.get(0), output_slot.get(0));
     let mut idle = ticks as u64;
@@ -164,7 +166,7 @@ fn catch_up(w: &World, id: u64, pos: BlockPos, s: &mut Smelting, ticks: u32) {
         .then(|| recipe_process(&crate::recipes::SMELTING, input.item))
         .flatten()
     {
-        let q = abi::Query { entity: id, item: input.item, ..query() };
+        let q = abi::Query { pos, item: input.item, ..query() };
         s.cook_max = w
             .chain_compute(&SMELT_TIME, time as f64, &q)
             .round()
@@ -191,7 +193,7 @@ fn catch_up(w: &World, id: u64, pos: BlockPos, s: &mut Smelting, ticks: u32) {
             input_slot.set(0, input.shrink(done));
             output_slot.set(0, if output.is_empty() { cooked(w, output.merged(out, done)) } else { output.merged(out, done) });
             for _ in 0..done {
-                w.emit(&SMELTED, Smelted { furnace: id, input: input.item, output: out });
+                w.emit(&SMELTED, Smelted { furnace: owner.entity, input: input.item, output: out });
             }
         }
         idle -= worked;
@@ -203,19 +205,17 @@ fn catch_up(w: &World, id: u64, pos: BlockPos, s: &mut Smelting, ticks: u32) {
 /// Every furnace of a region at once, through its state (a system: no host call to reach it).
 fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
     let w = b.world();
-    for (id, s, ticks) in b.iter_mut() {
-        let Some(st) = w.entity(id) else { continue };
+    for (owner, s, ticks) in b.iter_mut() {
+        let Some(pos) = w.block_location(owner.entity) else { continue };
         if ticks > 1 {
             let was_lit = s.burn > 0;
-            let pos = st.block_pos();
-            catch_up(&w, id, pos, s, ticks);
-            if (s.burn > 0) != was_lit && FURNACE.is(w.block(pos)) {
-                w.prop_set(pos, "lit", if s.burn > 0 { "true" } else { "false" });
+            catch_up(&w, owner, pos, s, ticks);
+            if (s.burn > 0) != was_lit {
+                set_lit(&w, owner, s.burn > 0);
             }
             continue;
         }
-        let pos = st.block_pos();
-        let inv = w.inventory(id);
+        let inv = w.inventory(owner);
         let (input_slot, fuel_slot, output_slot) = (inv.group("input"), inv.group("fuel"), inv.group("output"));
         let (input, fuel, output) = (input_slot.get(0), fuel_slot.get(0), output_slot.get(0));
         let was_lit = s.burn > 0;
@@ -251,7 +251,7 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
         }
         if s.burn > 0 && fits && warm {
             let (out, time) = recipe.unwrap();
-            let q = abi::Query { entity: id, item: input.item, ..query() };
+            let q = abi::Query { pos, item: input.item, ..query() };
             s.cook_max = w
                 .chain_compute(&SMELT_TIME, time as f64, &q)
                 .round()
@@ -264,7 +264,7 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
                 // Into a slot already holding some, it takes the stamps there (`cooked`).
                 let merged = if output.is_empty() { cooked(&w, output.merged(out, 1)) } else { output.merged(out, 1) };
                 output_slot.set(0, merged);
-                w.emit(&SMELTED, Smelted { furnace: id, input: input.item, output: out });
+                w.emit(&SMELTED, Smelted { furnace: owner.entity, input: input.item, output: out });
             }
         } else if s.burn > 0 {
             // Modern's: burning with nothing it can do starts over; out of fuel it cools down.
@@ -273,9 +273,17 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
             s.cook = s.cook.saturating_sub(2);
         }
         let lit = s.burn > 0;
-        if lit != was_lit && FURNACE.is(w.block(pos)) {
-            w.prop_set(pos, "lit", if lit { "true" } else { "false" });
+        if lit != was_lit {
+            set_lit(&w, owner, lit);
         }
+    }
+}
+
+fn set_lit(w: &World, owner: Holder, lit: bool) {
+    if let Some(state) = w.block_instance_state(owner.entity)
+        && let Some(next) = state_with(state, "lit", if lit { "true" } else { "false" })
+    {
+        w.set_block_instance_state(owner.entity, next);
     }
 }
 

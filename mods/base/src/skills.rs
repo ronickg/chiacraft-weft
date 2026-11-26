@@ -330,13 +330,14 @@ pub fn made(w: &World, player: u64, out: &ItemStack, inputs: u32) {
     give_skill(w, player, skill, gain::craft(inputs), skills::for_level(level_of_stack(out)));
 }
 
-/// The nearest player within `TENDING` of a block entity (its cook or smith).
+/// The nearest player within `TENDING` of a placed block (`block_instance`: its cook or smith).
 fn tender(w: &World, id: u64) -> Option<u64> {
-    let at = w.entity(id)?.pos;
+    let b = w.block_location(id)?;
+    let at = [b.x as f64 + 0.5, b.y as f64 + 0.5, b.z as f64 + 0.5];
     w.players()
         .into_iter()
         .filter_map(|p| Some((p, w.entity(p)?.pos)))
-        .map(|(p, pos)| (p, (pos.x - at.x).powi(2) + (pos.y - at.y).powi(2) + (pos.z - at.z).powi(2)))
+        .map(|(p, pos)| (p, (pos.x - at[0]).powi(2) + (pos.y - at[1]).powi(2) + (pos.z - at[2]).powi(2)))
         .filter(|&(_, d2)| d2 <= TENDING * TENDING)
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .map(|(p, _)| p)

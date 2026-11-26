@@ -334,7 +334,7 @@ fn decode(bytes: &[u8]) -> Vec<(u32, u32)> {
 
 /// A slot something can be taken from: the player's bag, then the chests.
 struct Source {
-    owner: u64,
+    owner: Holder,
     slot: u32,
 }
 
@@ -357,7 +357,7 @@ fn table_near(w: &World, player: u64) -> Option<[i32; 3]> {
 }
 
 /// The chests within `CHEST_REACH` of `table`, as their entities.
-fn chests_near(w: &World, table: [i32; 3]) -> Vec<u64> {
+fn chests_near(w: &World, table: [i32; 3]) -> Vec<Holder> {
     let r = CHEST_REACH;
     let mut out = Vec::new();
     for dx in -r..=r {
@@ -365,9 +365,9 @@ fn chests_near(w: &World, table: [i32; 3]) -> Vec<u64> {
             for dz in -r..=r {
                 let at = [table[0] + dx, table[1] + dy, table[2] + dz];
                 if CHESTS.on_block(w.block(at)) {
-                    let e = w.block_entity(at);
+                    let e = w.block_instance(at);
                     if e != 0 {
-                        out.push(e);
+                        out.push(Holder::block_id(e));
                     }
                 }
             }
@@ -383,7 +383,7 @@ fn sources(w: &World, player: u64, station: Station) -> Option<Vec<Source>> {
     // `core:inventory` are only what a menu calls them.
     for group in [BAG_GROUPS[0], BAG_GROUPS[1]] {
         if let Some(g) = w.inventory(player).find_group(group) {
-            out.extend((0..g.len()).map(|i| Source { owner: player, slot: g.slot(i) }));
+            out.extend((0..g.len()).map(|i| Source { owner: player.into(), slot: g.slot(i) }));
         }
     }
     if station == Station::Table {
@@ -452,7 +452,7 @@ fn craft(w: &World, player: u64, station: Station, r: &RecipeView, count: u32) -
             .map(|&(i, _)| w.inventory(src[i].owner).get(src[i].slot))
             .collect();
         for &(i, n) in &take {
-            if src[i].owner != player {
+            if src[i].owner != Holder::from(player) {
                 from_chests += n;
             }
             let inv = w.inventory(src[i].owner);

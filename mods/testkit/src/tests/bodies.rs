@@ -15,7 +15,7 @@ async fn spawn(t: &T, kind: &str, p: [i32; 3]) -> Result<u64, String> {
 }
 
 /// Server position of an entity (`me`: the player as the server last heard).
-async fn pos_of(t: &T, id: &str) -> Result<[f64; 3], String> {
+pub(super) async fn pos_of(t: &T, id: &str) -> Result<[f64; 3], String> {
     let line = t.op(&format!("entity {id}")).await?;
     let v: Vec<f64> = line
         .split_whitespace()
@@ -72,28 +72,26 @@ pub async fn body_chest(t: T) -> R {
     let id = spawn(&t, "testmod:skiff", add(f, [0, 12, 0])).await?;
     t.op(&format!("structureset {id} 1 1 0 base:chest")).await?;
     t.frames(5).await?;
-    let near = |t: T, id: u64| async move {
-        let at = pos_of(&t, &id.to_string()).await?;
-        t.op(&format!("near {} {} {} 8", at[0].floor(), at[1].floor(), at[2].floor()))
-            .await
+    let chest = t.op(&format!("block_instance 1 1 0 {id}")).await?;
+    t.check(chest != "0", "the chest on the skiff owns block data");
+    let block_pos = |t: T, body: u64, chest: String| async move {
+        let text = t.op(&format!("block_pos {chest} {body}")).await?;
+        let values: Vec<f64> = text
+            .split_whitespace()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+        <[f64; 3]>::try_from(values).map_err(|_| format!("bad block position {text}"))
     };
-    let list = near(t.clone(), id).await?;
-    let chest = list
-        .split_whitespace()
-        .find(|e| e.contains("chest"))
-        .and_then(|e| e.split(':').next())
-        .ok_or(format!("no chest entity among {list}"))?
-        .to_string();
     t.op(&format!("put {chest} 0 base:cobblestone 7")).await?;
     // It is where its block is, however the structure goes.
-    let (a, b) = (pos_of(&t, &id.to_string()).await?, pos_of(&t, &chest).await?);
+    let (a, b) = (pos_of(&t, &id.to_string()).await?, block_pos(t.clone(), id, chest.clone()).await?);
     // Asked a tick apart, the structure having gone on by 0.3 of a block.
     t.check(
         (b[0] - a[0] - 1.0).abs() < 0.7 && (b[1] - a[1] - 1.5).abs() < 0.1,
         format!("the chest is at its block: structure {a:?}, chest {b:?}"),
     );
     t.secs(1.0).await?;
-    let (a, b2) = (pos_of(&t, &id.to_string()).await?, pos_of(&t, &chest).await?);
+    let (a, b2) = (pos_of(&t, &id.to_string()).await?, block_pos(t.clone(), id, chest.clone()).await?);
     t.check((b2[0] - b[0]).abs() > 2.0, "it goes with the structure");
     t.check((b2[0] - a[0] - 1.0).abs() < 0.7, format!("and stays at its block: structure {a:?}, chest {b2:?}"));
 
@@ -130,18 +128,12 @@ pub async fn body_chest(t: T) -> R {
         .and_then(|e| e.split(':').next())
         .and_then(|e| e.parse().ok())
         .ok_or(format!("no skiff among {list}"))?;
-    let list = near(t.clone(), id).await?;
-    let chest = list
-        .split_whitespace()
-        .find(|e| e.contains("chest"))
-        .and_then(|e| e.split(':').next())
-        .ok_or(format!("no chest after loading among {list}"))?
-        .to_string();
+    let chest = t.op(&format!("block_instance 1 1 0 {id}")).await?;
     let (name, count, _) = t.slot(&chest, 0).await?;
     t.check(name.contains("cobblestone") && count == 7, format!("what it held came back: {name} {count}"));
 
     // Spills in the world, at the chest.
-    let at = pos_of(&t, &chest).await?;
+    let at = block_pos(t.clone(), id, chest.clone()).await?;
     t.op(&format!("structureset {id} 1 1 0 air")).await?;
     t.frames(5).await?;
     let list = t
@@ -390,11 +382,9 @@ pub async fn skiff_smooth(t: T) -> R {
     let (mut turns, mut dir, mut jump, mut slip, mut longest, mut before) = (0, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
     let (mut last, mut rel) = (x(&t, skiff), x(&t, idol) - x(&t, skiff));
     let start = std::time::Instant::now();
-    let mut frame = start;
     while start.elapsed().as_secs_f64() < 3.5 {
         t.frames(1).await?;
-        let dt = frame.elapsed().as_secs_f64();
-        frame = std::time::Instant::now();
+        let dt = t.state().dt as f64;
         longest = longest.max(dt);
         let (now, now_rel) = (x(&t, skiff), x(&t, idol) - x(&t, skiff));
         let d = now - last;
