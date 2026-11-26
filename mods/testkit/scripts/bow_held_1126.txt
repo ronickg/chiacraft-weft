@@ -11,7 +11,9 @@
 # white bar and a dark red block): the bow has a root bone and its own first-person hold
 # (animation.bow.hold.first_person): bh_held and bh_osage should show it smaller, tilted across
 # the lower right with its curve and string in view, as vanilla's; third person (bh_third,
-# bh_front) and the draw (bh_draw) unchanged.
+# bh_front) and the draw (bh_draw) unchanged. The engine now plays an item's own first-person
+# clip on its bones (it played the plain one): bh_shield and bh_shield_up, the shield held and
+# raised in first person by its own first-person clips, should look sensible.
 # Read the shots and run.log for "no model" or texture errors. A fresh world name each run.
 loaded
 idle
@@ -47,5 +49,13 @@ chat /gear bow osage_orange rawhide plant_cordage slot=2
 key 3
 wait 1
 shot bh_osage.png
+# The shield in first person: its own first-person clips (hold, use) now move its guard too.
+chat /tk hand me base:shield
+wait 1
+shot bh_shield.png
+hold core:use 1 nowait
+wait 0.6
+shot bh_shield_up.png
+wait 1
 expect alive
 quit
