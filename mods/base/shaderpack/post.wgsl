@@ -547,7 +547,25 @@ fn chain_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
         let eye = pow(0.18 / log2(2.5 * lb + 1.045) * 0.62, 0.2);
         col += glow * clamp(0.5 * eye, 0.0, 1.0) * (1.5 - 2.0 * r2) * fantasy_opt(OPT_BLOOM);
     }
+    if remix_grade() {
+        return col * remix_light(mean, uv, pass_);
+    }
     return col * bliss_exposure(mean);
+}
+
+// The Remix test grade's exposure (`remix_grade`): the whole way to the view's mean, as Remix's eye,
+// relative to the average sunlit view's 2.2 (`bliss_exposure`), within its -2.5 to +1.5 EV; then its
+// local tonemap as a gain from the light round the pixel (the bloom's blur): +1.4 EV where that is
+// dark, -2.5 EV where it is past white, eased between (Remix fuses three exposures so; method).
+fn remix_light(mean: f32, uv: vec2<f32>, pass_: Pass) -> f32 {
+    let k = 2.2 * clamp(EXPOSURE_REF / max(mean, 1e-6), exp2(-1.5), exp2(2.5));
+    if pass_.bloom == 0u {
+        return k;
+    }
+    let near = luma(bloom_tap(pass_.bloom - 1u, uv)) * k * 0.389;
+    let lift = 1.0 - smoothstep(0.02, 0.25, near);
+    let hold = smoothstep(0.7, 4.0, near);
+    return k * exp2(1.4 * lift - 2.5 * hold);
 }
 
 // The HDR world's light before the tone curve: the bloom mixed in and the exposure applied.

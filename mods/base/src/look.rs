@@ -184,6 +184,10 @@ pub static LOOK_RAIN_MIRROR: Config<f32> = Config::named("look_rain_mirror");
 /// (the engine's ten seconds without sky light, `Scene::cloud_shadow.z`) and its blue cave fog; 0
 /// neither (feature audit item 4, 11-26).
 pub static LOOK_CAVE_FOG: Config<f32> = Config::named("look_cave_fog");
+/// A test switch for the A/B sheets against RTX Remix (0 as made, never shipped as a look): Remix's
+/// auto exposure, local tonemap and neutral ACES curve in place of the Bliss chain's (`look.wgsl`'s
+/// `remix_grade`; path tracing stage 3, 11-26).
+pub static LOOK_REMIX_GRADE: Config<f32> = Config::named("look_remix_grade");
 /// The engine's map of the ground's height (`client::ground_map`), which the banks lie on: on with
 /// them (`register`'s frame hook keeps it so, however the banks were set).
 static GROUND_MAP: Config<bool> = Config::named("core:ground_map");
@@ -252,7 +256,7 @@ pub fn set_bliss_match(on: bool) {
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
 base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
 base:look_canopy, base:look_shafts, core:view_distance, base:look_storybook, base:fx_night_sky, base:fx_shooting_stars, \
-base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away, base:look_mist_tint, base:look_low_sun_keep, base:look_evening_shade, base:look_air_fade, base:look_glow_fill, base:look_mist_dawn_tint, base:look_mist_domes, base:look_horizon_lift, base:look_sun_disc, base:look_dawn_sky, base:look_bank_dense, base:look_bank_sun, base:look_bank_shade, base:look_shadow_reach, base:look_bank_fall, base:look_bank_edge, base:look_bank_top, base:look_mist_steps, base:look_sky_lobe, base:look_chain, base:look_sky_phys, base:look_fog_one, base:look_chain_night, base:look_weather, base:look_rain_dark, base:look_rain_mirror, base:look_cave_fog";
+base:moon_size, base:fx_glow, base:fx_biome_air, base:fx_sparkle, base:look_curve, base:look_bloom, base:look_auto_exposure, base:look_sky_light, base:look_foliage_test, base:look_white, base:look_ao_test, base:look_sharpen, base:look_leaf_sun, base:look_leaf_holes, base:look_leaf_light, base:look_debug, base:look_sky_hue, base:look_exposure_abs, base:look_split_warm, base:look_evening_mist, base:look_bloom_add, base:look_cirrus_off, base:look_glare, base:look_ao_power, base:look_water_absorb, base:look_water_foam, base:look_water_mirror, base:look_twilight, base:look_water_body, base:look_low_air, base:look_haze_sun, base:look_sun_glow, base:look_evening_away, base:look_mist_tint, base:look_low_sun_keep, base:look_evening_shade, base:look_air_fade, base:look_glow_fill, base:look_mist_dawn_tint, base:look_mist_domes, base:look_horizon_lift, base:look_sun_disc, base:look_dawn_sky, base:look_bank_dense, base:look_bank_sun, base:look_bank_shade, base:look_shadow_reach, base:look_bank_fall, base:look_bank_edge, base:look_bank_top, base:look_mist_steps, base:look_sky_lobe, base:look_chain, base:look_sky_phys, base:look_fog_one, base:look_chain_night, base:look_weather, base:look_rain_dark, base:look_rain_mirror, base:look_cave_fog, base:look_remix_grade";
 
 /// Every setting here is on the Developer page (`developer::page`): players pick presets and
 /// quality on the Video screen, the fitted values are tuned on its Developer tab (Ronald 11-24).
@@ -339,6 +343,7 @@ pub fn register(r: &mut Registry) {
     crate::developer::page(r.config(&LOOK_RAIN_DARK).float(0.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_RAIN_MIRROR).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_CAVE_FOG).float(1.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_REMIX_GRADE).float(0.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0));
     crate::developer::page(r.config(&LOOK_BLISS).bool(true));
     r.client_frame(|_| {
