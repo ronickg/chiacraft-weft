@@ -1,0 +1,283 @@
+# Body plans alone (cov_carcass part 5): a grey wolf, a golden eagle, a raptor, a yacare caiman and a pacu killed in a
+# row, then aged: whole, opened (3 days), bones (5), pile (9). Per stage: the row (_plans_), the wolf from straight
+# above (_wolf_above_: legs out sideways flat on the ground, not under it), and each body close and low (_low_).
+# Report whether each lies on its side (the caiman on its belly), rests on the ground, and is its own animal's shape.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 1000 90 544
+wait 4
+chat /tk fill 984 60 528 1016 68 560 base:dirt
+chat /tk fill 984 69 528 1016 69 560 base:grass
+chat /tk fill 984 70 528 1016 85 560 core:air
+chat /tk fill 984 86 528 1016 110 560 core:air
+chat /tk fill 984 111 528 1016 140 560 core:air
+chat /tk fill 984 70 561 1016 100 576 core:air
+chat /time set 6000
+chat /tk fill 999 69 543 1001 69 545 base:water
+chat /tk fill 999 70 543 1001 70 545 core:air
+wait 1
+chat /tk mode creative
+chat /tk spawn animals:grey_wolf 992 70 550
+wait 0.2
+chat /tp 992 70 553
+wait 0.2
+chat /animalprof kill
+wait 1
+chat /tk spawn animals:golden_eagle 996 70 550
+wait 0.2
+chat /tp 996 70 553
+wait 0.2
+chat /animalprof kill
+wait 1
+chat /tk spawn animals:raptor 1000 70 550
+wait 0.2
+chat /tp 1000 70 553
+wait 0.2
+chat /animalprof kill
+wait 1
+chat /tk spawn animals:yacare_caiman 1004 70 550
+wait 0.2
+chat /tp 1004 70 553
+wait 0.2
+chat /animalprof kill
+wait 1
+chat /tk spawn animals:pacu 1008 70 550
+wait 0.2
+chat /tp 1008 70 553
+wait 0.2
+chat /animalprof kill
+wait 1
+chat /tk mode spectator
+wait 2
+chat /animalprof carcass
+chat /tick freeze
+chat /tp 1000 76 560
+look 0 -30
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_10_plans_whole.png
+press core:hide_hud
+chat /tp 992 72.8 550
+look 0 -89
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_11_wolf_above_whole.png
+press core:hide_hud
+chat /tp 993.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_10_low_whole_wolf.png
+press core:hide_hud
+chat /tp 997.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_10_low_whole_eagle.png
+press core:hide_hud
+chat /tp 1001.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_10_low_whole_raptor.png
+press core:hide_hud
+chat /tp 1005.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_10_low_whole_caiman.png
+press core:hide_hud
+chat /tp 1009.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_10_low_whole_pacu.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tp 1000 75 550
+chat /animalprof carcass 3
+wait 2
+chat /animalprof carcass
+chat /tick freeze
+chat /tp 1000 76 560
+look 0 -30
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_12_plans_opened.png
+press core:hide_hud
+chat /tp 992 72.8 550
+look 0 -89
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_13_wolf_above_opened.png
+press core:hide_hud
+chat /tp 993.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_12_low_opened_wolf.png
+press core:hide_hud
+chat /tp 997.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_12_low_opened_eagle.png
+press core:hide_hud
+chat /tp 1001.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_12_low_opened_raptor.png
+press core:hide_hud
+chat /tp 1005.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_12_low_opened_caiman.png
+press core:hide_hud
+chat /tp 1009.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_12_low_opened_pacu.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tp 1000 75 550
+chat /animalprof carcass 2
+wait 2
+chat /animalprof carcass
+chat /tick freeze
+chat /tp 1000 76 560
+look 0 -30
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_14_plans_bones.png
+press core:hide_hud
+chat /tp 992 72.8 550
+look 0 -89
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_15_wolf_above_bones.png
+press core:hide_hud
+chat /tp 993.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_14_low_bones_wolf.png
+press core:hide_hud
+chat /tp 997.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_14_low_bones_eagle.png
+press core:hide_hud
+chat /tp 1001.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_14_low_bones_raptor.png
+press core:hide_hud
+chat /tp 1005.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_14_low_bones_caiman.png
+press core:hide_hud
+chat /tp 1009.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_14_low_bones_pacu.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tp 1000 75 550
+chat /animalprof carcass 4
+wait 2
+chat /animalprof carcass
+chat /tick freeze
+chat /tp 1000 76 560
+look 0 -30
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_15_plans_pile.png
+press core:hide_hud
+chat /tp 992 72.8 550
+look 0 -89
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_16_wolf_above_pile.png
+press core:hide_hud
+chat /tp 993.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_15_low_pile_wolf.png
+press core:hide_hud
+chat /tp 997.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_15_low_pile_eagle.png
+press core:hide_hud
+chat /tp 1001.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_15_low_pile_raptor.png
+press core:hide_hud
+chat /tp 1005.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_15_low_pile_caiman.png
+press core:hide_hud
+chat /tp 1009.6 68.9 551.8
+look 39 -9
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_plans_15_low_pile_pacu.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+quit
