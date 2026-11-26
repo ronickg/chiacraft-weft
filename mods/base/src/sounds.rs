@@ -17,7 +17,11 @@ fn strs(v: &[String]) -> Vec<&str> {
 
 pub fn register(r: &mut Registry) {
     for g in GROUPS {
-        let files = |kind: &str, n: u32| (1..=n).map(|i| format!("{kind}/{g}{i}")).collect::<Vec<_>>();
+        let files = |kind: &str, n: u32| {
+            (1..=n)
+                .map(|i| format!("{kind}/{g}{i}"))
+                .collect::<Vec<_>>()
+        };
         let (dig, step, place, hit) = (files("dig", 6), files("step", 6), files("place", 3), files("hit", 3));
         // Vanilla breaks glass with its own sound; ice cracks and metal clangs when they go.
         let broken = match g {

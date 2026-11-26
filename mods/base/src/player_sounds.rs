@@ -146,7 +146,8 @@ pub fn register(r: &mut Registry) {
     r.on_event(&KEY, |b| {
         let w = b.world();
         for k in b.iter() {
-            if k.down != 0 && k.key == keys::ATTACK.id()
+            if k.down != 0
+                && k.key == keys::ATTACK.id()
                 && let Some(st) = w.entity(k.player)
             {
                 w.play_sound(&SWING, st.eye(), 1.0);
@@ -167,12 +168,10 @@ fn is_player(w: &World, id: u64) -> bool {
 pub fn door(w: &World, pos: impl Into<BlockPos>, side: Option<Dir>) {
     let pos = pos.into();
     let open = w.prop(pos, "open") == Some("true");
-    let out = side.filter(|d| d.horizontal()).map_or(BlockPos::new(0, 0, 0), Dir::offset);
-    let at = Vec3::new(
-        pos.x as f64 + 0.5 + 0.6 * out.x as f64,
-        pos.y as f64 + 0.5,
-        pos.z as f64 + 0.5 + 0.6 * out.z as f64,
-    );
+    let out = side
+        .filter(|d| d.horizontal())
+        .map_or(BlockPos::new(0, 0, 0), Dir::offset);
+    let at = Vec3::new(pos.x as f64 + 0.5 + 0.6 * out.x as f64, pos.y as f64 + 0.5, pos.z as f64 + 0.5 + 0.6 * out.z as f64);
     w.play_sound(if open { &DOOR_OPEN } else { &DOOR_CLOSE }, at, 1.0);
 }
 
@@ -213,7 +212,9 @@ fn tick(w: &World) {
     all.retain(|id, _| players.contains(id));
     for p in players {
         let Some(st) = w.entity(p) else { continue };
-        let was = all.entry(p).or_insert_with(|| Was { on_ground: true, ..Was::default() });
+        let was = all
+            .entry(p)
+            .or_insert_with(|| Was { on_ground: true, ..Was::default() });
         let (in_liquid, on_ground) = (st.in_liquid != 0, st.on_ground != 0);
         // Water: a splash going in fast, steps while wading, strokes while swimming, a gasp up
         // from a long dive.
