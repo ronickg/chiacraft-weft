@@ -116,7 +116,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             // its skyGroundCol / 30, the sky straight down; / 0.122 is not its unit any more), right the cloudy one the land is lit by (texel 4, its
             // averageSkyCol_Clouds / 30 after its normalize), each 64 px square at 270 px down,
             // coded (log2(v) + 24) / 28 per channel through the screen's sRGB.
-            if look_debug() == 13u && scene.frame_look.x > 0.5 {
+            if (look_debug() == 13u || look_debug() == 14u) && scene.frame_look.x > 0.5 {
                 let q = in.clip.xy;
                 if q.y >= 270.0 && q.y < 334.0 && q.x < 132.0 && (q.x < 64.0 || q.x >= 68.0) {
                     let t = textures[u32(scene.frame_look.x) - 1u];

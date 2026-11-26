@@ -1586,6 +1586,11 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     for (var i = 0; i < 9; i++) {
                         if i == ATM_MEAN_SKIP { continue; }
                         cl[i] = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), map_sun, ground);
+                        // Debug view 14: view 13's swatches with no clouds in this average (Bliss's capture 5
+                        // has its cloud cover at 0), to set the clear sky's fill against Bliss's.
+                        if look_debug() == 14u {
+                            cl[i] = vec4(0.0, 0.0, 0.0, 1.0);
+                        }
                     }
                     // Each look's fog marched once: the rounds differ only in the air's sky light,
                     // which its light takes linearly (`fog_march_parts`), so the sum splits into what
@@ -1643,7 +1648,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
         // 9 (11-26): the clouds' light with no sun, their sky light alone (Bliss's capture 4 has the same:
         // the sun's share is 6 less this).
         case 6u, 7u, 8u, 9u: {
-            if from_sky && look_debug() == 13u {
+            if from_sky && (look_debug() == 13u || look_debug() == 14u) {
                 let moon = normalize(scene.moon.xyz);
                 let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
                 var mean = atm_mean(sun, moon, sky_k);
