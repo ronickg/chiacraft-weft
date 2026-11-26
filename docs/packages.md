@@ -57,6 +57,7 @@ base = "*"
 | `hardness` | how long it takes to break (stone 1.5, dirt 0.5) | |
 | `unbreakable` | `true` for bedrock-like blocks | `false` |
 | `light` | light it gives, 0 to 15 | 0 |
+| `light_color` | coloured light instead, `[r, g, b]` each 0 to 15 (`[15, 9, 4]` a fire's orange) | |
 | `sound` | sound group: `stone`, `wood`, `grass`, `gravel`, `sand`, `glass`, `cloth` (base's), or `mod:group` | |
 | `mineable` | tool class that mines it fast: `pickaxe`, `axe`, `shovel` | |
 | `tool_level` | tool level needed for it to drop anything | |
