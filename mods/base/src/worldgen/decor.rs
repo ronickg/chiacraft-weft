@@ -123,6 +123,19 @@ pub(super) fn decorate(g: &mut Gen) {
                 g.set(x, y - 1, z, GRAVEL.id());
                 continue;
             }
+            // Slopes keep less soil (`vitals::wild::COARSE_SLOPE`, `SCREE`): coarse dirt where the
+            // ground falls two to a neighbour, a loose stone at the foot of a rise.
+            let sh = unit(hash(seed ^ 0x5C0E, wx as i64, 0, wz as i64)) as f32;
+            if y >= 1 && fall == 2 && (GRASS.is(below) || DIRT.is(below)) && sh < wild::COARSE_SLOPE && !FROZEN.on_biome(b) {
+                g.set(x, y - 1, z, COARSE_DIRT.id());
+                continue;
+            }
+            let rise = near.iter().map(|(_, _, c)| c.height - col.height).max().unwrap_or(0);
+            if rise >= wild::SCREE_RISE && PLANT_SOIL.on_block(below) && sh < wild::SCREE && !FROZEN.on_biome(b) {
+                let mossy = WET.on_biome(b) || WOODS.on_biome(b);
+                g.set(x, y, z, if mossy && sh < wild::SCREE / 2.0 { MOSSY_COBBLESTONE.id() } else { COBBLESTONE.id() });
+                continue;
+            }
             if y >= 1
                 && pond(seed, wx, wz, col.height, b)
                 && PLANT_SOIL.on_block(below)
@@ -286,6 +299,53 @@ pub(super) fn decorate(g: &mut Gen) {
                 let surface = g.get(x, y, z);
                 if SAND.is(surface) || GRAVEL.is(surface) {
                     g.set(x, y, z, CLAY.id());
+                }
+            }
+        }
+    }
+    moss(g, seed, &cols, [ox, oy, oz]);
+}
+
+/// Moss on the rock and wood over the ground in the woods and the wet (`vitals::wild::MOSS_NORTH`):
+/// on boulders, fallen trunks, logs and scree, most on their shaded north faces, then their tops.
+/// Within the cube only (a face on the cube's edge looks no further).
+fn moss(g: &mut Gen, seed: u64, cols: &[Column; 256], [ox, oy, oz]: [i32; 3]) {
+    let holds = |b: u32| STONE.is(b) || COBBLESTONE.is(b) || MOSSY_COBBLESTONE.is(b) || LOGS.on_block(b);
+    for z in 0..16usize {
+        for x in 0..16usize {
+            let col = &cols[z * 16 + x];
+            if col.height < SEA || !(WET.on_biome(col.biome) || WOODS.on_biome(col.biome)) {
+                continue;
+            }
+            let (wx, wz) = (ox + x as i32, oz + z as i32);
+            for wy in col.height + 1..=col.height + wild::MOSS_REACH {
+                let y = wy - oy;
+                if !(0..16).contains(&y) {
+                    continue;
+                }
+                let y = y as usize;
+                if g.get(x, y, z) != 0 {
+                    continue;
+                }
+                let roll = unit(hash(seed ^ 0x3055, wx as i64, wy as i64, wz as i64)) as f32;
+                // The face it lies on: the north face of what is south of it first, then the top of
+                // what is under it (not the ground's), then the east and west faces.
+                let side = if z < 15 && holds(g.get(x, y, z + 1)) && roll < wild::MOSS_NORTH {
+                    Dir::South
+                } else if y >= 1 && wy - 1 > col.height && holds(g.get(x, y - 1, z)) && roll < wild::MOSS_TOP {
+                    Dir::Down
+                } else if x < 15 && holds(g.get(x + 1, y, z)) && roll < wild::MOSS_SIDE {
+                    Dir::East
+                } else if x > 0 && holds(g.get(x - 1, y, z)) && roll < wild::MOSS_SIDE {
+                    Dir::West
+                } else {
+                    continue;
+                };
+                let state = Dir::ALL
+                    .into_iter()
+                    .try_fold(MOSS.id(), |s, d| state_with(s, d.name(), if d == side { "true" } else { "false" }));
+                if let Some(state) = state {
+                    g.set(x, y, z, state);
                 }
             }
         }

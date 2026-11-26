@@ -493,6 +493,24 @@ pub fn pick(biome: &str, ground: Ground, roll: f32) -> Option<usize> {
     None
 }
 
+/// Moss on rock and wood (`notes/ECOLOGY.md`, "Plants by the place"): in the woods and the wet
+/// lands, a carpet of moss (`base:moss`) on the shaded north face of stone, cobbles and logs a
+/// boulder or a fallen trunk shows (the face that sees the least sun north of the tropics, where
+/// mosses keep wet longest), by `MOSS_NORTH`; on their tops by `MOSS_TOP`; on the other faces by
+/// `MOSS_SIDE`. Up to `MOSS_REACH` blocks over the ground, where boulders and trunks lie.
+pub const MOSS_NORTH: f32 = 0.55;
+pub const MOSS_TOP: f32 = 0.2;
+pub const MOSS_SIDE: f32 = 0.06;
+pub const MOSS_REACH: i32 = 6;
+
+/// Slopes keep less soil: where the ground falls two blocks to a neighbour, coarse dirt (stony,
+/// thin soil) by `COARSE_SLOPE` in place of grass or dirt (from three, gravel, as before); at the
+/// foot of a rise of `SCREE_RISE` or more, a loose stone (scree, what a slope sheds) by `SCREE`,
+/// mossy in the woods and the wet.
+pub const COARSE_SLOPE: f32 = 0.5;
+pub const SCREE_RISE: i32 = 3;
+pub const SCREE: f32 = 0.2;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -553,5 +571,15 @@ mod tests {
             assert!(!in_bloom(seasons, None), "{leaves} blooms without a calendar");
         }
         assert_eq!(blooms("base:oak_leaves"), None);
+    }
+
+    /// Moss favours the shaded north face, then tops, and reaches no higher than a boulder or a
+    /// trunk; slopes thin the soil without baring every one.
+    #[test]
+    fn moss_and_slopes() {
+        const { assert!(MOSS_NORTH > MOSS_TOP && MOSS_TOP > MOSS_SIDE && MOSS_NORTH < 1.0) };
+        const { assert!(MOSS_REACH >= 5 && MOSS_REACH <= 8) };
+        const { assert!(COARSE_SLOPE > 0.0 && COARSE_SLOPE < 1.0 && SCREE < COARSE_SLOPE) };
+        const { assert!(SCREE_RISE >= 3) };
     }
 }
