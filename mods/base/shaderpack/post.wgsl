@@ -537,6 +537,12 @@ fn chain_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
             VIEW_ROD = t.b;
         }
     }
+    // `base:look_auto_exposure` 0 (1 as made): the exposure held at the average sunlit view's, for
+    // A/B shots whose light differs (path tracing's checks: the eye's easing over seconds otherwise
+    // brought a darker picture back up and a brighter one down, s3o).
+    if fantasy_opt(OPT_AUTO_EXPOSURE) < 0.5 {
+        mean = EXPOSURE_REF;
+    }
     VIEW_MEAN = mean;
     LAND_PIXEL = 1.0;
     if pass_.bloom != 0u {
