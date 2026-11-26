@@ -265,7 +265,9 @@ pub(super) fn pre_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[P
 /// table's slots (a power of two), [1] the lights listed; then 4 a slot (x, y, z, start | count <<
 /// 20; x `i32::MIN` empty); then the lights, each its place from the cube's corner plus 16 (6 bits
 /// an axis, the light may be in a cube next to it), its light per channel (4 bits each) and bit 30
-/// when it is a small light (an entity's: a torch's flame), not a whole glowing block.
+/// when it is a small light (an entity's: a torch's flame), not a whole glowing block; then
+/// (chiacraft) each listed light's strength in quarters (`Mesh::lights`), a word each in the same
+/// order, at [1] words past the lights' start.
 ///
 /// A cube's list holds only lights whose level is left above 0 somewhere in it (the lightmap's
 /// falloff, a level a block), strongest there first, at most `LIGHTS_PER_CUBE`: drawing among all
@@ -285,6 +287,11 @@ const LIGHTS_EVERY: u64 = 15;
 fn pt_plain() -> u32 {
     u32::from(crate::config::by_name("core:pt_plain").map_or(0.0, crate::config::get) > 0.5)
 }
+/// chiacraft: `core:pt_emissive`, the traced block lights' strength (stage 2 of the Remix match):
+/// 0 the lightmap's block light, shadowed.
+fn pt_emissive() -> f32 {
+    crate::config::by_name("core:pt_emissive").map_or(1.0, crate::config::get) as f32
+}
 const LIGHTS_PER_CUBE: usize = 48;
 const LIGHTS_MAX: usize = 1 << 20;
 
@@ -303,8 +310,8 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
             targets.insert(c + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1));
         }
     }
-    let mut lists: Vec<(IVec3, Vec<u32>)> = Vec::new();
-    let mut near: Vec<(i32, u32)> = Vec::new();
+    let mut lists: Vec<(IVec3, Vec<(u32, u32)>)> = Vec::new();
+    let mut near: Vec<(i32, u32, u32)> = Vec::new();
     for &t in &targets {
         near.clear();
         let lo = t * 16;
@@ -320,7 +327,7 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
                 let level = e - (gap.x + gap.y + gap.z);
                 if level > 0 {
                     let o = (p - lo + IVec3::splat(16)).as_uvec3();
-                    near.push((level, o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18 | (w >> 24 & 1) << 30));
+                    near.push((level, o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18 | (w >> 24 & 1) << 30, w >> 25 & 15));
                 }
             }
         }
@@ -329,7 +336,7 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
         }
         near.sort_unstable_by_key(|n| std::cmp::Reverse(n.0));
         near.truncate(LIGHTS_PER_CUBE);
-        lists.push((t, near.iter().map(|n| n.1).collect()));
+        lists.push((t, near.iter().map(|n| (n.1, n.2)).collect()));
     }
     let slots = (lists.len() * 2).next_power_of_two().max(1024);
     let mut table = vec![0u32; slots * 4];
@@ -337,23 +344,26 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
         table[i * 4] = i32::MIN as u32;
     }
     let mut out: Vec<u32> = Vec::new();
+    let mut strengths: Vec<u32> = Vec::new();
     for (c, l) in &lists {
         if out.len() + l.len() > LIGHTS_MAX {
             break;
         }
         let start = out.len() as u32;
-        out.extend_from_slice(l);
+        out.extend(l.iter().map(|w| w.0));
+        strengths.extend(l.iter().map(|w| w.1));
         let mut i = light_hash(*c) as usize & (slots - 1);
         while table[i * 4] != i32::MIN as u32 {
             i = (i + 1) & (slots - 1);
         }
         table[i * 4..i * 4 + 4].copy_from_slice(&[c.x as u32, c.y as u32, c.z as u32, start | (l.len() as u32) << 20]);
     }
-    let mut words = Vec::with_capacity(2 + table.len() + out.len());
+    let mut words = Vec::with_capacity(2 + table.len() + out.len() * 2);
     words.push(slots as u32);
     words.push(out.len() as u32);
     words.extend_from_slice(&table);
     words.extend_from_slice(&out);
+    words.extend_from_slice(&strengths);
     words
 }
 
@@ -655,7 +665,8 @@ impl WorldRenderer {
             mode: u32::from(denoised && debug == 0),
             light: 0,
             plain: pt_plain(),
-            pad: [0; 2],
+            emissive: pt_emissive(),
+            flags: 0,
         };
         let origins = page;
         self.bind_run(list, cs, page, origins);
@@ -723,7 +734,8 @@ impl WorldRenderer {
             mode: 1,
             light: gpu.texture_index(light),
             plain: pt_plain(),
-            pad: [0; 2],
+            emissive: pt_emissive(),
+            flags: 0,
         };
         list.push(Cmd::BeginPass { color: Some((target, None)), depth: None, motion: None });
         self.bind_run(list, finish, page, page);

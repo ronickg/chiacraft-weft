@@ -910,6 +910,8 @@ pub static FLUID: Component<Text> = Component::named(abi::comp::FLUID);
 pub static MINING_SPEED: Component<f32> = Component::named(abi::comp::MINING_SPEED);
 pub static TOOL_LEVEL: Component<u32> = Component::named(abi::comp::TOOL_LEVEL);
 pub static HARVEST_LEVEL: Component<u32> = Component::named(abi::comp::HARVEST_LEVEL);
+/// chiacraft: how strongly the path tracer's traced light shines from a light-giving block (1 a torch's).
+pub static LIGHT_STRENGTH: Component<f32> = Component::named(abi::comp::LIGHT_STRENGTH);
 pub static USE_PRIORITY: Component<i32> = Component::named(abi::comp::USE_PRIORITY);
 pub static DAMAGE: Component<u32> = Component::named(abi::comp::WEAR);
 pub static LOOT_ROLLS: Component<u32> = Component::named(abi::comp::LOOT_ROLLS);

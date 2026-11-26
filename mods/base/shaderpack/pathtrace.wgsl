@@ -374,6 +374,123 @@ fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: ve
     return vec2(select(1.0, 0.0, hit.hit && !hit.clear), 1.0);
 }
 
+// ---- the lamps' own light (stage 2 of the Remix match, `core:pt_emissive` above 0) ----
+//
+// In place of the lightmap's block light (its level falling a step a block, then shadowed), the
+// light from the lamp itself: I colour cos / (d^2 + r^2), I the light's level times its strength
+// (`light_strength`: a torch 1, fire 2.5, lava 2, glowstone 1.5) times `core:pt_emissive`, r its
+// size (a flame's small, a glowing block's half a block). Calibrated so that 1 block off a light of
+// strength 1 gives what the lightmap gives there (the look's own curve and colour: `light_on` of
+// the light's level less 1), and from there it falls off as light does. The candidates are drawn as
+// above (8, then one in proportion to its estimate here: resampled importance sampling, so a near
+// fire beats a far torch) and one shadow ray goes to it. Where no light of the cube's list reaches,
+// the lightmap's block light stays (lights past the lists, the far land).
+
+// The light's size squared (blocks): a glowing block's, a flame's.
+const PT_NEE_R2_BLOCK: f32 = 0.25;
+const PT_NEE_R2_FLAME: f32 = 0.04;
+
+// The lamps' light at a surface at `world` (`rel` camera relative), its shading normal `n` and
+// face's `ng`: rgb in the world's light units, a as `pt_block_visibility`'s y (1 a light drawn;
+// 0 no list for the cube, -1 none in reach, -2 no lights at all).
+fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>, lift: vec3<f32>, px: vec2<f32>) -> vec4<f32> {
+    if pt_lights[1] == 0u {
+        return vec4(0.0, 0.0, 0.0, -2.0);
+    }
+    let cell = vec3<i32>(floor(world + ng * 0.5));
+    let cube = cell >> vec3(4u);
+    let base = 2u + pt_lights[0] * 4u;
+    let strengths = base + pt_lights[1];
+    let r = pt_light_find(cube);
+    let total = r.y;
+    if total == 0u {
+        return vec4(0.0);
+    }
+    var chosen = 0u;
+    var chosen_p = 0.0;
+    var chosen_s = 0.0;
+    var w_sum = 0.0;
+    var found = false;
+    for (var k = 0u; k < PT_LIGHT_CANDIDATES; k++) {
+        let t = min(u32(pt_rand(px, 16u + k * 2u).x * f32(total)), total - 1u);
+        let l = pt_lights[base + r.x + t];
+        let lp = vec3<i32>(i32(l & 63u), i32((l >> 6u) & 63u), i32((l >> 12u) & 63u)) - 16 + cube * 16;
+        let e = f32(max((l >> 18u) & 15u, max((l >> 22u) & 15u, (l >> 26u) & 15u)));
+        let d = abs(lp - cell);
+        // Within the lightmap's reach of it, as the lists are made.
+        if e - f32(d.x + d.y + d.z) <= 0.0 {
+            continue;
+        }
+        let small = ((l >> 30u) & 1u) == 1u;
+        let strength = f32(pt_lights[strengths + r.x + t]) * 0.25;
+        var p: f32;
+        if all(lp == vec3<i32>(floor(world - ng * 0.5))) {
+            // The surface is the light's own block.
+            p = strength * e / 15.0;
+        } else {
+            var to = vec3<f32>(lp) + select(vec3(0.5), vec3(0.5, 0.6, 0.5), small) - world;
+            let behind = -dot(to, ng);
+            if behind > 1.0 {
+                continue;
+            }
+            if behind >= 0.0 {
+                to += ng * (behind + 0.05);
+            }
+            let d2 = dot(to, to);
+            let r2 = select(PT_NEE_R2_BLOCK, PT_NEE_R2_FLAME, small);
+            let cs = dot(n, to * inverseSqrt(max(d2, 1e-6)));
+            if cs <= 0.0 {
+                continue;
+            }
+            p = strength * e / 15.0 * cs * (1.0 + r2) / (d2 + r2);
+        }
+        let w = p * f32(total);
+        w_sum += w;
+        if pt_rand(px, 17u + k * 2u).x * w_sum < w {
+            chosen = l;
+            chosen_p = p;
+            chosen_s = strength;
+            found = true;
+        }
+    }
+    if !found || chosen_p <= 0.0 {
+        return vec4(0.0, 0.0, 0.0, -1.0);
+    }
+    let l = chosen;
+    let lp = vec3<i32>(i32(l & 63u), i32((l >> 6u) & 63u), i32((l >> 12u) & 63u)) - 16 + cube * 16;
+    let small = ((l >> 30u) & 1u) == 1u;
+    // Its colour 1 block off, in the world's light (the look's curve and tint), facing it.
+    let level = vec3(f32((l >> 18u) & 15u), f32((l >> 22u) & 15u), f32((l >> 26u) & 15u));
+    let up = vec3(0.0, 1.0, 0.0);
+    let one_off = max(light_on(up, vec4(0.0, max(level - 1.0, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - light_on(up, vec4(0.0), 0.0, 1.0, world, rel), vec3(0.0));
+    // (RIS: what was chosen, over its estimate, times the candidates' mean weight.)
+    let ris = w_sum / (f32(PT_LIGHT_CANDIDATES) * chosen_p);
+    if all(lp == vec3<i32>(floor(world - ng * 0.5))) {
+        return vec4(one_off * chosen_s * ris * pt.emissive, 1.0);
+    }
+    // A point on the light, a new one each frame (as `pt_block_visibility`), and one shadow ray.
+    let j = vec3(pt_rand(px, 40u).xy, pt_rand(px, 48u).x) * 2.0 - 1.0;
+    var to = vec3<f32>(lp) + select(vec3(0.5) + j * 0.45, vec3(0.5, 0.6, 0.5) + j * PT_FLAME, small) - world;
+    let behind = -dot(to, ng);
+    if behind >= 0.0 {
+        to += ng * (behind + 0.05);
+    }
+    let d2 = dot(to, to);
+    let dist = sqrt(d2);
+    let dir = to / max(dist, 1e-4);
+    let cs = max(dot(n, dir), 0.0);
+    if cs <= 0.0 {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let hit = rt_hit(rel + lift, dir, max(dist - 0.9, 0.0), 0.0);
+    if hit.hit && !hit.clear {
+        return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+    let r2 = select(PT_NEE_R2_BLOCK, PT_NEE_R2_FLAME, small);
+    let f = one_off * chosen_s * cs * (1.0 + r2) / (d2 + r2);
+    return vec4(f * ris * pt.emissive, 1.0);
+}
+
 // ---- plain (`core:pt_plain`): vanilla's math, and only what tracing adds to it ----
 //
 // The world's pass without a pack (the engine's `world.wgsl`): the texel times its tint, its face's
@@ -603,9 +720,22 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // lightmap's block light keeps its colour and reach; the held light is not a block's.
     let block = max(light_on(n, h.light, 0.0, 1.0, h.world, h.rel) - light_on(n, vec4(h.light.x, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel), vec3(0.0));
     var block_vis = vec2(1.0, 0.0);
+    var direct = vec3(0.0);
     if max(block.r, max(block.g, block.b)) > 1e-4 {
-        block_vis = pt_block_visibility(h.world, h.rel, ng, lift, px);
-        diffuse -= block * ((1.0 - block_vis.x) * PT_BLOCK_SHADOW);
+        if pt.emissive > 0.0 {
+            // The lamps' own light in place of the lightmap's, where a light of the list reaches.
+            let e = pt_block_direct(h.world, h.rel, n, ng, lift, px);
+            block_vis = vec2(select(0.0, 1.0, max(e.r, max(e.g, e.b)) > 0.0), e.a);
+            if e.a > 0.5 {
+                direct = e.rgb;
+                diffuse += direct - block;
+            } else {
+                direct = block;
+            }
+        } else {
+            block_vis = pt_block_visibility(h.world, h.rel, ng, lift, px);
+            diffuse -= block * ((1.0 - block_vis.x) * PT_BLOCK_SHADOW);
+        }
     }
     // Into the cache: the indirect light found here (one pixel in four a frame).
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
@@ -690,6 +820,8 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 6u: { out = albedo * pt_cached(h.world, ng, dist, pt_noise(px + vec2(3.0, 11.0))).rgb; }
             // 14: the lightmap's block light at the surface (as light, without the texture).
             case 14u: { out = block; }
+            // 19: the lamps' light as traced (`core:pt_emissive`; the lightmap's where none reaches).
+            case 19u: { out = direct; }
             // 15: the traced block lights: green seen, red hidden; no light drawn: blue no list for
             // the cube, cyan none in reach, magenta no lights at all; black no block light.
             case 15u: {

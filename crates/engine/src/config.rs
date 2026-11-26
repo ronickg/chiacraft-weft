@@ -653,13 +653,17 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         number("core:rt_reflections", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         // Path traced lighting over the traced scene (reports/Path tracing plan.md; M0: the sun and
         // one bounce on the terrain, with a shader pack that has `pathtrace.wgsl`); its debug views
-        // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends; 8-12 timing only: the trace stopped after its primary test, the sun, the bounce, with no specular ray, before any ray, without the air's haze; 14 the block light, 15 the traced block lights seen/hidden).
+        // (0 the picture, 1 albedo, 2 normals, 3 direct light, 4 the bounce, 5 the specular light, 6 the radiance cache, 7 the picture with a line where tracing ends; 8-12 timing only: the trace stopped after its primary test, the sun, the bounce, with no specular ray, before any ray, without the air's haze; 14 the block light, 15 the traced block lights seen/hidden, 17-18 plain's sky share and sun, 19 the lamps' own light under `core:pt_emissive`).
         number("core:path_traced", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
-        number("core:pt_debug", ck::INT, 0.0, 0.0, 18.0, 1.0),
+        number("core:pt_debug", ck::INT, 0.0, 0.0, 19.0, 1.0),
         // chiacraft: path tracing lit with vanilla's math (texture x tint x face shade x the
         // lightmap's curve, no grade, no haze), its sky level the traced sky's share and the sun's
         // shadow: what tracing adds over vanilla, for the stage-1 compare (checks, no menu row).
         number("core:pt_plain", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        // chiacraft: how strongly the traced block lights shine (stage 2 of the Remix match: light
+        // from the lamp itself, falling off with distance, in place of the lightmap's block light);
+        // 0 the lightmap's block light, only shadowed. Live.
+        number("core:pt_emissive", ck::FLOAT, 1.0, 0.0, 4.0, 0.25),
         // How the path tracer's light is denoised (`denoise::Denoiser`) where Ray Reconstruction
         // doesn't do it: 0 not at all (raw, for checks), 1 ours (SVGF-like), live.
         number("core:pt_denoiser", ck::INT, 1.0, 0.0, 1.0, 1.0),

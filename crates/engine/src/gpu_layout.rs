@@ -2025,8 +2025,8 @@ struct PtArgs {
     mode: u32,
     light: u32,
     plain: u32,
-    pad1: u32,
-    pad2: u32,
+    emissive: f32,
+    flags: u32,
 }
 var<immediate> pt: PtArgs;
 @group(1) @binding(34) var<storage, read_write> pt_out: array<vec4<f32>>;
@@ -2066,7 +2066,11 @@ pub struct PtArgs {
     pub light: u32,
     /// chiacraft: 1 lights with vanilla's math (`core:pt_plain`, the pack's `pathtrace.wgsl`).
     pub plain: u32,
-    pub pad: [u32; 2],
+    /// chiacraft: the traced block lights' strength (`core:pt_emissive`; 0 the lightmap's block
+    /// light, shadowed, as before stage 2).
+    pub emissive: f32,
+    /// chiacraft: stage 2's parts, by bit (none yet).
+    pub flags: u32,
 }
 
 /// What goes in front of `rt_expand.wgsl` (ray tracing's scene, `world_render::rt`): the
