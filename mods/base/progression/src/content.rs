@@ -171,6 +171,9 @@ pub const RULES: &[Rule] = &[
     r(&["base:oak_wood", "base:birch_wood", "base:spruce_wood"], 0, Shared, Wood, Made),
     r(&["base:oak_log_hollow", "base:birch_log_hollow", "base:spruce_log_hollow"], 0, Shared, Wood, Made),
     r(&["base:oak_door"], 0, Shared, Building, Made),
+    // fences.rs: keeping animals off a field (crop raids)
+    r(&["base:fence", "base:fence_gate"], 0, Shared, Building, Made),
+    r(&["base:scarecrow"], 0, Shared, Building, Made),
     n(
         &["base:shield"],
         2,
