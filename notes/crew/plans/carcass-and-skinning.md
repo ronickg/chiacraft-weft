@@ -99,6 +99,10 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
 - r6 (Planner on r5's shots): an opened body lies on a pool of blood and guts (`carcass_gore`, a second entity, until
   the art slice draws the opened body); the skinning camera a three-quarter view from the right with the knife and
   the body in frame; part 1's deer wounded to 30 % before the wolves come.
+- r6 (a1eff5304): part 1's wolves killed and opened their deer (carcass, meal, Opened); the pool shows under opened
+  bodies (shots 1, 4, 8) and is gone at Bones and after skinning; the camera shows the kneeling skinner side-on with
+  the knife and the body. The red was too bright (darkened after). The body lies at the pool's edge, not its middle:
+  rolling the model about its root moves it off its entity's centre, which the art slice's lying models fix.
 - Left for later: the opened body itself (art slice); the dead body shows the base coat, not its own; vultures
   fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.

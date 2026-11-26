@@ -51,7 +51,7 @@ for x in range(48):
 for x in range(24):
     for y in range(32, 40):
         v = random.randint(-20, 16)
-        img.putpixel((x, y), (122 + v, 34 + v // 2, 30 + v // 2, 255))
+        img.putpixel((x, y), (88 + v, 16 + v // 3, 14 + v // 3, 255))  # dark, like blood soaked in (r6: a bright red slab)
 d = os.path.join(ROOT, "textures", "entity", "carcass")
 os.makedirs(d, exist_ok=True)
 img.save(os.path.join(d, "bones.png"))
