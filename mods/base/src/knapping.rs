@@ -4,6 +4,10 @@
 //! square outside the outline is struck away with a click; a click inside breaks the nodule into
 //! a flake. When the last square outside is gone the head comes free, into the bag.
 //!
+//! Native copper (`vitals::first::COPPER_LANDS`) is hammered cold on the same screen: the squares
+//! outside the outline are beaten flat into the head, and a strike inside only dents it (copper
+//! bends, it doesn't break). The head is copper, its skill smithing.
+//!
 //! The server keeps each player's nodule (where it is, the head picked, what's struck away) and
 //! sends it to the client, whose screen shows it; the client sends its clicks.
 
@@ -13,14 +17,15 @@ use crafting::{code, grades, skills};
 use vitals::first::{self as f, KNAPPED};
 use weft_sdk::*;
 
-use crate::first::{BONE_SPLINTER, LOOSE_BONE, LOOSE_FLINT, SHARP_FLAKE};
+use crate::first::{BONE_SPLINTER, LOOSE_BONE, LOOSE_COPPER, LOOSE_FLINT, SHARP_FLAKE};
 use crate::parts::{PART, PartOf, SKILLS};
 
 value! {
     /// A player's nodule on the knapping screen: the head picked (`KNAPPED`), the squares struck
     /// away (a bit each, row by row), and where it lies; at the end, the square that broke it
     /// (`broken`, 1 + the square) or the head freed (`done`), shown a moment before it closes.
-    pub struct Knap { pub shape: u32, pub removed: u32, pub x: i32, pub y: i32, pub z: i32, pub broken: u32, pub done: u32 }
+    /// `copper`: native copper, hammered cold (its own lines on the screen).
+    pub struct Knap { pub shape: u32, pub removed: u32, pub x: i32, pub y: i32, pub z: i32, pub broken: u32, pub done: u32, pub copper: u32 }
 }
 static OPEN: Channel<Knap> = Channel::named("knap_open");
 static UPDATE: Channel<Knap> = Channel::named("knap_update");
@@ -127,7 +132,7 @@ pub fn open(w: &World, player: u64, pos: BlockPos) {
     let mut nodules = NODULES.lock().unwrap();
     let knap = match nodules.iter().find(|(p, _)| *p == player) {
         Some(&(_, k)) if BlockPos::new(k.x, k.y, k.z) == pos => k,
-        _ => Knap { shape: 0, removed: 0, x: pos.x, y: pos.y, z: pos.z, broken: 0, done: 0 },
+        _ => Knap { shape: 0, removed: 0, x: pos.x, y: pos.y, z: pos.z, broken: 0, done: 0, copper: LOOSE_COPPER.is(w.block(pos)) as u32 },
     };
     nodules.retain(|(p, _)| *p != player);
     nodules.push((player, knap));
@@ -145,10 +150,11 @@ fn hit(w: &World, player: u64, v: u32) {
     let near = w
         .entity(player)
         .is_some_and(|e| (e.pos - at).length_squared() <= REACH * REACH);
-    // What's knapped: a flint nodule, or a bone (the bone lands' way in).
+    // What's knapped: a flint nodule, a bone (the bone lands' way in), or native copper.
     let bone = LOOSE_BONE.is(w.block(pos));
+    let copper = LOOSE_COPPER.is(w.block(pos));
     // The nodule gone (picked up, broken) or left behind: the screen closes.
-    if !near || !(LOOSE_FLINT.is(w.block(pos)) || bone) {
+    if !near || !(LOOSE_FLINT.is(w.block(pos)) || bone || copper) {
         nodules.remove(i);
         w.send(player, &CLOSE, &0);
         return;
@@ -167,6 +173,11 @@ fn hit(w: &World, player: u64, v: u32) {
         return;
     }
     let head = &KNAPPED[k.shape as usize % KNAPPED.len()];
+    if head.keeps(square) && copper {
+        // Copper bends: a strike inside the outline only dents it, nothing is lost.
+        w.play_sound(&STRIKE, at, 0.6);
+        return;
+    }
     if head.keeps(square) {
         // Struck inside the outline: the nodule breaks, a flake is all that's left.
         w.set_block(pos, 0);
@@ -182,7 +193,13 @@ fn hit(w: &World, player: u64, v: u32) {
     w.play_sound(&STRIKE, at, 1.0);
     if k.removed & head.away() == head.away() {
         w.set_block(pos, 0);
-        let material = if bone { "bone" } else { "flint" };
+        let material = if copper {
+            "copper"
+        } else if bone {
+            "bone"
+        } else {
+            "flint"
+        };
         let made = knapped_head(w, player, head.shape, material, true, Some(unit(w)));
         weft_sdk::info!("knapping: {player} freed a {material} {}", head.shape);
         crate::skills::made(w, player, &made, 1);
@@ -205,23 +222,40 @@ fn unit(w: &World) -> f32 {
     (w.random() >> 40) as f32 / (1u64 << 24) as f32
 }
 
-/// A head of part shape `shape` knapped from `material` (flint, or bone) by `player`: its grade
-/// from the material, their knapping skill and no station; work by hand scores `BY_HAND_BONUS`
+/// A head of part shape `shape` knapped from `material` (flint, or bone; copper hammered cold) by
+/// `player`: its grade from the material, their knapping skill (smithing for copper) and no station; work by hand scores `BY_HAND_BONUS`
 /// over work from memory (the book). With a roll, luck and the skill's rise as any made part;
 /// without (a grid's preview), neither.
 pub fn knapped_head(w: &World, player: u64, shape: &str, material: &str, by_hand: bool, roll: Option<f32>) -> ItemStack {
-    let craft = skills::index(crafting::materials::Making::Knap);
+    let making = if material == "copper" { crafting::materials::Making::Forge } else { crafting::materials::Making::Knap };
+    let craft = skills::index(making);
     let xp = w.component(player, &SKILLS).map_or(0, |s| s.xp[craft]);
     let memory = grades::work_from_memory(skills::level(xp));
     let work = if by_hand { (memory + f::BY_HAND_BONUS).min(grades::WORK_MAX) } else { memory };
     // 0.5 is no luck either way (`grades::LUCK`).
-    let points = if material == "bone" { f::BONE_HEAD_MATERIAL_POINTS } else { f::HEAD_MATERIAL_POINTS };
+    let points = match material {
+        "bone" => f::BONE_HEAD_MATERIAL_POINTS,
+        "copper" => f::COPPER_HEAD_MATERIAL_POINTS,
+        _ => f::HEAD_MATERIAL_POINTS,
+    };
     let grade = grades::roll(grades::Points { material: points, work, station: 0 }, roll.unwrap_or(0.5));
     if roll.is_some()
         && let Some(s) = w.component_mut(player, &SKILLS)
     {
         s.xp[craft] = s.xp[craft].saturating_add(skills::xp_for(grade));
     }
+    let made_day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
+    ItemStack::new(Item::generated(format!("part_{shape}")).id(), 1)
+        .with(&PART, PartOf { material: code(material), grade: grade as u32, worn: 0, made_day, repairs: 0 })
+}
+
+/// A head of part shape `shape` cast in a mould from `material` (`casting.rs`): its grade from the
+/// material, the mould's work and the hot furnace (`vitals::smelt::CAST_WORK`, `CAST_STATION`),
+/// with luck as any made part. No one's skill: the mould shapes it.
+pub fn cast_head(w: &World, shape: &str, material: &str) -> ItemStack {
+    let points =
+        grades::Points { material: f::COPPER_HEAD_MATERIAL_POINTS, work: vitals::smelt::CAST_WORK, station: vitals::smelt::CAST_STATION };
+    let grade = grades::roll(points, unit(w));
     let made_day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
     ItemStack::new(Item::generated(format!("part_{shape}")).id(), 1)
         .with(&PART, PartOf { material: code(material), grade: grade as u32, worn: 0, made_day, repairs: 0 })
@@ -236,7 +270,9 @@ fn screen(ui: &mut Ui) {
     let Some(k) = view() else { return };
     let head = &KNAPPED[k.shape as usize % KNAPPED.len()];
     let ended = k.broken != 0 || k.done != 0;
-    crate::window::window_titled(ui, S::column().pad(crate::window::WINDOW_PAD).gap(5.0), "knapping.base.title", &[], |ui| {
+    let copper = k.copper != 0;
+    let title = if copper { "knapping.base.copper_title" } else { "knapping.base.title" };
+    crate::window::window_titled(ui, S::column().pad(crate::window::WINDOW_PAD).gap(5.0), title, &[], |ui| {
         ui.row(S::row().gap(1.0).self_align(abi::ui_align::CENTER), |ui| {
             for (i, h) in KNAPPED.iter().enumerate() {
                 let picked = i as u32 == k.shape;
@@ -278,7 +314,8 @@ fn screen(ui: &mut Ui) {
                                 };
                                 ui.panel(class, square, |_| {});
                             } else if keeps {
-                                let s = square.class("knap_head").tooltip("knapping.base.keep_tip");
+                                let tip = if copper { "knapping.base.copper_keep_tip" } else { "knapping.base.keep_tip" };
+                                let s = square.class("knap_head").tooltip(tip);
                                 ui.button_with(s, move |c| c.client().send(&HIT, &(i as u32)), |_| {});
                             } else {
                                 let s = square.class("knap_stone");
@@ -293,6 +330,8 @@ fn screen(ui: &mut Ui) {
             "knapping.base.freed"
         } else if k.broken != 0 {
             "knapping.base.broke"
+        } else if copper {
+            "knapping.base.copper_how"
         } else {
             "knapping.base.how"
         };

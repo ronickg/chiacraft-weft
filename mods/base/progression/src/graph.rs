@@ -233,7 +233,30 @@ const RECIPES_LIST: &[Recipe] = &[
     s("base:iron_ingot", &[("base:raw_iron", 1.0)], Furnace),
     s("base:gold_ingot", &[("base:raw_gold", 1.0)], Furnace),
     // Copper, tin, bronze and steel (`metals.rs`, `vitals::crafts`).
-    s("base:copper_ingot", &[("base:raw_copper", 1.0)], Furnace),
+    // Copper melts only in a hot furnace (`vitals::smelt`): charcoal (a coal smelts 8) and
+    // bellows beside it; the furnace itself is a stone-age station, so the bellows stands for both.
+    Recipe {
+        out: "base:copper_ingot",
+        n: 1.0,
+        ins: &[("base:raw_copper", 1.0), ("base:coal", 0.125)],
+        at: Station("base:bellows"),
+        secs: 10.0,
+    },
+    Recipe {
+        out: "base:copper_ingot",
+        n: 1.0,
+        ins: &[("base:malachite", 1.0), ("base:coal", 0.125)],
+        at: Station("base:bellows"),
+        secs: 10.0,
+    },
+    c("base:bellows", 1.0, &[("#planks", 5.0), ("base:leather", 3.0), ("#stick", 1.0)], Table),
+    // Moulds (`casting.rs`): clay shaped, fired; three ingots cast beside a hot furnace.
+    c("base:unfired_mould_felling_axe_head", 1.0, &[("base:clay", 3.0)], Hand),
+    c("base:unfired_mould_pick_head", 1.0, &[("base:clay", 4.0)], Table),
+    c("base:unfired_mould_shovel_blade", 1.0, &[("base:clay", 4.0)], Hand),
+    s("base:mould_felling_axe_head", &[("base:unfired_mould_felling_axe_head", 1.0)], Furnace),
+    s("base:mould_pick_head", &[("base:unfired_mould_pick_head", 1.0)], Furnace),
+    s("base:mould_shovel_blade", &[("base:unfired_mould_shovel_blade", 1.0)], Furnace),
     s("base:tin_ingot", &[("base:raw_tin", 1.0)], Furnace),
     Recipe {
         out: "base:bronze_ingot",
@@ -258,6 +281,10 @@ const RECIPES_LIST: &[Recipe] = &[
     b("base:raw_iron", 1.0, &[("base:iron_ore", 1.0)], PICK_BRONZE, 60.0),
     // Copper is common where it is; tin about thirty times rarer: a long search.
     b("base:raw_copper", 1.0, &[("base:copper_ore", 1.0)], PICK_STONE, 90.0),
+    // Malachite: copper's shallow ore in the dry lands and on beaches (`vitals::smelt::MALACHITE_LANDS`).
+    b("base:malachite", 1.0, &[("base:malachite_ore", 1.0)], PICK_STONE, 90.0),
+    // Native copper lies loose in the copper lands, a find: about two in a 64-block walk.
+    b("base:native_copper", 1.0, &[("base:loose_copper", 1.0)], Needs::Hand, 300.0),
     b("base:raw_tin", 1.0, &[("base:tin_ore", 1.0)], PICK_STONE, 300.0),
     b("base:raw_gold", 1.0, &[("base:gold_ore", 1.0)], PICK_STONE, 180.0),
     b("base:diamond", 1.0, &[("base:diamond_ore", 1.0)], PICK_STEEL, 600.0),

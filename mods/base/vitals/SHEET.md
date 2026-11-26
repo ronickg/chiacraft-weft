@@ -207,7 +207,7 @@ An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log'
 | wood, gold | 0 | 56 logs | 2 | 12 s | 14 s | 4 min * | 9 min * | 36 min * |
 | bone, antler | 50 | 72 logs | 2.5 | 10 s | 11 s | 26 s | 7 min * | 29 min * |
 | flint, chert, obsidian, stone | 100 | 96 logs | 2.91 | 8 s | 10 s | 23 s | 6 min * | 25 min * |
-| copper | 150 | 192 logs | 4.85 | 5 s | 6 s | 14 s | 28 s | 15 min * |
+| copper | 170 | 192 logs | 4.85 | 5 s | 6 s | 14 s | 28 s | 15 min * |
 | bronze, iron, wrought iron | 200 | 512 logs | 6.79 | 4 s | 4 s | 10 s | 20 s | 11 min * |
 | steel, diamond (old) | 300 | 1536 logs | 7.76 | 3 s | 4 s | 8 s | 18 s | 70 s |
 | diamond | 400 | 4096 logs | 8 | 3 s | 4 s | 8 s | 17 s | 67 s |

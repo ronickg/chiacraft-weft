@@ -131,7 +131,7 @@ wood 2 to diamond 8):
 | Knapped stone (flint, chert) | 100 | 75 | 3 | very sharp, brittle | knapping, cheap |
 | Obsidian | 100 | 40 | 3 | the sharpest, shortest life | - |
 | Ground stone | 120 | 125 | 4 | tough | grinding slab |
-| Copper | 150 | 150 | 5 | soft | anvil, free |
+| Copper | 170 (`vitals::gear::COPPER_HARVEST`) | 150 | 5 | soft | anvil, free |
 | Bronze | 200 | 250 | 7 | hard | anvil, recast |
 | Wrought iron | 220 | 275 | 7 | softer than bronze, tougher body | forge |
 | Steel | 300 | 500 | 8 | the best | forge |

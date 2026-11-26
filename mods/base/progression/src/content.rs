@@ -226,12 +226,20 @@ pub const RULES: &[Rule] = &[
     ),
     n(&["base:coal_ore", "base:banded_clay_coal_ore"], 0, Shared, Ground, Not, "breaks into coal"),
     n(
-        &["base:copper_ore", "base:tin_ore"],
+        &["base:loose_copper"],
+        0,
+        Tech,
+        Ground,
+        Not,
+        "picked up as native copper, loose in the cold and dry lands (`vitals::first::COPPER_LANDS`)",
+    ),
+    n(
+        &["base:copper_ore", "base:malachite_ore", "base:tin_ore"],
         1,
         Tech,
         Ground,
         Not,
-        "breaks into raw copper or raw tin (a stone pickaxe): copper in cold, dry and beach land, tin on beaches and in mountains (`metals.rs`)",
+        "breaks into raw copper, malachite or raw tin (a stone pickaxe): copper ore in cold land and deep, malachite in dry and beach land, tin on beaches and in mountains (`metals.rs`)",
     ),
     n(
         &["base:iron_ore", "base:granite_iron_ore", "base:red_sandstone_iron_ore"],
@@ -441,6 +449,14 @@ pub const RULES: &[Rule] = &[
     r(&["base:coal", "base:coal_block"], 0, Shared, Material, Made),
     // Copper, tin and bronze (`metals.rs`): the Bronze Age's; steel the Iron Age's.
     r(&["base:raw_copper", "base:copper_ingot", "base:raw_tin", "base:tin_ingot", "base:bronze_ingot"], 1, Tech, Material, Made),
+    // native copper, the copper tier's first step (vitals::first::COPPER_LANDS): a Stone Age find,
+    // picked up by hand (the Old Copper Complex hammered it before any smelting); what's hammered
+    // from it is copper, the Bronze Age's (its parts by `MATERIALS`)
+    n(&["base:native_copper"], 0, Tech, Material, Made, "a find on the ground, hammered cold with a rock into copper heads"),
+    // copper's smelt and casting (`vitals::smelt`): malachite, bellows, moulds
+    r(&["base:malachite"], 1, Tech, Material, Made),
+    r(&["base:unfired_mould_*"], 1, Tech, Material, Made),
+    r(&["base:bellows", "base:mould_*"], 1, Tech, Station, Made),
     r(&["base:crucible"], 1, Tech, Station, Made),
     r(&["base:steel_ingot"], 2, Tech, Material, Made),
     r(&["base:forge"], 2, Tech, Station, Made),

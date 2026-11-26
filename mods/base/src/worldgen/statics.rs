@@ -60,6 +60,9 @@ pub static BIG_LEAVES: Component<f32> = Component::named("big_leaves");
 pub static BIG_LEAF_KINDS: Component<BlockList> = Component::named("big_leaf_kinds");
 pub(super) static FROZEN: Tag = Tag::named("frozen");
 pub(super) static DRY: Tag = Tag::named("dry");
+/// The copper lands' tags (`vitals::first::COPPER_LANDS`, native copper on the ground), each a
+/// biome tag of `metals.rs`'s shallow copper.
+pub(super) static COPPER_LANDS: [Tag; 2] = [Tag::named(vitals::first::COPPER_LANDS[0]), Tag::named(vitals::first::COPPER_LANDS[1])];
 pub static PLAINS: Biome = Biome::named("plains");
 pub static FOREST: Biome = Biome::named("forest");
 pub static BIRCH_FOREST: Biome = Biome::named("birch_forest");
