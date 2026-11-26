@@ -158,7 +158,7 @@ fn rain_rings(p: vec2<f32>) -> vec2<f32> {
     let q = floor(p * 16.0) / 16.0 / 0.8;
     let base = floor(q);
     var slope = vec2(0.0);
-    for (var j = -1; j <= 1; j++) {
+    for (var j = -1; j <= rolled(1); j++) {
         for (var i = -1; i <= 1; i++) {
             let cell = vec2<i32>(base) + vec2(i, j);
             let h = hash3(vec3(cell.x, 7, cell.y));
@@ -506,7 +506,7 @@ fn atm_toward(o: vec3<f32>, d: vec3<f32>, n: i32) -> vec3<f32> {
     }
     let step = far / f32(n);
     var od = vec3(0.0);
-    for (var i = 0; i < n; i++) {
+    for (var i = 0; i < rolled(n); i++) {
         od += atm_extinction(atm_density(length(o + d * (f32(i) + 0.5) * step) - ATM_GROUND)) * step;
     }
     return od;
@@ -554,7 +554,7 @@ fn atm_march(dir: vec3<f32>, sun: vec3<f32>, moon: vec3<f32>, moon_k: f32, backg
     var s_sun = vec3(0.0);
     var s_moon = vec3(0.0);
     var s_multi = vec3(0.0);
-    for (var i = 0; i < n; i++) {
+    for (var i = 0; i < rolled(n); i++) {
         let p = o + dir * (f32(i) + 0.5) * step;
         let d = atm_density(length(p) - ATM_GROUND);
         let ext = atm_extinction(d) * step;
@@ -625,7 +625,7 @@ fn atm_rain(c: vec3<f32>, dir: vec3<f32>, through: vec3<f32>, mean: vec3<f32>) -
 fn atm_mean(sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3<f32> {
     var sum = vec3(0.0);
     var multi = vec3(0.0);
-    for (var i = 0; i < 9; i++) {
+    for (var i = 0; i < rolled(9); i++) {
         if i == ATM_MEAN_SKIP { continue; }
         let a = atm_march(atm_mean_dir(i, sun), sun, moon, moon_k, ATM_FLOOR, 4, 2);
         sum += a.light;
@@ -651,9 +651,9 @@ fn atm_background(mean: vec3<f32>) -> vec3<f32> {
 fn atm_rain_mean(sun: vec3<f32>, moon: vec3<f32>, moon_k: f32) -> vec3<f32> {
     var m = atm_mean(sun, moon, moon_k);
     let rounds = select(1, 4, rain_amount() > 0.0);
-    for (var k = 0; k < rounds; k++) {
+    for (var k = 0; k < rolled(rounds); k++) {
         var sum = vec3(0.0);
-        for (var i = 0; i < 9; i++) {
+        for (var i = 0; i < rolled(9); i++) {
             if i == ATM_MEAN_SKIP { continue; }
             let dir = atm_mean_dir(i, sun);
             let a = atm_march(dir, sun, moon, moon_k, atm_background(m), 4, 2);
@@ -914,6 +914,17 @@ fn foliage_test() -> vec3<f32> {
     return mix(vec3(1.0), vec3(0.62, 0.72, 0.66), clamp(fantasy_opt(OPT_FOLIAGE_TEST), 0.0, 1.0));
 }
 
+// A loop's bound with a zero the compiler cannot see (`scene.frame.y`, 0 or 1, at most 0 by
+// `min`): NVIDIA's compiler unrolled constant-bound loops with noise, texture reads or marches in
+// them, then inlined them into every fragment entry: a look.wgsl change made the 3060's 56 world
+// pipelines cold for 231 s at load and up to 178 s an entry with ray tracing on (Port upstream
+// Weft fixes, pipeline-compile-stall-1126). Kept rolled, the same picture.
+fn rolled(n: i32) -> i32 {
+    return n + i32(min(scene.frame.y, 0.0));
+}
+fn rolled_u(n: u32) -> u32 {
+    return n + u32(min(scene.frame.y, 0.0));
+}
 fn fantasy_opt(i: u32) -> f32 {
     return scene.options[i / 4u][i % 4u];
 }
@@ -1817,7 +1828,7 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
         let base = vec2<i32>(floor(p));
         let f = fract(p);
         var lit4 = vec4(0.0);
-        for (var k = 0; k < 4; k++) {
+        for (var k = 0; k < rolled(4); k++) {
             let t = clamp(base + vec2(k % 2, k / 2), vec2(0), vec2(size - 1));
             lit4[k] = select(0.0, 1.0, textureLoad(textures[index], t, 0).r <= ndc.z + bias);
         }
@@ -1835,7 +1846,7 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
     // Mac's compiler kept it in memory (the world pass's register spill, Tester's trace 11-05).
     var lit = 0.0;
     var above = vec3(0.0);
-    for (var j = 0; j < 4; j++) {
+    for (var j = 0; j < rolled(4); j++) {
         let y = clamp(at.y + j - 1, 0, size - 1);
         let x0 = clamp(at.x - 1, 0, size - 1);
         let x1 = clamp(at.x, 0, size - 1);
@@ -1889,7 +1900,7 @@ fn shadow_pcss(index: u32, size: i32, texel: f32, depth: f32, rel: vec3<f32>, p:
     var count = 0.0;
     var sum = 0.0;
     let search = 0.14 / texel;
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < rolled(4); i++) {
         let o = pcss_spiral(f32(i), 3.0, ign) * search;
         let t = clamp(vec2<i32>(floor(p + o)), vec2(0), vec2(size - 1));
         let d = textureLoad(textures[index], t, 0).r;
@@ -1906,7 +1917,7 @@ fn shadow_pcss(index: u32, size: i32, texel: f32, depth: f32, rel: vec3<f32>, p:
     let step = 0.3 * 0.009 * radius / texel;
     var q = p;
     var lit = 0.0;
-    for (var i = 0; i < 13; i++) {
+    for (var i = 0; i < rolled(13); i++) {
         q += pcss_spiral(f32(i), 12.0, turn) * step;
         let g = textureGather(0, textures[index], nearest_clamp, q / f32(size));
         let nearest = max(max(g.x, g.y), max(g.z, g.w));
@@ -1962,7 +1973,7 @@ fn screen_contact(rel: vec3<f32>, frag: vec2<f32>) -> f32 {
     // In reverse depth: larger is nearer. The ray's depth over the step just taken, a hair widened.
     var near_z = pa.z;
     var far_z = pa.z;
-    for (var i = 0; i < 16; i++) {
+    for (var i = 0; i < rolled(16); i++) {
         if p.x < 0.0 || p.y < 0.0 || p.x >= dims.x || p.y >= dims.y || p.z <= 0.0 {
             break;
         }
@@ -2016,20 +2027,25 @@ fn screen_ao(rel: vec3<f32>, n: vec3<f32>) -> f32 {
     let facing = normalize(n);
     var closed = 0.0;
     var count = 0.0;
-    for (var k = 0; k < 14; k++) {
+    for (var k = 0; k < rolled(14); k++) {
         let i = k % 7;
         let noise = fract(turn + 0.5 * f32(k / 7));
         let q = centre + pcss_spiral(f32(i), 6.0, noise) * share * 0.3 * dims.x;
         if q.x < 0.0 || q.y < 0.0 || q.x >= dims.x || q.y >= dims.y {
             continue;
         }
-        let stored = textureLoad(depth_tex, vec2<i32>(q), 0).r;
+        let texel = floor(q);
+        let stored = textureLoad(depth_tex, vec2<i32>(texel), 0).r;
         // The sky: open, far past any reach.
         if stored <= 0.0 {
             count += 1.0;
             continue;
         }
-        let ndc = vec2(q.x / dims.x * 2.0 - 1.0, 1.0 - q.y / dims.y * 2.0);
+        // Rebuilt at the centre of the pixel whose depth it read (Bliss's + 0.5 texel): at the tap's
+        // own point, up to a pixel off along the surface, a slanting floor's taps stood off its
+        // plane by a share that followed the taps' fractions, a fixed fine hatch (lksp_ssao1-5).
+        let at = texel + 0.5;
+        let ndc = vec2(at.x / dims.x * 2.0 - 1.0, 1.0 - at.y / dims.y * 2.0);
         let h = scene.taa_prev_inv * vec4(ndc, stored, 1.0);
         let v = h.xyz / h.w - rel;
         let d2 = dot(v, v);
@@ -2321,7 +2337,7 @@ fn bc_layer(layer: u32, start: vec3<f32>, step: vec3<f32>, mult: f32, steps: i32
         occlusion = mix(1.0, (1.0 - bc_density(1u)) * 0.8 + 0.2, (1.0 - exp2(-5.0 * up * up)) * distant);
     }
     var pos = start;
-    for (var i = 0; i < steps; i++) {
+    for (var i = 0; i < rolled(steps); i++) {
         if length(pos - cam) > far {
             break;
         }
@@ -2333,7 +2349,7 @@ fn bc_layer(layer: u32, start: vec3<f32>, step: vec3<f32>, mult: f32, steps: i32
             if with_density > 1e-5 {
                 let mu_e = cumulus * faded;
                 var od = 0.0;
-                for (var j = 0; j < 3; j++) {
+                for (var j = 0; j < rolled(3); j++) {
                     od += bc_cumulus(layer, w + l * (20.0 + f32(j) * (20.0 + dither * 20.0)), 0u) * dens;
                 }
                 if layer == 0u {
@@ -2515,7 +2531,7 @@ fn soft_cloud_shadow(rel: vec3<f32>) -> f32 {
         // Past the map, the deck's mean over it (a 3 x 3 grid of taps), not an open sky: at 1 a
         // storm's far land, the fog's far steps and the sky's march were sunlit beyond a hard
         // straight edge (lkmxS1's rain vista). Bliss's cloud shadow has no edge to cross.
-        for (var i = 0; i < 9; i++) {
+        for (var i = 0; i < rolled(9); i++) {
             let g = vec2(f32(i % 3), f32(i / 3)) / 3.0 + 1.0 / 6.0;
             through += textureSampleLevel(t, linear_clamp, g, 0.0).r / 9.0;
         }
@@ -3261,7 +3277,7 @@ fn fog_through_banks(c: vec3<f32>, rel: vec3<f32>, bank_rel: vec3<f32>, sky: f32
     var gained = vec3(0.0);
     var last = 0.0;
     var lit = 1.0;
-    for (var i = 1u; i <= steps; i++) {
+    for (var i = 1u; i <= rolled_u(steps); i++) {
         let k = f32(i) / f32(steps);
         let near = (exp(2.2 * k) - 1.0) / (exp(2.2) - 1.0);
         let far = 1.0 - (exp(2.2 * (1.0 - k)) - 1.0) / (exp(2.2) - 1.0);
@@ -3354,7 +3370,7 @@ fn bank_hidden(rel: vec3<f32>) -> f32 {
     let span = select(dist, max(scene.params.y, MIST_MARCH_FAR), is_sky);
     let e = 11.0;
     var depth = 0.0;
-    for (var i = 0u; i < 8u; i++) {
+    for (var i = 0u; i < rolled_u(8u); i++) {
         let u = (f32(i) + 0.5) / 8.0;
         let t = span * (pow(e, u) - 1.0) / (e - 1.0);
         let step = span * pow(e, u) * log(e) / (8.0 * (e - 1.0));
@@ -3501,7 +3517,7 @@ fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_f
     // In a cave the fog is gone and the air's light with it (Bliss's inACave on its fog's density and
     // its Atmosphere term; the air still dims what lies behind).
     let open = 1.0 - cave_k();
-    for (var i = 0u; i < n; i++) {
+    for (var i = 0u; i < rolled_u(n); i++) {
         let u = (f32(i) + jitter) / f32(n);
         let t = span * (pow(e, u) - 1.0) / (e - 1.0);
         let step = span * pow(e, u) * log(e) / (f32(n) * (e - 1.0));
@@ -3741,7 +3757,7 @@ fn froxel_cell(dir: vec3<f32>, at: f32, floor: f32) -> vec4<f32> {
     let banks0 = fog_banks_at(scene.eye.xyz + dir * a0, floor);
     let banks1 = fog_banks_at(scene.eye.xyz + dir * a1, floor);
     var d = 0.0;
-    for (var i = 0; i < 8; i++) {
+    for (var i = 0; i < rolled(8); i++) {
         let t = (f32(i) + 0.5) / 8.0;
         d += fog_density_with(scene.eye.xyz + dir * mix(a0, a1, t), floor, mix(banks0, banks1, t));
     }
@@ -3844,7 +3860,7 @@ fn under_water(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let reach = min(dist, 32.0);
         let t = scene.params.w;
         var beams = 0.0;
-        for (var i = 0; i < 6; i++) {
+        for (var i = 0; i < rolled(6); i++) {
             let at = rel * ((f32(i) + 0.5) / 6.0) * (reach / max(dist, 1e-4));
             let wy = scene.eye.y + at.y;
             // Straight up the light to the surface: where it came through.
