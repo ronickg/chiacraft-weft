@@ -415,10 +415,13 @@ pub fn recent_lushness(
     if mine.is_empty() {
         return None;
     }
-    let n = days.clamp(1, day + 1);
+    // A full window from the world's first day: the days before it are those a year on (their weather another run),
+    // so a fresh world's first spawns don't hang on one day's rain (cap_r1: the usual 53% on day 0, 64% by day 2).
+    let year = crate::calendar::YEAR_DAYS as u64;
+    let n = days.clamp(1, year);
     let total: f32 = (0..n)
         .map(|back| {
-            let d = day - back;
+            let d = if back <= day { day - back } else { day + year - back };
             let of_year = (d % crate::calendar::YEAR_DAYS as u64) as f32;
             let season = (of_year as u32 / crate::calendar::SEASON_DAYS) as usize;
             let air = if calendar { crate::plants::mean_air(celsius, seasons, of_year + 0.5) } else { celsius };

@@ -1,8 +1,8 @@
 # Arrows and blows into a carcass. A white-tailed deer killed on the pad at x 0: "carcass N of white_tailed_deer".
-# Then 10 arrows shot into the body from 5 blocks and 10 sword blows from beside it. `/animalprof carcass` after the
-# arrows and after the blows still lists "carcass N ... Whole" (not "no carcasses near"); then it is skinned with a
-# knife: "skins carcass N" and hide and venison in `/tk inv me`. Shots: 1_shot (the body with arrows round it),
-# 2_skinned.
+# Then 10 arrows shot into the body from 5 blocks: `/animalprof carcass` still lists "carcass N ... Whole" (not "no
+# carcasses near"); it is skinned with a knife: "skins carcass N", hide and venison in `/tk inv me`, the carcass
+# Opened. Then 10 sword blows into the opened body: still listed, Opened. (r1 skinned after the blows, which had
+# pushed the body 3 blocks from the knife.) Shots: 1_shot (the body with arrows round it), 2_skinned, 3_struck.
 loaded
 idle
 chat /tk mode creative
@@ -73,6 +73,37 @@ wait 0.5
 aim 8
 wait 3
 chat /animalprof carcass
+chat /tick freeze
+chat /tp 3 74 550
+look 0 -40
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_arrows_1_shot.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tk put me 3 base:knife 1
+key 4
+chat /tp 0 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /animalprof carcass
+chat /tk inv me
+chat /tick freeze
+chat /tp 3 74 550
+look 0 -40
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_arrows_2_skinned.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
 chat /tk put me 2 base:iron_sword 1
 key 3
 chat /tp 0 70 546
@@ -106,28 +137,7 @@ look 0 -40
 wait 2
 press core:hide_hud
 wait 0.5
-shot cov_carcass_arrows_1_shot.png
-press core:hide_hud
-chat /tick unfreeze
-wait 1
-chat /tk put me 3 base:knife 1
-key 4
-chat /tp 0 70 546
-look 0 -40
-wait 1
-aim 4
-wait 1
-press core:use
-wait 12
-chat /animalprof carcass
-chat /tk inv me
-chat /tick freeze
-chat /tp 3 74 550
-look 0 -40
-wait 2
-press core:hide_hud
-wait 0.5
-shot cov_carcass_arrows_2_skinned.png
+shot cov_carcass_arrows_3_struck.png
 press core:hide_hud
 chat /tick unfreeze
 wait 1
