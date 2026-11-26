@@ -403,7 +403,7 @@ fn pt_lightmap(light: vec4<f32>) -> vec3<f32> {
 
 // The plain pixel at `at` (see above): `h` the surface met, `n` its normal, `ng` its face's, `sun`
 // the traced sun on it (0..1, 0 facing away), `albedo` the G-buffer's (linear, tinted).
-fn pt_plain(at: u32, px: vec2<f32>, h: RtHit, ng: vec3<f32>, lift: vec3<f32>, sun: f32, albedo: vec3<f32>) {
+fn pt_plain(at: u32, px: vec2<f32>, h: RtHit, ng: vec3<f32>, lift: vec3<f32>, sun: f32, albedo: vec3<f32>, glow: f32) {
     // The sky's share: one cosine ray a frame about the face (the denoisers average them).
     let b = rt_hit(h.rel + lift, pt_cosine(ng, pt_noise(px)), 96.0, 2.0);
     let access = select(1.0, clamp(b.light.x, 0.0, 1.0), b.hit);
@@ -431,6 +431,10 @@ fn pt_plain(at: u32, px: vec2<f32>, h: RtHit, ng: vec3<f32>, lift: vec3<f32>, su
         return;
     }
     light = clamp(light, vec3(0.0), vec3(1.0)) * normal_shade(ng);
+    // A glowing texel at least its glow, as the engine's `max(light, tint * e)` (the G-buffer's
+    // alpha under plain, `gbuffer` in world.wgsl; the tint is in the albedo): lit as plain
+    // colour a campfire's flame came out dimmer than raster's (fire2, 11-26).
+    light = max(light, vec3(glow));
     let surface = pt_srgb_decode(pt_srgb_encode(albedo) * light);
     // The light alone for the denoisers (the surface over its albedo), no specular, no air.
     pt_out[at] = vec4(surface / max(albedo, vec3(1e-4)), select(PT_SKY_T, max(b.t, 1e-3), b.hit));
@@ -549,7 +553,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         sun *= models_shadow(h.rel, n) * cloud_shadow(h.rel);
     }
     if pt.plain != 0u {
-        pt_plain(at, px, h, ng, lift, sun, albedo);
+        pt_plain(at, px, h, ng, lift, sun, albedo, textureLoad(textures[pt.albedo], ip, 0).a);
         return;
     }
     // Diffuse. The world's light (its sky light from the lightmap); the sky's share of it, as the
