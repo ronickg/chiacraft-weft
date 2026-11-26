@@ -255,7 +255,12 @@ pub fn block(mc: &str) -> (Vec<String>, bool) {
         // Vines and cave vines: our liana (a hanging climber, crossed planes) in the vine's own cell
         // rather than flat on the wall; air left the showcase's ruins bare (about 280,000 vines,
         // the cathedral and the nave against NVIDIA's Remix, 11-25).
-        "vine" | "cave_vines" | "cave_vines_plant" | "weeping_vines" | "weeping_vines_plant" | "twisting_vines"
+        "vine"
+        | "cave_vines"
+        | "cave_vines_plant"
+        | "weeping_vines"
+        | "weeping_vines_plant"
+        | "twisting_vines"
         | "twisting_vines_plant" => (vec!["base:liana".into(), AIR.into()], false),
         _ => {
             // Waterlogged small things stand in water; other small things are left out; any other
