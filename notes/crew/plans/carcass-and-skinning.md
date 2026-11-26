@@ -90,3 +90,12 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   (low beside the right shoulder), knife tier from `base_api::ITEM_LEVEL`, hide quality on `animals:pelt_quality`,
   hints `hint.animals.pelt_1..3`. The progression sheet's kill yields stay true (skinning gives the same hide, meat or
   carcass pieces as the death loot did, at good quality).
+- Runs: r4 (f0c719804) had wolves kill and open a carcass (14.4/38.1 kg), vultures eat at one, rot Opened 3 d →
+  Bones 5 d → Pile 9 d → gone 13 d, skinning (2 hides quality 2 with flint, 4 venison), no drops at kills; but the
+  body stood up (the held death clip doesn't play on a swapped appearance) and the camera sat in the arm. r5
+  (1804dc789): the client rolls whole/opened bodies onto their side (`SHOWN` synced, root bone turned and lifted),
+  the camera stands out past the arm; shots 2, 4 (lying), 5 (ribcage), 6 (pile), 8 (kneel with knife), 9 (skinned
+  ribcage) pass. r5's wolves wounded the deer but didn't kill it in the time (r4 did): a chance, not a regression.
+- Left for later: Opened looks like Whole until the art slice; the dead body shows the base coat, not its own; vultures
+  fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
+  inventory with no pickup shown.
