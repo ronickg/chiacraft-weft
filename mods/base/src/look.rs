@@ -333,7 +333,7 @@ pub fn register(r: &mut Registry) {
     crate::developer::page(r.config(&LOOK_SKY_PHYS).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_FOG_ONE).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_CHAIN_NIGHT).float(0.08, 0.0, 1.0));
-    crate::developer::page(r.config(&LOOK_WEATHER).float(1.0, 0.0, 3.0));
+    crate::developer::page(r.config(&LOOK_WEATHER).float(1.0, 0.0, 10.0));
     crate::developer::page(r.config(&LOOK_RAIN_DARK).float(0.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_RAIN_MIRROR).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_CAVE_FOG).float(1.0, 0.0, 1.0));
