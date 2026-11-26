@@ -158,6 +158,11 @@ fn pt_cache_find(cell: vec2<u32>, insert: bool) -> i32 {
 }
 
 fn pt_cache_add(i: u32, light: vec3<f32>) {
+    // Never a NaN or an infinity into the sums (a cast of one to u32 is undefined, and one bad sum
+    // would stand in its cell for good).
+    if !all(light == light) || !all(abs(light) < vec3(1e30)) {
+        return;
+    }
     let q = vec3<u32>(clamp(light, vec3(0.0), vec3(64.0)) * 256.0);
     let a = PT_CACHE + i * 4u;
     atomicAdd(&pt_cache[a], q.r);
