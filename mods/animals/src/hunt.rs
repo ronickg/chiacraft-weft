@@ -183,14 +183,14 @@ pub fn init(r: &mut Registry) {
     });
 }
 
-/// How fed its prey are where `pos` is this season, 0 to 1: the best fed of its prey that live in
-/// that biome (`needs::prey_in`), by how much of their own food grows there now
-/// (`forage::season_lush`). `None`: none of its prey live there (only farm animals, which don't
+/// How fed its prey are where `pos` is now, 0 to 1: the best fed of its prey that live in
+/// that biome (`needs::prey_in`), by how much of their own food grew there in its last days
+/// (`forage::recent_lush`). `None`: none of its prey live there (only farm animals, which don't
 /// thin with the seasons).
 pub fn prey_lush(w: &World, s: &Species, pos: [i32; 3]) -> Option<f32> {
     let biome = name_of(abi::entry_kind::BIOME, w.biome(pos));
     animals_core::needs::prey_in(s, biome)
-        .map(|o| crate::forage::season_lush(w, o, pos))
+        .map(|o| crate::forage::recent_lush(w, o, pos))
         .reduce(f32::max)
 }
 

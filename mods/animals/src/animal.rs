@@ -354,7 +354,7 @@ fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
     let s = &SPECIES[index];
     let at = pos.map(|v| v.floor() as i32);
     let lush = if s.forages_wild() {
-        Some(crate::forage::season_lush(w, s, at))
+        Some(crate::forage::recent_lush(w, s, at))
     } else if s.hungry_in_the_wild() {
         crate::hunt::prey_lush(w, s, at)
     } else {
@@ -366,7 +366,7 @@ fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
             "wild {} {id} arrives {:.0}% fed (its {} at {:.0}% here this season)",
             s.name,
             a.food as f32 / a.stat(species::FOOD) * 100.0,
-            if s.forages_wild() { "food grows" } else { "prey are fed" },
+            if s.forages_wild() { "food grew in its last days" } else { "prey are fed" },
             lush * 100.0
         );
     }

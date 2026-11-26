@@ -650,3 +650,21 @@ s += pad(200) + ["chat /season spring 5", f"chat /tp 200 70 {Z}", "wait 1", "cha
     met_shots(200, "3_out_of_season") + ["wait 6", "chat /animalprof where 48"]
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("births", s)
+
+
+# Capacity by food (notes/ECOLOGY.md part 7): a wild plant eater's room follows its food over the last ten days
+# against what it usually is then (`needs::room_by_food`), so a dry spell thins a place and rain fills it back.
+# Ticks frozen with one white-tailed deer on the pad (`/animal room` asks for the nearest one's kind), the calendar
+# set to every other day of the year in turn.
+SWEEP = [(season, d) for season in ["spring", "summer", "autumn", "winter"] for d in range(1, 15, 2)]
+s = head("capacity", [
+    "Capacity by food. One white-tailed deer on the pad at x 0, ticks frozen; the calendar set to every other day of the",
+    "year, each followed by `/animal room`: \"room: white_tailed_deer at ... (<biome>, day D): food N% (usual U%), ...",
+    "room for R of C\". R is C on most days; on days whose food is well under its usual (a dry spell) R is smaller, about",
+    "C x N/U (never under a quarter of C), and back to C once N comes back up. Food in winter is browse (40%), with R at",
+    "C. No shots.",
+]) + pad(0) + ["chat /tk spawn animals:white_tailed_deer 3 70 544", "wait 2", "chat /tick freeze"]
+for season, d in SWEEP:
+    s += [f"chat /season {season} {d}", "wait 0.5", "chat /animal room"]
+s += ["chat /tick unfreeze"]
+write("capacity", s)
