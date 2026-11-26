@@ -44,6 +44,25 @@ fn ground_wet() -> f32 {
 // traced, the ground stayed dry and bright in the rain, w27).
 fn rain_on_ground(c_in: vec3<f32>, n: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>, sky: f32, leafy: bool) -> vec3<f32> {
     var c = c_in;
+    // Bliss's rain (as made, `base:look_rain_dark` 0): the ground is not darkened, only smoothed:
+    // all_solid's smoothness goes to at least the rain's (rainStrength x noPuddleAreas x its sky
+    // light past 0.9), so the face mirrors the sky by Schlick's Fresnel at F0 0.02, sharper the
+    // wetter (roughness (1 - smoothness)^2), and the sun's highlight sharpens with it (`rain_sun`,
+    // world.wgsl) and the screen's reflections take it up (`mirror_alpha`). Method only.
+    if fantasy_opt(OPT_RAIN_DARK) < 0.5 {
+        let w = rain_smooth(sky, pos);
+        if w > 0.0 {
+            let v = -normalize(rel);
+            let rough = (1.0 - w) * (1.0 - w);
+            let r = reflect(-v, n);
+            let seen = mix(sky_color(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(rough * 2.0, 0.0, 1.0));
+            let f = 0.02 + 0.98 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
+            // As `mat_shine`: a rough face mirrors little (leaves and plants as the rest, as Bliss).
+            let gloss = 1.0 - clamp(rough * 1.6, 0.0, 0.85);
+            c = mix(c, seen, f * gloss);
+        }
+        return c;
+    }
     // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
     // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
     // after it stopped, Tester 2's after-rain shots, 11-05). Leaves and plants wet too, less: a
@@ -96,6 +115,13 @@ fn rain_on_ground(c_in: vec3<f32>, n: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>,
         }
     }
     return c;
+}
+
+// Bliss's rain smoothness at a face with sky light `sky` (0..1) at `pos`: the rain's strength where
+// it rains (not on snow, `rain_fog_at`, as its noPuddleAreas), only out under the open sky
+// (clamp((sky - 0.9) x 10), its lightmap gate).
+fn rain_smooth(sky: f32, pos: vec3<f32>) -> f32 {
+    return rain_amount() * rain_fog_at(pos.y) * clamp((sky - 0.9) * 10.0, 0.0, 1.0);
 }
 
 // 0..1 for puddle cell `c` and key `k`: a sine hash (the pack's `hash3` picked far too few cells,
@@ -414,6 +440,10 @@ const LAND_MOON: f32 = 0.00229;
 const OPT_CHAIN_NIGHT: u32 = 73u;
 // How strongly rain and snow are drawn over the Bliss look (`base:look_weather`, 1 as made).
 const OPT_WEATHER: u32 = 74u;
+// Rain on the ground as before Bliss, darker with puddles (`base:look_rain_dark`, 0 as made: Bliss's).
+const OPT_RAIN_DARK: u32 = 75u;
+// With Bliss's rain, the screen's reflections on the wet ground (`base:look_rain_mirror`, 1 as made).
+const OPT_RAIN_MIRROR: u32 = 76u;
 // How much of the sky's light's blue goes by day, with the chain. (The sun's light is already the
 // 4300 K of Ronald's profile through the air, `sun_kelvin_linear`, since 11-06.)
 const CHAIN_AMBIENT_GREY: f32 = 0.4;

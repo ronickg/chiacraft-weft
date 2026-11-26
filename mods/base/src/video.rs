@@ -288,6 +288,7 @@ fn look_on() {
     CLOUD_SHADOWS.set(true);
     crate::look::LOOK_MIST_DOMES.set(1.0);
     crate::look::LOOK_LEAF_HOLES.set(1.0);
+    crate::look::LOOK_RAIN_MIRROR.set(1.0);
 }
 
 /// What Ultra adds past the features' top steps, as far as this GPU goes: anti-aliasing, the far
@@ -876,7 +877,7 @@ fn row_ui(ui: &mut Ui, rows: &'static [Row], i: usize, step: fn(usize, i32)) {
 /// Players see the features' rows instead (Ronald, 11-24: the tuning "is more for developer
 /// things"). Traced shadows, reflections and the path tracer's denoiser only where the GPU traces
 /// rays (`traced`).
-const PARTS: [Row; 23] = [
+const PARTS: [Row; 24] = [
     Row {
         key: "shadows",
         values: &[0.0, 1.0, 2.0],
@@ -965,6 +966,15 @@ const PARTS: [Row; 23] = [
     },
     // The mist's banks walked per pixel on the ground the engine maps (stage 2, 11-24): on as made
     // and in every preset (the look always on, Ronald 11-24).
+    // The screen's reflections on rain-wet ground (Bliss's rain, 11-26): on as made and in every
+    // preset; its cost shows only in the rain (the reflect pass traces the wet pixels too).
+    Row {
+        key: "wet_mirror",
+        values: &[0.0, 1.0],
+        get: || (crate::look::LOOK_RAIN_MIRROR.get() > 0.5) as u8 as f64,
+        set: |v| crate::look::LOOK_RAIN_MIRROR.set(if v > 0.0 { 1.0 } else { 0.0 }),
+        shown: off_on,
+    },
     Row {
         key: "mist_banks",
         values: &[0.0, 1.0],
@@ -1130,7 +1140,7 @@ pub(crate) fn measured_rows(tab: crate::video_costs::Tab) -> Vec<crate::video_co
             pick(&PARTS, &keys)
         }
         Tab::Extra => {
-            let mut keys = vec![("bloom", 0.4), ("cloud_shadows", 0.6), ("leaf_holes", 0.4), ("far_detail", 0.6), ("leaf_light", 0.4)];
+            let mut keys = vec![("bloom", 0.4), ("cloud_shadows", 0.6), ("leaf_holes", 0.4), ("far_detail", 0.6), ("leaf_light", 0.4), ("wet_mirror", 0.4)];
             if GPU_RAY_QUERY.get() {
                 keys.push(("pt_denoiser", 1.0));
             }
