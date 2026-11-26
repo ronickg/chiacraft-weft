@@ -299,7 +299,10 @@ fn pt_emissive() -> f32 {
 fn pt_flags() -> u32 {
     let level = |k: &str| crate::config::by_name(k).map_or(1.0, crate::config::get);
     let on = |k: &str| u32::from(level(k) > 0.5);
-    on("core:pt_bounce_lights") | on("core:pt_restir") << 1 | on("core:pt_cache_fill") << 2 | u32::from(level("core:pt_cache_fill") > 1.5) << 3
+    on("core:pt_bounce_lights")
+        | on("core:pt_restir") << 1
+        | on("core:pt_cache_fill") << 2
+        | u32::from(level("core:pt_cache_fill") > 1.5) << 3
 }
 const LIGHTS_PER_CUBE: usize = 48;
 const LIGHTS_MAX: usize = 1 << 20;
