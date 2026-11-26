@@ -1,0 +1,85 @@
+# Animals at the crops and the water plants. Part 1 (x 0): a 5 x 5 field of ripe wheat east of the pond and one of
+# ripe carrots west of it, 2 white-tailed deer and 2 hares beside them, hungry (food 30%), nothing else to eat on the
+# bare pad. Expect "animal N eats base:wheat at ..." from the deer and "eats base:carrots" from the hares, each
+# eaten plant set back to a seedling (the 1_fields shot after: gaps of young crop in the fields). Part 2 (x 200, summer):
+# a pond with lily pads on it and reeds along its south side, 2 capybaras hungry: "eats base:lily_pad" or
+# "eats base:reed" (they stay: no block changes). Shots 1_fields, 2_pond.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 86 528 16 110 560 core:air
+chat /tk fill -16 111 528 16 140 560 core:air
+chat /tk fill -16 70 561 16 100 576 core:air
+chat /time set 6000
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /tk fill 4 69 542 8 69 546 base:farmland
+chat /tk fill 4 70 542 8 70 546 base:wheat[age=7]
+chat /tk fill -8 69 542 -4 69 546 base:farmland
+chat /tk fill -8 70 542 -4 70 546 base:carrots[age=3]
+chat /tk spawn animals:white_tailed_deer 6 70 549
+chat /tk spawn animals:white_tailed_deer 7 70 549
+chat /tk spawn animals:hare -6 70 549
+chat /tk spawn animals:hare -5 70 549
+chat /tp 0 74 558
+wait 1
+chat /animalprof food 0.3
+chat /animalprof water 0.9
+wait 60
+chat /tick freeze
+chat /tp 0 80 554
+look 0 -50
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_crops_1_fields.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tp 200 90 544
+wait 4
+chat /tk fill 184 60 528 216 68 560 base:dirt
+chat /tk fill 184 69 528 216 69 560 base:grass
+chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 86 528 216 110 560 core:air
+chat /tk fill 184 111 528 216 140 560 core:air
+chat /tk fill 184 70 561 216 100 576 core:air
+chat /time set 6000
+chat /tk fill 198 69 542 202 69 546 base:water
+chat /tk fill 198 70 542 202 70 546 core:air
+wait 1
+chat /tk fill 198 70 542 202 70 546 base:lily_pad
+chat /tk fill 198 70 547 202 70 547 base:reed
+chat /tk spawn animals:capybara 200 70 550
+chat /tk spawn animals:capybara 201 70 550
+chat /tp 200 74 558
+wait 1
+chat /animalprof food 0.3
+chat /animalprof water 0.9
+wait 60
+chat /tick freeze
+chat /tp 200 78 553
+look 0 -40
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_crops_2_pond.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+quit

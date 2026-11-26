@@ -48,6 +48,16 @@ const fn wild(block: &'static str, age: u8, category: Category, food: u16, eaten
     Source { block, age: Some(age), category, food, eaten, renews: Some(block), found, seasons: 0 }
 }
 
+/// Where a crop is found: in no biome, only where a player sowed it, so a place's food (`lushness`, `recent_lushness`,
+/// `season_lushness`) never counts it, and an animal still eats it where it finds it.
+pub const PLANTED: &[&str] = &["planted"];
+
+/// A ripe crop (`crops::CROPS`) an animal eats where it finds one (deer in the wheat, mice and birds at the grain, hares
+/// at the roots): eaten, the crop is set back to a seedling, as a raided field is.
+const fn crop(block: &'static str, ripe: u8, category: Category, food: u16) -> Source {
+    Source { block, age: Some(ripe), category, food, eaten: Eaten::Age(0), renews: Some(block), found: PLANTED, seasons: 0 }
+}
+
 /// Browse: always there in `found`, in `seasons`.
 const fn browse(block: &'static str, category: Category, food: u16, found: &'static [&'static str], seasons: u8) -> Source {
     Source { block, age: None, category, food, eaten: Eaten::Stays, renews: None, found, seasons }
@@ -86,7 +96,7 @@ const ARAUCARIAS: &[&str] = &["animals:scrubland", "animals:floodplain", "animal
 const SCALE_CONIFERS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:crags"];
 const BIRCHES: &[&str] = &["base:forest", "base:old_growth_forest", "base:birch_forest"];
 
-pub const SOURCES: [Source; 76] = [
+pub const SOURCES: [Source; 90] = [
     // A tuft of tall grass feeds 2 (it fed 10): a grazer crops five tufts for what it used to eat
     // of one, so herds crop their ground as real ones do, 25-50% of a biome's regrowth in its
     // best season (`GRAZED`, Ronald 11-05: "Real levels, 25-50%"; with Animals' stocking).
@@ -218,6 +228,25 @@ pub const SOURCES: [Source; 76] = [
     browse("base:kelp_wrack", Category::WaterPlants, 4, &["base:beach"], ALL_YEAR),
     // Turtle grass on the lagoons' floor, all year (green turtles and manatees graze it).
     browse("base:turtle_grass", Category::WaterPlants, 5, wild::LAGOONS, ALL_YEAR),
+    // The other water plants (`wild::WILD`): reeds at the lakes' and rivers' edges and lily pads on still water, from
+    // spring to autumn (they die back in winter; capybaras graze both), and the sea's eelgrass meadows and kelp
+    // forests, all year.
+    browse("base:reed", Category::WaterPlants, 4, wild::REEDBEDS, GREEN),
+    browse("base:lily_pad", Category::WaterPlants, 5, wild::LAKES, GREEN),
+    browse("base:seagrass", Category::WaterPlants, 5, wild::SEA_MEADOWS, ALL_YEAR),
+    browse("base:kelp", Category::WaterPlants, 4, wild::KELP_FORESTS, ALL_YEAR),
+    // Ripe crops where a player sowed them (`PLANTED`): the grain and beans as seeds, the roots and tubers as roots.
+    // The two-block-tall ones (maize, sorghum, millet) and the stems' fruit are left alone.
+    crop("base:wheat", 7, Category::Seeds, 8),
+    crop("base:barley", 3, Category::Seeds, 8),
+    crop("base:rye", 3, Category::Seeds, 8),
+    crop("base:paddy_rice", 3, Category::Seeds, 6),
+    crop("base:beans", 3, Category::Seeds, 8),
+    crop("base:tepary_beans", 3, Category::Seeds, 6),
+    crop("base:carrots", 3, Category::Roots, 6),
+    crop("base:potatoes", 3, Category::Roots, 8),
+    crop("base:beetroots", 3, Category::Roots, 6),
+    crop("base:cassava", 3, Category::Roots, 8),
     // Grubs and beetles in the rotten logs, all year.
     browse("animals:rotten_log", Category::Insects, 3, wild::DEADWOOD, ALL_YEAR),
     // The next batch (`wild::WILD`): beachgrass grazed and growing back, beach plums and
@@ -498,4 +527,30 @@ pub fn season_lushness(
             .fold(0.0f32, f32::max)
     };
     (!mine.is_empty()).then(|| season.map_or_else(|| (0..4).map(at).sum::<f32>() / 4.0, at))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A crop's row is its ripe crop (`crops::CROPS`), set back to a seedling when eaten, and counted in no place's
+    /// food: a sown field doesn't feed a biome's herds on paper.
+    #[test]
+    fn crops_are_eaten_ripe_where_sown() {
+        for s in SOURCES.iter().filter(|s| s.found == PLANTED) {
+            let c = crate::crops::of(s.block).unwrap_or_else(|| panic!("{}: a PLANTED row that is no crop", s.block));
+            assert_eq!(s.age, Some(c.ripe as u8), "{}: eaten at age {:?}, ripe at {}", s.block, s.age, c.ripe);
+            assert!(c.tall.is_none() && c.fruit.is_none(), "{}: two blocks tall or a stem, left alone", s.block);
+            assert!(matches!(s.eaten, Eaten::Age(0)), "{}: eaten, a crop goes back to a seedling", s.block);
+        }
+        let all = |_: Category| true;
+        let with = lushness(all, "base:plains", 20.0, 1.0);
+        let without = SOURCES
+            .iter()
+            .filter(|s| s.found != PLANTED && (s.found.is_empty() || s.found.contains(&"base:plains")))
+            .filter_map(|s| s.renews.and_then(crate::plants::of))
+            .map(|p| crate::plants::rate(p, 20.0, 1.0))
+            .reduce(f32::max);
+        assert_eq!(with, without, "crops counted in the plains' food");
+    }
 }

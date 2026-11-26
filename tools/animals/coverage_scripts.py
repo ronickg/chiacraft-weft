@@ -735,3 +735,33 @@ s = head("carcass_rot", [
 ]) + rot_part(0)
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass_rot", s)
+
+
+# Animals at the crops and the water plants (notes/ECOLOGY.md part 3's "not yet": `vitals::forage::crop` rows, eaten
+# where sown, and the reeds, lily pads, eelgrass and kelp rows).
+s = head("crops", [
+    "Animals at the crops and the water plants. Part 1 (x 0): a 5 x 5 field of ripe wheat east of the pond and one of",
+    "ripe carrots west of it, 2 white-tailed deer and 2 hares beside them, hungry (food 30%), nothing else to eat on the",
+    "bare pad. Expect \"animal N eats base:wheat at ...\" from the deer and \"eats base:carrots\" from the hares, each",
+    "eaten plant set back to a seedling (the 1_fields shot after: gaps of young crop in the fields). Part 2 (x 200, summer):",
+    "a pond with lily pads on it and reeds along its south side, 2 capybaras hungry: \"eats base:lily_pad\" or",
+    "\"eats base:reed\" (they stay: no block changes). Shots 1_fields, 2_pond.",
+])
+s += pad(0) + [
+    f"chat /tk fill 4 69 {Z-2} 8 69 {Z+2} base:farmland", f"chat /tk fill 4 70 {Z-2} 8 70 {Z+2} base:wheat[age=7]",
+    f"chat /tk fill -8 69 {Z-2} -4 69 {Z+2} base:farmland", f"chat /tk fill -8 70 {Z-2} -4 70 {Z+2} base:carrots[age=3]",
+    f"chat /tk spawn animals:white_tailed_deer 6 70 {Z+5}", f"chat /tk spawn animals:white_tailed_deer 7 70 {Z+5}",
+    f"chat /tk spawn animals:hare -6 70 {Z+5}", f"chat /tk spawn animals:hare -5 70 {Z+5}",
+    f"chat /tp 0 74 {Z+14}", "wait 1", "chat /animalprof food 0.3", "chat /animalprof water 0.9", "wait 60",
+    "chat /tick freeze", f"chat /tp 0 80 {Z+10}", "look 0 -50", "wait 2", "shot cov_crops_1_fields.png",
+    "chat /tick unfreeze", "wait 1",
+]
+s += pad(200, pond=2) + [
+    f"chat /tk fill 198 70 {Z-2} 202 70 {Z+2} base:lily_pad", f"chat /tk fill 198 70 {Z+3} 202 70 {Z+3} base:reed",
+    f"chat /tk spawn animals:capybara 200 70 {Z+6}", f"chat /tk spawn animals:capybara 201 70 {Z+6}",
+    f"chat /tp 200 74 {Z+14}", "wait 1", "chat /animalprof food 0.3", "chat /animalprof water 0.9", "wait 60",
+    "chat /tick freeze", f"chat /tp 200 78 {Z+9}", "look 0 -40", "wait 2", "shot cov_crops_2_pond.png",
+    "chat /tick unfreeze", "wait 1",
+]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("crops", s)

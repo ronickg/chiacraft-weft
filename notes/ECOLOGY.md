@@ -575,10 +575,15 @@ and cactus.**
   `base_api::ground_at` and `air_at`): wheat left over a winter rests through it and a tender
   crop left into autumn meets that autumn's frost, not today's weather. Only rain falling at that
   moment is today's (it decides snow against rain in the air, not the soil's water).
+- **Water plants and crops as food (2026-11-26, branch claude/animals-plants):** reeds and lily
+  pads (spring to autumn) and the sea's eelgrass and kelp (all year) are water plants to the
+  animals that eat them (`forage::SOURCES`; capybaras graze reeds and lily pads). Ripe crops are
+  eaten where a player sowed them, the grain and beans as seeds (deer, mice, birds), roots and
+  tubers as roots (hares, voles), each set back to a seedling as a raided field is
+  (`forage::crop`, `PLANTED`); a sown field counts in no place's food, so capacity is as before.
+  Maize, sorghum, millet and the stems' fruit are left alone (two blocks tall). Check: `cov_crops`.
 - **Not yet:**
-  - the water plants as food: reeds, lily pads, eelgrass and the kelp standing in the sea
-    (2026-11-04) have no `forage::SOURCES` rows yet (the wrack washed up on beaches has);
-  - animals eating the crops and their grain;
+  - none of the crops' raiding seen yet (`cov_crops`, below);
   - beetroot's own seed and cooked cassava, waiting for icons;
   - none of it seen in the game yet;
 

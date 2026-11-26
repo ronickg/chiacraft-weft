@@ -539,6 +539,20 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | animals:water_lily | water_plants | 5 | stays | always there in animals:floodplain, animals:red_dunes (all year), worth 40% of fresh growth |
 | base:kelp_wrack | water_plants | 4 | stays | always there in base:beach (all year), worth 40% of fresh growth |
 | base:turtle_grass | water_plants | 5 | stays | always there in base:lagoon (all year), worth 40% of fresh growth |
+| base:reed | water_plants | 4 | stays | always there in base:plains, base:forest, base:old_growth_forest, base:birch_forest, base:taiga, base:swamp (spring, summer, autumn), worth 40% of fresh growth |
+| base:lily_pad | water_plants | 5 | stays | always there in base:plains, base:forest, base:old_growth_forest, base:birch_forest, base:swamp, base:taiga, base:savanna (spring, summer, autumn), worth 40% of fresh growth |
+| base:seagrass | water_plants | 5 | stays | always there in base:ocean, base:beach (all year), worth 40% of fresh growth |
+| base:kelp | water_plants | 4 | stays | always there in base:ocean (all year), worth 40% of fresh growth |
+| base:wheat (age 7) | seeds | 8 | back to age 0 | base:wheat, where sown (not in any place's food) |
+| base:barley (age 3) | seeds | 8 | back to age 0 | base:barley, where sown (not in any place's food) |
+| base:rye (age 3) | seeds | 8 | back to age 0 | base:rye, where sown (not in any place's food) |
+| base:paddy_rice (age 3) | seeds | 6 | back to age 0 | base:paddy_rice, where sown (not in any place's food) |
+| base:beans (age 3) | seeds | 8 | back to age 0 | base:beans, where sown (not in any place's food) |
+| base:tepary_beans (age 3) | seeds | 6 | back to age 0 | base:tepary_beans, where sown (not in any place's food) |
+| base:carrots (age 3) | roots | 6 | back to age 0 | base:carrots, where sown (not in any place's food) |
+| base:potatoes (age 3) | roots | 8 | back to age 0 | base:potatoes, where sown (not in any place's food) |
+| base:beetroots (age 3) | roots | 6 | back to age 0 | base:beetroots, where sown (not in any place's food) |
+| base:cassava (age 3) | roots | 8 | back to age 0 | base:cassava, where sown (not in any place's food) |
 | animals:rotten_log | insects | 3 | stays | always there in animals:floodplain, animals:fern_forest (all year), worth 40% of fresh growth |
 | base:dune_grass (age 1) | grass | 4 | back to age 0 | base:dune_grass |
 | base:beach_plum_bush (age 3) | fruit | 6 | back to age 1 | base:beach_plum_bush |
