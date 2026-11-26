@@ -436,7 +436,8 @@ def skin_part(x, prefix="cov_carcass"):
         # The hide and meat tossed from the body toward the skinner as it ends (the deer's 8.1 s with flint), held in
         # the air and landing (ticks frozen for each shot), then picked up 1.25 s later; looking down at the body and the
         # ground before the player (r4's level view after the skinning camera saw only the wall).
-        f"shot {prefix}_8_skinning.png", "wait 4", "look 0 -50", "wait 0.5", "chat /tick freeze", f"shot {prefix}_8b_off.png",
+        # r4b's 8b, frozen 1.2 s after the end, came after the half-second toss had landed: 0.6 s sooner.
+        f"shot {prefix}_8_skinning.png", "wait 3.4", "look 0 -50", "wait 0.5", "chat /tick freeze", f"shot {prefix}_8b_off.png",
         "chat /tick unfreeze", "wait 0.4", "chat /tick freeze", f"shot {prefix}_8c_off.png", "chat /tick unfreeze",
         "wait 4", "chat /animalprof carcass"] + \
         side_shot(x, f"{prefix}_9_skinned") + low_shot(x, f"{prefix}_9_low") + [

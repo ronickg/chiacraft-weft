@@ -665,10 +665,12 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     let quality = core::quality(b.level, core::kill(b.hits, b.cause), knife, rot);
     // What comes off is tossed from the body toward the skinner (`off`), to be picked up a moment later: spawned on
     // the skinner, it went into the inventory with nothing seen (Planner 11-26).
-    let from = w.entity(id).map_or(st.pos, |c| c.pos);
+    // (`st` is the carcass's own: skin r4b's toss, aimed from it to itself, went straight up and fell into the ribs.)
+    let from = st.pos;
+    let to = w.entity(player).map_or(from, |p| p.pos);
     let mut n_off = 0;
     let mut off = |stack: ItemStack| {
-        let (dx, dz) = (st.pos.x - from.x, st.pos.z - from.z);
+        let (dx, dz) = (to.x - from.x, to.z - from.z);
         let d = (dx * dx + dz * dz).sqrt().max(0.1);
         let spread = (n_off as f64 - 1.0) * 0.6;
         let v = [

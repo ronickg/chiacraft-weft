@@ -314,7 +314,7 @@ press core:hide_hud
 wait 0.5
 shot cov_carcass_8_skinning.png
 press core:hide_hud
-wait 4
+wait 3.4
 look 0 -50
 wait 0.5
 chat /tick freeze
