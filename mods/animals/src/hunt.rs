@@ -45,8 +45,9 @@ static SITE: Component<[f64; 3]> = Component::named("animal_site");
 /// The water a prowl last reached, `[x, z, until]`: not a leg's goal again until then
 /// (`needs::SITE_AGAIN_SECS`).
 static WATER_SEEN: Component<[f64; 3]> = Component::named("animal_water_seen");
-/// The blood trail it follows: when the last spot it went to fell (game tick; 0: none; `blood::trail`, not saved).
-static TRAIL: Component<u64> = Component::named("animal_trail");
+/// The blood trail it follows: when the spot it walks to fell (game tick; 0: none; `blood::trail`) and where it lies
+/// (not saved).
+static TRAIL: Component<[f64; 4]> = Component::named("animal_trail");
 /// The prey it set off after and what that weighed then, `[id, kg as f32 bits]` (not saved): the
 /// dead can't be read at the kill, and its kind's grown mass fed hunters a young one's carcass as
 /// a grown one's (cov_hunters run 4: a 2.7 kg young capybara eaten as 50 kg).
@@ -61,6 +62,8 @@ use animals_core::needs::{FULL, HUNTS_AT};
 /// Ticks: a chase it gives up, between looks, and a flight.
 const GIVE_UP: u64 = 600;
 const LOOK_EVERY: u64 = 60;
+/// Blocks from the blood spot it walks to at which it goes on to the next.
+const TRAIL_AT: f64 = 1.5;
 const RUN: u64 = 80;
 /// Ticks a herd animal walks back to its herd before it looks again (`huddle`).
 const HUDDLE_WALK: u64 = 40;
@@ -75,7 +78,7 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&FOLLOW, [0u64; 2], 0);
     r.entity_component(&LAST, 0u64, 0);
     r.entity_component(&SITE, [0.0; 3], 0);
-    r.entity_component(&TRAIL, 0u64, 0);
+    r.entity_component(&TRAIL, [0.0; 4], 0);
     r.entity_component(&WATER_SEEN, [0.0; 3], 0);
     r.entity_component(&PREY_KG, [0u64; 2], 0);
     for s in &SPECIES {
@@ -261,6 +264,7 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         if h[0] != 0 {
             w.component_mut(id, &HUNT).map(|h| *h = [0; 4]);
         }
+        w.component_mut(id, &TRAIL).map(|c| *c = [0.0; 4]);
         // Not hungry enough to hunt itself, a pack's member not yet full goes with its leader
         // on the hunt: a timid wolf at 29 % slept 110 s while its pack hunted and killed 40
         // blocks off (ai1124_moveFar1).
@@ -315,6 +319,11 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     }
     if now < h[2] {
         w.component_mut(id, &HUNT).map(|c| *c = h);
+        // On a blood trail it keeps the turn between its looks, walking or at a spot: r3's wolf, giving it up at its
+        // first spot, searched for food instead, and that walk then passed for the trail's.
+        if w.component(id, &TRAIL).is_some_and(|t| t[0] != 0.0) {
+            return true;
+        }
         // On a prowl's leg it keeps the turn, looking again at `LOOK_EVERY`; one following its
         // leader keeps up with it every tick.
         if !w.component(id, &PROWL).is_some_and(|p| now < p) {
@@ -329,12 +338,15 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     // Out of its hours it rests rather than hunts, unless hunger presses (`routines::HUNTS_FROM`).
     if crate::routines::activity(w, s.index()) < animals_core::routines::HUNTS_FROM && full >= animals_core::routines::HUNTS_ANYWAY {
         w.component_mut(id, &HUNT).map(|c| *c = h);
+        w.component_mut(id, &TRAIL).map(|c| *c = [0.0; 4]);
         return false;
     }
     // Food lying near (a carcass, dropped meat) is a meal without a chase: it eats that first
     // (`forage.rs`).
     if crate::forage::ground_food(w, s, st.pos.to_array(), crate::forage::ITEM_LOOK).is_some() {
         w.component_mut(id, &HUNT).map(|c| *c = h);
+        // A trail's end in sight: the turn is the forager's.
+        w.component_mut(id, &TRAIL).map(|c| *c = [0.0; 4]);
         return false;
     }
     // Its prey and its pack from its last look round (`senses`): a pack's kind with others of it
@@ -357,24 +369,31 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         {
             w.component_mut(id, &PROWL).map(|p| *p = 0);
             w.component_mut(id, &FOLLOW).map(|f| f[0] = 0);
+            w.component_mut(id, &TRAIL).map(|c| *c = [0.0; 4]);
             return false;
         }
         // No prey in sight: blood it smells it follows, spot by spot as it fell (`blood::trail`), to a wounded animal it
         // takes or to where one bled out. Walked as a prowl's leg, keeping the turn.
         let own = mass(w, id).unwrap_or(s.bio.mass);
-        let after = w.component(id, &TRAIL).unwrap_or(0);
-        // On a trail it looks again every second, and walks on to the next spot once it has reached this one.
+        let trail = w.component(id, &TRAIL).unwrap_or_default();
+        let after = trail[0] as u64;
+        // On a trail it looks again every second, and walks on to the next spot once it is at this one.
         if after != 0 {
             w.component_mut(id, &HUNT).map(|c| c[2] = now + 20);
-            if w.navigating(id) {
+            let left = (st.pos.x - trail[1]).powi(2) + (st.pos.z - trail[3]).powi(2);
+            if left > TRAIL_AT * TRAIL_AT && w.navigating(id) {
                 return true;
             }
         }
         if let Some((spot, at)) = crate::blood::trail(w, id, st.pos, after, |b| mass(w, b).is_some_and(|kg| s.takes_at_most(own, kg))) {
             if after == 0 {
                 weft_sdk::info!("{} {id} follows a blood trail from {:.0} {:.0}", s.name, spot[0], spot[2]);
+            } else {
+                weft_sdk::debug!("{} {id} on the blood trail to {:.0} {:.0}", s.name, spot[0], spot[2]);
             }
-            w.component_mut(id, &TRAIL).map(|c| *c = at);
+            w.component_mut(id, &TRAIL)
+                .map(|c| *c = [at as f64, spot[0], spot[1], spot[2]]);
+            w.component_mut(id, &HUNT).map(|c| c[2] = now + 20);
             w.navigate(id, spot, 1.0);
             w.component_mut(id, &PROWL)
                 .map(|p| *p = now + (animals_core::needs::PROWL_SECS * 20.0) as u64);
@@ -382,7 +401,7 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
         }
         if after != 0 {
             weft_sdk::info!("{} {id} loses the blood trail", s.name);
-            w.component_mut(id, &TRAIL).map(|c| *c = 0);
+            w.component_mut(id, &TRAIL).map(|c| *c = [0.0; 4]);
         }
         // Nor blood: it goes where kills were (`memory::haunt`), where prey come and die.
         // A site it has just been to and found nothing at it leaves for `needs::SITE_AGAIN_SECS`
@@ -426,6 +445,7 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
     };
     w.component_mut(id, &PROWL).map(|p| *p = 0);
     w.component_mut(id, &FOLLOW).map(|f| *f = [0; 2]);
+    w.component_mut(id, &TRAIL).map(|c| *c = [0.0; 4]);
     weft_sdk::info!("{} {id} hunts {} ({kg:.1} kg, a pack of {pack})", s.name, t);
     w.component_mut(id, &PREY_KG)
         .map(|p| *p = [t, kg.to_bits() as u64]);
