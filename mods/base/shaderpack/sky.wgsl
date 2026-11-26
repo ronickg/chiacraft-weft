@@ -1451,6 +1451,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                 let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
                 var sum = vec3(0.0);
                 for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
                     let dir = atm_mean_dir(i, sun);
                     let a = atm_march(dir, sun, moon, sky_k, ATM_FLOOR, 4, 2);
                     sum += a.light;
@@ -1463,6 +1464,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                 var wet: array<vec3<f32>, 9>;
                 var clear = vec3(0.0);
                 for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
                     let dir = atm_mean_dir(i, sun);
                     let a = atm_march(dir, sun, moon, sky_k, atm_background(mean), 4, 2);
                     wet[i] = atm_rain(a.light, dir, a.through, mean);
@@ -1493,6 +1495,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     // (lkmxE2d: the sun's share 0.016 under the deck, the map's air all the light).
                     var cl: array<vec4<f32>, 9>;
                     for (var i = 0; i < 9; i++) {
+                        if i == ATM_MEAN_SKIP { continue; }
                         cl[i] = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), bc_sky_light(clear / 9.0));
                     }
                     var amb = land_ambient(clear / 9.0);
@@ -1500,6 +1503,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     for (var k = 0; k < 4; k++) {
                         cloudy = vec3(0.0);
                         for (var i = 0; i < 9; i++) {
+                            if i == ATM_MEAN_SKIP { continue; }
                             let dir = atm_mean_dir(i, sun);
                             let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k), bc_sky_light(clear / 9.0), amb, 1.0, false);
                             cloudy += (wet[i] * cl[i].a + cl[i].rgb) * fog.a + fog.rgb;
@@ -1519,11 +1523,13 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                 let sky_k = scene.moon.w * smoothstep(0.0, -0.1, scene.sun.y);
                 var sum = vec3(0.0);
                 for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
                     sum += atm_march(atm_mean_dir(i, sun), sun, moon, sky_k, ATM_FLOOR, 4, 2).light;
                 }
                 let mean = sum / 9.0;
                 var clear = vec3(0.0);
                 for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
                     let dir = atm_mean_dir(i, sun);
                     let a = atm_march(dir, sun, moon, sky_k, atm_background(mean), 4, 2);
                     clear += atm_rain(a.light, dir, a.through, mean);
@@ -1547,6 +1553,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                 var mean = atm_mean(sun, moon, sky_k);
                 var clear = vec3(0.0);
                 for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
                     let dir = atm_mean_dir(i, sun);
                     let a = atm_march(dir, sun, moon, sky_k, atm_background(mean), 4, 2);
                     clear += atm_rain(a.light, dir, a.through, mean);
@@ -1556,6 +1563,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                 var fog_rgb = vec3(0.0);
                 var alphas = vec3(0.0);
                 for (var i = 0; i < 9; i++) {
+                    if i == ATM_MEAN_SKIP { continue; }
                     let dir = atm_mean_dir(i, sun);
                     let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), bc_sky_light(mean));
                     let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k), bc_sky_light(mean), land_ambient(mean), 1.0, false);
