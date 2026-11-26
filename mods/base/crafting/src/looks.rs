@@ -561,12 +561,18 @@ mod tests {
         // stave, a grip or a string (a missing ramp leaves that region unpainted).
         let tex = concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/textures/");
         let file = |name: &str| format!("{tex}{}.png", name.trim_start_matches("base:"));
-        let (map, ramps) = bow_skin("yew", "leather", "sinew").split_once('@').map(|(m, r)| (m.to_string(), r.to_string())).unwrap();
+        let (map, ramps) = bow_skin("yew", "leather", "sinew")
+            .split_once('@')
+            .map(|(m, r)| (m.to_string(), r.to_string()))
+            .unwrap();
         assert!(std::path::Path::new(&file(&map)).exists(), "no {map}");
         assert_eq!(ramps.split(',').count(), 3);
         let bow = crate::kinds::KINDS.iter().find(|k| k.id == "bow").unwrap();
         for slot in bow.slots {
-            for m in crate::materials::MATERIALS.iter().filter(|m| crate::materials::fits(m, "bow", slot.name, slot.role)) {
+            for m in crate::materials::MATERIALS
+                .iter()
+                .filter(|m| crate::materials::fits(m, "bow", slot.name, slot.role))
+            {
                 let f = file(&ramp(m.id));
                 assert!(std::path::Path::new(&f).exists(), "a bow's {} of {}: no {f}", slot.name, m.id);
             }

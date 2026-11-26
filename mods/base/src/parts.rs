@@ -641,10 +641,7 @@ fn bow_model(kind: &str, parts: &[Part]) -> Option<String> {
         return None;
     }
     let material = |slot: &str| parts.iter().find(|p| p.slot == slot).map(|p| p.material);
-    Some(format!(
-        "base:item/bow|{}",
-        crafting::looks::bow_skin(material("stave")?, material("grip")?, material("string")?)
-    ))
+    Some(format!("base:item/bow|{}", crafting::looks::bow_skin(material("stave")?, material("grip")?, material("string")?)))
 }
 
 /// What the assembly slots make, for the output slot (empty when nothing).
