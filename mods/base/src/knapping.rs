@@ -249,6 +249,18 @@ pub fn knapped_head(w: &World, player: u64, shape: &str, material: &str, by_hand
         .with(&PART, PartOf { material: code(material), grade: grade as u32, worn: 0, made_day, repairs: 0 })
 }
 
+/// A head of part shape `shape` cast in a mould from `material` (`casting.rs`): its grade from the
+/// material, the mould's work and the hot furnace (`vitals::smelt::CAST_WORK`, `CAST_STATION`),
+/// with luck as any made part. No one's skill: the mould shapes it.
+pub fn cast_head(w: &World, shape: &str, material: &str) -> ItemStack {
+    let points =
+        grades::Points { material: f::COPPER_HEAD_MATERIAL_POINTS, work: vitals::smelt::CAST_WORK, station: vitals::smelt::CAST_STATION };
+    let grade = grades::roll(points, unit(w));
+    let made_day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
+    ItemStack::new(Item::generated(format!("part_{shape}")).id(), 1)
+        .with(&PART, PartOf { material: code(material), grade: grade as u32, worn: 0, made_day, repairs: 0 })
+}
+
 /// The screen (kit 2, UI redo): the heads to pick as categories, the nodule in a well, a line on how.
 /// The squares: `knap_stone` the chalky cortex to strike away (hover: a strike mark), `knap_head`
 /// the head's outline in dark flint (hover: a red crack, and a warning tooltip), `knap_gone` a

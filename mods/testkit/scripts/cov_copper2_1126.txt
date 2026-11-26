@@ -1,0 +1,115 @@
+# Copper slice 2: the ore, the smelt and casting (11-26, notes/COPPER.md "Slice 2";
+# vitals::smelt). Seed 1, a fresh world.
+# Part 1, worldgen: a census of malachite ore and copper ore within 64 blocks in a desert spot
+# (-240 240, a dry land: malachite expected, some copper ore only deep) and a taiga spot (-96 -208,
+# cold: copper ore, no malachite).
+# Part 2, the recipes: /tk craft replies for bellows, the three unfired moulds, and the cooking pot
+# (its clay cup must still make the pot, not a mould).
+# Part 3, the smelt, on a pad in the desert. Furnace A (2 ahead) with 6 raw copper:
+#   a. sticks for fuel, no bellows: it doesn't light (raw copper 6, sticks 8 stay); the
+#      copper_heat hint shows (uc2_heat.png). A /tk skip 600 (the catch-up path) changes nothing.
+#   b. charcoal (base:coal) for fuel, no bellows: still unlit.
+#   c. bellows set beside it: it lights and melts; after 33 s about 3 ingots in its output.
+# Part 4, casting: a pick head mould beside furnace A, 3 copper ingots put in it: after 12 s a
+#   copper pick head in its output (run.log "casting: a copper pick_head cast"), the ingots gone,
+#   the mould still there; its screen opened by a real use (uc2_mould.png).
+# Part 5, firing: furnace B (2 behind) with an unfired pick head mould and sticks: fired with
+#   plain fuel into base:mould_pick_head (other smelts are unchanged by the heat rule).
+# Part 6, hints: malachite in the bag (the copper_ore hint), a copper ingot (the casting hint).
+# Read: every /tk census, /tk craft, /tk inv and /tk get reply, /tk prop lit replies, run.log
+# "casting:" and "died" (none), and the shots.
+# Yaw 0 faces -z; a negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /tk mode spectator
+look 0 -60
+chat /tp -240 86 240
+wait 2
+loaded
+idle
+chat /tk census 64 base:malachite_ore,base:copper_ore,base:tin_ore
+where desert
+chat /tp -96 105 -208
+wait 2
+loaded
+idle
+chat /tk census 64 base:malachite_ore,base:copper_ore,base:tin_ore
+where taiga
+# Part 2: the recipes.
+chat /tk craft 3 3 base:oak_planks base:oak_planks base:oak_planks base:leather base:leather base:leather base:oak_planks base:stick base:oak_planks
+chat /tk craft 2 2 base:clay base:clay base:clay air
+chat /tk craft 3 2 base:clay base:clay base:clay air base:clay air
+chat /tk craft 2 2 base:clay base:clay base:clay base:clay
+chat /tk craft 3 3 base:clay air base:clay base:clay air base:clay base:clay base:clay base:clay
+# Part 3: a pad in the desert.
+chat /tp -240 86 240
+wait 2
+loaded
+chat /tk mode creative
+chat /tk top -240 240
+chat /tp -240 67 240
+wait 1
+chat /tk fill ~-6 ~-2 ~-6 ~6 ~-1 ~6 base:stone
+chat /tk fill ~-6 ~ ~-6 ~6 ~5 ~6 core:air
+wait 1
+chat /tk mode survival
+until mode survival within 10
+wait 1
+look 0 -20
+chat /tk set ~ ~ ~-2 base:furnace
+chat /tk set ~ ~ ~2 base:furnace
+wait 0.5
+# a. Sticks, no bellows.
+chat /tk put ~ ~ ~-2 0 base:raw_copper 6
+chat /tk put ~ ~ ~-2 1 base:stick 8
+wait 3
+chat /tk inv ~ ~ ~-2
+chat /tk prop ~ ~ ~-2 lit
+shot uc2_heat.png
+chat /tk skip 600
+wait 1
+chat /tk inv ~ ~ ~-2
+# b. Charcoal, no bellows.
+chat /tk put ~ ~ ~-2 1 base:coal 2
+wait 3
+chat /tk inv ~ ~ ~-2
+chat /tk prop ~ ~ ~-2 lit
+# c. Bellows beside it.
+chat /tk set ~1 ~ ~-2 base:bellows
+wait 2
+chat /tk prop ~ ~ ~-2 lit
+shot uc2_hot.png
+wait 31
+chat /tk inv ~ ~ ~-2
+# Part 4: the mould beside the hot furnace.
+chat /tk set ~-1 ~ ~-2 base:mould_pick_head
+wait 0.5
+chat /tk put ~-1 ~ ~-2 0 base:copper_ingot 3
+wait 12
+chat /tk inv ~-1 ~ ~-2
+chat /tk get ~-1 ~ ~-2
+aim_block -1 0 -2 0.3
+hold core:use 0.2
+until screen base:mould within 5
+wait 1
+shot uc2_mould.png
+key Escape
+until screen none within 5
+# Part 5: firing a mould with plain fuel.
+chat /tk put ~ ~ ~2 0 base:unfired_mould_pick_head 1
+chat /tk put ~ ~ ~2 1 base:stick 4
+wait 12
+chat /tk inv ~ ~ ~2
+# Part 6: the hints.
+chat /tk give base:malachite
+wait 2.5
+shot uc2_hint_ore.png
+wait 6
+chat /tk give base:copper_ingot
+wait 2.5
+shot uc2_hint_cast.png
+chat /tk inv me
+expect alive
+quit

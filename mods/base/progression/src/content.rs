@@ -234,12 +234,12 @@ pub const RULES: &[Rule] = &[
         "picked up as native copper, loose in the cold and dry lands (`vitals::first::COPPER_LANDS`)",
     ),
     n(
-        &["base:copper_ore", "base:tin_ore"],
+        &["base:copper_ore", "base:malachite_ore", "base:tin_ore"],
         1,
         Tech,
         Ground,
         Not,
-        "breaks into raw copper or raw tin (a stone pickaxe): copper in cold, dry and beach land, tin on beaches and in mountains (`metals.rs`)",
+        "breaks into raw copper, malachite or raw tin (a stone pickaxe): copper ore in cold land and deep, malachite in dry and beach land, tin on beaches and in mountains (`metals.rs`)",
     ),
     n(
         &["base:iron_ore", "base:granite_iron_ore", "base:red_sandstone_iron_ore"],
@@ -451,6 +451,10 @@ pub const RULES: &[Rule] = &[
     r(&["base:raw_copper", "base:copper_ingot", "base:raw_tin", "base:tin_ingot", "base:bronze_ingot"], 1, Tech, Material, Made),
     // native copper, the copper tier's first step (vitals::first::COPPER_LANDS): hammered cold
     r(&["base:native_copper"], 1, Tech, Material, Made),
+    // copper's smelt and casting (`vitals::smelt`): malachite, bellows, moulds
+    r(&["base:malachite"], 1, Tech, Material, Made),
+    r(&["base:unfired_mould_*"], 1, Tech, Material, Made),
+    r(&["base:bellows", "base:mould_*"], 1, Tech, Station, Made),
     r(&["base:crucible"], 1, Tech, Station, Made),
     r(&["base:steel_ingot"], 2, Tech, Material, Made),
     r(&["base:forge"], 2, Tech, Station, Made),
