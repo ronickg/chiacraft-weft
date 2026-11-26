@@ -356,6 +356,13 @@ def carcass_rows(n, every=10):
     return out
 
 
+def side_shot(x, name):
+    """From the south-east, low, at a body lying at (x, Z+6): its side, legs and back (r4's shot from above couldn't tell
+    a standing deer from a lying one)."""
+    return ["chat /tick freeze", f"chat /tp {x+3} 72 {Z+10}", "look 37 -22", "wait 2", f"shot {name}.png",
+            "chat /tick unfreeze", "wait 1"]
+
+
 s = head("carcass", [
     "Carcasses (slices 1 and 2). Part 1: three hungry grey wolves and two fed white-tailed deer: the kill leaves a carcass",
     "(\"carcass N of white_tailed_deer\") that the pack's meal opens or takes to bones (\"carcass N of ... now Opened/Bones\").",
@@ -375,19 +382,19 @@ s += pad(x) + spawns(x, [("grey_wolf", 3, 8, -10), ("white_tailed_deer", 2, -6, 
 s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.15"]
 s += watch(x, 12) + carcass_rows(4) + shot(x, "cov_carcass_1_wolves", z_back=18, pitch=-40)
 x = 200
-s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 0)])
-s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+4}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2"]
-s += ["chat /animalprof carcass"] + shot(x, "cov_carcass_2_killed", z_back=6, pitch=-35)
+s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
+s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2"]
+s += ["chat /animalprof carcass"] + side_shot(x, "cov_carcass_2_killed")
 s += spawns(x, [("turkey_vulture", 2, 10, -12)]) + ["chat /animalprof food 0.2"]
 s += ["chat /tk mode spectator", f"chat /tp {x} 90 {Z+20}", "wait 1"] + carcass_rows(10)
 s += shot(x, "cov_carcass_3_vultures", z_back=8, pitch=-35)
 x = 400
-s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 0)])
-s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+4}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
+s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
+s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
       "chat /tk mode spectator"]
 for n, days in enumerate([3, 2, 4]):
     s += [f"chat /tp {x} 75 {Z+6}", f"chat /animalprof carcass {days}", "wait 2", "chat /animalprof carcass"]
-    s += shot(x, f"cov_carcass_{4+n}_aged", z_back=6, pitch=-35)
+    s += side_shot(x, f"cov_carcass_{4+n}_aged")
 s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 4", "wait 2", "chat /animalprof carcass"]
 x = 600
 # On the grass south of the pond (r3's deer died in the pond's pit, below the knife's aim).
@@ -397,5 +404,5 @@ s += ["chat /tk mode creative", f"chat /tp {x} 70 {Z+10}", "look 0 -30", "wait 1
       # Standing 2 blocks south of it, looking down at it (a positive pitch looks up).
       f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "press core:use", "wait 4",
       "shot cov_carcass_8_skinning.png", "wait 9", "chat /animalprof carcass"]
-s += shot(x, "cov_carcass_9_skinned", z_back=11, pitch=-40)
+s += side_shot(x, "cov_carcass_9_skinned")
 write("carcass", s)

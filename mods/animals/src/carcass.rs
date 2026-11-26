@@ -1,7 +1,7 @@
 //! A dead animal's body (`animals_core::carcass`, `notes/crew/plans/carcass-and-skinning.md`, slice 1). The engine
 //! removes a creature the tick it dies, so its body is read at the `DIE` question (before removal: its species,
 //! mass, where it faces) and a carcass entity is laid where it fell. Its look steps down as it is eaten and as it rots:
-//! whole and opened drawn as the animal itself lying dead (its death clip held), then a ribcage, then a pile of bones
+//! whole and opened drawn as the animal itself laid on its side, then a ribcage, then a pile of bones
 //! (placeholders until the blocky-model looks per body plan), then it is gone.
 //!
 //! Who takes from it: the killer and its pack (`hunt.rs`: their meal's kilograms, `taken`), scavengers (`forage.rs`:
@@ -55,7 +55,8 @@ value! {
     }
 }
 pub static BODY: Component<Body> = Component::named("carcass");
-/// The look it is drawn as on this run, + 1 (not saved: the engine forgets appearance and scale on loading).
+/// The look it is drawn as on this run, + 1 (not saved: the engine forgets appearance and scale on loading); its
+/// watchers have it, to lay a whole or opened body on its side (`client_entity_frame`).
 static SHOWN: Component<u32> = Component::named("carcass_shown");
 
 /// Hits taken in its life (not saved): a hide's quality (`animals_core::carcass::kill`).
@@ -72,12 +73,15 @@ static DYING: Mutex<Vec<Dying>> = Mutex::new(Vec::new());
 /// Kilograms taken off a body before its carcass was laid (the hunters' `DIE` handler may run first).
 static TAKEN: Mutex<Vec<(u64, f32)>> = Mutex::new(Vec::new());
 
+/// Model pixels a body laid on its side is lifted by: about half a deer's body width, so its flank lies on the ground.
+const LIE_LIFT: f32 = 4.0;
+
 /// How often a carcass ages and looks again, ticks.
 const EVERY: u64 = 100;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&BODY, Body::default(), component_flags::SAVE);
-    r.entity_component(&SHOWN, 0u32, 0);
+    r.entity_component(&SHOWN, 0u32, component_flags::SYNC_WATCHERS);
     let (bw, bh) = animals_core::bodies::of("carcass_bones");
     r.entity(&CARCASS)
         .no_egg()
@@ -97,6 +101,15 @@ pub fn init(r: &mut Registry) {
         })
         .goals(Goals::new().then(rot));
     r.entity_component(&SKIN, [0u64; 4], 0);
+    // A whole or opened body is the animal's own model, laid on its side: its root rolled a quarter turn and lifted by
+    // half a body's width (r4: drawn with no clip it stood, legs down, beside the skinner).
+    r.client_entity_frame(&CARCASS, |c, e| {
+        let shown = c.view().component_of(e.id(), &SHOWN).unwrap_or(0);
+        if shown == Look::Whole as u32 + 1 || shown == Look::Opened as u32 + 1 {
+            c.bone_turn(e.id(), "root", [0.0, 0.0, 90.0]);
+            c.bone_move(e.id(), "root", [0.0, LIE_LIFT, 0.0]);
+        }
+    });
     // A knife used at the ground beside a carcass skins it too (a body lying flat is easy to aim past: r3's use hit
     // the grass by it). The nearest carcass within `SKIN_REACH` of the block aimed at, or of the player.
     r.before_event(&actions::USE_ITEM, |q| {
@@ -145,8 +158,9 @@ pub fn init(r: &mut Registry) {
         .shot(camera::Shot::new(&[abi::comp::camera::BODY, abi::comp::camera::HUD, abi::comp::camera::CLIP], |a| {
             let (yaw, eye) = (a.eye_yaw as f64, a.eye);
             let (f, right) = ([-yaw.sin(), -yaw.cos()], [yaw.cos(), -yaw.sin()]);
-            let pos = Vec3 { x: eye.x + right[0] * 1.1 - f[0] * 0.4, y: eye.y + 0.25, z: eye.z + right[1] * 1.1 - f[1] * 0.4 };
-            let at = Vec3 { x: eye.x + f[0] * 1.2, y: eye.y - 0.8, z: eye.z + f[1] * 1.2 };
+            // Out past the arm (r4's, 1.1 blocks out, sat inside it), a little above the eyes.
+            let pos = Vec3 { x: eye.x + right[0] * 1.9 - f[0] * 1.3, y: eye.y + 0.7, z: eye.z + right[1] * 1.9 - f[1] * 1.3 };
+            let at = Vec3 { x: eye.x + f[0] * 1.5, y: eye.y - 0.9, z: eye.z + f[1] * 1.5 };
             let (yaw, pitch) = camera::look_at(pos, at);
             a.out = abi::CameraPose { pos, yaw, pitch, ..abi::CameraPose::DEFAULT };
         }))
@@ -308,11 +322,11 @@ fn show(w: &World, id: u64) {
         return;
     };
     match l {
-        // The animal itself lying dead: its death clip, held on its last frame.
+        // The animal itself lying dead, laid on its side on the client (`client_entity_frame`).
         Look::Whole | Look::Opened => {
             w.set_appearance(id, Some(name_of(abi::entry_kind::ENTITY, s.kind.id())));
             w.set_scale(id, if b.scale > 0.0 { b.scale } else { 1.0 });
-            w.action_play(id, "death", false);
+            w.action_stop(id);
         }
         Look::Bones | Look::Pile => {
             let kind = if l == Look::Bones { &BONES } else { &PILE };
