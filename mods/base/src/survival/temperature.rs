@@ -165,10 +165,12 @@ fn worn(w: &World, id: u64) -> Worn {
             crate::parts::armour_worn(&mut worn, material("shell"), material("lining"), i as usize);
             continue;
         }
+        // Fur and leather by the hides they were sewn of (`base:hide_quality`).
+        let warmth = clothing::hide_warmth(base_api::HIDE_QUALITY.on_stack(&stack).unwrap_or(0));
         if let Some(c) = clothing::cloak_of(name) {
-            worn.cloak(c);
+            worn.cloak_of(c, warmth);
         } else if let Some((m, piece)) = clothing::piece_of(name) {
-            worn.clothes(m, piece);
+            worn.clothes_of(m, piece, warmth);
         } else if i < 4 {
             let material = name
                 .split_once(':')

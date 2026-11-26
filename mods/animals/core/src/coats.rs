@@ -1355,11 +1355,14 @@ fn eagle(r: &Read, hawk: bool) -> Look {
         };
     }
     let base = mix([70.0, 52.0, 40.0], [112.0, 82.0, 58.0], tone);
+    let nape = mix([180.0, 132.0, 72.0], [214.0, 172.0, 104.0], tone);
     Look {
         name: if tone < 0.35 { "Dark brown".into() } else { "Brown, golden nape".into() },
         base,
         under: mix([112.0, 86.0, 64.0], [150.0, 114.0, 80.0], tone),
-        points: Some(mix([180.0, 132.0, 72.0], [214.0, 172.0, 104.0], tone)),
+        points: Some(nape),
+        // The wing coverts' paler tawny edges, mottling the brown (Planner on the carcass sheet: a plain brown read flat).
+        pattern: Some(Pattern { kind: "mottle", color: mix(base, nape, 0.45), amount: 0.5 }),
         ..Look::default()
     }
 }
@@ -2470,7 +2473,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 32] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 33] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2502,7 +2505,9 @@ const MODEL_LAYERS: [ModelLayers; 32] = model_layers!(
     "iguanodont",
     "citipati",
     "early_bird",
-    "sauropod"
+    "sauropod",
+    // Not a species' own: the dead bodies' shared texture (`mods/animals/source/carcass/body.py`, `paint_dead`).
+    "carcass"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
@@ -2556,6 +2561,46 @@ pub fn paint(index: usize, genome: &Genome, rgba: &mut [u8], width: usize, heigh
     mend(&mut genome);
     let (Some(look), Some(l)) = (phenotype(&genome), layers(SPECIES[index].model)) else { return };
     render(l, rgba, width, height, &look);
+}
+
+/// Paints a dead animal's coat from its genes over the dead bodies' shared texture (`genetics/layers/carcass`, which
+/// `mods/animals/source/carcass/body.py` writes, each texel placed back where it would be on the animal standing):
+/// its white spotting, points, mask, patterns and scars as alive, its patterns at their real size on a body drawn at
+/// `scale` times its plan's reference animal. Each coat texel keeps its painted light: it is turned from the
+/// texture's own colours (`coat`, `under`) to the animal's, at the painted brightness.
+pub fn paint_dead(genome: &Genome, rgba: &mut [u8], width: usize, height: usize, scale: f32, coat: Rgb, under: Rgb) {
+    let mut genome = *genome;
+    mend(&mut genome);
+    let (Some(mut look), Some(l)) = (phenotype(&genome), layers("carcass")) else { return };
+    look.scale /= scale.max(0.05);
+    look.eye = None;
+    let (w, h) = (l.w.min(width), l.h.min(height));
+    if rgba.len() < width * height * 4 {
+        return;
+    }
+    // The animal's colours, flat (the layers' light level 12 tones nothing), then over the painted light.
+    let mut flat = rgba.to_vec();
+    render(l, &mut flat, width, height, &look);
+    for y in 0..h {
+        for x in 0..w {
+            let (i, o) = ((y * l.w + x) * 4, (y * width + x) * 4);
+            if l.info[i] < 128 {
+                continue;
+            }
+            if flat[o + 3] == 0 {
+                rgba[o + 3] = 0;
+                continue;
+            }
+            // The animal's colour at the painted texel's brightness against the texture's own colour there (a
+            // channel-by-channel ratio turned pale coats green: the painted ramps' hue shifts, multiplied).
+            let from = mix(coat, under, l.info[i + 2] as f32 / 255.0);
+            let lum = |c: [f32; 3]| 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+            let k = lum([0, 1, 2].map(|c| rgba[o + c] as f32)) / lum(from).max(1.0);
+            for c in 0..3 {
+                rgba[o + c] = (flat[o + c] as f32 * k).round().clamp(0.0, 255.0) as u8;
+            }
+        }
+    }
 }
 
 /// How `genome`'s body is built: each bone its build traits scale, and how much (the traits as

@@ -14,8 +14,18 @@ pub const FROM_KG: f32 = crate::meat::CARCASS_FROM_KG;
 pub const OPENED: f32 = 0.25;
 pub const BONES: f32 = 0.65;
 pub const PILE: f32 = 0.95;
-/// What a scavenger bites off at a time, kg (a vulture swallows a few hundred grams a mouthful).
-pub const BITE_KG: f32 = 0.5;
+/// A mouthful an eater tears off a carcass, a share of its own mass (a wolf's a kilo, a turkey vulture's 40 g), one a
+/// chew (`forage.rs`), and no more than it still needs, so it feeds a few mouthfuls and leaves the rest (a fixed 0.5 kg
+/// bite filled a 1.4 kg vulture, whose meal is 140 g, at once and took the rest off the body for nothing).
+pub const MOUTHFUL: f32 = 0.03;
+/// The least it takes in a mouthful, kg.
+pub const MOUTHFUL_MIN_KG: f32 = 0.02;
+
+/// The kg an eater of `own` kg, `full` of its food stat (0..1), takes off a carcass in a mouthful.
+pub fn bite_kg(own: f32, full: f32) -> f32 {
+    let need = own * crate::needs::MEAL * (1.0 - full).clamp(0.0, 1.0);
+    (own * MOUTHFUL).min(need).max(MOUTHFUL_MIN_KG)
+}
 /// The raw meat a carcass rots as (`vitals::food::FOODS`): venison.
 pub const ROTS_AS: &str = "animals:venison";
 
@@ -139,6 +149,137 @@ pub fn body_scale(mass: f32, plan: Plan) -> f32 {
 pub const COAT_RGB: [f32; 3] = [124.0, 80.0, 50.0];
 pub const UNDER_RGB: [f32; 3] = [212.0, 194.0, 166.0];
 
+// ---------------------------------------------------------------- rot drawn
+//
+// A body shows its rot (the stages are `vitals::rot::carcass_stage`'s): fresh, it is the animal's coat; bloating, the
+// skin and fur go a dull green-black (the marbling of decay) step by step; gone to remains, a dried grey-brown hide.
+// Blow flies hover over it while it bloats and rots (they come within minutes of a death and are thickest at bloat and
+// active decay; few stay at dry remains, none at bones).
+
+/// Steps the rot is drawn in (each a repaint of the coat): 0 fresh, 1.. through the bloat, `ROT_STEPS` at remains.
+pub const ROT_STEPS: u8 = 6;
+/// The colour a bloating body turns toward and how far at its last step (0..1), and a dry one's.
+pub const BLOAT_RGB: [f32; 3] = [66.0, 78.0, 46.0];
+pub const BLOAT_TINT: f32 = 0.45;
+pub const DRY_RGB: [f32; 3] = [118.0, 104.0, 84.0];
+pub const DRY_TINT: f32 = 0.55;
+/// How much darker it is at the full tint: a dark texel by the first, a white one by both (a white belly goes a
+/// dirty olive-grey, not mint: Planner on sheet_rot).
+pub const ROT_DARKEN: [f32; 2] = [0.25, 0.42];
+/// The share of that darkening at remains: dried skin and bone bleach paler than the wet bloat.
+pub const DRY_DARKEN: f32 = 0.8;
+/// The opened meat and blood (strongly red texels) rot apart from the coat: toward a dark brown while bloating, a dried
+/// near-black brown at remains, and how far at the last step of each (Planner on sheet_rot: they stayed fresh red).
+pub const MEAT_ROT_RGB: [f32; 3] = [92.0, 54.0, 40.0];
+pub const MEAT_ROT_TINT: f32 = 0.85;
+pub const MEAT_DRY_RGB: [f32; 3] = [62.0, 44.0, 36.0];
+pub const MEAT_DRY_TINT: f32 = 0.85;
+/// The blood pool under an opened body (`carcass_gore`) goes the meat's way, all of it: toward `MEAT_ROT_RGB` by this
+/// much at the last bloated step (less before), and at remains to a dry dark stain, `MEAT_DRY_RGB` by
+/// `GORE_DRY_TINT` and then this much darker (Planner 11-26: "darker red-brown through the bloat, a dry dark stain at
+/// remains, gone with the pile").
+pub const GORE_TINT: f32 = 0.85;
+pub const GORE_DRY_TINT: f32 = 0.9;
+pub const GORE_DRY_DARKEN: f32 = 0.75;
+/// Flies over a deer-sized body at once while it bloats (as many again per body as big by area), and the share left at
+/// remains.
+pub const FLIES: f32 = 10.0;
+pub const FLIES_MAX: u8 = 24;
+pub const DRY_FLIES: f32 = 0.3;
+
+/// The rot step drawn at `larder_days` of age for meat keeping `keeps` (`keeps()`).
+pub fn rot_step(keeps: (f32, f32), larder_days: f32) -> u8 {
+    let t = (larder_days - keeps.0) / keeps.1.max(1e-3);
+    if t <= 0.0 {
+        0
+    } else if t >= 1.0 {
+        ROT_STEPS
+    } else {
+        1 + (t * (ROT_STEPS - 1) as f32) as u8
+    }
+}
+
+/// Turns a painted body (`rgba`, every opaque texel: coat, meat and bones alike) to rot `step`'s colour: the coat and
+/// bones toward `BLOAT_RGB` or `DRY_RGB` at their own brightness, darker the brighter they are; the meat and blood toward
+/// `MEAT_ROT_RGB` or `MEAT_DRY_RGB`.
+pub fn rot_tint(rgba: &mut [u8], step: u8) {
+    if step == 0 {
+        return;
+    }
+    let dry = step >= ROT_STEPS;
+    let share = if dry { 1.0 } else { step as f32 / (ROT_STEPS - 1) as f32 };
+    let (to, k) = if dry { (DRY_RGB, DRY_TINT) } else { (BLOAT_RGB, BLOAT_TINT * share) };
+    let (meat_to, meat_k) = if dry { (MEAT_DRY_RGB, MEAT_DRY_TINT) } else { (MEAT_ROT_RGB, MEAT_ROT_TINT * share) };
+    let lum = |c: [f32; 3]| 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+    let full = if dry { DRY_DARKEN } else { share };
+    let lt = lum(to);
+    for px in rgba.as_chunks_mut::<4>().0 {
+        if px[3] == 0 {
+            continue;
+        }
+        let c = [px[0] as f32, px[1] as f32, px[2] as f32];
+        let l = lum(c);
+        // Meat and blood: red well over green and blue (an orange or rust coat has its green well over its blue).
+        if c[0] > 60.0 && c[0] > 2.4 * c[1] && c[0] > 2.4 * c[2] {
+            for i in 0..3 {
+                px[i] = (c[i] * (1.0 - meat_k) + meat_to[i] * meat_k)
+                    .round()
+                    .clamp(0.0, 255.0) as u8;
+            }
+            continue;
+        }
+        let dark = 1.0 - full * (ROT_DARKEN[0] + ROT_DARKEN[1] * (l / 255.0).powi(2));
+        for i in 0..3 {
+            let v = c[i] * (1.0 - k) + l * to[i] / lt * k;
+            px[i] = (v * dark).round().clamp(0.0, 255.0) as u8;
+        }
+    }
+}
+
+/// Turns the blood pool's texture (`rgba`, every opaque texel) to rot `step`'s colour at its own brightness: toward
+/// `MEAT_ROT_RGB` through the bloat, a dark dry `MEAT_DRY_RGB` stain at remains.
+pub fn gore_tint(rgba: &mut [u8], step: u8) {
+    if step == 0 {
+        return;
+    }
+    let dry = step >= ROT_STEPS;
+    let (to, k, dark) = if dry {
+        (MEAT_DRY_RGB, GORE_DRY_TINT, GORE_DRY_DARKEN)
+    } else {
+        (MEAT_ROT_RGB, GORE_TINT * step as f32 / (ROT_STEPS - 1) as f32, 1.0)
+    };
+    let lum = |c: [f32; 3]| 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+    let lt = lum(to);
+    for px in rgba.as_chunks_mut::<4>().0 {
+        if px[3] == 0 {
+            continue;
+        }
+        let c = [px[0] as f32, px[1] as f32, px[2] as f32];
+        let l = lum(c);
+        for i in 0..3 {
+            px[i] = ((c[i] * (1.0 - k) + l * to[i] / lt * k) * dark)
+                .round()
+                .clamp(0.0, 255.0) as u8;
+        }
+    }
+}
+
+/// Whether a body drawn as `look` at rot `step` has its blood pool under it: opened, and still as a dry stain under
+/// the bones it rotted to (remains), but not under bones eaten clean while fresh, nor the pile.
+pub fn has_gore(look: Look, step: u8) -> bool {
+    look == Look::Opened || (look == Look::Bones && step >= ROT_STEPS)
+}
+
+/// Flies over a body at rot `step`, drawn as `look`, at `scale` of its plan's reference animal.
+pub fn flies(step: u8, look: Look, scale: f32) -> u8 {
+    let n = match (step, look) {
+        (0, _) | (_, Look::Bones | Look::Pile) => return 0,
+        (s, _) if s >= ROT_STEPS => FLIES * DRY_FLIES,
+        _ => FLIES,
+    };
+    (n * scale * scale).round().clamp(1.0, FLIES_MAX as f32) as u8
+}
+
 // ---------------------------------------------------------------- skinning (slice 2)
 //
 // Ronald (11-25): "skinning only": an animal that leaves a carcass drops no hide or meat when it dies; a player kneels
@@ -233,6 +374,52 @@ pub fn meat_count(lo: u32, hi: u32, eaten: f32, mass: f32, rot: vitals::rot::Car
 mod tests {
     use super::*;
     use vitals::rot::Carcass;
+
+    #[test]
+    fn mouthfuls_by_the_eater() {
+        // A turkey vulture (1.4 kg) takes 40 g a mouthful and is full after a few, its 140 g meal; never more than it
+        // needs; a wolf about a kilo.
+        let v = bite_kg(1.4, 0.0);
+        assert!((0.03..0.06).contains(&v), "{v}");
+        let mouthfuls = (1.4 * crate::needs::MEAL / v).ceil();
+        assert!((3.0..=5.0).contains(&mouthfuls), "{mouthfuls}");
+        assert!(bite_kg(1.4, 0.9) <= 1.4 * crate::needs::MEAL * 0.1 + MOUTHFUL_MIN_KG);
+        assert!((0.9..1.5).contains(&bite_kg(40.0, 0.0)));
+        assert_eq!(bite_kg(40.0, 1.0), MOUTHFUL_MIN_KG);
+    }
+
+    #[test]
+    fn rot_steps_and_flies() {
+        let k = keeps();
+        assert_eq!(rot_step(k, 0.0), 0);
+        assert_eq!(rot_step(k, k.0 + k.1 * 0.01), 1);
+        assert_eq!(rot_step(k, k.0 + k.1 * 0.99), ROT_STEPS - 1);
+        assert_eq!(rot_step(k, k.0 + k.1), ROT_STEPS);
+        let mut last = 0;
+        for i in 0..100 {
+            let s = rot_step(k, i as f32 * 0.1);
+            assert!(s >= last);
+            last = s;
+        }
+        // The tint darkens and pulls toward green while bloating; nothing while fresh, transparent untouched.
+        let mut px = [200, 150, 100, 255, 9, 9, 9, 0];
+        rot_tint(&mut px, 0);
+        assert_eq!(px, [200, 150, 100, 255, 9, 9, 9, 0]);
+        rot_tint(&mut px, ROT_STEPS - 1);
+        assert!(px[0] < 200 && px[1] < 150 && px[4..] == [9, 9, 9, 0]);
+        assert_eq!(flies(0, Look::Whole, 1.0), 0);
+        assert_eq!(flies(3, Look::Bones, 1.0), 0);
+        assert!(flies(ROT_STEPS, Look::Opened, 1.0) < flies(3, Look::Opened, 1.0));
+        assert!(flies(3, Look::Whole, 0.3) >= 1 && flies(3, Look::Whole, 5.0) <= FLIES_MAX);
+        // The pool: browner and darker as it rots, a dark stain at remains; under remains' bones, not the pile.
+        let fresh = [150u8, 24, 22, 255];
+        let (mut mid, mut dry) = (fresh, fresh);
+        gore_tint(&mut mid, 3);
+        gore_tint(&mut dry, ROT_STEPS);
+        assert!(mid[0] < fresh[0] && mid[1] > fresh[1] && dry[0] < mid[0]);
+        assert!(has_gore(Look::Opened, 0) && has_gore(Look::Bones, ROT_STEPS));
+        assert!(!has_gore(Look::Bones, 2) && !has_gore(Look::Pile, ROT_STEPS) && !has_gore(Look::Whole, 3));
+    }
 
     #[test]
     fn eaten_steps_it_down() {
