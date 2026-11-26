@@ -1,0 +1,134 @@
+# Arrows and blows into a carcass. A white-tailed deer killed on the pad at x 0: "carcass N of white_tailed_deer".
+# Then 10 arrows shot into the body from 5 blocks and 10 sword blows from beside it. `/animalprof carcass` after the
+# arrows and after the blows still lists "carcass N ... Whole" (not "no carcasses near"); then it is skinned with a
+# knife: "skins carcass N" and hide and venison in `/tk inv me`. Shots: 1_shot (the body with arrows round it),
+# 2_skinned.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 86 528 16 110 560 core:air
+chat /tk fill -16 111 528 16 140 560 core:air
+chat /tk fill -16 70 561 16 100 576 core:air
+chat /time set 6000
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /tk mode survival
+chat /tk spawn animals:white_tailed_deer 0 70 544
+wait 0.2
+chat /tp 0 70 549
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /animalprof carcass
+chat /tk put me 0 base:bow 1
+chat /tk put me 1 base:arrow 32
+key 1
+wait 1
+look 0 -12
+aim 8
+hold core:use 1.2
+wait 0.5
+aim 8
+hold core:use 1.2
+wait 0.5
+aim 8
+hold core:use 1.2
+wait 0.5
+aim 8
+hold core:use 1.2
+wait 0.5
+aim 8
+hold core:use 1.2
+wait 0.5
+aim 8
+hold core:use 1.2
+wait 0.5
+aim 8
+hold core:use 1.2
+wait 0.5
+aim 8
+hold core:use 1.2
+wait 0.5
+aim 8
+hold core:use 1.2
+wait 0.5
+aim 8
+hold core:use 1.2
+wait 0.5
+aim 8
+wait 3
+chat /animalprof carcass
+chat /tk put me 2 base:iron_sword 1
+key 3
+chat /tp 0 70 546
+wait 0.5
+aim 4
+press core:attack
+wait 0.7
+press core:attack
+wait 0.7
+press core:attack
+wait 0.7
+press core:attack
+wait 0.7
+press core:attack
+wait 0.7
+press core:attack
+wait 0.7
+press core:attack
+wait 0.7
+press core:attack
+wait 0.7
+press core:attack
+wait 0.7
+press core:attack
+wait 0.7
+wait 3
+chat /animalprof carcass
+chat /tick freeze
+chat /tp 3 74 550
+look 0 -40
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_arrows_1_shot.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tk put me 3 base:knife 1
+key 4
+chat /tp 0 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /animalprof carcass
+chat /tk inv me
+chat /tick freeze
+chat /tp 3 74 550
+look 0 -40
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_arrows_2_skinned.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+quit

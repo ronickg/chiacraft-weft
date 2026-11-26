@@ -668,3 +668,33 @@ for season, d in SWEEP:
     s += [f"chat /season {season} {d}", "wait 0.5", "chat /animal room"]
 s += ["chat /tick unfreeze"]
 write("capacity", s)
+
+
+# Arrows into a carcass (Tester, pt_rain_8: 11 arrows after the kill shot the deer's body to nothing in 20 s, with no
+# line logged; carcasses, the gore pool and blood spots are invulnerable since).
+s = head("carcass_arrows", [
+    "Arrows and blows into a carcass. A white-tailed deer killed on the pad at x 0: \"carcass N of white_tailed_deer\".",
+    "Then 10 arrows shot into the body from 5 blocks and 10 sword blows from beside it. `/animalprof carcass` after the",
+    "arrows and after the blows still lists \"carcass N ... Whole\" (not \"no carcasses near\"); then it is skinned with a",
+    "knife: \"skins carcass N\" and hide and venison in `/tk inv me`. Shots: 1_shot (the body with arrows round it),",
+    "2_skinned.",
+]) + pad(0) + [
+    "chat /tk mode survival", f"chat /tk spawn animals:white_tailed_deer 0 70 {Z}", "wait 0.2",
+    f"chat /tp 0 70 {Z+5}", "wait 0.2", "chat /animalprof kill", "wait 2", "chat /animalprof carcass",
+    "chat /tk put me 0 base:bow 1", "chat /tk put me 1 base:arrow 32", "key 1", "wait 1", "look 0 -12", "aim 8",
+]
+for _ in range(10):
+    s += ["hold core:use 1.2", "wait 0.5", "aim 8"]
+s += ["wait 3", "chat /animalprof carcass", "chat /tk put me 2 base:iron_sword 1", "key 3", f"chat /tp 0 70 {Z+2}",
+      "wait 0.5", "aim 4"]
+for _ in range(10):
+    s += ["press core:attack", "wait 0.7"]
+s += ["wait 3", "chat /animalprof carcass",
+      "chat /tick freeze", f"chat /tp 3 74 {Z+6}", "look 0 -40", "wait 2", "shot cov_carcass_arrows_1_shot.png",
+      "chat /tick unfreeze", "wait 1",
+      "chat /tk put me 3 base:knife 1", "key 4", f"chat /tp 0 70 {Z+2}", "look 0 -40", "wait 1", "aim 4", "wait 1",
+      "press core:use", "wait 12", "chat /animalprof carcass", "chat /tk inv me",
+      "chat /tick freeze", f"chat /tp 3 74 {Z+6}", "look 0 -40", "wait 2", "shot cov_carcass_arrows_2_skinned.png",
+      "chat /tick unfreeze", "wait 1"]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("carcass_arrows", s)
