@@ -7,6 +7,11 @@
 # first person (a wooden bow with a string, not a box), its icon in hotbar slot 1, the draw
 # bending it with an arrow nocked (bh_draw), in third person the bow in the player's hand, and in
 # bh_osage the second bow golden with its own icon in slot 3. Read the /gear replies too.
+# 11-26, later (Planner, pt_rain_8: in first person the bow showed edge-on, an orange zigzag, a
+# white bar and a dark red block): the bow has a root bone and its own first-person hold
+# (animation.bow.hold.first_person): bh_held and bh_osage should show it smaller, tilted across
+# the lower right with its curve and string in view, as vanilla's; third person (bh_third,
+# bh_front) and the draw (bh_draw) unchanged.
 # Read the shots and run.log for "no model" or texture errors. A fresh world name each run.
 loaded
 idle
