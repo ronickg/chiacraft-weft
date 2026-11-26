@@ -30,6 +30,17 @@ static SEARCH: Component<[f64; 3]> = Component::named("animal_search");
 /// cut short by that, not by the ground (`ran`).
 static RAN: Component<[f64; 3]> = Component::named("animal_ran");
 
+/// A pen's walls: never ground to leap or hop onto, so a leap out of a pit can't clear a fence
+/// (First hours' fences4 and fences6: a pen with no food or water read as shut in, and a deer in 4
+/// leapt onto the 1.5-high fence and over).
+static FENCES: Tag = Tag::named("fences");
+static FENCE_GATES: Tag = Tag::named("fence_gates");
+
+/// Whether the cell `p` is a fence or a gate (any part of it).
+fn fence(w: &World, p: [i32; 3]) -> bool {
+    FENCES.at(w, p) || FENCE_GATES.at(w, p)
+}
+
 pub fn init(r: &mut Registry) {
     r.entity_component(&STUCK, [0.0; 5], 0);
     r.entity_component(&RAN, [0.0; 3], 0);
@@ -237,10 +248,15 @@ fn landing(w: &World, st: &EntityState) -> Option<(f64, f64, f64)> {
             // `ground` looks from 3 above the height it is given down: its highest is the feet's limit.
             let Some(g) = crate::comfort::ground(w, bx, feet + LEAP_MOST - 3, bz) else { continue };
             // Higher than a step (one up it walks), at most `LEAP_MOST`, open over it.
-            if g < feet + 2 || g - feet > LEAP_MOST || (g..=top).any(|y| solid([bx, y, bz])) {
+            // Never onto a fence or gate (its top is the ground `ground` finds over one).
+            if g < feet + 2 || g - feet > LEAP_MOST || (g..=top).any(|y| solid([bx, y, bz])) || fence(w, [bx, g - 1, bz]) {
                 continue;
             }
             let (ox, oz) = (bx as f64 + 0.5 - st.pos.x, bz as f64 + 0.5 - st.pos.z);
+            // Nor over one: no fence or gate on the line to it, at its feet's height or the next.
+            if over_fence(w, st.pos, ox, oz, feet) {
+                continue;
+            }
             let d = ox * ox + oz * oz;
             if best.is_none_or(|b| d < b.3) {
                 best = Some((ox, g as f64 - st.pos.y, oz, d));
@@ -248,6 +264,17 @@ fn landing(w: &World, st: &EntityState) -> Option<(f64, f64, f64)> {
         }
     }
     best.map(|(x, y, z, _)| (x, y, z))
+}
+
+/// Whether the line from `from` (x, z) to `ox`, `oz` off crosses a fence or gate at height `feet`
+/// or the one over it, in quarter-block steps.
+fn over_fence(w: &World, from: Vec3, ox: f64, oz: f64, feet: i32) -> bool {
+    let steps = ((ox * ox + oz * oz).sqrt() * 4.0).ceil() as i32;
+    (1..=steps).any(|i| {
+        let t = i as f64 / steps as f64;
+        let (x, z) = ((from.x + ox * t).floor() as i32, (from.z + oz * t).floor() as i32);
+        fence(w, [x, feet, z]) || fence(w, [x, feet + 1, z])
+    })
 }
 
 /// Driven by thirst or hunger and knowing none it can find: shut in, it looks for a way out
@@ -308,7 +335,11 @@ pub fn search(w: &World, id: u64, st: &EntityState, water: bool) -> bool {
 fn enclosed(w: &World, st: &EntityState) -> bool {
     use std::collections::{HashSet, VecDeque};
     let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
-    let stand = |p: [i32; 3]| solid([p[0], p[1] - 1, p[2]]) && !solid(p) && !solid([p[0], p[1] + 1, p[2]]);
+    // Never on a fence or gate: a pen's wall is no ledge out of it.
+    let stand = |p: [i32; 3]| {
+        let under = [p[0], p[1] - 1, p[2]];
+        solid(under) && !solid(p) && !solid([p[0], p[1] + 1, p[2]]) && !fence(w, under)
+    };
     let start = [st.pos.x.floor() as i32, (st.pos.y + 0.05).floor() as i32, st.pos.z.floor() as i32];
     let mut seen = HashSet::from([start]);
     let mut queue = VecDeque::from([start]);
