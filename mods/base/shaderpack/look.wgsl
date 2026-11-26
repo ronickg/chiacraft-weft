@@ -1982,14 +1982,14 @@ fn screen_contact(rel: vec3<f32>, frag: vec2<f32>) -> f32 {
 }
 
 // Bliss's screen-space shade from the sky (SSAO, composite.fsh, indirect_effect 1; method only):
-// 7 taps on its spiral round the point drawn at `rel` (camera relative) facing `n`, a share of the
-// screen wide that shrinks with the distance (P11 / (3 x (1 + clamp(z^2 / 50, 0, 5))) x 0.3 of the
+// 7 taps on its spiral (twice, see below) round the point drawn at `rel` (camera relative) facing
+// `n`, a share of the screen wide that shrinks with the distance (P11 / (3 x (1 + clamp(z^2 / 50, 0, 5))) x 0.3 of the
 // width), each the solid world there rebuilt in space; one inside the reach (squared z^2 x that
 // share x 10 / mix(4, 50, clamp(z^2 - 0.1))) closes the point in by how much it stands over the
 // face (dot of the way to it and n) and how near it is. 1 open, 0 closed in. Bliss works from this
 // frame's depth before it lights; ours from last frame's solid world (`scene.behind`) through last
 // frame's camera (`taa_prev`, and back with `taa_prev_inv`), as `screen_contact`; Bliss's half-size
-// pass and its denoiser are left to TAA.
+// pass and its denoiser are left to TAA and the second ring.
 fn screen_ao(rel: vec3<f32>, n: vec3<f32>) -> f32 {
     if scene.behind.z < 0.5 || scene.taa.z < 0.5 || length(rel) < 1.6 {
         return 1.0;
@@ -2007,11 +2007,17 @@ fn screen_ao(rel: vec3<f32>, n: vec3<f32>) -> f32 {
     let dist = 1.0 + clamp(z * z / 50.0, 0.0, 5.0);
     let share = p11 / (3.0 * dist);
     let reach = z * z * share * 10.0 / mix(4.0, 50.0, clamp(z * z - 0.1, 0.0, 1.0));
-    let noise = fract(52.9829189 * fract(dot(centre + 5.588238 * scene.frame.w, vec2(0.06711056, 0.00583715))));
+    // Bliss denoises its SSAO before the ^6 its lighting takes; ours has only TAA, whose clamp left
+    // a fine hatch of the noise (lksp_ssao1): two of its rings, the second turned half a turn, and
+    // the turn stepped by the golden ratio each frame (as `shadow_pcss`).
+    let ign = fract(52.9829189 * fract(dot(floor(centre), vec2(0.06711056, 0.00583715))));
+    let turn = fract(ign + 0.7548777 * fract(scene.frame.w * 0.618034));
     let facing = normalize(n);
     var closed = 0.0;
     var count = 0.0;
-    for (var i = 0; i < 7; i++) {
+    for (var k = 0; k < 14; k++) {
+        let i = k % 7;
+        let noise = fract(turn + 0.5 * f32(k / 7));
         let q = centre + pcss_spiral(f32(i), 6.0, noise) * share * 0.3 * dims.x;
         if q.x < 0.0 || q.y < 0.0 || q.x >= dims.x || q.y >= dims.y {
             continue;
