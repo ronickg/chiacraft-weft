@@ -27,7 +27,6 @@ run per group is the last table in its section.
   - `HURT_AT` never attached (healing ran through fights; the hurt-cause log never ran).
 - **Not tested:**
   - a player's own right click, blows and bites (the scripts use commands);
-  - hawk and snowy owl strikes;
   - small land animals fleeing a walk-in;
   - wolves mating;
   - Borkon's leash;
@@ -318,6 +317,27 @@ the whole run, none on a flying look (run 2: 8): the fix holds.
 | songbirds (4 kinds) | pass (bolt from the walk-in, fly) | n/a |
 
 Grid r3: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r7_birds_m-175912/r7_birds_grid.jpg`.
+
+Run 4 (09494f1f, `r15_birds_m`, 346 s, script pass). Every bird of prey now strikes from the air and eats its kill
+at the prey's own mass. The savanna hawk took a wood mouse. The golden eagle struck a hare three times and killed
+it. The great horned owl took a mouse at night. The snowy owl struck a vole twice and killed it. Scavengers:
+the vultures smelled the deer from 18-19 blocks, glided in and ate venison; a gull ate too, and a raven and a
+gull went to the kill site. Songbirds bolted from the player with their alarm. Flocking can't be told from the
+rows. Shots: the owls' night pad is lit, but the birds were out of frame (the snowy owl behind the camera, the
+rodents off-axis); the raptors' pad was in rain with the birds off frame.
+
+| Species | strikes from the air / scavenges | shot |
+|---|---|---|
+| golden_eagle | pass (hare, 3 strikes, 3.8 kg) | r4 2 (out of frame) |
+| savanna_hawk | pass (mouse) | r4 2 (out of frame) |
+| great_horned_owl | pass (mouse, at night) | r4 3 (out of frame) |
+| snowy_owl | pass (vole, 2 strikes) | r4 3 (out of frame) |
+| turkey_vulture | pass (smells, lands, eats venison) | r4 4 |
+| herring_gull | pass (one ate venison) | r4 4 |
+| raven | goes to the kill site; eating not seen | r4 4 |
+| songbirds | flee the player (alarm); flocking not tested | r4 1 |
+
+Grid r4: `~/Coding/chiacraft-archive/images/tester/2026-11-25/r15_birds_m-210707/r15_birds_grid.jpg`.
 
 ## Small animals and fish (cov_small.txt)
 
@@ -657,7 +677,7 @@ their own. Since facb1a89f (working since ffdb839c1, which attaches `HURT_AT`) e
 |---|---|---|---|
 | HUD health over max in Drenkaun's shot ("1585 / 90") | base clamped health to its own fed max and the HUD divided by it, but anything else on the engine's max (the script's +300, the game's health boost +4) was outside both | base counts the rest of the engine's max (`base:fed_set`), and the HUD and the levels screen show the engine's whole max (7d0700f1b) | pass (r15_bosses, 09494f1f): shot 5 "1585 / 1590", shot 6 "84 / 89" |
 | wyvern pad empty in the shot | the hit wyvern stayed angry at the player after they turned spectator and followed them to the watch spot at z 574, out of frame | anger at a spectator ends (`knockout::behave`, 598c06be7) | pass (r15_bosses): the wyvern stays at its pad's centre and is in shot 4 |
-| night caiman shot black | no light at 01:37 | glowstone round the night pads after the watching, before the shot (hunters' caimans, birds' owls; 75668b544) | hunters r15: the pad is lit and readable, but no caiman in frame. The spectacled caiman rested under water in the pond (y 68), the yacare had wandered behind the camera (z 573) and the hares were 22 blocks off: placement, not drawing. Owls: to run |
+| night caiman shot black | no light at 01:37 | glowstone round the night pads after the watching, before the shot (hunters' caimans, birds' owls; 75668b544) | hunters r15: the pad is lit and readable, but no caiman in frame. The spectacled caiman rested under water in the pond (y 68), the yacare had wandered behind the camera (z 573) and the hares were 22 blocks off: placement, not drawing. Owls (birds r15): the pad is lit, the birds out of frame |
 
 ## Sounds
 
