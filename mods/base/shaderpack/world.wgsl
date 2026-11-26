@@ -627,6 +627,11 @@ fn bliss_sun_sheen(n: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
 // `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
 fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
+    // Bliss's SSAO over this pixel's quad (`screen_ao_quad`), for `light_on_bliss`; worked out
+    // here in uniform control so the quad's differences hold.
+    if land_from_sky() && fantasy_opt(OPT_SSAO) > 0.5 {
+        SCREEN_AO = screen_ao_quad(in.rel, n);
+    }
     var light = paint * light_on(n, in.light, shadow, ao, in.pos, in.rel);
     // Where the land is lit from the physical sky, leaves and plants as any block, as Ronald's Bliss
     // (SSS type 3 with no LabPBR pack: no light through them, no extra sun, no hold-back), apart

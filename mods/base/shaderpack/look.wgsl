@@ -2045,6 +2045,26 @@ fn screen_ao(rel: vec3<f32>, n: vec3<f32>) -> f32 {
     return max(1.0 - closed / count, 0.0);
 }
 
+// `screen_ao` averaged over the 2x2 pixels drawn together (their differences, `dpdxFine` and
+// `dpdyFine`, give the neighbours'), each with its own turn: four times the taps for one's cost.
+// Bliss denoises its SSAO before the ^6 its lighting takes; with each pixel's own taps alone, the
+// ^6 swung a pixel further than TAA's variance box lets its history follow, so the raw noise stood
+// as a fine hatch over the forest floor (lksp_ssao1-3, 11-26).
+// The world's fragment shader sets it (`surface_light`) before it lights; a vertex stage cannot take
+// the differences, and lighting there (models, entities) takes `screen_ao` alone (-1: not set).
+var<private> SCREEN_AO: f32 = -1.0;
+fn screen_ao_quad(rel: vec3<f32>, n: vec3<f32>) -> f32 {
+    let s = screen_ao(rel, n);
+    // Which of its quad's columns and rows this pixel is: from where it is drawn this frame.
+    let c = scene.view_proj * vec4(rel, 1.0);
+    let dims = vec2<f32>(textureDimensions(textures[u32(max(scene.behind.y, 0.0))]));
+    let px = floor(vec2(c.x / c.w * 0.5 + 0.5, 0.5 - c.y / c.w * 0.5) * dims);
+    let side = select(vec2(1.0), vec2(-1.0), fract(px * 0.5) > vec2(0.25));
+    let dx = dpdxFine(s);
+    let dy = dpdyFine(s);
+    return clamp(s + 0.5 * side.x * dx + 0.5 * side.y * dy, 0.0, 1.0);
+}
+
 // How much of the sun reaches `rel` (camera relative) facing `n`: the near cascade's map (80 blocks
 // about the player, fine) where it holds, the far one's (400 blocks, coarser) beyond, handing over
 // smoothly; x 1 lit to 0 in shadow, y how far to trust it.
@@ -2746,7 +2766,10 @@ fn light_on_bliss(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec
     // shade on all but the sun the darker of the blocks' corner shading and SSAO^6.
     var shade = ao;
     if fantasy_opt(OPT_SSAO) > 0.5 {
-        let s = screen_ao(rel, n);
+        var s = SCREEN_AO;
+        if s < 0.0 {
+            s = screen_ao(rel, n);
+        }
         let open = pow(1.0 - sqrt(1.0 - s), 2.0);
         facing = min(facing, mix(0.95, 2.5, open));
         shade = min(ao, pow(s, 6.0));
