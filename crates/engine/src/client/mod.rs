@@ -900,8 +900,9 @@ pub struct Client {
     /// puts after the occlusion's depth (and after the copy, with it on).
     pub behind: [f32; 4],
     /// Last frame's projection and view without the jitter, where its camera stood and the
-    /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`.
-    taa_last: Option<(glam::Mat4, DVec3, f32)>,
+    /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`, and its
+    /// jitter (NDC), for `Scene::taa_prev_inv`.
+    taa_last: Option<(glam::Mat4, DVec3, f32, glam::Vec2)>,
     /// Temporal anti-aliasing's count image this frame, bindless index + 1 (`Scene::taa_frame`),
     /// set by the app before `render` (`post::Post::taa_out`).
     pub taa_out: u32,
@@ -3781,17 +3782,20 @@ impl Client {
     /// shaders' clock then. A camera that moved more than 32 blocks (a teleport, a respawn) or a
     /// clock that went back starts it anew, and so does a frame without it (`post::taa_active`):
     /// `taa.z` 0 then, and the shaders skip their motion.
-    fn taa_frame(&mut self, cam: &Camera, frame: &FrameInfo) -> ([f32; 4], [[f32; 4]; 4]) {
+    /// `Scene::taa`, `taa_prev` and `taa_prev_inv` (last frame's clip with its jitter, inverted).
+    fn taa_frame(&mut self, cam: &Camera, frame: &FrameInfo) -> ([f32; 4], [[f32; 4]; 4], [[f32; 4]; 4]) {
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
         let now = cam.proj_plain(aspect) * cam.view();
         let j = crate::post::jitter();
         let t = crate::shaders::time();
-        match self.taa_last.replace((now, cam.pos, t)) {
-            Some((last, at, then)) if crate::post::taa_active() && (cam.pos - at).length() < 32.0 && then <= t => {
+        match self.taa_last.replace((now, cam.pos, t, j)) {
+            Some((last, at, then, last_j)) if crate::post::taa_active() && (cam.pos - at).length() < 32.0 && then <= t => {
                 let moved = glam::Mat4::from_translation((cam.pos - at).as_vec3());
-                ([j.x, j.y, 1.0, then], (last * moved).to_cols_array_2d())
+                let prev = last * moved;
+                let jittered = glam::Mat4::from_translation(glam::vec3(last_j.x, last_j.y, 0.0)) * prev;
+                ([j.x, j.y, 1.0, then], prev.to_cols_array_2d(), jittered.inverse().to_cols_array_2d())
             }
-            _ => ([j.x, j.y, 0.0, t], now.to_cols_array_2d()),
+            _ => ([j.x, j.y, 0.0, t], now.to_cols_array_2d(), now.inverse().to_cols_array_2d()),
         }
     }
 
@@ -4321,8 +4325,7 @@ impl Client {
         self.ground_map
             .frame(gpu, crate::settings::ground_map(), cam.pos, &self.world);
         let mut scene = self.scene(&cam, frame);
-        (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
-        scene.taa_prev_inv = glam::Mat4::from_cols_array_2d(&scene.taa_prev).inverse().to_cols_array_2d();
+        (scene.taa, scene.taa_prev, scene.taa_prev_inv) = self.taa_frame(&cam, frame);
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
         self.frame_camera = Some(FrameCamera {
             view: cam.view(),

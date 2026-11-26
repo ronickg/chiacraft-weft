@@ -832,8 +832,9 @@ gpu_struct! {
         /// (`@location(1)`, `weft_render::MOTION_FORMAT`) puts a point's position last frame
         /// through it.
         pub taa_prev: [[f32; 4]; 4],
-        /// `taa_prev`'s inverse: a point on last frame's screen (its clip position, depth as the
-        /// world drew it) back to this frame's camera-relative position. For packs reading last
+        /// The inverse of `taa_prev` with last frame's jitter in it: a point on last frame's screen
+        /// (its clip position and depth as the world drew them, jittered) back to this frame's
+        /// camera-relative position. For packs reading last
         /// frame's world (`behind`) while this one's is drawn (chiacraft's screen-space shade).
         pub taa_prev_inv: [[f32; 4]; 4],
         /// What temporal anti-aliasing writes this frame, for the screen effects after it: x the
