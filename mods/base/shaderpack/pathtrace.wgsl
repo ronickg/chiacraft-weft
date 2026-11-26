@@ -419,12 +419,16 @@ fn pt_nee_fade(e: f32, to: vec3<f32>) -> f32 {
     return clamp((e - (d.x + d.y + d.z)) / PT_NEE_FADE, 0.0, 1.0);
 }
 
-// How far above the lightmap's own block light at a surface the lamps' light may sum. Each lamp
-// is matched to the lightmap as if alone, and the lightmap takes the strongest light where tracing
-// adds them up: a 10 x 7 lava pit lit the floor round it white, a third over the room's lightmap
-// (s2o lava_glow). One lamp near a surface never reaches it (it is matched); a field of them stops
-// here. Shadows still take the light down freely.
+// How far above the lightmap's own block light at a surface a field of lamps' light may sum (a lamp
+// with two or more glowing neighbours, bit 31 of its listed word: a lava pit, a glowstone wall).
+// Each lamp is matched to the lightmap as if alone, and the lightmap takes the strongest light
+// where tracing adds them up: a 10 x 7 lava pit lit the floor round it white, a third over the
+// room's lightmap (s2o lava_glow). A lamp alone keeps its own light (capped for all, it took a
+// third of the alcove fire's off its pillar and wall, s2p fire18000). Shadows still take the
+// light down freely.
 const PT_NEE_SUM: f32 = 2.0;
+// Whether the lamp just shaded (`pt_block_direct`) is one of a field.
+var<private> PT_NEE_FIELD: bool = false;
 
 fn pt_nee_sum_cap(c: vec3<f32>, block: vec3<f32>) -> vec3<f32> {
     let w = vec3(0.2126, 0.7152, 0.0722);
@@ -639,11 +643,12 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     // (RIS: what was chosen, over its estimate, times the draws' mean weight.)
     let ris = w_sum / (m * y_p);
     let l = y.word;
+    PT_NEE_FIELD = (l >> 31u) == 1u;
     let lp = y.lp;
     if reuse {
         let o = lp - cell + 32;
         if all(o >= vec3(0)) && all(o < vec3(64)) {
-            let word = u32(o.x) | (u32(o.y) << 6u) | (u32(o.z) << 12u) | (l & 0x7FFC0000u);
+            let word = u32(o.x) | (u32(o.y) << 6u) | (u32(o.z) << 12u) | (l & 0xFFFC0000u);
             let q = u32(round(y.strength * 4.0)) & 15u;
             pt_res[at] = vec4(word, q | (u32(min(m, PT_RES_CAP)) << 4u), bitcast<u32>(ris), check);
         }
@@ -938,7 +943,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             if max(b_block.r, max(b_block.g, b_block.b)) > 1e-4 {
                 let e = pt_block_direct(b.world, b.rel, b.n, b.n, b.n * 0.02, px + vec2(37.0, 53.0), 0xffffffffu, vec2(0));
                 if e.a > 0.5 {
-                    bounce += pt_albedo(b) * (pt_nee_sum_cap(e.rgb, b_block) - b_block);
+                    bounce += pt_albedo(b) * (select(e.rgb, pt_nee_sum_cap(e.rgb, b_block), PT_NEE_FIELD) - b_block);
                 }
             }
         }
@@ -967,7 +972,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             let e = pt_block_direct(h.world, h.rel, n, ng, lift, px, id.y * pt.size.x + id.x, vec2<i32>(id.xy));
             block_vis = vec2(select(0.0, 1.0, max(e.r, max(e.g, e.b)) > 0.0), e.a);
             if e.a > 0.5 {
-                direct = pt_nee_sum_cap(e.rgb, block);
+                direct = select(e.rgb, pt_nee_sum_cap(e.rgb, block), PT_NEE_FIELD);
                 diffuse += direct - block;
             } else {
                 direct = block;

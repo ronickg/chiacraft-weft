@@ -317,6 +317,23 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
             targets.insert(c + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1));
         }
     }
+    // Every light's block, to tell a light in a field (a lava pit, a glowstone wall: two or more
+    // of its six neighbours glowing too, bit 31 of its listed word) from one alone. The tracer
+    // caps a field's summed light near the lightmap's, as each light is matched to it as if alone.
+    let at = |c: IVec3, w: u32| c * 16 + IVec3::new((w & 15) as i32, (w >> 4 & 15) as i32, (w >> 8 & 15) as i32);
+    let mut blocks: rustc_hash::FxHashSet<IVec3> = rustc_hash::FxHashSet::default();
+    for (&c, l) in lights {
+        for &w in l {
+            blocks.insert(at(c, w));
+        }
+    }
+    let field = |p: IVec3| {
+        [IVec3::X, IVec3::NEG_X, IVec3::Y, IVec3::NEG_Y, IVec3::Z, IVec3::NEG_Z]
+            .iter()
+            .filter(|&&d| blocks.contains(&(p + d)))
+            .count()
+            >= 2
+    };
     let mut lists: Vec<(IVec3, Vec<(u32, u32)>)> = Vec::new();
     let mut near: Vec<(i32, u32, u32)> = Vec::new();
     for &t in &targets {
@@ -327,14 +344,15 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
             let n = t + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1);
             let Some(l) = lights.get(&n) else { continue };
             for &w in l {
-                let p = n * 16 + IVec3::new((w & 15) as i32, (w >> 4 & 15) as i32, (w >> 8 & 15) as i32);
+                let p = at(n, w);
                 let e = ((w >> 12) & 15).max((w >> 16) & 15).max((w >> 20) & 15) as i32;
                 // Its level at the cube's nearest block.
                 let gap = (lo - p).max(IVec3::ZERO) + (p - hi).max(IVec3::ZERO);
                 let level = e - (gap.x + gap.y + gap.z);
                 if level > 0 {
                     let o = (p - lo + IVec3::splat(16)).as_uvec3();
-                    near.push((level, o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18 | (w >> 24 & 1) << 30, w >> 25 & 15));
+                    let word = o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18 | (w >> 24 & 1) << 30 | u32::from(field(p)) << 31;
+                    near.push((level, word, w >> 25 & 15));
                 }
             }
         }
