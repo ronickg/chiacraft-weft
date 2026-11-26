@@ -687,6 +687,10 @@ fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32>
 // Horizons): 1 small plants thin out, 2 the cubes' block-scale shading softens, 4 textures give way
 // to their average colour, all with distance.
 fn far_look() -> u32 {
+    // None of it path traced plain (`scene.rt.x` 3): the engine's world has no far look.
+    if scene.rt.x > 2.5 {
+        return 0u;
+    }
     return g.extra.w >> 24u;
 }
 
@@ -706,6 +710,9 @@ fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
 
 // `shade` with the cubes' shading softened by `soft` (distant terrain's boxes too, `fs_lod`).
 fn shade_soft(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
+    if scene.rt.x > 2.5 {
+        return plain_shade(in, albedo_in, in.ao);
+    }
     let lit = shade_soft_lit(in, albedo_in, soft);
     return vec4(display(haze_lit(lit.rgb, in.rel, in.light.x)), lit.a);
 }
@@ -805,6 +812,97 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     // The air before it glows with the placed lights' light (the held one is in `haze_lit`).
     let glow = placed_in_fog(in.light.yzw, in.rel, in.pos, in.light.x);
     return vec4(lit.rgb + glow, lit.a);
+}
+
+// ---- plain (`scene.rt.x` 3: path traced with `core:pt_plain`) ----
+//
+// The surfaces the path tracer doesn't light again (past its reach, the far land, water and glass,
+// plants) as the engine's own `world.wgsl` lights them with no pack: the texel times its tint, face
+// shade, corner shade and the lightmap's curve, multiplied in sRGB values as vanilla does, then
+// vanilla's fog (Distant Horizons' over the far land), with no snow, rain, materials, haze or
+// `display`. The pack's look round the plain traced land made the frame greyer and darker than
+// raster without the pack.
+
+fn plain_srgb_encode(l: vec3<f32>) -> vec3<f32> {
+    let c = max(l, vec3(0.0));
+    return select(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, c * 12.92, c <= vec3(0.0031308));
+}
+
+fn plain_srgb_decode(s: vec3<f32>) -> vec3<f32> {
+    let c = max(s, vec3(0.0));
+    return select(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, c <= vec3(0.04045));
+}
+
+// The engine's `plain_fog`: vanilla's fog, and with distant terrain Distant Horizons' instead.
+fn plain_fog_at(dist: f32) -> f32 {
+    let fog = fog_amount(dist, scene.params.x, scene.params.y);
+    let near = f32(g.extra.w & 0x7FFFFFu) * 16.0;
+    if abs(scene.params.x - 0.6 * scene.params.y) > 0.5 || near <= 0.0 || scene.params.y <= near {
+        return fog;
+    }
+    let k = 2.5 * clamp((dist / scene.params.y - 0.4) / 0.6, 0.0, 1.0);
+    return 1.0 - exp(-k * k);
+}
+
+fn plain_fogged(c: vec3<f32>, f: f32) -> vec3<f32> {
+    if f <= 0.0 {
+        return c;
+    }
+    return plain_srgb_decode(mix(plain_srgb_encode(c), plain_srgb_encode(scene.fog_color.rgb), f));
+}
+
+// The light on the surface in sRGB values, without its tint: face shade, corner shade `ao` and the
+// lightmap (the engine's vertex colour times its lightmap, the tint left to `plain_lit`).
+fn plain_light(in: VOut, ao: f32) -> vec3<f32> {
+    let lit = lightmap(in.light, scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
+    return normal_shade(normalize(in.normal)) * ao * min(vec3(1.0), lit + lightning_ground(scene, in.rel, in.light.x));
+}
+
+// The engine's `shade_unfogged`. The tint is the biome's in sRGB values (white under an overlay,
+// which `with_overlay` tinted already).
+fn plain_lit(in: VOut, albedo: vec4<f32>, ao: f32) -> vec4<f32> {
+    var light = select(in.tint, vec3(1.0), in.overlay != 0u) * plain_light(in, ao);
+    if in.glow != 0xffffffffu {
+        let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
+        light = max(light, in.tint * e);
+    }
+    if in.slot == 0u {
+        return vec4(plain_srgb_decode(plain_srgb_encode(albedo.rgb) * light), albedo.a);
+    }
+    return block_shade(in.slot, BlockPixel(in.uv, albedo, pow(light, vec3(2.2)), in.pos, scene.params.w));
+}
+
+// The engine's `shade`: lit, then fogged.
+fn plain_shade(in: VOut, albedo: vec4<f32>, ao: f32) -> vec4<f32> {
+    let lit = plain_lit(in, albedo, ao);
+    return vec4(plain_fogged(lit.rgb, plain_fog_at(in.dist)), lit.a);
+}
+
+// The engine's `far_water`: the water at its alpha over a dark sea floor, mixed in gamma, fogged.
+// Our far tiles don't carry the floor's depth, so it is the engine's bed for an unknown depth.
+fn plain_far_water(in: VOut, albedo: vec4<f32>, ao: f32) -> vec3<f32> {
+    let lit = plain_lit(in, vec4(albedo.rgb, 1.0), ao).rgb;
+    let bed = 0.15 * plain_light(in, ao);
+    let water = pow(mix(bed, pow(lit, vec3(1.0 / 2.2)), albedo.a), vec3(2.2));
+    return plain_fogged(water, plain_fog_at(in.dist));
+}
+
+// The engine's `fs_translucent`: water over what was drawn before it (`scene.behind`), mixed in gamma
+// as vanilla's screen mixes it, glass blended as it is; then the clouds' air before it.
+fn plain_translucent(in: VOut) -> vec4<f32> {
+    let albedo = translucent_albedo(in);
+    var lit = plain_shade(in, albedo, in.ao);
+    if in.kind.x == TINT_WATER && scene.behind.z > 0.5 {
+        let px = vec2<i32>(in.clip.xy);
+        if textureLoad(textures[u32(scene.behind.y)], px, 0).r <= 0.0 {
+            lit = vec4(plain_far_water(in, albedo, in.ao), 1.0);
+        } else {
+            let under = pow(max(textureLoad(textures[u32(scene.behind.x)], px, 0).rgb, vec3(0.0)), vec3(1.0 / 2.2));
+            let mixed = mix(under, pow(max(lit.rgb, vec3(0.0)), vec3(1.0 / 2.2)), lit.a);
+            lit = vec4(pow(mixed, vec3(2.2)), 1.0);
+        }
+    }
+    return through_cloud(lit, in.rel, scene);
 }
 
 // The material at this pixel: none for distant terrain, plants, models and far off (from 96 blocks).
@@ -1503,6 +1601,17 @@ struct GbOut {
 
 fn gbuffer(in: VOut, albedo: vec4<f32>) -> GbOut {
     let paint = albedo.rgb * in.color;
+    // Path traced plain (`scene.rt.x` 3): vanilla has no materials, so the texel's colour as it is,
+    // the face's own normal, no shine. The maps' metal halved the colour the plain light multiplies
+    // (sunlit nave floor 24 % darker than raster with a pack's maps, s1x 11-26).
+    if scene.rt.x > 2.5 {
+        // The alpha (metal otherwise) carries the texel's glow, as `plain_lit` reads it.
+        var glow = 0.0;
+        if in.glow != 0xffffffffu {
+            glow = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
+        }
+        return GbOut(vec4(paint, glow), vec4(normalize(in.normal), 1.0), vec4(0.0));
+    }
     let m = shade_mat(in, albedo.rgb);
     let n = mat_normal(m, normalize(in.normal), in.rel, fract(in.uv));
     let metal = m.metal > 0.5;
@@ -1593,7 +1702,8 @@ fn fs_cutout_shade(in: VOut) -> WorldOut {
 // was a solid mat, where Bliss's stay speckled through to the dark inside (Trees' roughness gap,
 // 11-06). `base:look_leaf_holes` 0 the old cut.
 fn cutout_edge(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> f32 {
-    if scene.frame.x < 0.5 || in.kind.z != 0u || fantasy_opt(OPT_LEAF_HOLES) < 0.5 {
+    // (Vanilla's 0.1 path traced plain, `scene.rt.x` 3, as the engine's `fs_cutout`.)
+    if scene.frame.x < 0.5 || in.kind.z != 0u || fantasy_opt(OPT_LEAF_HOLES) < 0.5 || scene.rt.x > 2.5 {
         return 0.1;
     }
     let lod = max(log2(max(min(length(du * in.size), length(dv * in.size)), 1e-6)), 0.0);
@@ -1686,6 +1796,9 @@ fn glass_lit(in: VOut, albedo: vec4<f32>, glass: bool) -> vec4<f32> {
     return vec4(l.rgb, a);
 }
 fn translucent(in: VOut) -> vec4<f32> {
+    if scene.rt.x > 2.5 {
+        return plain_translucent(in);
+    }
     let albedo = translucent_albedo(in);
     // Water and glass each lit, then one haze for both (one copy of it in the shader, as for distant
     // terrain in `lod_color`; Android port, 11-06). The same colours.
@@ -1729,6 +1842,9 @@ fn fs_translucent_fade(in: VOut) -> @location(0) vec4<f32> {
 // with the water's code each took as long to compile (NVIDIA about 42 s each, 6 per pack load).
 @fragment
 fn fs_layers(in: VOut) -> @location(0) vec4<f32> {
+    if scene.rt.x > 2.5 {
+        return plain_shade(in, translucent_albedo(in), in.ao);
+    }
     let g = glass_lit(in, translucent_albedo(in), true);
     return vec4(display(haze_lit(g.rgb, in.rel, in.light.x)), g.a);
 }
@@ -2011,6 +2127,23 @@ fn lod_color(in_lod: VOut) -> vec4<f32> {
     // Land and water each lit, then one haze for both: with a haze in each path the shader held two
     // copies of it and, on the Pixel 10, ran fewer pixels at once (far water without its own haze
     // was 6.9 ms of the vista's 44; Android port, 11-06). The same colours.
+    // Path traced plain (`scene.rt.x` 3): the engine's `fs_lod`, vanilla's light on the texture with
+    // its corner shade (`vs_lod` packs it with ours: taken back out to vanilla's 0.45 to 1) and
+    // Distant Horizons' fog; none of the crowns' shade, the far water's mirror or the haze.
+    if scene.rt.x > 2.5 {
+        let base = mix(0.85, 0.95, clamp(in.normal.y, 0.0, 1.0));
+        var ao = 0.45 + 0.55 * clamp((in.ao / base - 0.55) / 0.45, 0.0, 1.0);
+        // (A crown's side holds its own shade toward its bottom there, not a corner's.)
+        if in.kind.w != 0u && abs(in.normal.y) < 0.5 {
+            ao = 1.0;
+        }
+        if in.kind.x == TINT_WATER {
+            return vec4(plain_far_water(in, albedo, ao), SOLID_ALPHA);
+        }
+        let cover = smoothstep(0.1, 0.6, albedo.a);
+        let flat_ = vec4(mix(select(albedo.rgb, vec3(1.0), any(in.tint != vec3(1.0))), albedo.rgb, cover), 1.0);
+        return vec4(plain_shade(in, flat_, ao).rgb, SOLID_ALPHA);
+    }
     var pre: vec3<f32>;
     if in.kind.x == TINT_WATER {
         pre = far_water_lit(in);

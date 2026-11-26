@@ -3,6 +3,11 @@
 // out at half the size each way (`shaders/post_low/contact.wgsl`) and upsampled by depth here, so a
 // darkening keeps to its own surface; without the half-size image, worked out here as before.
 fn apply(p: PostPixel) -> vec4<f32> {
+    // None of the pack's look path traced plain (`scene.rt.x` 3, `core:pt_plain`): the picture as
+    // the engine draws it with no pack.
+    if scene.rt.x > 2.5 {
+        return p.color;
+    }
     // Not on water (the world image's alpha, which the pack leaves at 0 for solid things and the
     // reflections before this keep): its surface closes nothing in, and on the Mac (MoltenVK, M3
     // Max) a pool's flat top seen at a slant took level stripes from this pass, 8 pixels a pair,

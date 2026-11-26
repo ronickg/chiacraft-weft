@@ -815,7 +815,8 @@ gpu_struct! {
         pub upscale: [f32; 4],
         /// Ray-traced sun and moon shadows (`core:rt_shadows`, a GPU with ray queries): x 1 when
         /// the world's shader traces them this frame (its prelude then has `rt_sun`; the near shadow
-        /// map then holds the models alone, the far one the terrain as before), y a frame count
+        /// map then holds the models alone, the far one the terrain as before; chiacraft: 2 also path
+        /// traced, 3 path traced with `core:pt_plain`, the rest of the frame drawn plain), y a frame count
         /// (to 2^24, for noise that moves every frame), z 1 for soft edges from more rays a pixel
         /// (`core:rt_shadows` 2: `rt_sun_soft`'s `fine`), w 1 when it traces reflections
         /// (`core:rt_reflections`: `rt_hit`; the screen's reflections then step aside).
