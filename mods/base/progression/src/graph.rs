@@ -258,6 +258,8 @@ const RECIPES_LIST: &[Recipe] = &[
     b("base:raw_iron", 1.0, &[("base:iron_ore", 1.0)], PICK_BRONZE, 60.0),
     // Copper is common where it is; tin about thirty times rarer: a long search.
     b("base:raw_copper", 1.0, &[("base:copper_ore", 1.0)], PICK_STONE, 90.0),
+    // Native copper lies loose in the copper lands, a find: about two in a 64-block walk.
+    b("base:native_copper", 1.0, &[("base:loose_copper", 1.0)], Needs::Hand, 300.0),
     b("base:raw_tin", 1.0, &[("base:tin_ore", 1.0)], PICK_STONE, 300.0),
     b("base:raw_gold", 1.0, &[("base:gold_ore", 1.0)], PICK_STONE, 180.0),
     b("base:diamond", 1.0, &[("base:diamond_ore", 1.0)], PICK_STEEL, 600.0),
