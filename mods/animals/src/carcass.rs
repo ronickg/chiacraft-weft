@@ -5,8 +5,13 @@
 //! (placeholders until the blocky-model looks per body plan), then it is gone.
 //!
 //! Who takes from it: the killer and its pack (`hunt.rs`: their meal's kilograms, `taken`), scavengers (`forage.rs`:
-//! a bite at a time, smelled from afar as carrion is), and later a player's knife. A player's kill still drops its
-//! loot as before, so its carcass starts opened (skinned, as RDR2's).
+//! a bite at a time, smelled from afar as carrion is), and a player's knife (slice 2, `skin`).
+//!
+//! Skinning (Ronald 11-25: "skinning only"): an animal that leaves a carcass drops no hide or meat when it dies
+//! (`lib.rs`); a player with a knife (or a flake) in hand uses the carcass, kneels beside it (`SKINNING`, frozen and
+//! turned to it), the camera eases in low beside them (`SKIN_CAMERA`), and after the knife's time
+//! (`animals_core::carcass::skin_secs`) the hide (poor, good or perfect: `quality`) and what meat is left come off and
+//! the carcass is left skinned and stripped. Walking off (more than `SKIN_REACH`) stops it.
 
 use std::sync::Mutex;
 
@@ -43,14 +48,26 @@ value! {
         pub look: u32,
         /// The animal it was.
         pub of: u64,
+        /// Its wild level, the hits it took and what killed it (`damage_cause`): its hide's quality.
+        pub level: u32,
+        pub hits: u32,
+        pub cause: u32,
     }
 }
 pub static BODY: Component<Body> = Component::named("carcass");
 /// The look it is drawn as on this run, + 1 (not saved: the engine forgets appearance and scale on loading).
 static SHOWN: Component<u32> = Component::named("carcass_shown");
 
-/// The dying read at the `DIE` question: the animal, its species index, mass, yaw, drawn scale.
-type Dying = (u64, usize, f32, f32, f32);
+/// Hits taken in its life (not saved): a hide's quality (`animals_core::carcass::kill`).
+static HITS: Component<u32> = Component::named("carcass_hits");
+/// Being skinned: by whom, from and until which tick, the knife's tier + 1 (0: a flake); not saved.
+static SKIN: Component<[u64; 4]> = Component::named("carcass_skin");
+/// The player kneeling at a carcass, and the camera beside them.
+static SKINNING: Pose = Pose::named("skinning");
+static SKIN_CAMERA: CameraMode = CameraMode::named("skinning");
+
+/// The dying read at the `DIE` question: the animal, its species index, mass, yaw, drawn scale, level, hits.
+type Dying = (u64, usize, f32, f32, f32, u32, u32);
 static DYING: Mutex<Vec<Dying>> = Mutex::new(Vec::new());
 /// Kilograms taken off a body before its carcass was laid (the hunters' `DIE` handler may run first).
 static TAKEN: Mutex<Vec<(u64, f32)>> = Mutex::new(Vec::new());
@@ -73,7 +90,44 @@ pub fn init(r: &mut Registry) {
         .texture("carcass/bones")
         .attach(&BODY)
         .attach(&SHOWN)
+        .attach(&SKIN)
+        .on_interact(|e| {
+            let (w, id, player) = (e.world(), e.entity(), e.other());
+            start_skinning(&w, id, player)
+        })
         .goals(Goals::new().then(rot));
+    r.entity_component(&SKIN, [0u64; 4], 0);
+    r.stack_component(&PELT_QUALITY, 0);
+    r.entity_component(&HITS, 0u32, 0);
+    for s in &SPECIES {
+        r.edit(s.kind).attach(&HITS);
+    }
+    r.on_event(&actions::HURT, |b| {
+        let w = b.world();
+        for h in b.iter() {
+            if let Some(n) = w.component_mut(h.entity, &HITS) {
+                *n += 1;
+            }
+        }
+    });
+    // Kneeling, still, at eye height a little over half a standing one's (`player.animation.json`'s `skin` clip).
+    r.pose(&SKINNING)
+        .height(0.6)
+        .eye(0.55)
+        .speed(0.0)
+        .action("skin")
+        .no_bob();
+    // Low beside the skinner's right shoulder, looking down at the body before them.
+    r.camera(&SKIN_CAMERA)
+        .shot(camera::Shot::new(&[abi::comp::camera::BODY, abi::comp::camera::HUD, abi::comp::camera::CLIP], |a| {
+            let (yaw, eye) = (a.eye_yaw as f64, a.eye);
+            let (f, right) = ([-yaw.sin(), -yaw.cos()], [yaw.cos(), -yaw.sin()]);
+            let pos = Vec3 { x: eye.x + right[0] * 1.1 - f[0] * 0.4, y: eye.y + 0.25, z: eye.z + right[1] * 1.1 - f[1] * 0.4 };
+            let at = Vec3 { x: eye.x + f[0] * 1.2, y: eye.y - 0.8, z: eye.z + f[1] * 1.2 };
+            let (yaw, pitch) = camera::look_at(pos, at);
+            a.out = abi::CameraPose { pos, yaw, pitch, ..abi::CameraPose::DEFAULT };
+        }))
+        .transition(0.6, camera::easing::IN_OUT);
     for (kind, model) in [(&BONES, "carcass_bones"), (&PILE, "carcass_pile")] {
         let (w, h) = animals_core::bodies::of(model);
         r.entity(kind)
@@ -96,9 +150,11 @@ pub fn init(r: &mut Registry) {
             && let Some(mass) = crate::hunt::mass(&w, id)
         {
             let scale = crate::coats::size_of(&w, id).unwrap_or(1.0) * crate::breeding::growth(&w, id, index);
+            // The killing blow is no `HURT` (a lethal hit fires `DIE` alone): one more.
+            let hits = w.component(id, &HITS).unwrap_or(0) + 1;
             let mut d = DYING.lock().unwrap();
             d.retain(|r| r.0 != id);
-            d.push((id, index, mass, e.yaw, scale));
+            d.push((id, index, mass, e.yaw, scale, a.level(), hits));
             if d.len() > 64 {
                 d.remove(0);
             }
@@ -114,23 +170,25 @@ pub fn init(r: &mut Registry) {
                 i.map(|i| dying.swap_remove(i))
             };
             // Died some other way (a command, the void): its kind's own size, facing north.
-            let Some((_, index, mass, yaw, scale)) = read.or_else(|| {
+            let Some((_, index, mass, yaw, scale, level, hits)) = read.or_else(|| {
                 let index = SPECIES.iter().position(|s| s.kind.id() == d.kind)?;
-                Some((d.entity, index, SPECIES[index].bio.mass, 0.0, 1.0))
+                Some((d.entity, index, SPECIES[index].bio.mass, 0.0, 1.0, 0, 1))
             }) else {
                 continue;
             };
-            if mass < core::FROM_KG || crate::hunt::egg_of(&w, d.entity).is_some() {
+            // By its species' size, as its loot goes (`lib.rs`): a young deer leaves a carcass too.
+            if core::drops_on_death(SPECIES[index].bio.mass) || crate::hunt::egg_of(&w, d.entity).is_some() {
                 continue;
             }
-            let by_player = w.entity(d.source).is_some_and(|e| e.kind == PLAYER.id());
-            lay(&w, d.entity, index, (mass, scale), yaw, [d.pos.x, d.pos.y, d.pos.z], by_player);
+            let id = lay(&w, d.entity, index, (mass, scale), yaw, [d.pos.x, d.pos.y, d.pos.z], false);
+            if let Some(b) = w.component_mut(id, &BODY) {
+                (b.level, b.hits, b.cause) = (level, hits, d.cause);
+            }
         }
     });
 }
 
-/// A carcass of `of` (species `index`, `mass` kg drawn at `scale`) laid at `pos` facing `yaw`; skinned if a player's kill (its loot
-/// dropped).
+/// A carcass of `of` (species `index`, `mass` kg drawn at `scale`) laid at `pos` facing `yaw`.
 fn lay(w: &World, of: u64, index: usize, (mass, scale): (f32, f32), yaw: f32, pos: [f64; 3], skinned: bool) -> u64 {
     let id = w.spawn_with(&CARCASS, pos, &Spawn::new().yaw(yaw));
     if id == 0 {
@@ -143,7 +201,18 @@ fn lay(w: &World, of: u64, index: usize, (mass, scale): (f32, f32), yaw: f32, po
         kg
     };
     if let Some(b) = w.component_mut(id, &BODY) {
-        *b = Body { species: index as u32 + 1, mass, eaten, aged: 0.0, at: w.game_time(), scale, skinned: skinned as u32, look: 0, of };
+        *b = Body {
+            species: index as u32 + 1,
+            mass,
+            eaten,
+            aged: 0.0,
+            at: w.game_time(),
+            scale,
+            skinned: skinned as u32,
+            look: 0,
+            of,
+            ..Body::default()
+        };
     }
     drop(w.entity_modify(id).persistent(true));
     weft_sdk::info!(
@@ -246,9 +315,10 @@ fn show(w: &World, id: u64) {
     }
 }
 
-/// A goal: it ages as its raw meat would at its spot's air (`vitals::rot::rate`), and looks again.
+/// A goal: it ages as its raw meat would at its spot's air (`vitals::rot::rate`), and looks again; a skinning goes on.
 fn rot(w: &World, id: u64, st: &EntityState) -> bool {
     let now = w.game_time();
+    skinning(w, id, st, now);
     if !(now + id).is_multiple_of(EVERY) {
         return true;
     }
@@ -291,3 +361,138 @@ pub fn report(w: &World, at: Vec3, days: f32) -> String {
     }
     if rows.is_empty() { "no carcasses near".to_string() } else { rows.join(" | ") }
 }
+
+// ---------------------------------------------------------------- skinning
+
+/// A knife's tier in `player`'s hand (`base_api::ITEM_LEVEL` / 10), `Some(None)` for a flake, `None` for neither.
+fn knife(w: &World, player: u64) -> Option<Option<u32>> {
+    let stack = w.inventory(player).get(w.selected_slot(player));
+    match item_name(stack.item) {
+        "base:knife" => Some(Some((base_api::ITEM_LEVEL.on_stack(&stack).unwrap_or(5.0) / 10.0) as u32)),
+        "base:sharp_flake" | "base:flake" => Some(None),
+        _ => None,
+    }
+}
+
+/// `player` used carcass `id`: with a knife, they kneel and start skinning it. Whether it took the use.
+fn start_skinning(w: &World, id: u64, player: u64) -> bool {
+    let (Some(b), Some(c), Some(p)) = (w.component(id, &BODY), w.entity(id), w.entity(player)) else { return false };
+    let Some(tier) = knife(w, player) else {
+        base_api::hint(w, player, "hint.animals.skin_knife", &[]);
+        return false;
+    };
+    if b.skinned != 0 || w.component(id, &SKIN).is_some_and(|k| k[0] != 0) {
+        base_api::hint(w, player, "hint.animals.skinned_already", &[]);
+        return true;
+    }
+    let now = w.game_time();
+    let ticks = (core::skin_secs(b.mass, tier) * 20.0).round() as u64;
+    if let Some(k) = w.component_mut(id, &SKIN) {
+        *k = [player, now, now + ticks, tier.map_or(0, |t| t as u64 + 1)];
+    }
+    // Turned to the body, kneeling beside it; the camera eases in.
+    let (dx, dz) = (c.pos.x - p.pos.x, c.pos.z - p.pos.z);
+    let facing = ((-dx).atan2(-dz) as f32).to_degrees();
+    w.set_pose(player, Some(&SKINNING), Some(facing));
+    w.force_camera(player, &SKIN_CAMERA, Some((0.6, camera::easing::IN_OUT)));
+    weft_sdk::info!("player {player} skins carcass {id} ({:.1} kg, {:.1} s, knife tier {tier:?})", b.mass, ticks as f32 / 20.0);
+    true
+}
+
+/// The player is let go: standing again, their own camera back.
+fn stand_up(w: &World, player: u64) {
+    w.set_pose(player, None, None);
+    w.release_camera(player, Some((0.5, camera::easing::IN_OUT)));
+}
+
+/// A skinning of carcass `id` goes on: halfway the body shows opened, at the end its hide and meat come off; it stops
+/// if the skinner is gone or walked off.
+fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
+    let Some([player, from, until, tier]) = w.component(id, &SKIN).filter(|k| k[0] != 0) else { return };
+    let gone = w
+        .entity(player)
+        .is_none_or(|p| p.health <= 0.0 || crate::dist2(p.pos, st.pos) > core::SKIN_REACH * core::SKIN_REACH);
+    if gone {
+        if let Some(k) = w.component_mut(id, &SKIN) {
+            *k = [0; 4];
+        }
+        stand_up(w, player);
+        weft_sdk::info!("player {player} stops skinning carcass {id}");
+        return;
+    }
+    if now < until {
+        // Halfway: the hide is off, the body opened.
+        if now == from + (until - from) / 2
+            && let Some(b) = w.component_mut(id, &BODY)
+        {
+            b.skinned = 1;
+            show(w, id);
+        }
+        return;
+    }
+    if let Some(k) = w.component_mut(id, &SKIN) {
+        *k = [0; 4];
+    }
+    stand_up(w, player);
+    let Some(b) = w.component(id, &BODY) else { return };
+    let Some(s) = (b.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+    else {
+        return;
+    };
+    let rot = vitals::rot::carcass_stage(core::keeps(), b.aged);
+    let knife = (tier != 0).then(|| tier as u32 - 1);
+    let quality = core::quality(b.level, core::kill(b.hits, b.cause), knife, rot);
+    let at = [st.pos.x, st.pos.y + 0.4, st.pos.z];
+    let mut got = Vec::new();
+    // The hide (none once rotted to remains), its quality on it.
+    let hide_share = vitals::rot::CARCASS
+        .iter()
+        .find(|c| c.0 == rot)
+        .map_or(0.0, |c| c.3);
+    if hide_share > 0.0
+        && let Some(&(_, item, lo, hi)) = animals_core::hides::HIDES.iter().find(|h| h.0 == s.name)
+    {
+        let n = core::hide_count(lo, hi, quality);
+        if n > 0 {
+            w.spawn_item(at, ItemStack::new(Item::generated(item.to_string()).id(), n).with(&PELT_QUALITY, quality as u32));
+            got.push(format!("{n} {item} (quality {quality})"));
+        }
+    }
+    // The meat left on it: what's not been eaten, less as it rots. It comes off the body.
+    if let Some((_, meat, lo, hi)) = animals_core::meat::drops().find(|d| d.0 == s.name) {
+        let n = core::meat_count(lo, hi, b.eaten, b.mass, rot);
+        if n > 0 {
+            w.spawn_item(at, ItemStack::new(Item::generated(format!("animals:{meat}")).id(), n));
+            got.push(format!("{n} animals:{meat}"));
+        }
+    }
+    // One with no meat of its own gives carcass pieces (`meat::carcass`: carrion, bait), as many as its meat would be.
+    if let Some((lo, hi)) = animals_core::meat::carcass(s.name) {
+        let n = core::meat_count(lo, hi, b.eaten, b.mass, rot);
+        if n > 0 {
+            w.spawn_item(at, ItemStack::new(Item::generated(animals_core::meat::CARCASS.to_string()).id(), n));
+            got.push(format!("{n} {}", animals_core::meat::CARCASS));
+        }
+    }
+    let meat_kg = (b.mass * animals_core::meat::YIELD).min((b.mass * core::EDIBLE - b.eaten).max(0.0));
+    if let Some(b) = w.component_mut(id, &BODY) {
+        b.skinned = 1;
+        b.eaten += meat_kg;
+    }
+    weft_sdk::info!(
+        "player {player} skinned carcass {id} of {}: {} (level {}, {} hits, cause {}, knife {knife:?}, {:?})",
+        s.name,
+        if got.is_empty() { "nothing".to_string() } else { got.join(", ") },
+        b.level,
+        b.hits,
+        damage_cause::NAMES.get(b.cause as usize).unwrap_or(&"?"),
+        rot
+    );
+    base_api::hint(w, player, &format!("hint.animals.pelt_{quality}"), &[]);
+    show(w, id);
+}
+
+/// A hide's quality from skinning, 1 poor, 2 good, 3 perfect (`animals_core::carcass::quality`); none: an old one.
+pub static PELT_QUALITY: Component<u32> = Component::named("pelt_quality");

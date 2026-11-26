@@ -81,3 +81,12 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
 2. **Skinning:** knife hold, kneel, camera, clip, yields moved from loot to the carcass, pelt quality.
 3. **Art:** the blocky-model carcasses per plan and the player clips (the art crew / `blocky-model`).
 4. Later: rot tint and flies, carrying a pelt, a hanging rack, hunters following blood.
+
+## Where it stands
+
+- Slice 1 (912b84f55): built; Mac run cov_carcass_r1 sent 11-25.
+- Slice 2 (Ronald 11-25: "Yes, skinning only"): built on the same branch. Click to start (RDR2 holds the button; ours
+  runs on once started, stopped by walking off), kneel pose `skinning` with base's `skin` clip, camera `skinning`
+  (low beside the right shoulder), knife tier from `base_api::ITEM_LEVEL`, hide quality on `animals:pelt_quality`,
+  hints `hint.animals.pelt_1..3`. The progression sheet's kill yields stay true (skinning gives the same hide, meat or
+  carcass pieces as the death loot did, at good quality).

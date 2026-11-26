@@ -192,7 +192,12 @@ fn init(r: &mut Registry) {
     // What a carcass gives: pelts and hides for clothes (`animals_core::hides`) and meat
     // (`animals_core::meat`), one table a species.
     meat::init(r);
-    for s in &species::SPECIES {
+    // Ronald 11-25, "skinning only": one big enough to leave a carcass (`carcass.rs`) drops nothing when it dies; its
+    // hide and meat come off by skinning, and its body is the scavengers' carrion.
+    for s in species::SPECIES
+        .iter()
+        .filter(|s| animals_core::carcass::drops_on_death(s.bio.mass))
+    {
         let hide = animals_core::hides::HIDES
             .iter()
             .find(|h| h.0 == s.name)
