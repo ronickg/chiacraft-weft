@@ -21,6 +21,7 @@ mod developer;
 mod discovery;
 mod dlss;
 mod doors;
+pub mod fences;
 mod effects;
 mod events;
 mod fall;
@@ -205,6 +206,7 @@ fn init(r: &mut Registry) {
     // ships (assembly, vehicles), the music player, the woodcutter, storage sorting, the target
     // info panel. Cutting one is deleting its file, its `mod` line and its line here.
     doors::register(r);
+    fences::register(r);
     effects::register(r);
     assembly::register(r);
     vehicles::register(r);

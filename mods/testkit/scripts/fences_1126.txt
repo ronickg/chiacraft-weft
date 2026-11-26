@@ -1,0 +1,103 @@
+# Fences, gates and the scarecrow (11-26, mods/base/src/fences.rs, vitals::fences). Seed 1, a
+# fresh world.
+# Part 1, the pens: on a stone pad two pens 7 x 7 (inside 5 x 5), each with 4 white-tailed deer:
+#   A (west, centre ~-8 ~ ~-10) walled with fences, B (east, centre ~8 ~ ~-10) with a cobblestone
+#   wall one block high (a control: a deer steps over one block). After 90 s (ticks running, the
+#   player a spectator high above so nothing is scared), /tk near counts what is still inside
+#   each pen (radius 3) and round it (radius 12). Expect A: all 4 inside; B: fewer inside (they
+#   step out). The shot fp_pens shows the fences joined into a ring (rails between posts, no
+#   gaps) and the deer.
+# Part 2, the gate and the scarecrow by real actions in survival:
+#   - a gate set in pen A's south side; used: /tk prop open true; used again: false.
+#   - a scarecrow set between the pens (~0 ~ ~-7); a torch in hand, used on it: /tk prop lit true,
+#     the torch gone from the hand (/tk inv me), run.log "scarecrow: a lantern hung"; /tk light
+#     at 7 and 9 blocks north of it along the ground: block light 8 or more at 7, under 8 at 9
+#     (`vitals::fences::scarecrow_reach` 7). /tk light answers the packed light: give the raw
+#     numbers, and the block light if it reads as one.
+#   - shots fp_gate_open, fp_scarecrow (lit, its lantern), fp_scarecrow_night (dark, lit round it).
+# Read: the /tk near replies, the /tk prop, /tk inv and /tk light replies, run.log "scarecrow:",
+# "died" (none), and the shots. Yaw 0 faces -z; a negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /time set 1000
+chat /tk mode creative
+look 0 -20
+chat /tk fill ~-14 ~-1 ~-20 ~14 ~-1 ~6 base:stone
+chat /tk fill ~-14 ~ ~-20 ~14 ~6 ~6 core:air
+wait 1
+# Pen A: fences, a ring round ~-8 ~ ~-10.
+chat /tk fill ~-11 ~ ~-13 ~-5 ~ ~-13 base:fence
+chat /tk fill ~-11 ~ ~-7 ~-5 ~ ~-7 base:fence
+chat /tk fill ~-11 ~ ~-13 ~-11 ~ ~-7 base:fence
+chat /tk fill ~-5 ~ ~-13 ~-5 ~ ~-7 base:fence
+# Pen B: a cobblestone wall one high round ~8 ~ ~-10.
+chat /tk fill ~5 ~ ~-13 ~11 ~ ~-13 base:cobblestone
+chat /tk fill ~5 ~ ~-7 ~11 ~ ~-7 base:cobblestone
+chat /tk fill ~5 ~ ~-13 ~5 ~ ~-7 base:cobblestone
+chat /tk fill ~11 ~ ~-13 ~11 ~ ~-7 base:cobblestone
+wait 1
+chat /tk spawn animals:white_tailed_deer ~-9 ~ ~-11
+chat /tk spawn animals:white_tailed_deer ~-7 ~ ~-11
+chat /tk spawn animals:white_tailed_deer ~-9 ~ ~-9
+chat /tk spawn animals:white_tailed_deer ~-7 ~ ~-9
+chat /tk spawn animals:white_tailed_deer ~7 ~ ~-11
+chat /tk spawn animals:white_tailed_deer ~9 ~ ~-11
+chat /tk spawn animals:white_tailed_deer ~7 ~ ~-9
+chat /tk spawn animals:white_tailed_deer ~9 ~ ~-9
+wait 1
+chat /tk near ~-8 ~ ~-10 3
+chat /tk near ~8 ~ ~-10 3
+# Up out of the way, a spectator: nothing scares them.
+chat /tk mode spectator
+chat /tp ~ ~30 ~6
+look 0 -55
+wait 2
+shot fp_pens.png
+wait 88
+chat /tp ~ ~-30 ~-6
+wait 1
+chat /tk near ~-8 ~ ~-10 3
+chat /tk near ~-8 ~ ~-10 12
+chat /tk near ~8 ~ ~-10 3
+chat /tk near ~8 ~ ~-10 12
+# Part 2: the gate in pen A's south side, used for real.
+chat /tk mode creative
+chat /tk set ~-8 ~ ~-7 base:fence_gate
+chat /tk set ~0 ~ ~-7 base:scarecrow
+wait 1
+chat /tk mode survival
+until mode survival within 10
+chat /tp ~-8 ~ ~-4
+wait 1
+look 0 -10
+aim_block 0 0 -3 0.5
+hold core:use 0.2
+wait 1
+chat /tk prop ~ ~ ~-3 open
+shot fp_gate_open.png
+hold core:use 0.2
+wait 1
+chat /tk prop ~ ~ ~-3 open
+# The scarecrow, a torch in hand.
+chat /tp ~8 ~ ~
+wait 1
+chat /tk give base:torch
+chat /tk hand me base:torch
+wait 0.5
+aim_block 0 0 -3 0.8
+hold core:use 0.2
+wait 1
+chat /tk prop ~ ~ ~-3 lit
+chat /tk inv me
+chat /tk light ~ ~ ~-10
+chat /tk light ~ ~ ~-12
+look 0 0
+wait 1
+shot fp_scarecrow.png
+chat /time set 18000
+wait 3
+shot fp_scarecrow_night.png
+expect alive
+quit
