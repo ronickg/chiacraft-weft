@@ -1605,7 +1605,12 @@ fn gbuffer(in: VOut, albedo: vec4<f32>) -> GbOut {
     // the face's own normal, no shine. The maps' metal halved the colour the plain light multiplies
     // (sunlit nave floor 24 % darker than raster with a pack's maps, s1x 11-26).
     if scene.rt.x > 2.5 {
-        return GbOut(vec4(paint, 0.0), vec4(normalize(in.normal), 1.0), vec4(0.0));
+        // The alpha (metal otherwise) carries the texel's glow, as `plain_lit` reads it.
+        var glow = 0.0;
+        if in.glow != 0xffffffffu {
+            glow = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
+        }
+        return GbOut(vec4(paint, glow), vec4(normalize(in.normal), 1.0), vec4(0.0));
     }
     let m = shade_mat(in, albedo.rgb);
     let n = mat_normal(m, normalize(in.normal), in.rel, fract(in.uv));
