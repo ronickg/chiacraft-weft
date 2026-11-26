@@ -359,7 +359,12 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
         if near.is_empty() {
             continue;
         }
-        near.sort_unstable_by_key(|n| std::cmp::Reverse(n.0));
+        // Lights alone first, then a field's (bit 31), each by its level: a field's lights are
+        // capped near the lightmap as a whole, so a few of them stand for it, but a lamp left
+        // out goes dark in the whole cube. A 10 x 7 lava pit's 70 level-15 lights crowded the
+        // ceiling glowstone out of some cubes' 48 and not others, its light ending in a hard
+        // line on the floor at a cube's edge (s2s lava_glow).
+        near.sort_unstable_by_key(|n| (n.1 >> 31, std::cmp::Reverse(n.0)));
         near.truncate(LIGHTS_PER_CUBE);
         lists.push((t, near.iter().map(|n| (n.1, n.2)).collect()));
     }
