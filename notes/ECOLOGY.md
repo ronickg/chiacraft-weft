@@ -581,7 +581,12 @@ and cactus.**
   eaten where a player sowed them, the grain and beans as seeds (deer, mice, birds), roots and
   tubers as roots (hares, voles), each set back to a seedling as a raided field is
   (`forage::crop`, `PLANTED`); a sown field counts in no place's food, so capacity is as before.
-  Maize, sorghum, millet and the stems' fruit are left alone (two blocks tall). Check: `cov_crops`.
+  Maize, sorghum, millet and the stems' fruit are left alone (two blocks tall). Farming stays
+  winnable (Planner): a wild animal goes for a ripe plant only on that plant's day, about a third
+  of a field a game day (`animals_core::needs::RAID_SHARE`), so a herd thins a field rather than
+  clearing it; never in block light 8 or more (`RAID_LIGHT`: a torch in the field keeps them off,
+  night and day); and a wall 2 high keeps them out, as they can't path through it. The game has no
+  fence block yet. Check: `cov_crops` (an open, a walled and a torch-lit field at night).
 - **Not yet:**
   - none of the crops' raiding seen yet (`cov_crops`, below);
   - beetroot's own seed and cooked cassava, waiting for icons;

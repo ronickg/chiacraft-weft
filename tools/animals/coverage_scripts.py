@@ -740,19 +740,33 @@ write("carcass_rot", s)
 # Animals at the crops and the water plants (notes/ECOLOGY.md part 3's "not yet": `vitals::forage::crop` rows, eaten
 # where sown, and the reeds, lily pads, eelgrass and kelp rows).
 s = head("crops", [
-    "Animals at the crops and the water plants. Part 1 (x 0): a 5 x 5 field of ripe wheat east of the pond and one of",
-    "ripe carrots west of it, 2 white-tailed deer and 2 hares beside them, hungry (food 30%), nothing else to eat on the",
-    "bare pad. Expect \"animal N eats base:wheat at ...\" from the deer and \"eats base:carrots\" from the hares, each",
-    "eaten plant set back to a seedling (the 1_fields shot after: gaps of young crop in the fields). Part 2 (x 200, summer):",
+    "Animals at the crops and the water plants. Part 1 (x 0, night, ticks running): a 5 x 5 field of ripe wheat east of",
+    "the pond (x 4..8, z 542..546) and one of ripe carrots west of it (x -8..-4), 2 white-tailed deer and 2 hares beside",
+    "them, hungry (food 30%), nothing else to eat on the bare pad; north of them two more wheat fields, one walled in 2",
+    "high (x 4..8, z 532..536) and one lit by torches (x -8..-4, z 532..536). Expect \"animal N eats base:wheat at ...\"",
+    "from the deer and \"eats base:carrots\" from the hares, only in the open fields (about a third of each field's",
+    "plants a day, `needs::RAID_SHARE`), none at z 532..536; each eaten plant set back to a seedling (1_fields: gaps of",
+    "young crop in the open fields, the walled and lit ones whole). Part 2 (x 200, summer):",
     "a pond with lily pads on it and reeds along its south side, 2 capybaras hungry: \"eats base:lily_pad\" or",
     "\"eats base:reed\" (they stay: no block changes). Shots 1_fields, 2_pond.",
 ])
 s += pad(0) + [
     f"chat /tk fill 4 69 {Z-2} 8 69 {Z+2} base:farmland", f"chat /tk fill 4 70 {Z-2} 8 70 {Z+2} base:wheat[age=7]",
     f"chat /tk fill -8 69 {Z-2} -4 69 {Z+2} base:farmland", f"chat /tk fill -8 70 {Z-2} -4 70 {Z+2} base:carrots[age=3]",
+    # The walled field (planks 2 high round it) and the lit one (a torch at each corner and in the middle).
+    f"chat /tk fill 4 69 {Z-12} 8 69 {Z-8} base:farmland", f"chat /tk fill 4 70 {Z-12} 8 70 {Z-8} base:wheat[age=7]",
+    f"chat /tk fill 3 70 {Z-13} 9 71 {Z-13} base:oak_planks", f"chat /tk fill 3 70 {Z-7} 9 71 {Z-7} base:oak_planks",
+    f"chat /tk fill 3 70 {Z-13} 3 71 {Z-7} base:oak_planks", f"chat /tk fill 9 70 {Z-13} 9 71 {Z-7} base:oak_planks",
+    f"chat /tk fill -8 69 {Z-12} -4 69 {Z-8} base:farmland", f"chat /tk fill -8 70 {Z-12} -4 70 {Z-8} base:wheat[age=7]",
+    f"chat /tk fill -9 70 {Z-13} -9 70 {Z-13} base:torch", f"chat /tk fill -3 70 {Z-13} -3 70 {Z-13} base:torch",
+    f"chat /tk fill -9 70 {Z-7} -9 70 {Z-7} base:torch", f"chat /tk fill -3 70 {Z-7} -3 70 {Z-7} base:torch",
+    f"chat /tk fill -6 70 {Z-10} -6 70 {Z-10} base:torch",
+    "chat /time set 18000",
     f"chat /tk spawn animals:white_tailed_deer 6 70 {Z+5}", f"chat /tk spawn animals:white_tailed_deer 7 70 {Z+5}",
+    f"chat /tk spawn animals:white_tailed_deer 0 70 {Z-10}", f"chat /tk spawn animals:white_tailed_deer 1 70 {Z-10}",
     f"chat /tk spawn animals:hare -6 70 {Z+5}", f"chat /tk spawn animals:hare -5 70 {Z+5}",
-    f"chat /tp 0 74 {Z+14}", "wait 1", "chat /animalprof food 0.3", "chat /animalprof water 0.9", "wait 60",
+    f"chat /tp 0 74 {Z+14}", "wait 1", "chat /animalprof food 0.3", "chat /animalprof water 0.9", "wait 90",
+    "chat /time set 6000",
     "chat /tick freeze", f"chat /tp 0 80 {Z+10}", "look 0 -50", "wait 2", "shot cov_crops_1_fields.png",
     "chat /tick unfreeze", "wait 1",
 ]

@@ -253,6 +253,9 @@ fn nearest(w: &World, s: &Species, center: [i32; 3], r: i32, p: [i32; 3], ground
                     continue;
                 }
                 match food(s, w.block(at), now, full) {
+                    // A ripe crop only on its day and in the dark (`needs::raids`): a torch keeps them off it.
+                    Some(src)
+                        if src.found == vitals::forage::PLANTED && !animals_core::needs::raids(w.block_light(at), raid_roll(w, at)) => {}
                     Some(src) if !src.fallback() => best = Some((at, d)),
                     Some(_) if ground_too && ground.is_none_or(|(_, b)| d < b) => ground = Some((at, d)),
                     _ => {}
@@ -261,6 +264,19 @@ fn nearest(w: &World, s: &Species, center: [i32; 3], r: i32, p: [i32; 3], ground
         }
     }
     best.or(ground).map(|(at, _)| at)
+}
+
+/// A crop plant's roll for today (0 to 1, `needs::RAID_SHARE`): the same all day, another the next.
+fn raid_roll(w: &World, at: [i32; 3]) -> f32 {
+    let day = w.day_time() / vitals::calendar::DAY_TICKS;
+    let mut h = (at[0] as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ (at[1] as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
+        ^ (at[2] as u64).wrapping_mul(0x1656_67B1_9E37_79F9)
+        ^ day.wrapping_mul(0x27D4_EB2F_1656_67C5);
+    h ^= h >> 31;
+    h = h.wrapping_mul(0x94D0_49BB_1331_11EB);
+    h ^= h >> 29;
+    (h >> 11) as f32 / (1u64 << 53) as f32
 }
 
 /// The share of a spoiled carcass's weight an insect eater gets from it (its insects).

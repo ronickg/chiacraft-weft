@@ -50,6 +50,19 @@ pub const FOOD_DAYS: u64 = 10;
 /// until the rain brings it back; never above the usual.
 pub const ROOM_FLOOR: f32 = 0.25;
 
+/// Crops (`vitals::forage::crop`, part 3): a wild animal finds a ripe crop worth raiding only on some days, a share
+/// `RAID_SHARE` of a field's plants a game day (each plant's own roll for the day), so a herd thins a field rather than
+/// clearing it at once; and never one in block light of `RAID_LIGHT` or more (a torch within about 6 blocks: lit ground
+/// is people's ground). A fence keeps them out as any wall does (they can't path through it). Game numbers, not
+/// measured ones: farming has to stay winnable.
+pub const RAID_SHARE: f32 = 0.3;
+pub const RAID_LIGHT: u32 = 8;
+
+/// Whether a wild animal goes for a ripe crop in block light `light` whose roll for the day is `roll` (0 to 1).
+pub fn raids(light: u32, roll: f32) -> bool {
+    light < RAID_LIGHT && roll < RAID_SHARE
+}
+
 /// A plant eater's room, `crowd` in a usual season, where its food grew `now` against the season's `usual`
 /// (`ROOM_FLOOR` of it at least, at least one).
 pub fn room_by_food(crowd: u32, now: f32, usual: f32) -> u32 {
@@ -539,5 +552,13 @@ mod healing {
         assert_eq!(room_by_food(20, 0.0, 0.6), 5);
         assert_eq!(room_by_food(2, 0.0, 0.6), 1);
         assert_eq!(room_by_food(20, 0.0, 0.0), 20);
+    }
+
+    #[test]
+    fn torchlight_keeps_raiders_off_the_crops() {
+        assert!(raids(0, 0.0), "a dark field is raided on its day");
+        assert!(!raids(RAID_LIGHT, 0.0), "a field lit by a torch is left alone");
+        assert!(!raids(0, RAID_SHARE), "only RAID_SHARE of a field's plants a day");
+        assert!(RAID_SHARE < 0.5, "a herd should thin a field, not clear it");
     }
 }
