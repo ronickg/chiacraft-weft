@@ -80,6 +80,9 @@ until chat base:bone_splinter within 5
 chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
 chat /tk set ~ ~ ~-1 base:loose_bone
 aim_block 0 0 -1 0.05
+# Three splinters use the old bones up (FLAKES_PER_STONE) and a strike on the bare ground after
+# puts the bone down: a bone back in the bag.
+chat /tk give base:bone
 chat /tk hand me base:bone
 wait 0.5
 hold core:sneak 2 nowait
