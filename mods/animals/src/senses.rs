@@ -768,6 +768,14 @@ pub fn herd_mid(w: &World, id: u64) -> Option<[f64; 3]> {
     (herd && s.kin >= 2).then(|| s.kin_mid.map(f64::from))
 }
 
+/// It heard its kind's alarm a moment ago (`alarm`, within `roles::ALARM_QUIET`) and is aware
+/// still: `hunt::wary` runs it off with them.
+pub fn alarmed(w: &World, id: u64) -> bool {
+    let now = w.game_time();
+    w.component(id, &SENSES)
+        .is_some_and(|s| s.alarm_at != 0 && now < s.alarm_at + roles::ALARM_QUIET && s.aware >= NOTICED)
+}
+
 /// It runs from `threat` at `pos`: it calls, and its wild kin within `roles::ALARM` blocks know at
 /// once (unless it ran on a call itself). How many heard.
 pub fn alarm(w: &World, id: u64, st: &EntityState, threat: u64, pos: [f32; 3]) -> u32 {
@@ -798,7 +806,9 @@ pub fn alarm(w: &World, id: u64, st: &EntityState, threat: u64, pos: [f32; 3]) -
             continue;
         }
         if let Some(s) = w.component_mut(o, &SENSES) {
-            s.aware = s.aware.max(NOTICED);
+            // Past the mark by what fades before its next look (an alarm at exactly `NOTICED` faded
+            // to a stare: cov_grazers' herds never ran).
+            s.aware = s.aware.max(NOTICED + 0.5);
             s.threat = threat;
             s.threat_pos = pos;
             s.alarm_at = now.max(1);

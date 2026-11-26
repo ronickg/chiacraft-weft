@@ -318,6 +318,7 @@ fn bite(w: &World, id: u64, st: &EntityState) {
         k.bite = BITE_TICKS;
     });
     animal::feed(w, id, food.food);
+    weft_sdk::debug!("animal {id} bites, out cold: taming {:.0}%", progress * 100.0);
     if progress >= 1.0 {
         spill(w, id, st);
         set(w, id, |k| {
@@ -351,6 +352,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
         k.food = held.item;
         k.count += held.count;
     });
+    weft_sdk::debug!("animal {id}, out cold, given {} to eat", held.count);
     if !w.outside_survival(player) {
         inv.set(slot, ItemStack::EMPTY);
     }

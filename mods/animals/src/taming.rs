@@ -116,6 +116,11 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return false;
         }
         let Some(t) = w.component(id, &TAMING) else { return false };
+        // Charging what hurt it (`hunt::turn_on`): it doesn't bolt from the player it charges
+        // (cov_bosses: a hit gastonia turned on the player, then bolted from him).
+        if crate::hunt::turned_on(w, id) {
+            return false;
+        }
         let t0 = crate::prof::stamp();
         let _slow = Slow(t0, id);
         if t.scared > 0 {
@@ -155,6 +160,12 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                 // And it stares only a while (`perception::STARE_SECS`, `senses::staring`): a
                 // player standing still is only smelled, which never makes it bolt, and a deer
                 // stood staring at one a whole game day (ai1124_graze7).
+                // Its herd's alarm goes first: it runs with them (`hunt::wary`), not stops to
+                // stare (round 2 of cov_grazers: a hit deer's herd heard the alarm and stood
+                // staring at the player; only the reindeer, past bolting already, ran).
+                if crate::senses::alarmed(w, id) {
+                    return false;
+                }
                 if seen.fright >= animals_core::perception::STARE && !driven(w, id) && crate::senses::staring(w, id) {
                     crate::senses::stare(w, id, st, seen.player_pos);
                     return true;
@@ -332,10 +343,35 @@ pub fn hurt(w: &World, id: u64, source: u64, cause: u32) {
             t.effectiveness = (t.effectiveness - HURT).max(0.0);
         }
     });
-    if source != 0 && source != id {
+    let attacker = (source != 0 && source != id)
+        .then(|| w.entity(source))
+        .flatten();
+    if let (Some(a), Some(st)) = (attacker, w.entity(id)) {
+        let at = [a.pos.x as f32, a.pos.y as f32, a.pos.z as f32];
+        // Its herd hears it: it calls as it is hit, and they run (or stand) with it (cov_grazers:
+        // a hit deer ran alone, its herd grazed on beside the player).
+        let heard = crate::senses::alarm(w, id, &st, source, at);
+        if heard > 0 {
+            weft_sdk::info!("animal {id} calls the alarm as it is hurt: {heard} of its kind near run too");
+        }
+        // A big plant eater turns on what hit it instead of running (`roles::STANDS_KG`:
+        // `hunt::wary` stands and charges at its next look; cov_grazers: hit iguanodonts and
+        // ankylosaurs only ran).
+        if stands_when_hit(w, id) {
+            crate::hunt::turn_on(w, id, source);
+            weft_sdk::info!("animal {id} hurt by {source}: turns on it");
+            return;
+        }
         weft_sdk::info!("animal {id} hurt by {source}: runs from it");
     }
     scare(w, id, source);
+}
+
+/// Whether a wild one turns on what hurt it: a grown plant eater of `roles::STANDS_KG` or more.
+fn stands_when_hit(w: &World, id: u64) -> bool {
+    crate::senses::facts(w, id)
+        .and_then(|f| Some((f, f.species()?)))
+        .is_some_and(|(f, s)| !s.hunts() && f.young == 0 && f.tamed == 0 && f.mass >= animals_core::roles::STANDS_KG)
 }
 
 /// A player right clicks a wild animal with `held`: food it eats goes toward taming it. True if
@@ -361,6 +397,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
     crate::memory::fed(w, id, player);
     if t.asking == 0 {
         // Fed when it wasn't asking: it eats, warily.
+        weft_sdk::debug!("animal {id} fed by {player} unasked: a mistake");
         mistake(w, id, &st, w.random_below(3) == 0);
         return true;
     }
@@ -381,10 +418,20 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
         t.wait = wait;
     });
     hearts(w, st.pos.to_array(), 2);
+    weft_sdk::debug!(
+        "animal {id} fed by {player} as it asked{}: taming {:.0}%",
+        if wanted { " (what it wanted)" } else { "" },
+        (t.progress + gain).min(1.0) * 100.0
+    );
     if t.progress + gain >= 1.0 {
         tame(w, id, player, t.effectiveness);
     }
     true
+}
+
+/// Asking for food now (`behave`): the time to feed it.
+pub fn asking(w: &World, id: u64) -> bool {
+    w.component(id, &TAMING).is_some_and(|t| t.asking > 0)
 }
 
 /// A mistake: effectiveness down, and maybe it runs off.
