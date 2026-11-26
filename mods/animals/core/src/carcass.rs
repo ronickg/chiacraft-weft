@@ -169,7 +169,7 @@ mod tests {
         assert_eq!(by_eaten(25.0, 70.0), Look::Opened);
         assert_eq!(by_eaten(30.0, 70.0), Look::Bones);
         assert_eq!(by_eaten(42.0, 70.0), Look::Pile);
-        assert!(OPENED < BONES && BONES < PILE && PILE <= 1.0);
+        const { assert!(OPENED < BONES && BONES < PILE && PILE <= 1.0) };
     }
 
     #[test]
@@ -206,6 +206,6 @@ mod tests {
         assert!(vitals::food::find(ROTS_AS).is_some());
         assert!((scale(REF_KG) - 1.0).abs() < 1e-5);
         assert!(scale(2.5) < 0.4 && scale(500.0) > 1.8);
-        assert!(FROM_KG >= 1.0 && EDIBLE > crate::meat::YIELD);
+        const { assert!(FROM_KG >= 1.0 && EDIBLE > crate::meat::YIELD) };
     }
 }

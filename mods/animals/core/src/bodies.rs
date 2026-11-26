@@ -82,6 +82,7 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     // 1.7 blocks long, a pile of bones.
     ("carcass_bones", (1.1, 0.4)),
     ("carcass_pile", (0.9, 0.2)),
+    ("carcass_gore", (1.5, 0.1)),
     // A bird's cup nest (`source/nest/cup.py`), scaled up for bigger birds' eggs.
     ("nest_cup", (0.44, 0.17)),
 ];

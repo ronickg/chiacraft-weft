@@ -96,6 +96,9 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   (1804dc789): the client rolls whole/opened bodies onto their side (`SHOWN` synced, root bone turned and lifted),
   the camera stands out past the arm; shots 2, 4 (lying), 5 (ribcage), 6 (pile), 8 (kneel with knife), 9 (skinned
   ribcage) pass. r5's wolves wounded the deer but didn't kill it in the time (r4 did): a chance, not a regression.
-- Left for later: Opened looks like Whole until the art slice; the dead body shows the base coat, not its own; vultures
+- r6 (Planner on r5's shots): an opened body lies on a pool of blood and guts (`carcass_gore`, a second entity, until
+  the art slice draws the opened body); the skinning camera a three-quarter view from the right with the knife and
+  the body in frame; part 1's deer wounded to 30 % before the wolves come.
+- Left for later: the opened body itself (art slice); the dead body shows the base coat, not its own; vultures
   fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.

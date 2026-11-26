@@ -33,7 +33,12 @@ bones += [cube([-3, 2, 7], [6, 2, 3]),  # pelvis
 pile = [cube([-2, 0, -2], [4, 3, 4]),  # the skull
         cube([-6, 0, -5], [8, 1, 1]), cube([-4, 0, 3], [1, 1, 7]), cube([3, 0, -6], [1, 1, 8]),
         cube([-7, 1, 1], [9, 1, 1]), cube([0, 0, 4], [6, 1, 1]), cube([-5, 0, -1], [2, 1, 2])]
-for name, cubes, w, h in [("carcass_bones", bones, 2, 1), ("carcass_pile", pile, 1, 1)]:
+# Under an opened body: a pool of blood (6 px tiles side by side, none overlapping, so no top fights another) and the
+# guts on it, wider than the body lying on it so it shows round it.
+gore = [cube([x, 0, z], [6, 1, 6], FLESH) for x in (-12, -6, 0, 6) for z in (-12, -6, 0, 6)
+        if (x, z) not in [(-12, -12), (6, 6), (6, -12)]]
+gore += [cube([-9, 1, 7], [3, 2, 3], FLESH), cube([8, 1, -3], [3, 2, 4], FLESH), cube([9, 1, 2], [2, 1, 3], FLESH)]
+for name, cubes, w, h in [("carcass_bones", bones, 2, 1), ("carcass_pile", pile, 1, 1), ("carcass_gore", gore, 2, 1)]:
     with open(os.path.join(ROOT, "models", f"{name}.geo.json"), "w") as f:
         json.dump(geo(name, cubes, w, h), f, indent=1)
 

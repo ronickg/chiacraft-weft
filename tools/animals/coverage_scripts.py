@@ -377,7 +377,10 @@ s = head("carcass", [
     "while skinning; anything floating, sunk, flickering or drawn wrong.",
 ])
 x = 0
-s += pad(x) + spawns(x, [("grey_wolf", 3, 8, -10), ("white_tailed_deer", 2, -6, 6)])
+# The deer first, wounded to 30 % (no one behind the blow, so they don't flee anyone), then the wolves: r5's healthy
+# deer took 8 hunts and lived; r4's died in one.
+s += pad(x) + spawns(x, [("white_tailed_deer", 2, -6, 6)]) + ["chat /animalprof wound 0.3"]
+s += spawns(x, [("grey_wolf", 3, 8, -10)])
 # Hungrier than the hunters runs (r3's wolves rested 100 s at 30 %, and the part ended before their kill).
 s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.15"]
 s += watch(x, 12) + carcass_rows(4) + shot(x, "cov_carcass_1_wolves", z_back=18, pitch=-40)

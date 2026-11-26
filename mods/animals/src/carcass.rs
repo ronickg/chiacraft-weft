@@ -27,6 +27,9 @@ use crate::species::SPECIES;
 pub static CARCASS: EntityKind = EntityKind::named("carcass_body");
 static BONES: EntityKind = EntityKind::named("carcass_bones");
 static PILE: EntityKind = EntityKind::named("carcass_pile");
+/// The blood and guts under an opened body: a second entity at its place (the animal's own model can't be painted per
+/// carcass), so "opened" reads apart from "whole" until the art slice draws the opened body itself.
+static GORE: EntityKind = EntityKind::named("carcass_gore");
 
 value! {
     #[derive(Default)]
@@ -153,18 +156,35 @@ pub fn init(r: &mut Registry) {
         .speed(0.0)
         .action("skin")
         .no_bob();
-    // Low beside the skinner's right shoulder, looking down at the body before them.
+    // Beside the skinner, three-quarters from the right, the body before them in view.
     r.camera(&SKIN_CAMERA)
         .shot(camera::Shot::new(&[abi::comp::camera::BODY, abi::comp::camera::HUD, abi::comp::camera::CLIP], |a| {
             let (yaw, eye) = (a.eye_yaw as f64, a.eye);
             let (f, right) = ([-yaw.sin(), -yaw.cos()], [yaw.cos(), -yaw.sin()]);
-            // Out past the arm (r4's, 1.1 blocks out, sat inside it), a little above the eyes.
-            let pos = Vec3 { x: eye.x + right[0] * 1.9 - f[0] * 1.3, y: eye.y + 0.7, z: eye.z + right[1] * 1.9 - f[1] * 1.3 };
-            let at = Vec3 { x: eye.x + f[0] * 1.5, y: eye.y - 0.9, z: eye.z + f[1] * 1.5 };
+            // A three-quarter side view from the right, level with the body before them and looking between the
+            // skinner and it, so both the knife and the body are in frame (r4's, 1.1 blocks out, sat inside the
+            // arm; r5's, behind the shoulder, had the head filling the near side).
+            let pos = Vec3 { x: eye.x + right[0] * 2.6 + f[0] * 0.7, y: eye.y + 0.8, z: eye.z + right[1] * 2.6 + f[1] * 0.7 };
+            let at = Vec3 { x: eye.x + f[0] * 0.9, y: eye.y - 0.45, z: eye.z + f[1] * 0.9 };
             let (yaw, pitch) = camera::look_at(pos, at);
             a.out = abi::CameraPose { pos, yaw, pitch, ..abi::CameraPose::DEFAULT };
         }))
         .transition(0.6, camera::easing::IN_OUT);
+    let (gw, gh) = animals_core::bodies::of("carcass_gore");
+    r.entity(&GORE)
+        .no_egg()
+        .size(gw, gh)
+        .walk_speed(0.0)
+        .passive()
+        .unpushable()
+        .model_file("carcass_gore")
+        .texture("carcass/bones")
+        .on_interact(|e| {
+            let (w, id, player) = (e.world(), e.entity(), e.other());
+            let Some(at) = w.entity(id).map(|g| g.pos) else { return false };
+            let near = w.entities_near(at, 1.0, Some(&CARCASS));
+            near.first().is_some_and(|&c| start_skinning(&w, c, player))
+        });
     for (kind, model) in [(&BONES, "carcass_bones"), (&PILE, "carcass_pile")] {
         let (w, h) = animals_core::bodies::of(model);
         r.entity(kind)
@@ -308,6 +328,7 @@ fn show(w: &World, id: u64) {
     let Some(b) = w.component(id, &BODY) else { return };
     let Some(l) = look(&b) else {
         weft_sdk::info!("carcass {id} gone ({:.1} of {:.1} kg eaten, {:.1} days aged)", b.eaten, b.mass * core::EDIBLE, b.aged);
+        gore(w, id, &b, false);
         w.despawn(id);
         return;
     };
@@ -335,6 +356,7 @@ fn show(w: &World, id: u64) {
             w.action_stop(id);
         }
     }
+    gore(w, id, &b, l == Look::Opened);
     if let Some(v) = w.component_mut(id, &SHOWN) {
         *v = n;
     }
@@ -350,6 +372,31 @@ fn show(w: &World, id: u64) {
     if let Some(b) = w.component_mut(id, &BODY) {
         b.look = n;
     }
+}
+
+/// Lays the blood and guts under carcass `id` (`on`), at its size, or takes them up; one at most.
+fn gore(w: &World, id: u64, b: &Body, on: bool) {
+    let Some(e) = w.entity(id) else { return };
+    let near = w.entities_near(e.pos, 0.5, Some(&GORE));
+    if !on {
+        for g in near {
+            w.despawn(g);
+        }
+        return;
+    }
+    let g = match near.first() {
+        Some(&g) => g,
+        None => {
+            let g = w.spawn_with(&GORE, [e.pos.x, e.pos.y, e.pos.z], &Spawn::new().yaw(e.yaw));
+            if g == 0 {
+                return;
+            }
+            drop(w.entity_modify(g).persistent(true));
+            g
+        }
+    };
+    // Its scale isn't saved: set again whenever the carcass is shown afresh (after a load too).
+    w.set_scale(g, core::scale(b.mass));
 }
 
 /// A goal: it ages as its raw meat would at its spot's air (`vitals::rot::rate`), and looks again; a skinning goes on.
