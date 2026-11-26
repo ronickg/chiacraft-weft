@@ -410,15 +410,22 @@ for n, days in enumerate([3, 2, 4]):
     s += side_shot(x, f"cov_carcass_{4+n}_aged") + low_shot(x, f"cov_carcass_{4+n}_low")
 s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 4", "wait 2", "chat /animalprof carcass"]
 x = 600
-# On the grass south of the pond (r3's deer died in the pond's pit, below the knife's aim).
-s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
-s += ["chat /tk mode creative", f"chat /tp {x} 70 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
-      "chat /animalprof carcass", "chat /tk put me 0 base:knife 1", "key 1", "wait 1",
-      # Standing 2 blocks south of it, looking down at it (a positive pitch looks up).
-      # r7's deer died 2 blocks west of the aim line and the use hit the grass: face the body itself (`aim`).
-      f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "aim 6", "wait 1", "press core:use", "wait 4",
-      "shot cov_carcass_8_skinning.png", "wait 9", "chat /animalprof carcass"]
-s += side_shot(x, "cov_carcass_9_skinned") + low_shot(x, "cov_carcass_9_low")
+
+
+def skin_part(x, prefix="cov_carcass"):
+    """Part 4: a deer killed with one blow on the grass south of the pond (r3's died in the pond's pit, below the
+    knife's aim), skinned with a flint knife, shot mid-skin from the skinning camera and after."""
+    return pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)]) + [
+        "chat /tk mode creative", f"chat /tp {x} 70 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
+        "chat /animalprof carcass", "chat /tk put me 0 base:knife 1", "key 1", "wait 1",
+        # Standing 2 blocks south of it, looking down at it (a positive pitch looks up).
+        # r7's deer died 2 blocks west of the aim line and the use hit the grass: face the body itself (`aim`).
+        f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "aim 6", "wait 1", "press core:use", "wait 4",
+        f"shot {prefix}_8_skinning.png", "wait 9", "chat /animalprof carcass"] + \
+        side_shot(x, f"{prefix}_9_skinned") + low_shot(x, f"{prefix}_9_low")
+
+
+s += skin_part(x)
 x = 1000
 # Slice 3: one of each body plan killed in a row, drawn as its plan's lying model in its own coat (a grey wolf's grey,
 # not a deer's brown), whole, then opened by 3 days' rot. West to east: a grey wolf, a golden eagle, a raptor, a yacare
@@ -443,3 +450,12 @@ s += ["chat /tick unfreeze", "wait 1"]
 # Every shot without the HUD (Planner on r7: the chat log covered half of each frame): F1 off, shoot, F1 on.
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("carcass", s)
+
+# Part 4 alone, for the kneel and the skinning camera (Planner on r9: the kneeling player read as oversized boxes).
+s = head("carcass_skin", [
+    "Skinning alone (cov_carcass part 4): a white-tailed deer killed with one blow, skinned with a flint knife. Shot 8:",
+    "mid-skin from the skinning camera (the player kneeling beside the body, the knife, the body on its pool); 9: after.",
+    "Report the \"skins carcass\" and \"skinned carcass\" lines and the shots.",
+]) + skin_part(600, "cov_carcass_skin")
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("carcass_skin", s)

@@ -189,9 +189,11 @@ pub fn init(r: &mut Registry) {
             let (f, right) = ([-yaw.sin(), -yaw.cos()], [yaw.cos(), -yaw.sin()]);
             // A three-quarter side view from the right, level with the body before them and looking between the
             // skinner and it, so both the knife and the body are in frame (r4's, 1.1 blocks out, sat inside the
-            // arm; r5's, behind the shoulder, had the head filling the near side).
-            let pos = Vec3 { x: eye.x + right[0] * 2.6 + f[0] * 0.7, y: eye.y + 0.8, z: eye.z + right[1] * 2.6 + f[1] * 0.7 };
-            let at = Vec3 { x: eye.x + f[0] * 0.9, y: eye.y - 0.45, z: eye.z + f[1] * 0.9 };
+            // arm; r5's, behind the shoulder, had the head filling the near side). r9's, level with the skinner and
+            // above, showed the back of a tipped head bigger than the body: now out in front on the right and lower,
+            // the body nearer the camera than the skinner, who shows face and chest.
+            let pos = Vec3 { x: eye.x + right[0] * 2.4 + f[0] * 2.2, y: eye.y + 0.45, z: eye.z + right[1] * 2.4 + f[1] * 2.2 };
+            let at = Vec3 { x: eye.x + f[0] * 1.0, y: eye.y - 0.5, z: eye.z + f[1] * 1.0 };
             let (yaw, pitch) = camera::look_at(pos, at);
             a.out = abi::CameraPose { pos, yaw, pitch, ..abi::CameraPose::DEFAULT };
         }))
