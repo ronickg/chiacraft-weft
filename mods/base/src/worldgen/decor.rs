@@ -307,10 +307,11 @@ pub(super) fn decorate(g: &mut Gen) {
 }
 
 /// Moss on the rock and wood over the ground in the woods and the wet (`vitals::wild::MOSS_NORTH`):
-/// on boulders, fallen trunks, logs and scree, most on their shaded north faces, then their tops.
+/// on boulders, fallen trunks, the foot of logs and scree, most on their shaded north faces, then
+/// their tops.
 /// Within the cube only (a face on the cube's edge looks no further).
 fn moss(g: &mut Gen, seed: u64, cols: &[Column; 256], [ox, oy, oz]: [i32; 3]) {
-    let holds = |b: u32| STONE.is(b) || COBBLESTONE.is(b) || MOSSY_COBBLESTONE.is(b) || LOGS.on_block(b);
+    let rock = |b: u32| STONE.is(b) || COBBLESTONE.is(b) || MOSSY_COBBLESTONE.is(b);
     for z in 0..16usize {
         for x in 0..16usize {
             let col = &cols[z * 16 + x];
@@ -328,6 +329,9 @@ fn moss(g: &mut Gen, seed: u64, cols: &[Column; 256], [ox, oy, oz]: [i32; 3]) {
                     continue;
                 }
                 let roll = unit(hash(seed ^ 0x3055, wx as i64, wy as i64, wz as i64)) as f32;
+                // Wood holds it near the ground only (a fallen trunk, a standing one's foot).
+                let low = wy <= col.height + wild::MOSS_TRUNK;
+                let holds = |b: u32| rock(b) || (low && LOGS.on_block(b));
                 // The face it lies on: the north face of what is south of it first, then the top of
                 // what is under it (not the ground's), then the east and west faces.
                 let side = if z < 15 && holds(g.get(x, y, z + 1)) && roll < wild::MOSS_NORTH {

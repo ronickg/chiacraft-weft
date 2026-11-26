@@ -1,7 +1,9 @@
 # Moss on rock and wood, slopes and scree (11-26, worldgen/decor.rs `moss`, vitals::wild::MOSS_*,
 # COARSE_SLOPE, SCREE). Seed 1, a fresh world (worldgen only shows in new chunks).
-# Five stops in the old-growth forest round the Bliss spot (-4232, -392), each: dropped to the
-# ground in creative, then a spectator 2 up looking south (yaw 180, +z) and down, so the north
+# Five stops in the old-growth forest round the Bliss spot (-4232, -392; the ground about y 86),
+# each: put at y 100 (under the canopy) in creative with flying off (`/tk edit_me … 0 0`: a
+# creative player came from the spectator step still flying, moss2), fallen to the ground (`where`
+# says the y; /tk top the column's top), then a spectator 2 up looking south (yaw 180, +z) and down, so the north
 # faces of boulders, fallen trunks and logs face the camera; then a second shot looking north (yaw
 # 0) at their south faces for the contrast.
 # Expect: green moss plates on most north faces of boulders, mossy cobbles and fallen trunks
@@ -18,10 +20,13 @@ chat /weather clear 99999
 chat /time set 6000
 # Stop 1
 chat /tk mode creative
-chat /tp -4232 140 -392
-wait 4
+chat /tp -4232 100 -392
+wait 3
 loaded
-wait 4
+chat /tk edit_me 180 0 0 0
+wait 6
+chat /tk top -4232 -392
+where stop_-4232_-392
 chat /tk mode spectator
 chat /tp ~ ~2 ~
 chat /tick freeze
@@ -34,10 +39,13 @@ shot moss_1_south_faces.png
 chat /tick unfreeze
 # Stop 2
 chat /tk mode creative
-chat /tp -4192 140 -392
-wait 4
+chat /tp -4192 100 -392
+wait 3
 loaded
-wait 4
+chat /tk edit_me 180 0 0 0
+wait 6
+chat /tk top -4192 -392
+where stop_-4192_-392
 chat /tk mode spectator
 chat /tp ~ ~2 ~
 chat /tick freeze
@@ -50,10 +58,13 @@ shot moss_2_south_faces.png
 chat /tick unfreeze
 # Stop 3
 chat /tk mode creative
-chat /tp -4272 140 -392
-wait 4
+chat /tp -4272 100 -392
+wait 3
 loaded
-wait 4
+chat /tk edit_me 180 0 0 0
+wait 6
+chat /tk top -4272 -392
+where stop_-4272_-392
 chat /tk mode spectator
 chat /tp ~ ~2 ~
 chat /tick freeze
@@ -66,10 +77,13 @@ shot moss_3_south_faces.png
 chat /tick unfreeze
 # Stop 4
 chat /tk mode creative
-chat /tp -4232 140 -352
-wait 4
+chat /tp -4232 100 -352
+wait 3
 loaded
-wait 4
+chat /tk edit_me 180 0 0 0
+wait 6
+chat /tk top -4232 -352
+where stop_-4232_-352
 chat /tk mode spectator
 chat /tp ~ ~2 ~
 chat /tick freeze
@@ -82,10 +96,13 @@ shot moss_4_south_faces.png
 chat /tick unfreeze
 # Stop 5
 chat /tk mode creative
-chat /tp -4232 140 -432
-wait 4
+chat /tp -4232 100 -432
+wait 3
 loaded
-wait 4
+chat /tk edit_me 180 0 0 0
+wait 6
+chat /tk top -4232 -432
+where stop_-4232_-432
 chat /tk mode spectator
 chat /tp ~ ~2 ~
 chat /tick freeze
