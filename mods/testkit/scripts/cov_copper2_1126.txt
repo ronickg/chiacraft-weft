@@ -2,7 +2,8 @@
 # vitals::smelt). Seed 1, a fresh world.
 # Part 1, worldgen: a census of malachite ore and copper ore within 64 blocks in a desert spot
 # (-240 240, a dry land: malachite expected, some copper ore only deep) and a taiga spot (-96 -208,
-# cold: copper ore, no malachite).
+# cold: mostly copper ore; cov_copper3 found 728 copper ore and 68 malachite there, the cube
+# reaching a dry or beach land nearby). A block's menu reads as screen core:menu.
 # Part 2, the recipes: /tk craft replies for bellows, the three unfired moulds, and the cooking pot
 # (its clay cup must still make the pot, not a mould).
 # Part 3, the smelt, on a pad in the desert. Furnace A (2 ahead) with 6 raw copper:
@@ -92,7 +93,7 @@ chat /tk inv ~-1 ~ ~-2
 chat /tk get ~-1 ~ ~-2
 aim_block -1 0 -2 0.3
 hold core:use 0.2
-until screen base:mould within 5
+until screen core:menu within 5
 wait 1
 shot uc2_mould.png
 key Escape
