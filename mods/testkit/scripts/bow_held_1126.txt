@@ -14,7 +14,8 @@
 # of view); third person (bh_third,
 # bh_front) and the draw (bh_draw) unchanged. The engine now plays an item's own first-person
 # clip on its bones (it played the plain one): bh_shield and bh_shield_up, the shield held and
-# raised in first person by its own first-person clips, should look sensible.
+# raised in first person: held, its plain hold (bow_held6: its own first-person hold hid it
+# behind the forearm, so it went); raised, its own first-person clip, a guard held out front.
 # Read the shots and run.log for "no model" or texture errors. A fresh world name each run.
 loaded
 idle
