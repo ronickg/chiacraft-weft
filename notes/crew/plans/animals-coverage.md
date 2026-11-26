@@ -722,5 +722,9 @@ Ronald (11-25): wild hunters spare a tamed dog near its owner; wild or untamed d
 
 | part | expected | run |
 |---|---|---|
-| 1: tamed dog beside its owner, hungry wild cat 12 off | no "hunts" of the dog | (pending) |
-| 2: untamed dog, hungry wild cat | the cat may hunt it | (pending) |
+| 1: tamed dog beside its owner, hungry jaguar 12 off | no "hunts" of the dog | r1 (house cat): no hunt, the cat sat beside the dog 30 s; not telling (see part 2) |
+| 2: untamed dog, hungry jaguar | the jaguar hunts it | r1 (house cat): no hunt either: a house cat takes up to 0.4 x 4.5 kg = 1.8 kg, the dog is 2.5 kg; r2 with a jaguar |
+
+Run 1 (323f7ea32, `cov_dogs_r1-215301`, 196 s, script pass): with a house cat neither dog was hunted, so part 1
+proved nothing. The cat cannot take a grown chihuahua (the r2 kill was a big cat's or a small dog's genes);
+round 2 uses a jaguar (prey 0.01 to 1.5 of its mass), which hunted at noon in the hunters runs.
