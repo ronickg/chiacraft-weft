@@ -1045,33 +1045,35 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         if i >= 0 {
             pt_cache_add(u32(i), indirect);
         }
-        // Stage 3 (2), `core:pt_cache_fill` (flags bit 2): the surface the bounce met fills its own
-        // cell too, from one more ray of its own (SHaRC's idea: every vertex of a path updates the
-        // cache). Only surfaces the eye saw had cells: 58 % of the nave's bounce hits (the
-        // columns' backs, the walls above and behind) found none and fell back to their lightmap,
-        // so the light past one bounce, the lamps' with it, hardly reached the room (s3j: the
-        // picture with the cache unread came out as bright as with it). One pixel in 16 a frame:
-        // at one in four it cost the hall 2.8 ms of pt_trace and the torch cave 0.8 (s3l), where it
-        // took the cave from 14.5 % near black to 3 %; the cells keep a long history, so fewer
-        // samples suffice (SHaRC's update pass traces a few percent of the pixels). One in four at
-        // `core:pt_cache_fill` 2 (flags bit 3; the Max and Ultra presets).
-        let fill_mask = select(15u, 3u, (pt.flags & 8u) != 0u);
-        if b.hit && (pt.flags & 4u) != 0u && ((id.x + id.y * 3u + u32(scene.rt.y)) & fill_mask) == 0u {
-            let bn = b.n;
-            let blift = bn * 0.02;
-            let u2 = pt_noise(px + vec2(19.0, 29.0));
-            let d2 = pt_cosine(bn, u2);
-            let b2 = rt_hit(b.rel + blift, d2, 96.0, 2.0);
-            var in2 = vec3(0.0);
-            if b2.hit {
-                in2 = pt_lit(b2, l, pt_noise(px + vec2(41.0, 13.0)));
-            } else {
-                in2 = max(light_on(d2, vec4(1.0, 0.0, 0.0, 0.0), 0.0, 1.0, b.world, b.rel) - light_on(d2, vec4(0.0), 0.0, 1.0, b.world, b.rel), vec3(0.0));
-            }
-            let j = pt_cache_find(pt_cell(b.world, bn, length(b.rel), pt_noise(px + vec2(23.0, 31.0))), true);
-            if j >= 0 {
-                pt_cache_add(u32(j), in2);
-            }
+    }
+    // Stage 3 (2), `core:pt_cache_fill` (flags bit 2): the surface the bounce met fills its own
+    // cell too, from one more ray of its own (SHaRC's idea: every vertex of a path updates the
+    // cache). Only surfaces the eye saw had cells: 58 % of the nave's bounce hits (the columns'
+    // backs, the walls above and behind) found none and fell back to their lightmap, so the light
+    // past one bounce, the lamps' with it, hardly reached the room (s3j: the picture with the
+    // cache unread came out as bright as with it). With it the torch cave went from 15 % near
+    // black to 3 %, alike from one pixel in 4 or 16 (s3l, s3m).
+    // By whole 8 x 8 groups (this pass's workgroups), one in 16 a frame (one in 4 at
+    // `core:pt_cache_fill` 2, flags bit 3): scattered pixels, one or two in every warp, held each
+    // warp for their ray, so one in 16 cost the hall almost what one in 4 did (pt_trace +2.6 ms
+    // against +2.8, s3m).
+    let fill_mask = select(15u, 3u, (pt.flags & 8u) != 0u);
+    let tile = pt_hash((id.x >> 3u) ^ pt_hash((id.y >> 3u) ^ pt_hash(u32(scene.rt.y))));
+    if b.hit && (pt.flags & 4u) != 0u && (tile & fill_mask) == 0u {
+        let bn = b.n;
+        let blift = bn * 0.02;
+        let u2 = pt_noise(px + vec2(19.0, 29.0));
+        let d2 = pt_cosine(bn, u2);
+        let b2 = rt_hit(b.rel + blift, d2, 96.0, 2.0);
+        var in2 = vec3(0.0);
+        if b2.hit {
+            in2 = pt_lit(b2, l, pt_noise(px + vec2(41.0, 13.0)));
+        } else {
+            in2 = max(light_on(d2, vec4(1.0, 0.0, 0.0, 0.0), 0.0, 1.0, b.world, b.rel) - light_on(d2, vec4(0.0), 0.0, 1.0, b.world, b.rel), vec3(0.0));
+        }
+        let j = pt_cache_find(pt_cell(b.world, bn, length(b.rel), pt_noise(px + vec2(23.0, 31.0))), true);
+        if j >= 0 {
+            pt_cache_add(u32(j), in2);
         }
     }
     if pt.debug == 10u {
