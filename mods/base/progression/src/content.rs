@@ -227,7 +227,7 @@ pub const RULES: &[Rule] = &[
     n(&["base:coal_ore", "base:banded_clay_coal_ore"], 0, Shared, Ground, Not, "breaks into coal"),
     n(
         &["base:loose_copper"],
-        1,
+        0,
         Tech,
         Ground,
         Not,
@@ -449,8 +449,10 @@ pub const RULES: &[Rule] = &[
     r(&["base:coal", "base:coal_block"], 0, Shared, Material, Made),
     // Copper, tin and bronze (`metals.rs`): the Bronze Age's; steel the Iron Age's.
     r(&["base:raw_copper", "base:copper_ingot", "base:raw_tin", "base:tin_ingot", "base:bronze_ingot"], 1, Tech, Material, Made),
-    // native copper, the copper tier's first step (vitals::first::COPPER_LANDS): hammered cold
-    r(&["base:native_copper"], 1, Tech, Material, Made),
+    // native copper, the copper tier's first step (vitals::first::COPPER_LANDS): a Stone Age find,
+    // picked up by hand (the Old Copper Complex hammered it before any smelting); what's hammered
+    // from it is copper, the Bronze Age's (its parts by `MATERIALS`)
+    n(&["base:native_copper"], 0, Tech, Material, Made, "a find on the ground, hammered cold with a rock into copper heads"),
     // copper's smelt and casting (`vitals::smelt`): malachite, bellows, moulds
     r(&["base:malachite"], 1, Tech, Material, Made),
     r(&["base:unfired_mould_*"], 1, Tech, Material, Made),

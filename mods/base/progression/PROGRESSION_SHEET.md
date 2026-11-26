@@ -13,7 +13,7 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | each age's key by each declared route | passes |
 | path parity: each age's key by each route within ×1.15 of its cheapest, in EM | passes |
 | knowledge: each key's blueprint from its age's ruins, the first Stone ruin near spawn | passes |
-| each age's materials need the age before (its tools, stations or materials): no age skipped | **1 problems** |
+| each age's materials need the age before (its tools, stations or materials): no age skipped | passes |
 | every tool-part material tagged, made from its tier or below | passes |
 | each age's making inside its budget | passes |
 | every size and role inside its bands, floors hold | passes |
@@ -26,18 +26,14 @@ Written from `mods/base/progression` (`cargo run -p progression --bin sheet > mo
 | saddles lift tames by their fitting, as the tame model does, tooltip in step | passes |
 | loot per hour: kill drops priced from their cheapest kill, no kill paying over its time (+30 %, +50 % more for what fights back) | passes |
 
-**each age's materials need the age before (its tools, stations or materials): no age skipped:**
-
-- base:native_copper (tier 1) skips the age before: its cheapest way has nothing of tier 0
-
 ## The ages
 
 Power grows ×1.6 an age: `g(L) = 1.6^(L/10)` over area and item level L (tier × 10 + a depth of 0-9). The currency is effort minutes (EM). The reference player is same-age gear at grade 4, measured at the age's middle (depth 5). The kit is what an average player makes in the age the first time (`graph::KITS`), gathered and crafted the cheapest way, against its budget: 40 % of the age's EM (`curve::MAKING_SHARE`). Everything once is one of every made thing tagged to the age, alternatives and all, each from scratch.
 
 | tier | age | hours | EM | g at start | reference: hit / health / armour | things tagged | made | kit EM | of budget | everything once |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 555 | 160 | 48 | 33 % | 217 EM |
-| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 62 | 44 | 150 | 52 % | 161 EM |
+| 0 | Stone Age | 6 | 360 | 1.00 | 7.6 / 25 / 32 | 557 | 161 | 48 | 33 % | 222 EM |
+| 1 | Bronze Age | 12 | 720 | 1.60 | 12.1 / 40 / 51 | 60 | 43 | 150 | 52 % | 156 EM |
 | 2 | Iron Age | 16 | 960 | 2.56 | 19.4 / 65 / 81 | 67 | 30 | 95 | 25 % | 312 EM |
 | 3 | Age of Steam | 18 | 1080 | 4.10 | 31.1 / 104 / 130 | 38 | 32 | 94 | 22 % | 328 EM |
 | 4 | Age of Lightning | 20 | 1200 | 6.55 | 49.7 / 166 / 207 | 0 | 0 | 0 | 0 % | 0 EM |
@@ -417,7 +413,6 @@ An age's key needs the age before's tools or stations (`graph::age_gates`): each
 | base:lava_bucket | Iron Age | base:bronze_ingot | Bronze Age | - |
 | base:malachite | Bronze Age | base:pickaxe | Stone Age | - |
 | base:meteoric_iron | Bronze Age | base:pickaxe | Stone Age | - |
-| base:native_copper | Bronze Age | - | - | **yes** |
 | base:raw_copper | Bronze Age | base:pickaxe | Stone Age | - |
 | base:raw_gold | Bronze Age | base:pickaxe | Stone Age | - |
 | base:raw_iron | Iron Age | base:bronze_ingot | Bronze Age | - |
@@ -450,11 +445,12 @@ An age's key needs its age's blueprint, found in its age's ruins on the ley line
 
 Every named item and block, by its tag (`content::RULES`). EM is the cheapest way to have one; "-" not had as an item.
 
-### Stone Age (555)
+### Stone Age (557)
 
-**tech** (46)
+**tech** (48)
 
-- material: gem_amber (2.0), gem_tektite (5.1)
+- ground: loose_copper (-)
+- material: gem_amber (2.0), gem_tektite (5.1), native_copper (5.0)
 - tool: arrow (0.13), axe (0.48), bow (0.48), glider (8.2), hoe (0.70), knife (0.40), pickaxe (0.48), shovel (0.48), spear (0.70), sword (0.70)
 - armour: boots (0.70), chestplate (0.70), helmet (0.70), leggings (0.70)
 - station: furnace (1.2)
@@ -499,6 +495,7 @@ Notes:
 - base:campfire: a laid campfire, lit
 - base:loose_rock, base:loose_flint, base:loose_tektite, base:fallen_branch, base:loose_bone: picked up as a rock, flint, tektite, sticks or a bone
 - base:coal_ore, base:banded_clay_coal_ore: breaks into coal
+- base:loose_copper: picked up as native copper, loose in the cold and dry lands (`vitals::first::COPPER_LANDS`)
 - animals:amber_ore: breaks into amber
 - animals:gateway, animals:termite_mound_upper: the Cretaceous gateway is built of amber blocks; a mound's top
 - portals:portal, packages:unknown: a linked world's door; a missing package's stand-in
@@ -513,6 +510,7 @@ Notes:
 - base:part_*: a part's material sets its real age (`MATERIALS`)
 - base:gem_tektite, base:gem_amber: cut gems: a boost in a tool's, weapon's or armour's socket
 - base:arrow: dropped by skeletons, or fletched from an arrowhead part, a stick and a feather (its head's material its age)
+- base:native_copper: a find on the ground, hammered cold with a rock into copper heads
 - base:furnace: the Stone Age key's infrastructure: what it makes is the Bronze Age's
 - base:cooking_pot, base:stew: a clay pot (Ronald, 11-07: "move them to fit")
 - animals:claw, animals:scute: a large animal's stagger breaks (animals_core::parts): a fight with a Utahraptor or an ankylosaur
@@ -522,12 +520,12 @@ Notes:
 - animals:warden_antler, animals:warden_bark: Drenkaun's part breaks and loot
 - animals:kibble: an egg, food, grain and fibre (no iron bucket; Ronald, 11-07: "move them to fit")
 
-### Bronze Age (62)
+### Bronze Age (60)
 
-**tech** (54)
+**tech** (52)
 
-- ground: copper_ore (-), gold_ore (-), granite_gold_ore (-), loose_copper (-), malachite_ore (-), meteorite (-), tin_ore (-)
-- material: bronze_ingot (7.4), copper_ingot (1.7), gold_block (29), gold_ingot (3.2), malachite (1.5), meteoric_iron (10), native_copper (5.0), raw_copper (1.5), raw_gold (3.0), raw_tin (5.0), tin_ingot (5.2), unfired_mould_felling_axe_head (0.35), unfired_mould_pick_head (0.45), unfired_mould_shovel_blade (0.45)
+- ground: copper_ore (-), gold_ore (-), granite_gold_ore (-), malachite_ore (-), meteorite (-), tin_ore (-)
+- material: bronze_ingot (7.4), copper_ingot (1.7), gold_block (29), gold_ingot (3.2), malachite (1.5), meteoric_iron (10), raw_copper (1.5), raw_gold (3.0), raw_tin (5.0), tin_ingot (5.2), unfired_mould_felling_axe_head (0.35), unfired_mould_pick_head (0.45), unfired_mould_shovel_blade (0.45)
 - armour: boots_scale (-), chestplate_scale (-), helmet_scale (-), leggings_scale (-)
 - station: bellows (8.4), crucible (2.2), mould_felling_axe_head (0.52), mould_pick_head (0.62), mould_shovel_blade (0.62)
 - building: blue_glazed_tiles (0.32), blue_stained_glass (0.47), bricks (0.27), bronze_plate (7.4), checker_tiles (0.19), copper_block (15), frosted_glass (0.42), glass (0.27), green_glazed_tiles (0.33), green_stained_glass (0.52), leaded_glass (2.2), limestone_tiles (0.20), polished_limestone (0.19), red_glazed_tiles (0.30), red_stained_glass (0.42), smoked_glass (0.65), stone (0.32), stone_bricks (0.33), verdigris_copper (-)
@@ -545,7 +543,6 @@ Notes:
 - part: animals:summit_stone (60), blueprint_ironwork (30)
 
 Notes:
-- base:loose_copper: picked up as native copper, loose in the cold and dry lands (`vitals::first::COPPER_LANDS`)
 - base:copper_ore, base:malachite_ore, base:tin_ore: breaks into raw copper, malachite or raw tin (a stone pickaxe): copper ore in cold land and deep, malachite in dry and beach land, tin on beaches and in mountains (`metals.rs`)
 - base:meteorite, base:gold_ore, base:granite_gold_ore: breaks into meteoric iron or raw gold (a stone pickaxe)
 - base:pallasite: a stony-iron meteorite's olivine, found where one fell
