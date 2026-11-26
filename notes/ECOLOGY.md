@@ -544,8 +544,17 @@ and cactus.**
     seasons stored; placeholder pictures until Chiacraft's art.
   - **The grass top** turned four ways at random (`grass_top.ctm`); tall grass's variant waits on
     a check of Weft's random CTM on plants.
-  - **Next:** trees grown from branches (the Animal models session's `branchy`), a bloom look,
-    moss, boulders and coarse ground by noise and slope.
+  - **Blooms:** seven trees bloom in their real season (`vitals::wild::BLOOMS`: dogwood, umbrella
+    thorn, mesquite, creosote, willow, golden ipê, wild cherry), their leaves swapped for a
+    `_bloom` look.
+  - **Moss on rock and wood** (11-26): in the woods and the wet, a moss carpet on the shaded
+    north faces of boulders, fallen trunks, logs and scree, fewer on their tops and the other
+    faces (`vitals::wild::MOSS_*`).
+  - **Slopes:** coarse dirt where the ground falls two blocks (`COARSE_SLOPE`), gravel from three
+    (as before), loose stones (scree) at the foot of a rise of three (`SCREE`); boulders by biome
+    (`BOULDERS`).
+  - **Next:** trees grown from branches are built (`TREE_STYLE` "branched") but the default stays
+    "simple" (Ronald, 11-05) until a look and a perf check; boulders gathered in clusters by noise.
 - **Looks:** a grazed tuft shows bitten down (`<plant>_grazed`), a ripe seed head its fruit or
   seed (`<plant>_ripe`).
 - **Grown plants rest:** a plant at its last age returns from its growth step before reading the
