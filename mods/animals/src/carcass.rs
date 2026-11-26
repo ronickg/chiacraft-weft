@@ -113,7 +113,9 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&BODY, Body::default(), component_flags::SAVE);
     r.entity_component(&SHOWN, 0u32, 0);
     r.entity_component(&COAT, [0u32; 2], component_flags::SAVE | component_flags::SYNC_WATCHERS);
-    let (bw, bh) = animals_core::bodies::of("carcass_bones");
+    // Its box the lying deer's (scaled with it, `set_scale`), so a click on the body hits it (r7's knife use landed on
+    // the grass beside one boxed as the ribcage).
+    let (bw, bh) = animals_core::bodies::of("carcass_quadruped");
     r.entity(&CARCASS)
         .no_egg()
         .size(bw, bh)
@@ -145,8 +147,10 @@ pub fn init(r: &mut Registry) {
         let Some(me) = w.entity(player) else { return Verdict::Abstain };
         let p = q.pos();
         let at = if q.state() != 0 { Vec3 { x: p.x as f64 + 0.5, y: p.y as f64 + 1.0, z: p.z as f64 + 0.5 } } else { me.pos };
+        // A block's breadth past the reach round the spot aimed at (r7's deer lay 2.5-3 blocks off it); the player
+        // still within reach of the body.
         let near = w
-            .entities_near(at, core::SKIN_REACH, Some(&CARCASS))
+            .entities_near(at, core::SKIN_REACH + 1.0, Some(&CARCASS))
             .into_iter()
             .filter(|&c| crate::dist2(w.entity(c).map_or(at, |e| e.pos), me.pos) <= core::SKIN_REACH * core::SKIN_REACH)
             .min_by(|&a, &b| {

@@ -263,6 +263,8 @@ wait 1
 chat /tp 600 70 552
 look 0 -40
 wait 1
+aim 6
+wait 1
 press core:use
 wait 4
 shot cov_carcass_8_skinning.png
@@ -333,8 +335,8 @@ chat /tp 1000 76 560
 look 0 -30
 wait 2
 shot cov_carcass_10_plans_whole.png
-chat /tp 994 72 554
-look 20 -30
+chat /tp 994 71.5 552.5
+look 38 -40
 wait 2
 shot cov_carcass_11_wolf_close.png
 chat /tick unfreeze
@@ -351,10 +353,26 @@ shot cov_carcass_12_plans_opened.png
 chat /tick unfreeze
 wait 1
 chat /tick freeze
-chat /tp 1000 68.9 557
-look 0 -4
+chat /tp 994 68.9 552.5
+look 39 -8
 wait 2
-shot cov_carcass_13_plans_low.png
+shot cov_carcass_13_low_wolf.png
+chat /tp 998 68.9 552.5
+look 39 -8
+wait 2
+shot cov_carcass_13_low_eagle.png
+chat /tp 1002 68.9 552.5
+look 39 -8
+wait 2
+shot cov_carcass_13_low_raptor.png
+chat /tp 1006 68.9 552.5
+look 39 -8
+wait 2
+shot cov_carcass_13_low_caiman.png
+chat /tp 1010 68.9 552.5
+look 39 -8
+wait 2
+shot cov_carcass_13_low_pacu.png
 chat /tick unfreeze
 wait 1
 quit

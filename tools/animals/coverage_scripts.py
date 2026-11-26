@@ -415,7 +415,8 @@ s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
 s += ["chat /tk mode creative", f"chat /tp {x} 70 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
       "chat /animalprof carcass", "chat /tk put me 0 base:knife 1", "key 1", "wait 1",
       # Standing 2 blocks south of it, looking down at it (a positive pitch looks up).
-      f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "press core:use", "wait 4",
+      # r7's deer died 2 blocks west of the aim line and the use hit the grass: face the body itself (`aim`).
+      f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "aim 6", "wait 1", "press core:use", "wait 4",
       "shot cov_carcass_8_skinning.png", "wait 9", "chat /animalprof carcass"]
 s += side_shot(x, "cov_carcass_9_skinned") + low_shot(x, "cov_carcass_9_low")
 x = 1000
@@ -428,11 +429,15 @@ for kind, dx in [("grey_wolf", -8), ("golden_eagle", -4), ("raptor", 0), ("yacar
           "chat /animalprof kill", "wait 1"]
 s += ["chat /tk mode spectator", "wait 2", "chat /animalprof carcass"]
 row_shot = ["chat /tick freeze", f"chat /tp {x} 76 {Z+16}", "look 0 -30", "wait 2"]
-s += row_shot + ["shot cov_carcass_10_plans_whole.png", "chat /tp " + f"{x-6} 72 {Z+10}", "look 20 -30", "wait 2",
+# The wolf close, from its south-east and above (r7's 11 had it at the frame's top edge behind the chat).
+s += row_shot + ["shot cov_carcass_10_plans_whole.png", f"chat /tp {x-6} 71.5 {Z+8.5}", "look 38 -40", "wait 2",
                  "shot cov_carcass_11_wolf_close.png", "chat /tick unfreeze", "wait 1"]
 s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 3", "wait 2", "chat /animalprof carcass"]
 s += row_shot + ["shot cov_carcass_12_plans_opened.png", "chat /tick unfreeze", "wait 1"]
-# The row at the ground, from the south: every plan's opened body on the grass, none sunk.
-s += ["chat /tick freeze", f"chat /tp {x} 68.9 {Z+13}", "look 0 -4", "wait 2", "shot cov_carcass_13_plans_low.png",
-      "chat /tick unfreeze", "wait 1"]
+# Each plan's opened body at the ground, close, from its south-east: on the grass, none sunk (r7's one shot of the row
+# from 7 blocks had them tiny behind the chat).
+s += ["chat /tick freeze"]
+for kind, dx in [("wolf", -8), ("eagle", -4), ("raptor", 0), ("caiman", 4), ("pacu", 8)]:
+    s += [f"chat /tp {x+dx+2} 68.9 {Z+8.5}", "look 39 -8", "wait 2", f"shot cov_carcass_13_low_{kind}.png"]
+s += ["chat /tick unfreeze", "wait 1"]
 write("carcass", s)
