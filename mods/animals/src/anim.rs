@@ -211,7 +211,12 @@ pub fn init(r: &mut Registry) {
     r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
-            if h.amount > 0.0 && w.component(h.entity, &HELD).is_some() && w.entity(h.entity).is_some_and(|e| e.health > h.amount) {
+            // Not at its own bleeding, hunger or cold (a wound's bleed hurts it every second).
+            if h.amount > 0.0
+                && !crate::comfort::bodily(h.cause)
+                && w.component(h.entity, &HELD).is_some()
+                && w.entity(h.entity).is_some_and(|e| e.health > h.amount)
+            {
                 act(&w, h.entity, Act::Flinch);
             }
         }

@@ -273,6 +273,8 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                 }
             }
             heal(w, id, secs);
+            // A wound bleeds (`blood.rs`).
+            crate::blood::tick(w, id, st, secs);
         }
         if slow {
             let (health, speed) = factors(w, id, &a);

@@ -24,7 +24,11 @@ static HEAT: DamageCause = DamageCause::named("base:heat");
 /// (`memory`). A parched deer hurt by its thirst at the pool's edge fled from it again and again
 /// and marked the pool as feared, and died 130 blocks off (ai1124_savanna6).
 pub fn bodily(cause: u32) -> bool {
-    cause == damage_cause::STARVE || cause == crate::drink::THIRST.id() || cause == FREEZE.id() || cause == HEAT.id()
+    cause == damage_cause::STARVE
+        || cause == crate::drink::THIRST.id()
+        || cause == FREEZE.id()
+        || cause == HEAT.id()
+        || cause == crate::blood::BLEED.id()
 }
 
 value! {

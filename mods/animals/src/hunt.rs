@@ -45,6 +45,8 @@ static SITE: Component<[f64; 3]> = Component::named("animal_site");
 /// The water a prowl last reached, `[x, z, until]`: not a leg's goal again until then
 /// (`needs::SITE_AGAIN_SECS`).
 static WATER_SEEN: Component<[f64; 3]> = Component::named("animal_water_seen");
+/// The blood trail it follows: when the last spot it went to fell (game tick; 0: none; `blood::trail`, not saved).
+static TRAIL: Component<u64> = Component::named("animal_trail");
 /// The prey it set off after and what that weighed then, `[id, kg as f32 bits]` (not saved): the
 /// dead can't be read at the kill, and its kind's grown mass fed hunters a young one's carcass as
 /// a grown one's (cov_hunters run 4: a 2.7 kg young capybara eaten as 50 kg).
@@ -73,6 +75,7 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&FOLLOW, [0u64; 2], 0);
     r.entity_component(&LAST, 0u64, 0);
     r.entity_component(&SITE, [0.0; 3], 0);
+    r.entity_component(&TRAIL, 0u64, 0);
     r.entity_component(&WATER_SEEN, [0.0; 3], 0);
     r.entity_component(&PREY_KG, [0u64; 2], 0);
     for s in &SPECIES {
@@ -86,6 +89,7 @@ pub fn init(r: &mut Registry) {
         r.edit(s.kind).attach(&FOLLOW);
         r.edit(s.kind).attach(&LAST);
         r.edit(s.kind).attach(&SITE);
+        r.edit(s.kind).attach(&TRAIL);
         r.edit(s.kind).attach(&WATER_SEEN);
     }
     // A kill feeds the hunter that made it and its pack near (`needs::KILL_SHARED`), the prey's
@@ -355,7 +359,25 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
             w.component_mut(id, &FOLLOW).map(|f| f[0] = 0);
             return false;
         }
-        // No prey in sight: it goes where kills were (`memory::haunt`), where prey come and die.
+        // No prey in sight: blood it smells it follows, spot by fresher spot (`blood::trail`), to a wounded animal it
+        // takes or to where one bled out. Walked as a prowl's leg, keeping the turn.
+        let own = mass(w, id).unwrap_or(s.bio.mass);
+        let after = w.component(id, &TRAIL).unwrap_or(0);
+        if let Some((spot, at)) = crate::blood::trail(w, id, st.pos, after, |b| mass(w, b).is_some_and(|kg| s.takes_at_most(own, kg))) {
+            if after == 0 {
+                weft_sdk::info!("{} {id} follows a blood trail from {:.0} {:.0}", s.name, spot[0], spot[2]);
+            }
+            w.component_mut(id, &TRAIL).map(|c| *c = at);
+            w.navigate(id, spot, 1.0);
+            w.component_mut(id, &PROWL)
+                .map(|p| *p = now + (animals_core::needs::PROWL_SECS * 20.0) as u64);
+            return true;
+        }
+        if after != 0 {
+            weft_sdk::info!("{} {id} loses the blood trail", s.name);
+            w.component_mut(id, &TRAIL).map(|c| *c = 0);
+        }
+        // Nor blood: it goes where kills were (`memory::haunt`), where prey come and die.
         // A site it has just been to and found nothing at it leaves for `needs::SITE_AGAIN_SECS`
         // (a wolf went between one and a prowl's leg 12 times in 150 s, ai1124_wolves1c).
         let site = crate::memory::haunt(w, st.pos.to_array()).filter(|site| {
