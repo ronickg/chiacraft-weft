@@ -38,6 +38,7 @@ chat /tk inv me
 until chat base:rock within 5
 # 2. Flakes: the rock struck on a flint nodule, three times.
 chat /tk set ~ ~ ~-1 base:loose_flint
+aim_block 0 0 -1 0.15
 chat /tk hand me base:rock
 wait 0.5
 hold core:use 0.3
@@ -57,6 +58,7 @@ chat /tk hand me base:rock
 wait 0.5
 hold core:sneak 2 nowait
 wait 0.3
+aim_block 0 0 -1 0.15 1.27
 hold core:use 0.3
 until screen base:knapping within 5
 wait 1
@@ -102,146 +104,182 @@ look 0 -60
 # 5. Fibre: 36 tufts of tall grass cut with the flake (50% each, 12.5% by hand).
 chat /tk hand me base:sharp_flake
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
 chat /tk set ~ ~ ~-1 base:tall_grass
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6

@@ -45,6 +45,7 @@
 //! respawn             # back from the death screen (the server ignores it while alive)
 //! aim 8               # face the nearest living creature within 8 blocks (its middle), if any
 //! aim_block 0 0 -1 0.05 # look at the block 1 north of the player's, its middle, 0.05 up it (a thin thing on the ground)
+//! aim_block 0 0 -1 0.1 1.27 # the same from a crouching eye (after `hold core:sneak .. nowait`)
 //! live cmd.txt 20     # runs each line later appended to cmd.txt as a step (results in cmd.txt.out),
 //!                     # until a `quit` line, a `stop` file beside it or 20 minutes with no new line
 //! reload_pack dir     # copies dir's .wgsl and pack.cfg into the shader pack in use (only a variant,
@@ -780,7 +781,7 @@ async fn run_lines(t: T, src: String) -> R {
             }
             "respawn" => t.c().respawn(),
             "aim" => aim(&t, num(0, 8.0)),
-            "aim_block" => aim_block(&t, [num(0, 0.0), num(1, 0.0), num(2, -1.0)], num(3, 0.5)),
+            "aim_block" => aim_block(&t, [num(0, 0.0), num(1, 0.0), num(2, -1.0)], num(3, 0.5), num(4, 1.62)),
             "live" => {
                 let (file, mins) = rest.split_once(' ').unwrap_or((rest, ""));
                 live(&t, file.trim(), mins.trim().parse().unwrap_or(20.0)).await?;
@@ -901,13 +902,14 @@ fn reload_pack(t: &T, dir: &str) -> Result<String, String> {
 /// has it, the client draws nothing".
 /// Faces the nearest living creature within `r` the client knows (more than 1 health at most:
 /// not items, arrows or graves), at its middle: a scripted fighter's aim.
-/// `aim_block <dx> <dy> <dz> [h]`: look at the middle of the block that far from the player's own
-/// (its x and z middle, `h` of the way up it), so a thin thing on the ground there (a fallen
-/// branch, a bone, 1-2 px tall) is hit wherever in its block the player stands; a fixed `look`
-/// pitch lands past it unless the player is centred.
-fn aim_block(t: &T, d: [f32; 3], h: f32) {
+/// `aim_block <dx> <dy> <dz> [h] [eye]`: look at the middle of the block that far from the
+/// player's own (its x and z middle, `h` of the way up it), so a thin thing on the ground there (a
+/// fallen branch, a bone, 1-2 px tall) is hit wherever in its block the player stands; a fixed
+/// `look` pitch lands past it unless the player is centred. `eye`: the eye's height, 1.62
+/// standing, 1.27 crouching (aim after the sneak has begun).
+fn aim_block(t: &T, d: [f32; 3], h: f32, eye_height: f32) {
     let me = t.state().pos;
-    let eye = me + weft_sdk::Vec3 { x: 0.0, y: 1.62, z: 0.0 };
+    let eye = me + weft_sdk::Vec3 { x: 0.0, y: eye_height as f64, z: 0.0 };
     let at = weft_sdk::Vec3 {
         x: me.x.floor() + d[0] as f64 + 0.5,
         y: me.y.floor() + d[1] as f64 + h as f64,

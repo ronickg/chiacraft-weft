@@ -114,85 +114,107 @@ wait 0.4
 hold core:attack 0.4
 wait 1
 look 0 -60
-# 5. Fibre: 20 tufts of tall grass cut with the splinter.
+# 5. Fibre: 20 sedges (the bone lands' fibre plant, hardy in the cold) cut with the splinter.
 chat /tk hand me base:bone_splinter
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
+chat /tk get ~ ~ ~-1
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk inv me
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
-chat /tk set ~ ~ ~-1 base:tall_grass
+chat /tk set ~ ~ ~-1 base:sedge
+aim_block 0 0 -1 0.4
 wait 0.3
 hold core:attack 0.3
 wait 0.6
