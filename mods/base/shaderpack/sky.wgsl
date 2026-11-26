@@ -1494,10 +1494,14 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                     // one alone, a rain's map stayed a dark blue-grey where Bliss's settles warm
                     // (lkmxE2d: the sun's share 0.016 under the deck, the map's air all the light).
                     let ground = bc_ground_sky(sun, moon, sky_k, select(clear / 9.0, mean, rain_amount() > 0.0));
+                    // The map's clouds and fog take its light source x 2 (deferred.fsh's suncol * 2.0);
+                    // the screen's take its stored copy / 80 (composite2: x 150 / 80 = x 1.875), which
+                    // `land_sun` is: so x 2 / 1.875 here.
+                    let map_sun = land_sun(sun, moon_k) * (2.0 / 1.875);
                     var cl: array<vec4<f32>, 9>;
                     for (var i = 0; i < 9; i++) {
                         if i == ATM_MEAN_SKIP { continue; }
-                        cl[i] = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), ground);
+                        cl[i] = bc_clouds(atm_mean_dir(i, sun), BC_SKY_FAR, vec2(0.5), map_sun, ground);
                     }
                     var amb = land_ambient(clear / 9.0);
                     var cloudy = vec3(0.0);
@@ -1506,7 +1510,7 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                         for (var i = 0; i < 9; i++) {
                             if i == ATM_MEAN_SKIP { continue; }
                             let dir = atm_mean_dir(i, sun);
-                            let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k), ground, amb, 1.0, false);
+                            let fog = fog_march(dir, 1024.0, 0.5, map_sun, ground, amb, 1.0, false);
                             cloudy += (wet[i] * cl[i].a + cl[i].rgb) * fog.a + fog.rgb;
                         }
                         amb = land_ambient(cloudy / 9.0);
@@ -1566,8 +1570,8 @@ fn fs_frame_look(in: CloudOut) -> @location(0) vec4<f32> {
                 for (var i = 0; i < 9; i++) {
                     if i == ATM_MEAN_SKIP { continue; }
                     let dir = atm_mean_dir(i, sun);
-                    let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k), bc_ground_sky(sun, moon, sky_k, mean));
-                    let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k), bc_ground_sky(sun, moon, sky_k, mean), land_ambient(mean), 1.0, false);
+                    let cl = bc_clouds(dir, BC_SKY_FAR, vec2(0.5), land_sun(sun, moon_k) * (2.0 / 1.875), bc_ground_sky(sun, moon, sky_k, mean));
+                    let fog = fog_march(dir, 1024.0, 0.5, land_sun(sun, moon_k) * (2.0 / 1.875), bc_ground_sky(sun, moon, sky_k, mean), land_ambient(mean), 1.0, false);
                     var sh = 0.0;
                     for (var k = 0; k < 4; k++) {
                         sh += bc_shadow(dir * (64.0 * pow(2.0, f32(k)))) / 4.0;
