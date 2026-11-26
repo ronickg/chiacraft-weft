@@ -1,0 +1,123 @@
+# The copper tier's first steps (11-26, notes/COPPER.md; vitals::first::COPPER_LANDS). Seed 1, a
+# fresh world.
+# Part 1, worldgen: a census of native copper (base:loose_copper) within 64 blocks at the plains
+# spawn (none expected: not a copper land) and in a taiga and a desert spot (taiga -96 -208 and desert -240 240,
+# from land_find on seed 1). Expect 0 at the spawn, about 1-4 at each of the others (a find:
+# `copper_lands_have_some` expects ~2 in a 64-block walk of open ground).
+# Part 2, by real actions in survival on a pad: a lump picked up, put down on the ground, a plain
+# strike with a rock (a knock: no flake, the lump stays), a sneaking strike opens the screen as
+# "Hammering Copper"; the pick head picked, one strike inside the outline (a dent: the lump stays,
+# the screen stays open), then the rest struck away: a copper pick head in the bag. Hafted from the
+# book with a stick and two string: a pickaxe with a copper head. Then raw copper given: the
+# copper_ore hint.
+# Read: the /tk census replies, every /tk inv me and /tk get reply, run.log lines "first: strike"
+# (copper true), "knapping: ... freed a copper pick_head", "first-clock: ... copper" and
+# "copper_tool", "died" (none), and the shots (uc_screen: the copper title and how-to line;
+# uc_hint_native, uc_hint_ore: the hints; uc_pick: the pick in hand).
+# Yaw 0 faces -z; a negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /tk mode spectator
+look 0 -60
+chat /tk census 64 base:loose_copper,base:loose_flint,base:loose_rock
+where spawn
+chat /tp -96 105 -208
+wait 2
+loaded
+idle
+chat /tk census 64 base:loose_copper,base:loose_flint,base:loose_rock
+where taiga
+shot uc_taiga.png
+chat /tp -240 86 240
+wait 2
+loaded
+idle
+chat /tk census 64 base:loose_copper,base:loose_flint,base:loose_rock
+where desert
+shot uc_desert.png
+# Part 2: a pad here in the desert.
+chat /tk mode creative
+chat /tk top -240 240
+chat /tp -240 67 240
+wait 1
+chat /tk fill ~-6 ~-2 ~-6 ~6 ~-1 ~6 base:stone
+chat /tk fill ~-6 ~ ~-6 ~6 ~5 ~6 core:air
+wait 1
+chat /tk mode survival
+until mode survival within 10
+wait 1
+# 1. A lump off the ground.
+chat /tk set ~ ~ ~-1 base:loose_copper
+aim_block 0 0 -1 0.05
+wait 0.5
+hold core:attack 0.5
+wait 1.5
+chat /tk inv me
+until chat base:native_copper within 5
+wait 2
+shot uc_hint_native.png
+# 2. Put down: the lump in hand, used on the ground in front.
+chat /tk hand me base:native_copper
+wait 0.5
+aim_block 0 -1 -1 1
+hold core:use 0.2
+wait 1.6
+chat /tk get ~ ~ ~-1
+# 3. A plain strike with a rock: a knock, the lump stays.
+chat /tk give base:rock
+chat /tk hand me base:rock
+wait 0.5
+aim_block 0 0 -1 0.05
+hold core:use 0.2
+wait 1.7
+chat /tk get ~ ~ ~-1
+# 4. Sneaking: the screen opens, hammering copper.
+hold core:sneak 2 nowait
+wait 0.6
+aim_block 0 -1 -1 1 1.45
+hold core:use 0.3
+until screen base:knapping within 5
+wait 1
+tap_once base:knapping text:Pick Head
+wait 0.5
+tap_once base:knapping class:knap_head
+wait 0.5
+shot uc_screen.png
+chat /tk get ~ ~ ~-1
+# The pick head has 13 squares to strike away; `tap` clicks at most 10 times, so twice.
+tap base:knapping class:knap_stone
+wait 0.5
+tap base:knapping class:knap_stone
+until screen none within 5
+chat /tk inv me
+until chat base:part_pick_head within 5
+# 5. Hafted: a stick and two string, the pick from the book.
+chat /tk give base:stick
+chat /tk give base:string 2
+wait 0.5
+press core:inventory
+until screen core:menu within 10
+wait 1
+tap_once core:menu icon:base:pickaxe
+wait 1
+shot uc_book_pick.png
+tap_once core:menu text:max (
+wait 1
+key Escape
+until screen none within 10
+chat /tk inv me
+until chat base:pickaxe within 5
+chat /tk hand me base:pickaxe
+wait 0.5
+shot uc_pick.png
+chat /inspect
+# 6. Raw copper with no furnace: its hint.
+chat /tk give base:raw_copper
+wait 2.5
+shot uc_hint_ore.png
+chat /firstclock
+wait 1
+expect alive
+quit
