@@ -1121,6 +1121,9 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 20u: { out = vec3(PT_RES_M / PT_RES_CAP); }
             // 21: the first fresh draw's tests (`PT_NEE_DBG`; half bright when its strength is 0).
             case 21u: { out = PT_NEE_DBG; }
+            // 22: the G-buffer's material: red F0 (times 10), green 1 - roughness, blue 1 where the
+            // reflection ray is traced (roughness squared under 0.5).
+            case 22u: { out = vec3(min(luma(f0) * 10.0, 1.0), 1.0 - rough_p, select(0.0, 1.0, rough_p * rough_p < 0.5)); }
             // 15: the traced block lights: green seen, red hidden; no light drawn: blue no list for
             // the cube, cyan none in reach, magenta no lights at all; black no block light.
             case 15u: {
