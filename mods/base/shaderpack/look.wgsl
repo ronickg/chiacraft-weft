@@ -70,7 +70,11 @@ fn rain_on_ground(c_in: vec3<f32>, n: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>,
             // there; where ours find nothing the sky stood in, and greying it (above) alone left the
             // pale slabs (lksp_wetfacesw). So the sky's share fades out below the horizon.
             let open = smoothstep(-0.2, 0.02, r.y);
-            c = mix(c, seen, f * gloss * open);
+            // And a face sees only its share of the sky ((1 + n.y) / 2: a wall half of it, the rest
+            // the land and the wall it stands in): the stone wall's side faces stayed the brightest
+            // thing on a rainy hillside at half the smoothness alone (lksp_wetfaces2w, Planner 11-26).
+            let view = clamp(0.5 + 0.5 * n.y, 0.0, 1.0);
+            c = mix(c, seen, f * gloss * open * view);
         }
         return c;
     }
