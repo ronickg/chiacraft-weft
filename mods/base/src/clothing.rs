@@ -242,7 +242,8 @@ pub fn register(r: &mut Registry) {
                 Some(rows) => {
                     let rows = with_needle(rows);
                     let rows: Vec<&str> = rows.iter().map(String::as_str).collect();
-                    r.shaped(&CRAFTING, &item, 1, &rows, &keys).wear('n', sewing);
+                    r.shaped(&CRAFTING, &item, 1, &rows, &keys)
+                        .wear('n', sewing);
                 }
                 None => {
                     let mut parts = vec![sewn_from(m.name); m.makes[piece] as usize];

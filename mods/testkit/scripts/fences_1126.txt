@@ -7,6 +7,9 @@
 #   each pen (radius 3) and round it (radius 12). Expect A: all 4 inside; B: fewer inside (they
 #   step out). The shot fp_pens shows the fences joined into a ring (rails between posts, no
 #   gaps) and the deer.
+# Part 3 (11-26 later): fences of other woods join each other and the oak: a line south from pen
+#   A's south-west corner of spruce, ipe, a birch gate and two sequoia; /tk prop north and south
+#   of the first two say true (joined). Shot fp_woods: each in its own planks, one joined line.
 # Part 2, the gate and the scarecrow by real actions in survival:
 #   - a gate placed by hand in a gap of pen A's south side: /tk prop facing south, open false
 #     (fp_gate_shut: across the fence line); used: open true (fp_gate_open: swung to one side);
@@ -30,10 +33,10 @@ chat /tk fill ~-14 ~-1 ~-20 ~14 ~-1 ~6 base:stone
 chat /tk fill ~-14 ~ ~-20 ~14 ~6 ~6 core:air
 wait 1
 # Pen A: fences, a ring round ~-8 ~ ~-10.
-chat /tk fill ~-11 ~ ~-13 ~-5 ~ ~-13 base:fence
-chat /tk fill ~-11 ~ ~-7 ~-5 ~ ~-7 base:fence
-chat /tk fill ~-11 ~ ~-13 ~-11 ~ ~-7 base:fence
-chat /tk fill ~-5 ~ ~-13 ~-5 ~ ~-7 base:fence
+chat /tk fill ~-11 ~ ~-13 ~-5 ~ ~-13 base:oak_fence
+chat /tk fill ~-11 ~ ~-7 ~-5 ~ ~-7 base:oak_fence
+chat /tk fill ~-11 ~ ~-13 ~-11 ~ ~-7 base:oak_fence
+chat /tk fill ~-5 ~ ~-13 ~-5 ~ ~-7 base:oak_fence
 # Pen B: a cobblestone wall one high round ~8 ~ ~-10.
 chat /tk fill ~5 ~ ~-13 ~11 ~ ~-13 base:cobblestone
 chat /tk fill ~5 ~ ~-7 ~11 ~ ~-7 base:cobblestone
@@ -75,8 +78,8 @@ chat /tk mode survival
 until mode survival within 10
 chat /tp ~-8 ~ ~-4
 wait 1
-chat /tk give base:fence_gate
-chat /tk hand me base:fence_gate
+chat /tk give base:oak_fence_gate
+chat /tk hand me base:oak_fence_gate
 wait 0.5
 aim_block 0 -1 -3 1
 hold core:use 0.2
@@ -95,6 +98,23 @@ shot fp_gate_open.png
 hold core:use 0.2
 wait 1
 chat /tk prop ~ ~ ~-3 open
+# Part 3: fences of other woods. The player stands at the gate's south (start ~-8 ~ ~-4); pen A's
+# south-west corner is 3 west and 3 north. A line south from that corner, along x: spruce, ipe,
+# a birch gate (a set gate faces west, so it lies across this line), sequoia, sequoia.
+chat /tk mode creative
+chat /tk set ~-3 ~ ~-2 base:spruce_fence
+chat /tk set ~-3 ~ ~-1 base:ipe_fence
+chat /tk set ~-3 ~ ~ base:birch_fence_gate
+chat /tk set ~-3 ~ ~1 base:sequoia_fence
+chat /tk set ~-3 ~ ~2 base:sequoia_fence
+chat /tk prop ~-3 ~ ~-2 north
+chat /tk prop ~-3 ~ ~-1 south
+wait 1
+aim_block -3 0 0 0.3
+wait 1
+shot fp_woods.png
+chat /tk mode survival
+until mode survival within 10
 # The scarecrow, a torch in hand.
 chat /tp ~8 ~ ~
 wait 1

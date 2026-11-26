@@ -15,8 +15,24 @@
 use vitals::fences as fv;
 use weft_sdk::*;
 
-pub static FENCE: Block = Block::named("fence");
-pub static FENCE_GATE: Block = Block::named("fence_gate");
+/// The woods with planks (`blocks.rs`'s `planks_<wood>` tiles): a `<wood>_fence` and a
+/// `<wood>_fence_gate` each, of its own planks and drawn in them.
+pub const WOODS: [&str; 14] = [
+    "oak",
+    "birch",
+    "spruce",
+    "acacia",
+    "mesquite",
+    "acuri_palm",
+    "moriche_palm",
+    "brazil_nut",
+    "cacao",
+    "andiroba",
+    "matamata",
+    "ipe",
+    "cherry",
+    "sequoia",
+];
 pub static SCARECROW: Block = Block::named("scarecrow");
 static TORCH_ITEM: Item = Item::named("torch");
 
@@ -26,89 +42,10 @@ fn top() -> f32 {
 }
 
 pub fn register(r: &mut Registry) {
-    // A post and two rails toward each joined side.
-    r.block(&FENCE)
-        .sound_group("wood")
-        .texture("planks_oak")
-        .tag("fences")
-        .tag("fence_joins")
-        .joins(Facings::HORIZONTAL, "#fence_joins")
-        .states(|p, s| {
-            let mut s = s
-                .cutout()
-                .model_box([6.0, 0.0, 6.0], [10.0, 16.0, 10.0])
-                .hitbox([6.0, 0.0, 6.0], [10.0, top(), 10.0]);
-            for d in [Dir::North, Dir::South, Dir::East, Dir::West] {
-                if !p.is(d.name(), "true") {
-                    continue;
-                }
-                let o = d.offset();
-                // From the post's side out to the cell's edge on that side.
-                let span = |v: i32, lo: f32, hi: f32| {
-                    if v < 0 {
-                        (0.0, lo)
-                    } else if v > 0 {
-                        (hi, 16.0)
-                    } else {
-                        (7.0, 9.0)
-                    }
-                };
-                let (x0, x1) = span(o.x, 6.0, 10.0);
-                let (z0, z1) = span(o.z, 6.0, 10.0);
-                for (y0, y1) in [(6.0, 9.0), (12.0, 15.0)] {
-                    s = s.model_box([x0, y0, z0], [x1, y1, z1]);
-                }
-                let wide = |a: f32, b: f32| if (a, b) == (7.0, 9.0) { (6.0, 10.0) } else { (a, b) };
-                let ((hx0, hx1), (hz0, hz1)) = (wide(x0, x1), wide(z0, z1));
-                s = s.hitbox([hx0, 0.0, hz0], [hx1, top(), hz1]);
-            }
-            s
-        })
-        .needs_below("")
-        .hardness(2.0)
-        .mined_by("axe", tool_tier::HAND)
-        .tab(&crate::tabs::BUILDING);
-    r.shaped(&base_api::recipes::CRAFTING, "fence", fv::FENCES_MADE, &["psp", "psp"], &[('p', "#planks"), ('s', "#stick")]);
-
-    // Written facing north (across x); open, it swings against the west side and stops nothing.
-    r.block(&FENCE_GATE)
-        .sound_group("wood")
-        .texture("planks_oak")
-        .tag("fence_gates")
-        .tag("fence_joins")
-        .facing(Facings::HORIZONTAL, Toward::Player)
-        .prop("open", ["false", "true"])
-        .states(|p, s| {
-            let s = s.cutout();
-            if p.is("open", "true") {
-                s.not_solid()
-                    .model_box([0.0, 5.0, 0.0], [2.0, 16.0, 2.0])
-                    .model_box([0.0, 6.0, 2.0], [2.0, 9.0, 16.0])
-                    .model_box([0.0, 12.0, 2.0], [2.0, 15.0, 16.0])
-                    .model_box([0.0, 6.0, 14.0], [2.0, 15.0, 16.0])
-                    .hitbox([0.0, 0.0, 0.0], [2.0, 16.0, 16.0])
-                    // Not solid, so only outlined: the doorway too, so a use where it stood shuts it
-                    // (fences4: the second use looked through the open gate).
-                    .hitbox([0.0, 0.0, 6.0], [16.0, 16.0, 10.0])
-            } else {
-                s.model_box([0.0, 5.0, 7.0], [2.0, 16.0, 9.0])
-                    .model_box([14.0, 5.0, 7.0], [16.0, 16.0, 9.0])
-                    .model_box([2.0, 6.0, 7.0], [14.0, 9.0, 9.0])
-                    .model_box([2.0, 12.0, 7.0], [14.0, 15.0, 9.0])
-                    .model_box([7.0, 9.0, 7.0], [9.0, 12.0, 9.0])
-                    .hitbox([0.0, 0.0, 6.0], [16.0, top(), 10.0])
-            }
-        })
-        .needs_below("")
-        .hardness(2.0)
-        .mined_by("axe", tool_tier::HAND)
-        .on_use(|u| {
-            u.world().prop_cycle(u.pos(), "open");
-            crate::player_sounds::door(&u.world(), u.pos(), Some(u.face()));
-            true
-        })
-        .tab(&crate::tabs::BUILDING);
-    r.shaped(&base_api::recipes::CRAFTING, "fence_gate", 1, &["sps", "sps"], &[('p', "#planks"), ('s', "#stick")]);
+    for wood in WOODS {
+        fence(r, wood);
+        gate(r, wood);
+    }
 
     // A post, arms, a straw body and head; lit, a lantern hangs from its right arm.
     r.block(&SCARECROW)
@@ -165,4 +102,97 @@ pub fn register(r: &mut Registry) {
         .pool(Pool::new().item("scarecrow"))
         .pool(Pool::new().when(Cond::state("lit=true")).item("torch"));
     r.shaped(&base_api::recipes::CRAFTING, "scarecrow", 1, &[" f ", "sfs", " s "], &[('f', "plant_fibre"), ('s', "#stick")]);
+}
+
+/// A fence of `wood`: a post and two rails toward each joined side.
+fn fence(r: &mut Registry, wood: &str) {
+    let planks = format!("planks_{wood}");
+    r.block(Block::generated(format!("{wood}_fence")))
+        .sound_group("wood")
+        .texture(&planks)
+        .tag("fences")
+        .tag("fence_joins")
+        .joins(Facings::HORIZONTAL, "#fence_joins")
+        .states(|p, s| {
+            let mut s = s
+                .cutout()
+                .model_box([6.0, 0.0, 6.0], [10.0, 16.0, 10.0])
+                .hitbox([6.0, 0.0, 6.0], [10.0, top(), 10.0]);
+            for d in [Dir::North, Dir::South, Dir::East, Dir::West] {
+                if !p.is(d.name(), "true") {
+                    continue;
+                }
+                let o = d.offset();
+                // From the post's side out to the cell's edge on that side.
+                let span = |v: i32, lo: f32, hi: f32| {
+                    if v < 0 {
+                        (0.0, lo)
+                    } else if v > 0 {
+                        (hi, 16.0)
+                    } else {
+                        (7.0, 9.0)
+                    }
+                };
+                let (x0, x1) = span(o.x, 6.0, 10.0);
+                let (z0, z1) = span(o.z, 6.0, 10.0);
+                for (y0, y1) in [(6.0, 9.0), (12.0, 15.0)] {
+                    s = s.model_box([x0, y0, z0], [x1, y1, z1]);
+                }
+                let wide = |a: f32, b: f32| if (a, b) == (7.0, 9.0) { (6.0, 10.0) } else { (a, b) };
+                let ((hx0, hx1), (hz0, hz1)) = (wide(x0, x1), wide(z0, z1));
+                s = s.hitbox([hx0, 0.0, hz0], [hx1, top(), hz1]);
+            }
+            s
+        })
+        .needs_below("")
+        .hardness(2.0)
+        .mined_by("axe", tool_tier::HAND)
+        .tab(&crate::tabs::BUILDING);
+    let of = format!("#planks/{wood}");
+    r.shaped(&base_api::recipes::CRAFTING, &format!("{wood}_fence"), fv::FENCES_MADE, &["psp", "psp"], &[('p', &of), ('s', "#stick")]);
+}
+
+/// A fence gate of `wood`.
+fn gate(r: &mut Registry, wood: &str) {
+    // Written facing north (across x); open, it swings against the west side and stops nothing.
+    let planks = format!("planks_{wood}");
+    r.block(Block::generated(format!("{wood}_fence_gate")))
+        .sound_group("wood")
+        .texture(&planks)
+        .tag("fence_gates")
+        .tag("fence_joins")
+        .facing(Facings::HORIZONTAL, Toward::Player)
+        .prop("open", ["false", "true"])
+        .states(|p, s| {
+            let s = s.cutout();
+            if p.is("open", "true") {
+                s.not_solid()
+                    .model_box([0.0, 5.0, 0.0], [2.0, 16.0, 2.0])
+                    .model_box([0.0, 6.0, 2.0], [2.0, 9.0, 16.0])
+                    .model_box([0.0, 12.0, 2.0], [2.0, 15.0, 16.0])
+                    .model_box([0.0, 6.0, 14.0], [2.0, 15.0, 16.0])
+                    .hitbox([0.0, 0.0, 0.0], [2.0, 16.0, 16.0])
+                    // Not solid, so only outlined: the doorway too, so a use where it stood shuts it
+                    // (fences4: the second use looked through the open gate).
+                    .hitbox([0.0, 0.0, 6.0], [16.0, 16.0, 10.0])
+            } else {
+                s.model_box([0.0, 5.0, 7.0], [2.0, 16.0, 9.0])
+                    .model_box([14.0, 5.0, 7.0], [16.0, 16.0, 9.0])
+                    .model_box([2.0, 6.0, 7.0], [14.0, 9.0, 9.0])
+                    .model_box([2.0, 12.0, 7.0], [14.0, 15.0, 9.0])
+                    .model_box([7.0, 9.0, 7.0], [9.0, 12.0, 9.0])
+                    .hitbox([0.0, 0.0, 6.0], [16.0, top(), 10.0])
+            }
+        })
+        .needs_below("")
+        .hardness(2.0)
+        .mined_by("axe", tool_tier::HAND)
+        .on_use(|u| {
+            u.world().prop_cycle(u.pos(), "open");
+            crate::player_sounds::door(&u.world(), u.pos(), Some(u.face()));
+            true
+        })
+        .tab(&crate::tabs::BUILDING);
+    let of = format!("#planks/{wood}");
+    r.shaped(&base_api::recipes::CRAFTING, &format!("{wood}_fence_gate"), 1, &["sps", "sps"], &[('p', &of), ('s', "#stick")]);
 }
