@@ -508,7 +508,15 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         // Above 0 on every traced pixel: the denoisers read diffuse's a > 0 as "traced".
         diffuse_t = max(b.t, 1e-3);
     }
-    let indirect = select(sky_open, bounce, b.hit);
+    // A ray that gets out brings the sky's light from its own way (`light_on`'s tops 1, sides 0.75,
+    // bottoms 0.5 about the ray), not the face's: the face's tilt is already in which rays get out,
+    // and with the face's own share a wall counted it twice. NVIDIA's cathedral, out of the sun at
+    // 07:00, came out near black against the world's 0.75 (parity5, 11-25: facade 18 % against 37 %).
+    var sky_way = sky_open;
+    if !b.hit {
+        sky_way = max(light_on(bdir, vec4(1.0, 0.0, 0.0, 0.0), 0.0, 1.0, h.world, h.rel) - light_on(bdir, vec4(0.0), 0.0, 1.0, h.world, h.rel), vec3(0.0));
+    }
+    let indirect = select(sky_way, bounce, b.hit);
     var diffuse = lit - sky_part + indirect;
     // The block light, shadowed: its share of the world's light, as much of it as reaches the
     // surface (one light drawn among those near, one shadow ray; frames average it). The
