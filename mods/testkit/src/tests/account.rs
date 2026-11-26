@@ -30,6 +30,11 @@ pub async fn account(t: T) -> R {
     t.laid_out(&["text:Your key: worlds know you by it", "text:Copy Key", "text:Account and Words"]);
     let needs_backup = shown(&t, "aren't written down");
 
+    // The profile scrolls now: its account buttons are below the fold.
+    t.c().input_cursor(0.5, 0.5);
+    t.frames(1).await?;
+    t.c().input_scroll(-40.0);
+    t.frames(3).await?;
     t.click_until_screen("text:Account and Words", "core:account")
         .await?;
     t.frames(2).await?;
