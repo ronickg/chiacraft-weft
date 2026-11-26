@@ -71,6 +71,8 @@ const SOURCES: &[(&str, &str)] = &[
     ("mesquite", "#planks/mesquite"),
     ("stone", "#cobblestone"),
     ("bone", "bone"),
+    // A shed antler off the ground (`first::ANTLER`).
+    ("antler", "antler"),
     ("wrought_iron", "#ingots/iron"),
     ("meteoric_iron", "#meteoric_iron"),
     ("star_steel", "#ingots/star_steel"),

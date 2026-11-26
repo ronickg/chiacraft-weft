@@ -1694,8 +1694,14 @@ impl Models {
                 .name
                 .strip_suffix(".first_person")
                 .unwrap_or(&b.anim.name);
-            // Its own idle plays above, on its own clock.
-            let own = if name == "idle" { &[][..] } else { m.action(0, name) };
+            // Its own idle plays above, on its own clock. Its own clip for the first person when
+            // the holder's is one and it has it (a bow's `hold.first_person`), else the plain one.
+            let own = if name == "idle" {
+                &[][..]
+            } else {
+                let first = if name.len() < b.anim.name.len() { m.action(0, &b.anim.name) } else { &[][..] };
+                if first.is_empty() { m.action(0, name) } else { first }
+            };
             for &i in own {
                 let Some(own) = m.anims.get(i as usize) else { continue };
                 out.push(PlayClip { anim: i, t: c.t / b.anim.length * own.anim.length, w: c.w, mirror: off, ..PlayClip::default() });

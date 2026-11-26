@@ -151,7 +151,7 @@ All in the inventory's 2 × 2, so no table is needed before the first axe.
 |---|---|---|
 | Hands | flake, hafted stone tools | logs, planks, the workbench (the table), stone |
 | Stone and flint (100) | stone axe, pick, knife, shovel | trees to 96 logs, stone, the furnace |
-| Bone and antler (50) | bone knife and awl; an antler flaker (better knapping grades) | hides, sinew, sewing (Survival's clothes) |
+| Bone and antler (50) | bone knife and awl; an antler flaker (better knapping grades: built 11-26, shed antlers in the deer lands, `vitals::first::FLAKER_POINTS`) | hides, sinew, sewing (Survival's clothes) |
 | Fire and clay | the kiln, ground stone axe (tougher) | pottery, charcoal |
 | Copper (170, `vitals::gear::COPPER_HARVEST`) | native copper, cold-hammered (`notes/COPPER.md`) | young sequoias (192 logs) |
 | Bronze (200) | casting | |
