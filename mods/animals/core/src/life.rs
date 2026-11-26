@@ -54,7 +54,7 @@ pub const YOUNG_GROWN_MAX: f32 = 0.8;
 
 /// The share of grown females of a live-bearing species met by natural spawning in its breeding season that come with
 /// their litter, so that `YOUNG_SHARE` of all met are young: half of those met are female, each bringing `litter` young
-/// on average (`litter_mean`); a deer's litter of 1 or 2: 44 %; a wolf's of 4 to 6: 13 %.
+/// on average (`litter_mean`); a white-tailed deer's litter of 1-3: 33 %; a grey wolf's of 2-8: 13 %.
 pub fn mother_share(litter_mean: f32) -> f32 {
     (YOUNG_SHARE / (1.0 - YOUNG_SHARE) * 2.0 / litter_mean.max(0.5)).min(1.0)
 }

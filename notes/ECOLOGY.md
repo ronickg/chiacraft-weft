@@ -809,7 +809,7 @@ and cactus.**
   in her breeding season, a grown female of a live-bearing kind comes with her litter
   (`breeding::bring_young`): her genes and a father's from the place's pool, all born together up
   to 80% grown, around her and following her. How many mothers do so is set by the litter size
-  (`life::mother_share`: a deer's litter of 1-2, 44%; a wolf's of 4-6, 13%), so a quarter of the
+  (`life::mother_share`: a white-tailed deer's litter of 1-3, 33%; a grey wolf's of 2-8, 13%), so a quarter of the
   ones met in season are still young (`YOUNG_SHARE`). Spawned by a command, a share still come
   alone. Egg layers' young come from their nests. Check: `cov_births`.
 
