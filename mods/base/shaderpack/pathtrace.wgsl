@@ -394,7 +394,11 @@ const PT_NEE_R2_FLAME: f32 = 0.04;
 // Where the lamps' light matches the lightmap's (blocks off the light), and how much brighter it
 // may get nearer.
 const PT_NEE_AT: f32 = 5.0;
-const PT_NEE_HOT: f32 = 6.0;
+const PT_NEE_HOT: f32 = 3.0;
+// The most the lamps' light gives a surface, its brightest channel, its hue kept (the world's light
+// units: 1 a full lightmap). Past it the display's curve took red to 1 and green after it, and the
+// fire's orange went yellow-white on the pillar and wall (s2c fire18000).
+const PT_NEE_MAX: f32 = 1.5;
 // How far the normal map may change the lamps' light (a share either way): the cosine is the face's,
 // times 1 plus the map's difference to it, within this. (Its cosine itself, even 0.3 of its tilt,
 // mottled a wall the fire's light grazed: s2a and s2b fire18000.)
@@ -403,6 +407,11 @@ const PT_NEE_DETAIL: f32 = 0.2;
 // The falloff at `d2` (squared distance) from a light of size `r2` whose match lies `at` blocks off.
 fn pt_nee_falloff(d2: f32, r2: f32, at: f32) -> f32 {
     return min((at * at + r2) / (d2 + r2), PT_NEE_HOT);
+}
+
+// The lamps' light within `PT_NEE_MAX`, its hue kept.
+fn pt_nee_cap(c: vec3<f32>) -> vec3<f32> {
+    return c * min(1.0, PT_NEE_MAX / max(max(c.r, max(c.g, c.b)), 1e-4));
 }
 
 // The cosine for the lamps' light: the face's own, with the normal map's detail within
@@ -486,11 +495,16 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     let level = vec3(f32((l >> 18u) & 15u), f32((l >> 22u) & 15u), f32((l >> 26u) & 15u));
     let at = clamp(max(level.r, max(level.g, level.b)) - 1.0, 1.0, PT_NEE_AT);
     let up = vec3(0.0, 1.0, 0.0);
-    let one_off = max(light_on(up, vec4(0.0, max(level - at, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - light_on(up, vec4(0.0), 0.0, 1.0, world, rel), vec3(0.0));
+    // Its hue as the lightmap has it a block off, its brightness as there: matched `at` blocks off
+    // the colour itself drifted (a fire's green and blue run out first).
+    let dark = light_on(up, vec4(0.0), 0.0, 1.0, world, rel);
+    let near = max(light_on(up, vec4(0.0, max(level - 1.0, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - dark, vec3(0.0));
+    let far = max(light_on(up, vec4(0.0, max(level - at, vec3(0.0)) / 15.0), 0.0, 1.0, world, rel) - dark, vec3(0.0));
+    let one_off = near * (dot(far, vec3(0.2126, 0.7152, 0.0722)) / max(dot(near, vec3(0.2126, 0.7152, 0.0722)), 1e-4));
     // (RIS: what was chosen, over its estimate, times the candidates' mean weight.)
     let ris = w_sum / (f32(PT_LIGHT_CANDIDATES) * chosen_p);
     if all(lp == vec3<i32>(floor(world - ng * 0.5))) {
-        return vec4(one_off * chosen_s * PT_NEE_HOT * ris * pt.emissive, 1.0);
+        return vec4(pt_nee_cap(one_off * chosen_s * PT_NEE_HOT * ris * pt.emissive), 1.0);
     }
     // A point on the light, a new one each frame (as `pt_block_visibility`), and one shadow ray.
     let j = vec3(pt_rand(px, 40u).xy, pt_rand(px, 48u).x) * 2.0 - 1.0;
@@ -512,7 +526,7 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     }
     let r2 = select(PT_NEE_R2_BLOCK, PT_NEE_R2_FLAME, small);
     let f = one_off * chosen_s * cs * pt_nee_falloff(d2, r2, at);
-    return vec4(f * ris * pt.emissive, 1.0);
+    return vec4(pt_nee_cap(f * ris * pt.emissive), 1.0);
 }
 
 // ---- plain (`core:pt_plain`): vanilla's math, and only what tracing adds to it ----
