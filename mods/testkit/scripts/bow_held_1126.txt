@@ -9,8 +9,9 @@
 # bh_osage the second bow golden with its own icon in slot 3. Read the /gear replies too.
 # 11-26, later (Planner, pt_rain_8: in first person the bow showed edge-on, an orange zigzag, a
 # white bar and a dark red block): the bow has a root bone and its own first-person hold
-# (animation.bow.hold.first_person): bh_held and bh_osage should show it smaller, tilted across
-# the lower right with its curve and string in view, as vanilla's; third person (bh_third,
+# (animation.bow.hold.first_person): bh_held and bh_osage show it upright at the lower right, its
+# curve and string in view (a tilt waits for a tuning pass: bow_held5's blind 40° roll took it out
+# of view); third person (bh_third,
 # bh_front) and the draw (bh_draw) unchanged. The engine now plays an item's own first-person
 # clip on its bones (it played the plain one): bh_shield and bh_shield_up, the shield held and
 # raised in first person by its own first-person clips, should look sensible.
@@ -50,6 +51,7 @@ key 3
 wait 1
 shot bh_osage.png
 # The shield in first person: its own first-person clips (hold, use) now move its guard too.
+chat /tk give base:shield
 chat /tk hand me base:shield
 wait 1
 shot bh_shield.png
