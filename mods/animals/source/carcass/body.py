@@ -123,9 +123,14 @@ bird = bird_body + [b("wing", (-7, 14, -7), (11, 15.5, 14)), b("primaries", (-4,
 bird_open = bird_body + [
     b("cut", (-5, 13, -9), (5, 15, 9), MEAT),
     *ribs(-7, 8, -6, 6, 14.5, step=5, w=1.5),
-    b("feather_a", (12, 0, -22), (22, 1, -16)),
-    b("feather_b", (-20, 0.5, 4), (-12, 1.5, 9)),
-    b("feather_c", (14, 0.25, 18), (22, 1.25, 24)),
+    # A few loose feathers from the torn-off wing, each a narrow quill lying beside the body (Planner on the coats
+    # sheet: broad slabs read as loose wings).
+    b("feather_a1", (9, 0.25, -24), (11.5, 1, -15)),
+    b("feather_a2", (12, 0.5, -22), (14.5, 1.25, -13.5)),
+    b("feather_b1", (-13, 0.5, 0), (-10.5, 1.25, 9)),
+    b("feather_b2", (-16, 0.25, 3), (-13.5, 1, 11.5)),
+    b("feather_c1", (9, 0.4, 16), (11.5, 1.15, 25)),
+    b("feather_c2", (12, 0.25, 18.5), (14.5, 1, 26)),
 ]
 
 # ---- biped: a raptor on its side; tail to +z, legs out to +x.
@@ -183,8 +188,11 @@ fish_body = [
     b("rear", (-6, 1, 5.5), (6, 6, 14), under=(0, 2, 1)),
     b("stalk", (-3.5, 1.5, 13.5), (3.5, 5.5, 19)),
     b("tail_stem", (-4.5, 2.25, 18.5), (4.5, 4.25, 22)),
-    b("tail_top", (-11, 2.75, 21.5), (-2, 3.75, 30)),
-    b("tail_low", (2, 2.75, 21.5), (11, 3.75, 30)),
+    # The forked tail as a V from the stem (Planner on the coats sheet: two square plates read as loose fins).
+    b("tail_top", (-8, 2.75, 21), (-1.5, 3.75, 26.5)),
+    b("tail_top_tip", (-12, 3.25, 26), (-6, 4.25, 32)),
+    b("tail_low", (1.5, 2.75, 21), (8, 3.75, 26.5)),
+    b("tail_low_tip", (6, 3.25, 26), (12, 4.25, 32)),
     b("dorsal", (-13, 2, -8), (-7.5, 5, 4)),
     b("dorsal_back", (-10.5, 2.5, 3.5), (-5.5, 4.5, 9)),
     b("anal", (5.5, 2.5, 4), (10, 4, 10)),
