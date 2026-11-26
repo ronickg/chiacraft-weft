@@ -430,6 +430,16 @@ fn show(w: &World, id: u64) {
     let Some(b) = w.component(id, &BODY) else { return };
     let Some(l) = look(&b) else {
         weft_sdk::info!("carcass {id} gone ({:.1} of {:.1} kg eaten, {:.1} days aged)", b.eaten, b.mass * core::EDIBLE, b.aged);
+        // What's left of it rots into the ground: richer farmland, grass grown back round it (`vitals::soil::RICH_KG`).
+        if let Some(e) = w.entity(id) {
+            let at = e.pos.to_array().map(|v| v.floor() as i32);
+            let levels = vitals::soil::rotted_levels(b.mass - b.eaten);
+            let (fed, grown) = base_api::grow::enrich(w, at, levels, vitals::soil::RICH_REACH, levels > 0);
+            weft_sdk::info!(
+                "carcass {id} rots into the ground at {at:?}: {:.1} kg, {levels} levels to {fed} farmland, {grown} grass grown back",
+                b.mass - b.eaten
+            );
+        }
         gore(w, id, &b, false, 0);
         w.despawn(id);
         return;

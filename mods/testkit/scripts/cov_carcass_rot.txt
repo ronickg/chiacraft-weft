@@ -1,0 +1,73 @@
+# A body rots into the ground. Worn-out farmland (fertility 0) round where a white-tailed deer will lie, a strip of
+# grazed grass beside it, and a control plot of worn farmland 6 blocks off. `/growth` on the farmland first: "0 of 3".
+# The deer killed ("carcass N of white_tailed_deer"), then aged 60 days (`/animalprof carcass 60`): "carcass N gone
+# (...)" then "carcass N rots into the ground at ...: K kg, 3 levels to F farmland, G grass grown back" (F about 20,
+# G about 5; K its mass, 60-80 kg), and "no carcasses near". `/growth` on the farmland by it: "3 of 3"; on the
+# control plot: still "0 of 3". Shots: 1_before (the plot, the grazed strip short), 2_after (the strip tall grass).
+# (A dung pat rotting gives farmland beside it a level too, but pats take 16 minutes or more: not in this check.)
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 86 528 16 110 560 core:air
+chat /tk fill -16 111 528 16 140 560 core:air
+chat /tk fill -16 70 561 16 100 576 core:air
+chat /time set 6000
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /tk fill 5 69 542 9 69 545 base:farmland[worn=3]
+chat /tk fill 5 70 546 9 70 546 base:grazed_grass
+chat /tk fill 13 69 542 14 69 543 base:farmland[worn=3]
+chat /tp 6 70 543
+wait 0.5
+chat /growth
+chat /tick freeze
+chat /tp 7 78 552
+look 0 -45
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_rot_1_before.png
+press core:hide_hud
+chat /tick unfreeze
+chat /tk spawn animals:white_tailed_deer 7 70 544
+wait 0.2
+chat /tp 7 70 548
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /animalprof carcass
+chat /animalprof carcass 60
+wait 2
+chat /animalprof carcass
+chat /tp 6 70 543
+wait 0.5
+chat /growth
+chat /tp 13 70 542
+wait 0.5
+chat /growth
+chat /tick freeze
+chat /tp 7 78 552
+look 0 -45
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_carcass_rot_2_after.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+quit

@@ -8,6 +8,8 @@ use vitals::plants::{self, Plant};
 use weft_sdk::*;
 
 static FARMLAND: Block = Block::named("base:farmland");
+static GRAZED_GRASS: Block = Block::named("base:grazed_grass");
+static TALL_GRASS: Block = Block::named("base:tall_grass");
 
 /// What a growth step comes to.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -41,6 +43,33 @@ pub fn fertility(w: &World, pos: [i32; 3]) -> Option<u8> {
         .and_then(|v| v.parse::<u8>().ok())
         .unwrap_or(0);
     Some(vitals::soil::MAX.saturating_sub(worn))
+}
+
+/// Something rotting into the ground at `at` feeds it (`vitals::soil`, part 8): farmland within `reach` (and a block
+/// up or down) gets `levels` of its fertility back, and with `flush` grazed grass there grows back at once. The
+/// farmland and grass fed.
+pub fn enrich(w: &World, [x, y, z]: [i32; 3], levels: u8, reach: i32, flush: bool) -> (u32, u32) {
+    let (mut fed, mut grown) = (0, 0);
+    for dy in -2..=1 {
+        for dz in -reach..=reach {
+            for dx in -reach..=reach {
+                let p = [x + dx, y + dy, z + dz];
+                let state = w.block(p);
+                if levels > 0 && FARMLAND.is(state) {
+                    let Some(f) = fertility(w, p) else { continue };
+                    if f < vitals::soil::MAX {
+                        let worn = vitals::soil::MAX - (f + levels).min(vitals::soil::MAX);
+                        w.prop_set(p, "worn", &worn.to_string());
+                        fed += 1;
+                    }
+                } else if flush && GRAZED_GRASS.is(state) {
+                    w.set_block(p, TALL_GRASS.id());
+                    grown += 1;
+                }
+            }
+        }
+    }
+    (fed, grown)
 }
 
 /// A growth step of the plant `block` at `e`: whether it grows, with the chance of its rate there;
