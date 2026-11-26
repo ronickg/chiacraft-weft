@@ -192,7 +192,6 @@ pub fn init(r: &mut Registry) {
             _ => Verdict::Abstain,
         }
     });
-    r.stack_component(&PELT_QUALITY, 0);
     r.entity_component(&HITS, 0u32, 0);
     for s in &SPECIES {
         r.edit(s.kind).attach(&HITS);
@@ -643,7 +642,7 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     {
         let n = core::hide_count(lo, hi, quality);
         if n > 0 {
-            w.spawn_item(at, ItemStack::new(Item::generated(item.to_string()).id(), n).with(&PELT_QUALITY, quality as u32));
+            w.spawn_item(at, ItemStack::new(Item::generated(item.to_string()).id(), n).with(&base_api::HIDE_QUALITY, quality as u32));
             got.push(format!("{n} {item} (quality {quality})"));
         }
     }
@@ -680,9 +679,6 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     base_api::hint(w, player, &format!("hint.animals.pelt_{quality}"), &[]);
     show(w, id);
 }
-
-/// A hide's quality from skinning, 1 poor, 2 good, 3 perfect (`animals_core::carcass::quality`); none: an old one.
-pub static PELT_QUALITY: Component<u32> = Component::named("pelt_quality");
 
 /// Paints a body's coat from its genes (`GENES`) over the bodies' texture (`animals_core::coats::paint_dead`), at its
 /// species' usual size for its plan (the client has its genes, not its own mass).

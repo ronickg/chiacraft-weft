@@ -144,5 +144,10 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   `MOUTHFUL_MIN_KG`; a turkey vulture 40 g, a wolf a kilo), one a chew, so a 1.4 kg vulture feeds four mouthfuls to
   its 140 g meal; the fixed 0.5 kg bite filled it at once and took the rest off the body for nothing. Check:
   cov_carcass_vultures (part 2 alone, watched 4 minutes).
+- Hide quality (Planner 11-26, fourth of the four): the skinned stack carries `base:hide_quality` (base_api, was
+  `animals:pelt_quality`), kept through tanning (`crafts.rs`: leather of one quality stacks alone) and sewing
+  (`clothing.rs` `crafted`, the crafting grid and the book: a garment as good as its worst hide, an unknown one as
+  good); fur and leather clothes and cloaks warm by `vitals::clothing::HIDE_WARMTH` (poor 0.85, good 1, perfect
+  1.15) in `survival/temperature.rs`. The tooltip (`tagged.base.hide_quality`, en and ru) gives stars and the warmth.
 - Left for later: species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.

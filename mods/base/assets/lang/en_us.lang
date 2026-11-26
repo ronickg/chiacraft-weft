@@ -208,6 +208,7 @@ block.base.furnace.tooltip = Smelts ores and cooks food.
 tagged.base.nutrition = {value.units}0 g: {#e8907a}P{/} {value.protein} · {#d9945a}E{/} {value.energy} · {#d8b98a}F{/} {value.fat} · {#8fd16a}G{/} {value.greens} · {#7ac4f0}W{/} {value.water}
 tagged.base.freshness = {if:value==0}{#8fd16a}Fresh{/}{/if}{if:value==1}{#d8b98a}Stale: half as good{/}{/if}{if:value==2}{#e8907a}Spoiled: a quarter as good, and may make you sick{/}{/if}{if:value==3}{#e0905a}Hot from the fire: warms you{/}{/if}
 tagged.base.keeps = {#a8c8d8}Keeps {value.larder} days in a cool larder, {value.cold} on snow or ice; sooner in the heat{/}
+tagged.base.hide_quality = {#c6a383}{if:value==1}★☆☆ Poor hide: clothes of it 15 % less warm{/if}{if:value==2}★★☆ Good hide{/if}{if:value==3}★★★ Perfect hide: clothes of it 15 % warmer{/if}{/}
 command.base.rot = Store air {0} °C, food spoils ×{1} as fast as in a larder: {2}
 tagged.base.heals = {#e8907a}Stops bleeding{/} and heals {value}
 tagged.armor = {#5555ff}+{value.points} Armor{/}{if:value.toughness>0}\n{#5555ff}+{value.toughness} Armor Toughness{/}{/if}
