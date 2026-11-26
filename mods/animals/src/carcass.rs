@@ -332,10 +332,10 @@ fn rot(w: &World, id: u64, st: &EntityState) -> bool {
     true
 }
 
-/// `/animalprof carcass [days]`: every carcass within 64 blocks of `at` (aged `days` more first): a line each.
+/// `/animalprof carcass [days]`: every carcass within 128 blocks (a chase ends far off) of `at` (aged `days` more first): a line each.
 pub fn report(w: &World, at: Vec3, days: f32) -> String {
     let mut rows = Vec::new();
-    for id in w.entities_near(at, 64.0, Some(&CARCASS)) {
+    for id in w.entities_near(at, 128.0, Some(&CARCASS)) {
         if days > 0.0 {
             if let Some(b) = w.component_mut(id, &BODY) {
                 b.aged += days;

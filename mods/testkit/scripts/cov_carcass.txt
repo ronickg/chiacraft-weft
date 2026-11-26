@@ -1,11 +1,11 @@
 # Carcasses (slices 1 and 2). Part 1: three hungry grey wolves and two fed white-tailed deer: the kill leaves a carcass
 # ("carcass N of white_tailed_deer") that the pack's meal opens or takes to bones ("carcass N of ... now Opened/Bones").
-# Part 2: a red deer killed by the player (no drops now: "skinning only"; drawn as the deer lying dead) and two hungry
-# turkey vultures: "smells carrion", "animal N eats 0.50 kg off carcass M", its look stepping down. Part 3: a red deer
-# killed by the player, then aged by `/animalprof carcass <days>`: 3 days (opened), 5 (bones), 9 (a pile), 13 (gone).
-# Part 4: skinning: a red deer killed with one blow, the player with a (flint) knife uses its carcass: kneels, the camera
-# comes in beside them (shot 8 is taken mid-skin from the player's own camera), and after about 10 s "skinned carcass N
-# of red_deer: K base:hide (quality Q), M animals:venison" (Q at most 2 with flint), the hide and meat on the ground.
+# Part 2: a white-tailed deer killed by the player (no drops now: "skinning only"; drawn as the deer lying dead) and two hungry
+# turkey vultures: "smells carrion", "animal N eats 0.50 kg off carcass M", its look stepping down. Part 3: a white-tailed
+# deer (not a red deer: a Large animal's blow cap kept r1's alive) killed by the player, then aged by `/animalprof carcass <days>`: 3 days (opened), 5 (bones), 9 (a pile), 13 (gone).
+# Part 4: skinning: a white-tailed deer killed with one blow, the player with a (flint) knife uses its carcass: kneels, the camera
+# comes in beside them (shot 8 is taken mid-skin from the player's own camera), and after about 8 s "skinned carcass N
+# of white_tailed_deer: K base:hide (quality Q), M animals:venison" (Q at most 2 with flint), the hide and meat on the ground.
 # Report per part: the carcass, eats and skin lines, the `/animalprof carcass` rows, no hide or meat dropped at the kills,
 # and the shots: the dead animal lying at its place, the ribcage and the bone pile sized to it, the kneel and the camera
 # while skinning; anything floating, sunk, flickering or drawn wrong.
@@ -83,7 +83,7 @@ chat /time set 6000
 chat /tk fill 199 69 543 201 69 545 base:water
 chat /tk fill 199 70 543 201 70 545 core:air
 wait 1
-chat /tk spawn animals:red_deer 200 70 544
+chat /tk spawn animals:white_tailed_deer 200 70 544
 wait 2
 chat /tk mode creative
 chat /tp 200 71 548
@@ -145,7 +145,7 @@ chat /time set 6000
 chat /tk fill 399 69 543 401 69 545 base:water
 chat /tk fill 399 70 543 401 70 545 core:air
 wait 1
-chat /tk spawn animals:red_deer 400 70 544
+chat /tk spawn animals:white_tailed_deer 400 70 544
 wait 2
 chat /tk mode creative
 chat /tp 400 71 548
@@ -203,7 +203,7 @@ chat /time set 6000
 chat /tk fill 599 69 543 601 69 545 base:water
 chat /tk fill 599 70 543 601 70 545 core:air
 wait 1
-chat /tk spawn animals:red_deer 600 70 544
+chat /tk spawn animals:white_tailed_deer 600 70 544
 wait 2
 chat /tk mode creative
 chat /tp 600 70 547
