@@ -1,0 +1,57 @@
+# The game's catalogue as a public website (GitHub Pages): every item, block, plant, creature,
+# skill and recipe with its picture, built from the repository alone by tools/catalogue/build.py
+# --out (no game, no PC, no archive; the registry is the snapshot committed in
+# tools/catalogue/registry/). Only the game's own files are read: the mods, the engine's textures
+# and lang, and the box-model renderer; never reports/ or resource packs.
+#   - on every push to dev, and by hand: Actions > "catalogue site" > Run workflow.
+#   - Pages must be set to "GitHub Actions" once: Settings > Pages > Build and deployment > Source.
+name: catalogue site
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "mods/**"
+      - "crates/engine/assets/textures/**"
+      - "crates/engine/assets/lang/**"
+      - "tools/catalogue/**"
+      - ".claude/skills/blocky-model/scripts/**"
+      - ".github/workflows/catalogue.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: catalogue-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The whole history: each picture's "art changed" date is its files' last commit.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install numpy==2.1.3 pillow==11.0.0
+      - name: Build the catalogue
+        run: python3 tools/catalogue/build.py --rev HEAD --out site --strict
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

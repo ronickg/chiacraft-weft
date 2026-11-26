@@ -24,7 +24,7 @@ const AID_RANGE: f64 = 16.0;
 pub fn init(r: &mut Registry) {
     // Tamed raptors fight better together: a tenth more damage for each other tame raptor of
     // its species within 8 blocks, up to three.
-    r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
+    r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
         let (w, id) = (m.world(), m.query().entity);
         if !is_tame_raptor(&w, id) {
             return;
@@ -86,11 +86,11 @@ fn register(r: &mut Registry, kind: &'static EntityKind, index: usize, texture: 
                         .with(Need::Comfort, crate::comfort::seek)
                         .with(Need::Drink, crate::drink::drink)
                         .with(Need::Eat, crate::forage::eat)
-                        .with(Need::Wander, ai::wander(0.6, 9.0)),
+                        .with(Need::Wander, crate::group::or_follow(0.6, ai::wander(0.6, 9.0))),
                 ),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity, h.source);
+            crate::taming::hurt(w, h.entity, h.source, h.cause);
             crate::rest::stop(w, h.entity);
         });
 }

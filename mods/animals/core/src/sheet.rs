@@ -94,15 +94,15 @@ pub fn markdown() -> String {
     for n in STAT_NAMES {
         let _ = write!(w, " {n} |");
     }
-    let _ = writeln!(w, " hunger (s a point) |");
-    let _ = writeln!(w, "|---|{}---|", "---|".repeat(STATS));
+    let _ = writeln!(w, " hunger (s a point) | fasts (game days) |");
+    let _ = writeln!(w, "|---|{}---|---|", "---|".repeat(STATS));
     for s in &SPECIES {
         let _ = write!(w, "| {} |", name(s));
         for i in 0..STATS {
             let v = s.base_stat(i);
             let _ = if v >= 10.0 || v == v.round() { write!(w, " {v:.0} |") } else { write!(w, " {v:.1} |") };
         }
-        let _ = writeln!(w, " {} |", s.hunger);
+        let _ = writeln!(w, " {} | {} |", s.hunger, trim(needs::fasts(s) as f64, 1));
     }
     let _ = writeln!(w);
 
@@ -271,7 +271,7 @@ fn species(w: &mut String, s: &Species) {
     if b.gestation > 0.0 || s.gestation() > 0 {
         let _ = writeln!(w, "| carries her young | {} | {}{} |", real(b.gestation), days(s.gestation()), set(t.gestation.is_some()));
     } else if s.in_water() {
-        let _ = writeln!(w, "| spawns | | in the water when mated; the fry come by her after the eggs' time |");
+        let _ = writeln!(w, "| spawns | | {} after mating: roe on the bottom, developing in the water |", days(life::LAYING));
         let _ = writeln!(w, "| eggs hatch in | {} | {}{} |", real(b.incubation), days(s.incubation()), set(t.incubation.is_some()));
     } else {
         let _ = writeln!(w, "| lays | | {} after mating |", days(life::LAYING));
@@ -482,7 +482,16 @@ fn shared(w: &mut String) {
         "| a wild one arrives fed | {}% where its food grows least (or its prey are thinnest), all of it where most |",
         trim(needs::ARRIVES_FED as f64 * 100.0, 0)
     );
-    let _ = writeln!(w, "| starving, a wild one dies in | {} s on an empty stomach |", needs::STARVES_SECS);
+    let _ = writeln!(
+        w,
+        "| starving, a wild one dies in | {} · (mass / {} kg)^{} game days on an empty stomach, x{} cold-blooded, {} to {} (the stats' \"fasts\"; Lindstedt & Boyce 1985) |",
+        needs::FAST_DAYS,
+        needs::FAST_MASS,
+        needs::FAST_POWER,
+        needs::FAST_COLD_BLOODED,
+        needs::FAST_RANGE.0,
+        needs::FAST_RANGE.1
+    );
     let _ = writeln!(
         w,
         "| water needed a day | {} · kg^{} L (a mammal's), x{} cold-blooded; a species drinks its share of it (`DRINKS`) |",

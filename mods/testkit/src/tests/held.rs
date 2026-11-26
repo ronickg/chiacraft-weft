@@ -1,4 +1,4 @@
-//! Blocks standing in water (`.holds_liquid()`, Weft's waterlogging), with testmod's waterweed and
+//! Blocks standing in water (`.shares_cell_with("#water")`, Weft's waterlogging), with testmod's waterweed and
 //! sea slab: the water is a part of the cell beside the block (`/tk parts`), so "wet" is the block
 //! and a water source in one cell. Placing, breaking, buckets, pistons, swimming and how the water
 //! around them is drawn. The engine's own checks are its unit tests (`liquid.rs`).
@@ -182,8 +182,14 @@ pub async fn held_water_piston(t: T) -> R {
         t.set(add(f, [2, -1, z]), &lever(true)).await?;
     }
     t.secs(1.0).await?;
-    t.check_eq(parts(&t, add(f, [5, -1, -4])).await?, cell(&[SLAB, SOURCE]), "pushed into water, the slab stands in it");
-    t.check(t.block(add(f, [4, -1, -4])).await?.contains("piston_head"), "the head out");
+    // Weft's pistons break the liquid in a push's way (`signal.rs`, push_plan): the slab arrives
+    // alone or with the water flowing back in.
+    let pushed = parts(&t, add(f, [5, -1, -4])).await?;
+    t.check(pushed.contains(&SLAB.to_string()), format!("pushed into water, the slab is there: {pushed:?}"));
+    let head = parts(&t, add(f, [4, -1, -4])).await?;
+    // Out, the head is the piston's own block reaching into the next cell (base's pistons).
+    let out = |p: &String| p.contains("piston_head") || (p.contains("piston[") && p.contains("power=on"));
+    t.check(head.iter().any(out), format!("the head out: {head:?}"));
     let weed_gone = parts(&t, add(f, [5, -1, -8])).await?;
     t.check(!weed_gone.contains(&WEED.to_string()), format!("the weed broke, not moved: {weed_gone:?}"));
     for z in [-4, -8] {
@@ -194,7 +200,9 @@ pub async fn held_water_piston(t: T) -> R {
     // SYNC9 had it wet), so either is right.
     let back = parts(&t, add(f, [4, -1, -4])).await?;
     t.check(back == cell(&[SLAB]) || back == cell(&[SLAB, SOURCE]), format!("pulled back, the slab is there: {back:?}"));
-    t.check_eq(parts(&t, add(f, [5, -1, -4])).await?, cell(&[SOURCE]), "the water stayed where it stood");
+    // The push broke its source; the channel's water flows back in.
+    let left = parts(&t, add(f, [5, -1, -4])).await?;
+    t.check(left.len() == 1 && left[0].starts_with("base:water"), format!("water where the slab was: {left:?}"));
     t.check_eq(parts(&t, add(f, [5, -1, -8])).await?, cell(&[SOURCE]), "the weed's channel still full");
     let near = t.count_near("core:item", 12.0).await?;
     t.check(near >= 1, format!("the broken weed dropped: {near} items"));
@@ -239,16 +247,19 @@ pub async fn held_water_swim(t: T) -> R {
     t.hold("core:sprint", 4.0);
     t.hold("core:forward", 4.0);
     t.secs(0.5).await?;
-    let mut swum = 0;
-    for _ in 0..120 {
+    // 2.5 s inside the 4 s hold by the script clock, not 120 frames: on CI (software Vulkan) those
+    // outlast the hold.
+    let (end, mut frames, mut swum) = (crate::runner::script_clock() + std::time::Duration::from_secs_f32(2.5), 0, 0);
+    while crate::runner::script_clock() < end {
         t.frames(1).await?;
+        frames += 1;
         swum += t
             .c()
             .view()
             .player_state()
             .is_some_and(|m| m.pose == abi::pose::SWIM) as u32;
     }
-    t.check(swum > 20, format!("swam through the weed for {swum} frames"));
+    t.check(swum >= 3 && swum * 3 > frames, format!("swam through the weed for {swum} of {frames} frames"));
     t.secs(4.0).await?;
     let moved = (s.z - t.state().pos.z).abs();
     t.check(moved > 3.0, format!("got somewhere through it: {moved:.1} blocks"));
@@ -276,11 +287,13 @@ pub async fn held_water_mesh(t: T) -> R {
     t.c().set_look(0.0, -45.0);
     t.frames(30).await?;
     let above = t.shot("held_above").await?;
+    // One row in from the near edge: further out the weed's box sat under base's target-info
+    // tooltip at the top centre (Weft 9973eb6c9), all of it brown, 0.0000 on every run.
     let y = f[1] as f64 - 0.12;
     let (water, weed, slab) = (
-        around(&t, &above, [f[0] as f64 - 2.5, y, f[2] as f64 - 6.5], 0.02, probe::blue),
-        around(&t, &above, [f[0] as f64 + 0.5, y, f[2] as f64 - 6.5], 0.02, probe::blue),
-        around(&t, &above, [f[0] as f64 + 3.5, y, f[2] as f64 - 6.5], 0.02, probe::blue),
+        around(&t, &above, [f[0] as f64 - 2.5, y, f[2] as f64 - 4.5], 0.02, probe::blue),
+        around(&t, &above, [f[0] as f64 + 0.5, y, f[2] as f64 - 4.5], 0.02, probe::blue),
+        around(&t, &above, [f[0] as f64 + 3.5, y, f[2] as f64 - 4.5], 0.02, probe::blue),
     );
     t.probe("plain water drawn blue from above", water, water > 0.4);
     t.probe("over the weed too", weed, weed > 0.4);

@@ -1,0 +1,102 @@
+# Saddles lift tames (vitals::gear::saddle_lift), written by tools/progression/gen_saddle.py.
+# Read run.log: `saddle:` lines (the lift), `tame_fight:` lines (its hits), `entities` (its max health).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 6000
+chat /tk attr_mod me core:max_health testkit:hp core:add 200 0
+chat /tk mode spectator
+chat /tp 0.5 205 -0.5
+wait 2
+loaded
+chat /tk fill -6 195 -6 6 201 6 stone
+chat /tk fill -4 197 -4 4 199 4 core:air
+chat /tp 0.5 197 -2.5
+wait 1
+loaded
+chat /tk mode survival
+chat /tp 0.5 197 -2.5
+chat /tk heal
+chat /tk spawn animals:utahraptor 0 197 0
+wait 1
+look 0 -10
+aim 6
+chat /animal level 0
+chat /animal age 30
+chat /animal tame
+wait 1
+# ---- plain: a leather saddle on it
+chat /gear saddle utahraptor leather slot=0
+chat /tp 0.5 197 -2.5
+aim 6
+press core:use
+wait 3
+where plain_saddled
+entities 10
+shot saddle_plain_start.png
+# ---- plain: zombies hit its owner; it defends them
+chat /tk spawn base:zombie -3 197 3
+chat /tk spawn base:zombie 0 197 3
+chat /tk spawn base:zombie 3 197 3
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+entities 10
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+entities 10
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+entities 10
+shot saddle_plain_end.png
+chat /kill @e[type=base:zombie]
+wait 1
+# ---- bronze: a bronze saddle on it
+chat /gear saddle utahraptor bronze slot=0
+chat /tp 0.5 197 -2.5
+aim 6
+press core:use
+wait 3
+where bronze_saddled
+entities 10
+shot saddle_bronze_start.png
+# ---- bronze: zombies hit its owner; it defends them
+chat /tk spawn base:zombie -3 197 3
+chat /tk spawn base:zombie 0 197 3
+chat /tk spawn base:zombie 3 197 3
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+entities 10
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+entities 10
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+wait 5
+chat /tk heal
+chat /tp 0.5 197 -2.5
+entities 10
+shot saddle_bronze_end.png
+chat /kill @e[type=base:zombie]
+wait 1
+quit

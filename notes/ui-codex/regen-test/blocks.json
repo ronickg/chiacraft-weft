@@ -1,0 +1,62 @@
+[
+ {
+  "kind": "block",
+  "name": "b1_stone",
+  "type": "natural cube",
+  "cutout": false,
+  "what": "large sage-grey stone slabs (#3f4341, #616661, #81938a, #90a398, #a8bab1) with deep sage crevices, 6-9 slabs",
+  "no_ref": true
+ },
+ {
+  "kind": "block",
+  "name": "b2_stone",
+  "type": "natural cube",
+  "cutout": false,
+  "what": "large sage-grey stone slabs (#3f4341, #616661, #81938a, #90a398, #a8bab1) with deep sage crevices, 6-9 slabs"
+ },
+ {
+  "kind": "block",
+  "name": "b1_diamond_ore",
+  "type": "ore",
+  "cutout": false,
+  "what": "the same sage-grey slab stone as plain stone (#3f4341 to #a8bab1), with 2-3 faceted diamond crystals (#48aeba base, #468594/#3a5a62 teal shadow, #c6f9fb to white facet tips) in deep sockets of the stone's own dark shade, a near-white sparkle on each",
+  "no_ref": true
+ },
+ {
+  "kind": "block",
+  "name": "b2_diamond_ore",
+  "type": "ore",
+  "cutout": false,
+  "what": "the same sage-grey slab stone as plain stone (#3f4341 to #a8bab1), with 2-3 faceted diamond crystals (#48aeba base, #468594/#3a5a62 teal shadow, #c6f9fb to white facet tips) in deep sockets of the stone's own dark shade, a near-white sparkle on each"
+ },
+ {
+  "kind": "block",
+  "name": "b1_log_oak",
+  "type": "log side",
+  "cutout": false,
+  "what": "oak log bark (#2a2319, #362c1f, #443927, #5b4b33, #7e6643): vertical bark with deep grooves and ridges, tileable top to bottom",
+  "no_ref": true
+ },
+ {
+  "kind": "block",
+  "name": "b2_log_oak",
+  "type": "log side",
+  "cutout": false,
+  "what": "oak log bark (#2a2319, #362c1f, #443927, #5b4b33, #7e6643): vertical bark with deep grooves and ridges, tileable top to bottom"
+ },
+ {
+  "kind": "block",
+  "name": "b1_leaves_oak",
+  "type": "leaves",
+  "cutout": true,
+  "what": "oak leaves: overlapping rounded oak leaves 3-5 px long with transparent gaps covering 25-35% of the tile, tileable, drawn in light greyscale for biome tinting (the shading of #27380f to #74a72e turned grey)",
+  "no_ref": true
+ },
+ {
+  "kind": "block",
+  "name": "b2_leaves_oak",
+  "type": "leaves",
+  "cutout": true,
+  "what": "oak leaves: overlapping rounded oak leaves 3-5 px long with transparent gaps covering 25-35% of the tile, tileable, drawn in light greyscale for biome tinting (the shading of #27380f to #74a72e turned grey)"
+ }
+]

@@ -109,6 +109,33 @@ steps as the first groups). Kenney files are from Impact Sounds (CC0): `step/sno
 | `dig/leaves1` (at:2.6), `dig/leaves2` (at:3.3), `dig/leaves3` (at:5.4) | "Rustling leaves" ([freesound 437356](https://freesound.org/people/giddster/sounds/437356/)) | giddster | CC0 |
 | `step/leaves1` (at:1.2), `step/leaves2` (at:2.5), `step/leaves3` (at:4.0) | "Leaves_Rustling_Edited.wav" ([freesound 443065](https://freesound.org/people/AmberdeMeillon/sounds/443065/)) | AmberdeMeillon | CC0 |
 
+## The land, water and lava (`ambient/`)
+
+Added 2026-11-24 by the Sound worker for `ambience.rs`: Freesound HQ previews (the first 4 MB of each, fetched with `reports/sound-files/fetch_freesound.py`, which refuses any page whose licence isn't CC0 1.0), cut and levelled with `reports/sound-files/sfx.py` from `reports/sound-files/ambience.tsv`. Raw downloads: `~/Coding/chiacraft-archive/references/sound/freesound/`. Not yet listened to by a person: picked by loudness and steadiness.
+
+| files | source | author | licence |
+|---|---|---|---|
+| `ambient/birds1` (loop:73) | "Forest Day - Bird Chirps, Insects" ([freesound 788118](https://freesound.org/people/RealSquink/sounds/788118/)) | RealSquink | CC0 |
+| `ambient/dawn1` (loop:24) | "Henllys Woods 22-06-2026 Dawn Chorus" ([freesound 856634](https://freesound.org/people/Noisyjones/sounds/856634/)) | Noisyjones | CC0 |
+| `ambient/night1` (loop:80) | "Crickets At Night - Raw sound" ([freesound 522299](https://freesound.org/people/Defelozedd94/sounds/522299/)) | Defelozedd94 | CC0 |
+| `ambient/dry1` (loop:67) | "Wind blowing into some cactus spine ... Atacama (Chile)" ([freesound 156414](https://freesound.org/people/felix.blume/sounds/156414/)) | felix.blume | CC0 |
+| `ambient/swamp1` (loop:110) | "Frogs and geese in a swamp" ([freesound 633817](https://freesound.org/people/DBlover/sounds/633817/)) | DBlover | CC0 |
+| `ambient/surf1` (loop:33) | "Ocean waves crushing on the chilean shore." ([freesound 155641](https://freesound.org/people/felix.blume/sounds/155641/)) | felix.blume | CC0 |
+| `ambient/water_flow1` (loop:2) | "Creek 06 (loop)" ([freesound 231536](https://freesound.org/people/VKProduktion/sounds/231536/)) | VKProduktion | CC0 |
+| `ambient/water_still1` (loop:116) | "Gentle waves on a lake" ([freesound 614299](https://freesound.org/people/TheFlyFishingFilmmaker/sounds/614299/)) | TheFlyFishingFilmmaker | CC0 |
+| `ambient/lava1` (loop:13) | "Lava Loop 3" ([freesound 474851](https://freesound.org/people/Fission9/sounds/474851/)) | Fission9 | CC0 |
+| `ambient/call/lava_pop1-2` (hit:0-1) | "lava.wav" ([freesound 145036](https://freesound.org/people/ATG142/sounds/145036/)) | ATG142 | CC0 |
+| `ambient/call/drip1-3` (hit:0-2) | "Dripping water" ([freesound 234554](https://freesound.org/people/Electroviolence/sounds/234554/)) | Electroviolence | CC0 |
+| `ambient/call/raven1-2` (hit:0-1) | "Solitary raven cawing" ([freesound 723570](https://freesound.org/people/SoundsLikeYukon/sounds/723570/)) | SoundsLikeYukon | CC0 |
+| `ambient/call/owl1` (copy) | "Owl-4" ([freesound 871240](https://freesound.org/people/SyntaxSeed/sounds/871240/)) | SyntaxSeed | CC0 |
+| `ambient/call/owl2` (copy) | "Owl Hoot" ([freesound 465697](https://freesound.org/people/Breviceps/sounds/465697/)) | Breviceps | CC0 |
+| `ambient/call/gull1` (copy) | "Seagull single call" ([freesound 263786](https://freesound.org/people/steaq/sounds/263786/)) | steaq | CC0 |
+| `ambient/call/frog1-2` (hit:0-1) | "frog Croaks.wav" ([freesound 527846](https://freesound.org/people/D.jones/sounds/527846/)) | D.jones | CC0 |
+| `ambient/call/frog3` (hit:0) | "Croaking" ([freesound 397028](https://freesound.org/people/ceelum/sounds/397028/)) | ceelum | CC0 |
+| `ambient/call/bird1-2` (hit:0-1) | "Quiet Forest, Single Bird" ([freesound 730301](https://freesound.org/people/HECKFRICKER/sounds/730301/)) | HECKFRICKER | CC0 |
+| `ambient/call/bird3` (hit:0) | "Single Blackbird at Dawn" ([freesound 346853](https://freesound.org/people/Kinoton/sounds/346853/)) | Kinoton | CC0 |
+| `ambient/call/bird4` (hit:0) | "robin song" ([freesound 671058](https://freesound.org/people/Andrew.soundscape/sounds/671058/)) | Andrew.soundscape | CC0 |
+
 ## A falling tree (`tree/`)
 
 Made 2026-11-05 by the Tree felling session with `reports/sound-files/fall_sounds.py` (numpy and
@@ -119,3 +146,10 @@ ffmpeg), from nothing but synthesis and CC0 files already here:
 | `tree/creak1-2` | synthesized stick-slip creak through wood resonances; the crack at its end is Kenney's Impact Sounds `impactWood_light_001-002` | ours + CC0 |
 | `tree/fall1-2` | swept noise (synthesized) with base's own `dig/leaves1-3` (Kenney, Impact Sounds) scattered through | ours + CC0 |
 | `tree/thud1-2` | Kenney's Impact Sounds `impactWood_heavy_001-002` an octave down, a synthesized low thump, `dig/leaves1-3` | CC0 + ours |
+
+## Made here
+
+| files | how | licence |
+|---|---|---|
+| `random/ley_twitch.wav` (the dowsing rod's tick, `ley.rs`) | synthesised: bell-like partials over a short decay, `mods/base/source/sounds/ley_twitch.py` | CC0 |
+| `random/ley_wake.wav` (a waystone waking, `waystones.rs`) | synthesised: a low swell rising into a bell chime, `mods/base/source/sounds/ley_wake.py` | CC0 |

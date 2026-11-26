@@ -180,7 +180,8 @@ pub struct Band {
     /// second from all sources together (players, tames, fire, traps). Damage over the floor fills
     /// its stagger (knockdowns and part breaks), not its death.
     pub floor: Option<f32>,
-    /// Knockback resistance (1: none).
+    /// Knockback resistance: the share of a hit's knockback it shrugs off (0: all of it moves it,
+    /// 1: none; the engine's `core:knockback_resistance`).
     pub knockback: f32,
 }
 
@@ -365,6 +366,70 @@ pub fn fight(player: Player, size: Size, level: f32, them: Stats) -> Fight {
     Fight { ttk, raw, hits: p.health() / taken.max(1e-6), counted }
 }
 
+/// The share of a hit an over-tier weapon keeps against a creature of `size` at `level`: its item
+/// level counts at most the size's cap above the creature (grade and marks still multiply what's
+/// counted). 1 for small creatures and for gear within the cap.
+pub fn cap_share(size: Size, item_level: f32, level: f32) -> f32 {
+    match size.band().cap {
+        Some(cap) if item_level > level + cap => g(level + cap) / g(item_level),
+        _ => 1.0,
+    }
+}
+
+/// The rate floor as a bucket: a big creature may lose at most `floor_rate` a second, from
+/// everything together, with one second's worth held in hand (`FLOOR_HELD`, what a fresh one
+/// starts with). What it can take now out of `budget` (refilled over `secs` since the last hit),
+/// the budget left, and what spilled over (for stagger and part breaks).
+pub const FLOOR_HELD: f32 = 1.0;
+
+/// The most a creature of `size` and `max_health` loses a second: paced so that with the second
+/// held in hand a kill still takes the whole floor (PC floors run 3, 11-05: paced at
+/// `max_health / floor`, the held second let an iron sword kill a utahraptor in 9.2 s).
+pub fn floor_rate(size: Size, max_health: f32) -> Option<f32> {
+    size.band().floor.map(|f| max_health / (f + FLOOR_HELD))
+}
+
+pub fn floor_take(size: Size, max_health: f32, budget: f32, secs: f32, hit: f32) -> (f32, f32, f32) {
+    let Some(rate) = floor_rate(size, max_health) else { return (hit, budget, 0.0) };
+    let have = (budget + rate * secs.max(0.0)).min(rate * FLOOR_HELD);
+    let took = hit.min(have);
+    (took, have - took, hit - took)
+}
+
+// ------------------------------------------------------------------ stagger
+
+/// Stagger, for creatures with a rate floor (large, huge, titan; Ronald 11-22: option B, as the
+/// bosses have it): what spills over the floor plus this share of what it took. A same-age fight
+/// gathers this share of its health, so it breaks parts too (Planner's recommendation, taken).
+pub const STAGGER_SHARE: f32 = 0.5;
+/// Its breaks, at these shares of its max health in stagger: each drops one more of its own loot
+/// (Ronald 11-22: an extra of the animal's existing loot, no new items).
+pub const BREAKS: [f32; 2] = [0.2, 0.4];
+/// A knockdown each time this share of its max health more has gathered: it lies down
+/// `KNOCK_SECS`, and can't be knocked down again for `KNOCK_REST` after it stands (an over-tier
+/// player gathers stagger fast, and mustn't hold it down the whole fight).
+pub const KNOCK_AT: f32 = 0.25;
+pub const KNOCK_SECS: f32 = 3.0;
+pub const KNOCK_REST: f32 = 12.0;
+
+/// Whether a creature of `size` staggers: those with a rate floor.
+pub fn staggers(size: Size) -> bool {
+    size.band().floor.is_some()
+}
+
+/// The stagger a hit adds: what spilled over the floor, and `STAGGER_SHARE` of what it took.
+pub fn stagger_gain(took: f32, over: f32) -> f32 {
+    over + took * STAGGER_SHARE
+}
+
+/// Breaks reached at `stagger` on a creature of `max_health`, of `BREAKS`.
+pub fn breaks_at(stagger: f32, max_health: f32) -> usize {
+    BREAKS
+        .iter()
+        .filter(|&&b| stagger >= b * max_health)
+        .count()
+}
+
 /// A same-age reference player of `age` against a creature of `size` and `role` at `level`.
 pub fn reference_fight(age: Age, size: Size, role: Role, level: f32) -> Fight {
     fight(Player::of(age), size, level, derive(size, role, level))
@@ -413,6 +478,25 @@ mod tests {
             let f = fight(star, size, lv, derive(size, Role::Grazer, lv));
             assert!(f.ttk >= size.band().floor.unwrap(), "{size:?}: {f:?}");
         }
+    }
+
+    #[test]
+    fn the_floor_holds_whatever_the_hits() {
+        // A large creature of 100 health: a fresh one holds a second's worth, and from full it
+        // takes the whole 10 s floor to die however hard and often it is hit.
+        let rate = floor_rate(Size::Large, 100.0).unwrap();
+        let (mut budget, mut dealt, mut t) = (rate * FLOOR_HELD, 0.0, 0.0);
+        while dealt < 100.0 - 1e-3 {
+            let (took, left, over) = floor_take(Size::Large, 100.0, budget, 0.1, 50.0);
+            assert!((took + over - 50.0).abs() < 1e-4);
+            budget = left;
+            dealt += took;
+            t += 0.1;
+        }
+        assert!(t >= 10.0 - 0.1 - 1e-3, "{t}");
+        assert_eq!(floor_take(Size::Small, 5.0, 0.0, 0.0, 9.0), (9.0, 0.0, 0.0));
+        assert!((cap_share(Size::Large, 45.0, 5.0) - g(25.0) / g(45.0)).abs() < 1e-6);
+        assert_eq!(cap_share(Size::Small, 60.0, 0.0), 1.0);
     }
 
     #[test]

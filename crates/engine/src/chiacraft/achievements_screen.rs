@@ -47,7 +47,7 @@ impl Screen for Achievements {
                             None => label(ui, cx, "achievements.no_did", &[], "dim"),
                         };
                         let n = store.credentials.len() as i64;
-                        let form = super::plural(&cx.settings.language(), n);
+                        let form = super::plural(&crate::settings::language(), n);
                         let key = format!("achievements.count.{form}");
                         // A language without that form uses its `other`.
                         let key = if cx.lang.has(&key) { key } else { "achievements.count.other".into() };

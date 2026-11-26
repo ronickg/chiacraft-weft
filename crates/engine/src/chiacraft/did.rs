@@ -42,9 +42,9 @@ fn work(f: impl FnOnce() -> Result<(), String> + Send + 'static) {
 }
 
 /// The account's first wallet address on the chain's network, and its puzzle hash.
-fn first_address(settings: &crate::settings::Settings) -> Result<(String, [u8; 32]), String> {
+fn first_address() -> Result<(String, [u8; 32]), String> {
     let session = chiacraft_account::current().ok_or("no account is open")?;
-    let network = crate::chiacraft::chain::network(&settings.chain())?;
+    let network = crate::chiacraft::chain::network(&crate::settings::chain())?;
     let ph = session
         .first_puzzle_hash()
         .ok_or("the account has no wallet address")?;
@@ -56,9 +56,9 @@ pub fn get(settings: &crate::settings::Settings) {
     let settings = settings.clone();
     work(move || {
         let session = chiacraft_account::current().ok_or("no account is open")?;
-        let (address, owner) = first_address(&settings)?;
-        let network = crate::chiacraft::chain::network(&settings.chain())?;
-        let sponsors = settings.sponsors();
+        let (address, owner) = first_address()?;
+        let network = crate::chiacraft::chain::network(&crate::settings::chain())?;
+        let sponsors = crate::settings::sponsors();
         if sponsors.is_empty() {
             return Err("no DID sponsor is set (setting core:sponsors)".into());
         }

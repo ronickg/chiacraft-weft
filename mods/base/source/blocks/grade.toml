@@ -504,6 +504,14 @@ outline = 0.883
 base = "stone"
 overlay = "ore_gold_b"
 
+[tiles.copper_ore]  # metals (11-05): malachite and native copper on stone
+base = "stone"
+overlay = "ore_copper"
+
+[tiles.tin_ore]  # metals (11-05): cassiterite on stone
+base = "stone"
+overlay = "ore_tin"
+
 [items.tepary_beans]  # outline 0.60 -> 0.40 (new, Plants' batch 3: pale beans, the edge too light)
 outline = 0.67
 

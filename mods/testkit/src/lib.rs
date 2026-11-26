@@ -10,6 +10,8 @@
 //! With `TESTKIT_CI=1` (CI's software Vulkan) what `ci-skip.txt` names is left out, by name.
 //! Without those options the mod only registers its message channels.
 
+mod compare;
+mod generation;
 mod runner;
 mod script;
 mod server;
@@ -20,6 +22,9 @@ use std::sync::OnceLock;
 
 use weft_sdk::*;
 
+// Ours: no dependency on testmod (upstream's has one). testmod is loaded only for `--test` runs
+// (`play = false`, run-dir/test-mods), and a `--script` run must start without it: with the
+// dependency the loader turned testkit off and no script could run (Tester 2, 11-22).
 declare_mod!(deps: [], init: init);
 
 static PLAN: OnceLock<(Option<String>, Option<String>)> = OnceLock::new();
@@ -27,6 +32,15 @@ static PLAN: OnceLock<(Option<String>, Option<String>)> = OnceLock::new();
 fn init(r: &mut Registry) {
     server::register(r);
     r.key(&runner::PROBE, "F9");
+    // Compare mode (`compare.rs`): every control of a like-for-like look shot in one switch.
+    r.config(&compare::COMPARE_MODE).bool(false);
+    r.client_command("compare", "<state:word(on,off)> [overrides:text]", |cmd| {
+        let on = cmd.text("state") == Some("on");
+        let overrides = cmd.text("overrides").unwrap_or("").to_string();
+        let said = compare::apply(&cmd.client(), on, &overrides);
+        weft_sdk::info!("{said}");
+        cmd.reply("command.testkit.compare", &[Arg::Text(&said)]);
+    });
     // A branch of an engine command, handled by this mod (on the client, like /gizmo).
     r.client_command_branch("gizmo", "probe <n:int>", |cmd| {
         let n = cmd.int("n").unwrap_or(0);
@@ -105,21 +119,39 @@ pub(crate) fn same_conditions(c: &Client) {
     use weft_sdk::settings::*;
     // Tests look at what the hands hold, in the view.
     static FIRST_PERSON_MODEL: Config<bool> = Config::named("core:first_person_model");
+    static AUTO_JUMP: Config<bool> = Config::named("core:auto_jump");
+    // Base's hints (the first 20 s into a world) put a dark box under the crosshair: on CI tests
+    // run past 20 s and it counted as pieces, black ones and a changing picture.
+    static HINTS: Config<bool> = Config::named("base:hints");
     let scripted = PLAN.get().is_some_and(|p| p.1.is_some());
-    if FIRST_PERSON_MODEL.get() && !scripted {
-        FIRST_PERSON_MODEL.set(false);
+    if !scripted {
+        if HINTS.get() {
+            HINTS.set(false);
+        }
+        if FIRST_PERSON_MODEL.get() {
+            FIRST_PERSON_MODEL.set(false);
+        }
+        if AUTO_JUMP.get() {
+            AUTO_JUMP.set(false);
+        }
     }
-    // The player's packs would change every picture.
-    let packs = !RESOURCE_PACKS.get().is_empty() || !SHADER_PACK.get().is_empty();
+    // The player's packs would change every picture; a run playing a player's start
+    // (`--player-start`, base's) keeps what that start chose.
+    let first_start = launch_option("player-start").is_some();
+    let packs = !first_start && (!RESOURCE_PACKS.get().is_empty() || !SHADER_PACK.get().is_empty());
     LANGUAGE.set("en_us");
     GUI_SCALE.set(2);
     VIEW_DISTANCE.set(12);
+    CLOUD_DISTANCE.set(6144);
     FOV.set(70.0);
     BRIGHTNESS.set(0.5);
     VSYNC.set(true);
-    RESOURCE_PACKS.set("");
-    SHADER_PACK.set("");
+    if !first_start {
+        RESOURCE_PACKS.set("");
+        SHADER_PACK.set("");
+    }
     DEBUG_GROUPS.set(u32::MAX);
+    ADVANCED_TOOLTIPS.set(false);
     DEBUG_LINES.set("");
     if packs {
         c.reload_assets();

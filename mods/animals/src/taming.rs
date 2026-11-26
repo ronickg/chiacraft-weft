@@ -56,8 +56,8 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&TAMING, FRESH, component_flags::SAVE | component_flags::SYNC_MENU | component_flags::SYNC_WATCHERS);
     r.entity_component(&FROM, 0u64, 0);
     for s in &SPECIES {
-        r.attach(s.kind, &TAMING);
-        r.attach(s.kind, &FROM);
+        r.edit(s.kind).attach(&TAMING);
+        r.edit(s.kind).attach(&FROM);
     }
     // Kibble (`notes/ANIMALS.md`, "Kibble"): an egg, meat or a plant, wheat for fiber, and water;
     // every species takes it, and it tames fastest. Tiers by egg and cooking in a pot come with
@@ -93,6 +93,16 @@ pub fn init(r: &mut Registry) {
 /// The bubble particle of a food item (`base:cooked_beef`: `want_cooked_beef`).
 fn bubble(item: &str) -> String {
     format!("want_{}", item.split_once(':').map_or(item, |(_, n)| n))
+}
+
+/// Whether thirst or hunger presses `id` past `memory::DRIVEN` (as it goes onto feared ground):
+/// then a half-noticed player doesn't stop it; one it has noticed still sends it off.
+fn driven(w: &World, id: u64) -> bool {
+    use animals_core::needs;
+    w.component(id, &crate::animal::ANIMAL).is_some_and(|a| {
+        let fed = a.food as f32 / a.stat(crate::species::FOOD).max(1.0);
+        needs::thirst_score(1.0 - a.thirst, false).max(needs::hunger_score(fed, false)) >= animals_core::memory::DRIVEN
+    })
 }
 
 /// A goal for wild animals of species `index`, after `animal::upkeep`: running off when
@@ -134,10 +144,18 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                         seen.fright
                     );
                     scare(w, id, 0);
+                    crate::wild::alarm(w, id);
                     crate::senses::ran(w, id, true);
                     return true;
                 }
-                if seen.fright >= animals_core::perception::STARE {
+                // Half aware it stops to stare, unless thirst or hunger drives it on (`driven`): a
+                // player standing still by the only pool froze the herd that came to drink there,
+                // and it drifted off and died parched (ai1124_graze3: deer at 5 % water staring 10
+                // blocks from the water).
+                // And it stares only a while (`perception::STARE_SECS`, `senses::staring`): a
+                // player standing still is only smelled, which never makes it bolt, and a deer
+                // stood staring at one a whole game day (ai1124_graze7).
+                if seen.fright >= animals_core::perception::STARE && !driven(w, id) && crate::senses::staring(w, id) {
                     crate::senses::stare(w, id, st, seen.player_pos);
                     return true;
                 }
@@ -293,10 +311,15 @@ fn flee(w: &World, id: u64, st: &EntityState) {
     w.navigate(id, to, 1.6);
 }
 
-/// It was hurt by `source` (0: nothing, a fall, the cold): a taming under way loses effectiveness,
+/// It was hurt by `source` (0: nothing, a fall, a fire), not by its own body (`comfort::bodily`):
+/// a taming under way loses effectiveness,
 /// and it runs off, from what hurt it (a deer a wolf bit runs from the wolf, not from the player
 /// who happens to be nearest).
-pub fn hurt(w: &World, id: u64, source: u64) {
+pub fn hurt(w: &World, id: u64, source: u64, cause: u32) {
+    // Its own body's hurts (`comfort::bodily`: starving, thirst) send it nowhere.
+    if crate::comfort::bodily(cause) {
+        return;
+    }
     let passive = w
         .component(id, &ANIMAL)
         .and_then(|a| a.species())
@@ -347,6 +370,9 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
     // Near a capybara it takes to you a quarter faster.
     let calm = if crate::signatures::calm(w, st.pos.to_array()) { 1.25 } else { 1.0 };
     let gain = food.liking.taming() * if wanted { 1.25 } else { 1.0 } * calm / needed;
+    // The tamer's web (taming speed) through the base game's chain.
+    let q = abi::Query { entity: id, other: player, ..query() };
+    let gain = w.chain_compute(&base_api::skills::TAMING_SPEED, gain as f64, &q) as f32;
     let wait = WAIT_TICKS.0 + w.random_below(WAIT_TICKS.1 - WAIT_TICKS.0);
     set(w, id, |t| {
         t.progress = (t.progress + gain).min(1.0);
@@ -402,6 +428,13 @@ pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
         weft_sdk::info!("animal {id} tamed at {:.0}%: {bonus} bonus levels, now level {}", effectiveness * 100.0, a.level());
         let level = a.level();
         crate::xp::tamed(w, player, level);
+        // Taming rises by doing (`vitals::skills::gain::tame`): the size class's taming time, its
+        // work level by the animal's level (a level-200 one about 34 item levels over a level-0).
+        if let Some(s) = a.species() {
+            let minutes = vitals::skills::gain::TAME_MINUTES[s.size as usize];
+            let work = vitals::skills::for_level(5.0 + level as f32 * 34.0 / 200.0);
+            base_api::skills::give_skill(w, player, base_api::skills::Skill::Taming, vitals::skills::gain::tame(minutes), work);
+        }
         crate::journal::note_animal(w, player, id, animals_core::journal::TAMED);
         // The first time this player tames one: how to give it orders (a line under the
         // crosshair, `base_api::hint`), then Survival's "A Friend" advancement

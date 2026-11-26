@@ -27,7 +27,7 @@ pub fn register(r: &mut Registry) {
         Known { bits: [0; WORDS] },
         component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
-    r.attach(&PLAYER, &KNOWN);
+    r.edit(&PLAYER).attach(&KNOWN);
     r.world_tick(|w| {
         if w.game_time() % EVERY != 0 {
             return;
@@ -67,7 +67,7 @@ pub fn held(known: &Known, name: &str) -> bool {
 /// How a recipe stands for a player who has held `items`: (ingredients held, ingredients, an
 /// item of the first one not held). Each different ingredient counts once; it's held if any item
 /// it takes was.
-pub fn standing(r: &Recipe, items: &[u32]) -> (u32, u32, Option<u32>) {
+pub fn standing(r: &RecipeView, items: &[u32]) -> (u32, u32, Option<u32>) {
     let inputs = r.inputs();
     let mut seen: Vec<u32> = Vec::new();
     let (mut have, mut all, mut missing) = (0, 0, None);
@@ -99,7 +99,7 @@ const STARTERS: &[&str] = &[
 ];
 
 /// Whether `r` is known from the start: planks of any wood, and the `STARTERS`.
-pub fn starter(r: &Recipe) -> bool {
+pub fn starter(r: &RecipeView) -> bool {
     r.outputs()
         .first()
         .is_some_and(|(o, _)| item_has_tag(o.item, "planks") || STARTERS.contains(&item_name(o.item)))

@@ -24,13 +24,11 @@ pub fn speed(w: &World, id: u64, v: &mut Vitals, stats: &[f32; STATS], mods: &Mo
     let speed = if v.out != 0 { 0.0 } else { stats[Stat::Speed.index()] * mods.speed };
     if (v.speed - speed).abs() > 0.001 || w.game_time() % 100 == 0 {
         v.speed = speed;
-        w.attribute_add_modifier(id, &attribute::MOVEMENT_SPEED, "base:vitals", attr_op::MULTIPLY_TOTAL, (speed - 1.0) as f64, 0);
+        w.attribute_add_modifier(id, "base:vitals", &Modifier::mul(&attribute::MOVEMENT_SPEED, 1.0 + (speed - 1.0) as f64), 0);
         w.attribute_add_modifier(
             id,
-            &attribute::JUMP_STRENGTH,
             "base:vitals",
-            attr_op::MULTIPLY_TOTAL,
-            if v.out != 0 { -1.0 } else { 0.0 },
+            &Modifier::mul(&attribute::JUMP_STRENGTH, 1.0 + if v.out != 0 { -1.0 } else { 0.0 }),
             0,
         );
     }
@@ -72,6 +70,22 @@ pub fn weight(name: &str) -> f32 {
     }
     let n = name.split_once(':').map_or(name, |(_, n)| n);
     let piece = |p: &str| n.ends_with(p);
+    // Armour built from parts, by the set it looks like (`parts::ARMOUR_LOOKS`) as the old whole
+    // pieces were: a leather look 0.5 a piece unit, mail 2, scales 2.5, gems 2.
+    if let Some(slot) = crafting::materials::ARMOUR
+        .iter()
+        .position(|k| n == *k || n.strip_prefix(k).is_some_and(|r| r.starts_with('_')))
+    {
+        let per = match n.rsplit_once('_').map(|x| x.1) {
+            Some("mail") | Some("gem") => 2.0,
+            Some("scale") => 2.5,
+            _ => 0.5,
+        };
+        return per * [1.0, 2.0, 1.5, 1.0][slot];
+    }
+    if matches!(n, "pickaxe" | "axe" | "shovel" | "hoe" | "sword" | "knife" | "spear") {
+        return 1.0;
+    }
     if piece("_helmet") || piece("_chestplate") || piece("_leggings") || piece("_boots") {
         let per = match n.split('_').next().unwrap_or("") {
             "leather" => 0.5,

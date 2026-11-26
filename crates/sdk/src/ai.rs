@@ -18,37 +18,25 @@ use std::sync::{Arc, Mutex};
 use crate::{EntityKind, EntityState, EntityTick, World};
 
 /// What a mob feels about whom: per mob, (who, until which tick) for anger and for fear. Kept
-/// by this mod while it runs, not saved with the world.
+/// by this mod while its world is open, not saved with it.
 #[derive(Default)]
 struct Moods {
     anger: Vec<(u64, u64)>,
     fear: Vec<(u64, u64)>,
 }
 
-/// Every mob's moods, with the world they belong to: its seed and the last tick they were read.
-struct AllMoods {
-    seed: u64,
-    last: u64,
-    mobs: HashMap<u64, Moods>,
-}
-
-static MOODS: Mutex<Option<AllMoods>> = Mutex::new(None);
+/// By mob, for one opening of a world (`World::session`): another starts its ids over.
+static MOODS: Mutex<Option<(u64, HashMap<u64, Moods>)>> = Mutex::new(None);
 
 /// `f` on mob `id`'s moods, what has run out already dropped.
 fn moods<T>(w: &World, id: u64, f: impl FnOnce(&mut Moods) -> T) -> T {
     let now = w.game_time();
-    let seed = w.seed();
+    let session = w.session();
     let mut all = MOODS.lock().unwrap();
-    let all = all.get_or_insert_with(|| AllMoods { seed, last: now, mobs: HashMap::new() });
-    // Another world opened in the same game (another seed, or its clock behind the last one's):
-    // its entity ids and ticks start over, so the old world's moods would land on whoever has
-    // those ids now (a spider angry at the player for a zombie's grudge).
-    if all.seed != seed || now < all.last {
-        all.mobs.clear();
-        all.seed = seed;
+    let (of, all) = all.get_or_insert_with(|| (session, HashMap::new()));
+    if *of != session {
+        (*of, *all) = (session, HashMap::new());
     }
-    all.last = now;
-    let all = &mut all.mobs;
     // Now and then everything run out, so mobs gone leave nothing behind.
     if now % 200 == 0 && all.len() > 64 {
         all.retain(|_, m| m.anger.iter().chain(&m.fear).any(|e| e.1 > now));
@@ -137,6 +125,11 @@ impl Trigger {
         self
     }
 
+    /// Only while `c` holds where the mob is (`!Cond::new("day")`).
+    pub fn only_while(self, c: crate::Cond) -> Trigger {
+        self.only_if(move |w, st| w.holds(&c, st.pos, 0))
+    }
+
     /// Notices mobs of `kind` instead of players (a wolf and sheep).
     pub fn of(self, kind: &'static EntityKind) -> Trigger {
         self.of_any(move |_, _, st| st.kind == kind.id())
@@ -213,7 +206,9 @@ fn looks_at(w: &World, who: &EntityState, st: &EntityState) -> bool {
     let len = d.length_squared().sqrt().max(1e-6);
     let look = crate::look_dir(who.yaw, who.pitch);
     let dot = (look.x * d.x + look.y * d.y + look.z * d.z) / len;
-    dot > 1.0 - 0.025 / len && w.raycast(from, d * (1.0 / len), len, false).is_none()
+    dot > 1.0 - 0.025 / len
+        && w.raycast(from, d * (1.0 / len), len, crate::Ray::blocks())
+            .is_none()
 }
 
 /// The usual reactions.
@@ -497,7 +492,7 @@ pub fn watch_player(range: f64) -> impl Goal {
             if let Some((_, ps)) = nearest_player(w, st, range) {
                 let (dx, dz) = (ps.pos.x - st.pos.x, ps.pos.z - st.pos.z);
                 let dy = ps.eye().y - st.eye().y;
-                w.entity_edit(id)
+                w.entity_modify(id)
                     .yaw(crate::yaw_toward(st.pos, ps.pos))
                     .pitch(dy.atan2((dx * dx + dz * dz).sqrt()) as f32);
             }
@@ -506,14 +501,14 @@ pub fn watch_player(range: f64) -> impl Goal {
     }
 }
 
-/// Hits its `target` when it is in reach (`World::in_reach`: the kind's `.reach(..)`, an
-/// attribute modifiers change) with `World::attack`, which keeps the pace. Never takes over:
-/// chasing goes on.
+/// Hits its `target` with a full swing (`World::swing_strength`) when it is in reach
+/// (`World::in_reach`: the kind's `.reach(..)`, an attribute modifiers change) with
+/// `World::attack`. Never takes over: chasing goes on.
 pub fn melee() -> impl Goal {
     move |w: &World, id: u64, st: &EntityState| {
         let reach = w.attribute(id, &crate::attribute::ENTITY_REACH);
         if let Some((p, _)) = target(w, id, st, reach + st.size.width as f64 + 2.0) {
-            if w.in_reach(id, p) {
+            if w.in_reach(id, p) && w.swing_strength(id) >= 1.0 {
                 w.attack(id, p);
             }
         }
@@ -533,7 +528,7 @@ pub fn melee_within(reach: f64) -> impl Goal {
                 eye.z.clamp(ps.pos.z - half, ps.pos.z + half),
             );
             let d2 = (near - eye).length_squared();
-            if d2 <= reach * reach {
+            if d2 <= reach * reach && w.swing_strength(id) >= 1.0 {
                 w.attack(id, p);
             }
         }

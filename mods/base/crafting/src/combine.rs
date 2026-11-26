@@ -9,7 +9,7 @@
 
 use crate::grades::grade;
 use crate::kinds::{Role, Use, kind, shape};
-use crate::materials::material;
+use crate::materials::{fits, material};
 use crate::traits::{Effect, Trait, When, of_material};
 
 /// How many times longer a holding part lasts than a working part of the same material.
@@ -88,10 +88,10 @@ pub fn life_of(role: Role, id: &str, grade_n: u8) -> f32 {
     let g = grade(grade_n).mult;
     let wear = always_wear(&of_material(m.id));
     match role {
-        Role::Working => m.uses * g / wear,
-        Role::Holding => m.uses * g * HAFT_WEAR / wear,
+        Role::Working => m.uses() * g / wear,
+        Role::Holding => m.uses() * g * HAFT_WEAR / wear,
         Role::Fitting => m.fitting_uses * g / wear,
-        Role::Extra => 0.0,
+        Role::Extra | Role::Lining => 0.0,
     }
 }
 
@@ -124,8 +124,7 @@ pub fn combine(kind_id: &str, parts: &[Part]) -> Result<ToolStats, Missing> {
             .filter(|s| s.slot == slot.name)
             .ok_or(Missing::Shape(p.shape))?;
         let m = material(p.material).ok_or(Missing::Material(p.material))?;
-        let as_role = if slot.role == Role::Extra { Role::Fitting } else { slot.role };
-        if !m.roles.contains(&as_role) && !(slot.role == Role::Extra && m.roles.contains(&Role::Working)) {
+        if !fits(m, k.id, slot.name, slot.role) {
             return Err(Missing::Role(p.material, slot.name));
         }
         let g = grade(p.grade).mult;
@@ -147,10 +146,10 @@ pub fn combine(kind_id: &str, parts: &[Part]) -> Result<ToolStats, Missing> {
                 hold_mul_damage *= s.damage;
                 // A haft rarely wears: a tenth as fast as a head, so a good head outlives it and
                 // a worn haft is replaced, not the tool.
-                life.push(Life { slot: slot.name, uses: m.uses * g * HAFT_WEAR / always_wear(&own) });
+                life.push(Life { slot: slot.name, uses: m.uses() * g * HAFT_WEAR / always_wear(&own) });
             }
             Role::Fitting => life.push(Life { slot: slot.name, uses: m.fitting_uses * g / always_wear(&own) }),
-            Role::Extra => {}
+            Role::Extra | Role::Lining => {}
         }
     }
     let (p, s, m, own) = working.ok_or(Missing::Slot("working"))?;
@@ -175,13 +174,125 @@ pub fn combine(kind_id: &str, parts: &[Part]) -> Result<ToolStats, Missing> {
     let base_damage = if k.use_ == Use::Shoot {
         k.damage * crate::materials::spring(m.id)
     } else {
-        vitals::gear::weapon_of(k.id, m.id).map_or(k.damage + m.damage, |(hit, _)| hit)
+        vitals::gear::weapon_of(k.id, m.id).map_or(k.damage, |(hit, _)| hit)
     };
-    let stat = m.speed * s.stat * stat_mul * if weapon { 1.0 } else { g.mult } * (1.0 + hold_speed) * hold_mul_speed * s.speed;
+    let stat = m.speed() * s.stat * stat_mul * if weapon { 1.0 } else { g.mult } * (1.0 + hold_speed) * hold_mul_speed * s.speed;
     let damage = base_damage * s.damage * dmg_mul * if weapon { g.mult } else { 1.0 } * hold_mul_damage;
-    let head = Life { slot: p.slot, uses: m.uses * g.mult * (1.0 + hold_uses) / always_wear(&own) };
+    let head = Life { slot: p.slot, uses: m.uses() * g.mult * (1.0 + hold_uses) / always_wear(&own) };
     life.insert(0, head);
-    Ok(ToolStats { kind: k.id, harvest: m.harvest, grade: g.n, modifier_slots: g.slots, stat, damage, reach, mass_kg: mass, life, traits })
+    Ok(ToolStats {
+        kind: k.id,
+        harvest: m.harvest(),
+        grade: g.n,
+        modifier_slots: g.slots,
+        stat,
+        damage,
+        reach,
+        mass_kg: mass,
+        life,
+        traits,
+    })
+}
+
+/// How much of a shell's uses each armour slot gets, head to feet (a coat takes the most blows;
+/// vanilla's 11, 16, 15, 13 of 16).
+pub const SLOT_WEAR: [f32; 4] = [0.69, 1.0, 0.94, 0.81];
+
+/// A piece of armour built from parts (`notes/CRAFTING.md`, "Kinds and their parts").
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArmourStats {
+    pub kind: &'static str,
+    /// Head to feet.
+    pub slot: usize,
+    /// Its shell's material's item level (`vitals::gear`): what over-tier caps read.
+    pub level: f32,
+    pub grade: u8,
+    pub modifier_slots: u8,
+    /// Armour points (`vitals::combat::armour_cut`) and the health it adds over the base, from the
+    /// curve by its shell's level and slot, × the shell's grade.
+    pub armour: f32,
+    pub health: f32,
+    pub mass_kg: f32,
+    /// The shell's and fastening's lives in blows, the shell first.
+    pub life: Vec<Life>,
+    pub traits: Vec<&'static Trait>,
+    /// The materials of its shell, fastening and lining (warmth: `vitals::clothing`).
+    pub shell: &'static str,
+    pub fastening: &'static str,
+    pub lining: &'static str,
+}
+
+impl ArmourStats {
+    pub fn weakest(&self) -> Option<Life> {
+        self.life
+            .iter()
+            .copied()
+            .min_by(|a, b| a.uses.total_cmp(&b.uses))
+    }
+}
+
+/// The numbers of armour `kind_id` built from `parts`: the shell sets them (its material's level
+/// on the curve, × its grade), the fastening wears first, the lining pads and warms.
+pub fn armour(kind_id: &str, parts: &[Part]) -> Result<ArmourStats, Missing> {
+    let k = kind(kind_id).ok_or_else(|| Missing::Kind(kind_id.to_string()))?;
+    let slot_n = k
+        .armour_slot()
+        .ok_or_else(|| Missing::Kind(kind_id.to_string()))?;
+    let mut mass = 0.0;
+    let mut traits: Vec<&'static Trait> = Vec::new();
+    let mut life = Vec::new();
+    let (mut shell, mut fastening, mut lining) = (None, "", "");
+    for slot in k.slots {
+        let p = parts
+            .iter()
+            .find(|p| p.slot == slot.name)
+            .ok_or(Missing::Slot(slot.name))?;
+        let s = shape(k.id, p.shape)
+            .filter(|s| s.slot == slot.name)
+            .ok_or(Missing::Shape(p.shape))?;
+        let m = material(p.material).ok_or(Missing::Material(p.material))?;
+        if !fits(m, k.id, slot.name, slot.role) {
+            return Err(Missing::Role(p.material, slot.name));
+        }
+        let bulk = if slot.role == Role::Working { m.bulk } else { 1.0 };
+        mass += m.density * s.volume * bulk / 1000.0;
+        let own = of_material(m.id);
+        for t in &own {
+            if !traits.iter().any(|x| x.id == t.id) {
+                traits.push(t);
+            }
+        }
+        let g = grade(p.grade).mult;
+        match slot.role {
+            Role::Working => {
+                life.insert(0, Life { slot: slot.name, uses: m.uses() * SLOT_WEAR[slot_n] * g / always_wear(&own) });
+                shell = Some((p, m));
+            }
+            Role::Fitting => {
+                life.push(Life { slot: slot.name, uses: m.fitting_uses * g / always_wear(&own) });
+                fastening = m.id;
+            }
+            _ => lining = m.id,
+        }
+    }
+    let (p, m) = shell.ok_or(Missing::Slot("shell"))?;
+    let g = grade(p.grade);
+    let (armour, health) = vitals::gear::armour(slot_n, m.level());
+    Ok(ArmourStats {
+        kind: k.id,
+        slot: slot_n,
+        level: m.level(),
+        grade: g.n,
+        modifier_slots: g.slots,
+        armour: armour * g.mult,
+        health: health * g.mult,
+        mass_kg: mass,
+        life,
+        traits,
+        shell: m.id,
+        fastening,
+        lining,
+    })
 }
 
 #[cfg(test)]
@@ -203,8 +314,9 @@ mod tests {
     #[test]
     fn the_mock_ups_flint_axe() {
         let a = flint_axe(7);
-        // Flint 3.0 × Superior 1.20, oak's −3%.
-        assert!((a.stat - 3.0 * 1.20 * 0.97).abs() < 1e-4, "{}", a.stat);
+        // Flint's speed (about 3.0, from the curve) × Superior 1.20, oak's −3%.
+        let flint = material("flint").unwrap().speed();
+        assert!((a.stat - flint * 1.20 * 0.97).abs() < 1e-4, "{}", a.stat);
         assert_eq!((a.grade, a.modifier_slots, a.harvest), (7, 2, 100));
         // The lashing goes first, as it did.
         assert_eq!(a.weakest().unwrap().slot, "fitting");
@@ -289,5 +401,56 @@ mod tests {
         ];
         assert_eq!(combine("axe", &copper_haft), Err(Missing::Role("copper", "haft")));
         assert!(matches!(combine("mace", &copper_haft), Err(Missing::Kind(_))));
+    }
+
+    #[test]
+    fn a_mail_coat() {
+        let coat = |shell: &'static str, g| {
+            armour(
+                "chestplate",
+                &[
+                    Part { slot: "shell", shape: "chest_shell", material: shell, grade: g },
+                    Part { slot: "fastening", shape: "straps", material: "leather", grade: 4 },
+                    Part { slot: "lining", shape: "lining", material: "wool", grade: 4 },
+                ],
+            )
+            .unwrap()
+        };
+        let (iron, leather) = (coat("wrought_iron", 4), coat("leather", 4));
+        // The curve's coat: its slot's share of a same-age set.
+        let (a, _) = vitals::gear::armour(1, vitals::gear::material("wrought_iron").unwrap().level());
+        assert!((iron.armour - a).abs() < 1e-4);
+        assert!(iron.armour > leather.armour && iron.mass_kg > 5.0 && leather.mass_kg < 3.0, "{} {}", iron.mass_kg, leather.mass_kg);
+        assert!(coat("wrought_iron", 9).armour > iron.armour);
+        assert_eq!((iron.slot, iron.lining), (1, "wool"));
+        // No gold coat, no diamond straps.
+        let gold = [
+            Part { slot: "shell", shape: "chest_shell", material: "gold", grade: 4 },
+            Part { slot: "fastening", shape: "straps", material: "leather", grade: 4 },
+            Part { slot: "lining", shape: "lining", material: "wool", grade: 4 },
+        ];
+        assert_eq!(armour("chestplate", &gold), Err(Missing::Role("gold", "shell")));
+    }
+
+    #[test]
+    fn numbers_from_the_curve() {
+        // A Sound flint pick at its level's uses and speed; a diamond one above an iron one.
+        let pick = |head: &'static str| {
+            combine(
+                "pickaxe",
+                &[
+                    Part { slot: "head", shape: "pick_head", material: head, grade: 4 },
+                    Part { slot: "haft", shape: "haft", material: "birch", grade: 4 },
+                    Part { slot: "fitting", shape: "lashing", material: "wrought_iron", grade: 4 },
+                ],
+            )
+            .unwrap()
+        };
+        let flint = pick("flint");
+        let lv = vitals::gear::material("flint").unwrap().level();
+        assert!((flint.stat - vitals::gear::mining_speed(lv) * 1.05).abs() < 1e-3, "{}", flint.stat);
+        assert_eq!(flint.harvest, vitals::gear::harvest(lv));
+        let (iron, diamond) = (pick("wrought_iron"), pick("diamond"));
+        assert!(diamond.harvest > iron.harvest && diamond.stat > iron.stat && diamond.life[0].uses > iron.life[0].uses);
     }
 }

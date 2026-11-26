@@ -61,3 +61,14 @@ the right side, with eyelids from the same corner; animations idle (cropping low
 head up to look about, chewing, the tail swaying a little, two blinks; 10 s), walk (a slow lateral
 walk on all fours, 1.6 s), run (a heavy trot, 1.0 s), lie (on its belly, the legs folded under, the
 tail along the ground, two blinks; 8 s).
+
+Behaviour clips (11-05, `src/anim.rs`): stare, graze, drink, watch, sleep (also in the lying file),
+approach and charge loop; sniff, look, scratch (the thumb spike to the neck), stretch, alarm (a head
+toss and bellow, the tail lashing), rear, play, groom, nuzzle and flinch play once; death (onto its
+side) holds. At 4000 kg it stands its ground, so it has rear (up on the hind legs, tipped 50 degrees,
+the forelimbs up with the hands turned out, the tail fitted down to the ground behind as a
+counterweight, the hind feet planted) and charge (a heavy trot, the head down). `build.py` asserts the
+loops, every standing clip's feet within 0.3 of the ground, the gaits' and rear's grounding, nothing
+below -0.3 in any clip, the beak at the ground grazing and drinking, shut lids asleep and dead, and
+death on its lowest point each frame. The walk and run are grounded from their feet too (their hind
+feet sank 1.6 and 1.1 before).

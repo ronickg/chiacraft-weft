@@ -1,0 +1,165 @@
+# showcase_scene: the RTX showcase hall (notes/RTX_SHOWCASE.md), built at absolute coordinates by seed 1's
+# spawn (149.5 73 -166.5) on a base of its own, so the ground there never matters. A hall 21 x 31 blocks:
+# a floor of tiles with a pool down its middle, walls with tall windows (clear, stained), metal columns
+# and trims, lamps on the columns, a roof with a skylight strip; a doorway in the south wall.
+# Shots: inside looking north (along the pool to the stained back window), low across the pool, and the
+# outside from the south-east; each by day (10:00), at sunset (18:30) and at night (23:00).
+# Run with --shader-pack chiacraft and --config "core:hdr_world=1" (the mirror floors' screen reflections
+# need the HDR world), and once more with core:rt_shadows=1 on the RT branch.
+#
+# v1 (11-06): the showcase blocks (v0, today's blocks only, is in chiacraft-archive's
+# tester-tools/rtx-showcase/showcase_v0.txt).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /weather clear 99999
+chat /season summer 8
+chat /time set 4000
+wait 1
+# Clear the air and lay a base.
+chat /tk fill 135 73 -171 163 92 -129 core:air
+chat /tk fill 135 64 -171 163 72 -129 base:slate_tiles
+# Floor (y 72): checker tiles, a band of polished obsidian (the black mirror) round the pool, a
+# polished limestone rim, red glazed tiles edging the band.
+chat /tk fill 139 72 -165 159 72 -135 base:checker_tiles
+chat /tk fill 143 72 -162 155 72 -138 base:red_glazed_tiles
+chat /tk fill 144 72 -161 154 72 -139 base:polished_obsidian
+chat /tk fill 145 72 -160 153 72 -140 base:polished_limestone
+# The pool: a basin of blue glazed tiles two deep, water to the floor.
+chat /tk fill 145 69 -160 153 71 -140 base:blue_glazed_tiles
+chat /tk fill 146 70 -159 152 72 -141 base:water
+# Walls (x 139 and 159, z -165 and -135), 9 high: limestone tiles on a course of slate tiles, a
+# green glazed band at the back.
+chat /tk fill 139 73 -165 139 81 -135 base:limestone_tiles
+chat /tk fill 159 73 -165 159 81 -135 base:limestone_tiles
+chat /tk fill 139 73 -165 159 81 -165 base:limestone_tiles
+chat /tk fill 139 73 -135 159 81 -135 base:limestone_tiles
+chat /tk fill 139 73 -165 139 73 -135 base:slate_tiles
+chat /tk fill 159 73 -165 159 73 -135 base:slate_tiles
+chat /tk fill 139 73 -135 159 73 -135 base:slate_tiles
+chat /tk fill 139 73 -165 159 73 -165 base:green_glazed_tiles
+# Tall windows in the side walls, every 6 blocks: leaded, frosted, smoked and clear glass.
+chat /tk fill 139 75 -161 139 79 -159 base:leaded_glass
+chat /tk fill 139 75 -155 139 79 -153 base:frosted_glass
+chat /tk fill 139 75 -149 139 79 -147 base:smoked_glass
+chat /tk fill 139 75 -143 139 79 -141 base:glass
+chat /tk fill 159 75 -161 159 79 -159 base:leaded_glass
+chat /tk fill 159 75 -155 159 79 -153 base:glass
+chat /tk fill 159 75 -149 159 79 -147 base:frosted_glass
+chat /tk fill 159 75 -143 159 79 -141 base:leaded_glass
+# The back window (north wall): leaded glass framed by stained panes, in a steel surround.
+chat /tk fill 142 74 -165 156 80 -165 base:steel_plate
+chat /tk fill 143 75 -165 155 79 -165 base:leaded_glass
+chat /tk fill 143 75 -165 143 79 -165 base:red_stained_glass
+chat /tk fill 155 75 -165 155 79 -165 base:blue_stained_glass
+# The doorway (south wall), 3 wide, 4 high, in a steel frame.
+chat /tk fill 147 73 -135 151 77 -135 base:steel_plate
+chat /tk fill 148 73 -135 150 76 -135 core:air
+# Columns inside the side walls: copper, one weathered to verdigris; bronze lanterns on top.
+chat /tk fill 141 73 -158 141 79 -158 base:copper_block
+chat /tk fill 141 73 -150 141 79 -150 base:verdigris_copper
+chat /tk fill 141 73 -142 141 79 -142 base:copper_block
+chat /tk fill 157 73 -158 157 79 -158 base:copper_block
+chat /tk fill 157 73 -150 157 79 -150 base:copper_block
+chat /tk fill 157 73 -142 157 79 -142 base:verdigris_copper
+chat /tk fill 141 80 -158 141 80 -158 base:bronze_lantern
+chat /tk fill 141 80 -150 141 80 -150 base:bronze_lantern
+chat /tk fill 141 80 -142 141 80 -142 base:bronze_lantern
+chat /tk fill 157 80 -158 157 80 -158 base:bronze_lantern
+chat /tk fill 157 80 -150 157 80 -150 base:bronze_lantern
+chat /tk fill 157 80 -142 157 80 -142 base:bronze_lantern
+# A bronze trim along the walls' top, a roof of limestone tiles, a frosted skylight down the middle.
+chat /tk fill 140 81 -164 158 81 -164 base:bronze_plate
+chat /tk fill 140 81 -136 158 81 -136 base:bronze_plate
+chat /tk fill 140 81 -164 140 81 -136 base:bronze_plate
+chat /tk fill 158 81 -164 158 81 -136 base:bronze_plate
+chat /tk fill 139 82 -165 159 82 -135 base:limestone_tiles
+chat /tk fill 147 82 -162 151 82 -138 base:frosted_glass
+wait 2
+where
+# ---- inside, looking north along the pool
+chat /tk mode spectator
+chat /tp 149.5 76.6 -137.5
+wait 10
+loaded
+idle
+wait 6
+look 0 -12
+chat /time set 4000
+wait 1
+chat /tick freeze
+wait 3
+shot hall_in_h10.png
+chat /tick unfreeze
+chat /time set 12500
+wait 1
+chat /tick freeze
+wait 3
+shot hall_in_h1830.png
+chat /tick unfreeze
+chat /time set 17000
+wait 1
+chat /tick freeze
+wait 3
+shot hall_in_h23.png
+chat /tick unfreeze
+# ---- low across the pool, toward the back window
+chat /tp 149.5 73.4 -139.5
+wait 3
+look 0 -6
+chat /time set 4000
+wait 1
+chat /tick freeze
+wait 3
+shot pool_low_h10.png
+chat /tick unfreeze
+chat /time set 12500
+wait 1
+chat /tick freeze
+wait 3
+shot pool_low_h1830.png
+chat /tick unfreeze
+chat /time set 17000
+wait 1
+chat /tick freeze
+wait 3
+shot pool_low_h23.png
+chat /tick unfreeze
+# ---- a column and the floor close up (the metals' highlights)
+chat /tp 154.5 75.5 -146.5
+wait 3
+look -36 -20
+chat /time set 4000
+wait 1
+chat /tick freeze
+wait 3
+shot metal_close_h10.png
+chat /tick unfreeze
+# ---- the west wall's windows from inside, the coloured light on the floor (the afternoon sun)
+chat /tp 152.5 76.5 -151.5
+wait 3
+look 75 -25
+chat /time set 8000
+wait 1
+chat /tick freeze
+wait 3
+shot windows_h14.png
+chat /tick unfreeze
+# ---- outside, from the south-east
+chat /tp 172.5 88 -118.5
+wait 4
+look 36 -22
+chat /time set 4000
+wait 1
+chat /tick freeze
+wait 3
+shot hall_out_h10.png
+chat /tick unfreeze
+chat /time set 12500
+wait 1
+chat /tick freeze
+wait 3
+shot hall_out_h1830.png
+chat /tick unfreeze
+quit

@@ -57,7 +57,7 @@ fn effect(g: Glyph) -> Glyph {
 
 ### Conditions
 `{if:name}` shows text while a condition holds.\
-The engine's are every game mode by its name (`creative`, `survival`, `spectator`), `day`, `night`, `underground`, `surface`, `debug` and `dev`. Your own are registered in the mod, and in text they are asked on the client, so they see the local player only:
+The engine's are every game mode by its name (`creative`, `survival`, `spectator`), `day`, `night`, `underground`, `surface`, `light(..7)`, `debug` and `dev`, and they go together with `&`, `|` and `!`: `{if:night & surface}`. Your own are registered in the mod, and in text they are asked on the client, so they see the local player only:
 ```rust
 static CHARGED: Condition = Condition::named("charged");
 r.condition(&CHARGED, |c| c.client().is_some_and(|v| v.component(&CHARGE).is_some_and(|c| c > 0)));
@@ -108,6 +108,12 @@ block.base.furnace.tooltip = Smelts ores and cooks food.
     {on_key:!core:sneak}{lang:tooltip.more}{/on_key}{on_key:core:sneak}Burns {item:base:coal} coal, {item:base:oak_planks} planks or other {#ffe070}fuel{/} in the bottom slot.{/on_key}
 ```
 
+## Attribute modifiers
+What an item gives worn or in hand (`Modifier::add(&ARMOR, 3.0).worn()`) gets a line by itself, `tooltip.modifier.worn` or `tooltip.modifier` with the amount and the attribute's name, `attribute.<name>`:
+```
+attribute.base.armor = Armor
+```
+
 ## Lines by tag
 A line for every item with a tag or component, in one place, is `tagged.<name>`. It goes under the item's own tooltip, and a new item gets it just by having the tag:
 ```
@@ -129,7 +135,7 @@ Another mod adds its line to the same tag without replacing it, as with tooltips
   server overrides or that need a restart get a note added by the engine.
 - **Creative tabs:** show their name from `tab.<mod>.<name>`, or the mod's display name when there is no key.
 - **Your own screens:** any part with a style takes one, `S::column().tooltip("examplemod.hint")`.
-- **Slots:** a slot group's `tooltip(key)` shows over its empty slots ([machines guide](machines.md#creating-a-machine)).
+- **Slots:** a slot group's `tooltip(key)` shows over its empty slots ([block entities guide](block_entities.md#creating-one)).
 
 ## Adding from outside
 Translations are one shared table: every `lang/<code>.lang` of every mod and pack is read into it, so the

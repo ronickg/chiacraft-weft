@@ -12,11 +12,14 @@ pub struct ClientView {
     raw: *mut abi::ClientCtx,
 }
 
+static GAME_MODE: Component<u32> = Component::named(abi::comp::GAME_MODE);
+static PERMISSION: Component<u32> = Component::named(abi::comp::PERMISSION);
+
 impl ClientView {
     pub(crate) fn from_raw(raw: *mut abi::ClientCtx) -> ClientView {
         ClientView { raw }
     }
-    /// The client's actions (`screen_open`, `world_open`, `quit`..), for a button's callback:
+    /// The client's actions (`menu_open`, `world_open`, `quit`..), for a button's callback:
     /// a button may drive the client, a binding that only shows a value may not.
     pub fn client(&self) -> crate::Client {
         crate::Client::from_raw(self.raw)
@@ -24,10 +27,19 @@ impl ClientView {
     pub fn player(&self) -> u64 {
         unsafe { (host().client_player)(self.raw) }
     }
+    /// The block or entity under the crosshair, as the client uses it for interactions.
+    pub fn target(&self) -> Option<abi::Target> {
+        let mut target = abi::Target::default();
+        (unsafe { (host().client_target)(self.raw, &mut target) } != 0).then_some(target)
+    }
     /// Own player's attribute, as the server says. Mods' attributes come too. Unlike
     /// `World::attribute` it takes no entity: the client only has its own player's.
     pub fn attribute(&self, a: &crate::Attribute) -> f64 {
         unsafe { (host().client_attribute)(self.raw, abi::Str::new(a.name())) }
+    }
+    /// The level of `effect` on the local player, 0 without it (poisoned hearts).
+    pub fn effect_level(&self, effect: &crate::EntityEffect) -> u32 {
+        unsafe { (host().client_effect_level)(self.raw, effect.id()) }
     }
     /// How charged the next swing is, 0..1: for a bar of your own.
     pub fn swing_strength(&self) -> f32 {
@@ -41,13 +53,13 @@ impl ClientView {
     pub fn day_time(&self) -> u64 {
         unsafe { (host().client_day_time)(self.raw) }
     }
-    /// The weather's id now (`weathers::RAIN.id()`), as the server says.
+    /// The weather's id at the camera (`weathers::RAIN.id()`).
     pub fn weather(&self) -> u32 {
         unsafe { (host().client_weather)(self.raw) }
     }
     /// The player's permission level (`abi::permission`).
     pub fn permission(&self) -> u32 {
-        unsafe { (host().client_permission)(self.raw) }
+        self.component(&PERMISSION).unwrap_or(0)
     }
     /// Own player's synced component. Unlike `World::component` it takes no entity: another
     /// one's is `component_of`.
@@ -80,11 +92,12 @@ impl ClientView {
     }
     /// The local player's mode spares it damage and hunger: no bars to show.
     pub fn outside_survival(&self) -> bool {
-        crate::GameMode::flags_of(self.game_mode()) & abi::game_mode_flags::INVULNERABLE != 0
+        self.attribute(&crate::attribute::INVULNERABLE) >= 1.0
     }
     /// `abi::game_mode`.
     pub fn game_mode(&self) -> u32 {
-        unsafe { (host().client_game_mode)(self.raw) }
+        self.component(&GAME_MODE)
+            .unwrap_or(abi::game_mode::SURVIVAL)
     }
     /// Another entity's component the server shares with this client (`SYNC_WATCHERS`, or
     /// `SYNC_MENU` while its menu is open).
@@ -95,12 +108,12 @@ impl ClientView {
         let p = unsafe { (host().client_component)(self.raw, entity, c.id()) };
         (!p.is_null()).then(|| unsafe { std::ptr::read_unaligned(p as *const T) })
     }
-    /// The entity whose menu is open (a machine), if any.
+    /// The entity the open menu is on (a block entity, a mob), if any.
     pub fn menu_owner(&self) -> Option<u64> {
         let o = unsafe { (host().client_menu_owner)(self.raw) };
         (o != 0).then_some(o)
     }
-    /// A component of the open menu's machine, synced with `SYNC_MENU`, for screens to bind to.
+    /// A component of what the open menu is on, synced with `SYNC_MENU`, for screens to bind to.
     pub fn menu_component<T: Value>(&self, c: &Component<T>) -> Option<T> {
         self.component_of(self.menu_owner()?, c)
     }
@@ -147,6 +160,8 @@ pub struct S {
     pub grow: f32,
     pub gap: f32,
     pub pad: f32,
+    /// Left and right padding instead of `pad` (`S::pad_xy`).
+    pub pad_x: Option<f32>,
     pub row: bool,
     pub align: u32,
     pub justify: u32,
@@ -185,6 +200,7 @@ impl Default for S {
             grow: 0.0,
             gap: 0.0,
             pad: 0.0,
+            pad_x: None,
             row: false,
             align: abi::ui_align::START,
             justify: abi::ui_justify::START,
@@ -260,6 +276,11 @@ impl S {
         self.flags |= abi::ui_flags::SCROLL;
         self
     }
+    /// Children scroll, with a narrow bar for a compact panel.
+    pub fn scroll_thin(mut self) -> S {
+        self.flags |= abi::ui_flags::SCROLL | abi::ui_flags::THIN_SCROLLBAR;
+        self
+    }
     /// Text on one line.
     pub fn no_wrap(mut self) -> S {
         self.flags |= abi::ui_flags::NO_WRAP;
@@ -276,7 +297,7 @@ impl S {
         self.scale = s;
         self
     }
-    /// A button that can't be pressed now.
+    /// A button or slider that can't be used now.
     pub fn disabled(mut self, yes: bool) -> S {
         if yes {
             self.flags |= abi::ui_flags::DISABLED;
@@ -296,6 +317,13 @@ impl S {
     }
     pub fn pad(mut self, p: f32) -> S {
         self.pad = p;
+        self.pad_x = None;
+        self
+    }
+    /// `x` left and right, `y` above and below.
+    pub fn pad_xy(mut self, x: f32, y: f32) -> S {
+        self.pad = y;
+        self.pad_x = Some(x);
         self
     }
     pub fn size(mut self, w: f32, h: f32) -> S {
@@ -347,6 +375,12 @@ pub struct Ui {
 impl Ui {
     pub(crate) fn from_raw(ui: *mut abi::UiCtx, client: *mut abi::ClientCtx) -> Ui {
         Ui { raw: ui, client: ClientView { raw: client } }
+    }
+
+    /// The recipe currently being built, in a recipe layout or an `entry` part of the viewer.
+    pub fn recipe(&self) -> Option<crate::RecipeView> {
+        let (mut kind, mut recipe) = (Str::new(""), 0);
+        unsafe { ((host().ui_recipe)(self.raw, &mut kind, &mut recipe) != 0).then(|| crate::RecipeView::named(kind.as_str(), recipe)) }
     }
 }
 
@@ -400,7 +434,10 @@ fn node(kind: u32, s: S) -> Node {
         scale: s.scale,
         grow: s.grow,
         gap: s.gap,
-        pad: [s.pad; 4],
+        pad: match s.pad_x {
+            Some(x) => [x, s.pad, x, s.pad],
+            None => [s.pad; 4],
+        },
         row: s.row as u32,
         align: s.align,
         justify: s.justify,
@@ -485,10 +522,16 @@ impl Ui {
         self.leaf(n)
     }
 
-    /// What mods add to place `area` of `screen` (`Registry::screen_part`). A screen of your own
+    /// What mods add to place `area` of a screen or HUD element (`Registry::screen_part`). A screen of your own
     /// that replaces an engine one (`core:title`) keeps other mods' buttons by building its places.
     pub fn screen_parts(&mut self, screen: &str, area: &str) {
-        let mut n = node(k::SCREEN_PARTS, S::default());
+        self.screen_parts_in(screen, area, S::default())
+    }
+
+    /// `screen_parts` laid out by `s`: `S::row()` for a row of tabs (chiacraft: other mods' tabs
+    /// stacked in a column beside the inventory's own, a row too high, Planner 11-24).
+    pub fn screen_parts_in(&mut self, screen: &str, area: &str, s: S) {
+        let mut n = node(k::SCREEN_PARTS, s);
         n.class = Str::new(screen);
         n.text = Str::new(area);
         self.leaf(n)
@@ -547,7 +590,7 @@ impl Ui {
         });
     }
 
-    /// The open menu's title: what a player named the machine or chest, else the name of the
+    /// The open menu's title: what a player named the furnace or chest, else the name of the
     /// block it was opened on, else the translation `menu.<ns>.<name>`.
     pub fn title(&mut self) {
         self.leaf(node(k::TITLE, S::default()))
@@ -558,7 +601,7 @@ impl Ui {
         self.leaf(node(k::EQUIPMENT, S::default()))
     }
 
-    /// The arrow of a menu that makes recipes (`.recipes(..)` on the menu or machine): clicking
+    /// The arrow of a menu that makes recipes (`.recipes(..)` on the menu): clicking
     /// it opens them in the recipe viewer. Empty, for a crafting grid.
     pub fn recipe_arrow(&mut self) {
         self.leaf(node(k::RECIPE_ARROW, S::default()))
@@ -593,6 +636,16 @@ impl Ui {
         n.count = count;
         n.bind = bind_cb(f);
         Icons { ui: self, node: Some(n), effects: Vec::new() }
+    }
+
+    /// An image shown while `f` is above 0, that much opaque (up to 1): an overlay that comes and
+    /// goes (a glider's frame overhead while gliding). `s` sizes it; in `hud_anchor::TOP`,
+    /// `S::default().h(..)` spans the screen's width.
+    pub fn image_bind(&mut self, texture: &str, s: S, f: impl Fn(&ClientView) -> f32 + Send + Sync + 'static) {
+        let mut n = node(k::IMAGE, s);
+        n.text = Str::new(texture);
+        n.bind = bind_cb(f);
+        self.leaf(n)
     }
 
     pub fn image(&mut self, texture: &str, w: f32, h: f32) {
@@ -634,14 +687,54 @@ impl Ui {
         self.button_args(key, &[], s, f)
     }
 
-    /// A button whose label has arguments (`settings.gui_scale` with the scale).
-    pub fn button_args(&mut self, key: &str, args: &[Arg], s: S, f: impl Fn(&ClientView) + Send + Sync + 'static) {
+    /// A button that does something more when clicked twice in a row (a world in a list: once
+    /// selects, twice plays).
+    pub fn button_double(
+        &mut self,
+        key: &str,
+        s: S,
+        f: impl Fn(&ClientView) + Send + Sync + 'static,
+        double: impl Fn(&ClientView) + Send + Sync + 'static,
+    ) {
         let mut n = node(k::BUTTON, s);
+        n.on_click = callback(move |a: &mut abi::UiArgs| f(&ClientView { raw: a.client }));
+        n.on_double_click = callback(move |a: &mut abi::UiArgs| double(&ClientView { raw: a.client }));
+        if n.class.len == 0 {
+            n.class = Str::new("button");
+        }
+        self.with(n, |ui| ui.text_styled(S::column().class("button").no_wrap(), key, &[]));
+    }
+
+    /// A button showing a picture (a texture like `image`'s, `"mymod:gui/sort"`, `w` by `h` GUI
+    /// pixels) and nothing else: what it does goes in its tooltip (`S::tooltip`).
+    pub fn icon_button(&mut self, texture: &str, w: f32, h: f32, s: S, f: impl Fn(&ClientView) + Send + Sync + 'static) {
+        let mut n = node(k::BUTTON, s.size(w + 2.0, h + 2.0).pad(1.0));
         n.on_click = callback(move |a: &mut abi::UiArgs| f(&ClientView { raw: a.client }));
         if n.class.len == 0 {
             n.class = Str::new("button");
         }
-        self.with(n, |ui| ui.text_styled(S::column().class("button").no_wrap(), key, args));
+        self.with(n, |ui| ui.image(texture, w, h));
+    }
+
+    /// A button whose label has arguments (`settings.gui_scale` with the scale).
+    pub fn button_args(&mut self, key: &str, args: &[Arg], s: S, f: impl Fn(&ClientView) + Send + Sync + 'static) {
+        self.button_data(key, args, s, 0, move |c, _| f(c));
+    }
+
+    /// A button with an index or other small value passed to its callback.
+    pub fn button_data(&mut self, key: &str, args: &[Arg], s: S, data: u32, f: impl Fn(&ClientView, u32) + Send + Sync + 'static) {
+        self.button_content(s, data, f, |ui| ui.text_styled(S::column().class("button").no_wrap(), key, args));
+    }
+
+    /// A button with custom content and a small value passed to its callback.
+    pub fn button_content(&mut self, s: S, data: u32, f: impl Fn(&ClientView, u32) + Send + Sync + 'static, content: impl FnOnce(&mut Ui)) {
+        let mut n = node(k::BUTTON, s);
+        n.data = data;
+        n.on_click = callback(move |a: &mut abi::UiArgs| f(&ClientView { raw: a.client }, a.data));
+        if n.class.len == 0 {
+            n.class = Str::new("button");
+        }
+        self.with(n, content);
     }
 
     /// A button holding any parts (an item's icon, a row of them) instead of a label.
@@ -671,10 +764,83 @@ impl Ui {
         value: impl Fn(&ClientView) -> f32 + Send + Sync + 'static,
         on_change: impl Fn(&ClientView, f32) + Send + Sync + 'static,
     ) {
+        self.make_slider(s, value, on_change, false);
+    }
+
+    /// A slider whose bound value is committed once when the pointer is released.
+    pub fn slider_on_release(
+        &mut self,
+        s: S,
+        value: impl Fn(&ClientView) -> f32 + Send + Sync + 'static,
+        on_release: impl Fn(&ClientView, f32) + Send + Sync + 'static,
+    ) {
+        self.make_slider(s, value, on_release, true);
+    }
+
+    fn make_slider(
+        &mut self,
+        s: S,
+        value: impl Fn(&ClientView) -> f32 + Send + Sync + 'static,
+        on_change: impl Fn(&ClientView, f32) + Send + Sync + 'static,
+        release: bool,
+    ) {
+        self.slider_track(
+            s,
+            &[0.0],
+            SliderOptions { release, ..SliderOptions::default() },
+            move |c, values| values[0] = value(c),
+            move |c, _, v| on_change(c, v),
+        );
+    }
+
+    /// A range with two ordered handles. The edit reports the endpoint index and its new 0..1 value.
+    pub fn range_slider(
+        &mut self,
+        s: S,
+        value: impl Fn(&ClientView) -> [f32; 2] + Send + Sync + 'static,
+        on_change: impl Fn(&ClientView, usize, f32) + Send + Sync + 'static,
+    ) {
+        self.slider_track(
+            s,
+            &[0.0, 1.0],
+            SliderOptions { ordered: true, fill: Some([0, 1]), ..SliderOptions::default() },
+            move |c, values| values.copy_from_slice(&value(c)),
+            on_change,
+        );
+    }
+
+    /// A slider track with any number of handles. `values` defines the starting positions and
+    /// handle order. `bind` can update all positions at once; an edit names the modified index.
+    pub fn slider_track(
+        &mut self,
+        s: S,
+        values: &[f32],
+        options: SliderOptions,
+        bind: impl Fn(&ClientView, &mut [f32]) + Send + Sync + 'static,
+        change: impl Fn(&ClientView, usize, f32) + Send + Sync + 'static,
+    ) {
+        if values.is_empty() {
+            return;
+        }
         let mut n = node(k::SLIDER, s);
-        n.bind = bind_cb(value);
-        n.on_change = callback(move |a: &mut abi::UiChangeArgs| on_change(&ClientView { raw: a.client }, a.value));
-        self.leaf(n)
+        n.slider_values = abi::Slice::new(values);
+        n.slider_fill = options.fill.unwrap_or([u32::MAX; 2]);
+        n.count = options.steps;
+        if options.release {
+            n.flags |= abi::ui_flags::SLIDER_RELEASE;
+        }
+        if options.ordered {
+            n.flags |= abi::ui_flags::SLIDER_ORDERED;
+        }
+        if options.snap {
+            n.flags |= abi::ui_flags::SLIDER_SNAP;
+        }
+        n.bind = callback(move |a: &mut abi::UiSliderBindArgs| {
+            let values = unsafe { std::slice::from_raw_parts_mut(a.values, a.len) };
+            bind(&ClientView { raw: a.client }, values);
+        });
+        n.on_change = callback(move |a: &mut abi::UiChangeArgs| change(&ClientView { raw: a.client }, a.handle as usize, a.value));
+        self.leaf(n);
     }
 
     /// An item's icon, with `count` under it when above 1.
@@ -684,6 +850,17 @@ impl Ui {
         n.count = count;
         self.leaf(n)
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SliderOptions {
+    /// Steps across the track for arrow keys. Zero uses the default of 100.
+    pub steps: u32,
+    pub snap: bool,
+    pub ordered: bool,
+    pub release: bool,
+    /// Indices of the two handles marking a highlighted span.
+    pub fill: Option<[u32; 2]>,
 }
 
 fn bind_cb(f: impl Fn(&ClientView) -> f32 + Send + Sync + 'static) -> abi::Callback {
@@ -765,10 +942,22 @@ impl Icons<'_> {
     pub fn wave_while(self, pixels: f32, f: impl Fn(&ClientView) -> f32 + Send + Sync + 'static) -> Self {
         self.effect(abi::icon_effect::WAVE, pixels, Some(Box::new(f)))
     }
+    /// The halves the row holds, `f`'s value (none: twice the count): past the count more rows
+    /// go on above, closer the more there are (hearts past twenty health).
+    pub fn max_by(self, f: impl Fn(&ClientView) -> f32 + Send + Sync + 'static) -> Self {
+        self.effect(abi::icon_effect::MAX, 0.0, Some(Box::new(f)))
+    }
     /// Any `abi::icon_effect` by `f`'s value (none: 1).
     pub fn effect(mut self, kind: u32, amount: f32, f: Option<Box<dyn Fn(&ClientView) -> f32 + Send + Sync>>) -> Self {
         let bind = f.map_or(abi::Callback::NONE, |f| bind_cb(move |c| f(c)));
-        self.effects.push(abi::IconEffect { kind, bind, amount });
+        self.effects
+            .push(abi::IconEffect { kind, bind, amount, class: Str::EMPTY });
+        self
+    }
+    /// Drawn in `class`'s icons instead while `f` is above 0 (food turned green by hunger).
+    pub fn look_while(mut self, class: &'static str, f: impl Fn(&ClientView) -> f32 + Send + Sync + 'static) -> Self {
+        self.effects
+            .push(abi::IconEffect { kind: abi::icon_effect::LOOK, bind: bind_cb(f), amount: 0.0, class: Str::new(class) });
         self
     }
 }

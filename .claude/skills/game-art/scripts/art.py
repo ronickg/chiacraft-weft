@@ -9,9 +9,12 @@ in the game. The guides and their reference images are in ../guides/ (`0 Making 
     art.py animal NAME --type "small mammal" --what "a chihuahua ..." [--size 48x32]
 
 Attached to every run: our own style key for the kind (`Our key.png` in the guide's folder, approved
-art of ours), the game's UI sheet, and the grid. Never the guides' reference images: those are cut
-from another texture pack, for reading only.
-    art.py refs                       # every reference image and type line, by kind
+art of ours), the guide's reference sheet for that kind of thing (Ronald's guides 2, 11-05: "attach
+the matching sheet with each prompt"; picked by `--ref`, else by what is drawn or the block type),
+the game's UI sheet, and the grid. The sheet's family notes ("How each family looks", ending in "Make
+it yours") go into the prompt with it, so the sheet shows how things are built and nothing is copied.
+`--no-ref` leaves the sheet out (the old way, for A/B tests).
+    art.py refs                       # every reference sheet and type line, by kind
     art.py prompt item NAME ...       # print the prompt instead of running it
     art.py check item NAME image.png  # the checks on an image already made
     art.py install item NAME --mod base [--dir OUT]   # the cut sprite over the game's texture
@@ -22,8 +25,9 @@ Every image is also kept for good in the archive (ART_ARCHIVE, default
 /Users/ronald/Coding/chiacraft-archive/images/chiacraft-art/<date>/): each try, each cut sprite, each
 game texture an install replaces. Nothing is ever deleted from it.
 
-Options: --dir (default run/art/, kept out of git), --green (purple or pink things, so the background
-can be keyed), --pale (pale things whose outline may be light), --tries N (default 3). Output in --dir: NAME.png (as generated), NAME_px.png (the exact sprite),
+Options: --ref "07,16" (reference sheets by number or name part, comma-separated), --no-ref, --dir (default run/art/, kept out of git), --green (purple or pink things, so the background
+can be keyed), --pale (pale things whose outline may be light), --tries N (default 3). Output in --dir: NAME.png (as generated), NAME_px.png (the sprite: the exact cut, and for items pixfix's cleanup of
+orphan pixels and the outline; --no-fix skips it, NAME_raw_px.png keeps the cut before it),
 NAME_checks.json (every try's numbers), failed tries as NAME__tryK.png.
 """
 import argparse
@@ -37,6 +41,12 @@ from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GUIDES = os.path.join(HERE, "..", "guides")
+# ART_RAW=guides-3 (Ronald, 11-05: "the version 3, but without how edited skill ... the raw version"):
+# his guide set exactly as sent (archived in chiacraft-archive/references/style-guides), with its own
+# reference sheets and none of ours: no style key of approved art, no lessons, no lines we added.
+RAW = os.environ.get("ART_RAW", "")
+if RAW:
+    GUIDES = os.path.expanduser(f"~/Coding/chiacraft-archive/references/style-guides/{RAW}")
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
 UI_DIR = os.path.join(ROOT, "mods", "base", "source", "ui")
 CODEX = "/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex"
@@ -146,25 +156,109 @@ def type_line(kind, name):
 
 
 def key_path(kind):
-    """Our own style key for a kind (approved art of ours), or None. Never the guides' pack sheets."""
+    """Our own style key for a kind (approved art of ours), or None (the guides' sheets are `pick_refs`)."""
     p = os.path.join(GUIDES, os.path.dirname(KINDS[kind][1]), "Our key.png")
     if os.path.exists(p):
         return p
     if kind in KEY_FROM:
         return key_path(KEY_FROM[kind])
     print(f"warning: no 'Our key.png' for {kind}s yet: generating without a style key "
-          "(make one from an approved set; never attach the guide's pack sheets)", file=sys.stderr)
+          "(make one from an approved set of ours)", file=sys.stderr)
     return None
 
 
-def ref_path(kind, name):
+# The guides' reference sheets are cut from another texture pack, so they stay out of git
+# (guides/.gitignore): a checkout without them reads the archived copy of the guide set this skill
+# holds (every version Ronald sends is kept in ~/Coding/chiacraft-archive/references/style-guides/).
+GUIDES_VERSION = "guides-3"
+REFS_HOME = os.environ.get("GUIDE_REFS", os.path.expanduser(
+    f"~/Coding/chiacraft-archive/references/style-guides/{GUIDES_VERSION}"))
+
+
+def ref_dir(kind):
     d = os.path.join(GUIDES, KINDS[kind][1])
-    if os.path.exists(os.path.join(d, name)):
-        return os.path.join(d, name)
-    hits = [f for f in sorted(os.listdir(d)) if name.lower() in f.lower()]
+    if os.path.isdir(d) and os.listdir(d):
+        return d
+    return os.path.join(REFS_HOME, KINDS[kind][1])
+
+
+def ref_path(kind, name):
+    d = ref_dir(kind)
+    if not os.path.isdir(d):
+        sys.exit(f"no reference sheets for {kind}s in {d}: copy Ronald's guides there or set GUIDE_REFS")
+    files = sorted(f for f in os.listdir(d) if f.lower().endswith(".png"))
+    name = name.strip()
+    hits = [f for f in files if f == name] or [f for f in files if f.split(" ")[0] == name.zfill(2)] or \
+        [f for f in files if name.lower() in f.lower()]
     if not hits:
-        sys.exit(f"no reference like {name!r} in {d}: {', '.join(sorted(os.listdir(d)))}")
+        sys.exit(f"no reference like {name!r} in {d}: {', '.join(files)}")
     return os.path.join(d, hits[0])
+
+
+# Items: which sheet by what is drawn (first match wins, so a diamond sword is a weapon, not a gem).
+ITEM_SHEETS = [
+    (("helmet", "chestplate", "leggings", "boots", "armour", "armor", "shell", "cuirass", "greaves"), "03"),
+    (("sword", "blade", "spear", "dagger", "knife", "mace", "club", "trident", "shield", "point"), "02"),
+    (("bow", "crossbow"), "14"),
+    (("pickaxe", "axe", "shovel", "hoe", "haft", "hammer", "sickle", "tool"), "01"),
+    (("bucket", "bottle", "potion", "flask", "vial"), "08"),
+    (("book", "paper", "map", "scroll"), "09"),
+    (("compass", "spyglass", "shears", "rod", "rope", "lead"), "10"),
+    (("saddle", "bundle", "pouch", "sack", "nest"), "11"),
+    (("egg", "bowl", "stew", "soup"), "11"),
+    (("arrow", "dart", "clock", "horn", "charm", "amulet"), "12"),
+    (("seed", "sapling", "grain", "nut", "cone", "pod"), "22"),
+    (("ingot", "raw ", "nugget", "lump", "ore"), "04"),
+    (("diamond", "gem", "crystal", "amber", "peridot", "tektite", "powder", "dust"), "05"),
+    (("bread", "apple", "meat", "beef", "pork", "mutton", "chicken", "fish", "trout", "berr", "fruit", "carrot",
+      "potato", "pie", "steak", "food", "melon", "cooked", "vegetable", "root"), "07"),
+    (("stick", "string", "feather", "leather", "bone", "hide", "fibre", "cloth", "wool"), "06"),
+]
+# Blocks: which sheet by the type line's name (`Block Art Style Guide.md`, "Reference images to attach").
+BLOCK_SHEETS = [("natural", "01"), ("grass block", "02"), ("ore", "03"), ("log", "04"), ("plank", "05"),
+                ("brick", "05"), ("built", "05"), ("framed", "06"), ("leaves", "07"), ("flower", "08"),
+                ("short grass", "09"), ("crop", "10"), ("two-tall", "15"), ("workstation", "11"),
+                ("liquid", "12"), ("light", "12"), ("glass", "13"), ("colour set", "13")]
+
+
+def pick_refs(a):
+    """The reference sheets for a request: `--ref` if given, else by kind (items by what's drawn,
+    blocks by type, a kind with one sheet that one); none with `--no-ref`."""
+    if getattr(a, "no_ref", False):
+        return []
+    if getattr(a, "ref", ""):
+        return [ref_path(a.kind, r) for r in a.ref.split(",") if r.strip()]
+    if a.kind == "item":
+        words = f" {a.name.replace('_', ' ')} {a.what.split(':')[0]} ".lower()
+        for keys, sheet in ITEM_SHEETS:
+            if any(k in words for k in keys):
+                return [ref_path("item", sheet)]
+        return []
+    if a.kind == "block":
+        t = a.type.lower()
+        return [ref_path("block", sh) for k, sh in BLOCK_SHEETS if k in t][:1]
+    d = ref_dir(a.kind)
+    files = sorted(f for f in os.listdir(d) if f.endswith(".png")) if os.path.isdir(d) else []
+    files = [f for f in files if f[:2].isdigit()]  # the guide's sheets, not Ronald's UI sheets
+    return [os.path.join(d, files[0])] if len(files) == 1 else []
+
+
+def family(kind, sheets):
+    """The guide's "How each family looks" notes for the first sheet (the family naming its number,
+    `(`01`, `13`)`), with its "Make it yours" line: pasted into the prompt beside the sheet."""
+    if kind not in ("item", "block") or not sheets:
+        return ""
+    g = guide(kind)
+    if "## 9. How each family looks" not in g:
+        return ""
+    body = g[g.index("## 9. How each family looks"):]
+    body = body[:body.index("\n---")] if "\n---" in body else body
+    num = os.path.basename(sheets[0])[:2]
+    for block in body.split("\n\n"):
+        head = block.strip().split("\n")[0]
+        if head.startswith("**") and f"`{num}`" in head:
+            return re.sub(r"\s*\(`[^)]*\)", "", block.strip(), count=1)
+    return ""
 
 
 # ---------------------------------------------------------------- the prompt
@@ -194,21 +288,33 @@ def grid_image(w, h):
     return path
 
 
+ORD = ["First", "Second", "Third"]
+SHEET_TEXT = ("{n}, the style guide's reference sheet for this kind of {label}, from another game's texture pack: "
+              "take how such things are built there (view, proportions, how the parts and materials read), never "
+              "their designs; {who} decides the look. Make it ours, as the guide says:\n{fam}")
+
+
 def build(a):
     """(prompt, reference images, (w, h), full tile?) for one request."""
+    sheets = pick_refs(a) if a.kind in ("item", "block", "model_block", "monster", "animal", "effect", "sky") else []
+    fam = family(a.kind, sheets)
     bg = ("solid flat #00FFFF cyan" if a.green == "cyan" else
           "solid flat #00FF00 green" if a.green else "solid flat #FF00FF magenta")
-    key = key_path(a.kind) if a.kind != "ui" else None
+    key = key_path(a.kind) if a.kind != "ui" and not RAW else None
     if getattr(a, "key", ""):  # another style key of ours (approved art), e.g. the plants sheet for flowers
         key = a.key
     if a.kind == "item":
         w, h = 32, 32
         t = (f"Make one item icon for my block game.\n\n{style('item')}\n\n{GRID.format(w=w, h=h, W=1024, H=1024, c=32)} "
              f"The item sits inside the 32 x 32 grid; everything outside it is {bg} (it will be cut out). Use about "
-             "16-32 colors.\n\nAttached: first, approved items of my game, the style key: take their size, outline, "
-             "light and level of detail, not their designs. Second, the game's UI: its colors and the dark brown slot "
+             "16-32 colors.\n\nAttached: "
+             + ("first, approved items of my game, the style key: take their size, outline, light and level of detail, "
+                "not their designs. " if key else "")
+             + (SHEET_TEXT.format(n="Second" if key else "first", label="item", fam=fam or "(the shapes are free)", who="the style above" if RAW else "our style key")
+                + "\n\n" if sheets else "")
+             + ORD[bool(key) + bool(sheets)] + ", the game's UI: its colors and the dark brown slot "
              f"(#352015) the icon must read on.\n\nThe item: {a.what}.\n\n")
-        refs, full = [key, UI_REF], False
+        refs, full = [key, *sheets, UI_REF], False
     elif a.kind == "block":
         w, h = 32, 32
         full = not a.cutout
@@ -216,10 +322,14 @@ def build(a):
                 "seamlessly." if full else
                 f"Where there is nothing (gaps, around the plant) the image is {bg}, which stands for transparent.")
         t = (f"Make one block texture for my block game.\n\n{style('block')}\n\n{type_line('block', a.type)}\n\n"
-             f"{GRID.format(w=w, h=h, W=1024, H=1024, c=32)} {fill}\n\nAttached: first, approved block textures of my "
-             "game, the style key: take their look, not their designs. Second, the game's UI, for its colors.\n\n"
+             f"{GRID.format(w=w, h=h, W=1024, H=1024, c=32)} {fill}\n\nAttached: "
+             + ("first, approved block textures of my game, the style key: take their look, not their designs. "
+                if key else "")
+             + (SHEET_TEXT.format(n="Second" if key else "first", label="block", fam=fam or "(the shapes are free)", who="the style above" if RAW else "our style key")
+                + "\n\n" if sheets else "")
+             + ORD[bool(key) + bool(sheets)] + ", the game's UI, for its colors.\n\n"
              f"The block: {a.what}.\n\n")
-        refs = [key, UI_REF]
+        refs = [key, *sheets, UI_REF]
     elif a.kind == "animal":
         w, h = map(int, a.size.lower().split("x"))
         W, H = w * 32, h * 32
@@ -262,7 +372,12 @@ def build(a):
              f"{GRID.format(w=w, h=h, W=W, H=H, c=c)} Make the image {W} x {H}. {place}\n\n{attached}\n\n"
              f"The {label}: {a.what}. Where the text above offers a choice in [brackets], take it from this "
              "description.\n\n")
-    if not key:  # no style key of ours for this kind yet: say so rather than describe a missing image
+    if sheets and a.kind not in ("item", "block"):
+        refs = [refs[0], *sheets] + list(refs[1:])
+        t = t.replace("\n\nThe ", "\n\nAlso attached, right after the style key: "
+                      + SHEET_TEXT.format(n="the guide's sheet", label=LABEL[a.kind], fam=fam or "(the shapes are free)", who="the style above" if RAW else "our style key")
+                      .replace("the guide's sheet, ", "") + "\n\nThe ", 1)
+    if not key and not RAW:  # no style key of ours for this kind yet: say so rather than describe a missing image
         t = t.replace(", the style key:", " (none attached yet, so follow the words):")
     extra = [r for r in (getattr(a, "like", "") or "").split(",") if r]
     if extra:  # our own drawings to match in shape (never another game's or pack's art)
@@ -328,6 +443,92 @@ def snap(path, w, h, full, green=False):
             out[j, i, :3] = cols[counts.argmax()] * 4 + 2
             out[j, i, 3] = 255
     return out
+
+
+def pixfix(sprite, pale=False, near=18.0, speck=64.0, dark=0.42, green=False):
+    """The item cut's one cleanup (Ronald via Planner, 11-22, after the pickaxe colouring test, row E2):
+    1. an orphan, a pixel with no 4-neighbour within `near` RGB of its color but one within `speck`
+       (a speckle of the same material), takes its neighbours' most common color, unless it is one of
+       the icon's brightest (a deliberate highlight or glint); a lone pixel of another material (a
+       1 px gold band on a leather handle, a rivet) is a detail and stays;
+    2. the silhouette's edge (a pixel touching the background or the canvas side) becomes an unbroken
+       dark outline: the darkest nearby color of the same material (within 2 px, close in hue), or the
+       icon's own darkest color of that hue anywhere; when it has none dark enough, that darkest color
+       taken down to `dark` of the icon's brightness, one new outline shade per material);
+    3. on magenta, edge pixels tinted by the key (a pink fringe from the cut) go.
+    `pale` things (paper, feathers) keep their light edges. Palette, shapes and every other pixel stay
+    as drawn: this is not the palette cut or grid guessing that mangled icons before."""
+    import numpy as np
+    a = sprite.astype(float).copy()
+    h, w = a.shape[:2]
+    if not green:  # the key's pink fringe: magenta-tinted pixels at the edge
+        r, g, b = a[..., 0], a[..., 1], a[..., 2]
+        pink = (a[..., 3] > 0) & (r > 120) & (b > 80) & (g < 0.62 * np.minimum(r, b))
+        a[pink, 3] = 0
+    op = a[..., 3] > 0
+    if not op.any():
+        return sprite
+    lum = 0.3 * a[..., 0] + 0.59 * a[..., 1] + 0.11 * a[..., 2]
+    bright = np.percentile(lum[op], 95)
+    N4 = ((0, 1), (0, -1), (1, 0), (-1, 0))
+    src = a.copy()
+    for y in range(h):
+        for x in range(w):
+            if not op[y, x] or lum[y, x] >= bright:
+                continue
+            ns = [src[y + dy, x + dx, :3] for dy, dx in N4
+                  if 0 <= y + dy < h and 0 <= x + dx < w and op[y + dy, x + dx]]
+            dist = [np.sqrt(((n - src[y, x, :3]) ** 2).sum()) for n in ns]
+            if len(ns) < 2 or min(dist) <= near or min(dist) > speck:
+                continue
+            ns = [n for n, d in zip(ns, dist) if d <= speck]
+            groups = []  # the neighbours clustered within `near`: the biggest group's first color wins
+            for n in ns:
+                for g in groups:
+                    if np.sqrt(((g[0] - n) ** 2).sum()) <= near:
+                        g.append(n)
+                        break
+                else:
+                    groups.append([n])
+            a[y, x, :3] = max(groups, key=len)[0]
+    if pale:
+        return a.astype(np.uint8)
+    lum = 0.3 * a[..., 0] + 0.59 * a[..., 1] + 0.11 * a[..., 2]
+    inner = np.median(lum[op])
+    limit = max(dark * inner, 40.0)
+
+    def hue(c):
+        m = c.max()
+        return c / m if m > 0 else c
+
+    out = a.copy()
+    for y in range(h):
+        for x in range(w):
+            if not op[y, x]:
+                continue
+            edge = any(not (0 <= y + dy < h and 0 <= x + dx < w) or not op[y + dy, x + dx] for dy, dx in N4)
+            if not edge or lum[y, x] <= limit:
+                continue
+            best = None
+            for rad in (2, max(h, w)):  # near first, then anywhere in the icon
+                if best:
+                    break
+                for yy in range(max(0, y - rad), min(h, y + rad + 1)):
+                    for xx in range(max(0, x - rad), min(w, x + rad + 1)):
+                        if op[yy, xx] and lum[yy, xx] <= limit and \
+                                np.abs(hue(a[yy, xx, :3]) - hue(a[y, x, :3])).max() < 0.25 and \
+                                (best is None or lum[yy, xx] < lum[best]):
+                            best = (yy, xx)
+            if best:
+                out[y, x, :3] = a[best][:3]
+                continue
+            # nothing dark enough of this hue: the icon's darkest color of the hue, darkened once to
+            # the limit, so a material gets one outline shade (not a new color per pixel)
+            same = [(lum[yy, xx], yy, xx) for yy in range(h) for xx in range(w)
+                    if op[yy, xx] and np.abs(hue(a[yy, xx, :3]) - hue(a[y, x, :3])).max() < 0.25]
+            l0, yy, xx = min(same)
+            out[y, x, :3] = np.round(a[yy, xx, :3] * (limit / max(l0, 1)))
+    return np.clip(out, 0, 255).astype(np.uint8)
 
 
 def vertical_runs(sprite, longest=6):
@@ -427,7 +628,13 @@ def make(a):
         shutil.copy(os.path.join(a.dir, f"{a.name}__try{made[0]}.png"), out)
     from PIL import Image
     pxp = os.path.join(a.dir, a.name + "_px.png")
-    Image.fromarray(snap(out, w, h, full, a.green)).save(pxp)
+    sprite = snap(out, w, h, full, a.green)
+    if a.kind == "item" and not full and not getattr(a, "no_fix", False):
+        raw = os.path.join(a.dir, a.name + "_raw_px.png")  # the exact cut, before the cleanup
+        Image.fromarray(sprite).save(raw)
+        archive(raw, f"{a.name}__raw_px", "cut")
+        sprite = pixfix(sprite, a.pale, green=bool(a.green))
+    Image.fromarray(sprite).save(pxp)
     archive(pxp, f"{a.name}__px", "cut")
     passed = tries and tries[-1].get("passed")
     return f"{a.name}: {'passed' if passed else 'FAILED the checks'} after {len(tries)} tr{'y' if len(tries) == 1 else 'ies'} {tries[-1] if tries else ''}"
@@ -449,7 +656,7 @@ def install(a):
 def main():
     if len(sys.argv) > 2 and sys.argv[1] == "batch":
         jobs = json.load(open(sys.argv[2]))
-        base = dict(what="", ref="", type="", guide_only=False, cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3, like="", diagonal=False, key="",
+        base = dict(what="", ref="", no_ref=False, type="", guide_only=False, cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3, like="", diagonal=False, key="", no_fix=False,
                     dir=SCRATCH, mod="base")
         # Two at a time by default (the crew's rule for batch scripts on the Mac); ART_JOBS overrides.
         with ThreadPoolExecutor(int(os.environ.get("ART_JOBS", "2"))) as ex:
@@ -458,8 +665,8 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "refs":
         for kind, (_, d) in KINDS.items():
-            folder = os.path.join(GUIDES, d)
-            print(f"== {kind}: reading sheets in guides/{d} (never attached; not in git)")
+            folder = ref_dir(kind)
+            print(f"== {kind}: reference sheets in {folder} (attached by --ref or picked; not in git)")
             for f in sorted(os.listdir(folder)) if os.path.isdir(folder) else ["(not here)"]:
                 print("  ", f)
             for k, line in type_lines(kind).items():
@@ -473,7 +680,8 @@ def main():
     ap.add_argument("name")
     ap.add_argument("image", nargs="?", help="check: the image to check")
     ap.add_argument("--what", default="", help="what to draw: material and colors, then shape and view")
-    ap.add_argument("--ref", default="", help="unused for generating (the guides' pack sheets are never attached)")
+    ap.add_argument("--ref", default="", help="the guide's reference sheet(s) to attach, by number or name part, comma-separated (default: picked by kind)")
+    ap.add_argument("--no-ref", action="store_true", help="attach no reference sheet (the old way, for A/B tests)")
     ap.add_argument("--type", default="", help="blocks and animals: the guide's type line (part of its name)")
     ap.add_argument("--cutout", action="store_true", help="blocks: see-through (plants, leaves)")
     ap.add_argument("--size", default="48x32", help="animals and the other kinds: the canvas in pixels (16x16, 32x32, 48x32, 64x64...)")
@@ -486,6 +694,7 @@ def main():
     ap.add_argument("--key", default="", help="another style key of ours (approved art) instead of the kind's Our key.png")
     ap.add_argument("--like", default="", help="our own drawing(s), comma-separated paths, to match in shape (a chosen design)")
     ap.add_argument("--tries", type=int, default=3)
+    ap.add_argument("--no-fix", action="store_true", help="items: keep the exact cut, without pixfix's orphan and outline cleanup")
     ap.add_argument("--dir", default=SCRATCH)
     ap.add_argument("--mod", default="base", help="install: the mod whose texture it replaces")
     a = ap.parse_args()

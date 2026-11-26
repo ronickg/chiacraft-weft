@@ -18,18 +18,18 @@ The engine's own text effects are in `crates/engine/assets/shaders/fx/`.
 [snippets](#snippets) | [text effects](#text-effects) | [panels](#panels) | [entities](#entities) | [blocks](#blocks) | [particles](#particles) | [screen effects](#screen-effects) | [shader packs](#shader-packs)
 
 ## Snippets
-A snippet is a file `shaders/<kind>/<name>.wgsl` in your mod, holding one function whose name depends on the kind. The engine puts all snippets of a kind into a single shader and picks one by number for each text, panel, mob or particle, so a hundred snippets don't cost a hundred shaders.
+A snippet is a file `shaders/<kind>/<name>.wgsl` in your mod, holding one function whose name depends on the kind. The engine puts all snippets of a kind into a single shader and picks one by number for each text, panel, mob or particle, so a hundred snippets don't cost a hundred shaders. Code names a snippet by a handle like anything else, `static GHOST: Shader = Shader::named("ghost");`, and the kind's folder is found from what uses it.
 
 | kind | folder | function | used by |
 |---|---|---|---|
 | text effects | `shaders/fx/` | `fn effect(g: Glyph) -> Glyph` | `{fx:mymod:name}` in a translation |
 | panels | `shaders/gui/` | `fn fill(p: GuiPixel) -> vec4<f32>` | a class's `.gui`: `shader = mymod:name` |
-| entities | `shaders/entity/` | `fn shade(p: EntityPixel) -> vec4<f32>` | `r.entity(..).shader("name")` |
-| entity effects | `shaders/entity_effect/` | `fn effect(p: EntityPixel, c: vec4<f32>, strength: f32) -> vec4<f32>` | `r.entity_effect(&E)`, then `w.entity_effect(id, &E, strength, ticks)` |
-| blocks | `shaders/block/` | `fn shade(p: BlockPixel) -> vec4<f32>` | `r.block(..).shader("name")` |
-| particles | `shaders/particle/` | `fn shade(p: ParticleFrag) -> vec4<f32>` | `r.particle(..).shader("name")` |
-| sky | `shaders/sky/` | `fn shade(p: SkyPixel) -> vec4<f32>` | `r.sky_body(..).shader("name")`, see the [sky guide](sky.md#shaders) |
-| screen effects | `shaders/post/` | `fn apply(p: PostPixel) -> vec4<f32>` | `client.post_effect("mymod:name", strength)` |
+| entities | `shaders/entity/` | `fn shade(p: EntityPixel) -> vec4<f32>` | `r.entity(..).shader(&SHADER)` |
+| entity effects | `shaders/entity_effect/` | `fn effect(p: EntityPixel, c: vec4<f32>, strength: f32) -> vec4<f32>` | `r.entity_effect(&E)`, then `w.entity_effect(id, &E, level, ticks)` |
+| blocks | `shaders/block/` | `fn shade(p: BlockPixel) -> vec4<f32>` | `r.block(..).shader(&SHADER)` |
+| particles | `shaders/particle/` | `fn shade(p: ParticleFrag) -> vec4<f32>` | `r.particle(..).shader(&SHADER)` |
+| sky | `shaders/sky/` | `fn shade(p: SkyPixel) -> vec4<f32>` | `r.sky_body(..).shader(&SHADER)`, see the [sky guide](sky.md#shaders) |
+| screen effects | `shaders/post/` | `fn apply(p: PostPixel) -> vec4<f32>` | `client.post_effect(&SHADER, strength)` |
 
 The file name is the snippet's name, so `shaders/fx/glitch.wgsl` in `testmod` is `testmod:glitch`. Whatever a function can see is in the struct it takes, and all of them carry `time`, the seconds since the game started. A resource pack can replace a snippet the way it replaces a texture, and a mistake in one shows up in the log with the file and the error.
 
@@ -74,11 +74,11 @@ fn shade(p: EntityPixel) -> vec4<f32> {
 }
 ```
 ```rust
-r.entity(&WISP).texture("wisp").model(model.uv_size(32, 16)).shader("ghost");
+r.entity(&WISP).texture("wisp").model(model.uv_size(32, 16)).shader(&GHOST);
 ```
 `EntityPixel` has `uv`, `albedo` (the skin's texel, linear, `a` is its alpha), `light` (a vec3 with shading and the glow mask already included) and `time`. A returned alpha under 0.5 cuts the pixel out, which is how the wisp gets its holes. The `_e` glow masks of the [textures guide](textures.md#emission) are a separate and simpler way to make parts of a skin shine.
 
-An entity effect goes on top of whatever shaded a mob, for a while: it gets the color `c` and a `strength`, and returns the new color. The engine's are effects too, `core:hurt` is the red a hit leaves, `core:flash` a creeper's white and `core:glow` lights a mob up whatever the light around (`entity_effects::GLOW`). `w.entity_effect(id, &MY_EFFECT, 0.6, 40)` puts one on for everyone who sees it, players arriving later included, and one at a time: a new one replaces it, `0` ticks takes it off. `w.flash(id)` is the white one for two ticks.
+An entity effect goes on top of whatever shaded a mob, for a while: it gets the color `c` and a `strength` (1 while it is on), and returns the new color. The engine's are effects too, `core:hurt` is the red a hit leaves, `core:flash` a white flash and `core:glow` lights a mob up whatever the light around (`entity_effects::GLOW`). `w.entity_effect(id, &MY_EFFECT, 1, 40)` puts one on for everyone who sees it, players arriving later included, and one of a kind at a time: a new one replaces it, `0` ticks takes it off. `w.flash(id)` is the white one for two ticks.
 
 ## Blocks
 A block shader colors the pixels of a block's faces and takes over from the normal lighting the same way:
@@ -89,7 +89,7 @@ fn shade(p: BlockPixel) -> vec4<f32> {
 }
 ```
 ```rust
-r.block(&REINFORCED_STONE).shader("stripes");
+r.block(&REINFORCED_STONE).shader(&STRIPES);
 ```
 `BlockPixel` has `uv` (across the face), `albedo` (the texel with its overlay, linear), `light` (shading, AO, the biome tint and glow already in), `pos` (block coordinates of the pixel, handy for patterns that run across blocks) and `time`. Fog goes on top of what it returns. The shader goes with the block's textures, so two blocks sharing a texture share it.
 
@@ -103,11 +103,11 @@ fn shade(p: ParticleFrag) -> vec4<f32> {
 ```
 ```rust
 static SPARK: Particle = Particle::named("spark");
-r.particle(&SPARK).textures(&["glint_0", "glint_1"]).life(0.3, 0.6).fullbright().shader("twinkle");
+r.particle(&SPARK).textures(&["glint_0", "glint_1"]).life(0.3, 0.6).fullbright().shader(&TWINKLE);
 ```
 `ParticleFrag` has `uv` (0 to 1 across the quad), `albedo` (the texture sample), `color` (the kind's color at this age, between the two you gave to `color(start, end)`), `life` (0 at birth, 1 at the end) and `time`.
 
-The rest of the builder is `life(min, max)` in seconds, `size(min, max)` in blocks, `gravity(g)` (negative rises), `drag(d)`, `colliding()`, `fullbright()`, `translucent()` and `shrinking()`. From the server, `world.spawn_particles(&SPARK, pos).count(12).spread(0.4).speed(2.0)` makes them appear for everyone nearby. Registering a particle named `core:block` or `core:poof` changes how the engine's own block dust and smoke look.
+The rest of the builder is `life(min, max)` in seconds, `size(min, max)` in blocks, `gravity(g)` (negative rises), `drag(d)`, `colliding()`, `fullbright()`, `translucent()` and `shrinking()`. From the server, `world.spawn_particles(&SPARK, pos).count(12).spread(0.4).speed(2.0)` makes them appear for everyone nearby. `r.edit(&POOF)` with `static POOF: Particle = Particle::named("core:poof")` (or `replace`) changes how the engine's own smoke looks, `core:block` its block dust.
 
 ## Screen effects
 A screen effect works on the finished picture of the world, and fades in and out with a strength from 0 to 1:
@@ -120,9 +120,10 @@ fn apply(p: PostPixel) -> vec4<f32> {
 ```
 ```rust
 static DREAM: Key = Key::named("dream");
-r.key(&DREAM, "N").on_press_client(|c| c.post_effect("dream", 1.0));
+static DREAM_EFFECT: Shader = Shader::named("dream");
+r.key(&DREAM, "N").on_client(|c| c.post_effect(&DREAM_EFFECT, 1.0));
 ```
-`PostPixel` has `uv` (0 to 1, top left first), `color` (the picture so far at that point, linear), `strength`, `time` and `size` in pixels, and `scene_at(p, uv)` reads the picture anywhere else, for blur and waves. `post_effect(name, 0.0)` turns an effect off, and several can be on at once, applied one after another in the order they were turned on.
+`PostPixel` has `uv` (0 to 1, top left first), `color` (the picture so far at that point, linear), `strength`, `time` and `size` in pixels, and `scene_at(p, uv)` reads the picture anywhere else, for blur and waves. `post_effect(&EFFECT, 0.0)` turns an effect off, and several can be on at once. It is a convenience over named [environment sources](environment.md); priority and source identity determine their order. Use an environment contribution to set transitions, conditions or override other effects.
 
 ## Shader packs
 Snippets add to the engine's shaders, a shader pack replaces them. It is a folder `shaderpacks/<id>/` next to the game, chosen by players in the settings, with any of these files:
@@ -133,6 +134,7 @@ Snippets add to the engine's shaders, a shader pack replaces them. It is a folde
 | `model.wgsl` | mobs and the player's model |
 | `entity.wgsl` | held items |
 | `particle.wgsl` | particles |
+| `wake.wgsl` | wakes, bow waves and hull splash sheets |
 | `weather.wgsl` | rain and snow |
 | `sky.wgsl` | the sky, what is in it, and the overlay from inside a liquid |
 | `post.wgsl` | screen effects |
@@ -148,8 +150,23 @@ A screen effect (`shaders/post/<name>.wgsl`, `fn apply(p: PostPixel) -> vec4<f32
 
 An effect can have a half-size part (chiacraft): `shaders/post_low/<name>.wgsl` with `fn low(p: PostPixel) -> vec4<f32>`, drawn before the effects into an image of its own at half the size each way (Rgba16Float), with the world's image and depth as the effects see them. The effect of the same name then reads it through `p.low` (its bindless index + 1, 0 when there is none): `post_low_at(p, uv)` filtered, or `post_low_upsampled(p)` from the four nearest texels weighted by depth, so it doesn't bleed across silhouettes. Both files are composed into one shader, so the effect can call the part's functions itself when `p.low` is 0. The base game's volumetric light works this way (`post_low/volume.wgsl`).
 
+With the HDR world (`core:hdr_world`, chiacraft) the world is drawn in linear light past 1 and the effects' last pass finishes the picture (`Pass::spare` 1 there). A pack whose post.wgsl has `fs_bloom_down`, `fs_bloom_up` and `fs_exposure` also gets a bloom pyramid and an exposure texel drawn before the effects, which each effect's pass names in `bloom` and `exposure` (bindless index + 1; `core:bloom` 0 none, 1 four levels, 2 six); `scene.frame.y` is 1 while it draws, so an effect's own glow can step aside.
+
+### Temporal anti-aliasing and motion
+With `core:aa` 1 (or 2: from the camera alone, no motion image and `scene.taa_frame.y` 0, cheaper on phones) the world is drawn a fraction of a pixel aside each frame and gathered over frames by `taa.wgsl` (the engine's; a pack may replace it, keeping `vs`, `fs_taa` and `fs_taa_motion`), right after the world and before the screen effects, which then read the gathered picture. `scene.taa.xy` is this frame's jitter in NDC (a clip position's `xy / w - scene.taa.xy` is where it would be without), `scene.taa.z` 1 when there is a last frame to gather from (0: the shaders skip their motion), `scene.taa.w` the shaders' clock last frame, and `scene.taa_prev` last frame's view and projection without the jitter, taking this frame's camera-relative positions. Blocks, distant terrain and the sky need nothing: their motion comes from the depth. What moves by itself writes its motion as a second output, `@location(1) vec4<f32>`, from common's `screen_motion(clip, scene.taa_prev * vec4(where_it_was, 1.0), scene.taa.xy)` per vertex and `motion_texel(m, in.clip.z)` in the fragment (chiacraft's swaying leaves and grass, mobs through `prev_bones`, the hand as still). A fragment entry without that output leaves the motion as it is, so older packs keep working. Its w is a reactive share: chiacraft's rain and snow write how much they cover, and that much more of the new frame is taken there, so their streaks don't wash out. After the gathering, `scene.taa_frame.x` (the bindless index + 1 of its count image; 0 without) tells a screen effect how far each pixel moved this frame in pixels (its g), so a pack can sharpen more where the picture moves. A moving structure's last place is in `offsets` after the table's three vec4 a structure: `offsets[2].w` structures, then two vec4 each (offset, rotation), as chiacraft's `finish_prev` reads them.
+
+The path traced mode's light is denoised by `denoise.wgsl` (the engine's; a pack may replace it, keeping `vs`, `fs_temporal`, `fs_moments`, `fs_variance`, `fs_atrous` and `fs_composite`; `denoise::Denoiser`, `core:pt_denoiser`): the path tracer hands its diffuse light over the albedo and its specular light over `pt_spec_albedo(f0, roughness, n_dot_v)` (common.wgsl, Karis's fit of the environment BRDF; the alpha its hit distance in blocks), beside the G-buffer (rgb albedo; xyz shading normal in world axes and w perceptual roughness; rgb F0). Each entry reads its images from `dn[instance]` (`DenoisePass`: bindless indices, their meaning per entry in the file's header). Under DLSS Ray Reconstruction it only multiplies the albedo back in, and `upscale_guides.wgsl`'s `fs_pt_guides` draws RR's specular albedo and hit distance from the same G-buffer.
+
+The stock `world.wgsl` defines `lod_tile_covered(data: u32)`. Keeping this function in a pack opts into the flag at `LOD_DRAW_COVERED_SHIFT` in the packed draw word. When the flag is set, loaded cubes cover every solid fragment of the tile under the stock ground-mask rules, so `vs_lod` can clip its vertices immediately. A pack that drops the helper receives the original draw word. Water and forest impostors use their own coverage rules.
+
 ### Sun shadows
 A pack that wants shadows gets the two things it needs from the world shader's prelude: `scene.sun` (xyz points toward the sun, w is how high it stands, 0 at night and in dimensions without sky) and `solid_at(p: vec3<i32>) -> bool`, which says whether the block at `p` casts a shadow (anything that dims sky light, liquids aside). It knows the blocks about 112 blocks around the camera and answers false beyond them, so march from the pixel toward `scene.sun.xyz` through block cells and stop at the first solid one. The engine only keeps these blocks on the GPU while the chosen pack's `world.wgsl` calls `solid_at`, so packs without shadows pay nothing.
+
+Materials (chiacraft): a world shader may call `mat_at(layer, uv, albedo) -> Mat`, the material of a block's texel from its texture's LabPBR maps (`_s`, `_n`; the [textures guide](textures.md#materials)): `smoothness`, `rough` ((1 - smoothness)²), `f0` (rgb, a metal's colour), `metal` (0 or 1), `porosity`, `sss`, `n` (the normal in the texture's frame: x along u, y down v, z out), `ao`, `height`, and `has` (false: the texture has no maps, and the rest is rough stone at 4%, flat). `layer` is the texel's bindless index (`VOut.layer`), `uv` within the texture. `mat_normal(m, n, rel, uv)` tilts a face's normal `n` by it, its frame from the screen's derivatives, so fragment shaders only. The table behind it is `mat_map` (two words per bindless index: the specular map's and the normal map's, all ones none).
+
+Traced shadows (chiacraft, `core:rt_shadows`): on a GPU with Vulkan's ray queries (a desktop RTX or RDNA2 card; not the Mac or phones) the engine keeps the world's cubes and the distant terrain in acceleration structures, and a pack's `world.wgsl` may call `rt_sun(rel, n, l, plant) -> vec3<f32>`: how much of the light coming along `l` (unit, toward the light, as `scene.sun.xyz`) reaches the surface at `rel` (camera relative) facing `n`, 0 blocked to 1 open, one ray through the scene. The see-through texels of leaves and plants let it by, a stained pane colours it (rgb), and water lets it through. With `plant` true (a plant's own pixel) other plants don't shade it. For soft edges, `rt_sun_soft(rel, n, l, plant, radius, px, fine)` takes the light's disc (`radius` in radians; the real sun's is 0.0047) and the pixel (`@builtin(position).xy`): with temporal anti-aliasing on (`core:aa`, its jitter in `scene.taa.xy`) it traces one ray to a point of the disc that moves every frame (`fine`: two rays to opposite sides, two more where they disagree, about three times the cost), so the history gives penumbrae that widen with the distance to the caster; without TAA it is `rt_sun` toward `l`. It is traced only while `scene.rt.x` is 1; otherwise these functions are stubs that return 1, so the same pack runs everywhere: branch on `scene.rt.x` and use the shadow maps without it. For reflections (`core:rt_reflections`, `scene.rt.w` 1), `rt_hit(rel, dir, t_max, blur) -> RtHit` gives the first surface along `dir`: `hit` (false: the sky), `t`, where it is (`rel` camera relative, `world`), its facing `n`, its texel `albedo` (linear, before the tint; `blur` mips more), its `light` as the world stores it (x the sky's, yzw the blocks'), its `tint` kind and `biome`, and whether it is distant terrain (`lod`); leaves' holes and clear panes are seen through, water is a surface. The pack lights it as it lights the world (chiacraft's `traced_view`), and the screen's reflections should then step aside. While a pack traces, the engine's near shadow map holds the models alone (mobs, the player: the rays don't see them), and the far one the terrain as before, for what doesn't trace (mobs, the mist).
+
+Path traced (chiacraft, `core:path_traced`, opt-in): after the world's pass the engine draws the opaque and cutout terrain again, where the world's depth is theirs, with the pack's `world.wgsl` entries `fs_gb_opaque` and `fs_gb_cutout` (over `vs_face`/`vs_quad`). They return three images: `@location(0)` albedo (Rgba8 sRGB: rgb, metals at half, as the world draws them; a metalness), `@location(1)` normal (Rgba16F: xyz world, a perceptual roughness), `@location(2)` spec (Rgba8 sRGB: rgb F0, metals their colour, 0 without material maps; a subsurface). The path tracer and its denoisers read them; without those entries there is no G-buffer. The pack's `pathtrace.wgsl` (`cs_trace`, then the composite `vs_pt`/`fs_pt`) lights each terrain pixel by tracing and hands its light on in two Rgba16F images, `WorldRenderer::pt_images`: diffuse (rgb divided by the albedo; a the bounce ray's distance, 65504 the sky) and specular (rgb divided by the specular albedo, Karis' fit of the split sum: `pt_env_brdf(f0, roughness, n.v)`; a the reflection ray's distance, 65504 the sky, 0 untraced). Both already carry the air's transmittance: the composite writes the air's own light under them and, without a denoiser, the light itself (albedo × diffuse + specular albedo × specular). Further bounces come from a radiance cache in world space (`pt_cache`, binding 36, `cs_cache` resolving it each frame): cells a block wide near the eye, wider with distance, one per face direction, holding the indirect light the paths found there; a bounce ray that meets a surface takes that surface's indirect light from its cell.
 
 Textures and models stay with resource packs, see the [resource packs guide](resourcepacks.md).
 
@@ -173,4 +190,14 @@ chiacraft's pack reads these settings (`mods/base/src/look.rs`; Mod Settings in 
 | `base:night_moon` | 1, 0.3-2 | the moon's light at night |
 | `base:look_canopy` | 1, 0.2-2 | under a forest's canopy (`vitals::air::CANOPY`): how dim and green the shade under the leaves is, and how freely the sunflecks come through |
 | `base:look_shafts` | 1, 0.2-3 | how strong the light shafts through a forest's crown gaps are (most in morning mist) |
+| `base:look_curve` | 1, 0-2 | with the HDR world (without it Lottes's always): the day's tone curve, 0 Lottes's (as made), 1 Hejl's 2015 (a deeper toe, Ronald's pick), 2 AgX (Bliss's current default) |
+| `base:look_bloom` | 1, 0-3 | with the HDR world: how much of the bloom pyramid's glow is mixed in (1: a tenth, more in fog and rain) |
+| `base:look_auto_exposure` | 1, 0-2 | with the HDR world: how much the exposure follows how bright the view is (0 fixed) |
+| `base:look_white` | 1.6, -1..2.5 | with the HDR world: the white balance by day after the curve, 0 neutral, more warmer and less blue |
+| `base:look_sky_light` | 1, 0.2-1.5 | the sky's light in the shade, scaled (with the HDR world 0.6 of it as made, times this) |
+| `base:look_foliage_test` | 0, 0-1 | a test: grass and leaf tints darker and less yellow (1: 30% darker) |
+| `base:look_ao_test` | 0, 0-1 | a test: takes the corner shade (AO) away |
+| `base:look_sharpen` | 0.4, 0-1 | with the HDR world: contrast-adaptive sharpening in the last pass (Bliss runs 0.35-0.4) |
+| `base:look_leaf_sun` | 1, 0.5-4 | with the HDR world: the sun on leaves' lit faces (not on plants; 2 overshot on real meshes in Bliss's own world) |
+| `base:look_leaf_holes` | 1, 0-1 | with the HDR world: leaves keep their see-through holes at a distance (alpha one mip sharper, cut at 0.5, as Minecraft's leaves); 0 the old 0.1 cut |
 

@@ -1,0 +1,9 @@
+# The catalogue's registry (tools/catalogue/build.py --fetch-dump <job>): `/tk dump` writes every item, block, entity, recipe,
+# skill and the perk web as JSON into the run's shot dir (~/looktest/t2_<job>/registry.json). Queue with
+# t2q.py look <tag>_dump <@dev> notes/crew/tester-tools/t2/scripts/t2_catalogue_dump.txt <world> --fresh
+loaded
+idle
+chat /tk dump registry.json
+wait 3
+shot catalogue_dump.png
+quit

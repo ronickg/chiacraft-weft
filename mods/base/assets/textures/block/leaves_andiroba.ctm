@@ -1,4 +1,0 @@
-# Tropical forest (11-04): three variants beside the plain tile, picked at random, so a crown does not show its tile repeating.
-method = random
-tiles = <default> leaves_andiroba/1-3
-symmetry = all

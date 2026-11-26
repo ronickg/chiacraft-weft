@@ -6,7 +6,7 @@ having to ... redo every asset").
 reads mods/base/source/blocks/grade.toml (groups and per-tile rows; the knobs are explained there), and
 rebuilds every graded tile of base and animals, CTM variants included, from its source in
 mods/<mod>/source/blocks/tiles/. It prints each tile's luma, saturation and p10-p90 spread, before and
-after, and the vanilla band when the packs are at --packs (see block-textures, "Close to vanilla's
+after, and the vanilla band when the packs are at --packs (see game-art's guides/2 Blocks/Full set.md, "Close to vanilla's
 colour"), and with --preview draws a tiled 3x3 before / after of every tile the grade changes.
 
 Sources: a tile a group or row grades for the first time is adopted from the game's current tile. A

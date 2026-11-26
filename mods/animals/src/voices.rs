@@ -20,7 +20,7 @@ const HOWL_ONE_IN: u32 = 30;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&HOWLED, 0u64, 0);
-    r.attach(&crate::wolf::WOLF, &HOWLED);
+    r.edit(&crate::wolf::WOLF).attach(&HOWLED);
     for s in &crate::species::SPECIES {
         let Some(v) = voices::of(s.name) else { continue };
         let Some(f) = voices::family(v.family) else {
@@ -44,7 +44,12 @@ pub fn init(r: &mut Registry) {
                 .pitch(v.pitch * 0.92, v.pitch * 1.08)
                 .voices(AT_ONCE);
         }
-        r.sounds_on(Target::Entity(&format!("animals:{kind}")), &format!("animals:{kind}"));
+        r.sounds_on_entities(&format!("animals:{kind}"), &format!("animals:{kind}"));
+    }
+    // The bosses' young have no species of their own yet: a deer's voice for Borkon's ibex kid and
+    // Drenkaun's calf till they get theirs (the testkit's `sound_coverage` found them silent).
+    for young in ["animals:borkon_kid", "animals:drenkaun_calf"] {
+        r.sounds_on_entities(young, "animals:reindeer");
     }
 }
 
@@ -63,6 +68,7 @@ pub fn howl_at_blood_moon(w: &World, id: u64, st: &EntityState) -> bool {
         *n = night;
     }
     w.play_sound(&HOWL, st.pos, 1.0);
+    crate::anim::act(w, id, crate::anim::Act::Howl);
     weft_sdk::info!("grey_wolf {id} howls at the blood moon");
     false
 }

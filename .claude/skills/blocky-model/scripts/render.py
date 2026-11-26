@@ -12,7 +12,7 @@ the same size and their texels can be compared. Views: `3q` (front three-quarter
 `side`, `front`, `back`, `top`, `head` (the head close up, 3/4).
 
 Faces follow the painters' `face_frame` (u right and v down seen from outside the face); a quad
-shows its texture on both sides, mirrored on the back, as `to_bedrock` exports it.
+shows its texture on both sides, lined up in 3D (seen from behind, mirrored), as `to_bedrock` exports it.
 """
 
 import argparse
@@ -113,7 +113,10 @@ def render(spec, tex, pose=None, yaw=35, pitch=20, ppu=8.0, size=None, center=No
             continue
         z = q[0, 2] + s * (q[1, 2] - q[0, 2]) + tt * (q[2, 2] - q[0, 2])
         u0, v0, u1, v1 = rect
-        su = s if front else 1 - s  # the back of a quad: mirrored in u
+        # The back of a quad shows the same picture where it lies in 3D (to_bedrock mirrors the back face's
+        # uv to line up), so a point samples the same texel from either side. Sampling 1 - s on the back
+        # drew lopsided cut-outs (antlers) reversed from behind (11-05: the reindeer's antler read as a ring).
+        su = s
         tu = np.clip(np.floor(u0 + su * (u1 - u0)).astype(int), 0, tw - 1)
         tv = np.clip(np.floor(v0 + tt * (v1 - v0)).astype(int), 0, th - 1)
         col = tex[tv, tu]

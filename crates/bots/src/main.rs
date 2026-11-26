@@ -198,7 +198,8 @@ fn main() {
     let cache = o.run_dir.join("cache");
     let off = o.run_dir.join("disabled_mods.txt");
     // Kept loaded for the whole run.
-    let _mods = match weft_engine::modloader::load(&o.mod_dirs, &o.package_dirs, &cache, &off) {
+    let _mods = match weft_engine::modloader::load(&o.mod_dirs, &o.package_dirs, &cache, &off, &[], &weft_engine::app::engine_assets(false))
+    {
         Ok(m) => m,
         Err(e) => {
             log::error!("loading the mods: {e}");
@@ -452,6 +453,8 @@ async fn join(n: usize, world: &World) -> Result<Joined, String> {
 /// What the reader saw, for the player loop.
 #[derive(Default)]
 struct Seen {
+    /// Where the server put it (`PrepareJoin`), until it says it is in.
+    prepared: Option<DVec3>,
     welcome: Option<(DVec3, Instant)>,
     /// When the last cube, list of saved cubes, edits or block changes came: the view settles
     /// once these stop for a while.
@@ -491,13 +494,15 @@ async fn play(
                 let mut s = seen.lock();
                 match kind {
                     ClientTag::Cube | ClientTag::Saved | ClientTag::Edits | ClientTag::Blocks => s.last_cube = Some(Instant::now()),
-                    ClientTag::Welcome
+                    ClientTag::PrepareJoin
+                    | ClientTag::Welcome
                     | ClientTag::Teleport
                     | ClientTag::CommandReply
                     | ClientTag::Disconnect
                     | ClientTag::Refused
                     | ClientTag::Died => match codec::decode_client(&frame) {
-                        Some(ToClient::Welcome { pos, .. }) => s.welcome = Some((pos, Instant::now())),
+                        Some(ToClient::PrepareJoin { pos, .. }) => s.prepared = Some(pos),
+                        Some(ToClient::Welcome { .. }) => s.welcome = Some((s.prepared.unwrap_or_default(), Instant::now())),
                         Some(ToClient::Teleport { pos, .. }) => s.teleport = Some(pos),
                         Some(ToClient::CommandReply { id, .. }) => {
                             if let Some(at) = s.pings.remove(&id) {
@@ -545,6 +550,7 @@ async fn play(
     let mut ping_id = 0u32;
     let mut view_done = false;
     let mut mining: Option<(IVec3, u64)> = None;
+    let mut ready_sent = false;
     let why = loop {
         tick.tick().await;
         ticks += 1;
@@ -558,6 +564,14 @@ async fn play(
         let Some((spawn, welcomed)) = welcome else {
             if t0.elapsed() > Duration::from_secs(60) {
                 break "no welcome in 60 s".into();
+            }
+            // The world is prepared for it: it doesn't wait for its view, it says it is ready
+            // to go in (the server's welcome follows).
+            if !ready_sent && seen.lock().prepared.is_some() {
+                ready_sent = true;
+                if let Err(e) = p2p::write_frame(&mut send, &out(&ToServer::Ready)).await {
+                    break format!("write: {e}");
+                }
             }
             continue;
         };
@@ -598,6 +612,7 @@ async fn play(
         let yaw = (-(heading.cos()).atan2(-(heading.sin()))) as f32;
         msgs.push(ToServer::Move {
             pos,
+            vel: DVec3::ZERO,
             yaw,
             pitch: 0.0,
             on_ground: true,
@@ -608,14 +623,17 @@ async fn play(
             frame: None,
         });
         // Now and then: dig the block under it (start, then finish a second later).
+        // SYNC: a break names the block's state now (`world::placement::Part`), which the bots
+        // don't track (they read no cubes), so the server refuses these digs; to load the server
+        // with mining again, decode the cube under the bot for its state.
         match mining {
             Some((at, done)) if ticks >= done => {
-                msgs.push(ToServer::Break { pos: at, part: 0, face: 1, frame: 0 });
+                msgs.push(ToServer::Break { pos: at, part: Default::default(), face: 1, hit: [0.5, 1.0, 0.5], frame: 0 });
                 mining = None;
             }
             None if r() < 1.0 / (30.0 * 20.0) => {
                 let at = (pos - DVec3::new(0.0, 1.0, 0.0)).floor().as_ivec3();
-                msgs.push(ToServer::StartBreak { pos: at, part: 0, frame: 0 });
+                msgs.push(ToServer::StartBreak { pos: at, part: Default::default(), frame: 0 });
                 mining = Some((at, ticks + 20));
             }
             _ => {}

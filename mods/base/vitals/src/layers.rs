@@ -1,7 +1,7 @@
 //! The layers of a biome's vegetation under and between its trees (`notes/VEGETATION.md`): the
 //! floor the ground shows, ferns, shrubs, and young trees, each biome's from the real place its
 //! climate comes from (`notes/ECOLOGY.md`, "Each biome's real place"). Base sets them on its
-//! biomes as components (`mods/base/src/worldgen.rs`), so another mod sets its own the same way.
+//! biomes as components (`mods/base/src/worldgen/mod.rs`), so another mod sets its own the same way.
 //! The canopy is `TREES` and `STAND_TREES`; the grass is `forage::GRASS_COVER`; the wild plants
 //! and flowers are `wild`.
 
@@ -85,7 +85,7 @@ const fn l(
 /// willow at the edges and juniper; Konza's dogwood and sumac thickets (oak leaves stand in); the
 /// llanos' and the Pantanal's scattered shrubs; Davos' juniper mats; the tundra's dwarf willow;
 /// Sonora's creosote bush.
-pub const LAYERS: [Layers; 11] = [
+pub const LAYERS: [Layers; 12] = [
     Layers { tall_grass: 0.4, ..l("base:plains", "base:coarse_dirt", 0.03, 0.0, 0.06, "base:oak_leaves", 0.0) },
     // Mushrooms round trunks: Białowieża's honey fungus on the oaks' roots and ceps; Moscow's
     // chanterelles under birches; the taiga's chanterelles and ceps under spruce.
@@ -93,6 +93,25 @@ pub const LAYERS: [Layers; 11] = [
         mushrooms: "base:honey_fungus:3 base:porcini:2 base:mushroom_brown:1",
         mushroom_cover: 0.12,
         ..l("base:forest", "base:leaf_litter:3 base:moss_block:1", 0.25, 0.05, 0.2, "base:oak_leaves:3 base:birch_leaves:1", 0.15)
+    },
+    // Białowieża's strict reserve: deep litter and moss on a dark floor, more ferns and fungi on the
+    // dead wood than the managed forest, hazel and hornbeam under the oaks, young oaks and
+    // blossoming dogwoods (white in spring, standing in for the reserve's wild cherry and rowan)
+    // in the clearings, and treefall gaps where old trees came down.
+    Layers {
+        mushrooms: "base:honey_fungus:3 base:porcini:2 base:mushroom_brown:1",
+        mushroom_cover: 0.16,
+        young_kinds: "base:dogwood_log:3 base:oak_log:2 base:birch_log:1",
+        gaps: 0.1,
+        ..l(
+            "base:old_growth_forest",
+            "base:leaf_litter:3 base:moss_block:2 base:podzol:1",
+            0.4,
+            0.1,
+            0.16,
+            "base:oak_leaves:3 base:birch_leaves:1",
+            0.3,
+        )
     },
     Layers {
         mushrooms: "base:chanterelle:3 base:honey_fungus:1 base:mushroom_red:1",
@@ -162,8 +181,11 @@ mod tests {
     #[test]
     fn layers_leave_room() {
         for l in &LAYERS {
-            // Floor patches up to twice their cover under crowns; under half the soil.
-            assert!(l.floor_cover * 2.0 < 0.5, "{}: floor patches too thick", l.biome);
+            // Floor patches are twice their cover under crowns, where a closed forest's litter may
+            // take all the soil (the tropical forest's nearly all), and half in the open, where
+            // they leave the grass most of it.
+            assert!((0.0..=1.0).contains(&l.floor_cover), "{}: floor cover {}", l.biome, l.floor_cover);
+            assert!(l.floor_cover * 0.5 < 0.5, "{}: floor patches too thick in the open", l.biome);
             // Ferns round trunks are three times as thick; still under half the bare soil.
             assert!(l.ferns * 3.0 < 0.5, "{}: ferns too thick", l.biome);
             assert!((0.0..=0.5).contains(&l.shrubs), "{}: shrubs", l.biome);

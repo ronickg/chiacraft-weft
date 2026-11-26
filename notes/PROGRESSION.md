@@ -103,6 +103,38 @@ The regions, grouped:
 | Beasts | Taming and riding (Ronald: "also taming too") |
 | Proposed by Planner | Mining and prospecting, Engineering (machines and automation), Exploring and cartography, Trading, Survival (fishing, tracking, weather) |
 
+**Built 11-05** (branch claude/perk-web-a4441b): the 16 skills rising by doing, priced in effort
+minutes with tier against skill (`vitals::skills`); one web of 288 nodes, a region per skill from
+one template, bridges, keystones, depth gated by skill, refunds with the Unlearning Stone
+(`vitals::perks`, checked and written to `mods/base/vitals/WEB_SHEET.md`); the effects that touch
+today's systems through chains and attributes, and the K screen (`mods/base/src/skills.rs`,
+`web.rs`). The magic schools, Engineering and Trading are data until spells, machines and traders
+come.
+
+**The web's layout** (Ronald, 11-05, on the first even wheel: "it sohuldnt be uniform, if that
+makes sesne check poe2 one"; then "A, with clearer islands"): each region its own island in one
+ring round the start, sized by its room, notables on rings of small nodes, keystones at the rim,
+bridges across the gaps; a small start hub of five gates (one a group) whose roads split at
+junctions near neighbouring islands of one group. The screen opens on the island of your highest
+skill. `vitals::web_layout`.
+
+**Sockets and found stones** (Ronald, 11-05: "It would be cool if you can then insert items which
+generate boosts and you find those items in the world, relics or whatever. It's a bit like how Path
+of Exile 2 has that, where you have certain slots where you can insert them"). Built 11-05:
+- **Socket nodes** on the web, taken like any node for 3 points: four near the centre (between
+  region pairs), one deep in every region, one past every second bridge. At one or two points the
+  dominance check found sockets in every build.
+- **Stones**, the ancients' work (Old Eskenai names): Maunduk, the mind-stone (1-3 rolled boosts,
+  3 units at the Stone Age to 5 at the Age of Stars, by item level = tier × 10 + depth); Aruduk,
+  the flow-stone (amplifies or turns the small nodes taken near its socket, like Path of Exile's
+  radius jewels); relics with their own effect (Remaru, the Flow-Watcher: ley sight; Emakaun, the
+  Life-Keeper: health for the nodes near it).
+- **Found, never made:** ruins, boss loot, ley nodes, rare animals, fallen stars, each with its odds
+  (`vitals::sockets::SOURCES`); pallasite drops them today. A drop table adds one with
+  `base_api::skills::drop_stone(w, StoneSource::Boss, tier, pos)`.
+- **Swapped freely:** the checks assume the best stone for the job in every socket taken.
+- Numbers and odds: `mods/base/vitals/WEB_SHEET.md`, "Sockets and stones".
+
 Crafting perks follow Smithing's shape: perks unlock working the next tier's materials, better
 grades and rolls, repairs, salvage, and later merging and upgrading items (see "Gear that keeps
 getting better").
@@ -195,6 +227,7 @@ Valheim, GregTech and the automation packs, Thaumcraft and Botania). It builds o
 `notes/CRAFTING.md`'s parts and ten grades, and keeps its rule of no rerolls to buy:
 - **Item level:** tier × 10, plus a depth of 0-9 from where the material or drop came from (a ley vein, a boss form, a dimension's depth). It caps which properties can roll.
 - **Marks:** properties (affixes) with item-level tiers, added only with found crafting materials, each material with one job: ley shards, star dust, pallasite tears and others, from ley nodes, ruins and meteorites.
+- **Gem sockets** (built 11-05, Ronald: "pieces and items should also get like gem slots because that will make it even cooler"): the first marks. A part's grade gives its item sockets; gems cut from found stones roll gear boosts with the web's stone roll at their stone's item level; grade and gems stay under +60% (the check "grade and gems at most +60% over a plain item"). `notes/CRAFTING.md`, "Gem sockets".
 - **Merging:** the ancients' fusing anvil pools two items' properties into one, with risk. A relic's potential (1-4) caps how much transfers.
 - **A repeatable endgame:** star charts open pocket worlds through the gates at depths 1-16. Deeper charts drop deeper charts and higher item levels, and the Exploring and cartography region of the web plays Path of Exile's Atlas tree.
 - **Boss forms:** one per age, and each higher form gives everything the lower ones do plus more. A boss's drop is a key or tool that opens the next material.

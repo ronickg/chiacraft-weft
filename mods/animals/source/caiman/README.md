@@ -42,6 +42,15 @@ jaws slowly gaping and closing, the head lifting so the lower jaw stays clear of
 tail sweep, blinks), walk (the high walk), run (a rush), bask (flat on the bank, the jaws agape, a
 slow blink) and its attack, bite (the jaws wide, a sideways snap).
 
+Behaviour clips (`mods/animals/src/anim.rs`, 11-05): held stare, watch, drink, sleep (also in the
+basking file) and the gaits stalk (the belly a hand off the ground, the legs sprawled, a slow creep)
+and approach loop; pounce (a lunge on straightened legs, the jaws flung open, the tail driving),
+alarm (a hiss up on straight legs, the tail curled), sniff, look, scratch (a hind foot at the flank:
+it can't reach its jaw), stretch (a gape, then legs and tail), play (a tail swish), groom and nuzzle
+(head nudges) and flinch play once; death rolls it onto its back. `build.py` grounds the gaits, the
+alarm, the pounce and each frame of the death, and asserts the feet, the stalk's belly and which
+clips loop.
+
 ## How it's made
 
 - **Laid out in the lizard's space**: every box and pivot in `caiman.py` is in the lizard's units

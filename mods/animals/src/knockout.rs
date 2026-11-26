@@ -65,14 +65,14 @@ const DART_SPEED: f64 = 30.0;
 pub fn init(r: &mut Registry) {
     r.entity_component(&KNOCKOUT, Knockout::default(), component_flags::SAVE | component_flags::SYNC_MENU | component_flags::SYNC_WATCHERS);
     for s in SPECIES.iter().filter(|s| s.taming == Method::Knockout) {
-        r.attach(s.kind, &KNOCKOUT);
+        r.edit(s.kind).attach(&KNOCKOUT);
     }
     r.item(&CLUB).max_stack(1).attack_damage(1.0).tab(&COMBAT);
     r.shaped(&CRAFTING, "club", 1, &["l", "s"], &[('l', "#logs"), ('s', "base:stick")]);
     r.item(&SEDATIVE).tab(&TOOLS);
     r.shapeless(&CRAFTING, "sedative", 2, &["base:spider_eye", "base:sugar", "base:wheat_seeds"], 0);
     r.item(&DART).tab(&COMBAT).on_use(|u| {
-        let (w, player) = (u.world(), u.player());
+        let (w, player) = (u.world(), u.entity());
         throw_dart(&w, player);
         if !w.outside_survival(player) {
             u.set_stack(StackData::shrink(u.stack(), 1));
@@ -104,7 +104,7 @@ pub fn init(r: &mut Registry) {
         .gravity(-0.25)
         .drag(0.92)
         .fullbright();
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
             hurt(&w, h);
@@ -291,7 +291,17 @@ fn bite(w: &World, id: u64, st: &EntityState) {
         Liking::Favorite => FAVORITE_BITE,
         Liking::Kibble => 0.0,
     };
-    let progress = (t.progress + food.liking.taming() / needed).min(1.0);
+    // Tamed by whoever is nearest (the tamer, as a rule), whose web (taming speed) speeds it
+    // through the base game's chain.
+    let tamer = w
+        .players()
+        .into_iter()
+        .filter_map(|p| Some((p, w.entity(p)?)))
+        .min_by(|a, b| dist2(a.1.pos, st.pos).total_cmp(&dist2(b.1.pos, st.pos)))
+        .map(|(p, _)| p);
+    let q = abi::Query { entity: id, other: tamer.unwrap_or(0), ..query() };
+    let gain = w.chain_compute(&base_api::skills::TAMING_SPEED, (food.liking.taming() / needed) as f64, &q) as f32;
+    let progress = (t.progress + gain).min(1.0);
     let effectiveness = (t.effectiveness - cost).max(0.0);
     if let Some(t) = w.component_mut(id, &TAMING) {
         t.progress = progress;
@@ -304,13 +314,6 @@ fn bite(w: &World, id: u64, st: &EntityState) {
     });
     animal::feed(w, id, food.food);
     if progress >= 1.0 {
-        // Tamed by whoever is nearest (the tamer, as a rule).
-        let tamer = w
-            .players()
-            .into_iter()
-            .filter_map(|p| Some((p, w.entity(p)?)))
-            .min_by(|a, b| dist2(a.1.pos, st.pos).total_cmp(&dist2(b.1.pos, st.pos)))
-            .map(|(p, _)| p);
         spill(w, id, st);
         set(w, id, |k| {
             k.out = 0;
@@ -368,7 +371,7 @@ fn throw_dart(w: &World, player: u64) {
         *s = player;
     }
     if w.entity(dart).is_some() {
-        w.entity_edit(dart)
+        w.entity_modify(dart)
             .velocity(dir.map(|d| d * DART_SPEED))
             .yaw(p.yaw);
     }
@@ -383,10 +386,10 @@ fn dart_flies(w: &World, id: u64, st: &EntityState) -> bool {
         .into_iter()
         .find(|&e| e != id && e != shooter && w.entity(e).is_some_and(|s| s.kind != st.kind));
     if let Some(target) = hit {
-        w.damage(target, 1.0, shooter, damage_cause::ATTACK);
+        w.damage(target, Damage::new(1.0, damage_cause::ATTACK).by(shooter));
         add_torpor(w, target, DART_TORPOR);
         w.despawn(id);
-    } else if st.flags & entity_flags::BLOCKED != 0 || st.on_ground != 0 || st.age > 100 {
+    } else if st.flags & abi::entity_state::BLOCKED != 0 || st.on_ground != 0 || st.age > 100 {
         w.despawn(id);
     }
     true

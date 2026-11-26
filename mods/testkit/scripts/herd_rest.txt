@@ -1,0 +1,49 @@
+# Herds rest in step (creature AI step 9, slice 3: `group::rest_in_step`, `groups::JOIN_REST_IN`,
+# `JOIN_UP_IN`). At noon red deer (twilight animals) rest often. Before, each lay down and got up
+# on its own dice, so a herd was half lying, half wandering off. Now a member lies down about 5 s
+# after its leader does and gets up about 3 s after its leader is up and about.
+# Flat pad, spectator (not sensed) at ground level, mobs off, fed and watered; 10 red deer 4-10
+# blocks out. ANIMAL_SENSES every 15 s ("lead <id>", "doing rest").
+# PASS: "animal <id> lies down with its leader" lines, and in most samples each group (same
+# "lead") is mostly all "rest" or mostly all up; "gets up with its leader" lines after a
+# leader's rest ends. herd_rest_1..4.png show the herd lying together or standing together.
+# FAIL: no "lies down with its leader" lines in 2 minutes, or groups always split half and half.
+loaded
+idle
+wait 3
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+chat /air 0 0 0
+chat /tk fill ~-30 ~-1 ~-30 ~30 ~-1 ~30 base:grass
+chat /tk fill ~-30 ~ ~-30 ~30 ~4 ~30 core:air
+wait 2
+chat /tk time 6000
+chat /tk mode spectator
+chat /tk ring animals:red_deer 10 4 10
+wait 3
+chat /animalprof food 1.0
+chat /animalprof water 1.0
+look 0 -35
+wait 15
+chat /animalprof senses
+shot herd_rest_1.png
+wait 15
+chat /animalprof senses
+wait 15
+chat /animalprof food 1.0
+chat /animalprof water 1.0
+chat /animalprof senses
+shot herd_rest_2.png
+wait 15
+chat /animalprof senses
+wait 15
+chat /animalprof food 1.0
+chat /animalprof water 1.0
+chat /animalprof senses
+shot herd_rest_3.png
+wait 15
+chat /animalprof senses
+wait 15
+chat /animalprof senses
+shot herd_rest_4.png
+quit

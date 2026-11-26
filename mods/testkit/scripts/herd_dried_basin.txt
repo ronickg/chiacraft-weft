@@ -1,0 +1,67 @@
+# Deer at a dried waterhole's last block: a 5 x 5 pond bed of `base:dried_mud` (a 2 px crust,
+# `base`'s waterholes.rs) with one block of water left in the middle, the way a dry season leaves
+# it. Before the paths' thin floors (`engine/server/path.rs` `THIN`) no cell over the crust could be
+# stood in, so a deer on it could walk nowhere and one beside it could not reach the water
+# (ai1124_savanna10: deer 86 stood 100 s on one crust block 2 blocks from the last water and died
+# of thirst). `/waterholes dry` keeps the bed dry (the last block stays: `climate::edge_dries`)
+# whatever the season. Seed 1's savanna, as `herd_savanna_winter.txt`.
+# PASS: every deer (5) reaches the last block and drinks: "anim: <id> holds drink" for each id,
+# and in the `/animalprof where` rows every deer's water climbs from 30 % to 90 % or more within
+# the 60 s, the three spawned on the crust and the two on the rim alike; deer drinking stand at
+# y 69 (on the crust, 1-2 blocks from 0 69 538). Report any deer whose place stays the same for 3
+# or more rows with its water under 50 %, and any "stuck walking" lines.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /tk fill ~-20 ~-1 ~-30 ~20 ~-1 ~10 base:grass
+chat /tk fill ~-20 ~ ~-30 ~20 ~6 ~10 core:air
+chat /tk fill -2 68 536 2 68 540 base:dirt
+chat /tk fill -2 69 536 2 69 540 base:dried_mud
+chat /tk fill 0 69 538 0 69 538 base:water
+chat /waterholes dry
+wait 2
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tk count -2 69 536 2 69 540 base:dried_mud
+look 0 -30
+wait 1
+shot herd_dried_basin_1.png
+chat /tk spawn animals:white_tailed_deer 2 69 537
+chat /tk spawn animals:white_tailed_deer -2 69 540
+chat /tk spawn animals:white_tailed_deer 1 69 536
+chat /tk spawn animals:white_tailed_deer 4 70 538
+chat /tk spawn animals:white_tailed_deer -4 70 538
+wait 2
+chat /anim log
+chat /animalprof water 0.3
+chat /animalprof food 1
+# The player stands back, as in the savanna runs, so he doesn't scare them off it.
+chat /tp 0 90 572
+wait 3
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+wait 10
+chat /animalprof where
+chat /animalprof senses
+chat /tk count -2 69 536 2 69 540 base:water
+chat /tp 0 72 546
+wait 2
+look 0 -40
+wait 1
+shot herd_dried_basin_2.png
+chat /waterholes real
+quit

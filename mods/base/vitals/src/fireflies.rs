@@ -6,7 +6,7 @@ use crate::{calendar, climate};
 
 /// Each biome's fireflies, from its real place (0 where there are none: taiga, mountains, the
 /// sequoia grove, desert, snow, beach, the seas).
-pub const WEIGHTS: [(&str, f32); 6] = [
+pub const WEIGHTS: [(&str, f32); 7] = [
     // The Pantanal: swarms over the wet grass.
     ("base:swamp", 1.0),
     // Konza Prairie: Photinus pyralis.
@@ -17,6 +17,8 @@ pub const WEIGHTS: [(&str, f32); 6] = [
     ("base:savanna", 0.6),
     // Kassel: Lamprohiza and Lampyris at the edges and in meadows.
     ("base:forest", 0.6),
+    // Białowieża: Lampyris along the rides and the river meadows, the canopy's floor dark.
+    ("base:old_growth_forest", 0.4),
     // Moscow: Lampyris noctiluca, fewer.
     ("base:birch_forest", 0.3),
 ];

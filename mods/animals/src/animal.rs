@@ -116,15 +116,27 @@ static APPLIED: Component<[f32; 2]> = Component::named("animal_applied");
 static SCALED: Component<f32> = Component::named("animal_scaled");
 /// The owner's player key (64 hex digits), zeros while wild.
 pub static OWNER: Component<[u8; 64]> = Component::named("owner");
+/// The game tick it was last hurt (`heal`).
+static HURT_AT: Component<f64> = Component::named("animal_hurt_at");
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&ANIMAL, Animal::default(), component_flags::SAVE | component_flags::SYNC_MENU);
     r.entity_component(&APPLIED, [0.0; 2], 0);
     r.entity_component(&SCALED, 0.0f32, 0);
     r.entity_component(&OWNER, [0u8; 64], component_flags::SAVE | component_flags::SYNC_MENU);
+    r.entity_component(&HURT_AT, 0.0f64, 0);
+    r.on_event(&actions::HURT, |b| {
+        let w = b.world();
+        let now = w.game_time() as f64;
+        for h in b.iter() {
+            if let Some(t) = w.component_mut(h.entity, &HURT_AT) {
+                *t = now;
+            }
+        }
+    });
     // A young one bites as hard as its size: by the area of its jaws, the square of how far it has
     // grown (a hatchling raptor a fortieth of a grown one's mass killed a cat in a PC run).
-    r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
+    r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
         let (w, id) = (m.world(), m.query().entity);
         let Some(index) = w
             .component(id, &ANIMAL)
@@ -137,15 +149,17 @@ pub fn init(r: &mut Registry) {
         m.value *= (g * g).clamp(0.05, 1.0);
     });
     for s in &SPECIES {
-        r.attach(s.kind, &ANIMAL);
-        r.attach(s.kind, &APPLIED);
-        r.attach(s.kind, &SCALED);
-        r.attach(s.kind, &OWNER);
+        r.edit(s.kind).attach(&ANIMAL);
+        r.edit(s.kind).attach(&APPLIED);
+        r.edit(s.kind).attach(&SCALED);
+        r.edit(s.kind).attach(&OWNER);
+        r.edit(s.kind).attach(&base_api::TAME_OF);
     }
-    // An animal hits as hard as its damage stat.
-    r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
-        if let Some(a) = m.world().component(m.query().entity, &ANIMAL) {
-            m.value *= (a.factor(species::DAMAGE) * crate::comfort::condition(&a)) as f64;
+    // An animal hits as hard as its damage stat, a saddled tame as its saddle lifts it.
+    r.modify(&chain::MELEE, &phase::MULTIPLY, |m| {
+        let (w, id) = (m.world(), m.query().entity);
+        if let Some(a) = w.component(id, &ANIMAL) {
+            m.value *= (a.factor(species::DAMAGE) * crate::comfort::condition(&a) * crate::riding::lift(&w, id)) as f64;
         }
     });
 }
@@ -153,6 +167,32 @@ pub fn init(r: &mut Registry) {
 /// Whether `id` is tamed.
 pub fn tamed(w: &World, id: u64) -> bool {
     w.component(id, &OWNER).is_some_and(|k| k[0] != 0)
+}
+
+/// Keeps `id`'s `base_api::TAME_OF` (its owner's player entity while they're in the world, 0
+/// otherwise), which watchers' clients read to mark their own tames on the map. Its owner's key
+/// against each player's, the keys asked once per player.
+pub fn mark_owner(w: &World, id: u64) {
+    static KEYS: std::sync::Mutex<Vec<(u64, String)>> = std::sync::Mutex::new(Vec::new());
+    let want = match w.component(id, &OWNER) {
+        Some(k) if k[0] != 0 => {
+            let mut keys = KEYS.lock().unwrap_or_else(|e| e.into_inner());
+            w.players().into_iter().find(|&p| {
+                if !keys.iter().any(|(q, _)| *q == p) {
+                    keys.push((p, crate::player_key(p)));
+                }
+                keys.iter()
+                    .any(|(q, key)| *q == p && key.len() == 64 && key.as_bytes() == k)
+            })
+        }
+        _ => None,
+    }
+    .unwrap_or(0);
+    if w.component(id, &base_api::TAME_OF)
+        .is_some_and(|v| v != want)
+    {
+        w.set_component(id, &base_api::TAME_OF, want);
+    }
 }
 
 /// Whether `player` (by key) owns `id`.
@@ -168,10 +208,13 @@ pub fn owns(w: &World, id: u64, player: u64) -> bool {
 /// the turn.
 pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send + Sync + 'static {
     move |w, id, st| {
+        // What its body shows: a held state no longer asked for ends, idle life (`anim.rs`).
+        crate::anim::tick(w, id);
         let Some(a) = w.component_mut(id, &ANIMAL) else { return false };
         let new = a.species == 0;
         if new {
             first_roll(w, id, index, a, st.pos.to_array());
+            crate::drink::arrive(w, id, a, st.pos.to_array());
         }
         let away = if a.seen == 0 { 0 } else { life::age(w.game_time(), a.seen) };
         a.seen = life::birth(w.game_time(), 0);
@@ -190,6 +233,9 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return false;
         }
         let a = *a;
+        if slow {
+            mark_owner(w, id);
+        }
         crate::senses::refresh(w, id, index, st.kind);
         // Its size, from its genes and sex, and how far it has grown (the engine forgets it on
         // loading: set it again).
@@ -216,6 +262,7 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                     crate::drink::thirst(w, id, &a, st, rate, secs);
                 }
             }
+            heal(w, id, secs);
         }
         if slow {
             let (health, speed) = factors(w, id, &a);
@@ -225,7 +272,8 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                 apply(w, id, st, health, speed, if new { f32::MAX } else { 0.0 });
             }
         }
-        false
+        // Knocked down by its stagger, it lies there and nothing after this goal runs.
+        crate::armour::lie_down(w, id, index, st)
     }
 }
 
@@ -321,7 +369,7 @@ fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
 
 /// The share of wild ones met in their breeding season that are young.
 const YOUNG_PERCENT: u32 = 25;
-use animals_core::needs::{ARRIVES_FED, STARVES_SECS};
+use animals_core::needs::ARRIVES_FED;
 
 /// Its area was away (unloaded) for `away` ticks, and life went on there (`notes/ANIMALS.md`,
 /// "Time away"): its timers run out (a mother due gives birth now), it has aged (by the world's
@@ -400,7 +448,7 @@ fn old_age(w: &World, id: u64, index: usize, a: &mut Animal, calls: u64) -> bool
     crate::breeding::count(&crate::breeding::OLD, index);
     weft_sdk::info!("animal {id} ({}) died of old age, {} days old", s.name, age / life::DAY);
     // Bypassing armor and leaving no scar: nothing hit it.
-    w.damage(id, 1e9, 0, damage_cause::VOID);
+    w.damage(id, Damage::new(1e9, damage_cause::VOID));
     true
 }
 
@@ -412,14 +460,38 @@ pub fn age_days(a: &Animal) -> Option<(f64, f64, u8)> {
 
 /// Max health and speed as its stats, its condition and (cold-blooded) the air say.
 fn factors(w: &World, id: u64, a: &Animal) -> (f32, f32) {
-    (a.factor(species::HEALTH) * crate::comfort::condition(a), a.factor(species::SPEED) * crate::comfort::speed(w, id))
+    (
+        a.factor(species::HEALTH) * crate::comfort::condition(a) * crate::riding::lift(w, id),
+        a.factor(species::SPEED) * crate::comfort::speed(w, id),
+    )
+}
+
+/// Sets a wild one's level to `level` (its points spread evenly over the stats), at full health:
+/// for checks that need a known animal (`/animal level`, `scripts/floors.txt`).
+pub fn set_level(w: &World, id: u64, level: u32) {
+    let Some(st) = w.entity(id) else { return };
+    let Some(a) = w.component_mut(id, &ANIMAL) else { return };
+    let level = level.min(MAX_WILD_LEVEL);
+    a.wild = [0; STATS];
+    for i in 0..level as usize {
+        a.wild[i % STATS] += 1;
+    }
+    let a = *a;
+    let (health, speed) = factors(w, id, &a);
+    apply(w, id, &st, health, speed, f32::MAX);
 }
 
 /// Max health and speed as the stats say; `heal` adds that much health on top (a new animal
 /// starts full).
 fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f32) {
-    w.attribute_add_modifier(id, &attribute::MAX_HEALTH, "animals:stats", attr_op::MULTIPLY_BASE, health as f64 - 1.0, 0);
-    w.attribute_add_modifier(id, &attribute::MOVEMENT_SPEED, "animals:stats", attr_op::MULTIPLY_BASE, speed as f64 - 1.0, 0);
+    w.attribute_add_modifier(id, "animals:stats", &Modifier::percent(&attribute::MAX_HEALTH, health as f64 - 1.0), 0);
+    w.attribute_add_modifier(id, "animals:stats", &Modifier::percent(&attribute::MOVEMENT_SPEED, speed as f64 - 1.0), 0);
+    // Big creatures stand their ground: knockback resistance by size class (`vitals::combat`'s
+    // bands: medium 0.3, large 0.7, huge and titan 1).
+    if let Some(s) = w.component(id, &ANIMAL).and_then(|a| a.species()) {
+        let resist = animals_core::danger::size(s).band().knockback;
+        w.attribute_add_modifier(id, "animals:size", &Modifier::add(&attribute::KNOCKBACK_RESISTANCE, resist as f64), 0);
+    }
     if let Some(p) = w.component_mut(id, &APPLIED) {
         *p = [health, speed];
     }
@@ -427,7 +499,7 @@ fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f3
         && let Some(a) = w.component(id, &ANIMAL)
     {
         let max = a.stat(species::HEALTH) * crate::comfort::condition(&a);
-        w.entity_edit(id).health((st.health + heal).min(max));
+        w.entity_modify(id).health((st.health + heal).min(max));
     }
 }
 
@@ -436,12 +508,12 @@ fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f3
 /// from the world (`forage.rs`). A wild one with an empty stomach starves.
 fn hunger(w: &World, id: u64, a: &Animal, rate: f32, secs: f32) {
     let Some(s) = a.species() else { return };
-    // A wild one with nothing left starves to death in a game day (a tame suffers, never dies:
-    // its condition falls instead).
+    // A wild one with nothing left lives on its reserves, then starves to death
+    // (`needs::starves_secs`, by its mass; a tame suffers, never dies: its condition falls instead).
     if a.food == 0 && !tamed(w, id) {
-        // A scavenger fasts instead (`needs::STARVES_SECS`).
+        // A scavenger fasts instead (`needs::FAST_DAYS`).
         if let Some(st) = w.entity(id).filter(|_| !s.scavenges()) {
-            w.damage(id, st.max_health / STARVES_SECS * secs, 0, damage_cause::STARVE);
+            w.damage(id, Damage::new(st.max_health / animals_core::needs::starves_secs(s) * secs, damage_cause::STARVE));
         }
         return;
     }
@@ -452,6 +524,28 @@ fn hunger(w: &World, id: u64, a: &Animal, rate: f32, secs: f32) {
         && let Some(a) = w.component_mut(id, &ANIMAL)
     {
         a.food = a.food.saturating_sub(used);
+    }
+}
+
+/// Heals `id` over `secs` seconds while it is watered, fed or thin, and unhurt for a while
+/// (`needs::heal_share`): its whole health in `needs::HEAL_DAYS`. One that goes hungry in the wild
+/// heals by its food; one that doesn't, as if fed.
+fn heal(w: &World, id: u64, secs: f32) {
+    let Some(a) = w.component(id, &ANIMAL) else { return };
+    let Some(st) = w
+        .entity(id)
+        .filter(|st| st.health > 0.0 && st.health < st.max_health)
+    else {
+        return;
+    };
+    let most = a.stat(species::FOOD);
+    let fed = if most > 0.0 { a.food as f32 / most } else { 1.0 };
+    let since = w
+        .component(id, &HURT_AT)
+        .map_or(f32::MAX, |t| ((w.game_time() as f64 - t) / 20.0) as f32);
+    let share = animals_core::needs::heal_share(fed, 1.0 - a.thirst, since);
+    if share > 0.0 {
+        w.heal(id, animals_core::needs::heal_per_sec(st.max_health) * share * secs);
     }
 }
 

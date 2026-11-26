@@ -404,7 +404,7 @@ impl Species {
     }
     /// Whether it lives on the dead: half its diet or more carrion (the vulture). It gets hungry in
     /// the wild, smells carrion from afar (`needs::SCENT`), takes a carcass's meat as carrion and
-    /// rotten flesh without harm, and never starves in the wild (`needs::STARVES_SECS`).
+    /// rotten flesh without harm, and never starves in the wild (`needs::FAST_DAYS`).
     pub fn scavenges(&self) -> bool {
         self.eats
             .iter()
@@ -456,7 +456,10 @@ impl Species {
         if !self.hunts() {
             return stocked;
         }
-        hunter_room_cached(self.name, biome).map_or(stocked, |room| room.clamp(1, stocked))
+        // An omnivore that forages (Citipati) eats more plants where prey is short: its prey's
+        // room never leaves it under a pair.
+        let least = if self.forages_wild() { 2 } else { 1 };
+        hunter_room_cached(self.name, biome).map_or(stocked, |room| room.clamp(least, stocked))
     }
     /// Its crowd in `biome` by the biome's stocking alone (a plant eater's; others' as they are).
     pub fn stocked_in(&self, biome: &str) -> u32 {
@@ -487,6 +490,8 @@ pub const STOCKING: &[(&str, f32)] = &[
     ("base:plains", 1.4),
     ("base:forest", 1.0),
     ("base:swamp", 0.9),
+    // The old growth's floor is shaded: grass in its clearings and by the water only.
+    ("base:old_growth_forest", 0.3),
     ("base:birch_forest", 0.55),
     ("base:taiga", 0.35),
     ("base:mountains", 0.26),
@@ -601,7 +606,14 @@ pub static SPECIES: [Species; 46] = [
         size_spread: 0.2,
         height: (0.20, "shoulder"),
         // Chihuahua, Mexico: dry country, and wherever people are; never the cold.
-        habitats: &[("base:plains", 1.0), ("base:savanna", 0.6), ("base:desert", 0.4), ("base:forest", 0.3), ("base:birch_forest", 0.3)],
+        habitats: &[
+            ("base:plains", 1.0),
+            ("base:savanna", 0.6),
+            ("base:desert", 0.4),
+            ("base:forest", 0.3),
+            ("base:old_growth_forest", 0.3),
+            ("base:birch_forest", 0.3),
+        ],
         bio: Biology {
             mass: 2.5,
             gestation: 63.0,
@@ -663,6 +675,7 @@ pub static SPECIES: [Species; 46] = [
         habitats: &[
             ("base:plains", 1.0),
             ("base:forest", 0.6),
+            ("base:old_growth_forest", 0.6),
             ("base:birch_forest", 0.6),
             ("base:savanna", 0.5),
             ("base:desert", 0.4),
@@ -995,7 +1008,14 @@ pub static SPECIES: [Species; 46] = [
         height: (0.30, "shoulder"),
         // Open country: farmland and grassland first, woods' edges; the jackrabbit's desert, the
         // cottontail's llanos and the rabbit's dunes by the sea in the research share its row.
-        habitats: &[("base:plains", 1.0), ("base:desert", 1.0), ("base:forest", 0.6), ("base:savanna", 0.4), ("base:beach", 0.4)],
+        habitats: &[
+            ("base:plains", 1.0),
+            ("base:desert", 1.0),
+            ("base:forest", 0.6),
+            ("base:old_growth_forest", 0.6),
+            ("base:savanna", 0.4),
+            ("base:beach", 0.4),
+        ],
         bio: Biology {
             mass: 3.8,
             gestation: 42.0,
@@ -1107,7 +1127,14 @@ pub static SPECIES: [Species; 46] = [
         height: (0.05, "shoulder"),
         // Hedgerows, woods, fields and grassland; the desert's, the llanos' and the dunes' mice share
         // its row.
-        habitats: &[("base:plains", 1.0), ("base:forest", 1.0), ("base:desert", 0.6), ("base:savanna", 0.6), ("base:beach", 0.5)],
+        habitats: &[
+            ("base:plains", 1.0),
+            ("base:forest", 1.0),
+            ("base:old_growth_forest", 0.8),
+            ("base:desert", 0.6),
+            ("base:savanna", 0.6),
+            ("base:beach", 0.5),
+        ],
         bio: Biology {
             mass: 0.023,
             gestation: 25.0,
@@ -1229,7 +1256,14 @@ pub static SPECIES: [Species; 46] = [
         height: (0.95, "shoulder"),
         // The Americas' deer: prairie and woods' edges in Kansas, the llanos' savanna, the desert edge
         // (Coues deer), the Pantanal's marshes (the marsh deer's place).
-        habitats: &[("base:plains", 1.0), ("base:savanna", 0.8), ("base:desert", 0.5), ("base:forest", 0.5), ("base:swamp", 0.4)],
+        habitats: &[
+            ("base:plains", 1.0),
+            ("base:savanna", 0.8),
+            ("base:desert", 0.5),
+            ("base:forest", 0.5),
+            ("base:old_growth_forest", 0.5),
+            ("base:swamp", 0.4),
+        ],
         bio: Biology {
             mass: 70.0,
             gestation: 200.0,
@@ -1277,7 +1311,13 @@ pub static SPECIES: [Species; 46] = [
         height: (0.95, "shoulder"),
         // Europe's deer of the forests (Białowieża), birch woods and the Alps, wintering lower in the
         // woods, summering high.
-        habitats: &[("base:forest", 1.0), ("base:birch_forest", 0.8), ("base:mountains", 0.8), ("base:sequoia_grove", 0.8)],
+        habitats: &[
+            ("base:forest", 1.0),
+            ("base:old_growth_forest", 0.8),
+            ("base:birch_forest", 0.8),
+            ("base:mountains", 0.8),
+            ("base:sequoia_grove", 0.8),
+        ],
         bio: Biology {
             mass: 160.0,
             gestation: 250.0,
@@ -1334,7 +1374,14 @@ pub static SPECIES: [Species; 46] = [
         size_spread: 0.2,
         height: (0.37, "fork"),
         // Cool, clear rivers, streams and lakes of the temperate and northern country.
-        habitats: &[("base:forest", 1.0), ("base:birch_forest", 1.0), ("base:mountains", 1.0), ("base:taiga", 0.8), ("base:plains", 0.6)],
+        habitats: &[
+            ("base:forest", 1.0),
+            ("base:old_growth_forest", 0.8),
+            ("base:birch_forest", 1.0),
+            ("base:mountains", 1.0),
+            ("base:taiga", 0.8),
+            ("base:plains", 0.6),
+        ],
         bio: Biology {
             mass: 0.5,
             gestation: 0.0,
@@ -1443,6 +1490,7 @@ pub static SPECIES: [Species; 46] = [
         // dune foxes share its row.
         habitats: &[
             ("base:forest", 1.0),
+            ("base:old_growth_forest", 0.8),
             ("base:birch_forest", 1.0),
             ("base:taiga", 0.8),
             ("base:mountains", 0.8),
@@ -1566,6 +1614,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:taiga", 1.0),
             ("base:mountains", 0.8),
             ("base:forest", 0.6),
+            ("base:old_growth_forest", 0.6),
             ("base:birch_forest", 0.6),
             ("base:snowy_plains", 0.6),
             ("base:desert", 0.4),
@@ -1863,7 +1912,14 @@ pub static SPECIES: [Species; 46] = [
         size_spread: 0.2,
         height: (0.61, "shoulder"),
         // The prairie and the desert first (its old range), into the woods and the mountains.
-        habitats: &[("base:plains", 1.0), ("base:desert", 1.0), ("base:forest", 0.4), ("base:mountains", 0.4), ("base:sequoia_grove", 0.6)],
+        habitats: &[
+            ("base:plains", 1.0),
+            ("base:desert", 1.0),
+            ("base:forest", 0.4),
+            ("base:old_growth_forest", 0.4),
+            ("base:mountains", 0.4),
+            ("base:sequoia_grove", 0.6),
+        ],
         bio: Biology {
             // Southern ones about 11.5 kg, northern ones 18.
             mass: 13.0,
@@ -1918,7 +1974,14 @@ pub static SPECIES: [Species; 46] = [
         // Wherever people farm and build, from the prairie to the desert's towns and the coast; few in
         // the deep woods. Not in the birch woods', the Alps' or the llanos' dry-season winters, where
         // it lives only on what people leave (`web`: nothing of its diet there then).
-        habitats: &[("base:plains", 1.0), ("base:desert", 0.5), ("base:beach", 0.5), ("base:forest", 0.4), ("base:swamp", 0.3)],
+        habitats: &[
+            ("base:plains", 1.0),
+            ("base:desert", 0.5),
+            ("base:beach", 0.5),
+            ("base:forest", 0.4),
+            ("base:old_growth_forest", 0.4),
+            ("base:swamp", 0.3),
+        ],
         bio: Biology {
             mass: 0.03,
             gestation: 0.0,
@@ -2034,6 +2097,7 @@ pub static SPECIES: [Species; 46] = [
         // desert's canyons, the swamps.
         habitats: &[
             ("base:forest", 1.0),
+            ("base:old_growth_forest", 0.8),
             ("base:birch_forest", 0.8),
             ("base:taiga", 0.8),
             ("base:plains", 0.8),
@@ -2155,6 +2219,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:taiga", 0.5),
             ("base:snowy_plains", 0.3),
             ("base:forest", 0.3),
+            ("base:old_growth_forest", 0.3),
             ("base:birch_forest", 0.3),
             ("base:sequoia_grove", 0.3),
         ],
@@ -2269,6 +2334,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:desert", 0.8),
             ("base:plains", 0.6),
             ("base:forest", 0.3),
+            ("base:old_growth_forest", 0.3),
             ("base:mountains", 0.3),
             ("base:sequoia_grove", 0.4),
         ],
@@ -2550,6 +2616,7 @@ pub static SPECIES: [Species; 46] = [
         habitats: &[
             ("base:taiga", 1.0),
             ("base:forest", 0.6),
+            ("base:old_growth_forest", 0.6),
             ("base:birch_forest", 0.6),
             ("base:mountains", 0.5),
             ("base:snowy_plains", 0.4),

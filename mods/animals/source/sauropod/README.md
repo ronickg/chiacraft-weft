@@ -73,3 +73,18 @@ trees, the head tipped up and chewing, then down to drink, gulping, and up again
 ground's speed, 2.4 s), run (a faster amble on the same footfalls, higher steps, the neck a little
 lower, 2.0 s), lie (on its belly, the front legs folded camel-fashion with the forearms under the
 chest, the hind legs folded, the neck lowered, the tail along the ground; two blinks; 10 s).
+
+Behaviour clips (11-05, `src/anim.rs`): stare, graze (the neck swept low, the mouth at the ground
+plants), drink, watch (the neck raised high, turning slowly), sleep (lying, the neck turned round and
+lowered to the ground, the head laid on it; also in the lying file), approach and charge (a ponderous
+head-low amble, the neck level and thrust forward) loop; sniff, look, scratch (the flank rubbed on a
+trunk, the body swaying over planted feet), stretch, alarm (a bellow, the tail whipped), rear, play
+(a tail swish), groom (the neck arched round to the flank), nuzzle and flinch play once; death (rolled
+onto its side, slow) holds. It stands its ground (10 t, over `roles::STANDS_KG`), so it rears: up on
+the hind legs 40 degrees with the tail laid on the ground behind as the tripod's third leg (fitted),
+the hind feet planted, the hips kept over them. Fitted in `fit_clips`. The idle's drink was fitted on
+the whole head, and its top touched the water with the head upside down: refitted on the lips with
+the crown above them (11-05); the idle's and lie's chest breath sank the forefeet and the drinking
+snout (0.7-2.2 units) and is gone. `build.py` asserts the loops, every standing clip's feet within 0.3
+of the ground, the gaits' and rear's grounding, the mouth at the ground grazing and drinking, nothing
+below -0.3 in any clip, and death on its lowest point each frame.

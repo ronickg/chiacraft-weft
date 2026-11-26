@@ -1,0 +1,454 @@
+# Stagger on a large animal (Ronald 11-22, option B): breaks at 20 % and 40 % of its health drop one
+# more of its own loot, a knockdown every 25 % (3 s down, 12 s up before the next). Two pens from
+# floors.txt: S0 a same-age stone sword (breaks late in the fight), S1 over-tier iron (breaks and a
+# knockdown early). Read run.log: `stagger:` lines (break, knocked down) beside `floor:` lines; shots
+# every 8 swings; `entities 10` lists the dropped items in the pit.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode survival
+chat /time set 6000
+chat /tk attr_mod me core:entity_reach testkit:reach core:add 3 0
+chat /tk attr_mod me core:max_health testkit:hp core:add 200 0
+# ---- S0_stone: stone sword, leather armour vs utahraptor (level 0) in a 3x3 pit, 64 swings
+chat /tk mode spectator
+chat /tp 0.5 205 -0.5
+wait 2
+loaded
+chat /tk fill -6 196 -5 6 199 7 stone
+chat /tk fill -1 197 0 1 199 2 core:air
+chat /tk fill -1 200 -2 1 202 -2 stone
+chat /tk fill -1 200 -1 -1 202 -1 stone
+chat /tk fill 1 200 -1 1 202 -1 stone
+chat /tk fill 0 202 -1 0 202 -1 stone
+chat /tp 0.5 200 -0.5
+wait 1
+loaded
+chat /tk mode survival
+chat /tp 0.5 200 -0.5
+chat /gear sword flint slot=0
+chat /gear helmet leather slot=36
+chat /gear chestplate leather slot=37
+chat /gear leggings leather slot=38
+chat /gear boots leather slot=39
+wait 1
+chat /tk heal
+chat /tk entity me
+look 180 -60
+chat /tk spawn animals:utahraptor 0 197 1
+wait 1
+chat /animal level 0
+wait 0.5
+where S0_stone_start
+entities 10
+shot stagger_S0_stone_start.png
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S0_swing8.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S0_swing16.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+entities 10
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S0_swing24.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S0_swing32.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+entities 10
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S0_swing40.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S0_swing48.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+entities 10
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S0_swing56.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 0.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S0_swing64.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+entities 10
+entities 10
+where S0_stone_end
+shot stagger_S0_stone_end.png
+# ---- S1_iron: iron sword, iron armour vs utahraptor (level 0) in a 3x3 pit, 48 swings
+chat /tk mode spectator
+chat /tp 16.5 205 -0.5
+wait 2
+loaded
+chat /tk fill 10 196 -5 22 199 7 stone
+chat /tk fill 15 197 0 17 199 2 core:air
+chat /tk fill 15 200 -2 17 202 -2 stone
+chat /tk fill 15 200 -1 15 202 -1 stone
+chat /tk fill 17 200 -1 17 202 -1 stone
+chat /tk fill 16 202 -1 16 202 -1 stone
+chat /tp 16.5 200 -0.5
+wait 1
+loaded
+chat /tk mode survival
+chat /tp 16.5 200 -0.5
+chat /gear sword wrought_iron slot=0
+chat /gear helmet wrought_iron slot=36
+chat /gear chestplate wrought_iron slot=37
+chat /gear leggings wrought_iron slot=38
+chat /gear boots wrought_iron slot=39
+wait 1
+chat /tk heal
+chat /tk entity me
+look 180 -60
+chat /tk spawn animals:utahraptor 16 197 1
+wait 1
+chat /animal level 0
+wait 0.5
+where S1_iron_start
+entities 10
+shot stagger_S1_iron_start.png
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S1_swing8.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S1_swing16.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+entities 10
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S1_swing24.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S1_swing32.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+entities 10
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S1_swing40.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+chat /tk entity me
+chat /tk heal
+chat /tp 16.5 200 -0.5
+look 180 -60
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+wait 0.65
+press core:attack
+shot stagger_S1_swing48.png
+entities 10
+wait 0.65
+chat /tk entity me
+chat /tk heal
+entities 10
+entities 10
+where S1_iron_end
+shot stagger_S1_iron_end.png
+quit

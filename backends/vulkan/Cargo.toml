@@ -12,3 +12,16 @@ gpu-allocator.workspace = true
 naga.workspace = true
 raw-window-handle.workspace = true
 log.workspace = true
+bytemuck.workspace = true
+# NVIDIA's Streamline (DLSS), loaded at run time from a folder: `streamline` feature.
+libloading = { workspace = true, optional = true }
+
+[features]
+# DLSS through NVIDIA's Streamline on Windows (`src/streamline.rs`). Off by default; the game
+# then needs Streamline's DLLs in `streamline/` beside it (or WEFT_STREAMLINE_DIR) to use it,
+# and starts as always without them.
+streamline = ["dep:libloading"]
+# DLSS through NVIDIA's NGX directly, on Linux (`src/ngx.rs`). Off by default; building with it
+# links the DLSS SDK's `libnvsdk_ngx.a` from `NGX_SDK_DIR` (the SDK's root, kept outside the
+# repository), and the game finds DLSS's libraries in `ngx/` beside it, WEFT_NGX_DIR or the driver.
+ngx = []

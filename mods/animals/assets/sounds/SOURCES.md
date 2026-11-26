@@ -67,4 +67,18 @@ strongest separate call cut from a longer recording. Every source's own Freesoun
 | `dragon/hurt1` (hit:0) | "dragonroar.wav" ([freesound 185069](https://freesound.org/people/juryduty/sounds/185069/)) | juryduty | CC0 |
 | `dragon/death1` (hit:0) | "Dragon Death" ([freesound 366096](https://freesound.org/people/bevibeldesign/sounds/366096/)) | bevibeldesign | CC0 |
 
+## Ambient life (`ambient/`)
+
+The sprites' sounds (`mods/animals/src/ambient.rs`), cut by `reports/sound-files/life.tsv` with
+`reports/sound-files/sfx.py` from the Freesound HQ previews (fetched by
+`reports/sound-files/fetch_freesound.py`, which refuses any sound not CC0). Not yet listened to.
+
+| files | source | author | licence |
+|---|---|---|---|
+| `eagle1` (hit:0), `eagle2` (hit:1) | "210227 Red Tailed Hawk, eq isolated calls, roof 77mel 10am.wav" ([freesound 616926](https://freesound.org/people/TRP/sounds/616926/)) | TRP | CC0 |
+| `eagle3` (hit:0) | "red-tailed-hawk.wav" ([freesound 575524](https://freesound.org/people/1888software/sounds/575524/)) | 1888software | CC0 |
+| `splash1` | "Fish Jumping Splash 1.wav" ([freesound 507092](https://freesound.org/people/paulprit/sounds/507092/)) | paulprit | CC0 |
+| `splash2` (hit:0) | "Fish Jumping Splash 2.wav" ([freesound 507091](https://freesound.org/people/paulprit/sounds/507091/)) | paulprit | CC0 |
+| `splash3` (hit:0), `splash4` (hit:3) | "water_splash_10shots.wav" ([freesound 50623](https://freesound.org/people/vibe_crc/sounds/50623/)) | vibe_crc | CC0 |
+
 The chihuahua's `chihuahua/bark1-3.wav` were here before and are not covered by this file.

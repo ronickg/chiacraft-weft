@@ -22,6 +22,9 @@ enum Source {
     Look,
     /// Pictures one over the other, each tinted (a stack's `layers`).
     Layers(Vec<(String, u32)>),
+    /// Another entry, every frame multiplied by a color (`0xRRGGBB`): a block face's layer of a
+    /// fixed tint, or a connected tile of one.
+    Tinted(u32, u32),
 }
 
 struct Entry {
@@ -30,6 +33,8 @@ struct Entry {
     /// Bindless index per frame and of its glow mask (`u32::MAX` none); empty until loaded.
     frames: Vec<u32>,
     glow: Vec<u32>,
+    /// Per frame the bindless indexes of its material maps (specular, normal), `u32::MAX` none.
+    mat: Vec<[u32; 2]>,
     anim: Option<Anim>,
     images: Vec<TextureId>,
     stamp: u64,
@@ -50,6 +55,11 @@ struct Inner {
     glow_buffer: BufferId,
     glow_capacity: usize,
     glow_dirty: bool,
+    /// Material maps per bindless color index (chiacraft): two words each, the specular map's
+    /// index and the normal map's (`u32::MAX` none), on the GPU too.
+    mat_map: Vec<u32>,
+    mat_buffer: BufferId,
+    mat_capacity: usize,
     generation: u64,
     assets: Assets,
     /// Texture id per look text, made at runtime after the fixed ones.
@@ -61,8 +71,6 @@ struct Inner {
 
 pub struct GameTextures {
     inner: RefCell<Inner>,
-    /// Per block texture id: its overlay texture id + 1, or 0 (see `ctm::Ctm::overlay`).
-    pub overlays: Vec<u32>,
     /// Fully transparent, drawn for a texture until it has loaded.
     blank: (TextureId, u32),
 }
@@ -95,7 +103,6 @@ impl GameTextures {
     pub fn new(gpu: &mut dyn Backend, c: &Content, assets: &Assets) -> GameTextures {
         let (looks, names) = super::looks::load(assets, c);
         let (ctm, extra) = super::ctm::load(assets, c, &looks, names);
-        let overlays = ctm.overlay.clone();
         super::ctm::set(ctm);
         let mut entries: Vec<Entry> = Vec::new();
         let mut by_name: FxHashMap<String, u32> = FxHashMap::default();
@@ -106,6 +113,7 @@ impl GameTextures {
                     source,
                     frames: Vec::new(),
                     glow: Vec::new(),
+                    mat: Vec::new(),
                     anim: None,
                     images: Vec::new(),
                     stamp: 0,
@@ -120,12 +128,29 @@ impl GameTextures {
             .textures
             .iter()
             .chain(&extra.names)
-            .map(|n| add(n.clone(), Source::File, &mut entries))
+            .map(|n| match crate::content::tinted_copy(n) {
+                Some((of, rgb)) => {
+                    let of = add(of.to_string(), Source::File, &mut entries);
+                    add(n.clone(), Source::Tinted(of, rgb), &mut entries)
+                }
+                None => add(n.clone(), Source::File, &mut entries),
+            })
             .collect();
+        // A face of several layers, drawn one by one, is its first anywhere it is one picture.
+        for (t, layers) in c.face_layers.iter().enumerate() {
+            if let Some(first) = layers.first().filter(|l| l.tex as usize != t) {
+                ids[t] = ids[first.tex as usize];
+            }
+        }
         for parts in &extra.composites {
             let parts = parts.map(|p| ids.get(p as usize).copied().unwrap_or(0));
             let name = composite_name(&parts.map(|i| entries[i as usize].name.clone()));
             ids.push(add(name, Source::Composite(parts), &mut entries));
+        }
+        for &(tile, rgb) in &extra.tinted {
+            let of = ids.get(tile as usize).copied().unwrap_or(0);
+            let name = format!("{}#{rgb:06X}", entries[of as usize].name);
+            ids.push(add(name, Source::Tinted(of, rgb), &mut entries));
         }
         super::looks::set(looks);
         let blank = gpu.create_texture(
@@ -135,6 +160,7 @@ impl GameTextures {
         gpu.write_texture(blank, 0, &[0, 0, 0, 0]);
         let blank = (blank, gpu.texture_index(blank));
         let glow_buffer = gpu.create_buffer(4096 * 4, usage::STORAGE, "glow map");
+        let mat_buffer = gpu.create_buffer(8192 * 4, usage::STORAGE, "material map");
         log::info!("textures: {} known ({} of the content), loaded when first used", entries.len(), c.textures.len());
         let t = GameTextures {
             inner: RefCell::new(Inner {
@@ -145,13 +171,15 @@ impl GameTextures {
                 glow_buffer,
                 glow_capacity: 4096,
                 glow_dirty: true,
+                mat_map: Vec::new(),
+                mat_buffer,
+                mat_capacity: 8192,
                 generation: next_generation(),
                 assets: assets.clone(),
                 looks: FxHashMap::default(),
                 looks_full: false,
                 layered: FxHashMap::default(),
             }),
-            overlays,
             blank,
         };
         t.flush_glow(gpu);
@@ -176,6 +204,12 @@ impl GameTextures {
     /// The texture id of a stack's `layers` text, made the first time it is asked for; loaded like
     /// any texture once drawn.
     pub fn layered(&self, spec: &str) -> u32 {
+        // Chiacraft's look (shade maps and ramps) composes on its own.
+        if crate::stack::is_look(spec)
+            && let Some(id) = self.look(spec)
+        {
+            return id;
+        }
         let mut i = self.inner.borrow_mut();
         if let Some(&id) = i.layered.get(spec) {
             return id;
@@ -189,6 +223,7 @@ impl GameTextures {
             source: Source::Layers(parts),
             frames: Vec::new(),
             glow: Vec::new(),
+            mat: Vec::new(),
             anim: None,
             images: Vec::new(),
             stamp: 0,
@@ -245,6 +280,7 @@ impl GameTextures {
             source: Source::Look,
             frames: Vec::new(),
             glow: Vec::new(),
+            mat: Vec::new(),
             anim: None,
             images: Vec::new(),
             stamp: 0,
@@ -277,6 +313,12 @@ impl GameTextures {
         self.inner.borrow().glow_buffer
     }
 
+    /// The material map on the GPU (chiacraft): per bindless color index two words, its
+    /// specular and normal maps' indexes, `u32::MAX` none.
+    pub fn mat_buffer(&self) -> BufferId {
+        self.inner.borrow().mat_buffer
+    }
+
     /// Changes whenever textures were loaded, so tables built from them can be redone.
     pub fn generation(&self) -> u64 {
         self.inner.borrow().generation
@@ -292,7 +334,14 @@ impl GameTextures {
             let todo: Vec<u32> = (0..i.entries.len() as u32)
                 .filter(|&e| {
                     let en = &i.entries[e as usize];
-                    en.frames.is_empty() && !en.requested
+                    // A face of several layers or one tinted by a kind is only a name: drawn as
+                    // its layers (`ids` points at its first), never loaded as a picture of its own.
+                    let only_a_name = en.source == Source::File && {
+                        let mut layers = weft_abi::layers(&en.name);
+                        let first = layers.next();
+                        layers.next().is_some() || first.is_some_and(|l| l.kind.is_some())
+                    };
+                    en.frames.is_empty() && !en.requested && !only_a_name
                 })
                 .collect();
             for &e in &todo {
@@ -305,19 +354,32 @@ impl GameTextures {
         n
     }
 
-    /// Block textures `ids` (and their overlays) loaded now: a mesh about to be drawn uses them.
+    /// A small face image for distant silhouettes, from the same resolved asset as the mesh.
+    pub(super) fn impostor_texels(&self, id: u32, side: usize) -> Box<[[u8; 4]]> {
+        let i = self.inner.borrow();
+        let Some(&entry) = i.ids.get(id as usize) else { return vec![[255, 0, 255, 255]; side * side].into_boxed_slice() };
+        let (image, _) = load_one(&i.entries, &i.assets, entry);
+        let level = image.size.ilog2().saturating_sub(side.ilog2());
+        let width = (image.size >> level) as usize;
+        let mip = &image.frames[0][level as usize];
+        (0..side * side)
+            .map(|k| {
+                let at = ((k / side * width / side) * width + (k % side * width / side)) * 4;
+                mip[at..at + 4].try_into().unwrap()
+            })
+            .collect()
+    }
+
+    /// Block textures `ids` loaded now: a mesh about to be drawn uses them.
     pub fn ensure_blocks(&self, gpu: &mut dyn Backend, ids: impl IntoIterator<Item = u32>) {
         {
             let mut i = self.inner.borrow_mut();
             for id in ids {
-                let over = self.overlays.get(id as usize).copied().unwrap_or(0);
-                for id in [Some(id), over.checked_sub(1)].into_iter().flatten() {
-                    let Some(&e) = i.ids.get(id as usize) else { continue };
-                    let en = &mut i.entries[e as usize];
-                    if en.frames.is_empty() && !en.requested {
-                        en.requested = true;
-                        i.requests.push(e);
-                    }
+                let Some(&e) = i.ids.get(id as usize) else { continue };
+                let en = &mut i.entries[e as usize];
+                if en.frames.is_empty() && !en.requested {
+                    en.requested = true;
+                    i.requests.push(e);
                 }
             }
         }
@@ -359,15 +421,23 @@ impl GameTextures {
         let mut words = i.glow_map.clone();
         words.resize(i.glow_capacity, u32::MAX);
         gpu.write_buffer(i.glow_buffer, 0, bytemuck::cast_slice(&words));
+        let need = i.mat_map.len().max(2);
+        if need > i.mat_capacity {
+            gpu.destroy_buffer(i.mat_buffer);
+            i.mat_capacity = need.next_power_of_two();
+            i.mat_buffer = gpu.create_buffer(i.mat_capacity as u64 * 4, usage::STORAGE, "material map");
+        }
+        let mut words = i.mat_map.clone();
+        words.resize(i.mat_capacity, u32::MAX);
+        gpu.write_buffer(i.mat_buffer, 0, bytemuck::cast_slice(&words));
     }
 
     /// The world shader's tables, per texture id. `info`: four words, nothing read past them or
     /// worked out from the table's length (on macOS, MoltenVK, `arrayLength` came back longer
     /// than it, and every block drew in one flat color): static -> (index, 0, size, 0), animated
     /// -> (offset into `frames`, count | total ticks << 16 | interpolate << 31, size, 0).
-    /// `frames`: animation frames (index | ticks << 16), then from `overlays` per block texture
-    /// its overlay id + 1 or 0.
-    pub fn world_tables(&self) -> (Vec<u32>, Vec<u32>, u32) {
+    /// `frames`: animation frames (index | ticks << 16).
+    pub fn world_tables(&self) -> (Vec<u32>, Vec<u32>) {
         let i = self.inner.borrow();
         let mut info: Vec<u32> = Vec::with_capacity(i.ids.len() * 4);
         let mut frames: Vec<u32> = Vec::new();
@@ -388,9 +458,11 @@ impl GameTextures {
                 (_, true) => info.extend([self.blank.1, 0, size, 0]),
             }
         }
-        let overlays = frames.len() as u32;
-        frames.extend((0..i.ids.len()).map(|b| self.overlays.get(b).copied().unwrap_or(0)));
-        (info, frames, overlays)
+        // An empty storage buffer can't be bound.
+        if frames.is_empty() {
+            frames.push(0);
+        }
+        (info, frames)
     }
 
     /// Takes assets that may have changed on disk: block, item and particle lists and connected
@@ -428,16 +500,17 @@ impl GameTextures {
                         .is_some_and(|&o| composite_stamp(assets, entries, *parts) == old.entries[o as usize].stamp),
                     Source::Look => false,
                     // Made again when next asked for.
-                    Source::Layers(_) => false,
+                    Source::Layers(_) | Source::Tinted(..) => false,
                 })
                 .collect();
             for k in 0..n.entries.len() {
                 let Some(&o) = loaded.get(&n.entries[k].name) else { continue };
                 if same[k] {
                     let (oe, ne) = (&mut old.entries[o as usize], &mut n.entries[k]);
-                    (ne.frames, ne.glow, ne.images, ne.anim, ne.stamp, ne.size) = (
+                    (ne.frames, ne.glow, ne.mat, ne.images, ne.anim, ne.stamp, ne.size) = (
                         std::mem::take(&mut oe.frames),
                         std::mem::take(&mut oe.glow),
+                        std::mem::take(&mut oe.mat),
                         std::mem::take(&mut oe.images),
                         oe.anim.take(),
                         oe.stamp,
@@ -449,8 +522,17 @@ impl GameTextures {
                         .copied()
                         .zip(ne.glow.iter().copied())
                         .collect();
+                    let mats: Vec<(u32, [u32; 2])> = ne
+                        .frames
+                        .iter()
+                        .copied()
+                        .zip(ne.mat.iter().copied())
+                        .collect();
                     for (f, g) in pairs {
                         set_glow(&mut n.glow_map, f, g);
+                    }
+                    for (f, m) in mats {
+                        set_mat(&mut n.mat_map, f, m);
                     }
                     kept += 1;
                 } else {
@@ -467,6 +549,7 @@ impl GameTextures {
             }
         }
         gpu.destroy_buffer(old.glow_buffer);
+        gpu.destroy_buffer(old.mat_buffer);
         gpu.destroy_texture(blank);
         self.load_requested(gpu);
         self.flush_glow(gpu);
@@ -492,6 +575,14 @@ pub fn layered(assets: &Assets, parts: &[(String, u32)]) -> assets::LoadedTextur
     assets::layered_texture(&refs)
 }
 
+fn set_mat(map: &mut Vec<u32>, color: u32, mat: [u32; 2]) {
+    let at = color as usize * 2;
+    if at + 2 > map.len() {
+        map.resize(at + 2, u32::MAX);
+    }
+    map[at..at + 2].copy_from_slice(&mat);
+}
+
 fn set_glow(map: &mut Vec<u32>, color: u32, glow: u32) {
     if color as usize >= map.len() {
         map.resize(color as usize + 1, u32::MAX);
@@ -499,38 +590,54 @@ fn set_glow(map: &mut Vec<u32>, color: u32, glow: u32) {
     map[color as usize] = glow;
 }
 
-/// Reads and prepares entries in parallel (composites read their parts again).
+/// Reads and prepares entries in parallel (composites and tinted copies read their sources again).
 fn load(entries: &[Entry], assets: &Assets, ids: &[u32]) -> Vec<Loaded> {
     ids.par_iter()
         .map(|&e| {
             let en = &entries[e as usize];
-            match &en.source {
-                Source::File => Loaded {
-                    entry: e,
-                    tex: assets::load_texture(assets, &en.name),
-                    stamp: assets::texture_stamp(assets, &en.name),
-                    pixels: None,
-                },
-                Source::Layers(parts) => Loaded { entry: e, tex: layered(assets, parts), stamp: 0, pixels: None },
-                &Source::Composite(ids) => {
-                    let parts = ids.map(|p| assets::load_texture(assets, &entries[p as usize].name));
-                    Loaded {
-                        entry: e,
-                        tex: assets::composite_texture([&parts[0], &parts[1], &parts[2], &parts[3]]),
-                        stamp: composite_stamp(assets, entries, ids),
-                        pixels: None,
-                    }
-                }
-                Source::Look => {
-                    let pixels = super::stack_look::compose(&en.name, |n| assets::read_image(assets, n));
-                    let tex = pixels
-                        .as_ref()
-                        .map_or_else(assets::missing_texture, |(size, rgba)| assets::image_texture(*size, rgba.clone()));
-                    Loaded { entry: e, tex, stamp: 0, pixels }
-                }
+            // A stack's look keeps its composed pixels too, for held items' texel boxes (chiacraft).
+            if en.source == Source::Look {
+                let pixels = super::stack_look::compose(&en.name, |n| assets::read_image(assets, n));
+                let tex = pixels
+                    .as_ref()
+                    .map_or_else(assets::missing_texture, |(size, rgba)| assets::image_texture(*size, rgba.clone()));
+                return Loaded { entry: e, tex, stamp: 0, pixels };
             }
+            let (tex, stamp) = load_one(entries, assets, e);
+            Loaded { entry: e, tex, stamp, pixels: None }
         })
         .collect()
+}
+
+fn load_one(entries: &[Entry], assets: &Assets, e: u32) -> (LoadedTexture, u64) {
+    let en = &entries[e as usize];
+    match &en.source {
+        Source::File => (assets::load_texture(assets, &en.name), assets::texture_stamp(assets, &en.name)),
+        Source::Layers(parts) => (layered(assets, parts), 0),
+        Source::Look => {
+            let pixels = super::stack_look::compose(&en.name, |n| assets::read_image(assets, n));
+            (pixels.map_or_else(assets::missing_texture, |(size, rgba)| assets::image_texture(size, rgba)), 0)
+        }
+        &Source::Composite(ids) => {
+            let parts = ids.map(|p| assets::load_texture(assets, &entries[p as usize].name));
+            (assets::composite_texture([&parts[0], &parts[1], &parts[2], &parts[3]]), composite_stamp(assets, entries, ids))
+        }
+        &Source::Tinted(of, rgb) => {
+            let (mut tex, stamp) = load_one(entries, assets, of);
+            let t = [(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255];
+            for px in tex
+                .frames
+                .iter_mut()
+                .flatten()
+                .flat_map(|m| m.chunks_exact_mut(4))
+            {
+                for k in 0..3 {
+                    px[k] = (px[k] as u32 * t[k] / 255) as u8;
+                }
+            }
+            (tex, stamp)
+        }
+    }
 }
 
 fn upload(gpu: &mut dyn Backend, i: &mut Inner, l: Loaded) {
@@ -539,7 +646,8 @@ fn upload(gpu: &mut dyn Backend, i: &mut Inner, l: Loaded) {
     let mut images = Vec::new();
     let mut frames = Vec::new();
     let mut glows = Vec::new();
-    for (mips, glow) in l.tex.frames.iter().zip(&l.tex.glow) {
+    let mut mats = Vec::new();
+    for (k, (mips, glow)) in l.tex.frames.iter().zip(&l.tex.glow).enumerate() {
         let t = gpu.create_texture(
             &TextureDesc { width: size, height: size, mips: mips.len() as u32, format: Format::Rgba8Srgb, render_target: false },
             label,
@@ -557,12 +665,32 @@ fn upload(gpu: &mut dyn Backend, i: &mut Inner, l: Loaded) {
             gpu.texture_index(g)
         });
         set_glow(&mut i.glow_map, index, g);
+        // Material maps: linear, one level (read texel by texel, as the glow masks).
+        let m = l
+            .tex
+            .mat
+            .get(k)
+            .and_then(Option::as_ref)
+            .map_or([u32::MAX; 2], |m| {
+                [&m.spec, &m.normal].map(|rgba| {
+                    let t = gpu.create_texture(
+                        &TextureDesc { width: size, height: size, mips: 1, format: Format::Rgba8Unorm, render_target: false },
+                        label,
+                    );
+                    gpu.write_texture(t, 0, rgba);
+                    images.push(t);
+                    gpu.texture_index(t)
+                })
+            });
+        set_mat(&mut i.mat_map, index, m);
         frames.push(index);
         glows.push(g);
+        mats.push(m);
     }
     let en = &mut i.entries[l.entry as usize];
     for t in std::mem::replace(&mut en.images, images) {
         gpu.destroy_texture(t);
     }
-    (en.frames, en.glow, en.anim, en.stamp, en.requested, en.size, en.pixels) = (frames, glows, l.tex.anim, l.stamp, false, size, l.pixels);
+    (en.frames, en.glow, en.mat, en.anim, en.stamp, en.requested, en.size, en.pixels) =
+        (frames, glows, mats, l.tex.anim, l.stamp, false, size, l.pixels);
 }

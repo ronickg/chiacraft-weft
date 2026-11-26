@@ -1,0 +1,4 @@
+# Four foxfire tiles, each with its own runs of thread, picked at random and turned four ways (mats_snap.py), so a floor of it doesn't show one shape repeating. Each tile has its own _e.
+method = random
+tiles = 0 1-3
+symmetry = all

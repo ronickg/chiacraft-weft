@@ -46,7 +46,11 @@ against the body and thicker, broad hooves, the neck carried forward and low, a 
 blunt furred muzzle, small round ears, a short tail. Antlers on both sexes (the cows' smaller, by
 the build gene for horns), the brow shovel on the left only. Idle (grazing with the mouth at the
 ground, chewing, looking up, ear and tail flicks, blinks), walk, a gallop and lying down to chew
-the cud (blinking).
+the cud (blinking); and the behaviour clips the game asks for (`mods/animals/src/anim.rs`), ported
+from the deer's: held stare, graze, drink, sleep (in the lying file too), watch; the gaits approach
+and charge (stood on their feet by `build.py`); once alarm, rear (the hind hooves kept down),
+sniff, look, scratch, stretch, play, groom, nuzzle, flinch; death (each frame of the fall on its
+lowest point). Graze, drink and sniff reach the ground with the muzzle, the antlers clear of it.
 
 ## How it's made
 

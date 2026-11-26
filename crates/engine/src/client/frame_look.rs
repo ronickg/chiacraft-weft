@@ -46,6 +46,7 @@ impl FrameLook {
             blend: Blend::None,
             cull_back: false,
             topology: Topology::Triangles,
+            motion: false,
         }) {
             Ok(p) => self.pipe = Some(p),
             Err(e) => log::error!("frame look shader: {}", e.0),
@@ -78,7 +79,7 @@ impl FrameLook {
         });
         self.scene = [index as f32 + 1.0, 0.0, 0.0, 0.0];
         self.passes
-            .push(Cmd::BeginPass { color: Some((Target::Texture(t), Some([0.0; 4]))), depth: None });
+            .push(Cmd::BeginPass { motion: None, color: Some((Target::Texture(t), Some([0.0; 4]))), depth: None });
         self.passes.pipeline(pipe);
         self.passes.bind(bind::sky::OBJECTS, objects);
         self.passes.bind(bind::sky::SCENE, scene);

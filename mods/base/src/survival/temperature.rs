@@ -30,7 +30,7 @@ static HUD_ROOM: HudElement = HudElement::named("room");
 
 pub fn register(r: &mut Registry) {
     r.entity_component(&ROOM, Shelter { wall: 0, gain: 0 }, component_flags::SYNC_OWNER);
-    r.attach(&PLAYER, &ROOM);
+    r.edit(&PLAYER).attach(&ROOM);
     // "Sheltered · log walls, +18 °C" (over the air outside), under the vitals' bars while in a room.
     r.hud_element(&HUD_ROOM, hud_anchor::TOP_LEFT, 8, |ui| {
         // One line, wide enough not to wrap (in a narrow top-left column it broke a letter a line).
@@ -141,8 +141,8 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
     (here, comfort)
 }
 
-/// What one wears: armor by its material, a share a piece (head to feet), and clothes by theirs
-/// (`vitals::clothing`, named `<material>_<piece>`).
+/// What one wears: armor by its material, a share a piece (head to feet), built armour by its
+/// shell and lining, and clothes by theirs (`vitals::clothing`, named `<material>_<piece>`).
 fn worn(w: &World, id: u64) -> Worn {
     let mut worn = Worn::default();
     let Some(slots) = w.inventory(id).find_group(EQUIPMENT_GROUP) else { return worn };
@@ -152,6 +152,19 @@ fn worn(w: &World, id: u64) -> Worn {
             continue;
         }
         let name = item_name(stack.item);
+        // Armour built from parts: its shell's insulation and its lining's warmth.
+        if i < 4
+            && let Some(p) = crate::parts::PARTS.on_stack_own(&stack)
+        {
+            let material = |slot: &str| {
+                (0..p.n.min(4) as usize)
+                    .find(|&j| p.slots[j] == crafting::code(slot))
+                    .and_then(|j| crafting::material_of(p.materials[j]))
+                    .map_or("", |m| m.id)
+            };
+            crate::parts::armour_worn(&mut worn, material("shell"), material("lining"), i as usize);
+            continue;
+        }
         if let Some(c) = clothing::cloak_of(name) {
             worn.cloak(c);
         } else if let Some((m, piece)) = clothing::piece_of(name) {

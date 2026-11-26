@@ -1,3 +1,0 @@
-# 3D plants pack (mods/base/source/plants3d/build.py): 3 model tiles picked by position
-method = random
-tiles = p3d/beans_stage_1_0 p3d/beans_stage_1_1 p3d/beans_stage_1_2

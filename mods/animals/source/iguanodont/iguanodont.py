@@ -27,7 +27,7 @@ sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
 from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit, swing  # noqa: E402
-from ground import corners, lowest, world  # noqa: E402
+from ground import corners, grounded, lowest, world  # noqa: E402
 from house import TX  # noqa: E402
 
 # TX: texels a unit, 0.5 (32 a block, the house density, as the blocks and items). The eye's face,
@@ -179,7 +179,9 @@ def elements():
     E = [el("hips", "spine_0", (-32, 92, -42), (32, 164, 34)),  # highest over the hips
          el("belly", "spine_0", (-34, 72, -20), (34, 122, 40)),  # the big gut slung between the legs
          el("chest", "spine_1", (-37, 76, 28), (37, 152, 122)),  # deep, the back sloping down to the shoulders
-         el("shoulders", "spine_1", (-39.5, 96, 84), (39.5, 147, 124)),  # the shoulder girdle and its muscle
+         # the shoulder girdle and its muscle: forward over two texels from the chest's front, its sides half a
+         # unit out from the chest's (2.5 out and 2 forward, they read as rims; linecheck)
+         el("shoulders", "spine_1", (-37.5, 96, 84), (37.5, 147, 126.5)),
          el("neck", "neck", NECK_BASE + np.array([-NECK_HW, -NECK_HH, -6.0]), NECK_BASE + np.array([NECK_HW, NECK_HH, NECK_LEN + 2.0]),
             rot=(-NECK_ANGLE, 0, 0), origin=tuple(NECK_BASE)),
          # Its root, deeper and wider, ending short of the head: the neck thick where it leaves the chest.
@@ -187,11 +189,14 @@ def elements():
             rot=(-NECK_ANGLE, 0, 0), origin=tuple(NECK_BASE)),
          el("skull", "head", *SKULL),
          el("nasal", "head", (-6, 162, 198), (6, 167, 230)),  # the ridge down the face
-         el("snout", "head", (-10, 137, 200), (10, 163, 236)),
+         el("snout", "head", (-11.5, 137, 200), (11.5, 163, 236)),  # half a unit short of the skull's sides (at 10, a rim; linecheck)
          el("beak", "head", (-7.5, 134, 234), (7.5, 148, 243)),  # the toothless upper beak
-         el("mouth", "head", (-8, 138.5, 168), (8, 141.5, 234)),
-         el("jaw", "jaw", (-9, 126, 164), (9, 144, 224)),  # deep, under the cheeks
-         el("predentary", "jaw", (-6.5, 130, 222), (6.5, 139, 235))]  # the lower beak, behind the upper's tip
+         el("mouth", "head", (-7, 138.5, 168), (7, 141.5, 234)),  # a unit inside the lower beak's sides (boxcheck)
+         el("jaw", "jaw", (-8.5, 126, 164), (8.5, 144, 224)),  # deep, under the cheeks; half a unit past the lower beak
+         # the lower beak, behind the upper's tip: half a unit past the upper beak's sides and inside the jaw's,
+         # down to the jaw's bottom (narrower and higher, the jaw's front and its own showed round them as
+         # rims; linecheck)
+         el("predentary", "jaw", (-8.0, 126.5, 222), (8.0, 139, 235))]
     for s, n in ((1, "L"), (-1, "R")):
         za, zb, top, bottom = eye_box(s)
         h = top - bottom
@@ -207,16 +212,20 @@ def elements():
         s = 1 if leg[1] == "L" else -1
         if leg[0] == "F":
             x, z = FRONT_X * s, FRONT_Z
-            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 11, 64, z - 12), (x + 11, 118, z + 11)))
+            # its front half a unit short of the chest's (at z + 11 the chest showed before it a unit wide; linecheck)
+            E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 11, 64, z - 12), (x + 11, 118, z + 11.6)))
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 8.5, 20, z - 9), (x + 8.5, 70, z + 8.5)))
             # The hand: the three middle fingers bound into a hoof, the thumb a spike on the inside.
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 10, 0, z - 10.0), (x + 10, 23, z + 11.5)))
             xi = x - s * 10.0  # the hand's inner side
             ta, tb = sorted((xi + s * 1.0, xi - s * 4.5))
-            E.append(el(f"thumb_{leg}", f"leg_{leg}_paw", (ta, 11, z + 2.0), (tb, 19, z + 8.0)))
+            # two texels short of the hand's front (at z + 8, 1.75; linecheck)
+            E.append(el(f"thumb_{leg}", f"leg_{leg}_paw", (ta, 11, z + 2.0), (tb, 19, z + 7.0)))
         else:
             x, z = BACK_X * s, BACK_Z
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 15, 74, z - 21), (x + 15, 140, z + 19)))  # the big drumstick
+            # the big drumstick, down to half a unit over the belly's bottom (at 74 the belly's sides showed under
+            # it a texel high; linecheck)
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 15, 72.5, z - 21), (x + 15, 140, z + 19)))
             E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 11, 26, z - 14), (x + 11, 80, z + 10)))
             E.append(el(f"meta_{leg}", f"leg_{leg}_paw", (x - 10, 6, z - 12), (x + 10, 30, z + 8.5)))
             E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 12.6, 0, z - 13), (x + 12.6, 9, z + 24)))  # three hoofed toes
@@ -404,7 +413,9 @@ def paint_face(e, face, boxes):
 # ------------------------------------------------------------------ animation
 
 L = {"lie_front": 80, "lie_elbow": -150, "lie_hip": -70, "lie_knee": 140, "lie_ankle": -70, "lie_wrist": 0, "lie_drop": 60.0,
-     "tail_0": -10, "tail_1": 4, "tail_2": 4, "graze_neck": 60, "graze_head": 20}
+     "tail_0": -10, "tail_1": 4, "tail_2": 4, "graze_neck": 60, "graze_head": 20,
+     "clip_chew": 5.0, "sleep_neck": 30, "sleep_head": 10, "turn_neck": 14, "turn_head": 16, "charge_level": 0.0,
+     "rear_tilt": 50, "rear_tail0": 18, "rear_tail1": 4, "rear_tail2": 2, "death_drop": 60.0, "death_neck": 20, "death_roll": 10}
 
 
 def gait(p, phases, swing_amp, lift):
@@ -507,9 +518,286 @@ def pose_lie(t, P=L):
     return q
 
 
-BLINKS = {"idle": [3.0, 7.4], "lie": [1.8, 5.6]}
+# ------------------------------------------------------------------ behaviour clips (`anim.rs`)
+# Each a whole-body pose over what plays below on the bones it moves (`to_bedrock.as_action`): held
+# states and the gaits loop, the rest play once. A big plant eater (4000 kg, over `roles::STANDS_KG`)
+# stands its ground against a lone hunter: it rears up on its hind legs with the thumb spikes out,
+# stares, then charges head low.
+
+
+def still(t, period=4.0, tail=2.0):
+    """Standing still and breathing, the tail swaying a little: what a clip builds on. (No spine
+    pitch: the front legs hang from the chest, and a tilt lifts or sinks their feet.)"""
+    br = S(TAU * t / period * 2)
+    q = {"root": (0, 0.1 * br, 0), "spine_1": (0.2 * br, 0, 0)}
+    q.update(tail_sway(t / period, 1, tail))
+    return q
+
+
+def pose_stare(t):
+    """Half aware: frozen, the head raised and level, looking, only the breath moving (2.5 s, held)."""
+    q = still(t, 2.5, tail=0.6)
+    q.update({"neck": (-10, 0, 0), "head": (6, 0, 0), "jaw": (0.01, 0, 0)})
+    return q
+
+
+def pose_graze(t, P=L):
+    """Cropping low plants: the beak at the ground, biting and chewing, the head working side to side
+    (3 s, held)."""
+    p = t / 3.0
+    q = still(t, 3.0, tail=2.5)
+    q.update(graze_pose(1.0, P))
+    q["head"] = (q["head"][0] - 1.5 * max(0.0, S(TAU * p * 2)), 6 * S(TAU * p), 0)
+    q.update(chew(t, 2.0, P["clip_chew"]))
+    return q
+
+
+def pose_drink(t, P=L):
+    """Drinking: the beak in the water, dipping and sipping (2 s, held)."""
+    q = still(t, 2.0, tail=1.5)
+    q.update(graze_pose(1.0, P))
+    q["head"] = (q["head"][0] - 1.5 * max(0.0, S(TAU * t / 2.0 * 2)), 0, 0)
+    q.update(chew(t, 2.0, 0.6 * P["clip_chew"]))
+    return q
+
+
+def pose_sniff(t):
+    """The beak down to the ground, a sniff along it side to side, and up (2.4 s, once)."""
+    p = t / 2.4
+    d = float(np.interp(p, [0, .3, .75, 1], [0, 1, 1, 0]))
+    q = still(t, 2.4)
+    q.update(graze_pose(0.97 * d, L))
+    q["head"] = (q["head"][0], 8 * d * S(TAU * p * 2), 0)
+    return q
+
+
+def pose_look(t):
+    """The head up and round one way, then the other (3.2 s, once)."""
+    p = t / 3.2
+    yaw = float(np.interp(p, [0, .15, .4, .55, .8, 1], [0, 1, 1, -1, -1, 0]))
+    up = float(np.interp(p, [0, .12, .88, 1], [0, 1, 1, 0]))
+    q = still(t, 3.2)
+    q.update({"neck": (-10 * up, L["turn_neck"] * yaw, 0), "head": (5 * up, L["turn_head"] * yaw, 0)})
+    return q
+
+
+def pose_scratch(t):
+    """An itch: the left hand lifted to the neck, the thumb spike rubbing it, the neck bent down to
+    meet it (2.6 s, once)."""
+    p = t / 2.6
+    d = float(np.interp(p, [0, .2, .8, 1], [0, 1, 1, 0]))
+    rub = d * S(TAU * p * 5)
+    q = still(t, 2.6)
+    q.update({"leg_FL_upper": (-62 * d + 6 * rub, 0, -14 * d), "leg_FL_lower": (-34 * d - 8 * rub, 0, 0),
+              "leg_FL_paw": (20 * d, 0, 0), "neck": (12 * d, 8 * d, 0), "head": (6 * d, 6 * d, -10 * d)})
+    return q
+
+
+def pose_groom(t):
+    """Grooming: the beak nudging and nibbling down along the left forearm, lifted a little to it
+    (2.6 s, once)."""
+    p = t / 2.6
+    d = float(np.interp(p, [0, .2, .85, 1], [0, 1, 1, 0]))
+    q = still(t, 2.6)
+    q.update({"spine_1": (q["spine_1"][0], 5 * d, 0), "neck": (44 * d, 10 * d, 0),
+              "head": (26 * d + 5 * d * S(TAU * p * 4), 8 * d, 0),
+              "leg_FL_upper": (-20 * d, 0, 0), "leg_FL_lower": (34 * d, 0, 0), "leg_FL_paw": (-12 * d, 0, 0)})
+    q.update(chew(t, 4.0, 5.0 * d))
+    return q
+
+
+def pose_stretch(t):
+    """Getting up: the neck stretched long and up, a yawn, then a hind leg pushed out behind (3 s, once)."""
+    p = t / 3.0
+    a = float(np.interp(p, [0, .2, .5, .6, 1], [0, 1, 1, 0, 0]))
+    b = float(np.interp(p, [0, .55, .7, .9, 1], [0, 0, 1, 1, 0]))
+    q = still(t, 3.0)
+    q.update({"neck": (-18 * a, 0, 0), "head": (-8 * a, 0, 0),
+              # pushed out behind, the knee lifting it clear on the way
+              "leg_BR_upper": (26 * b, 0, 0), "leg_BR_lower": (30 * S(math.pi * b), 0, 0),
+              "leg_BR_paw": (-8 * b - 24 * S(math.pi * b), 0, 0)})
+    q.update(chew(t, 0.5, 26 * a))  # the yawn
+    return q
+
+
+def pose_sleep(t, P=L):
+    """Asleep, lying: the head laid on the ground, turned a little, eyes shut, a slow breath (6 s, held)."""
+    q = pose_lie(0.0, P)
+    b = 0.5 * (1 + S(TAU * t / 6.0 * 2))  # the breath, 0..1: the chest rising lifts the head (at 0 laid down, fitted)
+    q.update({"root": (0, -P["lie_drop"] + 0.3 * b, 0), "spine_1": (-0.4 * b, 0, 0), "neck": (P["sleep_neck"], 6, 0),
+              "head": (P["sleep_head"], 4, 0), "jaw": (0.01, 0, 0)})
+    for k in range(1, len(TAIL)):  # the tail along the ground, curled a little to the left
+        q[f"tail_{k}"] = swing((0, 0, -1), 4.0, (q[f"tail_{k}"][0], 0, 0))
+    q.update({"eyelid_L": (0, 0, 90), "eyelid_R": (0, 0, -90)})
+    return q
+
+
+def pose_alarm(t):
+    """Alarm: the head flung up and tossed, a bellow with the jaw wide, the tail lashing side to side
+    (1.6 s, once)."""
+    p = t / 1.6
+    up = float(np.interp(p, [0, .12, .82, 1], [0, 1, 1, 0]))
+    toss = float(np.interp(p, [0, .12, .22, .3, .42, .5, 1], [0, 0, -1, 1, -1, 0, 0]))
+    bellow = float(np.interp(p, [0, .45, .55, .85, 1], [0, 0, 1, 1, 0]))
+    q = still(t, 1.6, tail=0.0)
+    q.update({"neck": (-20 * up + 4 * toss, 0, 0), "head": (6 * up + 10 * toss - 8 * bellow, 0, 0), "jaw": (24 * bellow, 0, 0)})
+    for k in range(len(TAIL)):  # lashing: stiff, swung from its base, fast
+        q[f"tail_{k}"] = swing((0, 0, -1), up * (14 if k == 0 else 3) * S(TAU * p * 2.5 - 0.4 * k), (-3 * up if k == 0 else 0, 0, 0))
+    return q
+
+
+def rear_body(r, P=L, arm=None):
+    """Up on the hind legs by `r` (0..1): the body tipped up about the hips, the hind legs kept
+    upright under it, the forelimbs raised forward with the hands spread (the thumb spikes out), the
+    neck and head brought forward, the tail down as a counterweight to the ground (fitted). The
+    forelimbs by `arm` if given (unhurried by the easing: barely turned off the chest, their fronts
+    flicker against its own)."""
+    a = r if arm is None else arm
+    q = {"spine_0": (-P["rear_tilt"] * r, 0, 0), "spine_1": (0.01, 0, 0), "neck": (22 * r, 0, 0), "head": (14 * r, 0, 0)}
+    for leg in ("BL", "BR"):  # the hind legs kept upright under the tilt
+        q[f"leg_{leg}_upper"] = ((P["rear_tilt"] - 4) * r, 0, 0)
+        q[f"leg_{leg}_lower"] = (4 * r, 0, 0)
+        q[f"leg_{leg}_paw"] = (0.01, 0, 0)
+    for leg, s in (("FL", 1), ("FR", -1)):  # the forelimbs up and forward, the hands turned out
+        q[f"leg_{leg}_upper"] = (-38 * a, 0, s * 14 * a)
+        q[f"leg_{leg}_lower"] = (-24 * a, 0, 0)
+        q[f"leg_{leg}_paw"] = (-10 * a, s * 30 * a, s * 10 * a)
+    q["tail_0"] = (P["rear_tail0"] * r, 0, 0)
+    q["tail_1"] = (P["rear_tail1"] * r, 0, 0)
+    for k in (2, 3, 4):
+        q[f"tail_{k}"] = (P["rear_tail2"] * r, 0, 0)
+    return q
+
+
+def pose_rear(t, P=L):
+    """Standing its ground, as the stand begins: up on the hind legs, slowly (it weighs four tonnes),
+    the forelimbs up with the thumb spikes out, a bellow, the tail on the ground behind; the hind feet
+    planted (its height set from them frame by frame, `ground_clips`) (2.4 s, once)."""
+    p = t / 2.4
+    a = float(np.interp(p, [0, .35, .72, 1], [0, 1, 1, 0]))
+    r = a * a * (3 - 2 * a)  # eased: a heavy body
+    bellow = float(np.interp(p, [0, .35, .45, .62, .72, 1], [0, 0, 1, 1, 0, 0]))
+    q = still(t, 2.4, tail=0.0)
+    q.update(rear_body(r, P, a))
+    q["head"] = (q["head"][0] - 6 * bellow, 0, 0)
+    q["jaw"] = (22 * bellow, 0, 0)
+    sh = r * S(TAU * p * 2)  # the hands brandished
+    for leg in ("FL", "FR"):
+        q[f"leg_{leg}_lower"] = (q[f"leg_{leg}_lower"][0] - 8 * sh, 0, 0)
+    return q
+
+
+def pose_play(t):
+    """A young one's play: two heavy bounces off all four feet, the head tossed side to side, the tail
+    wagging (1.6 s, once; it lands on the ground, `ground_clips`)."""
+    p = t / 1.6
+    hop = max(0.0, S(TAU * p * 2))
+    q = still(t, 1.6)
+    q.update({"root": (0, 3.0 * hop, 0), "neck": (-8 * hop, 0, 0), "head": (4 * hop, 10 * S(TAU * p), 6 * S(TAU * p)),
+              "jaw": (6 * hop, 0, 0)})
+    for leg in LEGS:
+        q[f"leg_{leg}_upper"] = ((-8 if leg[0] == "F" else 8) * hop, 0, 0)
+        q[f"leg_{leg}_lower"] = (12 * hop, 0, 0)
+        q[f"leg_{leg}_paw"] = (-6 * hop, 0, 0)
+    q.update(tail_sway(p, 2, 6))
+    return q
+
+
+def pose_nuzzle(t):
+    """Nuzzling its young: the beak low and forward, gentle nudges, a nibble (2.2 s, once)."""
+    p = t / 2.2
+    d = float(np.interp(p, [0, .2, .85, 1], [0, 1, 1, 0]))
+    push = max(0.0, S(TAU * p * 3))
+    q = still(t, 2.2)
+    q.update(graze_pose(0.6 * d, L))
+    q["head"] = (q["head"][0] - 10 * push * d, 0, 0)
+    q.update(chew(t, 3.0, 4.0 * d))
+    return q
+
+
+def pose_flinch(t):
+    """Hit: a jerk aside, the head ducked and turned away, the tail clamped (0.5 s, once). (Turned,
+    not rolled: a roll at the chest dips one forefoot into the ground.)"""
+    p = t / 0.5
+    d = float(np.interp(p, [0, .15, .45, 1], [0, 1, 0.8, 0]))
+    q = still(t, 0.5, tail=0.0)
+    q.update({"spine_1": (0, 3 * d, 0), "neck": (12 * d, -L["turn_neck"] * 0.6 * d, 0), "head": (8 * d, -8 * d, 0), "jaw": (6 * d, 0, 0)})
+    for k in range(3):
+        q[f"tail_{k}"] = (q[f"tail_{k}"][0] - 3 * d, -3 * d, 0)
+    return q
+
+
+def pose_watch(t):
+    """A herd's sentinel: the head raised high on the neck, turning slowly one way and the other, a
+    chew now and then (4.5 s, held)."""
+    p = t / 4.5
+    yaw = S(TAU * p)
+    q = still(t, 4.5, tail=1.0)
+    q.update({"neck": (-24, L["turn_neck"] * yaw, 0), "head": (14, L["turn_head"] * yaw, 0)})
+    q.update(chew(t, 2.0, 2.0 * max(0.0, S(TAU * p * 2))))
+    return q
+
+
+def pose_approach(t):
+    """Curious, coming to look: slow careful steps, the neck stretched out low and the beak forward,
+    the head turned a little one way and the other (2.2 s a cycle, in place of the walk; its height
+    set from its feet, `ground_clips`)."""
+    p = t / 2.2
+    q = gait(p, (0.0, 0.5, 0.75, 0.25), 12, 26)
+    q.update({"neck": (28 + 1.5 * S(TAU * p * 2), 0, 0), "head": (-16 - 1.5 * S(TAU * p * 2), 6 * S(TAU * p), 0),
+              "spine_0": (0, 1.5 * S(TAU * p), 0)})
+    q.update(tail_sway(p, 1, 2.5))
+    return q
+
+
+def pose_charge(t, P=L):
+    """Charging a hunter: the heavy trot driven hard, the head down and forward like a ram, the tail
+    out straight (0.8 s a cycle, in place of the walk and the run). No lean but `charge_level`,
+    fitted so all four feet come down to the ground; `ground_clips` sets its height from its feet,
+    keeping the bounce."""
+    p = t / 0.8
+    q = gait(p, (0.0, 0.5, 0.5, 0.0), 26, 50)
+    for leg in ("BL", "BR"):  # the hind legs kept on their stride under the level
+        q[f"leg_{leg}_upper"] = (q[f"leg_{leg}_upper"][0] - P["charge_level"], 0, 0)
+    c = S(TAU * p * 2)
+    q.update({"root": (0, 3.0 * abs(S(TAU * p)), 0), "spine_0": (P["charge_level"], 0, 0), "spine_1": (1.5 * c, 0, 0),
+              "neck": (36, 0, 0), "head": (4 + 2 * c, 0, 0)})
+    q.update(tail_sway(p, 1, 2, lift=-2.0))
+    return q
+
+
+def pose_death(t, P=L):
+    """Dying: the legs give, the heavy body rolls onto its side, the neck and tail fall slack, the eyes
+    shut; it stays (2.2 s, holds; each frame rests on its lowest point, `ground_clips`)."""
+    p = t / 2.2
+    fall = float(np.interp(p, [0, .3, .7, 1], [0, 0.3, 1, 1]))
+    q = {"root": (0, -P["death_drop"] * fall, 0), "spine_0": (0, 0, 82 * fall), "spine_1": (0, 0, 4 * fall),
+         "neck": (P["death_neck"] * fall, 0, -P["death_roll"] * fall), "head": (8 * fall, 0, -10 * fall), "jaw": (12 * fall, 0, 0)}
+    for leg in LEGS:
+        q[f"leg_{leg}_upper"] = ((14 if leg[0] == "F" else -14) * fall, 0, 0)
+        q[f"leg_{leg}_lower"] = (12 * fall, 0, 0)
+        q[f"leg_{leg}_paw"] = (0.01, 0, 0)
+    for k in range(len(TAIL)):
+        q[f"tail_{k}"] = (0.01, 0, -3 * fall)
+    q.update({"eyelid_L": (0, 0, 90 * fall), "eyelid_R": (0, 0, -90 * fall)})
+    return q
+
+
+BLINKS = {"idle": [3.0, 7.4], "lie": [1.8, 5.6], "stare": [1.4], "graze": [1.3], "drink": [1.1], "look": [1.7], "watch": [1.3, 3.4]}
 BLINK = 0.12
-ANIMS = {"idle": (pose_idle, 10.0), "walk": (pose_walk, 1.6), "run": (pose_run, 1.0), "lie": (pose_lie, 8.0)}
+ANIMS = {"idle": (pose_idle, 10.0), "walk": (pose_walk, 1.6), "run": (pose_run, 1.0), "lie": (pose_lie, 8.0),
+         "stare": (pose_stare, 2.5), "graze": (pose_graze, 3.0), "drink": (pose_drink, 2.0), "sniff": (pose_sniff, 2.4),
+         "look": (pose_look, 3.2), "scratch": (pose_scratch, 2.6), "stretch": (pose_stretch, 3.0), "sleep": (pose_sleep, 6.0),
+         "alarm": (pose_alarm, 1.6), "rear": (pose_rear, 2.4), "play": (pose_play, 1.6), "groom": (pose_groom, 2.6),
+         "nuzzle": (pose_nuzzle, 2.2), "flinch": (pose_flinch, 0.5), "death": (pose_death, 2.2),
+         "watch": (pose_watch, 4.5), "approach": (pose_approach, 2.2), "charge": (pose_charge, 0.8)}
+# Only the held states and the gaits loop (the engine loops a clip whose file says so, whatever the
+# game asks); the one-offs play once, death holds its last frame.
+LOOPS = {"stare": True, "graze": True, "drink": True, "sleep": True, "watch": True, "approach": True, "charge": True,
+         "death": "hold_on_last_frame"}
+BLENDS = {"flinch": (0.05, 0.2), "death": (0.1, 0.0), "sleep": (0.6, 0.6), "graze": (0.4, 0.4), "watch": (0.4, 0.4),
+          "approach": (0.3, 0.3), "charge": (0.15, 0.3), "rear": (0.3, 0.4)}
+STANDING = ("idle", "walk", "run", "lie")
 
 
 def eyelids(name, t):
@@ -518,7 +806,8 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = {"idle": 100, "lie": 64, "walk": 24, "run": 20}.get(name, 16)
+    n = {"idle": 100, "lie": 64, "walk": 24, "run": 20, "sleep": 36, "flinch": 12, "watch": 45, "approach": 24, "charge": 20,
+         "graze": 30, "look": 32, "rear": 30}.get(name, 24)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
@@ -529,13 +818,30 @@ def animations(bone_names):
     out = {}
     for name, (fn, dur) in ANIMS.items():
         frames = []
+        loops = LOOPS.get(name, name in STANDING)
         for t in frame_times(name, dur):
-            tt = t % dur if t < dur else 0.0
+            # A loop's last frame is its first; a clip played once ends where it ends.
+            tt = t % dur if t < dur else (0.0 if loops is True else dur)
             pose = fn(tt)
-            pose.update(eyelids(name, tt))
+            if name not in ("sleep", "death"):  # those keep their eyes shut
+                pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
         out[name] = {"length": dur, "frames": frames}
+        if name not in STANDING:
+            out[name].update(loop=loops, blend=BLENDS.get(name, (0.25, 0.3)))
+    # A clip goes over what plays below only on the bones it writes, and the exporter leaves out a bone
+    # that stays at 0: kept at a hundredth of a degree, so the idle's cropping neck and head, chewing
+    # jaw and swaying tail don't show through a clip that holds them straight. The eyelids are left to
+    # the idle's blinks.
+    moved = {b for a in ("idle", "lie") for f in out[a]["frames"] for b, r in f["rot"].items() if any(abs(v) > 1e-6 for v in r)}
+    for name, anim in out.items():
+        if name in STANDING:
+            continue
+        for b in moved - {"eyelid_L", "eyelid_R"}:
+            if all(not any(abs(v) > 1e-6 for v in f["rot"][b]) for f in anim["frames"]):
+                for f in anim["frames"]:
+                    f["rot"][b] = [0.01, 0.0, 0.0]
     return out
 
 
@@ -613,6 +919,76 @@ def fit_poses(spec):
     best = fit({"graze_neck": list(range(20, 71, 2)), "graze_head": list(range(-20, 111, 3))}, graze_cost)[1]
     L.update(best)
 
+    # The clips' cropping chews no wider than keeps the open jaw out of the ground (the beak is fitted closed).
+    def jaw_low(a):
+        q = graze_pose(1.0)
+        q.update(chew(0.125, 2.0, a))
+        return lowest(spec, q, GROUPS)["muzzle"]
+    L["clip_chew"] = max([a for a in (1, 2, 3, 4, 5, 6) if jaw_low(a) > 0.1], default=0.5)
+    # Charging: the level that brings all four feet down to the ground over the stride.
+    feet = {f: (lambda n, f=f: n == f) for f in FEET}
+
+    def feet_reach(P):
+        lows = [lowest(spec, pose_charge(0.8 * k / 20, P), feet) for k in range(20)]
+        m = {f: min(g[f] for g in lows) for f in FEET}
+        return max(m.values()) - min(m.values())
+    L["charge_level"] = min((round(0.25 * k, 2) for k in range(-16, 17)), key=lambda v: feet_reach(dict(L, charge_level=v)))
+    print("charging, level", L["charge_level"], "; the feet's lowest within", round(feet_reach(L), 2))
+    # Rearing: the tail down behind as a counterweight, its back half along the ground and nothing
+    # below it, measured from the planted hind feet.
+    hind = {"hind": lambda n: n in ("leg_BL_paw", "leg_BR_paw")}
+
+    def rear_cost(P):
+        q = rear_body(1.0, dict(L, **P))
+        g = lowest(spec, q, dict(GROUPS, **hind))
+        f = g["hind"]
+        return (g["tail_4"] - f - 1.0) ** 2 + 0.3 * (g["tail_3"] - f - 2.0) ** 2 + 2000 * min(0.0, g["tail"] - f - 0.5) ** 2
+    L.update(fit({"rear_tail0": list(range(0, 41, 2)), "rear_tail1": list(range(-10, 21, 2)), "rear_tail2": list(range(-6, 13, 2))},
+                 rear_cost)[1])
+    q = rear_body(1.0)
+    g = lowest(spec, q, dict(GROUPS, **hind))
+    print("rearing: the tail", {k: round(float(g[k] - g["hind"]), 2) for k in ("tail_3", "tail_4", "tail")}, "over the ground")
+    # Asleep: the head laid on the ground (its lowest a quarter unit over it).
+    head = {"head": lambda n: n in HEAD_PARTS}
+
+    def sleep_cost(P):
+        g = lowest(spec, pose_sleep(2.25, dict(L, **P)), head)
+        return (g["head"] - 0.25) ** 2 + 0.002 * ((P["sleep_neck"] - 30) ** 2 + (P["sleep_head"] - 10) ** 2)
+    L.update(fit({"sleep_neck": list(range(14, 71, 2)), "sleep_head": list(range(-10, 41, 2))}, sleep_cost)[1])
+    # Dying on its side: the neck let down so the head lies on the ground too; dropped until nothing is
+    # below it (each frame of the fall rests on its lowest point: `ground_clips`).
+    everything = {"all": lambda n: True}
+
+    def death_cost(P):
+        g = lowest(spec, pose_death(2.2, dict(L, death_drop=0, **P)), dict(everything, **head))
+        return (g["head"] - g["all"] - 0.5) ** 2 + 0.001 * (P["death_neck"] ** 2 + P["death_roll"] ** 2)
+    L.update(fit({"death_neck": list(range(0, 61, 4)), "death_roll": list(range(0, 61, 4))}, death_cost)[1])
+    g = lowest(spec, pose_death(2.2, dict(L, death_drop=0)), dict(everything, **head))
+    L["death_drop"] = round(float(g["all"]), 2)
+    print("cropping: chew", L["clip_chew"], "; asleep, the head", round(float(lowest(spec, pose_sleep(2.25), head)["head"]), 2),
+          "over the ground", {k: L[k] for k in ("sleep_neck", "sleep_head")}, "; dead, dropped", L["death_drop"], "the head",
+          round(float(g["head"] - g["all"]), 2), "over its lowest", {k: L[k] for k in ("death_neck", "death_roll")})
+
+
+HEAD_PARTS = ("skull", "nasal", "snout", "beak", "mouth", "jaw", "predentary")
+FEET = ["leg_FL_paw", "leg_FR_paw", "leg_BL_paw", "leg_BR_paw"]
+
+
+def ground_clips(spec):
+    """The clips written as angles, stood on the ground: the gaits' height from their feet frame by
+    frame (the walk and approach) or once over the loop (the run, the charge and the play's bounces, kept); rearing on its
+    hind feet, frame by frame; dying, each frame of the fall on its lowest point (mid-roll the legs
+    swing out below where it ends up lying)."""
+    A = spec["animations"]
+    # The walk and run too: written before these checks, their hind feet sank 1.6 and 1.1 into the ground.
+    A["walk"] = grounded(spec, A["walk"], FEET)
+    A["run"] = grounded(spec, A["run"], FEET, True)
+    A["approach"] = grounded(spec, A["approach"], FEET)
+    A["charge"] = grounded(spec, A["charge"], FEET, True)
+    A["play"] = grounded(spec, A["play"], FEET, True)
+    A["rear"] = grounded(spec, A["rear"], ["leg_BL_paw", "leg_BR_paw"])
+    A["death"] = grounded(spec, A["death"], [e["name"] for e in spec["elements"]])
+
 
 # ------------------------------------------------------------------ build
 
@@ -638,6 +1014,7 @@ def build():
             "bones": [{"name": n, "parent": p, "pivot": [float(v) for v in pv]} for n, p, pv in B], "elements": E}
     fit_poses(spec)
     spec["animations"] = animations([n for n, _, _ in B])
+    ground_clips(spec)
     spec["fitted"] = dict(L)
     return spec, sheet
 

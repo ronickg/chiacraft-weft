@@ -30,7 +30,7 @@ pub fn init(r: &mut Registry) {
         Journal { entries: [0; ENTRIES] },
         component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
-    r.attach(&PLAYER, &JOURNAL);
+    r.edit(&PLAYER).attach(&JOURNAL);
     // Seen up close.
     r.world_tick(|w| {
         if !w.game_time().is_multiple_of(EVERY) {
@@ -56,7 +56,7 @@ pub fn init(r: &mut Registry) {
         }
     });
     // Hunted: a player's kill.
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             if w.entity(d.source).is_some_and(|e| e.kind == PLAYER.id())
@@ -82,7 +82,7 @@ fn in_sight(w: &World, eye: [f64; 3], at: [f64; 3]) -> bool {
         return true;
     }
     let dir = [d[0] / len, d[1] / len, d[2] / len];
-    w.raycast(eye, dir, len - 0.5, false)
+    w.raycast(eye, dir, len - 0.5, Ray::blocks())
         .is_none_or(|hit| !weft_sdk::block_info(hit.state).is_some_and(|b| b.opaque()))
 }
 

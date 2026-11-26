@@ -26,7 +26,7 @@ pub fn register(r: &mut Registry) {
         r.damage_cause(cause).bypasses_armor().death_message(key);
     }
     // A heavy blow on a player opens a wound that bleeds.
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for e in b.iter().filter(|e| e.cause == damage_cause::ATTACK) {
             // A blow that killed leaves nothing to bleed: it would carry over the respawn (the
@@ -48,7 +48,7 @@ pub fn register(r: &mut Registry) {
         .use_ticks(40)
         .on_use(bandage)
         .tab(&crate::tabs::COMBAT);
-    r.shapeless(&base_api::CRAFTING, "bandage", 3, &["wool"], 0);
+    r.shapeless(&base_api::recipes::CRAFTING, "bandage", 3, &["wool"], 0);
 }
 
 /// A tick of poison, bleeding and torpor.
@@ -70,7 +70,7 @@ pub fn tick(v: &mut Vitals, stats: &[f32; STATS]) {
 /// Binds a wound: only when bleeding or hurt.
 fn bandage(u: &mut ItemUse) -> bool {
     let w = u.world();
-    let player = u.player();
+    let player = u.entity();
     let Some(mut st) = w.entity(player) else { return false };
     let Some(v) = w.component_mut(player, &VITALS) else { return false };
     let max = v.max_health / HEALTH_SCALE;
@@ -79,7 +79,7 @@ fn bandage(u: &mut ItemUse) -> bool {
     }
     v.bleed = 0.0;
     st.health = (st.health + BANDAGE_HEALS / HEALTH_SCALE).min(max);
-    w.entity_edit(player).health(st.health);
+    w.entity_modify(player).health(st.health);
     if !w.outside_survival(player) {
         u.set_stack(u.stack().shrink(1));
     }

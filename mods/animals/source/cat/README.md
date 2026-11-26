@@ -60,3 +60,12 @@ idle (tail sway, ear twitch, blink), walk, run, sit, lie (loaf), meow.
   (`fit_tail`) because hand-set angles compound into the rest curve.
 - **Poses**: sit and lie fitted with forward kinematics (`fit_poses`) so the paws and body rest
   on the ground.
+- **Behaviour clips** (`mods/animals/src/anim.rs`, 11-05): held stare, watch, drink, sleep (curled in
+  the loaf, in the lying file too); the gaits stalk and approach; once alarm (the hiss: back arched,
+  tail up), pounce (a leap, off the ground 0.57-0.77 s), sniff, look, scratch (sitting, a hind foot
+  up toward the ear: at this build it reaches the shoulder), stretch (the bow, then a hind leg),
+  play (a pat and a front hop), groom (paw licked, face washed), nuzzle, flinch; death onto its side.
+  The canids' module (`../_clips/canid.py`) bound as the jaguar's gives the stalk's and approach's
+  steps and the death fall; the rest are the cat's own, their paws planted by two-bone IK (`plant`).
+  The neck and head turn only as far as the boxes take (the poke check). `build.py` asserts the
+  loops, paws on the ground, the gaits, the death's lowest point and no new pokes.

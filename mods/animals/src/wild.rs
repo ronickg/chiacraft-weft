@@ -36,6 +36,8 @@ value! {
         pub rest: u32,
         /// Whether the resting look is on.
         pub resting: bool,
+        /// Ticks rested so far.
+        pub rested: u32,
     }
 }
 
@@ -96,11 +98,12 @@ pub fn register(r: &mut Registry, kinds: &[&'static EntityKind], body: &'static 
                             .with(Need::Comfort, crate::comfort::seek)
                             .with(Need::Drink, crate::drink::drink)
                             .with(Need::Eat, crate::forage::eat)
-                            .with(Need::Wander, ai::wander(body.wander, 8.0)),
+                            .with(Need::Migrate, crate::migrate::goal(body.wander))
+                            .with(Need::Wander, crate::group::or_follow(body.wander, ai::wander(body.wander, 8.0))),
                     ),
             )
             .on_hurt(|w, h| {
-                crate::taming::hurt(w, h.entity, h.source);
+                crate::taming::hurt(w, h.entity, h.source, h.cause);
                 wake(w, h.entity);
             });
     }
@@ -120,21 +123,48 @@ fn startle(w: &World, id: u64, _: &EntityState) -> bool {
 fn settle(w: &World, id: u64, st: &EntityState, look: &str) -> bool {
     let Some(c) = w.component_mut(id, &STATE) else { return false };
     let chance = crate::routines::rest_chance(400, crate::routines::activity_of(w, id));
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(chance) == 0 {
+    // In step with its herd's leader (`group::rest_in_step`), else now and then by itself.
+    let step = crate::group::rest_in_step(w, id, c.rest > 0);
+    let free = c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id);
+    if free && (step == Some(true) || (step.is_none() && w.random_below(chance) == 0)) {
         c.rest = 600 + w.random_below(1800);
+    }
+    if step == Some(false) {
+        c.rest = 0;
     }
     let resting = c.rest > 0;
     if resting {
-        c.rest = c.rest.saturating_sub(w.tick_elapsed(id) as _);
+        let e = w.tick_elapsed(id);
+        c.rest = c.rest.saturating_sub(e as _);
+        c.rested = c.rested.saturating_add(e);
     }
+    let rested = c.rested;
     if c.resting != resting {
         c.resting = resting;
+        c.rested = 0;
         w.set_appearance(id, resting.then(|| format!("animals:{look}")).as_deref());
+        if !resting {
+            // Rested enough: up, and a stretch.
+            crate::anim::clear(w, id);
+            crate::anim::act(w, id, crate::anim::Act::Stretch);
+        }
     }
     if resting && w.navigating(id) {
         w.navigate(id, st.pos, 0.0);
     }
+    if resting && animals_core::routines::asleep(crate::routines::activity_of(w, id), rested) {
+        crate::anim::hold(w, id, crate::anim::Act::Sleep);
+    }
     resting
+}
+
+/// The alarm as it bolts (`hunt::wary`, `taming::behave`), unless it is still in its resting look:
+/// those looks are other kinds with no alarm clip, and the look comes off later than a clip goes
+/// out (the PC log: "no clip for action alarm on animals:deer_lie"). Up at once instead.
+pub fn alarm(w: &World, id: u64) {
+    if !w.component(id, &STATE).is_some_and(|c| c.resting) {
+        crate::anim::act(w, id, crate::anim::Act::Alarm);
+    }
 }
 
 /// Up and running from a hunter (`hunt::wary`): out of its rest.
@@ -151,5 +181,7 @@ pub fn wake(w: &World, id: u64) {
         c.rest = 0;
         c.resting = false;
         w.set_appearance(id, None);
+        // Up at once (scared, hurt): no stretch, and not asleep standing.
+        crate::anim::clear(w, id);
     }
 }

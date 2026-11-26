@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use vitals::curve::{AGES, Age, Em, Path, ROUTES};
 
-use crate::content::{self, AXE, CUTTER, Get, Needs, PICK, PICK_IRON, PICK_STEEL, PICK_STONE};
+use crate::content::{self, AXE, CUTTER, Get, Needs, PICK, PICK_BRONZE, PICK_IRON, PICK_STEEL, PICK_STONE};
 
 /// Where a recipe is made.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -85,29 +85,6 @@ const fn b(out: &'static str, n: f32, from: &'static [(&'static str, f32)], need
     Recipe { out, n, ins: from, at: Break(needs), secs }
 }
 
-macro_rules! tools {
-    ($m:literal, $x:literal) => {
-        [
-            c(concat!("base:", $m, "_pickaxe"), 1.0, &[($x, 3.0), ("#stick", 2.0)], Table),
-            c(concat!("base:", $m, "_axe"), 1.0, &[($x, 3.0), ("#stick", 2.0)], Table),
-            c(concat!("base:", $m, "_shovel"), 1.0, &[($x, 1.0), ("#stick", 2.0)], Table),
-            c(concat!("base:", $m, "_hoe"), 1.0, &[($x, 2.0), ("#stick", 2.0)], Table),
-            c(concat!("base:", $m, "_sword"), 1.0, &[($x, 2.0), ("#stick", 1.0)], Table),
-        ]
-    };
-}
-
-macro_rules! armour {
-    ($m:literal, $x:literal) => {
-        [
-            c(concat!("base:", $m, "_helmet"), 1.0, &[($x, 5.0)], Table),
-            c(concat!("base:", $m, "_chestplate"), 1.0, &[($x, 8.0)], Table),
-            c(concat!("base:", $m, "_leggings"), 1.0, &[($x, 7.0)], Table),
-            c(concat!("base:", $m, "_boots"), 1.0, &[($x, 4.0)], Table),
-        ]
-    };
-}
-
 macro_rules! clothes {
     ($m:literal, $x:literal) => {
         [
@@ -119,19 +96,6 @@ macro_rules! clothes {
     };
 }
 
-const MC_TOOLS: [[Recipe; 5]; 5] = [
-    tools!("wood", "#planks"),
-    tools!("stone", "#cobblestone"),
-    tools!("iron", "base:iron_ingot"),
-    tools!("gold", "base:gold_ingot"),
-    tools!("diamond", "base:diamond"),
-];
-const MC_ARMOUR: [[Recipe; 4]; 4] = [
-    armour!("leather", "base:sole_leather"),
-    armour!("iron", "base:iron_ingot"),
-    armour!("gold", "base:gold_ingot"),
-    armour!("diamond", "base:diamond"),
-];
 const CLOTHES: [[Recipe; 4]; 4] =
     [clothes!("fur", "base:fur"), clothes!("hide", "base:hide"), clothes!("wool", "base:wool"), clothes!("linen", "base:cloth")];
 
@@ -155,6 +119,8 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:fire_bed", 1.0, &[("base:plant_fibre", 1.0), ("#stick", 3.0)], Hand),
     c("base:bow_drill", 1.0, &[("#stick", 2.0), ("#string", 1.0)], Hand),
     c("base:hand_drill", 1.0, &[("#stick", 2.0)], Hand),
+    // the ley lines (ley.rs): the magic path's first step
+    c("base:dowsing_rod", 1.0, &[("#stick", 2.0), ("#string", 1.0), ("base:tektite", 1.0)], Hand),
     c("base:campfire_laid", 1.0, &[("#stick", 2.0), ("#logs", 2.0)], Hand),
     c("base:tanning_frame", 1.0, &[("#stick", 4.0), ("#string", 4.0)], Table),
     c("base:tanning_pit", 1.0, &[("#planks", 7.0)], Table),
@@ -170,11 +136,36 @@ const RECIPES_LIST: &[Recipe] = &[
     Recipe { out: "base:coal", n: 1.0, ins: &[("#logs", 1.0)], at: Station("base:charcoal_clamp"), secs: 2.0 },
     // parts from the recipe book (parts.rs): any part, of any material its shape takes
     c("base:part_*", 1.0, &[("#part_material", 2.0)], Table),
+    // Four arrows from a head, a stick and a feather at the assembly row (`parts::fletched`).
+    c("base:arrow", 4.0, &[("base:part_arrowhead", 1.0), ("#stick", 1.0), ("base:feather", 1.0)], Table),
     // tools built from parts (the assembly)
     c("base:hoe", 1.0, &[("base:part_hoe_blade", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
     c("base:spear", 1.0, &[("base:part_leaf_point", 1.0), ("base:part_shaft", 1.0), ("base:part_lashing", 1.0)], Table),
     c("base:sword", 1.0, &[("base:part_straight_blade", 1.0), ("base:part_grip", 1.0), ("base:part_bar_guard", 1.0)], Table),
     c("base:bow", 1.0, &[("base:part_self_stave", 1.0), ("base:part_bowstring", 1.0)], Table),
+    c("base:axe", 1.0, &[("base:part_felling_axe_head", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
+    c("base:pickaxe", 1.0, &[("base:part_pick_head", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
+    c("base:shovel", 1.0, &[("base:part_shovel_blade", 1.0), ("base:part_haft", 1.0), ("base:part_lashing", 1.0)], Table),
+    c("base:knife", 1.0, &[("base:part_knife_blade", 1.0), ("base:part_grip", 1.0), ("base:part_lashing", 1.0)], Table),
+    // Gems cut from their stones (gems.rs).
+    c("base:gem_diamond", 1.0, &[("base:diamond", 1.0)], Table),
+    c("base:gem_peridot", 1.0, &[("base:peridot", 1.0)], Table),
+    c("base:gem_tektite", 1.0, &[("base:tektite", 1.0)], Table),
+    c("base:gem_amber", 1.0, &[("animals:amber", 1.0)], Table),
+    // Armour: a shell, straps and a lining; a look family's item takes its shell's material
+    // (`parts::ARMOUR_LOOKS`: an iron or steel shell is worn as mail, a diamond one as gems).
+    c("base:helmet", 1.0, &[("base:part_helmet_shell", 1.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:chestplate", 1.0, &[("base:part_chest_shell", 1.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:leggings", 1.0, &[("base:part_leg_shell", 1.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:boots", 1.0, &[("base:part_boot_shell", 1.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:helmet_mail", 1.0, &[("base:iron_ingot", 2.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:chestplate_mail", 1.0, &[("base:iron_ingot", 3.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:leggings_mail", 1.0, &[("base:iron_ingot", 3.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:boots_mail", 1.0, &[("base:iron_ingot", 2.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:helmet_gem", 1.0, &[("base:diamond", 2.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:chestplate_gem", 1.0, &[("base:diamond", 3.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:leggings_gem", 1.0, &[("base:diamond", 3.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
+    c("base:boots_gem", 1.0, &[("base:diamond", 2.0), ("base:part_straps", 1.0), ("base:part_lining", 1.0)], Table),
     // recipes.rs
     c("base:*_planks", 4.0, &[("#logs", 1.0)], Hand),
     c("base:stick", 4.0, &[("#planks", 2.0)], Hand),
@@ -209,6 +200,27 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:iron_block", 1.0, &[("base:iron_ingot", 9.0)], Table),
     c("base:gold_block", 1.0, &[("base:gold_ingot", 9.0)], Table),
     c("base:diamond_block", 1.0, &[("base:diamond", 9.0)], Table),
+    // The RTX showcase blocks (`showcase.rs`).
+    c("base:frosted_glass", 1.0, &[("base:glass", 1.0), ("#sand", 1.0)], Hand),
+    c("base:smoked_glass", 1.0, &[("base:glass", 1.0), ("base:coal", 1.0)], Hand),
+    c(
+        "base:leaded_glass",
+        3.0,
+        &[("base:red_stained_glass", 1.0), ("base:green_stained_glass", 1.0), ("base:blue_stained_glass", 1.0), ("base:tin_ingot", 1.0)],
+        Hand,
+    ),
+    c("base:polished_limestone", 4.0, &[("base:limestone", 4.0), ("#sand", 1.0)], Table),
+    c("base:limestone_tiles", 4.0, &[("base:polished_limestone", 4.0)], Hand),
+    c("base:polished_obsidian", 1.0, &[("base:obsidian", 1.0), ("#sand", 1.0)], Hand),
+    c("base:slate_tiles", 4.0, &[("base:slate", 4.0)], Hand),
+    c("base:checker_tiles", 4.0, &[("base:polished_limestone", 2.0), ("base:slate_tiles", 2.0)], Hand),
+    c("base:blue_glazed_tiles", 4.0, &[("base:bricks", 4.0), ("base:ice", 1.0)], Table),
+    c("base:green_glazed_tiles", 4.0, &[("base:bricks", 4.0), ("base:cactus", 1.0)], Table),
+    c("base:red_glazed_tiles", 4.0, &[("base:bricks", 4.0), ("base:rose", 1.0)], Table),
+    c("base:copper_block", 1.0, &[("base:copper_ingot", 9.0)], Table),
+    c("base:bronze_plate", 4.0, &[("base:bronze_ingot", 4.0)], Hand),
+    c("base:steel_plate", 4.0, &[("base:steel_ingot", 4.0)], Hand),
+    c("base:bronze_lantern", 1.0, &[("base:bronze_ingot", 4.0), ("base:frosted_glass", 1.0), ("base:glowstone", 1.0)], Table),
     c("base:coal_block", 1.0, &[("base:coal", 9.0)], Table),
     c("base:iron_ingot", 9.0, &[("base:iron_block", 1.0)], Hand),
     c("base:gold_ingot", 9.0, &[("base:gold_block", 1.0)], Hand),
@@ -216,6 +228,19 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:coal", 9.0, &[("base:coal_block", 1.0)], Hand),
     s("base:iron_ingot", &[("base:raw_iron", 1.0)], Furnace),
     s("base:gold_ingot", &[("base:raw_gold", 1.0)], Furnace),
+    // Copper, tin, bronze and steel (`metals.rs`, `vitals::crafts`).
+    s("base:copper_ingot", &[("base:raw_copper", 1.0)], Furnace),
+    s("base:tin_ingot", &[("base:raw_tin", 1.0)], Furnace),
+    Recipe {
+        out: "base:bronze_ingot",
+        n: 1.0,
+        ins: &[("base:copper_ingot", 1.0), ("base:tin_ingot", 1.0)],
+        at: Station("base:crucible"),
+        secs: 30.0,
+    },
+    Recipe { out: "base:steel_ingot", n: 1.0, ins: &[("base:iron_ingot", 1.0), ("base:coal", 1.0)], at: Station("base:forge"), secs: 48.0 },
+    c("base:crucible", 1.0, &[("base:bricks", 7.0), ("base:coal", 1.0)], Table),
+    c("base:forge", 1.0, &[("base:iron_ingot", 3.0), ("base:bricks", 5.0), ("base:furnace", 1.0)], Table),
     s("base:cooked_beef", &[("base:beef", 1.0)], Fire),
     s("base:cooked_porkchop", &[("base:porkchop", 1.0)], Fire),
     s("base:cooked_chicken", &[("base:chicken", 1.0)], Fire),
@@ -226,7 +251,10 @@ const RECIPES_LIST: &[Recipe] = &[
     s("base:bricks", &[("base:clay", 1.0)], Furnace),
     // ores and the sky (blocks.rs, meteors.rs, stars.rs)
     b("base:coal", 1.0, &[("base:coal_ore", 1.0)], PICK, 30.0),
-    b("base:raw_iron", 1.0, &[("base:iron_ore", 1.0)], PICK_STONE, 60.0),
+    b("base:raw_iron", 1.0, &[("base:iron_ore", 1.0)], PICK_BRONZE, 60.0),
+    // Copper is common where it is; tin about thirty times rarer: a long search.
+    b("base:raw_copper", 1.0, &[("base:copper_ore", 1.0)], PICK_STONE, 90.0),
+    b("base:raw_tin", 1.0, &[("base:tin_ore", 1.0)], PICK_STONE, 300.0),
     b("base:raw_gold", 1.0, &[("base:gold_ore", 1.0)], PICK_STONE, 180.0),
     b("base:diamond", 1.0, &[("base:diamond_ore", 1.0)], PICK_STEEL, 600.0),
     b("base:redstone", 4.0, &[("base:redstone_ore", 1.0)], PICK_IRON, 120.0),
@@ -235,6 +263,7 @@ const RECIPES_LIST: &[Recipe] = &[
     b("base:starheart", 1.0, &[("base:star_steel_ore", 1.0)], PICK_IRON, 3600.0),
     c("base:peridot", 2.0, &[("base:pallasite", 1.0)], Hand),
     c("base:star_lantern", 1.0, &[("base:iron_ingot", 2.0), ("base:starheart", 1.0)], Table),
+    c("base:unlearning_stone", 1.0, &[("base:peridot", 1.0), ("base:tektite", 2.0)], Table),
     Recipe { out: "base:star_steel_ingot", n: 1.0, ins: &[("base:star_steel_lump", 1.0)], at: Furnace, secs: 20.0 },
     Recipe { out: "base:water_bucket", n: 1.0, ins: &[("base:bucket", 1.0)], at: Fill, secs: 10.0 },
     Recipe { out: "base:lava_bucket", n: 1.0, ins: &[("base:bucket", 1.0)], at: Fill, secs: 30.0 },
@@ -252,6 +281,7 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:sticky_piston", 1.0, &[("base:slime_block", 1.0), ("base:piston", 1.0)], Hand),
     c("base:floater", 1.0, &[("base:iron_ingot", 4.0), ("base:redstone", 1.0), ("base:piston", 2.0)], Table),
     c("base:golden_lamp", 1.0, &[("base:gold_ingot", 4.0), ("base:redstone", 1.0)], Table),
+    c("base:copper_lamp", 1.0, &[("base:copper_ingot", 4.0), ("base:redstone", 1.0)], Table),
     c("base:anchor", 1.0, &[("base:iron_ingot", 8.0), ("base:redstone", 1.0)], Table),
     c("base:observer", 1.0, &[("#cobblestone", 6.0), ("base:redstone", 2.0), ("base:iron_ingot", 1.0)], Table),
     c("base:dispenser", 1.0, &[("#cobblestone", 7.0), ("#stick", 1.0), ("base:redstone", 1.0)], Table),
@@ -288,6 +318,10 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:wool_cloak", 1.0, &[("base:wool", 3.0), ("#string", 1.0)], Table),
     c("base:fur_robe", 1.0, &[("base:fur", 5.0), ("#string", 1.0)], Table),
     c("base:rain_cape", 1.0, &[("base:leather", 5.0), ("#string", 1.0)], Table),
+    // glider.rs
+    c("base:glider", 1.0, &[("base:leather", 3.0), ("#stick", 4.0), ("#string", 1.0)], Table),
+    // grapple.rs
+    c("base:grappling_hook", 1.0, &[("base:iron_ingot", 3.0), ("#string", 3.0)], Table),
     // the animals mod (knockout.rs, screen.rs, gateway.rs, riding.rs, taming.rs, eggs.rs)
     c("animals:club", 1.0, &[("#logs", 1.0), ("base:stick", 1.0)], Hand),
     c("animals:sedative", 2.0, &[("base:spider_eye", 1.0), ("base:sugar", 1.0), ("base:wheat_seeds", 1.0)], Hand),
@@ -306,21 +340,55 @@ const RECIPES_LIST: &[Recipe] = &[
         secs: 3.0,
     },
     c("animals:nest", 1.0, &[("base:stick", 4.0), ("base:wheat", 1.0)], Table),
+    // drenkaun.rs: the old forest's boss
+    c(
+        "animals:forest_offering",
+        1.0,
+        &[("base:acorn", 1.0), ("base:mushroom_red", 1.0), ("base:berries", 1.0), ("base:moss_block", 1.0)],
+        Hand,
+    ),
+    c("animals:drenkaun_altar", 1.0, &[("base:mossy_cobblestone", 7.0), ("base:flint", 1.0), ("#logs", 2.0)], Table),
+    // borkon.rs: the high passes' boss
+    c(
+        "animals:mountain_offering",
+        1.0,
+        &[("base:edelweiss", 1.0), ("base:gentian", 1.0), ("base:wool", 1.0), ("base:gold_ingot", 1.0)],
+        Hand,
+    ),
+    c("animals:heartwood_offering", 1.0, &[("animals:forest_offering", 1.0), ("base:iron_ingot", 1.0), ("animals:warden_bark", 1.0)], Hand),
+    c("animals:peak_offering", 1.0, &[("animals:mountain_offering", 1.0), ("base:iron_ingot", 1.0), ("animals:height_fleece", 1.0)], Hand),
+    c("animals:borkon_altar", 1.0, &[("base:granite", 4.0), ("base:gold_ingot", 1.0), ("base:stone_bricks", 4.0)], Table),
     s("animals:cooked_venison", &[("animals:venison", 1.0)], Fire),
     s("animals:cooked_hare", &[("animals:hare", 1.0)], Fire),
     s("animals:cooked_trout", &[("animals:trout", 1.0)], Fire),
     s("animals:cooked_pacu", &[("animals:pacu", 1.0)], Fire),
+    // Upstream Weft's content (11-22 sync): kept until Ronald's call (items.rs, recipes.rs,
+    // doors.rs, assembly.rs, redstone.rs, woodcutter.rs; `content::RULES`).
+    c("base:shield", 1.0, &[("#planks", 6.0), ("base:iron_ingot", 1.0)], Table),
+    c("base:oak_door", 3.0, &[("base:oak_planks", 6.0)], Table),
+    c("base:oak_wood", 4.0, &[("base:oak_log", 4.0)], Hand),
+    c("base:birch_wood", 4.0, &[("base:birch_log", 4.0)], Hand),
+    c("base:spruce_wood", 4.0, &[("base:spruce_log", 4.0)], Hand),
+    c("base:oak_log_hollow", 4.0, &[("base:oak_log", 4.0)], Table),
+    c("base:birch_log_hollow", 4.0, &[("base:birch_log", 4.0)], Table),
+    c("base:spruce_log_hollow", 4.0, &[("base:spruce_log", 4.0)], Table),
+    c("base:clay", 1.0, &[("base:clay_ball", 4.0)], Hand),
+    c("base:mossy_cobblestone", 1.0, &[("base:cobblestone", 1.0), ("base:moss", 1.0)], Hand),
+    s("base:cooked_dryads_saddle", &[("base:dryads_saddle", 1.0)], Fire),
+    c("base:woodcutter", 1.0, &[("base:iron_ingot", 1.0), ("#planks", 3.0)], Table),
+    c("base:music_player", 1.0, &[("#planks", 8.0), ("base:iron_ingot", 1.0)], Table),
+    c("base:assembly_tool", 1.0, &[("base:iron_ingot", 1.0), ("#stick", 1.0)], Hand),
+    c("base:thruster", 1.0, &[("base:iron_ingot", 6.0), ("base:furnace", 2.0), ("base:redstone", 1.0)], Table),
+    c("base:helm", 1.0, &[("#stick", 3.0), ("#planks", 4.0)], Table),
+    c("base:linear_guide", 1.0, &[("base:iron_ingot", 4.0), ("base:piston", 1.0), ("base:redstone", 1.0)], Table),
+    c("base:guide_rail", 6.0, &[("base:iron_ingot", 6.0), ("#stick", 3.0)], Table),
+    c("base:assembler", 1.0, &[("base:iron_ingot", 6.0), ("base:redstone", 1.0), ("base:piston", 1.0)], Table),
+    c("base:rotor", 1.0, &[("base:iron_ingot", 4.0), ("base:assembler", 1.0), ("base:redstone", 1.0)], Table),
 ];
 
 /// Every recipe.
 pub fn recipes() -> Vec<&'static Recipe> {
-    MC_TOOLS
-        .iter()
-        .flatten()
-        .chain(MC_ARMOUR.iter().flatten())
-        .chain(CLOTHES.iter().flatten())
-        .chain(RECIPES_LIST)
-        .collect()
+    CLOTHES.iter().flatten().chain(RECIPES_LIST).collect()
 }
 
 /// The `#groups` recipes take: any one of their members.
@@ -328,6 +396,8 @@ pub const GROUPS: &[(&str, &[&str])] = &[
     ("#logs", &["base:*_log", "animals:*_log"]),
     ("#planks", &["base:*_planks"]),
     ("#stick", &["base:stick"]),
+    // A key's boss part where any one of an age's bosses will do (`KEYS`).
+    ("#iron_boss_part", &["animals:warden_heartwood", "animals:summit_lodestone"]),
     ("#string", &["base:string"]),
     ("#cobblestone", &["base:cobblestone", "base:mossy_cobblestone"]),
     ("#coal", &["base:coal"]),
@@ -357,36 +427,48 @@ pub const GROUPS: &[(&str, &[&str])] = &[
             "base:meteoric_iron",
             "base:star_steel_ingot",
             "base:gold_ingot",
+            "base:copper_ingot",
+            "base:bronze_ingot",
+            "base:steel_ingot",
             "base:diamond",
+            "base:wool",
+            "base:cloth",
+            "base:fur",
         ],
     ),
 ];
 
-/// What can break what: a tool item, its kind and the level it harvests (today's tools by their
-/// material, `items.rs`; the tools built from parts at flint's, the best their parts make today).
+/// What can break what: a tool item, its kind and the level it harvests. Every tool is built from
+/// parts, so a kind's item stands for its cheapest (a flint head, harvest 100); a better head's
+/// material stands for the tool it makes (`vitals::gear::harvest` by its level: wrought iron 280,
+/// star steel 340, diamond 400; a check keeps these equal to the curve's).
 pub const TOOLS: &[(&str, &str, u32)] = &[
-    ("base:wood_axe", "axe", 0),
-    ("base:stone_axe", "axe", 100),
-    ("base:iron_axe", "axe", 200),
-    ("base:gold_axe", "axe", 0),
-    ("base:diamond_axe", "axe", 400),
     ("base:axe", "axe", 100),
-    ("base:wood_pickaxe", "pickaxe", 0),
-    ("base:stone_pickaxe", "pickaxe", 100),
-    ("base:iron_pickaxe", "pickaxe", 200),
-    ("base:gold_pickaxe", "pickaxe", 0),
-    ("base:diamond_pickaxe", "pickaxe", 400),
-    // A pickaxe built with a star-steel head (harvest 350) has no item of its own: its ingot
-    // stands for it.
-    ("base:star_steel_ingot", "pickaxe", 350),
     ("base:pickaxe", "pickaxe", 100),
-    ("base:wood_shovel", "shovel", 0),
-    ("base:stone_shovel", "shovel", 100),
-    ("base:iron_shovel", "shovel", 200),
-    ("base:diamond_shovel", "shovel", 400),
+    ("base:copper_ingot", "pickaxe", 170),
+    ("base:bronze_ingot", "pickaxe", 210),
+    ("base:iron_ingot", "pickaxe", 280),
+    ("base:steel_ingot", "pickaxe", 320),
+    ("base:meteoric_iron", "pickaxe", 230),
+    ("base:star_steel_ingot", "pickaxe", 340),
+    ("base:diamond", "pickaxe", 400),
     ("base:shovel", "shovel", 100),
     ("base:sharp_flake", "cutter", 0),
     ("base:knife", "cutter", 0),
+];
+
+/// The material each stand-in in `TOOLS` is a head of.
+pub const TOOL_HEADS: &[(&str, &str)] = &[
+    ("base:axe", "flint"),
+    ("base:pickaxe", "flint"),
+    ("base:copper_ingot", "copper"),
+    ("base:bronze_ingot", "bronze"),
+    ("base:iron_ingot", "wrought_iron"),
+    ("base:steel_ingot", "steel"),
+    ("base:meteoric_iron", "meteoric_iron"),
+    ("base:star_steel_ingot", "star_steel"),
+    ("base:diamond", "diamond"),
+    ("base:shovel", "flint"),
 ];
 
 /// The tools that meet `needs`.
@@ -409,15 +491,47 @@ pub struct Key {
     pub missing: &'static [&'static str],
 }
 
-/// The keys so far: only the Stone Age has parts of one (11-07).
-pub const KEYS: &[Key] = &[Key {
-    age: Age::Stone,
-    routes: &[
-        (Path::Tech, &["base:pickaxe", "base:furnace"]),
-        (Path::Beasts, &["animals:club", "animals:tranquilizer_dart", "animals:nest"]),
-    ],
-    missing: &["magic route: a dowsing rod (sensing ley lines)", "a biome boss's part", "knowledge: a ruin's blueprint or lore page"],
-}];
+/// The keys so far: the Stone Age's, the Bronze Age's boss part (11-05) and materials gate, the
+/// Iron Age's materials gate and boss part (11-23), and each key's knowledge, its age's ruin's
+/// blueprint (`vitals::ruins`, 11-23).
+pub const KEYS: &[Key] = &[
+    Key {
+        age: Age::Stone,
+        routes: &[
+            (Path::Tech, &["base:pickaxe", "base:furnace", "animals:warden_heartseed", "base:blueprint_crucible"]),
+            (
+                Path::Beasts,
+                &["animals:club", "animals:tranquilizer_dart", "animals:nest", "animals:warden_heartseed", "base:blueprint_crucible"],
+            ),
+            (Path::Magic, &["base:dowsing_rod", "animals:warden_heartseed", "base:blueprint_crucible"]),
+        ],
+        missing: &[],
+    },
+    // The Bronze Age's key: its boss part (Borkon's Summit Stone) and its materials gate, a
+    // bronze pickaxe (`base:bronze_ingot` stands for its head), which iron ore takes
+    // (`vitals::gear::IRON_ORE_HARVEST`, 11-23), by every route.
+    Key {
+        age: Age::Bronze,
+        routes: &[
+            (Path::Tech, &["base:bronze_ingot", "animals:summit_stone", "base:blueprint_ironwork"]),
+            (Path::Beasts, &["base:bronze_ingot", "animals:summit_stone", "base:blueprint_ironwork"]),
+            (Path::Magic, &["base:bronze_ingot", "animals:summit_stone", "base:blueprint_ironwork"]),
+        ],
+        missing: &["infrastructure: a working setup from the Bronze Age"],
+    },
+    // The Iron Age's key: its materials gate, a steel pickaxe (diamond ore and obsidian take
+    // harvest 300) from the forge that makes steel, and (11-23) either boss's Iron form part, by
+    // every route.
+    Key {
+        age: Age::Iron,
+        routes: &[
+            (Path::Tech, &["base:steel_ingot", "base:forge", "#iron_boss_part", "base:blueprint_forge"]),
+            (Path::Beasts, &["base:steel_ingot", "base:forge", "#iron_boss_part", "base:blueprint_forge"]),
+            (Path::Magic, &["base:steel_ingot", "base:forge", "#iron_boss_part", "base:blueprint_forge"]),
+        ],
+        missing: &["infrastructure: past the forge, a working setup from the Iron Age"],
+    },
+];
 
 // ------------------------------------------------------------------ the graph, solved
 
@@ -476,6 +590,7 @@ pub fn solve() -> Solved {
     let ids = content::universe();
     let mut g = Solved { ids: ids.clone(), cost: HashMap::new(), by: HashMap::new() };
     let all = recipes();
+    let kill_prices = crate::loot::prices();
     let outs: Vec<Vec<String>> = all
         .iter()
         .map(|r| members(&ids, r.out).into_iter().cloned().collect())
@@ -496,6 +611,11 @@ pub fn solve() -> Solved {
             match content::rule(id).map(|r| r.get) {
                 Some(Get::World(needs, em)) if g.can(needs) => relax(&mut g, id, em, None),
                 Some(Get::Drop(em)) => relax(&mut g, id, em, None),
+                Some(Get::Kill) => {
+                    if let Some(&em) = kill_prices.get(id.as_str()) {
+                        relax(&mut g, id, em, None)
+                    }
+                }
                 _ => {}
             }
         }
@@ -627,7 +747,7 @@ pub fn keys(g: &Solved) -> Vec<String> {
     for k in KEYS {
         for (path, items) in k.routes {
             for id in *items {
-                match content::tier(id) {
+                match tier_of(&g.ids, id) {
                     None => out.push(format!("{}'s {} key takes {id}, which has no tag", k.age.name(), path.name())),
                     Some(t) if t > k.age.tier() => out.push(format!("{}'s {} key takes {id} of tier {t}", k.age.name(), path.name())),
                     _ if !g.reachable(id) => out.push(format!("{}'s {} key takes {id}, which can't be reached", k.age.name(), path.name())),
@@ -640,6 +760,301 @@ pub fn keys(g: &Solved) -> Vec<String> {
 }
 
 /// The routes each age's key has, by path, for the sheet: `None` where a path has none yet.
+/// The cheapest thing that meets `needs` (`Needs::Hand`: none), for breaking or gathering `what`:
+/// one of an age before `what`'s if there is one, as a player has the tool before what it opens
+/// (an iron ingot meets iron ore's pickaxe too, but isn't had before iron).
+fn tool_for(g: &Solved, needs: Needs, what: &str) -> Option<&'static str> {
+    let cost = |t: &&str| g.cost_of(t).unwrap_or(f32::MAX);
+    let below = content::tier(what).unwrap_or(u8::MAX);
+    let ok: Vec<&'static str> = match needs {
+        Needs::Hand => return None,
+        n => tools_for(n).filter(|t| g.reachable(t)).collect(),
+    };
+    let earlier = ok
+        .iter()
+        .copied()
+        .filter(|t| content::tier(t).is_some_and(|x| x < below))
+        .min_by(|a, b| cost(a).total_cmp(&cost(b)));
+    earlier.or_else(|| ok.into_iter().min_by(|a, b| cost(a).total_cmp(&cost(b))))
+}
+
+/// The cheapest id a name (an id or a `#group`) stands for.
+fn cheapest_member(g: &Solved, name: &str) -> Option<String> {
+    members(&g.ids, name)
+        .into_iter()
+        .filter(|m| g.cost.contains_key(m.as_str()))
+        .min_by(|a, b| g.cost[a.as_str()].total_cmp(&g.cost[b.as_str()]))
+        .cloned()
+}
+
+/// What a route's `items` cost together, from scratch: each item at its cheapest cost (what it
+/// uses up), plus each tool and station needed anywhere on the way there once (kept, not used up),
+/// and those tools and stations.
+pub fn route_cost(g: &Solved, items: &[&str]) -> (Em, Vec<String>) {
+    let (_, kept) = route_walk(g, items);
+    let used: Em = items.iter().filter_map(|i| g.cost_of(i)).sum();
+    let tools: Em = kept.iter().filter_map(|t| g.cost_of(t)).sum();
+    (used + tools, kept)
+}
+
+/// Everything on the cheapest way to `items` (what's used up, `items` included) and the tools and
+/// stations kept on the way, each once.
+pub fn route_walk(g: &Solved, items: &[&str]) -> (Vec<String>, Vec<String>) {
+    let all = recipes();
+    let mut seen: Vec<String> = Vec::new();
+    let mut kept: Vec<String> = Vec::new();
+    // A `#group` stands for its cheapest member (any one of an age's bosses' parts will do).
+    let mut todo: Vec<String> = items
+        .iter()
+        .map(|s| if s.starts_with('#') { cheapest_member(g, s).unwrap_or_else(|| s.to_string()) } else { s.to_string() })
+        .collect();
+    while let Some(id) = todo.pop() {
+        if seen.contains(&id) {
+            continue;
+        }
+        seen.push(id.clone());
+        let mut needs_tool = |t: Option<&str>, todo: &mut Vec<String>| {
+            if let Some(t) = t
+                && !items.contains(&t)
+                && !kept.iter().any(|k| k == t)
+            {
+                kept.push(t.to_string());
+                todo.push(t.to_string());
+            }
+        };
+        if let Some(&i) = g.by.get(&id) {
+            let r = all[i];
+            let station =
+                r.at.stations()
+                    .into_iter()
+                    .filter(|s| g.reachable(s))
+                    .min_by(|a, b| {
+                        g.cost_of(a)
+                            .unwrap_or(f32::MAX)
+                            .total_cmp(&g.cost_of(b).unwrap_or(f32::MAX))
+                    });
+            needs_tool(station, &mut todo);
+            if let At::Break(n) = r.at {
+                needs_tool(tool_for(g, n, &id), &mut todo);
+            }
+            for &(name, _) in r.ins {
+                if let Some(m) = cheapest_member(g, name) {
+                    todo.push(m);
+                }
+            }
+        } else if let Some(Get::World(n, _)) = content::rule(&id).map(|r| r.get) {
+            needs_tool(tool_for(g, n, &id), &mut todo);
+        }
+    }
+    (seen, kept)
+}
+
+/// Each declared route of each key with its cost (`route_cost`), and how far it is over the cheapest
+/// route of its age (1: the cheapest).
+pub fn parity(g: &Solved) -> Vec<(Age, Path, Em, f32)> {
+    let mut out = Vec::new();
+    for k in KEYS {
+        let costs: Vec<(Path, Em)> = k
+            .routes
+            .iter()
+            .map(|(p, items)| (*p, route_cost(g, items).0))
+            .collect();
+        let low = costs.iter().map(|c| c.1).fold(f32::MAX, f32::min).max(1e-6);
+        out.extend(costs.into_iter().map(|(p, em)| (k.age, p, em, em / low)));
+    }
+    out
+}
+
+/// Path parity (`reports/Balance model.md`, 5.3): each age's key by each route costs at most
+/// `vitals::curve::PARITY` more than its cheapest route.
+pub fn path_parity(g: &Solved) -> Vec<String> {
+    parity(g)
+        .into_iter()
+        .filter(|&(_, _, _, over)| over > 1.0 + vitals::curve::PARITY)
+        .map(|(a, p, em, over)| {
+            format!(
+                "{}'s key by the {} route costs {em:.0} EM, ×{over:.2} its cheapest route (at most ×{:.2})",
+                a.name(),
+                p.name(),
+                1.0 + vitals::curve::PARITY
+            )
+        })
+        .collect()
+}
+
+/// Gate skips waiting on a decision, by root: a material whose cheapest way goes through one of
+/// these (or is one) is listed but doesn't fail the check. Each goes once its fix is in.
+/// None now: iron, the first (11-23), takes a bronze pickaxe since Ronald's "A: bronze pickaxe".
+pub const KNOWN_SKIPS: &[(&str, &str)] = &[];
+
+/// A material of tier `tier` and how it stands at the gate (`age_gates`).
+pub struct Gate {
+    pub id: String,
+    pub tier: u8,
+    /// The first thing of the age before on its cheapest way, if any.
+    pub through: Option<String>,
+    /// The highest tier below its own on that way (none: only its own age's things).
+    pub top: Option<u8>,
+    /// The known skip it waits on, if it skips the age before.
+    pub known: Option<&'static str>,
+}
+
+/// Every material past the Stone Age had in the game (made or gathered, not a creature's drop: a
+/// boss is its own gate) and whether its cheapest way goes through the age before.
+pub fn gates(g: &Solved) -> Vec<Gate> {
+    let mut out = Vec::new();
+    for id in &g.ids {
+        let Some(r) = content::rule(id) else { continue };
+        if r.tier == 0 || r.kind != content::Kind::Material || !matches!(r.get, Get::Made | Get::World(..)) || !g.reachable(id) {
+            continue;
+        }
+        let (seen, _) = route_walk(g, &[id.as_str()]);
+        let on: Vec<(&String, u8)> = seen
+            .iter()
+            .filter(|x| *x != id)
+            .filter_map(|x| Some((x, content::tier(x)?)))
+            .collect();
+        let through = on
+            .iter()
+            .find(|(_, t)| *t + 1 == r.tier)
+            .map(|(x, _)| x.to_string());
+        let top = on.iter().map(|(_, t)| *t).filter(|t| *t < r.tier).max();
+        let known = through.is_none().then(|| {
+            KNOWN_SKIPS
+                .iter()
+                .find(|(root, _)| root == id || seen.iter().any(|x| x == root))
+                .map(|k| k.0)
+        });
+        out.push(Gate { id: id.clone(), tier: r.tier, through, top, known: known.flatten() });
+    }
+    out
+}
+
+/// The materials gate (`notes/PROGRESSION.md`, "How an age is gated"): each age's materials need
+/// something of the age before on their cheapest way (its tools, stations or materials), so no age
+/// can be skipped. Skips waiting on a decision (`KNOWN_SKIPS`) are listed in the sheet; a known
+/// skip that no longer happens fails, to be taken off the list.
+pub fn age_gates(g: &Solved) -> Vec<String> {
+    let gates = gates(g);
+    let mut out: Vec<String> = gates
+        .iter()
+        .filter(|x| x.through.is_none() && x.known.is_none())
+        .map(|x| {
+            format!(
+                "{} (tier {}) skips the age before: its cheapest way has nothing of tier {}{}",
+                x.id,
+                x.tier,
+                x.tier - 1,
+                x.top
+                    .map_or(String::new(), |t| format!(", only up to tier {t}"))
+            )
+        })
+        .collect();
+    for (root, _) in KNOWN_SKIPS {
+        if !gates.iter().any(|x| x.known == Some(*root)) {
+            out.push(format!("{root} is a known skip, but nothing skips through it now: take it off `graph::KNOWN_SKIPS`"));
+        }
+    }
+    out
+}
+
+/// The knowledge gate (`vitals::ruins`): each key's every route takes its age's blueprint, found in
+/// its age's ruins and teaching something of its age or later that the graph makes; the first
+/// Stone ruin within `SPAWN_REACH` of spawn on every seed tried.
+pub fn knowledge(g: &Solved) -> Vec<String> {
+    use vitals::ruins as r;
+    let mut out = Vec::new();
+    for key in KEYS {
+        let age = key.age as u8;
+        let Some(b) = r::BLUEPRINTS.iter().find(|b| b.age == age) else {
+            out.push(format!("the {:?} key has no blueprint in `vitals::ruins::BLUEPRINTS`", key.age));
+            continue;
+        };
+        let item = b.item();
+        for (path, items) in key.routes {
+            if !items.contains(&item.as_str()) {
+                out.push(format!("the {:?} key's {:?} route doesn't take {item}", key.age, path));
+            }
+        }
+        if key.missing.iter().any(|m| m.starts_with("knowledge")) {
+            out.push(format!("the {:?} key still lists its knowledge as missing", key.age));
+        }
+    }
+    for b in r::BLUEPRINTS {
+        let item = b.item();
+        match content::tier(&item) {
+            None => out.push(format!("{item} has no tag")),
+            Some(t) if t != b.age => out.push(format!("{item} is tier {t}, but its ruins are age {}", b.age)),
+            _ => {}
+        }
+        if !g.cost.contains_key(&item) {
+            out.push(format!("{item} is unreachable"));
+        }
+        match r::kind_of_age(b.age) {
+            None => out.push(format!("{item}: no ruin holds age {}", b.age)),
+            Some(k) => {
+                if content::rule(&item).is_some_and(|rule| rule.get != content::Get::Drop(k.find_em)) {
+                    out.push(format!("{item} isn't priced at its ruin's finding ({} EM)", k.find_em));
+                }
+                // Its ward wants the age's own pickaxe: one of its age breaks it, none before.
+                let best = |up_to: u8, below: bool| {
+                    TOOLS
+                        .iter()
+                        .filter(|t| t.1 == "pickaxe")
+                        .filter(|t| content::tier(t.0).is_some_and(|x| if below { x < up_to } else { x <= up_to }))
+                        .map(|t| t.2)
+                        .max()
+                        .unwrap_or(0)
+                };
+                // Past the Stone Age no flint pickaxe opens a vault, and each vault wants more than
+                // the one before (the Iron vault a bronze pickaxe where the Bronze one a copper).
+                if k.age > 0 && k.ward <= best(0, false) {
+                    out.push(format!("the {} ruin's ward ({}) breaks with a Stone Age pickaxe", k.id, k.ward));
+                }
+                if let Some(before) = r::kind_of_age(k.age.wrapping_sub(1)).filter(|_| k.age > 0)
+                    && k.ward <= before.ward
+                {
+                    out.push(format!("the {} ruin's ward ({}) is no harder than the {} ruin's ({})", k.id, k.ward, before.id, before.ward));
+                }
+                if k.ward > best(k.age, false) {
+                    out.push(format!("the {} ruin's ward ({}) takes a pickaxe past age {}", k.id, k.ward, k.age));
+                }
+            }
+        }
+        for &what in b.crafts.iter().chain(b.smelts) {
+            match content::tier(what) {
+                None => out.push(format!("{item} teaches {what}, which has no tag")),
+                Some(t) if t < b.age => out.push(format!("{item} (age {}) teaches {what} of tier {t}: found too late", b.age)),
+                _ => {}
+            }
+        }
+        for &what in b.crafts {
+            if !recipes().iter().any(|rc| rc.out == what) {
+                out.push(format!("{item} teaches crafting {what}, which no recipe makes"));
+            }
+        }
+        for &what in b.smelts {
+            if !recipes()
+                .iter()
+                .any(|rc| rc.at == Furnace && rc.ins.iter().any(|i| i.0 == what))
+            {
+                out.push(format!("{item} teaches smelting {what}, which no furnace recipe takes"));
+            }
+        }
+    }
+    // The first ruin near spawn on a few seeds and spawns (the real spawns: base_api's tests).
+    for seed in 1..=6u64 {
+        for spawn in [[0, 0], [2048, -1536], [-4000, 900]] {
+            let ruin = r::spawn_ruin(seed, spawn, &|_, _| true);
+            let d = (((ruin.x - spawn[0]) as f64).powi(2) + ((ruin.z - spawn[1]) as f64).powi(2)).sqrt();
+            if d > r::SPAWN_REACH {
+                out.push(format!("seed {seed}, spawn {spawn:?}: the first Stone ruin is {d:.0} blocks off (over {})", r::SPAWN_REACH));
+            }
+        }
+    }
+    out
+}
+
 pub fn routes(age: Age) -> Vec<(Path, Option<&'static [&'static str]>)> {
     let key = KEYS.iter().find(|k| k.age == age);
     ROUTES
@@ -710,6 +1125,8 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
             ("animals:tranquilizer_dart", 8.0),
             ("animals:kibble", 8.0),
             ("animals:nest", 1.0),
+            ("animals:drenkaun_altar", 1.0),
+            ("animals:forest_offering", 2.0),
         ],
     ),
     (
@@ -721,28 +1138,42 @@ pub const KITS: &[(Age, &[(&str, f32)])] = &[
             ("base:glowstone", 2.0),
             ("base:meteoric_iron", 4.0),
             ("base:gold_ingot", 4.0),
+            ("animals:borkon_altar", 1.0),
+            ("animals:mountain_offering", 2.0),
+            // A bronze pick and axe head and a sword blade (3, 3, 2) from the crucible.
+            ("base:crucible", 1.0),
+            ("base:bronze_ingot", 8.0),
         ],
     ),
     (
         Age::Iron,
         &[
-            ("base:iron_pickaxe", 1.0),
-            ("base:iron_axe", 1.0),
-            ("base:iron_sword", 1.0),
-            ("base:iron_helmet", 1.0),
-            ("base:iron_chestplate", 1.0),
-            ("base:iron_leggings", 1.0),
-            ("base:iron_boots", 1.0),
+            // An iron pick, axe and sword and a mail set, built from parts: their iron (3 for a
+            // pick or axe head, 2 for a blade, the shells 2, 3, 3, 2) and wool linings.
+            ("base:pickaxe", 1.0),
+            ("base:axe", 1.0),
+            ("base:sword", 1.0),
+            ("base:helmet_mail", 1.0),
+            ("base:chestplate_mail", 1.0),
+            ("base:leggings_mail", 1.0),
+            ("base:boots_mail", 1.0),
+            ("base:iron_ingot", 8.0),
+            ("base:wool", 4.0),
+            // A steel blade at the forge.
+            ("base:forge", 1.0),
+            ("base:steel_ingot", 2.0),
             ("base:bucket", 2.0),
             ("animals:spyglass", 1.0),
             ("animals:wyvern_saddle", 1.0),
+            // The Iron Age's boss: Drenkaun's Iron form, as the Stone Age's kit calls its first.
+            ("animals:heartwood_offering", 2.0),
         ],
     ),
     (
         Age::Steam,
         &[
-            ("base:diamond_pickaxe", 1.0),
-            ("base:diamond_sword", 1.0),
+            // A diamond pick head and sword blade on the Iron Age's hafts and hilts.
+            ("base:diamond", 5.0),
             ("base:piston", 4.0),
             ("base:observer", 2.0),
             ("base:repeater", 4.0),
@@ -862,6 +1293,18 @@ pub fn literal_outputs(text: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tool_stand_ins_harvest_as_their_heads() {
+        for &(item, kind, level) in TOOLS.iter().filter(|t| t.1 != "cutter") {
+            let (_, head) = TOOL_HEADS
+                .iter()
+                .find(|h| h.0 == item)
+                .unwrap_or_else(|| panic!("{item}"));
+            let m = crafting::materials::material(head).unwrap();
+            assert_eq!(level, m.harvest(), "{item} as a {kind}");
+        }
+    }
 
     #[test]
     fn literal_outputs_are_found() {

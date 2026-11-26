@@ -88,10 +88,90 @@ pub fn fog(days: [f32; 4], kind: Fog, season: Option<usize>, key: u64, day: u64,
     thick * fog_hours(kind, hour) * (1.0 - blown)
 }
 
+/// How long wet ground takes to dry once the rain stops, in seconds of play (`DRYING`, as the
+/// engine counts it): seven minutes in mild damp calm air (15 °C, humidity 0.6), twice as fast
+/// for every ten degrees warmer, slower in damp air, faster in a wind; from half a minute (hot,
+/// dry, windy) to an hour (frozen or close to it). Ronald's pick, 11-05: the ground and leaves
+/// stay wet after rain and dry over minutes by the air's warmth and wind.
+pub const DRYING: (f32, f32) = (30.0, 3600.0);
+
+pub fn drying_secs(celsius: f32, humidity: f32, wind: f32) -> f32 {
+    if celsius <= 0.5 {
+        return DRYING.1;
+    }
+    let warmth = 2.0f32.powf(-(celsius - 15.0) / 10.0);
+    let damp = (0.5 + humidity.clamp(0.0, 1.0)) / 1.1;
+    let breeze = 1.0 + wind.max(0.0) / 4.0;
+    // (Seven minutes: at three, a summer forest's ground was dry again within a minute, PC shw2.)
+    (420.0 * warmth * damp / breeze).clamp(DRYING.0, DRYING.1)
+}
+
+/// `drying_secs` as the engine's byte (`air_flags::DRYING_SHIFT`): 1 an hour to 255 half a minute,
+/// spaced evenly in the logarithm.
+pub fn drying_byte(secs: f32) -> u32 {
+    let t = (secs.clamp(DRYING.0, DRYING.1) / DRYING.1).ln() / (DRYING.0 / DRYING.1).ln();
+    1 + (t * 254.0).round() as u32
+}
+
+/// A thin mist on every calm, clear morning that is no fog day (Ronald's pick, 11-05: "Every clear
+/// morning", after mist on only some mornings; before that, none at 05:00-06:00 in a clear summer):
+/// the ground cools through the night and the air above it condenses in the last hours before
+/// sunrise, lying in valleys and over water (the shader pack lays it below sea level +
+/// `MIST_TOP`); the sun burns it off within two hours after it rises. Dry air (humidity under
+/// `DAWN_MIST_DAMP.0`) `DAWN_MIST.0`, a veil; damp air (over `DAWN_MIST_DAMP.1`) `DAWN_MIST.1`.
+/// The driest air none, faded out over `DAWN_MIST_DRY` (deserts and red dunes rarely see dawn
+/// mist; scrubland and drier plains keep the veil). Rain or a wind clears it. `sunrise` the hour the sun rises that day.
+// (0.1 damp: at 0.42 a damp morning over the birch forest went a golden white-out, at 0.2 it still
+// hid most of the land from 30 blocks up, PC shm_mist, shm_mist2. 0.04 dry: the Look session's.)
+pub const DAWN_MIST: (f32, f32) = (0.04, 0.1);
+pub const DAWN_MIST_DAMP: (f32, f32) = (0.45, 0.8);
+pub const DAWN_MIST_DRY: (f32, f32) = (0.2, 0.3);
+
+pub fn dawn_mist(humidity: f32, sunrise: f32, hour: f32, wind: f32, raining: bool) -> f32 {
+    if raining {
+        return 0.0;
+    }
+    let damp = ((humidity - DAWN_MIST_DAMP.0) / (DAWN_MIST_DAMP.1 - DAWN_MIST_DAMP.0)).clamp(0.0, 1.0);
+    let wet = ((humidity - DAWN_MIST_DRY.0) / (DAWN_MIST_DRY.1 - DAWN_MIST_DRY.0)).clamp(0.0, 1.0);
+    let ramp = |from: f32, to: f32| ((hour - from) / (to - from)).clamp(0.0, 1.0);
+    // From two and a half hours before sunrise, burnt off within two after it (it lasted three and
+    // a half, a white sea at the vista to 08:00 at the equinox: the Look session's checkpoint).
+    let hours = ramp(sunrise - 2.5, sunrise - 0.5) * (1.0 - ramp(sunrise + 0.5, sunrise + 2.0));
+    let blown = ((wind - CLEARS.0) / (CLEARS.1 - CLEARS.0)).clamp(0.0, 1.0);
+    (DAWN_MIST.0 + (DAWN_MIST.1 - DAWN_MIST.0) * damp) * wet * hours * (1.0 - blown)
+}
+
+/// How high over sea level the mist lies at most (blocks): under it valleys, rivers and lakes fill,
+/// above it ridges and forests stand out of it. The shader pack reads it (`MIST_TOP` in its
+/// shaders, written by `mods/base/src/shaderpack.rs`), today's look and the HDR path alike. 18, as
+/// the Look session found: our land stands higher than Minecraft's, and at 8 a hilly forest got
+/// mist only along its rivers (11-05).
+pub const MIST_TOP: f32 = 18.0;
+
 // ---- snow, blizzards and dust ----
 
 /// Below this air (°C, out in the open, the rain's cooling counted) what falls is snow.
 pub const SNOWS_BELOW: f32 = 1.0;
+
+/// How much colder the air is per block up from the sea, °C: game-scaled, 6.5 °C per 150 blocks
+/// (the real lapse is 6.5 °C per km; with a block a metre, a peak 250 blocks up was only 1.6 °C
+/// colder and a snow line would hardly ever show). Ronald's pick (A) via Planner, 11-06 (the
+/// Recrafted study, item 6). The snow line reads it; body warmth on peaks and the snow lying on
+/// the ground should read it too (later: `notes/SYSTEMS.md`).
+pub const LAPSE: f32 = 6.5 / 150.0;
+
+/// Where what falls turns from rain to snow, blocks above the sea, in air of `sea_air` °C at sea
+/// level (`Place::air`): 0 where it snows at the sea already.
+pub fn snow_line(sea_air: f32) -> f32 {
+    ((sea_air - SNOWS_BELOW) / LAPSE).max(0.0)
+}
+
+/// The snow line for the air's flags (`air_flags::SNOWLINE_SHIFT`, 6 bits): 0 none (over about 250
+/// blocks up: rain to the top of any mountain), else 1 + its height above the sea in 4-block steps.
+pub fn snow_line_bits(sea_air: f32) -> u32 {
+    let h = snow_line(sea_air);
+    if h >= 246.0 { 0 } else { 1 + (h / 4.0).round() as u32 }
+}
 
 /// Snow lying, 0 bare to 1 deep: a day of snow adds `SNOWFALL`, and each day's mean above
 /// freezing melts `MELT` a degree (a degree-day factor: about 4 mm of water, 1.2 cm of fresh
@@ -348,6 +428,44 @@ mod tests {
     use super::*;
     use crate::climate::BIOMES;
 
+    /// Drying: faster warm, dry and windy, an hour when it freezes; the byte runs 1 (an hour) to 255
+    /// (half a minute) as the engine reads it.
+    #[test]
+    fn drying_by_warmth_damp_and_wind() {
+        let mild = drying_secs(15.0, 0.6, 0.0);
+        assert!((mild - 420.0).abs() < 1.0, "{mild}");
+        assert!(drying_secs(30.0, 0.6, 0.0) < mild && drying_secs(15.0, 0.9, 0.0) > mild && drying_secs(15.0, 0.6, 8.0) < mild);
+        assert_eq!(drying_secs(-5.0, 0.6, 0.0), DRYING.1);
+        assert_eq!(drying_byte(DRYING.1), 1);
+        assert_eq!(drying_byte(DRYING.0), 255);
+    }
+
+    /// The snow line: at the sea where it snows there, 150 blocks up for 6.5 °C more, none in warm
+    /// air; its bits stay in 6 and 0 is none.
+    #[test]
+    fn snow_line_by_air() {
+        assert_eq!(snow_line(SNOWS_BELOW - 2.0), 0.0);
+        assert!((snow_line(SNOWS_BELOW + 6.5) - 150.0).abs() < 0.01);
+        assert_eq!(snow_line_bits(SNOWS_BELOW - 2.0), 1);
+        assert_eq!(snow_line_bits(SNOWS_BELOW + 6.5), 1 + 38);
+        assert_eq!(snow_line_bits(30.0), 0);
+        assert!((0..400).all(|i| snow_line_bits(i as f32 * 0.1 - 5.0) < 64));
+    }
+
+    /// Dawn mist: every calm clear morning, a veil in dry air and the most in damp air; none in
+    /// desert air, in rain, in a wind or at noon, and it follows the season's sunrise.
+    #[test]
+    fn dawn_mist_by_air_and_hour() {
+        let (dry, damp) = (dawn_mist(0.3, 6.0, 6.0, 0.0, false), dawn_mist(1.0, 6.0, 6.0, 0.0, false));
+        assert!(dry > 0.6 * DAWN_MIST.0 && dry <= DAWN_MIST.0, "{dry}");
+        assert!(damp > 0.6 * DAWN_MIST.1 && damp <= DAWN_MIST.1, "{damp}");
+        assert_eq!(dawn_mist(DAWN_MIST_DRY.0, 6.0, 6.0, 0.0, false), 0.0, "desert air");
+        assert_eq!(dawn_mist(1.0, 6.0, 6.0, 0.0, true), 0.0);
+        assert_eq!(dawn_mist(1.0, 6.0, 6.0, CLEARS.1, false), 0.0);
+        assert_eq!(dawn_mist(1.0, 6.0, 12.0, 0.0, false), 0.0);
+        assert!(dawn_mist(1.0, 4.0, 4.0, 0.0, false) > 0.6 * DAWN_MIST.1, "it follows the season's sunrise");
+    }
+
     /// Every biome the per-biome shares name (aurorae, canopies) has a climate row, so a renamed
     /// biome can't silently lose its aurora or its light under the leaves.
     #[test]
@@ -509,8 +627,10 @@ pub const AURORA: [(&str, f32); 3] = [("base:taiga", 1.0), ("base:snowy_plains",
 /// a temperate broadleaf wood in leaf 3-10 %, a conifer or birch wood more, and an open grove or a
 /// swamp's scattered trees more again (Lighting's estimates from those shares). Biomes not listed
 /// have open sky.
-pub const CANOPY: [(&str, f32); 6] = [
+pub const CANOPY: [(&str, f32); 7] = [
     ("base:tropical_forest", 1.0),
+    // Białowieża's old oaks and hornbeams in leaf: a closed temperate canopy, 2-5 % of the sun.
+    ("base:old_growth_forest", 0.75),
     ("base:sequoia_grove", 0.6),
     ("base:forest", 0.5),
     ("base:taiga", 0.4),

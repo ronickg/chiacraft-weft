@@ -1,0 +1,2 @@
+# linecheck: strips the egg means (the blocky-model skill's Props rule: small round props taper a unit a layer)
+egg*  # the egg's stacked layers, each a unit narrower: the half-texel steps are its round outline

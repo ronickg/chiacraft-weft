@@ -13,7 +13,7 @@ use weft_sdk::*;
 
 static LEVEL_UP: Channel<u32> = Channel::named("level_up");
 static PLACE: Channel<u32> = Channel::named("place_stat");
-pub static SCREEN: Screen = Screen::named("stats");
+pub static SCREEN: Menu = Menu::named("stats");
 static OPEN: Key = Key::named("stats");
 static FANFARE: Sound = Sound::named("level_up");
 pub static TOMBSTONE: Block = Block::named("tombstone");
@@ -43,21 +43,21 @@ pub fn register(r: &mut Registry) {
         .files(&["random/advancement"])
         .category(&sound_categories::UI);
     // Mining, chopping, digging: by how hard the block is.
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             give_xp(&w, e.player, xp::gather(HARDNESS.on_block(e.state).unwrap_or(1.0).max(0.0)));
         }
     });
     // Building: a little a block.
-    r.on(&actions::PLACE_BLOCK, |b| {
+    r.on_event(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             give_xp(&w, e.player, xp::BUILD);
         }
     });
     // Killing: by the creature's strength (a monster more than a chicken).
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             if d.source != 0 && d.source != d.entity && w.players().contains(&d.source) {
@@ -84,8 +84,12 @@ pub fn register(r: &mut Registry) {
     // Gives XP (for testing), or tells it.
     r.command("xp", "[amount:int]", |cmd| {
         let w = cmd.world();
-        if let Some(n) = cmd.int("amount") {
-            give_xp(&w, cmd.player(), n.max(0) as u64);
+        // Straight in, in any game mode: `give_xp` gives nothing outside survival (right for play),
+        // which left test scripts in spectator at level 1 with no perk points (Ley lines' look, 11-05).
+        if let Some(n) = cmd.int("amount")
+            && let Some(v) = w.component_mut(cmd.player(), &VITALS)
+        {
+            v.xp += n.max(0) as u64;
         }
         let Some(v) = w.component(cmd.player(), &VITALS) else { return };
         let (level, into) = levels::level_of(v.xp);
@@ -123,6 +127,8 @@ fn tick(w: &World) {
         }
         if found > 0 && !creative {
             give_xp(w, id, found);
+            // Exploring rises by the same finds (a dimension's are ten a biome's).
+            crate::skills::discovered(w, id, found >= xp::DISCOVER * 10);
         }
         let Some(v) = w.component_mut(id, &VITALS) else { continue };
         let level = levels::level_of(v.xp).0;
@@ -196,20 +202,22 @@ fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
 /// A gravestone holding a dead one's things (a chest's menu with room for a whole inventory);
 /// broken, it drops what's left.
 fn tombstone_block(r: &mut Registry) {
-    r.machine(&TOMBSTONE, &TOMBSTONE_MENU)
-        .block(|b| {
-            b.sound_group("stone")
-                .facing(Facings::HORIZONTAL, Toward::Player)
-                .states(|_, s| {
-                    s.faces(["mossy_cobblestone"; 6])
-                        .model_box([3.0, 0.0, 6.0], [13.0, 15.0, 10.0])
-                })
-                .hardness(1.0)
-                .tab(&crate::tabs::FUNCTIONAL)
+    r.block(&TOMBSTONE)
+        .sound_group("stone")
+        .facing(Facings::HORIZONTAL, Toward::Player)
+        .states(|_, s| {
+            s.texture("mossy_cobblestone")
+                .model_box([3.0, 0.0, 6.0], [13.0, 15.0, 10.0])
         })
-        .group("grave", Slots::chest(5))
+        .hardness(1.0)
+        .tab(&crate::tabs::FUNCTIONAL)
+        .entity(|e| e.inventory(45))
+        .opens(&TOMBSTONE_MENU);
+    r.menu(&TOMBSTONE_MENU)
+        .group("grave", Slots::chest(5).holder())
+        .player_inventory()
         .screen(|ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0), &[], |ui| {
+            crate::window::window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0), &[], |ui| {
                 ui.group("grave");
                 ui.player_inventory(true);
             });
@@ -319,11 +327,11 @@ fn client(r: &mut Registry) {
     });
     // The stats (the UI redo's stats screen): the level on a badge with the XP bar and the points
     // to place, then each stat as a bar with its value inside, its points and a +.
-    r.screen(&SCREEN, |ui| {
+    r.menu(&SCREEN).screen(|ui| {
         let tabs: [crate::window::Tab; 1] = [("window.base.tab.advancements", |c| {
-            c.client().screen_open(&crate::advancements::SCREEN);
+            c.client().menu_open(&crate::advancements::SCREEN);
         })];
-        crate::window::family_window(ui, S::column().pad(8.0).gap(4.0), Some("window.base.tab.stats"), &tabs, |ui| {
+        crate::window::family_window(ui, S::column().pad(crate::window::WINDOW_PAD).gap(4.0), Some("window.base.tab.stats"), &tabs, |ui| {
             ui.row(S::row().gap(5.0).center(), |ui| {
                 ui.panel("hud_badge", S::row().size(20.0, 24.0).center(), |ui| {
                     ui.text_bind_styled(S::default().no_wrap(), |c, t| {
@@ -470,7 +478,7 @@ fn client(r: &mut Registry) {
         });
     });
     // On P: Weft's free camera, on P there, is on F6 here (`core:freecam`, Ronald 11-04).
-    r.key(&OPEN, "P").on_press_client(|c| {
-        c.screen_open(&SCREEN);
+    r.key(&OPEN, "P").on_client(|c| {
+        c.menu_open(&SCREEN);
     });
 }

@@ -1,0 +1,57 @@
+{
+ "format_version": "1.12.0",
+ "minecraft:geometry": [
+  {
+   "description": {
+    "identifier": "geometry.egg_bird_mesozoic",
+    "texture_width": 64,
+    "texture_height": 32
+   },
+   "bones": [
+    {
+     "name": "body",
+     "pivot": [-0.0, 0.0, -0.0],
+     "cubes": []
+    },
+    {
+     "name": "egg0_tilt",
+     "parent": "body",
+     "pivot": [-0.0, -1.2456, 0.2088],
+     "rotation": [8.0, 0.0, 0.0],
+     "cubes": [
+      {
+       "origin": [-0.75, -1.2456, -0.5412],
+       "size": [1.5, 3.0, 1.5],
+       "uv": {
+        "south": {
+         "uv": [1.0, 1.0],
+         "uv_size": [3.0, 6.0]
+        },
+        "north": {
+         "uv": [6.0, 1.0],
+         "uv_size": [3.0, 6.0]
+        },
+        "west": {
+         "uv": [11.0, 1.0],
+         "uv_size": [3.0, 6.0]
+        },
+        "east": {
+         "uv": [16.0, 1.0],
+         "uv_size": [3.0, 6.0]
+        },
+        "down": {
+         "uv": [24.0, 1.0],
+         "uv_size": [-3.0, 3.0]
+        },
+        "up": {
+         "uv": [29.0, 4.0],
+         "uv_size": [-3.0, -3.0]
+        }
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

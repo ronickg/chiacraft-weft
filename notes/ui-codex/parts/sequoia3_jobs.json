@@ -1,0 +1,10 @@
+[
+ {
+  "kind": "block",
+  "type": "log side / log top",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "name": "log_sequoia_top_3",
+  "like": "/Users/ronald/Coding/chiacraft-weft/mods/base/assets/textures/block/log_mesquite_top.png",
+  "what": "the cut end of a giant sequoia log: the SAME layout as the attached log top (the same many dense concentric rings, clearly drawn, the pale sapwood band and the bark edge), redrawn in sequoia colours: the heartwood rings a warm cinnamon red-brown (#a04c2e to #d8905e) with thin darker ring lines (#6a2c18), a pale pinkish-tan sapwood band (#d8b08a) inside the bark, and a 3 px edge of thick fibrous dark red-brown bark (#5e2a18). Every cell filled, no border, flat face-on."
+ }
+]

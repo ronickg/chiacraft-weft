@@ -13,7 +13,13 @@ pub enum Role {
     Fitting,
     /// Adds to the look and a little to the numbers: a guard, a pommel.
     Extra,
+    /// Pads armour and keeps its wearer warm: Survival's clothing in numbers (wool, linen, fur).
+    Lining,
 }
+
+/// Seconds a chopping tool's hit takes a raised shield down for (vanilla's axe, and Weft's
+/// `comp::DISABLE_BLOCKING` on its own axes).
+pub const CHOP_DISABLES_BLOCKING: f32 = 5.0;
 
 /// What a kind's working part is for, and so its main stat.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,6 +32,8 @@ pub enum Use {
     Thrust,
     /// A bow: its power is its stave's spring.
     Shoot,
+    /// Armour: its shell stops blows (`armour`).
+    Guard,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -49,6 +57,9 @@ const fn s(name: &'static str, role: Role) -> Slot {
 }
 
 const TOOL: &[Slot] = &[s("head", Role::Working), s("haft", Role::Holding), s("fitting", Role::Fitting)];
+/// Armour: the shell stops blows, the fastening holds it together (and wears first), the lining
+/// pads and warms (`notes/CRAFTING.md`, "Kinds and their parts").
+const ARMOUR: &[Slot] = &[s("shell", Role::Working), s("fastening", Role::Fitting), s("lining", Role::Lining)];
 
 pub const KINDS: &[Kind] = &[
     Kind { id: "axe", key: "kind.base.axe", use_: Use::Chop, slots: TOOL, damage: 5.0 },
@@ -83,10 +94,34 @@ pub const KINDS: &[Kind] = &[
         slots: &[s("stave", Role::Working), s("grip", Role::Holding), s("string", Role::Fitting)],
         damage: 6.0,
     },
+    // An arrow: only its head is a part (its material sets the arrow's item level,
+    // `vitals::gear::arrow_level`); a stick and a feather make the rest, four at a time at the
+    // assembly row (`base`'s `parts::fletched`). Never built as a tool.
+    Kind { id: "arrow", key: "kind.base.arrow", use_: Use::Shoot, slots: &[s("head", Role::Working)], damage: 0.0 },
+    // Armour, head to feet (`materials::ARMOUR`, `vitals::gear::SLOT_SHARE`).
+    Kind { id: "helmet", key: "kind.base.helmet", use_: Use::Guard, slots: ARMOUR, damage: 0.0 },
+    Kind { id: "chestplate", key: "kind.base.chestplate", use_: Use::Guard, slots: ARMOUR, damage: 0.0 },
+    Kind { id: "leggings", key: "kind.base.leggings", use_: Use::Guard, slots: ARMOUR, damage: 0.0 },
+    Kind { id: "boots", key: "kind.base.boots", use_: Use::Guard, slots: ARMOUR, damage: 0.0 },
 ];
 
 pub fn kind(id: &str) -> Option<&'static Kind> {
     KINDS.iter().find(|k| k.id == id)
+}
+
+impl Kind {
+    /// Its working slot's name (every kind has one).
+    pub fn working(&self) -> &'static str {
+        self.slots
+            .iter()
+            .find(|s| s.role == Role::Working)
+            .map_or("", |s| s.name)
+    }
+
+    /// For armour, its slot head to feet (0-3).
+    pub fn armour_slot(&self) -> Option<usize> {
+        crate::materials::ARMOUR.iter().position(|a| *a == self.id)
+    }
 }
 
 /// One way to make a slot's part: its size, and what it does to the item's numbers (×). The
@@ -148,6 +183,22 @@ pub const SHAPES: &[Shape] = &[
     sh("short_stave", "bow", "stave", 280.0, (1.0, 1.15, 0.85, 0.0)),
     sh("grip", "bow", "grip", 40.0, (1.0, 1.0, 1.0, 0.0)),
     sh("bowstring", "bow", "string", 2.0, (1.0, 1.0, 1.0, 0.0)),
+    // An arrowhead: a few grams of flint, bone or metal.
+    sh("arrowhead", "arrow", "head", 2.0, (1.0, 1.0, 1.0, 0.0)),
+    // Armour: a shell of its slot's size (a metal coat about 1.2 litres of iron, 9 kg; a leather
+    // one under a kilogram), straps or rivets, and a lining (cloth's own density).
+    sh("helmet_shell", "helmet", "shell", 300.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("chest_shell", "chestplate", "shell", 1200.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("leg_shell", "leggings", "shell", 900.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("boot_shell", "boots", "shell", 400.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("straps", "helmet", "fastening", 10.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("straps", "chestplate", "fastening", 30.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("straps", "leggings", "fastening", 20.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("straps", "boots", "fastening", 10.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("lining", "helmet", "lining", 400.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("lining", "chestplate", "lining", 2000.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("lining", "leggings", "lining", 1500.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("lining", "boots", "lining", 500.0, (1.0, 1.0, 1.0, 0.0)),
 ];
 
 impl Shape {

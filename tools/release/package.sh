@@ -16,7 +16,7 @@
 # [label] (default: the commit) too: chiacraft-<label>-<platform>.tar.gz (.zip on Windows) in
 # $OUT_DIR (default dist/). On macOS set MOLTENVK_DYLIB (and MOLTENVK_LICENSE) to the
 # libMoltenVK.dylib to bundle. Run it from the repository root. It runs the game only with
-# `--dist`, which writes the folder and quits: no window, no GPU.
+# `dist`, which writes the folder and quits: no window, no GPU.
 #
 # Prints the archive's path last, and writes `archive=` and `name=` to $GITHUB_OUTPUT in CI.
 set -euo pipefail
@@ -47,13 +47,15 @@ mkdir -p "$out_dir"
 if [ -n "${TARGET:-}" ]; then
 	python3 -I tools/release/cross-pack.py "$build" "$exe" "$folder"
 else
-	"$bin" --dist "$folder"
+	# A command since the Weft sync of 11-22 (`weft dist <dir>`); `--dist` now starts the game.
+	"$bin" dist "$folder"
 fi
 
 # What a player's copy needs, checked here rather than on their machine.
 fail() { echo "package: $*" >&2; exit 1; }
 [ -f "$folder/$exe" ] || fail "no $exe in $folder"
 [ -f "$folder/assets/core/icon.png" ] || fail "no engine assets in $folder/assets/core"
+[ -s "$folder/mod-abi.txt" ] || fail "no mod-abi.txt (what mods must be built against) in $folder"
 # Every mod in mods/ is packed, except the development ones marked `dist = false`.
 [ -f "$folder/run/mods/base.zip" ] || fail "base was not packed"
 for dir in mods/*/; do

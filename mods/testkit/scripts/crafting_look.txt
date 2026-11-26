@@ -19,10 +19,10 @@ wait 1
 tap core:menu text:parts
 wait 1
 shot parts_tab.png
-tap_once core:menu class:slot
+tap_once core:menu icon:base:part_felling_axe_head
 wait 1
 shot parts_head_picked.png
-tap core:menu text:all (
+tap core:menu text:max (
 wait 1
 key Escape
 until screen none within 10
@@ -32,10 +32,10 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap_once core:menu class:slot
+tap_once core:menu icon:base:part_haft
 wait 1
 shot parts_haft_picked.png
-tap core:menu text:all (
+tap core:menu text:max (
 wait 1
 key Escape
 until screen none within 10
@@ -45,9 +45,9 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap_once core:menu class:slot
+tap_once core:menu icon:base:part_lashing
 wait 1
-tap core:menu text:all (
+tap core:menu text:max (
 wait 1
 chat /tk inv me
 shot parts_made.png

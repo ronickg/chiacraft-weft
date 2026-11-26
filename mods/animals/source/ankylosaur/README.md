@@ -22,6 +22,18 @@ and exports `models/ankylosaur.geo.json`, `animations/ankylosaur[_lie].animation
 (`render.py out/spec.json out/texture.png shot.png --ppb 100 --views 3q,side,front,head`, add
 `--anim idle --t 1` or `--anim lie --t 0`; a blink is `--anim idle --t 2.0`).
 
+Behaviour clips (11-05, `src/anim.rs`): stare, graze, drink, watch, sleep (flat as in the lie; also
+in the lying file), approach and charge loop; sniff, look, scratch, stretch, alarm, rear, play, groom,
+nuzzle and flinch play once; death holds. At 1.9 t it stands its ground, so it has rear (a threat
+display braced on all four, the legs set wide, the hindquarters turned a little, the tail's club
+raised and swung side to side twice) and charge (a heavy head-low trot). Scratch rubs the barrel side
+to side (a hind foot can't reach the flank); alarm is a snort and one swing of the club; play a slow
+wag of it; death sinks onto the belly and tips onto its side, propped on the flank spikes (62
+degrees: rolled right over, a body twice as wide as deep stands up like a wall). No stalk or pounce.
+`build.py` asserts the loops, every standing clip's feet within 0.3 of the ground, all four planted
+in rear, the gaits' grounding, the beak at the ground in graze and drink, nothing under -0.3 in any
+clip, and death on its lowest point each frame.
+
 ## Research (2026-11-04)
 
 - ***Gastonia burgei***: about 5 m long and 1.9 t (Paul 2010; Kirkland 1998 said about 6 m); the

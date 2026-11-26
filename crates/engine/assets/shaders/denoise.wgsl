@@ -1,0 +1,552 @@
+// Our own denoiser for the path tracer's light (`denoise::Denoiser`, `core:pt_denoiser`), in the way
+// of SVGF (Schied et al. 2017, "Spatiotemporal Variance-Guided Filtering"): the path tracer hands
+// its diffuse and specular light with the albedo divided out (`pt_spec_albedo` for the specular),
+// so texture detail never gets blurred; each is gathered over frames along TAA's motion with depth
+// and normal tests, its variance worked out from the gathered moments (spatially while the history
+// is short), filtered by a few à-trous passes that stop at edges of depth, normal and light, and the
+// albedo multiplied back in, added onto the scene image (which holds emission and the sky).
+// Every image is at the world's size. A shader pack may replace this file; it keeps the entries.
+//
+// Entry fields (`DenoisePass`, `dn`), by pass:
+// - `fs_temporal` (diffuse, specular gathered; alpha the frames gathered): `diffuse`/`specular` the
+//   path tracer's, `normal`, `depth`, `motion` + 1, `prev_*` last frame's (`prev_diffuse` and
+//   `prev_specular` its first à-trous step, `prev_len_*` its gathered light for the frame counts,
+//   `prev_guide` + 1, 0: start anew), `alpha` the least share of a new frame, `max_len` the most frames;
+// - `fs_moments` (the light's luminance moments, and this frame's guide for the next): as above,
+//   `prev_moments` last frame's;
+// - `fs_variance` (diffuse, specular with their variance in alpha): `diffuse`/`specular` the gathered,
+//   `moments` this frame's, `prev_guide` + 1 THIS frame's guide (in this and the passes below: what
+//   was lit);
+// - `fs_atrous` (one à-trous step): `diffuse`/`specular` the last step's, `step` the tap spacing,
+//   `phi_color` how far light may differ (in standard deviations), `phi_normal` the normal's power;
+// - `fs_composite` (added onto the scene image): `diffuse`/`specular` the light, `albedo`, `spec`
+//   (F0), `normal`, `depth`.
+
+struct VOut {
+    @builtin(position) clip: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+    @location(1) @interpolate(flat) pass_index: u32,
+}
+
+@vertex
+fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
+    let p = vec2<f32>(f32((vi << 1u) & 2u), f32(vi & 2u));
+    var out: VOut;
+    out.clip = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+    out.uv = vec2(p.x, 1.0 - p.y);
+    out.pass_index = ii;
+    return out;
+}
+
+fn dn_luma(c: vec3<f32>) -> f32 {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+// A texel of light, finite and not past `HUGE` (one stray path can't light a whole region).
+const HUGE: f32 = 6.0e4;
+
+fn dn_light(tex: u32, at: vec2<i32>, size: vec2<i32>) -> vec4<f32> {
+    let t = textureLoad(textures[tex], clamp(at, vec2(0), size - 1), 0);
+    let c = select(vec3(0.0), min(max(t.rgb, vec3(0.0)), vec3(HUGE)), t.rgb == t.rgb);
+    return vec4(c, select(0.0, t.a, t.a == t.a));
+}
+
+// Unit vectors in two numbers (octahedral), for the guide kept for next frame.
+fn dn_oct(n: vec3<f32>) -> vec2<f32> {
+    let p = n.xy / max(abs(n.x) + abs(n.y) + abs(n.z), 1e-6);
+    if n.z >= 0.0 {
+        return p;
+    }
+    return (1.0 - abs(p.yx)) * select(vec2(-1.0), vec2(1.0), p >= vec2(0.0));
+}
+
+fn dn_unoct(e: vec2<f32>) -> vec3<f32> {
+    var n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
+    if n.z < 0.0 {
+        n = vec3((1.0 - abs(n.yx)) * select(vec2(-1.0), vec2(1.0), n.xy >= vec2(0.0)), n.z);
+    }
+    return normalize(n);
+}
+
+fn dn_depth(depth: u32, at: vec2<i32>, size: vec2<i32>) -> f32 {
+    return textureLoad(textures[depth], clamp(at, vec2(0), size - 1), 0).r;
+}
+
+// Where the surface at texel `at` (depth `d`) is, camera-relative (blocks).
+fn dn_position(at: vec2<i32>, d: f32, size: vec2<f32>) -> vec3<f32> {
+    let uv = (vec2<f32>(at) + 0.5) / size;
+    let h = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, max(d, 1e-7), 1.0);
+    return h.xyz / h.w;
+}
+
+// Whether the path tracer lit the surface at `at`: something drawn (depth) that the G-buffer holds
+// (its normal not 0; it is cleared where mobs, distant tiles and what is seen through stand). The
+// rest keeps its own light, and no filter takes from it or gives to it.
+fn dn_traced(normal: u32, depth: u32, at: vec2<i32>, size: vec2<i32>) -> bool {
+    let p = clamp(at, vec2(0), size - 1);
+    return textureLoad(textures[depth], p, 0).r > 0.0 && length(textureLoad(textures[normal], p, 0).xyz) > 0.5;
+}
+
+// What the path tracer lit at `at`, from the entry's raw light (`fs_temporal`, `fs_moments`, and the
+// composite of the raw light): the G-buffer drew it and the diffuse light's alpha (its bounce's
+// distance, 65504 the sky) is set; terrain it drew but didn't trace (past 384 blocks, a failed depth
+// match) has 0 there.
+fn dn_lit(d: DenoisePass, at: vec2<i32>) -> bool {
+    let isize = vec2<i32>(d.size);
+    return dn_traced(d.normal, d.depth, at, isize) && dn_light(d.diffuse, at, isize).a > 0.0;
+}
+
+// The same, from this frame's guide (`prev_guide` + 1 in the later passes: `fs_moments` wrote z 0
+// where nothing was lit), or from the raw light without one.
+fn dn_marked(d: DenoisePass, at: vec2<i32>) -> bool {
+    if d.prev_guide == 0u {
+        return dn_lit(d, at);
+    }
+    let isize = vec2<i32>(d.size);
+    return textureLoad(textures[d.prev_guide - 1u], clamp(at, vec2(0), isize - 1), 0).z > 0.0;
+}
+
+fn dn_normal(normal: u32, at: vec2<i32>, size: vec2<i32>) -> vec4<f32> {
+    let t = textureLoad(textures[normal], clamp(at, vec2(0), size - 1), 0);
+    return vec4(normalize(t.xyz + vec3(0.0, 0.0, 1e-6)), clamp(t.w, 0.0, 1.0));
+}
+
+// Where what is seen at `at` was last frame, minus where it is now, in UV: what the surface wrote
+// in the motion image (its depth tag matching), else the camera's (as `taa.wgsl`).
+fn dn_motion(motion: u32, depth: u32, at: vec2<i32>, size: vec2<i32>) -> vec2<f32> {
+    let p = clamp(at, vec2(0), size - 1);
+    let d = textureLoad(textures[depth], p, 0).r;
+    if motion != 0u {
+        let m = textureLoad(textures[motion - 1u], p, 0);
+        if m.z > 0.0 && abs(m.z - d) <= max(d * 4.0e-3, 1.0e-7) {
+            return m.xy;
+        }
+    }
+    if d >= 0.5 {
+        return vec2(0.0);
+    }
+    let fs = vec2<f32>(size);
+    let uv = (vec2<f32>(p) + 0.5) / fs;
+    let ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let h = scene.inv_view_proj * vec4(ndc, d, 1.0);
+    let prev = scene.taa_prev * h;
+    if prev.w <= 1e-9 {
+        return vec2(0.0);
+    }
+    let now = ndc - scene.taa.xy;
+    return (prev.xy / prev.w - now) * vec2(0.5, -0.5);
+}
+
+// Last frame's four texels round where this one's surface was, each weighed bilinearly and kept
+// only where last frame saw the same surface there: about the same distance along the view (the
+// guide's z against where this point stood from last frame's camera) and facing about the same way.
+struct Reprojected {
+    base: vec2<i32>,
+    w: vec4<f32>,
+    ok: bool,
+}
+
+fn dn_reproject(d: DenoisePass, at: vec2<i32>) -> Reprojected {
+    var r: Reprojected;
+    r.base = vec2(0);
+    r.w = vec4(0.0);
+    r.ok = false;
+    let isize = vec2<i32>(d.size);
+    let dep = dn_depth(d.depth, at, isize);
+    if !dn_lit(d, at) || d.prev_guide == 0u || d.reset != 0u {
+        return r;
+    }
+    let m = dn_motion(d.motion, d.depth, at, isize);
+    let uv = (vec2<f32>(at) + 0.5) / d.size;
+    let back = (uv + m) * d.size - 0.5;
+    let base = vec2<i32>(floor(back));
+    let f = back - floor(back);
+    let p = dn_position(at, dep, d.size);
+    let z_then = (scene.taa_prev * vec4(p, 1.0)).w;
+    let n = dn_normal(d.normal, at, isize).xyz;
+    // How far one texel spans along the view here (the gentler neighbour each way): last frame's
+    // texel may be up to about that far off and still be this surface. A share of the distance
+    // instead (3 %, 4.5 blocks at 150) took a lit step's light into the shadowed step beside it
+    // (same facing, a block apart): the hill's block shadows faded (ptd_rrt5/6, 11-06).
+    let z_now = (scene.view_proj * vec4(p, 1.0)).w;
+    let span = max(dn_view_span(d, at, z_now), 0.002 * z_now);
+    let bil = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
+    var w = vec4(0.0);
+    for (var k = 0; k < 4; k++) {
+        let q = base + vec2(k & 1, k >> 1u);
+        if any(q < vec2(0)) || any(q >= isize) {
+            continue;
+        }
+        let g = textureLoad(textures[d.prev_guide - 1u], q, 0);
+        if g.z <= 0.0 {
+            continue;
+        }
+        let same_depth = abs(g.z - z_then) <= 2.0 * span + 0.01;
+        let same_facing = dot(dn_unoct(g.xy), n) > 0.85;
+        if same_depth && same_facing {
+            w[k] = bil[k];
+        }
+    }
+    let s = w.x + w.y + w.z + w.w;
+    if s < 1e-3 {
+        return r;
+    }
+    r.base = base;
+    r.w = w / s;
+    r.ok = true;
+    return r;
+}
+
+fn dn_fetch(tex: u32, r: Reprojected) -> vec4<f32> {
+    var s = vec4(0.0);
+    for (var k = 0; k < 4; k++) {
+        if r.w[k] > 0.0 {
+            s += textureLoad(textures[tex], r.base + vec2(k & 1, k >> 1u), 0) * r.w[k];
+        }
+    }
+    return s;
+}
+
+struct Pair {
+    @location(0) diffuse: vec4<f32>,
+    @location(1) specular: vec4<f32>,
+}
+
+@fragment
+fn fs_temporal(in: VOut) -> Pair {
+    let d = dn[in.pass_index];
+    let isize = vec2<i32>(d.size);
+    let at = vec2<i32>(in.clip.xy);
+    var out: Pair;
+    if !dn_lit(d, at) {
+        out.diffuse = vec4(0.0);
+        out.specular = vec4(0.0);
+        return out;
+    }
+    let cd = dn_light(d.diffuse, at, isize).rgb;
+    let cs = dn_light(d.specular, at, isize).rgb;
+    let r = dn_reproject(d, at);
+    if !r.ok {
+        out.diffuse = vec4(cd, 1.0);
+        out.specular = vec4(cs, 1.0);
+        return out;
+    }
+    // Last frame's light after its first à-trous step (SVGF's history: less noise carried on), the
+    // frames gathered from the gathered light's alpha.
+    let hd = dn_fetch(d.prev_diffuse, r);
+    let hs = dn_fetch(d.prev_specular, r);
+    // Smooth surfaces' reflections move with the eye, not the surface: they keep fewer frames.
+    let rough = dn_normal(d.normal, at, isize).w;
+    let len_d = min(dn_fetch(d.prev_len_diffuse, r).a + 1.0, d.max_len);
+    let len_s = min(dn_fetch(d.prev_len_specular, r).a + 1.0, mix(4.0, d.max_len, clamp(rough * 2.0, 0.0, 1.0)));
+    out.diffuse = vec4(mix(hd.rgb, cd, max(1.0 / len_d, d.alpha)), len_d);
+    out.specular = vec4(mix(hs.rgb, cs, max(1.0 / len_s, d.alpha)), len_s);
+    return out;
+}
+
+struct MomentsOut {
+    @location(0) moments: vec4<f32>,
+    @location(1) guide: vec4<f32>,
+}
+
+@fragment
+fn fs_moments(in: VOut) -> MomentsOut {
+    let d = dn[in.pass_index];
+    let isize = vec2<i32>(d.size);
+    let at = vec2<i32>(in.clip.xy);
+    var out: MomentsOut;
+    let dep = dn_depth(d.depth, at, isize);
+    if dep <= 0.0 || !dn_lit(d, at) {
+        out.moments = vec4(0.0);
+        out.guide = vec4(0.0);
+        return out;
+    }
+    let nr = dn_normal(d.normal, at, isize);
+    let p = dn_position(at, dep, d.size);
+    out.guide = vec4(dn_oct(nr.xyz), (scene.view_proj * vec4(p, 1.0)).w, nr.w);
+    let ld = dn_luma(dn_light(d.diffuse, at, isize).rgb);
+    let ls = dn_luma(dn_light(d.specular, at, isize).rgb);
+    var m = vec4(ld, ld * ld, ls, ls * ls);
+    let r = dn_reproject(d, at);
+    if r.ok {
+        let len = min(dn_fetch(d.prev_len_diffuse, r).a + 1.0, d.max_len);
+        m = mix(dn_fetch(d.prev_moments, r), m, max(1.0 / len, 0.2));
+    }
+    out.moments = m;
+    return out;
+}
+
+@fragment
+fn fs_variance(in: VOut) -> Pair {
+    let d = dn[in.pass_index];
+    let isize = vec2<i32>(d.size);
+    let at = vec2<i32>(in.clip.xy);
+    var out: Pair;
+    let dep = dn_depth(d.depth, at, isize);
+    let hd = dn_light(d.diffuse, at, isize);
+    let hs = dn_light(d.specular, at, isize);
+    if dep <= 0.0 || !dn_marked(d, at) {
+        out.diffuse = vec4(0.0);
+        out.specular = vec4(0.0);
+        return out;
+    }
+    let m = textureLoad(textures[d.moments], at, 0);
+    var v = max(vec2(m.y - m.x * m.x, m.w - m.z * m.z), vec2(0.0));
+    if hd.a < 4.0 {
+        // Too few frames gathered: the moments of the 7x7 alike texels round it instead, made
+        // larger while the history is this short.
+        let gc = dn_guide(d, at);
+        let nc = dn_unoct(gc.xy);
+        var sum = vec4(0.0);
+        var wsum = 0.0;
+        for (var y = -3; y <= 3; y++) {
+            for (var x = -3; x <= 3; x++) {
+                let q = at + vec2(x, y);
+                let gq = dn_guide(d, q);
+                if gq.z <= 0.0 {
+                    continue;
+                }
+                let w = exp(-abs(gq.z - gc.z) / (0.004 * gc.z + 0.02)) * pow(max(dot(nc, dn_unoct(gq.xy)), 0.0), 64.0);
+                let lq = vec2(dn_luma(dn_light(d.diffuse, q, isize).rgb), dn_luma(dn_light(d.specular, q, isize).rgb));
+                sum += vec4(lq.x, lq.x * lq.x, lq.y, lq.y * lq.y) * w;
+                wsum += w;
+            }
+        }
+        let s = sum / max(wsum, 1e-6);
+        v = max(vec2(s.y - s.x * s.x, s.w - s.z * s.z), vec2(0.0)) * (4.0 / max(hd.a, 1.0));
+    }
+    out.diffuse = vec4(hd.rgb, v.x);
+    out.specular = vec4(hs.rgb, v.y);
+    return out;
+}
+
+// The variance round `at`, blurred over 3x3 (a steadier measure for the light test).
+fn dn_variance_blur(tex: u32, at: vec2<i32>, size: vec2<i32>) -> f32 {
+    let k = array<f32, 3>(0.25, 0.5, 0.25);
+    var s = 0.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            s += dn_light(tex, at + vec2(x, y), size).a * k[x + 1] * k[y + 1];
+        }
+    }
+    return s;
+}
+
+@fragment
+fn fs_atrous(in: VOut) -> Pair {
+    let d = dn[in.pass_index];
+    let isize = vec2<i32>(d.size);
+    let at = vec2<i32>(in.clip.xy);
+    var out: Pair;
+    let cd = dn_light(d.diffuse, at, isize);
+    let cs = dn_light(d.specular, at, isize);
+    // This frame's guide (`prev_guide` + 1 here): the normal, the distance along the view (0 where
+    // nothing was lit) and the roughness, one read a tap instead of depth, normal and position.
+    let gc = dn_guide(d, at);
+    if gc.z <= 0.0 {
+        out.diffuse = cd;
+        out.specular = cs;
+        return out;
+    }
+    let nc = dn_unoct(gc.xy);
+    let zc = gc.z;
+    // How fast the view distance changes across the screen here (each way the gentler side, so an
+    // edge doesn't widen what counts as the same surface): taps further than that away are other
+    // surfaces.
+    let zl = dn_guide(d, at - vec2(1, 0)).z;
+    let zr = dn_guide(d, at + vec2(1, 0)).z;
+    let zu = dn_guide(d, at - vec2(0, 1)).z;
+    let zd = dn_guide(d, at + vec2(0, 1)).z;
+    let grad = vec2(dn_slope(zl, zc, zr), dn_slope(zu, zc, zd));
+    let lc = vec2(dn_luma(cd.rgb), dn_luma(cs.rgb));
+    let sigma = sqrt(max(vec2(dn_variance_blur(d.diffuse, at, isize), dn_variance_blur(d.specular, at, isize)), vec2(0.0)));
+    let phi = d.phi_color * sigma + vec2(1e-4);
+    // The B3 spline's 5 taps a side, spread `step` texels apart.
+    let h = array<f32, 5>(1.0 / 16.0, 1.0 / 4.0, 3.0 / 8.0, 1.0 / 4.0, 1.0 / 16.0);
+    var sd = vec3(0.0);
+    var ss = vec3(0.0);
+    var vd = 0.0;
+    var vs = 0.0;
+    var wd = 0.0;
+    var ws = 0.0;
+    let step = i32(d.step);
+    for (var y = -2; y <= 2; y++) {
+        for (var x = -2; x <= 2; x++) {
+            let off = vec2(x, y) * step;
+            let q = at + off;
+            if any(q < vec2(0)) || any(q >= isize) {
+                continue;
+            }
+            let gq = textureLoad(textures[d.prev_guide - 1u], q, 0);
+            if gq.z <= 0.0 {
+                continue;
+            }
+            let tol = abs(dot(grad, vec2<f32>(off))) * 1.5 + 0.002 * zc + 1e-3;
+            let w_z = exp(-abs(gq.z - zc) / tol);
+            let w_n = pow(max(dot(nc, dn_unoct(gq.xy)), 0.0), d.phi_normal);
+            let geo = w_z * w_n * h[x + 2] * h[y + 2];
+            let qd = dn_light(d.diffuse, q, isize);
+            let qs = dn_light(d.specular, q, isize);
+            let w1 = geo * exp(-abs(dn_luma(qd.rgb) - lc.x) / phi.x);
+            // Specular light also only between alike roughness: a mirror next to rough stone
+            // keeps its own reflection.
+            let w2 = geo * exp(-abs(dn_luma(qs.rgb) - lc.y) / phi.y) * exp(-abs(gq.w - gc.w) * 8.0);
+            sd += qd.rgb * w1;
+            vd += qd.a * w1 * w1;
+            wd += w1;
+            ss += qs.rgb * w2;
+            vs += qs.a * w2 * w2;
+            ws += w2;
+        }
+    }
+    out.diffuse = vec4(sd / max(wd, 1e-6), vd / max(wd * wd, 1e-12));
+    out.specular = vec4(ss / max(ws, 1e-6), vs / max(ws * ws, 1e-12));
+    return out;
+}
+
+// This frame's guide at `at` (the later passes' `prev_guide` + 1), zero outside the picture.
+fn dn_guide(d: DenoisePass, at: vec2<i32>) -> vec4<f32> {
+    let isize = vec2<i32>(d.size);
+    if d.prev_guide == 0u || any(at < vec2(0)) || any(at >= isize) {
+        return vec4(0.0);
+    }
+    return textureLoad(textures[d.prev_guide - 1u], at, 0);
+}
+
+// The view distance's change a texel, from the side nearer `c` (a neighbour that wasn't lit, z 0,
+// doesn't count).
+// The view distance's change a texel at `at` (view distance `z`), the gentler side each way, from the
+// depth (its neighbours' points through this frame's camera).
+fn dn_view_span(d: DenoisePass, at: vec2<i32>, z: f32) -> f32 {
+    let isize = vec2<i32>(d.size);
+    var zs = array<f32, 4>(0.0, 0.0, 0.0, 0.0);
+    let offs = array<vec2<i32>, 4>(vec2(-1, 0), vec2(1, 0), vec2(0, -1), vec2(0, 1));
+    for (var k = 0; k < 4; k++) {
+        let q = at + offs[k];
+        if any(q < vec2(0)) || any(q >= isize) {
+            continue;
+        }
+        let dq = dn_depth(d.depth, q, isize);
+        if dq > 0.0 {
+            zs[k] = (scene.view_proj * vec4(dn_position(q, dq, d.size), 1.0)).w;
+        }
+    }
+    return max(dn_slope(zs[0], z, zs[1]), dn_slope(zs[2], z, zs[3]));
+}
+
+fn dn_slope(a: f32, c: f32, b: f32) -> f32 {
+    let da = select(1e9, abs(c - a), a > 0.0);
+    let db = select(1e9, abs(b - c), b > 0.0);
+    let m = min(da, db);
+    return select(0.0, m, m < 1e8);
+}
+
+// What `core:pt_dn_debug` shows: 1 the frames gathered (white 32), 2 the path tracer's raw diffuse
+// light, 3 that gathered over frames, 4 after the à-trous steps (all without the albedo, mapped
+// x/(1+x)), 5 the filtered light's noise (its standard deviation), 6 what counts as lit (green
+// yes, red the G-buffer drew it but it isn't lit).
+fn dn_debug_view(d: DenoisePass, at: vec2<i32>, isize: vec2<i32>) -> vec4<f32> {
+    let lit = dn_marked(d, at);
+    var c = vec3(0.0);
+    switch d.debug {
+        case 1u: {
+            if d.gathered != 0u {
+                c = vec3(textureLoad(textures[d.gathered - 1u], at, 0).a / 32.0);
+            }
+        }
+        case 2u: {
+            c = dn_light(d.raw - 1u, at, isize).rgb;
+            c = c / (1.0 + c);
+        }
+        case 3u: {
+            if d.gathered != 0u {
+                c = dn_light(d.gathered - 1u, at, isize).rgb;
+                c = c / (1.0 + c);
+            }
+        }
+        case 4u: {
+            c = dn_light(d.diffuse, at, isize).rgb;
+            c = c / (1.0 + c);
+        }
+        case 5u: {
+            c = vec3(sqrt(max(dn_light(d.diffuse, at, isize).a, 0.0)) * 4.0);
+        }
+        default: {
+            c = select(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), lit);
+        }
+    }
+    return vec4(c, 1.0);
+}
+
+// The light with the albedo back in, added onto the scene image (emission and the sky are there):
+// drawn with `Blend::Additive`, which scales by this alpha and keeps the image's own (the water mask).
+@fragment
+fn fs_composite(in: VOut) -> @location(0) vec4<f32> {
+    let d = dn[in.pass_index];
+    let isize = vec2<i32>(d.size);
+    let at = vec2<i32>(in.clip.xy);
+    let dep = dn_depth(d.depth, at, isize);
+    if dep <= 0.0 {
+        // The sky is in the scene image already; in the check (`step` 1) it comes from the picture.
+        return select(vec4(0.0), vec4(textureLoad(textures[d.albedo], at, 0).rgb, 1.0), d.step == 1u);
+    }
+    // The debug views (`core:pt_dn_debug`, checks only), over everything the G-buffer holds.
+    if d.debug != 0u {
+        return dn_debug_view(d, at, isize);
+    }
+    // Not traced (mobs, distant tiles, water: the G-buffer holds terrain only): its own light stays.
+    if !dn_marked(d, at) {
+        return vec4(0.0);
+    }
+    let nr = dn_normal(d.normal, at, isize);
+    let v = -normalize(dn_position(at, dep, d.size));
+    let albedo = textureLoad(textures[d.albedo], at, 0).rgb;
+    let f0 = textureLoad(textures[d.spec], at, 0).rgb;
+    let diffuse = dn_light(d.diffuse, at, isize).rgb * albedo;
+    let specular = dn_light(d.specular, at, isize).rgb * pt_spec_albedo(f0, nr.w, abs(dot(nr.xyz, v)));
+    return vec4(diffuse + specular, 1.0);
+}
+
+// The check before the path tracer exists (`Denoiser::run_test`, `WEFT_PT_DENOISE_TEST`): a light
+// of mean 1 a pixel, new each frame (`step` the frame), heavy-tailed as one path a pixel is
+// (-log of a uniform), and the normals from the depth (the nearer neighbour each way, as
+// `upscale_guides.wgsl`), roughness 1. `diffuse` the picture (taken as the albedo), `depth`.
+fn dn_hash(x: u32) -> u32 {
+    var h = x * 747796405u + 2891336453u;
+    h = ((h >> ((h >> 28u) + 4u)) ^ h) * 277803737u;
+    return (h >> 22u) ^ h;
+}
+
+@fragment
+fn fs_test(in: VOut) -> Pair {
+    let d = dn[in.pass_index];
+    let isize = vec2<i32>(d.size);
+    let at = vec2<i32>(in.clip.xy);
+    var out: Pair;
+    let dep = dn_depth(d.depth, at, isize);
+    if dep <= 0.0 {
+        out.diffuse = vec4(0.0);
+        out.specular = vec4(0.0, 0.0, 1.0, 1.0);
+        return out;
+    }
+    let u = f32(dn_hash(u32(at.x) + dn_hash(u32(at.y) + dn_hash(d.step))) >> 8u) / 16777216.0;
+    let l = min(-log(max(1.0 - u, 1e-6)), 12.0);
+    out.diffuse = vec4(vec3(l), 1.0);
+    let c = dn_position(at, dep, d.size);
+    let l_ = dn_position(clamp(at - vec2(1, 0), vec2(0), isize - 1), dn_depth(d.depth, at - vec2(1, 0), isize), d.size);
+    let r_ = dn_position(clamp(at + vec2(1, 0), vec2(0), isize - 1), dn_depth(d.depth, at + vec2(1, 0), isize), d.size);
+    let u_ = dn_position(clamp(at - vec2(0, 1), vec2(0), isize - 1), dn_depth(d.depth, at - vec2(0, 1), isize), d.size);
+    let w_ = dn_position(clamp(at + vec2(0, 1), vec2(0), isize - 1), dn_depth(d.depth, at + vec2(0, 1), isize), d.size);
+    // As `upscale_guides.wgsl`: at the last column or row the clamped neighbour is the texel itself.
+    let right = at.x + 1 < isize.x && (at.x == 0 || length(r_ - c) < length(c - l_));
+    let down = at.y + 1 < isize.y && (at.y == 0 || length(w_ - c) < length(c - u_));
+    let dx = select(c - l_, r_ - c, right);
+    let dy = select(c - u_, w_ - c, down);
+    let cr = cross(dy, dx);
+    var n = select(-normalize(c), cr / max(length(cr), 1e-20), length(cr) > 1e-12);
+    if dot(n, c) > 0.0 {
+        n = -n;
+    }
+    out.specular = vec4(n, 1.0);
+    return out;
+}

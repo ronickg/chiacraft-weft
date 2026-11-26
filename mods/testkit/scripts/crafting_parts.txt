@@ -1,7 +1,9 @@
 # Crafting slice 2, parts: make a stone axe head, an oak haft and a cordage lashing from the book's
 # Parts tab, build the axe in the table's assembly slots, then take it apart again. One copy, a
 # fresh world. The table menu's slots: grid 0-8, result 9, assembly 10-13, assembled 14, apart 15,
-# the bag 16-42, the hotbar 43-51. Each part is the only one its materials make, so it's first.
+# the bag 16-42, the hotbar 43-51. Each part is picked by its item (`icon:<item>`): the craftable
+# recipes come first, so the first slot showing it is the one these materials make (one stone, one
+# oak log and one string make other parts too: a bearded head, a grip, a bowstring).
 loaded
 idle
 chat /tk mode survival
@@ -19,10 +21,10 @@ wait 1
 tap core:menu text:parts
 wait 1
 shot parts_tab.png
-tap_once core:menu class:slot
+tap_once core:menu icon:base:part_felling_axe_head
 wait 1
 shot parts_head_picked.png
-tap core:menu text:all (
+tap core:menu text:max (
 wait 1
 key Escape
 until screen none within 10
@@ -32,10 +34,10 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap_once core:menu class:slot
+tap_once core:menu icon:base:part_haft
 wait 1
 shot parts_haft_picked.png
-tap core:menu text:all (
+tap core:menu text:max (
 wait 1
 key Escape
 until screen none within 10
@@ -45,9 +47,9 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap_once core:menu class:slot
+tap_once core:menu icon:base:part_lashing
 wait 1
-tap core:menu text:all (
+tap core:menu text:max (
 wait 1
 chat /tk inv me
 until chat base:part_lashing within 5

@@ -20,7 +20,7 @@ pub fn breathe(w: &World, id: u64, v: &mut Vitals, drowning: bool) {
         v.air -= 1.0;
         if v.air <= -20.0 {
             v.air = 0.0;
-            w.damage(id, 2.0, 0, damage_cause::DROWN);
+            w.damage(id, Damage::new(2.0, damage_cause::DROWN));
         }
     } else if v.air < MAX_AIR {
         v.air = (v.air + 4.0).min(MAX_AIR);

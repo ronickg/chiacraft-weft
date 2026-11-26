@@ -71,10 +71,6 @@ pub struct Font {
 }
 
 impl Font {
-    pub fn parse_hex(src: &str) -> Font {
-        Self::new(src, None)
-    }
-
     /// Unifont for everything, with the glyphs of a bitmap atlas (`.font` description and its
     /// image) drawn over it. Atlas pixels become `pixel` font pixels so both fill the 16 pixel cell.
     pub fn new(hex: &str, bitmap: Option<(&str, &crate::assets::Image)>) -> Font {
@@ -320,6 +316,8 @@ impl Font {
 
     #[inline]
     pub fn glyph(&self, c: char) -> Glyph {
+        // A no-break space looks like a space (text only breaks lines at ' ': "0.59 ms" stays whole).
+        let c = if c == '\u{a0}' { ' ' } else { c };
         self.glyphs.get(&c).copied().unwrap_or(self.fallback)
     }
 

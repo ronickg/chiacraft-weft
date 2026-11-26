@@ -281,12 +281,12 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         set_spot(&dir, "a", Some(([1, 2, 3], None, None)));
         set_spot(&dir, "b", Some(([4, 5, 6], Some("base:overworld".into()), Some(1.5))));
-        set_spot(&dir, "a", Some(([7, 8, 9], Some("base:nether".into()), Some(-1.5708))));
+        set_spot(&dir, "a", Some(([7, 8, 9], Some("base:nether".into()), Some(-1.25))));
         assert_eq!(
             spots(&dir),
             vec![
                 Spot { link: "b".into(), pos: [4, 5, 6], dim: Some("base:overworld".into()), yaw: Some(1.5) },
-                Spot { link: "a".into(), pos: [7, 8, 9], dim: Some("base:nether".into()), yaw: Some(-1.5708) },
+                Spot { link: "a".into(), pos: [7, 8, 9], dim: Some("base:nether".into()), yaw: Some(-1.25) },
             ]
         );
         set_spot(&dir, "b", None);

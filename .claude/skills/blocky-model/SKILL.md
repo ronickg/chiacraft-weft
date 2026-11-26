@@ -36,6 +36,11 @@ The numbers are in `scripts/house.py`; build scripts import them instead of choo
   128; the owl at 64 too (its face is its two big eyes, 4 by 4 texels at 32). Everything else at
   32, the chihuahua and cat included: Ronald, 2026-11-04, shown both at 32 and finer, "32, one
   look". A new animal follows the same rule. Boxes, export scale and in-game size stay the same.
+- **Keep 32 for small animals** (Ronald, 2026-11-07, after the chihuahua, red fox and brown hare
+  side by side at 32 and 64: "Keep 32"): every animal stays at 32 texels a block, small ones too.
+  A small face (a chihuahua's 5 by 4) is not a reason to paint finer: design its eyes and marks
+  for the texels it has. `fine` is only for a face that can't hold an eye at all (under
+  `MIN_FACE` at 32: the birds, fish and rodents above). Don't offer a 64 version again.
 - **Faces at 32 are small** (a wolf's 7 by 6 texels, a cat's 6 by 5, a chihuahua's 5 by 4): eyes
   are 2-3 texel designs with no halo (`paint.EYES` `px2`, `px3`..., or the animal's own; two front
   eyes placed with `paint.eye_corner` so they land mirror-symmetric), a mark is a texel or more
@@ -62,7 +67,8 @@ The numbers are in `scripts/house.py`; build scripts import them instead of choo
   into it, not blocks with their own model: block models here take only coarse texture
   coordinates (a 128th of the texture), and a painted sheet on one came out a flat color.
 - **Built from source**: every model is `mods/<mod>/source/<thing>/build.py`, which writes its
-  assets and asserts the checks (`boxcheck`, `ground.joints`, `ground.pokes`, `ground.gait`).
+  assets and asserts the checks (`boxcheck`, `linecheck`, `ground.joints`, `ground.pokes`,
+  `ground.gait`).
   Never edit an exported asset by hand.
 
 ## Rules that decide the look
@@ -108,6 +114,26 @@ Geometry
   "hips", "tail_"])` checks it at rest and in every keyframe; build scripts assert it's empty.
   Without the list it also shows limb joints (knee, ankle, toes) and an opening jaw: there a
   small step at the bend is the usual box joint and reads as one.
+
+- **No thin lines: flush, or two texels clear** (Ronald, 11-05, on a strip of Drenkaun's
+  shoulders showing beside a moss pad: "a thin line there, which makes no sense to have there";
+  he had seen it on several models). Where a box lies on or in another (a pad of moss or armour
+  on a back, a haunch on the hips, a nose on a muzzle, a tuft on a neck), every edge of the one
+  against the other is either **flush** (within half a unit, the step `boxcheck` asks for) or
+  **clearly out, two texels or more**. A step of a quarter texel to two texels shows the box
+  underneath as a hairline in its own colour: brown fur beside green moss, a dark nose's side
+  as a rim, the hips' side as a band behind the thigh. It reads as a mistake (a sliver poking
+  out, a texture edge) because it has no shape of its own. The usual causes, all found in our
+  models: a pad a little narrower than the back it lies on (Drenkaun's first moss pad, the
+  ankylosaur's shield); a part a texel too tall (a thigh's top a texel above the hips: a lip);
+  a nose or snout out from the muzzle by a texel and a half; tufts in a row whose ends differ by
+  a fraction; a box sitting a texel or so proud of the surface. Fix by moving the edge, not by
+  painting: make the cover reach half a unit past the edge, pull the poking box in, or push it
+  out to two texels so it reads as a step on purpose. `scripts/linecheck.py` finds every one
+  (`line`, with the box, face, width and the box beside it; `--shot` marks them magenta on a
+  render); build scripts assert none, naming in `allow` the few that are meant. A chain's
+  joint rim (a hoof's top round the shank, the chest's back round the hips) and parts meeting
+  at an angle (a neck into a head: `ground.pokes`) are not lines. Undersides are listed apart.
 
 Texture (paint it like an illustration; each face is a small pixel painting)
 - One light, from above and a bit front-left, baked in: tops lightest, sides mid, bottoms
@@ -239,6 +265,15 @@ Animation
   foot, in walk and run; build scripts assert it. Short legs need a clear lift (a big knee
   bend, a small swing) and fine keyframes (20-24 a cycle), or the foot only shuffles and the
   check can't tell forward from back.
+- **Every gait, not just walk and run**: a clip that plays in place of the walk (a crouched
+  stalk, a slow approach, a charge) is checked the same way. A crouch made by adding a knee bend
+  *against* the way the lift bends it straightens the knee as the foot lifts, so the foot is
+  lowest mid-swing and the gait moonwalks (the first stalks did, on four species, 2026-11-05):
+  bend each joint the way a step lifts it, paw kept flat (`upper + lower + paw = 0`), and search
+  the bends with `gait` and `feet_low`. Bending a leg also shortens it less than you guess: set
+  such a clip's height from its feet with `ground.grounded(spec, anim, feet)` (each frame on its
+  lowest foot; `bounds=True` for a run's or charge's bounce) and assert `feet_low` within 0.3 of
+  the ground, as the builds do. A hand-set root drop sank the first stalk 4 units into the ground.
 - **Feet that don't slide** (big creatures, where sliding shows): give each foot a path (on the
   ground moving back at the ground speed, then lifted and swung forward) and solve the limb's
   angles to it every frame (least squares on the model's bones, warm-started from the last frame,
@@ -291,6 +326,43 @@ Animation
   solve it to its targets like a gait's foot. Ears flat, a hiss, the head following the strike
   sell it. Run `boxcheck` on them too: a raised limb sweeps through the body's planes.
 
+## What the best ones do
+
+Ronald, 11-05, shown them on `model_refs_sheet.png`: "Yes, all 11". From the
+best-regarded animal mods that fit vanilla's look (Naturalist, Alex's Mobs, Friends & Foes,
+Critters and Companions, Ecologics, Untamed Wilds) and Mojang's own camel, sniffer, armadillo,
+frog and axolotl. Images and what each teaches: `references.md`; measurements:
+`~/Coding/chiacraft-archive/references/models/FINDINGS.md`. They work at 16 px a block, so double
+their numbers. Our own rules stay: 32 texels a block, the designed eyes, cute only on heads.
+
+1. **One density, bigger sheets**: none of them changes its pixel for a big animal; the sheet
+   grows (the sniffer 192, Alex's elephant 256). Ours: 32 everywhere.
+2. **4-6 masses read first**: chest, hips, neck, head, muzzle, legs. 10-15 boxes carry the body
+   (vanilla camel 11, Alex's grizzly 15); the rest is face, joints and fringe, and detail goes in
+   the paint.
+3. **Front-heavy, in clean steps**: chest wider and taller than the hips (Naturalist bear 17
+   against 15, rhino 24x29 against 20x25), stepped in evenly on both sides, every step whole and
+   two texels or more at 32 (see "No thin lines").
+4. **Skull plus a narrower muzzle box**, 40-70% of the skull's width, as long as the species'
+   muzzle (a bear's 4-6 px at 16 is 8-12 texels at 32; a wolf's is longer for its head, a cat's
+   shorter); the nose painted on it or a thin strip, never a pad a texel proud.
+5. **A long neck is its own column** (camel, deer, giraffe), the head set on top.
+6. **Coats, manes and moss: one shell per area**, a little bigger than the body (ours: half a unit
+   or more out, no inflate in our exporter), its hem cut out ragged and the shag painted as
+   streaks: the sniffer's moss, the armadillo's shell, the lion's mane. Not a pile of pads and
+   tufts: every pad edge is a chance for a thin line.
+7. **Thin parts are cut-out planes or thin cores** (antlers, fins, gills, whiskers, crests),
+   never boxes a texel thick.
+8. **Legs: one box with a painted dark hoof or paw band**; knee and hock boxes only where the bend
+   shows (big animals: Ronald asked for Drenkaun's).
+9. **Paint**: pale belly and throat; patterns running straight across box seams (the giraffe's
+   patches, the armadillo's bands); the strongest contrast only at eyes, nose and hooves.
+10. **Eyes**: ours stay the designed Hytale eyes; theirs agree on the structure (a pupil, a
+    highlight, a ring or white). Prey with eyes on the sides, hunters in front; expressions by
+    swapping lids or faces, not by animating pixels.
+11. **Idle**: a 3-8 s loop, the body nearly still, tail and ears moving a little, one event a
+    loop (an ear flick, a sniff), the head following what it looks at (the camel's 4 s idle).
+
 ## Workflow
 
 0. **Research the animal first** (web search and fetch), before laying out a single box, and
@@ -304,6 +376,8 @@ Animation
      for its boxes (what the fewest boxes that still read as the animal are). Hytale's creatures
      (screenshots, its blog, mods that show unused models): head size, eyes, which areas are white
      or recolorable. Vintage Story too when it has the animal.
+     The animal mods in `references.md` (Naturalist, Alex's Mobs...) when they have it: how a
+     modder fitted it to vanilla's look.
    - **What makes it recognizable**: ear shape, muzzle, markings (a tabby's M and stripes), eye
      color and pupil shape, tail carriage, typical poses (a cat sits upright with its tail around
      its paws, lies as a loaf).
@@ -365,6 +439,8 @@ Animation
    via `Modes.options.animate.select(); anim.select(); Timeline.setTime(t); Animator.preview();`):
    - [ ] `boxcheck` 0 at rest and in poses; look from below and from the side at every resting
          pose: nothing flickers
+   - [ ] `linecheck` 0 lines: no strip of a box under two texels showing beside another (look at
+         `--shot`: nothing magenta); every pad, haunch, nose and tuft flush or two texels out
    - [ ] two eyes on the front only; no stray eye/nose texels on sides or top; face reads cute;
          a blink frame closes the eyes completely
    - [ ] no part reads wrong side-on (stray flaps); thin parts solid, no gaps between layers;
@@ -486,14 +562,81 @@ that and came out looking like a wooden crate with polka dots. What fixed it:
 - **Lay materials as the real thing has them**: stems running round a dish (as an animal turns
   while lining it), an egg's marks gathered at its blunt end, darker marks over paler deeper
   ones, bark along a twig; things kicked out of a scrape land outside its rim.
-- **Small props** (an egg is 10 units, 5 texels at 32 a block): taper both ends a unit a layer so it reads
-  round, keep marks one or two texels (hairlines don't read at this size), and review it scaled
-  up six times in a copy of the spec (Blockbench frames tiny models too small to see).
+- **Small props**: taper both ends a step a layer so they read round, keep marks one or two
+  texels (hairlines don't read at this size), and review them scaled up in a copy of the spec
+  (Blockbench frames tiny models too small to see). The one allowed exception to "No thin lines"
+  (Planner, 11-05): the one-texel steps of a stacked taper are its round outline, so name the
+  layers in `linecheck_allow.txt` beside its source (`egg*`) or in the build's `allow`. Only on
+  small round props; a body steps by two texels. Eggs: see "Eggs" below.
 - **Show a prop as it is used** (a nest with eggs in it, half sunk and leaning as they are laid).
 
 Worked examples: `mods/animals/source/nest` (`build.py --variants`: a bare, lined and grassy
-scrape, each also with eggs) and `mods/animals/source/egg` (`build.py --variants`: four markings
-on one layout).
+scrape) and `mods/animals/source/egg` (every species' egg, next section).
+
+## Eggs
+
+Every laying species' egg reads as its own at a glance (Ronald, 2026-11-06: "I don't want them to
+all look the same... I've got to easily see, okay, well, this is like a raptor egg"), and every egg
+sits with Minecraft-style blocks and items the way vanilla's and the animal mods' eggs do (Ronald,
+on a finer-painted try: "it looks a bit too different"). Built in `mods/animals/source/egg`:
+`build.py` (the looks), `eggshape.py` (shapes, where a texel sits on the egg, marks), `sheet.py`
+(the review sheet); the numbers in `animals_core::eggs` (each look's model and drawn length, each
+species' look, real cm and drawn px); one entity kind `egg_<look>`, model `egg_<look>`, texture
+`entity/egg/<look>`, icon `item/egg_<look>` per look (`game-art`). The approved set, v3:
+`~/Coding/chiacraft-archive/images/eggs/2026-11-06/eggs_by_species_v3.png`.
+
+1. **Research the real egg first** into `reports/Eggs by species.md`: size, shape (elongation, one
+   end pointed or both alike, round), shell (hard or soft; smooth, ridged, knobbed, pitted,
+   leathery), colour and marks (pigment evidence, else say inference or guess), clutch and how it
+   lies (upright, paired rings, buried, mound, gravel). Fossil eggs by oogenus (Elongatoolithidae
+   for oviraptorids, Megaloolithus for titanosaurs, Spheroolithus for hadrosaurs, Krokolithes for
+   crocodiles); colour from Wiemann et al. 2017-18 (only maniraptorans had pigment; sauropod and
+   ornithischian eggs were white); soft shells from Norell et al. 2020. Where nothing is known, pick
+   a look that keeps the family apart and label it a guess (the ankylosaurs' olive leathery egg).
+2. **Pick the signature that reads**, one or two things you'd name it by, shared with no other
+   look: raptors pale sky blue-green, brown blotches at the blunt end, stood on end; Citipati the
+   longest, dark teal, lengthwise ridges, lying inclined; ceratopsians soft pale buff, dented;
+   ankylosaurs olive-grey mottled; the ornithopod warm ivory with a net of bumps; the sauropod a
+   chalk-white ball of knobs; crocodilians a capsule with a chalk band round the middle; the
+   lizard tiny, white, dented; roe as a few beads (trout orange with a dark eye texel in a heap,
+   pacu glassy with a yellow yolk, Lycoptera straw, scattered, the lungfish's jelly balls); birds
+   by their field-guide colours (owls plain white and round, the raven green, kept off the raptors'
+   blue); the wyvern teal-silver metal-rimmed scales (Ronald's pick). Colour alone made the white
+   round eggs one look: shape, marks and how it lies count too.
+3. **Size and density like Minecraft's** (`reports/Eggs in Minecraft mods.md`, measured from the
+   mods' model files): painted at the blocks' **32 texels a block**, never finer (JurassiCraft's
+   and Fossils' finer eggs are the ones that look off; our v2 at 128-512 did too); drawn about
+   **5x life**: 1.6 px a real cm, **5 to 28 px** long (the turtle egg is ~10x, dinosaur eggs 3-7x);
+   no egg under 2 x 3 px (fish eggs as a few 3 px beads). A species is drawn at its family's look
+   scaled by at most 15%: further off gets the look at its own size (`dromaeosaur_large` for
+   Utahraptor, `ceratopsian_small` for Psittacosaurus); the test `eggs_keep_the_house_density`.
+4. **Few boxes** (`build.slices`): 1-2 for eggs up to 9 px, 3 layers up to 14, 4 up to 20, 6 for
+   the biggest; each layer a pixel narrower a side than the next, whole pixels (an odd width stays
+   centred), the tips at least 2 px, nothing under 2 px thick. The stepped round layers are the
+   dragon egg's way; small eggs are one box as the turtle egg is, and the texture rounds them.
+5. **Paint** with the house light (`prop.paint`), marks laid out in real units on the egg
+   (`eggshape.local`: u round it, even along each face; v along it): blotches (`stamp`), 1-2 px
+   speckles (`hashed`), ridges and knobs on texel grids (the lit texel with its shadow *under* it:
+   rows count up the egg), scales as overlapping discs (`scaled`: the highest row wins, a metal rim
+   on the lower edge, a shadow under the row above). 6-12 colours; never contrasty camouflage
+   mottling. Birds: `bird` with a look's `marks` (blotch, deep, speck, cap).
+6. **Review** with `sheet.py` (`build.py --out DIR` first): close-ups, the clutch as a nest holds
+   it, the egg in the game beside a quarter block, the icon in a slot at 4x and 1x. Two that read
+   alike: change one. Then the game's look script `mods/animals/tests/eggs.txt` (PC queue).
+7. **Icons** (`game-art`, `art.py item egg_<look>`): **one egg per icon**, never a cluster (Ronald:
+   "it should always be one image of the egg... then it looks like a seed"), roe too; a smaller
+   egg for a smaller species; colours as hex; `--pale` for white eggs, `--green` for purple.
+8. **Into the game**: `build.py` writes the models and textures; `build.py --boxes DIR` prints each
+   model's box for `animals_core::bodies::BOXES`; a new look gets a row in `eggs::LOOKS`, a new
+   laying species a row in `EGGS` (`every_layer_has_its_egg`), and `entity.animals.egg_<look>`
+   in en and ru. Nests grow with the egg's width (`eggs.rs` `nest_size`).
+9. **Fantasy eggs**: take the qualities that are liked (Game of Thrones' eggs: scaled, stone-like,
+   petrified, jewel colours, a metal sheen), never a show's design or prop; offer colourings as
+   texture variants (`WYVERN`) for Ronald to pick.
+
+References (local, `~/Coding/chiacraft-archive/references/eggs/`, list in `references.md`): the
+turtle, sniffer and dragon eggs (vanilla), Alex's Mobs and Caves, Prehistoric Fauna, Naturalist
+(the good ones), Fossils and JurassiCraft (what not to do: finer than the blocks).
 
 ## Items from icons (held models)
 
@@ -557,6 +700,44 @@ shades in a short ramp, not noise; a blade brightest toward its point; lit edges
    in the 16x16 square as the sprite lies: the sword turned -45 degrees about its middle, handle
    bottom left (the points, turned +45, come out straight); a long sword's diagonal just fits.
 
+## 3D plants (planes and boxes)
+
+Ronald (2026-11-06) may move from flat crossed-quad plants to more 3D ones: "research sort of mods
+where you have like 3D plants ... include that in the modeling skill". The survey is
+`reports/3D plants in block games.md` (vanilla, 3D-crop and flower packs, Better Foliage, Hytale,
+Vintage Story, Veloren; image links in its last section). What carries over:
+
+- **Most "3D" plants are planes, not boxes.** Vanilla's spore blossom is 10 faces, the azalea 14,
+  the big dripleaf 12, pink petals up to 24; the pitcher plant, torchflower and berry bush are
+  plain crosses with depth painted in. Hash crosses (4-6 planes, some tilted 22.5°) and layered
+  cards read 3D for 2-4x a cross's cost.
+- **Boxes earn their quads close up, on few big plants**: crop ears and stages, sugar cane and
+  bamboo, berry bushes (berries 1-2 px boxes), flower heads with real cups, mushrooms, cactus.
+  Grass as boxes is the worst value (most plants, tiniest, aliases).
+- **Free variety first**: a random offset (up to a third of a block), yaw and height from the
+  position hash breaks the grid of Xs at no quad cost (Vintage Story's `randomizeRotations`).
+- **Density**: one model pixel = two texels, the blocks' 32 a block, as every model here.
+- **No flicker**: no parallel planes closer than one texel; pull walls a hair in from the block
+  faces (Mojang uses 0.002-0.01 px).
+- **Wind by height**: our shader pack bends each quad from its own bottom, so box plants would
+  shear apart, boxes under 0.2 block stay still and untinted crops never move. Weight the bend by
+  height above the plant's base, as Vintage Story's per-vertex wind does (a shader-pack change, no
+  engine change) before any box plant ships.
+- **Cost**: a meadow at 12 chunks is about 69,000 plants, ~9 MB as crosses, ~88 MB as 40-quad box
+  plants (and the shadow pass draws them again). So: box plants only in a near ring (2-4 chunks),
+  plane models beyond (Vintage Story's `lod0Shape`/`lod2Shape`); never per-plant entities for
+  fields (keep entities for plants that act: a snapping flytrap).
+- **Order** (the report's recommendation): random offset, yaw and height plus hash crosses; the
+  wind fix; box plants for crops, cane, bushes and big flowers in the near ring; a PC bench on the
+  meadow and wheat-field spots with the shader pack on; instanced plant models only if that bench
+  says so.
+
+Build plant models with this skill's prop tools (`scripts/prop.py`: boxes and quads with `cut`),
+lit and painted like everything else, and check them in a dense field shot, not alone.
+References (local, `~/Coding/chiacraft-archive/references/plants/`, list in `references.md`):
+vanilla's spore blossom, azalea, pink petals and big dripleaf; Fresh Flowers and Plants, 3D Crops
+Revamped, Vanilla Plus Crops, Better Foliage.
+
 ## Scripts
 
 Run them with `~/.venvs/blocky/bin/python` (Homebrew's Python 3.14 with scipy added; it sees the
@@ -577,6 +758,12 @@ system numpy and Pillow). Homebrew's own `python3` has no scipy and refuses inst
   `front_flat`, `side_flat`, `top`, `back` (flat views to hold against a reference sheet).
 - `scripts/boxcheck.py spec.json` — coplanar overlapping faces (z-fighting) at rest and, with
   animations in the spec, in every keyframe (`check_posed`); exit 1 if any.
+- `scripts/linecheck.py spec.json texture.png [--shot out.png] [--all-kinds]` (or a `.geo.json`
+  and its texture; `--all [repo]` for every model in `mods/*/assets/models`) — thin lines:
+  strips under two texels of one box beside another (`line`), whole faces under a texel
+  (`thin`), texture rectangles off whole texels or with a gutter unlike their edge (`bleed`);
+  joint rims as `seam`, undersides as `under`. `lines(boxes_from_spec(spec), tex, allow=...)`
+  for build scripts. Exit 1 on any line or bleed.
 - `scripts/paint.py` — `tones`, `occlusion`, `paint_face_smooth` (default look), `EYES` (ten eye
   types: six Hytale-style, four cute) and `stamp_eyes`, `stamp`, `majority`, `pack`;
   `ramp`/`paint_face` (flat five-step look).
@@ -586,7 +773,9 @@ system numpy and Pillow). Homebrew's own `python3` has no scipy and refuses inst
   `joints(spec)`: joints whose pivot isn't inside both parts (parts that come apart);
   `pokes(spec, parts)`: corners poking out of a neighbor at an angled joint, at rest and in every
   keyframe (`python ground.py spec.json neck skull ...` prints them);
-  `gait(spec, anim, feet)`: whether a walk or run moves forward (positive per foot).
+  `gait(spec, anim, feet)`: whether a walk or run moves forward (positive per foot);
+  `feet_low(spec, anim, feet)`: the feet's lowest y in each frame; `grounded(spec, anim, feet,
+  bounds=False)`: the clip with its root's height set so its feet stand on the ground.
 - `scripts/variants.py model.glb out.json name=tex.png ...` — texture variants padded to the
   GLB's texture size, as data URLs for the viewer.
 - `scripts/layers.py` — per-texel layers for coats painted on the fly (see above).

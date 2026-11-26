@@ -9,9 +9,12 @@
 //! fall to a floor, never to death.
 
 pub mod air;
+pub mod ambience;
 pub mod balance;
 pub mod calendar;
+pub mod canopy;
 pub mod climate;
+pub mod climb;
 pub mod clothing;
 pub mod combat;
 pub mod crafts;
@@ -27,22 +30,37 @@ pub mod foliage;
 pub mod food;
 pub mod forage;
 pub mod gear;
+pub mod glide;
+pub mod grapple;
 pub mod impact;
 pub mod layers;
 pub mod levels;
+pub mod ley;
+pub mod loot;
 pub mod meals;
+pub mod mobs;
+pub mod perks;
 pub mod plants;
 pub mod preserve;
+pub mod rot;
+pub mod ruins;
 pub mod sheet;
 pub mod shelter;
+pub mod skills;
+pub mod sockets;
 pub mod soil;
 pub mod stamina;
 pub mod stats;
 pub mod stomach;
 pub mod temperature;
+pub mod waystones;
 pub mod weather_sound;
+pub mod weathering;
 pub mod web;
+pub mod web_layout;
+pub mod web_sheet;
 pub mod wild;
+pub mod wind_life;
 
 /// Ticks a second, as the game's.
 pub const TICKS: u32 = 20;

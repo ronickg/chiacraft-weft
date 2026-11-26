@@ -1,9 +1,10 @@
-//! Cubes kept loaded with no player near (`Host::force_load`): a machine's tickets, each a box
-//! of cubes kept for so many ticks more unless renewed, as machines only or all of it. Saved
+//! Cubes kept loaded with no player near (`Host::force_load`): a mod's tickets, each a box
+//! of cubes kept for so many ticks more unless renewed, as block entities only or all of it. Saved
 //! with the world, so a factory goes on after a restart.
 
 use glam::IVec3;
 use rustc_hash::{FxHashMap, FxHashSet};
+use weft_abi::entry_kind as ek;
 use weft_abi::force_load as fl;
 
 use super::Server;
@@ -103,11 +104,11 @@ impl Server {
         out
     }
 
-    /// The cubes of `dim` only machines tickets keep: their mobs stand still and nothing grows.
+    /// The cubes of `dim` only block entity tickets keep: their mobs stand still and nothing grows.
     pub(super) fn idle_cubes(&self, dim: u32, near_player: impl Fn(IVec3) -> bool) -> FxHashSet<IVec3> {
         let tickets = &self.forced[dim as usize];
         let mut out = FxHashSet::default();
-        for t in tickets.values().filter(|t| t.mode == fl::MACHINES) {
+        for t in tickets.values().filter(|t| t.mode == fl::BLOCK_ENTITIES) {
             for y in t.min.y..=t.max.y {
                 for z in t.min.z..=t.max.z {
                     for x in t.min.x..=t.max.x {
@@ -140,7 +141,7 @@ impl Server {
     /// What `forced_specs` wrote.
     pub(super) fn read_forced(&mut self, c: &Content, specs: &[(String, String)]) {
         for (name, spec) in specs {
-            let Some(&d) = c.dim_names.get(name) else { continue };
+            let Some(d) = c.game.catalog.find(ek::DIMENSION, name) else { continue };
             let mut words = spec.split_whitespace();
             let Some(k) = words.next().and_then(|w| w.parse::<u64>().ok()) else { continue };
             let v: Vec<i64> = words.filter_map(|w| w.parse().ok()).collect();

@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ronald/Coding/chiacraft-weft/.claude/hooks/crew-guard.py",
+            "timeout": 10,
+            "statusMessage": "Crew guard"
+          }
+        ]
+      }
+    ]
+  }
+}

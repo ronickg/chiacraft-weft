@@ -79,6 +79,31 @@ pub fn is_friend(account: &str) -> bool {
     with(|s| s.store.friends.iter().any(|f| f.account == account)).unwrap_or(false)
 }
 
+/// Whether the player with identity `identity` (hex) is on this player's Friends list.
+pub fn is_friend_identity(identity: &str) -> bool {
+    !identity.is_empty() && with(|s| s.store.friends.iter().any(|f| f.identity == identity)).unwrap_or(false)
+}
+
+/// Friends' worlds as known now (each friend is asked again when the last answer is old): the
+/// world's key and name, and the friend's account endpoint (where a link request for it goes).
+pub fn known_worlds() -> Vec<(String, String, String)> {
+    if let Some(settings) = crate::saved_worlds::settings() {
+        ask_all(&settings);
+    }
+    list()
+        .into_iter()
+        .filter_map(|f| match worlds_of(&f.account)? {
+            Ok(a) => Some((f, a)),
+            Err(_) => None,
+        })
+        .flat_map(|(f, a)| {
+            a.worlds
+                .into_iter()
+                .map(move |w| (w.key, w.name, f.account.clone()))
+        })
+        .collect()
+}
+
 /// Adds a friend: their account endpoint, the identity that vouches for it, and where you met.
 pub fn add(account: &str, identity: &str, met: &str) {
     with(|s| {
@@ -232,22 +257,24 @@ impl Screen for Friends {
         ask_all(cx.settings);
         let friends = list();
         frame(ui, cx, "friends.title", |ui| {
+            // Panels 400 wide: a scrolled column doesn't stretch them, and the 20 beside them are
+            // its scrollbar's (as Find Worlds).
             let body = ui.container(
                 Style::default()
                     .gap(10.0)
-                    .w(400.0)
+                    .w(420.0)
                     .h(0.0)
                     .grow()
                     .min_h(60.0)
                     .scroll(),
                 |ui| {
                     if friends.is_empty() {
-                        ui.panel("panel", Style::default().pad(8.0).stretch(), |ui| {
+                        ui.panel("panel", Style::default().pad(8.0).w(400.0), |ui| {
                             label(ui, cx, "friends.none", &[], "dim");
                         });
                     }
                     for (i, f) in friends.iter().enumerate() {
-                        ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch(), |ui| {
+                        ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(400.0), |ui| {
                             ui.container(Style::row().gap(6.0).stretch(), |ui| {
                                 label(
                                     ui,

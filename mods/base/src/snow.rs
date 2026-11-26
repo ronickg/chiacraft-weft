@@ -6,7 +6,8 @@
 //! while there is less snow than it and the air is above freezing (`air::SNOW_MELT_SECS`, `air::melt_chance`: a growth step, so land away from
 //! players melts too and catches up when it loads). Far land shows the cover in the shader
 //! pack's dusting (`snow_on`). Still water freezes the same way (`air::freeze_chance`): its open top
-//! turns to ice in the cold, and ice on water thaws in the warmth. The cover is blended over the biomes round a column (`cover_at`).
+//! turns to ice in the cold, and ice on water thaws in the warmth. A pond's rim dries in its dry
+//! season on the same visits (`waterholes`). The cover is blended over the biomes round a column (`cover_at`).
 
 use vitals::air;
 use weft_sdk::*;
@@ -35,7 +36,7 @@ pub fn register(r: &mut Registry) {
         .texture("snow")
         .sound_group("snow")
         .hardness(0.1)
-        .mineable("shovel")
+        .mined_by("shovel", weft_sdk::abi::tool_tier::HAND)
         .drops_nothing()
         .no_item()
         .grows(air::SNOW_MELT_SECS, 0)
@@ -98,7 +99,7 @@ fn with_layers(n: u8) -> u32 {
 }
 
 fn tick(w: &World) {
-    if w.dimension() != crate::OVERWORLD.id() {
+    if !crate::land::overworld_land(w.dimension()) {
         return;
     }
     for player in w.players() {
@@ -134,7 +135,14 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     if state == WATER.id() {
         if w.sky_light(above) >= 15 && freezes(w, pos) {
             w.set_block(pos, LAKE_ICE.id());
+        } else {
+            // A pond's rim dries in its dry season (`waterholes`).
+            crate::waterholes::visit_water(w, pos);
         }
+        return;
+    }
+    if crate::waterholes::CRUST.is(state) {
+        crate::waterholes::visit_crust(w, pos);
         return;
     }
     if LAKE_ICE.is(state) && melts(w, pos) {

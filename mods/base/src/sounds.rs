@@ -8,6 +8,7 @@ use weft_sdk::*;
 /// where they are made.
 pub const GROUPS: [&str; 13] =
     ["stone", "wood", "gravel", "grass", "sand", "glass", "cloth", "dirt", "snow", "leaves", "ice", "mud", "metal"];
+static SHEEP: Music = Music::named("sheep");
 
 pub fn register(r: &mut Registry) {
     for g in GROUPS {
@@ -50,10 +51,8 @@ pub fn register(r: &mut Registry) {
             r.sound_group_on(b, group);
         }
     }
-    r.music(&Music::named("calm"))
-        .tracks(&["music/calm1"])
+    // Upstream's music (our calm1 track is gone with their asset clean-up).
+    r.music(&SHEEP)
+        .tracks(&["music/418DreamingSheep"])
         .when(&conditions::SURFACE);
-    r.music(&Music::named("deep"))
-        .tracks(&["music/deep1"])
-        .when(&conditions::UNDERGROUND);
 }

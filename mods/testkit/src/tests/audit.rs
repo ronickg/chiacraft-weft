@@ -54,7 +54,7 @@ pub async fn death_is_a_state(t: T) -> R {
     t.click_ui(&t.hotbar(0), 0);
     t.until("on the cursor", Duration::from_secs(2), |t| t.c().inventory_slot(0).is_empty())
         .await?;
-    t.cmd("/clear @s").await?;
+    t.cmd("/clear entity @s").await?;
     t.screen("core:death").await?;
     t.secs(5.0).await?;
     t.check_eq(t.op("health").await?, "0".to_string(), "still dead after a hunger pulse");
@@ -205,7 +205,7 @@ pub async fn shift_click_skips_grid(t: T) -> R {
     t.frames(2).await?;
     t.c().input_click(0, 0.0);
     t.secs(0.3).await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     let inv = t.op("inv me").await?;
     t.check(inv.contains("base:diamond:5"), format!("still in the inventory: '{inv}'"));
@@ -223,7 +223,10 @@ pub async fn no_block_into_mob(t: T) -> R {
         .await?;
     t.fill(add(spot, [1, 0, 0]), add(spot, [1, 2, 0]), "stone")
         .await?;
-    t.op(&format!("spawn base:pig {}", at(spot))).await?;
+    let pig = t.op(&format!("spawn base:pig {}", at(spot))).await?;
+    // Held in its nook: on CI the click came seconds after the spawn, time for the pig to walk
+    // out of the open side, and the stone then rightly went into the empty nook.
+    t.op(&format!("drive {pig} 0 0 200")).await?;
     t.op("put me 0 stone 1").await?;
     t.c().select_slot(0);
     t.secs(0.2).await?;
@@ -231,7 +234,8 @@ pub async fn no_block_into_mob(t: T) -> R {
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check_eq(t.block(spot).await?, "core:air".to_string(), "no stone in the pig");
+    let (got, pig_at) = (t.block(spot).await?, t.op(&format!("entity {pig}")).await?);
+    t.check(got == "core:air", format!("no stone in the pig: got {got:?}, pig at {pig_at}"));
     Ok(())
 }
 
@@ -296,7 +300,7 @@ pub async fn chat_down_keeps_text(t: T) -> R {
     t.c().input_key("ArrowDown", 0.0);
     t.frames(3).await?;
     t.check_eq(t.c().focused_text(), "hello".to_string(), "the text is still there");
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await
 }
 
@@ -332,7 +336,7 @@ pub async fn break_refused(t: T) -> R {
 pub async fn creative_sword_no_flicker(t: T) -> R {
     t.flat().await?;
     t.op("mode creative").await?;
-    t.op("put me 0 iron_sword 1").await?;
+    t.cmd("/gear sword wrought_iron slot=0").await?;
     t.c().select_slot(0);
     let b = add(t.feet(), [2, 0, 0]);
     t.set(b, "stone").await?;
@@ -359,7 +363,8 @@ pub async fn reach_and_mining_attributes(t: T) -> R {
     t.press("core:attack");
     t.secs(0.3).await?;
     t.check_eq(t.block(far).await?, "base:stone".to_string(), "out of reach at first");
-    t.op("attr_mod me core:block_reach reach 0 10 0").await?;
+    t.op("attr_mod me core:block_reach reach core:add 10 0")
+        .await?;
     t.secs(0.2).await?;
     t.press("core:attack");
     t.until("reached", Duration::from_secs(2), |t| t.c().block(far).is_some_and(|s| s == 0))
@@ -375,7 +380,8 @@ pub async fn reach_and_mining_attributes(t: T) -> R {
         .await?;
     t.look_at(near);
     t.frames(3).await?;
-    t.op("attr_mod me core:mining_speed haste 0 49 0").await?;
+    t.op("attr_mod me core:mining_speed haste core:add 49 0")
+        .await?;
     t.secs(0.2).await?;
     // Dirt takes 0.75 s by hand, and the server must not call this too soon.
     t.hold("core:attack", 0.3);

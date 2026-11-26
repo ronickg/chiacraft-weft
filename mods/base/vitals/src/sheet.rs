@@ -8,7 +8,7 @@ use crate::effects;
 use crate::food::{self, NUTRIENT_NAMES};
 use crate::stats::{self, Growth};
 use crate::{
-    air, calendar, climate, clothing, crafts, difficulty, forage, levels, meals, plants, preserve, shelter, soil, temperature, wild,
+    air, calendar, climate, clothing, crafts, difficulty, forage, levels, meals, plants, preserve, rot, shelter, soil, temperature, wild,
 };
 
 pub fn markdown() -> String {
@@ -21,19 +21,23 @@ pub fn markdown() -> String {
     stats_table(&mut w);
     foods(&mut w);
     cooking(&mut w);
+    rot_table(&mut w);
     clothes(&mut w);
     rooms(&mut w);
     waiting(&mut w);
     felling_table(&mut w);
     effects_table(&mut w);
+    climbing_gliding(&mut w);
     climates(&mut w);
     plant_table(&mut w);
     crop_table(&mut w);
     wild_table(&mut w);
+    canopy_table(&mut w);
     forage_table(&mut w);
     soil_table(&mut w);
     difficulties(&mut w);
     level_table(&mut w);
+    mob_table(&mut w);
     w
 }
 
@@ -130,6 +134,42 @@ fn cooking(w: &mut String) {
             .map(|p| format!("{:.0}", food::FOODS[p].keeps.0 + food::FOODS[p].keeps.1))
             .collect();
         let _ = writeln!(w, "| {} ({:.0}) | {} | {} |", f.name, f.keeps.0 + f.keeps.1, made.join(" | "), keeps.join(", "));
+    }
+    let _ = writeln!(w);
+}
+
+fn rot_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Where food keeps\n\nRot by place (`vitals::rot`): the keeps above are for a cool larder at {:.0} °C. Elsewhere food spoils {} times faster per 10 °C warmer, at most x{:.0}, and x{:.2} frozen (below {:.0} °C). Snow or ice next to a chest holds it at {:.0} °C (an ice house); underground it keeps at the year's mean; in a room at the room's air; carried, at the air the player feels. A chest's food is aged once a game hour ({} ticks), a player's every second. The world's difficulty `keep` applies on top. Days in total (fresh + stale):\n\n| air | rate | porkchop | bread | apple |\n|---|---|---|---|---|",
+        rot::REF_C,
+        rot::Q10,
+        rot::FASTEST,
+        rot::FROZEN,
+        rot::FROZEN_C,
+        rot::ICE_C,
+        rot::STORE_EVERY
+    );
+    let keeps = |n: &str| food::FOODS[food::find(n).expect("food")].keeps;
+    for (place, c) in rot::PLACES {
+        let d = |n: &str| format!("{:.1}", rot::days_at(keeps(n), c));
+        let _ = writeln!(
+            w,
+            "| {c:.0} °C, {place} | x{:.2} | {} | {} | {} |",
+            rot::rate(c),
+            d("base:porkchop"),
+            d("base:bread"),
+            d("base:apple")
+        );
+    }
+    let _ = writeln!(
+        w,
+        "\nCarcasses (for Animals' wave two): a body ages as its raw meat at its spot's air: fresh while the meat is fresh, bloated while it's stale, remains for {:.0} more life, bones for {:.0} more, then gone.\n\n| stage | meat | hide | bones |\n|---|---|---|---|",
+        rot::REMAINS_LIVES,
+        rot::BONES_LIVES
+    );
+    for (_, name, meat, hide, bones) in rot::CARCASS {
+        let _ = writeln!(w, "| {name} | x{meat:.1} | x{hide:.1} | x{bones:.1} |");
     }
     let _ = writeln!(w);
 }
@@ -271,6 +311,71 @@ fn clothes(w: &mut String) {
             c.windproof * 100.0,
             if c.keeps_dry { "yes" } else { "no" },
             c.from
+        );
+    }
+    let _ = writeln!(w);
+}
+
+fn climbing_gliding(w: &mut String) {
+    use crate::{climb, glide};
+    // The grappling hook's row follows the glider's.
+    let _ = writeln!(
+        w,
+        "## Climbing and gliding\n\nAny wall, pushing into it in the air: {} blocks a second at grip 1, {} stamina a second climbing and {:.1} hanging still (sneaking; sneaking into it climbs down). Grip: rough rock and logs {}, dressed stone and planks {}, loose ground {}, ice and glass {}. Run out and the hands let go until {} is back.\n\n| on the climber | pace | stamina |\n|---|---|---|",
+        climb::SPEED,
+        crate::stamina::CLIMB,
+        climb::cost(false, climb::FREE),
+        climb::GRIP_ROUGH,
+        climb::GRIP_SMOOTH,
+        climb::GRIP_LOOSE,
+        climb::GRIP_NONE,
+        climb::AGAIN
+    );
+    for (e, b) in climb::BURDENS {
+        let _ = writeln!(w, "| {} | x{} | x{} |", e.name(), b.pace, b.cost);
+    }
+    let _ = writeln!(
+        w,
+        "\n| glider | airspeed | sink | glide ratio | from 40 up: still air | 4 m/s behind | 4 m/s against | seconds aloft |\n|---|---|---|---|---|---|---|---|"
+    );
+    for g in glide::WINGS {
+        let wind = 4.0 * glide::WIND_SHARE;
+        let _ = writeln!(
+            w,
+            "| `{}` | {} | {} | {:.1} | {:.0} | {:.0} | {:.0} | {} |",
+            g.name,
+            g.speed,
+            g.sink,
+            g.ratio(),
+            g.range(40.0, 0.0),
+            g.range(40.0, wind),
+            g.range(40.0, -wind),
+            g.durability()
+        );
+    }
+    let _ = writeln!(
+        w,
+        "\nThe wind carries a glider at {} of the surface wind. Rising air: thermals up to {} blocks a second at 14:00 over bare ground (half over grass) in {} of {}-block cells, none in rain; wind up a slope lifts by its rise over {} blocks downwind, x{}; at most {} together.\n",
+        glide::WIND_SHARE,
+        glide::THERMAL,
+        glide::THERMAL_SHARE,
+        glide::THERMAL_CELL,
+        glide::RIDGE_LOOK,
+        glide::RIDGE_SHARE,
+        glide::LIFT_MAX
+    );
+    let _ = writeln!(w, "| grappling hook | reach | pulled in | let out | throws | stamina on the rope |\n|---|---|---|---|---|---|");
+    for h in crate::grapple::HOOKS {
+        let _ = writeln!(
+            w,
+            "| `{}` | {} | {} a second | {:.1} a second | {} | climbing's: {} a second pulling, {:.1} hanging |",
+            h.name,
+            h.reach,
+            h.reel,
+            h.reel * crate::grapple::LET_OUT_SHARE,
+            h.durability(),
+            crate::stamina::CLIMB,
+            climb::cost(false, climb::FREE)
         );
     }
     let _ = writeln!(w);
@@ -461,6 +566,35 @@ fn wild_table(w: &mut String) {
     let _ = writeln!(w);
 }
 
+fn canopy_table(w: &mut String) {
+    use crate::canopy::{self, Kind, Tier};
+    let _ = writeln!(
+        w,
+        "## Stands of trees\n\nA forest's layers (`vitals::canopy`): each wild tree's site grows under the canopy, in it or over it by its biome's shares; a simple tree's height (to its crown's top) and crown by its kind and layer, a big one a block taller and wider. A canopy tree carries a side lobe {:.0}% of the time; a round or slim crown hangs its depth down from the top, so the trunk stands clear under it (height - depth), and a cone's needles start at {:.0}% / {:.0}% / {:.0}% of its height (under / canopy / emergent). Branched trees grow x{} as tall under the canopy and x{} over it, broadleaves on at least {} / {} blocks of clear trunk in and over the canopy.\n\n| crown | layer | height | crown radius | depth | lobes |\n|---|---|---|---|---|---|",
+        canopy::CANOPY_LOBE * 100.0,
+        canopy::cone_bare(Tier::Under) * 100.0,
+        canopy::cone_bare(Tier::Canopy) * 100.0,
+        canopy::cone_bare(Tier::Emergent) * 100.0,
+        canopy::branched_height(Tier::Under),
+        canopy::branched_height(Tier::Emergent),
+        canopy::clear_trunk(Tier::Canopy),
+        canopy::clear_trunk(Tier::Emergent)
+    );
+    for kind in [Kind::Round, Kind::Cone, Kind::Slim] {
+        for tier in [Tier::Under, Tier::Canopy, Tier::Emergent] {
+            let c = canopy::crown(kind, tier);
+            let depth = if c.depth == 0 { "a spire".to_string() } else { c.depth.to_string() };
+            let _ = writeln!(w, "| {kind:?} | {tier:?} | {}-{} | {} | {depth} | {} |", c.low, c.low + c.spread - 1, c.radius, c.lobes);
+        }
+    }
+    let _ = writeln!(w, "\n| biome | under | emergent |\n|---|---|---|");
+    for s in canopy::STANDS.iter().chain([&canopy::STAND_ELSE]) {
+        let name = if s.biome.is_empty() { "elsewhere" } else { s.biome };
+        let _ = writeln!(w, "| {name} | {:.0}% | {:.0}% |", s.under * 100.0, s.emergent * 100.0);
+    }
+    let _ = writeln!(w);
+}
+
 fn forage_table(w: &mut String) {
     let _ = writeln!(
         w,
@@ -590,5 +724,43 @@ fn level_table(w: &mut String) {
     let _ = writeln!(w, "## Levels\n\n| level | XP to the next | XP from level 1 |\n|---|---|---|");
     for l in [1, 2, 5, 10, 25, 50, 75, 99, 100] {
         let _ = writeln!(w, "| {l} | {} | {} |", levels::to_next(l), levels::total_to(l));
+    }
+}
+
+fn mob_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "\n## Hostile mobs\n\nBase's night mobs on the one curve (`vitals::mobs`), like the animals: a size class from a real body's mass, a role, and the start of their home age, tweaked within x{}-x{} with a reason. Health and hit in engine points; armour cuts a hit by armour / (armour + {} x hit). Their hits are priced against {} (`vitals::mobs::MEETS`): their size's hits to down that player, times their role's hit. The last column is the hits that down the home age's reference in its armour (at least {}).\n\n| mob | kg | size | role | level | health | armour | hit | every | armoured hits | tweaks |\n|---|---|---|---|---|---|---|---|---|---|---|",
+        crate::curve::TWEAK_RANGE.0,
+        crate::curve::TWEAK_RANGE.1,
+        crate::combat::ARMOUR_K,
+        match crate::mobs::MEETS {
+            crate::mobs::Meets::Fresh => "a fresh player (base health, no armour)",
+            crate::mobs::Meets::Reference => "the age's reference player",
+        },
+        crate::mobs::ARMOURED_HITS,
+    );
+    for m in crate::mobs::MOBS {
+        let s = m.stats();
+        let tweaks: Vec<String> = m
+            .tweaks
+            .iter()
+            .map(|(st, t)| format!("{st:?} x{} ({})", t.x, t.why))
+            .collect();
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {} | {:.0} | {:.1} | {:.1} | {:.2} | {:.1} s | {:.1} | {} |",
+            m.name,
+            m.mass,
+            m.size().name(),
+            m.role.name(),
+            m.level(),
+            s.health,
+            s.armour,
+            s.hit,
+            s.interval,
+            crate::mobs::armoured_hits(m),
+            tweaks.join("; "),
+        );
     }
 }

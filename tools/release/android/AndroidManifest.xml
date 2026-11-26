@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- chiacraft for Android: a NativeActivity (no Java code) that loads libchiacraft.so
+     (crates/android). Built by tools/release/android.sh, which sets the versions. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="net.chiacraft.game">
+    <!-- Vulkan 1.3 (0x00403000): the renderer needs it (backends/vulkan). -->
+    <uses-feature android:name="android.hardware.vulkan.version" android:version="0x403000" android:required="true" />
+    <uses-feature android:glEsVersion="0x00030000" android:required="false" />
+    <!-- Multiplayer and the network key's peers (iroh), and reading the chain. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <application
+        android:label="chiacraft"
+        android:icon="@mipmap/ic_launcher"
+        android:hasCode="false"
+        android:extractNativeLibs="true"
+        android:appCategory="game"
+        android:isGame="true">
+        <!-- configChanges: every change the game takes in place. Android would otherwise destroy
+             and recreate the activity, and the engine is once per process (crates/android). -->
+        <activity
+            android:name="android.app.NativeActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="sensorLandscape"
+            android:resizeableActivity="false"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|density|screenSize|smallestScreenSize|layoutDirection|colorMode|fontWeightAdjustment|grammaticalGender"
+            android:theme="@style/Game">
+            <meta-data android:name="android.app.lib_name" android:value="chiacraft" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

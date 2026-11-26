@@ -201,6 +201,21 @@ pub fn body(s: &Species) -> Stats {
     stats(s, 0).unwrap_or(Stats { health: s.base[HEALTH], armour: 0.0, hit: s.base[DAMAGE], interval: 1.0 })
 }
 
+// ------------------------------------------------------------------ bosses
+
+/// The biome bosses (`crate::bosses`): titans whatever their mass, at their form's age.
+pub fn boss_size() -> Size {
+    crate::bosses::SIZE
+}
+
+/// A boss's form at `age` (its last past its last): its area level and numbers, derived like
+/// every creature's and tweaked within the range.
+pub fn boss(name: &str, age: Age) -> Option<(f32, Stats)> {
+    let b = crate::bosses::boss(name)?;
+    let f = b.form(age);
+    Some((b.level(f), b.stats(f)))
+}
+
 // ------------------------------------------------------------------ tames
 
 /// A tame's own bonuses together (tamed points, imprint, bond, Ark's mutations among them) add at
@@ -217,9 +232,14 @@ pub const BOND: f32 = 0.05;
 /// Its hits still go through the target's over-tier cap and rate floor (`combat::fight`), so a
 /// pack of star-age tames can't melt a titan either.
 pub fn tame(s: &Species, level: u32, saddle: Option<Age>, bonus: f32) -> Option<Stats> {
+    tame_with(s, level, saddle.map(|a| a.reference()), bonus)
+}
+
+/// The same with a saddle of item level `saddle` (`vitals::gear::saddle_level`: a fitted one's).
+pub fn tame_with(s: &Species, level: u32, saddle: Option<f32>, bonus: f32) -> Option<Stats> {
     let d = danger(s.name)?;
     let own = d.area_level(level);
-    let at = saddle.map_or(own, |a| own.max(a.reference()));
+    let at = saddle.map_or(own, |l| own.max(l));
     let times = bonus.clamp(1.0, TAME_CEILING);
     let m = mass_times(s);
     let mut st = combat::derive(size(s), d.role, at);

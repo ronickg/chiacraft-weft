@@ -1,5 +1,6 @@
 # Crafting slice 1, at a table: the book takes from the bag and from a chest by the table.
-# The player has 1 iron ingot; the sticks are only in the chest, so an iron shovel proves the
+# The player has 1 string; the sticks are only in the chest, so a bow or hand drill (the Tools
+# tab's recipes that can be made: tools themselves are built from parts since 11-05) proves the
 # chest was used. One copy, a fresh world.
 loaded
 idle
@@ -11,7 +12,7 @@ chat /tk set ~ ~1 ~-2 base:crafting_table
 chat /tk set ~2 ~ ~-2 base:chest
 until block ~2 ~ ~-2 base:chest within 10
 chat /tk insert ~2 ~ ~-2 base:stick 8
-chat /tk give base:iron_ingot 1
+chat /tk give base:string 1
 chat /tk inv me
 look 0 0
 press core:use
@@ -24,10 +25,10 @@ shot book_table_tools.png
 tap_once core:menu class:slot
 wait 1
 shot book_table_picked.png
-tap core:menu text:all (
+tap core:menu text:max (
 wait 1
 chat /tk inv me
-until chat base:iron_shovel within 5
+until chat _drill within 5
 shot book_table_after.png
 key Escape
 until screen none within 10

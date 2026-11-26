@@ -43,8 +43,7 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .texture("meteorite")
         .hardness(1.5)
-        .mineable("pickaxe")
-        .needs_tool_level(tool_tier::STONE)
+        .mined_by("pickaxe", tool_tier::STONE)
         .states(|p, s| match p.get("heat") {
             "3" => s.texture("meteorite_hot").light(9),
             "2" => s.texture("meteorite_hot").light(6),
@@ -57,7 +56,7 @@ pub fn register(r: &mut Registry) {
     // Only mined with its tool (a hand-written table needs `Harvested` to say so).
     r.loot(&METEORITE).pool(
         Pool::new()
-            .when(Cond::Harvested)
+            .when(Cond::harvested())
             .items("meteoric_iron", ev::METEORITE_DROPS.0, ev::METEORITE_DROPS.1),
     );
     r.item(&METEORIC_IRON)

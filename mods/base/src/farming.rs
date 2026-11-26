@@ -22,9 +22,9 @@ pub fn register(r: &mut Registry) {
     r.item(Item::generated("compost".into()))
         .on_use(fertilize)
         .tab(&crate::tabs::NATURAL);
-    r.shaped(&base_api::CRAFTING, "compost_bin", 1, &["# #", "# #", "###"], &[('#', "#planks")]);
+    r.shaped(&base_api::recipes::CRAFTING, "compost_bin", 1, &["# #", "# #", "###"], &[('#', "#planks")]);
     // A ripe harvest wears the farmland under it, or feeds it (beans; `vitals::crops`).
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             let name = block_name(e.state).split('[').next().unwrap_or("");
@@ -58,7 +58,7 @@ pub fn till(u: &mut ItemUse) -> bool {
         return false;
     }
     w.set_block(p, FARMLAND.id());
-    if !w.outside_survival(u.player()) {
+    if !w.outside_survival(u.entity()) {
         u.set_stack(u.stack().add_wear(1));
     }
     true
@@ -74,7 +74,7 @@ fn fertilize(u: &mut ItemUse) -> bool {
         return false;
     }
     wear(&w, p, -(levels as i32));
-    if !w.outside_survival(u.player()) {
+    if !w.outside_survival(u.entity()) {
         u.set_stack(StackData::shrink(u.stack(), 1));
     }
     true

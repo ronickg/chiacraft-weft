@@ -1,0 +1,19 @@
+# World content
+
+Biomes, dimensions, weather, sky, ores, structures and spawns are all registered the same way as blocks. This page is the map; [worldgen](../worldgen.md) and [sky](../sky.md) have the detail.
+
+- `r.biome(..)` with its climate, surface and tints (`.temperature(0.35..).surface(..).tint(&tints::GRASS, ..)`); terrain rules inherit them
+- `r.dimension(..)` (`spawn_point`, `player_spawn`, `height_cubes`, `gravity`, `day_length`, `daylight`, `fixed_time`, `sky_color`, `bare`, or `generator` + `column` to fill it in code)
+- Register a weather with `r.weather(&ACID_RAIN).darkness(0.5).gray(0.8, 0.6, 0.9).sound("mymod:weather.acid").weight(1)`. A dimension lists its local presets with `.weathers(&[&weathers::RAIN, &weathers::THUNDER, &ACID_RAIN])`. The field uses the preset's `lightning()` flag to select it for storm patches and its weight to choose among presets of the same kind. Use `w.weather_at(pos)` for a particular block and `w.set_weather(&weathers::THUNDER, ticks)` for a timed override across the dimension. `w.weather()` and the weather ID in `WEATHER_TICK` refer to the dimension's origin. A mod handling weather for several players can sample each player's position on that event. The biome still picks the precipitation.
+- `r.sky_body(&DIM, &OBJECT)`, `r.sky_stars`, `r.sky_dome`, `r.sky_clouds` for what is in its sky, the sun and the moon included; `OVERWORLD.sky(&MOON)` is one of them for `r.edit` and `r.remove`
+- `r.terrain(&DIM)` for your dimension's terrain, `r.edit(OVERWORLD.terrain())` for another mod's
+- `r.ore(block)`, in every dimension whose stone it replaces (`.dimension(..)` limits it). `.replaces_with("#granite", &GRANITE_IRON_ORE)` makes the same vein go on as another block where it meets granite, so veins don't stop at stone borders; `.exposed(0.5)` leaves out half of what would touch a cave, as vanilla's gold and diamonds. `r.edit(IRON_ORE.ore())` changes another mod's ore: what you set, a `replaces` taking the place of its own and `replaces_with` added to its own (a block tagged `#stone_ore_replaceables` is in every ore's way at once)
+- `r.record(&R)` for data of your own that other mods add to and change (an API's entries): tags and components on it say what it is, `entries_with(entry_kind::RECORD, "mymod:thing")` lists them once the game is loaded, `COMP.on_record(id)` reads one
+- everything generation puts into the world is a feature: `r.ore`, `r.structure`, `r.scatter(&TREES)` for trees and the like, `r.decoration(f)` for plants (named `<mod>:decoration`, `/2`..) are presets of `r.feature(&F)`, which takes any spread (`per_cube`, `spacing`), shape (`vein`, `template`, `plan` for a layout of your own) and order (`stage`, `after`, `before`). Those on a grid give way to higher `priority` ones
+- `r.template(&T)` (layers and keys, or `fill` boxes, `@slot` keys, `.loot`, `.entity`, `.joint`) or a file `structures/<name>.json` for a shape of blocks, then `r.structure(&T)` (`T.structure()` to edit it, `.turns_and_mirrors()`, `.palette(&P)` after `r.palette(&P).slot("wall", "base:bricks")`), `.body(&T)` on an entity, `p.grow(..)` in a plan to join pieces by their joints, or `w.place_template(&T, pos, transform, palette)` / `w.place_feature(&F, pos)` now (`w.unplace(id)` takes it back). `/structure save|load|undo|locate` in the game
+- `r.natural_spawn(&ENTITY).biome("#animals").light(7, 15)`, named `<mod>:<entity>`, `/2`..
+
+The terrain has presets like hills, canyons, dunes, caves, lava lakes if you don't want to write noise by hand.\
+Mars in testmod is built from presets only.\
+Your own shapes are formulas (`Expr`) the GPU runs as fast as the presets, and `.field(..)` gives biome rules any value you make, not just temperature and humidity.\
+It works on other mods' dimensions too, so adding a biome to base's overworld is a `r.edit(OVERWORLD.terrain()).rule_before("base:desert", ..)` away.

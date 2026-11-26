@@ -7,7 +7,7 @@
 #   tools/release/cross-windows.sh [label]
 #
 # Same as CI: the dist profile, no debug info, then tools/release/package.sh, which packs with
-# tools/release/cross-pack.py (a Windows weft.exe can't run here to do `--dist`). The archive
+# tools/release/cross-pack.py (a Windows weft.exe can't run here to do `weft dist`). The archive
 # lands in $OUT_DIR (default dist/). Niced and 4 jobs, so the machine stays usable.
 set -euo pipefail
 

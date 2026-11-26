@@ -76,7 +76,7 @@ fn chop(logs: usize, tool: &ItemStack) -> vitals::felling::Felling {
 pub fn register(r: &mut Registry) {
     // Mining starts (and ends): a tree's foot is slow, a cut in its trunk with an axe as slow for
     // what stands on it, a felled piece with an axe too, anything else as it is.
-    r.intercept(&actions::BREAK_BLOCK, |q| {
+    r.before_event(&actions::BREAK_BLOCK, |q| {
         let player = q.entity();
         let pos = q.pos().to_array();
         if player == 0 || felling_now(pos) {
@@ -116,14 +116,7 @@ pub fn register(r: &mut Registry) {
                 // Till taken off, or an hour and a bit at most (a player who walked away).
                 Some(s) => {
                     let secs = vitals::felling::LONGEST_SECS as u64 + 60;
-                    w.attribute_add_modifier(
-                        player,
-                        &attribute::MINING_SPEED,
-                        CHOPPING,
-                        attr_op::MULTIPLY_TOTAL,
-                        s as f64 - 1.0,
-                        secs * 20,
-                    );
+                    w.attribute_add_modifier(player, CHOPPING, &Modifier::mul(&attribute::MINING_SPEED, 1.0 + s as f64 - 1.0), secs * 20);
                     slowed.insert(player);
                 }
                 None => {
@@ -134,7 +127,7 @@ pub fn register(r: &mut Registry) {
             false
         });
     });
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             let pos = e.pos.to_array();

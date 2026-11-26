@@ -29,5 +29,9 @@ fn bloom_glow(p: PostPixel) -> vec3<f32> {
 }
 
 fn low(p: PostPixel) -> vec4<f32> {
+    // Not needed with the HDR world's bloom pyramid (`scene.frame.y`): `apply` reads none then.
+    if scene.frame.y > 0.5 {
+        return vec4(0.0);
+    }
     return vec4(bloom_glow(p), 1.0);
 }

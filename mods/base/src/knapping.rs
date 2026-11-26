@@ -28,7 +28,7 @@ static CLOSE: Channel<u32> = Channel::named("knap_close");
 /// Client to server: a square struck (0-24), or a head picked (`PICK` + its index).
 static HIT: Channel<u32> = Channel::named("knap_hit");
 const PICK: u32 = 100;
-pub static SCREEN: Screen = Screen::named("knapping");
+pub static SCREEN: Menu = Menu::named("knapping");
 
 static STRIKE: Sound = Sound::named("block.stone.hit");
 static CRACK: Sound = Sound::named("block.stone.break");
@@ -53,7 +53,7 @@ pub fn register(r: &mut Registry) {
     r.packet(&HIT, |p, v| hit(&p.world(), p.player(), v));
     r.client_packet(&OPEN, |c, v| {
         *VIEW.lock().unwrap() = Some(v);
-        let opened = c.screen_open(&SCREEN);
+        let opened = c.menu_open(&SCREEN);
         weft_sdk::info!("knapping: screen opened {opened}");
     });
     r.client_packet(&UPDATE, |c, v| {
@@ -71,7 +71,7 @@ pub fn register(r: &mut Registry) {
             *CLOSE_AT.lock().unwrap() = Some(std::time::Instant::now() + END_SHOWN);
         } else {
             *VIEW.lock().unwrap() = None;
-            c.screen_close();
+            c.menu_close();
         }
     });
     r.client_frame(|c| {
@@ -79,7 +79,7 @@ pub fn register(r: &mut Registry) {
         if at.is_some_and(|t| std::time::Instant::now() >= t) {
             *at = None;
             *VIEW.lock().unwrap() = None;
-            c.screen_close();
+            c.menu_close();
         }
     });
     // A nodule at the feet and its screen, without striking (for checks and looks; UI redo).
@@ -119,7 +119,7 @@ pub fn register(r: &mut Registry) {
         }
     })
     .permission(permission::GAME_MASTER);
-    r.screen(&SCREEN, screen);
+    r.menu(&SCREEN).screen(screen);
 }
 
 /// `player` starts (or goes on with) knapping the nodule at `pos`.
@@ -180,9 +180,9 @@ fn hit(w: &World, player: u64, v: u32) {
     w.play_sound(&STRIKE, at, 1.0);
     if k.removed & head.away() == head.away() {
         w.set_block(pos, 0);
-        let left = w
-            .inventory(player)
-            .insert(knapped_head(w, player, head.shape, true, Some(unit(w))));
+        let made = knapped_head(w, player, head.shape, true, Some(unit(w)));
+        crate::skills::made(w, player, &made, 1);
+        let left = w.inventory(player).insert(made);
         if !left.is_empty() {
             w.spawn_item(at, left);
         }
@@ -230,7 +230,7 @@ fn screen(ui: &mut Ui) {
     let Some(k) = view() else { return };
     let head = &KNAPPED[k.shape as usize % KNAPPED.len()];
     let ended = k.broken != 0 || k.done != 0;
-    crate::window::window_titled(ui, S::column().pad(7.0).gap(5.0), "knapping.base.title", &[], |ui| {
+    crate::window::window_titled(ui, S::column().pad(crate::window::WINDOW_PAD).gap(5.0), "knapping.base.title", &[], |ui| {
         ui.row(S::row().gap(1.0).self_align(abi::ui_align::CENTER), |ui| {
             for (i, h) in KNAPPED.iter().enumerate() {
                 let picked = i as u32 == k.shape;

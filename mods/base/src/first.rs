@@ -52,7 +52,7 @@ pub fn register(r: &mut Registry) {
     r.loot(&LOOSE_FLINT).pool(Pool::new().item("flint"));
     r.loot(&FALLEN_BRANCH).pool(Pool::new().item("stick")).pool(
         Pool::new()
-            .when(Cond::Chance(f::BRANCH_SECOND_STICK))
+            .when(Cond::chance(f::BRANCH_SECOND_STICK))
             .item("stick"),
     );
 
@@ -89,7 +89,7 @@ pub fn register(r: &mut Registry) {
         r.shapeless(&crate::recipes::CRAFTING, kind, 1, &inputs, 0);
     }
 
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             if e.player == 0 || w.outside_survival(e.player) {
@@ -166,7 +166,7 @@ fn strike(u: &mut ItemUse) -> bool {
     };
     let state = w.block(p);
     let flint = LOOSE_FLINT.is(state);
-    let player = u.player();
+    let player = u.entity();
     let at = p.center().offset(0.0, -0.3, 0.0);
     // Sneaking: crouched (the held keys aren't on the server any more).
     let sneaking = w
@@ -215,7 +215,7 @@ fn put_down(u: &mut ItemUse, p: BlockPos, face: u32) -> bool {
     let s = u.stack();
     let block = if s.item == FLINT.id() { LOOSE_FLINT.id() } else { LOOSE_ROCK.id() };
     w.set_block(at, block);
-    if !w.outside_survival(u.player()) {
+    if !w.outside_survival(u.entity()) {
         u.set_stack(StackData::shrink(s, 1));
     }
     true
@@ -246,7 +246,7 @@ fn knapped_of(item: u32) -> Option<&'static f::Knapped> {
 
 /// Whether the book keeps `r` out of sight for a player who has held `touched`: a knapped head
 /// from memory before a head of its shape has been made (held) by hand.
-pub fn locked(r: &Recipe, touched: &[u32]) -> bool {
+pub fn locked(r: &RecipeView, touched: &[u32]) -> bool {
     r.kind() == crate::recipes::CRAFTING.name()
         && r.outputs()
             .first()
@@ -254,7 +254,7 @@ pub fn locked(r: &Recipe, touched: &[u32]) -> bool {
 }
 
 /// The same on the server, before the book takes anything.
-pub fn locked_for(w: &World, player: u64, r: &Recipe) -> bool {
+pub fn locked_for(w: &World, player: u64, r: &RecipeView) -> bool {
     r.kind() == crate::recipes::CRAFTING.name()
         && r.outputs()
             .first()

@@ -38,7 +38,10 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// time-of-day rate per dimension (`ToClient::Time`). 13: a moving structure leans
 /// (`ToClient::BodyLean`; chiacraft, falling trees). 14: Weft's 26.11.2 messages merged in (structs
 /// for positions, weather by id, cell parts, riding, camera modes; chiacraft's upstream sync).
-pub const PROTOCOL: u32 = 14;
+/// 25: Weft's protocol 24 merged in at the 11-22 sync (its clock, weather field, sites, skins,
+/// bodies; peers must agree on deterministic terrain and weather as well as the wire format),
+/// with ours on top (`ToClient::Clock`'s day rate, `ShapeField::scale`).
+pub const PROTOCOL: u32 = 25;
 pub const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its
@@ -178,9 +181,8 @@ fn mod_list() -> String {
         .join(", ")
 }
 
-fn relay_mode(settings: &Settings) -> RelayMode {
-    let custom: Vec<RelayUrl> = settings
-        .relays()
+fn relay_mode() -> RelayMode {
+    let custom: Vec<RelayUrl> = crate::settings::relays()
         .iter()
         .filter_map(|r| r.parse().ok())
         .collect();
@@ -200,10 +202,10 @@ enum Who {
 /// neither is needed alone; a hosted world publishes to both (its relay only, never its IPs).
 async fn endpoint(settings: &Settings, who: Who) -> Result<Endpoint, String> {
     use iroh_mainline_address_lookup::DhtAddressLookup;
-    let mut b = Endpoint::builder(presets::N0).relay_mode(relay_mode(settings));
+    let mut b = Endpoint::builder(presets::N0).relay_mode(relay_mode());
     // The relay-only test (`core:net_relay_only`): no IP transport at all, so nothing goes direct
     // and nothing direct is published; every path is the relay.
-    if settings.net_relay_only() {
+    if crate::settings::net_relay_only() {
         log::info!("net: relay only (core:net_relay_only): no direct paths");
         b = b.clear_ip_transports();
     }

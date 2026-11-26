@@ -23,7 +23,7 @@ async fn wait_text(t: &T, text: &str) -> R {
 
 pub async fn account(t: T) -> R {
     t.screen("core:title").await?;
-    t.check(t.c().screen_open(&screens::PROFILE), "cannot open the profile");
+    t.check(t.c().menu_open(&screens::PROFILE), "cannot open the profile");
     t.screen("core:profile").await?;
     t.frames(2).await?;
     t.shot("profile").await?;
@@ -77,7 +77,7 @@ pub async fn account(t: T) -> R {
     t.check(!shown(&t, "Restored account"), "nonsense words restore nothing");
 
     // A fresh screen has an empty field.
-    t.c().screen_close();
+    t.c().menu_close();
     t.screen("core:profile").await?;
     t.click_until_screen("text:Account and Words", "core:account")
         .await?;
@@ -90,9 +90,9 @@ pub async fn account(t: T) -> R {
     wait_text(&t, "Restored account").await?;
     t.shot("restored").await?;
 
-    t.c().screen_close();
+    t.c().menu_close();
     t.screen("core:profile").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.screen("core:title").await?;
     Ok(())
 }

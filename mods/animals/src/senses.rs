@@ -76,6 +76,9 @@ value! {
         /// Wild ones of its kind within `KIN` (itself among them), and their middle.
         pub kin: u16,
         pub kin_mid: [f32; 3],
+        /// Its herd's or pack's leader among those kin: the lowest id, itself if it is lowest
+        /// (`animals_core::groups`, `group.rs`).
+        pub leader: u64,
         /// A hungry hunter's nearest prey it can take with its kin near (0: none), and its mass.
         pub prey: u64,
         pub prey_kg: f32,
@@ -89,6 +92,9 @@ value! {
         pub heading: f32,
         pub wind: f32,
         pub sight_at: u64,
+        /// When its stare at the player it half noticed began (0: not staring;
+        /// `perception::STARE_SECS`).
+        pub stared: u64,
     }
 }
 
@@ -138,20 +144,33 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&FACTS, Facts::default(), 0);
     r.entity_component(&SENSES, Senses::default(), 0);
     for s in &SPECIES {
-        r.attach(s.kind, &FACTS);
-        r.attach(s.kind, &SENSES);
+        r.edit(s.kind).attach(&FACTS);
+        r.edit(s.kind).attach(&SENSES);
     }
     // What animals hear besides footsteps: a block broken, a fight.
-    r.on(&actions::BREAK_BLOCK, |b| {
+    r.on_event(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
+            // By a player only: a plant broken off by the engine as one grazes beside it (a
+            // double plant's other half, one left on bare dirt) says `player: 0`, and the grazer
+            // heard its own meal and bolted (ai1124_graze9: 9 of 13 alarm calls within 1.5 s of
+            // the caller starting to graze; one ran into a pit two blocks deep and starved).
+            if c.player == 0 {
+                continue;
+            }
             let p = c.pos;
             noise(&w, [p.x as f64 + 0.5, p.y as f64 + 0.5, p.z as f64 + 0.5], perception::BREAK_HEARD, c.player);
         }
     });
-    r.on(&actions::HURT, |b| {
+    r.on_event(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
+            // Its own body's hurts (starving, thirst, the cold, the heat: `comfort::bodily`) are
+            // no fight: a parched deer's every tick of thirst set it and its kin running and
+            // calling the alarm (ai1124_savanna10: 241 alarms, none with a hunter or a player).
+            if crate::comfort::bodily(h.cause) {
+                continue;
+            }
             if let Some(e) = w.entity(h.entity) {
                 noise(&w, e.pos.to_array(), perception::FIGHT_HEARD, h.source);
             }
@@ -245,7 +264,7 @@ pub fn sense(w: &World, id: u64, st: &EntityState, watch: impl Fn(f32) -> f64) -
     s
 }
 
-/// Whether a hungry hunter `s` wants prey now (`hunt::hunt` hunts under `needs::HUNGRY` and keeps
+/// Whether a hungry hunter `s` wants prey now (`hunt::hunt` hunts under `needs::HUNTS_AT` and keeps
 /// on to `needs::FULL`).
 fn hunting(w: &World, id: u64, s: &Species, tamed: bool) -> bool {
     !tamed
@@ -282,7 +301,7 @@ pub fn clear(w: &World, from: Vec3, to: Vec3) -> bool {
     let mut t = 0.0;
     for _ in 0..4 {
         let at = from + dir * t;
-        let Some(hit) = w.raycast(at, dir, d - t, false) else { return true };
+        let Some(hit) = w.raycast(at, dir, d - t, Ray::blocks()) else { return true };
         if block_info(hit.state).is_some_and(|b| b.opaque()) {
             return false;
         }
@@ -363,6 +382,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
     // A skittish one notices sooner, a calm one later.
     let eyes = eyes * (1.0 + roles::SKITTISH * roles::lean(me.persona()[0]));
     let (mut kin, mut mid) = (1u16, [p.x, p.y, p.z]);
+    let mut leader = id;
     let mut prey: Vec<(u64, f32, f64)> = Vec::new();
     // The hunters it senses, best first after the loop.
     let mut hunters: Vec<(Sensed, u64, Vec3, Vec3)> = Vec::new();
@@ -389,6 +409,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         if kin_too && d2 <= kin_r * kin_r {
             kin += 1;
             mid = [mid[0] + e.pos.x, mid[1] + e.pos.y, mid[2] + e.pos.z];
+            leader = animals_core::groups::leader([leader, t]);
         }
         if hunter {
             let d = d2.sqrt() as f32;
@@ -482,6 +503,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
         players(w, id, st, out, mine, facing, field, secs, player_noise, full);
     }
     out.kin = kin;
+    out.leader = leader;
     out.kin_mid = mid.map(|v| (v / kin as f64) as f32);
     // One adult of a herd at a time stands watch, the watch going round (by id and time).
     let herd = social == animals_core::biology::Social::Herd;
@@ -566,6 +588,9 @@ fn players(
         sensed = Some((Sensed { gain: g, ..Default::default() }, q, e.pos));
     }
     out.fright = aware_after(out.fright, sensed.map(|b| b.0), secs);
+    if out.fright < perception::STARE {
+        out.stared = 0;
+    }
     match sensed {
         Some((_, q, pos)) => {
             out.player = q;
@@ -577,7 +602,7 @@ fn players(
 }
 
 /// Where to run from `from`: `dist` blocks away along the way most nearly straight away from it
-/// that has ground to stand on half way and at the end (no drop of more than 3, no water), trying
+/// that has ground to stand on half way and at the end (no drop of more than `needs::FLEE_DROP`, so it can step back up; no water), trying
 /// ways turned up to 110° off; straight away when none has.
 pub fn escape(w: &World, st: &EntityState, from: [f64; 3], dist: f64, herd: Option<[f64; 3]>) -> [f64; 3] {
     let (mut x, mut z) = (st.pos.x - from[0], st.pos.z - from[2]);
@@ -602,7 +627,7 @@ pub fn escape(w: &World, st: &EntityState, from: [f64; 3], dist: f64, herd: Opti
             let (px, pz) = (st.pos.x + a.cos() * step, st.pos.z + a.sin() * step);
             let (bx, bz) = (px.floor() as i32, pz.floor() as i32);
             match crate::comfort::ground(w, bx, y, bz) {
-                Some(g) if y - g <= 3 && !crate::comfort::WATER.at(w, [bx, g, bz]) => {
+                Some(g) if y - g <= animals_core::needs::FLEE_DROP && !crate::comfort::WATER.at(w, [bx, g, bz]) => {
                     y = g;
                     at = Some([px, g as f64, pz]);
                 }
@@ -619,16 +644,33 @@ pub fn escape(w: &World, st: &EntityState, from: [f64; 3], dist: f64, herd: Opti
     straight
 }
 
-/// It has half noticed something at `at`: it stops and turns to look that way (what the player
-/// sees before it bolts).
+/// It has half noticed something at `at`: it stops and turns to look that way, staring (what the
+/// player sees before it bolts).
 pub fn stare(w: &World, id: u64, st: &EntityState, at: [f32; 3]) {
+    face(w, id, st, at);
+    crate::anim::hold(w, id, crate::anim::Act::Stare);
+}
+
+/// Whether it still stares at the player it half noticed: from when its awareness rose past
+/// `perception::STARE`, for `perception::STARE_SECS`.
+pub fn staring(w: &World, id: u64) -> bool {
+    let now = w.game_time();
+    let Some(s) = w.component_mut(id, &SENSES) else { return false };
+    if s.stared == 0 {
+        s.stared = now.max(1);
+    }
+    now.saturating_sub(s.stared) < (perception::STARE_SECS * 20.0) as u64
+}
+
+/// It stops and turns to face `at`.
+pub fn face(w: &World, id: u64, st: &EntityState, at: [f32; 3]) {
     if w.navigating(id) {
         w.navigate(id, st.pos, 0.0);
     }
     let (x, z) = (at[0] as f64 - st.pos.x, at[2] as f64 - st.pos.z);
     if x * x + z * z > 0.01 {
         // `yaw_dir`'s inverse: facing (x, z) is (-sin yaw, -cos yaw).
-        w.entity_edit(id).yaw((-x).atan2(-z) as f32);
+        w.entity_modify(id).yaw((-x).atan2(-z) as f32);
     }
 }
 
@@ -701,8 +743,9 @@ pub fn watch_goal(w: &World, id: u64, st: &EntityState) -> bool {
     }
     if (w.game_time() + id).is_multiple_of(40) {
         let turn = (w.random_below(240) as f32 - 120.0).to_radians();
-        w.entity_edit(id).yaw(st.yaw + turn);
+        w.entity_modify(id).yaw(st.yaw + turn);
     }
+    crate::anim::hold(w, id, crate::anim::Act::Watch);
     true
 }
 
@@ -755,6 +798,8 @@ pub fn investigate(w: &World, id: u64, st: &EntityState) -> bool {
         }
         let k = ((d - to) / d) as f64;
         w.navigate(id, [st.pos.x + (e.pos.x - st.pos.x) * k, e.pos.y, st.pos.z + (e.pos.z - st.pos.z) * k], 0.6);
+        // Slowly, the head low (held till its next look, in 20 ticks).
+        crate::anim::hold(w, id, crate::anim::Act::Approach);
     } else {
         stare(w, id, st, [e.pos.x as f32, e.pos.y as f32, e.pos.z as f32]);
     }

@@ -40,21 +40,20 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .texture("star_steel_ore")
         .hardness(5.0)
-        .mineable("pickaxe")
-        .needs_tool_level(tool_tier::IRON)
+        .mined_by("pickaxe", tool_tier::IRON)
         .states(|p, s| if p.is("heart", "1") { s.light_rgb(5, 6, 8) } else { s })
         .tag("star_ores")
         .tab(&crate::tabs::NATURAL);
     r.loot(&STAR_STEEL_ORE)
         .pool(
             Pool::new()
-                .when(Cond::Harvested)
+                .when(Cond::harvested())
                 .items("star_steel_lump", ev::STAR_STEEL_PER_BLOCK.0, ev::STAR_STEEL_PER_BLOCK.1),
         )
         .pool(
             Pool::new()
-                .when(Cond::Harvested)
-                .when(Cond::BlockState("heart=1"))
+                .when(Cond::harvested())
+                .when(Cond::state("heart=1"))
                 .item("starheart"),
         );
     crate::first::loose(
@@ -71,8 +70,7 @@ pub fn register(r: &mut Registry) {
         .sound_group("stone")
         .texture("pallasite")
         .hardness(4.0)
-        .mineable("pickaxe")
-        .needs_tool_level(tool_tier::STONE)
+        .mined_by("pickaxe", tool_tier::STONE)
         .tag("decor")
         .tab(&crate::tabs::BUILDING);
     r.shapeless(&crate::recipes::CRAFTING, "peridot", ev::PERIDOT_PER_PALLASITE, &["pallasite"], 0);
@@ -84,7 +82,7 @@ pub fn register(r: &mut Registry) {
         .not_solid()
         .cutout()
         .hardness(1.0)
-        .mineable("pickaxe")
+        .mined_by("pickaxe", weft_sdk::abi::tool_tier::HAND)
         .light_rgb(10, 12, 15)
         .tag("lights")
         .tab(&crate::tabs::FUNCTIONAL);

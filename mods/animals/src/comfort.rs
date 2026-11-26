@@ -19,6 +19,14 @@ use crate::species::{self, SPECIES};
 static FREEZE: DamageCause = DamageCause::named("base:freeze");
 static HEAT: DamageCause = DamageCause::named("base:heat");
 
+/// Whether damage of `cause` comes from its own body (starving, thirst, the cold, the heat), not
+/// from anything round it: it doesn't make it run (`taming::hurt`) or fear the place
+/// (`memory`). A parched deer hurt by its thirst at the pool's edge fled from it again and again
+/// and marked the pool as feared, and died 130 blocks off (ai1124_savanna6).
+pub fn bodily(cause: u32) -> bool {
+    cause == damage_cause::STARVE || cause == crate::drink::THIRST.id() || cause == FREEZE.id() || cause == HEAT.id()
+}
+
 value! {
     #[derive(Default)]
     /// How its body is (once a second), sent to whoever has its screen open.
@@ -65,8 +73,8 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&BODY, Body::default(), component_flags::SAVE | component_flags::SYNC_MENU);
     r.entity_component(&SEEK, [0.0; 4], 0);
     for s in &SPECIES {
-        r.attach(s.kind, &BODY);
-        r.attach(s.kind, &SEEK);
+        r.edit(s.kind).attach(&BODY);
+        r.edit(s.kind).attach(&SEEK);
     }
 }
 
@@ -134,7 +142,7 @@ pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState, secs: f32) -> f3
         let loss = (e.modifiers().health_loss * max * d.harm * secs).min((st.health - max * TAME_FLOOR).max(0.0));
         if loss > 0.0 {
             let cause = if e == Effect::Freezing { &FREEZE } else { &HEAT };
-            w.damage(id, loss, 0, cause);
+            w.damage(id, Damage::new(loss, cause));
         }
     }
     d.digest

@@ -74,10 +74,16 @@ fn reflect_swell(p: vec2<f32>, t: f32, dist: f32, glance: f32) -> vec3<f32> {
     return normalize(vec3(-gx * k, 1.0, -gz * k));
 }
 
-// How much of what it shows water mirrors at the angle it is seen at (the pack's `water` uses the
-// same): a near mirror at an ordinary look across it, as in the reference pictures.
+// How much of what it shows water mirrors at the angle it is seen at (the pack's `water_fresnel`,
+// the same): a fourth power from 0.04, muted navy water as Bliss's in its own world (Far view,
+// 11-06; it was a near mirror at an ordinary look, ^2 from 0.08).
+// With base's `look_water_mirror` (option 44, read raw: 0 as made) Bliss's, a fifth power from 0.02.
 fn reflect_fresnel(ndv: f32) -> f32 {
-    return 0.08 + 0.92 * pow(1.0 - clamp(ndv, 0.0, 1.0), 2.0);
+    let c = 1.0 - clamp(ndv, 0.0, 1.0);
+    return mix(0.04 + 0.96 * pow(c, 4.0), 0.02 + 0.98 * pow(c, 5.0), reflect_bliss());
+}
+fn reflect_bliss() -> f32 {
+    return clamp(scene.options[11][0], 0.0, 1.0);
 }
 
 // Where `rel` (camera relative) lands on the screen, and its depth there.
@@ -108,9 +114,18 @@ fn reflect_reach(pos: vec3<f32>) -> f32 {
 // What the water mirrors at this pixel, premultiplied by how much (rgb), and how much (a): 0 where
 // it mirrors nothing. Premultiplied, a shore's half-size texels average to less mirror, not to black.
 fn reflect_result(p: PostPixel) -> vec4<f32> {
+    // Traced reflections (`core:rt_reflections`): the world's pass mirrored it already.
+    if scene.rt.w > 0.5 {
+        return vec4(0.0);
+    }
     let water = p.color.a;
-    // Not water, the eye in a liquid, or nothing drawn.
-    if water < 0.02 || abs(scene.params.x - 0.6 * scene.params.y) > 0.5 {
+    // A smooth solid (a polished floor, a metal, a glazed tile: chiacraft's pack, `mirror_alpha`)
+    // writes minus how much it mirrors, its Fresnel already in: traced as a flat mirror facing any
+    // way, without the water's swell.
+    let mirror = max(-water, 0.0);
+    let solid = mirror >= 0.02;
+    // Not water or a mirror, the eye in a liquid, or nothing drawn.
+    if (water < 0.02 && !solid) || abs(scene.params.x - 0.6 * scene.params.y) > 0.5 {
         return vec4(0.0);
     }
     if post_depth(p, p.uv) <= 0.0 {
@@ -125,21 +140,23 @@ fn reflect_result(p: PostPixel) -> vec4<f32> {
     if dot(n, pos) > 0.0 {
         n = -n;
     }
-    if n.y < 0.9 || pos.y > -0.3 {
+    if !solid && (n.y < 0.9 || pos.y > -0.3) {
         return vec4(0.0);
     }
     let v = normalize(pos);
-    n = reflect_swell(pos.xz + scene.eye.xz, scene.params.w, length(pos), -v.y);
+    if !solid {
+        n = reflect_swell(pos.xz + scene.eye.xz, scene.params.w, length(pos), -v.y);
+    }
     var r = reflect(v, n);
     // A swell tilted so far that the ray would go down: mirror as if it were flat.
-    if r.y <= 0.0 {
+    if r.y <= 0.0 && !solid {
         n = vec3(0.0, 1.0, 0.0);
         r = reflect(v, n);
     }
-    let fresnel = reflect_fresnel(dot(-v, n));
+    let fresnel = select(reflect_fresnel(dot(-v, n)), 1.0, solid);
     // Strength under 0.75 (the Low setting): as strong, in 16 longer steps that reach as far.
     let cheap = p.strength < 0.75;
-    let mask = smoothstep(0.02, 0.3, water) * select(min(p.strength, 1.0), 1.0, cheap) * reflect_reach(pos);
+    let mask = select(smoothstep(0.02, 0.3, water), mirror, solid) * select(min(p.strength, 1.0), 1.0, cheap) * reflect_reach(pos);
     if mask <= 0.0 {
         return vec4(0.0);
     }
@@ -212,7 +229,8 @@ fn reflect_result(p: PostPixel) -> vec4<f32> {
     // Blurred more the farther the ray went before it hit (a reflection in rippled water softens
     // with distance): the hit and four samples about it. One sharp sample turned dark tree crowns
     // over a bright sky into a hard black-and-white mosaic looking down at a lake (Tester 2).
-    let spread = clamp(travelled * 0.0006, 0.002, 0.014) * vec2(p.size.y / p.size.x, 1.0);
+    // A polished solid blurs less than rippled water.
+    let spread = select(clamp(travelled * 0.0006, 0.002, 0.014), clamp(travelled * 0.0003, 0.001, 0.006), solid) * vec2(p.size.y / p.size.x, 1.0);
     var mirrored = textureSampleLevel(textures[p.scene], linear_clamp, hit, 0.0).rgb * 2.0;
     mirrored += textureSampleLevel(textures[p.scene], linear_clamp, clamp(hit + vec2(spread.x, 0.0), vec2(0.0), vec2(1.0)), 0.0).rgb;
     mirrored += textureSampleLevel(textures[p.scene], linear_clamp, clamp(hit - vec2(spread.x, 0.0), vec2(0.0), vec2(1.0)), 0.0).rgb;
@@ -229,7 +247,7 @@ fn reflect_result(p: PostPixel) -> vec4<f32> {
     // than the Fresnel share: the water's own body under it is dark, so what it mirrors carries.
     // That extra fades looking steeply down, where the water shows its body more than what it mirrors.
     let steep = smoothstep(0.5, 0.9, dot(-v, n));
-    let amount = clamp(fresnel + 0.15 * (1.0 - steep), 0.0, 0.97) * mask * edge * near;
+    let amount = clamp(fresnel + select(0.15 * (1.0 - steep) * (1.0 - reflect_bliss()), 0.0, solid), 0.0, 0.97) * mask * edge * near;
     return vec4(mirrored * amount, amount);
 }
 

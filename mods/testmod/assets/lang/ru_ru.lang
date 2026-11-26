@@ -13,6 +13,11 @@ block.testmod.generator = Генератор
 block.testmod.electric_furnace = Электропечь
 block.testmod.battery = Аккумулятор
 block.testmod.pedestal = Пьедестал
+block.testmod.big = Большой блок
+item.testmod.edited = Изменённый предмет
+item.testmod.scoped_blaster = Бластер с прицелом
+entity.testmod.fast_arrow = Быстрая стрела
+entity.testmod.sentry = Часовой
 block.testmod.cable = Кабель
 testmod.energy = {color:key}{0}{/} / {1} ЭЕ
 block.testmod.regolith = Реголит
@@ -83,3 +88,13 @@ block.testmod.dynamite = Динамит
 config.testmod.dynamite_radius = Радиус воронки динамита
 config.testmod.dynamite_radius.tooltip = Сколько блоков вокруг выносит динамит. Сотни можно: движок копает воронку за один раз.
 entity.testmod.steed = Скакун
+item.testmod.ruby = Рубин
+item.testmod.wand = Слоёный жезл
+block.testmod.black_wool = Чёрная шерсть
+block.testmod.mossy_stone = Заросший камень
+block.testmod.red_glass = Красное стекло
+item.testmod.hammer = Молот
+
+command.testmod.display_calls = {0}: {1}
+
+command.testmod.eclipse = Источник окружения обновлён

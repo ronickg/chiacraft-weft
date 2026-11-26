@@ -253,6 +253,9 @@ pub fn problems() -> Vec<String> {
         (crate::crafts::Station::TanningFrame, 120.0, 240.0),
         (crate::crafts::Station::CharcoalClamp, 240.0, 360.0),
         (crate::crafts::Station::TanningPit, 3.0 * crate::DAY_SECS, 5.0 * crate::DAY_SECS),
+        // A crucible's bronze about half a minute, a forge's steel under a minute (`metals.rs`).
+        (crate::crafts::Station::Crucible, 20.0, 45.0),
+        (crate::crafts::Station::Forge, 30.0, 60.0),
     ] {
         let secs = crate::crafts::craft(station).secs();
         if !(lo..=hi).contains(&secs) {
@@ -334,7 +337,8 @@ mod tests {
             assert_eq!(crate::levels::total_to(level) + into, xp);
         }
         assert_eq!(crate::levels::level_of(20).0, 2);
-        assert_eq!(crate::levels::after_death(crate::levels::total_to(5) + 100, 0.25), crate::levels::total_to(5) + 75);
+        // 60 into level 5 (its width is 95): a quarter of it goes, the level stays.
+        assert_eq!(crate::levels::after_death(crate::levels::total_to(5) + 60, 0.25), crate::levels::total_to(5) + 45);
     }
 
     #[test]

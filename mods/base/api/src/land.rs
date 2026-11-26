@@ -3,7 +3,7 @@
 //! (`cargo run -p base_api --example land_map`) and any other mod read one source.
 //!
 //! The engine sums the features; most are its expressions (`Expr`, run on the CPU and the GPU
-//! alike), several of ours are mods' code (`Feature::custom`, on the CPU) because they need to
+//! alike), several of ours are mods' code (`Landform::custom`, on the CPU) because they need to
 //! know the land around them:
 //! - **Rivers** run where the rain gathers: a network of nodes, each draining downhill to a
 //!   neighbour (`net`), so streams meet into rivers that grow toward the sea or a lake, and end
@@ -11,7 +11,9 @@
 //!   dry gully; with more it reaches the water and widens, with a floodplain and valley sides that
 //!   climb to the land. A river's water is the sea's: its bed is under sea level, so it fills
 //!   where the sea does. To know how deep to cut it rebuilds the height of every other feature
-//!   here (`land_height`), the same integers the engine adds.
+//!   here (`land_height`), the same integers the engine adds. Over them run the long rivers
+//!   (`line_rivers`): Minecraft's way, along a noise's lines, kilometres long and 20-52 blocks
+//!   across, so the land reads as rivers winding to the sea (Ronald, 11-06: "Yes, both kinds").
 //! - **Mesas** in the hot, dry land: flat tops on two or three tiers, each a steep cliff and a
 //!   ledge, the cliffs bare (`ROCK_FALL`).
 //!
@@ -24,7 +26,7 @@
 use std::cell::Cell;
 
 use weft_sdk::noise::fixed::{self, Fields, ONE, div_floor, q4, q12, ramp, shape};
-use weft_sdk::terrain::{Expr, Feature, preset};
+use weft_sdk::terrain::{Expr, Landform, preset};
 
 use crate::SEA;
 
@@ -79,6 +81,9 @@ pub mod salt {
     pub const CANYONS: u64 = 0xCA1;
     pub const CANYON_AREA: u64 = 0xCA2;
     pub const CANYON_WARP: u64 = 0xCA3;
+    pub const OLD_GROWTH: u64 = 0x01D6;
+    pub const MC_MIX: u64 = 0x3C3F;
+    pub const RIVER_LINES: u64 = 0x3C40;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -227,6 +232,29 @@ pub const SEQUOIA_AREA: Area = Area {
         Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH * 0.5, to: RANGE_WIDTH * 0.8 },
         Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH * 3.2, to: RANGE_WIDTH * 2.2 },
         Ramp::Continent(0.15, 0.25),
+    ],
+    not: false,
+};
+
+/// Old-growth forest (Ronald, 11-05: "a biome looking similar to the one shown in bliss ... with all
+/// those trees"): a closed canopy of old oaks over rolling hills, rivers and lakes through it,
+/// Białowieża's strict reserve (`vitals::climate`). In big patches of its own noise (some
+/// `OLD_GROWTH_SIZE` blocks across, a forest seen to the horizon from a hill) over the temperate
+/// land that isn't dry (neither the taiga's cold nor the warm lands' heat), inland, where
+/// `OLD_GROWTH_AREA` is over `OLD_GROWTH_FROM` and the ground no more than `OLD_GROWTH_TOP` over the
+/// sea. It takes the forest, birch wood, swamp and plains it covers: each ramp's halfway point is
+/// the edge, so it holds where the patch noise is over 0.05, the temperature within ±0.105, the
+/// humidity over -0.04 and the continent over 0.1.
+pub const OLD_GROWTH_SIZE: f64 = 3000.0;
+pub const OLD_GROWTH_FROM: f64 = 0.5;
+pub const OLD_GROWTH_TOP: i32 = 52;
+pub const OLD_GROWTH_AREA: Area = Area {
+    all: &[
+        Ramp::Noise { salt: salt::OLD_GROWTH, scale: OLD_GROWTH_SIZE, from: 0.0, to: 0.1 },
+        Ramp::Temperature(-0.13, -0.08),
+        Ramp::Temperature(0.13, 0.08),
+        Ramp::Humidity(-0.06, -0.02),
+        Ramp::Continent(0.06, 0.14),
     ],
     not: false,
 };
@@ -555,8 +583,10 @@ pub const RIVER_REACH: i32 = 40;
 pub const RIVER_ROUTE_MOUNTAINS: f64 = 120.0;
 pub const RIVER_ROUTE_HILLS: f64 = 0.0;
 /// Where a river ends inland with at least this flow, it fills a lake, its radius from `.0` to
-/// `.1` blocks as its flow grows to `RIVER_FLOW.2`.
-pub const RIVER_SINK_FLOW: f64 = 6.0;
+/// `.1` blocks as its flow grows to `RIVER_FLOW.2`. 20 (was 6, Ronald, 11-06: "Yes, both kinds",
+/// `reports/Rivers like Bliss.md`): only a big river's end fills one; the small networks just
+/// stop, so the land reads as rivers, not as a lake every few hundred blocks.
+pub const RIVER_SINK_FLOW: f64 = 20.0;
 pub const RIVER_SINK_RADIUS: (i32, i32) = (24, 80);
 /// A node's rain, by humidity: all of it from `.1` on, falling to the driest's share `.2` at `.0`.
 pub const RIVER_RAIN: (f64, f64, f64) = (-0.25, 0.05, 0.15);
@@ -595,9 +625,11 @@ pub const RIVER_WARP_SCALE: f64 = 75.0;
 /// blocks square, kept with `LAKE_CHANCE` times its climate's share (`LAKE_WET`: the dry land a
 /// quarter of it, the wet all; `LAKE_COLD` more in the cold, as glacial country is full of lakes).
 /// Only on low land, its middle at most `LAKE_MAX_RISE` blocks over the sea, inland, and out of
-/// the mountains. Their bed is under the sea's level, so the sea's water fills them.
+/// the mountains. Their bed is under the sea's level, so the sea's water fills them. A cell in seven
+/// keeps one (`LAKE_CHANCE` 0.15, was 0.8, Ronald, 11-06: "Yes, both kinds"): four in five gave
+/// seed 1 a lake every half kilometre, 2.8% of the ground against the rivers' 1.4%.
 pub const LAKE_CELL: i32 = 420;
-pub const LAKE_CHANCE: f64 = 0.8;
+pub const LAKE_CHANCE: f64 = 0.15;
 pub const LAKE_WET: (f64, f64) = (-0.2, 0.1);
 pub const LAKE_COLD: (f64, f64) = (-0.05, -0.2);
 pub const LAKE_COLD_MORE: f64 = 0.35;
@@ -655,12 +687,14 @@ pub const SEA_SAND_DEEP: i32 = 3;
 /// The land's biome rules in the order they're tried, after the coasts and the mountains, with
 /// the bed under their water: gravel in the north and the birch woods, sand in the warm lands,
 /// mud (dirt) in the swamp.
-pub const RIVER_BEDS: [(&str, &str); 9] = [
+pub const RIVER_BEDS: [(&str, &str); 10] = [
     ("snowy_plains", "gravel"),
     ("taiga", "gravel"),
     ("desert", "sand"),
     ("savanna", "sand"),
     ("tropical_forest", "dirt"),
+    // Before the swamp: the old growth takes its low wet land too (rivers and lakes in the woods).
+    ("old_growth_forest", "sand"),
     ("swamp", "dirt"),
     ("forest", "sand"),
     ("birch_forest", "gravel"),
@@ -723,19 +757,19 @@ pub const STRATA_TILT: i32 = 3;
 
 /// The engine's features of the land, in the order they're added; `mesas` and `rivers` go after
 /// them (`land_height`, `rivers`).
-pub fn features() -> Vec<Feature> {
+pub fn features() -> Vec<Landform> {
     vec![
         preset::continents(CONTINENTS),
         preset::hills(HILLS.0 * COAST_CALM, HILLS.1).mask(HILLS_AREA.mask()),
         preset::hills(HILLS.0 * (1.0 - COAST_CALM), HILLS.1).mask(HILLS_INLAND.mask()),
-        Feature::new(Expr::blocks(COAST_CLIFF))
+        Landform::new(Expr::blocks(COAST_CLIFF))
             .mask(COAST_CLIFF_AREA.mask())
             .named("coast_cliffs"),
-        Feature::new(Expr::blocks(-OCEAN_DEEP)).mask(OCEAN_DEEP_AREA.mask()),
-        Feature::new(Expr::blocks(ISLAND_HEIGHT))
+        Landform::new(Expr::blocks(-OCEAN_DEEP)).mask(OCEAN_DEEP_AREA.mask()),
+        Landform::new(Expr::blocks(ISLAND_HEIGHT))
             .mask(ISLANDS_AREA.mask())
             .named("islands"),
-        Feature::new(Expr::blocks(HIGHLANDS))
+        Landform::new(Expr::blocks(HIGHLANDS))
             .mask(HIGHLANDS_AREA.mask())
             .named("highlands"),
         preset::dunes(DUNES.0, DUNES.1).mask(DUNES_AREA.mask()),
@@ -744,7 +778,7 @@ pub fn features() -> Vec<Feature> {
             .named("mountain_rise"),
         // Mesas, canyons, karst, reefs, lakes, rivers, craters, tarns and their streams: one
         // callback, so a column's ground under them is worked out once (`customs`).
-        Feature::custom(customs).named("land"),
+        Landform::custom(customs).named("land"),
     ]
 }
 
@@ -754,12 +788,14 @@ pub fn features() -> Vec<Feature> {
 pub const MOUNTAINS_FIELD: &str = "base:mountains";
 pub const SEQUOIA_FIELD: &str = "base:sequoia_groves";
 pub const SNOW_DRIFT_FIELD: &str = "base:snow_drift";
+pub const OLD_GROWTH_FIELD: &str = "base:old_growth";
 
 pub fn rule_fields() -> Vec<(&'static str, Expr)> {
     vec![
         (MOUNTAINS_FIELD, MOUNTAINS_AREA.mask()),
         (SEQUOIA_FIELD, SEQUOIA_AREA.mask()),
         (SNOW_DRIFT_FIELD, Expr::fbm(salt::SNOW_DRIFT, SNOW_DRIFT_SIZE, 3).ramp(-0.2, 0.2)),
+        (OLD_GROWTH_FIELD, OLD_GROWTH_AREA.mask()),
     ]
 }
 
@@ -1105,8 +1141,15 @@ pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
     rivers_on(&here, &|| land_height_at(&here))
 }
 
-/// `rivers` at `here`, the land under them (`land_height`) from `land`, asked only near a river.
+/// `rivers` at `here`, the land under them (`land_height`) from `land`, asked only near a river:
+/// the drainage streams and the long rivers along the noise's lines (`line_rivers`), the deeper
+/// cut of the two.
 fn rivers_on(here: &Here, land: &dyn Fn() -> i32) -> i32 {
+    drain_rivers_on(here, land).min(line_rivers(here, land))
+}
+
+/// The drainage rivers' cut at `here` (`net`).
+fn drain_rivers_on(here: &Here, land: &dyn Fn() -> i32) -> i32 {
     let (f, x, z) = (here.f, here.x, here.z);
     let (bx, bz) = (x >> 4, z >> 4);
     let region = net::region_at(f, bx, bz);
@@ -1164,6 +1207,102 @@ fn rivers_on(here: &Here, land: &dyn Fn() -> i32) -> i32 {
         cut = cut.min((((target - h0).min(0)) * deep) >> 12);
     }
     cut
+}
+
+/// The long rivers (Ronald, 11-06: "Yes, both kinds", `reports/Rivers like Bliss.md`; first built
+/// for the Minecraft forest test world, Planner: "wide winding rivers through forest like Bliss's
+/// scene (ours show mostly lakes)"): not where the rain gathers but along the zero lines of a noise
+/// (`RIVER_LINE_SCALE` blocks across, two octaves), as Minecraft lays its river biome, so they run
+/// on for kilometres, meet and wind, and cross the hills in valleys; the drainage streams still run
+/// into them. A column's distance to the line is the noise over its slope (measured over
+/// `RIVER_LINE_SLOPE` blocks each way: over one it came out in steps, ridges along the valleys on
+/// the first map). The channel's half width swings between `RIVER_LINE_HALF_WIDTH`'s ends by a
+/// second noise (some `RIVER_LINE_WIDTH_SIZE` blocks across), `RIVER_LINE_DEPTH` deep in the
+/// middle, a `RIVER_LINE_FLOODPLAIN` strip level with the water, then the valley's sides as the
+/// drainage rivers' (`RIVER_BANKS`, `RIVER_VALLEY_PER_BLOCK`). Faded out in the mountains
+/// (`RIVER_MOUNTAINS`) and round a waystone (`RIVER_LINE_WAYSTONE`: its plinth stays on dry land);
+/// none under the sea.
+pub const RIVER_LINE_SCALE: f64 = 1100.0;
+pub const RIVER_LINE_HALF_WIDTH: (i32, i32) = (10, 26);
+pub const RIVER_LINE_WIDTH_SIZE: f64 = 500.0;
+pub const RIVER_LINE_DEPTH: i32 = 5;
+pub const RIVER_LINE_FLOODPLAIN: i32 = 4;
+pub const RIVER_LINE_SLOPE: i32 = 8;
+/// Gone within `.0` blocks of a waystone's node, full from `.1` (the plinth's 5 x 5 and its clearing
+/// stand inside `.0`).
+pub const RIVER_LINE_WAYSTONE: (f64, f64) = (24.0, 56.0);
+
+/// A column by a long river: its distance to the line and the channel's half width there (Q4),
+/// and how much is left of the river (0 to `ONE`: the mountains and waystones fade it).
+struct LineRiver {
+    d: i32,
+    half: i32,
+    strength: i32,
+}
+
+/// The long river near `here`, if its valley could reach it (`reach`, Q4, past the floodplain).
+fn line_river(here: &Here, reach: i32) -> Option<LineRiver> {
+    let (f, x, z) = (here.f, here.x, here.z);
+    let scale = q4(RIVER_LINE_SCALE);
+    let n = f.fbm(salt::RIVER_LINES, x, z, scale, 2);
+    // Far from any line (a third of the noise's range): nothing to work out.
+    if n.abs() > q12(0.3) {
+        return None;
+    }
+    let s = RIVER_LINE_SLOPE;
+    let at = |dx: i32, dz: i32| f.fbm(salt::RIVER_LINES, x + dx * 16, z + dz * 16, scale, 2) as i64;
+    let (gx, gz) = (at(s, 0) - at(-s, 0), at(0, s) - at(0, -s));
+    let slope = ((gx * gx + gz * gz) as u64).isqrt().max(1) as i64;
+    // The noise over its slope per block: Q4 blocks to the line.
+    let d = ((n.abs() as i64 * 16 * 2 * s as i64) / slope).min(i32::MAX as i64) as i32;
+    let size = ramp(f.fbm(salt::RIVER_LINES ^ 1, x, z, q4(RIVER_LINE_WIDTH_SIZE), 2), q12(-0.3), q12(0.3));
+    let (lo, hi) = (q4(RIVER_LINE_HALF_WIDTH.0 as f64), q4(RIVER_LINE_HALF_WIDTH.1 as f64));
+    let half = lo + (((hi - lo) * size) >> 12);
+    if d >= half + q4(RIVER_LINE_FLOODPLAIN as f64) + reach {
+        return None;
+    }
+    let mountains = net::mountains(here);
+    if mountains == 0 {
+        return None;
+    }
+    // Round a waystone: its nearest node within reach.
+    let (bx, bz) = (x >> 4, z >> 4);
+    let clear = vitals::ley::waystones_near(f.seed, bx, bz, RIVER_LINE_WAYSTONE.1 as i32)
+        .iter()
+        .map(|w| ((w.x - bx) as f64).hypot((w.z - bz) as f64))
+        .fold(f64::INFINITY, f64::min);
+    let away = ramp(q12(clear / 1000.0), q12(RIVER_LINE_WAYSTONE.0 / 1000.0), q12(RIVER_LINE_WAYSTONE.1 / 1000.0));
+    let strength = (mountains * away) >> 12;
+    (strength > 0).then_some(LineRiver { d, half, strength })
+}
+
+/// The long rivers' cut at `here`, the land under it from `land`.
+fn line_rivers(here: &Here, land: &dyn Fn() -> i32) -> i32 {
+    let most = q4(RIVER_BANKS as f64) + RIVER_VALLEY_PER_BLOCK * RIVER_VALLEY_RISE;
+    let Some(r) = line_river(here, most) else { return 0 };
+    let flat = r.half + q4(RIVER_LINE_FLOODPLAIN as f64);
+    let sea = q4(SEA as f64);
+    let h0 = land();
+    let rise = (h0 - sea) >> 4;
+    if rise < 0 {
+        return 0;
+    }
+    let banks = q4(RIVER_BANKS as f64) + RIVER_VALLEY_PER_BLOCK * rise.min(RIVER_VALLEY_RISE);
+    if r.d >= flat + banks {
+        return 0;
+    }
+    let target = if r.d < r.half {
+        let t = r.d * ONE / r.half.max(1);
+        let bowl = ONE - ((t * t) >> 12);
+        sea - 16 - (((q4(RIVER_LINE_DEPTH as f64) - 16) * bowl) >> 12)
+    } else if r.d < flat {
+        sea
+    } else {
+        let t = (r.d - flat) * ONE / banks.max(1);
+        let smooth = (((t * t) >> 12) * (3 * ONE - 2 * t)) >> 12;
+        sea + (((h0 - sea) * smooth) >> 12)
+    };
+    (((target - h0).min(0)) * r.strength) >> 12
 }
 
 /// The river network's region holding block (`bx`, `bz`): its nodes, the pits that spilled over
@@ -1295,7 +1434,7 @@ pub fn spawn_where(seed: u64, open: &dyn Fn(i32, i32) -> bool) -> [i32; 3] {
             && MOUNTAINS_AREA.value(&f, x * 16, z * 16) < q12(0.2)
             && near(x, z, SPAWN_WATER, 4, &|px, pz| h(px, pz) < SEA && biome(px, pz) != "ocean")
             && near(x, z, SPAWN_WOODS, 8, &|px, pz| {
-                matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove" | "tropical_forest")
+                matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove" | "tropical_forest" | "old_growth_forest")
             })
     };
     let plains = |x: i32, z: i32| biome(x, z) == "plains" && h(x, z) > SEA + 1 && level(x, z, h(x, z));
@@ -1371,6 +1510,15 @@ pub fn bank(f: &Fields, x: i32, z: i32) -> Option<Bank> {
             }
         }
     }
+    // The long rivers, their channel and bank band as the drainage rivers'.
+    if let Some(r) = line_river(&here, q4(RIVER_BANK as f64)) {
+        if r.d < r.half {
+            take(Bank { water: Water::River, in_water: true, wet: r.strength });
+        } else if r.d < r.half + q4(RIVER_BANK as f64) {
+            let w = ONE - (r.d - r.half) * ONE / q4(RIVER_BANK as f64);
+            take(Bank { water: Water::River, in_water: false, wet: (w * r.strength) >> 12 });
+        }
+    }
     // Lakes.
     let (cx, cz) = (div_floor(bx, LAKE_CELL).0, div_floor(bz, LAKE_CELL).0);
     let reach = LAKE_RADIUS.1 + ((LAKE_RADIUS.1 * q12(LAKE_WOBBLE)) >> 12) + LAKE_BANK;
@@ -1413,7 +1561,7 @@ pub struct Edge {
 pub const EDGE_BAND: f64 = 0.03;
 
 /// The biome the climate rules pick for these fields (`overworld_biome` without the coasts).
-fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool) -> &'static str {
+fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool, old: bool) -> &'static str {
     let at = q12;
     if mountain || h >= snow_line(t) {
         "mountains"
@@ -1431,6 +1579,8 @@ fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool) -
         // Before the swamp: the tropical forest takes its low wet land too (Ronald: "Yes, take
         // the low land"), so the flooded forest has room along its rivers.
         "tropical_forest"
+    } else if old && h <= SEA + OLD_GROWTH_TOP {
+        "old_growth_forest"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
     } else if hu >= at(FOREST_HUMIDITY) {
@@ -1451,13 +1601,14 @@ pub fn biome_edge(f: &Fields, x: i32, z: i32, height: i32) -> Option<Edge> {
     let m = MOUNTAINS_AREA.at(&here);
     let line = q12(MOUNTAIN_BIOME);
     let grove = SEQUOIA_AREA.at(&here) >= q12(SEQUOIA_GROVE);
-    let own = climate_biome(t, hu, c, height, m >= line, grove);
+    let old = OLD_GROWTH_AREA.at(&here) >= q12(OLD_GROWTH_FROM);
+    let own = climate_biome(t, hu, c, height, m >= line, grove, old);
     let band = q12(EDGE_BAND);
     let mut best: Option<Edge> = None;
     for k in 1..=3 {
         let step = band * k / 3;
         for (dt, dh, dm) in [(step, 0, 0), (-step, 0, 0), (0, step, 0), (0, -step, 0), (0, 0, step), (0, 0, -step)] {
-            let to = climate_biome(t + dt, hu + dh, c, height, m + dm >= line, grove);
+            let to = climate_biome(t + dt, hu + dh, c, height, m + dm >= line, grove, old);
             if to != own {
                 let near = ONE - (k - 1) * ONE / 3;
                 if best.is_none_or(|b| near > b.near) {
@@ -1754,6 +1905,65 @@ pub fn sea_sand(f: &Fields, ox: i32, oz: i32, heights: &[i32; 256]) -> [bool; 25
     out
 }
 
+/// What tops a column, as the overworld's rules make it (for maps and previews; the engine's own
+/// terrain is the truth): water under the sea's level, snow (`snowy`), a bare rock face where the
+/// ground falls steeply (`rock_set`, `RockSet::bare_from`), or the biome's ground block
+/// (`surface_of`, frayed at the borders, `fray`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Top {
+    Water,
+    Snow,
+    Rock(RockSet),
+    /// The ground block's bare name: `grass`, `sand`, `podzol`, `snowy_grass`...
+    Ground(&'static str),
+}
+
+impl Top {
+    /// Its name for the map's colours (`vitals::waystones::GROUND_COLOURS`): `water`, `snow`,
+    /// `rock:<set>` or the ground block's.
+    pub fn name(self) -> &'static str {
+        match self {
+            Top::Water => "water",
+            Top::Snow => "snow",
+            Top::Rock(RockSet::Strata) => "rock:strata",
+            Top::Rock(RockSet::Slate) => "rock:slate",
+            Top::Rock(RockSet::Granite) => "rock:granite",
+            Top::Rock(RockSet::Limestone) => "rock:limestone",
+            Top::Rock(RockSet::Karst) => "rock:karst",
+            Top::Ground(g) => g,
+        }
+    }
+}
+
+/// Column (`x`, `z`) (blocks): its ground's height (blocks), biome and top. The fall to its lowest
+/// neighbour is read from the four columns round it.
+pub fn top(f: &Fields, x: i32, z: i32) -> (i32, &'static str, Top) {
+    let h_at = |x: i32, z: i32| height(f, x * 16, z * 16) >> 4;
+    let h = h_at(x, z);
+    let (qx, qz) = (x * 16, z * 16);
+    let biome = biome_at(f, qx, qz, h);
+    if h < SEA {
+        return (h, biome, Top::Water);
+    }
+    let fall = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        .iter()
+        .map(|&(dx, dz)| h - h_at(x + dx, z + dz))
+        .max()
+        .unwrap_or(0);
+    let ground = fray(f, qx, qz, h).map_or(surface_of(biome).0, |g| g.0);
+    let rocks = rock_set(f, qx, qz, h, ground == "sand");
+    let snow = snowy(f, qx, qz, h);
+    // Snow slides off from `SNOW_FALL`, before the soil does (base's `bare`).
+    let top = if fall >= rocks.bare_from() || snow && fall >= SNOW_FALL {
+        Top::Rock(rocks)
+    } else if snow {
+        Top::Snow
+    } else {
+        Top::Ground(ground)
+    };
+    (h, biome, top)
+}
+
 /// The overworld biome the rules in `mods/base/src/land.rs` pick at (`x`, `z`) (Q4), by name, in
 /// their order: for the map preview and the checks here (the engine's own pick is the truth).
 pub fn overworld_biome(f: &Fields, x: i32, z: i32) -> &'static str {
@@ -1787,6 +1997,8 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
         // Before the swamp: the tropical forest takes its low wet land too (Ronald: "Yes, take
         // the low land"), so the flooded forest has room along its rivers.
         "tropical_forest"
+    } else if OLD_GROWTH_AREA.at(&here) >= at(OLD_GROWTH_FROM) && h <= SEA + OLD_GROWTH_TOP {
+        "old_growth_forest"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
     } else if hu >= at(FOREST_HUMIDITY) {
@@ -1833,9 +2045,99 @@ pub fn biome_shares(seed: u64, radius: i32, step: usize) -> Vec<(&'static str, f
         .collect()
 }
 
+/// The Minecraft forest test world (`base:mc_forest`, Ronald, 11-05: "lets also make our biome kinda
+/// match the one from mc/bliss too to help with testing"): the overworld's land from the same seed
+/// (continents, hills, mountains, rivers, lakes: every feature here) under Minecraft's temperate
+/// forest mix instead of the climate's biomes, so a shot there is like for like with the Minecraft
+/// scene of the Bliss and Distant Horizons comparisons. Off the overworld: nothing in a normal world
+/// changes. The coasts, the mountains and their snow keep the overworld's rules; the rest of the land
+/// is shared out by a patch noise (`MC_MIX_FIELD`, patches some `MC_MIX_SIZE` blocks across) in the
+/// shares of `MC_MIX`, plains to the densest woods along the noise so each meets its neighbours as
+/// in Minecraft. The Minecraft scene (seed 1, the comparison vista, read from its region files):
+/// forest 67% and plains 20% within 500 blocks, plains 40% and forest a tenth from 500 to 1,500,
+/// the forest's dense round dark crowns, a cherry grove. Our old growth (oaks, closed canopy) is
+/// the nearest to that forest's look, so it takes the biggest share, our lighter forest and birch
+/// wood the rest of the woods; the forests' cherry groves come with them
+/// (`vitals::wild::CHERRY_GROVES`).
+pub const MC_MIX_FIELD: &str = "base:mc_mix";
+pub const MC_MIX_SIZE: f64 = 700.0;
+pub const MC_MIX: [(&str, f64); 4] = [("plains", 0.35), ("birch_forest", 0.05), ("forest", 0.25), ("old_growth_forest", 0.35)];
+
+/// The mix field: the patch noise itself, about -1 to 1.
+pub fn mc_mix_field() -> Expr {
+    Expr::fbm(salt::MC_MIX, MC_MIX_SIZE, 3)
+}
+
+/// The mix noise's value where each of `MC_MIX` ends (its last runs to the top): the noise's own
+/// quantiles, measured on a grid (its spread is the same for every seed), so each biome takes its
+/// share of the land and not a guess at the noise's deviation.
+pub fn mc_mix_cuts() -> &'static [f64; MC_MIX.len()] {
+    static CUTS: std::sync::OnceLock<[f64; MC_MIX.len()]> = std::sync::OnceLock::new();
+    CUTS.get_or_init(|| {
+        let f = fields(1);
+        let mut v: Vec<i32> = (0..160 * 160)
+            .map(|i| f.fbm(salt::MC_MIX, (i % 160) * 97 * 16, (i / 160) * 97 * 16, q4(MC_MIX_SIZE), 3))
+            .collect();
+        v.sort_unstable();
+        let mut cuts = [f64::INFINITY; MC_MIX.len()];
+        let mut sum = 0.0;
+        for (i, &(_, share)) in MC_MIX.iter().enumerate().take(MC_MIX.len() - 1) {
+            sum += share;
+            cuts[i] = v[((v.len() as f64 * sum) as usize).min(v.len() - 1)] as f64 / ONE as f64;
+        }
+        cuts
+    })
+}
+
+/// The test world's biome at (`x`, `z`) (Q4), as its rules pick it (the overworld's coasts and
+/// mountains first, then the mix): for its checks and finding spots.
+pub fn mc_forest_biome(f: &Fields, x: i32, z: i32) -> &'static str {
+    let h = height(f, x, z) >> 4;
+    let here = Here::new(f, x, z);
+    let (t, c) = (here.temperature(), here.continent());
+    if let Some(top) = reefs::part(&here, h) {
+        if top { "coral_reef" } else { "lagoon" }
+    } else if h <= SEA - 2 && c < q12(OCEAN_CONTINENT) {
+        "ocean"
+    } else if h <= SEA + 1 && c < q12(BEACH_CONTINENT) {
+        if t < q12(SNOWY_BELOW) { "snowy_plains" } else { "beach" }
+    } else if MOUNTAINS_AREA.at(&here) >= q12(MOUNTAIN_BIOME) || snowy(f, x, z, h) {
+        "mountains"
+    } else {
+        let v = f.fbm(salt::MC_MIX, x, z, q4(MC_MIX_SIZE), 3) as f64 / ONE as f64;
+        MC_MIX[mc_mix_cuts()
+            .iter()
+            .position(|&c| v < c)
+            .unwrap_or(MC_MIX.len() - 1)]
+        .0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_mc_forest_mix_takes_its_shares() {
+        let f = fields(3);
+        let mut n = [0usize; MC_MIX.len()];
+        let mut all = 0;
+        for z in (-120..120).step_by(3) {
+            for x in (-120..120).step_by(3) {
+                let v = f.fbm(salt::MC_MIX, x * 61 * 16, z * 61 * 16, q4(MC_MIX_SIZE), 3) as f64 / ONE as f64;
+                let i = mc_mix_cuts()
+                    .iter()
+                    .position(|&c| v < c)
+                    .unwrap_or(MC_MIX.len() - 1);
+                n[i] += 1;
+                all += 1;
+            }
+        }
+        for (i, &(b, share)) in MC_MIX.iter().enumerate() {
+            let got = n[i] as f64 / all as f64;
+            assert!((got - share).abs() < 0.05, "{b}: {got:.3} of the land, {share} wanted");
+        }
+    }
 
     #[test]
     fn rivers_only_cut_and_reach_under_the_sea() {
@@ -2218,6 +2520,35 @@ mod tests {
                 .map_or((0.0, i32::MAX), |e| (e.1, e.2));
             assert!(share > 0.0005 && share < 0.03, "seed {seed}: sequoia groves are {:.2}% of the land", share * 100.0);
             assert!(near <= 6000, "seed {seed}: the nearest grove is {near} blocks out");
+        }
+    }
+
+    #[test]
+    fn long_rivers_carry_water_and_spare_the_waystones() {
+        // The long rivers (`line_rivers`) reach under the sea's level along kilometres of land.
+        let f = fields(1);
+        let mut wet = 0;
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 16 * 16, (i / 200) * 16 * 16);
+            let here = Here::new(&f, x, z);
+            if line_rivers(&here, &|| land_height_at(&here)) < 0 && height(&f, x, z) >> 4 < SEA {
+                wet += 1;
+            }
+        }
+        assert!(wet > 200, "only {wet} of 40 000 columns over 3.2 km in a long river's water");
+        // No waystone's node stands in one (its plinth needs dry ground).
+        for seed in [1, 7] {
+            let f = fields(seed);
+            for w in vitals::ley::waystones_near(seed, 0, 0, 6000) {
+                let here = Here::new(&f, w.x * 16, w.z * 16);
+                assert_eq!(
+                    line_rivers(&here, &|| land_height_at(&here)),
+                    0,
+                    "seed {seed}: a long river through the waystone at {} {}",
+                    w.x,
+                    w.z
+                );
+            }
         }
     }
 

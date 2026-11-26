@@ -78,7 +78,7 @@ impl Climate {
 // Wind and fog (`air`): each place's seasonal mean wind at 10 m and its days with fog, from airport
 // records, the weather services and the Cretaceous places' modern stand-ins
 // (`reports/ecology/Wind and fog.md`, with which are estimates).
-pub const BIOMES: [Climate; 21] = [
+pub const BIOMES: [Climate; 22] = [
     // The overworld (`mods/base/src/worldgen.rs`).
     c("base:plains", "Manhattan, Kansas (Konza Prairie)", 12.8, 0.42, 14.2, [0.27, 0.27, 0.2, 0.14]).air(
         [3.8, 3.0, 3.0, 3.1],
@@ -88,6 +88,17 @@ pub const BIOMES: [Climate; 21] = [
     c("base:forest", "Kassel, Germany", 9.3, 0.77, 8.7, [0.34, 0.34, 0.37, 0.41]).air(
         [2.5, 2.0, 2.4, 3.0],
         [5.8, 4.9, 16.1, 11.3],
+        Fog::Dawn,
+    ),
+    // Old-growth forest (Ronald, 11-05: the Bliss shots' forest): Białowieża's strict reserve, the
+    // lowland oak-hornbeam and mixed old growth, cooler and more continental than Kassel's. Its
+    // numbers are Białystok's 1991-2020 normals, 60 km off on the same plain: 7.7 °C, January
+    // -2.9, July 18.4, about 106 days of rain a year, a little more in summer. Humidity fitted to
+    // its 8.9 °C day range; wind and fog are estimates for the sheltered forest (no station
+    // record): a light wind, dawn fog in autumn and winter along the river valleys.
+    c("base:old_growth_forest", "Białowieża Forest, Poland", 7.7, 0.7, 10.7, [0.28, 0.3, 0.29, 0.29]).air(
+        [2.8, 2.2, 2.4, 2.9],
+        [6.0, 5.0, 16.0, 14.0],
         Fog::Dawn,
     ),
     c("base:birch_forest", "Moscow", 6.3, 0.8, 12.9, [0.29, 0.3, 0.32, 0.47]).air([1.5, 1.1, 1.4, 1.6], [1.5, 2.3, 3.0, 1.6], Fog::Dawn),
@@ -222,6 +233,65 @@ pub fn rain_share(rain: [f32; 4], season: Option<usize>) -> f32 {
     }
 }
 
+/// A season is a place's dry season when it rains on at most this share of the days its wettest
+/// season does: the llanos' winter (11 % of days against the summer's 70 %), the Pantanal's
+/// (7 % against 33 %), the Cedar Mountain floodplain's winter and spring, a Mediterranean summer;
+/// not a prairie winter (14 % against 27 %) or anywhere it rains much the same all year. Herds
+/// leave a place in its dry season for wetter ground (`animals_core::groups`, migration).
+pub const DRY_OF_WETTEST: f32 = 0.4;
+
+/// Whether `season` (0 spring) is a dry season for a place with `rain` (`DRY_OF_WETTEST`); never
+/// in a dimension without seasons, or where it never rains.
+pub fn dry_season(rain: [f32; 4], season: Option<usize>) -> bool {
+    let wettest = rain.iter().copied().fold(0.0f32, f32::max);
+    season.is_some_and(|s| wettest > 0.0 && rain[s % 4] <= wettest * DRY_OF_WETTEST)
+}
+
+/// Waterholes shrink in the dry season (`notes/ECOLOGY.md`, "Later"; `base`'s `waterholes.rs`):
+/// a pond's still water, a block deep, dries from its edges into a crust of cracked mud in its
+/// biome's dry season (`dry_season`), and fills back once the season is over. The llanos'
+/// lagoons and the Pantanal's bays shrink to pools by the end of the dry months, and the herds
+/// crowd round what is left (Mourão et al. 2000 on the Pantanal's dry-season waterholes). Never
+/// the sea's (these biomes' water is the sea, whatever their seasons).
+pub const NEVER_DRIES: [&str; 4] = ["base:ocean", "base:beach", "base:coral_reef", "base:lagoon"];
+/// A corner block of a waterhole dries in this many game days on average in the dry season (on
+/// visits near players, `air::snow_visit_secs`): a pond seven across, receding a few blocks at a
+/// time from its corners, shrinks to its last block in about a week of the season's two.
+pub const SHRINK_DAYS: f32 = 1.0;
+/// A dried block fills back in this many seconds on average once its season is no longer dry,
+/// also away from players (a growth step: caught up when its land loads).
+pub const REFILL_SECS: f32 = 600.0;
+
+/// Whether still water in `biome` (rain `rain`) shrinks now, in `season` (0 spring; None: no
+/// seasons there).
+pub fn waterholes_shrink(biome: &str, rain: [f32; 4], season: Option<usize>) -> bool {
+    !NEVER_DRIES.contains(&biome) && dry_season(rain, season)
+}
+
+/// The chance a visit (every `visit_secs` on average) dries an edge block (`SHRINK_DAYS`).
+pub fn shrink_chance(visit_secs: f32) -> f32 {
+    (visit_secs / (SHRINK_DAYS * crate::DAY_SECS)).clamp(0.0, 1.0)
+}
+
+/// Whether a block of water dries, given which of its four sides are water (`sides`: +x, -x, +z,
+/// -z; dry ground or dried crust otherwise) and, asked only when it needs to know, whether the
+/// block diagonal to it at (dx, dz) is water. It dries when it is a corner of the pool: water on
+/// one side only (a tail), or on two sides at a right angle with the water between them going on
+/// round the corner. Then drying it never cuts the pool in two or opens a hole in it, so a pond
+/// recedes from its corners down to one last block, which stays (no water beside it). A straight
+/// shore (water on three sides), a narrow neck (water on two opposite sides) and a corner whose
+/// diagonal is dry stay. ai1123_waterhole6: drying any rim block beside two of water opened
+/// holes, and a 7 x 7 pond stopped at 17 blocks scattered about its bed; "dry on two sides or
+/// more" alone still strands a few apart.
+pub fn edge_dries(sides: [bool; 4], diagonal: impl FnOnce(i32, i32) -> bool) -> bool {
+    let [e, w, s, n] = sides;
+    match sides.iter().filter(|&&b| b).count() {
+        1 => true,
+        2 if (e || w) && (s || n) => diagonal(if e { 1 } else { -1 }, if s { 1 } else { -1 }),
+        _ => false,
+    }
+}
+
 /// A rain spell's hours: a rainy day's rain falls in one spell of 2 to 8 hours, as most of a real
 /// rainy day's does.
 pub const SPELL_HOURS: (f32, f32) = (2.0, 8.0);
@@ -268,6 +338,68 @@ fn unit(r: u64) -> f32 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn waterholes_shrink_to_a_last_pool() {
+        let rain = |b: &str| of(b).unwrap().rain;
+        assert!(waterholes_shrink("base:savanna", rain("base:savanna"), Some(3)));
+        assert!(!waterholes_shrink("base:savanna", rain("base:savanna"), Some(1)));
+        // A beach's dry summer leaves the sea alone.
+        assert!(dry_season(rain("base:beach"), Some(1)) && !waterholes_shrink("base:beach", rain("base:beach"), Some(1)));
+        // Corners and tails dry; a straight shore, a neck, a cut corner and the last block don't.
+        assert!(edge_dries([true, false, true, false], |_, _| true) && edge_dries([false, false, false, true], |_, _| false));
+        assert!(!edge_dries([true, false, true, false], |_, _| false) && !edge_dries([true, true, false, false], |_, _| true));
+        assert!(!edge_dries([true, true, true, false], |_, _| true) && !edge_dries([false; 4], |_, _| true));
+        // A 7 x 7 pond and a round one dried corner by corner, in any order, end at one block.
+        let round: Vec<(i32, i32)> = (-5..=5)
+            .flat_map(|x| (-5..=5).map(move |z| (x, z)))
+            .filter(|(x, z)| x * x + z * z <= 26)
+            .collect();
+        let square: Vec<(i32, i32)> = (0..7).flat_map(|x| (0..7).map(move |z| (x, z))).collect();
+        for shape in [square, round] {
+            for seed in 0..50u64 {
+                let mut wet: std::collections::BTreeSet<(i32, i32)> = shape.iter().copied().collect();
+                let mut r = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+                loop {
+                    let can: Vec<(i32, i32)> = wet
+                        .iter()
+                        .copied()
+                        .filter(|&(x, z)| {
+                            let sides = [(1, 0), (-1, 0), (0, 1), (0, -1)].map(|(dx, dz)| wet.contains(&(x + dx, z + dz)));
+                            edge_dries(sides, |dx, dz| wet.contains(&(x + dx, z + dz)))
+                        })
+                        .collect();
+                    if can.is_empty() {
+                        break;
+                    }
+                    r ^= r << 13;
+                    r ^= r >> 7;
+                    r ^= r << 17;
+                    wet.remove(&can[(r % can.len() as u64) as usize]);
+                }
+                assert_eq!(wet.len(), 1, "seed {seed}");
+            }
+        }
+        // An edge block dries in about SHRINK_DAYS of visits.
+        let v = crate::air::snow_visit_secs();
+        let days = v / shrink_chance(v) / crate::DAY_SECS;
+        assert!((days - SHRINK_DAYS).abs() < 0.01);
+    }
+
+    #[test]
+    fn dry_seasons_are_the_places_own() {
+        let rain = |b: &str| of(b).unwrap().rain;
+        // The llanos and the Pantanal are dry in winter, wet in summer.
+        assert!(dry_season(rain("base:savanna"), Some(3)) && !dry_season(rain("base:savanna"), Some(1)));
+        assert!(dry_season(rain("base:swamp"), Some(3)));
+        assert!(dry_season(rain("animals:floodplain"), Some(0)));
+        // A prairie winter and a German forest's year aren't.
+        assert!(!dry_season(rain("base:plains"), Some(3)));
+        assert!((0..4).all(|s| !dry_season(rain("base:forest"), Some(s))));
+        // No seasons, no rain: no dry season.
+        assert!(!dry_season(rain("base:savanna"), None));
+        assert!(!dry_season([0.0; 4], Some(1)));
+    }
+
     use super::*;
 
     /// Over many years a biome rains on about its share of each season's days.

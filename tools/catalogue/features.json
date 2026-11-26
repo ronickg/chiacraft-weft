@@ -1,0 +1,423 @@
+{
+ "_": "The catalogue's Features cards. Every system of notes/crew/systems-map/systems.json gets a card; these add how a player uses it, the sheet sections with its numbers (vitals SHEET.md headings unless `sheet` names another), and the things it links to (ids, or `match` words found in ids).",
+ "body": {
+  "how": "Nine stats on the HUD: health, stamina, food, warmth, breath and more. Eat, rest, stay warm and dry; speed and health change with them.",
+  "sheets": [
+   "A player's stats",
+   "Effects"
+  ],
+  "match": [
+   "bandage"
+  ]
+ },
+ "air": {
+  "how": "The temperature you feel comes from the climate, season, hour, height, rain, wind, water nearby, fires and rooms. Watch the HUD's temperature; dress for it, or stand by a fire.",
+  "sheets": [
+   "Climates",
+   "Wind and fog"
+  ]
+ },
+ "clothing": {
+  "how": "Wear a hat, coat, trousers and boots of fur, hide, wool or linen (sewn at the crafting table from the cloth and string); armour goes over them. Wet clothes keep less warmth.",
+  "sheets": [
+   "Clothing"
+  ],
+  "match": [
+   "fur_",
+   "hide_",
+   "wool_",
+   "linen_",
+   "rain_cape"
+  ]
+ },
+ "rooms": {
+  "how": "Close a room around a fire: its walls and size keep the warmth in.",
+  "sheets": [
+   "Rooms"
+  ],
+  "links": [
+   "base:campfire_laid",
+   "base:torch"
+  ]
+ },
+ "food": {
+  "how": "Eat a mix: a varied stomach raises max health and stamina. Food keeps fresh, then goes stale and spoils.",
+  "sheets": [
+   "Foods"
+  ],
+  "match": [
+   "cooked_",
+   "dried_"
+  ]
+ },
+ "meals": {
+  "how": "Put ingredients in the cooking pot over a fire: stews warm and fill from what goes in.",
+  "sheets": [
+   "Meals and preserving"
+  ],
+  "links": [
+   "base:cooking_pot",
+   "base:stew",
+   "base:bowl"
+  ]
+ },
+ "preserve": {
+  "how": "Hang food on the drying rack (still air, a fire below, dry weather) or salt it; it keeps for weeks.",
+  "sheets": [
+   "Meals and preserving"
+  ],
+  "links": [
+   "base:drying_rack",
+   "base:salt",
+   "base:salted_meat",
+   "base:smoked_meat"
+  ],
+  "match": [
+   "dried_"
+  ]
+ },
+ "calendar": {
+  "how": "Days run 20 minutes; seasons change day length, the weather and what grows. A new world starts on spring's 8th at 10:00.",
+  "sheets": []
+ },
+ "weather": {
+  "how": "Rain by season from each biome's climate, wind and fog by biome, lying snow and freezing water. Being wet feels colder and wet clothes keep less warmth.",
+  "sheets": [
+   "Wind and fog"
+  ],
+  "links": [
+   "base:rain_cape",
+   "base:snow",
+   "base:snow_layer"
+  ]
+ },
+ "ley": {
+  "how": "Make a dowsing rod (sticks, string, a tektite) and hold it: it senses the ley lines and their nodes. Waystones sleep on the great crossings, ringed by the ancients' carved stone.",
+  "sheets": [],
+  "links": [
+   "base:dowsing_rod",
+   "base:ley_stone",
+   "base:waystone",
+   "base:tektite"
+  ]
+ },
+ "map": {
+  "how": "A map that fills in where you walk, a minimap in the HUD corner, and waystones woken on the ley crossings.",
+  "sheets": [],
+  "links": [
+   "base:waystone"
+  ]
+ },
+ "climbing": {
+  "how": "Climb any wall on stamina: slower on smooth stone, never on ice; at the top you mantle over.",
+  "sheets": [
+   "Climbing and gliding"
+  ]
+ },
+ "glider": {
+  "how": "Craft a leather glider; while falling press jump to open it. It drifts with the day's wind.",
+  "sheets": [
+   "Climbing and gliding"
+  ],
+  "links": [
+   "base:glider",
+   "base:leather",
+   "base:stick"
+  ]
+ },
+ "grapple": {
+  "how": "Throw the grappling hook (Iron Age: wrought-iron flukes on a cord) up to 22 blocks: it catches on blocks with grip and pulls you over walls.",
+  "sheets": [
+   "Climbing and gliding"
+  ],
+  "links": [
+   "base:grappling_hook",
+   "base:iron_ingot",
+   "base:string"
+  ]
+ },
+ "taming": {
+  "how": "Passive animals are tamed by feeding; wild ones are knocked out (club, tranquilizer darts), kept asleep with a sedative and fed while they sleep. A saddle lets you ride; the spyglass shows an animal's stats, genes and taming from afar.",
+  "sheets": [],
+  "links": [
+   "animals:club",
+   "animals:tranquilizer_dart",
+   "animals:sedative",
+   "animals:kibble",
+   "animals:spyglass",
+   "animals:utahraptor_saddle",
+   "animals:wyvern_saddle",
+   "animals:utahraptor",
+   "animals:wyvern"
+  ]
+ },
+ "breeding": {
+  "how": "Tame animals breed by season and bond; egg-layers lay in nests (an egg, then a hatchling). Genes pass on coats, size and personality.",
+  "sheets": [],
+  "links": [
+   "animals:nest"
+  ],
+  "match": [
+   "_egg"
+  ]
+ },
+ "gems": {
+  "how": "Cut a gem at the crafting table from a diamond, peridot, tektite or amber; set it in a part's or built item's socket at the assembly row (cheap gems crack one time in four coming out). Each rolls 1-3 boosts.",
+  "sheet": "crafting",
+  "sheets": [
+   "Gems"
+  ],
+  "links": [
+   "base:gem_diamond",
+   "base:gem_peridot",
+   "base:gem_tektite",
+   "base:gem_amber",
+   "base:diamond",
+   "base:peridot",
+   "base:tektite",
+   "animals:amber"
+  ]
+ },
+ "drenkaun": {
+  "how": "Make the Wood-Warden's altar and set it among old trees; use it with a forest offering (an acorn, a red mushroom, berries, a moss block). Drenkaun rises: charges, sweeps, stomps and roots; break its antlers and crown for loot. Its heartseed is the Stone Age key's boss part; its calf can be tamed.",
+  "sheets": [],
+  "links": [
+   "animals:drenkaun",
+   "animals:drenkaun_altar",
+   "animals:forest_offering",
+   "animals:warden_heartseed",
+   "animals:warden_antler",
+   "animals:warden_bark"
+  ]
+ },
+ "skyevents": {
+  "how": "One event a night: blood moons (more monsters), meteor showers and fallen stars, auroras and big impacts. Fallen stars and craters give star steel, pallasite, tektites and eclipse ash.",
+  "sheets": [],
+  "links": [
+   "base:meteorite",
+   "base:star_steel_ore",
+   "base:star_steel_lump",
+   "base:pallasite",
+   "base:tektite",
+   "base:eclipse_ash",
+   "base:starheart",
+   "base:impact_glass",
+   "base:suevite"
+  ]
+ },
+ "starmats": {
+  "how": "Mine a fallen meteorite or an impact crater for star steel and pallasite; a starheart in iron makes the star lantern.",
+  "sheets": [],
+  "links": [
+   "base:star_steel_ore",
+   "base:star_steel_lump",
+   "base:star_steel_ingot",
+   "base:pallasite",
+   "base:peridot",
+   "base:starheart",
+   "base:star_lantern",
+   "base:meteoric_iron"
+  ]
+ },
+ "firsthours": {
+  "how": "Pick up loose rocks, flint and fallen branches. Sneak and strike a flint nodule on the ground with a rock to open the knapping screen: strike away the squares outside the head's outline. A bow drill or hand drill on a fire bed lights the first fire.",
+  "sheets": [],
+  "links": [
+   "base:rock",
+   "base:flint",
+   "base:loose_flint",
+   "base:loose_rock",
+   "base:fallen_branch",
+   "base:sharp_flake",
+   "base:part_felling_axe_head",
+   "base:part_pick_head",
+   "base:part_shovel_blade",
+   "base:bow_drill",
+   "base:hand_drill",
+   "base:fire_bed",
+   "base:campfire_laid"
+  ]
+ },
+ "craftbook": {
+  "how": "Make parts at the crafting table (each of a material its shape takes), then put them in the assembly row: head, haft and fitting for tools; blade, grip, guard and pommel for swords; shell, fastening and lining for armour. The parts' materials set the numbers and the look.",
+  "sheet": "crafting",
+  "sheets": [
+   "Materials",
+   "Kinds and shapes"
+  ],
+  "match": [
+   "part_"
+  ],
+  "links": [
+   "base:sword",
+   "base:axe",
+   "base:pickaxe",
+   "base:helmet",
+   "base:chestplate"
+  ]
+ },
+ "waitcrafts": {
+  "how": "Some work takes real days: hides on the tanning frame become leather, in the tanning pit sole leather, logs in the charcoal clamp coal.",
+  "sheets": [
+   "Crafts that wait"
+  ],
+  "links": [
+   "base:tanning_frame",
+   "base:tanning_pit",
+   "base:charcoal_clamp",
+   "base:leather",
+   "base:sole_leather",
+   "base:coal",
+   "base:hide"
+  ]
+ },
+ "crops": {
+  "how": "Find seeds in grass, till with a hoe, sow; crops grow by warmth and water and tire or feed the soil.",
+  "sheets": [
+   "Crops"
+  ],
+  "match": [
+   "_seeds"
+  ],
+  "links": [
+   "base:hoe",
+   "base:farmland"
+  ]
+ },
+ "soil": {
+  "how": "Grazers leave dung pats; spoiled food becomes compost in the compost bin; fertile soil grows crops faster.",
+  "sheets": [
+   "Soil and compost"
+  ],
+  "links": [
+   "base:compost_bin",
+   "base:compost",
+   "base:dung",
+   "base:dung_pat"
+  ]
+ },
+ "wild": {
+  "how": "Ground cover, ferns, shrubs, young trees, mushrooms and berries by biome: pick them by hand, cut grass for fibre with a flake.",
+  "sheets": [
+   "Wild plants",
+   "Food in the world"
+  ]
+ },
+ "plants": {
+  "how": "Every plant grows by warmth, rain and the soil water where it stands.",
+  "sheets": [
+   "Plants"
+  ]
+ },
+ "trees": {
+  "how": "Fell a tree with an axe: it falls and lies down; branches and bark come off it.",
+  "sheets": [
+   "Felling"
+  ],
+  "match": [
+   "_log",
+   "_branch"
+  ]
+ },
+ "effects": {
+  "how": "Cold, heat, poison, bleeding, sedation, encumbered and well fed show on the HUD and change how you move and heal.",
+  "sheets": [
+   "Effects"
+  ]
+ },
+ "difficulty": {
+  "how": "The base:difficulty world rule scales the body, eating and tames.",
+  "sheets": [
+   "Difficulty (the `base:difficulty` rule)"
+  ]
+ },
+ "levels": {
+  "how": "XP from blocks, crafting, kills, taming and discoveries raises your level; each level gives a perk point.",
+  "sheets": [
+   "Levels"
+  ]
+ },
+ "skills": {
+  "how": "Doing things raises the matching skill (forging raises Smithing, taming raises Taming); a skill's level gates how deep you go in its region of the perk web.",
+  "links": [
+   "skill:perk_web"
+  ]
+ },
+ "perkweb": {
+  "how": "Open the Skills screen (K): spend perk points on nodes next to ones you have; notables and keystones change how you play, sockets take stones.",
+  "links": [
+   "skill:perk_web",
+   "base:maunduk",
+   "base:aruduk",
+   "base:remaru",
+   "base:emakaun",
+   "base:unlearning_stone"
+  ]
+ },
+ "sockets": {
+  "how": "Put a found stone in a web socket: Maunduk rolls boosts, Aruduk strengthens the nodes round it, Remaru gives ley sight, Emakaun health by the nodes in its reach.",
+  "links": [
+   "base:maunduk",
+   "base:aruduk",
+   "base:remaru",
+   "base:emakaun"
+  ]
+ },
+ "monsters": {
+  "how": "Hostile mobs come at night and in the dark, more on a blood moon; campfires keep them off.",
+  "links": [
+   "base:zombie",
+   "base:skeleton",
+   "base:creeper",
+   "base:spider",
+   "base:arrow",
+   "base:rotten_flesh",
+   "base:gunpowder",
+   "base:spider_eye",
+   "base:bone"
+  ]
+ },
+ "dimensions": {
+  "how": "A frame of amber blocks lit with a torch opens the gateway to the Cretaceous, a linked world of its own biomes and dinosaurs.",
+  "links": [
+   "animals:gateway",
+   "animals:amber_block",
+   "animals:amber",
+   "portals:portal"
+  ]
+ },
+ "death": {
+  "how": "When you die you drop everything at a grave (a tombstone) and run back for it; a short grace after.",
+  "links": [
+   "base:tombstone"
+  ]
+ },
+ "machines": {
+  "how": "Redstone, pistons, observers, dispensers and lamps work today; the Age of Steam's machines come later.",
+  "links": [
+   "base:redstone",
+   "base:piston",
+   "base:sticky_piston",
+   "base:observer",
+   "base:dispenser",
+   "base:repeater",
+   "base:comparator",
+   "base:lever",
+   "base:redstone_lamp"
+  ]
+ },
+ "gear": {
+  "how": "A weapon's, tool's or armour's numbers come from the curves by age, through its working part's material.",
+  "sheet": "progression",
+  "sheets": [
+   "Weapons, tools and armour"
+  ]
+ },
+ "glow": {
+  "how": "Fireflies by biome and warmth; foxfire and glowing mushrooms light dark forests.",
+  "links": [
+   "base:foxfire",
+   "base:glow_mycena"
+  ]
+ }
+}

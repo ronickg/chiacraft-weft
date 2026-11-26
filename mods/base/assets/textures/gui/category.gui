@@ -1,4 +1,6 @@
 scaling = nine_slice
-border = 1.5
-selected_offset = 0.5
+border = 2.5 2.5 2.5 2.5
 size = 16 12
+selected_offset = 0.5
+# How far the drawn frame comes into the box (GUI px): text keeps clear of it (ui::audit).
+inset = 2

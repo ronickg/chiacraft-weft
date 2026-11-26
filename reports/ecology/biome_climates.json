@@ -294,6 +294,37 @@
   }
  },
  {
+  "biome": "base:old_growth_forest",
+  "place": "Białowieża Forest, Podlaskie, Poland (the strict reserve's lowland oak-hornbeam and mixed old growth); the 1991-2020 normals of Białystok, 60 km north-west, as its station",
+  "lat": 52.7,
+  "lon": 23.85,
+  "elevation_m": 160,
+  "hemisphere": "north",
+  "koppen": "Dfb",
+  "wet_months": [
+   "May",
+   "Jun",
+   "Jul",
+   "Aug"
+  ],
+  "dry_months": [],
+  "sources": [
+   "https://climatestotravel.com/climate/poland/bialystok (1991-2020 monthly normals, Białystok)",
+   "https://www.ibles.pl/?p=6659 (the forest's own 1950-2003 record: warming winters, summer droughts 1997 and 2000; abstract only)"
+  ],
+  "estimate": false,
+  "notes": "Białystok's 1991-2020 normals stand in for the Białowieża station (IMGW), whose table wasn't found online; the forest lies 60 km south-east on the same plain, its record a little cooler in winter. rain_days: the source gives no threshold. snow_cover: no sourced value; snow lies most of December to February in the forest.",
+  "rain_days_threshold": "not given",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 7.7,
+   "half_range_c": 10.65,
+   "precip_year_mm": 610.0,
+   "rain_days_year": 106.0,
+   "mean_daily_range_c": 8.9
+  }
+ },
+ {
   "biome": "base:birch_forest",
   "place": "Moscow (VDNKh), Russia (mixed spruce-birch-pine forest of the central Russian plain)",
   "lat": 55.83,

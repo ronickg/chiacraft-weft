@@ -23,7 +23,7 @@ const REMEMBER: u64 = 1200;
 
 pub fn init(r: &mut Registry) {
     // Noted as the damage is worked out, while the animal still is.
-    r.modify(&chain::DAMAGE, stage::FINAL, |m| {
+    r.modify(&chain::DAMAGE, &phase::FINAL, |m| {
         let q = *m.query();
         let w = m.world();
         if q.other == 0 || !w.players().contains(&q.other) {
@@ -36,7 +36,7 @@ pub fn init(r: &mut Registry) {
             .get_or_insert_with(HashMap::new)
             .insert(q.entity, (q.other, a.level(), i, w.game_time()));
     });
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         let mut struck = STRUCK.lock().unwrap();
         let struck = struck.get_or_insert_with(HashMap::new);

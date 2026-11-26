@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What shows from the tap until the game draws its first frame: the title screen's picture
+     (mods/base/assets/textures/gui/background.png cut to a phone's 20:9), stretched to the screen. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/black" />
+    <item>
+        <bitmap android:src="@drawable/splash_art" android:gravity="fill" />
+    </item>
+</layer-list>

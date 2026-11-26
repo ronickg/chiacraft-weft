@@ -140,7 +140,7 @@ pub fn list(settings: &crate::settings::Settings, dir: PathBuf) {
                 .first_puzzle_hash()
                 .ok_or("the account has no wallet address")?,
         );
-        let deposit = settings.listing_deposit();
+        let deposit = crate::settings::listing_deposit();
         let reader = crate::chiacraft::chain::reader(&settings)?;
         let network = reader.network();
         crate::chiacraft::chain::may_spend(network)?;
@@ -149,7 +149,7 @@ pub fn list(settings: &crate::settings::Settings, dir: PathBuf) {
             return Err("the wallet isn't synced with the chain".into());
         }
         let keys = wallet_keys(network)?;
-        let fee = settings.listing_fee();
+        let fee = crate::settings::listing_fee();
         let pushed = std::time::Instant::now();
         let pushed_at = reader.status().peak.unwrap_or(0);
         let (push, coin) = push_while_full(|| {

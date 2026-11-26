@@ -194,3 +194,31 @@ if __name__ == "__main__":
     spec = json.load(open(sys.argv[1]))
     for (a, b), (d, where) in sorted(pokes(spec, sys.argv[2:] or None).items()):
         print(f"{a} pokes out of {b} by {d:.2f} in {len(where)} frames, e.g. {', '.join(where[:3])}")
+
+
+def feet_low(spec, anim, feet):
+    """The lowest point of `feet` (element names) in each frame of animation `anim` (a dict with
+    "frames", each {"rot", "root"}), the root's offset included."""
+    els = {e["name"]: e for e in spec["elements"]}
+    piv = {b["name"]: np.array(b["pivot"], float) for b in spec["bones"]}
+    out = []
+    for fr in anim["frames"]:
+        W = world(spec["bones"], dict(fr["rot"], root=fr["root"]))
+        out.append(min(((corners(els[f]) - piv[els[f]["bone"]]) @ W[els[f]["bone"]][0].T + W[els[f]["bone"]][1])[:, 1].min()
+                       for f in feet))
+    return out
+
+
+def grounded(spec, anim, feet, bounds=False):
+    """`anim` with its root's height set so its feet stand on the ground (y = 0): a gait written
+    as angles (a crouched stalk, a head-low approach) sinks or floats where its legs bend. Each
+    frame on its lowest foot (`bounds` False: a walk, always a foot down), or the whole clip
+    shifted once so its lowest foot over the loop touches (`bounds` True: a run or charge with
+    airborne moments, keeping its own bounce)."""
+    low = feet_low(spec, anim, feet)
+    frames = []
+    for fr, y in zip(anim["frames"], low):
+        r = list(fr["root"])
+        r[1] = r[1] - (min(low) if bounds else y)
+        frames.append({**fr, "root": r})
+    return {**anim, "frames": frames}

@@ -135,7 +135,7 @@ fn box_vertex(b: Box, v: u32) -> VOut {
     out.graded = select(0u, 1u, world_lit);
     out.sky = select(1.0, unpack_light(b.ids2.y).x, world_lit);
     if world_lit {
-        lit = lightmap(unpack_light(b.ids2.y), scene.params.z, scene.light.x, scene.light.y);
+        lit = lightmap(unpack_light(b.ids2.y), scene.params.z, scene.light.x, scene.light.y, scene.light.w, scene.environment.x);
     }
     // Gamma-space shading applied in linear space, as in the world shader.
     let shade = select(SHADE[face], b.dims.x, b.ids.y == BOX_MODE_QUAD);

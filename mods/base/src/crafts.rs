@@ -7,7 +7,7 @@
 use vitals::crafts::{self, Station};
 use weft_sdk::*;
 
-pub use base_api::CRAFTING;
+pub use base_api::recipes::CRAFTING;
 
 pub static TANNING_FRAME: Block = Block::named("tanning_frame");
 pub static TANNING_PIT: Block = Block::named("tanning_pit");
@@ -15,6 +15,10 @@ pub static CHARCOAL_CLAMP: Block = Block::named("charcoal_clamp");
 static FRAME_MENU: Menu = Menu::named("tanning_frame");
 static PIT_MENU: Menu = Menu::named("tanning_pit");
 static CLAMP_MENU: Menu = Menu::named("charcoal_clamp");
+pub static CRUCIBLE: Block = Block::named("crucible");
+pub static FORGE: Block = Block::named("forge");
+static CRUCIBLE_MENU: Menu = Menu::named("crucible");
+static FORGE_MENU: Menu = Menu::named("forge");
 /// A raw hide off an animal (tanned at a frame or in a pit), sole leather from the pit, and the
 /// oak bark that tans it.
 pub static HIDE: Item = Item::named("hide");
@@ -37,7 +41,7 @@ fn is(item: u32, want: &'static str) -> bool {
         return false;
     }
     match want.strip_prefix('#') {
-        Some(tag) => Tag::named(tag).on_item(item),
+        Some(tag) => Tag::<kind::Any>::named(tag).on_item(item),
         None => item_name(item) == want,
     }
 }
@@ -55,6 +59,8 @@ pub fn register(r: &mut Registry) {
     r.shaped(&CRAFTING, "tanning_frame", 1, &["sts", "t t", "sts"], &[('s', "#stick"), ('t', "#string")]);
     r.shaped(&CRAFTING, "tanning_pit", 1, &["p p", "p p", "ppp"], &[('p', "#planks")]);
     r.shaped(&CRAFTING, "charcoal_clamp", 1, &["ddd", "dld", "ddd"], &[('d', "dirt"), ('l', "#logs")]);
+    r.shaped(&CRAFTING, "crucible", 1, &["b b", "bcb", "bbb"], &[('b', "bricks"), ('c', "#gems/coal")]);
+    r.shaped(&CRAFTING, "forge", 1, &["iii", "bfb", "bbb"], &[('i', "#ingots/iron"), ('b', "bricks"), ('f', "#furnaces")]);
 
     r.entity_component(&WAITING, Waiting { station: 0, done: 0.0, item: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
     r.system(&WAITING, tick);
@@ -62,6 +68,10 @@ pub fn register(r: &mut Registry) {
     station(r, Station::TanningFrame, &TANNING_FRAME, &FRAME_MENU, "wood", "axe", [2.0, 0.0, 2.0], [14.0, 16.0, 14.0]);
     station(r, Station::TanningPit, &TANNING_PIT, &PIT_MENU, "wood", "axe", [0.0, 0.0, 0.0], [16.0, 12.0, 16.0]);
     station(r, Station::CharcoalClamp, &CHARCOAL_CLAMP, &CLAMP_MENU, "gravel", "shovel", [0.0, 0.0, 0.0], [16.0, 12.0, 16.0]);
+    // The metal stations (`metals.rs`): a crucible of fired clay in its hearth, a forge of brick
+    // round an iron hearth.
+    station(r, Station::Crucible, &CRUCIBLE, &CRUCIBLE_MENU, "stone", "pickaxe", [1.0, 0.0, 1.0], [15.0, 14.0, 15.0]);
+    station(r, Station::Forge, &FORGE, &FORGE_MENU, "stone", "pickaxe", [0.0, 0.0, 0.0], [16.0, 16.0, 16.0]);
 }
 
 /// An axe used on a log strips it (Planner, 11-05: "Bark comes from stripping a log with an
@@ -126,43 +136,53 @@ fn station(
     let c = crafts::craft(s);
     let index = crafts::STATIONS.iter().position(|&x| x == s).unwrap_or(0) as u32;
     let name = s.name();
-    let mut m = r
-        .machine(block, menu)
-        .block(move |b| {
-            b.sound_group(sound)
-                .textures(&format!("{name}_top"), &format!("{name}_side"), &format!("{name}_side"))
-                .model_box(from, to)
-                .hardness(1.5)
-                .mineable(tool)
-                .tab(&crate::tabs::FUNCTIONAL)
+    let size = if c.with.is_some() { 3 } else { 2 };
+    r.block(block)
+        .sound_group(sound)
+        .texture(&format!("{name}_side"))
+        .top(&format!("{name}_top"))
+        .bottom(&format!("{name}_side"))
+        .model_box(from, to)
+        .hardness(1.5)
+        .mined_by(tool, weft_sdk::abi::tool_tier::HAND)
+        .tab(&crate::tabs::FUNCTIONAL)
+        .entity(move |e| {
+            e.attach_with(&WAITING, Waiting { station: index, done: 0.0, item: 0 })
+                .inventory(size)
         })
-        .group(
-            "input",
-            Slots::single()
-                .accepts(c.input.trim_start_matches('#'))
-                .limit(s.holds()),
-        );
+        .opens(menu);
+    let mut m = r
+        .menu(menu)
+        .group("input", Slots::single().accepts(c.input).limit(s.holds()).holder());
     if let Some(with) = c.with {
-        m = m.group("with", Slots::single().accepts(with.trim_start_matches('#')));
+        m = m.group("with", Slots::single().accepts(with).holder());
     }
-    m.group("output", Slots::single().output())
-        .attach_with(&WAITING, Waiting { station: index, done: 0.0, item: 0 })
+    m.group("output", Slots::single().output().holder())
+        .player_inventory()
         .screen(move |ui| {
-            crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
-                ui.row(S::row().gap(8.0), |ui| {
-                    ui.spacer();
-                    ui.column(S::column().gap(2.0), |ui| {
-                        ui.group("input");
-                        if c.with.is_some() {
-                            ui.group("with");
-                        }
+            crate::window::window(
+                ui,
+                S::column()
+                    .pad(crate::window::WINDOW_PAD)
+                    .gap(4.0)
+                    .stretch(),
+                &[],
+                |ui| {
+                    ui.row(S::row().gap(8.0), |ui| {
+                        ui.spacer();
+                        ui.column(S::column().gap(2.0), |ui| {
+                            ui.group("input");
+                            if c.with.is_some() {
+                                ui.group("with");
+                            }
+                        });
+                        ui.recipe_arrow_bind(|c| c.menu_component(&WAITING).map_or(0.0, |w| w.done));
+                        ui.group("output");
+                        ui.spacer();
                     });
-                    ui.recipe_arrow_bind(|c| c.menu_component(&WAITING).map_or(0.0, |w| w.done));
-                    ui.group("output");
-                    ui.spacer();
-                });
-                ui.player_inventory(true);
-            });
+                    ui.player_inventory(true);
+                },
+            );
         });
 }
 

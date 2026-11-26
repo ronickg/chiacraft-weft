@@ -20,6 +20,7 @@ mod camp;
 mod food;
 mod health;
 mod load;
+mod rot;
 mod shelter;
 mod stamina;
 mod temperature;
@@ -34,7 +35,8 @@ use weft_sdk::*;
 
 pub use breath::MAX_AIR;
 pub use camp::REST_SECS;
-pub(crate) use food::{crafted, life_used, made_for, spoiled};
+pub(crate) use food::{crafted, life_used, made_for, spoiled, stamp};
+pub(crate) use rot::LARDER;
 
 /// A tick, in seconds.
 const DT: f32 = 1.0 / 20.0;
@@ -46,7 +48,7 @@ pub fn register(r: &mut Registry) {
         .world();
     // Gentle's grace: no monsters appear by themselves in a new world's first nights
     // (`Difficulty::grace_nights`, counted from the world's first day, `calendar::START_DAY`).
-    r.intercept(&question::NATURAL_SPAWN, |q| {
+    r.before_event(&question::NATURAL_SPAWN, |q| {
         static HOSTILE: Tag = Tag::named("hostile");
         let w = q.world();
         let nights = base_api::difficulty().grace_nights;
@@ -62,15 +64,16 @@ pub fn register(r: &mut Registry) {
         Vitals::new(MAX_AIR),
         component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN,
     );
-    r.attach(&PLAYER, &VITALS);
+    r.edit(&PLAYER).attach(&VITALS);
     r.world_tick(tick);
     food::register(r);
+    rot::register(r);
     temperature::register(r);
     stamina::register(r);
     body::register(r);
     // Dying empties the stomach but for a light meal (the one a new player arrives with: Research
     // round 4, H1, so the first death isn't a spiral), and costs part of the XP into the level.
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             let Some(v) = w.component_mut(d.entity, &VITALS) else { continue };
@@ -148,11 +151,16 @@ fn tick(w: &World) {
             continue;
         }
 
-        let s = food::digest(v, d.digest);
+        // The perk web's slower hunger, health and stamina, through base_api's chains.
+        let q = abi::Query { entity: id, ..query() };
+        let pace = w.chain_compute(&base_api::skills::HUNGER_PACE, d.digest as f64, &q) as f32;
+        let s = food::digest(v, pace);
         let stats = v.stats();
         let capacity = v.capacity();
         let full = s.fullness(capacity);
         let (max_health, max_stamina) = stomach::max_health_stamina(stats[0], stats[1], &s, capacity);
+        let max_health = w.chain_compute(&base_api::skills::MAX_HEALTH, max_health as f64, &q) as f32;
+        let max_stamina = w.chain_compute(&base_api::skills::MAX_STAMINA, max_stamina as f64, &q) as f32;
         // Armour lifts it with the ages (`vitals::gear::armour`: a full same-age set takes it to the
         // age's reference, about 25 engine points in the Stone Age's middle, 65 in the Iron Age's).
         let max_health = max_health + crate::player::armor_of(w, id).1 * base_api::HEALTH_SCALE;
@@ -165,7 +173,8 @@ fn tick(w: &World) {
         food::effects(v, &s, capacity);
         body::tick(v, &stats);
         if pulse {
-            food::age(w, id);
+            // Carried food ages by the air one feels (`rot.rs`), then is stamped and marked.
+            rot::carried(w, id, v.outside);
             load::weigh(w, id, v, &stats);
         }
         let mods = effects::combine(v.effects());

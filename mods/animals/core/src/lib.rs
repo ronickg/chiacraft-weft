@@ -5,12 +5,16 @@
 
 use std::sync::Mutex;
 
+pub mod ambient;
 pub mod balance;
 pub mod biology;
 pub mod bodies;
+pub mod bosses;
 pub mod coats;
 pub mod danger;
+pub mod eggs;
 pub mod evolution;
+pub mod groups;
 pub mod hides;
 pub mod journal;
 pub mod life;
@@ -18,6 +22,7 @@ pub mod meat;
 pub mod memory;
 pub mod needs;
 pub mod nests;
+pub mod parts;
 pub mod perception;
 pub mod roles;
 pub mod routines;
@@ -44,21 +49,22 @@ pub fn problems() -> Vec<String> {
 }
 
 #[cfg(feature = "sdk")]
-unsafe impl weft_sdk::Value for coats::Genome {
-    // As `weft_sdk::value!` writes it, so saves and other mods read it alike.
-    fn schema() -> String {
-        format!(
-            "{{seed:{},species:{},breed:{},female:{},genes:{},core:{},version:{},stage:{},scars:{},temper:{}}}",
-            <u32 as weft_sdk::Value>::schema(),
-            <u8 as weft_sdk::Value>::schema(),
-            <u8 as weft_sdk::Value>::schema(),
-            <u8 as weft_sdk::Value>::schema(),
-            <[u8; 32] as weft_sdk::Value>::schema(),
-            <[u8; 32] as weft_sdk::Value>::schema(),
-            <u8 as weft_sdk::Value>::schema(),
-            <u8 as weft_sdk::Value>::schema(),
-            <[u8; 8] as weft_sdk::Value>::schema(),
-            <[u8; 2] as weft_sdk::Value>::schema()
-        )
-    }
-}
+unsafe impl weft_sdk::Value for coats::Genome {}
+
+// As `weft_sdk::value!` writes it, so saves and other mods read it alike.
+#[cfg(feature = "sdk")]
+weft_sdk::raw_data!(coats::Genome, {
+    format!(
+        "{{seed:{},species:{},breed:{},female:{},genes:{},core:{},version:{},stage:{},scars:{},temper:{}}}",
+        u32::schema(),
+        u8::schema(),
+        u8::schema(),
+        u8::schema(),
+        <[u8; 32]>::schema(),
+        <[u8; 32]>::schema(),
+        u8::schema(),
+        u8::schema(),
+        <[u8; 8]>::schema(),
+        <[u8; 2]>::schema()
+    )
+});

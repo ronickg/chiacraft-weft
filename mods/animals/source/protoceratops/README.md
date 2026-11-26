@@ -38,3 +38,10 @@ down and cropping ferns to the ground; `build.py` checks flicker, joints, pokes 
 Decided: the real size, the head a little bigger than life; the frill a plate rising up and back
 over the neck; amber-brown eyes on the sides; wild, in herds; animations idle (cropping ferns,
 looking about), walk, run (a heavy trot), lie (on its belly, the legs folded under).
+
+Behaviour clips (11-05, `src/anim.rs`): stare, graze, drink, watch, sleep (also in the lying file),
+approach and charge loop; sniff, look, scratch, stretch, alarm, rear, play, groom, nuzzle and flinch
+play once; death holds. A mother stands her ground for her young, so it has rear (the forequarters
+lifted a little, the head tipped to turn the frill at the threat, hind feet planted) and charge
+(head down, frill forward). `build.py` asserts the loops, every standing clip's feet within 0.3 of
+the ground, the gaits' and rear's grounding, and death on its lowest point each frame.

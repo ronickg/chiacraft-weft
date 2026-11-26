@@ -79,7 +79,7 @@ pub fn register(r: &mut Registry) {
 
 /// The day since the world began, the hour (06:00 at the day's start) and the season (in a
 /// dimension with a calendar).
-fn now(w: &World) -> (u64, f32, Option<usize>) {
+pub(crate) fn now(w: &World) -> (u64, f32, Option<usize>) {
     let time = w.day_time();
     let hour = ((time % calendar::DAY_TICKS) as f32 / 1000.0 + 6.0) % 24.0;
     let season = (SEASONS.on_dimension(w.dimension()).unwrap_or(0) > 0).then(|| calendar::date(time).season.index() as usize);
@@ -138,6 +138,21 @@ fn now_heading(w: &World) -> f32 {
     air::heading(w.seed(), day, hour)
 }
 
+/// The wind at `pos` now, m/s, and where it blows to in degrees clockwise from north: its
+/// biome's air as the engine is told it (`/air` included). The glider drifts with it.
+pub(crate) fn wind_at(w: &World, pos: BlockPos) -> (f32, f32) {
+    let heading = match *SET.lock().unwrap() {
+        Some((_, _, h, _, until)) if w.game_time() < until => h,
+        _ => now_heading(w),
+    };
+    let id = w.biome(pos);
+    let speed = biomes()
+        .iter()
+        .find(|b| b.0 == id)
+        .map_or(0.0, |&(id, c)| air_of(w, id, &c).wind);
+    (speed, heading)
+}
+
 /// The air in biome `id` now: fog (blizzards and dust storms count as fog), wind, snow lying,
 /// and whether it snows or dust blows.
 fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
@@ -159,6 +174,13 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
         && climate::thunders(c.celsius, c.seasons, season, key, day);
     let wind = air::wind(c.wind, season, key, day, hour, storm);
     let mut fog = air::fog(c.fog, climate::Fog::from_index(c.fog_kind), season, key, day, hour, wind);
+    // A thin dawn mist on every calm, clear morning that is no fog day, at the season's sunrise.
+    let sunrise = if season.is_some() {
+        12.0 - calendar::daylight_hours((day % calendar::YEAR_DAYS as u64) as f32 + hour / 24.0, base_api::calendars::FOUR_SWING) / 2.0
+    } else {
+        6.0
+    };
+    fog = fog.max(air::dawn_mist(c.humidity, sunrise, hour, wind, raining));
     let mut flags = 0;
     if raining && place.air(day, hour, true) < air::SNOWS_BELOW {
         flags |= air_flags::SNOWING;
@@ -169,7 +191,11 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
         flags |= air_flags::DUST;
         fog = fog.max(dust * 0.95);
     }
-    BiomeAir { biome: id, fog, wind, snow, flags: flags | aurora }
+    // How fast the ground dries here after rain (the engine's wet ground, `Scene::canopy.y`).
+    let drying = air::drying_byte(air::drying_secs(place.air(day, hour, raining), c.humidity, wind));
+    // Where rain turns to snow up a mountain (`air::LAPSE`), for the pack's rain.
+    let line = air::snow_line_bits(place.air(day, hour, raining));
+    BiomeAir { biome: id, fog, wind, snow, flags: flags | aurora | drying << air_flags::DRYING_SHIFT | line << air_flags::SNOWLINE_SHIFT }
 }
 
 /// Biome `id`'s share in a per-biome list (`air::AURORA`, `air::CANOPY`) as 0 to 255, 0 for one

@@ -100,11 +100,11 @@ pub fn unpack(a: &[u32; 10], more: &More) -> Option<Genome> {
 pub fn init(r: &mut Registry) {
     r.entity_component(&BREEDING, Breeding::default(), component_flags::SAVE | component_flags::SYNC_MENU);
     for s in &SPECIES {
-        r.attach(s.kind, &BREEDING);
+        r.edit(s.kind).attach(&BREEDING);
     }
     // Counted for `/animal census`: deaths other than of old age (counted in `animal::old_age`).
     // (By its kind: its components are gone by the time the event comes.)
-    r.on(&actions::DIE, |b| {
+    r.on_event(&actions::DIE, |b| {
         for d in b.iter() {
             if d.cause != damage_cause::VOID
                 && let Some(i) = SPECIES.iter().position(|s| s.kind.id() == d.kind)
@@ -221,7 +221,7 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
         let room = crowd.max(s.bio.social.group().1);
         if roll < life::want_chance(days, near, room, a.stage) {
             weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {crowd})", s.name);
-            w.damage(id, 1e9, 0, damage_cause::STARVE);
+            w.damage(id, Damage::new(1e9, damage_cause::STARVE));
             return;
         }
         wild_love(w, id, index, a, &b, &kin, near, crowd, days);
@@ -481,14 +481,16 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
         };
         let angle = k as f64 / n as f64 * std::f64::consts::TAU;
         let at = [st.pos.x + angle.cos() * 0.6, st.pos.y, st.pos.z + angle.sin() * 0.6];
-        // A fish's eggs lie in the water for their time (`life::carrying`), then the fry come.
-        if s.gestation() > 0 || s.in_water() {
+        if s.gestation() > 0 {
             born(w, at, &y, owner);
         } else {
             clutch.push(y);
         }
     }
-    if animals_core::nests::site(s.name).is_some() {
+    if s.in_water() {
+        // A fish's roe, on the bottom under her; its fry hatch from it (`eggs::lay_roe`).
+        crate::eggs::lay_roe(w, st.pos.to_array(), &clutch, owner);
+    } else if animals_core::nests::site(s.name).is_some() {
         crate::eggs::lay_in_nest(w, index, id, st.pos.to_array(), &clutch, owner);
     } else {
         crate::eggs::lay(w, st.pos.to_array(), &clutch, owner);
@@ -497,7 +499,7 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
     let what = if s.gestation() > 0 {
         "young born"
     } else if s.in_water() {
-        "fry hatched"
+        "roe laid"
     } else {
         "eggs laid"
     };

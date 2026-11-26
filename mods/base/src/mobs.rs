@@ -3,176 +3,80 @@
 use weft_sdk::ai;
 use weft_sdk::*;
 
-pub static ZOMBIE: EntityKind = EntityKind::named("zombie");
-pub static SPIDER: EntityKind = EntityKind::named("spider");
-pub static PIG: EntityKind = EntityKind::named("pig");
-pub static CREEPER: EntityKind = EntityKind::named("creeper");
-pub static SKELETON: EntityKind = EntityKind::named("skeleton");
-pub static SHEEP: EntityKind = EntityKind::named("sheep");
-pub static CHICKEN: EntityKind = EntityKind::named("chicken");
-pub static ARROW: EntityKind = EntityKind::named("arrow");
-static EGG: Item = Item::named("egg");
-/// Ticks of whatever a mob counts: a creeper's fuse, a skeleton's reload, a chicken's next egg.
+use base_api::entities::*;
+use base_api::items::{ARROW as ARROW_ITEM, BOW, EGG};
+/// Ticks of whatever a mob counts: a skeleton's reload, a chicken's next egg.
 static FUSE: Component<u32> = Component::named("fuse");
-static SHOOTER: Component<u64> = Component::named("shooter");
+/// A player's arrow on the curve (`vitals::gear::arrow_hit`): its hit at full draw (the bow's
+/// times and the web's ranged damage in it), its item level (what an over-tier cap reads) and who
+/// shot it. A skeleton's arrow has none: it hits for its row's hit (below).
+static ARROW_SHOT: Component<[f64; 3]> = Component::named("arrow_shot");
+/// A full draw's speed, blocks a tick (vanilla's 3): an arrow hits by its speed over this.
+const FULL_SPEED: f64 = 3.0;
+/// Ours: vanilla's creeper (upstream removed it).
+pub static CREEPER: EntityKind = EntityKind::named("creeper");
 
-/// A part of a model written as vanilla's are, y down from 24, so their textures fit.
-fn vanilla_part(name: &str, pivot: [f32; 3], boxes: &[([f32; 3], [f32; 3], [f32; 2])]) -> ModelPart {
-    let mut part = ModelPart::new(name, [pivot[0], 24.0 - pivot[1], pivot[2]]);
-    for &(at, size, uv) in boxes {
-        part = part.cuboid([at[0], -(at[1] + size[1]), at[2]], size, uv);
+use base_api::entities::COW;
+
+/// The mobs `vitals::mobs` gives numbers, by their row's name.
+static MOB_KINDS: [(&EntityKind, &str); 4] = [(&ZOMBIE, "zombie"), (&SPIDER, "spider"), (&SKELETON, "skeleton"), (&CREEPER, "creeper")];
+
+/// "player", or a mob's row name, for the night checks' log lines.
+fn fighter(w: &World, id: u64) -> Option<&'static str> {
+    if w.players_iter().any(|p| p == id) {
+        return Some("player");
     }
-    part
+    let kind = w.entity(id)?.kind;
+    MOB_KINDS
+        .iter()
+        .find(|(k, _)| k.id() == kind)
+        .map(|(_, n)| *n)
 }
 
-/// Legs as vanilla's, hanging from `y` (y down), back ones at z 7, front ones at z -5.
-fn vanilla_legs(x: f32, y: f32) -> [ModelPart; 4] {
-    let height = 24.0 - y;
-    let leg = |name, px, pz| vanilla_part(name, [px, y, pz], &[([-2.0, 0.0, -2.0], [4.0, height, 4.0], [0.0, 16.0])]);
-    [leg("leg0", -x, 7.0), leg("leg1", x, 7.0), leg("leg2", x, -5.0), leg("leg3", -x, -5.0)]
+/// A mob's numbers on the curve (`vitals::mobs`).
+fn curve(name: &str) -> vitals::combat::Stats {
+    vitals::mobs::mob(name)
+        .map(|m| m.stats())
+        .expect("a row in vitals::mobs")
 }
-
-/// Vanilla's creeper (`CreeperModel`): 64 x 32.
-fn creeper_model() -> Model {
-    let leg = |name, x, z| vanilla_part(name, [x, 18.0, z], &[([-2.0, 0.0, -2.0], [4.0, 6.0, 4.0], [0.0, 16.0])]);
-    Model::from(vec![
-        vanilla_part("head", [0.0, 6.0, 0.0], &[([-4.0, -8.0, -4.0], [8.0, 8.0, 8.0], [0.0, 0.0])]),
-        vanilla_part("body", [0.0, 6.0, 0.0], &[([-4.0, 0.0, -2.0], [8.0, 12.0, 4.0], [16.0, 16.0])]),
-        leg("leg0", -2.0, 4.0),
-        leg("leg1", 2.0, 4.0),
-        leg("leg2", 2.0, -4.0),
-        leg("leg3", -2.0, -4.0),
-    ])
-    .uv_size(64, 32)
-}
-
-/// Vanilla's skeleton (`SkeletonModel`): a thin biped, arms held out like a zombie's while aiming.
-fn skeleton_model() -> Model {
-    let forward = 90.0;
-    Model::from(vec![
-        vanilla_part("head", [0.0, 0.0, 0.0], &[([-4.0, -8.0, -4.0], [8.0, 8.0, 8.0], [0.0, 0.0])]),
-        vanilla_part("body", [0.0, 0.0, 0.0], &[([-4.0, 0.0, -2.0], [8.0, 12.0, 4.0], [16.0, 16.0])]),
-        vanilla_part("rightArm", [-5.0, 2.0, 0.0], &[([-1.0, -2.0, -1.0], [2.0, 12.0, 2.0], [40.0, 16.0])])
-            .mirrored()
-            .rotation(forward, 0.0, 0.0),
-        vanilla_part("leftArm", [5.0, 2.0, 0.0], &[([-1.0, -2.0, -1.0], [2.0, 12.0, 2.0], [40.0, 16.0])]).rotation(forward, 0.0, 0.0),
-        vanilla_part("rightLeg", [-2.0, 12.0, 0.0], &[([-1.0, 0.0, -1.0], [2.0, 12.0, 2.0], [0.0, 16.0])]).mirrored(),
-        vanilla_part("leftLeg", [2.0, 12.0, 0.0], &[([-1.0, 0.0, -1.0], [2.0, 12.0, 2.0], [0.0, 16.0])]),
-    ])
-    .uv_size(64, 32)
-}
-
-/// Vanilla's sheep (`SheepModel` and `SheepFurModel`) in one texture: the sheep in the upper half,
-/// its wool in the lower, on boxes grown over it.
-fn sheep_model() -> Model {
-    let wool = |p: [f32; 2]| [p[0], p[1] + 32.0];
-    let head = vanilla_part("head", [0.0, 6.0, -8.0], &[([-3.0, -4.0, -6.0], [6.0, 6.0, 8.0], [0.0, 0.0])])
-        .cuboid([-3.0, -2.0, -4.0], [6.0, 6.0, 6.0], wool([0.0, 0.0]))
-        .inflated(0.6);
-    let body = vanilla_part("body", [0.0, 5.0, 2.0], &[([-4.0, -10.0, -7.0], [8.0, 16.0, 6.0], [28.0, 8.0])])
-        .cuboid([-4.0, -6.0, -7.0], [8.0, 16.0, 6.0], wool([28.0, 8.0]))
-        .inflated(1.75)
-        .rotation(-90.0, 0.0, 0.0);
-    let mut parts = vec![head, body];
-    parts.extend(vanilla_legs(3.0, 12.0).map(|l| {
-        l.cuboid([-2.0, -6.0, -2.0], [4.0, 6.0, 4.0], wool([0.0, 16.0]))
-            .inflated(0.5)
-    }));
-    Model::from(parts).uv_size(64, 64)
-}
-
-/// Vanilla's chicken: 64 x 32.
-fn chicken_model() -> Model {
-    let leg = |name, x| vanilla_part(name, [x, 19.0, 1.0], &[([-1.0, 0.0, -3.0], [3.0, 5.0, 3.0], [26.0, 0.0])]);
-    Model::from(vec![
-        vanilla_part(
-            "head",
-            [0.0, 15.0, -4.0],
-            &[
-                ([-2.0, -6.0, -2.0], [4.0, 6.0, 3.0], [0.0, 0.0]),
-                ([-2.0, -4.0, -4.0], [4.0, 2.0, 2.0], [14.0, 0.0]),
-                ([-1.0, -2.0, -3.0], [2.0, 2.0, 2.0], [14.0, 4.0]),
-            ],
-        ),
-        vanilla_part("body", [0.0, 16.0, 0.0], &[([-3.0, -4.0, -3.0], [6.0, 8.0, 6.0], [0.0, 9.0])]).rotation(-90.0, 0.0, 0.0),
-        vanilla_part("wing0", [-4.0, 13.0, 0.0], &[([0.0, 0.0, -3.0], [1.0, 4.0, 6.0], [24.0, 13.0])]),
-        vanilla_part("wing1", [4.0, 13.0, 0.0], &[([-1.0, 0.0, -3.0], [1.0, 4.0, 6.0], [24.0, 13.0])]),
-        leg("rightLeg", -2.0),
-        leg("leftLeg", 1.0),
-    ])
-    .uv_size(64, 32)
-}
-
-/// A shot arrow: a thin stick.
-fn arrow_model() -> Model {
-    Model::from(vec![ModelPart::new("body", [0.0, 2.0, 0.0]).cuboid([-0.5, -0.5, -8.0], [1.0, 1.0, 16.0], [0.0, 0.0])]).uv_size(32, 32)
-}
-
-/// Vanilla's cow (`CowModel`): head with muzzle and horns, body lying along z with its udder.
-fn cow_model() -> Model {
-    let head = vanilla_part(
-        "head",
-        [0.0, 4.0, -8.0],
-        &[
-            ([-4.0, -4.0, -6.0], [8.0, 8.0, 6.0], [0.0, 0.0]),
-            ([-3.0, 1.0, -7.0], [6.0, 3.0, 1.0], [1.0, 33.0]),
-            ([-5.0, -5.0, -5.0], [1.0, 3.0, 1.0], [22.0, 0.0]),
-            ([4.0, -5.0, -5.0], [1.0, 3.0, 1.0], [22.0, 0.0]),
-        ],
-    );
-    let body = vanilla_part(
-        "body",
-        [0.0, 5.0, 2.0],
-        &[([-6.0, -10.0, -7.0], [12.0, 18.0, 10.0], [18.0, 4.0]), ([-2.0, 2.0, -8.0], [4.0, 6.0, 1.0], [52.0, 0.0])],
-    )
-    .rotation(-90.0, 0.0, 0.0);
-    let mut parts = vec![head, body];
-    parts.extend(vanilla_legs(4.0, 12.0));
-    Model::from(parts).uv_size(64, 64)
-}
-
-/// Vanilla's pig (`PigModel`).
-fn pig_model() -> Model {
-    let head = vanilla_part(
-        "head",
-        [0.0, 12.0, -6.0],
-        &[([-4.0, -4.0, -8.0], [8.0, 8.0, 8.0], [0.0, 0.0]), ([-2.0, 0.0, -9.0], [4.0, 3.0, 1.0], [16.0, 16.0])],
-    );
-    let body = vanilla_part("body", [0.0, 11.0, 2.0], &[([-5.0, -10.0, -7.0], [10.0, 16.0, 8.0], [28.0, 8.0])]).rotation(-90.0, 0.0, 0.0);
-    let mut parts = vec![head, body];
-    parts.extend(vanilla_legs(3.0, 18.0));
-    Model::from(parts).uv_size(64, 64)
-}
-pub static COW: EntityKind = EntityKind::named("cow");
 
 pub fn register(r: &mut Registry) {
     // The engine's player kind, drawn as the same humanoid as the zombie.
     r.set_model(&PLAYER, humanoid(false));
+    r.edit(&PLAYER).hitboxes(Hitboxes::humanoid());
     r.entity(&ZOMBIE)
+        .hitboxes(Hitboxes::humanoid().reaching())
         .tag("hostile")
+        // Undead, as vanilla's: poison and regeneration take no hold.
+        .tag("immune_effect/base:poison")
+        .tag("immune_effect/base:regeneration")
+        .equipment()
         .sound("ambient")
         .sound("hurt")
         .sound("death")
         .size(0.6, 1.95)
-        .max_health(20.0)
+        .max_health(curve("zombie").health)
         .walk_speed(2.6)
         .hostile()
-        .flags(entity_flags::BURNS_IN_SUN)
-        .model(humanoid(true))
-        .attack_damage(3.0)
+        .burns_in_sun()
+        .attack_damage(curve("zombie").hit)
+        // Its band's seconds between hits (`vitals::combat::Band::interval`).
+        .attack_speed(1.0 / curve("zombie").interval)
         .reach(1.3)
         .goals(hostile(ai::Goals::new().aggressive(35.0)));
     r.entity(&SPIDER)
+        .hitboxes(spider_parts())
         .tag("hostile")
         .sound("ambient")
         .sound("hurt")
         .sound("death")
         .size(1.3, 0.9)
-        .max_health(16.0)
+        .max_health(curve("spider").health)
         .walk_speed(3.6)
         .hostile()
-        .model(spider())
-        .attack_damage(2.0)
+        .attack_damage(curve("spider").hit)
+        // Its band's seconds between hits (`vitals::combat::Band::interval`).
+        .attack_speed(1.0 / curve("spider").interval)
         // Vanilla's reach goes by a mob's width: a body this wide stops further off.
         .reach(2.4)
         // In daylight it only fights back.
@@ -182,42 +86,173 @@ pub fn register(r: &mut Registry) {
                 .neutral(),
         ));
     r.entity_component(&FUSE, 0u32, 0);
-    r.entity_component(&SHOOTER, 0u64, 0);
+    r.entity_component(&ARROW_SHOT, [0.0; 3], 0);
+    r.edit(&ARROW).attach(&ARROW_SHOT);
+    // A skeleton's arrow hits for its row's hit (`vitals::mobs`), not by its speed: set first, so
+    // armour and the rest still apply.
+    r.modify(&chain::DAMAGE, &phase::BASE, |m| {
+        let q = *m.query();
+        if q.cause != damage_cause::PROJECTILE {
+            return;
+        }
+        if m.world()
+            .entity(q.other)
+            .is_some_and(|e| e.kind == SKELETON.id())
+        {
+            // In the head, half as much again, as every arrow (`PROJECTILE_DAMAGE` above).
+            let head = if q.part == hitbox_part::HEAD { 2.0 } else { 1.0 };
+            m.value = curve("skeleton").hit as f64 * head;
+        }
+    });
+    // One line per hit between a player and a mob, and per death of either (night checks:
+    // `mods/testkit/scripts/night_survival.txt`).
+    r.on_event(&actions::HURT, |b| {
+        let w = b.world();
+        for h in b.iter() {
+            let (Some(target), Some(by)) = (fighter(&w, h.entity), fighter(&w, h.source)) else { continue };
+            if (target == "player") == (by == "player") {
+                continue;
+            }
+            let (health, max) = w
+                .entity(h.entity)
+                .map_or((0.0, 0.0), |e| (e.health, e.max_health));
+            weft_sdk::info!(
+                "mob_fight: {by} {} hit {target} {} for {:.2} (cause {}), health {health:.1}/{max:.1}",
+                h.source,
+                h.entity,
+                h.amount,
+                h.cause
+            );
+        }
+    });
+    r.on_event(&actions::DIE, |b| {
+        let w = b.world();
+        for d in b.iter() {
+            let who = if w.players_iter().any(|p| p == d.entity) {
+                Some("player")
+            } else {
+                MOB_KINDS
+                    .iter()
+                    .find(|(k, _)| k.id() == d.kind)
+                    .map(|(_, n)| *n)
+            };
+            if let Some(who) = who {
+                weft_sdk::info!("mob_fight: {who} {} died (cause {}, by {})", d.entity, d.cause, d.source);
+            }
+        }
+    });
+    // Over-tier armour against them counts at most their size's cap (`base_api::chains::GEAR_COUNTS`).
+    r.modify(&base_api::chains::GEAR_COUNTS, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        let Some(kind) = m.world().entity(q.other).map(|e| e.kind) else { return };
+        let Some(mob) = MOB_KINDS
+            .iter()
+            .find(|(k, _)| k.id() == kind)
+            .and_then(|(_, n)| vitals::mobs::mob(n))
+        else {
+            return;
+        };
+        m.value *= vitals::combat::cap_share(mob.size(), q.amount as f32, mob.level()) as f64;
+    });
+    // Their armour (`vitals::mobs`), through the same formula as the player's and the animals'.
+    r.modify(&chain::DAMAGE, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        if !crate::player::armor_applies(q.cause) {
+            return;
+        }
+        let Some(kind) = m.world().entity(q.entity).map(|e| e.kind) else { return };
+        let Some(mob) = MOB_KINDS
+            .iter()
+            .find(|(k, _)| k.id() == kind)
+            .and_then(|(_, n)| vitals::mobs::mob(n))
+        else {
+            return;
+        };
+        m.value *= 1.0 - vitals::combat::armour_cut(mob.stats().armour, m.value as f32) as f64;
+    });
+    // Ours: the creeper stays (upstream removed it; our blood moon sends creepers, `events.rs`).
+    // Its look: `models/creeper.geo.json` (vanilla's layout, 64 x 32) and `textures/entity/creeper.png`.
     r.entity(&CREEPER)
         .sound("hurt")
         .sound("death")
         .tag("hostile")
         .size(0.6, 1.7)
-        .max_health(20.0)
+        .max_health(curve("creeper").health)
         .walk_speed(2.5)
         .hostile()
-        .model(creeper_model())
         .attach(&FUSE)
         .goals(creeper());
     r.entity(&SKELETON)
+        .hitboxes(Hitboxes::humanoid().slim(2.0).reaching())
         .sound("ambient")
         .sound("hurt")
         .sound("death")
         .tag("hostile")
+        .tag("immune_effect/base:poison")
+        .tag("immune_effect/base:regeneration")
+        .equipment()
         .size(0.6, 1.99)
-        .max_health(20.0)
+        .max_health(curve("skeleton").health)
         .walk_speed(2.5)
         .hostile()
-        .flags(entity_flags::BURNS_IN_SUN)
-        .model(skeleton_model())
+        .burns_in_sun()
         .attach(&FUSE)
         .goals(skeleton());
+    r.on_event(&actions::SPAWN, |batch| {
+        for spawned in batch.iter() {
+            if spawned.kind == SKELETON.id() {
+                batch
+                    .world()
+                    .inventory(spawned.entity)
+                    .set(0, ItemStack::new(BOW.id(), 1));
+            }
+        }
+    });
+    // Drawn as long as the use button is held, shot when it is let go (upstream's). The bow itself
+    // is ours, a tool of parts (`parts.rs`), so this only adds the drawing and shooting.
+    r.edit(&BOW).use_until_released().on_release(shoot_bow);
+    // A player's arrow hits on the curve (`vitals::gear::arrow_hit`) by its speed, as vanilla's
+    // does by its own: less drawn, less. Its item level counts against a big creature at most its
+    // size's cap over it, as a blade's (`base_api::chains::GEAR_COUNTS`). In the head it hurts
+    // twice as much, a bow's critical hit: `part` is the part of the hitbox it went into.
+    r.modify(&chain::PROJECTILE_DAMAGE, &phase::MULTIPLY, |m| {
+        let q = *m.query();
+        let w = m.world();
+        if !w.entity(q.entity).is_some_and(|e| e.kind == ARROW.id()) {
+            return;
+        }
+        if let Some([hit, level, owner]) = w.component(q.entity, &ARROW_SHOT).filter(|a| a[0] > 0.0) {
+            let counts = w.chain_compute(
+                &base_api::chains::GEAR_COUNTS,
+                1.0,
+                &abi::Query { entity: owner as u64, other: q.other, amount: level, ..abi::Query::DEFAULT },
+            );
+            m.value = hit * (q.amount / FULL_SPEED) * counts;
+        }
+        if q.part == hitbox_part::HEAD {
+            m.value *= 2.0;
+        }
+    });
+    // Drawing it narrows the view, more the further it is drawn (vanilla's 15% at full draw).
+    r.modify(&attribute::FOV, &phase::MULTIPLY, |m| {
+        let Some(s) = m.world().entity(m.query().entity) else { return };
+        if s.using == BOW.id() {
+            let drawn = (s.using_ticks as f64 / 20.0).min(1.0);
+            m.value *= 1.0 - drawn * drawn * 0.15;
+        }
+    });
+    r.shaped(&crate::recipes::CRAFTING, "bow", 1, &[" s#", "s #", " s#"], &[('s', "#stick"), ('#', "#string")]);
+    // Vanilla's arrow: 0.05 a tick down, stuck a minute where it hits a block.
     r.entity(&ARROW)
         .no_egg()
         .size(0.5, 0.5)
         .unpushable()
         .max_health(1.0)
         .walk_speed(0.0)
-        .model(arrow_model())
-        .attach(&SHOOTER)
-        .always_active()
-        .goals(ai::Goals::new().then(arrow_flies));
+        .attribute(&attribute::GRAVITY, 0.625)
+        .projectile(Projectile::new().sticks(1200));
     r.entity(&SHEEP)
+        .hitboxes(sheep_parts())
         .sound("ambient")
         .sound("hurt")
         .sound("death")
@@ -226,9 +261,9 @@ pub fn register(r: &mut Registry) {
         .max_health(8.0)
         .walk_speed(2.3)
         .passive()
-        .model(sheep_model())
         .goals(passive());
     r.entity(&CHICKEN)
+        .hitboxes(chicken_parts())
         .sound("ambient")
         .sound("hurt")
         .sound("death")
@@ -237,10 +272,10 @@ pub fn register(r: &mut Registry) {
         .max_health(4.0)
         .walk_speed(2.5)
         .passive()
-        .model(chicken_model())
         .attach(&FUSE)
         .goals(passive_chicken());
     r.entity(&PIG)
+        .hitboxes(pig_parts())
         .tag("livestock")
         .sound("ambient")
         .sound("hurt")
@@ -249,9 +284,9 @@ pub fn register(r: &mut Registry) {
         .max_health(10.0)
         .walk_speed(2.5)
         .passive()
-        .model(pig_model())
         .goals(passive());
     r.entity(&COW)
+        .hitboxes(Hitboxes::quadruped())
         .tag("livestock")
         .sound("ambient")
         .sound("hurt")
@@ -260,23 +295,22 @@ pub fn register(r: &mut Registry) {
         .max_health(10.0)
         .walk_speed(2.2)
         .passive()
-        .model(cow_model())
         .goals(passive());
     // Vanilla amounts; meat comes out cooked when the animal burns.
-    r.loot(&ZOMBIE)
-        .pool(Pool::new().items("rotten_flesh", 0, 2));
-    r.loot(&SPIDER)
-        .pool(Pool::new().items("string", 0, 2))
-        .pool(
-            Pool::new()
-                .when(Cond::KilledByPlayer)
-                .when(Cond::Chance(0.33))
-                .item("spider_eye"),
-        );
-    r.loot(&CREEPER).pool(Pool::new().items("gunpowder", 0, 2));
-    r.loot(&SKELETON)
-        .pool(Pool::new().items("arrow", 0, 2))
-        .pool(Pool::new().items("bone", 0, 2));
+    // The hostile ones' from `vitals::mobs::LOOT` (the loot check prices them); a chance roll only
+    // when a player killed it.
+    for (kind, mob) in [(&ZOMBIE, "zombie"), (&SPIDER, "spider"), (&CREEPER, "creeper"), (&SKELETON, "skeleton")] {
+        let mut table = r.loot(kind);
+        for &(_, item, lo, hi, chance) in vitals::mobs::LOOT.iter().filter(|l| l.0 == mob) {
+            let pool = Pool::new().items(item, lo, hi);
+            table = table.pool(if chance < 1.0 {
+                pool.when(Cond::killed_by_player())
+                    .when(Cond::chance(chance))
+            } else {
+                pool
+            });
+        }
+    }
     r.loot(&SHEEP).pool(Pool::new().item("wool")).pool(
         Pool::new().entry(
             Entry::item("mutton")
@@ -313,8 +347,8 @@ pub fn register(r: &mut Registry) {
     // Natural spawning, as rules the engine runs: monsters in the dark (spiders more in deep
     // caves), animals in small herds on grass by day, rarely once the world is loaded.
     r.natural_spawn(&ZOMBIE).light(0, 6).weight(2);
-    r.natural_spawn(&CREEPER).light(0, 6).weight(2);
     r.natural_spawn(&SKELETON).light(0, 6).weight(2);
+    r.natural_spawn(&CREEPER).light(0, 6).weight(2);
     r.natural_spawn(&SPIDER).light(0, 6);
     r.natural_spawn(&SPIDER)
         .light(0, 6)
@@ -370,14 +404,14 @@ fn blast(w: &World, id: u64, at: Vec3, radius: f64) {
         let d = (s.pos - at).length_squared().sqrt();
         let impact = (1.0 - d / (radius * 2.0)).max(0.0);
         let damage = (impact * impact + impact) / 2.0 * 7.0 * radius * 2.0 + 1.0;
-        w.damage(other, damage as f32, id, damage_cause::EXPLOSION);
+        w.damage(other, Damage::new(damage as f32, damage_cause::EXPLOSION).by(id));
     }
     // Vanilla's: one going off in a liquid breaks nothing (a waterlogged block's cell too), and
     // liquids don't break at all.
     if w.liquid_in_cell(block_pos_of(at)).is_none() {
         w.fill(Shape::blast(at, radius, w.random()), 0)
-            .keep(Filter::unbreakable())
-            .keep(Filter::liquids());
+            .keep("#unbreakable")
+            .keep("#liquids");
     }
     w.spawn_particles(&Particle::named("core:poof"), at)
         .count(40)
@@ -409,6 +443,54 @@ fn skeleton() -> ai::Goals {
         .then(ai::wander(0.6, 10.0))
 }
 
+/// Vanilla's bow: full strength after a second's draw, the curve easing in; an arrow from the
+/// inventory, none taken in creative.
+fn shoot_bow(u: &mut ItemUse) -> bool {
+    let (w, id) = (u.world(), u.entity());
+    let t = u.held_ticks() as f32 / 20.0;
+    let power = vitals::gear::draw_power(t) as f64;
+    if power < 0.1 {
+        return false;
+    }
+    let creative = w.creative(id);
+    let inv = w.inventory(id);
+    let arrow = (0..inv.len()).find(|&s| inv.get(s).item == ARROW_ITEM.id());
+    if arrow.is_none() && !creative {
+        return false;
+    }
+    let Some(s) = w.entity(id) else { return false };
+    // Three blocks a tick at full draw.
+    let v = look_dir(s.yaw, s.pitch) * (power * FULL_SPEED * 20.0);
+    // Its hit at full draw: the arrow's level (a plain one is flint-tipped), the bow's times (its
+    // power over a Sound yew bow's), the web's ranged damage.
+    let level = arrow
+        .and_then(|slot| base_api::ITEM_LEVEL.on_stack(&inv.get(slot)))
+        .unwrap_or(vitals::gear::ARROW_LEVEL);
+    let bow_times = crate::parts::BOW_POWER
+        .on_stack(&u.stack())
+        .zip(crafting::kinds::kind("bow"))
+        .map_or(1.0, |(d, k)| d / k.damage);
+    let web = base_api::skills::times(&w, id, base_api::skills::Family::RangedDamage);
+    let hit = vitals::gear::arrow_hit(level, bow_times) * web;
+    let shot = w.spawn_with(
+        &ARROW,
+        s.eye(),
+        &Spawn::new()
+            .owner(id)
+            .velocity(v)
+            .inherit_velocity()
+            .yaw(s.yaw),
+    );
+    w.set_component(shot, &ARROW_SHOT, [hit as f64, level as f64, id as f64]);
+    if !creative {
+        if let Some(slot) = arrow {
+            inv.set(slot, consume_one(inv.get(slot)));
+        }
+        u.set_stack(u.stack().add_wear(1));
+    }
+    true
+}
+
 fn shoot(w: &World, id: u64, from: &EntityState, at: &EntityState) {
     let eye = from.eye().y;
     let d = [at.pos.x - from.pos.x, at.pos.y + at.size.eye as f64 * 0.7 - eye, at.pos.z - from.pos.z];
@@ -416,38 +498,23 @@ fn shoot(w: &World, id: u64, from: &EntityState, at: &EntityState) {
     let len = (flat * flat + d[1] * d[1]).sqrt().max(0.1);
     // A little above the target for the drop on the way.
     const SPEED: f64 = 32.0;
-    let arrow = w.spawn(&ARROW, [from.pos.x, eye, from.pos.z]);
-    if let Some(shooter) = w.component_mut(arrow, &SHOOTER) {
-        *shooter = id;
-    }
-    w.entity_edit(arrow)
-        .velocity([d[0] / len * SPEED, d[1] / len * SPEED + flat * 0.4, d[2] / len * SPEED])
-        .yaw(yaw_toward([0.0; 3], d));
-}
-
-/// An arrow in flight: gone when it hits something or has flown for five seconds.
-fn arrow_flies(w: &World, id: u64, st: &EntityState) -> bool {
-    let shooter = w.component(id, &SHOOTER).unwrap_or(0);
-    // Its own box against theirs: a tall mob is hit in the head too.
-    let tip = Shape::cuboid([st.pos.x - 0.25, st.pos.y, st.pos.z - 0.25], [st.pos.x + 0.25, st.pos.y + 0.5, st.pos.z + 0.25]);
-    let hit = w
-        .entities_in(&tip, EntityFilter::any().targets().touching())
-        .into_iter()
-        .find(|&e| e != id && e != shooter && w.entity(e).is_some_and(|s| s.kind != st.kind));
-    if let Some(target) = hit {
-        w.damage(target, 3.0, shooter, damage_cause::ATTACK);
-        w.despawn(id);
-    } else if st.flags & entity_flags::BLOCKED != 0 || st.on_ground != 0 || st.age > 100 {
-        w.despawn(id);
-    }
-    true
+    let v = [d[0] / len * SPEED, d[1] / len * SPEED + flat * 0.4, d[2] / len * SPEED];
+    w.spawn_with(
+        &ARROW,
+        [from.pos.x, eye, from.pos.z],
+        &Spawn::new()
+            .owner(id)
+            .velocity(v)
+            .inherit_velocity()
+            .yaw(yaw_toward([0.0; 3], d)),
+    );
 }
 
 /// A chicken: flutters down instead of falling, and lays an egg now and then.
 fn passive_chicken() -> ai::Goals {
     let goals = ai::Goals::new().then(|w: &World, id: u64, st: &EntityState| {
         if st.on_ground == 0 && st.vel.y < 0.0 {
-            w.entity_edit(id)
+            w.entity_modify(id)
                 .velocity(Vec3 { y: st.vel.y * 0.6, ..st.vel });
         }
         if let Some(next) = w.component_mut(id, &FUSE) {
@@ -572,4 +639,46 @@ fn with_passive(goals: ai::Goals) -> ai::Goals {
         .then(ai::watch_player(6.0))
         .then(ai::panic(1.6))
         .then(ai::wander(0.5, 10.0))
+}
+
+// Where each of base's mobs is hit, part by part, in the pixels of its model: what its body
+// looks like, not the model itself (`Hitboxes`).
+fn four_legs(h: Hitboxes, x: [f32; 2], tall: f32, front: [f32; 2], back: [f32; 2]) -> Hitboxes {
+    h.bone("front_right_leg", "leg3", [-x[1], 0.0, front[0]], [-x[0], tall, front[1]])
+        .bone("front_left_leg", "leg2", [x[0], 0.0, front[0]], [x[1], tall, front[1]])
+        .bone("back_right_leg", "leg0", [-x[1], 0.0, back[0]], [-x[0], tall, back[1]])
+        .bone("back_left_leg", "leg1", [x[0], 0.0, back[0]], [x[1], tall, back[1]])
+}
+
+fn sheep_parts() -> Hitboxes {
+    let h = Hitboxes::new()
+        .bone("head", "head", [-4.0, 14.0, -14.0], [4.0, 22.0, -6.0])
+        .bone("body", "body", [-4.5, 10.0, -8.0], [4.5, 18.0, 10.0]);
+    four_legs(h, [1.0, 5.0], 12.0, [-7.0, -3.0], [5.0, 9.0])
+}
+
+fn pig_parts() -> Hitboxes {
+    let h = Hitboxes::new()
+        .bone("head", "head", [-4.0, 8.0, -15.0], [4.0, 16.0, -6.0])
+        .bone("body", "body", [-5.0, 6.0, -8.0], [5.0, 14.0, 9.0]);
+    four_legs(h, [1.0, 5.0], 6.0, [-7.0, -3.0], [5.0, 9.0])
+}
+
+fn chicken_parts() -> Hitboxes {
+    Hitboxes::new()
+        .bone("head", "head", [-2.0, 9.0, -8.0], [2.0, 15.0, -3.0])
+        .bone("body", "body", [-3.0, 5.0, -4.0], [3.0, 11.0, 4.0])
+        .bone("right_wing", "wing0", [-4.0, 7.0, -3.0], [-3.0, 11.0, 3.0])
+        .bone("left_wing", "wing1", [3.0, 7.0, -3.0], [4.0, 11.0, 3.0])
+        .bone("right_leg", "rightLeg", [-2.5, 0.0, -1.0], [-1.5, 5.0, 1.0])
+        .bone("left_leg", "leftLeg", [0.5, 0.0, -1.0], [1.5, 5.0, 1.0])
+}
+
+fn spider_parts() -> Hitboxes {
+    Hitboxes::new()
+        .head("head", [-4.0, 5.0, -11.0], [4.0, 13.0, -3.0], [0.0, 9.0, -3.0])
+        .part("body", [-3.0, 6.0, -3.0], [3.0, 12.0, 3.0])
+        .part("abdomen", [-5.0, 5.0, 3.0], [5.0, 13.0, 15.0])
+        .part("right_legs", [-15.0, 0.0, -4.0], [-3.0, 9.0, 4.0])
+        .part("left_legs", [3.0, 0.0, -4.0], [15.0, 9.0, 4.0])
 }

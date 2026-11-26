@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "crew-gallery",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["notes/crew/gallery/serve.py"],
+      "port": 8765
+    }
+  ]
+}

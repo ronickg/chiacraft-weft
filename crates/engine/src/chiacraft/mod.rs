@@ -10,6 +10,7 @@ pub mod achievements_screen;
 pub mod bridge;
 pub mod chain;
 pub mod did;
+pub mod mc_import;
 pub mod package_trust;
 pub mod worlds;
 

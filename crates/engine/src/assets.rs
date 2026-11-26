@@ -72,27 +72,55 @@ impl Assets {
         std::fs::read(self.path(name, kind, ext)?).ok()
     }
 
-    /// `<name>.<ext>` if what it says is about the picture `<name>.<of>` in effect: from the pack or
-    /// mod that has that picture, or from one above it. A mod's rules were made for the mod's
-    /// picture, and a pack that replaces it without bringing rules of its own has none.
-    pub fn sidecar(&self, name: &str, kind: &str, of: &str, ext: &str) -> Option<PathBuf> {
+    /// The connected texture rules of texture `name` (`client::ctm`): `<name>/<last part>.ctm`
+    /// beside its tiles, from the highest pack or mod with either them or a picture `<name>.png`
+    /// (a pack's plain picture has no rules). One with both stops the game.
+    pub fn ctm_rules(&self, name: &str) -> Option<PathBuf> {
         let (ns, rel) = name.split_once(':').unwrap_or(("core", name));
-        let (file, picture) = (format!("{kind}/{rel}.{ext}"), format!("{kind}/{rel}.{of}"));
+        let last = rel.rsplit('/').next().unwrap_or(rel);
+        let (rules, picture) = (format!("textures/{rel}/{last}.ctm"), format!("textures/{rel}.png"));
         for root in self
             .packs
             .iter()
             .map(|p| p.join(ns))
             .chain(self.mods.get(ns).cloned())
         {
-            let candidate = root.join(&file);
-            if self.files.contains(&candidate) {
-                return Some(candidate);
-            }
-            if self.files.contains(&root.join(&picture)) {
-                return None;
+            let (r, p) = (root.join(&rules), root.join(&picture));
+            match (self.files.contains(&r), self.files.contains(&p)) {
+                (true, true) => {
+                    let why = format!("{}: both a picture and connected texture rules {}: keep the folder", p.display(), r.display());
+                    log::error!("{why}");
+                    panic!("{why}");
+                }
+                (true, false) => return Some(r),
+                (false, true) => return None,
+                _ => {}
             }
         }
         None
+    }
+
+    /// The file texture `name` is drawn from where nothing connects it: its own picture, or the
+    /// tile its rules give a block with no neighbors (`ctm_alone`).
+    pub fn picture(&self, name: &str) -> String {
+        let Some(src) = self
+            .ctm_rules(name)
+            .and_then(|p| std::fs::read(p).ok())
+            .map(|b| String::from_utf8_lossy(&b).into_owned())
+        else {
+            return name.to_string();
+        };
+        let first = crate::kv::sections(&src)
+            .into_iter()
+            .next()
+            .unwrap_or_default();
+        let get = |k: &str| first.iter().find(|p| p.1 == k).map(|p| p.2);
+        let tiles = ctm_tiles(get("tiles").unwrap_or(""), name);
+        let alone = ctm_alone(get("method").unwrap_or("ctm"));
+        tiles
+            .into_iter()
+            .nth(alone)
+            .unwrap_or_else(|| name.to_string())
     }
 
     /// `<name><suffix>.<ext>` from the same pack or mod as `<name>.<ext>` itself: a mask drawn
@@ -253,7 +281,52 @@ pub struct LoadedTexture {
     pub size: u32,
     pub frames: Vec<Vec<Vec<u8>>>,
     pub glow: Vec<Option<Vec<u8>>>,
+    /// Per frame its material maps (`MatMaps`), when the texture has any.
+    pub mat: Vec<Option<MatMaps>>,
     pub anim: Option<Anim>,
+}
+
+/// A frame's material (chiacraft), as LabPBR 1.3 has it: `<name>_s.png` (r smoothness, g F0 or a
+/// metal, b porosity or subsurface, a emission) and `<name>_n.png` (rg the normal, DirectX's y,
+/// b ambient occlusion, a height). Both RGBA at the texture's size, linear; the one a texture
+/// lacks is the format's neutral (`SPEC_NONE`, `NORMAL_NONE`).
+#[derive(Clone)]
+pub struct MatMaps {
+    pub spec: Vec<u8>,
+    pub normal: Vec<u8>,
+}
+
+/// LabPBR's "no material": rough, F0 0.04, no porosity, no emission.
+pub const SPEC_NONE: [u8; 4] = [0, 10, 0, 255];
+/// A flat normal, no occlusion, the surface's own height.
+pub const NORMAL_NONE: [u8; 4] = [128, 128, 255, 255];
+
+/// The material maps of texture `name`, per frame at `size` (nearest, as the texture's frames),
+/// or `None` with neither `_s.png` nor `_n.png` beside it.
+fn material_maps(assets: &Assets, name: &str, count: u32, size: u32) -> Vec<Option<MatMaps>> {
+    let read = |suffix: &str| {
+        assets
+            .beside(name, "textures", "png", suffix)
+            .and_then(|p| std::fs::read(p).ok())
+            .and_then(|b| decode_png(&b))
+            .filter(|m| m.width > 0 && m.height >= m.width)
+    };
+    let (spec, normal) = (read("_s"), read("_n"));
+    if spec.is_none() && normal.is_none() {
+        return vec![None; count as usize];
+    }
+    let frame = |img: &Option<Image>, f: u32, none: [u8; 4]| match img {
+        Some(m) => {
+            let frames = (m.height / m.width).max(1);
+            let bytes = (m.width * m.width * 4) as usize;
+            let at = (f % frames) as usize * bytes;
+            scale_nearest(&m.rgba[at..at + bytes], m.width, size)
+        }
+        None => none.repeat((size * size) as usize),
+    };
+    (0..count)
+        .map(|f| Some(MatMaps { spec: frame(&spec, f, SPEC_NONE), normal: frame(&normal, f, NORMAL_NONE) }))
+        .collect()
 }
 
 /// A picture of the `_e.png` kind as a mask: it glows by its red channel times alpha.
@@ -409,7 +482,36 @@ pub fn parse_anim(src: &str, size: [u32; 2], first: u32) -> Anim {
 
 /// A texture by name: animated ones are vertical strips of square frames (`.anim` next to it
 /// says how they play). A missing or malformed file gives the magenta checker and a warning.
+/// Tile names of a texture's connected rules (`tiles`), in its folder `<name>/` unless they name
+/// a mod; `a-b` at the end of an entry expands to numbers.
+pub fn ctm_tiles(v: &str, texture: &str) -> Vec<String> {
+    let full = |rel: &str| if rel.contains(':') { rel.to_string() } else { format!("{texture}/{rel}") };
+    let mut out = Vec::new();
+    for t in v.split_whitespace() {
+        let (prefix, last) = t.rsplit_once('/').map_or(("", t), |(p, l)| (p, l));
+        let prefix = if prefix.is_empty() { String::new() } else { format!("{prefix}/") };
+        match last
+            .split_once('-')
+            .and_then(|(a, b)| Some((a.parse::<u32>().ok()?, b.parse::<u32>().ok()?)))
+        {
+            Some((a, b)) => out.extend((a..=b).map(|i| full(&format!("{prefix}{i}")))),
+            None => out.push(full(t)),
+        }
+    }
+    out
+}
+
+/// The tile a connected texture method gives a block with no neighbors: all its edges (`ctm`,
+/// `compact`), both ends (`horizontal`, `vertical` and the two together), else the first.
+pub fn ctm_alone(method: &str) -> usize {
+    match method {
+        "horizontal" | "bookshelf" | "vertical" | "h+v" | "horizontal+vertical" | "v+h" | "vertical+horizontal" => 3,
+        _ => 0,
+    }
+}
+
 pub fn load_texture(assets: &Assets, name: &str) -> LoadedTexture {
+    let name = &assets.picture(name);
     let img = (name != "core:missing")
         .then(|| {
             assets
@@ -430,20 +532,40 @@ pub fn load_texture(assets: &Assets, name: &str) -> LoadedTexture {
             return missing_texture();
         }
     };
+    let meta = assets
+        .read(name, "textures", "anim")
+        .map(|b| String::from_utf8_lossy(&b).into_owned());
+    // A strip nothing says is an animation is one tall picture, a big block's (a door's), put in
+    // a square from its left: its whole is `[0, 0, 16 * width / height, 16]`.
+    if img.height > img.width && meta.is_none() && assets.read(name, "textures", "png.mcmeta").is_none() {
+        let (w, side) = (img.width as usize, img.height as usize);
+        let mut px = vec![0u8; side * side * 4];
+        for (y, row) in img.rgba.chunks_exact(w * 4).enumerate() {
+            px[y * side * 4..y * side * 4 + w * 4].copy_from_slice(row);
+        }
+        let size = img.height.next_power_of_two();
+        return LoadedTexture {
+            size,
+            frames: vec![mip_chain(scale_nearest(&px, img.height, size), size)],
+            glow: vec![None],
+            mat: vec![None],
+            anim: None,
+        };
+    }
     let size = img.width.next_power_of_two();
     let count = img.height / img.width;
     let (img_width, img_height) = (img.width, img.height);
     let frame_bytes = (img.width * img.width * 4) as usize;
     let frames: Vec<Vec<Vec<u8>>> = (0..count as usize)
-        .map(|f| mip_chain(scale_nearest(&img.rgba[f * frame_bytes..(f + 1) * frame_bytes], img.width, size), size))
+        .map(|f| {
+            let frame = scale_nearest(&img.rgba[f * frame_bytes..(f + 1) * frame_bytes], img.width, size);
+            if dark_leaf_mips(name) { mip_chain_dark(frame, size) } else { mip_chain(frame, size) }
+        })
         .collect();
     let mask = emission_mask(assets, name).filter(|m| m.width > 0);
     let glow = (0..count)
         .map(|f| mask.as_ref().map(|m| mask_frame(m, f, size)))
         .collect();
-    let meta = assets
-        .read(name, "textures", "anim")
-        .map(|b| String::from_utf8_lossy(&b).into_owned());
     let anim = (count > 1 || meta.is_some()).then(|| {
         let a = parse_anim(meta.as_deref().unwrap_or(""), [img_width, img_height], 0);
         if a.frame_height == img_width {
@@ -452,7 +574,8 @@ pub fn load_texture(assets: &Assets, name: &str) -> LoadedTexture {
         log::warn!("texture {name}: frames of block and item textures are square, frame_height is for GUI pictures");
         parse_anim("", [img_width, img_height], 0)
     });
-    LoadedTexture { size, frames, glow, anim }
+    let mat = material_maps(assets, name, count, size);
+    LoadedTexture { size, frames, glow, mat, anim }
 }
 
 /// A texture's width and pixels by name, as the file has them (no frames, no scaling).
@@ -464,56 +587,93 @@ pub fn read_image(assets: &Assets, name: &str) -> Option<(u32, Vec<u8>)> {
 /// One square still image made in the game (a stack's composed look), ready like a file's.
 pub fn image_texture(size: u32, rgba: Vec<u8>) -> LoadedTexture {
     let to = size.max(1).next_power_of_two();
-    LoadedTexture { size: to, frames: vec![mip_chain(scale_nearest(&rgba, size, to), to)], glow: vec![None], anim: None }
+    LoadedTexture { size: to, frames: vec![mip_chain(scale_nearest(&rgba, size, to), to)], glow: vec![None], mat: vec![None], anim: None }
 }
 
 pub fn missing_texture() -> LoadedTexture {
-    LoadedTexture { size: 16, frames: vec![mip_chain(missing(16), 16)], glow: vec![None], anim: None }
+    LoadedTexture { size: 16, frames: vec![mip_chain(missing(16), 16)], glow: vec![None], mat: vec![None], anim: None }
 }
+
+/// What `composite_texture` takes of each part: a picture and its size.
+type Pick = dyn Fn(&LoadedTexture) -> Option<(Vec<u8>, u32)>;
 
 /// A texture made of the top-left, top-right, bottom-left and bottom-right quarters of the first
 /// frames of four others (connected textures' compact form), at the largest of their sizes.
 pub fn composite_texture(parts: [&LoadedTexture; 4]) -> LoadedTexture {
     let size = parts.iter().map(|p| p.size).max().unwrap_or(16);
     let half = (size / 2) as usize;
-    let mut out = vec![0u8; (size * size * 4) as usize];
-    for (q, p) in parts.iter().enumerate() {
-        let from = scale_nearest(&p.frames[0][0], p.size, size);
-        let (qx, qy) = ((q % 2) * half, (q / 2) * half);
-        for y in qy..qy + half {
-            let row = (y * size as usize + qx) * 4;
-            out[row..row + half * 4].copy_from_slice(&from[row..row + half * 4]);
+    // The quarters of `pick`'s picture of each part (its neutral where a part has none).
+    let quarters = |pick: &Pick, none: [u8; 4]| {
+        let mut out = vec![0u8; (size * size * 4) as usize];
+        for (q, p) in parts.iter().enumerate() {
+            let from = pick(p).map_or_else(|| none.repeat((size * size) as usize), |(rgba, s)| scale_nearest(&rgba, s, size));
+            let (qx, qy) = ((q % 2) * half, (q / 2) * half);
+            for y in qy..qy + half {
+                let row = (y * size as usize + qx) * 4;
+                out[row..row + half * 4].copy_from_slice(&from[row..row + half * 4]);
+            }
         }
-    }
-    LoadedTexture { size, frames: vec![mip_chain(out, size)], glow: vec![None], anim: None }
+        out
+    };
+    let out = quarters(&|p| Some((p.frames[0][0].clone(), p.size)), [0; 4]);
+    let mat = parts
+        .iter()
+        .any(|p| p.mat.first().is_some_and(Option::is_some))
+        .then(|| MatMaps {
+            spec: quarters(&|p| p.mat.first().cloned().flatten().map(|m| (m.spec, p.size)), SPEC_NONE),
+            normal: quarters(&|p| p.mat.first().cloned().flatten().map(|m| (m.normal, p.size)), NORMAL_NONE),
+        });
+    LoadedTexture { size, frames: vec![mip_chain(out, size)], glow: vec![None], mat: vec![mat], anim: None }
 }
 
 /// Pictures one over the other, the first at the bottom, each multiplied by its tint
-/// (0xRRGGBB): what a stack with `layers` shows. All are scaled to the biggest.
+/// (0xRRGGBB): what a stack with `layers` shows, and a block face of several. All are scaled to
+/// the biggest; a layer's glow mask glows where it shows, and covers what glows under it.
 pub fn layered_texture(parts: &[(&LoadedTexture, u32)]) -> LoadedTexture {
     let size = parts.iter().map(|p| p.0.size).max().unwrap_or(16);
     let mut out = vec![0u8; (size * size * 4) as usize];
+    let glows = parts
+        .iter()
+        .any(|p| p.0.glow.first().is_some_and(Option::is_some));
+    let mut glow = vec![0u8; if glows { (size * size) as usize } else { 0 }];
     for (p, tint) in parts {
         let Some(rgba) = p.frames.first().and_then(|f| f.first()) else { continue };
         let from = scale_nearest(rgba, p.size, size);
+        let own_glow = p.glow.first().and_then(Option::as_ref);
         let t = [(tint >> 16) & 255, (tint >> 8) & 255, tint & 255];
-        for (o, s) in out.chunks_exact_mut(4).zip(from.chunks_exact(4)) {
+        for (i, (o, s)) in out
+            .chunks_exact_mut(4)
+            .zip(from.chunks_exact(4))
+            .enumerate()
+        {
             let a = s[3] as u32;
             for k in 0..3 {
                 let c = s[k] as u32 * t[k] / 255;
                 o[k] = ((c * a + o[k] as u32 * (255 - a)) / 255) as u8;
             }
             o[3] = (a + o[3] as u32 * (255 - a) / 255) as u8;
+            if glows {
+                let (x, y) = (i as u32 % size, i as u32 / size);
+                let g = own_glow.map_or(0, |m| m[((y * p.size / size) * p.size + x * p.size / size) as usize] as u32);
+                glow[i] = ((g * a + glow[i] as u32 * (255 - a)) / 255) as u8;
+            }
         }
     }
-    LoadedTexture { size, frames: vec![mip_chain(out, size)], glow: vec![None], anim: None }
+    LoadedTexture { size, frames: vec![mip_chain(out, size)], glow: vec![glows.then_some(glow)], mat: vec![None], anim: None }
 }
 
 /// Fingerprint of the files a texture is made of (image, `.anim`, glow masks): changes when any of
 /// them is edited, added or removed, so a reload reads only what changed.
 pub fn texture_stamp(assets: &Assets, name: &str) -> u64 {
+    let name = &assets.picture(name);
     let mut h = weft_noise::FNV;
-    for (n, ext) in [(name.to_string(), "png"), (name.to_string(), "anim"), (format!("{name}_e"), "png"), (format!("{name}_s"), "png")] {
+    for (n, ext) in [
+        (name.to_string(), "png"),
+        (name.to_string(), "anim"),
+        (format!("{name}_e"), "png"),
+        (format!("{name}_s"), "png"),
+        (format!("{name}_n"), "png"),
+    ] {
         let meta = assets
             .path(&n, "textures", ext)
             .and_then(|p| std::fs::metadata(p).ok());
@@ -536,13 +696,71 @@ pub fn texture_stamp(assets: &Assets, name: &str) -> u64 {
 /// Full size first, halved down to 1x1. Transparent texels take the color of the opaque ones
 /// next to them first: filtering at cutout edges (tall grass, leaves, overlays) then blends
 /// towards the right color instead of black, which drew dark seams.
-fn mip_chain(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
+pub(crate) fn mip_chain(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
     let mut out = Vec::with_capacity(size.trailing_zeros() as usize + 1);
     let mut s = size;
     loop {
         bleed(&mut rgba, s);
         let next = (s > 1).then(|| downsample(&rgba, s));
         out.push(rgba);
+        match next {
+            Some(n) => (rgba, s) = (n, s / 2),
+            None => return out,
+        }
+    }
+}
+
+/// chiacraft, test only (`core:mc_leaves`, the Minecraft comparison): leaves' smaller mips as
+/// Minecraft's darken them. Its leaves average a texel's colour with the holes beside it as
+/// black, so far and grazing leaves go darker and duller; ours keep their full colour (Trees'
+/// measure in Bliss's world, shaders off: the vista's mid and shaded leaves G +8 over vanilla's,
+/// lit tops the same, close up the same).
+fn dark_leaf_mips(name: &str) -> bool {
+    name.contains("leaves") && crate::config::by_name("core:mc_leaves").is_some_and(|id| crate::config::get(id) != 0.0)
+}
+
+/// `mip_chain` as Minecraft makes leaves' (`dark_leaf_mips`, its dark cutout): each smaller texel's
+/// colour the sum of its opaque texels in linear light over all four (holes count as black); its
+/// alpha the plain average as ours (scaling it to keep the full-size coverage, as Minecraft's
+/// `scaleAlphaToCoverage` does at its 0.5 test, made far crowns solid and the vista's leaves
+/// brighter than vanilla's: pixel error 8.1 to 16.2, PC mwi_px3).
+fn mip_chain_dark(mut rgba: Vec<u8>, size: u32) -> Vec<Vec<u8>> {
+    let lin = |v: u8| {
+        let c = v as f32 / 255.0;
+        if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    };
+    let srgb = |l: f32| {
+        let c = if l <= 0.003_130_8 { l * 12.92 } else { 1.055 * l.powf(1.0 / 2.4) - 0.055 };
+        (c * 255.0).round().clamp(0.0, 255.0) as u8
+    };
+    let mut out = Vec::with_capacity(size.trailing_zeros() as usize + 1);
+    let mut s = size;
+    loop {
+        let next = (s > 1).then(|| {
+            let half = s / 2;
+            let mut o = downsample(&rgba, s);
+            for y in 0..half {
+                for x in 0..half {
+                    let mut sum = [0f32; 3];
+                    for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                        let i = (((y * 2 + dy) * s + x * 2 + dx) * 4) as usize;
+                        if rgba[i + 3] != 0 {
+                            for c in 0..3 {
+                                sum[c] += lin(rgba[i + c]);
+                            }
+                        }
+                    }
+                    let d = ((y * half + x) * 4) as usize;
+                    for c in 0..3 {
+                        o[d + c] = srgb(sum[c] / 4.0);
+                    }
+                }
+            }
+            o
+        });
+        let mut shown = rgba;
+        bleed(&mut shown, s);
+        out.push(shown);
         match next {
             Some(n) => (rgba, s) = (n, s / 2),
             None => return out,
@@ -643,7 +861,7 @@ mod layer_tests {
 
     fn one(size: u32, px: [u8; 4]) -> LoadedTexture {
         let rgba = px.repeat((size * size) as usize);
-        LoadedTexture { size, frames: vec![vec![rgba]], glow: vec![None], anim: None }
+        LoadedTexture { size, frames: vec![vec![rgba]], glow: vec![None], mat: vec![None], anim: None }
     }
 
     #[test]
@@ -664,47 +882,45 @@ mod tests {
 
     #[test]
     fn rules_go_with_their_picture() {
-        let root = std::env::temp_dir().join(format!("weft_sidecar_{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("weft_ctm_rules_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let put = |p: &str| {
             let p = root.join(p);
             std::fs::create_dir_all(p.parent().unwrap()).unwrap();
             std::fs::write(p, b"x").unwrap();
         };
-        put("mod/textures/both.png");
-        put("mod/textures/both.ctm");
-        put("mod/textures/replaced.png");
-        put("mod/textures/replaced.ctm");
-        put("mod/textures/own_rules.png");
-        put("mod/textures/own_rules.ctm");
+        put("mod/textures/folder/folder.ctm");
+        put("mod/textures/replaced/replaced.ctm");
+        put("mod/textures/own_rules/own_rules.ctm");
         put("mod/textures/rules_only.png");
         put("mod/textures/low.png");
+        put("mod/textures/both.png");
+        put("mod/textures/both/both.ctm");
         put("top/m/textures/replaced.png");
-        put("top/m/textures/own_rules.png");
-        put("top/m/textures/own_rules.ctm");
-        put("top/m/textures/rules_only.ctm");
+        put("top/m/textures/own_rules/own_rules.ctm");
+        put("top/m/textures/rules_only/rules_only.ctm");
         put("top/m/textures/low.png");
-        put("low/m/textures/low.ctm");
+        put("low/m/textures/low/low.ctm");
         let a = Assets::new([("m".to_string(), root.join("mod"))], vec![root.join("top"), root.join("low")]);
         let found = |n: &str| {
-            a.sidecar(&format!("m:{n}"), "textures", "png", "ctm")
-                .map(|p| {
-                    p.strip_prefix(&root)
-                        .unwrap()
-                        .components()
-                        .next()
-                        .unwrap()
-                        .as_os_str()
-                        .to_string_lossy()
-                        .into_owned()
-                })
+            a.ctm_rules(&format!("m:{n}")).map(|p| {
+                p.strip_prefix(&root)
+                    .unwrap()
+                    .components()
+                    .next()
+                    .unwrap()
+                    .as_os_str()
+                    .to_string_lossy()
+                    .into_owned()
+            })
         };
-        assert_eq!(found("both").as_deref(), Some("mod"), "nothing replaced");
-        assert_eq!(found("replaced"), None, "a pack's picture without rules has none");
+        assert_eq!(found("folder").as_deref(), Some("mod"), "nothing replaced");
+        assert_eq!(found("replaced"), None, "a pack's plain picture has no rules");
         assert_eq!(found("own_rules").as_deref(), Some("top"), "its own rules");
-        assert_eq!(found("rules_only").as_deref(), Some("top"), "rules over the mod's picture");
+        assert_eq!(found("rules_only").as_deref(), Some("top"), "a pack's folder over the mod's picture");
         assert_eq!(found("low"), None, "rules under a pack's picture aren't for it");
         assert_eq!(found("none"), None);
+        assert!(std::panic::catch_unwind(|| found("both")).is_err(), "a picture and a folder of one mod");
         let _ = std::fs::remove_dir_all(&root);
     }
     use super::*;

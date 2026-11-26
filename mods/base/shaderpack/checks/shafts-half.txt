@@ -8,7 +8,7 @@ chat /rule core:mob_spawning 0
 chat /tk mode spectator
 chat /weather clear 99999
 set_config core:vsync 0
-set_config core:fps_cap 0
+set_config core:fps_limit 0
 chat /time set 1500
 chat /tp 148.5 93 523.5
 loaded

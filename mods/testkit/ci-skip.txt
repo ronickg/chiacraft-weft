@@ -24,6 +24,5 @@ ride_frames                            no tick-sized jumps, frame by frame (2026
 body_chest                             a chest kept at its block on a moving structure, frame by frame (2026-11-05)
 body_sneak_edge                        sneaking at a moving structure's edge, frame by frame (2026-11-05)
 recipe_viewer                          opens its screen a few frames at a time; passes on the Mac's GPU at c1afd614 (2026-11-05)
-redstone_clock                         flips counted over 4 s of frames; passes on the Mac's GPU at c1afd614 (the PC failed it at af753f03) (2026-11-05)
-redstone_on_a_structure                wire on a moving structure seen frame by frame; passes on the Mac's GPU at c1afd614 (the PC failed it at af753f03) (2026-11-05)
-skiff_smooth                           measures how smoothly a skiff moves in front of its rider, frame by frame; passed and failed on alternate CI runs (2026-11-05)
+redstone_floater/rider                 a rider on a floater at 7.5 blocks a second: the client finds the body under its feet only between slow frames (2026-11-24)
+skiff_smooth/rider_view                the deck in front of a rider measured frame by frame; frames past the 0.25 s step cap (2026-11-24)

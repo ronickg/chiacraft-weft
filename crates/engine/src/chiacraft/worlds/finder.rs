@@ -133,7 +133,7 @@ fn find(settings: &crate::settings::Settings) -> Result<(), String> {
     if !reader.reachable() {
         return Err("no chain peer answers".into());
     }
-    let deposit = settings.listing_deposit();
+    let deposit = crate::settings::listing_deposit();
     let listings = reader
         .listings(deposit, MAX_READ, Duration::from_secs(60))
         .map_err(|e| e.to_string())?;

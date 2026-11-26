@@ -115,14 +115,14 @@ CFG = dict(
     name="eagle",
     K=K,
     TX=TX,
-    D=0.0,
+    D=1.8,  # Legs a little longer: the trousers show over two texels below the hips and chest (at 0, 1.7-2 texels read as a band; linecheck)
     head=HS,
     bill=dict(w=1.9, h=2.3, len=3.6, rot=10, hook=True, y=0.7),
-    body_w=1.15,
+    body_w=1.25,  # A little broader: the chest's top shows two texels beside the neck (at 1.15, 1.75 texels read as a rim; linecheck)
     tail=dict(len=0.8, w=1.2, cut="square"),
     wing=dict(arm=1.25, hand=1.2, chord=1.35, tip="fingers", folded=1.0),
-    shin=0.95,
-    toes=1.25,
+    shin=1.15,  # Feathered to the toes: two texels thick (at 0.95, 1.3 texels, the shin read as a line under the thigh; linecheck)
+    toes=1.3,  # The toes out two texels in front of the thicker shin (at 1.25, 1.9; linecheck)
     tilt=-30,
     eyes=dict(kind="side", pattern="eagle_px", z=11.25 + 2.75 * HS * 0.42, y=18.0 + 0.25 * HS, lash=(40, 30, 24)),
     materials=MATERIALS,

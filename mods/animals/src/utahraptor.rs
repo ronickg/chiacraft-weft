@@ -65,11 +65,11 @@ pub fn init(r: &mut Registry) {
                         .with(Need::Comfort, crate::comfort::seek)
                         .with(Need::Drink, crate::drink::drink)
                         .with(Need::Eat, crate::forage::eat)
-                        .with(Need::Wander, ai::wander(0.5, 12.0)),
+                        .with(Need::Wander, crate::group::or_follow(0.5, ai::wander(0.5, 12.0))),
                 ),
         )
         .on_hurt(|w, h| {
-            crate::taming::hurt(w, h.entity, h.source);
+            crate::taming::hurt(w, h.entity, h.source, h.cause);
             crate::rest::stop(w, h.entity);
         });
 }

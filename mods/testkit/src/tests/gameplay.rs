@@ -19,7 +19,7 @@ pub async fn sprint_and_sneak_modes(t: T) -> R {
     t.flat().await?;
     // Switching a binding between held and toggled.
     let toggle = async |action: &str| -> R {
-        t.c().screen_open(&screens::CONTROLS);
+        t.c().menu_open(&screens::CONTROLS);
         t.screen("core:controls").await?;
         t.frames(3).await?;
         t.c().input_key("ShiftLeft", 0.2);
@@ -27,7 +27,7 @@ pub async fn sprint_and_sneak_modes(t: T) -> R {
         t.click_ui(&format!("id:bind:{action}:0"), 1);
         // Shift let go again, or the walks after start sneaking.
         t.secs(0.3).await?;
-        t.c().screen_close();
+        t.c().menu_close();
         t.no_screen().await?;
         // Toggles and double taps switch only once the game has the mouse again.
         t.frames(3).await?;
@@ -35,11 +35,11 @@ pub async fn sprint_and_sneak_modes(t: T) -> R {
     };
     toggle("core:sneak").await?;
     t.check_eq(SNEAK.get(), "toggle ShiftLeft".to_string(), "Shift + right click makes sneak a toggle");
-    t.c().screen_open(&screens::CONTROLS);
+    t.c().menu_open(&screens::CONTROLS);
     t.screen("core:controls").await?;
     t.frames(3).await?;
     t.shot("controls").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     t.c().set_look(0.0, 0.0);
 
@@ -88,16 +88,18 @@ pub async fn sprint_and_sneak_modes(t: T) -> R {
 /// Breaking blocks with and without the right tool: drops, pick up, tool wear.
 pub async fn mining_and_wear(t: T) -> R {
     t.flat().await?;
-    t.op("put me 0 stone_pickaxe 1").await?;
+    // A pickaxe built from parts (`/gear`): a ground-stone head on a birch haft.
+    t.cmd("/gear pickaxe stone birch slot=0").await?;
     t.c().select_slot(0);
     let f = t.feet();
     let stone = add(f, [2, 0, 0]);
     t.set(stone, "stone").await?;
     t.look_at(stone);
     t.frames(2).await?;
-    // A stone pickaxe takes 0.56 s; letting go right after keeps the block behind intact.
-    t.hold("core:attack", 0.8);
-    t.secs(1.2).await?;
+    // A stone-headed pickaxe (speed about 3.1 from the curve) takes about 0.72 s; letting go
+    // right after keeps the block behind intact.
+    t.hold("core:attack", 1.0);
+    t.secs(1.4).await?;
     t.check_eq(t.block(stone).await?, "core:air".into(), "stone mined");
     t.check_eq(t.slot("me", 0).await?.2, 1, "pickaxe wear");
     t.c()
@@ -123,10 +125,10 @@ pub async fn mining_and_wear(t: T) -> R {
         .until("dirt picked up", Duration::from_secs(5), |t| (0..36).any(|i| t.c().inventory_slot(i).item == d))
         .await;
     t.check(got.is_ok(), "digging dirt by hand gave nothing");
-    // A break an interceptor refuses puts the block back on the client too.
+    // A break the question refuses puts the block back on the client too.
     let gold = add(f, [-2, 0, 0]);
     t.set(gold, "gold_block").await?;
-    t.op("put me 1 diamond_pickaxe 1").await?;
+    t.cmd("/gear pickaxe diamond slot=1").await?;
     t.c().select_slot(1);
     t.cmd("/rule testkit:protect_gold 1").await?;
     t.look_at(gold);
@@ -142,9 +144,13 @@ pub async fn mining_and_wear(t: T) -> R {
 /// Shift-click puts armor into its slots; hits wear it.
 pub async fn armor(t: T) -> R {
     t.flat().await?;
-    for (slot, name) in [(0, "iron_helmet"), (1, "diamond_chestplate"), (2, "gold_leggings"), (3, "leather_boots")] {
-        t.op(&format!("put me {slot} {name} 1")).await?;
+    // Built from parts: a wrought-iron helmet, a diamond-scale coat, bronze leggings with gold
+    // rivets, leather boots.
+    for (slot, gear) in [(0, "helmet wrought_iron"), (1, "chestplate diamond"), (2, "leggings bronze gold"), (3, "boots leather")] {
+        t.cmd(&format!("/gear {gear} slot={slot}")).await?;
     }
+    t.op("put me 4 shield 1").await?;
+    t.op("put me 5 dirt 3").await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
     // The inventory menu: the 2x2 grid (0-3), its result (4), the equipment slots (armor's four,
@@ -158,21 +164,54 @@ pub async fn armor(t: T) -> R {
     }
     t.until("armor worn", Duration::from_secs(5), |t| (36..40).all(|s| !t.c().inventory_slot(s).is_empty()))
         .await?;
+    // Sweep from the dirt to the shield with Shift held.
+    // Hotbar 5 and 4 (Weft's menu numbers them 41 and 40; base's has more slots before).
+    let dirt = t.c().ui_rect(&t.hotbar(5)).ok_or("no dirt slot")?;
+    let shield = t.c().ui_rect(&t.hotbar(4)).ok_or("no shield slot")?;
+    t.c()
+        .input_cursor(dirt.x + dirt.w / 2.0, dirt.y + dirt.h / 2.0);
+    // Held for seconds: a CI frame (software Vulkan) can take a good part of one, and a 0.5 s
+    // click had let go before the cursor reached the shield.
+    t.c().input_key("ShiftLeft", 3.0);
+    t.frames(2).await?;
+    t.c().input_click(0, 2.0);
+    t.frames(2).await?;
+    t.c()
+        .input_cursor(shield.x + shield.w / 2.0, shield.y + shield.h / 2.0);
+    // The other hand comes after base's clothes and cloak (Weft's is 40): wherever the shield
+    // went among the equipment.
+    let shield = item("base:shield");
+    let off_hand = |t: &T| (36..64u32).find(|&s| t.c().inventory_slot(s).item == shield);
+    t.until("shield in the other hand", Duration::from_secs(3), |t| off_hand(t).is_some())
+        .await?;
+    // Both let go before the next step.
+    t.secs(3.0).await?;
+    let off_hand = off_hand(&t).unwrap_or(40);
+    t.check_eq(t.slot("me", 9).await?.1, 3, "ordinary items go to main storage");
     // The player's inventory by group name: four equipment slots, all filled; the hotbar empty.
     // Armor's four, the clothes' four and the cloak; the arrival clothes on, no cloak.
     // SYNC: upstream's off-hand is an equipment slot now: check whether core:equipment counts 10.
     t.check_eq(t.op("group me core:equipment").await?, "9 8".to_string(), "equipment group (slots, filled)");
     t.check_eq(t.op("group me base:head").await?, "1 1".to_string(), "the head slot");
     t.check_eq(t.op("group me hotbar").await?, "9 0".to_string(), "hotbar group");
+    t.op("put me 0 cobblestone 1").await?;
+    t.op("put me 17 dirt 5").await?;
+    t.c().menu_sort(None);
+    t.until("main stacks joined", Duration::from_secs(3), |t| t.c().inventory_slot(9).count == 8)
+        .await?;
+    t.check_eq(t.slot("me", off_hand).await?.0, "base:shield".into(), "sorting keeps the shield equipped");
+    t.check_eq(t.slot("me", 0).await?.0, "base:cobblestone".into(), "sorting main storage skips the hotbar");
     t.shot("worn").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     let f = t.feet();
     let zombie = t
         .op(&format!("spawn zombie {}", at(add(f, [1, 0, 1]))))
         .await?;
-    let full = super::max_health(&t);
-    t.until("hit by the zombie", Duration::from_secs(15), |t| t.state().health < full - 0.5)
+    // From the health now, not the most: base's survival health starts under its maximum (its
+    // stomach), so "under the most" was true before any hit (17.5 of 64.7, a 0.6 hit).
+    let full = t.state().health;
+    t.until("hit by the zombie", Duration::from_secs(15), |t| t.state().health < full - 0.3)
         .await?;
     t.secs(0.5).await?;
     let mut worn = 0;
@@ -206,7 +245,20 @@ pub async fn slot_limit(t: T) -> R {
     t.frames(4).await?;
     t.check_eq(t.c().menu_slot(0).count, 16, "the input slot holds 16");
     t.check_eq(t.c().menu_slot(29).count, 16, "the rest stays in the hotbar");
-    t.c().screen_close();
+
+    t.secs(0.35).await?;
+    t.op(&format!("put {} {} {} 1 iron_ingot 5", p[0], p[1], p[2]))
+        .await?;
+    t.until("ingots in the output", Duration::from_secs(5), |t| t.c().menu_slot(1).count == 5)
+        .await?;
+    for (button, count) in [(1, 3), (1, 4), (0, 5)] {
+        t.click_ui("slot:1", button);
+        t.until("ingots on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().count == count)
+            .await
+            .map_err(|e| format!("{e}, expected {count}, cursor: {}, output: {}", t.c().cursor_stack().count, t.c().menu_slot(1).count))?;
+        t.check_eq(t.c().menu_slot(1).count, 5 - count, "remaining ingots in the output");
+    }
+    t.c().menu_close();
     t.no_screen().await
 }
 
@@ -244,7 +296,7 @@ pub async fn slot_accepts(t: T) -> R {
     t.click_ui("slot:0", 0);
     t.frames(4).await?;
     t.check(t.c().menu_slot(0).count + 1 >= before, "a shift-click doesn't take it out either");
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await
 }
 
@@ -290,7 +342,7 @@ pub async fn liquid_slot(t: T) -> R {
     click(0)?;
     t.secs(0.4).await?;
     t.check(t.slot(&at, 0).await?.1 == 0, "dirt stays out");
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await
 }
 
@@ -326,7 +378,7 @@ pub async fn advancements(t: T) -> R {
     fn made(t: &T) -> u64 {
         t.c()
             .view()
-            .component(&base_api::ADVANCEMENTS)
+            .component(&base_api::components::ADVANCEMENTS)
             .map_or(0, |a| a.done)
     }
     t.flat().await?;
@@ -345,8 +397,8 @@ pub async fn advancements(t: T) -> R {
     t.press("core:use");
     t.until("advancement for the torch", Duration::from_secs(5), |t| made(t).count_ones() == 2)
         .await?;
-    t.press("base:advancements");
-    t.screen("base:advancements").await?;
+    t.open_screen("base:advancements", |t| t.press("base:advancements"))
+        .await?;
     t.frames(3).await?;
     t.laid_out(&["text:Advancements", "text:Getting Started", "text:Exploration", "text:2 of "]);
     t.shot("list").await?;
@@ -358,22 +410,22 @@ pub async fn advancements(t: T) -> R {
         t.frames(5).await?;
         t.shot("tooltip").await?;
     }
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     // The pause menu's button, as wide as the engine's own, opens the list too.
-    t.c().screen_open(&screens::PAUSE);
+    t.c().menu_open(&screens::PAUSE);
     t.screen("core:pause").await?;
     t.frames(3).await?;
     t.shot("pause").await?;
     t.check(t.click_ui("text:Advancements", 0), "the pause menu's advancements button");
     t.screen("base:advancements").await?;
     // It opened on top of the pause menu, which is back once it closes.
-    t.c().screen_close();
+    t.c().menu_close();
     t.screen("core:pause").await?;
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     // Dying takes none of them.
-    t.cmd("/clear @s").await?;
+    t.cmd("/clear entity @s").await?;
     t.screen("core:death").await?;
     t.c().respawn();
     t.no_screen().await?;
@@ -388,7 +440,7 @@ pub async fn advancements(t: T) -> R {
 fn bed_spawn(t: &T) -> Option<[i32; 3]> {
     t.c()
         .view()
-        .component(&base_api::BED_SPAWN)
+        .component(&base_api::components::BED_SPAWN)
         .filter(|s| s.set != 0)
         .map(|s| s.bed)
 }
@@ -424,7 +476,7 @@ async fn place_bed(t: &T) -> Result<[i32; 3], String> {
 
 /// Dies and comes back, up to the point the world is seen again.
 async fn die_and_respawn(t: &T) -> R {
-    t.cmd("/clear @s").await?;
+    t.cmd("/clear entity @s").await?;
     t.screen("core:death").await?;
     t.c().respawn();
     t.no_screen().await
@@ -455,6 +507,17 @@ pub async fn model_bones(t: T) -> R {
     // Past its hold easing in.
     t.op("put me 0 testmod:greatsword").await?;
     t.secs(0.5).await?;
+    // Still from one frame to the next: on CI half a second was a frame or two, the tip still
+    // rising (5.67, then 6.25). Not read before the wait: its first check runs in this same
+    // frame, and compared a value with itself.
+    let mut last = None::<weft_sdk::abi::Vec3>;
+    t.until("the sword held still", Duration::from_secs(10), move |t| {
+        let now = t.c().bone_position(me, "tip");
+        let still = matches!((last, now), (Some(a), Some(b)) if (a - b).length_squared() < 1e-4);
+        last = now;
+        still
+    })
+    .await?;
     let tip = at("tip").ok_or("the sword's tip")?;
     for _ in 0..6 {
         t.c().bone_turn(me, "blade", [90.0, 0.0, 0.0]);
@@ -472,8 +535,14 @@ pub async fn model_bones(t: T) -> R {
     t.secs(1.0).await?;
     t.check(at("fruit").is_some(), "an apple in hand is its model");
     t.c().input_key("Digit2", 0.0);
+    let from = crate::runner::script_clock();
     t.frames(3).await?;
-    t.check(at("fruit").is_some(), "the apple going down is still its model");
+    // It goes down in about 0.11 s (0.4 a tick): slower frames (CI) are past it at once.
+    if crate::runner::script_clock() - from < Duration::from_millis(100) {
+        t.check(at("fruit").is_some(), "the apple going down is still its model");
+    } else {
+        t.note("frames slower than the apple going down: not seen");
+    }
     t.secs(1.0).await?;
     t.check(at("fruit").is_none(), "and then it is gone");
     Ok(())
@@ -577,8 +646,8 @@ pub async fn beds(t: T) -> R {
     let f = t.feet();
     let foot = place_bed(&t).await?;
     let head = add(foot, [0, 0, -1]);
-    t.check(t.block(foot).await?.contains("part=foot"), format!("the foot where it was placed: {}", t.block(foot).await?));
-    t.check(t.block(head).await?.contains("part=head"), format!("the head beyond it: {}", t.block(head).await?));
+    let (a, b) = (t.block(foot).await?, t.block(head).await?);
+    t.check(a.starts_with("base:bed") && a == b, format!("one bed where it was placed and beyond: {a}, {b}"));
 
     // By day only the respawn point.
     t.look_at(foot);
@@ -599,13 +668,13 @@ pub async fn beds(t: T) -> R {
     t.set(add(foot, [0, 2, 0]), "air").await?;
 
     // Any monster keeps the player up, by its tag.
-    let creeper = t
-        .op(&format!("spawn base:creeper {} {} {}", foot[0] + 5, foot[1], foot[2]))
+    let zombie = t
+        .op(&format!("spawn base:zombie {} {} {}", foot[0] + 5, foot[1], foot[2]))
         .await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check(t.c().screen() != "base:sleeping", "no sleeping with a creeper near");
-    t.op(&format!("remove {}", creeper.trim())).await?;
+    t.check(t.c().screen() != "base:sleeping", "no sleeping with a zombie near");
+    t.op(&format!("remove {}", zombie.trim())).await?;
 
     // Being hurt gets them up.
     t.press("core:use");
@@ -675,8 +744,7 @@ pub async fn beds(t: T) -> R {
         t.until(&format!("the {facing} bed"), Duration::from_secs(3), |t| t.c().block(head).is_some_and(|s| s != 0))
             .await?;
         let (a, b) = (t.block(foot).await?, t.block(head).await?);
-        t.check(a.contains("part=foot") && a.contains(&format!("facing={facing}")), format!("the foot: {a}"));
-        t.check(b.contains("part=head") && b.contains(&format!("facing={facing}")), format!("the head: {b}"));
+        t.check(a == b && a.contains(&format!("facing={facing}")), format!("one bed on both cells: {a}, {b}"));
     }
     t.c()
         .teleport([f[0] as f64 + 0.5, f[1] as f64 + 7.0, f[2] as f64 + 0.5]);
@@ -760,8 +828,7 @@ pub async fn beds_far(t: T) -> R {
     Ok(())
 }
 
-/// A creeper going off under water breaks nothing and the water stays. A crater in a lake is
-/// filled again by the water around it.
+/// A crater in a lake is filled again by the water around it.
 pub async fn explosions_and_water(t: T) -> R {
     t.flat().await?;
     t.cmd("/rule testkit:no_hurt 1").await?;
@@ -771,18 +838,7 @@ pub async fn explosions_and_water(t: T) -> R {
     t.fill(add(f, [-6, 0, -6]), add(f, [6, 2, 6]), "water")
         .await?;
     t.secs(0.3).await?;
-    let spot = add(f, [2, 0, 0]);
-    let creeper = t.op(&format!("spawn base:creeper {}", at(spot))).await?;
-    let id: u64 = creeper
-        .trim()
-        .parse()
-        .map_err(|_| format!("spawn creeper: {creeper}"))?;
-    t.until("the creeper going off", Duration::from_secs(6), |t| t.c().entity(id).is_none())
-        .await?;
-    t.secs(0.3).await?;
-    t.check(t.block(spot).await?.contains("water"), format!("the water stays: {}", t.block(spot).await?));
-    t.check_eq(t.block(add(spot, [0, -1, 0])).await?, "base:stone".into(), "the floor under it stays");
-    // The same place, a hole in the water that the water must fill.
+    // A hole in the water that the water must fill.
     t.op("mode creative").await?;
     t.c().set_flying(true);
     t.c()
@@ -805,22 +861,32 @@ pub async fn fall_damage(t: T) -> R {
     t.until("full health", Duration::from_secs(5), |t| super::full(t, t.state().health))
         .await?;
     let full = super::max_health(&t);
+    // Standing on a block 12 up, then the block taken away: the server sees the fall's top. A bare
+    // teleport let a slow frame (CI) fall blocks before the server's first move, its start.
+    let ledge = add(t.feet(), [0, 11, 0]);
+    t.set(ledge, "stone").await?;
+    t.until("the ledge on the client", Duration::from_secs(2), |t| t.c().block(ledge).is_some_and(|s| s != 0))
+        .await?;
     let s = t.state();
     t.c().teleport([s.pos.x, s.pos.y + 12.0, s.pos.z]);
+    t.until("on the ledge", Duration::from_secs(10), |t| t.flag(client::client_flags::ON_GROUND) && t.state().pos.y > s.pos.y + 11.5)
+        .await?;
+    t.secs(0.5).await?;
+    t.op("fell reset").await?;
+    t.set(ledge, "air").await?;
     t.until("falling", Duration::from_secs(5), |t| !t.flag(client::client_flags::ON_GROUND))
         .await?;
     t.until("landed", Duration::from_secs(10), |t| t.flag(client::client_flags::ON_GROUND))
         .await?;
-    // The lowest it gets: full and saturated it heals fast, a point in half a second.
-    let mut hp = f32::MAX;
-    let start = std::time::Instant::now();
-    while start.elapsed() < Duration::from_millis(500) {
-        hp = hp.min(t.state().health);
-        t.frames(1).await?;
+    // What the server dealt, as it dealt it: the client's health comes a round trip later, and full
+    // and saturated the player heals a point in half a second (CI: 6.1 of the 9 left to see).
+    let mut lost = 0.0f32;
+    let end = crate::runner::script_clock() + Duration::from_secs(5);
+    while lost <= 0.0 && crate::runner::script_clock() < end {
+        lost = t.op("fell").await?.parse().unwrap_or(0.0);
     }
-    // Vanilla takes 9 for 12 blocks (11 of its 20 left); the survival vitals' max is lower.
-    let lost = full - hp;
-    t.check((7.0..=10.0).contains(&lost), format!("health lost in a 12 block fall: {lost} (from {full} to {hp}), vanilla 9"));
+    t.note(format!("the client sees {:.2} of {full:.2}", t.state().health));
+    t.check((7.0..=10.0).contains(&lost), format!("health lost in a 12 block fall: {lost}, vanilla 9"));
     Ok(())
 }
 
@@ -880,7 +946,7 @@ pub async fn movement_attributes(t: T) -> R {
         Ok::<f64, String>(((end.x - start.x).powi(2) + (end.z - start.z).powi(2)).sqrt())
     };
     let slow = walk(t.clone()).await?;
-    t.op("attr_mod me core:movement_speed testkit:fast 1 1 0")
+    t.op("attr_mod me core:movement_speed testkit:fast core:percent 1 0")
         .await?;
     t.secs(0.2).await?;
     let fast = walk(t.clone()).await?;
@@ -899,7 +965,7 @@ pub async fn movement_attributes(t: T) -> R {
         Ok::<f64, String>(top - y0)
     };
     let low = jump(t.clone()).await?;
-    t.op("attr_mod me core:jump_strength testkit:spring 1 0.5 0")
+    t.op("attr_mod me core:jump_strength testkit:spring core:percent 0.5 0")
         .await?;
     t.secs(0.2).await?;
     let high = jump(t.clone()).await?;
@@ -915,6 +981,51 @@ pub async fn movement_attributes(t: T) -> R {
 
 /// Mobs move by the player's rules: a pig pushed across ice slides further than on grass, walks
 /// slower through oil, and climbs a ladder it walks into.
+/// A ladder (`on_sides`, walls only) goes against the wall clicked, a second wall of its cell
+/// adds a side, and a side whose wall goes falls off, then the rest.
+pub async fn ladder_sides(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let c = add(f, [0, 1, -3]);
+    let (north, west) = (add(c, [0, 0, -1]), add(c, [-1, 0, 0]));
+    for w in [north, west] {
+        t.set(w, "cobblestone").await?;
+    }
+    t.op("mode creative").await?;
+    t.op("put me 0 ladder 8").await?;
+    let at = |p: [i32; 3]| format!("/tp {} {} {}", p[0] as f64 + 0.5, p[1] - 1, p[2] as f64 + 0.5);
+    let side = |d: &str| format!("prop {} {} {} {d}", c[0], c[1], c[2]);
+    t.cmd(&at(add(c, [0, 0, 2]))).await?;
+    t.secs(0.3).await?;
+    t.look_at(north);
+    t.frames(3).await?;
+    t.press("core:use");
+    t.secs(0.4).await?;
+    t.check_eq(t.op(&side("north")).await?, "true".to_string(), "on the wall clicked");
+    t.check_eq(t.op(&side("west")).await?, "false".to_string(), "and only there");
+    t.cmd(&at(add(c, [2, 0, 0]))).await?;
+    t.secs(0.3).await?;
+    t.look_at(west);
+    t.frames(3).await?;
+    t.press("core:use");
+    t.secs(0.4).await?;
+    t.check_eq(t.op(&side("west")).await?, "true".to_string(), "a second wall of the cell adds a side");
+    t.check_eq(t.op(&side("north")).await?, "true".to_string(), "keeping the first");
+    t.cmd(&at(add(c, [1, 0, 1]))).await?;
+    t.secs(0.3).await?;
+    t.look_at(c);
+    t.frames(3).await?;
+    t.shot("two_sides").await?;
+    t.set(north, "air").await?;
+    t.secs(0.3).await?;
+    t.check_eq(t.op(&side("north")).await?, "false".to_string(), "a side without its wall falls off");
+    t.check_eq(t.op(&side("west")).await?, "true".to_string(), "the other stays");
+    t.set(west, "air").await?;
+    t.secs(0.3).await?;
+    t.check_eq(t.op(&format!("get {} {} {}", c[0], c[1], c[2])).await?, "core:air".to_string(), "with no side left it goes");
+    Ok(())
+}
+
 pub async fn mob_physics(t: T) -> R {
     t.flat().await?;
     t.cmd("/rule core:mob_spawning 0").await?;
@@ -928,6 +1039,9 @@ pub async fn mob_physics(t: T) -> R {
         let id = t
             .op(&format!("spawn base:pig {} {} {}", at[0], at[1], at[2] + 1))
             .await?;
+        // Its own walking held to nothing: on CI the push came seconds after the spawn, the pig
+        // was already walking off by itself, and that ate the slide on ice (1.32 grass, 1.26 ice).
+        t.op(&format!("drive {id} 0 0 200")).await?;
         t.secs(0.5).await?;
         let x0: f64 = t
             .op(&format!("entity {id}"))
@@ -991,7 +1105,7 @@ pub async fn mob_physics(t: T) -> R {
     let wall = add(f, [6, 0, -6]);
     t.fill(add(wall, [0, 0, -1]), add(wall, [0, 5, 1]), "stone")
         .await?;
-    t.fill(add(wall, [-1, 0, -1]), add(wall, [-1, 5, 1]), "base:ladder[facing=west]")
+    t.fill(add(wall, [-1, 0, -1]), add(wall, [-1, 5, 1]), "base:ladder[north=false,south=false,west=false,east=true]")
         .await?;
     let id = t
         .op(&format!("spawn base:pig {} {} {}", wall[0] - 2, wall[1], wall[2]))
@@ -1033,13 +1147,23 @@ pub async fn drop_and_pickup(t: T) -> R {
     t.hold("core:forward", 1.0);
     // The client lets the taken item fly to the player for three ticks before it goes.
     let mut flying = false;
+    let (mut last, mut steps) = (crate::runner::script_clock(), [Duration::ZERO; 2]);
     t.until("picked up again", Duration::from_secs(6), |t| {
+        let now = crate::runner::script_clock();
+        steps = [steps[1], now - last];
+        last = now;
         let got = t.c().inventory_slot(0).count == 10;
         flying |= got && item.is_some_and(|id| t.c().entity(id).is_some());
         got
     })
     .await?;
-    t.check(flying, "the taken item was still on its way when it reached the inventory");
+    // A frame longer than the flight (0.15 s: CI's software renderer) starts and ends it at once.
+    let slow = steps[0].max(steps[1]);
+    if flying || slow < Duration::from_millis(150) {
+        t.check(flying, "the taken item was still on its way when it reached the inventory");
+    } else {
+        t.note(format!("frames of {:.2} s, longer than the flight: not seen", slow.as_secs_f32()));
+    }
     t.secs(0.3).await?;
     t.check(item.is_none_or(|id| t.c().entity(id).is_none()), "the taken item is gone");
     Ok(())
@@ -1050,7 +1174,7 @@ pub async fn drop_and_pickup(t: T) -> R {
 pub async fn creative_and_invulnerable(t: T) -> R {
     t.flat().await?;
     t.op("mode creative").await?;
-    t.op("put me 0 stone_pickaxe 1").await?;
+    t.cmd("/gear pickaxe stone slot=0").await?;
     t.c().select_slot(0);
     let f = t.feet();
     let stone = add(f, [2, 0, 0]);
@@ -1131,8 +1255,8 @@ pub async fn block_shapes(t: T) -> R {
         "base:oak_planks_stairs[facing=east]",
         "base:oak_planks_slab",
         "base:oak_planks_slab[type=top]",
-        "base:bricks_vertical_slab[side=north]",
-        "base:bricks_vertical_slab[side=west]",
+        "base:bricks_vertical_slab[facing=south]",
+        "base:bricks_vertical_slab[facing=east]",
         "base:sandstone_slab[type=double]",
         "base:spruce_planks_stairs[facing=south,half=top]",
         "base:mossy_cobblestone_stairs[facing=north]",
@@ -1198,7 +1322,12 @@ pub async fn block_shapes(t: T) -> R {
         t.c().select_slot(0);
         t.c()
             .teleport(centre(floor, over[0], 1.0 + height, over[1]));
+        // Asked in the air: standing on the ground, flight ends at once (as one lands).
+        t.c().set_flying(true);
         t.secs(0.4).await?;
+        if height > 0.0 {
+            t.check(t.flag(client::client_flags::FLYING), format!("{name}: flying"));
+        }
         aim(&t, centre(floor, 0.5, 1.0, 0.45));
         t.frames(4).await?;
         t.press("core:use");
@@ -1263,7 +1392,7 @@ pub async fn block_shapes(t: T) -> R {
     // Standing right beside it, where it drops either way, as above.
     t.c().teleport(centre(mix, 0.5, 0.0, 1.3));
     t.secs(0.3).await?;
-    t.op(&format!("break {} base:iron_pickaxe", at(mix)))
+    t.op(&format!("break {} testmod:steel_pickaxe", at(mix)))
         .await?;
     t.secs(1.5).await?;
     t.check_eq(t.slot("me", 2).await?.1, 8, "it gives back the one");
@@ -1281,12 +1410,12 @@ pub async fn block_shapes(t: T) -> R {
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.3).await?;
-    t.check(t.block(cell).await?.contains("side=north"), format!("against the wall it is on: {}", t.block(cell).await?));
+    t.check(t.block(cell).await?.contains("facing=south"), format!("against the wall it is on: {}", t.block(cell).await?));
     aim(&t, centre(cell, 0.5, 0.5, 0.5));
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.3).await?;
-    t.check(t.block(cell).await?.contains("side=double"), format!("and a second one joins it: {}", t.block(cell).await?));
+    t.check(t.block(cell).await?.contains("double=true"), format!("and a second one joins it: {}", t.block(cell).await?));
     t.set(cell, "air").await?;
 
     // Corners, by vanilla's rules: what is behind a stair crossways makes it an outer corner, what
@@ -1325,9 +1454,9 @@ pub async fn block_shapes(t: T) -> R {
     let up = t.state().pos;
     t.check(up.y >= f[1] as f64 + 0.99, format!("up the stairs, one block: {up:?}"));
     let v = add(f, [-16, 0, 2]);
-    t.set(v, "base:oak_planks_vertical_slab[side=north]")
+    t.set(v, "base:oak_planks_vertical_slab[facing=south]")
         .await?;
-    t.set(add(v, [0, 1, 0]), "base:oak_planks_vertical_slab[side=north]")
+    t.set(add(v, [0, 1, 0]), "base:oak_planks_vertical_slab[facing=south]")
         .await?;
     t.c().teleport(centre(v, 0.5, 0.0, 2.5));
     t.c().set_look(0.0, 0.0);
@@ -1345,13 +1474,197 @@ pub async fn block_shapes(t: T) -> R {
         "a slab's recipe",
     );
     t.check_eq(
-        t.op("craft 3 3 base:bricks air air base:bricks base:bricks air base:bricks base:bricks base:bricks")
+        t.op("craft 2 2 base:bricks air base:bricks base:bricks")
             .await?,
         "base:bricks_stairs 4".to_string(),
         "a stair's",
     );
     t.check_eq(t.op("craft 1 1 base:bricks_slab").await?, "base:bricks_vertical_slab 1".to_string(), "from a slab, the vertical one");
     t.check_eq(t.op("craft 1 1 base:bricks_vertical_slab").await?, "base:bricks_slab 1".to_string(), "and back");
+    Ok(())
+}
+
+/// A cactus can anchor a fractional building block, but stays centered in either mode.
+pub async fn placement_mode(t: T) -> R {
+    t.flat().await?;
+    t.op("mode creative").await?;
+    t.c().set_flying(true);
+    let origin = add(t.feet(), [0, 1, -3]);
+    let aim_at_cactus = async |p: [i32; 3]| -> R {
+        let [x, y, z] = p.map(f64::from);
+        t.set(add(p, [0, -1, 0]), "base:sand").await?;
+        t.set(add(p, [1, -1, 0]), "base:sand").await?;
+        t.set(p, "base:cactus").await?;
+        t.c().teleport([x + 3.2, y - 0.6, z + 0.5]);
+        t.secs(0.35).await?;
+        aim(&t, [x + 15.0 / 16.0, y + 0.5, z + 0.5]);
+        t.frames(4).await?;
+        Ok(())
+    };
+    t.op("put me 0 base:gold_block 8").await?;
+    t.c().select_slot(0);
+    aim_at_cactus(origin).await?;
+    t.press("core:use");
+    t.secs(0.35).await?;
+    t.check_eq(t.op(&format!("parts {}", at(origin))).await?, "base:cactus".to_string(), "grid mode leaves the cactus cell alone");
+    t.check_eq(t.block(add(origin, [1, 0, 0])).await?, "base:gold_block".to_string(), "grid mode places in the adjacent cell");
+
+    t.press("core:placement_mode");
+    t.frames(2).await?;
+    let free = add(origin, [0, 0, 3]);
+    aim_at_cactus(free).await?;
+    t.press("core:use");
+    t.secs(0.35).await?;
+    let parts = t.op(&format!("parts {}", at(free))).await?;
+    t.check(parts.contains("base:cactus") && parts.contains("base:gold_block"), format!("by-face mode follows the inset edge: {parts}"));
+
+    t.op("put me 0 base:cactus 8").await?;
+    let planted = add(origin, [0, 0, 6]);
+    aim_at_cactus(planted).await?;
+    t.press("core:use");
+    t.secs(0.35).await?;
+    t.check_eq(t.op(&format!("parts {}", at(planted))).await?, "base:cactus".to_string(), "the second cactus has no fractional overlap");
+    t.check_eq(t.block(add(planted, [1, 0, 0])).await?, "base:cactus".to_string(), "the cactus uses the adjacent cell in by-face mode");
+    Ok(())
+}
+
+/// Clicking interior faces creates persistent instances at the physical surface.
+pub async fn surface_placement(t: T) -> R {
+    t.flat().await?;
+    t.op("mode creative").await?;
+    let f = t.feet();
+    let cell = [f[0], (f[1] + 15).div_euclid(16) * 16 - 1, f[2] - 3];
+    let point = |x, y, z| [f64::from(cell[0]) + x, f64::from(cell[1]) + y, f64::from(cell[2]) + z];
+    t.press("core:placement_mode");
+    t.frames(2).await?;
+    t.c().teleport(point(0.5, 0.0, 3.2));
+    // Asked in the air: standing on the ground, flight ends at once (as one lands).
+    t.c().set_flying(true);
+    t.set(cell, "base:oak_planks_vertical_slab[facing=south]")
+        .await?;
+    t.op("put me 0 base:ladder 8").await?;
+    t.c().select_slot(0);
+    t.secs(0.4).await?;
+    aim(&t, point(0.5, 0.5, 0.5));
+    t.frames(4).await?;
+    t.press("core:use");
+    t.secs(0.35).await?;
+    let parts = t.op(&format!("parts {}", at(cell))).await?;
+    t.check(parts.contains("ladder") && parts.contains("vertical_slab"), format!("ladder mounted inside the slab cell: {parts}"));
+    t.check(t.op("look").await?.contains("ladder"), "the inner ladder is in front of its support");
+    t.shot("ladder_on_inner_face").await?;
+    let copy = add(cell, [-3, 0, 0]);
+    t.cmd(&format!("/structure save inner_ladder {} {}", at(cell), at(cell)))
+        .await?;
+    t.cmd(&format!("/structure load inner_ladder {}", at(copy)))
+        .await?;
+    let copied = t.op(&format!("parts {}", at(copy))).await?;
+    t.check(copied.contains("ladder") && copied.contains("vertical_slab"), format!("structure retains both parts: {copied}"));
+    t.cmd("/structure undo").await?;
+    t.check_eq(t.block(copy).await?, "core:air".to_string(), "undo clears the copied assembly");
+    t.press("core:attack");
+    t.secs(0.35).await?;
+    t.check(t.op("look").await?.contains("vertical_slab"), "picking the ladder leaves the slab behind");
+
+    t.set(cell, "base:oak_planks_slab").await?;
+    t.op("put me 0 base:gold_block 8").await?;
+    t.c().teleport(point(0.5, 2.0, 2.2));
+    t.secs(0.3).await?;
+    aim(&t, point(0.5, 0.5, 0.5));
+    t.frames(4).await?;
+    t.press("core:use");
+    t.secs(0.35).await?;
+    let above = add(cell, [0, 1, 0]);
+    t.check(t.block(above).await?.contains("gold_block"), "upper half of the cube crosses the chunk boundary");
+    t.c().teleport(point(0.5, 2.3, 0.5));
+    t.c().set_flying(false);
+    t.secs(0.9).await?;
+    let height = t.state().pos.y - f64::from(cell[1]);
+    t.probe("top of the offset cube", height as f32, (height - 1.5).abs() < 0.02);
+    // Two wires at half height connect to full-height ports. A line at floor level beside
+    // the raised line cannot pick up its power.
+    t.op("mode creative").await?;
+    let wire = add(cell, [4, 0, 0]);
+    for x in 0..3 {
+        let at = add(wire, [x, 0, 0]);
+        t.set(at, "base:oak_planks_slab").await?;
+        t.op("put me 0 base:redstone 8").await?;
+        let p = |dx: f64, dy: f64, dz: f64| [f64::from(at[0]) + dx, f64::from(at[1]) + dy, f64::from(at[2]) + dz];
+        t.c().teleport(p(0.5, 2.0, 2.2));
+        t.c().set_flying(true);
+        t.secs(0.2).await?;
+        aim(&t, p(0.5, 0.5, 0.5));
+        t.frames(4).await?;
+        t.press("core:use");
+        t.secs(0.3).await?;
+    }
+    let feed = add(wire, [-1, 0, 0]);
+    t.set(feed, "base:redstone_block").await?;
+    let lamp = add(wire, [3, 0, 0]);
+    t.set(lamp, "base:redstone_lamp").await?;
+    let lower = add(wire, [1, 0, 1]);
+    t.set(add(lower, [0, -1, 0]), "base:stone").await?;
+    t.set(lower, "base:redstone[down=true]").await?;
+    let dark = add(lower, [0, 0, 1]);
+    t.set(dark, "base:redstone_lamp").await?;
+    t.secs(0.7).await?;
+    t.check(t.block(lamp).await?.contains("power=on"), "a full-height lamp receives the wire on a slab");
+    t.check(t.block(dark).await?.contains("power=off"), "different heights stay separate");
+    t.set(feed, "air").await?;
+    t.secs(0.5).await?;
+    t.check(t.block(lamp).await?.contains("power=off"), "removing the source updates the raised circuit");
+    t.set(add(wire, [0, 0, -1]), "base:piston[facing=south]")
+        .await?;
+    t.set(add(wire, [0, 0, -2]), "base:redstone_block").await?;
+    t.secs(0.6).await?;
+    let carried = t.op(&format!("parts {}", at(add(wire, [0, 0, 1])))).await?;
+    t.check(carried.contains("redstone[") && carried.contains("oak_planks_slab"), format!("wire rides the half-height support: {carried}"));
+
+    let sand = add(cell, [-3, 0, 0]);
+    t.set(sand, "base:oak_planks_slab").await?;
+    t.set(add(sand, [0, 3, 0]), "base:sand").await?;
+    t.secs(2.0).await?;
+    let resting = t.op(&format!("parts {}", at(sand))).await?;
+    t.check(
+        resting.contains("base:sand") && resting.contains("oak_planks_slab"),
+        format!("sand lands on the half-height surface: {resting}"),
+    );
+    t.check(t.block(add(sand, [0, 1, 0])).await?.contains("base:sand"), "the fallen sand reaches into the upper cell");
+
+    let piston = add(cell, [2, 3, -3]);
+    let target = add(piston, [2, 0, 0]);
+    t.set(piston, "base:piston[facing=east]").await?;
+    t.set(add(piston, [1, 0, 0]), "base:oak_planks_slab")
+        .await?;
+    t.set(target, "base:sandstone_slab[type=top]").await?;
+    t.set(add(piston, [-1, 0, 0]), "base:redstone_block")
+        .await?;
+    t.secs(0.6).await?;
+    let pushed = t.op(&format!("parts {}", at(target))).await?;
+    t.check(
+        pushed.contains("oak_planks_slab") && pushed.contains("sandstone_slab"),
+        format!("piston slides the lower slab under the upper one: {pushed}"),
+    );
+
+    let switches = add(cell, [0, 0, -3]);
+    t.set(add(switches, [0, -1, 0]), "base:redstone_lamp")
+        .await?;
+    t.set(add(switches, [0, 1, 0]), "base:redstone_lamp")
+        .await?;
+    t.set(switches, "base:stone_button[attach=down,front=east,power=off]")
+        .await?;
+    t.op(&format!("addpart {} base:stone_button[attach=up,front=east,power=on]", at(switches)))
+        .await?;
+    t.secs(0.45).await?;
+    let lights = [t.block(add(switches, [0, -1, 0])).await?, t.block(add(switches, [0, 1, 0])).await?];
+    t.check(lights.iter().any(|s| s.contains("power=on")), format!("second button powers its support: {lights:?}"));
+    t.c().world_leave();
+    t.screen("core:title").await?;
+    t.c().world_open(&format!("test-{}", t.name()), 1);
+    t.loaded().await?;
+    t.check(t.block(above).await?.contains("gold_block"), "the covered cell finds the cube after reopening");
+    t.op(&format!("break {}", at(above))).await?;
+    t.check(t.block(cell).await?.contains("oak_planks_slab"), "breaking through the upper chunk keeps the lower support");
     Ok(())
 }
 
@@ -1444,6 +1757,12 @@ pub async fn cell_parts(t: T) -> R {
     t.secs(0.3).await?;
     let full = t.op(&parts(pool)).await?;
     t.check(full.contains("type=double") && !full.contains("water"), format!("whole, it has no room for it: {full}"));
+    aim(&t, centre(pool, 0.5, 0.8, 1.0));
+    t.frames(3).await?;
+    t.press("core:attack");
+    t.secs(0.3).await?;
+    let half = t.op(&parts(pool)).await?;
+    t.check(half.contains("type=bottom"), format!("a hit takes the half aimed at: {half}"));
 
     // Stairs hold it too, from a bucket.
     let steps = add(pool, [3, 0, 0]);
@@ -1502,8 +1821,20 @@ pub async fn cell_parts(t: T) -> R {
     t.frames(4).await?;
     let stair = t.op(&parts(a)).await?;
     t.check(stair.contains("torch") && stair.contains("shape=outer_right"), format!("a part keeps up with its neighbors: {stair}"));
-    t.check(t.op(&format!("addpart {} base:glowstone", at(a))).await? == "0", "only one in a cell gives light");
     t.fill(a, add(a, [1, 0, 0]), "air").await?;
+    // Any part shines, not only what the cell stands for.
+    let lamp = add(f, [12, 0, 12]);
+    t.set(lamp, "base:stone_slab[type=top]").await?;
+    t.op(&format!("addpart {} base:torch[facing=up]", at(lamp)))
+        .await?;
+    t.frames(3).await?;
+    let lit: u32 = t
+        .op(&format!("light {}", at(lamp)))
+        .await?
+        .parse()
+        .unwrap_or(0);
+    t.check(lit >> 8 != 0, format!("a torch in with a slab lights the cell: {lit:x}"));
+    t.set(lamp, "air").await?;
 
     // A piston moves all of a cell.
     let row = add(f, [-6, 0, 6]);
@@ -1528,10 +1859,10 @@ pub async fn cell_parts(t: T) -> R {
     let name = format!("test-{}", t.name());
     t.c().world_leave();
     t.screen("core:title").await?;
-    t.c().screen_open(&screens::WORLDS);
+    t.c().menu_open(&screens::WORLDS);
     t.screen("core:worlds").await?;
     t.frames(2).await?;
-    t.click_ui(&format!("text:{name} |"), 0);
+    t.click_ui(&format!("text:{name}"), 0);
     t.secs(0.2).await?;
     t.click_ui("id:play", 0);
     t.until("joined again", std::time::Duration::from_secs(60), |t| t.flag(client::client_flags::JOINED))
@@ -1601,7 +1932,7 @@ fn max_health(t: &T) -> f32 {
 /// (`notes/SYSTEMS.md`).
 pub async fn every_food_has_nutrition(t: T) -> R {
     let missing: Vec<&str> = (0..u16::MAX as u32)
-        .filter(|&id| base_api::FOOD.on_item(id).is_some())
+        .filter(|&id| base_api::components::FOOD.on_item(id).is_some())
         .map(item_name)
         // The test mod's own foods (Weft's `testmod:apple`) are no part of the game's food table.
         .filter(|name| !name.is_empty() && !name.starts_with("testmod:") && vitals::food::find(name).is_none())
@@ -1613,6 +1944,8 @@ pub async fn every_food_has_nutrition(t: T) -> R {
 /// Food: eating puts it in the stomach (the vitals), and another mod's component on the base
 /// game's food plus the engine's `item_used` event heals (the owner's example).
 pub async fn food(t: T) -> R {
+    // In a world: run first in a process, it was at the title screen, with no one to feed.
+    t.flat().await?;
     // Fed some first (an apple, a loaf and a steak): with protein in it, max health is over what a
     // fall leaves, so the healing shows.
     t.cmd("/feed 60").await?;
@@ -1637,6 +1970,7 @@ pub async fn food(t: T) -> R {
         .await?;
     t.until("in the stomach", Duration::from_secs(5), |t| in_stomach(t, "base:cooked_beef") > beef + 10.0)
         .await?;
+    // Testmod puts its food_heal on base's beef too: the `item_used` event heals two.
     t.until("healed", Duration::from_secs(3), |t| t.state().health >= before + 2.0)
         .await?;
     let after = t.state().health;
@@ -1706,7 +2040,7 @@ pub async fn own_names(t: T) -> R {
     t.screen("core:menu").await?;
     t.frames(3).await?;
     t.check(t.c().ui_rect("text:Furnace").is_some(), "the furnace window is titled with the block's name");
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
     t.op("put me 0 chest 1").await?;
     t.c().select_slot(0);
@@ -1726,9 +2060,14 @@ pub async fn own_names(t: T) -> R {
     t.screen("core:menu").await?;
     t.frames(3).await?;
     t.check(t.c().ui_rect("text:Loot Box").is_some(), "the chest window shows its own name");
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
-    t.op(&format!("break {} wood_axe", at(chest))).await?;
+    // Broken with a flint axe built from parts, held.
+    t.cmd("/gear axe flint slot=8").await?;
+    t.c().select_slot(8);
+    t.frames(2).await?;
+    // At the block: a player's mining drops at their feet now (Weft), and the teleport left it.
+    t.op(&format!("break {} held at_block", at(chest))).await?;
     t.c()
         .teleport([chest[0] as f64 + 0.5, chest[1] as f64, chest[2] as f64 + 0.5]);
     let back = t
@@ -1757,10 +2096,10 @@ pub async fn respawn(t: T) -> R {
         t.until("fed", Duration::from_secs(5), |t| used(t) > 0.0)
             .await?;
         if with_effect {
-            t.op("attr_mod me core:movement_speed testkit:fast 1 1 0")
+            t.op("attr_mod me core:movement_speed testkit:fast core:percent 1 0")
                 .await?;
         }
-        t.cmd("/clear @s").await?;
+        t.cmd("/clear entity @s").await?;
         t.screen("core:death").await?;
         t.c().respawn();
         t.no_screen().await?;
@@ -1790,6 +2129,172 @@ pub async fn respawn(t: T) -> R {
     t.cmd("/feed 60").await?;
     t.until("stronger once fed", Duration::from_secs(5), move |t| max_health(t) > empty + 0.5)
         .await
+}
+
+/// A placed block shows at once, before the server says (so a player falling past it lands on
+/// it), and goes again when the server refuses for a reason the client can't know (a mod's).
+pub async fn placing_ahead(t: T) -> R {
+    t.flat().await?;
+    let cell = add(t.feet(), [2, 0, 0]);
+    let floor = add(cell, [0, -1, 0]);
+    t.op("put me 0 stone 4").await?;
+    t.c().select_slot(0);
+    t.cmd("/rule testkit:no_placing 1").await?;
+    t.secs(0.2).await?;
+    t.look_at(floor);
+    t.frames(2).await?;
+    t.press("core:use");
+    let stone = |t: &T| {
+        t.c()
+            .block(cell)
+            .is_some_and(|s| Block::named("base:stone").is(s))
+    };
+    t.until("the stone shown at once", Duration::from_secs(1), stone)
+        .await?;
+    t.until("taken back where it can't go", Duration::from_secs(2), |t| t.c().block(cell) == Some(0))
+        .await?;
+    t.check_eq(t.slot("me", 0).await?.1, 4, "no stone spent");
+    t.cmd("/rule testkit:no_placing 0").await?;
+    Ok(())
+}
+
+/// Base's tools in a menu's corner: sorting a chest joins its stacks and orders them, putting away
+/// moves what the player carries into storage around that already holds it.
+pub async fn inventory_tools(t: T) -> R {
+    t.flat().await?;
+    let p = add(t.feet(), [2, 0, 0]);
+    t.set(p, "chest").await?;
+    let at = format!("{} {} {}", p[0], p[1], p[2]);
+    t.op(&format!("put {at} 3 dirt 5")).await?;
+    t.op(&format!("put {at} 1 cobblestone 4")).await?;
+    t.op(&format!("put {at} 10 dirt 7")).await?;
+    t.op("put me 9 dirt 3").await?;
+    t.op("put me 10 stick 2").await?;
+    t.op(&format!("menu base:chest {at}")).await?;
+    t.screen("core:menu").await?;
+    t.frames(3).await?;
+    // What base's corner buttons do.
+    t.check(t.c().menu_sort(None), "sorting the chest");
+    t.secs(0.4).await?;
+    let mut held = Vec::new();
+    for i in 0..27 {
+        held.push(t.slot(&at, i).await?);
+    }
+    let filled: Vec<_> = held.iter().filter(|s| s.1 > 0).collect();
+    t.check_eq(filled.len(), 2, "two stacks left of three");
+    t.check(held[0].1 > 0 && held[1].1 > 0, format!("at the front: {held:?}"));
+    t.check(held.iter().any(|s| s.0 == "base:dirt" && s.1 == 12), format!("the dirt joined: {held:?}"));
+    static DEPOSIT: Channel<()> = Channel::named("base:deposit_nearby");
+    t.c().send(&DEPOSIT, &());
+    t.secs(0.4).await?;
+    t.check_eq(t.slot("me", 9).await?.1, 0, "the dirt went into the chest");
+    t.check_eq(t.slot("me", 10).await?.1, 2, "the sticks stay: the chest has none");
+    let dirt: u32 = {
+        let mut n = 0;
+        for i in 0..27 {
+            let s = t.slot(&at, i).await?;
+            if s.0 == "base:dirt" {
+                n += s.1;
+            }
+        }
+        n
+    };
+    t.check_eq(dirt, 15, "all the dirt in the chest");
+    let window = t.c().menu().ok_or("no chest menu")?.window;
+    let chest = t
+        .c()
+        .menu_group("chest")
+        .ok_or("no chest slot group")?
+        .start;
+    t.op(&format!("put {at} 20 dirt 10")).await?;
+    t.op(&format!("put {at} 23 stick 4")).await?;
+    let split = |count, to| ItemMove::new(chest + 20, chest + to, count);
+    t.check(t.c().menu_move(window, &[split(3, 21), split(7, 23)]), "sent a split with an incompatible destination");
+    t.secs(0.25).await?;
+    t.check_eq(t.slot(&at, 20).await?.1, 10, "a rejected batch leaves its source intact");
+    t.check_eq(t.slot(&at, 21).await?.1, 0, "a rejected batch leaves even the valid destination intact");
+    t.check(t.c().menu_move(window, &[split(3, 21), split(7, 22)]), "sent an exact split");
+    t.until("both branches of the split", Duration::from_secs(3), |t| {
+        t.c().menu_slot(chest + 21).count == 3 && t.c().menu_slot(chest + 22).count == 7
+    })
+    .await?;
+    t.check_eq(t.slot(&at, 20).await?.1, 0, "the exact split emptied the source");
+    t.check(
+        t.c()
+            .menu_move(window, &[ItemMove::new(chest + 22, chest + 23, 7), ItemMove::new(chest + 23, chest + 22, 4)]),
+        "sent a swap in one batch",
+    );
+    t.until("both sides of the swap", Duration::from_secs(3), |t| {
+        t.c().menu_slot(chest + 22).count == 4 && t.c().menu_slot(chest + 23).count == 7
+    })
+    .await?;
+    t.check_eq(t.slot(&at, 22).await?.0, "base:stick".into(), "the swap uses stacks from the start of the batch");
+    let main = t
+        .c()
+        .menu_group(INVENTORY_GROUP)
+        .ok_or("no player main slot group")?
+        .start;
+    t.check(
+        t.c()
+            .menu_move(window, &[ItemMove::new(chest + 22, main + 1, 1)]),
+        "sent a move from chest to player",
+    );
+    t.until("both inventories updated", Duration::from_secs(3), |t| {
+        t.c().menu_slot(chest + 22).count == 3 && t.c().menu_slot(main + 1).count == 3
+    })
+    .await?;
+    t.c().menu_close();
+    t.no_screen().await?;
+    t.op(&format!("menu testmod:shelves {at}")).await?;
+    t.screen("core:menu").await?;
+    t.op(&format!("put {at} 2 stick 2")).await?;
+    t.op("put me 0 stick 11").await?;
+    // Held well past the click: on CI two frames outlasted a 0.3 s hold, and the plain click
+    // that came took the sticks onto the cursor (the timeout shot).
+    t.c().input_key("ShiftLeft", 2.0);
+    t.frames(1).await?;
+    t.click_ui("slot:34", 0);
+    t.until("sticks transferred", Duration::from_secs(3), |t| t.c().menu_slot(2).count == 5)
+        .await?;
+    t.check_eq(t.slot(&at, 3).await?.1, 4, "preferred empty slots fill before an existing stack");
+    t.check_eq(t.slot(&at, 4).await?.1, 4, "priority applies up to each slot's limit");
+    t.op(&format!("put {at} 0 coal 0")).await?;
+    t.op(&format!("put {at} 1 stick 1")).await?;
+    t.op(&format!("put {at} 3 stick 1")).await?;
+    t.op(&format!("put {at} 6 dirt 3")).await?;
+    t.c().menu_sort(Some(2));
+    t.until("only stock sorted", Duration::from_secs(3), |t| t.c().menu_slot(0).count == 6)
+        .await?;
+    t.check_eq(t.slot(&at, 3).await?.1, 1, "sorting a particular group leaves its neighbor alone");
+    t.c().menu_sort(None);
+    t.until("fuel sorted to the slot limit", Duration::from_secs(3), |t| t.c().menu_slot(3).count == 4)
+        .await?;
+    t.check_eq(t.slot(&at, 4).await?.1, 1, "filtered stock stays on its shelf");
+    t.check_eq(t.slot(&at, 6).await?.1, 3, "the display keeps its arrangement");
+    t.c().menu_close();
+    Ok(())
+}
+
+/// A hoe tills what is tillable (any mod's hoe: it is the hoe's use), and nothing else.
+pub async fn hoe_tills(t: T) -> R {
+    t.flat().await?;
+    let soil = add(t.feet(), [2, -1, 0]);
+    let stone = add(t.feet(), [-2, -1, 0]);
+    t.set(stone, "stone").await?;
+    // Ours are assembled from parts (`/gear`); any hoe tills.
+    t.op("put me 0 hoe 1").await?;
+    t.c().select_slot(0);
+    for p in [soil, stone] {
+        t.look_at(p);
+        t.frames(2).await?;
+        t.press("core:use");
+        t.secs(0.3).await?;
+    }
+    // Ours carries how worn the soil is (`base:farmland[worn=0]`).
+    let tilled = t.block(soil).await?;
+    t.check(tilled.starts_with("base:farmland"), format!("the grass tilled: {tilled}"));
+    t.check_eq(t.block(stone).await?, "base:stone".to_string(), "stone left as it is");
+    Ok(())
 }
 
 /// Placing a block over a plant replaces it and drops what it would when broken, except in
@@ -1828,7 +2333,7 @@ pub async fn replaced_plants_drop(t: T) -> R {
         }
         t.set(flower, "air").await?;
         t.secs(0.5).await?;
-        t.cmd("/clear @e[type=core:item]").await?;
+        t.cmd("/clear entity @e[type=core:item]").await?;
     }
     Ok(())
 }
@@ -1871,13 +2376,214 @@ pub async fn swimming(t: T) -> R {
     let (wade, _) = sprint_speed(t.clone(), 0.0).await?;
     t.note(format!("sprinting in lava: {wade:.2} blocks/s"));
     t.check(wade < 1.8, format!("no swimming in lava: {wade:.2} blocks/s"));
-    t.op("put me 37 base:diamond_chestplate").await?;
+    // A diamond-scale chestplate (the test mod lets it swim in lava).
+    t.cmd("/gear chestplate diamond slot=37").await?;
     t.secs(0.2).await?;
     let (suit, _) = sprint_speed(t.clone(), 0.0).await?;
     t.note(format!("with the suit: {suit:.2} blocks/s"));
     t.check(suit > wade * 1.3, format!("the suit swims in lava: {wade:.2} -> {suit:.2}"));
-    t.op("put me 37 base:diamond_chestplate 0").await?;
+    t.op("put me 37 base:chestplate_gem 0").await?;
     pool("air").await?;
+    Ok(())
+}
+
+/// A projectile hits what its whole way through a tick crosses, however fast: a pig fifteen blocks
+/// a tick doesn't slip through; one into a wall sticks at the face it met, and stays.
+pub async fn projectiles(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let num = |s: &str, i: usize| {
+        s.split_whitespace()
+            .nth(i)
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(f64::NAN)
+    };
+    let pig = t
+        .op(&format!("spawn base:pig {} {} {}", f[0], f[1], f[2] - 8))
+        .await?;
+    t.fill(add(f, [-1, 0, -10]), add(f, [1, 2, -10]), "stone")
+        .await?;
+    t.secs(0.3).await?;
+    let before = num(&t.op(&format!("entity {pig}")).await?, 4);
+    let (x, y, z) = (f[0] as f64 + 0.5, f[1] as f64 + 0.45, f[2] as f64 - 1.5);
+    let fatal: u64 = t
+        .op(&format!("shoot base:arrow {x} {y} {z} 0 0 -300"))
+        .await?
+        .parse()
+        .map_err(|_| "bad arrow id")?;
+    t.secs(0.1).await?;
+    if let (Some(arrow), Some(pig)) = (t.c().entity(fatal), t.c().entity(pig.parse().map_err(|_| "bad pig id")?)) {
+        let off = (arrow.pos.x - pig.pos.x).hypot(arrow.pos.z - pig.pos.z);
+        t.check(off < 2.0, format!("a fatal hit stays at the displayed body: {off:.2} blocks off"));
+    } else {
+        t.fail("fatal hit and dying body must remain visible for the death animation");
+    }
+    t.shot("fatal_hit").await?;
+    t.secs(0.4).await?;
+    // That fast it kills: gone is hit too.
+    let after = t
+        .op(&format!("entity {pig}"))
+        .await
+        .map_or(0.0, |s| num(&s, 4));
+    t.check(after < before, format!("a fast arrow hits the pig in its way: health {before} -> {after}"));
+
+    let lane = f[0] as f64 + 4.5;
+    t.fill(add(f, [4, 0, -6]), add(f, [4, 2, -6]), "stone")
+        .await?;
+    let arrow = t
+        .op(&format!("shoot base:arrow {lane} {y} {z} 0 0 -300"))
+        .await?;
+    t.secs(0.5).await?;
+    let at = num(&t.op(&format!("entity {arrow}")).await?, 3);
+    let face = (f[2] - 5) as f64;
+    t.check((face..face + 0.2).contains(&at), format!("stuck at the wall's face {face}: z {at}"));
+    t.secs(1.0).await?;
+    let still = num(&t.op(&format!("entity {arrow}")).await?, 3);
+    t.check_eq(still, at, "and it stays");
+
+    // Shot up at a block a tick it slows as vanilla's arrow does: half a second on, some seven
+    // blocks higher.
+    let (ux, uz) = (f[0] as f64 - 4.5, f[2] as f64 + 0.5);
+    // Two ops sent in one frame are answered in one tick: what it says, and at which game tick.
+    // On CI half a script second was 19 ticks, and the arrow 12.33 blocks up as it should be then.
+    let same_tick = async |t: &T, a: &str, b: &str| -> Result<(String, String), String> {
+        let ids = [a, b].map(|s| t.c().run_command(&format!("/tk {s}")));
+        let mut got: [Option<String>; 2] = [None, None];
+        t.until("two server answers", Duration::from_secs(10), |t| {
+            for i in 0..2 {
+                if got[i].is_none() {
+                    got[i] = t.c().command_reply(ids[i]);
+                }
+            }
+            got.iter().all(Option::is_some)
+        })
+        .await?;
+        let ok = |s: Option<String>| {
+            let s = s.unwrap_or_default();
+            s.strip_prefix("ok").map(|r| r.trim().to_string()).ok_or(s)
+        };
+        let [x, y] = got;
+        Ok((ok(x)?, ok(y)?))
+    };
+    let (t0, up) = same_tick(&t, "gametime", &format!("shoot base:arrow {ux} {y} {uz} 0 20 0")).await?;
+    t.secs(0.5).await?;
+    let (t1, seen) = same_tick(&t, "gametime", &format!("entity {up}")).await?;
+    let ticks = t1
+        .parse::<u64>()
+        .unwrap_or(0)
+        .saturating_sub(t0.parse().unwrap_or(0));
+    let height = num(&seen, 2) - y;
+    // Its way tick by tick: drag 0.99, gravity 0.625 of flatlands' 0.05 a tick.
+    let (mut want, mut v) = (0.0, 1.0);
+    for _ in 0..ticks {
+        want += v;
+        v = v * 0.99 - 0.05 * 0.625;
+    }
+    t.check(
+        ticks >= 5 && (height - want).abs() < 1.1,
+        format!("an arrow shot up climbs and slows: {height:.2} blocks in {ticks} ticks, its way {want:.2}"),
+    );
+
+    // Its block taken away, the stuck one falls.
+    t.fill(add(f, [4, 0, -6]), add(f, [4, 2, -6]), "air")
+        .await?;
+    t.secs(1.0).await?;
+    let fell = num(&t.op(&format!("entity {arrow}")).await?, 2);
+    t.check(fell < y - 0.3, format!("the arrow falls once its block is gone: y {fell:.2} from {y:.2}"));
+
+    // Into a cow it stays in the cow, going about with it.
+    let (cx, cz) = (f[0] + 8, f[2] - 5);
+    let cow = t.op(&format!("spawn base:cow {cx} {} {cz}", f[1])).await?;
+    t.secs(0.3).await?;
+    let lane = cx as f64 + 0.5;
+    let in_cow = t
+        .op(&format!("shoot base:arrow {lane} {} {z} 0 0 -40", y + 0.3))
+        .await?;
+    t.secs(1.5).await?;
+    // Both in one tick: read a round trip apart, the cow running from the hit had gone 1.77 blocks on (CI).
+    let (a, c) = same_tick(&t, &format!("entity {in_cow}"), &format!("entity {cow}")).await?;
+    let near = (num(&a, 1) - num(&c, 1)).hypot(num(&a, 3) - num(&c, 3));
+    t.check(near < 1.2, format!("the arrow stays in the cow: {near:.2} blocks off ({a} / {c})"));
+
+    // Off what takes no harm it bounces back instead of going.
+    t.cmd("/gamemode creative").await?;
+    t.secs(0.2).await?;
+    let me = t.state().pos;
+    let back = t
+        .op(&format!("shoot base:arrow {} {} {} 0 0 40", me.x, me.y + 1.0, me.z - 4.0))
+        .await?;
+    t.secs(0.6).await?;
+    let after = t.op(&format!("entity {back}")).await;
+    t.check(after.as_ref().is_ok_and(|s| num(s, 3) < me.z), format!("an arrow that did no harm bounced off and stayed: {after:?}"));
+    Ok(())
+}
+
+/// The server hears the use button held and for how long; a bow drawn that long shoots when
+/// let go, an arrow taken from the inventory.
+pub async fn bow_and_keys(t: T) -> R {
+    t.flat().await?;
+    // Ours is built from parts (`/gear`): a bare `base:bow` carries no durability of its own.
+    t.cmd("/gear bow slot=0").await?;
+    t.op("put me 1 base:arrow 5").await?;
+    t.c().select_slot(0);
+    t.frames(2).await?;
+    t.hold("core:use", 1.5);
+    t.secs(0.6).await?;
+    let held = t.op("key core:use").await?;
+    let mut p = held
+        .split_whitespace()
+        .map(|v| v.parse::<u32>().unwrap_or(0));
+    let (down, ticks) = (p.next().unwrap_or(0), p.next().unwrap_or(0));
+    t.check(down == 1 && ticks >= 5, format!("the server sees the use button held a while: {held}"));
+    let fov = t.op("attr me core:fov").await?;
+    let narrow: f64 = fov
+        .split_whitespace()
+        .next()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1.0);
+    t.check((0.85..0.99).contains(&narrow), format!("drawing narrows the view: {fov}"));
+    t.secs(1.4).await?;
+    t.check_eq(t.op("key core:use").await?, "0 0".into(), "and let go");
+    t.check_eq(t.c().inventory_slot(1).count, 4, "one arrow shot");
+    t.check_eq(t.c().inventory_slot(0).wear(), 1, "the bow wore by one");
+    let f = t.feet();
+    let at = super::add(f, [0, 0, -2]);
+    // Something with no use of its own (our animals answer a use: feeding, a lead), so the
+    // interaction goes unhandled.
+    let cow: u64 = t
+        .op(&format!("spawn core:player {} {} {}", at[0], at[1], at[2]))
+        .await?
+        .parse()
+        .map_err(|_| "bad dummy id")?;
+    t.look_at(at);
+    t.until("aimed at the dummy", Duration::from_secs(5), |t| t.c().target().is_some_and(|target| target.entity == cow))
+        .await?;
+    t.hold("core:use", 1.2);
+    t.secs(1.6).await?;
+    t.check_eq(t.c().inventory_slot(1).count, 3, "an unhandled entity interaction still draws and fires the bow");
+    t.c()
+        .teleport([f[0] as f64 + 20.5, f[1] as f64, f[2] as f64 + 0.5]);
+    t.c().set_look(0.0, 0.0);
+    t.secs(0.2).await?;
+    let seen = t.c().entities();
+    let arrow = EntityKind::lookup("base:arrow").ok_or("no arrow kind")?;
+    t.hold("core:right", 2.0);
+    t.hold("core:use", 1.2);
+    t.secs(1.0).await?;
+    let launch_x = t.state().pos.x;
+    let shot = |t: &T| {
+        t.c()
+            .entities()
+            .into_iter()
+            .find(|id| !seen.contains(id) && t.c().entity(*id).is_some_and(|e| e.kind == arrow))
+    };
+    t.until("moving shot appeared", Duration::from_secs(3), |t| shot(t).is_some())
+        .await?;
+    let shot = shot(&t).ok_or("no moving shot")?;
+    t.c().input_release_all();
+    t.secs(0.3).await?;
+    let x = t.c().entity(shot).ok_or("moving shot disappeared")?.pos.x;
+    t.check(x > launch_x + 0.1, format!("the arrow keeps the shooter's sideways motion: {launch_x:.3} -> {x:.3}"));
     Ok(())
 }
 
@@ -1885,10 +2591,10 @@ pub async fn swimming(t: T) -> R {
 /// stronger hit during the target's recovery still adds the difference.
 pub async fn attack_charge(t: T) -> R {
     t.flat().await?;
-    // A wood sword, its hit from the curve (`vitals::gear`): small enough that the cow lives
-    // through both hits.
-    let sword = vitals::gear::weapon_of("sword", "wood").map_or(4.0, |w| w.0);
-    t.op("put me 0 wood_sword 1").await?;
+    // A flint-bladed sword built from parts, its hit from the curve (`vitals::gear`): small
+    // enough that the cow (10) lives through both hits.
+    let sword = vitals::gear::weapon_of("sword", "flint").map_or(4.0, |w| w.0);
+    t.cmd("/gear sword flint slot=0").await?;
     t.c().select_slot(0);
     let f = t.feet();
     let spot = add(f, [0, 0, -2]);
@@ -1926,7 +2632,38 @@ pub async fn attack_charge(t: T) -> R {
     t.secs(0.15).await?;
     let full = before - health(t.clone(), id.clone()).await?;
     t.note(format!("charged: {full:.2}"));
-    t.check((sword - 0.5..sword + 0.5).contains(&full), format!("a charged wood sword does {sword:.2}: {full:.2}"));
+    t.check((sword - 0.5..sword + 0.5).contains(&full), format!("a charged flint sword does {sword:.2}: {full:.2}"));
+
+    t.op(&format!("remove {id}")).await?;
+    let target: u64 = t
+        .op(&format!("spawn core:player {} {} {}", spot[0], spot[1], spot[2]))
+        .await?
+        .parse()
+        .map_err(|_| "target id")?;
+    let torch = add(f, [1, 1, 0]);
+    t.set(torch, "base:torch[facing=up]").await?;
+    t.until("torch ready", Duration::from_secs(2), |t| t.c().block(torch).is_some_and(|s| s != 0))
+        .await?;
+    t.secs(0.8).await?;
+    t.hold("core:jump", 0.12);
+    t.until("descending", Duration::from_secs(2), |t| t.state().vel.y < -0.14 && t.state().pos.y > f[1] as f64 + 0.3)
+        .await?;
+    let mob = t.c().entity(target).ok_or("missing melee target")?;
+    aim(&t, [mob.pos.x, mob.pos.y + mob.size.height as f64 * 0.65, mob.pos.z]);
+    t.until("mob under crosshair", Duration::from_millis(100), |t| t.c().target().is_some_and(|hit| hit.entity == target))
+        .await?;
+    let particles = t.state().particles;
+    t.hold("core:attack", 1.6);
+    t.until("critical hit burst", Duration::from_millis(300), |t| t.state().particles >= particles + 16)
+        .await?;
+    t.shot("critical").await?;
+    t.look_at(torch);
+    t.secs(0.1).await?;
+    t.check(t.c().block(torch).is_some_and(|s| s != 0), "a held melee swing cannot mine during recovery");
+    t.secs(0.2).await?;
+    t.look_at(torch);
+    t.until("same held click mines after recovery", Duration::from_secs(2), |t| t.c().block(torch) == Some(0))
+        .await?;
     Ok(())
 }
 
@@ -1941,7 +2678,7 @@ pub async fn permissions(t: T) -> R {
     t.cmd("/op @s 0").await?;
     let no = t.cmd("/time set 1000").await?;
     t.check(no.contains("permission level 2"), format!("/time at level 0: {no}"));
-    t.cmd("/rename shiny").await?;
+    t.c().say("/rename shiny");
     t.until("a command for everyone still works", Duration::from_secs(2), |t| t.c().inventory_slot(0).data != 0)
         .await?;
     let up = t.cmd("/op @s 4").await?;
@@ -1953,8 +2690,8 @@ pub async fn permissions(t: T) -> R {
 pub async fn creative_sword(t: T) -> R {
     t.flat().await?;
     t.op("mode creative").await?;
-    t.op("put me 0 iron_sword 1").await?;
-    t.op("put me 1 iron_pickaxe 1").await?;
+    t.cmd("/gear sword wrought_iron slot=0").await?;
+    t.cmd("/gear pickaxe wrought_iron slot=1").await?;
     t.c().select_slot(0);
     let b = add(t.feet(), [2, 0, 0]);
     t.set(b, "stone").await?;
@@ -1979,11 +2716,14 @@ pub async fn advancements_by_tags(t: T) -> R {
     fn made(t: &T) -> u64 {
         t.c()
             .view()
-            .component(&base_api::ADVANCEMENTS)
+            .component(&base_api::components::ADVANCEMENTS)
             .map_or(0, |a| a.done)
     }
     for food in ["base:cooked_beef", "base:cooked_porkchop", "base:cooked_chicken", "base:cooked_mutton"] {
-        t.check(Item::lookup(food).is_some_and(|i| Tag::named("cooked_meat").on_item(i)), format!("{food} is cooked meat"));
+        t.check(
+            Item::lookup(food).is_some_and(|i| Tag::<weft_sdk::kind::Any>::named("cooked_meat").on_item(i)),
+            format!("{food} is cooked meat"),
+        );
     }
     t.flat().await?;
     t.cmd("/feed 0").await?;
@@ -2033,7 +2773,7 @@ pub async fn names_translated(t: T) -> R {
                 .strip_prefix("base:")
                 // Named after what hatches from them, or what they are made of.
                 .filter(|n| {
-                    !["_spawn_egg", "_stairs", "_slab"]
+                    !["_spawn_egg", "_stairs", "_slab", "_beam", "_eighth"]
                         .iter()
                         .any(|end| n.ends_with(end))
                 })
@@ -2104,8 +2844,12 @@ pub async fn swimming_no_bob(t: T) -> R {
     t.hold("core:sprint", 4.0);
     t.hold("core:forward", 4.0);
     t.secs(1.0).await?;
-    for _ in 0..120 {
+    // 2.5 s inside the 4 s hold by the script clock, not 120 frames: on CI (software Vulkan) those
+    // outlast the hold, and the swim ended after 12 of them.
+    let (end, mut frames) = (crate::runner::script_clock() + Duration::from_secs_f32(2.5), 0);
+    while crate::runner::script_clock() < end {
         t.frames(1).await?;
+        frames += 1;
         if let Some(me) = t
             .c()
             .view()
@@ -2117,8 +2861,8 @@ pub async fn swimming_no_bob(t: T) -> R {
             swum = swum.max(t.state().bob);
         }
     }
-    t.note(format!("swimming frames {samples}, touching the bottom {touching}, bob {swum}"));
-    t.check(samples > 20, format!("swam for {samples} frames"));
+    t.note(format!("swimming frames {samples} of {frames}, touching the bottom {touching}, bob {swum}"));
+    t.check(samples >= 3 && samples * 3 > frames, format!("swam for {samples} of {frames} frames"));
     t.check(swum < 0.01, format!("swimming bobs: {swum}"));
     Ok(())
 }
@@ -2129,9 +2873,13 @@ pub async fn toast_with_the_gui(t: T) -> R {
     // screen's painted sky are yellow there, so not by its colour any more).
     let toast = |s: &crate::runner::Shot| s.share(0.80, 0.10, 0.99, 0.16, |c| crate::runner::lum(c.map(f32::from)) < 45.0 && c[0] >= c[2]);
     t.flat().await?;
+    // What is dark there with no toast: on CI the example packages are loaded, and bell's HUD
+    // panel stands right there under the clock.
+    t.c().set_look(0.0, -40.0);
+    t.frames(3).await?;
+    let before = toast(&t.shot("before").await?);
     t.op("put me 0 iron_ingot 1").await?;
     t.op("put me 1 gold_ingot 1").await?;
-    t.c().set_look(0.0, -40.0);
     t.secs(1.5).await?;
     let shown = toast(&t.shot("shown").await?);
     t.check(shown > 0.0005, format!("the toast shows: {shown}"));
@@ -2164,7 +2912,7 @@ pub async fn toast_with_the_gui(t: T) -> R {
     t.c().set_look(0.0, -40.0);
     t.frames(3).await?;
     let again = toast(&t.shot("again").await?);
-    t.check(again < 0.0001, format!("none from the world before: {again}"));
+    t.check(again < before + 0.0001, format!("none from the world before: {again} (no toast: {before})"));
     Ok(())
 }
 
@@ -2213,13 +2961,14 @@ fn hosting_address(dir: &str) -> Option<String> {
 /// one has settings of its own to lean on).
 pub async fn base_alone(t: T) -> R {
     use std::io::Write;
+    let port = 30000 + (std::process::id() % 20000) as u16 + 1;
     let dir = format!("{}/test-base-alone", t.c().run_dir());
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(format!("{dir}/config")).map_err(|e| e.to_string())?;
     std::fs::write(format!("{dir}/config/disabled_mods.txt"), "testkit\ntestmod").map_err(|e| e.to_string())?;
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut server = std::process::Command::new(exe)
-        .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--run-dir", &dir])
+        .args(["server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
         .args(crate::package_args())
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::null())
@@ -2257,6 +3006,7 @@ pub async fn dedicated_server(t: T) -> R {
             let _ = self.0.kill();
         }
     }
+    let port = 30000 + (std::process::id() % 20000) as u16;
     let dir = format!("{}/test-server", t.c().run_dir());
     let _ = std::fs::remove_dir_all(&dir);
     static SPARKS: Config<u32> = Config::named("testmod:wisp_sparks");
@@ -2268,7 +3018,7 @@ pub async fn dedicated_server(t: T) -> R {
         let _ = std::fs::remove_file(format!("{dir}/logs/latest.log"));
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         std::process::Command::new(exe)
-            .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--run-dir", &dir])
+            .args(["server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
             .args(crate::package_args())
             // The test-only mods too (testmod, whose setting this checks): the server needs the
             // joining game's code mods, and only `--test` games load them by themselves.
@@ -2325,7 +3075,7 @@ pub async fn dedicated_server(t: T) -> R {
         .world_join(&hosting_address(&dir).ok_or("no address")?);
     t.screen("core:message").await?;
     t.check(!t.flag(client::client_flags::IN_WORLD), "not on the whitelist, not in");
-    t.c().screen_close();
+    t.c().menu_close();
     Ok(())
 }
 
@@ -2371,6 +3121,9 @@ pub async fn clothes_and_stew(t: T) -> R {
 /// the seasonal tints read (`Vitals::date`) is day 49 of the year, winter by the calendar's
 /// seasons (Tester 2 11-04: after `/time set` in creative it stayed on its old day).
 pub async fn calendar_follows_time(t: T) -> R {
+    // In a world with seasons (the overworld; the flatlands have no calendar, their date 0):
+    // run first in a process, it asked a server there was none of yet.
+    t.world(1).await?;
     let mode = |t: T, m: &'static str| async move { t.op(&format!("mode {m}")).await };
     mode(t.clone(), "creative").await?;
     let day: u64 = 48;
@@ -2456,7 +3209,7 @@ pub async fn crafting_table_tags(t: T) -> R {
             (0..9).map(|i| c.menu_slot(i)).collect::<Vec<_>>()
         ),
     );
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await
 }
 
@@ -2496,7 +3249,7 @@ pub async fn creative_middle_click(t: T) -> R {
             )
         })?;
     t.check_eq(t.c().inventory_slot(0).count, 3, "and the slot keeps what it had");
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await?;
 
     t.op("mode survival").await?;
@@ -2508,7 +3261,7 @@ pub async fn creative_middle_click(t: T) -> R {
     t.click_ui(&t.hotbar(0), 2);
     t.secs(0.3).await?;
     t.check(t.c().cursor_stack().is_empty(), "nothing out of creative");
-    t.c().screen_close();
+    t.c().menu_close();
     t.no_screen().await
 }
 
@@ -2540,6 +3293,55 @@ pub async fn mob_in_the_way(t: T) -> R {
     t.press("core:use");
     t.until("placed with the pig gone", Duration::from_secs(2), |t| t.c().block(add(wall, [0, 0, 1])).is_some_and(|s| s != 0))
         .await
+}
+
+/// Every block and every spawned creature has sounds, and every sound event's files are there
+/// (`/sounds check`, chiacraft; needs no sound device). Left silent on purpose: the testkit's and
+/// test mod's own blocks and kinds, the packages' stand-in for a missing block, fish, and the
+/// animals' looks (a resting creature's pose, a dog's age and pose, a bird in flight: kinds
+/// drawn in place of the creature, which keeps its own voice), eggs and nests.
+fn look_egg_or_nest(n: &str) -> bool {
+    let path = n.split_once(':').map_or(n, |p| p.1);
+    ["_lie", "_sit", "_fly", "_bask", "_rest"]
+        .iter()
+        .any(|s| path.ends_with(s))
+        || path == "fish_flop"
+        || path.starts_with("egg_")
+        || path.starts_with("nest")
+        || path.starts_with("chihuahua_adult")
+        || path.starts_with("chihuahua_pup")
+}
+
+pub async fn sound_coverage(t: T) -> R {
+    t.flat().await?;
+    let reply = t.cmd("/sounds check").await?;
+    let part = |label: &str| -> Vec<String> {
+        let Some(at) = reply.find(label) else { return vec![format!("<no {label} in {reply:?}>")] };
+        let rest = &reply[at + label.len()..];
+        let end = rest.find(". ").unwrap_or(rest.len());
+        rest[..end]
+            .trim()
+            .trim_end_matches('.')
+            .split_whitespace()
+            .filter(|w| *w != "-")
+            .map(str::to_string)
+            .collect()
+    };
+    let ours = |n: &str| n.starts_with("testkit:") || n.starts_with("testmod:");
+    let blocks: Vec<String> = part("Silent blocks:")
+        .into_iter()
+        .filter(|n| !ours(n) && n != "packages:unknown")
+        .collect();
+    let fish = ["brown_trout", "pacu", "lungfish", "lycoptera"];
+    let kinds: Vec<String> = part("Silent creatures:")
+        .into_iter()
+        .filter(|n| !ours(n) && !fish.iter().any(|f| n.ends_with(&format!(":{f}"))) && !look_egg_or_nest(n))
+        .collect();
+    let missing = part("Events missing files:");
+    t.check(blocks.is_empty(), format!("blocks with no sounds: {}", blocks.join(" ")));
+    t.check(kinds.is_empty(), format!("creatures with no sounds: {}", kinds.join(" ")));
+    t.check(missing.is_empty(), format!("sound events missing files: {}", missing.join(" ")));
+    Ok(())
 }
 
 /// Breaking and placing play the block's sounds (from the server), walking plays steps, and

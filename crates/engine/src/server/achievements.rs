@@ -13,11 +13,7 @@ impl Server {
         if grants.is_empty() {
             return;
         }
-        let on = content()
-            .game
-            .config_names
-            .get("core:sign_achievements")
-            .is_none_or(|id| crate::config::get(*id) != 0.0);
+        let on = crate::config::by_name("core:sign_achievements").is_none_or(|id| crate::config::get(id) != 0.0);
         let Some(session) = chiacraft_account::current().filter(|_| on) else { return };
         let dir = self.storage.as_ref().map(|s| s.lock().meta.dir.clone());
         let name = self
@@ -54,7 +50,7 @@ impl Server {
                 continue;
             };
             let Some(subject) = p
-                .identity
+                .account
                 .as_deref()
                 .and_then(chiacraft_wallet::IdentityKey::from_hex)
             else {
@@ -80,7 +76,7 @@ impl Server {
                     continue;
                 }
             };
-            log::info!("{} earned '{}': signed", p.name, c.achievement.id);
+            log::info!("{} earned '{}': signed", p.identity.name, c.achievement.id);
             if let Some(d) = &dir {
                 record(d, &c);
             }
@@ -207,11 +203,7 @@ impl Server {
     /// with achievements signed and not anchored is committed on chain, its Merkle root in a coin
     /// the owner's wallet spends to itself (fee 0), on a thread of its own.
     pub(super) fn anchor_achievements(&mut self) {
-        let on = content()
-            .game
-            .config_names
-            .get("core:anchor_achievements")
-            .is_some_and(|id| crate::config::get(*id) != 0.0);
+        let on = crate::config::by_name("core:anchor_achievements").is_some_and(|id| crate::config::get(id) != 0.0);
         let Some(dir) = self
             .storage
             .as_ref()
@@ -283,7 +275,7 @@ impl Server {
                 .send(ToClient::Revocations(r.to_json()));
         }
         let Some(dir) = self.storage.as_ref().map(|s| s.lock().meta.dir.clone()) else { return };
-        let Some(me) = self.players[pi].identity.clone() else { return };
+        let Some(me) = self.players[pi].account.clone() else { return };
         let done = anchors(&dir);
         if done.is_empty() {
             return;

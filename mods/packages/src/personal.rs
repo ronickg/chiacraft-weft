@@ -22,7 +22,7 @@ use crate::client_half::{Half, build, game, lock};
 
 /// The world rule: 0 off, 1 client halves.
 pub static RULE: Config<u32> = Config::named("personal_mods");
-static SCREEN: Screen = Screen::named("personal");
+static SCREEN: Menu = Menu::named("personal");
 const KEYS: usize = 8;
 static KEY_SLOTS: [Key; KEYS] = [
     Key::named("personal_1"),
@@ -145,7 +145,7 @@ pub fn open_screen(c: Client, half: &Arc<Half>, name: &str) {
     });
     if let Some(s) = found {
         *SHOWING.lock().unwrap_or_else(|e| e.into_inner()) = Some(s);
-        c.screen_open(&SCREEN);
+        c.menu_open(&SCREEN);
     }
 }
 
@@ -175,7 +175,7 @@ pub fn register(r: &mut Registry) {
             }
         });
     }
-    r.screen(&SCREEN, |ui| {
+    r.menu(&SCREEN).screen(|ui| {
         let showing = *SHOWING.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((i, cb)) = showing
             && allowed()
@@ -186,7 +186,7 @@ pub fn register(r: &mut Registry) {
     });
     for (slot, key) in KEY_SLOTS.iter().enumerate() {
         r.key(key, &format!("shift+alt+{}", slot + 1))
-            .on_press_client(move |c| {
+            .on_client(move |c| {
                 if !allowed() {
                     return;
                 }

@@ -26,6 +26,28 @@ Things the reference does consistently:
 
 ---
 
+### How each one looks, in words
+
+These describe the reference's construction, not exact designs.
+
+- **Chest:**
+  - Dark walnut planks inside a grey-green **iron frame**, with corner brackets and rivets all round.
+  - The lid is a narrow band at the top, and a dark lock plate hangs from the seam.
+  - The trapped chest is identical apart from a small hint.
+- **Ender chest:** the same box shape in dark purple-black stone, with a faint carved face or eye in the middle. It's built for mood, not for detail.
+- **Bell:** solid gold with one strong vertical highlight down the centre, fading to darker edges and a darker lip.
+- **Decorated pot:** plain terracotta sides with a **key-pattern band** at the bottom and a row of small blocks near the top. The middle stays empty for the picture.
+- **Banner:**
+  - Pale cloth with soft vertical drape folds, a little darker toward the edges.
+  - Patterns are bold, simple pale shapes (a cross, a skull, a flower, bricks) on a transparent background, drawn grey so they can be dyed.
+- **Bed:** a dark plank frame underneath, a white puffy pillow at the head, and the coloured blanket over the rest. The head end has small metal legs.
+- **Signs:**
+  - A pale parchment board inside a 2-px wooden frame. The frame colour is the wood type.
+  - Standing signs have a post. Hanging signs use the same board on two short chains.
+- **Make it yours:** keep the shared materials (the same planks and iron frame as the doors and workstations) and the "grey for dyed parts" rule. Shapes and ornament are free.
+
+---
+
 ## 2. Rules
 
 ### How each one is built

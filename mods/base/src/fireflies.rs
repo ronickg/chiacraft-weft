@@ -19,7 +19,7 @@ static HERE: Component<f32> = Component::named("fireflies");
 
 pub fn register(r: &mut Registry) {
     r.entity_component(&HERE, 0.0, component_flags::SYNC_OWNER);
-    r.attach(&PLAYER, &HERE);
+    r.edit(&PLAYER).attach(&HERE);
     r.particle(&FIREFLY)
         .textures(&["firefly_0", "firefly_1", "firefly_2"])
         .life(ff::LIFE_SECS.0, ff::LIFE_SECS.1)

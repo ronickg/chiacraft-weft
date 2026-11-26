@@ -312,9 +312,12 @@ mod tests {
 
     #[test]
     fn the_axe_is_earned_not_a_chore() {
-        // More than a minute of the hands' own work for one who knows the way, less than three.
+        // The hands' own work for one who knows the way: strikes, the knapping screen's clicks
+        // (8 for the axe head since slice 2, 11-04) and cutting fibre, about 13 s; walking and
+        // finding make up the rest of their ~3 min (`notes/FIRST_HOURS.md`, "The timing"). More
+        // than a few clicks, less than three minutes.
         let s = axe_hands_secs();
-        assert!((15.0..180.0).contains(&s), "{s} s");
+        assert!((10.0..180.0).contains(&s), "{s} s");
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! The `core:energy` contract: any mod's generator, cable and machine work together without
-//! knowing each other. Cables are blocks tagged `core:conductor`; block entities next to a cable
-//! with a `core:energy` component join its network. Networks are rebuilt only when a conductor or
-//! an endpoint changes, and balanced in one pass per tick: total offer vs total demand, like
+//! knowing each other. Blocks tagged `conductor` form networks; block entities with
+//! `core:energy` join the network of their own block or an adjacent conductor. Networks are
+//! rebuilt when a conductor or endpoint changes and balanced in one pass per tick, like
 //! Factorio's electric networks, instead of ticking every cable block.
 
 use glam::IVec3;
@@ -90,13 +90,18 @@ impl Grid {
             let mut stack = vec![start];
             let mut ends: Vec<u64> = Vec::new();
             while let Some(p) = stack.pop() {
+                if let Some(id) = e.anchored(frame, p)
+                    && e.comps.contains_key(&(id, c.game.energy))
+                {
+                    ends.push(id);
+                }
                 for d in DIRS {
                     let n = p + d;
                     if self.conductors.contains(&n) {
                         if seen.insert(n) {
                             stack.push(n);
                         }
-                    } else if let Some(&id) = e.anchors.get(&(frame, n)) {
+                    } else if let Some(id) = e.anchored(frame, n) {
                         if e.comps.contains_key(&(id, c.game.energy)) {
                             ends.push(id);
                         }
@@ -140,7 +145,7 @@ impl Grid {
             for (list, sign) in [(&offer, -1i64), (&want, 1i64)] {
                 let total: i64 = list.iter().map(|x| x.1).sum();
                 let mut left = moved;
-                let shares: Vec<(u64, i64)> = list
+                let mut shares: Vec<(u64, i64)> = list
                     .iter()
                     .map(|&(id, amount)| {
                         let s = (amount as i128 * moved as i128 / total.max(1) as i128) as i64;
@@ -148,21 +153,18 @@ impl Grid {
                         (id, s)
                     })
                     .collect();
-                let mut extra: FxHashMap<u64, i64> = FxHashMap::default();
-                for &(id, amount) in list.iter() {
+                for ((_, amount), (_, share)) in list.iter().zip(&mut shares) {
                     if left == 0 {
                         break;
                     }
-                    let s = shares.iter().find(|s| s.0 == id).map_or(0, |s| s.1);
-                    if s < amount {
-                        *extra.entry(id).or_default() += 1;
+                    if *share < *amount {
+                        *share += 1;
                         left -= 1;
                     }
                 }
-                for (id, s) in shares {
-                    let d = s + extra.get(&id).copied().unwrap_or(0);
+                for (id, share) in shares {
                     if let Some(mut v) = read(e, c, id) {
-                        v.stored += sign * d;
+                        v.stored += sign * share;
                         write(e, c, id, v);
                     }
                 }
