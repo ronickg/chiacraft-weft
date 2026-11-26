@@ -137,29 +137,36 @@ def project(p):
 
 
 def draw(faces, scale=14, size=(440, 520)):
-    img = Image.new("RGBA", size, (53, 32, 21, 255))
+    """Faces drawn with a depth buffer (nearer pixel wins), so boxes passing through each other read right."""
+    W, H = size
+    out = np.zeros((H, W, 4), np.uint8)
+    out[...] = (53, 32, 21, 255)
+    zbuf = np.full((H, W), np.inf)
     shade = {"up": 1.0, "north": 0.86, "west": 0.7, "east": 0.6, "south": 0.6, "down": 0.5}
-    items = []
+    o = np.array([W / 2, H * 0.97])
     for corners, tex, name in faces:
         pts = [project(c) for c in corners]
-        depth = np.mean([d for _, d in pts])
-        items.append((depth, [p for p, _ in pts], tex, name))
-    for depth, (p0, p1, p2, p3), tex, name in sorted(items, key=lambda t: -t[0]):
-        o = np.array([size[0] / 2, size[1] * 0.97])
+        (p0, d0), (p1, d1), _, (p3, d3) = pts
         P0, P1, P3 = p0 * scale + o, p1 * scale + o, p3 * scale + o
-        # output (x, y) -> texture (u, v): solve [P1-P0, P3-P0] [u/w, v/h] = (x, y) - P0
         h, w = tex.shape[:2]
         A = np.array([P1 - P0, P3 - P0]).T
+        if abs(np.linalg.det(A)) < 1e-6:
+            continue
         Ai = np.linalg.inv(A)
         a, b, c = Ai[0, 0] * w, Ai[0, 1] * w, -(Ai[0] @ P0) * w
         d, e, f = Ai[1, 0] * h, Ai[1, 1] * h, -(Ai[1] @ P0) * h
-        t = Image.fromarray((tex.astype(float) * [shade[name]] * 3 + [0]).clip(0, 255).astype(np.uint8)) if False else None
         arr = tex.astype(float)
         arr[..., :3] *= shade[name]
         t = Image.fromarray(arr.clip(0, 255).astype(np.uint8), "RGBA")
-        warped = t.transform(size, Image.AFFINE, (a, b, c, d, e, f), Image.NEAREST)
-        img.alpha_composite(warped)
-    return img
+        warped = np.asarray(t.transform(size, Image.AFFINE, (a, b, c, d, e, f), Image.NEAREST))
+        yy, xx = np.mgrid[0:H, 0:W] + 0.5
+        u = (a * xx + b * yy + c) / w
+        v = (d * xx + e * yy + f) / h
+        depth = d0 + u * (d1 - d0) + v * (d3 - d0)
+        m = (warped[..., 3] > 0) & (depth < zbuf - 1e-4)
+        out[m] = warped[m]
+        zbuf[m] = depth[m]
+    return Image.fromarray(out)
 
 
 def box_faces(lo, hi, tex, rot=None):

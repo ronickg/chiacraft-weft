@@ -97,6 +97,14 @@ def row(r):
             return [tile_cell(p) for p in paths]
         if k == "gui":
             return [gui_cell(paths)] if paths else []
+        if k == "image":
+            out = []
+            for p in paths:
+                im = rgba(p)
+                if im.width > 1000:
+                    im = im.resize((1000, round(im.height * 1000 / im.width)), Image.NEAREST)
+                out.append(im)
+            return out
         if k == "box":
             return [box_cell(*paths, r["box"][0], r["box"][1])] if paths else []
     return cells(r.get("before", [])), cells(r.get("after", []))
