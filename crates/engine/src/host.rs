@@ -1377,7 +1377,9 @@ unsafe extern "C" fn day_time(w: *mut abi::WorldCtx) -> u64 {
 unsafe extern "C" fn grow_time(w: *mut abi::WorldCtx) -> u64 {
     unsafe {
         let d = dim(w);
-        d.growing_at().unwrap_or(d.time).saturating_add_signed(d.day_offset)
+        d.growing_at()
+            .unwrap_or(d.time)
+            .saturating_add_signed(d.day_offset)
     }
 }
 
