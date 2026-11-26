@@ -337,7 +337,7 @@ pub fn finish(w: &World, player: u64, r: &RecipeView, out: ItemStack, u: f32) ->
 }
 
 /// A loose part drawn in its material where its shape has a map (`crafting::looks::part_look`).
-fn drawn_part(stack: ItemStack, material: &str) -> ItemStack {
+pub(crate) fn drawn_part(stack: ItemStack, material: &str) -> ItemStack {
     match shape_id(stack.item).and_then(|s| crafting::looks::part_look(s, material)) {
         Some(look) => with_look(stack, Some(look.as_str())),
         None => stack,
