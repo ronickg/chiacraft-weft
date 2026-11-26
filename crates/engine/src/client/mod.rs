@@ -3668,7 +3668,10 @@ impl Client {
         let canopy = ((flags >> weft_abi::air_flags::CANOPY_SHIFT) & 255) as f32 / 255.0;
         self.canopy += (canopy - self.canopy).clamp(-dt / 10.0, dt / 10.0);
         let eye = self.camera().pos.floor().as_ivec3();
-        let sky = self.world.light_loaded(eye).map_or(self.eye_sky, |l| weft_abi::light::sky(l) as f32 / 15.0);
+        let sky = self
+            .world
+            .light_loaded(eye)
+            .map_or(self.eye_sky, |l| weft_abi::light::sky(l) as f32 / 15.0);
         self.eye_sky += (sky - self.eye_sky) * (1.0 - (-dt / 1.5).exp());
         // The ground wets as the rain comes (in about twenty seconds) and dries after it at the
         // pace the air there gives (a mod's `DRYING_SHIFT`; 0, about two minutes): it stayed wet
