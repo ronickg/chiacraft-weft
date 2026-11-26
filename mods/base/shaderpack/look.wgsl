@@ -2130,7 +2130,10 @@ fn bc_layer(layer: u32, start: vec3<f32>, step: vec3<f32>, mult: f32, steps: i32
 // The altostratus along the look: one sample on its plane, two light taps.
 fn bc_alto_layer(start: vec3<f32>, dir: vec3<f32>, mult: f32, dither: f32, sky: vec3<f32>, sun1: vec3<f32>, sun_multi: vec3<f32>, distant: f32, far: f32, hidden: bool) -> vec4<f32> {
     let cam = vec3(0.0, scene.eye.y, 0.0);
-    if hidden || length(start - cam) > far {
+    // Cut only by a surface in front (Bliss's CLOUDS_INTERSECT_TERRAIN: the sky's looks reach it at any
+    // distance). Cut at the sky's own reach too, it ended in a hard curve of one height across the
+    // sky seen from in the low deck, where the sheet lay past 8192 blocks (wx_band2 y300 / y320).
+    if hidden || (far < BC_SKY_FAR - 2.0 && length(start - cam) > far) {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
     let flip = select(-1.0, 1.0, scene.eye.y > BC_ALTO);
