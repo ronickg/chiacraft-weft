@@ -1,0 +1,34 @@
+# The bone needle (11-26, first.rs BONE_NEEDLE, vitals::first::NEEDLE_USES, clothing.rs
+# with_needle): a bone splinter ground on a rock (the rock kept) makes a needle; every garment and
+# cloak is sewn with one, wearing it by the string it takes. Seed 1, a fresh world.
+# Part 1, the recipes (/tk craft answers the grid's output):
+#   - splinter + rock (1 x 2) -> base:bone_needle 1
+#   - a hide hat: leather / string / needle (1 x 3) -> base:hide_hat 1; leather / string (1 x 2),
+#     no needle -> nothing (air or none 0)
+#   - a wool cloak: wool string wool / . wool . / . needle . (3 x 3) -> base:wool_cloak 1; the same
+#     without the needle row (3 x 2) -> nothing
+#   - linen coat: cloth string cloth / cloth string cloth / . needle . -> base:linen_coat 1
+# Part 2, the hint: in survival, leather given with no needle in the bag: the hint "To sew
+#   clothes you need a needle..." shows (shot fp_needle_hint).
+# Read: every /tk craft reply, the shot, run.log "panicked"/"ERROR" (none).
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /time set 1000
+chat /weather clear 99999
+chat /tk mode creative
+chat /tk craft 1 2 base:bone_splinter base:rock
+chat /tk craft 2 1 base:rock base:bone_splinter
+chat /tk craft 1 3 base:leather base:string base:bone_needle
+chat /tk craft 1 2 base:leather base:string
+chat /tk craft 3 3 base:wool base:string base:wool air base:wool air air base:bone_needle air
+chat /tk craft 3 2 base:wool base:string base:wool air base:wool air
+chat /tk craft 3 3 base:cloth base:string base:cloth base:cloth base:string base:cloth air base:bone_needle air
+chat /tk mode survival
+until mode survival within 10
+chat /tk give base:leather
+# Dry and clear first (needle1: the wet hint showed in front of it); one hint at a time.
+wait 8
+shot fp_needle_hint.png
+expect alive
+quit

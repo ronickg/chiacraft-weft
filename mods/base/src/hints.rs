@@ -15,7 +15,7 @@ use vitals::effects::Effect;
 use weft_sdk::*;
 
 /// The hints, by their bit in `SEEN`: `hint.base.<name>` in the lang files.
-const HINTS: [&str; 22] = [
+const HINTS: [&str; 23] = [
     "logs",
     "table",
     "night",
@@ -38,6 +38,7 @@ const HINTS: [&str; 22] = [
     "copper_heat",
     "casting",
     "antler",
+    "needle",
 ];
 const LOGS: u32 = 0;
 const TABLE: u32 = 1;
@@ -69,6 +70,8 @@ const COPPER_HEAT: u32 = 19;
 const CASTING: u32 = 20;
 /// A shed antler in the bag (`vitals::first::FLAKER_POINTS`): it's a pressure flaker.
 const ANTLER: u32 = 21;
+/// Something to sew (hide, fur, cloth) in the bag and no needle (`first.rs`'s bone needle).
+const NEEDLE: u32 = 22;
 
 /// Seconds played before the first hint, that bare hands can't fell a tree (`first.rs`).
 const LOGS_AFTER: u64 = 20;
@@ -97,6 +100,10 @@ static CAMPFIRE_TAG: Tag = Tag::named("campfires");
 static ROCKS_TAG: Tag = Tag::named("rocks");
 static FLINT_TAG: Tag = Tag::named("flint");
 static BONE_TAG: Tag = Tag::named("bone");
+static PELTS_TAG: Tag = Tag::named("pelts");
+static LEATHER_TAG: Tag = Tag::named("leather");
+static CLOTH_TAG: Tag = Tag::named("cloth");
+static NEEDLES_TAG: Tag = Tag::named("needles");
 static NATIVE_COPPER_TAG: Tag = Tag::named("native_copper");
 static RAW_COPPER_TAG: Tag = Tag::named("raw_ores/copper");
 /// Tools a player may hold (built ones carry `parts::PARTS` too): the logs hint waits while one is.
@@ -293,6 +300,9 @@ fn watch(w: &World) {
         }
         if items.iter().any(|&i| i == crate::first::ANTLER.id()) {
             once(w, id, ANTLER);
+        }
+        if (has(&PELTS_TAG) || has(&LEATHER_TAG) || has(&CLOTH_TAG)) && !has(&NEEDLES_TAG) {
+            once(w, id, NEEDLE);
         }
         if !logs && !seen(w, id, TREE) && has(&AXES_TAG) {
             mark(w, id, TREE);

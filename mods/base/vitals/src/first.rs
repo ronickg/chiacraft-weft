@@ -222,6 +222,13 @@ pub const FLAKE_FROM_ROCK: f32 = 0.25;
 pub const SPLINTER_FROM_BONE: f32 = 0.6;
 /// A bone splinter's uses before it's blunt: bone wears faster than a flint edge.
 pub const SPLINTER_USES: u32 = 25;
+/// The bone needle (`notes/FIRST_HOURS.md` §7, bone and antler: "sewing"): a bone splinter
+/// ground to a point on a rock in the grid (the rock stays). Every garment and cloak is sewn with
+/// it, wearing it by the string it takes (`clothing::STRING`, a cloak's 1): `NEEDLE_USES` in all,
+/// about four suits. Eyed bone needles are some 40,000 years old (Denisova Cave, Siberia); sewn
+/// clothes were what let people live in the cold north.
+pub const NEEDLE_USES: u32 = 20;
+
 /// Flakes (or splinters) a nodule, rock or bone gives before it is used up.
 pub const FLAKES_PER_STONE: u32 = 3;
 /// Seconds after a strike in which the hammer stone isn't put down on bare ground (Planner, 11-26,
@@ -511,5 +518,12 @@ mod tests {
                     .all(|b| b.book != a.book && b.outline != a.outline)
             );
         }
+    }
+
+    /// A needle sews several suits (a suit takes 5 string: `clothing::STRING`) but wears out.
+    #[test]
+    fn a_needle_sews_a_few_suits() {
+        let suit: u32 = crate::clothing::STRING.iter().sum();
+        assert!(NEEDLE_USES >= 3 * suit && NEEDLE_USES <= 6 * suit, "{NEEDLE_USES} uses, a suit {suit}");
     }
 }

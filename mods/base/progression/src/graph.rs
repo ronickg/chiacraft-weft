@@ -88,10 +88,10 @@ const fn b(out: &'static str, n: f32, from: &'static [(&'static str, f32)], need
 macro_rules! clothes {
     ($m:literal, $x:literal) => {
         [
-            c(concat!("base:", $m, "_hat"), 1.0, &[($x, 2.0), ("#string", 1.0)], Table),
-            c(concat!("base:", $m, "_coat"), 1.0, &[($x, 4.0), ("#string", 2.0)], Table),
-            c(concat!("base:", $m, "_trousers"), 1.0, &[($x, 3.0), ("#string", 2.0)], Table),
-            c(concat!("base:", $m, "_boots"), 1.0, &[($x, 2.0), ("#string", 1.0)], Table),
+            c(concat!("base:", $m, "_hat"), 1.0, &[($x, 2.0), ("#string", 1.0), ("base:bone_needle", 0.05)], Table),
+            c(concat!("base:", $m, "_coat"), 1.0, &[($x, 4.0), ("#string", 2.0), ("base:bone_needle", 0.1)], Table),
+            c(concat!("base:", $m, "_trousers"), 1.0, &[($x, 3.0), ("#string", 2.0), ("base:bone_needle", 0.05)], Table),
+            c(concat!("base:", $m, "_boots"), 1.0, &[($x, 2.0), ("#string", 1.0), ("base:bone_needle", 0.05)], Table),
         ]
     };
 }
@@ -114,6 +114,8 @@ const RECIPES_LIST: &[Recipe] = &[
     b("base:oak_bark", 1.0, &[("base:oak_log", 1.0)], AXE, 5.0),
     c("base:sharp_flake", 1.0, &[("base:flint", 1.0)], Hand),
     c("base:bone_splinter", 1.0, &[("base:bone", 1.0)], Hand),
+    // The bone needle (first.rs): a splinter ground on a rock (kept); it sews every garment.
+    c("base:bone_needle", 1.0, &[("base:bone_splinter", 1.0)], Hand),
     c("base:part_felling_axe_head", 1.0, &[("base:flint", 1.0)], Hand),
     c("base:part_pick_head", 1.0, &[("base:flint", 2.0)], Hand),
     c("base:part_shovel_blade", 1.0, &[("base:flint", 2.0)], Hand),
@@ -348,9 +350,9 @@ const RECIPES_LIST: &[Recipe] = &[
     // clothing.rs
     c("base:string", 1.0, &[("base:plant_fibre", 2.0)], Hand),
     c("base:cloth", 1.0, &[("#string", 3.0)], Table),
-    c("base:wool_cloak", 1.0, &[("base:wool", 3.0), ("#string", 1.0)], Table),
-    c("base:fur_robe", 1.0, &[("base:fur", 5.0), ("#string", 1.0)], Table),
-    c("base:rain_cape", 1.0, &[("base:leather", 5.0), ("#string", 1.0)], Table),
+    c("base:wool_cloak", 1.0, &[("base:wool", 3.0), ("#string", 1.0), ("base:bone_needle", 0.05)], Table),
+    c("base:fur_robe", 1.0, &[("base:fur", 5.0), ("#string", 1.0), ("base:bone_needle", 0.05)], Table),
+    c("base:rain_cape", 1.0, &[("base:leather", 5.0), ("#string", 1.0), ("base:bone_needle", 0.05)], Table),
     // glider.rs
     c("base:glider", 1.0, &[("base:leather", 3.0), ("#stick", 4.0), ("#string", 1.0)], Table),
     // grapple.rs
@@ -400,8 +402,8 @@ const RECIPES_LIST: &[Recipe] = &[
     c("base:shield", 1.0, &[("#planks", 6.0), ("base:iron_ingot", 1.0)], Table),
     c("base:oak_door", 3.0, &[("base:oak_planks", 6.0)], Table),
     // fences.rs
-    c("base:fence", 3.0, &[("#planks", 4.0), ("base:stick", 2.0)], Table),
-    c("base:fence_gate", 1.0, &[("#planks", 2.0), ("base:stick", 4.0)], Table),
+    c("base:*_fence", 3.0, &[("#planks", 4.0), ("base:stick", 2.0)], Table),
+    c("base:*_fence_gate", 1.0, &[("#planks", 2.0), ("base:stick", 4.0)], Table),
     c("base:scarecrow", 1.0, &[("base:plant_fibre", 2.0), ("base:stick", 3.0)], Table),
     c("base:oak_wood", 4.0, &[("base:oak_log", 4.0)], Hand),
     c("base:birch_wood", 4.0, &[("base:birch_log", 4.0)], Hand),
