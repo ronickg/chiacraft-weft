@@ -293,9 +293,11 @@ fn pt_emissive() -> f32 {
     crate::config::by_name("core:pt_emissive").map_or(1.0, crate::config::get) as f32
 }
 /// chiacraft: stage 2's parts for `PtArgs::flags`: bit 0 the lamps light the bounce's surface too
-/// (`core:pt_bounce_lights`).
+/// (`core:pt_bounce_lights`), bit 1 the lamps' draws reused over frames and neighbours
+/// (`core:pt_restir`).
 fn pt_flags() -> u32 {
-    u32::from(crate::config::by_name("core:pt_bounce_lights").map_or(1.0, crate::config::get) > 0.5)
+    let on = |k: &str| u32::from(crate::config::by_name(k).map_or(1.0, crate::config::get) > 0.5);
+    on("core:pt_bounce_lights") | on("core:pt_restir") << 1
 }
 const LIGHTS_PER_CUBE: usize = 48;
 const LIGHTS_MAX: usize = 1 << 20;
@@ -659,6 +661,21 @@ impl WorldRenderer {
                 c
             }
         };
+        // The lamps' reservoirs (16 bytes a pixel, two taking turns), made zeroed (0: none).
+        if self.pt_res.is_none_or(|r| r.1 < n) {
+            if let Some((r, _)) = self.pt_res.take() {
+                r.into_iter().for_each(|b| gpu.destroy_buffer(b));
+            }
+            let bytes = n as u64 * 16;
+            let r = [0, 1].map(|_| gpu.create_buffer(bytes, usage::STORAGE, "path traced reservoirs"));
+            for b in r {
+                list.push(Cmd::FillBuffer { buffer: b, offset: 0, size: bytes, value: 0 });
+            }
+            list.push(Cmd::Barrier);
+            self.pt_res = Some((r, n));
+        }
+        let res = self.pt_res.unwrap().0;
+        let turn = (self.rt_frame_no() & 1) as usize;
         let out = self.pt_out[slot].0;
         let args = crate::gpu_layout::PtArgs {
             size: [size.0, size.1],
@@ -678,6 +695,8 @@ impl WorldRenderer {
         list.bind(pt_bind::OUT, out);
         list.bind(pt_bind::CACHE, cache);
         list.bind(pt_bind::LIGHTS, lights);
+        list.bind(pt_bind::RES, res[turn]);
+        list.bind(pt_bind::RES_PREV, res[1 - turn]);
         list.push_constants(&args);
         list.push(Cmd::Dispatch { x: size.0.div_ceil(8), y: size.1.div_ceil(8), z: 1 });
         crate::diag::probe(list, "pt_trace");

@@ -509,6 +509,9 @@ pub struct WorldRenderer {
     /// The radiance cache (`pathtrace.wgsl`'s `pt_cache`, `gpu_layout::PT_CACHE` cells), made zeroed
     /// with the first traced frame.
     pt_cache: Option<BufferId>,
+    /// chiacraft: the lamps' reservoirs (ReSTIR, `core:pt_restir`), 16 bytes a pixel, two that
+    /// take turns (this frame's written, last frame's read), made zeroed; and the pixels they hold.
+    pt_res: Option<([BufferId; 2], u32)>,
     /// Each meshed world cube's light-giving blocks (`Mesh::lights`), kept whether or not anything
     /// traces, and whether they changed since the GPU's table (`rt::RtLights`) was made.
     cube_lights: FxHashMap<IVec3, Vec<u32>>,
@@ -730,6 +733,7 @@ impl WorldRenderer {
             pt_pipes: if rt_compiled { rt::pt_pipelines(gpu, assets) } else { None },
             pt_out: Vec::new(),
             pt_cache: None,
+            pt_res: None,
             cube_lights: FxHashMap::default(),
             body_lights: FxHashMap::default(),
             body_epoch: u64::MAX,
@@ -1518,6 +1522,9 @@ impl WorldRenderer {
         }
         if let Some(b) = self.pt_cache.take() {
             gpu.destroy_buffer(b);
+        }
+        if let Some((r, _)) = self.pt_res.take() {
+            r.into_iter().for_each(|b| gpu.destroy_buffer(b));
         }
         if let Some(l) = self.pt_lights.take() {
             l.destroy(gpu);

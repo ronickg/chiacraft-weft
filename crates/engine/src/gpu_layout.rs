@@ -2034,6 +2034,8 @@ var<immediate> pt: PtArgs;
 const PT_CACHE: u32 = 1048576u;
 @group(1) @binding(36) var<storage, read_write> pt_cache: array<atomic<u32>>;
 @group(1) @binding(37) var<storage, read> pt_lights: array<u32>;
+@group(1) @binding(38) var<storage, read_write> pt_res: array<vec4<u32>>;
+@group(1) @binding(39) var<storage, read> pt_res_prev: array<vec4<u32>>;
 ";
 
 /// The radiance cache's cells (`PT_CACHE` in `PT_DECLS`: change both), ten words each.
@@ -2046,6 +2048,9 @@ pub mod pt_bind {
     pub const IN: u32 = 35;
     pub const CACHE: u32 = 36;
     pub const LIGHTS: u32 = 37;
+    /// chiacraft: the lamps' reservoirs, this frame's and last frame's (`core:pt_restir`).
+    pub const RES: u32 = 38;
+    pub const RES_PREV: u32 = 39;
 }
 
 /// The path tracer's push constants (`PT_DECLS`).
@@ -2070,7 +2075,7 @@ pub struct PtArgs {
     /// light, shadowed, as before stage 2).
     pub emissive: f32,
     /// chiacraft: stage 2's parts, by bit: 0 the lamps light the bounce's surface too
-    /// (`core:pt_bounce_lights`).
+    /// (`core:pt_bounce_lights`), 1 their draws reused over frames and neighbours (`core:pt_restir`).
     pub flags: u32,
 }
 
