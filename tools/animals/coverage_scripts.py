@@ -747,8 +747,9 @@ s = head("crops", [
     "from the deer and \"eats base:carrots\" from the hares, only in the open fields (about a third of each field's",
     "plants a day, `needs::RAID_SHARE`), none at z 532..536; each eaten plant set back to a seedling (1_fields: gaps of",
     "young crop in the open fields, the walled and lit ones whole). Part 2 (x 200, summer):",
-    "a pond with lily pads on it and reeds along its south side, 2 capybaras hungry: \"eats base:lily_pad\" or",
-    "\"eats base:reed\" (they stay: no block changes). Shots 1_fields, 2_pond.",
+    "a pond with lily pads on it and reeds along its south side, 2 capybaras hungry on its north side: \"eats",
+    "base:lily_pad\" first (they stay: no block changes). Part 1's \"crop at ...: block light L\" lines: L 8 or more",
+    "in the torch field, \"left\"; the `/tk light` replies there 8 or more. Shots 1_fields, 2_pond.",
 ])
 s += pad(0) + [
     f"chat /tk fill 4 69 {Z-2} 8 69 {Z+2} base:farmland", f"chat /tk fill 4 70 {Z-2} 8 70 {Z+2} base:wheat[age=7]",
@@ -761,7 +762,9 @@ s += pad(0) + [
     f"chat /tk fill -9 70 {Z-13} -9 70 {Z-13} base:torch", f"chat /tk fill -3 70 {Z-13} -3 70 {Z-13} base:torch",
     f"chat /tk fill -9 70 {Z-7} -9 70 {Z-7} base:torch", f"chat /tk fill -3 70 {Z-7} -3 70 {Z-7} base:torch",
     f"chat /tk fill -6 70 {Z-10} -6 70 {Z-10} base:torch",
-    "chat /time set 18000",
+    "chat /time set 18000", "wait 1",
+    # The torch field's light where its plants stand (`needs::RAID_LIGHT` 8): r1's deer ate 5 of them.
+    f"chat /tk light -4 70 {Z-11}", f"chat /tk light -5 70 {Z-9}", f"chat /tk light -8 70 {Z-12}", f"chat /tk light 6 70 {Z+1}",
     f"chat /tk spawn animals:white_tailed_deer 6 70 {Z+5}", f"chat /tk spawn animals:white_tailed_deer 7 70 {Z+5}",
     f"chat /tk spawn animals:white_tailed_deer 0 70 {Z-10}", f"chat /tk spawn animals:white_tailed_deer 1 70 {Z-10}",
     f"chat /tk spawn animals:hare -6 70 {Z+5}", f"chat /tk spawn animals:hare -5 70 {Z+5}",
@@ -772,7 +775,8 @@ s += pad(0) + [
 ]
 s += pad(200, pond=2) + [
     f"chat /tk fill 198 70 {Z-2} 202 70 {Z+2} base:lily_pad", f"chat /tk fill 198 70 {Z+3} 202 70 {Z+3} base:reed",
-    f"chat /tk spawn animals:capybara 200 70 {Z+6}", f"chat /tk spawn animals:capybara 201 70 {Z+6}",
+    # On the lily pads' side (north), the reeds behind the pond (r1's on the south side ate only the reeds).
+    f"chat /tk spawn animals:capybara 200 70 {Z-5}", f"chat /tk spawn animals:capybara 201 70 {Z-5}",
     f"chat /tp 200 74 {Z+14}", "wait 1", "chat /animalprof food 0.3", "chat /animalprof water 0.9", "wait 60",
     "chat /tick freeze", f"chat /tp 200 78 {Z+9}", "look 0 -40", "wait 2", "shot cov_crops_2_pond.png",
     "chat /tick unfreeze", "wait 1",

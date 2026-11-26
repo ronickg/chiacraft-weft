@@ -257,8 +257,7 @@ fn nearest(w: &World, s: &Species, center: [i32; 3], r: i32, p: [i32; 3], ground
                 }
                 match food(s, w.block(at), now, full) {
                     // A ripe crop only on its day and in the dark (`needs::raids`): a torch keeps them off it.
-                    Some(src)
-                        if src.found == vitals::forage::PLANTED && !animals_core::needs::raids(w.block_light(at), raid_roll(w, at)) => {}
+                    Some(src) if src.found == vitals::forage::PLANTED && !raids(w, at) => {}
                     Some(src) if !src.fallback() => best = Some((at, d)),
                     Some(_) if ground_too && ground.is_none_or(|(_, b)| d < b) => ground = Some((at, d)),
                     _ => {}
@@ -267,6 +266,22 @@ fn nearest(w: &World, s: &Species, center: [i32; 3], r: i32, p: [i32; 3], ground
         }
     }
     best.or(ground).map(|(at, _)| at)
+}
+
+/// Whether a wild animal goes for the ripe crop at `at` today (`needs::raids`: its day's roll, and no torch near).
+fn raids(w: &World, at: [i32; 3]) -> bool {
+    let (light, roll) = (w.block_light(at), raid_roll(w, at));
+    let yes = animals_core::needs::raids(light, roll);
+    weft_sdk::debug!("crop at {at:?}: block light {light}, roll {roll:.2}: {}", if yes { "raided" } else { "left" });
+    yes
+}
+
+/// Whether block state `state` is a crop where a player sowed it (`vitals::forage::PLANTED`).
+fn sown(state: u32) -> bool {
+    rows(state, |r| {
+        r.iter()
+            .any(|&i| vitals::forage::SOURCES[i as usize].found == vitals::forage::PLANTED)
+    })
 }
 
 /// A crop plant's roll for today (0 to 1, `needs::RAID_SHARE`): the same all day, another the next.
@@ -442,8 +457,10 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     let target = (!f[0].is_nan() && f[3] != 0.0).then(|| [f[0], f[1], f[2]]);
     let close = target.is_some_and(|t| {
         let (dx, dz) = (t[0] + 0.5 - st.pos.x, t[2] + 0.5 - st.pos.z);
-        // Within reach of its mouth: two blocks for even a small one standing beside it.
-        dx * dx + dz * dz <= 4.0 && (t[1] - st.pos.y).abs() <= 2.5
+        // Within reach of its mouth: two blocks for even a small one standing beside it; a crop closer
+        // (`needs::CROP_REACH`), so it can't be eaten over a wall.
+        let r = if sown(w.block(t.map(|v| v as i32))) { animals_core::needs::CROP_REACH as f64 } else { 2.0 };
+        dx * dx + dz * dz <= r * r && (t[1] - st.pos.y).abs() <= 2.5
     });
     if close && let Some(t) = target {
         if now < f[3] {

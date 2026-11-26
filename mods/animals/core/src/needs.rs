@@ -53,10 +53,14 @@ pub const ROOM_FLOOR: f32 = 0.25;
 /// Crops (`vitals::forage::crop`, part 3): a wild animal finds a ripe crop worth raiding only on some days, a share
 /// `RAID_SHARE` of a field's plants a game day (each plant's own roll for the day), so a herd thins a field rather than
 /// clearing it at once; and never one in block light of `RAID_LIGHT` or more (a torch within about 6 blocks: lit ground
-/// is people's ground). A fence keeps them out as any wall does (they can't path through it). Game numbers, not
+/// is people's ground). A fence keeps them out as any wall does (they can't path through it, and `CROP_REACH` is too
+/// short to eat over it). Game numbers, not
 /// measured ones: farming has to stay winnable.
 pub const RAID_SHARE: f32 = 0.3;
 pub const RAID_LIGHT: u32 = 8;
+/// How close a raider must stand to a crop to eat it, blocks from its middle (other food: 2): a wall a block thick round
+/// a field keeps its edge plants out of reach (cov_crops r1: a deer ate the corner plant over a 2-high wall at 2).
+pub const CROP_REACH: f32 = 1.5;
 
 /// Whether a wild animal goes for a ripe crop in block light `light` whose roll for the day is `roll` (0 to 1).
 pub fn raids(light: u32, roll: f32) -> bool {
