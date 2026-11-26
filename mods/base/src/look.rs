@@ -169,7 +169,8 @@ pub static LOOK_FOG_ONE: Config<f32> = Config::named("look_fog_one");
 /// With the chain, the night's light and sky to this share (0.08 as made; 1 as before).
 pub static LOOK_CHAIN_NIGHT: Config<f32> = Config::named("look_chain_night");
 /// How strongly rain and snow are drawn over the HDR world's Bliss look, x their defaults (1 as
-/// made: flakes as before, rain a faint streak; 0 Bliss's own, only the mask for its bloomy fog).
+/// made: flakes as before, rain streaks lit as Bliss lights its particles; 0 Bliss's own, only the
+/// mask for its bloomy fog).
 pub static LOOK_WEATHER: Config<f32> = Config::named("look_weather");
 /// Rain on the ground as before Bliss (1: darker wet ground, a sheen, puddles that grow) or as
 /// Bliss's (0 as made: the ground only goes smooth, mirroring the sky and a sharp sun, all_solid's

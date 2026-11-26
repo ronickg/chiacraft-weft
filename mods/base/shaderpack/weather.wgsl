@@ -138,8 +138,10 @@ fn fs(in: VOut) -> WeatherOut {
         // (`base:look_weather`; 0 Bliss's own, the mask alone): with no colour at all neither rain
         // nor snow showed in a storm (wx_snow_B2, Planner 11-26).
         // (Rain at 0.12 did not show on open ground in a downpour, lksp_passBw lp_field_rain; dev's
-        // 0.42 drew clear streaks.)
-        strength = select(0.3, 0.95, snow) * max(fantasy_opt(OPT_WEATHER), 0.0);
+        // 0.42 drew clear streaks. At 0.3 x 3 they still hardly showed; at 0.3 x 8 they read as rain,
+        // grey over the stone and pale over the dark hillside, lksp_rainweightw. Thin as they are, a
+        // pixel holds only part of a drop, so the rain's own strength is 2.4; snow stays as made.)
+        strength = select(2.4, 0.95, snow) * max(fantasy_opt(OPT_WEATHER), 0.0);
         let near_mask = 1.0 - smoothstep(8.0, 10.0, length(in.rel.xz));
         let mask = min(cover * in.alpha * near_mask, 1.0);
         let a = min(cover * in.alpha * strength * near, 1.0);
