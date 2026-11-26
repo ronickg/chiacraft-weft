@@ -33,7 +33,7 @@ run per group is the last table in its section.
   - a pack kill made by another packmate than the one that started the hunt;
   - the sound runs' unlogged hurts (the cause log works now; next sound run).
 - **For Planner:**
-  - should hunters spare dogs (a wild cat killed a chihuahua);
+  - ~~should hunters spare dogs~~: Ronald 11-25: wild hunters spare a tamed dog within `roles::SPARED_NEAR_OWNER` (16) blocks of its owner; untamed dogs stay prey. Check: `cov_dogs.txt` (table below);
   - many lie/sit idle clips are missing (art);
   - the night caiman shot is black.
 
@@ -714,3 +714,13 @@ list, sources and listening pages are in `notes/crew/plans/ai-sound.md`. Each sp
   - whether each act sound plays at the right moment;
   - the bosses' young have no species, so nothing plays their alarm.
 - **Hurt sounds with no logged cause** (the section above): every hurt now logs its cause.
+
+## Dogs by their owner (`cov_dogs.txt`)
+
+Ronald (11-25): wild hunters spare a tamed dog near its owner; wild or untamed dogs stay prey.
+`roles::SPARED_NEAR_OWNER` (16 blocks), filtered in `senses.rs` (`spared`).
+
+| part | expected | run |
+|---|---|---|
+| 1: tamed dog beside its owner, hungry wild cat 12 off | no "hunts" of the dog | (pending) |
+| 2: untamed dog, hungry wild cat | the cat may hunt it | (pending) |

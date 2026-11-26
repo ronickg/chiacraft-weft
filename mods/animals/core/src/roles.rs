@@ -40,6 +40,14 @@ pub const WATCH: f32 = 0.42;
 pub const STANDS_KG: f32 = 150.0;
 pub const GUARDS_KG: f32 = 30.0;
 pub const YOUNG_NEAR: f64 = 10.0;
+/// Blocks from its owner within which a tamed dog is spared by wild hunters (a wolf or a cat
+/// leaves a dog at its owner's side alone); a wild or untamed dog, or one strayed farther, stays
+/// prey.
+pub const SPARED_NEAR_OWNER: f64 = 16.0;
+/// Whether a tamed animal of this species is spared near its owner (`SPARED_NEAR_OWNER`): dogs.
+pub fn spared_near_owner(species: &str) -> bool {
+    species == "dog"
+}
 pub const LONE: f64 = 10.0;
 pub const CHARGE: f64 = 3.5;
 /// A charge's hit, as a share of the hunter's max health, and the speed it charges at (times its
@@ -133,5 +141,13 @@ mod tests {
         assert!(prey_score(100.0, true, 1.0) < prey_score(64.0, false, 1.0));
         assert!(prey_score(100.0, false, 0.2) < prey_score(80.0, false, 1.0));
         assert!(WATCH < crate::needs::REST && WATCH > crate::needs::WANDER);
+    }
+
+    #[test]
+    fn dogs_by_their_owner() {
+        // Only dogs are spared, and only near: farther than a short walk they are fair game.
+        assert!(spared_near_owner("dog"));
+        assert!(!spared_near_owner("wolf") && !spared_near_owner("cat"));
+        assert!(SPARED_NEAR_OWNER >= 8.0 && SPARED_NEAR_OWNER <= 32.0);
     }
 }
