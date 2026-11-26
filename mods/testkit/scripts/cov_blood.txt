@@ -2,7 +2,7 @@
 # of blood, and bleeds out in about 75 s; 1_gashed: close, where it was hit (a dark red splash on the grass);
 # 2_trail: from high above (dark red specks in a line where it ran); 3_spots_low: low at the first spots. Then a
 # hungry grey wolf set 14 blocks off follows the spots ("grey_wolf N follows a blood trail") to the carcass and
-# eats ("eats K kg off carcass"). Part 2 (x 600): a deer gashed for 30 % bleeds 45 s and lives ("stops bleeding",
+# eats ("eats K kg off carcass"); 4_wolf_1/2: the wolf on the trail from above (ticks frozen); 5_wolf_end. Part 2 (x 600): a deer gashed for 30 % bleeds 45 s and lives ("stops bleeding",
 # health over half). Report the /animalprof blood rows ("bleeds N s more, health", the spot count rising then
 # falling as spots dry), the GASH lines, "wounded", "stops bleeding", the carcass line where the first deer died,
 # the wolf's lines, and any errors naming blood_spot or base:bleed.
@@ -60,7 +60,7 @@ wait 10
 chat /animalprof blood
 wait 10
 chat /tick freeze
-chat /tp 200 130 544
+chat /tp 200 105 544
 look 0 -89
 wait 2
 press core:hide_hud
@@ -95,15 +95,30 @@ chat /tp 200 110 544
 chat /tk spawn animals:grey_wolf 186 70 550
 wait 2
 chat /animalprof food 0.1
-chat /animalprof carcass
+wait 15
 chat /animalprof blood
-wait 10
-chat /animalprof carcass
+chat /tick freeze
+chat /tp 200 105 544
+look 0 -89
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_blood_4_wolf_1.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+wait 20
 chat /animalprof blood
-wait 10
-chat /animalprof carcass
-chat /animalprof blood
-wait 10
+chat /tick freeze
+chat /tp 200 105 544
+look 0 -89
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_blood_4_wolf_2.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
 chat /animalprof carcass
 chat /animalprof blood
 wait 10
@@ -132,12 +147,12 @@ chat /animalprof carcass
 chat /animalprof blood
 wait 10
 chat /tick freeze
-chat /tp 200 130 544
+chat /tp 200 105 544
 look 0 -89
 wait 2
 press core:hide_hud
 wait 0.5
-shot cov_blood_4_wolf.png
+shot cov_blood_5_wolf_end.png
 press core:hide_hud
 chat /tick unfreeze
 wait 1
