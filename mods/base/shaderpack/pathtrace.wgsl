@@ -549,6 +549,9 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
     }
     // Last frame's at this pixel and two near ones.
     let check = pt_res_check(cell, ng);
+    // Each reused reservoir's draws and block (for the count below).
+    var res_m = array<f32, 3>(0.0, 0.0, 0.0);
+    var res_dc = array<vec3<i32>, 3>(vec3(0), vec3(0), vec3(0));
     if reuse {
         for (var j = 0u; j < 3u; j++) {
             var q = pix;
@@ -566,15 +569,13 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
             }
             let lamp = PtLamp(cell + dc + vec3<i32>(i32(v.x & 63u), i32((v.x >> 6u) & 63u), i32((v.x >> 12u) & 63u)) - 32, v.x, f32(v.y & 15u) * 0.25);
             let mq = min(f32(v.y >> 4u), PT_RES_CAP);
+            res_m[j] = mq;
+            res_dc[j] = dc;
             let p = pt_nee_target(world, n, ng, lamp);
             let w = p * bitcast<f32>(v.z) * mq;
-            // A reservoir whose lamp can't light this surface counts for nothing, not as `mq`
-            // draws that found none: counted, it darkened the lit floor and pillar by 5-10 %
-            // (s2h fire18000, nave12800).
             if w <= 0.0 {
                 continue;
             }
-            m += mq;
             w_sum += w;
             if pt_rand(px, 70u + j).x * w_sum < w {
                 y = lamp;
@@ -583,10 +584,21 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
             }
         }
     }
-    PT_RES_M = m;
     if !found || y_p <= 0.0 {
+        PT_RES_M = m;
         return vec4(0.0, 0.0, 0.0, select(-1.0, 0.0, total == 0u));
     }
+    // The draws the chosen lamp stands for: this pixel's fresh ones, and each reused reservoir's
+    // only where that lamp could light the reservoir's own surface (its block, this face). Counting
+    // every reservoir's draws darkened the fires' light by 5-20 % (s2h, s2j nave12800 and
+    // fire18000): a near surface that can't see the chosen lamp (it lies behind it) could never
+    // have drawn it.
+    for (var j = 0u; j < 3u; j++) {
+        if res_m[j] > 0.0 && (all(res_dc[j] == vec3(0)) || pt_nee_target(world + vec3<f32>(res_dc[j]), n, ng, y) > 0.0) {
+            m += res_m[j];
+        }
+    }
+    PT_RES_M = m;
     // (RIS: what was chosen, over its estimate, times the draws' mean weight.)
     let ris = w_sum / (m * y_p);
     let l = y.word;
