@@ -494,7 +494,16 @@ pub async fn chat_overflow(t: T) -> R {
     t.check(t.click_ui("text:Chat", 0), "a button for the chat's settings");
     t.screen("core:chat_settings").await?;
     t.frames(2).await?;
-    t.laid_out(&["text:Chat width: 320", "text:Open chat height: 180", "text:Dark behind the chat: 50%", "text:Chat: Shown"]);
+    // A slider's value is its own label beside it (UI redo).
+    t.laid_out(&[
+        "text:Chat width",
+        "text:320",
+        "text:Open chat height",
+        "text:180",
+        "text:Dark behind the chat",
+        "text:50%",
+        "text:Chat: Shown",
+    ]);
     t.shot("settings").await?;
     t.check(t.click_ui("text:Chat: Shown", 0), "a button for who shows in the chat");
     t.until("the next choice on the button", Duration::from_secs(2), |t| t.c().ui_rect("text:Chat: Commands only").is_some())
