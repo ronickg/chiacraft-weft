@@ -470,6 +470,7 @@ const OPT_RAIN_MIRROR: u32 = 76u;
 // Bliss's caves (`base:look_cave_fog`, 1 as made): its fog and air's light gone with the eye in a
 // cave and its blue cave fog over what is seen there; 0 neither.
 const OPT_CAVE_FOG: u32 = 77u;
+const OPT_PCSS: u32 = 78u;
 // How much of the sky's light's blue goes by day, with the chain. (The sun's light is already the
 // 4300 K of Ronald's profile through the air, `sun_kelvin_linear`, since 11-06.)
 const CHAIN_AMBIENT_GREY: f32 = 0.4;
@@ -1821,6 +1822,10 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
         let lit = mix(mix(lit4.x, lit4.y, f.x), mix(lit4.z, lit4.w, f.x), f.y);
         return vec2(lit, (1.0 - smoothstep(0.85, 0.97, reach)) * low);
     }
+    if fantasy_opt(OPT_PCSS) > 0.5 {
+        let p = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * f32(size);
+        return vec2(shadow_pcss(index, size, texel, depth, rel, p, ndc.z, bias), (1.0 - smoothstep(0.85, 0.97, reach)) * low);
+    }
     // A 4x4 of the map about the point; each of the 3x3 taps takes the nearest to the light of its
     // texel and the ones right and below. That closes the one-texel cracks between neighbouring
     // meshes, through which sunlight would draw thin dotted lines across a shadow. Read a row at a
@@ -1852,6 +1857,60 @@ fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<
     // Near its edge it hands over to the caller's guess, and so it does as the light nears the
     // horizon (long smeared shadows, then the swap from the sun to the moon).
     return vec2(lit, (1.0 - smoothstep(0.85, 0.97, reach)) * low);
+}
+
+// Bliss's spiral of taps (CleanSample, method only): tap `i` of `total` turned 2.26 pi a tap, out to
+// the edge as sqrt of its share, the whole spiral turned by `noise`.
+fn pcss_spiral(i: f32, total: f32, noise: f32) -> vec2<f32> {
+    let v = noise * 0.897;
+    let s = i + v;
+    let theta = s * 3.14159265 * 2.26;
+    return vec2(cos(theta), sin(theta)) * sqrt(s / (total + v));
+}
+// Bliss's soft sun shadows (Variable_Penumbra_Shadows, composite.fsh's blocker search and
+// composite1's ComputeShadowMap; method only), on one map: `index` and `size` the map, `texel` the
+// blocks a texel covers, `depth` its depth (blocks), `p` the point on it (texels), `z` and `bias` its
+// depth and offset.
+//  - The search: 4 spiral taps within 0.14 blocks (its (1 + 30) x 0.009 x 0.5); where any meets a
+//    caster, the gap to their mean depth in blocks (its x 1500 is blocks in its map's depth) sets
+//    the filter from 5 at the caster's foot to 30 at 35 blocks out; no caster, 5.
+//  - The filter: 13 taps whose spiral offsets add up (its taps walk, each 0.3 x 0.009 x the filter
+//    blocks on), rotated per pixel and frame (TAA averages them). Each tap keeps our closing of the
+//    one-texel cracks between meshes: the nearest to the light of its 2x2 (one gather).
+// Its filter in blocks: 0.009 per unit at its 2048 map over 128 blocks (d0 k / 2048 of the map's
+// 256 blocks), whatever its distortion, so ours by our map's own texel.
+fn shadow_pcss(index: u32, size: i32, texel: f32, depth: f32, rel: vec3<f32>, p: vec2<f32>, z: f32, bias: f32) -> f32 {
+    let clip = scene.view_proj * vec4(rel, 1.0);
+    let px = trunc((vec2(clip.x, -clip.y) / max(clip.w, 1e-4) * 0.5 + 0.5) * vec2(2048.0, 1152.0)) + 5.588238 * scene.frame.w;
+    let ign = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
+    let turn = fract(ign + 0.7548777 * fract(scene.frame.w * 0.618034));
+    var count = 0.0;
+    var sum = 0.0;
+    let search = 0.14 / texel;
+    for (var i = 0; i < 4; i++) {
+        let o = pcss_spiral(f32(i), 3.0, ign) * search;
+        let t = clamp(vec2<i32>(floor(p + o)), vec2(0), vec2(size - 1));
+        let d = textureLoad(textures[index], t, 0).r;
+        // Reverse depth: a caster is nearer the light, the larger.
+        let b = select(0.0, 1.0, d > z + bias);
+        count += b;
+        sum += d * b;
+    }
+    var radius = 5.0;
+    if count >= 0.9 {
+        let gap = (sum / count - z) * depth;
+        radius = clamp(gap, 0.0, 35.0) / 35.0 * 25.0 + 5.0;
+    }
+    let step = 0.3 * 0.009 * radius / texel;
+    var q = p;
+    var lit = 0.0;
+    for (var i = 0; i < 13; i++) {
+        q += pcss_spiral(f32(i), 12.0, turn) * step;
+        let g = textureGather(0, textures[index], nearest_clamp, q / f32(size));
+        let nearest = max(max(g.x, g.y), max(g.z, g.w));
+        lit += select(0.0, 1.0, nearest <= z + bias);
+    }
+    return lit / 13.0;
 }
 
 // How much of the sun reaches `rel` (camera relative) facing `n`: the near cascade's map (80 blocks
