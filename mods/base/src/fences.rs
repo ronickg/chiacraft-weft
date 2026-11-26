@@ -87,6 +87,9 @@ pub fn register(r: &mut Registry) {
                     .model_box([0.0, 12.0, 2.0], [2.0, 15.0, 16.0])
                     .model_box([0.0, 6.0, 14.0], [2.0, 15.0, 16.0])
                     .hitbox([0.0, 0.0, 0.0], [2.0, 16.0, 16.0])
+                    // Not solid, so only outlined: the doorway too, so a use where it stood shuts it
+                    // (fences4: the second use looked through the open gate).
+                    .hitbox([0.0, 0.0, 6.0], [16.0, 16.0, 10.0])
             } else {
                 s.model_box([0.0, 5.0, 7.0], [2.0, 16.0, 9.0])
                     .model_box([14.0, 5.0, 7.0], [16.0, 16.0, 9.0])
