@@ -533,7 +533,7 @@ s = head("blood", [
     "of blood, and bleeds out in about 90 s; 1_gashed: close, where it was hit (a dark red splash on the grass);",
     "2_trail: from high above (dark red splashes in a line where it ran); 3_spots_low: low at the first spots. Then a",
     "hungry grey wolf set 14 blocks off follows the spots (\"grey_wolf N follows a blood trail\") to the carcass and",
-    "eats (\"eats K kg off carcass\"); 4_wolf_1/2: the wolf on the trail from above (ticks frozen, 5 s and 10 s in); 5_wolf_end. Part 2 (x 600): a deer gashed for 30 % bleeds 45 s and lives (\"stops bleeding\",",
+    "eats (\"eats K kg off carcass\"); 4_wolf_1/2/3: the wolf on the trail from above (ticks frozen, 5, 9 and 13 s in: on or beside the splashes, walking them in order); 5_wolf_end. Part 2 (x 600): a deer gashed for 30 % bleeds 45 s and lives (\"stops bleeding\",",
     "health over half). Report the /animalprof blood rows (\"bleeds N s more, health\", the spot count rising then",
     "falling as spots dry), the GASH lines, \"wounded\", \"stops bleeding\", the carcass line where the first deer died,",
     "the wolf's lines, and any errors naming blood_spot or base:bleed.",
@@ -554,9 +554,9 @@ s += ["chat /tick freeze", f"chat /tp {x+2} 69.6 {Z+9}", "look 30 -25", "wait 2"
 # A hungry wolf (food 0.1) 14 blocks west of where the deer was hit (on the pad), out of sight of where it died.
 s += [f"chat /tp {x} 110 {Z}", f"chat /tk spawn animals:grey_wolf {x-14} 70 {Z+6}", "wait 2",
       "chat /animalprof food 0.1"]
-# The wolf on the trail, ticks frozen, from above at 5 s and 10 s (Planner: a hunter following it; r1's at 18 s found
-# it at the body already: the trail took it 14 s), then rows.
-for n, wait in enumerate([3, 5]):
+# The wolf on the trail, ticks frozen, from above at 5, 9 and 13 s (Planner: a hunter following it; r1's at 18 s found
+# it at the body already), then rows. r2's walked straight to the body: it now walks the spots in the order they fell.
+for n, wait in enumerate([3, 4, 4]):
     s += [f"wait {wait}", "chat /animalprof blood", "chat /tick freeze", f"chat /tp {x+4} 90 {Z}", "look 0 -89",
           "wait 2", f"shot cov_blood_4_wolf_{n+1}.png", "chat /tick unfreeze", "wait 1"]
 for _ in range(9):

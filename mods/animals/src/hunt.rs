@@ -359,10 +359,17 @@ fn hunt_(w: &World, id: u64, st: &EntityState) -> bool {
             w.component_mut(id, &FOLLOW).map(|f| f[0] = 0);
             return false;
         }
-        // No prey in sight: blood it smells it follows, spot by fresher spot (`blood::trail`), to a wounded animal it
+        // No prey in sight: blood it smells it follows, spot by spot as it fell (`blood::trail`), to a wounded animal it
         // takes or to where one bled out. Walked as a prowl's leg, keeping the turn.
         let own = mass(w, id).unwrap_or(s.bio.mass);
         let after = w.component(id, &TRAIL).unwrap_or(0);
+        // On a trail it looks again every second, and walks on to the next spot once it has reached this one.
+        if after != 0 {
+            w.component_mut(id, &HUNT).map(|c| c[2] = now + 20);
+            if w.navigating(id) {
+                return true;
+            }
+        }
         if let Some((spot, at)) = crate::blood::trail(w, id, st.pos, after, |b| mass(w, b).is_some_and(|kg| s.takes_at_most(own, kg))) {
             if after == 0 {
                 weft_sdk::info!("{} {id} follows a blood trail from {:.0} {:.0}", s.name, spot[0], spot[2]);

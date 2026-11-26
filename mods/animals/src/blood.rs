@@ -121,15 +121,21 @@ fn dry(w: &World, id: u64, _st: &EntityState) -> bool {
     true
 }
 
-/// For hungry hunter `id` of `own` kg at `pos`: the next spot of a blood trail it follows, fresher than the last one
-/// it went to (`after`, a game tick), and when that fell. A trail of prey it takes (`takes`), or of one that bled out
-/// (its carcass at the end); never its own kind's.
+/// For hungry hunter `id` at `pos`: the next spot of a blood trail it follows, and when that fell. A trail of prey it
+/// takes (`takes`), or of one that bled out (its carcass at the end); never its own kind's. Not yet on one (`after`
+/// 0), the nearest spot it smells; on one, the spot that fell next after the last it went to (`after`, a game tick),
+/// so it walks the trail spot by spot as it was laid (r2's wolf, sent to the freshest, cut straight to the body).
 pub fn trail(w: &World, id: u64, pos: Vec3, after: u64, takes: impl Fn(u64) -> bool) -> Option<([f64; 3], u64)> {
     let kind = w.entity(id)?.kind;
-    let mut best: Option<([f64; 3], u64)> = None;
+    let mut best: Option<([f64; 3], u64, f64)> = None;
     for s in w.entities_near(pos, core::TRAIL_SMELL, Some(&SPOT)) {
         let (Some(o), Some(e)) = (w.component(s, &SPOT_OF), w.entity(s)) else { continue };
-        if o[1] <= after || best.is_some_and(|b| b.1 >= o[1]) {
+        if o[1] <= after {
+            continue;
+        }
+        let d = dist2(e.pos, pos);
+        let better = |b: &([f64; 3], u64, f64)| if after == 0 { d < b.2 } else { o[1] < b.1 };
+        if best.as_ref().is_some_and(|b| !better(b)) {
             continue;
         }
         let follows = match w.entity(o[0]) {
@@ -137,10 +143,10 @@ pub fn trail(w: &World, id: u64, pos: Vec3, after: u64, takes: impl Fn(u64) -> b
             None => true,
         };
         if follows {
-            best = Some(([e.pos.x, e.pos.y, e.pos.z], o[1]));
+            best = Some(([e.pos.x, e.pos.y, e.pos.z], o[1], d));
         }
     }
-    best
+    best.map(|(p, t, _)| (p, t))
 }
 
 /// `/animalprof blood`: every wound and spot within 64 blocks of `at`.
