@@ -216,6 +216,21 @@ pub fn refresh(w: &World, id: u64, index: usize, kind: u32) {
 
 /// What `id` is to the others: its kept facts, or for one that keeps none (an egg, a farm
 /// animal, a player) worked out now. `None`: it is nothing to the food web.
+/// A tamed dog by its owner (`roles::SPARED_NEAR_OWNER`): wild hunters leave it be.
+fn spared(w: &World, t: u64, f: &Facts) -> bool {
+    if f.tamed == 0
+        || f.egg != 0
+        || !f
+            .species()
+            .is_some_and(|s| roles::spared_near_owner(s.name))
+    {
+        return false;
+    }
+    let (Some(o), Some(e)) = (crate::commands::owner(w, t), w.entity(t)) else { return false };
+    w.entity(o)
+        .is_some_and(|oe| dist2(oe.pos, e.pos) <= roles::SPARED_NEAR_OWNER * roles::SPARED_NEAR_OWNER)
+}
+
 pub fn facts(w: &World, id: u64) -> Option<Facts> {
     if let Some(f) = w.component(id, &FACTS).filter(|f| f.at != 0) {
         return Some(f);
@@ -455,7 +470,7 @@ fn look(w: &World, id: u64, st: &EntityState, out: &mut Senses, watch: f64, secs
             && f.tamed == 0
             && f.species()
                 .is_some_and(|h| h.takes_at_most(f.mass, me.mass));
-        let food = hungry && !family && !(f.egg != 0 && f.tamed != 0) && mine.takes_at_most(me.mass, f.mass);
+        let food = hungry && !family && !(f.egg != 0 && f.tamed != 0) && mine.takes_at_most(me.mass, f.mass) && !spared(w, t, &f);
         if !(kin_too || hunter || food) {
             continue;
         }

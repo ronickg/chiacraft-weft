@@ -320,3 +320,29 @@ for n, kind in enumerate(["protoceratops", "psittacosaurus", "citipati", "raptor
     s += [f"chat /tp {x} 72 {Z}", "chat /animal hurry", "wait 4"] + watch(x, 3, every=8)
     s += shot(x, f"cov_taming_{n+5}_{kind}", z_back=8, pitch=-50)
 write("taming", s)
+
+# 8. Dogs by their owner: wild hunters spare a tamed dog within `roles::SPARED_NEAR_OWNER` (16) blocks of
+# its owner; an untamed dog stays prey (Ronald, 11-25).
+s = head("dogs", [
+    "Animal AI coverage, dogs and wild hunters. Part 1: a dog tamed by the player (`/animal tame`), the player standing",
+    "beside it in creative the whole part (spectators are not found as owners), a hungry jaguar 12 blocks off (a wild cat that takes a",
+    "2.5 kg dog: a house cat takes up to 0.4 of its 4.5 kg, and r1 never hunted the untamed dog)",
+    "(`/animalprof hunters 0.3`). Part 2: an untamed dog and a hungry jaguar, the player watching from 30 blocks.",
+    "Expected: part 1 no \"hunts\" of the tamed dog (the jaguar may hunt nothing, or wander); part 2 the jaguar hunts",
+    "the dog (\"hunts\" naming it, a chase, a kill or \"gives up on\"). Report per part: the jaguar's hunts lines (whom),",
+    "the dog's health in the where rows, any \"takes N\" hurt lines on the dog; the shots.",
+])
+x = 0
+s += pad(x) + spawns(x, [("chihuahua", 1, 2, 0)])
+s += ["chat /tk mode creative", f"chat /tp {x} 70 {Z}", "look 0 -20", "wait 1", "chat /animal tame", "wait 1"]
+s += spawns(x, [("jaguar", 1, 8, -10)])
+s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.3", "wait 1"]
+# The owner stays where they are: the watch rows from here, not from the camera spot 30 blocks off.
+for _ in range(8):
+    s += ["chat /animalprof where 64", "wait 10"]
+s += shot(x, "cov_dogs_1_tamed")
+x = 200
+s += ["chat /tk mode spectator"] + pad(x) + spawns(x, [("chihuahua", 1, 2, 0), ("jaguar", 1, 8, -10)])
+s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.3"]
+s += watch(x, 8) + shot(x, "cov_dogs_2_untamed")
+write("dogs", s)

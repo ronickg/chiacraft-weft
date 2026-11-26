@@ -33,7 +33,7 @@ run per group is the last table in its section.
   - a pack kill made by another packmate than the one that started the hunt;
   - the sound runs' unlogged hurts (the cause log works now; next sound run).
 - **For Planner:**
-  - should hunters spare dogs (a wild cat killed a chihuahua);
+  - ~~should hunters spare dogs~~: Ronald 11-25: wild hunters spare a tamed dog within `roles::SPARED_NEAR_OWNER` (16) blocks of its owner; untamed dogs stay prey. Check: `cov_dogs.txt` (table below);
   - many lie/sit idle clips are missing (art);
   - the night caiman shot is black.
 
@@ -714,3 +714,17 @@ list, sources and listening pages are in `notes/crew/plans/ai-sound.md`. Each sp
   - whether each act sound plays at the right moment;
   - the bosses' young have no species, so nothing plays their alarm.
 - **Hurt sounds with no logged cause** (the section above): every hurt now logs its cause.
+
+## Dogs by their owner (`cov_dogs.txt`)
+
+Ronald (11-25): wild hunters spare a tamed dog near its owner; wild or untamed dogs stay prey.
+`roles::SPARED_NEAR_OWNER` (16 blocks), filtered in `senses.rs` (`spared`).
+
+| part | expected | run |
+|---|---|---|
+| 1: tamed dog beside its owner, hungry jaguar 12 off | no "hunts" of the dog | r1 (house cat): no hunt, the cat sat beside the dog 30 s; not telling (see part 2) |
+| 2: untamed dog, hungry jaguar | the jaguar hunts it | r1 (house cat): no hunt either: a house cat takes up to 0.4 x 4.5 kg = 1.8 kg, the dog is 2.5 kg; r2 with a jaguar |
+
+Run 1 (323f7ea32, `cov_dogs_r1-215301`, 196 s, script pass): with a house cat neither dog was hunted, so part 1
+proved nothing. The cat cannot take a grown chihuahua (the r2 kill was a big cat's or a small dog's genes);
+round 2 uses a jaguar (prey 0.01 to 1.5 of its mass), which hunted at noon in the hunters runs.
