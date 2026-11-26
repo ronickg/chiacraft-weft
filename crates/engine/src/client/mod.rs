@@ -123,6 +123,7 @@ pub struct LocalPlayer {
 
 pub struct ClientEntity {
     pub kind: u32,
+    pub hidden_mode: bool,
     helm: Option<IVec3>,
     /// What it rides and in which seat: it is drawn there.
     pub vehicle: Option<(u64, u8)>,
@@ -407,6 +408,7 @@ impl ClientEntity {
     pub fn new(kind: u32, pos: DVec3, yaw: f32, pitch: f32) -> ClientEntity {
         ClientEntity {
             kind,
+            hidden_mode: false,
             helm: None,
             pos,
             target: pos,
@@ -701,6 +703,13 @@ const FRAME_TARGET: f64 = 0.016;
 const MIN_BUDGET: f64 = 0.002;
 const MAX_BUDGET: f64 = 0.005;
 
+pub(crate) struct ClientBlock {
+    pub view: crate::net::BlockView,
+    pub shown: Vec<ItemStack>,
+    animation_target: f32,
+    animation_pose: Option<f32>,
+}
+
 pub struct Client {
     conn: ClientConn,
     skin: Option<crate::net::Skin>,
@@ -818,8 +827,7 @@ pub struct Client {
     /// Brightness setting, 0 moody .. 1 bright.
     pub brightness: f32,
     pub entities: FxHashMap<u64, ClientEntity>,
-    /// Block entities that show items (`registry::SHOWN`): not drawn or hit, only lit by.
-    pub showing_blocks: FxHashMap<u64, ClientEntity>,
+    pub(crate) showing_blocks: FxHashMap<u64, ClientBlock>,
     pub inventory: Vec<ItemStack>,
     pub max_health: f32,
     pub mode: GameMode,
@@ -900,8 +908,9 @@ pub struct Client {
     /// puts after the occlusion's depth (and after the copy, with it on).
     pub behind: [f32; 4],
     /// Last frame's projection and view without the jitter, where its camera stood and the
-    /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`.
-    taa_last: Option<(glam::Mat4, DVec3, f32)>,
+    /// shaders' clock then, for temporal anti-aliasing's `Scene::taa_prev` and `taa`, and its
+    /// jitter (NDC), for `Scene::taa_prev_inv`.
+    taa_last: Option<(glam::Mat4, DVec3, f32, glam::Vec2)>,
     /// Temporal anti-aliasing's count image this frame, bindless index + 1 (`Scene::taa_frame`),
     /// set by the app before `render` (`post::Post::taa_out`).
     pub taa_out: u32,
@@ -3166,6 +3175,17 @@ impl Client {
                 self.environment.remote.insert(id, layers);
             }
         }
+        if let Some(block) = self.showing_blocks.get_mut(&id) {
+            if comp == shown {
+                block.shown = Vec::<ItemStack>::from_bytes(bytes).unwrap_or_default();
+            } else if Some(comp) == c.components.id(weft_abi::comp::block::ANIMATION_PROGRESS) {
+                block.animation_target = f32::from_bytes(bytes)
+                    .filter(|v| v.is_finite())
+                    .unwrap_or_default()
+                    .clamp(0.0, 1.0);
+            }
+            return;
+        }
         let now = self.ticks();
         let arriving = self.arriving_tick();
         let hp = (comp == health)
@@ -3178,10 +3198,7 @@ impl Client {
             self.entity_render.changed_items.insert(id);
         }
         let mine = id == self.player_id;
-        let other = self
-            .entities
-            .get_mut(&id)
-            .or(self.showing_blocks.get_mut(&id));
+        let other = self.entities.get_mut(&id);
         let Some(e) = (if mine { Some(&mut self.me) } else { other }) else { return };
         if let Some(hp) = &hp {
             // Lower health out of a lower maximum, or on joining, isn't a hit.
@@ -3375,10 +3392,7 @@ impl Client {
         let (now, light) = (self.ticks(), c.ids.light.unwrap_or(u32::MAX));
         let mut sources = Vec::new();
         let mine = (!self.mode.has(crate::tag_bits::game_mode::HIDDEN) && !self.dead).then_some((&self.player_id, &self.me));
-        let all = mine
-            .into_iter()
-            .chain(self.entities.iter())
-            .chain(&self.showing_blocks);
+        let all = mine.into_iter().chain(self.entities.iter());
         let hidden = |e: &ClientEntity| {
             e.effects.iter().any(|f| {
                 f.until > now
@@ -3393,6 +3407,23 @@ impl Client {
                 .map(Vec::as_slice);
             let pos = if *id == self.player_id { self.player.pos } else { e.pos };
             sources.push(glow::entity_glow(c, e, now, pos, e.body_yaw, stored));
+        }
+        for (&id, block) in &self.showing_blocks {
+            let own = self
+                .entity_components
+                .get(&(id, light))
+                .and_then(|b| b.as_slice().try_into().ok())
+                .unwrap_or([0; 3]);
+            let color = block
+                .shown
+                .iter()
+                .map(|s| c.stack_light(s))
+                .fold(own, glow::brightest);
+            sources.push((
+                self.frame_place(block.view.frame)
+                    .to_world(block.view.local),
+                color,
+            ));
         }
         let eye = self.player.pos;
         self.world.set_glow(c, eye, sources);
@@ -3781,17 +3812,20 @@ impl Client {
     /// shaders' clock then. A camera that moved more than 32 blocks (a teleport, a respawn) or a
     /// clock that went back starts it anew, and so does a frame without it (`post::taa_active`):
     /// `taa.z` 0 then, and the shaders skip their motion.
-    fn taa_frame(&mut self, cam: &Camera, frame: &FrameInfo) -> ([f32; 4], [[f32; 4]; 4]) {
+    /// `Scene::taa`, `taa_prev` and `taa_prev_inv` (last frame's clip with its jitter, inverted).
+    fn taa_frame(&mut self, cam: &Camera, frame: &FrameInfo) -> ([f32; 4], [[f32; 4]; 4], [[f32; 4]; 4]) {
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
         let now = cam.proj_plain(aspect) * cam.view();
         let j = crate::post::jitter();
         let t = crate::shaders::time();
-        match self.taa_last.replace((now, cam.pos, t)) {
-            Some((last, at, then)) if crate::post::taa_active() && (cam.pos - at).length() < 32.0 && then <= t => {
+        match self.taa_last.replace((now, cam.pos, t, j)) {
+            Some((last, at, then, last_j)) if crate::post::taa_active() && (cam.pos - at).length() < 32.0 && then <= t => {
                 let moved = glam::Mat4::from_translation((cam.pos - at).as_vec3());
-                ([j.x, j.y, 1.0, then], (last * moved).to_cols_array_2d())
+                let prev = last * moved;
+                let jittered = glam::Mat4::from_translation(glam::vec3(last_j.x, last_j.y, 0.0)) * prev;
+                ([j.x, j.y, 1.0, then], prev.to_cols_array_2d(), jittered.inverse().to_cols_array_2d())
             }
-            _ => ([j.x, j.y, 0.0, t], now.to_cols_array_2d()),
+            _ => ([j.x, j.y, 0.0, t], now.to_cols_array_2d(), now.inverse().to_cols_array_2d()),
         }
     }
 
@@ -3856,6 +3890,7 @@ impl Client {
             // Filled in by `render` (`taa_frame`).
             taa: [0.0; 4],
             taa_prev: [[0.0; 4]; 4],
+            taa_prev_inv: [[0.0; 4]; 4],
             taa_frame: [self.taa_out as f32, crate::post::motion() as u32 as f32, self.motion_out as f32, 0.0],
             dlss: [crate::post::mip_bias(), 0.0, 0.0, 0.0],
             cloud_shadow: [0.0; 4],
@@ -4320,7 +4355,7 @@ impl Client {
         self.ground_map
             .frame(gpu, crate::settings::ground_map(), cam.pos, &self.world);
         let mut scene = self.scene(&cam, frame);
-        (scene.taa, scene.taa_prev) = self.taa_frame(&cam, frame);
+        (scene.taa, scene.taa_prev, scene.taa_prev_inv) = self.taa_frame(&cam, frame);
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
         self.frame_camera = Some(FrameCamera {
             view: cam.view(),
@@ -4340,6 +4375,7 @@ impl Client {
             && (scene.params[0] - 0.6 * scene.params[1]).abs() <= 0.5;
         // And dry (`gpu_layout::DRY_OFF`): no rain, the ground dry, no puddles, no snow lying here.
         let dry = scene.fog_color[3] <= 0.0 && scene.canopy[1] <= 0.0 && scene.canopy[2] <= 0.0 && scene.ground[0] <= 0.0;
+        self.render.finish_calm(gpu);
         self.render.set_calm(if calm { 1 + dry as u8 } else { 0 });
         while self.scene_bufs.len() < gpu.frames_in_flight() {
             self.scene_bufs.push(gpu.create_buffer(
@@ -4489,6 +4525,11 @@ impl Client {
                 .map(|(f, pos, progress)| entity_render::Crack { pos, progress, place: self.frame_place(f), part: self.breaking_part }),
         );
         let s = crate::diag::span("render/entities");
+        let body_tick = self.anim_tick();
+        let target = self
+            .target
+            .filter(|_| !self.hide_gui)
+            .map(|h| (h, self.frame_place(h.frame)));
         self.entity_render.draw(
             gpu,
             list,
@@ -4496,6 +4537,8 @@ impl Client {
             &cam,
             self.ticks(),
             &self.entities,
+            &mut self.showing_blocks,
+            body_tick,
             me,
             shadow_me,
             hand,
@@ -4504,9 +4547,7 @@ impl Client {
             &|p: IVec3| self.world.biome_at(p),
             &scene,
             scene_buf,
-            self.target
-                .filter(|_| !self.hide_gui)
-                .map(|h| (h, self.frame_place(h.frame))),
+            target,
             self.placement_preview
                 .filter(|(frame, _, _)| self.target.is_some_and(|hit| hit.frame == *frame))
                 .map(|(_, p, part)| (p, part)),
@@ -4619,9 +4660,9 @@ fn evening_mist_floor(sun: [f32; 4]) -> f32 {
 }
 
 /// The values of the settings the shader pack reads (`Scene::options`).
-fn pack_options() -> [[f32; 4]; 20] {
-    let mut out = [[0.0; 4]; 20];
-    for (i, name) in crate::packs::pack_options().iter().enumerate().take(80) {
+fn pack_options() -> [[f32; 4]; 24] {
+    let mut out = [[0.0; 4]; 24];
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(96) {
         if let Some(id) = crate::config::by_name(name) {
             out[i / 4][i % 4] = crate::config::get(id) as f32;
         }

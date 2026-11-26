@@ -294,7 +294,7 @@ pub async fn virtual_menus(t: T) -> R {
     {
         Ok(_) => t.fail("a furnace menu opened on grass"),
         Err(e) => {
-            t.check(e.contains("no block entity"), format!("unexpected refusal: {e}"));
+            t.check(e.contains("no block data"), format!("unexpected refusal: {e}"));
         }
     }
     t.frames(5).await?;
@@ -526,24 +526,33 @@ pub async fn crater(t: T) -> R {
 /// saved (left behind), and again after reopening; the untouched land around costs nothing.
 pub async fn lod_columns(t: T) -> R {
     t.world(5).await?;
+    let dim = Dimension::lookup("testmod:lod_plain").ok_or("missing LOD test dimension")?;
+    t.cmd("/dim testmod:lod_plain").await?;
+    t.until("the LOD test dimension", Duration::from_secs(10), |t| t.state().dim == dim)
+        .await?;
+    t.loaded().await?;
     t.op("mode creative").await?;
+    t.c().set_flying(true);
     let f = t.feet();
     t.check_eq(t.state().lod_columns, 0, "nothing built, nothing sent");
-    t.op(&format!("fill {} {} {} {} {} {} base:stone", f[0] + 4, f[1], f[2] + 4, f[0] + 6, f[1] + 40, f[2] + 6))
+    let tower = t
+        .op(&format!("fill {} {} {} {} {} {} base:stone", f[0] + 4, f[1] + 32, f[2] + 4, f[0] + 6, f[1] + 48, f[2] + 6))
         .await?;
-    t.cmd(&format!("/tp {} 200 {}", f[0] + 3000, f[2])).await?;
+    t.check_eq(tower.trim(), "153", "all tower blocks were placed");
+    t.cmd(&format!("/tp {} {} {}", f[0] + 3000, f[1] + 24, f[2]))
+        .await?;
     t.until("the tower's columns sent", Duration::from_secs(30), |t| t.state().lod_columns >= 9)
         .await?;
-    let n = t.state().lod_columns;
-    t.probe("columns sent", n as f32, n < 64);
+    t.check_eq(t.state().lod_columns, 9, "only the tower's columns were sent");
     let name = format!("test-{}", t.name());
     t.c().world_leave();
     t.screen("core:title").await?;
     t.c().world_open(&name, 5);
     t.until("joined again", Duration::from_secs(60), |t| t.flag(client::client_flags::JOINED))
         .await?;
-    t.until("the columns again after reopening", Duration::from_secs(5), |t| t.state().lod_columns >= 9)
+    t.until("the columns again after reopening", Duration::from_secs(10), |t| t.state().dim == dim && t.state().lod_columns >= 9)
         .await?;
+    t.check_eq(t.state().lod_columns, 9, "the tower's columns survived reload");
     Ok(())
 }
 
@@ -869,14 +878,8 @@ pub async fn persistence(t: T) -> R {
     t.set(chest, "chest").await?;
     t.op(&format!("insert {} {} {} coal 5", chest[0], chest[1], chest[2]))
         .await?;
-    t.check_eq(
-        t.op(&format!("spawn base:chest {} {} {}", p[0], p[1] + 2, p[2]))
-            .await?,
-        "0".to_string(),
-        "no chest entity without a chest",
-    );
-    let said = t.cmd("/summon base:furnace").await?;
-    t.check(said.contains("belongs to a block"), format!("/summon refuses a furnace: {said}"));
+    t.check(EntityKind::lookup("base:chest").is_none(), "a chest registers only a block");
+    t.check(EntityKind::lookup("base:furnace").is_none(), "a furnace registers only a block");
     t.op("secret me 0 1234").await?;
     t.check_eq(t.op("secret me 0").await?, "1234".into(), "server keeps the secret");
     t.frames(5).await?;
@@ -1336,14 +1339,6 @@ pub async fn edit_while_loading(t: T) -> R {
 }
 
 async fn edit_while_loading_at(t: &T) -> R {
-    // A stall of the machine can hit one try; behind the whole queue, every try is many seconds late.
-    let first = edit_while_loading_once(t).await?;
-    let ms = if first < 1000.0 { first } else { edit_while_loading_once(t).await? };
-    t.check(ms < 1000.0, format!("shown after {ms:.0} ms"));
-    Ok(())
-}
-
-async fn edit_while_loading_once(t: &T) -> Result<f64, String> {
     t.world(5).await?;
     t.idle().await?;
     t.op("mode spectator").await?;
@@ -1357,7 +1352,9 @@ async fn edit_while_loading_once(t: &T) -> Result<f64, String> {
     // Eye level, three blocks north.
     let f = t.feet();
     let p = add(f, [0, 1, -3]);
-    let gold = |c: [u8; 3]| c[0] > 180 && c[1] > 130 && c[2] < 110;
+    t.look_at(p);
+    t.frames(3).await?;
+    let gold = |c: [u8; 3]| c[0] > c[1] && c[1] > 30 && c[2] < c[1] / 3;
     t.check(!gold(t.pixel(0.53, 0.53).await?), "sky in front before");
     t.c().reload_assets();
     let mut most = 0;
@@ -1370,14 +1367,15 @@ async fn edit_while_loading_once(t: &T) -> Result<f64, String> {
     let backlog = t.state().pending_meshes;
     let start = std::time::Instant::now();
     t.set(p, "gold_block").await?;
-    let mut shown = false;
-    while start.elapsed() < Duration::from_secs(5) && !shown {
-        shown = gold(t.pixel(0.53, 0.53).await?);
+    let mut pixel = t.pixel(0.53, 0.53).await?;
+    while start.elapsed() < Duration::from_secs(5) && !gold(pixel) {
+        pixel = t.pixel(0.53, 0.53).await?;
     }
     let ms = start.elapsed().as_secs_f64() * 1000.0;
-    t.note(format!("placed block shown after {ms:.0} ms with {backlog} meshes waiting"));
-    t.check(shown, "the placed block shows");
-    Ok(ms)
+    t.note(format!("placed block shown after {ms:.0} ms with {backlog} meshes waiting, pixel {pixel:?}"));
+    t.check(gold(pixel), "the placed block shows");
+    t.check(ms < 1000.0, format!("shown after {ms:.0} ms"));
+    Ok(())
 }
 
 /// Terrain the GPU makes is the CPU's to the bit (integer math on both sides): every cube of a

@@ -4,6 +4,8 @@
 
 pub static BLOCKS_ATTACKS: crate::Component<crate::Blocking> = crate::Component::named(crate::abi::comp::BLOCKS_ATTACKS);
 pub static DISABLE_BLOCKING: crate::Component<f32> = crate::Component::named(crate::abi::comp::DISABLE_BLOCKING);
+/// Target position in a placed block's animation clip, from 0 to 1.
+pub static BLOCK_ANIMATION_PROGRESS: crate::Component<f32> = crate::Component::named(crate::abi::comp::block::ANIMATION_PROGRESS);
 pub static CATCH_PROJECTILES: crate::Component<crate::ProjectileCatch> = crate::Component::named(crate::abi::comp::CATCH_PROJECTILES);
 pub static EMBEDDED_PROJECTILES: crate::Component<Vec<crate::EmbeddedProjectile>> =
     crate::Component::named(crate::abi::comp::EMBEDDED_PROJECTILES);
@@ -215,7 +217,10 @@ pub mod attribute {
 pub mod creative_tab {
     use crate::kind::CreativeTab;
     use crate::{Component, Text};
+    /// The item rendered as the tab's icon.
     pub static ICON: Component<Text, CreativeTab> = Component::named(crate::abi::comp::CREATIVE_TAB_ICON);
+    /// A named texture that takes precedence over the item icon.
+    pub static ICON_TEXTURE: Component<Text, CreativeTab> = Component::named(crate::abi::comp::CREATIVE_TAB_ICON_TEXTURE);
 }
 
 /// A tint kind's color where no biome gives one.
@@ -610,7 +615,6 @@ pub mod entity {
     pub static BONE_MODELS: Component<Vec<abi::BoneModel>, Entity> = Component::named(e::BONE_MODELS);
     pub static CATEGORY: Component<Text, Entity> = Component::named(e::CATEGORY);
     pub static TEMPLATE: Component<Text, Entity> = Component::named(e::TEMPLATE);
-    pub static BLOCK: Component<Text, Entity> = Component::named(e::BLOCK);
     pub static SEATS: Component<Vec<abi::Seat>, Entity> = Component::named(e::SEATS);
     pub static PROJECTILE: Component<abi::Projectile, Entity> = Component::named(e::PROJECTILE);
     pub static HITBOXES: Component<abi::Hitboxes, Entity> = Component::named(e::HITBOXES);

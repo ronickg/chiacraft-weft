@@ -96,7 +96,7 @@ pub fn register(r: &mut Registry) {
     // "Fire bed + bow drill": one rule for fire). Broken, it gives the laid one back.
     r.shaped(&CRAFTING, "campfire_laid", 1, &["ss", "ll"], &[('s', "#stick"), ('l', "#logs")]);
     r.loot(&CAMPFIRE).pool(Pool::new().item("campfire_laid"));
-    r.entity_component(&ROASTING, Roasting { cook: 0, cook_max: 0, item: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
+    r.instance_component(&ROASTING, Roasting { cook: 0, cook_max: 0, item: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
     r.system(&ROASTING, tick_campfires);
     // It cooks what a furnace cooks of food, a little slower, with no fuel.
     r.block(&CAMPFIRE)
@@ -111,7 +111,8 @@ pub fn register(r: &mut Registry) {
         .item_texture("campfire")
         .tag("campfires")
         .tab(&crate::tabs::FUNCTIONAL)
-        .entity(|e| e.attach(&ROASTING).inventory(2))
+        .attach(&ROASTING)
+        .inventory(2)
         .opens(&CAMPFIRE_MENU);
     r.menu(&CAMPFIRE_MENU)
         .group("input", Slots::single().accepts("#food").holder())
@@ -141,7 +142,11 @@ pub fn register(r: &mut Registry) {
             );
         });
 
-    r.entity_component(&COOKING, Cooking { burn: 0, burn_max: 0, cook: 0, cooking: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
+    r.instance_component(
+        &COOKING,
+        Cooking { burn: 0, burn_max: 0, cook: 0, cooking: 0 },
+        component_flags::SAVE | component_flags::SYNC_MENU,
+    );
     r.entity_component(
         &DRYING,
         Drying { done: [0; 4], items: [0; 4], wait: 0, smoking: 0 },
@@ -159,7 +164,8 @@ pub fn register(r: &mut Registry) {
         .mined_by("pickaxe", weft_sdk::abi::tool_tier::HAND)
         .item_texture("cooking_pot")
         .tab(&crate::tabs::FUNCTIONAL)
-        .entity(|e| e.attach(&COOKING).inventory(7))
+        .attach(&COOKING)
+        .inventory(7)
         .opens(&POT_MENU);
     r.menu(&POT_MENU)
         .group("ingredients", Slots::grid(2, 2).accepts("#food").holder())
@@ -210,7 +216,8 @@ pub fn register(r: &mut Registry) {
         .item_texture("drying_rack")
         .set(&base_api::components::FLAMMABLE, 20)
         .tab(&crate::tabs::FUNCTIONAL)
-        .entity(|e| e.attach(&DRYING).inventory(4))
+        .attach(&DRYING)
+        .inventory(4)
         .opens(&RACK_MENU);
     r.menu(&RACK_MENU)
         .group("rack", Slots::row(4).accepts("#food").holder())
@@ -289,7 +296,7 @@ fn tick_campfires(b: &mut SystemBatch<Roasting>) {
 }
 
 /// A tick of a campfire; false when it has nothing to cook.
-fn roast_step(w: &World, id: u64, s: &mut Roasting) -> bool {
+fn roast_step(w: &World, id: Holder, s: &mut Roasting) -> bool {
     let inv = w.inventory(id);
     let (input, output) = (inv.group("input"), inv.group("output"));
     let (st, out_now) = (input.get(0), output.get(0));
@@ -324,7 +331,7 @@ fn roast_step(w: &World, id: u64, s: &mut Roasting) -> bool {
         input.set(0, st.shrink(1));
         // Its cook learns, and their web may make it two (`skills::cooked`), as room allows.
         let room = max_stack(made.item).saturating_sub(out_now.count);
-        let made = ItemStack { count: crate::skills::cooked(w, id, &made, 1).clamp(1, room.max(1)), ..made };
+        let made = ItemStack { count: crate::skills::cooked(w, id.entity, &made, 1).clamp(1, room.max(1)), ..made };
         output.set(0, if out_now.is_empty() { made } else { out_now.grow(made.count) });
     }
     true
@@ -350,7 +357,7 @@ fn tick_pots(b: &mut SystemBatch<Cooking>) {
 }
 
 /// A tick of a pot; false when there's nothing more it can do (so catching up stops).
-fn pot_step(w: &World, id: u64, s: &mut Cooking) -> bool {
+fn pot_step(w: &World, id: Holder, s: &mut Cooking) -> bool {
     let inv = w.inventory(id);
     let (ings, bowl, fuel, output) = (inv.group("ingredients"), inv.group("bowl"), inv.group("fuel"), inv.group("output"));
     // Spoiled food doesn't go in (Research round 3, D1).
@@ -391,7 +398,7 @@ fn pot_step(w: &World, id: u64, s: &mut Cooking) -> bool {
             bowl.set(0, consume_one(bowl.get(0)));
             let stew = stew(w, &foods, used);
             // Its cook learns (a stew teaches by what went in); a pot makes one stew a bowl.
-            crate::skills::cooked(w, id, &stew, foods.len() as u32);
+            crate::skills::cooked(w, id.entity, &stew, foods.len() as u32);
             output.set(0, stew);
         }
         true
@@ -411,8 +418,7 @@ fn tick_racks(b: &mut SystemBatch<Drying>) {
         }
         let secs = s.wait as f32 / 20.0;
         s.wait = 0;
-        let Some(st) = w.entity(id) else { continue };
-        let pos = st.block_pos();
+        let Some(pos) = w.block_location(id.entity) else { continue };
         let smoking = (1..=preserve::SMOKE_REACH).any(|dy| base_api::heat_of(w.block([pos.x, pos.y - dy, pos.z])) >= preserve::SMOKE_HEAT);
         s.smoking = smoking as u32;
         let rate = if smoking {

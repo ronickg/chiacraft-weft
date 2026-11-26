@@ -30,6 +30,8 @@ pub static FALLEN_BRANCH: Block = Block::named("fallen_branch");
 pub static LOOSE_BONE: Block = Block::named("loose_bone");
 pub static BONE: Item = Item::named("bone");
 pub static BONE_SPLINTER: Item = Item::named("bone_splinter");
+/// Sews clothes and cloaks (`clothing.rs`), from a splinter ground on a rock.
+pub static BONE_NEEDLE: Item = Item::named("bone_needle");
 /// Native copper (the copper lands', `vitals::first::COPPER_LANDS`): a lump on the ground, put
 /// down on stone and hammered cold into a head on the knapping screen (`knapping.rs`), or melted
 /// in the furnace as raw copper is.
@@ -149,6 +151,17 @@ pub fn register(r: &mut Registry) {
         .max_stack(1)
         .durability(f::SPLINTER_USES)
         .tab(&crate::tabs::TOOLS);
+    // The bone needle: a splinter ground to a point on a rock, the rock kept.
+    r.item(&BONE_NEEDLE)
+        // The splinter's picture until Art draws the needle (art list).
+        .texture("bone_splinter")
+        .tag("needles")
+        .handheld()
+        .max_stack(1)
+        .durability(f::NEEDLE_USES)
+        .tab(&crate::tabs::TOOLS);
+    r.shapeless(&crate::recipes::CRAFTING, "bone_needle", 1, &["bone_splinter", "#rocks"], 0)
+        .keep(1usize);
     // A knife from a splinter too (`finish`: a bone blade).
     r.shapeless(&crate::recipes::CRAFTING, "knife", 1, &["bone_splinter", "#stick", "#string"], 0);
 

@@ -42,6 +42,9 @@ static DUNG: Item = Item::named("base:dung");
 static DUNG_PAT: Block = Block::named("base:dung_pat");
 static TALL_GRASS: Block = Block::named("base:tall_grass");
 static PLANT_SOIL: Tag = Tag::named("plant_soil");
+/// What keeps raiders off a field (`needs::GUARD_REACH`): light where people are. Another mod adds its own (a
+/// scarecrow) with `r.tag("crop_guards", ...)`.
+static CROP_GUARDS: Tag = Tag::named("crop_guards");
 
 /// Blocks it looks round, and up and down.
 const LOOK: i32 = 8;
@@ -59,6 +62,7 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&FORAGE, [0.0; 4], 0);
     r.entity_component(&ITEM, 0u64, 0);
     r.entity_component(&PATCH, [0i32; 4], 0);
+    r.tag("crop_guards", &["base:torch", "base:campfire", "base:glowstone"]);
     for s in &SPECIES {
         r.edit(s.kind).attach(&FORAGE);
         r.edit(s.kind).attach(&ITEM);
@@ -138,7 +142,10 @@ pub fn food_now(w: &World, s: &animals_core::species::Species, pos: [i32; 3]) ->
 }
 
 /// `food_now`'s usuals worked out today: (biome, species, day) and the usual.
-static USUAL: std::sync::Mutex<Vec<((u32, usize, u64), Option<f32>)>> = std::sync::Mutex::new(Vec::new());
+static USUAL: std::sync::Mutex<Vec<Usual>> = std::sync::Mutex::new(Vec::new());
+
+/// (biome, species, day) and its usual.
+type Usual = ((u32, usize, u64), Option<f32>);
 
 /// How much of its food the place at `pos` grows now, 0 to 1 (`vitals::forage::lushness`); 1 for
 /// one that doesn't forage.
@@ -253,6 +260,8 @@ fn nearest(w: &World, s: &Species, center: [i32; 3], r: i32, p: [i32; 3], ground
                     continue;
                 }
                 match food(s, w.block(at), now, full) {
+                    // A ripe crop only on its day and in the dark (`needs::raids`): a torch keeps them off it.
+                    Some(src) if src.found == vitals::forage::PLANTED && !raids(w, at) => {}
                     Some(src) if !src.fallback() => best = Some((at, d)),
                     Some(_) if ground_too && ground.is_none_or(|(_, b)| d < b) => ground = Some((at, d)),
                     _ => {}
@@ -261,6 +270,75 @@ fn nearest(w: &World, s: &Species, center: [i32; 3], r: i32, p: [i32; 3], ground
         }
     }
     best.or(ground).map(|(at, _)| at)
+}
+
+/// Whether a wild animal goes for the ripe crop at `at` today (`needs::raids`: its day's roll, no guard near, not lit).
+/// Worked out once a plant every 30 seconds: a herd looks at the same field many times a second.
+fn raids(w: &World, at: [i32; 3]) -> bool {
+    thread_local! {
+        static SEEN: std::cell::RefCell<(u64, std::collections::HashMap<[i32; 3], bool>)> = Default::default();
+    }
+    let now = w.day_time() / 600;
+    if let Some(yes) = SEEN.with_borrow(|(t, m)| if *t == now { m.get(&at).copied() } else { None }) {
+        return yes;
+    }
+    // The brighter of the crop's own cell and the air above it; and a guard block looked for (a scarecrow gives no
+    // light).
+    let light = w
+        .block_light(at)
+        .max(w.block_light([at[0], at[1] + 1, at[2]]));
+    let guard = guarded(w, at);
+    let roll = raid_roll(w, at);
+    let yes = animals_core::needs::raids(light, guard.is_some(), roll);
+    weft_sdk::debug!("crop at {at:?}: block light {light}, guard {guard:?}, roll {roll:.2}: {}", if yes { "raided" } else { "left" });
+    SEEN.with_borrow_mut(|(t, m)| {
+        if *t != now || m.len() > 4096 {
+            m.clear();
+            *t = now;
+        }
+        m.insert(at, yes);
+    });
+    yes
+}
+
+/// The nearest crop guard (`CROP_GUARDS`) within `needs::GUARD_REACH` of `at`, if any: any part of a cell (a torch
+/// in with a slab).
+fn guarded(w: &World, at: [i32; 3]) -> Option<[i32; 3]> {
+    let r = animals_core::needs::GUARD_REACH;
+    let mut best: Option<([i32; 3], i32)> = None;
+    for dy in -2..=2 {
+        for dz in -r..=r {
+            for dx in -r..=r {
+                let p = [at[0] + dx, at[1] + dy, at[2] + dz];
+                let d = dx.abs().max(dz.abs()) * 4 + dy.abs();
+                if best.is_none_or(|(_, b)| d < b) && CROP_GUARDS.at(w, p) {
+                    best = Some((p, d));
+                }
+            }
+        }
+    }
+    best.map(|(p, _)| p)
+}
+
+/// Whether block state `state` is a crop where a player sowed it (`vitals::forage::PLANTED`).
+fn sown(state: u32) -> bool {
+    rows(state, |r| {
+        r.iter()
+            .any(|&i| vitals::forage::SOURCES[i as usize].found == vitals::forage::PLANTED)
+    })
+}
+
+/// A crop plant's roll for today (0 to 1, `needs::RAID_SHARE`): the same all day, another the next.
+fn raid_roll(w: &World, at: [i32; 3]) -> f32 {
+    let day = w.day_time() / vitals::calendar::DAY_TICKS;
+    let mut h = (at[0] as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ (at[1] as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
+        ^ (at[2] as u64).wrapping_mul(0x1656_67B1_9E37_79F9)
+        ^ day.wrapping_mul(0x27D4_EB2F_1656_67C5);
+    h ^= h >> 31;
+    h = h.wrapping_mul(0x94D0_49BB_1331_11EB);
+    h ^= h >> 29;
+    (h >> 11) as f32 / (1u64 << 53) as f32
 }
 
 /// The share of a spoiled carcass's weight an insect eater gets from it (its insects).
@@ -423,8 +501,10 @@ pub fn eat(w: &World, id: u64, st: &EntityState) -> bool {
     let target = (!f[0].is_nan() && f[3] != 0.0).then(|| [f[0], f[1], f[2]]);
     let close = target.is_some_and(|t| {
         let (dx, dz) = (t[0] + 0.5 - st.pos.x, t[2] + 0.5 - st.pos.z);
-        // Within reach of its mouth: two blocks for even a small one standing beside it.
-        dx * dx + dz * dz <= 4.0 && (t[1] - st.pos.y).abs() <= 2.5
+        // Within reach of its mouth: two blocks for even a small one standing beside it; a crop closer
+        // (`needs::CROP_REACH`), so it can't be eaten over a wall.
+        let r = if sown(w.block(t.map(|v| v as i32))) { animals_core::needs::CROP_REACH as f64 } else { 2.0 };
+        dx * dx + dz * dz <= r * r && (t[1] - st.pos.y).abs() <= 2.5
     });
     if close && let Some(t) = target {
         if now < f[3] {

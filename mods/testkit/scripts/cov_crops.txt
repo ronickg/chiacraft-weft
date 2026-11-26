@@ -1,0 +1,117 @@
+# Animals at the crops and the water plants. Part 1 (x 0, night, ticks running): a 5 x 5 field of ripe wheat east of
+# the pond (x 4..8, z 542..546) and one of ripe carrots west of it (x -8..-4), 2 white-tailed deer and 2 hares beside
+# them, hungry (food 30%), nothing else to eat on the bare pad; north of them two more wheat fields, one walled in 2
+# high (x 4..8, z 532..536) and one lit by torches (x -8..-4, z 532..536). Expect "animal N eats base:wheat at ..."
+# from the deer and "eats base:carrots" from the hares, only in the open fields (about a third of each field's
+# plants a day, `needs::RAID_SHARE`), none at z 532..536; each eaten plant set back to a seedling (1_fields: gaps of
+# young crop in the open fields, the walled and lit ones whole). Part 2 (x 200, summer):
+# a pond with lily pads on it and reeds along its south side, 2 capybaras hungry on its north side: "eats
+# base:lily_pad" first (they stay: no block changes). Part 1's "crop at ...: block light L, guard G" lines: in the
+# torch field G is Some([..]) (a torch) and every one "left". The `/tk light` replies (plant cells, then the air above
+# them, then a cell beside a torch): raw packed light, sky in the low byte, block light in the three above it. Shots
+# 1_fields, 2_pond.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 86 528 16 110 560 core:air
+chat /tk fill -16 111 528 16 140 560 core:air
+chat /tk fill -16 70 561 16 100 576 core:air
+chat /time set 6000
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /tk fill 4 69 542 8 69 546 base:farmland
+chat /tk fill 4 70 542 8 70 546 base:wheat[age=7]
+chat /tk fill -8 69 542 -4 69 546 base:farmland
+chat /tk fill -8 70 542 -4 70 546 base:carrots[age=3]
+chat /tk fill 4 69 532 8 69 536 base:farmland
+chat /tk fill 4 70 532 8 70 536 base:wheat[age=7]
+chat /tk fill 3 70 531 9 71 531 base:oak_planks
+chat /tk fill 3 70 537 9 71 537 base:oak_planks
+chat /tk fill 3 70 531 3 71 537 base:oak_planks
+chat /tk fill 9 70 531 9 71 537 base:oak_planks
+chat /tk fill -8 69 532 -4 69 536 base:farmland
+chat /tk fill -8 70 532 -4 70 536 base:wheat[age=7]
+chat /tk fill -9 70 531 -9 70 531 base:torch[facing=up]
+chat /tk fill -3 70 531 -3 70 531 base:torch[facing=up]
+chat /tk fill -9 70 537 -9 70 537 base:torch[facing=up]
+chat /tk fill -3 70 537 -3 70 537 base:torch[facing=up]
+chat /tk fill -6 70 534 -6 70 534 base:torch[facing=up]
+chat /time set 18000
+wait 1
+chat /tk light -4 70 533
+chat /tk light -5 70 535
+chat /tk light -8 70 532
+chat /tk light 6 70 545
+chat /tk light -4 71 533
+chat /tk light -5 71 535
+chat /tk light -3 71 531
+chat /tk light -2 70 531
+chat /tk spawn animals:white_tailed_deer 6 70 549
+chat /tk spawn animals:white_tailed_deer 7 70 549
+chat /tk spawn animals:white_tailed_deer 0 70 534
+chat /tk spawn animals:white_tailed_deer 1 70 534
+chat /tk spawn animals:hare -6 70 549
+chat /tk spawn animals:hare -5 70 549
+chat /tp 0 74 558
+wait 1
+chat /animalprof food 0.3
+chat /animalprof water 0.9
+wait 90
+chat /time set 6000
+chat /tick freeze
+chat /tp 0 80 554
+look 0 -50
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_crops_1_fields.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+chat /tp 200 90 544
+wait 4
+chat /tk fill 184 60 528 216 68 560 base:dirt
+chat /tk fill 184 69 528 216 69 560 base:grass
+chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 86 528 216 110 560 core:air
+chat /tk fill 184 111 528 216 140 560 core:air
+chat /tk fill 184 70 561 216 100 576 core:air
+chat /time set 6000
+chat /tk fill 198 69 542 202 69 546 base:water
+chat /tk fill 198 70 542 202 70 546 core:air
+wait 1
+chat /tk fill 198 70 542 202 70 546 base:lily_pad
+chat /tk fill 198 70 547 202 70 547 base:reed
+chat /tk spawn animals:capybara 200 70 539
+chat /tk spawn animals:capybara 201 70 539
+chat /tp 200 74 558
+wait 1
+chat /animalprof food 0.3
+chat /animalprof water 0.9
+wait 60
+chat /tick freeze
+chat /tp 200 78 553
+look 0 -40
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_crops_2_pond.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
+quit

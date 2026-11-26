@@ -428,6 +428,28 @@ pub fn meat_count(lo: u32, hi: u32, eaten: f32, mass: f32, rot: vitals::rot::Car
     ((lo + hi) as f32 / 2.0 * left * share).round() as u32
 }
 
+/// The deer whose dead carry antlers (`base:antler`, First hours' material: a pressure flaker, tools of bone and antler),
+/// and the seasons they carry hard antler (bits, spring first): a white-tailed buck and a red stag from the velvet's
+/// shedding in late summer to the late-winter cast (autumn and winter); a reindeer bull only to the end of the autumn
+/// rut, a cow (the only deer cows with antlers) through the winter to calving. By sex: (species, males', females').
+pub const ANTLERED: &[(&str, u8, u8)] = &[("white_tailed_deer", 4 | 8, 0), ("red_deer", 4 | 8, 0), ("reindeer", 4, 4 | 8)];
+
+/// A pair of antlers.
+pub const ANTLER_PAIR: u32 = 2;
+
+/// Of its adult mass, the least a dead deer weighs to have antlers worth taking (a yearling's spikes count; a fawn's
+/// buttons don't).
+pub const ANTLER_GROWN: f32 = 0.6;
+
+/// The antlers a dead deer of `species` gives when skinned: `female` or not, in season bit `season` (`None`: a world
+/// without seasons, antlers always on), weighing `grown` of its adult mass. Bone keeps: rot doesn't take them.
+pub fn antlers(species: &str, female: bool, season: Option<u8>, grown: f32) -> u32 {
+    let Some(&(_, males, females)) = ANTLERED.iter().find(|a| a.0 == species) else { return 0 };
+    let carried = if female { females } else { males };
+    let on = carried != 0 && season.is_none_or(|bit| carried & bit != 0);
+    if on && grown >= ANTLER_GROWN { ANTLER_PAIR } else { 0 }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -564,5 +586,19 @@ mod tests {
             assert!((d - lands).abs() < 1.0, "{d}: {lands}");
         }
         assert_eq!(off_speed(0.1), 0.0);
+    }
+
+    #[test]
+    fn bucks_carry_antlers_in_their_season() {
+        assert_eq!(antlers("white_tailed_deer", false, Some(4), 1.0), ANTLER_PAIR, "an autumn buck");
+        assert_eq!(antlers("white_tailed_deer", false, Some(1), 1.0), 0, "a spring buck has cast them");
+        assert_eq!(antlers("white_tailed_deer", true, Some(4), 1.0), 0, "a doe has none");
+        assert_eq!(antlers("white_tailed_deer", false, Some(4), 0.3), 0, "a fawn's buttons");
+        assert_eq!(antlers("reindeer", true, Some(8), 1.0), ANTLER_PAIR, "a reindeer cow keeps hers through winter");
+        assert_eq!(antlers("reindeer", false, Some(8), 1.0), 0, "a bull has cast his after the rut");
+        assert_eq!(antlers("grey_wolf", false, Some(4), 1.0), 0);
+        for (name, _, _) in ANTLERED {
+            assert!(crate::species::SPECIES.iter().any(|s| s.name == *name), "{name}: no such species");
+        }
     }
 }

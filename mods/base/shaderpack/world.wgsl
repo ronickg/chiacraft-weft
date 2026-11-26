@@ -480,6 +480,16 @@ fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
 }
 
 fn sun_shadow_once(in: VOut, n: vec3<f32>) -> f32 {
+    let s = sun_shadow_mapped_or_mask(in, n);
+    // Bliss's contact shadows toward the sun on top, the darker of the two (its min()), also past
+    // the map's reach and on the far land (`screen_contact`; `base:look_contact_sun`).
+    if s > 0.0 && land_from_sky() && fantasy_opt(OPT_CONTACT_SUN) > 0.5 {
+        return min(s, screen_contact(in.rel, in.clip.xy));
+    }
+    return s;
+}
+
+fn sun_shadow_mapped_or_mask(in: VOut, n: vec3<f32>) -> f32 {
     let reach = fantasy_opt(OPT_SHADOW_REACH);
     if reach > 0.0 {
         let past = smoothstep(reach * 0.8, reach + 16.0, in.dist);
@@ -617,6 +627,11 @@ fn bliss_sun_sheen(n: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
 // `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
 fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>, ao: f32) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
+    // Bliss's SSAO over this pixel's quad (`screen_ao_quad`), for `light_on_bliss`; worked out
+    // here in uniform control so the quad's differences hold.
+    if land_from_sky() && fantasy_opt(OPT_SSAO) > 0.5 {
+        SCREEN_AO = screen_ao_quad(in.rel, n);
+    }
     var light = paint * light_on(n, in.light, shadow, ao, in.pos, in.rel);
     // Where the land is lit from the physical sky, leaves and plants as any block, as Ronald's Bliss
     // (SSS type 3 with no LabPBR pack: no light through them, no extra sun, no hold-back), apart
@@ -790,6 +805,13 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     let debug = look_debug();
     if debug == 1u || debug == 2u {
         return vec4(select(LIGHT_ALL - LIGHT_SUN, LIGHT_SUN, debug == 1u), lit.a);
+    }
+    if debug == 15u || debug == 16u {
+        AO_FROZEN = debug == 16u;
+        let own = screen_ao(in.rel, n);
+        let quad = max(SCREEN_AO, 0.0);
+        let open = pow(1.0 - sqrt(1.0 - quad), 2.0);
+        return vec4(clamp((1.0 - own) * 8.0, 0.0, 1.0), clamp((1.0 - quad) * 8.0, 0.0, 1.0), 1.0 - open, lit.a);
     }
     // 7: where the sun's light is cut: r the clouds' shadow here, g 1 on distant terrain (`fs_lod`),
     // b the sun map's coverage where the map was asked (`SHADOW_DEBUG`).

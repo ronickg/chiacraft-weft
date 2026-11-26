@@ -158,6 +158,11 @@ fn pt_cache_find(cell: vec2<u32>, insert: bool) -> i32 {
 }
 
 fn pt_cache_add(i: u32, light: vec3<f32>) {
+    // Never a NaN or an infinity into the sums (a cast of one to u32 is undefined, and one bad sum
+    // would stand in its cell for good).
+    if !all(light == light) || !all(abs(light) < vec3(1e30)) {
+        return;
+    }
     let q = vec3<u32>(clamp(light, vec3(0.0), vec3(64.0)) * 256.0);
     let a = PT_CACHE + i * 4u;
     atomicAdd(&pt_cache[a], q.r);
@@ -200,13 +205,19 @@ fn pt_light_on(n: vec3<f32>, light: vec4<f32>, sun: f32, pos: vec3<f32>, rel: ve
     return c + sun_part;
 }
 
+// Whether the last bounce hit `pt_lit` lit found its cell in the cache (1) or fell back to its
+// lightmap (0), for debug view 23.
+var<private> PT_BOUNCE_CACHED: f32 = 0.0;
 fn pt_lit(b: RtHit, l: vec3<f32>, u: vec2<f32>) -> vec3<f32> {
     var s = 0.0;
     if dot(b.n, l) > 0.0 && light_strength() > 0.0 {
         s = dot(rt_sun(b.rel, b.n, l, false), vec3(1.0 / 3.0)) * models_shadow(b.rel, b.n) * cloud_shadow(b.rel);
     }
     let c = pt_cached(b.world, b.n, length(b.rel), u);
-    if c.a > 0.5 {
+    PT_BOUNCE_CACHED = c.a;
+    // Debug view 24: the picture with the cache unread (each bounce hit lit from its lightmap, one
+    // bounce): against view 0, the cache's share, the light past the first bounce.
+    if c.a > 0.5 && pt.debug != 24u {
         return pt_albedo(b) * (pt_light_on(b.n, vec4(0.0, b.light.yzw), s, b.world, b.rel) + c.rgb);
     }
     return pt_albedo(b) * pt_light_on(b.n, b.light, s, b.world, b.rel);
@@ -1033,10 +1044,41 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         }
     }
     // Into the cache: the indirect light found here (one pixel in four a frame).
+    let bounce_cached = PT_BOUNCE_CACHED;
     if ((id.x + id.y * 3u + u32(scene.rt.y)) & 3u) == 0u {
         let i = pt_cache_find(pt_cell(h.world, ng, dist, pt_noise(px + vec2(7.0, 5.0))), true);
         if i >= 0 {
             pt_cache_add(u32(i), indirect);
+        }
+    }
+    // Stage 3 (2), `core:pt_cache_fill` (flags bit 2): the surface the bounce met fills its own
+    // cell too, from one more ray of its own (SHaRC's idea: every vertex of a path updates the
+    // cache). Only surfaces the eye saw had cells: 58 % of the nave's bounce hits (the columns'
+    // backs, the walls above and behind) found none and fell back to their lightmap, so the light
+    // past one bounce, the lamps' with it, hardly reached the room (s3j: the picture with the
+    // cache unread came out as bright as with it). With it the torch cave went from 15 % near
+    // black to 3 %, alike from one pixel in 4 or 16 (s3l, s3m).
+    // By whole 8 x 8 groups (this pass's workgroups), one in 16 a frame (one in 4 at
+    // `core:pt_cache_fill` 2, flags bit 3): scattered pixels, one or two in every warp, held each
+    // warp for their ray, so one in 16 cost the hall almost what one in 4 did (pt_trace +2.6 ms
+    // against +2.8, s3m).
+    let fill_mask = select(15u, 3u, (pt.flags & 8u) != 0u);
+    let tile = pt_hash((id.x >> 3u) ^ pt_hash((id.y >> 3u) ^ pt_hash(u32(scene.rt.y))));
+    if b.hit && (pt.flags & 4u) != 0u && (tile & fill_mask) == 0u {
+        let bn = b.n;
+        let blift = bn * 0.02;
+        let u2 = pt_noise(px + vec2(19.0, 29.0));
+        let d2 = pt_cosine(bn, u2);
+        let b2 = rt_hit(b.rel + blift, d2, 96.0, 2.0);
+        var in2 = vec3(0.0);
+        if b2.hit {
+            in2 = pt_lit(b2, l, pt_noise(px + vec2(41.0, 13.0)));
+        } else {
+            in2 = max(light_on(d2, vec4(1.0, 0.0, 0.0, 0.0), 0.0, 1.0, b.world, b.rel) - light_on(d2, vec4(0.0), 0.0, 1.0, b.world, b.rel), vec3(0.0));
+        }
+        let j = pt_cache_find(pt_cell(b.world, bn, length(b.rel), pt_noise(px + vec2(23.0, 31.0))), true);
+        if j >= 0 {
+            pt_cache_add(u32(j), in2);
         }
     }
     if pt.debug == 10u {
@@ -1104,7 +1146,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         diffuse *= k;
         specular = specular * k + added / max(s_alb, vec3(1e-3));
     }
-    if (pt.debug != 0u && pt.debug < 7u) || pt.debug >= 14u {
+    if (pt.debug != 0u && pt.debug < 7u) || (pt.debug >= 14u && pt.debug != 24u) {
         var out = vec3(0.0);
         switch pt.debug {
             case 1u: { out = albedo; }
@@ -1123,6 +1165,13 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             case 21u: { out = PT_NEE_DBG; }
             // 22: the G-buffer's material: red F0 (times 10), green 1 - roughness, blue 1 where the
             // reflection ray is traced (roughness squared under 0.5).
+            // 23: the cache's reach: red where the bounce ray met a surface whose cell the cache
+            // holds, green where it met one it doesn't (lit from the lightmap), blue where it left to
+            // the sky; brighter with the pixel's own cell held.
+            case 23u: {
+                let own = 0.6 + 0.4 * pt_cached(h.world, ng, dist, pt_noise(px + vec2(3.0, 11.0))).a;
+                out = select(vec3(0.0, 0.0, 1.0), select(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), bounce_cached > 0.5), b.hit) * own;
+            }
             case 22u: { out = vec3(min(luma(f0) * 10.0, 1.0), 1.0 - rough_p, select(0.0, 1.0, rough_p * rough_p < 0.5)); }
             // 15: the traced block lights: green seen, red hidden; no light drawn: blue no list for
             // the cube, cyan none in reach, magenta no lights at all; black no block light.

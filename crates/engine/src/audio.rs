@@ -32,6 +32,13 @@ use weft_abi::{MusicSource, MusicStatus, Str, local_music as op};
 use crate::assets::Assets;
 use crate::content::content;
 
+mod live;
+
+/// How far a mod's live stream (`open_stream`) is heard.
+pub(crate) const STREAM_REACH: f64 = live::REACH;
+/// Live streams open at once, at most.
+const MAX_STREAMS: usize = 32;
+
 /// Sounds playing at once, at most (music aside).
 pub const VOICES: usize = 64;
 /// Of them streaming from disk.
@@ -225,6 +232,9 @@ pub struct Audio {
     /// subtracted in f64), and in which dimension.
     ear: DVec3,
     ear_dim: Option<u32>,
+    /// Mods' live PCM streams (`open_stream`), by id.
+    streams: FxHashMap<u64, live::Stream>,
+    next_stream: u64,
     reverb: SendTrackHandle,
     reverb_shape: ReverbHandle,
     environment: TrackHandle,
@@ -540,6 +550,8 @@ impl Audio {
                 listener,
                 ear: DVec3::ZERO,
                 ear_dim: None,
+                streams: FxHashMap::default(),
+                next_stream: 1,
                 reverb,
                 reverb_shape,
                 environment,
@@ -911,6 +923,7 @@ impl Audio {
         });
         let Some(l) = l else {
             self.ear_dim = None;
+            self.clear_streams();
             if let Some(m) = &mut self.music {
                 m.stop(Tween { duration: Duration::from_secs(2), ..Default::default() });
                 self.music = None;
@@ -938,6 +951,7 @@ impl Audio {
                 self.voices.clear();
             }
             self.ear_dim = Some(l.dim);
+            self.clear_streams();
         }
         // Kira's listener stays at zero. Subtract in f64 before mixing nearby positions in f32.
         if l.pos != self.ear {
@@ -1059,6 +1073,67 @@ impl Audio {
     }
 
     /// A one-shot nobody holds a handle to.
+    /// A live PCM stream a mod feeds (`push_stream`), mono at `rate`, at `position` (None: not
+    /// positioned); None when too many are open or the arguments are out of range.
+    pub(crate) fn open_stream(&mut self, category: u32, rate: u32, position: Option<DVec3>) -> Option<u64> {
+        if self.streams.len() >= MAX_STREAMS || !(8_000..=96_000).contains(&rate) || position.is_some_and(|p| !p.is_finite()) {
+            return None;
+        }
+        self.ear_dim?;
+        let ear = self.ear;
+        let stream = live::Stream::new(self.groups.get_mut(category as usize)?, &self.listener, ear, rate, position)?;
+        let id = self.next_stream;
+        self.next_stream += 1;
+        self.streams.insert(id, stream);
+        Some(id)
+    }
+
+    pub(crate) fn push_stream(&mut self, id: u64, samples: &[f32]) -> bool {
+        let Some(stream) = self.streams.get(&id) else { return false };
+        if self.active {
+            stream.push(samples);
+        }
+        true
+    }
+
+    pub(crate) fn position_stream(&mut self, id: u64, pos: DVec3) -> bool {
+        let Some(stream) = self
+            .streams
+            .get_mut(&id)
+            .filter(|s| s.pos.is_some() && pos.is_finite())
+        else {
+            return false;
+        };
+        stream.pos = Some(pos);
+        true
+    }
+
+    pub(crate) fn filter_stream(&mut self, id: u64, cutoff: f32, gain: f32) -> bool {
+        let Some(stream) = self
+            .streams
+            .get_mut(&id)
+            .filter(|_| cutoff.is_finite() && gain.is_finite())
+        else {
+            return false;
+        };
+        stream.custom_filter = SourceFilter { cutoff: cutoff.clamp(20.0, 20_000.0), gain: gain.clamp(0.0, 2.0) };
+        true
+    }
+
+    pub(crate) fn close_stream(&mut self, id: u64) -> bool {
+        self.streams.remove(&id).is_some()
+    }
+
+    pub(crate) fn clear_streams(&mut self) {
+        self.streams.clear();
+    }
+
+    pub(crate) fn update_streams(&mut self, listener: DVec3, mut trace: impl FnMut(DVec3) -> [Option<Arrival>; 3]) {
+        for stream in self.streams.values_mut() {
+            stream.update(listener, &mut trace);
+        }
+    }
+
     pub fn play(&mut self, assets: &Assets, p: Play) {
         self.play_paths(assets, p, 0.0, &[]);
     }

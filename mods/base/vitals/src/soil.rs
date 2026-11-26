@@ -81,6 +81,12 @@ pub fn rotted_levels(kg: f32) -> u8 {
 /// The levels a dung pat gives the farmland under and beside it as it rots, as the dung would used on it (`FEEDS`).
 pub const PAT_FEEDS: u8 = 1;
 
+/// Farmland at `fertility` fed `levels` (a body or a pat rotting beside it, `base_api::grow::enrich`): its new
+/// fertility, never past `MAX`.
+pub fn fed(fertility: u8, levels: u8) -> u8 {
+    fertility.saturating_add(levels).min(MAX)
+}
+
 /// The chance a pat's growth step breaks it up though it didn't rot (`PAT_MOST_DAYS`).
 pub fn pat_break_chance() -> f32 {
     crate::plants::of("base:dung_pat")
@@ -167,5 +173,13 @@ mod tests {
         assert_eq!(rotted_levels(10.0), 1, "a fox's should give a level");
         assert_eq!(rotted_levels(70.0), MAX, "an uneaten deer's feeds it as compost does, to the full");
         assert!(rotted_levels(500.0) <= MAX);
+    }
+
+    #[test]
+    fn a_rotting_pat_feeds_farmland_as_its_dung_does() {
+        assert_eq!(Some(PAT_FEEDS), feeds("base:dung"), "a pat rotting into farmland should give what the dung used on it does");
+        assert_eq!(fed(0, PAT_FEEDS), 1, "worn-out farmland beside a rotted pat comes back a level");
+        assert_eq!(fed(MAX, PAT_FEEDS), MAX, "full farmland stays full");
+        assert_eq!(fed(0, rotted_levels(70.0)), MAX, "an uneaten deer rotting beside worn-out farmland makes it whole");
     }
 }

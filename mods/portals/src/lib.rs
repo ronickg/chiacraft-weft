@@ -23,7 +23,6 @@ use weft_sdk::*;
 declare_mod!(deps: [], init: init);
 
 static PORTAL: Block = Block::named("portal");
-static PORTAL_ENTITY: EntityKind = EntityKind::named("portal");
 /// The link the portal holds: its id as 64 hex digits, or zeros.
 static LINK: Component<[u8; 64]> = Component::named("link");
 static BUILDING: CreativeTab = CreativeTab::named("base:building");
@@ -122,15 +121,14 @@ fn init(r: &mut Registry) {
             .model_box_faces([2.0, 34.0, 6.0], [14.0, 36.0, 10.0], [(frame, abi::UV_FROM_BOX); 6])
             .light(if state == "open" { 11 } else { 4 })
         })
-        .entity(|e| e)
+        .attach(&LINK)
         .on_use(|u| {
             let (w, player, pos) = (u.world(), u.player(), u.pos());
             w.send(player, &OPEN, &menu_for(&w, player, [pos.x, pos.y, pos.z]));
             true
         });
-    // The block's own block entity (`block_entity`, named like the block) holds the link.
-    r.entity_component(&LINK, [0u8; 64], abi::component_flags::SAVE);
-    r.edit(&PORTAL_ENTITY).attach(&LINK);
+    // Each placed portal block holds its link (`block_instance`).
+    r.instance_component(&LINK, [0u8; 64], abi::component_flags::SAVE);
 
     r.packet(&BIND, |p, text| bind(p, &text));
     r.packet(&ASKED, |p, text| asked(&p.world(), p.player(), &text));
@@ -162,11 +160,11 @@ fn init(r: &mut Registry) {
 
 /// The portal's link at `pos`, if bound.
 fn link_at(w: &World, pos: [i32; 3]) -> Option<String> {
-    let e = w.block_entity(pos);
+    let e = w.block_instance(pos);
     if e == 0 {
         return None;
     }
-    let bytes = w.component(e, &LINK)?;
+    let bytes = w.component(Holder::block_id(e), &LINK)?;
     (bytes[0] != 0).then(|| String::from_utf8_lossy(&bytes).into_owned())
 }
 
@@ -223,7 +221,7 @@ fn bind_portal(w: &World, at: [i32; 3], id: &str) -> (Vec<[i32; 3]>, bool) {
     }
     let blocks = portal_blocks(w, at);
     for b in &blocks {
-        let e = w.block_entity(*b);
+        let e = w.block_instance(*b);
         if let Some(v) = (e != 0).then(|| w.component_mut(e, &LINK)).flatten() {
             *v = value;
         }

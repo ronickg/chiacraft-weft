@@ -1657,6 +1657,9 @@ impl Running {
                 self.remote_address = None;
             }
             g.client.leave();
+            if let Some(audio) = &mut self.audio {
+                audio.clear_streams();
+            }
             self.gpu.wait_idle();
             g.client.destroy(&mut *self.gpu);
             if let Some(mut s) = g.server.take() {
@@ -3966,12 +3969,16 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
         // `core:rt_shadows` or `core:ground_map` changed: the world shader composed again, tracing
-        // or not, with the ground map or not, before anything of this frame is drawn with it.
+        // or not, with the ground map or not, compiled behind while the one in use draws, and put
+        // in before this frame's draws once compiled (`finish_reload`).
         if g.client.rt_switch(&mut *r.gpu) || g.client.render.ground_switch() {
             g.client
                 .render
-                .reload_shaders(&mut *r.gpu, &r.textures, &r.assets);
+                .reload_shaders_behind(&mut *r.gpu, &r.textures, &r.assets);
         }
+        g.client
+            .render
+            .finish_reload(&mut *r.gpu, &r.textures, &r.assets);
         // The sun's light for shadow maps (packs that use them), which the world's scene samples.
         g.client.prepare_shadows(&mut *r.gpu);
         // A copy of the world for what is seen through it (`water_behind` packs, with post on).

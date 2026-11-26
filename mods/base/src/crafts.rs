@@ -51,18 +51,17 @@ fn is(item: u32, want: &'static str) -> bool {
 /// command, a script) skips them, and the station would hold the stray forever (Tester's
 /// pt_rain_6, 11-26: a tanning frame held in its own frame's input). Every station with filtered
 /// inputs calls this as it ticks.
-pub fn push_out(w: &World, id: u64, group: &str, ok: impl Fn(u32) -> bool) {
+pub fn push_out(w: &World, id: Holder, group: &str, ok: impl Fn(u32) -> bool) {
     let g = w.inventory(id).group(group);
     for i in 0..g.len() {
         let st = g.get(i);
         if st.is_empty() || ok(st.item) {
             continue;
         }
-        let Some(e) = w.entity(id) else { return };
-        let p = e.block_pos();
+        let Some(p) = w.block_location(id.entity) else { return };
         g.set(i, ItemStack::EMPTY);
         w.spawn_item([p.x as f64 + 0.5, p.y as f64 + 1.1, p.z as f64 + 0.5], st);
-        weft_sdk::info!("station {id}: pushed out {} x{} from {group}", item_name(st.item), st.count);
+        weft_sdk::info!("station {}: pushed out {} x{} from {group}", id.entity, item_name(st.item), st.count);
     }
 }
 
@@ -82,7 +81,7 @@ pub fn register(r: &mut Registry) {
     r.shaped(&CRAFTING, "crucible", 1, &["b b", "bcb", "bbb"], &[('b', "bricks"), ('c', "#gems/coal")]);
     r.shaped(&CRAFTING, "forge", 1, &["iii", "bfb", "bbb"], &[('i', "#ingots/iron"), ('b', "bricks"), ('f', "#furnaces")]);
 
-    r.entity_component(&WAITING, Waiting { station: 0, done: 0.0, item: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
+    r.instance_component(&WAITING, Waiting { station: 0, done: 0.0, item: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
     r.system(&WAITING, tick);
 
     station(r, Station::TanningFrame, &TANNING_FRAME, &FRAME_MENU, "wood", "axe", [2.0, 0.0, 2.0], [14.0, 16.0, 14.0]);
@@ -166,10 +165,8 @@ fn station(
         .hardness(1.5)
         .mined_by(tool, weft_sdk::abi::tool_tier::HAND)
         .tab(&crate::tabs::FUNCTIONAL)
-        .entity(move |e| {
-            e.attach_with(&WAITING, Waiting { station: index, done: 0.0, item: 0 })
-                .inventory(size)
-        })
+        .attach_with(&WAITING, Waiting { station: index, done: 0.0, item: 0 })
+        .inventory(size)
         .opens(menu);
     let mut m = r
         .menu(menu)

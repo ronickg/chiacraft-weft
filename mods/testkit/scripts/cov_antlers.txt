@@ -1,0 +1,233 @@
+# Antlers from skinned deer. Part 1 (x 0, autumn 5): 6 white-tailed deer killed and skinned one by one, 4 blocks
+# apart: each "skinned carcass N of white_tailed_deer (male|female): ..." line has "2 base:antler" for a male
+# and none for a female; then 2 reindeer the same (both sexes have them in autumn). Part 2 (x 200, spring 5): 6 more
+# white-tailed deer: no antlers, male or female. `/tk inv me` after each part: base:antler counts 2 per autumn male
+# and reindeer, none added in spring.
+loaded
+idle
+chat /tk mode creative
+chat /tp 0 90 544
+wait 4
+idle
+where
+chat /season summer 1
+chat /time set 6000
+chat /rule core:mob_spawning 0
+chat /anim log
+chat /tk mode spectator
+chat /tp 0 90 544
+wait 4
+chat /tk fill -16 60 528 16 68 560 base:dirt
+chat /tk fill -16 69 528 16 69 560 base:grass
+chat /tk fill -16 70 528 16 85 560 core:air
+chat /tk fill -16 86 528 16 110 560 core:air
+chat /tk fill -16 111 528 16 140 560 core:air
+chat /tk fill -16 70 561 16 100 576 core:air
+chat /time set 6000
+chat /tk fill -1 69 543 1 69 545 base:water
+chat /tk fill -1 70 543 1 70 545 core:air
+wait 1
+chat /season autumn 5
+chat /tk mode survival
+chat /tk put me 0 base:knife 1
+key 1
+chat /tk spawn animals:white_tailed_deer -10 70 544
+wait 0.2
+chat /tp -10 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp -10 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:white_tailed_deer -6 70 544
+wait 0.2
+chat /tp -6 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp -6 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:white_tailed_deer -2 70 544
+wait 0.2
+chat /tp -2 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp -2 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:white_tailed_deer 2 70 544
+wait 0.2
+chat /tp 2 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp 2 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:white_tailed_deer 6 70 544
+wait 0.2
+chat /tp 6 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp 6 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:white_tailed_deer 10 70 544
+wait 0.2
+chat /tp 10 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp 10 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:reindeer -14 70 544
+wait 0.2
+chat /tp -14 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp -14 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:reindeer 14 70 544
+wait 0.2
+chat /tp 14 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp 14 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk inv me
+chat /tp 200 90 544
+wait 4
+chat /tk fill 184 60 528 216 68 560 base:dirt
+chat /tk fill 184 69 528 216 69 560 base:grass
+chat /tk fill 184 70 528 216 85 560 core:air
+chat /tk fill 184 86 528 216 110 560 core:air
+chat /tk fill 184 111 528 216 140 560 core:air
+chat /tk fill 184 70 561 216 100 576 core:air
+chat /time set 6000
+chat /tk fill 199 69 543 201 69 545 base:water
+chat /tk fill 199 70 543 201 70 545 core:air
+wait 1
+chat /season spring 5
+chat /tk mode survival
+key 1
+chat /tk spawn animals:white_tailed_deer 190 70 544
+wait 0.2
+chat /tp 190 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp 190 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:white_tailed_deer 194 70 544
+wait 0.2
+chat /tp 194 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp 194 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:white_tailed_deer 198 70 544
+wait 0.2
+chat /tp 198 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp 198 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:white_tailed_deer 202 70 544
+wait 0.2
+chat /tp 202 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp 202 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:white_tailed_deer 206 70 544
+wait 0.2
+chat /tp 206 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp 206 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk spawn animals:white_tailed_deer 210 70 544
+wait 0.2
+chat /tp 210 70 547
+wait 0.2
+chat /animalprof kill
+wait 2
+chat /tp 210 70 546
+look 0 -40
+wait 1
+aim 4
+wait 1
+press core:use
+wait 12
+chat /tk inv me
+quit

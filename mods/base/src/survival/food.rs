@@ -100,11 +100,11 @@ pub fn register(r: &mut Registry) {
     // aged all along from its stamp, the stamp just says so now.
     r.before_event(&actions::USE_BLOCK, |q| {
         let w = q.world();
-        let be = w.block_entity(q.pos());
+        let be = w.block_instance(q.pos());
         if be != 0 {
             // Stacks merge only in a chest: a pot takes one of each slot for a stew and a rack
             // dries each slot apart (integration review: merging broke both).
-            age_inventory(&w, be, crate::blocks::CHEST.is(q.state()));
+            age_inventory_of(&w.inventory(Holder::block_id(be)), w.day_time(), crate::blocks::CHEST.is(q.state()));
         }
         Verdict::Abstain
     });

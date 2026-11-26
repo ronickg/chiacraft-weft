@@ -341,11 +341,7 @@ impl Client {
             if owner == self.player_id {
                 continue;
             }
-            let Some(e) = self
-                .entities
-                .get(&owner)
-                .or_else(|| self.showing_blocks.get(&owner))
-            else {
+            let Some(e) = self.entities.get(&owner) else {
                 continue;
             };
             let layers = env.layers(c, components::ENTITY, e.kind);
@@ -370,15 +366,13 @@ impl Client {
         for (&owner, layers) in &remote {
             let center = if owner == self.player_id {
                 body
-            } else {
-                let Some(e) = self
-                    .entities
-                    .get(&owner)
-                    .or_else(|| self.showing_blocks.get(&owner))
-                else {
-                    continue;
-                };
+            } else if let Some(e) = self.entities.get(&owner) {
                 e.pos
+            } else if let Some(block) = self.showing_blocks.get(&owner) {
+                self.frame_place(block.view.frame)
+                    .to_world(block.view.local)
+            } else {
+                continue;
             };
             self.environment_layers(&mut env, layers, &format!("entity/{owner}"), owner, center);
         }

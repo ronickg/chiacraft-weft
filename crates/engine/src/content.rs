@@ -743,10 +743,14 @@ impl LiquidDef {
     }
 }
 
-/// Its two sides are matchers.
+pub enum CreativeTabIcon {
+    Item(u32),
+    Texture(String),
+}
+
 pub struct CreativeTab {
     pub name: String,
-    pub icon: u32,
+    pub icon: CreativeTabIcon,
     pub items: Vec<u32>,
 }
 
@@ -910,10 +914,14 @@ impl DimensionDef {
     /// Fraction of full daylight (0..1) at world time `time`: the dimension's curve, or
     /// vanilla's.
     pub fn daylight(&self, time: u64) -> f32 {
+        self.daylight_at(time as f64)
+    }
+
+    pub fn daylight_at(&self, time: f64) -> f32 {
         if !self.sky_light {
             return 0.0;
         }
-        let turn = self.day_turn(time as f64);
+        let turn = self.day_turn(time);
         let pts = &self.daylight;
         if pts.is_empty() {
             return ((turn * std::f64::consts::TAU).sin() * 2.0 + 0.5).clamp(0.0, 1.0) as f32;
@@ -1962,16 +1970,24 @@ fn creative_tabs(
 ) -> Vec<CreativeTab> {
     fn tab<'a>(tabs: &'a mut Vec<CreativeTab>, name: &str, icon: u32) -> &'a mut CreativeTab {
         let i = tabs.iter().position(|t| t.name == name).unwrap_or_else(|| {
-            tabs.push(CreativeTab { name: name.to_owned(), icon, items: Vec::new() });
+            tabs.push(CreativeTab { name: name.to_owned(), icon: CreativeTabIcon::Item(icon), items: Vec::new() });
             tabs.len() - 1
         });
         &mut tabs[i]
     }
     let (made, _) = tables.bake(raw, abi::entry_kind::CREATIVE_TAB, mod_name, errors, |e, errors| {
-        let icon = e.text(abi::comp::CREATIVE_TAB_ICON).unwrap_or_default();
-        let Some(&icon) = item_names.get(icon) else {
-            errors.push(format!("creative tab {}: unknown icon item {icon}", e.name));
-            return None;
+        let icon = if let Some(texture) = e
+            .text(abi::comp::CREATIVE_TAB_ICON_TEXTURE)
+            .filter(|s| !s.is_empty())
+        {
+            CreativeTabIcon::Texture(texture.to_owned())
+        } else {
+            let item = e.text(abi::comp::CREATIVE_TAB_ICON).unwrap_or_default();
+            let Some(&item) = item_names.get(item) else {
+                errors.push(format!("creative tab {}: unknown icon item {item}", e.name));
+                return None;
+            };
+            CreativeTabIcon::Item(item)
         };
         Some(CreativeTab { name: e.name.clone(), icon, items: Vec::new() })
     });
@@ -2021,8 +2037,11 @@ fn creative_tabs(
         tab(&mut tabs, &name, list[0]).items.extend(list);
     }
     tabs.retain(|t| !t.items.is_empty());
-    for t in tabs.iter_mut().filter(|t| t.icon == 0) {
-        t.icon = t.items[0];
+    for t in tabs
+        .iter_mut()
+        .filter(|t| matches!(t.icon, CreativeTabIcon::Item(0)))
+    {
+        t.icon = CreativeTabIcon::Item(t.items[0]);
     }
     for t in &tabs {
         log::debug!(
@@ -2242,8 +2261,16 @@ pub fn freeze(
             errors.push(format!("{}: {pattern} matches no tag or component", mod_name(m)));
         }
     }
-    let crate::blocks::Blocks { mut states, mut block_defs, opens_names, block_names, rules: raw_rules, hazards: raw_hazards, .. } =
-        block_tables;
+    let crate::blocks::Blocks {
+        mut states,
+        mut block_defs,
+        opens_names,
+        block_names,
+        instance_data,
+        rules: raw_rules,
+        hazards: raw_hazards,
+        ..
+    } = block_tables;
     let ItemTables { mut item_defs, item_names, .. } = item_tables;
     let BiomeTables { biome_defs, biome_rules, biome_names, .. } = biome_tables;
     let DimTables { mut dim_defs, dim_names, spawn_dim, void_dim, .. } = dim_tables;
@@ -2302,7 +2329,6 @@ pub fn freeze(
     let mut game = crate::registry::freeze(
         games,
         entities,
-        &block_names,
         &item_names,
         &item_defs,
         &dim_names,
@@ -2316,6 +2342,7 @@ pub fn freeze(
         step_order,
         &mut errors,
     );
+    crate::registry::freeze_block_data(&mut game, &components, &block_defs, instance_data, &mut errors);
     // The kinds frozen with the game (poses, entity effects ...) get their tables before what
     // reads them.
     for (kind, entries) in &mut tables.0 {

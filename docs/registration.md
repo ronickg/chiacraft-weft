@@ -65,7 +65,7 @@ r.edit_pattern::<kind::Block>("#logs").set(&FUEL, 300);
 r.remove(&Block::named("base:mossy_cobblestone"));
 ```
 
-Item, loot and block entity are separate entries the builder sends with the block: `.no_item()`, `.item_texture(..)`, `.drops(..)`, `.entity(|e| ..)`. A remove takes the item along, not the loot table or the block entity.
+The builder can create an item and a loot table for the block. The block definition also declares its own slots (`.inventory(n)`) and per-instance components (`.attach(&C)`).
 
 ## Block states
 Not an entry of its own: the parts of a block. The engine builds the states from `PROPS`, then puts on each the block's operations and those of every part whose key (`prop=value,..`) fits it, in order. `.states(|p, s| ..)` makes a part per combination of the builder's own properties, `.state_where("lit=true", |s| ..)` one part by key, any mod's properties.
@@ -118,7 +118,7 @@ r.replace(&APPLE).texture("golden_apple");
 ```
 
 ## Entity
-A kind of entity: mobs, players, projectiles, moving platforms, block entities. `r.entity(&KIND)`, the engine's `PLAYER` and the rest editable like any.
+A kind of entity: mobs, players, projectiles, moving platforms. `r.entity(&KIND)`, the engine's `PLAYER` and the rest editable like any.
 
 | component (`comps::entity`) | schema | default | what |
 |---|---|---|---|
@@ -132,10 +132,9 @@ A kind of entity: mobs, players, projectiles, moving platforms, block entities. 
 | `BONE_MODELS` | `[BoneModel]` | none | models on bones (`r.bone_model`) |
 | `CATEGORY` | `str` | `core:misc` | `.category`, `.hostile`, `.passive` |
 | `TEMPLATE` | `str` | none | a moving body of a template (`.body`) |
-| `BLOCK` | `str` | none | the block it is the block entity of |
 | `SEATS` | `[Seat]` | none | `.seat` |
 | `ATTACH` | `[Attach]` | none | components each one carries, starting as the kind's own value (`.attach`, `.attach_with`, `.attach_storage`) |
-| `LIGHT_AT` | `[f32;3]` | its middle, a block entity's block | where its light comes from, from its feet, +Z ahead, turned with it (`.light_at`) |
+| `LIGHT_AT` | `[f32;3]` | its middle | where its light comes from, from its feet, +Z ahead, turned with it (`.light_at`) |
 | `SHOWN_SLOTS` | `[u32]` | none | inventory slots shared as public stacks (`.shown_slots`, `Client::displayed`) |
 | `ON_TICK`, `ON_INTERACT`, `STEER`, `DISMOUNT` | callback | none | `.on_tick`, `.on_interact`, `.steering`, seat exits |
 | `FRAMES` | `[callback]` | none | client frame hooks (`r.client_entity_frame`) |
@@ -301,8 +300,8 @@ A fixed shape of blocks for features, plans, moving bodies and `w.place_template
 | `BLOCKS` | `[TemplateBlock]` | from its lowest corner; a block, a state, `core:air`, or a slot `@wall`, `@wall:stairs[..]`, `@ground` |
 | `SLOTS` | `[PaletteSlot]` | what each slot takes unless a palette says (`.slot`) |
 | `ENTITIES` | `[TemplateEntity]` | `.entity(&KIND, pos)`, or saved |
-| `LOOT` | `[TemplateLoot]` | a block entity filled when placed (`.loot(pos, &TABLE)`) |
-| `DATA` | `[TemplateData]` | a block entity as it was saved |
+| `LOOT` | `[TemplateLoot]` | a block inventory filled when placed (`.loot(pos, &TABLE)`) |
+| `DATA` | `[TemplateData]` | a saved block data record |
 | `JOINTS` | `[TemplateJoint]` | where `Plan::grow` joins pieces (`.joint`) |
 
 ```rust
@@ -548,7 +547,10 @@ r.edit(&base_api::slots::CHEST).push(&comps::equipment_slot::COVERS, "leftWing".
 ```
 
 ## Creative tab
-`r.creative_tab(&TAB, &ICON)`; blocks and items join with `.tab(&TAB)` (tag `tab/<tab>`). `comps::creative_tab::ICON` (`str`).
+`r.creative_tab(&TAB, &ICON)` uses an item icon. `r.creative_tab_texture(&TAB, "gui/my_tab")`
+uses `textures/gui/my_tab.png` in your mod, with a matching `.anim` for a strip of frames.
+Blocks and items join with `.tab(&TAB)` (tag `tab/<tab>`). The `comps::creative_tab::ICON_TEXTURE`
+component takes precedence over `ICON` when both are set.
 
 ```rust
 r.edit(&base_api::tabs::FOOD).set_text(&comps::creative_tab::ICON, "base:bread");
