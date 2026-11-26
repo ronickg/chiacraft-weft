@@ -470,6 +470,20 @@ const OPT_RAIN_MIRROR: u32 = 76u;
 // Bliss's caves (`base:look_cave_fog`, 1 as made): its fog and air's light gone with the eye in a
 // cave and its blue cave fog over what is seen there; 0 neither.
 const OPT_CAVE_FOG: u32 = 77u;
+// A test switch for the A/B sheets against RTX Remix's Minecraft (`base:look_remix_grade`, 0 as made;
+// never a look to ship: Ronald's default stays the vivid Bliss chain): Remix's picture as its pack
+// sets it (rtx.conf, its log of 11-25): auto exposure to mid-grey, centre-metered, within -2.5 to
+// +1.5 EV, its local tonemap (shadows +1.4 EV, highlights -2.5 EV) and a neutral ACES curve, in
+// place of Bliss's log exposure, Purkinje, Hejl and 0.3 of saturation (`chain_light`,
+// `finish_picture`). Path tracing stage 3 (1), 11-26.
+const OPT_REMIX_GRADE: u32 = 78u;
+fn remix_grade() -> bool {
+    return bliss_chain() && fantasy_opt(OPT_REMIX_GRADE) > 0.5;
+}
+// Krzysztof Narkowicz's fit of the ACES film curve (his published formula, 2016).
+fn aces_fit(x: vec3<f32>) -> vec3<f32> {
+    return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), vec3(0.0), vec3(1.0));
+}
 // How much of the sky's light's blue goes by day, with the chain. (The sun's light is already the
 // 4300 K of Ronald's profile through the air, `sun_kelvin_linear`, since 11-06.)
 const CHAIN_AMBIENT_GREY: f32 = 0.4;
@@ -4160,6 +4174,11 @@ fn finish_picture(c_in: vec3<f32>) -> vec3<f32> {
         let rod_e = bliss_rod_exposure();
         let purk = clamp(e * e, 0.0, 1.0) * clamp(rod_e / (1.0 + rod_e), 0.0, 1.0);
         return vec3(purk, clamp(VIEW_ROD / 0.08, 0.0, 1.0), clamp(e * 0.5, 0.0, 1.0));
+    }
+    if remix_grade() {
+        // The Remix test grade: exposed in `chain_light`, the ACES curve at Hejl's input scale, no
+        // Purkinje, no saturation.
+        return aces_fit(max(c_in, vec3(0.0)) * look_opt(OPT_EXPOSURE, 1.0) * 0.389);
     }
     if bliss_chain() {
         // Bliss's chain: exposed in `hdr_light`, its Purkinje, Hejl 2015, then 0.3 of saturation in
