@@ -21,6 +21,12 @@ screen's look by UI redo) and seen in PC runs (11-05). The research behind it is
   `vitals::first::NO_PUT_DOWN_SECS` (1 s) after a strike a press on bare ground only knocks: the
   hammer stone stays in hand (before, the press after the last flake put it down unseen). Check:
   `mods/testkit/scripts/used_up_1126.txt`.
+- **The bone needle** (11-26, §7's "sewing"): a bone splinter ground on a rock in the grid (the
+  rock stays) makes `base:bone_needle`. Every garment and cloak is sewn with it (a needle row
+  under its pattern), wearing it by the string it takes; it lasts `vitals::first::NEEDLE_USES`
+  (20, about four suits). Something to sew in the bag and no needle shows `hint.base.needle`.
+  Bones are anywhere animals are (and on the ground in the bone lands). Art to come: its icon.
+  Check: `mods/testkit/scripts/needle_1126.txt`.
 - The knapping screen opens by sneaking and striking a flint nodule on the ground with a rock. It
   knaps an axe head (8 squares away), a pick head (13) or a shovel blade (8). A click inside the
   outline breaks the nodule into a flake. No knife blade: a knife is a flake on a stick.
@@ -151,7 +157,7 @@ All in the inventory's 2 × 2, so no table is needed before the first axe.
 |---|---|---|
 | Hands | flake, hafted stone tools | logs, planks, the workbench (the table), stone |
 | Stone and flint (100) | stone axe, pick, knife, shovel | trees to 96 logs, stone, the furnace |
-| Bone and antler (50) | bone knife and awl; an antler flaker (better knapping grades: built 11-26, shed antlers in the deer lands, `vitals::first::FLAKER_POINTS`) | hides, sinew, sewing (Survival's clothes) |
+| Bone and antler (50) | bone knife (a splinter on a stick) and needle (built 11-26: sews every garment); an antler flaker (better knapping grades: built 11-26, shed antlers in the deer lands, `vitals::first::FLAKER_POINTS`) | hides, sinew, sewing (Survival's clothes) |
 | Fire and clay | the kiln, ground stone axe (tougher) | pottery, charcoal |
 | Copper (170, `vitals::gear::COPPER_HARVEST`) | native copper, cold-hammered (`notes/COPPER.md`) | young sequoias (192 logs) |
 | Bronze (200) | casting | |

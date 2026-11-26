@@ -91,6 +91,15 @@ fn pattern(piece: usize, material: u32) -> Option<&'static [&'static str]> {
     })
 }
 
+/// A pattern with the needle (`n`) in a row under it, in its middle: every garment is sewn with one
+/// (`first.rs`, `vitals::first::NEEDLE_USES`). The patterns are at most two rows.
+fn with_needle(rows: &[&str]) -> Vec<String> {
+    let wide = rows.iter().map(|r| r.len()).max().unwrap_or(1);
+    let mut out: Vec<String> = rows.iter().map(|r| format!("{r:<wide$}")).collect();
+    out.push(format!("{:^wide$}", "n"));
+    out
+}
+
 /// How far out from the body each piece is drawn, under armor's (1, leggings 0.5).
 const INFLATE: [f32; 4] = [0.45, 0.3, 0.25, 0.35];
 
@@ -201,7 +210,10 @@ pub fn register(r: &mut Registry) {
             .wearable(&base_api::CLOAK, CLOAK_INFLATE, &format!("clothes/{}", c.name))
             .tab(&crate::tabs::COMBAT);
         let (from, rows) = cloak_recipe(c.name);
-        r.shaped(&CRAFTING, c.name, 1, rows, &[('X', from), ('s', "#string")]);
+        let rows = with_needle(rows);
+        let rows: Vec<&str> = rows.iter().map(String::as_str).collect();
+        r.shaped(&CRAFTING, c.name, 1, &rows, &[('X', from), ('s', "#string"), ('n', "#needles")])
+            .wear('n', 1);
     }
     for m in &MATERIALS {
         for (piece, name) in PIECES.iter().enumerate() {
@@ -223,13 +235,21 @@ pub fn register(r: &mut Registry) {
                 .tag(&format!("clothes/{}", m.name))
                 .wearable(CLOTHES[piece], INFLATE[piece], &format!("clothes/{}_{layer}", m.name))
                 .tab(&crate::tabs::COMBAT);
-            let keys = [('X', sewn_from(m.name)), ('s', "#string")];
+            // Sewn with a needle, worn by the string it takes (`vitals::first::NEEDLE_USES`).
+            let keys = [('X', sewn_from(m.name)), ('s', "#string"), ('n', "#needles")];
+            let sewing = clothing::STRING[piece];
             match pattern(piece, m.makes[piece]) {
-                Some(rows) => r.shaped(&CRAFTING, &item, 1, rows, &keys),
+                Some(rows) => {
+                    let rows = with_needle(rows);
+                    let rows: Vec<&str> = rows.iter().map(String::as_str).collect();
+                    r.shaped(&CRAFTING, &item, 1, &rows, &keys).wear('n', sewing);
+                }
                 None => {
                     let mut parts = vec![sewn_from(m.name); m.makes[piece] as usize];
                     parts.extend(std::iter::repeat_n("#string", clothing::STRING[piece] as usize));
-                    r.shapeless(&CRAFTING, &item, 1, &parts, 0)
+                    parts.push("#needles");
+                    let at = parts.len() - 1;
+                    r.shapeless(&CRAFTING, &item, 1, &parts, 0).wear(at, sewing);
                 }
             };
         }
