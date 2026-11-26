@@ -346,3 +346,66 @@ s += ["chat /tk mode spectator"] + pad(x) + spawns(x, [("chihuahua", 1, 2, 0), (
 s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.3"]
 s += watch(x, 8) + shot(x, "cov_dogs_2_untamed")
 write("dogs", s)
+
+# 9. Carcasses (notes/crew/plans/carcass-and-skinning.md, slice 1): a body lies where an animal died, and steps down
+# whole, opened, bones, a pile, gone, as it is eaten and as it rots.
+def carcass_rows(n, every=10):
+    out = []
+    for _ in range(n):
+        out += ["chat /animalprof carcass", f"wait {every}"]
+    return out
+
+
+def side_shot(x, name):
+    """From the south-east, low, at a body lying at (x, Z+6): its side, legs and back (r4's shot from above couldn't tell
+    a standing deer from a lying one)."""
+    return ["chat /tick freeze", f"chat /tp {x+3} 72 {Z+10}", "look 37 -22", "wait 2", f"shot {name}.png",
+            "chat /tick unfreeze", "wait 1"]
+
+
+s = head("carcass", [
+    "Carcasses (slices 1 and 2). Part 1: three hungry grey wolves and two fed white-tailed deer: the kill leaves a carcass",
+    "(\"carcass N of white_tailed_deer\") that the pack's meal opens or takes to bones (\"carcass N of ... now Opened/Bones\").",
+    "Part 2: a white-tailed deer killed by the player (no drops now: \"skinning only\"; drawn as the deer lying dead) and two hungry",
+    "turkey vultures: \"smells carrion\", \"animal N eats 0.50 kg off carcass M\", its look stepping down. Part 3: a white-tailed",
+    "deer (not a red deer: a Large animal's blow cap kept r1's alive) killed by the player, then aged by `/animalprof carcass <days>`: 3 days (opened), 5 (bones), 9 (a pile), 13 (gone).",
+    "Part 4: skinning: a white-tailed deer killed with one blow, the player with a (flint) knife uses its carcass: kneels, the camera",
+    "comes in beside them (shot 8 is taken mid-skin from the player's own camera), and after about 8 s \"skinned carcass N",
+    "of white_tailed_deer: K base:hide (quality Q), M animals:venison\" (Q at most 2 with flint), the hide and meat on the ground.",
+    "Report per part: the carcass, eats and skin lines, the `/animalprof carcass` rows, no hide or meat dropped at the kills,",
+    "and the shots: the dead animal lying at its place, the ribcage and the bone pile sized to it, the kneel and the camera",
+    "while skinning; anything floating, sunk, flickering or drawn wrong.",
+])
+x = 0
+# The deer first, wounded to 30 % (no one behind the blow, so they don't flee anyone), then the wolves: r5's healthy
+# deer took 8 hunts and lived; r4's died in one.
+s += pad(x) + spawns(x, [("white_tailed_deer", 2, -6, 6)]) + ["chat /animalprof wound 0.3"]
+s += spawns(x, [("grey_wolf", 3, 8, -10)])
+# Hungrier than the hunters runs (r3's wolves rested 100 s at 30 %, and the part ended before their kill).
+s += ["chat /animalprof food 0.9", "chat /animalprof water 0.9", "chat /animalprof hunters 0.15"]
+s += watch(x, 12) + carcass_rows(4) + shot(x, "cov_carcass_1_wolves", z_back=18, pitch=-40)
+x = 200
+s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
+s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2"]
+s += ["chat /animalprof carcass"] + side_shot(x, "cov_carcass_2_killed")
+s += spawns(x, [("turkey_vulture", 2, 10, -12)]) + ["chat /animalprof food 0.2"]
+s += ["chat /tk mode spectator", f"chat /tp {x} 90 {Z+20}", "wait 1"] + carcass_rows(10)
+s += shot(x, "cov_carcass_3_vultures", z_back=8, pitch=-35)
+x = 400
+s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
+s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
+      "chat /tk mode spectator"]
+for n, days in enumerate([3, 2, 4]):
+    s += [f"chat /tp {x} 75 {Z+6}", f"chat /animalprof carcass {days}", "wait 2", "chat /animalprof carcass"]
+    s += side_shot(x, f"cov_carcass_{4+n}_aged")
+s += [f"chat /tp {x} 75 {Z+6}", "chat /animalprof carcass 4", "wait 2", "chat /animalprof carcass"]
+x = 600
+# On the grass south of the pond (r3's deer died in the pond's pit, below the knife's aim).
+s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
+s += ["chat /tk mode creative", f"chat /tp {x} 70 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof kill", "wait 2",
+      "chat /animalprof carcass", "chat /tk put me 0 base:knife 1", "key 1", "wait 1",
+      # Standing 2 blocks south of it, looking down at it (a positive pitch looks up).
+      f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "press core:use", "wait 4",
+      "shot cov_carcass_8_skinning.png", "wait 9", "chat /animalprof carcass"]
+s += side_shot(x, "cov_carcass_9_skinned")
+write("carcass", s)
