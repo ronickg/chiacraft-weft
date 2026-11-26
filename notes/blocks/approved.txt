@@ -51,3 +51,8 @@ forge_side
 log_cherry
 leaves_cherry_bloom
 planks_cherry
+malachite_ore
+native_copper
+bellows_side
+bellows_top
+mould_side

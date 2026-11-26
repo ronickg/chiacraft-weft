@@ -9,6 +9,14 @@ flint nodule, 18 GUI px a square (36 texels), every corner stepped 3 px like the
 - `knap_cracked`: the square that broke it (the half second the screen stays).
 - `knap_free`: the head's squares once it comes free (the same half second), glow rim.
 
+Native copper is hammered cold on the same screen (art stand-ins, 11-26), so it has its own set:
+- `knap_copper`: the lump's rough, tarnished copper, raised (dark tarnish and green patina flecks).
+  Hover: the strike mark and glow rim; pressed: sunk.
+- `knap_copper_head`: the head's outline, hammered smooth and bright, a sheen across it. Hover: a
+  red rim and a dent, a warning that striking there only dents it (copper bends, it doesn't break).
+- `knap_copper_free`: the freed copper head, glow rim. `knap_copper_gone`: a square beaten flat
+  into the head, a hollow with a few copper chips at its rim.
+
 Usage: python3 knap.py [--out DIR]   (writes mods/base/assets/textures/gui/knap_*.png and .gui)"""
 import os
 import sys
@@ -29,6 +37,14 @@ CORTEX_FLECK = (160, 149, 126)
 FLINT = ((104, 108, 120), (72, 75, 86), (46, 48, 57))
 FLINT_GLINT = (150, 156, 170)
 STRIKE = k.GLOW_D
+# Native copper's lump: dull tarnished copper (light, face, shade), its tarnish and patina flecks.
+COPPER_LUMP = ((150, 84, 50), (120, 62, 36), (82, 40, 22))
+COPPER_TARNISH = (66, 34, 18)
+COPPER_PATINA = (92, 150, 108)
+# The head being hammered: bright, smooth copper, its sheen.
+COPPER_HEAD = ((240, 150, 88), (214, 112, 56), (150, 70, 32))
+COPPER_SHEEN = (252, 200, 150)
+DENT = (110, 52, 24)
 CRACK = (24, 16, 12)
 
 
@@ -60,6 +76,19 @@ def strike(a):
     for dy, dx in pts:
         a[c + dy, c + dx, :3] = STRIKE
         a[c + dy, c + dx, 3] = 255
+
+
+def dent(a, color):
+    """A dent: a small round hollow in the middle, dark below its upper-left lip, lit on its lower right."""
+    c = S // 2
+    for dy in range(-4, 5):
+        for dx in range(-4, 5):
+            d = dy * dy + dx * dx
+            if d <= 16:
+                a[c + dy, c + dx, :3] = color if d <= 9 else a[c + dy, c + dx, :3]
+                if 9 < d <= 16 and dy + dx > 0:
+                    a[c + dy, c + dx, :3] = COPPER_HEAD[0]
+                a[c + dy, c + dx, 3] = 255
 
 
 def crack(a, color=CRACK):
@@ -129,3 +158,50 @@ rng = np.random.default_rng(3)
 chips = (rng.random((S, S)) < 0.05) & inner & ~k.shrink(m, 4)
 k.paint(g, chips, CORTEX[2])
 save("knap_gone", g)
+
+
+# Native copper, hammered cold.
+def lump(rim=k.OUTLINE, pressed=False):
+    a = stone(COPPER_LUMP, COPPER_TARNISH, rim=rim, pressed=pressed, seed=4)
+    inner = k.shrink(k.shape(S, S, k.R), 4)
+    rng = np.random.default_rng(5)
+    k.paint(a, (rng.random((S, S)) < 0.04) & inner, COPPER_PATINA)
+    return a
+
+
+def sheen(a):
+    """Hammered copper's sheen: a soft diagonal band of light from the upper left, two px wide."""
+    for i in range(12):
+        for w in range(2 if 2 < i < 10 else 1):
+            a[6 + i, 9 + i + w, :3] = COPPER_SHEEN
+
+
+save("knap_copper", lump())
+h = lump(rim=k.GLOW)
+strike(h)
+save("knap_copper_hover", h)
+p = lump(rim=k.GLOW, pressed=True)
+strike(p)
+save("knap_copper_pressed", p)
+
+ch = stone(COPPER_HEAD, COPPER_HEAD[1], seed=6)
+sheen(ch)
+save("knap_copper_head", ch)
+chh = stone(COPPER_HEAD, COPPER_HEAD[1], rim=k.RED_UI, seed=6)
+sheen(chh)
+dent(chh, DENT)
+save("knap_copper_head_hover", chh)
+chp = stone(COPPER_HEAD, COPPER_HEAD[1], rim=k.RED_UI, pressed=True, seed=6)
+dent(chp, DENT)
+save("knap_copper_head_pressed", chp)
+cf = stone(COPPER_HEAD, COPPER_HEAD[1], rim=k.GLOW, seed=6)
+sheen(cf)
+save("knap_copper_free", cf)
+
+cg = k.canvas(S, S)
+k.paint(cg, ring, k.OUTLINE)
+k.paint(cg, inner, k.WELL)
+k.paint(cg, (up | lf) & inner, k.WELL_D)
+rng = np.random.default_rng(7)
+k.paint(cg, (rng.random((S, S)) < 0.05) & inner & ~k.shrink(m, 4), COPPER_LUMP[2])
+save("knap_copper_gone", cg)
