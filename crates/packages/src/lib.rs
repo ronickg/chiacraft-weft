@@ -133,6 +133,8 @@ pub struct BlockDef {
     pub unbreakable: bool,
     /// Light it gives, 0 to 15.
     pub light: Option<u8>,
+    /// Coloured light, each channel 0 to 15 (`[15, 9, 4]` a fire's orange), in place of `light`.
+    pub light_color: Option<[u8; 3]>,
     /// Step, dig and place sounds: a sound group such as `stone`, `wood`, `grass`, `glass`.
     pub sound: Option<String>,
     /// The tool class that mines it fast (`pickaxe`, `axe`, `shovel`).
@@ -435,6 +437,12 @@ fn check(p: &Package, errors: &mut Vec<String>) {
         if b.def.light.is_some_and(|l| l > 15) {
             errors.push(format!("{at}: light goes from 0 to 15"));
         }
+        if b.def.light_color.is_some_and(|c| c.iter().any(|&l| l > 15)) {
+            errors.push(format!("{at}: light_color's channels go from 0 to 15"));
+        }
+        if b.def.light.is_some() && b.def.light_color.is_some() {
+            errors.push(format!("{at}: `light` and `light_color` both set; use one"));
+        }
         if b.def.texture.is_some() && b.def.textures.is_some() {
             errors.push(format!("{at}: `texture` and `textures` both set; use one"));
         }
@@ -534,6 +542,7 @@ mod tests {
         write(&d, "package.toml", "format = \"1.0\"\nid = \"gems\"\nversion = \"0.1.0\"\n");
         write(&d, "defs/blocks/a.toml", "hardnes = 3.0\n");
         write(&d, "defs/blocks/b.toml", "light = 20\n");
+        write(&d, "defs/blocks/c.toml", "light_color = [15, 9, 16]\n");
         write(&d, "defs/blocks/Bad Name.toml", "\n");
         write(&d, "defs/recipes/r.toml", "pattern = [\"X\"]\nresult = \"a\"\n");
         write(&d, "defs/sounds/s.toml", "\n");
@@ -541,6 +550,7 @@ mod tests {
         let all = errors.join("\n");
         assert!(all.contains("defs/blocks/a.toml") && all.contains("hardnes"), "{all}");
         assert!(all.contains("defs/blocks/b.toml: light"), "{all}");
+        assert!(all.contains("defs/blocks/c.toml: light_color"), "{all}");
         assert!(all.contains("Bad Name"), "{all}");
         assert!(all.contains("`X` in the pattern has no key"), "{all}");
         assert!(all.contains("defs/sounds"), "{all}");
