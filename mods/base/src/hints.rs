@@ -15,7 +15,7 @@ use vitals::effects::Effect;
 use weft_sdk::*;
 
 /// The hints, by their bit in `SEEN`: `hint.base.<name>` in the lang files.
-const HINTS: [&str; 21] = [
+const HINTS: [&str; 22] = [
     "logs",
     "table",
     "night",
@@ -37,6 +37,7 @@ const HINTS: [&str; 21] = [
     "copper_ore",
     "copper_heat",
     "casting",
+    "antler",
 ];
 const LOGS: u32 = 0;
 const TABLE: u32 = 1;
@@ -66,6 +67,8 @@ const COPPER_ORE: u32 = 18;
 /// (to whoever stands near), and a copper ingot in the bag (cast it in a mould).
 const COPPER_HEAT: u32 = 19;
 const CASTING: u32 = 20;
+/// A shed antler in the bag (`vitals::first::FLAKER_POINTS`): it's a pressure flaker.
+const ANTLER: u32 = 21;
 
 /// Seconds played before the first hint, that bare hands can't fell a tree (`first.rs`).
 const LOGS_AFTER: u64 = 20;
@@ -282,6 +285,9 @@ fn watch(w: &World) {
         }
         if has(&COPPER_INGOTS_TAG) {
             once(w, id, CASTING);
+        }
+        if items.iter().any(|&i| i == crate::first::ANTLER.id()) {
+            once(w, id, ANTLER);
         }
         if !logs && !seen(w, id, TREE) && has(&AXES_TAG) {
             mark(w, id, TREE);

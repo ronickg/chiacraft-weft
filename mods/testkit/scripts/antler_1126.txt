@@ -1,0 +1,95 @@
+# Shed antlers and the antler flaker (11-26, vitals::first::ANTLER_LANDS, FLAKER_POINTS). Seed 1,
+# a fresh world.
+# Part 1, worldgen: a census of shed antlers (base:shed_antler) within 64 blocks at the plains
+# spawn and in the taiga spot (-96 -208), both deer lands: about 1-4 expected at each (a find:
+# `antler_lands_have_some` expects ~1 in a 64-block walk of open ground, so 0 at one spot is no
+# failure, 0 at both is), and in the desert spot (-240 240): 0 expected (no deer land).
+# Part 2, by real actions in survival on a pad in the desert: a flint axe head knapped with no
+# antler in the bag; a shed antler picked up off the ground (base:antler in the bag, the antler
+# hint shows); a second flint axe head knapped with it in the bag.
+# Read: the /tk census replies, every /tk inv me reply, run.log lines "knapping: flint
+# felling_axe_head work N (flaker F), grade G": the first with flaker 0, the second with flaker 6
+# and its work 6 more (grades roll with luck, so the work points are the check), "died" (none),
+# and the shots (ua_spawn, ua_taiga: antlers on the ground if any are in view; ua_hint: the antler
+# hint; ua_antler: one on the ground, close).
+# Yaw 0 faces -z; a negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear
+chat /tk mode spectator
+look 0 -60
+chat /tk census 64 base:shed_antler,base:loose_bone,base:loose_flint
+where spawn
+shot ua_spawn.png
+chat /tp -96 105 -208
+wait 2
+loaded
+idle
+chat /tk census 64 base:shed_antler,base:loose_bone,base:loose_flint
+where taiga
+shot ua_taiga.png
+chat /tp -240 86 240
+wait 2
+loaded
+idle
+chat /tk census 64 base:shed_antler,base:loose_bone,base:loose_flint
+where desert
+# Part 2: a pad here in the desert.
+chat /tk mode creative
+chat /tk top -240 240
+chat /tp -240 67 240
+wait 1
+chat /tk fill ~-6 ~-2 ~-6 ~6 ~-1 ~6 base:stone
+chat /tk fill ~-6 ~ ~-6 ~6 ~5 ~6 core:air
+wait 1
+chat /tk mode survival
+until mode survival within 10
+wait 1
+# 1. A flint axe head, no antler in the bag.
+chat /tk set ~ ~ ~-1 base:loose_flint
+chat /tk give base:rock
+chat /tk hand me base:rock
+wait 0.5
+hold core:sneak 2 nowait
+wait 0.6
+aim_block 0 -1 -1 1 1.45
+hold core:use 0.3
+until screen base:knapping within 5
+wait 1
+tap base:knapping class:knap_stone
+until screen none within 5
+chat /tk inv me
+until chat base:part_felling_axe_head within 5
+wait 1.5
+# 2. A shed antler off the ground.
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+chat /tk set ~ ~ ~-1 base:shed_antler
+look 0 -45
+wait 1
+shot ua_antler.png
+aim_block 0 0 -1 0.05
+wait 0.5
+hold core:attack 0.5
+wait 1.5
+chat /tk inv me
+until chat base:antler within 5
+wait 2
+shot ua_hint.png
+# 3. A second flint axe head, the antler in the bag.
+chat /tk fill ~ ~ ~-1 ~ ~ ~-1 core:air
+chat /tk set ~ ~ ~-1 base:loose_flint
+chat /tk hand me base:rock
+wait 0.5
+hold core:sneak 2 nowait
+wait 0.6
+aim_block 0 -1 -1 1 1.45
+hold core:use 0.3
+until screen base:knapping within 5
+wait 1
+tap base:knapping class:knap_stone
+until screen none within 5
+chat /tk inv me
+wait 1
+expect alive
+quit

@@ -108,6 +108,8 @@ const RECIPES_LIST: &[Recipe] = &[
     b("base:stick", 2.0, &[("base:fallen_branch", 1.0)], Needs::Hand, 6.0),
     // the bone lands' way in (vitals::first::BONE_LANDS)
     b("base:bone", 1.0, &[("base:loose_bone", 1.0)], Needs::Hand, 10.0),
+    // A shed antler, a find in the deer lands: about one in a 64-block walk.
+    b("base:antler", 1.0, &[("base:shed_antler", 1.0)], Needs::Hand, 240.0),
     b("base:plant_fibre", 1.0, &[("base:tall_grass", 1.0)], CUTTER, 1.0),
     b("base:oak_bark", 1.0, &[("base:oak_log", 1.0)], AXE, 5.0),
     c("base:sharp_flake", 1.0, &[("base:flint", 1.0)], Hand),
