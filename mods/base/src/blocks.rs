@@ -874,6 +874,9 @@ pub fn register(r: &mut Registry) {
             let rots = matches!(base_api::grow::step(e, "base:dung_pat", false), base_api::grow::Step::Grow)
                 || ((e.world().random() >> 11) as f32 / (1u64 << 53) as f32) < vitals::soil::pat_break_chance();
             if rots {
+                // Rotted into the ground: farmland under and beside it gets a level back (`PAT_FEEDS`).
+                let at = e.pos().to_array();
+                base_api::grow::enrich(&e.world(), at, vitals::soil::PAT_FEEDS, 1, false);
                 e.world().set_block(e.pos(), TALL_GRASS.id());
             }
         });
