@@ -11,6 +11,14 @@
 //! kept (`survival/food.rs` for the rest of food).
 
 use base_api::components::FUEL;
+
+/// The pot's bowl filter (`#bowl`, a tag; `#food` and `#fuel` are components), for
+/// `crafts::push_out`.
+static BOWL_TAG: Tag = Tag::named("bowl");
+
+fn is_food(item: u32) -> bool {
+    base_api::components::FOOD.on_item(item).is_some()
+}
 use base_api::{BOWL, FRESHNESS, HOT, MADE, MEAL, MEAL_NUTRITION, Nutrition, freshness};
 use vitals::food;
 use vitals::meals;
@@ -266,7 +274,12 @@ pub fn stew(w: &World, foods: &[usize], used: f32) -> ItemStack {
 /// Every campfire of a region: cooking the food in it.
 fn tick_campfires(b: &mut SystemBatch<Roasting>) {
     let w = b.world();
+    let check = w.day_time() % 20 == 0;
     for (id, s, ticks) in b.iter_mut() {
+        // The menu's filter (`crafts::push_out`), once a second.
+        if check {
+            crate::crafts::push_out(&w, id, "input", is_food);
+        }
         for _ in 0..ticks.clamp(1, CATCH_UP) {
             if !roast_step(&w, id, s) {
                 break;
@@ -320,7 +333,14 @@ fn roast_step(w: &World, id: u64, s: &mut Roasting) -> bool {
 /// Every pot of a region: burning its fuel while it has foods and a bowl to cook, then a stew.
 fn tick_pots(b: &mut SystemBatch<Cooking>) {
     let w = b.world();
+    let check = w.day_time() % 20 == 0;
     for (id, s, ticks) in b.iter_mut() {
+        // The menu's filters (`crafts::push_out`), once a second.
+        if check {
+            crate::crafts::push_out(&w, id, "ingredients", is_food);
+            crate::crafts::push_out(&w, id, "bowl", |i| BOWL_TAG.on_item(i));
+            crate::crafts::push_out(&w, id, "fuel", |i| FUEL.on_item(i).is_some());
+        }
         for _ in 0..ticks.clamp(1, CATCH_UP) {
             if !pot_step(&w, id, s) {
                 break;
@@ -410,6 +430,7 @@ fn tick_racks(b: &mut SystemBatch<Drying>) {
             // wind's drying is `dry_rate`'s breeze).
             preserve::dry_rate(air.still, air.humidity, air.wind, air.raining && air.open_sky)
         };
+        crate::crafts::push_out(&w, id, "rack", is_food);
         let inv = w.inventory(id);
         let rack = inv.group("rack");
         for i in 0..rack.len().min(4) as usize {

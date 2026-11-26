@@ -9,6 +9,7 @@ mod block_entities;
 mod blocks;
 mod book;
 mod camera;
+mod casting;
 mod climbing;
 mod clothing;
 mod commands;
@@ -154,6 +155,7 @@ fn init(r: &mut Registry) {
     book::register(r);
     discovery::register(r);
     metals::register(r);
+    casting::register(r);
     parts::register(r);
     gems::register(r);
     first::register(r);
