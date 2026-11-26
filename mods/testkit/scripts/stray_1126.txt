@@ -1,0 +1,48 @@
+# Strays in station inputs (11-26, Tester's pt_rain_6: a tanning frame item sat in a tanning
+# frame's input). A write straight to an inventory (/tk insert) skips the menus' slot filters; each
+# station now pushes out what its input can't take (crafts::push_out). Seed 1, a fresh world.
+# Expect: after each insert's "ok 1" and the wait, /tk inv of that block shows no stray (empty,
+# or only the good item), run.log has "station <id>: pushed out base:<item> x1 from <group>" for
+# the tanning frame, the tanning pit (input and with), the drying rack, the cooking pot
+# (ingredients, bowl and fuel), the campfire and the pick head mould, and none for the raw hide,
+# the beef and the copper ingots, which stay in.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode creative
+look 0 -20
+chat /tk fill ~-4 ~-1 ~-6 ~4 ~-1 ~-2 base:stone
+chat /tk fill ~-4 ~ ~-6 ~4 ~3 ~-2 core:air
+chat /tk set ~-3 ~ ~-3 base:tanning_frame
+chat /tk set ~-1 ~ ~-3 base:tanning_pit
+chat /tk set ~1 ~ ~-3 base:drying_rack
+chat /tk set ~3 ~ ~-3 base:cooking_pot
+chat /tk set ~-3 ~ ~-5 base:campfire
+chat /tk set ~-1 ~ ~-5 base:mould_pick_head
+wait 1
+chat /tk insert ~-3 ~ ~-3 base:tanning_frame 1
+chat /tk insert ~-1 ~ ~-3 base:stick 1
+chat /tk put ~-1 ~ ~-3 1 base:dirt 1
+chat /tk insert ~1 ~ ~-3 base:cobblestone 1
+chat /tk insert ~1 ~ ~-3 base:beef 1
+chat /tk put ~3 ~ ~-3 0 base:cobblestone 1
+chat /tk put ~3 ~ ~-3 4 base:dirt 1
+chat /tk put ~3 ~ ~-3 5 base:dirt 1
+chat /tk insert ~-3 ~ ~-5 base:cobblestone 1
+chat /tk insert ~-1 ~ ~-5 base:stick 1
+wait 3
+chat /tk inv ~-3 ~ ~-3
+chat /tk inv ~-1 ~ ~-3
+chat /tk inv ~1 ~ ~-3
+chat /tk inv ~3 ~ ~-3
+chat /tk inv ~-3 ~ ~-5
+chat /tk inv ~-1 ~ ~-5
+# The good ones stay.
+chat /tk insert ~-3 ~ ~-3 base:hide 1
+chat /tk insert ~-1 ~ ~-5 base:copper_ingot 3
+wait 3
+chat /tk inv ~-3 ~ ~-3
+chat /tk inv ~-1 ~ ~-5
+shot stray_strays.png
+expect alive
+quit

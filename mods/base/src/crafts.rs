@@ -46,6 +46,26 @@ fn is(item: u32, want: &'static str) -> bool {
     }
 }
 
+/// Whatever in `group` of block entity `id` its filter `ok` refuses, dropped above it. The menus'
+/// slot filters (`accepts`) stop a player's clicks, but a write straight to the inventory (a
+/// command, a script) skips them, and the station would hold the stray forever (Tester's
+/// pt_rain_6, 11-26: a tanning frame held in its own frame's input). Every station with filtered
+/// inputs calls this as it ticks.
+pub fn push_out(w: &World, id: u64, group: &str, ok: impl Fn(u32) -> bool) {
+    let g = w.inventory(id).group(group);
+    for i in 0..g.len() {
+        let st = g.get(i);
+        if st.is_empty() || ok(st.item) {
+            continue;
+        }
+        let Some(e) = w.entity(id) else { return };
+        let p = e.block_pos();
+        g.set(i, ItemStack::EMPTY);
+        w.spawn_item([p.x as f64 + 0.5, p.y as f64 + 1.1, p.z as f64 + 0.5], st);
+        weft_sdk::info!("station {id}: pushed out {} x{} from {group}", item_name(st.item), st.count);
+    }
+}
+
 pub fn register(r: &mut Registry) {
     r.item(&HIDE).tag("hides").tab(&crate::tabs::INGREDIENTS);
     r.item(&SOLE_LEATHER)
@@ -192,6 +212,10 @@ fn tick(b: &mut SystemBatch<Waiting>) {
     for (id, s, ticks) in b.iter_mut() {
         let station = crafts::STATIONS[(s.station as usize).min(crafts::STATIONS.len() - 1)];
         let c = crafts::craft(station);
+        push_out(&w, id, "input", |i| is(i, c.input));
+        if let Some(want) = c.with {
+            push_out(&w, id, "with", |i| is(i, want));
+        }
         let inv = w.inventory(id);
         let (input, output) = (inv.group("input"), inv.group("output"));
         let st = input.get(0);

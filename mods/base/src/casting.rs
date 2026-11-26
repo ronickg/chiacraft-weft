@@ -141,6 +141,7 @@ fn tick(b: &mut SystemBatch<Cast>) {
         let Some(e) = w.entity(id) else { continue };
         let pos = e.block_pos();
         let Some(shape) = shape_of(w.block(pos)) else { continue };
+        crate::crafts::push_out(&w, id, "input", |i| COPPER_INGOTS.on_item(i));
         let inv = w.inventory(id);
         let (input, output) = (inv.group("input"), inv.group("output"));
         let st = input.get(0);
