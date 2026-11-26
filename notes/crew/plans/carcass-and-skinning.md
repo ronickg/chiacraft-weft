@@ -112,6 +112,11 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   underside (its genes' phenotype read at death into `carcass_coat`; the client recolours the shared texture's coat
   texels by `body_mask.bin`). Sheet: `source/carcass/sheet.py` (archived in
   ~/Coding/chiacraft-archive/images/carcass/2026-11-26/). cov_carcass part 5 kills one of each plan for shots.
+- r7 (cd142572e): nothing sinks (low shots of each stage on the grass), each plan in its own coat; the knife missed
+  the deer (it lay 2 blocks off the aim). r9 (e2549bca5, every shot with the HUD hidden): skinning runs (7.9 s, flint,
+  1 hide at quality 1 from a level-33 deer, 4 venison; the venison taken counts as eaten, so it steps to Bones); the
+  kneel view shows the deer on its side, belly and legs toward the skinner, on its pool; the five plans' opened bodies
+  rest on the ground.
 - Left for later: white spotting and patterns on dead coats (only the base and underside colours carry over); the dead body shows the base coat, not its own; vultures
   fill after one 0.5 kg bite; species without stagger-break rows drop nothing on a break; the hide and meat go to the
   inventory with no pickup shown.
