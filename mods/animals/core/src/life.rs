@@ -46,6 +46,19 @@ pub fn roe_develops(in_water: bool) -> bool {
     in_water
 }
 
+/// In its breeding season this share of the wild ones met are this year's young (`notes/ECOLOGY.md`, part 7). Met
+/// by natural spawning, they come with their mother (`mother_share`); spawned any other way, alone.
+pub const YOUNG_SHARE: f32 = 0.25;
+/// A young one met is up to this share of the way grown.
+pub const YOUNG_GROWN_MAX: f32 = 0.8;
+
+/// The share of grown females of a live-bearing species met by natural spawning in its breeding season that come with
+/// their litter, so that `YOUNG_SHARE` of all met are young: half of those met are female, each bringing `litter` young
+/// on average (`litter_mean`); a white-tailed deer's litter of 1-3: 33 %; a grey wolf's of 2-8: 13 %.
+pub fn mother_share(litter_mean: f32) -> f32 {
+    (YOUNG_SHARE / (1.0 - YOUNG_SHARE) * 2.0 / litter_mean.max(0.5)).min(1.0)
+}
+
 /// How many young a litter or clutch has, `roll` any random number.
 pub fn litter(s: &Species, roll: u32) -> u32 {
     s.litter().0 + roll % (s.litter().1 - s.litter().0 + 1)
@@ -311,5 +324,16 @@ mod tests {
             // Nothing that comes is past what dies of want (`want_chance` is 0 up to the crowd).
             assert_eq!(want_chance(1.0, s.crowd() as f64, s.crowd(), ADULT), 0.0);
         }
+    }
+
+    #[test]
+    fn mothers_bring_a_quarter_young() {
+        for litter in [1.0f32, 1.5, 3.0, 5.0] {
+            let m = mother_share(litter);
+            let young = 0.5 * m * litter;
+            let share = young / (1.0 + young);
+            assert!((share - YOUNG_SHARE).abs() < 1e-4 || m == 1.0, "{litter}: {m} {share}");
+        }
+        assert!((mother_share(1.5) - 0.444).abs() < 0.01);
     }
 }
