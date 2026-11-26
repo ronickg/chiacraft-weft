@@ -81,17 +81,18 @@ const TABLE: &[(&str, f64, f64, f64)] = &[
     // at 1280x720, scaled by the pixels). Only while path tracing runs; nothing without it, which a
     // player's own measuring shows.
     ("pt_denoiser", 1.0, 1.1, f64::NAN),
-    // The path tracer's lamps' own light (stage 2 step 1, 11-26): an estimate until the laptop's
-    // bench, the same shadow ray as before and a few more ALU ops a candidate (+0.2-0.4 ms on the
-    // 3060 laptop expected). Its strengths cost the same.
+    // The path tracer's lamps (stage 2, 11-26): their own light, at the bounce's surface too, and
+    // their draws reused. All three together measured on the 3060 laptop at 1080p (cold
+    // blocklight_ab, s2o, dev d559e063f against 5ef3e4f0b): pt_trace +1.46 ms in the cave
+    // (1.67 -> 3.13) and +2.02 ms in the hall (5.35 -> 7.37), about the plan's +2-3 ms; the
+    // whole frame moved less than its run-to-run noise. The split between the rows is still the
+    // plan's (the light itself a few ALU ops a draw, the bounce a second draw and shadow ray, the
+    // reuse three reservoir reads and a write), in the table's PC units; a player's own
+    // measuring finds each. The strengths cost the same.
     ("pt_emissive", 1.0, 0.1, f64::NAN),
     ("pt_emissive", 2.0, 0.1, f64::NAN),
     ("pt_emissive", 4.0, 0.1, f64::NAN),
-    // The lamps' light at the bounce's surface (stage 2 step 2): a second light draw and shadow
-    // ray a pixel, an estimate (+1.0-1.5 ms on the 3060 laptop expected) until its bench.
     ("pt_bounce_lights", 1.0, 0.35, f64::NAN),
-    // The lamps' draws reused (stage 2 step 3): three reservoir reads and one write a pixel, no
-    // more rays; an estimate (+0.5-0.9 ms on the 3060 laptop expected) until its bench.
     ("pt_restir", 1.0, 0.2, f64::NAN),
     // The mist's banks walked per pixel (11-24): an estimate until the PC's bench at Max, 16 steps
     // a pixel each with a noise, a ground-map read and the shadow maps' taps, where there is mist.

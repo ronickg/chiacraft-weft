@@ -419,6 +419,19 @@ fn pt_nee_fade(e: f32, to: vec3<f32>) -> f32 {
     return clamp((e - (d.x + d.y + d.z)) / PT_NEE_FADE, 0.0, 1.0);
 }
 
+// How far above the lightmap's own block light at a surface the lamps' light may sum. Each lamp
+// is matched to the lightmap as if alone, and the lightmap takes the strongest light where tracing
+// adds them up: a 10 x 7 lava pit lit the floor round it white, a third over the room's lightmap
+// (s2o lava_glow). One lamp near a surface never reaches it (it is matched); a field of them stops
+// here. Shadows still take the light down freely.
+const PT_NEE_SUM: f32 = 2.0;
+
+fn pt_nee_sum_cap(c: vec3<f32>, block: vec3<f32>) -> vec3<f32> {
+    let w = vec3(0.2126, 0.7152, 0.0722);
+    let most = PT_NEE_SUM * dot(block, w);
+    return c * min(1.0, most / max(dot(c, w), 1e-6));
+}
+
 // The lamps' light within `PT_NEE_MAX`, its hue kept.
 fn pt_nee_cap(c: vec3<f32>) -> vec3<f32> {
     return c * min(1.0, PT_NEE_MAX / max(max(c.r, max(c.g, c.b)), 1e-4));
@@ -925,7 +938,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             if max(b_block.r, max(b_block.g, b_block.b)) > 1e-4 {
                 let e = pt_block_direct(b.world, b.rel, b.n, b.n, b.n * 0.02, px + vec2(37.0, 53.0), 0xffffffffu, vec2(0));
                 if e.a > 0.5 {
-                    bounce += pt_albedo(b) * (e.rgb - b_block);
+                    bounce += pt_albedo(b) * (pt_nee_sum_cap(e.rgb, b_block) - b_block);
                 }
             }
         }
@@ -954,7 +967,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             let e = pt_block_direct(h.world, h.rel, n, ng, lift, px, id.y * pt.size.x + id.x, vec2<i32>(id.xy));
             block_vis = vec2(select(0.0, 1.0, max(e.r, max(e.g, e.b)) > 0.0), e.a);
             if e.a > 0.5 {
-                direct = e.rgb;
+                direct = pt_nee_sum_cap(e.rgb, block);
                 diffuse += direct - block;
             } else {
                 direct = block;
