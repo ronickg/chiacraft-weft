@@ -553,17 +553,19 @@ fn chain_light(c: vec3<f32>, uv: vec2<f32>, pass_: Pass) -> vec3<f32> {
     return col * bliss_exposure(mean);
 }
 
-// The Remix test grade's exposure (`remix_grade`): the whole way to the view's mean, as Remix's eye,
-// relative to the average sunlit view's 2.2 (`bliss_exposure`), within its -2.5 to +1.5 EV; then its
-// local tonemap as a gain from the light round the pixel (the bloom's blur): +1.4 EV where that is
-// dark, -2.5 EV where it is past white, eased between (Remix fuses three exposures so; method).
+// The Remix test grade's exposure (`remix_grade`). Calibrated on the parity poses (s3g, 11-26): the
+// whole way to the view's mean with the full +1.4 EV shadow lift washed every pose out past Remix's
+// own frames (sRGB mean cherry 175 against 148, nave 145 against 72), where Bliss's log curve already
+// lands near them (137, 66). So Bliss's view exposure, Remix's preference offset (-0.1 EV), and its
+// local tonemap as a gain from the light round the pixel (the bloom's blur): up to +1.4 EV only in
+// the deep shade, -2.5 EV where it is past white, eased between (Remix fuses exposures so; method).
 fn remix_light(mean: f32, uv: vec2<f32>, pass_: Pass) -> f32 {
-    let k = 2.2 * clamp(EXPOSURE_REF / max(mean, 1e-6), exp2(-1.5), exp2(2.5));
+    let k = bliss_exposure(mean) * exp2(-0.1);
     if pass_.bloom == 0u {
         return k;
     }
     let near = luma(bloom_tap(pass_.bloom - 1u, uv)) * k * 0.389;
-    let lift = 1.0 - smoothstep(0.02, 0.25, near);
+    let lift = 1.0 - smoothstep(0.004, 0.05, near);
     let hold = smoothstep(0.7, 4.0, near);
     return k * exp2(1.4 * lift - 2.5 * hold);
 }
