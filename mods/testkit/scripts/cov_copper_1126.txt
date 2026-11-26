@@ -86,6 +86,9 @@ tap_once base:knapping class:knap_head
 wait 0.5
 shot uc_screen.png
 chat /tk get ~ ~ ~-1
+# The pick head has 13 squares to strike away; `tap` clicks at most 10 times, so twice.
+tap base:knapping class:knap_stone
+wait 0.5
 tap base:knapping class:knap_stone
 until screen none within 5
 chat /tk inv me
