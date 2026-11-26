@@ -621,22 +621,26 @@ s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:h
 write("carcass_wall", s)
 
 
-# Births in natural spawning (notes/ECOLOGY.md part 7: young come with their mother): spring, natural spawning on, a
-# creative player standing on a pad (ground 69: the spawner looks for ground from 16 above the player to 16 below) at
-# stops 200 blocks apart along z 544, the animals around each listed.
+# Births in natural spawning (notes/ECOLOGY.md part 7: young come with their mother). r1 waited 8 minutes on the
+# engine's spawner at 14 carved pads and met nothing (its spots are on grass 20-45 blocks out, within 16 of the
+# player's height: the pits' walls); so part 1 has deer "met" by natural spawning on a pad (`/animalprof met`: their
+# spawn cause natural), in autumn, the white-tailed deer's breeding season, and part 2 the same out of season.
 s = [f"# {l}" for l in [
-    "Births in natural spawning: in spring (most temperate species breed), with natural spawning on, a creative player",
-    "stands 30 s on a flat pad at each of 14 stops 200 blocks apart (x 0 to 2600, z 544, seed 1). Report every \"wild S",
-    "N arrives with her K young (D days old, P% grown)\" line (how many, of which species), the young's \"born to N and 0",
-    "(wild)\" lines, and in the `/animalprof where` rows the young marked \"(young, X from its mother N)\": X small (a few",
-    "blocks), as they follow her. Young with no mother near (\"(young)\" alone) should now come only from command spawns",
-    "(none here). Shots (_stopN): the nearest creature at every third stop.",
-]] + ["loaded", "idle", "chat /tk mode creative", "chat /tp 0 90 544", "wait 4", "idle",
-      "chat /season spring 5", "chat /rule core:mob_spawning 1", "chat /anim log"]
-for n, hx in enumerate(range(0, 2800, 200)):
-    s += pad(hx) + [f"chat /tp {hx} 70 {Z+10}", "wait 30", "chat /animalprof where 96"]
-    if n % 3 == 2:
-        s += ["chat /tick freeze", "aim 48", "wait 1", f"shot cov_births_stop{n}.png", "chat /tick unfreeze"]
-s += ["chat /animalprof where 96"]
+    "Births in natural spawning. Part 1 (x 0, autumn, the white-tailed deer's breeding season): 24 white-tailed deer met",
+    "by natural spawning on a pad (`/animalprof met 24`: spawned with the natural cause, as the engine's spawner would). About",
+    "a third of the females (so 3 to 6 of the 24) should log \"wild white_tailed_deer N arrives with her K young (D days",
+    "old, P% grown)\" with K 1 to 3, each young \"born to N and 0 (wild)\"; the `/animalprof where` rows 10 s and 60 s",
+    "later mark those young \"(young, X from its mother N)\" with X small (a few blocks: they follow her). Part 2 (x 200,",
+    "spring, out of season): 24 more, and no \"arrives with her\" line and no young at all there. Shots: 1_mothers (from",
+    "above, ticks frozen: young beside their mothers), 2_low (low beside the herd), 3_out_of_season.",
+]] + ["loaded", "idle", "chat /tk mode creative", "chat /tp 0 90 544", "wait 4", "idle", "chat /rule core:mob_spawning 0",
+      "chat /anim log"]
+s += pad(0) + ["chat /season autumn 5", f"chat /tp 0 70 {Z}", "wait 1", "chat /animalprof met 24", "wait 10",
+               "chat /animalprof where 32", "wait 50", "chat /animalprof where 32",
+               "chat /tick freeze", f"chat /tp 0 86 {Z+12}", "look 0 -55", "wait 2", "shot cov_births_1_mothers.png",
+               f"chat /tp 9 70.5 {Z+9}", "look 45 -12", "wait 2", "shot cov_births_2_low.png", "chat /tick unfreeze", "wait 1"]
+s += pad(200) + ["chat /season spring 5", f"chat /tp 200 70 {Z}", "wait 1", "chat /animalprof met 24", "wait 10",
+                 "chat /animalprof where 32", "chat /tick freeze", f"chat /tp 200 86 {Z+12}", "look 0 -55", "wait 2",
+                 "shot cov_births_3_out_of_season.png", "chat /tick unfreeze", "wait 1"]
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("births", s)

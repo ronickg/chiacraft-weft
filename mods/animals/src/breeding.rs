@@ -108,14 +108,15 @@ pub fn init(r: &mut Registry) {
         r.edit(s.kind).attach(&BREEDING);
         r.edit(s.kind).attach(&MET);
     }
-    // Met by natural spawning (`animal::arrive` reads it on its first upkeep).
-    r.on_event(&actions::SPAWN, |b| {
-        let w = b.world();
-        for e in b.iter() {
-            if e.cause == abi::spawn_cause::NATURAL && SPECIES.iter().any(|s| s.kind.id() == e.kind) {
-                w.set_component(e.entity, &MET, 1);
-            }
+    // Met by natural spawning (`animal::arrive` reads it on its first upkeep): marked as it is asked about, made and
+    // not yet seen (the event that it came could reach the mod after its first upkeep).
+    r.before_event(&actions::SPAWN, |q| {
+        let w = q.world();
+        let (id, cause) = (q.entity(), q.query().cause);
+        if cause == abi::spawn_cause::NATURAL && w.component(id, &crate::animal::ANIMAL).is_some() {
+            w.set_component(id, &MET, 1);
         }
+        Verdict::Abstain
     });
     // Counted for `/animal census`: deaths other than of old age (counted in `animal::old_age`).
     // (By its kind: its components are gone by the time the event comes.)

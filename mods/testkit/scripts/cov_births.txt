@@ -1,17 +1,17 @@
-# Births in natural spawning: in spring (most temperate species breed), with natural spawning on, a creative player
-# stands 30 s on a flat pad at each of 14 stops 200 blocks apart (x 0 to 2600, z 544, seed 1). Report every "wild S
-# N arrives with her K young (D days old, P% grown)" line (how many, of which species), the young's "born to N and 0
-# (wild)" lines, and in the `/animalprof where` rows the young marked "(young, X from its mother N)": X small (a few
-# blocks), as they follow her. Young with no mother near ("(young)" alone) should now come only from command spawns
-# (none here). Shots (_stopN): the nearest creature at every third stop.
+# Births in natural spawning. Part 1 (x 0, autumn, the white-tailed deer's breeding season): 24 white-tailed deer met
+# by natural spawning on a pad (`/animalprof met 24`: spawned with the natural cause, as the engine's spawner would). About
+# a third of the females (so 3 to 6 of the 24) should log "wild white_tailed_deer N arrives with her K young (D days
+# old, P% grown)" with K 1 to 3, each young "born to N and 0 (wild)"; the `/animalprof where` rows 10 s and 60 s
+# later mark those young "(young, X from its mother N)" with X small (a few blocks: they follow her). Part 2 (x 200,
+# spring, out of season): 24 more, and no "arrives with her" line and no young at all there. Shots: 1_mothers (from
+# above, ticks frozen: young beside their mothers), 2_low (low beside the herd), 3_out_of_season.
 loaded
 idle
 chat /tk mode creative
 chat /tp 0 90 544
 wait 4
 idle
-chat /season spring 5
-chat /rule core:mob_spawning 1
+chat /rule core:mob_spawning 0
 chat /anim log
 chat /tp 0 90 544
 wait 4
@@ -25,9 +25,31 @@ chat /time set 6000
 chat /tk fill -1 69 543 1 69 545 base:water
 chat /tk fill -1 70 543 1 70 545 core:air
 wait 1
-chat /tp 0 70 554
-wait 30
-chat /animalprof where 96
+chat /season autumn 5
+chat /tp 0 70 544
+wait 1
+chat /animalprof met 24
+wait 10
+chat /animalprof where 32
+wait 50
+chat /animalprof where 32
+chat /tick freeze
+chat /tp 0 86 556
+look 0 -55
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_births_1_mothers.png
+press core:hide_hud
+chat /tp 9 70.5 553
+look 45 -12
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_births_2_low.png
+press core:hide_hud
+chat /tick unfreeze
+wait 1
 chat /tp 200 90 544
 wait 4
 chat /tk fill 184 60 528 216 68 560 base:dirt
@@ -40,220 +62,20 @@ chat /time set 6000
 chat /tk fill 199 69 543 201 69 545 base:water
 chat /tk fill 199 70 543 201 70 545 core:air
 wait 1
-chat /tp 200 70 554
-wait 30
-chat /animalprof where 96
-chat /tp 400 90 544
-wait 4
-chat /tk fill 384 60 528 416 68 560 base:dirt
-chat /tk fill 384 69 528 416 69 560 base:grass
-chat /tk fill 384 70 528 416 85 560 core:air
-chat /tk fill 384 86 528 416 110 560 core:air
-chat /tk fill 384 111 528 416 140 560 core:air
-chat /tk fill 384 70 561 416 100 576 core:air
-chat /time set 6000
-chat /tk fill 399 69 543 401 69 545 base:water
-chat /tk fill 399 70 543 401 70 545 core:air
+chat /season spring 5
+chat /tp 200 70 544
 wait 1
-chat /tp 400 70 554
-wait 30
-chat /animalprof where 96
+chat /animalprof met 24
+wait 10
+chat /animalprof where 32
 chat /tick freeze
-aim 48
-wait 1
+chat /tp 200 86 556
+look 0 -55
+wait 2
 press core:hide_hud
 wait 0.5
-shot cov_births_stop2.png
+shot cov_births_3_out_of_season.png
 press core:hide_hud
 chat /tick unfreeze
-chat /tp 600 90 544
-wait 4
-chat /tk fill 584 60 528 616 68 560 base:dirt
-chat /tk fill 584 69 528 616 69 560 base:grass
-chat /tk fill 584 70 528 616 85 560 core:air
-chat /tk fill 584 86 528 616 110 560 core:air
-chat /tk fill 584 111 528 616 140 560 core:air
-chat /tk fill 584 70 561 616 100 576 core:air
-chat /time set 6000
-chat /tk fill 599 69 543 601 69 545 base:water
-chat /tk fill 599 70 543 601 70 545 core:air
 wait 1
-chat /tp 600 70 554
-wait 30
-chat /animalprof where 96
-chat /tp 800 90 544
-wait 4
-chat /tk fill 784 60 528 816 68 560 base:dirt
-chat /tk fill 784 69 528 816 69 560 base:grass
-chat /tk fill 784 70 528 816 85 560 core:air
-chat /tk fill 784 86 528 816 110 560 core:air
-chat /tk fill 784 111 528 816 140 560 core:air
-chat /tk fill 784 70 561 816 100 576 core:air
-chat /time set 6000
-chat /tk fill 799 69 543 801 69 545 base:water
-chat /tk fill 799 70 543 801 70 545 core:air
-wait 1
-chat /tp 800 70 554
-wait 30
-chat /animalprof where 96
-chat /tp 1000 90 544
-wait 4
-chat /tk fill 984 60 528 1016 68 560 base:dirt
-chat /tk fill 984 69 528 1016 69 560 base:grass
-chat /tk fill 984 70 528 1016 85 560 core:air
-chat /tk fill 984 86 528 1016 110 560 core:air
-chat /tk fill 984 111 528 1016 140 560 core:air
-chat /tk fill 984 70 561 1016 100 576 core:air
-chat /time set 6000
-chat /tk fill 999 69 543 1001 69 545 base:water
-chat /tk fill 999 70 543 1001 70 545 core:air
-wait 1
-chat /tp 1000 70 554
-wait 30
-chat /animalprof where 96
-chat /tick freeze
-aim 48
-wait 1
-press core:hide_hud
-wait 0.5
-shot cov_births_stop5.png
-press core:hide_hud
-chat /tick unfreeze
-chat /tp 1200 90 544
-wait 4
-chat /tk fill 1184 60 528 1216 68 560 base:dirt
-chat /tk fill 1184 69 528 1216 69 560 base:grass
-chat /tk fill 1184 70 528 1216 85 560 core:air
-chat /tk fill 1184 86 528 1216 110 560 core:air
-chat /tk fill 1184 111 528 1216 140 560 core:air
-chat /tk fill 1184 70 561 1216 100 576 core:air
-chat /time set 6000
-chat /tk fill 1199 69 543 1201 69 545 base:water
-chat /tk fill 1199 70 543 1201 70 545 core:air
-wait 1
-chat /tp 1200 70 554
-wait 30
-chat /animalprof where 96
-chat /tp 1400 90 544
-wait 4
-chat /tk fill 1384 60 528 1416 68 560 base:dirt
-chat /tk fill 1384 69 528 1416 69 560 base:grass
-chat /tk fill 1384 70 528 1416 85 560 core:air
-chat /tk fill 1384 86 528 1416 110 560 core:air
-chat /tk fill 1384 111 528 1416 140 560 core:air
-chat /tk fill 1384 70 561 1416 100 576 core:air
-chat /time set 6000
-chat /tk fill 1399 69 543 1401 69 545 base:water
-chat /tk fill 1399 70 543 1401 70 545 core:air
-wait 1
-chat /tp 1400 70 554
-wait 30
-chat /animalprof where 96
-chat /tp 1600 90 544
-wait 4
-chat /tk fill 1584 60 528 1616 68 560 base:dirt
-chat /tk fill 1584 69 528 1616 69 560 base:grass
-chat /tk fill 1584 70 528 1616 85 560 core:air
-chat /tk fill 1584 86 528 1616 110 560 core:air
-chat /tk fill 1584 111 528 1616 140 560 core:air
-chat /tk fill 1584 70 561 1616 100 576 core:air
-chat /time set 6000
-chat /tk fill 1599 69 543 1601 69 545 base:water
-chat /tk fill 1599 70 543 1601 70 545 core:air
-wait 1
-chat /tp 1600 70 554
-wait 30
-chat /animalprof where 96
-chat /tick freeze
-aim 48
-wait 1
-press core:hide_hud
-wait 0.5
-shot cov_births_stop8.png
-press core:hide_hud
-chat /tick unfreeze
-chat /tp 1800 90 544
-wait 4
-chat /tk fill 1784 60 528 1816 68 560 base:dirt
-chat /tk fill 1784 69 528 1816 69 560 base:grass
-chat /tk fill 1784 70 528 1816 85 560 core:air
-chat /tk fill 1784 86 528 1816 110 560 core:air
-chat /tk fill 1784 111 528 1816 140 560 core:air
-chat /tk fill 1784 70 561 1816 100 576 core:air
-chat /time set 6000
-chat /tk fill 1799 69 543 1801 69 545 base:water
-chat /tk fill 1799 70 543 1801 70 545 core:air
-wait 1
-chat /tp 1800 70 554
-wait 30
-chat /animalprof where 96
-chat /tp 2000 90 544
-wait 4
-chat /tk fill 1984 60 528 2016 68 560 base:dirt
-chat /tk fill 1984 69 528 2016 69 560 base:grass
-chat /tk fill 1984 70 528 2016 85 560 core:air
-chat /tk fill 1984 86 528 2016 110 560 core:air
-chat /tk fill 1984 111 528 2016 140 560 core:air
-chat /tk fill 1984 70 561 2016 100 576 core:air
-chat /time set 6000
-chat /tk fill 1999 69 543 2001 69 545 base:water
-chat /tk fill 1999 70 543 2001 70 545 core:air
-wait 1
-chat /tp 2000 70 554
-wait 30
-chat /animalprof where 96
-chat /tp 2200 90 544
-wait 4
-chat /tk fill 2184 60 528 2216 68 560 base:dirt
-chat /tk fill 2184 69 528 2216 69 560 base:grass
-chat /tk fill 2184 70 528 2216 85 560 core:air
-chat /tk fill 2184 86 528 2216 110 560 core:air
-chat /tk fill 2184 111 528 2216 140 560 core:air
-chat /tk fill 2184 70 561 2216 100 576 core:air
-chat /time set 6000
-chat /tk fill 2199 69 543 2201 69 545 base:water
-chat /tk fill 2199 70 543 2201 70 545 core:air
-wait 1
-chat /tp 2200 70 554
-wait 30
-chat /animalprof where 96
-chat /tick freeze
-aim 48
-wait 1
-press core:hide_hud
-wait 0.5
-shot cov_births_stop11.png
-press core:hide_hud
-chat /tick unfreeze
-chat /tp 2400 90 544
-wait 4
-chat /tk fill 2384 60 528 2416 68 560 base:dirt
-chat /tk fill 2384 69 528 2416 69 560 base:grass
-chat /tk fill 2384 70 528 2416 85 560 core:air
-chat /tk fill 2384 86 528 2416 110 560 core:air
-chat /tk fill 2384 111 528 2416 140 560 core:air
-chat /tk fill 2384 70 561 2416 100 576 core:air
-chat /time set 6000
-chat /tk fill 2399 69 543 2401 69 545 base:water
-chat /tk fill 2399 70 543 2401 70 545 core:air
-wait 1
-chat /tp 2400 70 554
-wait 30
-chat /animalprof where 96
-chat /tp 2600 90 544
-wait 4
-chat /tk fill 2584 60 528 2616 68 560 base:dirt
-chat /tk fill 2584 69 528 2616 69 560 base:grass
-chat /tk fill 2584 70 528 2616 85 560 core:air
-chat /tk fill 2584 86 528 2616 110 560 core:air
-chat /tk fill 2584 111 528 2616 140 560 core:air
-chat /tk fill 2584 70 561 2616 100 576 core:air
-chat /time set 6000
-chat /tk fill 2599 69 543 2601 69 545 base:water
-chat /tk fill 2599 70 543 2601 70 545 core:air
-wait 1
-chat /tp 2600 70 554
-wait 30
-chat /animalprof where 96
-chat /animalprof where 96
 quit
