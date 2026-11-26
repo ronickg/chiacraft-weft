@@ -566,12 +566,15 @@ fn pt_block_direct(world: vec3<f32>, rel: vec3<f32>, n: vec3<f32>, ng: vec3<f32>
             }
             let lamp = PtLamp(cell + dc + vec3<i32>(i32(v.x & 63u), i32((v.x >> 6u) & 63u), i32((v.x >> 12u) & 63u)) - 32, v.x, f32(v.y & 15u) * 0.25);
             let mq = min(f32(v.y >> 4u), PT_RES_CAP);
-            m += mq;
             let p = pt_nee_target(world, n, ng, lamp);
             let w = p * bitcast<f32>(v.z) * mq;
+            // A reservoir whose lamp can't light this surface counts for nothing, not as `mq`
+            // draws that found none: counted, it darkened the lit floor and pillar by 5-10 %
+            // (s2h fire18000, nave12800).
             if w <= 0.0 {
                 continue;
             }
+            m += mq;
             w_sum += w;
             if pt_rand(px, 70u + j).x * w_sum < w {
                 y = lamp;
