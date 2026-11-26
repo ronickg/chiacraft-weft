@@ -806,6 +806,13 @@ fn shade_soft_lit(in: VOut, albedo_in: vec4<f32>, soft: f32) -> vec4<f32> {
     if debug == 1u || debug == 2u {
         return vec4(select(LIGHT_ALL - LIGHT_SUN, LIGHT_SUN, debug == 1u), lit.a);
     }
+    if debug == 15u || debug == 16u {
+        AO_FROZEN = debug == 16u;
+        let own = screen_ao(in.rel, n);
+        let quad = max(SCREEN_AO, 0.0);
+        let open = pow(1.0 - sqrt(1.0 - quad), 2.0);
+        return vec4(clamp((1.0 - own) * 8.0, 0.0, 1.0), clamp((1.0 - quad) * 8.0, 0.0, 1.0), 1.0 - open, lit.a);
+    }
     // 7: where the sun's light is cut: r the clouds' shadow here, g 1 on distant terrain (`fs_lod`),
     // b the sun map's coverage where the map was asked (`SHADOW_DEBUG`).
     // 8: the weather's values about the player: r its snow cover, g its snowing, b the puddles.

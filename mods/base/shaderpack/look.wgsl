@@ -240,6 +240,9 @@ const OPT_LEAF_LIGHT: u32 = 32u;
 // A debug view (`base:look_debug`, read raw): 0 the picture, 1 the sun's light alone, 2 the sky's
 // alone, both on white (no texture or tint), haze and curve as usual: Bliss's DEBUG_VIEW
 // debug_DIRECT / debug_INDIRECT (composite1.fsh:1347-1354), to compare the light pixel by pixel.
+// 15 and 16, Bliss's SSAO's stages (`screen_ao`, world faces only), each x8 of what it takes away:
+// r one pixel's own taps, g its 2x2's average (`screen_ao_quad`), b what the facing cap takes
+// (1 - the curve the lighting puts it through); 16 the same with every pixel's taps on one turn.
 const OPT_DEBUG: u32 = 33u;
 // The HDR world's sky light by day in the upper sky's own hue, as Bliss's ambient (its sky averaged
 // between the horizon and the zenith, normalised: `deferred.vsh:121-151`), `base:look_sky_hue` read
@@ -2023,7 +2026,10 @@ fn screen_ao(rel: vec3<f32>, n: vec3<f32>) -> f32 {
     // the noise's pattern itself moved across the screen each frame (Jimenez's temporal IGN): only
     // stepping every pixel's turn by the same amount, what TAA's few frames left over still had
     // the pattern's weave (lksp_ssao4).
-    let turn = fract(52.9829189 * fract(dot(floor(centre) + 5.588238 * scene.frame.w, vec2(0.06711056, 0.00583715))));
+    var turn = fract(52.9829189 * fract(dot(floor(centre) + 5.588238 * scene.frame.w, vec2(0.06711056, 0.00583715))));
+    if AO_FROZEN {
+        turn = 0.5;
+    }
     let facing = normalize(n);
     var closed = 0.0;
     var count = 0.0;
@@ -2070,6 +2076,9 @@ fn screen_ao(rel: vec3<f32>, n: vec3<f32>) -> f32 {
 // The world's fragment shader sets it (`surface_light`) before it lights; a vertex stage cannot take
 // the differences, and lighting there (models, entities) takes `screen_ao` alone (-1: not set).
 var<private> SCREEN_AO: f32 = -1.0;
+// Debug view 16 (`base:look_debug`): every pixel's SSAO taps on the same turn, to see what the
+// taps make apart from the noise.
+var<private> AO_FROZEN: bool = false;
 fn screen_ao_quad(rel: vec3<f32>, n: vec3<f32>) -> f32 {
     let s = screen_ao(rel, n);
     // Which of its quad's columns and rows this pixel is: from where it is drawn this frame.

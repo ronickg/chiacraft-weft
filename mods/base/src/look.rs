@@ -193,10 +193,11 @@ pub static LOOK_PCSS: Config<f32> = Config::named("look_pcss");
 /// map's, also past the map and on the far land; 0 the map alone (feature audit item 6, 11-26).
 /// With temporal anti-aliasing on only (as SSAO).
 pub static LOOK_CONTACT_SUN: Config<f32> = Config::named("look_contact_sun");
-/// Bliss's SSAO (indirect_effect 1, 1 as made): 7 taps round each point over last frame's solid
-/// world cap the sky's facing light and shade all but the sun by the darker of the corner shading
-/// and SSAO^6, in place of the post passes' contact and far shade; 0 those passes as before
-/// (feature audit item 6, 11-26). On the land lit from the sky only, and with temporal
+/// Bliss's SSAO (indirect_effect 1; 0 as made until its denoise pass: without it a fine weave
+/// stays on the forest floor, lksp_ssao1-6, Planner 11-26): 7 taps (twice, over each 2x2) round
+/// each point over last frame's solid world cap the sky's facing light and shade all but the sun by
+/// the darker of the corner shading and SSAO^6, in place of the post passes' contact and far shade;
+/// 0 those passes as before (feature audit item 6, 11-26). On the land lit from the sky only, and with temporal
 /// anti-aliasing on (it reads last frame's depth through last frame's camera, which only TAA keeps).
 pub static LOOK_SSAO: Config<f32> = Config::named("look_ssao");
 /// The engine's map of the ground's height (`client::ground_map`), which the banks lie on: on with
@@ -356,7 +357,7 @@ pub fn register(r: &mut Registry) {
     crate::developer::page(r.config(&LOOK_CAVE_FOG).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_PCSS).float(1.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_CONTACT_SUN).float(1.0, 0.0, 1.0));
-    crate::developer::page(r.config(&LOOK_SSAO).float(1.0, 0.0, 1.0));
+    crate::developer::page(r.config(&LOOK_SSAO).float(0.0, 0.0, 1.0));
     crate::developer::page(r.config(&LOOK_MIST_CLOCK).float(0.0, 0.0, 3.0));
     crate::developer::page(r.config(&LOOK_BLISS).bool(true));
     r.client_frame(|_| {
