@@ -346,9 +346,11 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
             for &w in l {
                 let p = at(n, w);
                 let e = ((w >> 12) & 15).max((w >> 16) & 15).max((w >> 20) & 15) as i32;
-                // Its level at the cube's nearest block.
-                let gap = (lo - p).max(IVec3::ZERO) + (p - hi).max(IVec3::ZERO);
-                let level = e - (gap.x + gap.y + gap.z);
+                // Its level left at the cube's nearest block, by straight distance: the tracer's
+                // lamps reach round (`pt_nee_fade`), so one listed by the lightmap's axis-wise
+                // reach went missing from cubes its light still reached diagonally.
+                let gap = ((lo - p).max(IVec3::ZERO) + (p - hi).max(IVec3::ZERO)).as_vec3();
+                let level = e - gap.length().ceil() as i32;
                 if level > 0 {
                     let o = (p - lo + IVec3::splat(16)).as_uvec3();
                     let word = o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18 | (w >> 24 & 1) << 30 | u32::from(field(p)) << 31;

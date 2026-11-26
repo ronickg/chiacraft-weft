@@ -409,17 +409,18 @@ fn pt_nee_falloff(d2: f32, r2: f32, at: f32) -> f32 {
     return min((at * at + r2) / (d2 + r2), PT_NEE_HOT);
 }
 
-// How much of a light of level `e` reaches a surface `to` off its middle, by the surface's own
-// distance in blocks along the axes (the lightmap's reach): (1 - (m / e)^4)^2, near 1 well within
-// it (0.97 at the 5-block match of a level-15 light) and 0 at its end with no step. The inverse
-// square keeps a far light much brighter than the lightmap's steep level curve, so a fade over the
-// last 3 levels alone cut it off in a hard diamond (the ceiling glowstone's round the lava pit,
-// s2q and s2r lava_glow), and one cut by whole blocks drew a lava pit's light in block-shaped
-// steps (s2e).
+// How much of a light of level `e` reaches a surface `to` off its middle: whole out to its 5-block
+// match with the lightmap, then ((1 - x^2) / (1 - x_match^2))^2 by x, the surface's straight
+// distance from the block over `e`, to 0 at `e` blocks with no step. Round, as a real light's: by
+// the lightmap's axis-wise distance its reach was a diamond, and the inverse square, far brighter
+// there than the lightmap's steep level curve, ended at it in hard diagonal lines over walls and
+// floor (s2q to s2u lava_glow, the ceiling glowstone's). The lists hold every light within `e`
+// blocks of a cube the same way (`rt.rs` `light_words`).
 fn pt_nee_fade(e: f32, to: vec3<f32>) -> f32 {
-    let d = max(abs(to) - 0.5, vec3(0.0));
-    let x = (d.x + d.y + d.z) / max(e, 1.0);
-    let w = clamp(1.0 - x * x * x * x, 0.0, 1.0);
+    let reach = max(e, 1.0);
+    let x = length(max(abs(to) - 0.5, vec3(0.0))) / reach;
+    let xa = clamp(e - 1.0, 1.0, PT_NEE_AT) / reach;
+    let w = clamp((1.0 - x * x) / max(1.0 - xa * xa, 1e-3), 0.0, 1.0);
     return w * w;
 }
 
