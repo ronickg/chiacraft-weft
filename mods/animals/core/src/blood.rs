@@ -17,10 +17,11 @@ pub const BLEED_MAX_SECS: f32 = 120.0;
 /// under half by a heavy blow bleeds out, and one left well over half lives.
 pub const BLEED_RATE: f32 = 0.004;
 
-/// A spot falls at most this often, seconds, while it bleeds, and only when it has moved this many blocks since the
-/// last one (one standing still or lying bleeds into one spot).
-pub const SPOT_EVERY_SECS: f32 = 2.0;
-pub const SPOT_STEP: f64 = 1.0;
+/// A spot falls every this many blocks it goes while it bleeds, laid along its way since the last (one standing still or
+/// lying bleeds into one spot), at most `SPOT_PER_SEC` a second: r4's deer, a spot every 2 s, left the first one 12
+/// blocks from the next as it ran.
+pub const SPOT_GAP: f64 = 3.0;
+pub const SPOT_PER_SEC: u32 = 2;
 /// Spots stay this long, seconds, shrinking as they dry to `SPOT_DRY` of their size, then go.
 pub const SPOT_LIFE_SECS: f32 = 300.0;
 pub const SPOT_DRY: f32 = 0.4;
@@ -64,7 +65,7 @@ mod tests {
         assert_eq!(spot_size(0.0), Some(SPOT_SCALE));
         assert!(spot_size(SPOT_LIFE_SECS * 0.5).is_some_and(|s| s < SPOT_SCALE && s > SPOT_DRY * SPOT_SCALE));
         assert_eq!(spot_size(SPOT_LIFE_SECS), None);
-        // A whole bleed leaves at most 60 spots.
-        assert!(BLEED_MAX_SECS / SPOT_EVERY_SECS <= 60.0);
+        // A whole bleed leaves at most 240 spots.
+        assert!(BLEED_MAX_SECS * SPOT_PER_SEC as f32 <= 240.0);
     }
 }

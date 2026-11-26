@@ -15,16 +15,16 @@ use animals_core::blood as core;
 
 /// Base's bleeding (`survival::body::BLEED`): its death message, past armour.
 pub static BLEED: DamageCause = DamageCause::named("base:bleed");
-/// How long it still bleeds (seconds), where it left its last spot (x, z) and when (game tick): not saved.
+/// How long it still bleeds (seconds), where it left its last spot (x, z) and how many it has left: not saved.
 static WOUND: Component<[f64; 4]> = Component::named("animal_wound");
 /// A spot of blood on the ground.
 static SPOT: EntityKind = EntityKind::named("blood_spot");
-/// Whose blood a spot is and when it fell (game tick): not saved, nor are the spots.
-static SPOT_OF: Component<[u64; 2]> = Component::named("blood_spot_of");
+/// Whose blood a spot is, when it fell (game tick) and its place in the trail (`order`): not saved, nor are the spots.
+static SPOT_OF: Component<[u64; 3]> = Component::named("blood_spot_of");
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&WOUND, [0.0; 4], 0);
-    r.entity_component(&SPOT_OF, [0u64; 2], 0);
+    r.entity_component(&SPOT_OF, [0u64; 3], 0);
     for s in &SPECIES {
         r.edit(s.kind).attach(&WOUND);
     }
@@ -82,20 +82,27 @@ pub fn tick(w: &World, id: u64, st: &EntityState, secs: f32) {
     let bled = (secs as f64).min(wd[0]);
     wd[0] -= bled;
     let now = w.game_time();
-    let moved = (st.pos.x - wd[1]).powi(2) + (st.pos.z - wd[2]).powi(2);
-    let due = now as f64 >= wd[3] + (core::SPOT_EVERY_SECS * 20.0) as f64;
-    // On the ground only (a bird in the air, a swimmer: none).
-    if secs <= 2.0 && due && moved >= core::SPOT_STEP * core::SPOT_STEP && st.in_liquid == 0 && st.on_ground != 0 {
-        let at = st.pos.y;
-        let yaw = (now.wrapping_mul(2_654_435_761) % 360) as f32;
-        let spot = w.spawn_with(&SPOT, [st.pos.x, at + 0.01, st.pos.z], &Spawn::new().yaw(yaw));
-        if spot != 0 {
-            w.set_scale(spot, core::SPOT_SCALE);
-            if let Some(o) = w.component_mut(spot, &SPOT_OF) {
-                *o = [id, now];
+    // Its spots since the last, every `core::SPOT_GAP` blocks along its way (a second's run as a straight line), on the
+    // ground only (a bird in the air, a swimmer: none), only while ticking every second (far from players, unseen).
+    let (dx, dz) = (st.pos.x - wd[1], st.pos.z - wd[2]);
+    let fresh = wd[1] == f64::MAX;
+    let way = if fresh { 0.0 } else { (dx * dx + dz * dz).sqrt() };
+    if secs <= 2.0 && (fresh || way >= core::SPOT_GAP) && st.in_liquid == 0 && st.on_ground != 0 {
+        let n = if fresh { 1 } else { ((way / core::SPOT_GAP) as u32).clamp(1, core::SPOT_PER_SEC) };
+        for k in 1..=n {
+            let f = if fresh { 1.0 } else { k as f64 / n as f64 };
+            let (x, z) = if fresh { (st.pos.x, st.pos.z) } else { (wd[1] + dx * f, wd[2] + dz * f) };
+            let seq = wd[3] as u64 + k as u64;
+            let yaw = (seq.wrapping_mul(2_654_435_761) % 360) as f32;
+            let spot = w.spawn_with(&SPOT, [x, st.pos.y + 0.01, z], &Spawn::new().yaw(yaw));
+            if spot != 0 {
+                w.set_scale(spot, core::SPOT_SCALE);
+                if let Some(o) = w.component_mut(spot, &SPOT_OF) {
+                    *o = [id, now, k as u64];
+                }
             }
         }
-        (wd[1], wd[2], wd[3]) = (st.pos.x, st.pos.z, now as f64);
+        (wd[1], wd[2], wd[3]) = (st.pos.x, st.pos.z, wd[3] + n as f64);
     }
     if let Some(c) = w.component_mut(id, &WOUND) {
         *c = wd;
@@ -123,18 +130,21 @@ fn dry(w: &World, id: u64, _st: &EntityState) -> bool {
 
 /// For hungry hunter `id` at `pos`: the next spot of a blood trail it follows, and when that fell. A trail of prey it
 /// takes (`takes`), or of one that bled out (its carcass at the end); never its own kind's. Not yet on one (`after`
-/// 0), the nearest spot it smells; on one, the spot that fell next after the last it went to (`after`, a game tick),
+/// 0), the nearest spot it smells; on one, the spot that fell next after the last it went to (`after`, its key: game
+/// tick * 16 + its order that second),
 /// so it walks the trail spot by spot as it was laid (r2's wolf, sent to the freshest, cut straight to the body).
 pub fn trail(w: &World, id: u64, pos: Vec3, after: u64, takes: impl Fn(u64) -> bool) -> Option<([f64; 3], u64)> {
     let kind = w.entity(id)?.kind;
     let mut best: Option<([f64; 3], u64, f64)> = None;
     for s in w.entities_near(pos, core::TRAIL_SMELL, Some(&SPOT)) {
         let (Some(o), Some(e)) = (w.component(s, &SPOT_OF), w.entity(s)) else { continue };
-        if o[1] <= after {
+        // Its place in all trails: when it fell, then its order among the spots laid that second.
+        let key = o[1] * 16 + o[2];
+        if key <= after {
             continue;
         }
         let d = dist2(e.pos, pos);
-        let better = |b: &([f64; 3], u64, f64)| if after == 0 { d < b.2 } else { o[1] < b.1 };
+        let better = |b: &([f64; 3], u64, f64)| if after == 0 { d < b.2 } else { key < b.1 };
         if best.as_ref().is_some_and(|b| !better(b)) {
             continue;
         }
@@ -143,7 +153,7 @@ pub fn trail(w: &World, id: u64, pos: Vec3, after: u64, takes: impl Fn(u64) -> b
             None => true,
         };
         if follows {
-            best = Some(([e.pos.x, e.pos.y, e.pos.z], o[1], d));
+            best = Some(([e.pos.x, e.pos.y, e.pos.z], key, d));
         }
     }
     best.map(|(p, t, _)| (p, t))

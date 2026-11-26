@@ -157,7 +157,7 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   of its max health or more opens a wound on a wild animal (as a player's), bleeding 30 s at a fifth and longer for
   heavier, 120 s at most, 0.4 % of max health a second (`animals_core::blood`): one hit for 62.5 % or more bleeds out
   and leaves its carcass where it fell. Bleeding as it goes it drops a spot of blood (`blood_spot`, a flat splash drawn 1.8 times its 0.4-block model, `SPOT_SCALE`) every
-  2 s it has moved a block, shrinking as it dries over 5 minutes, then gone. A hungry hunter with no prey in sight
+  3 blocks along its way (`SPOT_GAP`, at most 2 a second), shrinking as it dries over 5 minutes, then gone. A hungry hunter with no prey in sight
   smells spots 24 blocks off, walks to the nearest and on along the trail spot by spot in the order they fell, to prey it takes or to a carcass
   (`hunt.rs`, before kill sites). Check: cov_blood (`/animalprof gash`, `/animalprof blood`).
 - Left for later: species without stagger-break rows drop nothing on a break; the hide and meat go to the
