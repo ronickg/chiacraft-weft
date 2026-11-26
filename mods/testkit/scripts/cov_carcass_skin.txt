@@ -89,6 +89,7 @@ shot cov_carcass_skin_9_low.png
 press core:hide_hud
 chat /tick unfreeze
 wait 1
+chat /tk inv me
 press core:inventory
 wait 1
 cursor 0.547 0.710

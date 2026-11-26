@@ -78,6 +78,7 @@ shot cov_carcass_wall_3_skinning.png
 press core:hide_hud
 wait 8
 chat /animalprof carcass
+chat /tk inv me
 chat /tick freeze
 chat /tp 603 76 554
 look 0 -45

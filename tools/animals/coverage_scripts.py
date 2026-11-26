@@ -445,7 +445,8 @@ def skin_part(x, prefix="cov_carcass"):
         # hotbar row's second and third slots (the knife in the first; the hide, then the venison, after it), at GUI
         # scale 2 in 1280 x 720 (skin r3: the creative inventory, its palette on the left, the player's hotbar row
         # at the bottom right). Not hidden with the HUD.
-        "press core:inventory", "wait 1", "cursor 0.547 0.710", "wait 1", f"shot {prefix}_10_tooltip_slot2.png",
+        # The inventory listed (pt_rain_5: the venison never reached it), then opened.
+        "chat /tk inv me", "press core:inventory", "wait 1", "cursor 0.547 0.710", "wait 1", f"shot {prefix}_10_tooltip_slot2.png",
         "cursor 0.576 0.710", "wait 1", f"shot {prefix}_10_tooltip_slot3.png", "press core:inventory", "wait 1"]
 
 
@@ -600,7 +601,7 @@ def wall_part(x, p="cov_carcass_wall"):
         # The first skinned from the open side: the knife reaches it.
         "chat /tk put me 0 base:knife 1", "key 1", "wait 1",
         f"chat /tp {x} 70 {Z+7}", "look 0 -40", "wait 1", "aim 6", "wait 1", "press core:use", "wait 4",
-        f"shot {p}_3_skinning.png", "wait 8", "chat /animalprof carcass",
+        f"shot {p}_3_skinning.png", "wait 8", "chat /animalprof carcass", "chat /tk inv me",
         "chat /tick freeze", f"chat /tp {x+3} 76 {Z+10}", "look 0 -45", "wait 2", f"shot {p}_4_skinned.png",
         "chat /tick unfreeze", "wait 1",
     ]
