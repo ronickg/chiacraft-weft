@@ -647,7 +647,29 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     let rot = vitals::rot::carcass_stage(core::keeps(), b.aged);
     let knife = (tier != 0).then(|| tier as u32 - 1);
     let quality = core::quality(b.level, core::kill(b.hits, b.cause), knife, rot);
-    let at = [st.pos.x, st.pos.y + 0.4, st.pos.z];
+    // What comes off is tossed from the body toward the skinner (`off`), to be picked up a moment later: spawned on
+    // the skinner, it went into the inventory with nothing seen (Planner 11-26).
+    let from = w.entity(id).map_or(st.pos, |c| c.pos);
+    let mut n_off = 0;
+    let mut off = |stack: ItemStack| {
+        let (dx, dz) = (st.pos.x - from.x, st.pos.z - from.z);
+        let d = (dx * dx + dz * dz).sqrt().max(0.1);
+        let spread = (n_off as f64 - 1.0) * 0.6;
+        let v = [
+            ((dx / d) * core::OFF_SPEED as f64 - dz / d * spread) as f32,
+            core::OFF_UP,
+            ((dz / d) * core::OFF_SPEED as f64 + dx / d * spread) as f32,
+        ];
+        n_off += 1;
+        w.spawn_with(
+            &ITEM,
+            [from.x, from.y + 0.5, from.z],
+            &Spawn::new()
+                .stack(stack)
+                .velocity(v)
+                .pickup_delay(core::OFF_PICKUP_TICKS),
+        );
+    };
     let mut got = Vec::new();
     // The hide (none once rotted to remains), its quality on it.
     let hide_share = vitals::rot::CARCASS
@@ -659,7 +681,7 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     {
         let n = core::hide_count(lo, hi, quality);
         if n > 0 {
-            w.spawn_item(at, ItemStack::new(Item::generated(item.to_string()).id(), n).with(&base_api::HIDE_QUALITY, quality as u32));
+            off(ItemStack::new(Item::generated(item.to_string()).id(), n).with(&base_api::HIDE_QUALITY, quality as u32));
             got.push(format!("{n} {item} (quality {quality})"));
         }
     }
@@ -667,7 +689,7 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     if let Some((_, meat, lo, hi)) = animals_core::meat::drops().find(|d| d.0 == s.name) {
         let n = core::meat_count(lo, hi, b.eaten, b.mass, rot);
         if n > 0 {
-            w.spawn_item(at, ItemStack::new(Item::generated(format!("animals:{meat}")).id(), n));
+            off(ItemStack::new(Item::generated(format!("animals:{meat}")).id(), n));
             got.push(format!("{n} animals:{meat}"));
         }
     }
@@ -675,7 +697,7 @@ fn skinning(w: &World, id: u64, st: &EntityState, now: u64) {
     if let Some((lo, hi)) = animals_core::meat::carcass(s.name) {
         let n = core::meat_count(lo, hi, b.eaten, b.mass, rot);
         if n > 0 {
-            w.spawn_item(at, ItemStack::new(Item::generated(animals_core::meat::CARCASS.to_string()).id(), n));
+            off(ItemStack::new(Item::generated(animals_core::meat::CARCASS.to_string()).id(), n));
             got.push(format!("{n} {}", animals_core::meat::CARCASS));
         }
     }

@@ -328,6 +328,12 @@ pub enum Kill {
     Ruined,
 }
 
+/// What a skinning takes off is tossed from the body toward the skinner at this speed (blocks a second) and this much
+/// up, and can be picked up this many ticks later: it is seen to come off and land before it is taken.
+pub const OFF_SPEED: f32 = 2.2;
+pub const OFF_UP: f32 = 4.0;
+pub const OFF_PICKUP_TICKS: u32 = 25;
+
 /// How a death with `hits` and the engine's damage `cause` (`abi::damage_cause`) leaves the hide.
 pub fn kill(hits: u32, cause: u32) -> Kill {
     // Fire 3, lava 7, explosion 10 (`weft_abi::damage_cause`).

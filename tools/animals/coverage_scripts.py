@@ -433,7 +433,11 @@ def skin_part(x, prefix="cov_carcass"):
         # Standing 2 blocks south of it, looking down at it (a positive pitch looks up).
         # r7's deer died 2 blocks west of the aim line and the use hit the grass: face the body itself (`aim`).
         f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "aim 6", "wait 1", "press core:use", "wait 4",
-        f"shot {prefix}_8_skinning.png", "wait 9", "chat /animalprof carcass"] + \
+        # The hide and meat tossed from the body toward the skinner as it ends (the deer's 8.1 s with flint), held in
+        # the air and landing (ticks frozen for each shot), then picked up 1.25 s later.
+        f"shot {prefix}_8_skinning.png", "wait 4.5", "chat /tick freeze", f"shot {prefix}_8b_off.png",
+        "chat /tick unfreeze", "wait 0.4", "chat /tick freeze", f"shot {prefix}_8c_off.png", "chat /tick unfreeze",
+        "wait 4", "chat /animalprof carcass"] + \
         side_shot(x, f"{prefix}_9_skinned") + low_shot(x, f"{prefix}_9_low") + [
         # The hide's tooltip (its quality's stars, `tagged.base.hide_quality`): the inventory open, the cursor on the
         # hotbar row's second and third slots (the knife in the first; the hide, then the venison, after it), at GUI
@@ -488,7 +492,8 @@ write("carcass", s)
 s = head("carcass_skin", [
     "Skinning alone (cov_carcass part 4): a white-tailed deer killed with one blow, skinned with a flint knife. Shot 8:",
     "mid-skin from the skinning camera (the player kneeling beside the body, the knife, the body on its pool); 9: after;",
-    "10_tooltip_slot2/3: the inventory open, the cursor on the hotbar row's 2nd and 3rd slots: the hide's tooltip with its",
+    "8b_off/8c_off (as the skinning ends): the hide and meat flying from the body toward the player and landing by them,",
+    "before they are picked up (1.25 s later). 10_tooltip_slot2/3: the inventory open, the cursor on the hotbar row's 2nd and 3rd slots: the hide's tooltip with its",
     "stars (\"★★☆ Good hide\" or the like) in one of them.",
     "Report the \"skins carcass\" and \"skinned carcass\" lines and the shots.",
 ]) + skin_part(600, "cov_carcass_skin")

@@ -160,5 +160,7 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
   3 blocks along its way (`SPOT_GAP`, at most 2 a second), shrinking as it dries over 5 minutes, then gone. A hungry hunter with no prey in sight
   smells spots 24 blocks off, walks to the nearest and on along the trail spot by spot in the order they fell, to prey it takes or to a carcass
   (`hunt.rs`, before kill sites). Check: cov_blood (`/animalprof gash`, `/animalprof blood`).
-- Left for later: species without stagger-break rows drop nothing on a break; the hide and meat go to the
-  inventory with no pickup shown.
+- Pickup shown (11-26, branch claude/animals-pickup): what a skinning takes off is tossed from the body toward the
+  skinner (`animals_core::carcass::OFF_SPEED`, `OFF_UP`), fanned apart, and picked up `OFF_PICKUP_TICKS` (1.25 s)
+  later, so it is seen to come off and land. cov_carcass_skin shots 8b_off, 8c_off.
+- Left for later: species without stagger-break rows drop nothing on a break.
