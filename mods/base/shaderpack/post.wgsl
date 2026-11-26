@@ -274,7 +274,9 @@ fn fs_exposure(in: VOut) -> @location(0) vec4<f32> {
         for (var i = 0; i < 8; i++) {
             let uv = (vec2(f32(i), f32(j)) + 0.5) / 8.0;
             let w = 1.0 - 0.7 * smoothstep(0.1, 0.75, length(uv - vec2(0.5)));
-            sum += w * log(max(luma(bloom_tap(pass_.scene, uv)), 1e-5));
+            // Bliss's chain takes its own luma (Rec. 601, `bliss_luma`) for its exposure.
+            let px = bloom_tap(pass_.scene, uv);
+            sum += w * log(max(select(luma(px), bliss_luma(px), bliss_chain()), 1e-5));
             weight += w;
             let rod_px = dot(bloom_tap(pass_.scene, 0.5 + (uv - 0.5) * 0.7), vec3(0.07, 0.22, 0.71)) * BLISS_UNITS;
             rod_sum += log(clamp(rod_px, 1e-6, 0.08));

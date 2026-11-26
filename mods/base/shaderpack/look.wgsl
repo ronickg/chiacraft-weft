@@ -41,6 +41,11 @@ fn ground_wet() -> f32 {
 fn luma(c: vec3<f32>) -> f32 {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
+// Bliss's luma (color_transforms.glsl: Rec. 601, 0.299 0.587 0.114), for its exposure's mean and the
+// land's light's min(3 luma, 2.5): a blue night reads about 1.3x ours there.
+fn bliss_luma(c: vec3<f32>) -> f32 {
+    return dot(c, vec3(0.299, 0.587, 0.114));
+}
 
 // What solid things write in the world image's alpha: nothing, so that what water, glass and ice
 // blend over them leaves their own share there, a mask the reflections effect reads
@@ -523,7 +528,7 @@ fn land_sun(sun: vec3<f32>, moon_k: f32) -> vec3<f32> {
 fn land_ambient(mean: vec3<f32>) -> vec3<f32> {
     // Bliss's average in its own units (1.5 x the stored sky / 150: 12.3 x ours).
     let avg = mean * 12.3;
-    let lum = max(luma(avg), 1e-9);
+    let lum = max(bliss_luma(avg), 1e-9);
     let amb = max(avg / max(length(avg), 1e-9) * min(3.0 * lum, 2.5) * (1.0 - 0.7 * rain_amount()), vec3(0.5, 0.75, 1.0) * 0.0005);
     // To the land's light: its / 30 of the stored (x 150), / 41.
     return amb * 0.122;
