@@ -405,10 +405,19 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // itself is clipped there, and traced from the eye it stopped every ray crossing it. A slab made
     // a full block by the showcase import's full shapes stood against the nave's camera, and half
     // the screen kept the world's pixel (debug 16 blue, the parity5 nave's seam, 11-25).
-    let h = rt_hit_mask(-v * PT_NEAR, -v, dist * 1.02 + 0.2 - PT_NEAR, 0.0, 3u);
+    // And past a face met from behind (the world culls back faces, the rays don't): the eye on a
+    // block's corner starts the ray inside that block, and it met the block's inner faces first.
+    var h = rt_hit_mask(-v * PT_NEAR, -v, dist * 1.02 + 0.2 - PT_NEAR, 0.0, 3u);
+    for (var k = 0; k < 2; k++) {
+        let from = length(h.rel);
+        if !h.hit || h.clear || dot(h.n, v) >= 0.0 || from >= dist - 0.02 * dist - 0.15 {
+            break;
+        }
+        h = rt_hit_mask(h.rel - v * 0.01, -v, dist * 1.02 + 0.2 - from - 0.01, 0.0, 3u);
+    }
     // Terrain at the depth drawn there: anything else (water, glass, a model, a particle) keeps the
     // world's own pixel.
-    if !h.hit || h.clear || abs(h.t + PT_NEAR - dist) > 0.02 * dist + 0.15 {
+    if !h.hit || h.clear || abs(length(h.rel) - dist) > 0.02 * dist + 0.15 {
         // Debug 16: why the trace kept the world's pixel: red no hit, green a clear pane, blue
         // a hit nearer than the depth, yellow one farther (the nave's half-screen seam, 11-25).
         if pt.debug == 16u {
@@ -416,7 +425,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
             if h.hit && h.clear {
                 why = vec3(0.0, 1.0, 0.0);
             } else if h.hit {
-                why = select(vec3(1.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), h.t + PT_NEAR < dist);
+                why = select(vec3(1.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), length(h.rel) < dist);
             }
             pt_out[at] = vec4(why, 0.0);
             pt_out[at + 2u] = vec4(0.0, 0.0, 0.0, 2.0);
