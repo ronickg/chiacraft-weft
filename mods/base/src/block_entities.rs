@@ -91,7 +91,10 @@ pub fn register(r: &mut Registry) {
         // Body and a lid that opens while the chest's menu is open (art stand-ins 11-26,
         // notes/art/standins/chest_split.py; upstream be14c5a8d's wiring).
         .states(|_, s| {
-            s.model_file("chest_body")
+            // The model file draws the faces; the state still names a texture (break particles,
+            // and the startup check that every drawn texture has a file: there is no chest.png).
+            s.texture("chest_side")
+                .model_file("chest_body")
                 .hitbox([1.0, 0.0, 1.0], [15.0, 14.0, 15.0])
         })
         .animated_part("block/chest_lid", "open")
