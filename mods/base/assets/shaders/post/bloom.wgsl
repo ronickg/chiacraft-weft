@@ -13,6 +13,11 @@ fn apply(p: PostPixel) -> vec4<f32> {
     // The HDR world's bloom pyramid glows in the last pass (`scene.frame.y`, chiacraft's pack):
     // here only the vignette then.
     if scene.frame.y > 0.5 {
+        // None with Bliss's chain (`base:look_chain`, option 70): Bliss has no vignette (feature
+        // audit B18, 11-26).
+        if scene.options[17][2] > 0.5 {
+            return p.color;
+        }
         let d = length((p.uv - vec2(0.5)) * vec2(1.0, p.size.y / p.size.x)) * 2.0;
         return vec4(p.color.rgb * (1.0 - 0.2 * smoothstep(0.55, 1.15, d) * min(p.strength, 1.0)), p.color.a);
     }

@@ -803,7 +803,8 @@ gpu_struct! {
         pub frame: [f32; 4],
         /// The soft clouds' shadow on the land (`client::cloud_shadow`, with the HDR world; a pack
         /// whose sky has `fs_cloud_shadow`): x the map's bindless index + 1 (0: none this frame), y
-        /// its texels each way, zw unused.
+        /// its texels each way, z how much the eye is in a cave, 0..1 (no sky light at the eye for
+        /// ten seconds, eased; chiacraft, for Bliss's cave fog), w unused.
         pub cloud_shadow: [f32; 4],
         /// The mist's volume (`client::froxels`, `core:froxels`, with a pack whose sky has
         /// `fs_froxel_light` and `fs_froxel_sum`; chiacraft): x the bindless index + 1 of the sums

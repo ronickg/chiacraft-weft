@@ -127,17 +127,24 @@ fn fs(in: VOut) -> WeatherOut {
     // the 10 blocks round the eye Minecraft draws its weather in (fancy), which is all Bliss's mask
     // ever holds: ours reaches far. (The dark spots over lkwxA1's snow plains were far puddles, not
     // this: lkwxA2 kept them; 379efefc's gate took them.)
-    if land_from_sky() {
-        let near = 1.0 - smoothstep(8.0, 10.0, length(in.rel.xz));
-        let mask = min(cover * in.alpha * near, 1.0);
-        return WeatherOut(vec4(0.0), vec4(0.0, 0.0, -1.0, min(mask * 2.5, 1.0)));
-    }
     let light = light_weather(unpack_light(in.data.y), in.rel);
     // Drops a pale grey-blue, flakes white; fading out right by the eye.
     let tint = select(vec3(0.78, 0.84, 0.92), vec3(1.0, 1.0, 1.04), snow);
     let near = smoothstep(select(1.5, 1.0, snow), select(6.0, 3.0, snow), length(in.rel));
     // (Rain at 0.6 drew bright white lines over a storm's dark deck.)
-    let strength = select(0.42, 0.95, snow);
+    var strength = select(0.42, 0.95, snow);
+    if land_from_sky() {
+        // Over Bliss's mask (above) the flakes as before and the rain a faint streak, x the setting
+        // (`base:look_weather`; 0 Bliss's own, the mask alone): with no colour at all neither rain
+        // nor snow showed in a storm (wx_snow_B2, Planner 11-26).
+        // (Rain at 0.12 did not show on open ground in a downpour, lksp_passBw lp_field_rain; dev's
+        // 0.42 drew clear streaks.)
+        strength = select(0.3, 0.95, snow) * max(fantasy_opt(OPT_WEATHER), 0.0);
+        let near_mask = 1.0 - smoothstep(8.0, 10.0, length(in.rel.xz));
+        let mask = min(cover * in.alpha * near_mask, 1.0);
+        let a = min(cover * in.alpha * strength * near, 1.0);
+        return WeatherOut(vec4(display(tint * light * select(1.0, 1.15, snow)), a), vec4(0.0, 0.0, -1.0, min(max(mask, a) * 2.5, 1.0)));
+    }
     let a = min(cover * in.alpha * strength * near, 1.0);
     return WeatherOut(vec4(display(haze(tint * light * select(1.0, 1.15, snow), in.rel)), a), vec4(0.0, 0.0, -1.0, min(a * 2.5, 1.0)));
 }

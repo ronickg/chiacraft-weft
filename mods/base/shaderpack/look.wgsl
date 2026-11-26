@@ -44,6 +44,25 @@ fn ground_wet() -> f32 {
 // traced, the ground stayed dry and bright in the rain, w27).
 fn rain_on_ground(c_in: vec3<f32>, n: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>, sky: f32, leafy: bool) -> vec3<f32> {
     var c = c_in;
+    // Bliss's rain (as made, `base:look_rain_dark` 0): the ground is not darkened, only smoothed:
+    // all_solid's smoothness goes to at least the rain's (rainStrength x noPuddleAreas x its sky
+    // light past 0.9), so the face mirrors the sky by Schlick's Fresnel at F0 0.02, sharper the
+    // wetter (roughness (1 - smoothness)^2), and the sun's highlight sharpens with it (`rain_sun`,
+    // world.wgsl) and the screen's reflections take it up (`mirror_alpha`). Method only.
+    if fantasy_opt(OPT_RAIN_DARK) < 0.5 {
+        let w = rain_smooth(sky, pos);
+        if w > 0.0 {
+            let v = -normalize(rel);
+            let rough = (1.0 - w) * (1.0 - w);
+            let r = reflect(-v, n);
+            let seen = mix(sky_color(r), sky_color(vec3(0.0, 1.0, 0.0)), clamp(rough * 2.0, 0.0, 1.0));
+            let f = 0.02 + 0.98 * pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 5.0);
+            // As `mat_shine`: a rough face mirrors little (leaves and plants as the rest, as Bliss).
+            let gloss = 1.0 - clamp(rough * 1.6, 0.0, 0.85);
+            c = mix(c, seen, f * gloss);
+        }
+        return c;
+    }
     // Out under the sky, the ground goes dark and wet, with a little of the sky on it, and stays so
     // after the rain until it dries (`ground_wet`: it followed the rain alone and was gone 25 s
     // after it stopped, Tester 2's after-rain shots, 11-05). Leaves and plants wet too, less: a
@@ -98,6 +117,13 @@ fn rain_on_ground(c_in: vec3<f32>, n: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>,
     return c;
 }
 
+// Bliss's rain smoothness at a face with sky light `sky` (0..1) at `pos`: the rain's strength where
+// it rains (not on snow, `rain_fog_at`, as its noPuddleAreas), only out under the open sky
+// (clamp((sky - 0.9) x 10), its lightmap gate).
+fn rain_smooth(sky: f32, pos: vec3<f32>) -> f32 {
+    return rain_amount() * rain_fog_at(pos.y) * clamp((sky - 0.9) * 10.0, 0.0, 1.0);
+}
+
 // 0..1 for puddle cell `c` and key `k`: a sine hash (the pack's `hash3` picked far too few cells,
 // PC shpd6).
 fn puddle_hash(c: vec2<i32>, k: f32) -> f32 {
@@ -129,10 +155,11 @@ fn rain_rings(p: vec2<f32>) -> vec2<f32> {
 fn luma(c: vec3<f32>) -> f32 {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
-// Bliss's luma (color_transforms.glsl: Rec. 601, 0.299 0.587 0.114), for its exposure's mean and the
-// land's light's min(3 luma, 2.5): a blue night reads about 1.3x ours there.
+// Bliss's luma where deferred.vsh takes it (its own luma there, 0.21 0.72 0.07, not
+// color_transforms.glsl's Rec. 601), for its exposure's mean and the land's light's
+// min(3 luma, 2.5) (feature audit B5, 11-26).
 fn bliss_luma(c: vec3<f32>) -> f32 {
-    return dot(c, vec3(0.299, 0.587, 0.114));
+    return dot(c, vec3(0.21, 0.72, 0.07));
 }
 
 // What solid things write in the world image's alpha: nothing, so that what water, glass and ice
@@ -412,6 +439,15 @@ const LAND_MOON: f32 = 0.00229;
 // with the chain. Ours were set for the per-hour exposures; under Bliss's one log curve the night
 // came out much brighter than Bliss's dark navy (lkmxC1), whose moon is 1/1250 of its sun.
 const OPT_CHAIN_NIGHT: u32 = 73u;
+// How strongly rain and snow are drawn over the Bliss look (`base:look_weather`, 1 as made).
+const OPT_WEATHER: u32 = 74u;
+// Rain on the ground as before Bliss, darker with puddles (`base:look_rain_dark`, 0 as made: Bliss's).
+const OPT_RAIN_DARK: u32 = 75u;
+// With Bliss's rain, the screen's reflections on the wet ground (`base:look_rain_mirror`, 1 as made).
+const OPT_RAIN_MIRROR: u32 = 76u;
+// Bliss's caves (`base:look_cave_fog`, 1 as made): its fog and air's light gone with the eye in a
+// cave and its blue cave fog over what is seen there; 0 neither.
+const OPT_CAVE_FOG: u32 = 77u;
 // How much of the sky's light's blue goes by day, with the chain. (The sun's light is already the
 // 4300 K of Ronald's profile through the air, `sun_kelvin_linear`, since 11-06.)
 const CHAIN_AMBIENT_GREY: f32 = 0.4;
@@ -2096,6 +2132,22 @@ fn bc_alto_layer(start: vec3<f32>, dir: vec3<f32>, mult: f32, dither: f32, sky: 
     let kept = exp(-mult * mu_e);
     return vec4(max(lit - lit * kept, vec3(0.0)), kept);
 }
+// A layer's step and its extinction per step (`mult`) for the look `d` (`renderClouds`' dV_view,
+// its planet curve in y). From outside the slab Bliss's: the slab crossed in `steps`, its extinction
+// by its fixed 90 / |y| / steps. From inside, ours (Bliss's camera never sits in its clouds): the way
+// out of the slab (or `far`) in `steps`, the extinction by the step's own length at the same 90 / 100
+// of it. Bliss's 100 / |y| steps from inside put a near-level look's samples 600+ blocks apart, and
+// the low layer ended at a hard curve of one height across the sky (wx_snow y300, lksd_mrgw).
+fn bc_inside_step(d: vec3<f32>, cam_y: f32, lo: f32, steps: i32, far: f32, outside: vec3<f32>, mult: f32) -> vec4<f32> {
+    let hi = lo + BC_WIDTH;
+    if cam_y <= lo || cam_y >= hi {
+        return vec4(outside, mult);
+    }
+    let out_y = select(cam_y - lo, hi - cam_y, d.y > 0.0) / max(abs(d.y), 1e-6);
+    let len = min(out_y, far / max(length(d), 1e-6));
+    let step = d * (len / f32(steps));
+    return vec4(step, length(step) * 0.9);
+}
 // All three along the unit look `dir` up to `far` blocks (renderClouds): `dither` x for the light
 // taps, y for the starts; `sun` the light reaching them (the land's: Bliss's light / 80), `sky` the
 // clear sky's average (its / 30). rgb their light, a what shows through.
@@ -2108,6 +2160,12 @@ fn bc_clouds(dir: vec3<f32>, far_in: f32, dither: vec2<f32>, sun: vec3<f32>, sky
     // The planet's curve: a level look still meets the low layer, some kilometres off.
     var d = dir;
     d.y += 0.025 * above_low;
+    // From inside a cumulus slab a level look still runs through it (`bc_inside_step`): kept just off
+    // level, where clear sky drew a line across the deck.
+    let in_slab = (cam_y > BC_L0 && cam_y < BC_L0 + BC_WIDTH) || (cam_y > BC_L1 && cam_y < BC_L1 + BC_WIDTH);
+    if in_slab && abs(d.y) < 1e-4 {
+        d.y = select(-1e-4, 1e-4, d.y >= 0.0);
+    }
     if abs(d.y) < 1e-4 || steps < 1 {
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
@@ -2133,9 +2191,11 @@ fn bc_clouds(dir: vec3<f32>, far_in: f32, dither: vec2<f32>, sun: vec3<f32>, sky
     let below1 = cam_y < BC_L1;
     let below2 = cam_y < BC_ALTO;
     let step0 = d * (BC_WIDTH / abs(d.y) / f32(steps));
-    let l0 = bc_layer(0u, bc_start(step0, cam_y, dither.y, BC_L0, BC_L0 + BC_WIDTH), step0, mult, steps, dither.x, sky, sun1, sun_multi, distant, far, false);
+    let in0 = bc_inside_step(d, cam_y, BC_L0, steps, far, step0, mult);
+    let in1 = bc_inside_step(d, cam_y, BC_L1, steps, far, step0, mult);
+    let l0 = bc_layer(0u, bc_start(in0.xyz, cam_y, dither.y, BC_L0, BC_L0 + BC_WIDTH), in0.xyz, in0.w, steps, dither.x, sky, sun1, sun_multi, distant, far, false);
     let hidden1 = l0.a < 1e-5 && below1;
-    var l1 = bc_layer(1u, bc_start(step0, cam_y, dither.y, BC_L1, BC_L1 + BC_WIDTH), step0, mult, steps, dither.x, sky, sun1, sun_multi, distant, far, hidden1 || bc_density(1u) <= 0.0);
+    var l1 = bc_layer(1u, bc_start(in1.xyz, cam_y, dither.y, BC_L1, BC_L1 + BC_WIDTH), in1.xyz, in1.w, steps, dither.x, sky, sun1, sun_multi, distant, far, hidden1 || bc_density(1u) <= 0.0);
     let hidden2 = (l1.a < 1e-5 || hidden1) && below1;
     let l2 = bc_alto_layer(bc_start(alto_step, cam_y, dither.y, BC_ALTO, BC_ALTO), d, mult_alto, dither.x, sky, sun1 * (1.0 + r * 3.0), sun_multi * (1.0 + r * 3.0), distant, far, hidden2);
     // The order by where the camera is: below the low layer front to back, above it back to front;
@@ -2646,6 +2706,18 @@ fn dust_reach(p: vec3<f32>) -> f32 {
     return mix(1.0, near * 0.6, dust);
 }
 
+// A storm's dust or blowing snow at `p` for the one fog (`fog_march`), per block, `s` its share
+// (`storm`): the layers' storm shape (`fog_density_with` at a full storm), which the one fog had
+// dropped with the rest of our mist: a dust storm drew a clear blue sky (wx_dust_B2, 11-26).
+fn storm_fog_density(p: vec3<f32>, floor: f32, s: f32) -> f32 {
+    let h = p.y - floor;
+    let low = exp(-max(h - 3.0, 0.0) / 40.0);
+    let high = exp(-max(h, 0.0) / 45.0);
+    let open = smoothstep(-24.0, -10.0, h);
+    let b = mix(smoothstep(0.25, 0.75, fog_banks(p)), 0.3, smoothstep(0.15, 0.45, scene.sun.y));
+    return s * air_mist() * dust_reach(p) * open * (low * (0.7 + 0.6 * b) + 0.012 * high) * 0.11;
+}
+
 fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     return fog_density_with(p, floor, fog_banks_at(p, floor));
 }
@@ -3078,6 +3150,15 @@ fn eye_sky_k() -> f32 {
     }
     return pow(clamp(scene.frame_look.y, 0.0, 1.0), 3.0) * 0.99 + 0.01;
 }
+// How much the eye is in a cave, 0..1 (the engine's: no sky light at the eye for ten seconds, eased
+// in over three and out over one, `scene.cloud_shadow.z`; Bliss's OLD_CAVE_DETECTION), with the
+// HDR world and `base:look_cave_fog`.
+fn cave_k() -> f32 {
+    if scene.frame.x < 0.5 || fantasy_opt(OPT_CAVE_FOG) < 0.5 {
+        return 0.0;
+    }
+    return clamp(scene.cloud_shadow.z, 0.0, 1.0);
+}
 // Our value noise with the spread of Bliss's fog noise (a linear map, matching its percentiles
 // within 0.01).
 fn fog_noise(q: vec3<f32>) -> f32 {
@@ -3115,8 +3196,25 @@ fn bliss_fog_density(p: vec3<f32>) -> f32 {
 // The one fog's march along the unit look `dir` from the eye for `span` blocks (`one_fog`), lit by
 // the sun `sun` (with its phase, the clouds' shadow and, with `shadows`, the shadow map's), the sky's
 // light `sky_fog` on the fog and `air_sky` on the air; jittered by `jitter`. rgb the light gathered,
-// a how much of what lies behind the fog lets through (the air never dims it).
+// a how much of what lies behind the fog and the air lets through (Bliss's VL_Fog.a x its atmosphereAlpha:
+// the air dims the land, sky and clouds behind it by its grey mean, composite2/3; ours had only added
+// the air's light, so far land and the horizon kept their full colour behind a lit haze).
 fn fog_march(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in: vec3<f32>, air_sky: vec3<f32>, eye_k: f32, shadows: bool) -> vec4<f32> {
+    let f = fog_march_parts(dir, span, jitter, sun, sky_fog_in, eye_k, shadows);
+    return vec4(f.light + f.air_k * air_sky, f.through * f.air_grey);
+}
+// The march's parts: the light without the air's sky light, and what that light is multiplied by
+// (the air's sky light enters linearly and never changes how much gets through), so a caller that
+// tries several of it (the frame look's settling rounds) marches once.
+struct FogParts {
+    light: vec3<f32>,
+    air_k: vec3<f32>,
+    through: f32,
+    // The air's own transmittance, grey: each step's mean, multiplied (overworld_fog.glsl's
+    // atmosphereAbsorbance; method only).
+    air_grey: f32,
+}
+fn fog_march_parts(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in: vec3<f32>, eye_k: f32, shadows: bool) -> FogParts {
     let eye = scene.eye.xyz;
     let mu = dot(dir, light_dir());
     // The fog's forward phase (Bliss's, x5) and Rayleigh's (its (0.1 c + 0.28) / pi).
@@ -3129,7 +3227,16 @@ fn fog_march(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in:
     var through = 1.0;
     var gained = vec3(0.0);
     var air = vec3(0.0);
+    var air_k = vec3(0.0);
     var air_through = vec3(1.0);
+    var air_grey = 1.0;
+    // A storm in the air (`storm`): its floor and colour once for the march.
+    let gale = storm();
+    let gale_floor = fog_floor(dir * span);
+    let gale_tint = mix(vec3(1.0, 1.0, 1.03), vec3(0.95, 0.68, 0.42), clamp(scene.ground.z, 0.0, 1.0));
+    // In a cave the fog is gone and the air's light with it (Bliss's inACave on its fog's density and
+    // its Atmosphere term; the air still dims what lies behind).
+    let open = 1.0 - cave_k();
     for (var i = 0u; i < n; i++) {
         let u = (f32(i) + jitter) / f32(n);
         let t = span * (pow(e, u) - 1.0) / (e - 1.0);
@@ -3145,10 +3252,16 @@ fn fog_march(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in:
         } else {
             lit *= cloud_shadow(dir * t);
         }
-        let d = bliss_fog_density(at);
-        if d > 0.0 {
-            let kept = exp(-d * step);
-            gained += through * (1.0 - kept) * (sun * sun_phase * lit + sky_fog);
+        let d = bliss_fog_density(at) * open;
+        // A storm's dust or blowing snow (ours: Bliss has none), in the same march, its own colour.
+        var ds = 0.0;
+        if gale > 0.0 {
+            ds = storm_fog_density(at, gale_floor, gale);
+        }
+        if d + ds > 0.0 {
+            let kept = exp(-(d + ds) * step);
+            let lit_by = sun * sun_phase * lit + sky_fog;
+            gained += through * (1.0 - kept) * lit_by * (d + ds * gale_tint) / (d + ds);
             through *= kept;
         }
         // The air below the cumulus base; its Mie takes the fog's droplets too (Bliss's x300 of the
@@ -3159,14 +3272,17 @@ fn fog_march(dir: vec3<f32>, span: f32, jitter: f32, sun: vec3<f32>, sky_fog_in:
         let m_k = ATM_MIE * BLISS_AIR * (exp2(-up / 1200.0 * 7.0) + 300.0 * d * 8.0) * below;
         let ext = r_k + vec3(m_k);
         let a_kept = exp(-ext * step);
-        let light = sun * lit * sun_phase * (ray_phase * r_k + vec3(sun_phase * m_k)) + air_sky * ext * eye_k;
-        air += (light - light * a_kept) / max(ext, vec3(1e-9)) * air_through * through;
+        let light = sun * lit * sun_phase * (ray_phase * r_k + vec3(sun_phase * m_k));
+        let held = (1.0 - a_kept) / max(ext, vec3(1e-9)) * air_through * through;
+        air += light * held * open;
+        air_k += ext * eye_k * held * open;
         air_through *= a_kept;
+        air_grey *= dot(a_kept, vec3(1.0 / 3.0));
         if through < 1e-5 {
             break;
         }
     }
-    return vec4(gained + air, through);
+    return FogParts(gained + air, air_k, through, air_grey);
 }
 fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let dist = length(rel);
@@ -3191,8 +3307,8 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let span = select(dist, max(scene.params.y, MIST_MARCH_FAR), is_sky);
     let f = fog_march(dir, span, jitter, sun, fog_sky, p.ambient, eye_k, true);
     let through = f.a;
-    // Debug views (`base:look_debug`): 3 the fog's opacity (1 - its transmittance, the air not
-    // counted) in grey; 4 the hour's fog weights (red morning, green evening, blue night); 5 the
+    // Debug views (`base:look_debug`): 3 the fog's and the air's opacity (1 - their transmittance)
+    // in grey; 4 the hour's fog weights (red morning, green evening, blue night); 5 the
     // cloudy fog's body at the surface, unworn (red) beside the fog's density there x 8 (green).
     let dbg = look_debug();
     if dbg == 3u {
@@ -3207,7 +3323,19 @@ fn one_fog(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
         let body = clamp((0.4 - noise3(q / vec3(36.0, 18.0, 36.0))) * 2.0, 0.0, 1.0);
         return vec3(body, bliss_fog_density(eye + rel) * 8.0, 0.0);
     }
-    return c * through + f.rgb;
+    // Bliss's cave fog (composite3's CAVE_FOG, method only), over the picture before the fog: its
+    // colour (0.1, 0.2, 0.5) in its units (ours x BLISS_UNITS), none at the eye and all at the render
+    // distance by 1 - (1 - (1 - d / far)^2)^2 (Ronald's CaveFogFallOff 2), and mostly looking down
+    // (exp(-7 (y / 2 + 1 / 2))), x how much the eye is in a cave.
+    let cave = cave_k();
+    var lit = c;
+    if cave > 0.0 {
+        let near = 1.0 - max(1.0 - dist / max(scene.params.y, 1.0), 0.0);
+        let k = 1.0 - pow(1.0 - pow(1.0 - near, 2.0), 2.0);
+        let look = exp(-7.0 * clamp(dir.y * 0.5 + 0.5, 0.0, 1.0)) * 0.999 + 0.001;
+        lit += vec3(0.1, 0.2, 0.5) / BLISS_UNITS * k * look * cave;
+    }
+    return lit * through + f.rgb;
 }
 
 // The mist as a volume (`client::froxels`, `core:froxels`): the view cut into cells an eighth of
@@ -3538,7 +3666,11 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             * exp(-10.0 * pow(4.0 * clamp(dir.y, 0.0, 1.0), 2.0));
         var out = c_in;
         if edge > 0.0 {
-            out = mix(out, sky_color(normalize(vec3(dir.x, max(dir.y, 1e-3), dir.z))), edge);
+            // With the physical sky, Bliss's own colour (its SKY_GROUND path, composite1): one for the
+            // whole border, the sky straight down (its averageSkyCol, texel (1,37) / 30, ours frame
+            // look texel 5, `bc_sky_read`), not the sky in the pixel's own direction (audit B9, 11-26).
+            let border = select(sky_color(normalize(vec3(dir.x, max(dir.y, 1e-3), dir.z))), bc_sky_read(), land_from_sky());
+            out = mix(out, border, edge);
         }
         if !CALM {
             out += held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);

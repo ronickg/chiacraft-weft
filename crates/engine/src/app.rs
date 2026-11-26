@@ -4004,16 +4004,22 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
             .client
             .render(&mut *r.gpu, &mut world, &mut after, &mut r.list, world_info, &r.textures, r.entering.is_none());
         drop(s);
+        // (Named GPU times inside "shadows" with `core:gpu_probes`: each step's own.)
+        crate::diag::probe(&mut r.list, "client_pre");
         // What the pack's look works out once a frame, before anything that reads it.
         r.list.append(&mut g.client.sky.frame_look.passes);
+        crate::diag::probe(&mut r.list, "frame_look");
         // The soft clouds' shadow on the land, before the world that reads it.
         r.list.append(&mut g.client.sky.cloud_shadow.passes);
+        crate::diag::probe(&mut r.list, "cloud_shadow");
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
         let s = crate::diag::span("shadows");
         g.client
             .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+        crate::diag::probe(&mut r.list, "shadow_map");
         // The mist's volume, which reads the shadow maps, before the world that reads it.
         r.list.append(&mut g.client.sky.froxels.passes);
+        crate::diag::probe(&mut r.list, "froxels");
         drop(s);
     }
     r.list.push(Cmd::Mark);
