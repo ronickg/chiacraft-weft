@@ -1327,6 +1327,18 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
             rgb = m.rgb;
             a = m.a * s.color.a;
         }
+        // Bliss's own sun (`OPT_SUN_DISC` at 1, with the physical sky): drawSun's disc alone, no halo
+        // or tints, its edge smoothstep cubed between 3.2 and 1.8 of its 0.0093 rad, at the land's
+        // sun (its lightCol / 80, `land_sun`) / 0.000882 x 0.62, dark under the horizon as its
+        // atmosphereGround; the air and the clouds over it redden and hide it as the rest of the
+        // sky (feature audit B7, 11-26; method only).
+        if is_sun && land_from_sky() && fantasy_opt(OPT_SUN_DISC) >= 0.5 {
+            let cos_y = dot(dir, normalize(scene.sun.xyz));
+            let edge = pow(smoothstep(cos(0.0093084 * 3.2), cos(0.0093084 * 1.8), cos_y), 3.0);
+            let ground = 1.0 - exp2(-50.0 * pow(clamp(dir.y + 0.025, 0.0, 1.0), 2.0));
+            let sun_rgb = land_sun(normalize(scene.sun.xyz), 0.0) / 0.0008821203 * edge * 0.62 * ground;
+            return vec4(sun_rgb * s.color.a, select(s.color.a * edge, 0.0, s.ids.w != 0u));
+        }
         if is_sun {
             // The sun as a round disc with a soft glow (Bliss's), not the picture's square: that
             // square, about 20° across with a pale border, went white through the curve, washed

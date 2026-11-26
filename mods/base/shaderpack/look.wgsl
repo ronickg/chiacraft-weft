@@ -3639,7 +3639,11 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
             * exp(-10.0 * pow(4.0 * clamp(dir.y, 0.0, 1.0), 2.0));
         var out = c_in;
         if edge > 0.0 {
-            out = mix(out, sky_color(normalize(vec3(dir.x, max(dir.y, 1e-3), dir.z))), edge);
+            // With the physical sky, Bliss's own colour (its SKY_GROUND path, composite1): one for the
+            // whole border, the sky straight down (its averageSkyCol, texel (1,37) / 30, ours frame
+            // look texel 5, `bc_sky_read`), not the sky in the pixel's own direction (audit B9, 11-26).
+            let border = select(sky_color(normalize(vec3(dir.x, max(dir.y, 1e-3), dir.z))), bc_sky_read(), land_from_sky());
+            out = mix(out, border, edge);
         }
         if !CALM {
             out += held_in_fog(rel, sky) + lightning_bolt_over(dir, dist);
