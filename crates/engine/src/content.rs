@@ -985,6 +985,8 @@ pub struct Ids {
     pub two_handed: Option<u32>,
     pub one_handed: Option<u32>,
     pub harvest_level: Option<u32>,
+    /// chiacraft: `light_strength` (the path tracer's traced block light).
+    pub light_strength: Option<u32>,
     pub damage: Option<u32>,
     pub name: Option<u32>,
     pub look: Option<u32>,
@@ -1545,6 +1547,26 @@ impl Content {
     pub fn harvest_level(&self, state: u32) -> u32 {
         self.block_value::<u32>(state, self.ids.harvest_level)
             .unwrap_or(0)
+    }
+
+    /// chiacraft: how strongly the path tracer's traced light shines from `state` (1 a torch's): its
+    /// `light_strength`, else by its kind as the block's name says (fire and campfires 2.5, lava 2,
+    /// glowstone 1.5; stage 2 of the Remix match, `notes/ENGINE_CHANGES.md`).
+    pub fn light_strength(&self, state: u32) -> f32 {
+        if let Some(s) = self.block_value::<f32>(state, self.ids.light_strength) {
+            return s;
+        }
+        let name = &self.block_of(state).name;
+        let kind = name.rsplit(':').next().unwrap_or(name);
+        if kind.contains("fire") {
+            2.5
+        } else if kind.contains("lava") {
+            2.0
+        } else if kind.contains("glowstone") {
+            1.5
+        } else {
+            1.0
+        }
     }
 
     /// Has a `harvest_level`: drops its loot only to a fitting tool.
@@ -2978,6 +3000,7 @@ fn component_ids(components: &Components) -> Ids {
         two_handed: id(abi::comp::TWO_HANDED),
         one_handed: id(abi::comp::ONE_HANDED),
         harvest_level: id(abi::comp::HARVEST_LEVEL),
+        light_strength: id(abi::comp::LIGHT_STRENGTH),
         damage: id(abi::comp::WEAR),
         name: id(abi::comp::NAME),
         look: id(abi::comp::LOOK),

@@ -858,11 +858,18 @@ and cactus.**
   dung, rotten flesh, leaves, saplings, wheat and seeds (`vitals::soil::COMPOSTS`). Full, it
   rots into compost in about 23 minutes, the weeks hot compost takes, at the growing pace.
 - **Carcasses:** a kill's drops stay where it fell.
+- **Bodies and dung into the soil (2026-11-26, branch claude/animals-rot):** a carcass that rots
+  away (`carcass.rs`, its bones and pile, eaten or not) feeds the ground where it lay: farmland
+  within 2 blocks gets a fertility level for every 20 kg left of it (`vitals::soil::RICH_KG`,
+  `rotted_levels`: an uneaten deer 3, as compost; a fox 1; a mouse none), and grazed grass there
+  grows back at once, as a bison's carcass leaves a patch of taller, richer grass on the prairie
+  (Towne 2000). A dung pat rotting gives farmland under and beside it a level (`PAT_FEEDS`), as
+  the dung used on it would. Both through `base_api::grow::enrich`. Check: `cov_carcass_rot`.
 - **Seen in the game:** the bin filling, its top turning to dirt.
 - **Not yet:**
-  - food and carcasses on the ground rotting away: the engine clears every item after 5
-    minutes (`ITEM_LIFETIME`), so this needs a per-item lifetime in the engine first (Upstream);
-  - scavengers eat food and carrion off the ground (part 5), but our species leave no carcass yet;
+  - food on the ground rotting: the engine still clears every item after 5 minutes
+    (`ITEM_LIFETIME`), so it vanishes before it would spoil; carcasses are entities and rot
+    (above);
   - the generated art for dung, compost and the bin (placeholders now, `notes/STYLE.md`).
 
 

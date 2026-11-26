@@ -265,7 +265,9 @@ pub(super) fn pre_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[P
 /// table's slots (a power of two), [1] the lights listed; then 4 a slot (x, y, z, start | count <<
 /// 20; x `i32::MIN` empty); then the lights, each its place from the cube's corner plus 16 (6 bits
 /// an axis, the light may be in a cube next to it), its light per channel (4 bits each) and bit 30
-/// when it is a small light (an entity's: a torch's flame), not a whole glowing block.
+/// when it is a small light (an entity's: a torch's flame), not a whole glowing block; then
+/// (chiacraft) each listed light's strength in quarters (`Mesh::lights`), a word each in the same
+/// order, at [1] words past the lights' start.
 ///
 /// A cube's list holds only lights whose level is left above 0 somewhere in it (the lightmap's
 /// falloff, a level a block), strongest there first, at most `LIGHTS_PER_CUBE`: drawing among all
@@ -285,6 +287,18 @@ const LIGHTS_EVERY: u64 = 15;
 fn pt_plain() -> u32 {
     u32::from(crate::config::by_name("core:pt_plain").map_or(0.0, crate::config::get) > 0.5)
 }
+/// chiacraft: `core:pt_emissive`, the traced block lights' strength (stage 2 of the Remix match):
+/// 0 the lightmap's block light, shadowed.
+fn pt_emissive() -> f32 {
+    crate::config::by_name("core:pt_emissive").map_or(1.0, crate::config::get) as f32
+}
+/// chiacraft: stage 2's parts for `PtArgs::flags`: bit 0 the lamps light the bounce's surface too
+/// (`core:pt_bounce_lights`), bit 1 the lamps' draws reused over frames and neighbours
+/// (`core:pt_restir`).
+fn pt_flags() -> u32 {
+    let on = |k: &str| u32::from(crate::config::by_name(k).map_or(1.0, crate::config::get) > 0.5);
+    on("core:pt_bounce_lights") | on("core:pt_restir") << 1
+}
 const LIGHTS_PER_CUBE: usize = 48;
 const LIGHTS_MAX: usize = 1 << 20;
 
@@ -303,8 +317,25 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
             targets.insert(c + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1));
         }
     }
-    let mut lists: Vec<(IVec3, Vec<u32>)> = Vec::new();
-    let mut near: Vec<(i32, u32)> = Vec::new();
+    // Every light's block, to tell a light in a field (a lava pit, a glowstone wall: two or more
+    // of its six neighbours glowing too, bit 31 of its listed word) from one alone. The tracer
+    // caps a field's summed light near the lightmap's, as each light is matched to it as if alone.
+    let at = |c: IVec3, w: u32| c * 16 + IVec3::new((w & 15) as i32, (w >> 4 & 15) as i32, (w >> 8 & 15) as i32);
+    let mut blocks: rustc_hash::FxHashSet<IVec3> = rustc_hash::FxHashSet::default();
+    for (&c, l) in lights {
+        for &w in l {
+            blocks.insert(at(c, w));
+        }
+    }
+    let field = |p: IVec3| {
+        [IVec3::X, IVec3::NEG_X, IVec3::Y, IVec3::NEG_Y, IVec3::Z, IVec3::NEG_Z]
+            .iter()
+            .filter(|&&d| blocks.contains(&(p + d)))
+            .count()
+            >= 2
+    };
+    let mut lists: Vec<(IVec3, Vec<(u32, u32)>)> = Vec::new();
+    let mut near: Vec<(i32, u32, u32)> = Vec::new();
     for &t in &targets {
         near.clear();
         let lo = t * 16;
@@ -313,23 +344,31 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
             let n = t + IVec3::new(d % 3 - 1, d / 3 % 3 - 1, d / 9 - 1);
             let Some(l) = lights.get(&n) else { continue };
             for &w in l {
-                let p = n * 16 + IVec3::new((w & 15) as i32, (w >> 4 & 15) as i32, (w >> 8 & 15) as i32);
+                let p = at(n, w);
                 let e = ((w >> 12) & 15).max((w >> 16) & 15).max((w >> 20) & 15) as i32;
-                // Its level at the cube's nearest block.
-                let gap = (lo - p).max(IVec3::ZERO) + (p - hi).max(IVec3::ZERO);
-                let level = e - (gap.x + gap.y + gap.z);
+                // Its level left at the cube's nearest block, by straight distance: the tracer's
+                // lamps reach round (`pt_nee_fade`), so one listed by the lightmap's axis-wise
+                // reach went missing from cubes its light still reached diagonally.
+                let gap = ((lo - p).max(IVec3::ZERO) + (p - hi).max(IVec3::ZERO)).as_vec3();
+                let level = e - gap.length().ceil() as i32;
                 if level > 0 {
                     let o = (p - lo + IVec3::splat(16)).as_uvec3();
-                    near.push((level, o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18 | (w >> 24 & 1) << 30));
+                    let word = o.x | o.y << 6 | o.z << 12 | (w >> 12 & 0xFFF) << 18 | (w >> 24 & 1) << 30 | u32::from(field(p)) << 31;
+                    near.push((level, word, w >> 25 & 15));
                 }
             }
         }
         if near.is_empty() {
             continue;
         }
-        near.sort_unstable_by_key(|n| std::cmp::Reverse(n.0));
+        // Lights alone first, then a field's (bit 31), each by its level: a field's lights are
+        // capped near the lightmap as a whole, so a few of them stand for it, but a lamp left
+        // out goes dark in the whole cube. A 10 x 7 lava pit's 70 level-15 lights crowded the
+        // ceiling glowstone out of some cubes' 48 and not others, its light ending in a hard
+        // line on the floor at a cube's edge (s2s lava_glow).
+        near.sort_unstable_by_key(|n| (n.1 >> 31, std::cmp::Reverse(n.0)));
         near.truncate(LIGHTS_PER_CUBE);
-        lists.push((t, near.iter().map(|n| n.1).collect()));
+        lists.push((t, near.iter().map(|n| (n.1, n.2)).collect()));
     }
     let slots = (lists.len() * 2).next_power_of_two().max(1024);
     let mut table = vec![0u32; slots * 4];
@@ -337,23 +376,26 @@ fn light_words(lights: &FxHashMap<IVec3, Vec<u32>>) -> Vec<u32> {
         table[i * 4] = i32::MIN as u32;
     }
     let mut out: Vec<u32> = Vec::new();
+    let mut strengths: Vec<u32> = Vec::new();
     for (c, l) in &lists {
         if out.len() + l.len() > LIGHTS_MAX {
             break;
         }
         let start = out.len() as u32;
-        out.extend_from_slice(l);
+        out.extend(l.iter().map(|w| w.0));
+        strengths.extend(l.iter().map(|w| w.1));
         let mut i = light_hash(*c) as usize & (slots - 1);
         while table[i * 4] != i32::MIN as u32 {
             i = (i + 1) & (slots - 1);
         }
         table[i * 4..i * 4 + 4].copy_from_slice(&[c.x as u32, c.y as u32, c.z as u32, start | (l.len() as u32) << 20]);
     }
-    let mut words = Vec::with_capacity(2 + table.len() + out.len());
+    let mut words = Vec::with_capacity(2 + table.len() + out.len() * 2);
     words.push(slots as u32);
     words.push(out.len() as u32);
     words.extend_from_slice(&table);
     words.extend_from_slice(&out);
+    words.extend_from_slice(&strengths);
     words
 }
 
@@ -644,6 +686,21 @@ impl WorldRenderer {
                 c
             }
         };
+        // The lamps' reservoirs (16 bytes a pixel, two taking turns), made zeroed (0: none).
+        if self.pt_res.is_none_or(|r| r.1 < n) {
+            if let Some((r, _)) = self.pt_res.take() {
+                r.into_iter().for_each(|b| gpu.destroy_buffer(b));
+            }
+            let bytes = n as u64 * 16;
+            let r = [0, 1].map(|_| gpu.create_buffer(bytes, usage::STORAGE, "path traced reservoirs"));
+            for b in r {
+                list.push(Cmd::FillBuffer { buffer: b, offset: 0, size: bytes, value: 0 });
+            }
+            list.push(Cmd::Barrier);
+            self.pt_res = Some((r, n));
+        }
+        let res = self.pt_res.unwrap().0;
+        let turn = (self.rt_frame_no() & 1) as usize;
         let out = self.pt_out[slot].0;
         let args = crate::gpu_layout::PtArgs {
             size: [size.0, size.1],
@@ -655,13 +712,16 @@ impl WorldRenderer {
             mode: u32::from(denoised && debug == 0),
             light: 0,
             plain: pt_plain(),
-            pad: [0; 2],
+            emissive: pt_emissive(),
+            flags: pt_flags(),
         };
         let origins = page;
         self.bind_run(list, cs, page, origins);
         list.bind(pt_bind::OUT, out);
         list.bind(pt_bind::CACHE, cache);
         list.bind(pt_bind::LIGHTS, lights);
+        list.bind(pt_bind::RES, res[turn]);
+        list.bind(pt_bind::RES_PREV, res[1 - turn]);
         list.push_constants(&args);
         list.push(Cmd::Dispatch { x: size.0.div_ceil(8), y: size.1.div_ceil(8), z: 1 });
         crate::diag::probe(list, "pt_trace");
@@ -723,7 +783,8 @@ impl WorldRenderer {
             mode: 1,
             light: gpu.texture_index(light),
             plain: pt_plain(),
-            pad: [0; 2],
+            emissive: pt_emissive(),
+            flags: pt_flags(),
         };
         list.push(Cmd::BeginPass { color: Some((target, None)), depth: None, motion: None });
         self.bind_run(list, finish, page, page);

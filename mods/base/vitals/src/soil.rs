@@ -65,6 +65,22 @@ pub const PAT_REACH: i32 = 2;
 pub const PAT_GROWTH: u32 = 2;
 pub const PAT_MOST_DAYS: f32 = 3.0;
 
+/// A body rotted into the ground feeds it (`notes/ECOLOGY.md`, part 8): a level of farmland's fertility within
+/// `RICH_REACH` for every `RICH_KG` of it left when it is gone (what wasn't eaten, bones and hide included; at most
+/// `MAX`), and the grazed grass round it grows back at once. A bison's carcass leaves a patch of richer, taller grass
+/// for years (Towne 2000, "Prairie vegetation and soil nutrient responses to ungulate carcasses", *Oecologia* 122):
+/// a deer's (70 kg) feeds the ground as much as compost, a mouse's not at all.
+pub const RICH_KG: f32 = 20.0;
+pub const RICH_REACH: i32 = 2;
+
+/// The fertility levels a body of `kg` left when it rots away gives the ground round it (`RICH_KG`).
+pub fn rotted_levels(kg: f32) -> u8 {
+    ((kg.max(0.0) / RICH_KG).round() as u8).min(MAX)
+}
+
+/// The levels a dung pat gives the farmland under and beside it as it rots, as the dung would used on it (`FEEDS`).
+pub const PAT_FEEDS: u8 = 1;
+
 /// The chance a pat's growth step breaks it up though it didn't rot (`PAT_MOST_DAYS`).
 pub fn pat_break_chance() -> f32 {
     crate::plants::of("base:dung_pat")
@@ -143,5 +159,13 @@ mod tests {
         assert!(lies(savanna, 3) >= 2.0 * lies(savanna, 1), "the savanna's dry winter should keep pats twice as long as its rains");
         let plains = crate::climate::of("base:plains").unwrap();
         assert!(lies(plains, 3) >= 2.0 * lies(plains, 1), "a cold winter should keep pats twice as long as summer");
+    }
+
+    #[test]
+    fn a_body_feeds_the_ground_by_its_mass() {
+        assert_eq!(rotted_levels(0.02), 0, "a mouse's body is too small to feed the ground");
+        assert_eq!(rotted_levels(10.0), 1, "a fox's should give a level");
+        assert_eq!(rotted_levels(70.0), MAX, "an uneaten deer's feeds it as compost does, to the full");
+        assert!(rotted_levels(500.0) <= MAX);
     }
 }
