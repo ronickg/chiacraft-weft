@@ -104,7 +104,7 @@ look 0 -30
 wait 1
 aim_block 0 0 -5 0.85 1.62
 hold core:use 0.2
-until screen base:chest within 5
+until screen core:menu within 5
 wait 1
 shot ac_chest_open.png
 key Escape
