@@ -295,10 +295,11 @@ fn pt_emissive() -> f32 {
 /// chiacraft: stage 2's parts for `PtArgs::flags`: bit 0 the lamps light the bounce's surface too
 /// (`core:pt_bounce_lights`), bit 1 the lamps' draws reused over frames and neighbours
 /// (`core:pt_restir`), bit 2 the bounce's surface fills its own cell of the radiance cache from a
-/// ray of its own (`core:pt_cache_fill`).
+/// ray of its own (`core:pt_cache_fill` 1, one pixel in 16), bit 3 from one pixel in 4 (2).
 fn pt_flags() -> u32 {
-    let on = |k: &str| u32::from(crate::config::by_name(k).map_or(1.0, crate::config::get) > 0.5);
-    on("core:pt_bounce_lights") | on("core:pt_restir") << 1 | on("core:pt_cache_fill") << 2
+    let level = |k: &str| crate::config::by_name(k).map_or(1.0, crate::config::get);
+    let on = |k: &str| u32::from(level(k) > 0.5);
+    on("core:pt_bounce_lights") | on("core:pt_restir") << 1 | on("core:pt_cache_fill") << 2 | u32::from(level("core:pt_cache_fill") > 1.5) << 3
 }
 const LIGHTS_PER_CUBE: usize = 48;
 const LIGHTS_MAX: usize = 1 << 20;
