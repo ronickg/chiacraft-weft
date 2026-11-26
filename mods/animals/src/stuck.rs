@@ -335,7 +335,7 @@ pub fn search(w: &World, id: u64, st: &EntityState, water: bool) -> bool {
 fn enclosed(w: &World, st: &EntityState) -> bool {
     use std::collections::{HashSet, VecDeque};
     let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
-    // Never on a fence or gate: a pen's wall is no ledge out of it.
+    // A fence's top is no way out either: a pen reads as shut in.
     let stand = |p: [i32; 3]| {
         let under = [p[0], p[1] - 1, p[2]];
         solid(under) && !solid(p) && !solid([p[0], p[1] + 1, p[2]]) && !fence(w, under)
@@ -394,7 +394,11 @@ fn way_out(w: &World, st: &EntityState, goal: Option<[f64; 3]>) -> Option<Way> {
 fn way_out_counted(w: &World, st: &EntityState, goal: Option<[f64; 3]>) -> (Option<Way>, usize, [i32; 3], usize) {
     use std::collections::{HashMap, VecDeque};
     let solid = |p: [i32; 3]| w.block_flags(p) & abi::block_flags::SOLID != 0;
-    let stand = |p: [i32; 3]| solid([p[0], p[1] - 1, p[2]]) && !solid(p) && !solid([p[0], p[1] + 1, p[2]]);
+    // Never on a fence or gate: a pen's wall is no ledge out of it.
+    let stand = |p: [i32; 3]| {
+        let under = [p[0], p[1] - 1, p[2]];
+        solid(under) && !solid(p) && !solid([p[0], p[1] + 1, p[2]]) && !fence(w, under)
+    };
     let start = [st.pos.x.floor() as i32, (st.pos.y + 0.05).floor() as i32, st.pos.z.floor() as i32];
     // Each place, the one it was reached from, and whether by a leap.
     let mut from: HashMap<[i32; 3], ([i32; 3], bool)> = HashMap::new();
