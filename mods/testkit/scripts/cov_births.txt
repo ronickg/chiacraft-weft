@@ -4,7 +4,7 @@
 # old, P% grown)" with K 1 to 3, each young "born to N and 0 (wild)"; the `/animalprof where` rows 10 s and 60 s
 # later mark those young "(young, X from its mother N)" with X small (a few blocks: they follow her). Part 2 (x 200,
 # spring, out of season): 24 more, and no "arrives with her" line and no young at all there. Shots: 1_mothers (from
-# above, ticks frozen: young beside their mothers), 2_low (low beside the herd), 3_out_of_season.
+# above, ticks frozen, 5 s after they came: young beside their mothers), 1_mothers_low (low from the south-east), 3_out_of_season(_low).
 loaded
 idle
 chat /tk mode creative
@@ -29,27 +29,30 @@ chat /season autumn 5
 chat /tp 0 70 544
 wait 1
 chat /animalprof met 24
-wait 10
-chat /animalprof where 32
-wait 50
-chat /animalprof where 32
+chat /tk mode spectator
+wait 3
 chat /tick freeze
-chat /tp 0 86 556
-look 0 -55
+chat /tp 0 76 554
+look 0 -38
 wait 2
 press core:hide_hud
 wait 0.5
 shot cov_births_1_mothers.png
 press core:hide_hud
-chat /tp 9 70.5 553
-look 45 -12
+chat /tp 7 70.6 551
+look 45 -8
 wait 2
 press core:hide_hud
 wait 0.5
-shot cov_births_2_low.png
+shot cov_births_1_mothers_low.png
 press core:hide_hud
 chat /tick unfreeze
 wait 1
+wait 6
+chat /animalprof where 48
+wait 50
+chat /animalprof where 48
+chat /tk mode creative
 chat /tp 200 90 544
 wait 4
 chat /tk fill 184 60 528 216 68 560 base:dirt
@@ -66,16 +69,25 @@ chat /season spring 5
 chat /tp 200 70 544
 wait 1
 chat /animalprof met 24
-wait 10
-chat /animalprof where 32
+chat /tk mode spectator
+wait 3
 chat /tick freeze
-chat /tp 200 86 556
-look 0 -55
+chat /tp 200 76 554
+look 0 -38
 wait 2
 press core:hide_hud
 wait 0.5
 shot cov_births_3_out_of_season.png
 press core:hide_hud
+chat /tp 207 70.6 551
+look 45 -8
+wait 2
+press core:hide_hud
+wait 0.5
+shot cov_births_3_out_of_season_low.png
+press core:hide_hud
 chat /tick unfreeze
 wait 1
+wait 6
+chat /animalprof where 48
 quit

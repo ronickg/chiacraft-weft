@@ -632,15 +632,21 @@ s = [f"# {l}" for l in [
     "old, P% grown)\" with K 1 to 3, each young \"born to N and 0 (wild)\"; the `/animalprof where` rows 10 s and 60 s",
     "later mark those young \"(young, X from its mother N)\" with X small (a few blocks: they follow her). Part 2 (x 200,",
     "spring, out of season): 24 more, and no \"arrives with her\" line and no young at all there. Shots: 1_mothers (from",
-    "above, ticks frozen: young beside their mothers), 2_low (low beside the herd), 3_out_of_season.",
+    "above, ticks frozen, 5 s after they came: young beside their mothers), 1_mothers_low (low from the south-east), 3_out_of_season(_low).",
 ]] + ["loaded", "idle", "chat /tk mode creative", "chat /tp 0 90 544", "wait 4", "idle", "chat /rule core:mob_spawning 0",
       "chat /anim log"]
-s += pad(0) + ["chat /season autumn 5", f"chat /tp 0 70 {Z}", "wait 1", "chat /animalprof met 24", "wait 10",
-               "chat /animalprof where 32", "wait 50", "chat /animalprof where 32",
-               "chat /tick freeze", f"chat /tp 0 86 {Z+12}", "look 0 -55", "wait 2", "shot cov_births_1_mothers.png",
-               f"chat /tp 9 70.5 {Z+9}", "look 45 -12", "wait 2", "shot cov_births_2_low.png", "chat /tick unfreeze", "wait 1"]
-s += pad(200) + ["chat /season spring 5", f"chat /tp 200 70 {Z}", "wait 1", "chat /animalprof met 24", "wait 10",
-                 "chat /animalprof where 32", "chat /tick freeze", f"chat /tp 200 86 {Z+12}", "look 0 -55", "wait 2",
-                 "shot cov_births_3_out_of_season.png", "chat /tick unfreeze", "wait 1"]
+# The herd shot at once, the player a spectator (r2's deer had fled the creative player by the shots, which saw
+# bare grass): from 6 up south of the ring of 24 (6 blocks round the pad's middle), and low from its south-east.
+def met_shots(x, name):
+    return ["chat /tk mode spectator", "wait 3", "chat /tick freeze", f"chat /tp {x} 76 {Z+10}", "look 0 -38", "wait 2",
+            f"shot cov_births_{name}.png", f"chat /tp {x+7} 70.6 {Z+7}", "look 45 -8", "wait 2",
+            f"shot cov_births_{name}_low.png", "chat /tick unfreeze", "wait 1"]
+
+
+s += pad(0) + ["chat /season autumn 5", f"chat /tp 0 70 {Z}", "wait 1", "chat /animalprof met 24"] + \
+    met_shots(0, "1_mothers") + ["wait 6", "chat /animalprof where 48", "wait 50", "chat /animalprof where 48",
+                                 "chat /tk mode creative"]
+s += pad(200) + ["chat /season spring 5", f"chat /tp 200 70 {Z}", "wait 1", "chat /animalprof met 24"] + \
+    met_shots(200, "3_out_of_season") + ["wait 6", "chat /animalprof where 48"]
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
 write("births", s)
