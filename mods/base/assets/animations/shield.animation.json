@@ -19,6 +19,24 @@
         }
       }
     },
+    "animation.shield.hold.first_person": {
+      "loop": true,
+      "animation_length": 0.05,
+      "bones": {
+        "guard": {
+          "rotation": [
+            -90,
+            -60,
+            90
+          ],
+          "position": [
+            1,
+            0,
+            0
+          ]
+        }
+      }
+    },
     "animation.shield.use": {
       "loop": "hold_on_last_frame",
       "animation_length": 0.05,
