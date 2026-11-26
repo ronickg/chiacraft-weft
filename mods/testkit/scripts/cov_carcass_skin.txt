@@ -1,5 +1,7 @@
 # Skinning alone (cov_carcass part 4): a white-tailed deer killed with one blow, skinned with a flint knife. Shot 8:
-# mid-skin from the skinning camera (the player kneeling beside the body, the knife, the body on its pool); 9: after.
+# mid-skin from the skinning camera (the player kneeling beside the body, the knife, the body on its pool); 9: after;
+# 10_tooltip_slot2/3: the inventory open, the cursor on the hotbar row's 2nd and 3rd slots: the hide's tooltip with its
+# stars ("★★☆ Good hide" or the like) in one of them.
 # Report the "skins carcass" and "skinned carcass" lines and the shots.
 loaded
 idle
@@ -69,5 +71,15 @@ wait 0.5
 shot cov_carcass_skin_9_low.png
 press core:hide_hud
 chat /tick unfreeze
+wait 1
+press core:inventory
+wait 1
+cursor 0.311 0.746
+wait 1
+shot cov_carcass_skin_10_tooltip_slot2.png
+cursor 0.339 0.746
+wait 1
+shot cov_carcass_skin_10_tooltip_slot3.png
+press core:inventory
 wait 1
 quit

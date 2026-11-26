@@ -163,9 +163,17 @@ pub const BLOAT_RGB: [f32; 3] = [66.0, 78.0, 46.0];
 pub const BLOAT_TINT: f32 = 0.45;
 pub const DRY_RGB: [f32; 3] = [118.0, 104.0, 84.0];
 pub const DRY_TINT: f32 = 0.55;
-/// How much darker it is at the full tint (wet, then dark dried skin), a white texel's (a dark one's less: a white belly
-/// goes a dirty grey-green, not mint).
-pub const ROT_DARKEN: f32 = 0.42;
+/// How much darker it is at the full tint: a dark texel by the first, a white one by both (a white belly goes a
+/// dirty olive-grey, not mint: Planner on sheet_rot).
+pub const ROT_DARKEN: [f32; 2] = [0.25, 0.42];
+/// The share of that darkening at remains: dried skin and bone bleach paler than the wet bloat.
+pub const DRY_DARKEN: f32 = 0.8;
+/// The opened meat and blood (strongly red texels) rot apart from the coat: toward a dark brown while bloating, a dried
+/// near-black brown at remains, and how far at the last step of each (Planner on sheet_rot: they stayed fresh red).
+pub const MEAT_ROT_RGB: [f32; 3] = [92.0, 54.0, 40.0];
+pub const MEAT_ROT_TINT: f32 = 0.85;
+pub const MEAT_DRY_RGB: [f32; 3] = [62.0, 44.0, 36.0];
+pub const MEAT_DRY_TINT: f32 = 0.85;
 /// Flies over a deer-sized body at once while it bloats (as many again per body as big by area), and the share left at
 /// remains.
 pub const FLIES: f32 = 10.0;
@@ -184,25 +192,39 @@ pub fn rot_step(keeps: (f32, f32), larder_days: f32) -> u8 {
     }
 }
 
-/// Turns a painted body (`rgba`, every opaque texel: coat, meat and bones alike) to rot `step`'s colour, keeping each
-/// texel's brightness.
+/// Turns a painted body (`rgba`, every opaque texel: coat, meat and bones alike) to rot `step`'s colour: the coat and
+/// bones toward `BLOAT_RGB` or `DRY_RGB` at their own brightness, darker the brighter they are; the meat and blood toward
+/// `MEAT_ROT_RGB` or `MEAT_DRY_RGB`.
 pub fn rot_tint(rgba: &mut [u8], step: u8) {
     if step == 0 {
         return;
     }
-    let (to, k) = if step >= ROT_STEPS { (DRY_RGB, DRY_TINT) } else { (BLOAT_RGB, BLOAT_TINT * step as f32 / (ROT_STEPS - 1) as f32) };
+    let dry = step >= ROT_STEPS;
+    let share = if dry { 1.0 } else { step as f32 / (ROT_STEPS - 1) as f32 };
+    let (to, k) = if dry { (DRY_RGB, DRY_TINT) } else { (BLOAT_RGB, BLOAT_TINT * share) };
+    let (meat_to, meat_k) = if dry { (MEAT_DRY_RGB, MEAT_DRY_TINT) } else { (MEAT_ROT_RGB, MEAT_ROT_TINT * share) };
     let lum = |c: [f32; 3]| 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
-    let full = k / BLOAT_TINT.max(DRY_TINT);
+    let full = if dry { DRY_DARKEN } else { share };
     let lt = lum(to);
     for px in rgba.as_chunks_mut::<4>().0 {
         if px[3] == 0 {
             continue;
         }
-        let l = lum([px[0] as f32, px[1] as f32, px[2] as f32]);
-        let dark = 1.0 - ROT_DARKEN * full * (0.35 + 0.65 * l / 255.0);
-        for c in 0..3 {
-            let v = px[c] as f32 * (1.0 - k) + l * to[c] / lt * k;
-            px[c] = (v * dark).round().clamp(0.0, 255.0) as u8;
+        let c = [px[0] as f32, px[1] as f32, px[2] as f32];
+        let l = lum(c);
+        // Meat and blood: red well over green and blue (an orange or rust coat has its green well over its blue).
+        if c[0] > 60.0 && c[0] > 2.4 * c[1] && c[0] > 2.4 * c[2] {
+            for i in 0..3 {
+                px[i] = (c[i] * (1.0 - meat_k) + meat_to[i] * meat_k)
+                    .round()
+                    .clamp(0.0, 255.0) as u8;
+            }
+            continue;
+        }
+        let dark = 1.0 - full * (ROT_DARKEN[0] + ROT_DARKEN[1] * (l / 255.0).powi(2));
+        for i in 0..3 {
+            let v = c[i] * (1.0 - k) + l * to[i] / lt * k;
+            px[i] = (v * dark).round().clamp(0.0, 255.0) as u8;
         }
     }
 }

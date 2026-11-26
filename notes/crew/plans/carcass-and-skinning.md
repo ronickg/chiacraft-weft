@@ -134,7 +134,9 @@ Player: a kneel pose, a two-handed knife "skin" loop (~1.5 s, cuts along the bod
 - Rot drawn (Planner 11-26, "rot tint and flies" first of the four): the body's coat is repainted at each rot step
   (`animals_core::carcass::rot_step`: 0 fresh, 1-5 through the bloat, 6 at remains), turning toward a dull green-black
   as it bloats and a dry grey-brown at remains, bright texels darkening most (`rot_tint`, `BLOAT_RGB`, `DRY_RGB`,
-  `ROT_DARKEN`); blow flies dart over it while it bloats (`FLIES` over a deer-sized body, as many again per body as big
+  `ROT_DARKEN`, pale bellies too, by `DRY_DARKEN` at remains), the opened flesh and ribs rotting with it, a dull
+  red-brown through the bloat and a dark dried brown at remains (`MEAT_ROT_RGB`, `MEAT_DRY_RGB`; Planner on
+  sheet_rot: the meat stayed fresh red, the bellies went mint); blow flies dart over it while it bloats (`FLIES` over a deer-sized body, as many again per body as big
   by area, `DRY_FLIES` of them at remains, none at bones), drawn on each client as short-lived particles
   (`carcass_fly`). The step and the flies ride in the synced `Dead` (`carcass_genome`) with the genes, so a step
   repaints the coat. `/animalprof carcass` lists both. Offline: `sheet.py --rot`. The golden eagle's coat now has its

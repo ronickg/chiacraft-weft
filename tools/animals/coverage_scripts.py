@@ -434,7 +434,12 @@ def skin_part(x, prefix="cov_carcass"):
         # r7's deer died 2 blocks west of the aim line and the use hit the grass: face the body itself (`aim`).
         f"chat /tp {x} 70 {Z+8}", "look 0 -40", "wait 1", "aim 6", "wait 1", "press core:use", "wait 4",
         f"shot {prefix}_8_skinning.png", "wait 9", "chat /animalprof carcass"] + \
-        side_shot(x, f"{prefix}_9_skinned") + low_shot(x, f"{prefix}_9_low")
+        side_shot(x, f"{prefix}_9_skinned") + low_shot(x, f"{prefix}_9_low") + [
+        # The hide's tooltip (its quality's stars, `tagged.base.hide_quality`): the inventory open, the cursor on the
+        # hotbar row's second and third slots (the knife in the first; the hide, then the venison, after it), at GUI
+        # scale 2 in 1280 x 720 (Tester 2's b1_02_inventory, 11-24). Not hidden with the HUD.
+        "press core:inventory", "wait 1", "cursor 0.311 0.746", "wait 1", f"shot {prefix}_10_tooltip_slot2.png",
+        "cursor 0.339 0.746", "wait 1", f"shot {prefix}_10_tooltip_slot3.png", "press core:inventory", "wait 1"]
 
 
 s += skin_part(x)
@@ -463,6 +468,9 @@ def plans_part(x, p="cov_carcass"):
                 f"chat /tp {x-8} 72.8 {Z+6}", "look 0 -89", "wait 2", f"shot {p}_{n+1}_wolf_above_{stage}.png"]
         for name, _, dx in PLANS:
             out += [f"chat /tp {x+dx+1.6} 68.9 {Z+7.8}", "look 39 -9", "wait 2", f"shot {p}_{n}_low_{stage}_{name}.png"]
+        if stage == "opened":
+            # Its flies close, ticks frozen (Planner on sheet_rot), then running.
+            out += [f"chat /tp {x-8+1.2} 68.9 {Z+7.2}", "look 39 -12", "wait 3", f"shot {p}_{n+1}_flies_wolf_frozen.png"]
         out += ["chat /tick unfreeze", "wait 1"]
         if stage == "opened":
             # Its flies (client particles, drawn with ticks running): the wolf at 3 days bloats, rot step 3.
@@ -472,16 +480,18 @@ def plans_part(x, p="cov_carcass"):
 
 s += plans_part(x)
 # Every shot without the HUD (Planner on r7: the chat log covered half of each frame): F1 off, shoot, F1 on.
-s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") and "tooltip" not in l else [l])]
 write("carcass", s)
 
 # Part 4 alone, for the kneel and the skinning camera (Planner on r9: the kneeling player read as oversized boxes).
 s = head("carcass_skin", [
     "Skinning alone (cov_carcass part 4): a white-tailed deer killed with one blow, skinned with a flint knife. Shot 8:",
-    "mid-skin from the skinning camera (the player kneeling beside the body, the knife, the body on its pool); 9: after.",
+    "mid-skin from the skinning camera (the player kneeling beside the body, the knife, the body on its pool); 9: after;",
+    "10_tooltip_slot2/3: the inventory open, the cursor on the hotbar row's 2nd and 3rd slots: the hide's tooltip with its",
+    "stars (\"★★☆ Good hide\" or the like) in one of them.",
     "Report the \"skins carcass\" and \"skinned carcass\" lines and the shots.",
 ]) + skin_part(600, "cov_carcass_skin")
-s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") and "tooltip" not in l else [l])]
 write("carcass_skin", s)
 
 # Part 2 alone, longer, for the scavengers' mouthfuls (Planner 11-26: vultures filled after one 0.5 kg bite).
@@ -491,7 +501,7 @@ s = head("carcass_vultures", [
     "a few per vulture 30 s apart, F rising to full, then it leaves; the carcass rows' kg eaten (about 0.3 at most), the",
     "body still whole; and the shots (3_vultures, 3_vultures_low): the vultures at or near the body.",
 ]) + vultures_part(200, "cov_carcass_vultures", rows=24)
-s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") and "tooltip" not in l else [l])]
 write("carcass_vultures", s)
 
 # Part 5 alone, for the body plans' looks (Planner on r10: the wolf read as standing; the bones and piles specks).
@@ -504,5 +514,5 @@ s = head("carcass_plans", [
     "grey-brown. 13_flies_wolf: small dark flies darting over the opened wolf (ticks running). Report each carcass's",
     "\"rot step\" and \"flies\" from the /animalprof carcass lines.",
 ]) + plans_part(1000, "cov_carcass_plans")
-s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") and "tooltip" not in l else [l])]
 write("carcass_plans", s)

@@ -313,6 +313,14 @@ fn clothes(w: &mut String) {
             c.from
         );
     }
+    let _ = writeln!(
+        w,
+        "\nA fur or leather piece or cloak warms (its cold and heat °C) by its hide's quality from skinning (`base:hide_quality`, kept by tanning; a garment is as good as its worst hide): poor {:.2}x, good {:.2}x, perfect {:.2}x; a hide of no known quality {:.2}x.",
+        clothing::hide_warmth(1),
+        clothing::hide_warmth(2),
+        clothing::hide_warmth(3),
+        clothing::hide_warmth(0)
+    );
     let _ = writeln!(w);
 }
 
