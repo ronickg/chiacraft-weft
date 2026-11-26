@@ -419,14 +419,15 @@ fn pt_nee_fade(e: f32, to: vec3<f32>) -> f32 {
     return clamp((e - (d.x + d.y + d.z)) / PT_NEE_FADE, 0.0, 1.0);
 }
 
-// How far above the lightmap's own block light at a surface a field of lamps' light may sum (a lamp
-// with two or more glowing neighbours, bit 31 of its listed word: a lava pit, a glowstone wall).
-// Each lamp is matched to the lightmap as if alone, and the lightmap takes the strongest light
-// where tracing adds them up: a 10 x 7 lava pit lit the floor round it white, a third over the
-// room's lightmap (s2o lava_glow). A lamp alone keeps its own light (capped for all, it took a
-// third of the alcove fire's off its pillar and wall, s2p fire18000). Shadows still take the
-// light down freely.
-const PT_NEE_SUM: f32 = 2.0;
+// How far above the lightmap's own block light at a surface a field of lamps' light may sum (a
+// lamp with two or more glowing neighbours, bit 31 of its listed word: a lava pit, a glowstone
+// wall). Each lamp is matched to the lightmap as if alone, and the lightmap takes the strongest
+// light where tracing adds them up: a 10 x 7 lava pit lit the floor round it white, a third over
+// the room's lightmap (s2o lava_glow); at twice, the floor round it still bleached pale in the
+// tone curve, its edge the lightmap's diamond steps (s2q). A lamp alone keeps its own light
+// (capped for all, it took a third of the alcove fire's off its pillar and wall, s2p fire18000).
+// Shadows still take the light down freely.
+const PT_NEE_SUM: f32 = 1.0;
 // Whether the lamp just shaded (`pt_block_direct`) is one of a field.
 var<private> PT_NEE_FIELD: bool = false;
 
