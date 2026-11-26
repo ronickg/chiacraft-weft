@@ -389,6 +389,8 @@ fn pt_block_visibility(world: vec3<f32>, rel: vec3<f32>, ng: vec3<f32>, lift: ve
 // The light's size squared (blocks): a glowing block's, a flame's.
 const PT_NEE_R2_BLOCK: f32 = 0.25;
 const PT_NEE_R2_FLAME: f32 = 0.04;
+// How much of the normal map's tilt the lamps' light follows (0 the face's own normal).
+const PT_NEE_NORMAL: f32 = 0.3;
 
 // The lamps' light at a surface at `world` (`rel` camera relative), its shading normal `n` and
 // face's `ng`: rgb in the world's light units, a as `pt_block_visibility`'s y (1 a light drawn;
@@ -736,7 +738,11 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     if max(block.r, max(block.g, block.b)) > 1e-4 {
         if pt.emissive > 0.0 {
             // The lamps' own light in place of the lightmap's, where a light of the list reaches.
-            let e = pt_block_direct(h.world, h.rel, n, ng, lift, px);
+            // About the face's normal with only some of the normal map's tilt: a lamp a block off
+            // lit each brick's bevel by the full map, and the pillar by the alcove fire went harsh
+            // and grainy where the lightmap's light is smooth (s2a_fire18000, Planner 11-26).
+            let n_lamp = normalize(mix(ng, n, PT_NEE_NORMAL));
+            let e = pt_block_direct(h.world, h.rel, n_lamp, ng, lift, px);
             block_vis = vec2(select(0.0, 1.0, max(e.r, max(e.g, e.b)) > 0.0), e.a);
             if e.a > 0.5 {
                 direct = e.rgb;
