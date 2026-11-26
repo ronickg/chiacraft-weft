@@ -442,7 +442,8 @@ def plans_part(x, p="cov_carcass"):
     toward the camera, read as standing)."""
     out = pad(x) + ["chat /tk mode creative"]
     for _, kind, dx in PLANS:
-        out += [f"chat /tk spawn animals:{kind} {x+dx} 70 {Z+6}", "wait 1", f"chat /tp {x+dx} 70 {Z+9}", "wait 1",
+        # Killed at once (r1: in the 2 s from spawn to kill the raptor walked 4 blocks east, onto the caiman's spot).
+        out += [f"chat /tk spawn animals:{kind} {x+dx} 70 {Z+6}", "wait 0.2", f"chat /tp {x+dx} 70 {Z+9}", "wait 0.2",
                 "chat /animalprof kill", "wait 1"]
     out += ["chat /tk mode spectator", "wait 2", "chat /animalprof carcass"]
     for days, n, stage in [(0, 10, "whole"), (3, 12, "opened"), (2, 14, "bones"), (4, 15, "pile")]:

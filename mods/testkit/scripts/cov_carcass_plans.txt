@@ -28,33 +28,33 @@ chat /tk fill 999 70 543 1001 70 545 core:air
 wait 1
 chat /tk mode creative
 chat /tk spawn animals:grey_wolf 992 70 550
-wait 1
+wait 0.2
 chat /tp 992 70 553
-wait 1
+wait 0.2
 chat /animalprof kill
 wait 1
 chat /tk spawn animals:golden_eagle 996 70 550
-wait 1
+wait 0.2
 chat /tp 996 70 553
-wait 1
+wait 0.2
 chat /animalprof kill
 wait 1
 chat /tk spawn animals:raptor 1000 70 550
-wait 1
+wait 0.2
 chat /tp 1000 70 553
-wait 1
+wait 0.2
 chat /animalprof kill
 wait 1
 chat /tk spawn animals:yacare_caiman 1004 70 550
-wait 1
+wait 0.2
 chat /tp 1004 70 553
-wait 1
+wait 0.2
 chat /animalprof kill
 wait 1
 chat /tk spawn animals:pacu 1008 70 550
-wait 1
+wait 0.2
 chat /tp 1008 70 553
-wait 1
+wait 0.2
 chat /animalprof kill
 wait 1
 chat /tk mode spectator
