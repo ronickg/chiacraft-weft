@@ -15,6 +15,7 @@ loaded
 idle
 chat /rule core:mob_spawning 0
 chat /time set 1000
+chat /weather clear 99999
 chat /tk mode creative
 chat /tk craft 1 2 base:bone_splinter base:rock
 chat /tk craft 2 1 base:rock base:bone_splinter
@@ -26,7 +27,8 @@ chat /tk craft 3 3 base:cloth base:string base:cloth base:cloth base:string base
 chat /tk mode survival
 until mode survival within 10
 chat /tk give base:leather
-wait 3
+# Dry and clear first (needle1: the wet hint showed in front of it); one hint at a time.
+wait 8
 shot fp_needle_hint.png
 expect alive
 quit
