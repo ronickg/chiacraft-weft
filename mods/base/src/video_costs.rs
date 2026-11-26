@@ -87,6 +87,9 @@ const TABLE: &[(&str, f64, f64, f64)] = &[
     ("pt_emissive", 1.0, 0.1, f64::NAN),
     ("pt_emissive", 2.0, 0.1, f64::NAN),
     ("pt_emissive", 4.0, 0.1, f64::NAN),
+    // The lamps' light at the bounce's surface (stage 2 step 2): a second light draw and shadow
+    // ray a pixel, an estimate (+1.0-1.5 ms on the 3060 laptop expected) until its bench.
+    ("pt_bounce_lights", 1.0, 0.35, f64::NAN),
     // The mist's banks walked per pixel (11-24): an estimate until the PC's bench at Max, 16 steps
     // a pixel each with a noise, a ground-map read and the shadow maps' taps, where there is mist.
     ("mist_banks", 1.0, 0.4, f64::NAN),

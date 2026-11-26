@@ -2069,7 +2069,8 @@ pub struct PtArgs {
     /// chiacraft: the traced block lights' strength (`core:pt_emissive`; 0 the lightmap's block
     /// light, shadowed, as before stage 2).
     pub emissive: f32,
-    /// chiacraft: stage 2's parts, by bit (none yet).
+    /// chiacraft: stage 2's parts, by bit: 0 the lamps light the bounce's surface too
+    /// (`core:pt_bounce_lights`).
     pub flags: u32,
 }
 

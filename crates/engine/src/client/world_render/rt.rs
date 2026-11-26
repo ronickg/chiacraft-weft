@@ -292,6 +292,11 @@ fn pt_plain() -> u32 {
 fn pt_emissive() -> f32 {
     crate::config::by_name("core:pt_emissive").map_or(1.0, crate::config::get) as f32
 }
+/// chiacraft: stage 2's parts for `PtArgs::flags`: bit 0 the lamps light the bounce's surface too
+/// (`core:pt_bounce_lights`).
+fn pt_flags() -> u32 {
+    u32::from(crate::config::by_name("core:pt_bounce_lights").map_or(1.0, crate::config::get) > 0.5)
+}
 const LIGHTS_PER_CUBE: usize = 48;
 const LIGHTS_MAX: usize = 1 << 20;
 
@@ -666,7 +671,7 @@ impl WorldRenderer {
             light: 0,
             plain: pt_plain(),
             emissive: pt_emissive(),
-            flags: 0,
+            flags: pt_flags(),
         };
         let origins = page;
         self.bind_run(list, cs, page, origins);
@@ -735,7 +740,7 @@ impl WorldRenderer {
             light: gpu.texture_index(light),
             plain: pt_plain(),
             emissive: pt_emissive(),
-            flags: 0,
+            flags: pt_flags(),
         };
         list.push(Cmd::BeginPass { color: Some((target, None)), depth: None, motion: None });
         self.bind_run(list, finish, page, page);

@@ -664,6 +664,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<RawEntry> {
         // from the lamp itself, falling off with distance, in place of the lightmap's block light);
         // 0 the lightmap's block light, only shadowed. Live.
         number("core:pt_emissive", ck::FLOAT, 1.0, 0.0, 4.0, 0.25),
+        // chiacraft: with it, the surface the bounce meets is lit by the lamps as traced too (one
+        // more shadow ray a pixel): a fire's light off the walls fills the room. Live.
+        number("core:pt_bounce_lights", ck::BOOL, 1.0, 0.0, 1.0, 1.0),
         // How the path tracer's light is denoised (`denoise::Denoiser`) where Ray Reconstruction
         // doesn't do it: 0 not at all (raw, for checks), 1 ours (SVGF-like), live.
         number("core:pt_denoiser", ck::INT, 1.0, 0.0, 1.0, 1.0),

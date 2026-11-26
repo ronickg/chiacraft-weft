@@ -702,6 +702,18 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     var diffuse_t = PT_SKY_T;
     if b.hit {
         bounce = pt_lit(b, l, pt_noise(px + vec2(3.0, 11.0)));
+        // Stage 2 step 2 (`core:pt_bounce_lights`, flags bit 0): the surface met is lit by the
+        // lamps as the pixel is (`pt_block_direct`: its own shadow ray), in place of its lightmap's
+        // block light; a lamp's own block met gives its glow. The wall a fire lights lights the floor.
+        if pt.emissive > 0.0 && (pt.flags & 1u) != 0u {
+            let b_block = max(light_on(b.n, vec4(0.0, b.light.yzw), 0.0, 1.0, b.world, b.rel) - light_on(b.n, vec4(0.0), 0.0, 1.0, b.world, b.rel), vec3(0.0));
+            if max(b_block.r, max(b_block.g, b_block.b)) > 1e-4 {
+                let e = pt_block_direct(b.world, b.rel, b.n, b.n, b.n * 0.02, px + vec2(37.0, 53.0));
+                if e.a > 0.5 {
+                    bounce += pt_albedo(b) * (e.rgb - b_block);
+                }
+            }
+        }
         // Above 0 on every traced pixel: the denoisers read diffuse's a > 0 as "traced".
         diffuse_t = max(b.t, 1e-3);
     }
