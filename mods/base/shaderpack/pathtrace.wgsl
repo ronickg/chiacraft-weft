@@ -409,11 +409,11 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // block's corner starts the ray inside that block, and it met the block's inner faces first.
     var h = rt_hit_mask(-v * PT_NEAR, -v, dist * 1.02 + 0.2 - PT_NEAR, 0.0, 3u);
     for (var k = 0; k < 2; k++) {
-        let from = length(h.rel);
-        if !h.hit || h.clear || dot(h.n, v) >= 0.0 || from >= dist - 0.02 * dist - 0.15 {
+        let met = length(h.rel);
+        if !h.hit || h.clear || dot(h.n, v) >= 0.0 || met >= dist - 0.02 * dist - 0.15 {
             break;
         }
-        h = rt_hit_mask(h.rel - v * 0.01, -v, dist * 1.02 + 0.2 - from - 0.01, 0.0, 3u);
+        h = rt_hit_mask(h.rel - v * 0.01, -v, dist * 1.02 + 0.2 - met - 0.01, 0.0, 3u);
     }
     // Terrain at the depth drawn there: anything else (water, glass, a model, a particle) keeps the
     // world's own pixel.
