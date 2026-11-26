@@ -518,3 +518,55 @@ s = head("carcass_plans", [
 ]) + plans_part(1000, "cov_carcass_plans")
 s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") and "tooltip" not in l else [l])]
 write("carcass_plans", s)
+
+
+def blood_rows(n, every=10):
+    out = []
+    for _ in range(n):
+        out += ["chat /animalprof blood", f"wait {every}"]
+    return out
+
+
+# Blood trails (animals_core::blood, mods/animals/src/blood.rs; Planner 11-26).
+s = head("blood", [
+    "Blood trails. Part 1 (x 200): a white-tailed deer gashed for 70 % of its health bleeds as it runs, leaving spots",
+    "of blood, and bleeds out in about 90 s; 1_gashed: close, where it was hit (a dark red splash on the grass);",
+    "2_trail: from high above (dark red splashes in a line where it ran); 3_spots_low: low at the first spots. Then a",
+    "hungry grey wolf set 14 blocks off follows the spots (\"grey_wolf N follows a blood trail\") to the carcass and",
+    "eats (\"eats K kg off carcass\"); 4_wolf_1/2/3: the wolf on the trail from above (ticks frozen, 5, 9 and 13 s in: on or beside the splashes, walking them in order); 5_wolf_end. Part 2 (x 600): a deer gashed for 30 % bleeds 45 s and lives (\"stops bleeding\",",
+    "health over half). Report the /animalprof blood rows (\"bleeds N s more, health\", the spot count rising then",
+    "falling as spots dry), the GASH lines, \"wounded\", \"stops bleeding\", the carcass line where the first deer died,",
+    "the wolf's lines, and any errors naming blood_spot or base:bleed.",
+])
+x = 200
+s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
+s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof gash 0.7",
+      "wait 3", "chat /tk mode spectator"]
+s += ["chat /tick freeze", f"chat /tp {x+2} 71 {Z+9}", "look 30 -40", "wait 2", "shot cov_blood_1_gashed.png",
+      "chat /tick unfreeze", "wait 1"]
+s += [f"chat /tp {x} 110 {Z}", "look 0 -89"] + blood_rows(4)
+# From 21 blocks up (r1's from 36 showed specks a pixel or two across), ticks frozen.
+s += ["chat /tick freeze", f"chat /tp {x+4} 90 {Z}", "look 0 -89", "wait 2", "shot cov_blood_2_trail.png",
+      "chat /tick unfreeze", "wait 1"]
+s += [f"chat /tp {x} 110 {Z}"] + blood_rows(5) + ["chat /animalprof carcass"]
+s += ["chat /tick freeze", f"chat /tp {x+2} 69.6 {Z+9}", "look 30 -25", "wait 2", "shot cov_blood_3_spots_low.png",
+      "chat /tick unfreeze", "wait 1"]
+# A hungry wolf (food 0.1) 14 blocks west of where the deer was hit (on the pad), out of sight of where it died.
+s += [f"chat /tp {x} 110 {Z}", f"chat /tk spawn animals:grey_wolf {x-14} 70 {Z+6}", "wait 2",
+      "chat /animalprof food 0.1"]
+# The wolf on the trail, ticks frozen, from above at 5, 9 and 13 s (Planner: a hunter following it; r1's at 18 s found
+# it at the body already), then rows. r2's walked straight to the body: it now walks the spots in the order they fell.
+for n, wait in enumerate([3, 4, 4]):
+    s += [f"wait {wait}", "chat /animalprof blood", "chat /tick freeze", f"chat /tp {x+4} 90 {Z}", "look 0 -89",
+          "wait 2", f"shot cov_blood_4_wolf_{n+1}.png", "chat /tick unfreeze", "wait 1"]
+for _ in range(9):
+    s += ["chat /animalprof carcass", "chat /animalprof blood", "wait 10"]
+s += ["chat /tick freeze", f"chat /tp {x} 105 {Z}", "look 0 -89", "wait 2", "shot cov_blood_5_wolf_end.png",
+      "chat /tick unfreeze", "wait 1"]
+x = 600
+s += pad(x) + spawns(x, [("white_tailed_deer", 1, 0, 6)])
+s += ["chat /tk mode creative", f"chat /tp {x} 71 {Z+10}", "look 0 -30", "wait 1", "chat /animalprof gash 0.3",
+      "wait 3", "chat /tk mode spectator", f"chat /tp {x} 110 {Z}"] + blood_rows(7)
+s += ["chat /animalprof where 96", "chat /animalprof blood"]
+s = [y for l in s for y in (["press core:hide_hud", "wait 0.5", l, "press core:hide_hud"] if l.startswith("shot ") else [l])]
+write("blood", s)

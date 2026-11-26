@@ -202,7 +202,8 @@ pub fn init(r: &mut Registry) {
     }
     r.on_event(&actions::HURT, |b| {
         let w = b.world();
-        for h in b.iter() {
+        // Blows only: not its bleeding, hunger or cold.
+        for h in b.iter().filter(|h| !crate::comfort::bodily(h.cause)) {
             if let Some(n) = w.component_mut(h.entity, &HITS) {
                 *n += 1;
             }

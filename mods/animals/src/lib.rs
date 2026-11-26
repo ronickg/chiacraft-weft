@@ -28,6 +28,7 @@ mod animal;
 mod ankylosaur;
 mod armour;
 mod birds;
+mod blood;
 mod borkon;
 mod boss;
 mod breath;
@@ -176,6 +177,7 @@ fn init(r: &mut Registry) {
     drink::init(r);
     stuck::init(r);
     carcass::init(r);
+    blood::init(r);
     hunt::init(r);
     anim::init(r);
     senses::init(r);

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""The pool of blood and guts under an opened carcass (`carcass_gore`) and its texture (`carcass/bones`). The bodies,
+"""The pool of blood and guts under an opened carcass (`carcass_gore`), the spot of blood a wounded animal leaves
+(`blood_spot`) and their texture (`carcass/bones`). The bodies,
 their bones and piles are `body.py`'s. Run from the repo root: python3 mods/animals/source/carcass/build.py"""
 import json, os, random
 from PIL import Image
@@ -24,7 +25,12 @@ def geo(name, cubes, w, h):
 gore = [cube([x, 0, z], [6, 1, 6], FLESH) for x in (-12, -6, 0, 6) for z in (-12, -6, 0, 6)
         if (x, z) not in [(-12, -12), (6, 6), (6, -12)]]
 gore += [cube([-9, 1, 7], [3, 2, 3], FLESH), cube([8, 1, -3], [3, 2, 4], FLESH), cube([9, 1, 2], [2, 1, 3], FLESH)]
-for name, cubes, w, h in [("carcass_gore", gore, 2, 1)]:
+# A spot of blood a wounded animal leaves (`blood_spot`, mods/animals/src/blood.rs): a splash of a few flat drops, none
+# overlapping (their tops share a plane), half a pixel thick so it lies on the ground.
+spot = [cube([-1.5, 0, -1.5], [3, 0.5, 3], FLESH), cube([1.5, 0, -0.5], [1.5, 0.5, 1], FLESH),
+        cube([-2.5, 0, 0], [1, 0.5, 1], FLESH), cube([-0.5, 0, 1.5], [1, 0.5, 1.5], FLESH),
+        cube([2.5, 0, 1.5], [1, 0.5, 1], FLESH)]
+for name, cubes, w, h in [("carcass_gore", gore, 2, 1), ("blood_spot", spot, 1, 1)]:
     with open(os.path.join(ROOT, "models", f"{name}.geo.json"), "w") as f:
         json.dump(geo(name, cubes, w, h), f, indent=1)
 
